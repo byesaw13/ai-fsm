@@ -1,0 +1,88 @@
+version: 1
+
+phases:
+  - id: P0
+    name: Planning and Contract Freeze
+    owner: orchestrator
+    required_agents: [product_manager, architect, security, qa]
+    tasks:
+      - id: P0-T1
+        title: Freeze domain model and workflow statuses
+        outputs: [docs/contracts/domain-model.md, docs/contracts/workflow-states.md]
+      - id: P0-T2
+        title: Freeze API contracts and error model
+        outputs: [docs/contracts/api-contract.md]
+      - id: P0-T3
+        title: Freeze test strategy and quality thresholds
+        outputs: [docs/contracts/test-strategy.md]
+
+  - id: P1
+    name: Platform Foundation
+    owner: backend
+    required_agents: [db_rls, backend, devops, security]
+    depends_on: [P0]
+    tasks:
+      - id: P1-T1
+        title: Implement auth/session and RBAC middleware
+      - id: P1-T2
+        title: Implement base schema migrations + RLS policies
+      - id: P1-T3
+        title: Implement audit log and request tracing
+      - id: P1-T4
+        title: Build CI/CD quality pipeline
+
+  - id: P2
+    name: Operations Module
+    owner: frontend
+    required_agents: [frontend, backend, db_rls, qa]
+    depends_on: [P1]
+    tasks:
+      - id: P2-T1
+        title: Jobs CRUD + lifecycle transitions
+      - id: P2-T2
+        title: Visits scheduling, assignment, completion
+      - id: P2-T3
+        title: Role-based admin/tech views
+
+  - id: P3
+    name: Finance Module
+    owner: backend
+    required_agents: [frontend, backend, db_rls, qa, security]
+    depends_on: [P2]
+    tasks:
+      - id: P3-T1
+        title: Estimates CRUD + lifecycle
+      - id: P3-T2
+        title: Estimate to invoice conversion
+      - id: P3-T3
+        title: Manual payment recording + invoice status
+
+  - id: P4
+    name: Automation and Hardening
+    owner: devops
+    required_agents: [worker, backend, qa, security, devops]
+    depends_on: [P3]
+    tasks:
+      - id: P4-T1
+        title: Visit reminder automation worker
+      - id: P4-T2
+        title: Overdue invoice follow-up automation
+      - id: P4-T3
+        title: Backup/restore and disaster recovery drill
+      - id: P4-T4
+        title: Observability, alerts, SLO dashboard
+
+  - id: P5
+    name: Production Release
+    owner: release_manager
+    required_agents: [release_manager, qa, security, devops]
+    depends_on: [P4]
+    tasks:
+      - id: P5-T1
+        title: Staging burn-in and defect triage
+      - id: P5-T2
+        title: VPS production deploy
+      - id: P5-T3
+        title: Pi4 target deploy validation
+      - id: P5-T4
+        title: Rollback rehearsal and sign-off

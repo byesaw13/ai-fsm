@@ -1,0 +1,43 @@
+:root {
+  --bg: #f6f8fb;
+  --fg: #1d2433;
+  --card: #ffffff;
+  --muted: #5a6477;
+  --border: #d7dfeb;
+  --accent: #0d7a5f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at top left, #ffffff, var(--bg));
+  color: var(--fg);
+  font-family: "Segoe UI", Tahoma, sans-serif;
+}
+
+main {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+a {
+  color: var(--accent);
+}

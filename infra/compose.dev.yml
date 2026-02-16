@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: ai-fsm-postgres-dev
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ai_fsm}
+      POSTGRES_USER: ${POSTGRES_USER:-ai_fsm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ai_fsm_dev_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ai_fsm} -d ${POSTGRES_DB:-ai_fsm}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    container_name: ai-fsm-redis-dev
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_dev:/data
+
+volumes:
+  pgdata_dev:
+  redis_dev:

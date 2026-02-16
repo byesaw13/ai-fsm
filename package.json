@@ -1,0 +1,25 @@
+{
+  "name": "ai-fsm",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AI-first Field Service Management MVP",
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @ai-fsm/web --filter @ai-fsm/worker dev",
+    "dev:web": "pnpm --filter @ai-fsm/web dev",
+    "dev:worker": "pnpm --filter @ai-fsm/worker dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "gate": "pnpm lint && pnpm typecheck && pnpm build && pnpm test",
+    "db:migrate": "bash scripts/db-migrate.sh",
+    "db:seed": "bash scripts/db-seed.sh"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

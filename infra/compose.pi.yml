@@ -1,0 +1,76 @@
+services:
+  web:
+    image: ghcr.io/your-org/ai-fsm-web:latest
+    platform: linux/arm64
+    container_name: ai-fsm-web
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          memory: 700M
+
+  worker:
+    image: ghcr.io/your-org/ai-fsm-worker:latest
+    platform: linux/arm64
+    container_name: ai-fsm-worker
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  postgres:
+    image: postgres:16
+    platform: linux/arm64
+    container_name: ai-fsm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_pi:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+    deploy:
+      resources:
+        limits:
+          memory: 900M
+
+  redis:
+    image: redis:7
+    platform: linux/arm64
+    container_name: ai-fsm-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_pi:/data
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+volumes:
+  pgdata_pi:
+  redis_pi:
