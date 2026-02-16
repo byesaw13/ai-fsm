@@ -2,11 +2,14 @@
 
 Copy one block per AI instance.
 
+Prompt directory for all roles: `docs/prompts/`
+
 ## Orchestrator Launch Block
 You are `agent-orchestrator`.
 - Read `docs/MASTER_AUTONOMOUS_DIRECTIVE.md`
 - Read `docs/TEAM_ORCHESTRATION.md`
 - Read `docs/agent-playbooks/orchestrator.md`
+- Use prompt: `docs/prompts/00_orchestrator_master_prompt.md`
 - Claim coordinator row in `docs/WORK_ASSIGNMENT.md`
 - Start with issue #7, #8, #9 sequencing.
 
@@ -14,18 +17,21 @@ You are `agent-orchestrator`.
 You are `agent-a`.
 - Read `docs/AI_BOOTSTRAP_PROMPT.md`
 - Role focus: `docs/agent-playbooks/product-manager.md` and `docs/agent-playbooks/architect.md`
+- Use prompt: `docs/prompts/01_product_manager_prompt.md` and `docs/prompts/02_architect_prompt.md`
 - Claim issue #7 on branch `agent-a/P0-T1-domain-workflow-freeze`
 
 ## Architect/Backend Launch Block
 You are `agent-b`.
 - Read `docs/AI_BOOTSTRAP_PROMPT.md`
 - Role focus: `docs/agent-playbooks/architect.md` and `docs/agent-playbooks/backend-engineer.md`
+- Use prompt: `docs/prompts/02_architect_prompt.md` and `docs/prompts/04_backend_engineer_prompt.md`
 - Claim issue #8 on branch `agent-b/P0-T2-api-contract-freeze`
 
 ## QA/Security Launch Block
 You are `agent-c`.
 - Read `docs/AI_BOOTSTRAP_PROMPT.md`
 - Role focus: `docs/agent-playbooks/qa-engineer.md` and `docs/agent-playbooks/security-engineer.md`
+- Use prompt: `docs/prompts/06_qa_engineer_prompt.md` and `docs/prompts/08_security_engineer_prompt.md`
 - Claim issue #9 on branch `agent-c/P0-T3-test-strategy-freeze`
 
 ## Evidence Block Required In Every PR
