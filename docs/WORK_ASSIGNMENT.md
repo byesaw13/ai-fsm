@@ -65,10 +65,10 @@ These files require explicit lock entry in `Active Claims` before edits:
 
 | Agent | Task ID | Branch | File Scope | Claimed At (UTC) | Status |
 |---|---|---|---|---|---|
-| `agent-orchestrator` | `orchestration-wave-1` | `agent-orchestrator/wave1-kickoff` | `docs/WORK_ASSIGNMENT.md`, `docs/CHANGELOG_AI.md` | `2026-02-16T17:45:00Z` | `in-progress` |
-| `agent-a` | `P0-T1` / `#7` | `agent-a/P0-T1-domain-workflow-freeze` | `docs/contracts/domain-model.md`, `docs/contracts/workflow-states.md` | `2026-02-16T17:45:00Z` | `ready-to-claim` |
-| `agent-b` | `P0-T2` / `#8` | `agent-b/P0-T2-api-contract-freeze` | `docs/contracts/api-contract.md` | `2026-02-16T17:45:00Z` | `ready-to-claim` |
-| `agent-c` | `P0-T3` / `#9` | `agent-c/P0-T3-test-strategy-freeze` | `docs/contracts/test-strategy.md` | `2026-02-16T17:45:00Z` | `ready-to-claim` |
+| `agent-orchestrator` | `orchestration-wave-1` | `orchestrator/start-process-wave1` | `docs/WORK_ASSIGNMENT.md`, `docs/CHANGELOG_AI.md` | `2026-02-16T17:45:00Z` | `completed` |
+| `agent-orchestrator` | `P0-T1` / `#7` | `orchestrator/start-process-wave1` | `docs/contracts/domain-model.md`, `docs/contracts/workflow-states.md`, `packages/domain/src/index.ts`, `db/migrations/001_core_schema.sql` | `2026-02-16T20:00:00Z` | `completed` |
+| `agent-orchestrator` | `P0-T2` / `#8` | `orchestrator/start-process-wave1` | `docs/contracts/api-contract.md` | `2026-02-16T20:00:00Z` | `completed` |
+| `agent-orchestrator` | `P0-T3` / `#9` | `orchestrator/start-process-wave1` | `docs/contracts/test-strategy.md` | `2026-02-16T20:00:00Z` | `completed` |
 
 ## Merge Order
 1. Foundation/auth changes
