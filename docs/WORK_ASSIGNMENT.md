@@ -3,6 +3,7 @@
 This document coordinates parallel AI execution.
 
 ## Agent IDs
+- `agent-orchestrator`
 - `agent-a`
 - `agent-b`
 - `agent-c`
@@ -64,7 +65,10 @@ These files require explicit lock entry in `Active Claims` before edits:
 
 | Agent | Task ID | Branch | File Scope | Claimed At (UTC) | Status |
 |---|---|---|---|---|---|
-| _none_ | _none_ | _none_ | _none_ | _none_ | _open_ |
+| `agent-orchestrator` | `orchestration-wave-1` | `agent-orchestrator/wave1-kickoff` | `docs/WORK_ASSIGNMENT.md`, `docs/CHANGELOG_AI.md` | `2026-02-16T17:45:00Z` | `in-progress` |
+| `agent-a` | `P0-T1` / `#7` | `agent-a/P0-T1-domain-workflow-freeze` | `docs/contracts/domain-model.md`, `docs/contracts/workflow-states.md` | `2026-02-16T17:45:00Z` | `ready-to-claim` |
+| `agent-b` | `P0-T2` / `#8` | `agent-b/P0-T2-api-contract-freeze` | `docs/contracts/api-contract.md` | `2026-02-16T17:45:00Z` | `ready-to-claim` |
+| `agent-c` | `P0-T3` / `#9` | `agent-c/P0-T3-test-strategy-freeze` | `docs/contracts/test-strategy.md` | `2026-02-16T17:45:00Z` | `ready-to-claim` |
 
 ## Merge Order
 1. Foundation/auth changes
