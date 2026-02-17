@@ -66,6 +66,16 @@ Append-only log of technical decisions made by AI agents.
 - Consequences: Full control over auth flow but responsible for all security considerations. Password hashing strength dependent on bcryptjs config (10 rounds chosen for Pi4 performance).
 - Rollback plan: Can migrate to Supabase Auth later by keeping user IDs consistent and syncing password hashes.
 
+### ADR-007: x-trace-id header for request-level correlation
+- Date (UTC): 2026-02-17
+- Agent: agent-orchestrator (Claude Code)
+- Task ID: P1-T3
+- Context: traceId was generated fresh per-function call in requireAuth and requireRole, producing two different UUIDs per request. audit_log had no correlation column, making it impossible to link an audit row back to the originating HTTP request.
+- Decision: Extract trace ID once per request from x-trace-id or x-request-id header (or generate a UUID if absent). Thread it through AuthSession so all downstream operations (error responses, audit writes) share the same ID. Add trace_id UUID column + index to audit_log.
+- Alternatives considered: (1) OpenTelemetry — rejected as overkill for MVP; (2) structured logging only (no DB column) — rejected because audit queries need trace correlation.
+- Consequences: Every API error response and every audit_log row carry the same traceId for a given request. Callers (load balancer, client) can inject their own trace ID via header.
+- Rollback plan: Column is nullable — existing rows unaffected. Remove column via migration if approach changes.
+
 ### ADR-006: Build timeout with Next.js 15 static generation
 - Date (UTC): 2026-02-16
 - Agent: agent-a (Backend+Security Specialist)

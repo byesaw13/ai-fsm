@@ -1,6 +1,8 @@
+import { describe, it } from 'vitest'
+
 /**
  * Auth Integration Tests
- * 
+ *
  * These tests verify:
  * - Login with valid credentials
  * - Login with invalid credentials

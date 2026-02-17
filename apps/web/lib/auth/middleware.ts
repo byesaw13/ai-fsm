@@ -2,18 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "./session";
 import { hasRole } from "./permissions";
 import type { Role } from "@ai-fsm/domain";
-import { randomUUID } from "crypto";
+import { getTraceId } from "../tracing";
+
+export interface AuthSession {
+  userId: string;
+  accountId: string;
+  role: Role;
+  traceId: string;
+}
 
 /**
- * Require authentication - returns session or error response
+ * Require authentication - returns session (with traceId) or error response.
+ *
+ * A single traceId is extracted/generated once per request and threaded
+ * through the session so all downstream operations (audit writes, error
+ * responses) share the same correlation ID.
  */
 export async function requireAuth(
   request: NextRequest
 ): Promise<
-  | { success: true; session: { userId: string; accountId: string; role: Role } }
+  | { success: true; session: AuthSession }
   | { success: false; response: NextResponse }
 > {
-  const traceId = randomUUID();
+  const traceId = getTraceId(request);
   const session = await getSession();
 
   if (!session) {
@@ -30,17 +41,17 @@ export async function requireAuth(
     return { success: false, response };
   }
 
-  return { success: true, session };
+  return { success: true, session: { ...session, traceId } };
 }
 
 /**
- * Require specific roles - returns session or forbidden response
+ * Require specific roles - returns session (with traceId) or error response.
  */
 export async function requireRole(
   request: NextRequest,
   allowedRoles: Role[]
 ): Promise<
-  | { success: true; session: { userId: string; accountId: string; role: Role } }
+  | { success: true; session: AuthSession }
   | { success: false; response: NextResponse }
 > {
   const authResult = await requireAuth(request);
@@ -49,15 +60,15 @@ export async function requireRole(
     return authResult;
   }
 
-  const traceId = randomUUID();
+  const { session } = authResult;
 
-  if (!hasRole(authResult.session.role, allowedRoles)) {
+  if (!hasRole(session.role, allowedRoles)) {
     const response = NextResponse.json(
       {
         error: {
           code: "FORBIDDEN",
           message: `This action requires one of: ${allowedRoles.join(", ")}`,
-          traceId,
+          traceId: session.traceId,
         },
       },
       { status: 403 }
@@ -65,20 +76,20 @@ export async function requireRole(
     return { success: false, response };
   }
 
-  return authResult;
+  return { success: true, session };
 }
 
 /**
- * Higher-order function to create role-protected route handlers
- * 
+ * Higher-order function to create role-protected route handlers.
+ *
  * Usage:
  * export const GET = withRole(["owner", "admin"], async (request, session) => {
- *   // Handler logic here - only runs if role check passes
+ *   // session.traceId available for audit writes
  *   return NextResponse.json({ data: "protected" });
  * });
  */
 export function withRole<
-  T extends (request: NextRequest, session: { userId: string; accountId: string; role: Role }) => Promise<NextResponse>
+  T extends (request: NextRequest, session: AuthSession) => Promise<NextResponse>
 >(allowedRoles: Role[], handler: T) {
   return async function (request: NextRequest): Promise<NextResponse> {
     const result = await requireRole(request, allowedRoles);
@@ -92,16 +103,16 @@ export function withRole<
 }
 
 /**
- * Higher-order function to create auth-protected route handlers (any role)
- * 
+ * Higher-order function to create auth-protected route handlers (any role).
+ *
  * Usage:
  * export const GET = withAuth(async (request, session) => {
- *   // Handler logic here - only runs if authenticated
+ *   // session.traceId available for audit writes
  *   return NextResponse.json({ data: "protected" });
  * });
  */
 export function withAuth<
-  T extends (request: NextRequest, session: { userId: string; accountId: string; role: Role }) => Promise<NextResponse>
+  T extends (request: NextRequest, session: AuthSession) => Promise<NextResponse>
 >(handler: T) {
   return async function (request: NextRequest): Promise<NextResponse> {
     const result = await requireAuth(request);
