@@ -69,6 +69,9 @@ These files require explicit lock entry in `Active Claims` before edits:
 | `agent-orchestrator` | `P0-T1` / `#7` | `orchestrator/start-process-wave1` | `docs/contracts/domain-model.md`, `docs/contracts/workflow-states.md`, `packages/domain/src/index.ts`, `db/migrations/001_core_schema.sql` | `2026-02-16T20:00:00Z` | `completed` |
 | `agent-orchestrator` | `P0-T2` / `#8` | `orchestrator/start-process-wave1` | `docs/contracts/api-contract.md` | `2026-02-16T20:00:00Z` | `completed` |
 | `agent-orchestrator` | `P0-T3` / `#9` | `orchestrator/start-process-wave1` | `docs/contracts/test-strategy.md` | `2026-02-16T20:00:00Z` | `completed` |
+| `agent-a` | `P1-T1` / `#10` | `agent-a/P1-T1-auth-rbac` | `apps/web/app/(auth)/**`, `apps/web/lib/auth/**`, `apps/web/app/api/v1/auth/**`, `packages/domain/src/index.ts` (auth-related sections only) | `2026-02-16T22:00:00Z` | `completed` |
+| `agent-b` | `P1-T2` / `#11` | `agent-b/P1-T2-rls-migrations` | `db/migrations/003_rls_policies.sql`, `db/migrations/004_workflow_invariants.sql` | `2026-02-17T00:00:00Z` | `in_progress` |
+| `agent-orchestrator` | `P1-T3` | — | — | — | `blocked` (awaiting P1-T1 + P1-T2 merge) |
 
 ## Merge Order
 1. Foundation/auth changes

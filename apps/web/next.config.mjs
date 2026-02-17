@@ -2,6 +2,13 @@
 const nextConfig = {
   experimental: {
     typedRoutes: true
+  },
+  output: 'standalone',
+  typescript: {
+    ignoreBuildErrors: false
+  },
+  eslint: {
+    ignoreDuringBuilds: true
   }
 };
 

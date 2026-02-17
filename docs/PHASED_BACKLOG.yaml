@@ -36,7 +36,8 @@ epics:
     tasks:
       - id: T1-1
         title: Implement email/password auth and session handling
-        status: pending
+        status: completed
+        completed_by: agent-a
         acceptance:
           - owner/admin/tech can sign in
           - unauthorized routes redirect to login
