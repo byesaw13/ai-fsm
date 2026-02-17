@@ -100,3 +100,49 @@ Each AI run must append one record. Keep entries factual and short.
   - Migrations not yet applied to live DB — validate against real PostgreSQL in next infra task.
   - P1-T2 complete pending merge after P1-T1 lands on main first (per orchestrator directive).
   - P1-T3 (audit log) remains blocked until P1-T1 + P1-T2 are both merged.
+
+---
+
+- Timestamp (UTC): 2026-02-17T22:00:00Z
+- Agent: agent-c (Frontend+QA Specialist)
+- Branch: agent-c/P2-T3-role-based-admin-tech-views
+- Task ID: P2-T3 / Issue #16
+- Summary: Implemented role-based admin and tech UI views for jobs and visits. Admin sees all jobs/visits with status transition controls and visit scheduling; tech sees only assigned jobs/visits with notes form and allowed status transitions. Role-aware nav hides finance/automations links from tech. All forbidden actions hidden client-side; API enforces hard RBAC. Added 7 new permission helpers. Added 32 new Vitest unit tests (all passing). Added Playwright E2E smoke specs for admin and tech roles.
+- Files changed:
+  - apps/web/lib/auth/permissions.ts (added: canCreateVisit, canAssignVisit, canTransitionJob, canTransitionVisit, canUpdateVisitNotes, canViewAllJobs, canViewAllVisits)
+  - apps/web/app/app/layout.tsx (role-aware nav: hides estimates/invoices/automations from tech; role badge)
+  - apps/web/app/app/jobs/page.tsx (jobs list: admin sees all, tech sees assigned-only via JOIN on visits)
+  - apps/web/app/app/jobs/[id]/page.tsx (job detail: transition panel admin-only, visit list role-scoped)
+  - apps/web/app/app/jobs/[id]/JobTransitionForm.tsx (client component: job status transition via API)
+  - apps/web/app/app/jobs/new/page.tsx (stub: role-guarded, links to P2-T1 form)
+  - apps/web/app/app/jobs/[id]/visits/new/page.tsx (stub: role-guarded, links to P2-T2 form)
+  - apps/web/app/app/visits/page.tsx (visits list: admin sees all+unassigned badge, tech assigned-only)
+  - apps/web/app/app/visits/[id]/page.tsx (visit detail: transition panel all roles, notes form all roles, assignment info)
+  - apps/web/app/app/visits/[id]/VisitTransitionForm.tsx (client component: visit status transition via API)
+  - apps/web/app/app/visits/[id]/VisitNotesForm.tsx (client component: PATCH tech_notes via API)
+  - apps/web/app/globals.css (nav, role badges, status pills, card/button/form styles)
+  - apps/web/lib/auth/__tests__/role-views.unit.test.ts (32 unit tests for new permissions)
+  - tests/e2e/admin-smoke.spec.ts (Playwright E2E: admin role smoke path)
+  - tests/e2e/tech-smoke.spec.ts (Playwright E2E: tech role smoke path)
+  - docs/WORK_ASSIGNMENT.md (claim registered)
+- Commands run:
+  - pnpm lint ✅
+  - pnpm typecheck ✅
+  - pnpm build ✅
+  - pnpm test ✅ (73 unit tests: 4 files, all pass — 32 new in role-views.unit.test.ts)
+- Gate results: lint ✅ | typecheck ✅ | build ✅ | test ✅ (73 tests)
+- Source evidence:
+  - Dovelite: app/admin/visits/page.tsx — grouped-by-status pattern, scheduled/in-progress/completed sections, client name display, unassigned/scheduled badge pattern
+  - Dovelite: app/admin/layout.tsx — role-protected layout pattern with redirect
+  - Dovelite: components/Button.tsx — btn/btn-primary/btn-secondary class conventions adapted
+  - Myprogram: RLS_POLICY_MATRIX.md — tech assignment scope (visits only to assigned_user_id) confirmed as DB-enforced; UI mirrors same constraint
+  - Myprogram: DOMAIN_MODEL.md — job/visit status transition maps, role access matrix used for permission helper design
+- Adoption decisions:
+  - Adopted Dovelite grouped-by-status layout for jobs/visits lists
+  - Adopted Dovelite server-side DB query pattern in server components (not loopback HTTP fetch)
+  - Client interactive components (transition buttons, notes form) call API routes directly from browser — consistent with Dovelite client-side mutation approach
+  - Tech scope enforced via SQL JOIN on visits.assigned_user_id — not client-only — matching Myprogram's RLS approach
+- Risks or follow-ups:
+  - /app/jobs/new and /app/jobs/[id]/visits/new are stubs pending P2-T1 and P2-T2 merges
+  - Playwright E2E specs ready but require running dev server + seeded DB (not run in current CI gate)
+  - Assignment update UI (PATCH visits.assigned_user_id) shows info text; full UI needed in follow-on
