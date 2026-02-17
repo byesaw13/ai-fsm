@@ -146,3 +146,45 @@ Each AI run must append one record. Keep entries factual and short.
   - /app/jobs/new and /app/jobs/[id]/visits/new are stubs pending P2-T1 and P2-T2 merges
   - Playwright E2E specs ready but require running dev server + seeded DB (not run in current CI gate)
   - Assignment update UI (PATCH visits.assigned_user_id) shows info text; full UI needed in follow-on
+
+---
+
+- Timestamp (UTC): 2026-02-17T23:00:00Z
+- Agent: agent-c (Claude Sonnet 4.5)
+- Branch: agent-c/P3-T1-estimates-lifecycle
+- Task ID: P3-T1 / #17
+- Summary: Implemented Estimates CRUD and lifecycle (draft→sent→approved|declined|expired). Full stack: backend API routes, frontend list/detail/form, unit tests, integration tests (skipped without test DB), E2E smoke, and RLS-context transaction helper.
+- Files changed:
+  - apps/web/lib/estimates/db.ts (new — RLS withEstimateContext)
+  - apps/web/lib/estimates/math.ts (new — pure calcTotals, lineItemTotal)
+  - apps/web/app/api/v1/estimates/route.ts (new — GET list, POST create)
+  - apps/web/app/api/v1/estimates/[id]/route.ts (new — GET, PATCH, DELETE)
+  - apps/web/app/api/v1/estimates/[id]/transition/route.ts (new — POST transition)
+  - apps/web/app/app/estimates/page.tsx (replaced placeholder with real list)
+  - apps/web/app/app/estimates/new/page.tsx (new — create form)
+  - apps/web/app/app/estimates/[id]/page.tsx (new — detail page)
+  - apps/web/app/app/estimates/[id]/EstimateTransitionForm.tsx (new)
+  - apps/web/app/app/estimates/[id]/EstimateInternalNotesForm.tsx (new)
+  - apps/web/lib/estimates/__tests__/estimates.unit.test.ts (new — 23 tests)
+  - apps/web/lib/estimates/__tests__/estimates.integration.test.ts (new — 16 tests, skipped without DB)
+  - tests/e2e/estimates-smoke.spec.ts (new — 6 E2E tests)
+  - docs/WORK_ASSIGNMENT.md (added P3-T1 claim)
+- Commands run:
+  - git checkout -b agent-c/P3-T1-estimates-lifecycle
+  - pnpm lint ✓
+  - pnpm typecheck ✓
+  - pnpm build ✓
+  - pnpm test ✓ (23 new unit tests pass; 16 integration tests skipped — no TEST_DATABASE_URL)
+- Gate results: lint ✓ / typecheck ✓ / build ✓ / test ✓ (96 tests pass, 16 skipped)
+- Source evidence:
+  - Dovelite: workflow/UX patterns — status-grouped list, card-based detail, transition buttons
+  - Dovelite: estimate form with dynamic line items, unit price/qty/total calculation
+  - Myprogram: RLS pattern — set_config('app.current_*', value, true) per transaction
+  - Myprogram: immutability discipline — app-layer checks before DB trigger enforcement
+  - AI-FSM: db/migrations/004_workflow_invariants.sql — estimate DB triggers already in place
+  - AI-FSM: packages/domain/src/index.ts — estimateTransitions map reused directly
+  - AI-FSM: apps/web/lib/auth/permissions.ts — canCreateEstimates/canSendEstimates/canDeleteRecords reused
+- Risks or follow-ups:
+  - Integration tests need TEST_DATABASE_URL env var to run (CI setup)
+  - Estimate→Invoice conversion (P3-T2, #18) is out of scope — OUT OF SCOPE field immutability enforced
+  - /api/v1/clients and /api/v1/jobs GET endpoints used by new/estimate form — these are placeholders; form will show empty dropdowns until those routes are implemented

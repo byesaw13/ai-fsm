@@ -71,6 +71,7 @@ These files require explicit lock entry in `Active Claims` before edits:
 | `agent-orchestrator` | `P0-T3` / `#9` | `orchestrator/start-process-wave1` | `docs/contracts/test-strategy.md` | `2026-02-16T20:00:00Z` | `completed` |
 | `agent-b` | `P1-T2` | `agent-b/P1-T2-rls-migrations` | `db/migrations/003_rls_policies.sql`, `db/migrations/004_workflow_invariants.sql` | `2026-02-17T00:00:00Z` | `completed` |
 | `agent-c` | `P2-T3` / `#16` | `agent-c/P2-T3-role-based-admin-tech-views` | `apps/web/app/app/jobs/**`, `apps/web/app/app/visits/**`, `apps/web/lib/auth/permissions.ts`, `apps/web/lib/auth/__tests__/**`, `tests/e2e/**` | `2026-02-17T22:00:00Z` | `in_progress` |
+| `agent-c` | `P3-T1` / `#17` | `agent-c/P3-T1-estimates-lifecycle` | `apps/web/app/app/estimates/**`, `apps/web/app/api/v1/estimates/**`, `apps/web/lib/estimates/**`, `tests/e2e/estimates-smoke.spec.ts` | `2026-02-17T23:00:00Z` | `in_progress` |
 
 ## Merge Order
 1. Foundation/auth changes
