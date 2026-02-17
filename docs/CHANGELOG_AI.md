@@ -112,3 +112,19 @@ Each AI run must append one record. Keep entries factual and short.
   - Test infrastructure not yet configured — auth.integration.test.ts serves as specification.
   - RLS policies not yet implemented — will be done in P1-T2 (Database+RLS Engineer).
   - Auth middleware needs real database for integration testing.
+
+- Timestamp (UTC): 2026-02-17T10:00:00Z
+- Agent: agent-orchestrator (Claude Code)
+- Branch: agent-a/P1-T1-auth-rbac (gate re-verification); agent-b/P1-T2-rls-migrations (gate re-verification)
+- Task ID: orchestration — P1 merge-readiness sweep
+- Summary: Clean-up and gate re-verification pass across both P1 branches. Added tsconfig.tsbuildinfo to .gitignore (was untracked build artefact causing dirty-tree on branch switches). Confirmed rebase on origin/main is clean on both branches (linear history). Re-ran pnpm gate from clean build cache on both branches — all four gates pass. ADR-006 build timeout confirmed resolved: all auth routes and app layout export `dynamic = "force-dynamic"`, build output shows all auth paths as ƒ (Dynamic). Updated PR #29 and #30 descriptions with confirmed gate evidence.
+- Files changed:
+  - .gitignore (add tsconfig.tsbuildinfo)
+  - docs/WORK_ASSIGNMENT.md (add P1-T2 claim + P1-T3 blocked row)
+- Commands run:
+  - pnpm gate (agent-a branch) → lint ✅ typecheck ✅ build ✅ test ✅
+  - pnpm gate (agent-b branch) → lint ✅ typecheck ✅ build ✅ test ✅
+- Gate results: lint ✅ | typecheck ✅ | build ✅ | test ✅ (both branches)
+- Risks or follow-ups:
+  - P1-T3 (audit log + request tracing) remains blocked until PR #29 (P1-T1) and PR #30 (P1-T2) are merged to main in order.
+  - Merge order: PR #28 → PR #29 → PR #30 → then P1-T3 unblocked.
