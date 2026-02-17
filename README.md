@@ -32,3 +32,9 @@ pnpm dev:web
 pnpm gate
 ```
 
+
+## Production (VPS)
+
+```bash
+docker compose -f infra/compose.prod.yml up -d
+```

@@ -4,6 +4,32 @@ meta:
   quality_gate: pnpm gate
 
 epics:
+  - id: E0
+    name: Planning and Contract Freeze
+    phase: 0
+    tasks:
+      - id: P0-T1
+        title: Freeze domain model and workflow statuses
+        status: completed
+        completed_by: agent-orchestrator
+        acceptance:
+          - domain-model.md frozen with all entity specs
+          - workflow-states.md frozen with transition tables
+          - Zod schemas match frozen contract
+          - Migration matches frozen contract
+      - id: P0-T2
+        title: Freeze API contracts and error model
+        status: completed
+        completed_by: agent-orchestrator
+        acceptance:
+          - api-contract.md frozen with all endpoints and error model
+      - id: P0-T3
+        title: Freeze test strategy and quality thresholds
+        status: completed
+        completed_by: agent-orchestrator
+        acceptance:
+          - test-strategy.md frozen with tooling, categories, and phase rollout
+
   - id: E1
     name: Foundation
     phase: 1
