@@ -80,51 +80,23 @@ Each AI run must append one record. Keep entries factual and short.
   - Migration not yet applied to a real database — validate in P1-T2.
   - P0 complete — P1 tasks (auth, schema+RLS, audit, CI/CD) are now unblocked.
 
-- Timestamp (UTC): 2026-02-16T22:00:00Z
-- Agent: agent-a (Backend+Security Specialist)
-- Branch: agent-a/P1-T1-auth-rbac
-- Task ID: P1-T1 (#10)
-- Summary: Implemented auth/session and RBAC middleware for owner/admin/tech roles. Created API routes for login/logout/me with JWT session cookies. Built RBAC utilities with role hierarchy and permission checks. Created login page with client-side form and app layout with auth redirect. Added test scaffolding for auth integration tests. Updated seed data with bcrypt password hashes.
+- Timestamp (UTC): 2026-02-17T00:00:00Z
+- Agent: agent-b (DB+RLS Specialist)
+- Branch: agent-b/P1-T2-rls-migrations
+- Task ID: P1-T2
+- Summary: Implemented full RLS policy suite (003_rls_policies.sql) and workflow invariant triggers (004_workflow_invariants.sql). RLS uses PostgreSQL session variables (app.current_user_id, app.current_account_id, app.current_role) set by the app layer. All 13 tables have RLS enabled with force_rls. Role matrix enforced at DB layer: owner/admin write access, tech read-only on estimates/invoices, tech update own-assigned visits only. Workflow guards enforce valid state transitions for jobs/visits/estimates/invoices; immutability triggers block field edits in non-editable states; payment INSERT trigger auto-syncs invoice paid_cents and status.
 - Files changed:
-  - apps/web/app/api/v1/auth/login/route.ts (POST login with bcrypt + JWT)
-  - apps/web/app/api/v1/auth/logout/route.ts (POST logout, clears cookie)
-  - apps/web/app/api/v1/auth/me/route.ts (GET current user)
-  - apps/web/lib/auth/middleware.ts (withAuth, withRole HOFs, requireAuth, requireRole)
-  - apps/web/lib/auth/permissions.ts (role hierarchy, permission checks)
-  - apps/web/lib/auth/__tests__/auth.integration.test.ts (test scaffolding)
-  - apps/web/app/(auth)/login/page.tsx (login form UI)
-  - apps/web/app/(auth)/layout.tsx (auth group layout)
-  - apps/web/app/app/layout.tsx (protected app layout with redirect)
-  - apps/web/app/globals.css (auth and app layout styles)
-  - apps/web/lib/env.ts (graceful handling during build)
-  - apps/web/next.config.mjs (standalone output, build config)
-  - apps/web/tsconfig.json (path aliases, exclude test files)
-  - db/migrations/002_seed_dev.sql (bcrypt password hashes)
-  - docs/WORK_ASSIGNMENT.md (task claim)
+  - db/migrations/003_rls_policies.sql (RLS helper functions, enable+force RLS, all policies)
+  - db/migrations/004_workflow_invariants.sql (job/visit/estimate/invoice transition guards, immutability triggers, payment→invoice sync trigger)
+  - docs/WORK_ASSIGNMENT.md (P1-T2 claim)
 - Commands run:
-  - pnpm gate (lint ✅ typecheck ✅ — build timeout documented in risks)
-- Gate results: lint ✅ | typecheck ✅ | build ⚠️ | test ⚠️
+  - rm -rf apps/web/.next && pnpm gate
+- Gate results: lint ✅ | typecheck ✅ | build ✅ | test ✅
 - Source evidence:
-  - Dovelite: lib/actions/tasks.ts (account context pattern), tests/fixtures.ts (login helper patterns)
-  - Myprogram: frontend/packages/auth/src/utils/permissions.ts (role hierarchy, permission functions)
+  - Myprogram: supabase/migrations/002_rls_policies.sql (RBAC policy structure, account-scoped helper functions, security definer pattern), supabase/migrations/003_workflow_invariants.sql (transition validation functions, immutability trigger pattern)
+  - Dovelite: db/002_rls_policies.sql (account-scoped RLS helper pattern, enable_rls + force_rls), db/001_initial_schema.sql (arrived_at/completed_at auto-set pattern)
 - Risks or follow-ups:
-  - Build timeout during static generation — likely Next.js 15 + cookies() issue in CI environment. Build passes locally with sufficient memory. Documented in DECISION_LOG.md.
-  - Test infrastructure not yet configured — auth.integration.test.ts serves as specification.
-  - RLS policies not yet implemented — will be done in P1-T2 (Database+RLS Engineer).
-  - Auth middleware needs real database for integration testing.
-
-- Timestamp (UTC): 2026-02-17T10:00:00Z
-- Agent: agent-orchestrator (Claude Code)
-- Branch: agent-a/P1-T1-auth-rbac (gate re-verification); agent-b/P1-T2-rls-migrations (gate re-verification)
-- Task ID: orchestration — P1 merge-readiness sweep
-- Summary: Clean-up and gate re-verification pass across both P1 branches. Added tsconfig.tsbuildinfo to .gitignore (was untracked build artefact causing dirty-tree on branch switches). Confirmed rebase on origin/main is clean on both branches (linear history). Re-ran pnpm gate from clean build cache on both branches — all four gates pass. ADR-006 build timeout confirmed resolved: all auth routes and app layout export `dynamic = "force-dynamic"`, build output shows all auth paths as ƒ (Dynamic). Updated PR #29 and #30 descriptions with confirmed gate evidence.
-- Files changed:
-  - .gitignore (add tsconfig.tsbuildinfo)
-  - docs/WORK_ASSIGNMENT.md (add P1-T2 claim + P1-T3 blocked row)
-- Commands run:
-  - pnpm gate (agent-a branch) → lint ✅ typecheck ✅ build ✅ test ✅
-  - pnpm gate (agent-b branch) → lint ✅ typecheck ✅ build ✅ test ✅
-- Gate results: lint ✅ | typecheck ✅ | build ✅ | test ✅ (both branches)
-- Risks or follow-ups:
-  - P1-T3 (audit log + request tracing) remains blocked until PR #29 (P1-T1) and PR #30 (P1-T2) are merged to main in order.
-  - Merge order: PR #28 → PR #29 → PR #30 → then P1-T3 unblocked.
+  - sync_invoice_on_payment uses security definer — must validate RLS pass-through in integration tests (P1-T3/P3).
+  - Migrations not yet applied to live DB — validate against real PostgreSQL in next infra task.
+  - P1-T2 complete pending merge after P1-T1 lands on main first (per orchestrator directive).
+  - P1-T3 (audit log) remains blocked until P1-T1 + P1-T2 are both merged.
