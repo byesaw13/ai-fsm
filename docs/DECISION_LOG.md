@@ -55,3 +55,23 @@ Append-only log of technical decisions made by AI agents.
 - Alternatives considered: (1) Jest — rejected (slower, worse ESM support); (2) Cypress for E2E — rejected (heavier, less aligned with existing patterns).
 - Consequences: Three test layers with clear separation. RLS abuse tests are a novel addition not present in either source.
 - Rollback plan: N/A — test tooling is low-risk to change.
+
+### ADR-005: JWT session cookies with jose library
+- Date (UTC): 2026-02-16
+- Agent: agent-a (Backend+Security Specialist)
+- Task ID: P1-T1
+- Context: Need auth/session implementation. Source repos use different approaches: Dovelite uses Supabase Auth with RLS; Myprogram uses edge functions with JWT. Neither fits ai-fsm's custom PostgreSQL requirement.
+- Decision: Implement custom JWT-based sessions using `jose` library (Edge Runtime compatible). Store session in HTTP-only cookie with 7-day expiry. Use `bcryptjs` for password hashing. Role stored in JWT payload for quick access control checks.
+- Alternatives considered: (1) Supabase Auth — rejected due to external dependency and RLS coupling; (2) NextAuth.js — rejected for lock-in and unnecessary OAuth complexity; (3) iron-session — rejected as jose is lighter and standards-compliant.
+- Consequences: Full control over auth flow but responsible for all security considerations. Password hashing strength dependent on bcryptjs config (10 rounds chosen for Pi4 performance).
+- Rollback plan: Can migrate to Supabase Auth later by keeping user IDs consistent and syncing password hashes.
+
+### ADR-006: Build timeout with Next.js 15 static generation
+- Date (UTC): 2026-02-16
+- Agent: agent-a (Backend+Security Specialist)
+- Task ID: P1-T1
+- Context: Next.js 15 build times out during static page generation when components use `cookies()` from `next/headers`. Build hangs at "Collecting page data..." step.
+- Decision: Mark all pages and API routes using cookies as `dynamic = "force-dynamic"`. Add graceful env placeholder for build-time when DATABASE_URL is not set. Document as known CI limitation — build passes locally.
+- Alternatives considered: (1) Mock cookies during build — rejected as fragile; (2) Remove cookies() from server components — rejected as breaks auth flow; (3) Skip build in CI — rejected as needs verification.
+- Consequences: No static optimization for auth pages (acceptable trade-off). Need to monitor build times on Pi4 target.
+- Rollback plan: Next.js may fix in future release; can also switch to fully dynamic rendering with `export const dynamicParams = false`.

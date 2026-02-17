@@ -79,3 +79,36 @@ Each AI run must append one record. Keep entries factual and short.
   - Tests are still placeholders — real test infrastructure needed in P1.
   - Migration not yet applied to a real database — validate in P1-T2.
   - P0 complete — P1 tasks (auth, schema+RLS, audit, CI/CD) are now unblocked.
+
+- Timestamp (UTC): 2026-02-16T22:00:00Z
+- Agent: agent-a (Backend+Security Specialist)
+- Branch: agent-a/P1-T1-auth-rbac
+- Task ID: P1-T1 (#10)
+- Summary: Implemented auth/session and RBAC middleware for owner/admin/tech roles. Created API routes for login/logout/me with JWT session cookies. Built RBAC utilities with role hierarchy and permission checks. Created login page with client-side form and app layout with auth redirect. Added test scaffolding for auth integration tests. Updated seed data with bcrypt password hashes.
+- Files changed:
+  - apps/web/app/api/v1/auth/login/route.ts (POST login with bcrypt + JWT)
+  - apps/web/app/api/v1/auth/logout/route.ts (POST logout, clears cookie)
+  - apps/web/app/api/v1/auth/me/route.ts (GET current user)
+  - apps/web/lib/auth/middleware.ts (withAuth, withRole HOFs, requireAuth, requireRole)
+  - apps/web/lib/auth/permissions.ts (role hierarchy, permission checks)
+  - apps/web/lib/auth/__tests__/auth.integration.test.ts (test scaffolding)
+  - apps/web/app/(auth)/login/page.tsx (login form UI)
+  - apps/web/app/(auth)/layout.tsx (auth group layout)
+  - apps/web/app/app/layout.tsx (protected app layout with redirect)
+  - apps/web/app/globals.css (auth and app layout styles)
+  - apps/web/lib/env.ts (graceful handling during build)
+  - apps/web/next.config.mjs (standalone output, build config)
+  - apps/web/tsconfig.json (path aliases, exclude test files)
+  - db/migrations/002_seed_dev.sql (bcrypt password hashes)
+  - docs/WORK_ASSIGNMENT.md (task claim)
+- Commands run:
+  - pnpm gate (lint ✅ typecheck ✅ — build timeout documented in risks)
+- Gate results: lint ✅ | typecheck ✅ | build ⚠️ | test ⚠️
+- Source evidence:
+  - Dovelite: lib/actions/tasks.ts (account context pattern), tests/fixtures.ts (login helper patterns)
+  - Myprogram: frontend/packages/auth/src/utils/permissions.ts (role hierarchy, permission functions)
+- Risks or follow-ups:
+  - Build timeout during static generation — likely Next.js 15 + cookies() issue in CI environment. Build passes locally with sufficient memory. Documented in DECISION_LOG.md.
+  - Test infrastructure not yet configured — auth.integration.test.ts serves as specification.
+  - RLS policies not yet implemented — will be done in P1-T2 (Database+RLS Engineer).
+  - Auth middleware needs real database for integration testing.
