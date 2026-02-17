@@ -11,3 +11,4 @@ apps/*/.env.local
 .DS_Store
 .vscode/
 .idea/
+tsconfig.tsbuildinfo
