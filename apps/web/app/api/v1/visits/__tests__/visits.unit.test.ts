@@ -38,7 +38,7 @@ vi.mock("../../../../../lib/db/audit", () => ({
 // ---------------------------------------------------------------------------
 // Import route handlers (after mocks)
 // ---------------------------------------------------------------------------
-import { GET as visitList, POST as visitCreate } from "../../jobs/[jobId]/visits/route";
+import { GET as visitList, POST as visitCreate } from "../../jobs/[id]/visits/route";
 import { GET as visitGet, PATCH as visitPatch } from "../[id]/route";
 import { POST as visitTransition } from "../[id]/transition/route";
 
