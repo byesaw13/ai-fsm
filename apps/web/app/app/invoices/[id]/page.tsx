@@ -1,11 +1,13 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
-import { canCreateInvoices } from "@/lib/auth/permissions";
+import { canCreateInvoices, canRecordPayments } from "@/lib/auth/permissions";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import { invoiceTransitions } from "@ai-fsm/domain";
 import type { InvoiceStatus } from "@ai-fsm/domain";
 import { InvoiceTransitionForm } from "./InvoiceTransitionForm";
+import { RecordPaymentForm } from "./RecordPaymentForm";
+import { PaymentHistory } from "./PaymentHistory";
 
 export const dynamic = "force-dynamic";
 
@@ -233,6 +235,27 @@ export default async function InvoiceDetailPage({
           </table>
         )}
       </div>
+
+      {/* Record Payment — owner/admin only, on payable invoices */}
+      {canRecordPayments(session.role) &&
+        ["sent", "partial", "overdue"].includes(currentStatus) &&
+        amountDue > 0 && (
+          <div className="card action-card" data-testid="record-payment-panel">
+            <h2>Record Payment</h2>
+            <RecordPaymentForm
+              invoiceId={invoice.id}
+              remainingCents={amountDue}
+            />
+          </div>
+        )}
+
+      {/* Payment History */}
+      {currentStatus !== "draft" && (
+        <div className="card" data-testid="payment-history-panel">
+          <h2>Payment History</h2>
+          <PaymentHistory invoiceId={invoice.id} />
+        </div>
+      )}
 
       {/* Status Transitions — owner/admin only */}
       {canTransition && allowedTransitions.length > 0 && (
