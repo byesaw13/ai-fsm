@@ -1,5 +1,6 @@
 import { Client } from "pg";
 import { runVisitReminders } from "./visit-reminder.js";
+import { runInvoiceFollowups } from "./invoice-followup.js";
 
 const pollMs = Number(process.env.WORKER_POLL_MS ?? "30000");
 const databaseUrl = process.env.DATABASE_URL;
@@ -19,13 +20,27 @@ async function runPollIteration(client: Client): Promise<void> {
 
     if (dueCount > 0) {
       // Dispatch visit reminders
-      const results = await runVisitReminders(client);
-      if (results.length > 0) {
-        const totalSent = results.reduce((sum, r) => sum + r.sent, 0);
-        const totalSkipped = results.reduce((sum, r) => sum + r.skipped, 0);
-        const totalErrors = results.reduce((sum, r) => sum + r.errors, 0);
-        console.log("automation dispatch complete", {
-          automations: results.length,
+      const visitReminderResults = await runVisitReminders(client);
+      if (visitReminderResults.length > 0) {
+        const totalSent = visitReminderResults.reduce((sum, r) => sum + r.sent, 0);
+        const totalSkipped = visitReminderResults.reduce((sum, r) => sum + r.skipped, 0);
+        const totalErrors = visitReminderResults.reduce((sum, r) => sum + r.errors, 0);
+        console.log("visit-reminder dispatch complete", {
+          automations: visitReminderResults.length,
+          sent: totalSent,
+          skipped: totalSkipped,
+          errors: totalErrors,
+        });
+      }
+
+      // Dispatch invoice follow-ups
+      const followupResults = await runInvoiceFollowups(client);
+      if (followupResults.length > 0) {
+        const totalSent = followupResults.reduce((sum, r) => sum + r.sent, 0);
+        const totalSkipped = followupResults.reduce((sum, r) => sum + r.skipped, 0);
+        const totalErrors = followupResults.reduce((sum, r) => sum + r.errors, 0);
+        console.log("invoice-followup dispatch complete", {
+          automations: followupResults.length,
           sent: totalSent,
           skipped: totalSkipped,
           errors: totalErrors,
