@@ -361,7 +361,6 @@ a {
 .muted { color: var(--muted); font-size: 13px; margin: 4px 0 0; }
 .error-inline { color: #dc2626; font-size: 13px; margin: 0 0 8px; }
 .success-inline { color: #065f46; font-size: 13px; margin: 0 0 8px; }
-
 /* Line items table */
 .line-items-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .line-items-table th { text-align: left; padding: 8px 10px; border-bottom: 2px solid var(--border); font-weight: 600; font-size: 13px; color: var(--muted); }
