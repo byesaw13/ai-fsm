@@ -14,11 +14,13 @@
 import { describe, it, expect, beforeAll } from "vitest";
 
 const DB_AVAILABLE = !!process.env.TEST_DATABASE_URL;
+const API_AVAILABLE = !!process.env.TEST_BASE_URL;
+const RUN_INTEGRATION = DB_AVAILABLE && API_AVAILABLE;
 
 const describeIf = (condition: boolean) =>
   condition ? describe : describe.skip;
 
-describeIf(DB_AVAILABLE)("Invoice conversion API integration", () => {
+describeIf(RUN_INTEGRATION)("Invoice conversion API integration", () => {
   let adminCookie: string;
   let techCookie: string;
   let testEstimateId: string;

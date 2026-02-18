@@ -14,13 +14,15 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 
-// Skip all integration tests if TEST_DATABASE_URL is not set
+// These HTTP integration tests require both a DB and a running web server base URL.
 const DB_AVAILABLE = !!process.env.TEST_DATABASE_URL;
+const API_AVAILABLE = !!process.env.TEST_BASE_URL;
+const RUN_INTEGRATION = DB_AVAILABLE && API_AVAILABLE;
 
 const describeIf = (condition: boolean) =>
   condition ? describe : describe.skip;
 
-describeIf(DB_AVAILABLE)("Estimates API integration", () => {
+describeIf(RUN_INTEGRATION)("Estimates API integration", () => {
   // TODO: Set up test DB helpers (seed account, admin user, tech user)
   // Reference: apps/web/lib/auth/__tests__/auth.integration.test.ts pattern
 
