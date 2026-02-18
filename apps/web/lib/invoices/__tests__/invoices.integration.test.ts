@@ -13,10 +13,7 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 
-// Skip if TEST_DATABASE_URL is not set OR if TEST_BASE_URL is not set
-// (these tests make HTTP calls and require a running Next.js server)
-const DB_AVAILABLE =
-  !!process.env.TEST_DATABASE_URL && !!process.env.TEST_BASE_URL;
+const DB_AVAILABLE = !!process.env.TEST_DATABASE_URL;
 
 const describeIf = (condition: boolean) =>
   condition ? describe : describe.skip;

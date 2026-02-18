@@ -10,6 +10,7 @@ import { estimateTransitions } from "@ai-fsm/domain";
 import type { EstimateStatus } from "@ai-fsm/domain";
 import { EstimateTransitionForm } from "./EstimateTransitionForm";
 import { EstimateInternalNotesForm } from "./EstimateInternalNotesForm";
+import { EstimateConvertButton } from "./EstimateConvertButton";
 
 export const dynamic = "force-dynamic";
 
@@ -240,6 +241,18 @@ export default async function EstimateDetailPage({
             estimateId={estimate.id}
             initialNotes={estimate.internal_notes}
           />
+        </div>
+      )}
+
+      {/* Convert to Invoice — owner/admin only, approved status only */}
+      {canTransition && currentStatus === "approved" && (
+        <div className="card action-card" data-testid="convert-panel-wrapper">
+          <h2>Convert to Invoice</h2>
+          <p className="muted">
+            Create a draft invoice from this approved estimate. Idempotent —
+            safe to click more than once.
+          </p>
+          <EstimateConvertButton estimateId={estimate.id} />
         </div>
       )}
 
