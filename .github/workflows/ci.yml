@@ -58,6 +58,27 @@ jobs:
   test:
     needs: [lint, typecheck]
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: aifsm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      TEST_DATABASE_URL: postgresql://test:test@localhost:5432/aifsm_test
+      DATABASE_URL: postgresql://test:test@localhost:5432/aifsm_test
+      # Note: TEST_BASE_URL is intentionally NOT set in CI.
+      # HTTP-based integration tests (estimates, invoices) require a running
+      # Next.js server and will skip when TEST_BASE_URL is absent.
+      # DB-only integration tests (worker, payments) run with TEST_DATABASE_URL.
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -66,4 +87,17 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test
+
+      - name: Apply database migrations
+        run: |
+          for file in db/migrations/*.sql; do
+            if [[ "$file" == *"seed"* ]]; then continue; fi
+            echo "applying: $file"
+            PGPASSWORD=test psql -h localhost -U test -d aifsm_test -v ON_ERROR_STOP=1 -f "$file"
+          done
+
+      - name: Apply seed data
+        run: PGPASSWORD=test psql -h localhost -U test -d aifsm_test -v ON_ERROR_STOP=1 -f db/migrations/002_seed_dev.sql
+
+      - name: Run tests (unit + integration)
+        run: pnpm test

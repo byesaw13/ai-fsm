@@ -1,4 +1,5 @@
 import { Client } from "pg";
+import { runVisitReminders } from "./visit-reminder.js";
 import { runInvoiceFollowups } from "./invoice-followup.js";
 
 const pollMs = Number(process.env.WORKER_POLL_MS ?? "30000");
@@ -18,6 +19,20 @@ async function runPollIteration(client: Client): Promise<void> {
     console.log("automation poll", { due: dueCount, at: new Date().toISOString() });
 
     if (dueCount > 0) {
+      // Dispatch visit reminders
+      const visitReminderResults = await runVisitReminders(client);
+      if (visitReminderResults.length > 0) {
+        const totalSent = visitReminderResults.reduce((sum, r) => sum + r.sent, 0);
+        const totalSkipped = visitReminderResults.reduce((sum, r) => sum + r.skipped, 0);
+        const totalErrors = visitReminderResults.reduce((sum, r) => sum + r.errors, 0);
+        console.log("visit-reminder dispatch complete", {
+          automations: visitReminderResults.length,
+          sent: totalSent,
+          skipped: totalSkipped,
+          errors: totalErrors,
+        });
+      }
+
       // Dispatch invoice follow-ups
       const followupResults = await runInvoiceFollowups(client);
       if (followupResults.length > 0) {
