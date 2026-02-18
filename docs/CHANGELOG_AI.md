@@ -100,3 +100,44 @@ Each AI run must append one record. Keep entries factual and short.
   - Migrations not yet applied to live DB — validate against real PostgreSQL in next infra task.
   - P1-T2 complete pending merge after P1-T1 lands on main first (per orchestrator directive).
   - P1-T3 (audit log) remains blocked until P1-T1 + P1-T2 are both merged.
+
+## [P4-T2] Overdue Invoice Follow-Up Automation — agent-d — 2026-02-18
+- Issue: #21
+- Branch: agent-d/P4-T2-overdue-invoice-followups
+- Summary: Implemented overdue invoice follow-up automation with configurable cadence thresholds, idempotent event emission, and per-record error isolation.
+- Files changed:
+  - services/worker/src/invoice-followup.ts (new — core follow-up logic)
+  - services/worker/src/invoice-followup.test.ts (new — 24 unit tests)
+  - services/worker/src/invoice-followup.integration.test.ts (new — 8 integration tests, skip without DB)
+  - services/worker/src/index.ts (modified — dispatch follow-ups in poll loop)
+  - tests/e2e/invoice-followup-smoke.spec.ts (new — 2 E2E smoke tests)
+  - docs/WORK_ASSIGNMENT.md (modified — P4-T2 claim)
+- Commands run:
+  - git checkout -b agent-d/P4-T2-overdue-invoice-followups
+  - pnpm lint ✓
+  - pnpm typecheck ✓
+  - pnpm build ✓
+  - pnpm test ✓ (107 tests pass, 8 skipped — integration requires DB)
+- Gate results: lint ✓ / typecheck ✓ / build ✓ / test ✓ (107 pass, 8 skipped)
+- Idempotency proof:
+  - `emitInvoiceFollowup` checks audit_log for existing entry matching entity_id + days_overdue_step before INSERT
+  - Unit test: "returns false and skips insert if follow-up already exists for cadence step"
+  - Integration test: "repeated runs don't duplicate follow-ups"
+- Retry-safety proof:
+  - Each invoice processed independently in try/catch — one failure doesn't block others
+  - Each cadence step processed independently — one failure doesn't block others
+  - Each automation processed independently — one failure doesn't block others
+  - Unit tests: "continues processing after individual invoice errors", "continues after a failed automation"
+  - `markAutomationRun` always called (even with 0 overdue invoices) to advance next_run_at
+- Source evidence:
+  - AI-FSM: docs/contracts/workflow-states.md — invoice_followup automation type, invoice lifecycle (overdue status)
+  - AI-FSM: db/migrations/001_core_schema.sql — invoices.due_date, automations.config jsonb
+  - AI-FSM: services/worker/src/visit-reminder.ts (P4-T1 branch) — reliability pattern reference
+  - Myprogram: EDGE_FUNCTIONS_RUNBOOK.md — idempotent worker pattern
+  - Dovelite: scripts/preflight.mjs — safe retry/check-before-act pattern
+- Risks or follow-ups:
+  - Integration tests need TEST_DATABASE_URL (skipped without it, 8 skipped)
+  - E2E tests need running dev server + seeded data
+  - Default cadence [7, 14, 30] days — configurable per automation via config.days_overdue
+  - Includes sent/partial invoices past due_date (not just status='overdue') for broader coverage
+  - P4-T1 (visit reminders) must merge first; this branch is independent but worker index.ts will need reconciliation
