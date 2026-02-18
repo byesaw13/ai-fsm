@@ -274,3 +274,74 @@ Each AI run must append one record. Keep entries factual and short.
   - Idempotency key stored as notes prefix `[idem:key]` — lightweight, no schema change
   - DELETE /payments/:id recalculates manually (trigger only fires on INSERT) — verified correct in unit tests
   - E2E tests require seeded invoices in 'sent' status
+
+## [P4-T1] Visit Reminder Automation Worker + CI DB Integration — agent-d — 2026-02-17
+- Issue: #20
+- Branch: agent-d/P4-T1-visit-reminder-worker-ci-db
+- Summary: Implemented visit reminder automation worker and hardened CI with PostgreSQL service for DB integration tests.
+
+### Scope A: Visit Reminder Automation
+- New file: services/worker/src/visit-reminder.ts
+  - `findDueReminders()` — queries automations WHERE type='visit_reminder', enabled, next_run_at <= now()
+  - `findEligibleVisits()` — finds visits within `hours_before` window, status='scheduled', NOT EXISTS in audit_log (idempotency)
+  - `emitVisitReminder()` — double-check idempotency + INSERT into audit_log (entity_type='visit_reminder')
+  - `markAutomationRun()` — updates last_run_at, advances next_run_at by 1 hour
+  - `processVisitReminder()` — processes each visit independently (errors don't block others)
+  - `runVisitReminders()` — top-level orchestrator for all due automations
+- Updated: services/worker/src/index.ts — dispatches visit reminders in poll loop
+
+### Scope B: CI DB Integration Tests
+- Updated: .github/workflows/ci.yml
+  - Added PostgreSQL 16 service container (user: test, db: aifsm_test)
+  - Added migration step (applies all *.sql except seed, then seed separately)
+  - Sets TEST_DATABASE_URL for DB-only integration tests
+  - TEST_BASE_URL intentionally NOT set — HTTP integration tests skip gracefully
+- Updated: apps/web/lib/estimates/__tests__/estimates.integration.test.ts — skip requires both TEST_DATABASE_URL AND TEST_BASE_URL
+- Updated: apps/web/lib/invoices/__tests__/invoices.integration.test.ts — same skip condition fix
+
+### Tests
+- services/worker/src/visit-reminder.test.ts — 16 unit tests (all mock-based, pass without DB)
+- services/worker/src/visit-reminder.integration.test.ts — 9 integration tests (8 skip without DB, 1 always runs)
+- tests/e2e/visit-reminder-smoke.spec.ts — 2 E2E smoke tests (Playwright)
+- Files modified:
+  - services/worker/src/visit-reminder.ts (new)
+  - services/worker/src/visit-reminder.test.ts (new)
+  - services/worker/src/visit-reminder.integration.test.ts (new)
+  - services/worker/src/index.ts (modified)
+  - .github/workflows/ci.yml (modified)
+  - apps/web/lib/estimates/__tests__/estimates.integration.test.ts (modified)
+  - apps/web/lib/invoices/__tests__/invoices.integration.test.ts (modified)
+  - tests/e2e/visit-reminder-smoke.spec.ts (new)
+  - docs/WORK_ASSIGNMENT.md (modified)
+- Commands run:
+  - git checkout -b agent-d/P4-T1-visit-reminder-worker-ci-db
+  - pnpm lint ✓
+  - pnpm typecheck ✓
+  - pnpm build ✓
+  - pnpm test ✓ (168 tests pass, 48 skipped — integration requires DB/server)
+- Gate results: lint ✓ / typecheck ✓ / build ✓ / test ✓ (168 pass, 48 skipped)
+- Idempotency proof:
+  - `findEligibleVisits` uses NOT EXISTS subquery against audit_log to skip already-reminded visits
+  - `emitVisitReminder` double-checks with SELECT before INSERT (race condition guard)
+  - Unit test "returns false and skips insert if reminder already exists" verifies idempotency
+  - Integration test "repeated runs don't duplicate reminders" verifies end-to-end idempotency
+- Retry-safety proof:
+  - Each visit processed independently in try/catch — one failure doesn't block others
+  - Each automation processed independently — one failure doesn't block others
+  - Unit tests verify: "continues processing after individual visit errors", "continues after a failed automation"
+  - `markAutomationRun` always called (even with 0 eligible visits) to advance next_run_at
+- CI evidence:
+  - PostgreSQL 16 service container with health checks
+  - Migrations applied via psql loop (skipping seed, then applying seed separately)
+  - TEST_DATABASE_URL set for worker integration tests
+  - HTTP-based integration tests (estimates, invoices) require TEST_BASE_URL to run — gracefully skip in CI
+- Source evidence:
+  - AI-FSM: docs/contracts/workflow-states.md — Automation Types table (visit_reminder)
+  - AI-FSM: db/migrations/001_core_schema.sql — automations.config jsonb, audit_log table
+  - Myprogram: EDGE_FUNCTIONS_RUNBOOK.md — idempotent worker pattern reference
+  - Dovelite: scripts/preflight.mjs — safe retry/check-before-act pattern reference
+- Risks or follow-ups:
+  - Worker integration tests need real PostgreSQL (skipped without TEST_DATABASE_URL)
+  - E2E tests need running dev server + seeded data
+  - `hours_before` defaults to 24 if not set in automation config
+  - next_run_at advances by 1 hour — high-frequency polling for near-real-time reminders
