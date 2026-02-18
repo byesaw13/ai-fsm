@@ -73,6 +73,9 @@ These files require explicit lock entry in `Active Claims` before edits:
 | `agent-c` | `P2-T3` / `#16` | `agent-c/P2-T3-role-based-admin-tech-views` | `apps/web/app/app/jobs/**`, `apps/web/app/app/visits/**`, `apps/web/lib/auth/permissions.ts`, `apps/web/lib/auth/__tests__/**`, `tests/e2e/**` | `2026-02-17T22:00:00Z` | `in_progress` |
 | `agent-c` | `P3-T1` / `#17` | `agent-c/P3-T1-estimates-lifecycle` | `apps/web/app/app/estimates/**`, `apps/web/app/api/v1/estimates/**`, `apps/web/lib/estimates/**`, `tests/e2e/estimates-smoke.spec.ts` | `2026-02-17T23:00:00Z` | `in_progress` |
 
+
+| `agent-c` | `P3-T2` / `#18` | `agent-c/P3-T2-estimate-to-invoice-conversion` | `apps/web/app/api/v1/estimates/**/convert/**`, `apps/web/app/api/v1/invoices/**`, `apps/web/app/app/invoices/**`, `apps/web/lib/invoices/**`, `tests/e2e/invoice-convert-smoke.spec.ts` | `2026-02-17T23:30:00Z` | `completed` |
+
 ## Merge Order
 1. Foundation/auth changes
 2. Jobs/visits

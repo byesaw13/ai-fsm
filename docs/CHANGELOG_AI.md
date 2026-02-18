@@ -188,3 +188,43 @@ Each AI run must append one record. Keep entries factual and short.
   - Integration tests need TEST_DATABASE_URL env var to run (CI setup)
   - Estimate→Invoice conversion (P3-T2, #18) is out of scope — OUT OF SCOPE field immutability enforced
   - /api/v1/clients and /api/v1/jobs GET endpoints used by new/estimate form — these are placeholders; form will show empty dropdowns until those routes are implemented
+
+---
+
+- Timestamp (UTC): 2026-02-17T23:30:00Z
+- Agent: agent-c (Claude Sonnet 4.5)
+- Branch: agent-c/P3-T2-estimate-to-invoice-conversion
+- Task ID: P3-T2 / #18
+- Summary: Implemented Estimate→Invoice conversion with idempotency guard, immutable snapshot copy, invoice lifecycle API, invoice list/detail UI, unit tests (28), integration tests (12, skipped without DB), and E2E smoke (5 tests).
+- Files changed:
+  - apps/web/lib/invoices/db.ts (new — withInvoiceContext RLS helper, generateInvoiceNumber)
+  - apps/web/app/api/v1/estimates/[id]/convert/route.ts (new — POST idempotent convert endpoint)
+  - apps/web/app/api/v1/invoices/route.ts (new — GET list with filters/pagination)
+  - apps/web/app/api/v1/invoices/[id]/route.ts (new — GET detail with line_items, PATCH draft fields)
+  - apps/web/app/api/v1/invoices/[id]/transition/route.ts (new — POST transition, DB trigger guard)
+  - apps/web/app/app/estimates/[id]/EstimateConvertButton.tsx (new — client component, idempotent convert)
+  - apps/web/app/app/estimates/[id]/page.tsx (updated — shows convert button when approved)
+  - apps/web/app/app/invoices/page.tsx (replaced placeholder — real invoice list, status-grouped)
+  - apps/web/app/app/invoices/[id]/page.tsx (new — detail with line items, summary, transition panel)
+  - apps/web/app/app/invoices/[id]/InvoiceTransitionForm.tsx (new — client component)
+  - apps/web/lib/invoices/__tests__/invoices.unit.test.ts (new — 28 tests)
+  - apps/web/lib/invoices/__tests__/invoices.integration.test.ts (new — 12 tests, skipped without DB)
+  - tests/e2e/invoice-convert-smoke.spec.ts (new — 5 E2E tests)
+  - docs/WORK_ASSIGNMENT.md (P3-T2 claim → completed)
+- Commands run:
+  - git checkout -b agent-c/P3-T2-estimate-to-invoice-conversion
+  - pnpm lint ✓
+  - pnpm build ✓ (regenerates .next/types/link.d.ts for new /app/invoices/[id] route)
+  - pnpm typecheck ✓
+  - pnpm test ✓ (124 tests pass, 28 skipped)
+- Gate results: lint ✓ / typecheck ✓ / build ✓ / test ✓ (124 pass, 28 skipped — integration requires DB)
+- Idempotency proof: POST /api/v1/estimates/:id/convert checks SELECT FROM invoices WHERE estimate_id = $1; returns existing invoice_id with created=false (HTTP 200) if already converted; inserts new with created=true (HTTP 201) otherwise.
+- Source evidence:
+  - AI-FSM: db/migrations/001_core_schema.sql — invoices.estimate_id FK, invoice_line_items.estimate_line_item_id FK
+  - AI-FSM: packages/domain/src/index.ts — invoiceTransitions map (draft allows sent+void; paid/void terminal)
+  - Myprogram: immutability discipline — snapshot at conversion; invoice line items never mutated after creation
+  - AI-FSM: apps/web/lib/estimates/db.ts — withEstimateContext pattern replicated as withInvoiceContext
+- Risks or follow-ups:
+  - Integration tests need TEST_DATABASE_URL env var (CI setup)
+  - Invoice number generation (COUNT-based) is eventually-consistent under high concurrency — acceptable for P3 scope
+  - Payment recording (P3-T3) will update invoice paid_cents via payment trigger already in 004_workflow_invariants.sql

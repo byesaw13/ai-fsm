@@ -65,7 +65,7 @@ epics:
           - estimate statuses enforced
       - id: T2-2
         title: Implement estimate-to-invoice conversion
-        status: pending
+        status: completed
         acceptance:
           - conversion creates immutable snapshot line items
       - id: T2-3
