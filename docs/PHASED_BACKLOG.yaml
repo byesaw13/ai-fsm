@@ -61,7 +61,7 @@ epics:
     tasks:
       - id: T2-1
         title: Implement estimates CRUD and lifecycle
-        status: pending
+        status: completed
         acceptance:
           - estimate statuses enforced
       - id: T2-2
