@@ -15,22 +15,22 @@ export default async function AppLayout({
     redirect("/login");
   }
 
+  const isTech = session.role === "tech";
+
   return (
     <div className="app-layout">
       <header className="app-header">
-        <nav>
+        <nav className="app-nav">
           <Link href="/app/jobs">Jobs</Link>
-          {" | "}
           <Link href="/app/visits">Visits</Link>
-          {" | "}
-          <Link href="/app/estimates">Estimates</Link>
-          {" | "}
-          <Link href="/app/invoices">Invoices</Link>
-          {" | "}
-          <Link href="/app/automations">Automations</Link>
+          {!isTech && <Link href="/app/estimates">Estimates</Link>}
+          {!isTech && <Link href="/app/invoices">Invoices</Link>}
+          {!isTech && <Link href="/app/automations">Automations</Link>}
         </nav>
         <div className="user-info">
-          <span>Role: {session.role}</span>
+          <span className="role-badge" data-role={session.role}>
+            {session.role}
+          </span>
           <LogoutButton />
         </div>
       </header>
