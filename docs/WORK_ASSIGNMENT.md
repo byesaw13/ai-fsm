@@ -75,6 +75,7 @@ These files require explicit lock entry in `Active Claims` before edits:
 
 
 | `agent-c` | `P3-T2` / `#18` | `agent-c/P3-T2-estimate-to-invoice-conversion` | `apps/web/app/api/v1/estimates/**/convert/**`, `apps/web/app/api/v1/invoices/**`, `apps/web/app/app/invoices/**`, `apps/web/lib/invoices/**`, `tests/e2e/invoice-convert-smoke.spec.ts` | `2026-02-17T23:30:00Z` | `completed` |
+| `agent-c` | `P3-T3` / `#19` | `agent-c/P3-T3-manual-payment-status-sync` | `apps/web/app/api/v1/invoices/**/payments/**`, `apps/web/app/api/v1/payments/**`, `apps/web/app/app/invoices/[id]/**`, `apps/web/lib/invoices/**`, `tests/e2e/payment-smoke.spec.ts` | `2026-02-18T00:00:00Z` | `completed` |
 
 ## Merge Order
 1. Foundation/auth changes

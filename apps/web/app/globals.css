@@ -265,6 +265,14 @@ a {
 .status-pill.status-completed   { background: #d1fae5; color: #065f46; }
 .status-pill.status-invoiced    { background: #ede9fe; color: #5b21b6; }
 .status-pill.status-cancelled   { background: #fee2e2; color: #991b1b; }
+.status-pill.status-sent        { background: #dbeafe; color: #1e40af; }
+.status-pill.status-partial     { background: #fef3c7; color: #92400e; }
+.status-pill.status-paid        { background: #d1fae5; color: #065f46; }
+.status-pill.status-overdue     { background: #fee2e2; color: #991b1b; }
+.status-pill.status-void        { background: #f1f5f9; color: #475569; }
+.status-pill.status-approved    { background: #d1fae5; color: #065f46; }
+.status-pill.status-declined    { background: #fee2e2; color: #991b1b; }
+.status-pill.status-expired     { background: #f1f5f9; color: #475569; }
 
 /* Status sections */
 .status-sections { display: flex; flex-direction: column; gap: 24px; }
@@ -353,3 +361,24 @@ a {
 .muted { color: var(--muted); font-size: 13px; margin: 4px 0 0; }
 .error-inline { color: #dc2626; font-size: 13px; margin: 0 0 8px; }
 .success-inline { color: #065f46; font-size: 13px; margin: 0 0 8px; }
+
+/* Line items table */
+.line-items-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.line-items-table th { text-align: left; padding: 8px 10px; border-bottom: 2px solid var(--border); font-weight: 600; font-size: 13px; color: var(--muted); }
+.line-items-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.line-items-table tfoot td { border-bottom: none; padding-top: 10px; }
+.subtotal-label { text-align: right; }
+
+/* Payment form */
+.payment-form-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.payment-form-fields .form-group:last-child { grid-column: 1 / -1; }
+.payment-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--card);
+  color: var(--fg);
+}
+.payment-select:focus { outline: none; border-color: var(--accent); }

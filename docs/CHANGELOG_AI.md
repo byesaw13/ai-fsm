@@ -228,3 +228,49 @@ Each AI run must append one record. Keep entries factual and short.
   - Integration tests need TEST_DATABASE_URL env var (CI setup)
   - Invoice number generation (COUNT-based) is eventually-consistent under high concurrency — acceptable for P3 scope
   - Payment recording (P3-T3) will update invoice paid_cents via payment trigger already in 004_workflow_invariants.sql
+
+---
+
+- Timestamp (UTC): 2026-02-18T00:00:00Z
+- Agent: agent-c (Claude Opus 4.6)
+- Branch: agent-c/P3-T3-manual-payment-status-sync
+- Task ID: P3-T3 / #19
+- Summary: Implemented manual payment recording with invoice status sync. Full stack: payment POST/GET/DELETE API endpoints with Zod validation, idempotency key support, deterministic duplicate guard (60s window), audit logging for both payment creation and invoice status changes. Frontend: record payment form with dollar-to-cents conversion, payment history table with live reload, payment form only shown on payable invoices (sent/partial/overdue) for owner/admin. Added 22 unit tests for payment math/status derivation/validation, 13 integration test stubs (12 skipped without DB), 5 E2E smoke tests. Added missing CSS classes for invoice/estimate status pills, line-items table, and payment form.
+- Files changed:
+  - apps/web/lib/invoices/payments.ts (new — deriveInvoiceStatus, amountDueCents, validatePaymentAmount)
+  - apps/web/app/api/v1/invoices/[id]/payments/route.ts (new — GET list + POST record with idempotency)
+  - apps/web/app/api/v1/payments/[id]/route.ts (new — DELETE owner-only with recalculation)
+  - apps/web/app/app/invoices/[id]/RecordPaymentForm.tsx (new — client component, dollar input, method select)
+  - apps/web/app/app/invoices/[id]/PaymentHistory.tsx (new — client component, fetches + displays payment list)
+  - apps/web/app/app/invoices/[id]/page.tsx (updated — added RecordPaymentForm + PaymentHistory sections)
+  - apps/web/app/globals.css (updated — added status-pill variants for sent/partial/paid/overdue/void/approved/declined/expired, line-items-table, payment-form-fields, payment-select)
+  - apps/web/lib/invoices/__tests__/payments.unit.test.ts (new — 22 tests)
+  - apps/web/lib/invoices/__tests__/payments.integration.test.ts (new — 13 tests, 12 skipped without DB)
+  - tests/e2e/payment-smoke.spec.ts (new — 5 E2E tests)
+  - docs/WORK_ASSIGNMENT.md (P3-T3 claim registered)
+- Commands run:
+  - git checkout -b agent-c/P3-T3-manual-payment-status-sync
+  - pnpm lint ✓
+  - pnpm typecheck ✓
+  - pnpm build ✓
+  - pnpm test ✓ (147 tests pass, 40 skipped — integration requires DB)
+- Gate results: lint ✓ / typecheck ✓ / build ✓ / test ✓ (147 pass, 40 skipped)
+- Payment status sync proof:
+  - DB trigger `trg_payment_sync_invoice` (004_workflow_invariants.sql) fires AFTER INSERT on payments
+  - Trigger sums all payments, derives status (partial if paid < total, paid if paid >= total)
+  - API POST endpoint validates payable status (sent/partial/overdue), validates amount <= remaining, inserts payment, reads back updated invoice status
+  - API DELETE endpoint recalculates paid_cents from remaining payments, derives new status
+  - Duplicate protection: deterministic guard (same invoice+amount+method within 60s = CONFLICT); optional idempotency_key prefix in notes field
+- Source evidence:
+  - AI-FSM: db/migrations/004_workflow_invariants.sql — sync_invoice_on_payment trigger (SECURITY DEFINER, FOR UPDATE lock)
+  - AI-FSM: db/migrations/003_rls_policies.sql — payments_select (all roles), payments_insert (owner/admin), payments_delete (owner only)
+  - AI-FSM: packages/domain/src/index.ts — paymentMethodSchema, paymentSchema, invoiceTransitions map
+  - AI-FSM: apps/web/lib/invoices/db.ts — withInvoiceContext RLS pattern reused
+  - AI-FSM: apps/web/lib/auth/permissions.ts — canRecordPayments reused
+  - Myprogram: RLS_POLICY_MATRIX.md — owner/admin write pattern for financial entities
+  - Dovelite: components/InvoiceDetail — payment history display pattern reference
+- Risks or follow-ups:
+  - Integration tests need TEST_DATABASE_URL env var to run (CI setup)
+  - Idempotency key stored as notes prefix `[idem:key]` — lightweight, no schema change
+  - DELETE /payments/:id recalculates manually (trigger only fires on INSERT) — verified correct in unit tests
+  - E2E tests require seeded invoices in 'sent' status
