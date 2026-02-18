@@ -73,6 +73,7 @@ These files require explicit lock entry in `Active Claims` before edits:
 | `agent-orchestrator` | `P1-T3` | `agent-orchestrator/P1-T3-audit-trace` | `apps/web/lib/tracing.ts`, `apps/web/lib/db/audit.ts`, `apps/web/lib/auth/middleware.ts`, `db/migrations/005_audit_log_trace_id.sql`, vitest configs, test files | `2026-02-17T10:30:00Z` | `completed` |
 | `agent-d` | `P1-T4` | `agent-d/P1-T4-ci-pipeline` | `.github/workflows/ci.yml` | `2026-02-16T14:14:00Z` | `completed` |
 | `agent-orchestrator` | `T1-2` / `P2-T1` | `agent-orchestrator/P2-T1-jobs-crud` | `apps/web/app/api/v1/jobs/**` | `2026-02-17T16:00:00Z` | `in_progress` |
+| `agent-c` | `P2-T3` / `#16` | `agent-c/P2-T3-role-based-admin-tech-views` | `apps/web/app/app/jobs/**`, `apps/web/app/app/visits/**`, `apps/web/lib/auth/permissions.ts`, `apps/web/lib/auth/__tests__/**`, `tests/e2e/**` | `2026-02-17T22:00:00Z` | `in_progress` |
 
 ## Merge Order
 1. Foundation/auth changes

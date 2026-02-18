@@ -118,3 +118,52 @@ export function canViewAuditLog(role: Role): boolean {
 export function canDeleteRecords(role: Role): boolean {
   return role === "owner";
 }
+
+/**
+ * Can create visits (owner, admin)
+ */
+export function canCreateVisit(role: Role): boolean {
+  return hasRole(role, ["owner", "admin"]);
+}
+
+/**
+ * Can assign a tech to a visit (owner, admin)
+ */
+export function canAssignVisit(role: Role): boolean {
+  return hasRole(role, ["owner", "admin"]);
+}
+
+/**
+ * Can transition job status (owner, admin)
+ */
+export function canTransitionJob(role: Role): boolean {
+  return hasRole(role, ["owner", "admin"]);
+}
+
+/**
+ * Can transition visit status — all roles; tech is limited to assigned visits server-side
+ */
+export function canTransitionVisit(role: Role): boolean {
+  return hasRole(role, ["owner", "admin", "tech"]);
+}
+
+/**
+ * Can update visit notes — all roles; tech limited to assigned visits server-side
+ */
+export function canUpdateVisitNotes(role: Role): boolean {
+  return hasRole(role, ["owner", "admin", "tech"]);
+}
+
+/**
+ * Can view all jobs — owner/admin see all; tech sees assigned jobs only (query filtered)
+ */
+export function canViewAllJobs(role: Role): boolean {
+  return hasRole(role, ["owner", "admin"]);
+}
+
+/**
+ * Can view all visits — owner/admin see all; tech sees assigned visits only (query filtered)
+ */
+export function canViewAllVisits(role: Role): boolean {
+  return hasRole(role, ["owner", "admin"]);
+}
