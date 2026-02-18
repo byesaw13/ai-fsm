@@ -44,7 +44,7 @@ describe.skipIf(!shouldRun)("invoice-followup integration", () => {
 
     // Create test user
     const userRes = await client.query(
-      `INSERT INTO users (account_id, email, password_hash, name, role)
+      `INSERT INTO users (account_id, email, password_hash, full_name, role)
        VALUES ($1, 'followup-test@test.com', 'hash', 'Test User', 'owner') RETURNING id`,
       [accountId]
     );
