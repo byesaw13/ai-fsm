@@ -43,7 +43,8 @@ epics:
           - unauthorized routes redirect to login
       - id: T1-2
         title: Implement jobs CRUD with status transitions
-        status: pending
+        status: in_progress
+        completed_by: agent-orchestrator
         acceptance:
           - create/read/update jobs
           - status transitions validated
