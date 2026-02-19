@@ -294,3 +294,34 @@ Each AI run must append one record. Keep entries factual and short.
   - window.confirm is browser-only; E2E tests that test delete flow should stub window.confirm
   - /app/jobs/new and /app/jobs/[id]/visits/new are still placeholder stubs (pending P2-T1/T2)
   - Success message on transition forms is cleared on router.refresh() if the component remounts; acceptable for current architecture
+
+---
+
+- Timestamp (UTC): 2026-02-19T06:00:00Z
+- Agent: agent-orchestrator (Claude Code)
+- Branch: agent-orchestrator/P5-T6-release-readiness-docs
+- Task ID: P5-T6
+- Summary: Finalized release-readiness documentation. Created three canonical deliverables by consolidating five pre-existing partial docs. PROD_READINESS_CHECKLIST.md provides an 8-section go/no-go gate (quality gates, security, data integrity, Pi4 infra, log rotation, restore drill, observability, documentation) with explicit pass/fail per item. DEPLOYMENT_RUNBOOK.md is the authoritative Pi4 deployment guide (hardware limits, prerequisites, first deploy, migrations, log rotation, backup config/cron, restore, update, rollback plan). INCIDENT_RESPONSE.md supersedes INCIDENT_RESPONSE_RUNBOOK.md with a structured escalation flow and runbooks for all known failure modes (app down, DB inaccessible, data corruption, OOM, disk full, worker failures, rate limit). ADR-012 logged in DECISION_LOG.md documenting the consolidation policy.
+- Files changed:
+  - docs/PROD_READINESS_CHECKLIST.md (new)
+  - docs/DEPLOYMENT_RUNBOOK.md (new)
+  - docs/INCIDENT_RESPONSE.md (new)
+  - docs/PHASED_BACKLOG.yaml (P5-T6 → completed)
+  - docs/WORK_ASSIGNMENT.md (P5-T6 claim added and completed)
+  - docs/CHANGELOG_AI.md (this entry)
+  - docs/DECISION_LOG.md (ADR-012)
+- Commands run: pnpm lint / pnpm typecheck / pnpm test / pnpm build
+- Gate results: lint ✅ | typecheck ✅ | test ✅ (222 passed, 48 skipped) | build ✅
+- Source paths consulted:
+  - Dovelite: READY_TO_DEPLOY.md (pre-flight checklist structure, rollback via git, smoke test pattern)
+  - Myprogram: EDGE_FUNCTIONS_RUNBOOK.md (structured verification steps, rollback options, post-deployment checklist)
+  - ai-fsm: docs/BACKUP_RUNBOOK.md, docs/INCIDENT_RESPONSE_RUNBOOK.md, docs/PI4_DEPLOYMENT.md, docs/CI_GOVERNANCE.md, docs/TEST_MATRIX.md, infra/compose.pi.yml
+- Adoption decisions:
+  - Dovelite's pre-flight checklist pattern adapted as PROD_READINESS_CHECKLIST.md sections
+  - Myprogram's structured rollback procedure (step-by-step with explicit verification) adopted for DEPLOYMENT_RUNBOOK.md rollback plan
+  - No cross-contamination of Supabase-specific tooling (supabase CLI, edge functions) — ai-fsm uses Docker Compose and pg_dump instead
+- Risks or follow-ups:
+  - WAL archiving / PITR not configured (MVP decision, RPO = 24h); post-MVP upgrade path documented in DEPLOYMENT_RUNBOOK.md
+  - Offsite backup via rclone is commented out in backup script — operator must configure rclone remote before it activates
+  - Log rotation for compose.pi.yml must be manually added (gate 5.1 in checklist enforces this pre-launch)
+  - Restore drill must be completed before go-live (gate 6.x in checklist)
