@@ -1,6 +1,7 @@
 import { Client } from "pg";
 import { runVisitReminders } from "./visit-reminder.js";
 import { runInvoiceFollowups } from "./invoice-followup.js";
+import { logger } from "./logger.js";
 
 const pollMs = Number(process.env.WORKER_POLL_MS ?? "30000");
 const databaseUrl = process.env.DATABASE_URL;
@@ -16,7 +17,7 @@ async function runPollIteration(client: Client): Promise<void> {
       `select count(*)::int as due_count from automations where enabled = true and next_run_at <= now()`
     );
     const dueCount = rows[0]?.due_count ?? 0;
-    console.log("automation poll", { due: dueCount, at: new Date().toISOString() });
+    logger.info("automation poll", { due: dueCount });
 
     if (dueCount > 0) {
       // Dispatch visit reminders
@@ -25,7 +26,7 @@ async function runPollIteration(client: Client): Promise<void> {
         const totalSent = visitReminderResults.reduce((sum, r) => sum + r.sent, 0);
         const totalSkipped = visitReminderResults.reduce((sum, r) => sum + r.skipped, 0);
         const totalErrors = visitReminderResults.reduce((sum, r) => sum + r.errors, 0);
-        console.log("visit-reminder dispatch complete", {
+        logger.info("visit-reminder dispatch complete", {
           automations: visitReminderResults.length,
           sent: totalSent,
           skipped: totalSkipped,
@@ -39,7 +40,7 @@ async function runPollIteration(client: Client): Promise<void> {
         const totalSent = followupResults.reduce((sum, r) => sum + r.sent, 0);
         const totalSkipped = followupResults.reduce((sum, r) => sum + r.skipped, 0);
         const totalErrors = followupResults.reduce((sum, r) => sum + r.errors, 0);
-        console.log("invoice-followup dispatch complete", {
+        logger.info("invoice-followup dispatch complete", {
           automations: followupResults.length,
           sent: totalSent,
           skipped: totalSkipped,
@@ -48,7 +49,7 @@ async function runPollIteration(client: Client): Promise<void> {
       }
     }
   } catch (error) {
-    console.error("worker poll failed", error);
+    logger.error("worker poll failed", error);
   }
 }
 
@@ -56,7 +57,7 @@ async function run() {
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
 
-  console.log("worker started", { pollMs });
+  logger.info("worker started", { pollMs });
 
   // Run immediately on start, then on interval
   await runPollIteration(client);
@@ -67,7 +68,7 @@ async function run() {
 }
 
 run().catch((error) => {
-  console.error("worker boot failed", error);
+  logger.error("worker boot failed", error);
   process.exit(1);
 });
 

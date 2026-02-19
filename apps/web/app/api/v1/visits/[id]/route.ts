@@ -4,6 +4,7 @@ import { withAuth } from "../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../lib/auth/middleware";
 import { queryOne, getPool } from "../../../../../lib/db";
 import { appendAuditLog } from "../../../../../lib/db/audit";
+import { logger } from "../../../../../lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -141,7 +142,7 @@ export const PATCH = withAuth(
       return NextResponse.json({ data: updated });
     } catch (err) {
       await client.query("ROLLBACK");
-      console.error("[visits PATCH]", err);
+      logger.error("[visits PATCH]", err, { traceId: session.traceId });
       return NextResponse.json(
         { error: { code: "INTERNAL_ERROR", message: "Failed to update visit", traceId: session.traceId } },
         { status: 500 }

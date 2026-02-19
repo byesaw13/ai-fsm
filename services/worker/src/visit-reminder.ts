@@ -1,4 +1,5 @@
 import type { Client } from "pg";
+import { logger } from "./logger.js";
 
 /**
  * Visit Reminder Automation
@@ -200,10 +201,7 @@ export async function processVisitReminder(
       }
     } catch (error) {
       result.errors++;
-      console.error(
-        `visit-reminder: failed to emit for visit ${visit.id}`,
-        error
-      );
+      logger.error("visit-reminder: failed to emit for visit", error, { visitId: visit.id });
     }
   }
 
@@ -224,7 +222,7 @@ export async function runVisitReminders(client: Client): Promise<ReminderResult[
     try {
       const result = await processVisitReminder(client, automation);
       results.push(result);
-      console.log("visit-reminder: processed", {
+      logger.info("visit-reminder: processed", {
         automationId: automation.id,
         accountId: automation.account_id,
         sent: result.sent,
@@ -232,10 +230,7 @@ export async function runVisitReminders(client: Client): Promise<ReminderResult[
         errors: result.errors,
       });
     } catch (error) {
-      console.error(
-        `visit-reminder: failed to process automation ${automation.id}`,
-        error
-      );
+      logger.error("visit-reminder: failed to process automation", error, { automationId: automation.id });
     }
   }
 

@@ -1,4 +1,5 @@
 import type { Client } from "pg";
+import { logger } from "./logger.js";
 
 /**
  * Overdue Invoice Follow-Up Automation
@@ -243,18 +244,12 @@ export async function processInvoiceFollowup(
           }
         } catch (error) {
           result.errors++;
-          console.error(
-            `invoice-followup: failed to emit for invoice ${invoice.id} step ${step}`,
-            error
-          );
+          logger.error("invoice-followup: failed to emit for invoice", error, { invoiceId: invoice.id, step });
         }
       }
     } catch (error) {
       result.errors++;
-      console.error(
-        `invoice-followup: failed to process invoice ${invoice.id}`,
-        error
-      );
+      logger.error("invoice-followup: failed to process invoice", error, { invoiceId: invoice.id });
     }
   }
 
@@ -275,7 +270,7 @@ export async function runInvoiceFollowups(client: Client): Promise<FollowupResul
     try {
       const result = await processInvoiceFollowup(client, automation);
       results.push(result);
-      console.log("invoice-followup: processed", {
+      logger.info("invoice-followup: processed", {
         automationId: automation.id,
         accountId: automation.account_id,
         sent: result.sent,
@@ -283,10 +278,7 @@ export async function runInvoiceFollowups(client: Client): Promise<FollowupResul
         errors: result.errors,
       });
     } catch (error) {
-      console.error(
-        `invoice-followup: failed to process automation ${automation.id}`,
-        error
-      );
+      logger.error("invoice-followup: failed to process automation", error, { automationId: automation.id });
     }
   }
 

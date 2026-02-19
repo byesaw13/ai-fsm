@@ -4,6 +4,7 @@ import { withAuth, withRole } from "../../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../../lib/auth/middleware";
 import { query, getPool } from "../../../../../../lib/db";
 import { appendAuditLog } from "../../../../../../lib/db/audit";
+import { logger } from "../../../../../../lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -111,7 +112,7 @@ export const POST = withRole(
       return NextResponse.json({ data: visit }, { status: 201 });
     } catch (err) {
       await client.query("ROLLBACK");
-      console.error("[visits POST]", err);
+      logger.error("[visits POST]", err, { traceId: session.traceId });
       return NextResponse.json(
         {
           error: {

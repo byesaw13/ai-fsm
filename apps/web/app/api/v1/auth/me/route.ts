@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { queryOne } from "@/lib/db";
 import { randomUUID } from "crypto";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,7 @@ export async function GET() {
       account_id: user.account_id,
     });
   } catch (error) {
-    console.error("Get user error:", error);
+    logger.error("Get user error", error, { traceId });
     return NextResponse.json(
       {
         error: {

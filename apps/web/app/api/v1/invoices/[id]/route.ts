@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth, withRole } from "@/lib/auth/middleware";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import { appendAuditLog } from "@/lib/db/audit";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +59,7 @@ export const GET = withAuth(async (request, session) => {
 
     return NextResponse.json({ data });
   } catch (error) {
-    console.error("GET /api/v1/invoices/[id] error:", error);
+    logger.error("GET /api/v1/invoices/[id] error", error, { traceId: session.traceId });
     return NextResponse.json(
       {
         error: {
@@ -176,7 +177,7 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         { status: 422 }
       );
     }
-    console.error("PATCH /api/v1/invoices/[id] error:", error);
+    logger.error("PATCH /api/v1/invoices/[id] error", error, { traceId: session.traceId });
     return NextResponse.json(
       {
         error: {
