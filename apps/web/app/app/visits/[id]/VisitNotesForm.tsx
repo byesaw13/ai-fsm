@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 interface Props {
@@ -14,6 +14,12 @@ export function VisitNotesForm({ visitId, initialNotes }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!saved) return;
+    const t = setTimeout(() => setSaved(false), 3000);
+    return () => clearTimeout(t);
+  }, [saved]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -51,7 +57,7 @@ export function VisitNotesForm({ visitId, initialNotes }: Props) {
         data-testid="visit-notes-input"
       />
       {error && <p className="error-inline">{error}</p>}
-      {saved && <p className="success-inline">Notes saved.</p>}
+      {saved && <p className="success-inline" data-testid="notes-saved-msg">Notes saved.</p>}
       <button
         type="submit"
         disabled={saving}
