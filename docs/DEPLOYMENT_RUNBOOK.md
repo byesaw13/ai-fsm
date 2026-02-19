@@ -127,12 +127,31 @@ docker compose -f infra/compose.pi.yml up -d
 ```bash
 # Container status
 docker compose -f infra/compose.pi.yml ps
+# Expected output (all four services Up, postgres healthy):
+# NAME                 IMAGE                        COMMAND                  SERVICE    CREATED        STATUS                   PORTS
+# ai-fsm-web          ghcr.io/.../ai-fsm-web:...   "docker-entrypoint.s…"  web        2 minutes ago  Up 2 minutes             0.0.0.0:3000->3000/tcp
+# ai-fsm-worker       ghcr.io/.../ai-fsm-worker:…  "docker-entrypoint.s…"  worker     2 minutes ago  Up 2 minutes
+# ai-fsm-postgres     postgres:16                   "docker-entrypoint.s…"  postgres   2 minutes ago  Up 2 minutes (healthy)   0.0.0.0:5432->5432/tcp
+# ai-fsm-redis        redis:7                       "docker-entrypoint.s…"  redis      2 minutes ago  Up 2 minutes
 
 # Health check
-curl -sf http://localhost:3000/api/health | jq .
-# Expected: {"status":"ok","checks":{"db":"ok"},"ts":"..."}
+curl -sf http://localhost:3000/api/health
+# Expected output:
+# {"status":"ok","service":"web","checks":{"db":"ok"},"ts":"<ISO-timestamp>","traceId":"<uuid>"}
 
-# Tail logs for startup errors
+# Login smoke test
+curl -si -X POST http://localhost:3000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"<seed-password>"}' | head -5
+# Expected:
+# HTTP/1.1 200 OK
+# Set-Cookie: session=<jwt-token>; Path=/; HttpOnly; SameSite=Lax
+
+# Memory usage
+docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}\t{{.MemPerc}}"
+# Expected: all services well below their limits; no service above 80% of its cap
+
+# Tail logs for startup errors (should see structured JSON, no ERROR level lines)
 docker compose -f infra/compose.pi.yml logs --tail=50 web worker
 ```
 
@@ -223,6 +242,27 @@ CRON
 **Backup retention policy:** 7 days local + 30 days offsite (once rclone is configured).
 **RPO:** 24 hours (daily backup cadence). WAL archiving is not configured (post-MVP).
 
+**Verify backup script and cron are installed:**
+```bash
+# Syntax check
+bash -n /home/pi/scripts/backup_db.sh && echo "syntax OK"
+# Expected: syntax OK
+
+# Run once manually to confirm it works
+/home/pi/scripts/backup_db.sh
+# Expected output:
+# [2026-02-19T02:00:01Z] Backup written: /home/pi/backups/ai_fsm_20260219_020001.dump (1.4M)
+# [2026-02-19T02:00:01Z] Old backups pruned
+
+# Verify cron entry
+crontab -l | grep backup_db
+# Expected: 0 2 * * * /home/pi/scripts/backup_db.sh ...
+
+# Verify log rotation on running container
+docker inspect ai-fsm-web --format '{{.HostConfig.LogConfig}}'
+# Expected: {json-file map[max-file:3 max-size:50m]}
+```
+
 ---
 
 ## Restore Procedure
@@ -267,9 +307,11 @@ curl -sf http://localhost:3000/api/health | jq .
 ```bash
 # 1. Pull latest images
 docker compose -f infra/compose.pi.yml pull
+# Expected: "Pulled" lines for web and worker; postgres/redis unchanged if unchanged version
 
 # 2. Take a pre-upgrade backup
 /home/pi/scripts/backup_db.sh
+# Expected: "[<timestamp>] Backup written: /home/pi/backups/ai_fsm_<ts>.dump (<size>)"
 
 # 3. Apply any new migrations
 for f in $(ls db/migrations/*.sql | sort); do
@@ -277,12 +319,17 @@ for f in $(ls db/migrations/*.sql | sort); do
     --username="${POSTGRES_USER}" \
     --dbname="${POSTGRES_DB}" < "$f"
 done
+# Expected: each migration outputs "CREATE TABLE", "ALTER TABLE", "CREATE INDEX", etc.
+# A migration that's already been applied will output errors about duplicate objects;
+# wrap idempotent migrations with IF NOT EXISTS to avoid this.
 
-# 4. Recreate containers with new images (zero-downtime for stateless services)
+# 4. Recreate containers with new images
 docker compose -f infra/compose.pi.yml up -d --force-recreate web worker
+# Expected: "Recreating ai-fsm-web ... done" and "Recreating ai-fsm-worker ... done"
 
 # 5. Verify health
-curl -sf http://localhost:3000/api/health | jq .
+curl -sf http://localhost:3000/api/health
+# Expected: {"status":"ok","checks":{"db":"ok"},...}
 ```
 
 ---
@@ -314,7 +361,11 @@ Do the same for `ai-fsm-worker`.
 
 ```bash
 docker compose -f infra/compose.pi.yml up -d --force-recreate web worker
-curl -sf http://localhost:3000/api/health | jq .
+# Expected: "Recreating ai-fsm-web ... done" and "Recreating ai-fsm-worker ... done"
+
+curl -sf http://localhost:3000/api/health
+# Expected: {"status":"ok","checks":{"db":"ok"},...}
+# If health check returns "degraded" or times out → check logs and consider DB restore.
 ```
 
 ### Step 4 — Rollback database (if migration was applied)

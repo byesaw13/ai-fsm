@@ -17,6 +17,11 @@ services:
       resources:
         limits:
           memory: 700M
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
 
   worker:
     image: ghcr.io/your-org/ai-fsm-worker:latest
@@ -34,6 +39,11 @@ services:
       resources:
         limits:
           memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
 
   postgres:
     image: postgres:16
@@ -57,6 +67,11 @@ services:
       resources:
         limits:
           memory: 900M
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
 
   redis:
     image: redis:7
@@ -70,6 +85,11 @@ services:
       resources:
         limits:
           memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "2"
 
 volumes:
   pgdata_pi:
