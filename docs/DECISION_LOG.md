@@ -147,3 +147,25 @@ Append-only log of technical decisions made by AI agents.
   - Merge everything into one mega-runbook: rejected — too large for a single operator to navigate under pressure during an incident.
 - Consequences: Clear single authoritative path per deliverable. Operators should update the three new files going forward; old files are read-only references.
 - Rollback plan: N/A (documentation only — no code or schema changed).
+
+- Timestamp (UTC): 2026-02-19T21:27:09Z
+- Decision ID: DRILL-2026-02-19
+- Type: Restore Drill Evidence
+- Environment: Raspberry Pi 4 (Ubuntu Server 24.04), compose profile `infra/compose.pi.yml`
+- Operator: nick
+- Backup used: `/home/nick/backups/ai_fsm_20260219_162051.dump`
+- Procedure: stop `web/worker` -> terminate DB sessions -> drop/recreate `ai_fsm` DB -> `pg_restore` -> start services -> verify health and row counts
+- Health result:
+  - `GET /api/health` => `{"status":"ok","service":"web","checks":{"db":"ok"},"ts":"2026-02-19T21:27:09.880Z"}`
+- Row counts (pre vs post):
+  - users: 4 -> 4
+  - jobs: 0 -> 0
+  - visits: 0 -> 0
+  - estimates: 0 -> 0
+  - invoices: 0 -> 0
+  - payments: 0 -> 0
+- Outcome: PASS
+- Notes:
+  - Initial attempt failed with `DROP DATABASE cannot run inside a transaction block`; corrected by issuing terminate/drop/create as separate `psql -c` commands.
+
+
