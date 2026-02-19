@@ -226,3 +226,25 @@ Each AI run must append one record. Keep entries factual and short.
   - Rate limiter resets on process restart (acceptable for Pi4 single-process; Redis upgrade documented in ADR-008)
   - In-flight login attempts from multi-instance deploy would not be counted cross-process (not a concern for current Pi4 target)
   - CSP 'unsafe-inline' for scripts is a known limitation of current Next.js 15 setup; tracked as follow-up for P5-T4
+
+---
+
+- Timestamp (UTC): 2026-02-19T01:00:00Z
+- Agent: agent-orchestrator (Claude Code)
+- Branch: agent-orchestrator/P5-T2-ci-governance
+- Task ID: P5-T2
+- Summary: Branch protection and CI governance hardening. Tightened main branch protection (approvals ≥1, conversation resolution required, strict up-to-date check). Fixed CI test job to supply AUTH_SECRET and REDIS_URL required by P5-T1 env validation. Added NEXT_PHASE to build job. Stable job name: fields. New docs/CI_GOVERNANCE.md runbook.
+- Files changed:
+  - .github/workflows/ci.yml (AUTH_SECRET/REDIS_URL/NEXT_PHASE, stable job names, expanded comments)
+  - docs/CI_GOVERNANCE.md (new — branch protection policy, recovery procedures)
+  - docs/WORK_ASSIGNMENT.md (P5-T2 claim)
+- Commands run: pnpm lint / pnpm typecheck / pnpm test; gh api PUT branch protection
+- Gate results:
+  - lint: ✅  typecheck: ✅  test: ✅ (206 pass, 40 skip)  build: CI
+- Branch protection applied:
+  - required_approving_review_count: 0 → 1
+  - required_conversation_resolution: false → true
+  - required_status_checks.strict: false → true
+- Risks or follow-ups:
+  - required_approving_review_count=1 may block AI-only PRs; bypass documented in CI_GOVERNANCE.md
+  - E2E suite not yet wired into CI; tracked as P5-T4 follow-up

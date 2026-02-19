@@ -114,7 +114,8 @@ epics:
           - Tests for rate limiter and security headers
       - id: P5-T2
         title: Branch/CI governance
-        status: pending
+        status: completed
+        completed_by: agent-orchestrator
         acceptance:
           - Branch protection restored (approvals, status checks, up-to-date)
           - CI deterministic with no flaky suites
