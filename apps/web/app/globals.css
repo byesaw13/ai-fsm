@@ -337,6 +337,12 @@ a {
 .danger-card h2 { color: #dc2626; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .section-header h2 { margin: 0; }
+.metric-value {
+  margin: 6px 0 0;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+}
 
 /* Transition buttons */
 .transition-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
