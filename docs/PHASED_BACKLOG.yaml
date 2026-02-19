@@ -95,3 +95,56 @@ epics:
         acceptance:
           - deploy on arm64 compose profile
           - backup/restore validated
+
+  - id: E5
+    name: Production Readiness Hardening
+    phase: 5
+    tasks:
+      - id: P5-T1
+        title: Security hardening
+        status: completed
+        completed_by: agent-orchestrator
+        acceptance:
+          - Rate limiting on login and sensitive endpoints
+          - Secure cookie flags audited and enforced
+          - Env validation fail-fast with min AUTH_SECRET length
+          - Security response headers (CSP, X-Frame-Options, etc.)
+          - Password complexity validation
+          - ADR documenting security posture
+          - Tests for rate limiter and security headers
+      - id: P5-T2
+        title: Branch/CI governance
+        status: pending
+        acceptance:
+          - Branch protection restored (approvals, status checks, up-to-date)
+          - CI deterministic with no flaky suites
+      - id: P5-T3
+        title: Observability and recovery
+        status: pending
+        acceptance:
+          - Structured logging for web and worker
+          - Request/job correlation IDs end-to-end
+          - Health/readiness checks with DB connectivity
+          - Backup/restore runbook with validation drill
+      - id: P5-T4
+        title: Test matrix completion
+        status: pending
+        acceptance:
+          - Unit/integration/HTTP/E2E suites separated
+          - Intentional skips documented
+          - No accidental coverage gaps
+      - id: P5-T5
+        title: UX stabilization
+        status: pending
+        acceptance:
+          - Error states, empty states, loading states for all flows
+          - Form validation messages
+          - Destructive action confirmations
+      - id: P5-T6
+        title: Release readiness docs
+        status: pending
+        acceptance:
+          - PROD_READINESS_CHECKLIST.md
+          - DEPLOYMENT_RUNBOOK.md
+          - INCIDENT_RESPONSE.md
+          - Pi4 constraints documented

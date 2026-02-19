@@ -188,3 +188,41 @@ Each AI run must append one record. Keep entries factual and short.
   - /app/jobs/new and /app/jobs/[id]/visits/new are stubs pending P2-T1 and P2-T2 merges
   - Playwright E2E specs ready but require running dev server + seeded DB (not run in current CI gate)
   - Assignment update UI (PATCH visits.assigned_user_id) shows info text; full UI needed in follow-on
+
+---
+
+- Timestamp (UTC): 2026-02-19T00:00:00Z
+- Agent: agent-orchestrator (Claude Code)
+- Branch: agent-orchestrator/P5-T1-security-hardening
+- Task ID: P5-T1
+- Summary: Production-readiness security hardening. Added in-process rate limiting for login (5 req/15 min/IP), strengthened env validation (AUTH_SECRET ≥ 32 chars with fail-fast startup error), added HTTP security response headers via Next.js Edge middleware (CSP, X-Frame-Options, HSTS, Permissions-Policy, Referrer-Policy, X-Content-Type-Options), raised password min length to 8, updated .env.example with generation instructions. ADR-008 written.
+- Files changed:
+  - apps/web/lib/rate-limit.ts (new — sliding-window rate limiter)
+  - apps/web/middleware.ts (new — security headers Edge middleware)
+  - apps/web/lib/env.ts (AUTH_SECRET min 32, fail-fast error with [startup] prefix, build bypass via NEXT_PHASE)
+  - apps/web/app/api/v1/auth/login/route.ts (rate-limit check + 429 response + password min 8)
+  - apps/web/lib/__tests__/rate-limit.unit.test.ts (new — 13 tests)
+  - apps/web/lib/__tests__/env.unit.test.ts (new — 7 tests)
+  - apps/web/__tests__/middleware.unit.test.ts (new — 8 tests)
+  - .env.example (AUTH_SECRET generation note)
+  - .env (dev secret updated to meet 32-char minimum)
+  - docs/DECISION_LOG.md (ADR-008)
+  - docs/PHASED_BACKLOG.yaml (E5/P5 tasks added, P5-T1 marked completed)
+  - docs/WORK_ASSIGNMENT.md (P5-T1 claim)
+- Commands run: pnpm lint / pnpm typecheck / pnpm test
+- Gate results:
+  - lint: ✅ no errors
+  - typecheck: ✅ no errors
+  - test: ✅ 206 passed, 40 skipped (DB integration require TEST_DATABASE_URL)
+  - build: not run locally (passes in CI via NEXT_PHASE placeholder)
+- Source paths consulted:
+  - Dovelite: n/a (security hardening has no UX analog in source)
+  - Myprogram: RLS_POLICY_MATRIX.md referenced for CSRF posture assessment
+- Adoption decisions:
+  - In-process rate limiter (no new dependency) chosen over Redis client; appropriate for single-process Pi4 deployment
+  - SameSite=lax retained (not Strict) to avoid breaking same-site navigation flows; documented in ADR-008
+  - CSP set to 'unsafe-inline' for scripts/styles (Next.js 15 requires it without nonce config); tightening deferred to P5-T4 if nonce pipeline is added
+- Risks or follow-ups:
+  - Rate limiter resets on process restart (acceptable for Pi4 single-process; Redis upgrade documented in ADR-008)
+  - In-flight login attempts from multi-instance deploy would not be counted cross-process (not a concern for current Pi4 target)
+  - CSP 'unsafe-inline' for scripts is a known limitation of current Next.js 15 setup; tracked as follow-up for P5-T4
