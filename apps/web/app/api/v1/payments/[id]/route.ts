@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withRole } from "@/lib/auth/middleware";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import { appendAuditLog } from "@/lib/db/audit";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -162,7 +163,7 @@ export const DELETE = withRole(["owner"], async (request, session) => {
         { status: 422 }
       );
     }
-    console.error("DELETE /api/v1/payments/[id] error:", error);
+    logger.error("DELETE /api/v1/payments/[id] error", error, { traceId: session.traceId });
     return NextResponse.json(
       {
         error: {

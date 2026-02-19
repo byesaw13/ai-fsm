@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { clearSessionCookie } from "@/lib/auth/session";
 import { randomUUID } from "crypto";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export async function POST(_request: NextRequest) {
 
     return NextResponse.json({ message: "ok" });
   } catch (error) {
-    console.error("Logout error:", error);
+    logger.error("Logout error", error, { traceId });
     return NextResponse.json(
       {
         error: {

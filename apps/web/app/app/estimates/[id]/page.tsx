@@ -11,6 +11,7 @@ import type { EstimateStatus } from "@ai-fsm/domain";
 import { EstimateTransitionForm } from "./EstimateTransitionForm";
 import { EstimateInternalNotesForm } from "./EstimateInternalNotesForm";
 import { EstimateConvertButton } from "./EstimateConvertButton";
+import { DeleteEstimateButton } from "./DeleteEstimateButton";
 
 export const dynamic = "force-dynamic";
 
@@ -268,20 +269,5 @@ export default async function EstimateDetailPage({
         </div>
       )}
     </div>
-  );
-}
-
-function DeleteEstimateButton({ estimateId }: { estimateId: string }) {
-  return (
-    <form
-      action={`/api/v1/estimates/${estimateId}`}
-      method="POST"
-      data-testid="delete-estimate-form"
-    >
-      <input type="hidden" name="_method" value="DELETE" />
-      <button type="submit" className="btn btn-danger">
-        Delete Estimate
-      </button>
-    </form>
   );
 }

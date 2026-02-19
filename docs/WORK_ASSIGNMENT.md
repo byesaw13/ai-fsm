@@ -75,7 +75,9 @@ These files require explicit lock entry in `Active Claims` before edits:
 | `agent-orchestrator` | `T1-2` / `P2-T1` | `agent-orchestrator/P2-T1-jobs-crud` | `apps/web/app/api/v1/jobs/**` | `2026-02-17T16:00:00Z` | `in_progress` |
 | `agent-c` | `P2-T3` / `#16` | `agent-c/P2-T3-role-based-admin-tech-views` | `apps/web/app/app/jobs/**`, `apps/web/app/app/visits/**`, `apps/web/lib/auth/permissions.ts`, `apps/web/lib/auth/__tests__/**`, `tests/e2e/**` | `2026-02-17T22:00:00Z` | `in_progress` |
 | `agent-orchestrator` | `P5-T1` | `agent-orchestrator/P5-T1-security-hardening` | `apps/web/lib/auth/**`, `apps/web/lib/env.ts`, `apps/web/lib/rate-limit.ts`, `apps/web/middleware.ts`, `docs/DECISION_LOG.md` | `2026-02-19T00:00:00Z` | `completed` |
-| `agent-orchestrator` | `P5-T2` | `agent-orchestrator/P5-T2-ci-governance` | `.github/workflows/ci.yml`, `docs/CI_GOVERNANCE.md` | `2026-02-19T01:00:00Z` | `in_progress` |
+| `agent-orchestrator` | `P5-T2` | `agent-orchestrator/P5-T2-ci-governance` | `.github/workflows/ci.yml`, `docs/CI_GOVERNANCE.md` | `2026-02-19T01:00:00Z` | `completed` |
+| `agent-orchestrator` | `P5-T3` | `agent-orchestrator/P5-T3-observability` | `apps/web/lib/logger.ts`, `apps/web/app/api/health/route.ts`, `services/worker/src/logger.ts`, all API route console replacements, `docs/BACKUP_RUNBOOK.md`, `docs/INCIDENT_RESPONSE_RUNBOOK.md` | `2026-02-19T02:00:00Z` | `in_progress` |
+| `agent-orchestrator` | `P5-T5` | `agent-orchestrator/P5-T5-ux-stabilization` | `apps/web/app/app/jobs/**`, `apps/web/app/app/visits/**`, `apps/web/app/app/estimates/**`, `apps/web/app/app/invoices/**` | `2026-02-19T04:00:00Z` | `completed` |
 
 ## Merge Order
 1. Foundation/auth changes

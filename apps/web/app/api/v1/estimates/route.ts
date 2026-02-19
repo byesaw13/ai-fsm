@@ -8,6 +8,7 @@ import {
   lineItemTotal,
 } from "@/lib/estimates/db";
 import { estimateStatusSchema } from "@ai-fsm/domain";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -101,7 +102,7 @@ export const GET = withAuth(async (request, session) => {
       pagination: { page, limit, total },
     });
   } catch (error) {
-    console.error("GET /api/v1/estimates error:", error);
+    logger.error("GET /api/v1/estimates error", error, { traceId: session.traceId });
     return NextResponse.json(
       {
         error: {
@@ -260,7 +261,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         { status: 404 }
       );
     }
-    console.error("POST /api/v1/estimates error:", error);
+    logger.error("POST /api/v1/estimates error", error, { traceId: session.traceId });
     return NextResponse.json(
       {
         error: {

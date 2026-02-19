@@ -4,6 +4,7 @@ import { withInvoiceContext } from "@/lib/invoices/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { paymentMethodSchema } from "@ai-fsm/domain";
 import { validatePaymentAmount } from "@/lib/invoices/payments";
+import { logger } from "@/lib/logger";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +60,7 @@ export const GET = withAuth(async (request, session) => {
 
     return NextResponse.json({ data });
   } catch (error) {
-    console.error("GET /api/v1/invoices/[id]/payments error:", error);
+    logger.error("GET /api/v1/invoices/[id]/payments error", error, { traceId: session.traceId });
     return NextResponse.json(
       {
         error: {
@@ -340,7 +341,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         { status: 400 }
       );
     }
-    console.error("POST /api/v1/invoices/[id]/payments error:", error);
+    logger.error("POST /api/v1/invoices/[id]/payments error", error, { traceId: session.traceId });
     return NextResponse.json(
       {
         error: {

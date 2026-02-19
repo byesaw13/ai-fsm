@@ -10,6 +10,7 @@ import {
 import { jobTransitions } from "@ai-fsm/domain";
 import type { Job, Visit, JobStatus, VisitStatus } from "@ai-fsm/domain";
 import { JobTransitionForm } from "./JobTransitionForm";
+import { DeleteJobButton } from "./DeleteJobButton";
 
 export const dynamic = "force-dynamic";
 
@@ -153,7 +154,7 @@ export default async function JobDetailPage({
 
         {visits.length === 0 ? (
           <p className="muted" data-testid="visits-empty">
-            No visits scheduled.
+            No visits scheduled yet.{canAddVisit ? " Use the button above to schedule the first visit." : ""}
           </p>
         ) : (
           <div className="visit-list">
@@ -195,20 +196,5 @@ export default async function JobDetailPage({
         </div>
       )}
     </div>
-  );
-}
-
-function DeleteJobButton({ jobId }: { jobId: string }) {
-  return (
-    <form
-      action={`/api/v1/jobs/${jobId}`}
-      method="POST"
-      data-testid="delete-job-form"
-    >
-      <input type="hidden" name="_method" value="DELETE" />
-      <button type="submit" className="btn btn-danger">
-        Delete Job
-      </button>
-    </form>
   );
 }

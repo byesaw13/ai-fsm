@@ -42,6 +42,7 @@ export default function NewEstimatePage() {
   const router = useRouter();
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [jobs, setJobs] = useState<JobOption[]>([]);
+  const [loadingOptions, setLoadingOptions] = useState(true);
   const [clientId, setClientId] = useState("");
   const [jobId, setJobId] = useState("");
   const [notes, setNotes] = useState("");
@@ -53,14 +54,20 @@ export default function NewEstimatePage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/v1/clients")
-      .then((r) => r.json())
-      .then((d) => setClients(d.data ?? []))
-      .catch(() => {});
-    fetch("/api/v1/jobs?limit=100")
-      .then((r) => r.json())
-      .then((d) => setJobs(d.data ?? []))
-      .catch(() => {});
+    let cancelled = false;
+    Promise.all([
+      fetch("/api/v1/clients").then((r) => r.json()).catch(() => ({ data: [] })),
+      fetch("/api/v1/jobs?limit=100").then((r) => r.json()).catch(() => ({ data: [] })),
+    ]).then(([clientsData, jobsData]) => {
+      if (!cancelled) {
+        setClients(clientsData.data ?? []);
+        setJobs(jobsData.data ?? []);
+        setLoadingOptions(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const filteredJobs = clientId
@@ -170,8 +177,12 @@ export default function NewEstimatePage() {
                 setJobId("");
               }}
               required
+              disabled={loadingOptions}
+              aria-busy={loadingOptions}
             >
-              <option value="">— Select client —</option>
+              <option value="">
+                {loadingOptions ? "Loading clients…" : "— Select client —"}
+              </option>
               {clients.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -186,8 +197,12 @@ export default function NewEstimatePage() {
               id="job_id"
               value={jobId}
               onChange={(e) => setJobId(e.target.value)}
+              disabled={loadingOptions}
+              aria-busy={loadingOptions}
             >
-              <option value="">— None —</option>
+              <option value="">
+                {loadingOptions ? "Loading jobs…" : "— None —"}
+              </option>
               {filteredJobs.map((j) => (
                 <option key={j.id} value={j.id}>
                   {j.title}
@@ -294,6 +309,7 @@ export default function NewEstimatePage() {
                           className="btn btn-danger btn-sm"
                           onClick={() => removeLineItem(i)}
                           data-testid={`remove-line-item-${i}`}
+                          aria-label={`Remove line item ${i + 1}`}
                         >
                           ×
                         </button>
@@ -331,7 +347,7 @@ export default function NewEstimatePage() {
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={submitting}
+              disabled={submitting || loadingOptions}
               data-testid="submit-estimate-btn"
             >
               {submitting ? "Creating…" : "Create Estimate"}

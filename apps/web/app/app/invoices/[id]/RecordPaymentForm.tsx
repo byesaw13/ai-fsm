@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 interface Props {
@@ -24,6 +24,12 @@ export function RecordPaymentForm({ invoiceId, remainingCents }: Props) {
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("cash");
   const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    if (!success) return;
+    const t = setTimeout(() => setSuccess(""), 5000);
+    return () => clearTimeout(t);
+  }, [success]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -79,8 +85,8 @@ export function RecordPaymentForm({ invoiceId, remainingCents }: Props) {
 
   return (
     <form onSubmit={handleSubmit} data-testid="record-payment-form">
-      {error && <p className="error-inline">{error}</p>}
-      {success && <p className="success-inline">{success}</p>}
+      {error && <p className="error-inline" data-testid="payment-error">{error}</p>}
+      {success && <p className="success-inline" data-testid="payment-success">{success}</p>}
 
       <div className="payment-form-fields">
         <div className="form-group">
