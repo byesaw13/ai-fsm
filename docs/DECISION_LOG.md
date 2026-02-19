@@ -131,3 +131,19 @@ Append-only log of technical decisions made by AI agents.
   - Inline CSS animation (opacity fade-out): purely cosmetic — doesn't remove from DOM; screen readers would still announce stale text.
 - Consequences: Zero new dependencies. Success messages self-clear. Cleanup via clearTimeout prevents memory/state leak.
 - Rollback plan: Remove useEffect block to revert to persistent success message; trivial one-line deletion per component.
+
+### ADR-012: Release-readiness doc consolidation — single authoritative path per deliverable
+- Date (UTC): 2026-02-19T06:00:00Z
+- Agent: agent-orchestrator
+- Task ID: P5-T6
+- Context: Three new required deliverables (PROD_READINESS_CHECKLIST.md, DEPLOYMENT_RUNBOOK.md, INCIDENT_RESPONSE.md) needed to consolidate five pre-existing partial docs (BACKUP_RUNBOOK.md, INCIDENT_RESPONSE_RUNBOOK.md, PI4_DEPLOYMENT.md, CI_GOVERNANCE.md, TEST_MATRIX.md) without creating conflicting guidance.
+- Decision:
+  1. INCIDENT_RESPONSE.md supersedes INCIDENT_RESPONSE_RUNBOOK.md. The older file is retained as historical reference but is no longer the canonical doc. A notice was added to INCIDENT_RESPONSE.md to make this clear.
+  2. DEPLOYMENT_RUNBOOK.md consolidates PI4_DEPLOYMENT.md (which was a minimal stub) into a full runbook. PI4_DEPLOYMENT.md is retained for discoverability but DEPLOYMENT_RUNBOOK.md is authoritative.
+  3. BACKUP_RUNBOOK.md remains the canonical backup reference; DEPLOYMENT_RUNBOOK.md and PROD_READINESS_CHECKLIST.md cross-reference it rather than duplicating content.
+  4. CI_GOVERNANCE.md and TEST_MATRIX.md remain as standalone canonical references for their respective domains; PROD_READINESS_CHECKLIST.md references them.
+- Alternatives considered:
+  - Delete the old files: rejected — preserves historical context and avoids breaking any existing cross-references.
+  - Merge everything into one mega-runbook: rejected — too large for a single operator to navigate under pressure during an incident.
+- Consequences: Clear single authoritative path per deliverable. Operators should update the three new files going forward; old files are read-only references.
+- Rollback plan: N/A (documentation only — no code or schema changed).
