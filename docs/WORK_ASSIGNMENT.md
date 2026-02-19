@@ -78,6 +78,7 @@ These files require explicit lock entry in `Active Claims` before edits:
 | `agent-orchestrator` | `P5-T2` | `agent-orchestrator/P5-T2-ci-governance` | `.github/workflows/ci.yml`, `docs/CI_GOVERNANCE.md` | `2026-02-19T01:00:00Z` | `completed` |
 | `agent-orchestrator` | `P5-T3` | `agent-orchestrator/P5-T3-observability` | `apps/web/lib/logger.ts`, `apps/web/app/api/health/route.ts`, `services/worker/src/logger.ts`, all API route console replacements, `docs/BACKUP_RUNBOOK.md`, `docs/INCIDENT_RESPONSE_RUNBOOK.md` | `2026-02-19T02:00:00Z` | `in_progress` |
 | `agent-orchestrator` | `P5-T5` | `agent-orchestrator/P5-T5-ux-stabilization` | `apps/web/app/app/jobs/**`, `apps/web/app/app/visits/**`, `apps/web/app/app/estimates/**`, `apps/web/app/app/invoices/**` | `2026-02-19T04:00:00Z` | `completed` |
+| `agent-orchestrator` | `P5-T6` | `agent-orchestrator/P5-T6-release-readiness-docs` | `docs/PROD_READINESS_CHECKLIST.md`, `docs/DEPLOYMENT_RUNBOOK.md`, `docs/INCIDENT_RESPONSE.md`, `docs/PHASED_BACKLOG.yaml`, `docs/WORK_ASSIGNMENT.md`, `docs/CHANGELOG_AI.md`, `docs/DECISION_LOG.md` | `2026-02-19T06:00:00Z` | `completed` |
 
 ## Merge Order
 1. Foundation/auth changes

@@ -145,7 +145,8 @@ epics:
           - Destructive action confirmations
       - id: P5-T6
         title: Release readiness docs
-        status: pending
+        status: completed
+        completed_by: agent-orchestrator
         acceptance:
           - PROD_READINESS_CHECKLIST.md
           - DEPLOYMENT_RUNBOOK.md
