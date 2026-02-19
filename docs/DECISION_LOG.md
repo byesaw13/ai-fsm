@@ -76,6 +76,24 @@ Append-only log of technical decisions made by AI agents.
 - Consequences: Every API error response and every audit_log row carry the same traceId for a given request. Callers (load balancer, client) can inject their own trace ID via header.
 - Rollback plan: Column is nullable — existing rows unaffected. Remove column via migration if approach changes.
 
+### ADR-008: P5-T1 Security hardening posture
+- Date (UTC): 2026-02-19
+- Agent: agent-orchestrator (Claude Code)
+- Task ID: P5-T1
+- Context: PRs #34–#41 merged. Pre-production audit identified: (1) no rate limiting on login, enabling brute-force; (2) AUTH_SECRET validated at min(1) char allowing weak secrets; (3) no HTTP security response headers; (4) password complexity unenforced at API layer.
+- Decision:
+  1. **Rate limiting**: In-process sliding-window Map store. Login: 5 req / 15 min per IP. Responds 429 with Retry-After header. Chosen over Redis client to avoid new dependency; appropriate for single-process Pi4 standalone deployment. Redis-backed upgrade path documented.
+  2. **Env hardening**: AUTH_SECRET raised to min 32 chars (matches JWT best-practice for HS256 keys). Error messages include `[startup]` prefix and enumerate every failing field with a fix hint.
+  3. **Security response headers**: Next.js Edge middleware injects `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, `Content-Security-Policy` (frame-ancestors none), `Strict-Transport-Security`. Applied to all routes except static assets.
+  4. **Password min length**: Login schema raised from min(1) to min(8). Enforced at API boundary with structured error (VALIDATION_ERROR).
+- Alternatives considered:
+  - Redis sorted-set rate limiter — deferred: no redis client installed; adds dependency; single process makes in-process equally effective.
+  - NextAuth / Helmet npm packages — rejected: Next.js middleware header injection requires no additional package; NextAuth adds unnecessary complexity.
+  - SameSite=Strict cookie — retained as lax: strict breaks same-site navigations; lax + HttpOnly + Secure is correct posture for cookie-based JWT.
+  - CSRF tokens — not added: all state-changing endpoints are JSON-only API routes; SameSite=lax + Content-Type enforcement blocks CSRF on modern browsers; explicit CSRF tokens can be added if form-based submissions are introduced.
+- Consequences: Login brute-force limited. Weak secrets rejected at startup. Browser-level frame injection and MIME sniffing blocked. CSP baseline established (will need tightening if external CDN assets are introduced).
+- Rollback plan: Revert middleware.ts to remove headers (zero DB/migration impact). Rate limiter is in-process and stateless — removing it requires no cleanup.
+
 ### ADR-006: Build timeout with Next.js 15 static generation
 - Date (UTC): 2026-02-16
 - Agent: agent-a (Backend+Security Specialist)

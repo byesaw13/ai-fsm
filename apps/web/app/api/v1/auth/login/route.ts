@@ -5,12 +5,18 @@ import { queryOne } from "@/lib/db";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { roleSchema } from "@ai-fsm/domain";
 import { randomUUID } from "crypto";
+import {
+  checkRateLimit,
+  getClientIp,
+  LOGIN_RATE_LIMIT,
+} from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(1),
+  // Enforce a minimum length here (display-only — real enforcement is bcrypt)
+  password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
 type UserRow = {
@@ -25,7 +31,31 @@ type UserRow = {
 
 export async function POST(request: NextRequest) {
   const traceId = randomUUID();
-  
+
+  // Rate-limit by IP: 5 attempts per 15 minutes
+  const ip = getClientIp(request);
+  const rl = checkRateLimit(`login:${ip}`, LOGIN_RATE_LIMIT);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "RATE_LIMITED",
+          message: "Too many login attempts. Please try again later.",
+          traceId,
+        },
+      },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(rl.resetAt - Math.floor(Date.now() / 1000)),
+          "X-RateLimit-Limit": String(LOGIN_RATE_LIMIT.limit),
+          "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": String(rl.resetAt),
+        },
+      }
+    );
+  }
+
   try {
     const body = await request.json();
     const parseResult = loginSchema.safeParse(body);
