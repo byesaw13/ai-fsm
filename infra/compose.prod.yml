@@ -20,6 +20,11 @@ services:
       interval: 20s
       timeout: 5s
       retries: 6
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
 
   worker:
     image: ${WORKER_IMAGE:-ghcr.io/your-org/ai-fsm-worker}:${APP_TAG:-latest}
@@ -32,6 +37,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
 
   postgres:
     image: postgres:16
@@ -50,6 +60,11 @@ services:
       interval: 15s
       timeout: 5s
       retries: 8
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
 
   redis:
     image: redis:7
@@ -58,6 +73,11 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis_prod:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "2"
 
 volumes:
   pgdata_prod:
