@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withRole } from "@/lib/auth/middleware";
 import { appendAuditLog } from "@/lib/db/audit";
 import { withInvoiceContext, generateInvoiceNumber } from "@/lib/invoices/db";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -213,7 +214,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       );
     }
 
-    console.error("POST /api/v1/estimates/[id]/convert error:", error);
+    logger.error("POST /api/v1/estimates/[id]/convert error", error, { traceId: session.traceId });
     return NextResponse.json(
       {
         error: {

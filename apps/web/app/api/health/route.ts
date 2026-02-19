@@ -1,39 +1,58 @@
+/**
+ * GET /api/health
+ *
+ * Health + readiness endpoint.
+ *
+ * Semantics:
+ *   200 { status: "ok",      checks: { db: "ok"   }, ... }  — fully healthy
+ *   503 { status: "degraded", checks: { db: "fail" }, ... } — at least one check failed
+ *
+ * Used by:
+ *   - Docker Compose healthcheck (compose.prod.yml, compose.pi.yml)
+ *   - Load balancer / reverse proxy liveness probe
+ *   - Uptime monitors
+ *
+ * The DB check runs a lightweight `SELECT 1` on a pooled connection.
+ * The pool is reused across requests (no new client per call).
+ */
+
 import { NextResponse } from "next/server";
-import { randomUUID } from "crypto";
+import { getPool } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const traceId = randomUUID();
-  let dbStatus: "ok" | "error" | "unconfigured" = "unconfigured";
+type CheckStatus = "ok" | "fail";
 
-  const databaseUrl = process.env.DATABASE_URL;
+interface HealthResponse {
+  status: "ok" | "degraded";
+  service: "web";
+  checks: {
+    db: CheckStatus;
+  };
+  ts: string;
+}
 
-  if (databaseUrl) {
-    try {
-      // Dynamic import is build-safe: pg is only loaded at runtime when
-      // DATABASE_URL is present, preventing build-time connection attempts.
-      const { Client } = await import("pg");
-      const client = new Client({ connectionString: databaseUrl });
-      await client.connect();
-      await client.query("SELECT 1");
-      await client.end();
-      dbStatus = "ok";
-    } catch {
-      dbStatus = "error";
-    }
+async function checkDb(): Promise<CheckStatus> {
+  try {
+    await getPool().query("SELECT 1");
+    return "ok";
+  } catch (err) {
+    logger.error("health: db check failed", err);
+    return "fail";
   }
+}
 
-  const healthy = dbStatus !== "error";
+export async function GET(): Promise<NextResponse<HealthResponse>> {
+  const db = await checkDb();
 
-  return NextResponse.json(
-    {
-      status: healthy ? "ok" : "degraded",
-      service: "web",
-      db: dbStatus,
-      traceId,
-      timestamp: new Date().toISOString(),
-    },
-    { status: healthy ? 200 : 503 }
-  );
+  const allOk = db === "ok";
+  const body: HealthResponse = {
+    status: allOk ? "ok" : "degraded",
+    service: "web",
+    checks: { db },
+    ts: new Date().toISOString(),
+  };
+
+  return NextResponse.json(body, { status: allOk ? 200 : 503 });
 }

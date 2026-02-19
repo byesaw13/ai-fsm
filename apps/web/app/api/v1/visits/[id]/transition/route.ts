@@ -4,6 +4,7 @@ import { withAuth } from "../../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../../lib/auth/middleware";
 import { getPool } from "../../../../../../lib/db";
 import { appendAuditLog } from "../../../../../../lib/db/audit";
+import { logger } from "../../../../../../lib/logger";
 import { visitTransitions, visitStatusSchema } from "@ai-fsm/domain";
 import type { VisitStatus } from "@ai-fsm/domain";
 
@@ -129,7 +130,7 @@ export const POST = withAuth(
       return NextResponse.json({ data: updated });
     } catch (err) {
       await client.query("ROLLBACK");
-      console.error("[visits transition POST]", err);
+      logger.error("[visits transition POST]", err, { traceId: session.traceId });
       return NextResponse.json(
         {
           error: {

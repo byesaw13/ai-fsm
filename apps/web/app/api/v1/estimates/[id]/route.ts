@@ -7,6 +7,7 @@ import {
   calcTotals,
   lineItemTotal,
 } from "@/lib/estimates/db";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +61,7 @@ export const GET = withAuth(async (request, session) => {
 
     return NextResponse.json({ data });
   } catch (error) {
-    console.error("GET /api/v1/estimates/[id] error:", error);
+    logger.error("GET /api/v1/estimates/[id] error", error, { traceId: session.traceId });
     return NextResponse.json(
       {
         error: {
@@ -315,7 +316,7 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         { status: 422 }
       );
     }
-    console.error("PATCH /api/v1/estimates/[id] error:", error);
+    logger.error("PATCH /api/v1/estimates/[id] error", error, { traceId: session.traceId });
     return NextResponse.json(
       {
         error: {
@@ -397,7 +398,7 @@ export const DELETE = withRole(["owner"], async (request, session) => {
         { status: 422 }
       );
     }
-    console.error("DELETE /api/v1/estimates/[id] error:", error);
+    logger.error("DELETE /api/v1/estimates/[id] error", error, { traceId: session.traceId });
     return NextResponse.json(
       {
         error: {

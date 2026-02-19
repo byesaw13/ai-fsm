@@ -10,6 +10,7 @@ import {
   getClientIp,
   LOGIN_RATE_LIMIT,
 } from "@/lib/rate-limit";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -147,7 +148,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Login error:", error);
+    logger.error("Login error", error, { traceId });
     return NextResponse.json(
       {
         error: {

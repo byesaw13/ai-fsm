@@ -4,6 +4,7 @@ import { withRole } from "../../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../../lib/auth/middleware";
 import { getPool } from "../../../../../../lib/db";
 import { appendAuditLog } from "../../../../../../lib/db/audit";
+import { logger } from "../../../../../../lib/logger";
 import { jobTransitions, jobStatusSchema } from "@ai-fsm/domain";
 import type { JobStatus } from "@ai-fsm/domain";
 
@@ -108,7 +109,7 @@ export const POST = withRole(
       return NextResponse.json({ data: updated });
     } catch (err) {
       await client.query("ROLLBACK");
-      console.error("[jobs transition POST]", err);
+      logger.error("[jobs transition POST]", err, { traceId: session.traceId });
       return NextResponse.json(
         {
           error: {

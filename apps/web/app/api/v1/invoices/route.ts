@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth } from "@/lib/auth/middleware";
 import { withInvoiceContext } from "@/lib/invoices/db";
+import { logger } from "@/lib/logger";
 import { invoiceStatusSchema } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
@@ -93,7 +94,7 @@ export const GET = withAuth(async (request, session) => {
       pagination: { page, limit, total },
     });
   } catch (error) {
-    console.error("GET /api/v1/invoices error:", error);
+    logger.error("GET /api/v1/invoices error", error, { traceId: session.traceId });
     return NextResponse.json(
       {
         error: {

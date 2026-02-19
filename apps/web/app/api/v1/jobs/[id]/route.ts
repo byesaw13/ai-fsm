@@ -4,6 +4,7 @@ import { withAuth, withRole } from "../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../lib/auth/middleware";
 import { queryOne, getPool } from "../../../../../lib/db";
 import { appendAuditLog } from "../../../../../lib/db/audit";
+import { logger } from "../../../../../lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -136,7 +137,7 @@ export const PATCH = withRole(
       return NextResponse.json({ data: updated });
     } catch (err) {
       await client.query("ROLLBACK");
-      console.error("[jobs PATCH]", err);
+      logger.error("[jobs PATCH]", err, { traceId: session.traceId });
       return NextResponse.json(
         { error: { code: "INTERNAL_ERROR", message: "Failed to update job", traceId: session.traceId } },
         { status: 500 }
@@ -214,7 +215,7 @@ export const DELETE = withRole(
       return new NextResponse(null, { status: 204 });
     } catch (err) {
       await client.query("ROLLBACK");
-      console.error("[jobs DELETE]", err);
+      logger.error("[jobs DELETE]", err, { traceId: session.traceId });
       return NextResponse.json(
         { error: { code: "INTERNAL_ERROR", message: "Failed to delete job", traceId: session.traceId } },
         { status: 500 }

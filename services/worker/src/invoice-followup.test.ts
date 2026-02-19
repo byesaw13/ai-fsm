@@ -10,6 +10,7 @@ import {
   runInvoiceFollowups,
 } from "./invoice-followup.js";
 import type { AutomationRow, OverdueInvoice } from "./invoice-followup.js";
+import { logger } from "./logger.js";
 
 // Mock pg Client
 function mockClient(overrides: Record<string, unknown> = {}): Client {
@@ -227,6 +228,7 @@ describe("processInvoiceFollowup", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(logger, "error").mockImplementation(() => {});
   });
 
   it("processes overdue invoices and returns counts", async () => {
@@ -305,9 +307,10 @@ describe("processInvoiceFollowup", () => {
 
     expect(result.sent).toBe(1);
     expect(result.errors).toBe(1);
-    expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining("inv-1"),
-      expect.any(Error)
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining("invoice-followup"),
+      expect.any(Error),
+      expect.objectContaining({ invoiceId: "inv-1" })
     );
   });
 
@@ -350,6 +353,8 @@ describe("runInvoiceFollowups", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(logger, "error").mockImplementation(() => {});
+    vi.spyOn(logger, "info").mockImplementation(() => {});
   });
 
   it("returns empty array when no automations are due", async () => {
@@ -407,9 +412,10 @@ describe("runInvoiceFollowups", () => {
 
     expect(results).toHaveLength(1);
     expect(results[0].automationId).toBe("auto-f2");
-    expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining("auto-f1"),
-      expect.any(Error)
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining("invoice-followup"),
+      expect.any(Error),
+      expect.objectContaining({ automationId: "auto-f1" })
     );
   });
 });

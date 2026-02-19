@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withRole } from "@/lib/auth/middleware";
 import { appendAuditLog } from "@/lib/db/audit";
 import { withEstimateContext } from "@/lib/estimates/db";
+import { logger } from "@/lib/logger";
 import { estimateStatusSchema, estimateTransitions } from "@ai-fsm/domain";
 import type { EstimateStatus } from "@ai-fsm/domain";
 
@@ -152,7 +153,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       );
     }
 
-    console.error("POST /api/v1/estimates/[id]/transition error:", error);
+    logger.error("POST /api/v1/estimates/[id]/transition error", error, { traceId: session.traceId });
     return NextResponse.json(
       {
         error: {
