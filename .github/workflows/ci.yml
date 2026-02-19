@@ -5,12 +5,23 @@ on:
     branches: ["**"]
   pull_request:
 
+# Cancel in-progress runs for the same ref when a new commit is pushed.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# ---------------------------------------------------------------------------
+# Branch protection requires all four jobs to pass before merge to main:
+#   lint · typecheck · build · test
+#
+# See docs/CI_GOVERNANCE.md for the full branch protection policy and
+# recovery procedures.
+# ---------------------------------------------------------------------------
+
 jobs:
+  # ── 1. Lint ──────────────────────────────────────────────────────────────
   lint:
+    name: lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,10 +30,14 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run ESLint across all workspaces
+        run: pnpm lint
 
+  # ── 2. Typecheck ─────────────────────────────────────────────────────────
   typecheck:
+    name: typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,12 +46,22 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run tsc --noEmit across all workspaces
+        run: pnpm typecheck
 
+  # ── 3. Build ─────────────────────────────────────────────────────────────
+  # Runs after lint + typecheck. Uses NEXT_PHASE to trigger the build-time
+  # env bypass in apps/web/lib/env.ts so real secrets are not required in CI.
   build:
+    name: build
     needs: [lint, typecheck]
     runs-on: ubuntu-latest
+    env:
+      # Signal to env.ts that this is a build-time invocation.
+      # Real secrets are NOT needed during `next build` (pages are force-dynamic).
+      NEXT_PHASE: phase-production-build
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -44,8 +69,9 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Cache Next.js build
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Restore Next.js build cache
         uses: actions/cache@v4
         with:
           path: apps/web/.next/cache
@@ -53,9 +79,23 @@ jobs:
           restore-keys: |
             nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
             nextjs-${{ runner.os }}-
-      - run: pnpm build
+      - name: Build all workspaces
+        run: pnpm build
 
+  # ── 4. Test ──────────────────────────────────────────────────────────────
+  # Runs after lint + typecheck (parallel with build).
+  #
+  # Environment provided:
+  #   DATABASE_URL / TEST_DATABASE_URL  — PostgreSQL 16 service fixture
+  #   AUTH_SECRET                       — Required by env.ts (≥32 chars)
+  #   REDIS_URL                         — Required by env.ts (no Redis service
+  #                                       needed; rate-limit uses in-memory store)
+  #
+  # Intentional skips (see docs/TEST_MATRIX.md):
+  #   - HTTP integration tests: skipped — require TEST_BASE_URL (running server)
+  #   - E2E (Playwright): not in this job — require TEST_BASE_URL + seeded DB
   test:
+    name: test
     needs: [lint, typecheck]
     runs-on: ubuntu-latest
     services:
@@ -75,10 +115,15 @@ jobs:
     env:
       TEST_DATABASE_URL: postgresql://test:test@localhost:5432/aifsm_test
       DATABASE_URL: postgresql://test:test@localhost:5432/aifsm_test
-      # Note: TEST_BASE_URL is intentionally NOT set in CI.
-      # HTTP-based integration tests (estimates, invoices) require a running
-      # Next.js server and will skip when TEST_BASE_URL is absent.
-      # DB-only integration tests (worker, payments) run with TEST_DATABASE_URL.
+      # Required by env.ts (≥32 chars). This is a CI-only test secret.
+      AUTH_SECRET: ci-test-only-secret-not-used-in-production!!
+      # Required by env.ts schema. No Redis service runs in CI;
+      # the in-process rate limiter does not connect to Redis.
+      REDIS_URL: redis://localhost:6379/0
+      # TEST_BASE_URL is intentionally NOT set.
+      # HTTP integration tests (estimates, invoices, auth HTTP) require a
+      # running Next.js server and will skip deterministically when absent.
+      # See docs/TEST_MATRIX.md — Tier 3: HTTP integration.
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -86,9 +131,10 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Apply database migrations
+      - name: Apply schema migrations
         run: |
           for file in db/migrations/*.sql; do
             if [[ "$file" == *"seed"* ]]; then continue; fi
@@ -99,5 +145,5 @@ jobs:
       - name: Apply seed data
         run: PGPASSWORD=test psql -h localhost -U test -d aifsm_test -v ON_ERROR_STOP=1 -f db/migrations/002_seed_dev.sql
 
-      - name: Run tests (unit + integration)
+      - name: Run unit + DB-integration tests
         run: pnpm test
