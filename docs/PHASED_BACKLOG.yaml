@@ -129,7 +129,8 @@ epics:
           - Backup/restore runbook with validation drill
       - id: P5-T4
         title: Test matrix completion
-        status: pending
+        status: completed
+        completed_by: agent-orchestrator
         acceptance:
           - Unit/integration/HTTP/E2E suites separated
           - Intentional skips documented
