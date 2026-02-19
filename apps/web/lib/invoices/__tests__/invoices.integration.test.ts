@@ -1,10 +1,17 @@
 /**
  * Integration tests for Estimate→Invoice conversion and Invoice API.
  *
- * Requires a running PostgreSQL instance (TEST_DATABASE_URL).
- * Skipped in CI environments without a test DB.
+ * Tier: HTTP integration (Tier 3)
+ * Skip condition: TEST_DATABASE_URL or TEST_BASE_URL absent
  *
- * To run locally: TEST_DATABASE_URL=postgresql://... pnpm test
+ * Requires:
+ *   - TEST_DATABASE_URL: PostgreSQL instance with migrations + seed applied
+ *   - TEST_BASE_URL: running Next.js server (e.g. http://localhost:3000)
+ *
+ * To run locally:
+ *   TEST_DATABASE_URL=postgresql://... TEST_BASE_URL=http://localhost:3000 pnpm test
+ *
+ * See docs/TEST_MATRIX.md for the full tier breakdown and CI skip rationale.
  *
  * Source evidence:
  *   AI-FSM: docs/contracts/api-contract.md (endpoint contracts)
@@ -13,14 +20,11 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 
-const DB_AVAILABLE = !!process.env.TEST_DATABASE_URL;
-const API_AVAILABLE = !!process.env.TEST_BASE_URL;
-const RUN_INTEGRATION = DB_AVAILABLE && API_AVAILABLE;
+// HTTP integration: requires both a running DB and a running web server.
+const RUN_INTEGRATION =
+  !!process.env.TEST_DATABASE_URL && !!process.env.TEST_BASE_URL;
 
-const describeIf = (condition: boolean) =>
-  condition ? describe : describe.skip;
-
-describeIf(RUN_INTEGRATION)("Invoice conversion API integration", () => {
+describe.skipIf(!RUN_INTEGRATION)("Invoice conversion API integration", () => {
   let adminCookie: string;
   let techCookie: string;
   let testEstimateId: string;

@@ -248,3 +248,25 @@ Each AI run must append one record. Keep entries factual and short.
 - Risks or follow-ups:
   - required_approving_review_count=1 may block AI-only PRs; bypass documented in CI_GOVERNANCE.md
   - E2E suite not yet wired into CI; tracked as P5-T4 follow-up
+
+---
+
+- Timestamp (UTC): 2026-02-19T02:00:00Z
+- Agent: agent-orchestrator (Claude Code)
+- Branch: agent-orchestrator/P5-T4-test-matrix
+- Task ID: P5-T4
+- Summary: Test matrix completion. Standardized skip patterns across all integration test files to use built-in describe.skipIf(). Fixed auth.integration.test.ts which was vacuously passing 13 empty test bodies — replaced with 8 properly-guarded stub tests that skip when TEST_BASE_URL is absent. Added docs/TEST_MATRIX.md defining all 4 test tiers, skip inventory, and how to run each tier locally.
+- Files changed:
+  - apps/web/lib/auth/__tests__/auth.integration.test.ts (replace vacuous stubs with skipIf guard + accurate tier doc)
+  - apps/web/lib/estimates/__tests__/estimates.integration.test.ts (replace custom describeIf() with describe.skipIf(), fix docstring)
+  - apps/web/lib/invoices/__tests__/invoices.integration.test.ts (same)
+  - docs/TEST_MATRIX.md (new — 4 tiers, skip inventory, local run instructions)
+  - docs/PHASED_BACKLOG.yaml (P5-T4 completed)
+  - docs/WORK_ASSIGNMENT.md (P5-T4 claim + completion)
+- Commands run: pnpm lint / pnpm typecheck / pnpm test
+- Gate results:
+  - lint: ✅  typecheck: ✅  test: ✅ 193 pass, 48 skip
+- Skip count change: 40 → 48 (auth.integration.test.ts now skips correctly; 8 vacuous passes replaced with 8 explicit skips)
+- Risks or follow-ups:
+  - auth.integration.test.ts bodies are stubs; implement in P5-T4 follow-on with TEST_BASE_URL
+  - E2E job not yet in CI; wiring documented in TEST_MATRIX.md as future work

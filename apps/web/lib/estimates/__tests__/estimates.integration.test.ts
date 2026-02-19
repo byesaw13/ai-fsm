@@ -1,10 +1,17 @@
 /**
  * Integration tests for the Estimates API.
  *
- * These tests require a running PostgreSQL instance (TEST_DATABASE_URL).
- * They are skipped in CI environments without a test DB.
+ * Tier: HTTP integration (Tier 3)
+ * Skip condition: TEST_DATABASE_URL or TEST_BASE_URL absent
  *
- * To run locally: TEST_DATABASE_URL=postgresql://... pnpm test
+ * Requires:
+ *   - TEST_DATABASE_URL: PostgreSQL instance with migrations + seed applied
+ *   - TEST_BASE_URL: running Next.js server (e.g. http://localhost:3000)
+ *
+ * To run locally:
+ *   TEST_DATABASE_URL=postgresql://... TEST_BASE_URL=http://localhost:3000 pnpm test
+ *
+ * See docs/TEST_MATRIX.md for the full tier breakdown and CI skip rationale.
  *
  * Source evidence:
  *   AI-FSM: docs/contracts/api-contract.md (endpoint contracts)
@@ -14,15 +21,11 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 
-// These HTTP integration tests require both a DB and a running web server base URL.
-const DB_AVAILABLE = !!process.env.TEST_DATABASE_URL;
-const API_AVAILABLE = !!process.env.TEST_BASE_URL;
-const RUN_INTEGRATION = DB_AVAILABLE && API_AVAILABLE;
+// HTTP integration: requires both a running DB and a running web server.
+const RUN_INTEGRATION =
+  !!process.env.TEST_DATABASE_URL && !!process.env.TEST_BASE_URL;
 
-const describeIf = (condition: boolean) =>
-  condition ? describe : describe.skip;
-
-describeIf(RUN_INTEGRATION)("Estimates API integration", () => {
+describe.skipIf(!RUN_INTEGRATION)("Estimates API integration", () => {
   // TODO: Set up test DB helpers (seed account, admin user, tech user)
   // Reference: apps/web/lib/auth/__tests__/auth.integration.test.ts pattern
 
