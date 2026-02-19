@@ -103,3 +103,31 @@ Append-only log of technical decisions made by AI agents.
 - Alternatives considered: (1) Mock cookies during build — rejected as fragile; (2) Remove cookies() from server components — rejected as breaks auth flow; (3) Skip build in CI — rejected as needs verification.
 - Consequences: No static optimization for auth pages (acceptable trade-off). Need to monitor build times on Pi4 target.
 - Rollback plan: Next.js may fix in future release; can also switch to fully dynamic rendering with `export const dynamicParams = false`.
+
+
+---
+
+### ADR-010: UX destructive action pattern — window.confirm over modal dialog
+- Date (UTC): 2026-02-19T04:00:00Z
+- Agent: agent-orchestrator
+- Task ID: P5-T5
+- Context: Delete buttons for jobs and estimates existed as plain HTML form POSTs. These were broken (route only exports DELETE handler, not POST), and had no confirmation step — a single misclick would permanently destroy data.
+- Decision: Extract delete buttons into "use client" components that call window.confirm before issuing a fetch DELETE to the API. No new dialog/modal library added.
+- Alternatives considered:
+  - Custom modal dialog component: adds UI complexity and CSS scope; overkill for two delete actions at current stage.
+  - shadcn/ui AlertDialog or similar: introduces a component library dependency; incompatible with Pi4 bundle-size goal of minimal JS.
+  - window.confirm: zero dependency, accessible (browser-native), appropriate for internal admin tooling at MVP stage.
+- Consequences: Confirmation is a native browser dialog — consistent styling guaranteed. UX may feel slightly outdated vs custom modal; acceptable for operator-facing internal tool.
+- Rollback plan: Replace window.confirm call with a custom inline confirm state (useState boolean) if design requirements change; logic change is isolated to the two client components.
+
+### ADR-011: Auto-dismiss success messages via useEffect+setTimeout
+- Date (UTC): 2026-02-19T04:00:00Z
+- Agent: agent-orchestrator
+- Task ID: P5-T5
+- Context: Success messages in notes forms and transition forms persisted indefinitely after save, cluttering the UI. Financial payment success needs slightly longer visibility.
+- Decision: Use useEffect to schedule clearTimeout-based auto-dismiss at 3s for general success messages and 5s for payment confirmations. Timer is cleared on component unmount to prevent state updates on unmounted components.
+- Alternatives considered:
+  - Toast notification library (react-hot-toast, sonner): adds a dependency, requires provider in layout; out of scope for Pi4 target.
+  - Inline CSS animation (opacity fade-out): purely cosmetic — doesn't remove from DOM; screen readers would still announce stale text.
+- Consequences: Zero new dependencies. Success messages self-clear. Cleanup via clearTimeout prevents memory/state leak.
+- Rollback plan: Remove useEffect block to revert to persistent success message; trivial one-line deletion per component.

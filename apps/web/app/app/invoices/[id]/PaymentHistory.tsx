@@ -42,7 +42,7 @@ export function PaymentHistory({ invoiceId }: Props) {
       try {
         const res = await fetch(`/api/v1/invoices/${invoiceId}/payments`);
         if (!res.ok) {
-          setError("Failed to load payments");
+          setError("Failed to load payments. Refresh the page to try again.");
           return;
         }
         const json = await res.json();
@@ -50,7 +50,7 @@ export function PaymentHistory({ invoiceId }: Props) {
           setPayments(json.data ?? []);
         }
       } catch {
-        if (!cancelled) setError("Failed to load payments");
+        if (!cancelled) setError("Failed to load payments. Refresh the page to try again.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -63,11 +63,15 @@ export function PaymentHistory({ invoiceId }: Props) {
   }, [invoiceId]);
 
   if (loading) {
-    return <p className="muted" data-testid="payment-history-loading">Loading payments...</p>;
+    return (
+      <p className="muted" data-testid="payment-history-loading" aria-busy="true" aria-live="polite">
+        Loading payments…
+      </p>
+    );
   }
 
   if (error) {
-    return <p className="error-inline" data-testid="payment-history-error">{error}</p>;
+    return <p className="error-inline" data-testid="payment-history-error" role="alert">{error}</p>;
   }
 
   if (payments.length === 0) {

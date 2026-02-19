@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { EstimateStatus } from "@ai-fsm/domain";
 
@@ -18,10 +18,18 @@ export function EstimateTransitionForm({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    if (!success) return;
+    const t = setTimeout(() => setSuccess(""), 3000);
+    return () => clearTimeout(t);
+  }, [success]);
 
   async function handleTransition(targetStatus: EstimateStatus) {
     setLoading(true);
     setError("");
+    setSuccess("");
     try {
       const res = await fetch(`/api/v1/estimates/${estimateId}/transition`, {
         method: "POST",
@@ -32,6 +40,7 @@ export function EstimateTransitionForm({
         const data = await res.json();
         setError(data.error?.message ?? "Transition failed");
       } else {
+        setSuccess(`Status updated to ${statusLabels[targetStatus]}`);
         router.refresh();
       }
     } catch {
@@ -43,7 +52,8 @@ export function EstimateTransitionForm({
 
   return (
     <div className="transition-buttons" data-testid="transition-buttons">
-      {error && <p className="error-inline">{error}</p>}
+      {error && <p className="error-inline" data-testid="estimate-transition-error">{error}</p>}
+      {success && <p className="success-inline" data-testid="estimate-transition-success">{success}</p>}
       {allowedTransitions.map((status) => (
         <button
           key={status}
@@ -52,7 +62,7 @@ export function EstimateTransitionForm({
           className="btn btn-secondary"
           data-testid={`transition-btn-${status}`}
         >
-          → {statusLabels[status]}
+          {loading ? "Updating…" : `→ ${statusLabels[status]}`}
         </button>
       ))}
     </div>

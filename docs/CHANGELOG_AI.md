@@ -248,3 +248,49 @@ Each AI run must append one record. Keep entries factual and short.
 - Risks or follow-ups:
   - required_approving_review_count=1 may block AI-only PRs; bypass documented in CI_GOVERNANCE.md
   - E2E suite not yet wired into CI; tracked as P5-T4 follow-up
+
+---
+
+- Timestamp (UTC): 2026-02-19T04:00:00Z
+- Agent: agent-orchestrator (Claude Code)
+- Branch: agent-orchestrator/P5-T5-ux-stabilization
+- Task ID: P5-T5
+- Summary: UX stabilization across jobs, visits, estimates, invoices, payments. Key improvements: (1) destructive delete buttons converted from HTML forms (broken — POST doesn't match DELETE route) to client components with window.confirm guard and proper fetch DELETE; (2) all four transition forms (Job/Visit/Estimate/Invoice) now show success feedback ("Status updated to X") with 3s auto-dismiss and "Updating…" button text during inflight; (3) notes forms (VisitNotesForm, EstimateInternalNotesForm) and RecordPaymentForm success messages now auto-dismiss (3s / 5s); (4) NewEstimatePage shows loading state in client/job selects during useEffect fetch and disables submit while options load; (5) PaymentHistory loading state annotated with aria-busy and error message improved with actionable copy; (6) visits empty state improved with contextual hint for admin/owner users. Added 18-test unit suite covering payment amount validation, line item totals, and auto-dismiss timer semantics.
+- Files changed:
+  - apps/web/app/app/jobs/[id]/DeleteJobButton.tsx (new — client component with confirm dialog)
+  - apps/web/app/app/jobs/[id]/page.tsx (import DeleteJobButton, improve visits empty state)
+  - apps/web/app/app/jobs/[id]/JobTransitionForm.tsx (success state, auto-dismiss, Updating… text)
+  - apps/web/app/app/visits/[id]/VisitTransitionForm.tsx (success state, auto-dismiss, Updating… text)
+  - apps/web/app/app/visits/[id]/VisitNotesForm.tsx (auto-dismiss saved message after 3s)
+  - apps/web/app/app/estimates/[id]/DeleteEstimateButton.tsx (new — client component with confirm dialog)
+  - apps/web/app/app/estimates/[id]/page.tsx (import DeleteEstimateButton)
+  - apps/web/app/app/estimates/[id]/EstimateTransitionForm.tsx (success state, auto-dismiss, Updating… text)
+  - apps/web/app/app/estimates/[id]/EstimateInternalNotesForm.tsx (auto-dismiss saved message after 3s)
+  - apps/web/app/app/invoices/[id]/InvoiceTransitionForm.tsx (success state, auto-dismiss, Updating… text)
+  - apps/web/app/app/invoices/[id]/RecordPaymentForm.tsx (auto-dismiss success message after 5s)
+  - apps/web/app/app/invoices/[id]/PaymentHistory.tsx (aria-busy loading, actionable error copy, role=alert)
+  - apps/web/app/app/estimates/new/page.tsx (loadingOptions state, disabled selects/submit while loading)
+  - apps/web/app/app/__tests__/ux-stabilization.unit.test.ts (new — 18 unit tests)
+  - docs/WORK_ASSIGNMENT.md (P5-T5 claim)
+- Commands run:
+  - pnpm --filter @ai-fsm/web lint
+  - pnpm --filter @ai-fsm/web typecheck
+  - pnpm --filter @ai-fsm/web test
+  - pnpm --filter @ai-fsm/web build
+- Gate results:
+  - lint: ✅ no errors
+  - typecheck: ✅ no errors
+  - test: ✅ 222 passed, 48 skipped (18 new tests all pass)
+  - build: ✅ clean production build, all routes compiled
+- Source paths consulted:
+  - Dovelite: n/a (UX pattern reference only — confirm dialogs and inline success/error patterns are standard)
+  - Myprogram: n/a (no direct UX code in myprogram to adopt)
+- Adoption decisions:
+  - window.confirm used for destructive confirmations (no external dialog library dependency; appropriate for Pi4 single-process target)
+  - Auto-dismiss via useEffect+setTimeout (no toast library dependency added)
+  - Delete buttons now use fetch DELETE instead of HTML form POST (fixes broken form-based approach that couldn't reach the DELETE route handler)
+- Risks or follow-ups:
+  - Component-level tests (RTL/jsdom) not added — requires adding @testing-library/react and jsdom to devDependencies; tracked as follow-up
+  - window.confirm is browser-only; E2E tests that test delete flow should stub window.confirm
+  - /app/jobs/new and /app/jobs/[id]/visits/new are still placeholder stubs (pending P2-T1/T2)
+  - Success message on transition forms is cleared on router.refresh() if the component remounts; acceptable for current architecture

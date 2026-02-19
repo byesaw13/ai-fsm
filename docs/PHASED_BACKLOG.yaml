@@ -137,7 +137,8 @@ epics:
           - No accidental coverage gaps
       - id: P5-T5
         title: UX stabilization
-        status: pending
+        status: completed
+        completed_by: agent-orchestrator
         acceptance:
           - Error states, empty states, loading states for all flows
           - Form validation messages
