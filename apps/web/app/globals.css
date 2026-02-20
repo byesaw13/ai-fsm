@@ -923,3 +923,128 @@ a {
     font-size: 14px;
   }
 }
+
+/* Metrics Enhancement */
+.metric-success {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+}
+
+.metric-success .metric-value {
+  color: #065f46;
+}
+
+.metric-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* Funnel Bar */
+.funnel-bar {
+  display: flex;
+  gap: 24px;
+  padding: 16px 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+
+.funnel-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.funnel-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.funnel-bar-container {
+  height: 8px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.funnel-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.funnel-fill-draft { background: #94a3b8; }
+.funnel-fill-sent { background: #3b82f6; }
+.funnel-fill-approved { background: var(--accent); }
+
+.funnel-count {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.funnel-pct {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Invoice Amounts */
+.invoice-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.invoice-total {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.invoice-due {
+  font-size: 13px;
+  color: #92400e;
+  background: #fef3c7;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* Text Colors */
+.text-warning {
+  color: #92400e !important;
+}
+
+.text-danger {
+  color: #dc2626 !important;
+}
+
+/* Responsive Funnel */
+@media (max-width: 640px) {
+  .funnel-bar {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .funnel-stage {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .funnel-label {
+    min-width: 60px;
+  }
+
+  .funnel-bar-container {
+    flex: 1;
+  }
+
+  .funnel-count {
+    min-width: 70px;
+    text-align: right;
+  }
+}

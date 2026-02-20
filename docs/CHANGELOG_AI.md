@@ -431,3 +431,30 @@ Each AI run must append one record. Keep entries factual and short.
   - P6-T1D (Estimates/Invoices polish) pending
   - Quick assignment modal for admin not implemented (would require client state)
   - No E2E tests for new timeline view
+
+---
+
+- Timestamp (UTC): 2026-02-19T21:37:00Z
+- Agent: agent-orchestrator (Claude Code)
+- Branch: agent-orchestrator/P6-T1-frontend-productization
+- Task ID: P6-T1D
+- Summary: Enhanced estimates and invoices workspaces with financial summaries, conversion funnel visibility, and aging indicators. Estimates page now shows total/pending/won values and a visual funnel bar showing draft→sent→approved progression. Invoices page shows outstanding/overdue/collected totals with invoice aging (days until due or days overdue). Both pages have improved empty states.
+- Files changed:
+  - apps/web/app/app/estimates/page.tsx (value totals, funnel bar, expiring/expired indicators)
+  - apps/web/app/app/invoices/page.tsx (outstanding totals, aging indicators, improved sorting)
+  - apps/web/app/globals.css (funnel bar, metric enhancements, invoice amount styles)
+  - docs/PHASED_BACKLOG.yaml (P6-T1D → completed)
+  - docs/CHANGELOG_AI.md (this entry)
+- Commands run: pnpm lint / pnpm typecheck / pnpm build / pnpm test
+- Gate results: lint ✅ | typecheck ✅ | test ✅ (222 passed, 48 skipped) | build ✅
+- Source paths consulted:
+  - Dovelite: app/admin/ (dashboard metrics patterns)
+- Adoption decisions:
+  - Funnel visualization for estimates (draft→sent→approved)
+  - Aging indicators for invoices (X days overdue, due in Y days)
+  - Financial totals prominently displayed at top of each page
+  - Color-coded metrics (green for success/collected, red for overdue/alert)
+- Risks or follow-ups:
+  - P6-T1 complete - all frontend productization tasks done
+  - E2E tests for new features not yet added
+  - Could add payment recording from invoice list page in future

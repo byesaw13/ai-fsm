@@ -184,7 +184,8 @@ epics:
           - Quick assignment modal for admin
       - id: P6-T1D
         title: Estimates/Invoices workspace polish
-        status: pending
+        status: completed
+        completed_by: agent-orchestrator
         acceptance:
           - Outstanding totals summary
           - Conversion funnel visibility
