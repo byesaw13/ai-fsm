@@ -380,3 +380,28 @@ Each AI run must append one record. Keep entries factual and short.
   - P6-T1C (Visits workspace polish) pending - tech "My Day" view, overdue highlighting
   - P6-T1D (Estimates/Invoices polish) pending - funnel visibility, aging indicators
   - E2E tests for navigation visibility by role not yet added
+
+---
+
+- Timestamp (UTC): 2026-02-19T21:25:00Z
+- Agent: agent-orchestrator (Claude Code)
+- Branch: agent-orchestrator/P6-T1-frontend-productization
+- Task ID: P6-T1B
+- Summary: Enhanced jobs workspace with priority badges, search/filter capability, and improved empty states. Jobs now display priority levels (Low/Medium/High/Urgent) as color-coded badges. Added filter bar with text search (title/client) and status dropdown. Empty states now include icons, descriptive text, and CTAs.
+- Files changed:
+  - apps/web/app/app/jobs/page.tsx (search params support, priority badges, filter bar, enhanced empty state)
+  - apps/web/app/globals.css (filter bar styles, priority badge styles, empty state styles)
+  - docs/PHASED_BACKLOG.yaml (P6-T1B → completed)
+  - docs/CHANGELOG_AI.md (this entry)
+- Commands run: pnpm lint / pnpm typecheck / pnpm build / pnpm test
+- Gate results: lint ✅ | typecheck ✅ | test ✅ (222 passed, 48 skipped) | build ✅
+- Source paths consulted:
+  - Dovelite: app/admin/visits/ (filter patterns, card layouts)
+- Adoption decisions:
+  - Added server-side filtering via URL search params (no client-side state needed)
+  - Priority levels derived from job.priority field (0-4 scale)
+  - Color scheme for priorities: blue=low, yellow=medium, orange=high, red=urgent
+- Risks or follow-ups:
+  - P6-T1C (Visits workspace polish) pending
+  - P6-T1D (Estimates/Invoices polish) pending
+  - No E2E tests for new filter functionality yet

@@ -159,7 +159,7 @@ epics:
     tasks:
       - id: P6-T1A
         title: Global shell + navigation coherence
-        status: in_progress
+        status: completed
         completed_by: agent-orchestrator
         acceptance:
           - Active nav state indicator on all pages
@@ -168,7 +168,8 @@ epics:
           - Dashboard or redirect option from root
       - id: P6-T1B
         title: Jobs workspace polish
-        status: pending
+        status: completed
+        completed_by: agent-orchestrator
         acceptance:
           - Priority badge on job cards
           - Search/filter capability

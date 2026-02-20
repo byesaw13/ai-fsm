@@ -647,3 +647,119 @@ a {
   flex-wrap: wrap;
   gap: 12px;
 }
+
+/* Filter Bar */
+.filter-bar {
+  margin-bottom: 20px;
+}
+
+.filter-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.filter-input {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--card);
+  color: var(--fg);
+  min-width: 200px;
+  flex: 1;
+}
+
+.filter-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.filter-select {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--card);
+  color: var(--fg);
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.filter-active {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Priority Badges */
+.priority-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.priority-low { background: #dbeafe; color: #1e40af; }
+.priority-medium { background: #fef3c7; color: #92400e; }
+.priority-high { background: #fed7aa; color: #c2410c; }
+.priority-urgent { background: #fee2e2; color: #991b1b; }
+
+/* Job Card Enhancement */
+.job-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.job-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.job-card-meta .job-client,
+.job-card-meta .job-date {
+  margin: 0;
+}
+
+/* Empty State Enhancement */
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.empty-state-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: var(--fg);
+}
+
+.empty-state-desc {
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .filter-form {
+    flex-direction: column;
+  }
+
+  .filter-input {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .filter-select {
+    width: 100%;
+  }
+}
