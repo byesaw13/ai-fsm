@@ -348,3 +348,35 @@ Each AI run must append one record. Keep entries factual and short.
 - Risks or follow-ups:
   - This is an admin-first visits enhancement; equivalent dashboard-style upgrades for jobs/estimates/invoices are still pending.
   - No new E2E coverage added yet for the new admin-specific visits summary panels.
+
+---
+
+- Timestamp (UTC): 2026-02-19T21:20:00Z
+- Agent: agent-orchestrator (Claude Code)
+- Branch: agent-orchestrator/P6-T1-frontend-productization
+- Task ID: P6-T1A
+- Summary: Started frontend productization with global shell and navigation improvements. Created UX_GAP_REPORT.md documenting friction points across jobs/visits/estimates/invoices workspaces. Implemented active navigation state indicator, app branding (FieldSync logo), mobile-responsive hamburger menu, and a dashboard page with quick stats. The dashboard now serves as the root /app destination instead of redirecting directly to jobs.
+- Files changed:
+  - docs/UX_GAP_REPORT.md (new - comprehensive UX audit)
+  - docs/PHASED_BACKLOG.yaml (added E6 epic with P6-T1A/B/C/D tasks)
+  - docs/WORK_ASSIGNMENT.md (P6-T1A claim)
+  - apps/web/components/AppShell.tsx (new - client component with active nav, mobile menu, branding)
+  - apps/web/app/app/layout.tsx (refactored to use AppShell)
+  - apps/web/app/app/page.tsx (new - dashboard with stats cards)
+  - apps/web/app/page.tsx (redirect to /app instead of /app/jobs)
+  - apps/web/app/globals.css (navigation styles, dashboard styles, mobile responsive)
+- Commands run: pnpm lint / pnpm typecheck / pnpm build / pnpm test
+- Gate results: lint ✅ | typecheck ✅ | test ✅ (305 passed, 64 skipped) | build ✅
+- Source paths consulted:
+  - Dovelite: components/AdminLayout.tsx (sidebar nav with active states, mobile bottom nav pattern)
+  - Dovelite: app/admin/page.tsx (dashboard metrics pattern)
+- Adoption decisions:
+  - Adopted Dovelite's active nav state pattern with highlighted background color
+  - Created a simpler header-based nav (not sidebar) suitable for FSM app's smaller scope
+  - Dashboard pattern with stat cards adapted from Dovelite admin dashboard
+  - Mobile hamburger menu pattern from Dovelite AdminLayout
+- Risks or follow-ups:
+  - P6-T1B (Jobs workspace polish) pending - priority badges, search/filter
+  - P6-T1C (Visits workspace polish) pending - tech "My Day" view, overdue highlighting
+  - P6-T1D (Estimates/Invoices polish) pending - funnel visibility, aging indicators
+  - E2E tests for navigation visibility by role not yet added

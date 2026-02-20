@@ -152,3 +152,38 @@ epics:
           - DEPLOYMENT_RUNBOOK.md
           - INCIDENT_RESPONSE.md
           - Pi4 constraints documented
+
+  - id: E6
+    name: Frontend Productization
+    phase: 6
+    tasks:
+      - id: P6-T1A
+        title: Global shell + navigation coherence
+        status: in_progress
+        completed_by: agent-orchestrator
+        acceptance:
+          - Active nav state indicator on all pages
+          - App branding/logo in header
+          - Mobile-responsive navigation
+          - Dashboard or redirect option from root
+      - id: P6-T1B
+        title: Jobs workspace polish
+        status: pending
+        acceptance:
+          - Priority badge on job cards
+          - Search/filter capability
+          - Improved empty states with CTAs
+      - id: P6-T1C
+        title: Visits workspace polish
+        status: pending
+        acceptance:
+          - My Day view for tech role
+          - Overdue visit highlighting
+          - Quick assignment modal for admin
+      - id: P6-T1D
+        title: Estimates/Invoices workspace polish
+        status: pending
+        acceptance:
+          - Outstanding totals summary
+          - Conversion funnel visibility
+          - Invoice aging indicators
