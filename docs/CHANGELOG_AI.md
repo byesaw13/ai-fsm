@@ -405,3 +405,29 @@ Each AI run must append one record. Keep entries factual and short.
   - P6-T1C (Visits workspace polish) pending
   - P6-T1D (Estimates/Invoices polish) pending
   - No E2E tests for new filter functionality yet
+
+---
+
+- Timestamp (UTC): 2026-02-19T21:30:00Z
+- Agent: agent-orchestrator (Claude Code)
+- Branch: agent-orchestrator/P6-T1-frontend-productization
+- Task ID: P6-T1C
+- Summary: Enhanced visits workspace with tech-focused "My Day" timeline view, overdue visit highlighting, and improved admin metrics. Tech users now see a personalized schedule with time-of-day greeting and timeline visualization. Overdue visits are highlighted with red borders and relative time indicators. Admin metrics card for overdue visits now shows alert styling when count > 0.
+- Files changed:
+  - apps/web/app/app/visits/page.tsx (My Day timeline, overdue highlighting, improved time formatting)
+  - apps/web/app/globals.css (timeline styles, overdue styles, metric alert styles)
+  - docs/PHASED_BACKLOG.yaml (P6-T1C → completed)
+  - docs/CHANGELOG_AI.md (this entry)
+- Commands run: pnpm lint / pnpm typecheck / pnpm build / pnpm test
+- Gate results: lint ✅ | typecheck ✅ | test ✅ (222 passed, 48 skipped) | build ✅
+- Source paths consulted:
+  - Dovelite: app/admin/visits/ (schedule visualization patterns)
+- Adoption decisions:
+  - Timeline-style view for tech "My Day" with visual dots and lines
+  - Relative time formatting (e.g., "2h ago", "in 30m") for overdue indicators
+  - Time-based greeting (morning/afternoon/evening) for tech users
+  - Overdue highlighting with red border and background
+- Risks or follow-ups:
+  - P6-T1D (Estimates/Invoices polish) pending
+  - Quick assignment modal for admin not implemented (would require client state)
+  - No E2E tests for new timeline view

@@ -176,7 +176,8 @@ epics:
           - Improved empty states with CTAs
       - id: P6-T1C
         title: Visits workspace polish
-        status: pending
+        status: completed
+        completed_by: agent-orchestrator
         acceptance:
           - My Day view for tech role
           - Overdue visit highlighting
