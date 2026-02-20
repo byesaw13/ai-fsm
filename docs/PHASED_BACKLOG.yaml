@@ -201,8 +201,7 @@ epics:
           - Success redirect to job detail
       - id: P6-T2B
         title: Visit schedule UX
-        status: completed
-        completed_by: agent-orchestrator
+        status: pending
         acceptance:
           - Real scheduling form with start/end/assignment
           - Role-aware assignment field
