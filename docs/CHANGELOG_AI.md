@@ -325,3 +325,26 @@ Each AI run must append one record. Keep entries factual and short.
   - Offsite backup via rclone is commented out in backup script — operator must configure rclone remote before it activates
   - Log rotation for compose.pi.yml must be manually added (gate 5.1 in checklist enforces this pre-launch)
   - Restore drill must be completed before go-live (gate 6.x in checklist)
+
+---
+
+- Timestamp (UTC): 2026-02-19T23:35:00Z
+- Agent: agent-orchestrator (Codex)
+- Branch: agent-orchestrator/P6-visits-admin-ux
+- Task ID: P6-visits-admin-ux
+- Summary: Built out the admin Visits page from a basic grouped list into an operational workspace with summary metrics and two priority work queues. Added richer context on every visit card (client/property) while preserving tech role scoping and existing permissions.
+- Files changed:
+  - apps/web/app/app/visits/page.tsx (admin metrics cards, "Needs Assignment" and "Today" panels, enriched SQL joins and card fields)
+  - apps/web/app/globals.css (new `.metric-value` style token for summary cards)
+- Commands run:
+  - pnpm gate
+  - gh pr create (PR #50)
+  - gh pr merge 50 --squash --admin
+- Gate results:
+  - lint: ✅
+  - typecheck: ✅
+  - build: ✅
+  - test: ✅ (222 passed, 48 skipped)
+- Risks or follow-ups:
+  - This is an admin-first visits enhancement; equivalent dashboard-style upgrades for jobs/estimates/invoices are still pending.
+  - No new E2E coverage added yet for the new admin-specific visits summary panels.
