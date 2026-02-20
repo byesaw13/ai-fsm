@@ -121,7 +121,8 @@ epics:
           - CI deterministic with no flaky suites
       - id: P5-T3
         title: Observability and recovery
-        status: pending
+        status: completed
+        completed_by: agent-orchestrator
         acceptance:
           - Structured logging for web and worker
           - Request/job correlation IDs end-to-end
@@ -137,14 +138,16 @@ epics:
           - No accidental coverage gaps
       - id: P5-T5
         title: UX stabilization
-        status: pending
+        status: completed
+        completed_by: agent-orchestrator
         acceptance:
           - Error states, empty states, loading states for all flows
           - Form validation messages
           - Destructive action confirmations
       - id: P5-T6
         title: Release readiness docs
-        status: pending
+        status: completed
+        completed_by: agent-orchestrator
         acceptance:
           - PROD_READINESS_CHECKLIST.md
           - DEPLOYMENT_RUNBOOK.md
