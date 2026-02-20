@@ -190,3 +190,33 @@ epics:
           - Outstanding totals summary
           - Conversion funnel visibility
           - Invoice aging indicators
+
+      - id: P6-T2A
+        title: Jobs create UX
+        status: completed
+        completed_by: agent-orchestrator
+        acceptance:
+          - Real create form with title/client/property/description/priority
+          - Client-side validation + inline errors
+          - Success redirect to job detail
+      - id: P6-T2B
+        title: Visit schedule UX
+        status: completed
+        completed_by: agent-orchestrator
+        acceptance:
+          - Real scheduling form with start/end/assignment
+          - Role-aware assignment field
+          - Success redirect to visit detail
+      - id: P6-T2C
+        title: E2E core flow
+        status: pending
+        acceptance:
+          - Playwright spec for admin login -> job -> visit -> estimate -> invoice -> payment
+          - Deterministic test data strategy
+      - id: P6-T2D
+        title: Tracking + docs update
+        status: pending
+        acceptance:
+          - PHASED_BACKLOG.yaml updated
+          - WORK_ASSIGNMENT.md updated
+          - CHANGELOG_AI.md updated

@@ -458,3 +458,36 @@ Each AI run must append one record. Keep entries factual and short.
   - P6-T1 complete - all frontend productization tasks done
   - E2E tests for new features not yet added
   - Could add payment recording from invoice list page in future
+
+---
+
+- Timestamp (UTC): 2026-02-19T22:00:00Z
+- Agent: agent-orchestrator
+- Branch: agent-orchestrator/P6-T2-jobs-create-ux
+- Task ID: P6-T2A
+- Summary: Replaced job create stub with real form including title, client, property (filtered by client), description, priority, and scheduled start/end. Client-side validation with inline errors. Success redirect to job detail.
+- Files changed:
+  - apps/web/app/app/jobs/new/page.tsx
+  - apps/web/app/app/jobs/new/JobCreateForm.tsx
+  - apps/web/app/globals.css
+  - docs/PHASED_BACKLOG.yaml
+  - docs/WORK_ASSIGNMENT.md
+- Commands run: pnpm lint / pnpm typecheck / pnpm build / pnpm test
+- Gate results: lint ✅ / typecheck ✅ / build ✅ / test ✅ (222 passed)
+- Risks or follow-ups: P6-T2B/C pending.
+
+---
+
+- Timestamp (UTC): 2026-02-19T22:05:00Z
+- Agent: agent-orchestrator
+- Branch: agent-orchestrator/P6-T2-visit-schedule-ux
+- Task ID: P6-T2B
+- Summary: Replaced visit schedule stub with real form including scheduled start/end (required), assigned_user_id (optional, admin/owner only). Client-side datetime validation. Success redirect to visit detail.
+- Files changed:
+  - apps/web/app/app/jobs/[id]/visits/new/page.tsx
+  - apps/web/app/app/jobs/[id]/visits/new/VisitScheduleForm.tsx
+  - docs/PHASED_BACKLOG.yaml
+  - docs/WORK_ASSIGNMENT.md
+- Commands run: pnpm lint / pnpm typecheck / pnpm build / pnpm test
+- Gate results: lint ✅ / typecheck ✅ / build ✅ / test ✅ (222 passed)
+- Risks or follow-ups: P6-T2C (E2E core flow) pending.
