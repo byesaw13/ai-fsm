@@ -1154,3 +1154,211 @@ a {
     justify-content: center;
   }
 }
+
+/* Automations Page */
+.automations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.automation-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.section-desc {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 16px;
+}
+
+.automation-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.automation-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.stat-group h4 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.stat-label {
+  color: var(--muted);
+}
+
+.stat-value {
+  font-weight: 600;
+}
+
+.automation-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.meta-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.meta-label {
+  color: var(--muted);
+}
+
+.meta-value {
+  font-weight: 500;
+}
+
+.run-btn {
+  margin-top: 8px;
+}
+
+.empty-card {
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.empty-card p {
+  margin: 0;
+}
+
+.empty-card .hint {
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.events-section {
+  margin-top: 24px;
+}
+
+.events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.event-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.event-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.event-content {
+  flex: 1;
+}
+
+.event-summary {
+  font-size: 14px;
+  margin: 0 0 2px;
+}
+
+.event-time {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.event-type-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+}
+
+.event-type-badge.type-visit_reminder {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.event-type-badge.type-invoice_followup {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 8px;
+}
+
+.status-badge.status-disabled {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.role-notice {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 16px;
+}
+
+.alert {
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.alert-error {
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.alert-success {
+  background: #d1fae5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+}
+
+@media (max-width: 768px) {
+  .automations-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .automation-stats {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
