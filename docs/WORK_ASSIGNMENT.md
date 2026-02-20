@@ -83,6 +83,9 @@ These files require explicit lock entry in `Active Claims` before edits:
 | `agent-orchestrator` | `P6-T1B` | `agent-orchestrator/P6-T1-frontend-productization` | `apps/web/app/app/jobs/page.tsx`, `apps/web/app/globals.css` | `2026-02-19T21:25:00Z` | `completed` |
 | `agent-orchestrator` | `P6-T1C` | `agent-orchestrator/P6-T1-frontend-productization` | `apps/web/app/app/visits/page.tsx`, `apps/web/app/globals.css` | `2026-02-19T21:30:00Z` | `completed` |
 | `agent-orchestrator` | `P6-T1D` | `agent-orchestrator/P6-T1-frontend-productization` | `apps/web/app/app/estimates/page.tsx`, `apps/web/app/app/invoices/page.tsx`, `apps/web/app/globals.css` | `2026-02-19T21:37:00Z` | `completed` |
+| `agent-orchestrator` | `P6-T2A` | `agent-orchestrator/P6-T2-jobs-create-ux` | `apps/web/app/app/jobs/new/page.tsx`, `apps/web/app/app/jobs/new/JobCreateForm.tsx`, `apps/web/app/globals.css` | `2026-02-19T22:00:00Z` | `completed` |
+| `agent-orchestrator` | `P6-T2B` | `agent-orchestrator/P6-T2-visit-schedule-ux` | `apps/web/app/app/jobs/[id]/visits/new/page.tsx`, `apps/web/app/app/jobs/[id]/visits/new/VisitScheduleForm.tsx` | `2026-02-19T22:05:00Z` | `completed` |
+| `agent-orchestrator` | `P6-T2C` | `agent-orchestrator/P6-T2-e2e-core-flow` | `tests/e2e/core-flow.spec.ts`, `playwright.config.ts`, `package.json` | `2026-02-19T22:15:00Z` | `completed` |
 
 ## Merge Order
 1. Foundation/auth changes
