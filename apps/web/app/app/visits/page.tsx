@@ -30,12 +30,49 @@ const STATUS_ORDER: VisitStatus[] = [
   "cancelled",
 ];
 
-function formatVisitDate(iso: string): string {
+function formatVisitTime(iso: string): string {
   const date = new Date(iso);
-  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {
+  return date.toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
-  })}`;
+  });
+}
+
+function formatVisitDate(iso: string): string {
+  const date = new Date(iso);
+  return `${date.toLocaleDateString()} ${formatVisitTime(iso)}`;
+}
+
+function formatRelativeTime(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const diffMs = date.getTime() - now.getTime();
+  const diffMins = Math.round(diffMs / 60000);
+
+  if (diffMins < -60) {
+    const hours = Math.round(-diffMins / 60);
+    return `${hours}h ago`;
+  } else if (diffMins < 0) {
+    return `${-diffMins}m ago`;
+  } else if (diffMins < 60) {
+    return `in ${diffMins}m`;
+  } else {
+    const hours = Math.round(diffMins / 60);
+    return `in ${hours}h`;
+  }
+}
+
+function isOverdue(visit: VisitRow): boolean {
+  const now = Date.now();
+  const scheduledTime = new Date(visit.scheduled_start).getTime();
+  return scheduledTime < now && (visit.status === "scheduled" || visit.status === "arrived");
+}
+
+function isToday(date: Date): boolean {
+  const today = new Date();
+  return date.getDate() === today.getDate() &&
+    date.getMonth() === today.getMonth() &&
+    date.getFullYear() === today.getFullYear();
 }
 
 export default async function VisitsPage() {
@@ -43,6 +80,7 @@ export default async function VisitsPage() {
   if (!session) redirect("/login");
 
   const isAdmin = canViewAllVisits(session.role);
+  const isTech = session.role === "tech";
 
   let visits: VisitRow[];
   if (isAdmin) {
@@ -64,7 +102,6 @@ export default async function VisitsPage() {
       [session.accountId]
     );
   } else {
-    // tech: only assigned visits
     visits = await query<VisitRow>(
       `SELECT
           v.*,
@@ -93,24 +130,28 @@ export default async function VisitsPage() {
   }
 
   const activeStatuses = STATUS_ORDER.filter((s) => grouped[s].length > 0);
-  const now = Date.now();
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const endOfToday = new Date(startOfToday);
   endOfToday.setDate(endOfToday.getDate() + 1);
 
   const unassigned = visits.filter((v) => !v.assigned_user_id);
   const todayVisits = visits.filter((v) => {
-    const ts = new Date(v.scheduled_start).getTime();
-    return ts >= startOfToday.getTime() && ts < endOfToday.getTime();
+    const ts = new Date(v.scheduled_start);
+    return isToday(ts);
   });
   const activeVisits = visits.filter(
     (v) => v.status === "in_progress" || v.status === "arrived"
   );
-  const overdueScheduled = visits.filter((v) => {
-    const ts = new Date(v.scheduled_start).getTime();
-    return ts < now && (v.status === "scheduled" || v.status === "arrived");
-  });
+  const overdueScheduled = visits.filter(isOverdue);
+
+  const currentHour = now.getHours();
+  let timeGreeting = "Good morning";
+  if (currentHour >= 12 && currentHour < 17) {
+    timeGreeting = "Good afternoon";
+  } else if (currentHour >= 17) {
+    timeGreeting = "Good evening";
+  }
 
   return (
     <div className="page-container">
@@ -118,33 +159,99 @@ export default async function VisitsPage() {
         <div>
           <h1 className="page-title">Visits</h1>
           <p className="page-subtitle">
-            {isAdmin
-              ? `All visits — ${visits.length} total`
-              : `Your assigned visits — ${visits.length} total`}
+            {isTech
+              ? `${timeGreeting} — ${todayVisits.length} visits today`
+              : isAdmin
+                ? `All visits — ${visits.length} total`
+                : `Your visits — ${visits.length} total`}
           </p>
         </div>
       </div>
 
+      {isTech && todayVisits.length > 0 && (
+        <section className="my-day-section">
+          <h2 className="section-title">Today&apos;s Schedule</h2>
+          <div className="schedule-timeline">
+            {todayVisits.map((visit, idx) => (
+              <div
+                key={visit.id}
+                className={`schedule-item ${isOverdue(visit) ? "overdue" : ""} ${visit.status === "completed" ? "completed" : ""}`}
+              >
+                <div className="schedule-time">
+                  <span className="schedule-start">{formatVisitTime(visit.scheduled_start)}</span>
+                  <span className="schedule-end">{formatVisitTime(visit.scheduled_end)}</span>
+                </div>
+                <div className="schedule-dot-container">
+                  <div className={`schedule-dot ${visit.status === "completed" ? "completed" : visit.status === "in_progress" ? "active" : ""}`} />
+                  {idx < todayVisits.length - 1 && <div className="schedule-line" />}
+                </div>
+                <Link href={`/app/visits/${visit.id}`} className="schedule-content">
+                  <span className="schedule-title">{visit.job_title ?? "Untitled job"}</span>
+                  {visit.property_address && (
+                    <span className="schedule-address">{visit.property_address}</span>
+                  )}
+                  {isOverdue(visit) && (
+                    <span className="overdue-alert">{formatRelativeTime(visit.scheduled_start)} overdue</span>
+                  )}
+                </Link>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {isAdmin && (
         <>
-          <div className="grid">
-            <div className="card">
+          <div className="grid metrics-grid">
+            <div className="card metric-card">
               <p className="muted">Needs Assignment</p>
               <p className="metric-value">{unassigned.length}</p>
             </div>
-            <div className="card">
+            <div className="card metric-card">
               <p className="muted">Today</p>
               <p className="metric-value">{todayVisits.length}</p>
             </div>
-            <div className="card">
+            <div className="card metric-card">
               <p className="muted">Active Now</p>
               <p className="metric-value">{activeVisits.length}</p>
             </div>
-            <div className="card">
-              <p className="muted">Overdue Scheduled</p>
+            <div className={`card metric-card ${overdueScheduled.length > 0 ? "metric-alert" : ""}`}>
+              <p className="muted">Overdue</p>
               <p className="metric-value">{overdueScheduled.length}</p>
             </div>
           </div>
+
+          {overdueScheduled.length > 0 && (
+            <section className="overdue-section">
+              <h2 className="status-heading overdue-heading">
+                Overdue Visits
+                <span className="count-badge count-alert">{overdueScheduled.length}</span>
+              </h2>
+              <div className="visit-list">
+                {overdueScheduled.slice(0, 5).map((visit) => (
+                  <Link
+                    key={visit.id}
+                    href={`/app/visits/${visit.id}`}
+                    className="visit-card overdue-card"
+                  >
+                    <div className="visit-card-header">
+                      <span className="visit-date">{formatVisitDate(visit.scheduled_start)}</span>
+                      <span className={`status-pill status-${visit.status}`}>
+                        {STATUS_LABELS[visit.status]}
+                      </span>
+                    </div>
+                    <p className="visit-job">{visit.job_title ?? "Untitled job"}</p>
+                    {visit.assigned_user_name ? (
+                      <p className="muted">Tech: {visit.assigned_user_name}</p>
+                    ) : (
+                      <p className="unassigned-badge">Unassigned</p>
+                    )}
+                    <p className="overdue-time">{formatRelativeTime(visit.scheduled_start)} overdue</p>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
 
           <div className="grid">
             <section className="card">
@@ -189,10 +296,10 @@ export default async function VisitsPage() {
                     <Link
                       key={visit.id}
                       href={`/app/visits/${visit.id}`}
-                      className="visit-card"
+                      className={`visit-card ${isOverdue(visit) ? "overdue-card" : ""}`}
                     >
                       <div className="visit-card-header">
-                        <span className="visit-date">{formatVisitDate(visit.scheduled_start)}</span>
+                        <span className="visit-date">{formatVisitTime(visit.scheduled_start)}</span>
                         <span className={`status-pill status-${visit.status}`}>
                           {STATUS_LABELS[visit.status]}
                         </span>
@@ -214,10 +321,14 @@ export default async function VisitsPage() {
 
       {visits.length === 0 ? (
         <div className="empty-state" data-testid="visits-empty">
-          <p>
+          <div className="empty-state-icon">📅</div>
+          <p className="empty-state-title">
+            {isAdmin ? "No visits scheduled" : "No visits assigned"}
+          </p>
+          <p className="empty-state-desc">
             {isAdmin
-              ? "No visits scheduled yet."
-              : "No visits assigned to you."}
+              ? "Schedule visits from job detail pages."
+              : "Visits will appear here when you're assigned."}
           </p>
         </div>
       ) : (
@@ -233,7 +344,7 @@ export default async function VisitsPage() {
                   <Link
                     key={visit.id}
                     href={`/app/visits/${visit.id}`}
-                    className="visit-card"
+                    className={`visit-card ${isOverdue(visit) ? "overdue-card" : ""}`}
                     data-testid="visit-card"
                     data-status={visit.status}
                   >
@@ -259,6 +370,9 @@ export default async function VisitsPage() {
                       <p className="unassigned-badge" data-testid="unassigned-badge">
                         Unassigned
                       </p>
+                    )}
+                    {isOverdue(visit) && (
+                      <p className="overdue-time">{formatRelativeTime(visit.scheduled_start)} overdue</p>
                     )}
                   </Link>
                 ))}
