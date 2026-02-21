@@ -149,10 +149,10 @@ jobs:
         run: pnpm test
 
   # ── 5. E2E (Playwright) — Optional ────────────────────────────────────────
-  # Only runs when E2E_ENABLED secret is set to "true".
+  # Only runs when E2E_ENABLED repository variable is set to "true".
   # This allows repos to opt-in to E2E CI without requiring it for all PRs.
   #
-  # To enable: Add a repository secret E2E_ENABLED=true
+  # To enable: Add a repository variable E2E_ENABLED=true
   #
   # NOT part of branch protection required checks — it's optional.
   # See docs/TEST_MATRIX.md — Tier 4: E2E.
@@ -160,7 +160,7 @@ jobs:
     name: e2e
     needs: [build]
     runs-on: ubuntu-latest
-    if: ${{ secrets.E2E_ENABLED == 'true' }}
+    if: ${{ vars.E2E_ENABLED == 'true' }}
     services:
       postgres:
         image: postgres:16
