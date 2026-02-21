@@ -147,3 +147,79 @@ jobs:
 
       - name: Run unit + DB-integration tests
         run: pnpm test
+
+  # ── 5. E2E (Playwright) — Optional ────────────────────────────────────────
+  # Only runs when E2E_ENABLED secret is set to "true".
+  # This allows repos to opt-in to E2E CI without requiring it for all PRs.
+  #
+  # To enable: Add a repository secret E2E_ENABLED=true
+  #
+  # NOT part of branch protection required checks — it's optional.
+  # See docs/TEST_MATRIX.md — Tier 4: E2E.
+  e2e:
+    name: e2e
+    needs: [build]
+    runs-on: ubuntu-latest
+    if: ${{ secrets.E2E_ENABLED == 'true' }}
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: aifsm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/aifsm_test
+      AUTH_SECRET: ci-e2e-test-secret-not-used-in-production!!
+      REDIS_URL: redis://localhost:6379/0
+      TEST_BASE_URL: http://localhost:3000
+      NEXT_PHASE: phase-production-build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Apply schema migrations
+        run: |
+          for file in db/migrations/*.sql; do
+            if [[ "$file" == *"seed"* ]]; then continue; fi
+            echo "applying: $file"
+            PGPASSWORD=test psql -h localhost -U test -d aifsm_test -v ON_ERROR_STOP=1 -f "$file"
+          done
+
+      - name: Apply seed data
+        run: PGPASSWORD=test psql -h localhost -U test -d aifsm_test -v ON_ERROR_STOP=1 -f db/migrations/002_seed_dev.sql
+
+      - name: Build production app
+        run: pnpm build
+
+      - name: Start production server
+        run: pnpm --filter @ai-fsm/web start &
+
+      - name: Wait for server
+        run: sleep 10 && curl -f http://localhost:3000/api/health
+
+      - name: Run Playwright E2E tests
+        run: pnpm exec playwright test --reporter=list
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

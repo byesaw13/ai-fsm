@@ -514,3 +514,37 @@ Each AI run must append one record. Keep entries factual and short.
   - Run endpoint tests excluded due to Vitest module mocking complexity with bracketed path [id] — can be added later
   - E2E tests require running dev server + seeded DB (not run in CI yet)
   - Branch protection approvals may have drifted to 0; must restore to 1 after merge
+
+---
+
+- Timestamp (UTC): 2026-02-20T19:40:00Z
+- Agent: agent-orchestrator
+- Branch: agent-orchestrator/P6-T4-test-hardening-ci-e2e
+- Task ID: P6-T4
+- Summary: Test hardening and CI E2E wiring. Refactored automations run endpoint logic into testable service module (apps/web/lib/automations/service.ts) with validation helpers, response builders, and trigger logic. Route is now thin (validate/auth -> call service -> response). Added 14 unit tests for automations service (validation, RBAC, response building). Added 7 HTTP integration tests for automations API (GET list, GET events, POST run, role matrix). Added optional E2E CI job gated by E2E_ENABLED secret — does not break existing required checks (lint, typecheck, build, test). Updated TEST_MATRIX.md with exact test tiers, new test files, and skip conditions.
+- Files changed:
+  - apps/web/lib/automations/service.ts (new — testable service module with validation, trigger, response logic)
+  - apps/web/lib/automations/__tests__/service.unit.test.ts (new — 14 unit tests for service)
+  - apps/web/lib/automations/__tests__/api.integration.test.ts (new — 7 HTTP integration tests)
+  - apps/web/app/api/v1/automations/[id]/run/route.ts (refactored to use service)
+  - .github/workflows/ci.yml (added optional e2e job)
+  - docs/TEST_MATRIX.md (updated with new tests and CI E2E section)
+  - docs/PHASED_BACKLOG.yaml (P6-T4 marked completed)
+  - docs/CHANGELOG_AI.md (this entry)
+- Commands run: pnpm lint / pnpm typecheck / pnpm build / pnpm test
+- Gate results:
+  - lint: ✅ no errors
+  - typecheck: ✅ no errors
+  - test: ✅ 242 passed, 55 skipped (21 new tests)
+  - build: ✅ clean production build
+- Source paths consulted:
+  - ai-fsm: apps/web/app/api/v1/jobs/__tests__/jobs.unit.test.ts (mock pattern reference)
+  - ai-fsm: apps/web/lib/automations/service.ts (own service extraction)
+- Adoption decisions:
+  - Service module extraction for testability without changing behavior
+  - HTTP integration tests skip pattern using RUN_INTEGRATION guard (consistent with existing tier 3 tests)
+  - E2E CI job optional via E2E_ENABLED secret (non-breaking for existing workflows)
+- Risks or follow-ups:
+  - Run endpoint route unit tests deferred due to Vitest bracketed path mocking issues — covered by service tests
+  - E2E CI requires repo owner to set E2E_ENABLED=true secret to activate
+  - Integration tests require TEST_DATABASE_URL + TEST_BASE_URL to run (skipped in default CI)

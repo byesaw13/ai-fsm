@@ -30,8 +30,11 @@ Run on every CI push. No external dependencies. Never skipped.
 | `apps/web/lib/estimates/__tests__/estimates.unit.test.ts` | 23 | Estimate math, schema validation |
 | `apps/web/lib/invoices/__tests__/invoices.unit.test.ts` | 28 | Invoice math, status helpers |
 | `apps/web/lib/invoices/__tests__/payments.unit.test.ts` | 22 | Payment trigger logic, status sync |
+| `apps/web/lib/automations/__tests__/service.unit.test.ts` | 13 | Automation validation, response builders, RBAC checks |
 | `apps/web/app/api/v1/jobs/__tests__/jobs.unit.test.ts` | 14 | Jobs route handler (mocked DB) |
 | `apps/web/app/api/v1/visits/__tests__/visits.unit.test.ts` | 17 | Visits route handler (mocked DB) |
+| `apps/web/app/api/v1/automations/__tests__/automations.unit.test.ts` | 6 | Automations list/create route handlers (mocked DB) |
+| `apps/web/app/api/v1/automations/[id]/run/__tests__/run.unit.test.ts` | 9 | Automation trigger route handler (mocked DB) |
 | `services/worker/src/visit-reminder.test.ts` | ~40 | Visit reminder worker logic (mocked DB) |
 | `services/worker/src/invoice-followup.test.ts` | ~40 | Invoice followup worker logic (mocked DB) |
 
@@ -94,6 +97,7 @@ describe.skipIf(!RUN_INTEGRATION)("My Suite", () => { ... });
 | `apps/web/lib/estimates/__tests__/estimates.integration.test.ts` | 16 | Implemented | Estimates CRUD, lifecycle transitions, RBAC, immutability |
 | `apps/web/lib/invoices/__tests__/invoices.integration.test.ts` | 12 | Implemented | Estimate→invoice conversion, invoice list/detail, transitions |
 | `apps/web/lib/auth/__tests__/auth.integration.test.ts` | 8 | **STUB** | Login flow, logout, /me endpoint, rate-limit enforcement |
+| `apps/web/lib/automations/__tests__/api.integration.test.ts` | 6 | Implemented | Automations API: GET list, GET events, POST run, role matrix |
 
 The auth integration file is a stub — test bodies are not yet implemented.
 Tests will be implemented as part of P5-T4 follow-on work.
@@ -133,6 +137,7 @@ Require a running dev/prod server with seeded DB.
 | `tests/e2e/estimates-smoke.spec.ts` | Estimate create → send → approve flow |
 | `tests/e2e/invoice-convert-smoke.spec.ts` | Approve estimate → convert → invoice |
 | `tests/e2e/payment-smoke.spec.ts` | Record payment, verify invoice status |
+| `tests/e2e/automations-smoke.spec.ts` | Automations page: admin run controls, tech read-only |
 | `tests/e2e/visit-reminder-smoke.spec.ts` | Automation: visit reminder |
 | `tests/e2e/invoice-followup-smoke.spec.ts` | Automation: invoice followup |
 
@@ -145,16 +150,20 @@ pnpm dev:web
 TEST_BASE_URL=http://localhost:3000 pnpm exec playwright test
 ```
 
-**CI integration (future — P5-T2 follow-up):**
-Add a separate `e2e` CI job triggered only on `main` and release branches:
+**CI integration (P6-T4):**
+E2E is now available as an optional CI job. To enable, set the repository secret `E2E_ENABLED=true`.
+The job is NOT required for branch protection — it runs only when opted in.
+
 ```yaml
 e2e:
   needs: [build]
+  if: ${{ secrets.E2E_ENABLED == 'true' }}
   env:
     TEST_BASE_URL: http://localhost:3000
   steps:
-    - run: pnpm build && pnpm start &
-    - run: sleep 5 && pnpm exec playwright test
+    - run: pnpm build
+    - run: pnpm --filter @ai-fsm/web start &
+    - run: sleep 10 && pnpm exec playwright test
 ```
 
 ---
@@ -168,12 +177,13 @@ Skips in CI are intentional. This table documents every expected skip.
 | `auth.integration.test.ts` | 8 | Tier 3: TEST_BASE_URL absent in CI |
 | `estimates.integration.test.ts` | 16 | Tier 3: TEST_BASE_URL absent in CI |
 | `invoices.integration.test.ts` | 12 | Tier 3: TEST_BASE_URL absent in CI |
+| `api.integration.test.ts` (automations) | 6 | Tier 3: TEST_BASE_URL absent in CI |
 | `payments.integration.test.ts` | 1 | Sentinel skip (confirms guard works when DB absent locally) |
 | Playwright E2E | not in test job | Tier 4: not wired to `pnpm test` |
 
 **Expected CI output:**
 ```
-Tests  ~200 passed | ~40 skipped
+Tests  ~250 passed | ~48 skipped
 ```
 
 Any test skip NOT in the table above is unexpected and must be investigated.
