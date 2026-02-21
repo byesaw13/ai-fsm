@@ -243,3 +243,17 @@ epics:
           - API tests for automations endpoints (RBAC + idempotency)
           - E2E smoke for automations page visibility and run button
           - PHASED_BACKLOG.yaml and WORK_ASSIGNMENT.md reconciled to reality
+
+      - id: P6-T4
+        title: Test Hardening + CI E2E Wiring
+        status: completed
+        completed_by: agent-orchestrator
+        acceptance:
+          - Automations run endpoint refactored into testable service module
+          - Route is thin (validate/auth -> call service -> response)
+          - Unit tests for success, RBAC deny, invalid automation id, idempotent behavior
+          - Integration tests for automations API (GET list, GET events, POST run)
+          - Role matrix coverage: admin/owner allowed for run, tech read-only
+          - Optional Playwright CI job (E2E_ENABLED secret gate)
+          - Existing required checks stable: lint, typecheck, build, test
+          - docs/TEST_MATRIX.md updated with exact tiers and skip conditions

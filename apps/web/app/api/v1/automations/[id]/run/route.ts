@@ -2,22 +2,40 @@ import { NextRequest, NextResponse } from "next/server";
 import { withRole } from "../../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../../lib/auth/middleware";
 import { query, getPool } from "../../../../../../lib/db";
-import { appendAuditLog } from "../../../../../../lib/db/audit";
 import { logger } from "../../../../../../lib/logger";
+import {
+  triggerAutomation,
+  validateAutomationId,
+  buildSuccessResponse,
+  buildErrorResponse,
+  type AutomationRecord,
+} from "../../../../../../lib/automations/service";
 
 export const dynamic = "force-dynamic";
+
+async function getAutomation(
+  automationId: string,
+  accountId: string
+): Promise<AutomationRecord | null> {
+  const rows = await query<AutomationRecord>(
+    `SELECT id, type, account_id, enabled FROM automations WHERE id = $1 AND account_id = $2`,
+    [automationId, accountId]
+  );
+  return rows[0] ?? null;
+}
 
 export const POST = withRole(
   ["owner", "admin"],
   async (request: NextRequest, session: AuthSession) => {
-    const automationId = request.nextUrl.pathname.split("/")[5];
+    const automationId = validateAutomationId(
+      request.nextUrl.pathname.split("/")[5]
+    );
 
     if (!automationId) {
       return NextResponse.json(
         {
           error: {
-            code: "VALIDATION_ERROR",
-            message: "Automation ID required",
+            ...buildErrorResponse("VALIDATION_ERROR", "Automation ID required"),
             traceId: session.traceId,
           },
         },
@@ -25,17 +43,13 @@ export const POST = withRole(
       );
     }
 
-    const existing = await query<{ id: string; type: string; account_id: string; enabled: boolean }>(
-      `SELECT id, type, account_id, enabled FROM automations WHERE id = $1 AND account_id = $2`,
-      [automationId, session.accountId]
-    );
+    const automation = await getAutomation(automationId, session.accountId);
 
-    if (existing.length === 0) {
+    if (!automation) {
       return NextResponse.json(
         {
           error: {
-            code: "NOT_FOUND",
-            message: "Automation not found",
+            ...buildErrorResponse("NOT_FOUND", "Automation not found"),
             traceId: session.traceId,
           },
         },
@@ -43,14 +57,11 @@ export const POST = withRole(
       );
     }
 
-    const automation = existing[0];
-
     if (!automation.enabled) {
       return NextResponse.json(
         {
           error: {
-            code: "VALIDATION_ERROR",
-            message: "Automation is disabled",
+            ...buildErrorResponse("VALIDATION_ERROR", "Automation is disabled"),
             traceId: session.traceId,
           },
         },
@@ -63,48 +74,24 @@ export const POST = withRole(
 
     try {
       await client.query("BEGIN");
-      await client.query(
-        `SET LOCAL app.current_user_id = $1; SET LOCAL app.current_account_id = $2; SET LOCAL app.current_role = $3`,
-        [session.userId, session.accountId, session.role]
-      );
 
-      await client.query(
-        `UPDATE automations SET next_run_at = now(), updated_at = now() WHERE id = $1`,
-        [automationId]
-      );
-
-      await appendAuditLog(client, {
-        account_id: session.accountId,
-        entity_type: "automation_run",
-        entity_id: automationId,
-        action: "insert",
-        actor_id: session.userId,
-        trace_id: session.traceId,
-        new_value: {
-          automation_id: automationId,
-          automation_type: automation.type,
-          triggered_by: "manual",
-          triggered_at: new Date().toISOString(),
-        },
+      await triggerAutomation(client, automationId, automation, {
+        accountId: session.accountId,
+        userId: session.userId,
+        traceId: session.traceId,
       });
 
       await client.query("COMMIT");
 
-      return NextResponse.json({
-        data: {
-          id: automationId,
-          triggered: true,
-          message: `Automation ${automation.type} queued to run`,
-        },
-      });
+      const result = buildSuccessResponse(automationId, automation.type);
+      return NextResponse.json({ data: result });
     } catch (err) {
       await client.query("ROLLBACK");
       logger.error("[automations run POST]", err, { traceId: session.traceId });
       return NextResponse.json(
         {
           error: {
-            code: "INTERNAL_ERROR",
-            message: "Failed to trigger automation",
+            ...buildErrorResponse("INTERNAL_ERROR", "Failed to trigger automation"),
             traceId: session.traceId,
           },
         },
