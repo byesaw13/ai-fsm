@@ -294,6 +294,16 @@ epics:
           - Visits workspace supports Today/Upcoming/Overdue segmentation with tech-friendly "My Day" view
           - Mobile action bar and desktop sticky actions implemented for key job/visit pages
           - Unit and E2E tests cover critical jobs/visits flow interactions
+      - id: P7-T2.5
+        title: Clients and properties workspace productization
+        status: completed
+        completed_by: agent-orchestrator
+        acceptance:
+          - Clients list/detail pages built with P7 primitives and URL-persisted filters
+          - Properties list/detail pages built with P7 primitives and client linkage context
+          - Owner/admin create and edit flows for clients/properties with explicit validation and feedback
+          - Quick actions link client/property context into job creation flow
+          - Unit and E2E tests cover client/property -> job path
       - id: P7-T3
         title: Estimates, invoices, and payments workspace rewrite
         status: pending

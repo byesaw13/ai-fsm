@@ -28,6 +28,8 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { href: "/app" as const,             label: "Dashboard",   icon: "⊞" },
   { href: "/app/jobs" as const,        label: "Jobs",        icon: "📋" },
   { href: "/app/visits" as const,      label: "Visits",      icon: "📅" },
+  { href: "/app/clients" as const,     label: "Clients",     icon: "👥", adminOnly: true },
+  { href: "/app/properties" as const,  label: "Properties",  icon: "🏠", adminOnly: true },
   { href: "/app/estimates" as const,   label: "Estimates",   icon: "📄", adminOnly: true },
   { href: "/app/invoices" as const,    label: "Invoices",    icon: "💰", adminOnly: true },
   { href: "/app/automations" as const, label: "Automations", icon: "⚙", adminOnly: true },

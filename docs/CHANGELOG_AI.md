@@ -706,3 +706,62 @@ Each AI run must append one record. Keep entries factual and short.
   - Run endpoint route unit tests deferred due to Vitest bracketed path mocking issues — covered by service tests
   - E2E CI requires repo owner to set E2E_ENABLED=true secret to activate
   - Integration tests require TEST_DATABASE_URL + TEST_BASE_URL to run (skipped in default CI)
+
+---
+
+- Timestamp (UTC): 2026-02-23T18:30:19Z
+- Agent: agent-orchestrator
+- Branch: agent-orchestrator/P7-T2.5-clients-properties-workspace
+- Task ID: P7-T2.5
+- Summary: Built first-class P7 clients/properties workspace for owner/admin roles. Added list/detail/create/edit UX for clients and properties using P7 primitives (PageHeader, FilterBar, DataTable, ItemCard, MetricGrid, Timeline, forms). Added REST API endpoints for clients/properties (GET/POST list, GET/PATCH detail) with auth/RBAC, Zod validation, audit logging, and transactional mutations. Added CRM UI helper module + unit tests. Added job creation context handoff from client/property pages by pre-filling `/app/jobs/new?client_id=&property_id=` and updated JobCreateForm to honor initial query values. Added E2E smoke covering client -> property -> job flow. Updated AppShell nav to include Clients/Properties routes for owner/admin.
+- Files changed:
+  - apps/web/app/api/v1/clients/route.ts (new)
+  - apps/web/app/api/v1/clients/[id]/route.ts (new)
+  - apps/web/app/api/v1/properties/route.ts (new)
+  - apps/web/app/api/v1/properties/[id]/route.ts (new)
+  - apps/web/app/app/clients/page.tsx (new)
+  - apps/web/app/app/clients/new/page.tsx (new)
+  - apps/web/app/app/clients/[id]/page.tsx (new)
+  - apps/web/app/app/clients/ClientForm.tsx (new)
+  - apps/web/app/app/clients/loading.tsx (new)
+  - apps/web/app/app/properties/page.tsx (new)
+  - apps/web/app/app/properties/new/page.tsx (new)
+  - apps/web/app/app/properties/[id]/page.tsx (new)
+  - apps/web/app/app/properties/PropertyForm.tsx (new)
+  - apps/web/app/app/properties/loading.tsx (new)
+  - apps/web/app/app/jobs/new/page.tsx (query prefill support)
+  - apps/web/app/app/jobs/new/JobCreateForm.tsx (initial client/property preselection)
+  - apps/web/lib/crm/p7.ts (new helper module)
+  - apps/web/lib/crm/__tests__/p7.unit.test.ts (new — 6 unit tests)
+  - apps/web/components/AppShell.tsx (Clients/Properties nav items)
+  - apps/web/components/ui/__tests__/design-system.unit.test.ts (nav count expectations updated)
+  - tests/e2e/clients-properties-smoke.spec.ts (new)
+  - docs/PHASED_BACKLOG.yaml (P7-T2.5 added + completed)
+  - docs/WORK_ASSIGNMENT.md (P7-T2.5 claim completed)
+  - docs/CHANGELOG_AI.md (this entry)
+- Commands run:
+  - pnpm --filter @ai-fsm/web typecheck
+  - pnpm --filter @ai-fsm/web lint
+  - pnpm gate
+- Gate results:
+  - lint: ✅
+  - typecheck: ✅
+  - build: ✅
+  - test: ✅ packages/domain 38 pass; services/worker 45 pass / 16 skip; apps/web 322 pass / 55 skip
+- Source evidence (dovelite):
+  - Consulted: /home/nick/dev/dovelite/app/admin/clients/page.tsx (header + CTA + empty-state structure)
+  - Consulted: /home/nick/dev/dovelite/app/admin/clients/[id]/page.tsx (client detail as operational profile with next-step/property prompts)
+  - Adopted: client detail as a hub with related records + next actions, but normalized into ai-fsm P7 primitives and FSM routes
+- Source evidence (myprogram):
+  - Consulted: /home/nick/dev/myprogram/frontend/apps/admin/src/app/(dashboard)/dashboard/clients/page.tsx (search + create-on-page workflow expectations)
+  - Consulted: /home/nick/dev/myprogram/DOMAIN_MODEL.md and /home/nick/dev/myprogram/RLS_POLICY_MATRIX.md (kept CRM fields scoped to existing client/property domain and owner/admin write boundary)
+  - Adopted: explicit owner/admin mutation boundary and client-centric list/search patterns while preserving ai-fsm REST route conventions
+- Adoption decisions:
+  - Added dedicated CRM REST routes instead of server actions to match existing ai-fsm mutation architecture and audit logging patterns
+  - Limited P7-T2.5 write UX to owner/admin (tech redirected) using existing `canManageClients` permission boundary
+  - Chose inline edit panels on detail pages instead of separate `/edit` routes to keep workflow tight and reduce page sprawl in first pass
+  - Reused `JobCreateForm` with query-prefill (`client_id`, `property_id`) rather than duplicating a property-context job form
+- Risks or follow-ups:
+  - Tech role currently has no read-only clients/properties workspace; if needed, add filtered read-only pages based on assigned jobs/visits in a follow-on task
+  - No API route unit/integration tests yet for clients/properties endpoints; current coverage is UI helper unit tests + E2E smoke spec only
+  - P7-T3 (commercial workspace rewrite) should add client/property context links consistently on estimate/invoice screens
