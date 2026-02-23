@@ -257,3 +257,68 @@ epics:
           - Optional Playwright CI job (E2E_ENABLED secret gate)
           - Existing required checks stable: lint, typecheck, build, test
           - docs/TEST_MATRIX.md updated with exact tiers and skip conditions
+
+  - id: E7
+    name: Product UX Overhaul (Jobber-Grade)
+    phase: 7
+    tasks:
+      - id: P7-T0
+        title: UX spec freeze for ai-fsm rewrite
+        status: completed
+        completed_by: agent-orchestrator
+        acceptance:
+          - docs/ux/P7_UX_SPEC.md defines IA, role UX, visual/system guidance, and global UX standards
+          - docs/ux/P7_SCREEN_MAP.md inventories current routes with Keep/Rewrite/Merge/Remove decisions
+          - docs/ux/P7_INTERACTION_PATTERNS.md defines filter, detail hub, timeline, payment panel, and mobile action patterns
+          - docs/PHASED_BACKLOG.yaml updated with P7 tasks and execution order
+          - docs/WORK_ASSIGNMENT.md contains an active claim for P7-T0
+          - docs/CHANGELOG_AI.md records source evidence (dovelite + myprogram) and adoption decisions
+      - id: P7-T1
+        title: Design system and app shell overhaul
+        status: completed
+        completed_by: agent-orchestrator
+        acceptance:
+          - Tokenized UI primitives for typography, spacing, colors, borders, elevation, and status semantics
+          - Reusable components for table, filter bar, badges, buttons, inputs, skeletons, toasts, modals, and panels
+          - Responsive app shell for desktop and mobile navigation using shared primitives
+          - apps/web/app/app/layout.tsx migrated to new shell without auth/RBAC regressions
+          - Unit tests added for core UI primitives and layout behavior
+      - id: P7-T2
+        title: Jobs and visits workspace rewrite
+        status: pending
+        acceptance:
+          - Jobs list supports dense table/cards, URL-persisted filters, and role-aware quick actions
+          - Job detail becomes an operational hub (timeline, visits, transitions, linked commercial actions)
+          - Visit scheduling/detail flows use new design system and explicit success/error states
+          - Visits workspace supports Today/Upcoming/Overdue segmentation with tech-friendly "My Day" view
+          - Mobile action bar and desktop sticky actions implemented for key job/visit pages
+          - Unit and E2E tests cover critical jobs/visits flow interactions
+      - id: P7-T3
+        title: Estimates, invoices, and payments workspace rewrite
+        status: pending
+        acceptance:
+          - Estimates workspace has dense list/table views, filters, and clear lifecycle actions
+          - Estimate detail supports line items, notes, transitions, and convert-to-invoice UX using shared patterns
+          - Invoices workspace shows aging buckets, outstanding/collected summaries, and quick actions
+          - Invoice detail includes payment panel/history with validation and role-aware actions
+          - Financial totals and status indicators are consistent across estimates/invoices/payments
+          - Unit and E2E tests cover estimate -> invoice -> payment critical path
+      - id: P7-T4
+        title: Dashboard and automations experience rewrite
+        status: pending
+        acceptance:
+          - /app dashboard is action-oriented with KPI summaries, attention queue, and recent activity feed
+          - /app/automations presents automation health, recent runs/events, and role-aware manual actions
+          - Shared dashboard/automation widgets use P7 design system components only
+          - Clear empty/error/recovery UX for automation failures and no-data states
+          - Unit and E2E tests cover dashboard load and automations visibility/manual actions
+      - id: P7-T5
+        title: UX QA, accessibility, and consistency hardening
+        status: pending
+        acceptance:
+          - Cross-page UX consistency sweep completed for P7 surfaces (copy, spacing, status labels, action placement)
+          - Playwright critical-flow coverage updated for jobs/visits and commercial workflows
+          - Accessibility checks added for keyboard navigation and key interactive controls
+          - docs/TEST_MATRIX.md updated with P7 coverage and skip conditions
+          - docs/PHASED_BACKLOG.yaml, docs/WORK_ASSIGNMENT.md, and docs/CHANGELOG_AI.md reconciled to merged P7 state
+          - pnpm gate passes on final P7 integration branch

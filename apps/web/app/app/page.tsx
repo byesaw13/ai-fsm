@@ -1,8 +1,12 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { query } from "@/lib/db";
 import { canViewAllJobs, canViewAllVisits } from "@/lib/auth/permissions";
+import { PageContainer } from "@/components/ui/PageContainer";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { MetricGrid, type MetricCardData } from "@/components/ui/MetricGrid";
+import { RoleBadge } from "@/components/ui/Badge";
+import { LinkButton } from "@/components/ui/Button";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +24,7 @@ export default async function HomePage() {
 
   const isAdmin = canViewAllJobs(session.role);
   const canViewAllVisits_ = canViewAllVisits(session.role);
+  const isTech = session.role === "tech";
 
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -59,61 +64,80 @@ export default async function HomePage() {
     overdueInvoices: parseInt(overdueInvoices[0]?.count || "0", 10),
   };
 
+  const metrics: MetricCardData[] = [
+    {
+      label: isTech ? "My Jobs" : "Total Jobs",
+      value: stats.jobs,
+      href: "/app/jobs",
+    },
+    {
+      label: "Today's Visits",
+      value: stats.todayVisits,
+      href: "/app/visits",
+    },
+    ...(isAdmin
+      ? [
+          {
+            label: "Overdue Invoices",
+            value: stats.overdueInvoices,
+            href: "/app/invoices",
+            variant: (stats.overdueInvoices > 0 ? "alert" : "default") as MetricCardData["variant"],
+          },
+        ]
+      : []),
+  ];
+
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Dashboard</h1>
-          <p className="page-subtitle">
-            Welcome back, <span className="role-badge" data-role={session.role}>{session.role}</span>
-          </p>
-        </div>
-      </div>
-
-      <div className="dashboard-grid">
-        <Link href="/app/jobs" className="stat-card">
-          <div className="stat-icon stat-icon-jobs">J</div>
-          <div className="stat-content">
-            <span className="stat-value">{stats.jobs}</span>
-            <span className="stat-label">Jobs</span>
-          </div>
-        </Link>
-
-        <Link href="/app/visits" className="stat-card">
-          <div className="stat-icon stat-icon-visits">V</div>
-          <div className="stat-content">
-            <span className="stat-value">{stats.todayVisits}</span>
-            <span className="stat-label">Today&apos;s Visits</span>
-          </div>
-        </Link>
-
-        {isAdmin && (
-          <Link href="/app/invoices" className="stat-card stat-card-alert">
-            <div className="stat-icon stat-icon-alert">!</div>
-            <div className="stat-content">
-              <span className="stat-value">{stats.overdueInvoices}</span>
-              <span className="stat-label">Overdue Invoices</span>
-            </div>
-          </Link>
-        )}
-      </div>
-
-      <div className="quick-actions">
-        <h2 className="section-title">Quick Actions</h2>
-        <div className="action-buttons">
-          {isAdmin && (
-            <Link href="/app/jobs/new" className="btn btn-primary">
+    <PageContainer>
+      <PageHeader
+        title="Dashboard"
+        subtitle={
+          isTech ? "Your day at a glance" : "Operations overview"
+        }
+        actions={
+          isAdmin ? (
+            <LinkButton href="/app/jobs/new" variant="primary">
               + New Job
-            </Link>
-          )}
-          <Link href="/app/jobs" className="btn btn-secondary">
+            </LinkButton>
+          ) : undefined
+        }
+      >
+        <RoleBadge variant={session.role as "owner" | "admin" | "tech"}>
+          {session.role}
+        </RoleBadge>
+      </PageHeader>
+
+      <MetricGrid metrics={metrics} />
+
+      <div style={{ marginTop: "var(--space-4)" }}>
+        <h2
+          style={{
+            fontSize: "var(--text-lg)",
+            fontWeight: "var(--font-semibold)",
+            margin: "0 0 var(--space-3)",
+          }}
+        >
+          Quick Actions
+        </h2>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)" }}>
+          <LinkButton href="/app/jobs" variant="secondary">
             View Jobs
-          </Link>
-          <Link href="/app/visits" className="btn btn-secondary">
+          </LinkButton>
+          <LinkButton href="/app/visits" variant="secondary">
             View Visits
-          </Link>
+          </LinkButton>
+          {isAdmin && (
+            <>
+              <LinkButton href="/app/estimates" variant="secondary">
+                Estimates
+              </LinkButton>
+              <LinkButton href="/app/invoices" variant="secondary">
+                Invoices
+              </LinkButton>
+            </>
+          )}
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }
