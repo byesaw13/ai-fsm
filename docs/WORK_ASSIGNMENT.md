@@ -82,6 +82,7 @@ These files require explicit lock entry in `Active Claims` before edits:
 
 | `agent-orchestrator` | `P7-T2` | `agent-orchestrator/P7-T2-jobs-visits-rewrite` | `apps/web/app/app/jobs/**`, `apps/web/app/app/visits/**`, `docs/PHASED_BACKLOG.yaml`, `docs/WORK_ASSIGNMENT.md`, `docs/CHANGELOG_AI.md` | `2026-02-23T03:00:00Z` | `completed` |
 | `agent-orchestrator` | `P7-T2.5` | `agent-orchestrator/P7-T2.5-clients-properties-workspace` | `apps/web/app/app/clients/**`, `apps/web/app/app/properties/**`, `apps/web/app/api/v1/clients/**`, `apps/web/app/api/v1/properties/**`, `apps/web/app/app/jobs/new/**`, `docs/PHASED_BACKLOG.yaml`, `docs/WORK_ASSIGNMENT.md`, `docs/CHANGELOG_AI.md` | `2026-02-23T18:20:00Z` | `completed` |
+| `agent-orchestrator` | `P7-T2.6` | `agent-orchestrator/P7-T2.6-dashboard-onboarding-client-address` | `apps/web/app/app/page.tsx`, `apps/web/app/app/jobs/page.tsx`, `apps/web/app/app/clients/**`, `apps/web/app/api/v1/clients/**`, `packages/domain/src/index.ts`, `db/migrations/006_client_address.sql`, `docs/PHASED_BACKLOG.yaml`, `docs/WORK_ASSIGNMENT.md`, `docs/CHANGELOG_AI.md` | `2026-02-23T20:25:00Z` | `completed` |
 
 ## Merge Order
 1. Foundation/auth changes

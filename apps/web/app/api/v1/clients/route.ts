@@ -13,6 +13,11 @@ const createClientBody = z.object({
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().max(50).optional().or(z.literal("")),
   notes: z.string().max(5000).optional().or(z.literal("")),
+  company_name: z.string().max(255).optional().or(z.literal("")),
+  address_line1: z.string().max(500).optional().or(z.literal("")),
+  city: z.string().max(100).optional().or(z.literal("")),
+  state: z.string().max(100).optional().or(z.literal("")),
+  zip: z.string().max(20).optional().or(z.literal("")),
 });
 
 function validationError(parsed: z.SafeParseError<unknown>, traceId: string) {
@@ -75,12 +80,23 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       [session.userId, session.accountId, session.role]
     );
 
-    const { name, email, phone, notes } = parsed.data;
+    const { name, email, phone, notes, company_name, address_line1, city, state, zip } = parsed.data;
     const result = await client.query(
-      `INSERT INTO clients (account_id, name, email, phone, notes)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO clients (account_id, name, email, phone, notes, company_name, address_line1, city, state, zip)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
-      [session.accountId, name.trim(), email || null, phone || null, notes || null]
+      [
+        session.accountId,
+        name.trim(),
+        email || null,
+        phone || null,
+        notes || null,
+        company_name || null,
+        address_line1 || null,
+        city || null,
+        state || null,
+        zip || null,
+      ]
     );
 
     const created = result.rows[0];

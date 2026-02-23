@@ -25,6 +25,11 @@ type ClientRow = {
   email: string | null;
   phone: string | null;
   notes: string | null;
+  company_name: string | null;
+  address_line1: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
   created_at: string;
   updated_at: string;
   property_count: number | string;
@@ -223,8 +228,11 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             <SectionHeader title="Client Details" />
             <dl className="p7-detail-list">
               <div className="p7-detail-row"><dt>Name</dt><dd>{client.name}</dd></div>
+              <div className="p7-detail-row"><dt>Company</dt><dd>{client.company_name || "—"}</dd></div>
               <div className="p7-detail-row"><dt>Email</dt><dd>{client.email || "—"}</dd></div>
               <div className="p7-detail-row"><dt>Phone</dt><dd>{client.phone || "—"}</dd></div>
+              <div className="p7-detail-row"><dt>Address</dt><dd>{client.address_line1 || "—"}</dd></div>
+              <div className="p7-detail-row"><dt>City / State / ZIP</dt><dd>{[client.city, client.state, client.zip].filter(Boolean).join(" ") || "—"}</dd></div>
               <div className="p7-detail-row"><dt>Created</dt><dd>{new Date(client.created_at).toLocaleDateString()}</dd></div>
               <div className="p7-detail-row"><dt>Updated</dt><dd>{new Date(client.updated_at).toLocaleDateString()}</dd></div>
               <div className="p7-detail-row"><dt>Notes</dt><dd style={{ whiteSpace: "pre-wrap" }}>{client.notes || "No notes"}</dd></div>
@@ -243,6 +251,11 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 email: client.email ?? "",
                 phone: client.phone ?? "",
                 notes: client.notes ?? "",
+                company_name: client.company_name ?? "",
+                address_line1: client.address_line1 ?? "",
+                city: client.city ?? "",
+                state: client.state ?? "",
+                zip: client.zip ?? "",
               }}
             />
           </Card>
