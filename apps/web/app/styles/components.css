@@ -1176,6 +1176,67 @@
 .status-badge.status-disabled { background: var(--color-red-100); color: #991b1b; }
 .role-notice { font-size: 13px; color: var(--fg-muted); text-align: center; margin-top: 16px; }
 
+/* -------------------------------------------------------------------------
+   P7 Detail utilities — card-danger + key-value list used in hub sidebars
+   ---------------------------------------------------------------------- */
+.p7-card-danger {
+  background: var(--bg-card);
+  border: 1px solid var(--color-red-200);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.p7-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.p7-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.p7-detail-row-label {
+  color: var(--fg-muted);
+  flex-shrink: 0;
+}
+
+.p7-detail-row-value {
+  font-weight: var(--font-medium);
+  text-align: right;
+}
+
+/* P7 form layouts (jobs/visits create & schedule) */
+.p7-form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.p7-form-grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.p7-form-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.p7-form-grid-span-2 {
+  grid-column: span 2;
+}
+
+.p7-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
 /* @deprecated text colors */
 .text-warning { color: #92400e !important; }
 .text-danger { color: var(--color-red-600) !important; }
@@ -1198,6 +1259,9 @@
 @media (max-width: 768px) {
   .automations-grid { grid-template-columns: 1fr; }
   .automation-stats { grid-template-columns: 1fr; gap: 12px; }
+  .p7-form-grid-2 { grid-template-columns: 1fr; }
+  .p7-form-grid-span-2 { grid-column: span 1; }
+  .p7-form-actions { flex-direction: column-reverse; align-items: stretch; }
 }
 
 @media (max-width: 480px) {

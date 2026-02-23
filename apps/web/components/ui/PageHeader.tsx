@@ -24,15 +24,15 @@ export function PageHeader({
   children,
 }: PageHeaderProps) {
   return (
-    <div className="p7-page-header">
+    <div className="p7-page-header page-header">
       <div className="p7-page-header-left">
         {backHref && (
-          <Link href={backHref as Route} className="p7-back-link">
+          <Link href={backHref as Route} className="p7-back-link back-link">
             ← {backLabel}
           </Link>
         )}
-        <h1 className="p7-page-title">{title}</h1>
-        {subtitle && <p className="p7-page-subtitle">{subtitle}</p>}
+        <h1 className="p7-page-title page-title">{title}</h1>
+        {subtitle && <p className="p7-page-subtitle page-subtitle">{subtitle}</p>}
         {children}
       </div>
       {actions && (

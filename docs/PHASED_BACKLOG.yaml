@@ -285,7 +285,8 @@ epics:
           - Unit tests added for core UI primitives and layout behavior
       - id: P7-T2
         title: Jobs and visits workspace rewrite
-        status: pending
+        status: completed
+        completed_by: agent-orchestrator
         acceptance:
           - Jobs list supports dense table/cards, URL-persisted filters, and role-aware quick actions
           - Job detail becomes an operational hub (timeline, visits, transitions, linked commercial actions)

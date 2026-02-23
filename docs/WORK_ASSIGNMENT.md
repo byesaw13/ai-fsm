@@ -80,6 +80,8 @@ These files require explicit lock entry in `Active Claims` before edits:
 | `agent-orchestrator` | `P7-T0` | `agent-orchestrator/P7-T0-ux-spec-freeze` | `docs/ux/P7_UX_SPEC.md`, `docs/ux/P7_SCREEN_MAP.md`, `docs/ux/P7_INTERACTION_PATTERNS.md`, `docs/PHASED_BACKLOG.yaml`, `docs/WORK_ASSIGNMENT.md`, `docs/CHANGELOG_AI.md` | `2026-02-23T00:00:00Z` | `completed` |
 | `agent-orchestrator` | `P7-T1` | `agent-orchestrator/P7-T1-design-system-shell` | `apps/web/app/globals.css`, `apps/web/app/styles/**`, `apps/web/components/ui/**`, `apps/web/components/AppShell.tsx`, `apps/web/app/app/layout.tsx`, `docs/PHASED_BACKLOG.yaml`, `docs/WORK_ASSIGNMENT.md`, `docs/CHANGELOG_AI.md` | `2026-02-23T01:00:00Z` | `completed` |
 
+| `agent-orchestrator` | `P7-T2` | `agent-orchestrator/P7-T2-jobs-visits-rewrite` | `apps/web/app/app/jobs/**`, `apps/web/app/app/visits/**`, `docs/PHASED_BACKLOG.yaml`, `docs/WORK_ASSIGNMENT.md`, `docs/CHANGELOG_AI.md` | `2026-02-23T03:00:00Z` | `completed` |
+
 ## Merge Order
 1. Foundation/auth changes
 2. Jobs/visits

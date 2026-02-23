@@ -15,6 +15,59 @@ Each AI run must append one record. Keep entries factual and short.
 
 ---
 
+- Timestamp (UTC): 2026-02-23T16:06:03Z
+- Agent: agent-orchestrator
+- Branch: agent-orchestrator/P7-T2-jobs-visits-rewrite
+- Task ID: P7-T2
+- Summary: Rewrote jobs/visits workspace pages onto P7 primitives. Jobs list and detail now use ItemCard/FilterBar/StatusSection patterns with improved role-aware actions and safer confirmations. Visits list now uses P7 segmentation (Today/Upcoming/Overdue) with shared visit UI helpers. Visit detail was rebuilt as an operational hub using PageHeader/Card/Timeline/StatusBadge. Updated visit transition/notes forms and job/visit create/schedule forms to P7 primitives with toast feedback. Added route loading skeletons and a jobs->visit E2E smoke test. Added helper unit tests for visits UI formatting/overdue logic.
+- Files changed:
+  - apps/web/app/app/jobs/page.tsx (P7 jobs list rewrite)
+  - apps/web/app/app/jobs/[id]/page.tsx (P7 job detail operational hub)
+  - apps/web/app/app/jobs/[id]/JobTransitionForm.tsx (P7 primitives + confirm fix)
+  - apps/web/app/app/jobs/[id]/DeleteJobButton.tsx (P7 primitives alignment)
+  - apps/web/app/app/jobs/new/page.tsx (P7 page wrapper)
+  - apps/web/app/app/jobs/new/JobCreateForm.tsx (P7 form primitives; priority options normalized)
+  - apps/web/app/app/jobs/[id]/visits/new/page.tsx (P7 page wrapper)
+  - apps/web/app/app/jobs/[id]/visits/new/VisitScheduleForm.tsx (P7 form primitives)
+  - apps/web/app/app/jobs/loading.tsx (new — route skeleton)
+  - apps/web/app/app/visits/page.tsx (P7 segmented visits workspace)
+  - apps/web/app/app/visits/[id]/page.tsx (P7 visit detail hub)
+  - apps/web/app/app/visits/[id]/VisitTransitionForm.tsx (P7 primitives + toasts)
+  - apps/web/app/app/visits/[id]/VisitNotesForm.tsx (P7 primitives + toasts)
+  - apps/web/app/app/visits/loading.tsx (new — route skeleton)
+  - apps/web/lib/visits/p7.ts (new — pure UI helper functions)
+  - apps/web/lib/visits/__tests__/p7.unit.test.ts (new — 11 unit tests)
+  - tests/e2e/jobs-visits-p7-smoke.spec.ts (new — jobs -> visit critical path smoke)
+  - apps/web/app/styles/components.css (P7 helper classes incl. form/layout/detail variants)
+  - apps/web/components/ui/PageContainer.tsx (legacy class alias for compatibility)
+  - apps/web/components/ui/PageHeader.tsx (legacy class alias for compatibility)
+  - apps/web/components/AppShell.tsx (adds data-role hook for existing E2E selectors)
+  - docs/PHASED_BACKLOG.yaml (P7-T2 marked completed)
+  - docs/WORK_ASSIGNMENT.md (P7-T2 claim marked completed)
+  - docs/CHANGELOG_AI.md (this entry)
+- Commands run:
+  - pnpm gate
+- Gate results:
+  - lint: ✅
+  - typecheck: ✅
+  - build: ✅
+  - test: ✅ packages/domain 38 pass; services/worker 45 pass / 16 skip; apps/web 316 pass / 55 skip
+- Source evidence (dovelite):
+  - Consulted: /home/nick/dev/dovelite app admin jobs/visits surfaces for grouped sections and dense operational cards
+  - Adopted: segmented list presentation (today/upcoming/overdue) and action-forward card structure; reimplemented with ai-fsm P7 primitives
+- Source evidence (myprogram):
+  - No domain/API changes; P7-T2 remains presentation-layer only and preserves existing FSM/RBAC behavior
+- Adoption decisions:
+  - Extracted visit date/time/overdue formatting into `apps/web/lib/visits/p7.ts` for deterministic unit testing and reuse across jobs + visits pages
+  - Preserved legacy selectors/classes (`page-container`, `page-header`, `data-role`) where needed to avoid breaking pre-existing E2E smoke coverage during migration
+  - Kept server-rendered page data loading pattern; only interactive forms use client components and `useToast`
+  - Added route-level `loading.tsx` skeletons for jobs/visits to standardize perceived performance without changing data contracts
+- Risks or follow-ups:
+  - P7-T3 (estimates/invoices/payments rewrite) is next critical path and should adopt the same compatibility strategy only where tests still depend on legacy selectors
+  - Clients/properties workspace is still under-productized and should be added as a dedicated P7 follow-on task (recommended: P7-T2.5 or P7-T4b)
+
+---
+
 - Timestamp (UTC): 2026-02-23T02:00:00Z
 - Agent: agent-orchestrator
 - Branch: agent-orchestrator/P7-T1-design-system-shell

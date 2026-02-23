@@ -102,7 +102,9 @@ export function AppShell({ role, children }: AppShellProps) {
               <div className="p7-user-avatar" aria-hidden="true">
                 {role[0]?.toUpperCase()}
               </div>
-              <span className="p7-user-role">{role}</span>
+              <span className="p7-user-role" data-role={role}>
+                {role}
+              </span>
             </div>
             <LogoutButton />
           </div>

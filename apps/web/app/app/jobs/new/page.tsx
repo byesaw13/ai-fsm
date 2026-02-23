@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { canTransitionJob } from "@/lib/auth/permissions";
 import { query } from "@/lib/db";
 import { JobCreateForm } from "./JobCreateForm";
+import { Card, PageContainer, PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -37,19 +37,11 @@ export default async function NewJobPage() {
   ]);
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <div>
-          <Link href="/app/jobs" className="back-link">
-            ← Jobs
-          </Link>
-          <h1 className="page-title">New Job</h1>
-        </div>
-      </div>
-
-      <div className="card">
+    <PageContainer>
+      <PageHeader title="New Job" backHref="/app/jobs" backLabel="Jobs" />
+      <Card>
         <JobCreateForm clients={clients} properties={properties} />
-      </div>
-    </div>
+      </Card>
+    </PageContainer>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { VisitStatus } from "@ai-fsm/domain";
+import { Button, useToast } from "@/components/ui";
 
 interface Props {
   visitId: string;
@@ -10,8 +11,13 @@ interface Props {
   statusLabels: Record<VisitStatus, string>;
 }
 
-export function VisitTransitionForm({ visitId, allowedTransitions, statusLabels }: Props) {
+export function VisitTransitionForm({
+  visitId,
+  allowedTransitions,
+  statusLabels,
+}: Props) {
   const router = useRouter();
+  const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -34,33 +40,50 @@ export function VisitTransitionForm({ visitId, allowedTransitions, statusLabels 
       });
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error?.message ?? "Transition failed");
+        const message = data.error?.message ?? "Transition failed";
+        setError(message);
+        toast.error(message);
       } else {
-        setSuccess(`Status updated to ${statusLabels[targetStatus]}`);
+        const message = `Status updated to ${statusLabels[targetStatus]}`;
+        setSuccess(message);
+        toast.success(message);
         router.refresh();
       }
     } catch {
-      setError("Unexpected error");
+      const message = "Unexpected error";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="transition-buttons" data-testid="visit-transition-buttons">
-      {error && <p className="error-inline" data-testid="visit-transition-error">{error}</p>}
-      {success && <p className="success-inline" data-testid="visit-transition-success">{success}</p>}
-      {allowedTransitions.map((status) => (
-        <button
-          key={status}
-          onClick={() => handleTransition(status)}
-          disabled={loading}
-          className="btn btn-secondary"
-          data-testid={`visit-transition-btn-${status}`}
-        >
-          {loading ? "Updating…" : `→ ${statusLabels[status]}`}
-        </button>
-      ))}
+    <div data-testid="visit-transition-buttons">
+      {error && (
+        <p className="p7-field-error" data-testid="visit-transition-error">
+          {error}
+        </p>
+      )}
+      {success && (
+        <p className="success-inline" data-testid="visit-transition-success">
+          {success}
+        </p>
+      )}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
+        {allowedTransitions.map((status) => (
+          <Button
+            key={status}
+            onClick={() => handleTransition(status)}
+            disabled={loading}
+            variant={status === "cancelled" ? "danger" : "secondary"}
+            size="sm"
+            data-testid={`visit-transition-btn-${status}`}
+          >
+            {loading ? "Updating…" : `→ ${statusLabels[status]}`}
+          </Button>
+        ))}
+      </div>
     </div>
   );
 }

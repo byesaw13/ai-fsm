@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button, Textarea, useToast } from "@/components/ui";
 
 interface Props {
   visitId: string;
@@ -10,6 +11,7 @@ interface Props {
 
 export function VisitNotesForm({ visitId, initialNotes }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const [notes, setNotes] = useState(initialNotes);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -34,13 +36,18 @@ export function VisitNotesForm({ visitId, initialNotes }: Props) {
       });
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error?.message ?? "Save failed");
+        const message = data.error?.message ?? "Save failed";
+        setError(message);
+        toast.error(message);
       } else {
         setSaved(true);
+        toast.success("Visit notes saved.");
         router.refresh();
       }
     } catch {
-      setError("Unexpected error");
+      const message = "Unexpected error";
+      setError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -48,24 +55,32 @@ export function VisitNotesForm({ visitId, initialNotes }: Props) {
 
   return (
     <form onSubmit={handleSave} data-testid="visit-notes-form">
-      <textarea
+      <Textarea
+        id="visit-notes-input"
+        label="Tech Notes"
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
-        rows={4}
+        rows={5}
         placeholder="Add notes about this visit..."
-        className="notes-textarea"
+        disabled={saving}
         data-testid="visit-notes-input"
       />
-      {error && <p className="error-inline">{error}</p>}
-      {saved && <p className="success-inline" data-testid="notes-saved-msg">Notes saved.</p>}
-      <button
-        type="submit"
-        disabled={saving}
-        className="btn btn-primary"
-        data-testid="save-notes-btn"
-      >
-        {saving ? "Saving..." : "Save Notes"}
-      </button>
+      {error && <p className="p7-field-error">{error}</p>}
+      {saved && (
+        <p className="success-inline" data-testid="notes-saved-msg">
+          Notes saved.
+        </p>
+      )}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "var(--space-3)" }}>
+        <Button
+          type="submit"
+          disabled={saving}
+          loading={saving}
+          data-testid="save-notes-btn"
+        >
+          {saving ? "Saving..." : "Save Notes"}
+        </Button>
+      </div>
     </form>
   );
 }
