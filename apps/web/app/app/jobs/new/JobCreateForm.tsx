@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { Button, Card, Input, LinkButton, Select, Textarea } from "@/components/ui";
 
 interface Client {
   id: string;
@@ -22,10 +22,11 @@ interface FormErrors {
 }
 
 const PRIORITY_OPTIONS = [
-  { value: 0, label: "Low" },
-  { value: 1, label: "Medium" },
-  { value: 2, label: "High" },
-  { value: 3, label: "Urgent" },
+  { value: 0, label: "None" },
+  { value: 1, label: "Low" },
+  { value: 2, label: "Medium" },
+  { value: 3, label: "High" },
+  { value: 4, label: "Urgent" },
 ];
 
 interface JobCreateFormProps {
@@ -132,130 +133,105 @@ export function JobCreateForm({ clients, properties }: JobCreateFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="form-container">
+    <form onSubmit={handleSubmit} className="p7-form-stack" data-testid="job-create-form">
       {error && (
-        <div className="error-message" role="alert">
-          {error}
-        </div>
+        <Card className="p7-card-danger" padding="sm" role="alert">
+          <p style={{ margin: 0 }}>{error}</p>
+        </Card>
       )}
 
-      <div className="form-group">
-        <label htmlFor="title">Title *</label>
-        <input
+      <div className="p7-form-grid p7-form-grid-2">
+        <Input
           id="title"
-          type="text"
+          label="Title"
+          required
           value={form.title}
           onChange={(e) => setForm({ ...form, title: e.target.value })}
           placeholder="e.g., Kitchen faucet repair"
           disabled={pending}
-          className={errors.title ? "input-error" : ""}
+          error={errors.title}
+          containerClassName="p7-form-grid-span-2"
         />
-        {errors.title && <p className="field-error">{errors.title}</p>}
-      </div>
 
-      <div className="form-group">
-        <label htmlFor="client_id">Client *</label>
-        <select
+        <Select
           id="client_id"
+          label="Client"
+          required
           value={form.client_id}
-          onChange={(e) => setForm({ ...form, client_id: e.target.value, property_id: "" })}
+          onChange={(e) =>
+            setForm({ ...form, client_id: e.target.value, property_id: "" })
+          }
           disabled={pending}
-          className={errors.client_id ? "input-error" : ""}
-        >
-          <option value="">Select a client</option>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        {errors.client_id && <p className="field-error">{errors.client_id}</p>}
-        {clients.length === 0 && (
-          <p className="field-hint">No clients found. Create a client first.</p>
-        )}
-      </div>
+          error={errors.client_id}
+          hint={clients.length === 0 ? "No clients found. Create a client first." : undefined}
+          options={clients.map((c) => ({ value: c.id, label: c.name }))}
+          placeholder="Select a client"
+        />
 
-      <div className="form-group">
-        <label htmlFor="property_id">Property</label>
-        <select
+        <Select
           id="property_id"
+          label="Property"
           value={form.property_id}
           onChange={(e) => setForm({ ...form, property_id: e.target.value })}
           disabled={pending || !selectedClientId}
-        >
-          <option value="">Select a property (optional)</option>
-          {filteredProperties.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.address}
-            </option>
-          ))}
-        </select>
-        {selectedClientId && filteredProperties.length === 0 && (
-          <p className="field-hint">No properties for this client.</p>
-        )}
-      </div>
+          hint={
+            selectedClientId && filteredProperties.length === 0
+              ? "No properties for this client."
+              : undefined
+          }
+          options={filteredProperties.map((p) => ({ value: p.id, label: p.address }))}
+          placeholder="Select a property (optional)"
+        />
 
-      <div className="form-group">
-        <label htmlFor="description">Description</label>
-        <textarea
+        <Textarea
           id="description"
+          label="Description"
           value={form.description}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
           placeholder="Job details, notes, or instructions..."
-          rows={3}
+          rows={4}
           disabled={pending}
+          containerClassName="p7-form-grid-span-2"
+        />
+
+        <Select
+          id="priority"
+          label="Priority"
+          value={String(form.priority)}
+          onChange={(e) => setForm({ ...form, priority: parseInt(e.target.value) })}
+          disabled={pending}
+          options={PRIORITY_OPTIONS.map((opt) => ({ value: String(opt.value), label: opt.label }))}
+        />
+
+        <div />
+
+        <Input
+          id="scheduled_start"
+          label="Scheduled Start"
+          type="datetime-local"
+          value={form.scheduled_start}
+          onChange={(e) => setForm({ ...form, scheduled_start: e.target.value })}
+          disabled={pending}
+        />
+
+        <Input
+          id="scheduled_end"
+          label="Scheduled End"
+          type="datetime-local"
+          value={form.scheduled_end}
+          onChange={(e) => setForm({ ...form, scheduled_end: e.target.value })}
+          disabled={pending}
+          error={errors.scheduled_end}
         />
       </div>
 
-      <div className="form-group">
-        <label htmlFor="priority">Priority</label>
-        <select
-          id="priority"
-          value={form.priority}
-          onChange={(e) => setForm({ ...form, priority: parseInt(e.target.value) })}
-          disabled={pending}
-        >
-          {PRIORITY_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="form-row">
-        <div className="form-group">
-          <label htmlFor="scheduled_start">Scheduled Start</label>
-          <input
-            id="scheduled_start"
-            type="datetime-local"
-            value={form.scheduled_start}
-            onChange={(e) => setForm({ ...form, scheduled_start: e.target.value })}
-            disabled={pending}
-          />
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="scheduled_end">Scheduled End</label>
-          <input
-            id="scheduled_end"
-            type="datetime-local"
-            value={form.scheduled_end}
-            onChange={(e) => setForm({ ...form, scheduled_end: e.target.value })}
-            disabled={pending}
-            className={errors.scheduled_end ? "input-error" : ""}
-          />
-          {errors.scheduled_end && <p className="field-error">{errors.scheduled_end}</p>}
-        </div>
-      </div>
-
-      <div className="form-actions">
-        <Link href="/app/jobs" className="btn btn-secondary">
+      <div className="p7-form-actions">
+        <LinkButton href="/app/jobs" variant="secondary">
           Cancel
-        </Link>
-        <button type="submit" disabled={pending} className="btn btn-primary">
+        </LinkButton>
+        <Button type="submit" disabled={pending} loading={pending}>
           {pending ? "Creating..." : "Create Job"}
-        </button>
+        </Button>
       </div>
     </form>
   );

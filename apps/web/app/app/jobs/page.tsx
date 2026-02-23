@@ -1,15 +1,28 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { query } from "@/lib/db";
 import { canTransitionJob, canViewAllJobs } from "@/lib/auth/permissions";
 import type { Job, JobStatus } from "@ai-fsm/domain";
+import {
+  PageContainer,
+  PageHeader,
+  FilterBar,
+  ItemCard,
+  StatusSection,
+  EmptyState,
+  StatusBadge,
+  PriorityBadge,
+  LinkButton,
+  priorityNumToVariant,
+  priorityLabel,
+} from "@/components/ui";
+import type { FilterDef, StatusVariant, PriorityVariant } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 type JobRow = Job & { client_name: string | null };
 
-const STATUS_LABELS: Record<JobStatus, string> = {
+const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   draft: "Draft",
   quoted: "Quoted",
   scheduled: "Scheduled",
@@ -19,7 +32,7 @@ const STATUS_LABELS: Record<JobStatus, string> = {
   cancelled: "Cancelled",
 };
 
-const STATUS_ORDER: JobStatus[] = [
+const JOB_STATUS_ORDER: JobStatus[] = [
   "in_progress",
   "scheduled",
   "quoted",
@@ -29,28 +42,33 @@ const STATUS_ORDER: JobStatus[] = [
   "cancelled",
 ];
 
-const PRIORITY_LABELS: Record<number, string> = {
-  0: "",
-  1: "Low",
-  2: "Medium",
-  3: "High",
-  4: "Urgent",
-};
-
-function getPriorityClass(priority: number): string {
-  if (priority >= 4) return "priority-urgent";
-  if (priority === 3) return "priority-high";
-  if (priority === 2) return "priority-medium";
-  if (priority === 1) return "priority-low";
-  return "";
-}
+const JOB_FILTERS: FilterDef[] = [
+  { name: "q", type: "text", label: "Search", placeholder: "Job title or client…" },
+  {
+    name: "status",
+    type: "select",
+    label: "Status",
+    options: JOB_STATUS_ORDER.map((s) => ({ value: s, label: JOB_STATUS_LABELS[s] })),
+  },
+  {
+    name: "priority",
+    type: "select",
+    label: "Priority",
+    options: [
+      { value: "4", label: "Urgent" },
+      { value: "3", label: "High" },
+      { value: "2", label: "Medium" },
+      { value: "1", label: "Low" },
+    ],
+  },
+];
 
 interface PageProps {
-  searchParams: Promise<{ q?: string; status?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; priority?: string }>;
 }
 
 export default async function JobsPage({ searchParams }: PageProps) {
-  const { q, status } = await searchParams;
+  const { q, status, priority } = await searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
 
@@ -58,24 +76,29 @@ export default async function JobsPage({ searchParams }: PageProps) {
   const canCreate = canTransitionJob(session.role);
 
   const searchPattern = q ? `%${q.toLowerCase()}%` : null;
-  const statusFilter = status && STATUS_ORDER.includes(status as JobStatus) ? status : null;
+  const statusFilter = status && JOB_STATUS_ORDER.includes(status as JobStatus) ? status : null;
+  const priorityFilter = priority ? parseInt(priority) : null;
 
   let jobs: JobRow[];
   if (isAdmin) {
     const conditions: string[] = ["j.account_id = $1"];
     const params: unknown[] = [session.accountId];
-    let paramIdx = 2;
+    let idx = 2;
 
     if (searchPattern) {
-      conditions.push(`(LOWER(j.title) LIKE $${paramIdx} OR LOWER(c.name) LIKE $${paramIdx})`);
+      conditions.push(`(LOWER(j.title) LIKE $${idx} OR LOWER(c.name) LIKE $${idx})`);
       params.push(searchPattern);
-      paramIdx++;
+      idx++;
     }
-
     if (statusFilter) {
-      conditions.push(`j.status = $${paramIdx}`);
+      conditions.push(`j.status = $${idx}`);
       params.push(statusFilter);
-      paramIdx++;
+      idx++;
+    }
+    if (priorityFilter !== null) {
+      conditions.push(`j.priority = $${idx}`);
+      params.push(priorityFilter);
+      idx++;
     }
 
     jobs = await query<JobRow>(
@@ -90,18 +113,22 @@ export default async function JobsPage({ searchParams }: PageProps) {
   } else {
     const conditions: string[] = ["j.account_id = $1", "v.assigned_user_id = $2"];
     const params: unknown[] = [session.accountId, session.userId];
-    let paramIdx = 3;
+    let idx = 3;
 
     if (searchPattern) {
-      conditions.push(`(LOWER(j.title) LIKE $${paramIdx} OR LOWER(c.name) LIKE $${paramIdx})`);
+      conditions.push(`(LOWER(j.title) LIKE $${idx} OR LOWER(c.name) LIKE $${idx})`);
       params.push(searchPattern);
-      paramIdx++;
+      idx++;
     }
-
     if (statusFilter) {
-      conditions.push(`j.status = $${paramIdx}`);
+      conditions.push(`j.status = $${idx}`);
       params.push(statusFilter);
-      paramIdx++;
+      idx++;
+    }
+    if (priorityFilter !== null) {
+      conditions.push(`j.priority = $${idx}`);
+      params.push(priorityFilter);
+      idx++;
     }
 
     jobs = await query<JobRow>(
@@ -116,159 +143,138 @@ export default async function JobsPage({ searchParams }: PageProps) {
     );
   }
 
-  const grouped = STATUS_ORDER.reduce<Record<string, JobRow[]>>(
+  const hasFilter = !!(q || statusFilter || priorityFilter);
+  const currentValues: Record<string, string> = {};
+  if (q) currentValues.q = q;
+  if (status) currentValues.status = status;
+  if (priority) currentValues.priority = priority;
+
+  // Group by status for the unfiltered view
+  const grouped = JOB_STATUS_ORDER.reduce<Record<string, JobRow[]>>(
     (acc, s) => ({ ...acc, [s]: [] }),
     {}
   );
-
-  for (const job of jobs) {
-    if (!statusFilter) {
+  if (!hasFilter) {
+    for (const job of jobs) {
       grouped[job.status]?.push(job);
     }
   }
-
-  const activeStatuses = statusFilter
-    ? [statusFilter as JobStatus]
-    : STATUS_ORDER.filter((s) => grouped[s].length > 0);
-
-  const activeFilters = [];
-  if (q) activeFilters.push(`search: "${q}"`);
-  if (statusFilter) activeFilters.push(`status: ${STATUS_LABELS[statusFilter as JobStatus]}`);
+  const activeStatuses = hasFilter
+    ? []
+    : JOB_STATUS_ORDER.filter((s) => grouped[s].length > 0);
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Jobs</h1>
-          <p className="page-subtitle">
-            {isAdmin
-              ? `All jobs — ${jobs.length} total`
-              : `Your assigned jobs — ${jobs.length} total`}
-          </p>
-        </div>
-        {canCreate && (
-          <Link href="/app/jobs/new" className="btn btn-primary" data-testid="create-job-btn">
-            + New Job
-          </Link>
-        )}
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Jobs"
+        subtitle={
+          isAdmin
+            ? `All jobs — ${jobs.length} total`
+            : `Your assigned jobs — ${jobs.length} total`
+        }
+        actions={
+          canCreate ? (
+            <LinkButton href="/app/jobs/new" variant="primary" data-testid="create-job-btn">
+              + New Job
+            </LinkButton>
+          ) : undefined
+        }
+      />
 
-      <div className="filter-bar">
-        <form method="GET" className="filter-form">
-          <input
-            type="text"
-            name="q"
-            placeholder="Search jobs..."
-            defaultValue={q || ""}
-            className="filter-input"
-          />
-          <select name="status" className="filter-select" defaultValue={statusFilter || ""}>
-            <option value="">All statuses</option>
-            {STATUS_ORDER.map((s) => (
-              <option key={s} value={s}>
-                {STATUS_LABELS[s]}
-              </option>
-            ))}
-          </select>
-          <button type="submit" className="btn btn-secondary btn-sm">
-            Filter
-          </button>
-          {(q || statusFilter) && (
-            <Link href="/app/jobs" className="btn btn-secondary btn-sm">
-              Clear
-            </Link>
-          )}
-        </form>
-        {activeFilters.length > 0 && (
-          <p className="filter-active">Filtered by {activeFilters.join(", ")}</p>
-        )}
-      </div>
+      <FilterBar
+        filters={JOB_FILTERS}
+        baseHref="/app/jobs"
+        currentValues={currentValues}
+        submitLabel="Filter"
+      />
 
       {jobs.length === 0 ? (
-        <div className="empty-state" data-testid="jobs-empty">
-          <div className="empty-state-icon">📋</div>
-          <p className="empty-state-title">
-            {q || statusFilter
+        <EmptyState
+          title={
+            hasFilter
               ? "No jobs match your filters"
               : isAdmin
                 ? "No jobs yet"
-                : "No assigned jobs"}
-          </p>
-          <p className="empty-state-desc">
-            {q || statusFilter
+                : "No assigned jobs"
+          }
+          description={
+            hasFilter
               ? "Try adjusting your search or filters."
               : isAdmin
                 ? "Create your first job to start tracking work."
-                : "Jobs will appear here when you're assigned to visits."}
-          </p>
-          {canCreate && !q && !statusFilter && (
-            <Link href="/app/jobs/new" className="btn btn-primary">
-              Create First Job
-            </Link>
-          )}
-        </div>
-      ) : statusFilter ? (
-        <div className="job-list">
+                : "Jobs will appear here when you're assigned to visits."
+          }
+          action={
+            canCreate && !hasFilter ? (
+              <LinkButton href="/app/jobs/new" variant="primary">
+                Create First Job
+              </LinkButton>
+            ) : undefined
+          }
+          data-testid="jobs-empty"
+        />
+      ) : hasFilter ? (
+        // Flat list when filtered
+        <div>
           {jobs.map((job) => (
-            <JobCard key={job.id} job={job} />
+            <JobItemCard key={job.id} job={job} />
           ))}
         </div>
       ) : (
-        <div className="status-sections">
-          {activeStatuses.map((status) => (
-            <section key={status} className="status-section">
-              <h2 className="status-heading" data-status={status}>
-                {STATUS_LABELS[status]}
-                <span className="count-badge">{grouped[status].length}</span>
-              </h2>
-              <div className="job-list">
-                {grouped[status].map((job) => (
-                  <JobCard key={job.id} job={job} />
-                ))}
-              </div>
-            </section>
+        // Status-grouped sections when unfiltered
+        <div>
+          {activeStatuses.map((s) => (
+            <StatusSection
+              key={s}
+              title={JOB_STATUS_LABELS[s as JobStatus]}
+              count={grouped[s].length}
+            >
+              {grouped[s].map((job) => (
+                <JobItemCard key={job.id} job={job} />
+              ))}
+            </StatusSection>
           ))}
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }
 
-function JobCard({ job }: { job: JobRow }) {
-  const priorityClass = getPriorityClass(job.priority);
-  const priorityLabel = PRIORITY_LABELS[job.priority] || "";
+function JobItemCard({ job }: { job: JobRow }) {
+  const pv: PriorityVariant | null = priorityNumToVariant(job.priority);
+  const pl: string = priorityLabel(job.priority);
+
+  const meta = (
+    <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "center" }}>
+      {job.client_name && (
+        <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+          {job.client_name}
+        </span>
+      )}
+      {job.scheduled_start && (
+        <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+          {new Date(job.scheduled_start).toLocaleDateString()}
+        </span>
+      )}
+    </div>
+  );
 
   return (
-    <Link
+    <ItemCard
       href={`/app/jobs/${job.id}`}
-      className="job-card"
+      title={job.title}
+      titleBadge={
+        pv ? (
+          <PriorityBadge variant={pv}>{pl}</PriorityBadge>
+        ) : undefined
+      }
+      meta={meta}
+      actions={
+        <StatusBadge variant={job.status as StatusVariant}>
+          {JOB_STATUS_LABELS[job.status as JobStatus]}
+        </StatusBadge>
+      }
       data-testid="job-card"
-      data-status={job.status}
-      data-priority={job.priority}
-    >
-      <div className="job-card-header">
-        <div className="job-card-title-row">
-          <span className="job-title">{job.title}</span>
-          {priorityLabel && (
-            <span className={`priority-badge ${priorityClass}`} title={`Priority: ${priorityLabel}`}>
-              {priorityLabel}
-            </span>
-          )}
-        </div>
-        <span className={`status-pill status-${job.status}`}>
-          {STATUS_LABELS[job.status as JobStatus]}
-        </span>
-      </div>
-      <div className="job-card-meta">
-        {job.client_name && (
-          <span className="job-client">{job.client_name}</span>
-        )}
-        {job.scheduled_start && (
-          <span className="job-date">
-            {new Date(job.scheduled_start).toLocaleDateString()}
-          </span>
-        )}
-      </div>
-    </Link>
+    />
   );
 }

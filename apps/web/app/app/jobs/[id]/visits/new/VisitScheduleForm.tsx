@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { Button, Card, Input, LinkButton, Select } from "@/components/ui";
 
 interface User {
   id: string;
@@ -103,70 +103,60 @@ export function VisitScheduleForm({ jobId, users, canAssign }: VisitScheduleForm
   const techUsers = users.filter((u) => u.role === "tech" || u.role === "admin" || u.role === "owner");
 
   return (
-    <form onSubmit={handleSubmit} className="form-container">
+    <form onSubmit={handleSubmit} className="p7-form-stack" data-testid="visit-schedule-form">
       {error && (
-        <div className="error-message" role="alert">
-          {error}
-        </div>
+        <Card className="p7-card-danger" padding="sm" role="alert">
+          <p style={{ margin: 0 }}>{error}</p>
+        </Card>
       )}
 
-      <div className="form-row">
-        <div className="form-group">
-          <label htmlFor="scheduled_start">Start Time *</label>
-          <input
-            id="scheduled_start"
-            type="datetime-local"
-            value={form.scheduled_start}
-            onChange={(e) => setForm({ ...form, scheduled_start: e.target.value })}
-            disabled={pending}
-            className={errors.scheduled_start ? "input-error" : ""}
-          />
-          {errors.scheduled_start && <p className="field-error">{errors.scheduled_start}</p>}
-        </div>
+      <div className="p7-form-grid p7-form-grid-2">
+        <Input
+          id="scheduled_start"
+          label="Start Time"
+          required
+          type="datetime-local"
+          value={form.scheduled_start}
+          onChange={(e) => setForm({ ...form, scheduled_start: e.target.value })}
+          disabled={pending}
+          error={errors.scheduled_start}
+        />
 
-        <div className="form-group">
-          <label htmlFor="scheduled_end">End Time *</label>
-          <input
-            id="scheduled_end"
-            type="datetime-local"
-            value={form.scheduled_end}
-            onChange={(e) => setForm({ ...form, scheduled_end: e.target.value })}
-            disabled={pending}
-            className={errors.scheduled_end ? "input-error" : ""}
-          />
-          {errors.scheduled_end && <p className="field-error">{errors.scheduled_end}</p>}
-        </div>
+        <Input
+          id="scheduled_end"
+          label="End Time"
+          required
+          type="datetime-local"
+          value={form.scheduled_end}
+          onChange={(e) => setForm({ ...form, scheduled_end: e.target.value })}
+          disabled={pending}
+          error={errors.scheduled_end}
+        />
       </div>
 
       {canAssign && (
-        <div className="form-group">
-          <label htmlFor="assigned_user_id">Assign To</label>
-          <select
-            id="assigned_user_id"
-            value={form.assigned_user_id}
-            onChange={(e) => setForm({ ...form, assigned_user_id: e.target.value })}
-            disabled={pending}
-          >
-            <option value="">Unassigned</option>
-            {techUsers.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.full_name} ({u.role})
-              </option>
-            ))}
-          </select>
-          {users.length === 0 && (
-            <p className="field-hint">No users available. Create users first.</p>
-          )}
-        </div>
+        <Select
+          id="assigned_user_id"
+          label="Assign To"
+          value={form.assigned_user_id}
+          onChange={(e) => setForm({ ...form, assigned_user_id: e.target.value })}
+          disabled={pending}
+          hint={users.length === 0 ? "No users available. Create users first." : undefined}
+          options={techUsers.map((u) => ({
+            value: u.id,
+            label: `${u.full_name} (${u.role})`,
+          }))}
+          placeholder="Unassigned"
+        />
       )}
 
-      <div className="form-actions">
-        <Link href={`/app/jobs/${jobId}`} className="btn btn-secondary">
+      <div className="p7-form-actions">
+        <LinkButton href={`/app/jobs/${jobId}`} variant="secondary">
           Cancel
-        </Link>
-        <button type="submit" disabled={pending} className="btn btn-primary">
+        </LinkButton>
+        <Button type="submit" disabled={pending} loading={pending}>
           {pending ? "Scheduling..." : "Schedule Visit"}
-        </button>
+        </Button>
       </div>
     </form>
   );

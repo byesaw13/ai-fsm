@@ -1,9 +1,9 @@
 import { redirect, notFound } from "next/navigation";
-import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { canCreateVisit, canAssignVisit } from "@/lib/auth/permissions";
 import { query, queryOne } from "@/lib/db";
 import { VisitScheduleForm } from "./VisitScheduleForm";
+import { Card, PageContainer, PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -47,19 +47,16 @@ export default async function NewVisitPage({
     : [];
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <div>
-          <Link href={`/app/jobs/${id}`} className="back-link">
-            ← {job.title ?? "Job"}
-          </Link>
-          <h1 className="page-title">Schedule Visit</h1>
-        </div>
-      </div>
-
-      <div className="card">
+    <PageContainer>
+      <PageHeader
+        title="Schedule Visit"
+        subtitle={job.title ?? undefined}
+        backHref={`/app/jobs/${id}`}
+        backLabel={job.title ?? "Job"}
+      />
+      <Card>
         <VisitScheduleForm jobId={id} users={users} canAssign={canAssign} />
-      </div>
-    </div>
+      </Card>
+    </PageContainer>
   );
 }

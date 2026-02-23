@@ -11,7 +11,7 @@ interface PageContainerProps {
 
 export function PageContainer({ children, className = "" }: PageContainerProps) {
   return (
-    <div className={`p7-page-container ${className}`}>
+    <div className={`p7-page-container page-container ${className}`}>
       {children}
     </div>
   );

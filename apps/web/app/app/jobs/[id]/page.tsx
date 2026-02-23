@@ -2,20 +2,34 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { queryOne, query } from "@/lib/db";
+import { formatVisitTime, isVisitOverdue } from "@/lib/visits/p7";
 import {
   canTransitionJob,
   canCreateVisit,
   canDeleteRecords,
 } from "@/lib/auth/permissions";
 import { jobTransitions } from "@ai-fsm/domain";
-import type { Job, Visit, JobStatus, VisitStatus } from "@ai-fsm/domain";
+import type { Job, Visit, JobStatus } from "@ai-fsm/domain";
 import { JobTransitionForm } from "./JobTransitionForm";
 import { DeleteJobButton } from "./DeleteJobButton";
+import {
+  PageContainer,
+  PageHeader,
+  StatusBadge,
+  LinkButton,
+  Timeline,
+  Card,
+  SectionHeader,
+  EmptyState,
+} from "@/components/ui";
+import type { TimelineEntryData, StatusVariant } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 type JobRow = Job & { client_name: string | null };
-type VisitRow = Visit & { assigned_user_name: string | null };
+type VisitRow = Visit & {
+  assigned_user_name: string | null;
+};
 
 const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   draft: "Draft",
@@ -24,14 +38,6 @@ const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   in_progress: "In Progress",
   completed: "Completed",
   invoiced: "Invoiced",
-  cancelled: "Cancelled",
-};
-
-const VISIT_STATUS_LABELS: Record<VisitStatus, string> = {
-  scheduled: "Scheduled",
-  arrived: "Arrived",
-  in_progress: "In Progress",
-  completed: "Completed",
   cancelled: "Cancelled",
 };
 
@@ -63,138 +69,248 @@ export default async function JobDetailPage({
     if (!assigned) notFound();
   }
 
-  let visits: VisitRow[];
-  if (session.role === "tech") {
-    visits = await query<VisitRow>(
-      `SELECT v.*, u.full_name AS assigned_user_name
-       FROM visits v
-       LEFT JOIN users u ON u.id = v.assigned_user_id
-       WHERE v.job_id = $1 AND v.account_id = $2 AND v.assigned_user_id = $3
-       ORDER BY v.scheduled_start ASC`,
-      [id, session.accountId, session.userId]
-    );
-  } else {
-    visits = await query<VisitRow>(
-      `SELECT v.*, u.full_name AS assigned_user_name
-       FROM visits v
-       LEFT JOIN users u ON u.id = v.assigned_user_id
-       WHERE v.job_id = $1 AND v.account_id = $2
-       ORDER BY v.scheduled_start ASC`,
-      [id, session.accountId]
-    );
-  }
+  const [visits, commercialCounts] = await Promise.all([
+    session.role === "tech"
+      ? query<VisitRow>(
+          `SELECT v.*, u.full_name AS assigned_user_name
+           FROM visits v
+           LEFT JOIN users u ON u.id = v.assigned_user_id
+           WHERE v.job_id = $1 AND v.account_id = $2 AND v.assigned_user_id = $3
+           ORDER BY v.scheduled_start ASC`,
+          [id, session.accountId, session.userId]
+        )
+      : query<VisitRow>(
+          `SELECT v.*, u.full_name AS assigned_user_name
+           FROM visits v
+           LEFT JOIN users u ON u.id = v.assigned_user_id
+           WHERE v.job_id = $1 AND v.account_id = $2
+           ORDER BY v.scheduled_start ASC`,
+          [id, session.accountId]
+        ),
+    // Count estimates and invoices linked to this job
+    session.role !== "tech"
+      ? queryOne<{ estimate_count: string; invoice_count: string }>(
+          `SELECT
+             (SELECT COUNT(*) FROM estimates WHERE job_id = $1 AND account_id = $2) AS estimate_count,
+             (SELECT COUNT(*) FROM invoices WHERE job_id = $1 AND account_id = $2) AS invoice_count`,
+          [id, session.accountId]
+        )
+      : Promise.resolve(null),
+  ]);
 
   const currentStatus = job.status as JobStatus;
   const allowedTransitions = jobTransitions[currentStatus];
   const canTransition = canTransitionJob(session.role);
   const canAddVisit = canCreateVisit(session.role);
   const canDelete = canDeleteRecords(session.role);
+  const isTech = session.role === "tech";
+
+  const estimateCount = commercialCounts ? parseInt(commercialCounts.estimate_count) : 0;
+  const invoiceCount = commercialCounts ? parseInt(commercialCounts.invoice_count) : 0;
+
+  // Build timeline entries from visits
+  const timelineEntries: TimelineEntryData[] = visits.map((v) => {
+    const overdue = isVisitOverdue(v);
+    return {
+      id: v.id,
+      timestamp: v.scheduled_start,
+      title: `${new Date(v.scheduled_start).toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      })} · ${formatVisitTime(v.scheduled_start)}`,
+      subtitle: v.assigned_user_name ? `Tech: ${v.assigned_user_name}` : "Unassigned",
+      status: v.status,
+      badge: overdue ? (
+        <span className="p7-badge p7-badge-status-overdue" style={{ fontSize: "var(--text-xs)" }}>
+          Overdue
+        </span>
+      ) : undefined,
+      href: `/app/visits/${v.id}`,
+      isCompleted: v.status === "completed" || v.status === "cancelled",
+    };
+  });
+
+  const scheduleVisitAction = canAddVisit ? (
+    <LinkButton
+      href={`/app/jobs/${job.id}/visits/new`}
+      variant="secondary"
+      size="sm"
+      data-testid="add-visit-btn"
+    >
+      + Schedule Visit
+    </LinkButton>
+  ) : undefined;
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <div>
-          <Link href="/app/jobs" className="back-link">
-            ← Jobs
-          </Link>
-          <h1 className="page-title">{job.title}</h1>
-          {job.client_name && (
-            <p className="page-subtitle">{job.client_name}</p>
+    <PageContainer>
+      <PageHeader
+        title={job.title}
+        subtitle={job.client_name ?? undefined}
+        backHref="/app/jobs"
+        backLabel="Jobs"
+        actions={
+          <span data-testid="job-status">
+            <StatusBadge variant={currentStatus as StatusVariant}>
+              {JOB_STATUS_LABELS[currentStatus]}
+            </StatusBadge>
+          </span>
+        }
+      />
+
+      {/* Detail Hub Layout: two-column on desktop, stacked on mobile */}
+      <div className="p7-detail-layout">
+        {/* LEFT: Visits Timeline + Danger Zone */}
+        <div className="p7-detail-primary">
+          <Card>
+            <SectionHeader
+              title="Visits"
+              count={visits.length}
+              action={scheduleVisitAction}
+            />
+            {visits.length === 0 ? (
+              <EmptyState
+                title="No visits scheduled yet"
+                description={
+                  canAddVisit
+                    ? "Use the button above to schedule the first visit."
+                    : "No visits have been scheduled for this job."
+                }
+                data-testid="visits-empty"
+              />
+            ) : (
+              <Timeline entries={timelineEntries} />
+            )}
+          </Card>
+
+          {/* Status Transitions — admin/owner only */}
+          {canTransition && allowedTransitions.length > 0 && (
+            <Card data-testid="job-transition-panel">
+              <SectionHeader title="Status Actions" />
+              <JobTransitionForm
+                jobId={job.id}
+                allowedTransitions={allowedTransitions as JobStatus[]}
+                statusLabels={JOB_STATUS_LABELS}
+              />
+            </Card>
+          )}
+
+          {/* Danger Zone — owner only, draft only */}
+          {canDelete && currentStatus === "draft" && (
+            <Card className="p7-card-danger" data-testid="danger-zone">
+              <SectionHeader title="Danger Zone" />
+              <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginBottom: "var(--space-3)" }}>
+                Delete this job permanently. Only available for draft jobs.
+              </p>
+              <DeleteJobButton jobId={job.id} />
+            </Card>
           )}
         </div>
-        <span className={`status-pill status-${job.status}`} data-testid="job-status">
-          {JOB_STATUS_LABELS[currentStatus]}
-        </span>
-      </div>
 
-      {/* Job Details */}
-      <div className="card detail-card">
-        <h2>Details</h2>
-        {job.description && <p>{job.description}</p>}
-        {job.scheduled_start && (
-          <p>
-            <strong>Starts:</strong>{" "}
-            {new Date(job.scheduled_start).toLocaleString()}
-          </p>
-        )}
-        {job.scheduled_end && (
-          <p>
-            <strong>Ends:</strong>{" "}
-            {new Date(job.scheduled_end).toLocaleString()}
-          </p>
-        )}
-      </div>
-
-      {/* Status Transitions — admin/owner only */}
-      {canTransition && allowedTransitions.length > 0 && (
-        <div className="card action-card" data-testid="job-transition-panel">
-          <h2>Transition Status</h2>
-          <JobTransitionForm
-            jobId={job.id}
-            allowedTransitions={allowedTransitions as JobStatus[]}
-            statusLabels={JOB_STATUS_LABELS}
-          />
-        </div>
-      )}
-
-      {/* Visits */}
-      <div className="card">
-        <div className="section-header">
-          <h2>Visits ({visits.length})</h2>
-          {canAddVisit && (
-            <Link
-              href={`/app/jobs/${job.id}/visits/new`}
-              className="btn btn-primary btn-sm"
-              data-testid="add-visit-btn"
-            >
-              + Schedule Visit
-            </Link>
-          )}
-        </div>
-
-        {visits.length === 0 ? (
-          <p className="muted" data-testid="visits-empty">
-            No visits scheduled yet.{canAddVisit ? " Use the button above to schedule the first visit." : ""}
-          </p>
-        ) : (
-          <div className="visit-list">
-            {visits.map((visit) => (
-              <Link
-                key={visit.id}
-                href={`/app/visits/${visit.id}`}
-                className="visit-card"
-                data-testid="visit-card"
-                data-status={visit.status}
-              >
-                <div className="visit-card-header">
-                  <span>
-                    {new Date(visit.scheduled_start).toLocaleDateString()}{" "}
-                    {new Date(visit.scheduled_start).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                  <span className={`status-pill status-${visit.status}`}>
-                    {VISIT_STATUS_LABELS[visit.status as VisitStatus]}
-                  </span>
+        {/* RIGHT: Job details + Commercial panel */}
+        {!isTech && (
+          <div className="p7-detail-sidebar">
+            {/* Job details */}
+            <Card>
+              <SectionHeader title="Job Details" />
+              <dl className="p7-detail-list">
+                <div className="p7-detail-row">
+                  <dt>Status</dt>
+                  <dd>
+                    <StatusBadge variant={currentStatus as StatusVariant}>
+                      {JOB_STATUS_LABELS[currentStatus]}
+                    </StatusBadge>
+                  </dd>
                 </div>
-                {visit.assigned_user_name && (
-                  <p className="muted">Tech: {visit.assigned_user_name}</p>
+                {job.description && (
+                  <div className="p7-detail-row">
+                    <dt>Description</dt>
+                    <dd style={{ whiteSpace: "pre-wrap" }}>{job.description}</dd>
+                  </div>
                 )}
-              </Link>
-            ))}
+                {job.scheduled_start && (
+                  <div className="p7-detail-row">
+                    <dt>Starts</dt>
+                    <dd>{new Date(job.scheduled_start).toLocaleString()}</dd>
+                  </div>
+                )}
+                {job.scheduled_end && (
+                  <div className="p7-detail-row">
+                    <dt>Ends</dt>
+                    <dd>{new Date(job.scheduled_end).toLocaleString()}</dd>
+                  </div>
+                )}
+              </dl>
+            </Card>
+
+            {/* Commercial links */}
+            <Card>
+              <SectionHeader title="Commercial" />
+              <dl className="p7-detail-list">
+                <div className="p7-detail-row">
+                  <dt>Estimates</dt>
+                  <dd>
+                    {estimateCount > 0 ? (
+                      <Link
+                        href={`/app/estimates?job_id=${job.id}`}
+                        style={{ color: "var(--accent)", textDecoration: "none", fontSize: "var(--text-sm)" }}
+                      >
+                        {estimateCount} estimate{estimateCount !== 1 ? "s" : ""} →
+                      </Link>
+                    ) : (
+                      <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>None</span>
+                    )}
+                  </dd>
+                </div>
+                <div className="p7-detail-row">
+                  <dt>Invoices</dt>
+                  <dd>
+                    {invoiceCount > 0 ? (
+                      <Link
+                        href={`/app/invoices?job_id=${job.id}`}
+                        style={{ color: "var(--accent)", textDecoration: "none", fontSize: "var(--text-sm)" }}
+                      >
+                        {invoiceCount} invoice{invoiceCount !== 1 ? "s" : ""} →
+                      </Link>
+                    ) : (
+                      <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>None</span>
+                    )}
+                  </dd>
+                </div>
+              </dl>
+            </Card>
+          </div>
+        )}
+
+        {/* Tech view: show job info inline below timeline */}
+        {isTech && (
+          <div className="p7-detail-sidebar">
+            <Card>
+              <SectionHeader title="Job Details" />
+              <dl className="p7-detail-list">
+                {job.client_name && (
+                  <div className="p7-detail-row">
+                    <dt>Client</dt>
+                    <dd>{job.client_name}</dd>
+                  </div>
+                )}
+                {job.description && (
+                  <div className="p7-detail-row">
+                    <dt>Description</dt>
+                    <dd style={{ whiteSpace: "pre-wrap" }}>{job.description}</dd>
+                  </div>
+                )}
+                {job.scheduled_start && (
+                  <div className="p7-detail-row">
+                    <dt>Starts</dt>
+                    <dd>{new Date(job.scheduled_start).toLocaleString()}</dd>
+                  </div>
+                )}
+              </dl>
+            </Card>
           </div>
         )}
       </div>
-
-      {/* Danger Zone — owner only */}
-      {canDelete && currentStatus === "draft" && (
-        <div className="card danger-card" data-testid="danger-zone">
-          <h2>Danger Zone</h2>
-          <p className="muted">Delete this job permanently. Only available for draft jobs.</p>
-          <DeleteJobButton jobId={job.id} />
-        </div>
-      )}
-    </div>
+    </PageContainer>
   );
 }
