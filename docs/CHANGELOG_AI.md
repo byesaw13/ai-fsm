@@ -15,6 +15,111 @@ Each AI run must append one record. Keep entries factual and short.
 
 ---
 
+- Timestamp (UTC): 2026-02-23T02:00:00Z
+- Agent: agent-orchestrator
+- Branch: agent-orchestrator/P7-T1-design-system-shell
+- Task ID: P7-T1
+- Summary: Design system and app shell overhaul. Replaced monolithic globals.css (1365 lines, raw hex values) with tokenized CSS architecture (6 import files: tokens, reset, animations, layout, components, utilities). Built 20 UI primitive components (Button, Badge, Input, Select, Textarea, Card, Skeleton, Toast/ToastProvider, Modal, ConfirmDialog, FilterBar, DataTable, Timeline, ItemCard, EmptyState, MetricGrid, StatusSection, PageContainer, PageHeader, SectionHeader) plus barrel export. Rewrote AppShell to P7 sidebar layout (desktop 240px fixed, tablet 56px collapsed, mobile bottom tab bar) with ToastProvider. Migrated dashboard page to use P7 primitives. All legacy CSS classes preserved as deprecated aliases in layout.css and components.css — no pages regressed. Unit test suite added with 63 tests covering all pure helper functions.
+- Files changed:
+  - apps/web/app/globals.css (rewritten — import-only, delegates to 6 sub-files)
+  - apps/web/app/styles/tokens.css (new — all CSS custom properties from P7_UX_SPEC §4.1)
+  - apps/web/app/styles/reset.css (new — minimal CSS reset)
+  - apps/web/app/styles/animations.css (new — shimmer, fadeIn, slideUp, slideInRight, fadeOut, spin)
+  - apps/web/app/styles/layout.css (new — P7 sidebar layout + deprecated legacy aliases)
+  - apps/web/app/styles/components.css (new — P7 component classes + deprecated legacy aliases)
+  - apps/web/app/styles/utilities.css (new — utility classes)
+  - apps/web/components/AppShell.tsx (full rewrite — P7 sidebar layout, ToastProvider, getNavItems, isNavActive)
+  - apps/web/app/app/page.tsx (updated — PageContainer, PageHeader, MetricGrid, LinkButton, RoleBadge)
+  - apps/web/components/ui/Badge.tsx (new — StatusBadge, PriorityBadge, RoleBadge, CountBadge)
+  - apps/web/components/ui/Button.tsx (new — Button, LinkButton, getButtonClass)
+  - apps/web/components/ui/Input.tsx (new)
+  - apps/web/components/ui/Select.tsx (new)
+  - apps/web/components/ui/Textarea.tsx (new)
+  - apps/web/components/ui/Card.tsx (new)
+  - apps/web/components/ui/Skeleton.tsx (new — Skeleton, SkeletonText, SkeletonCard)
+  - apps/web/components/ui/Toast.tsx (new — ToastProvider, useToast hook, auto-dismiss)
+  - apps/web/components/ui/Modal.tsx (new — focus trap, Escape/overlay dismiss)
+  - apps/web/components/ui/ConfirmDialog.tsx (new — wraps Modal with danger confirm)
+  - apps/web/components/ui/PageContainer.tsx (new)
+  - apps/web/components/ui/PageHeader.tsx (new)
+  - apps/web/components/ui/SectionHeader.tsx (new)
+  - apps/web/components/ui/EmptyState.tsx (new)
+  - apps/web/components/ui/StatusSection.tsx (new)
+  - apps/web/components/ui/MetricGrid.tsx (new)
+  - apps/web/components/ui/FilterBar.tsx (new — GET form, URL-persisted filters)
+  - apps/web/components/ui/Timeline.tsx (new)
+  - apps/web/components/ui/ItemCard.tsx (new)
+  - apps/web/components/ui/DataTable.tsx (new)
+  - apps/web/components/ui/index.ts (new — barrel export)
+  - apps/web/components/ui/__tests__/design-system.unit.test.ts (new — 63 unit tests)
+  - docs/PHASED_BACKLOG.yaml (P7-T1 marked completed)
+  - docs/WORK_ASSIGNMENT.md (P7-T1 claim marked completed)
+  - docs/CHANGELOG_AI.md (this entry)
+- Commands run:
+  - pnpm --filter @ai-fsm/web lint
+  - pnpm --filter @ai-fsm/web typecheck
+  - pnpm --filter @ai-fsm/web build
+  - pnpm --filter @ai-fsm/web test
+- Gate results:
+  - lint: ✅ no errors
+  - typecheck: ✅ no errors
+  - build: ✅ clean production build (all 38 routes compiled)
+  - test: ✅ 305 passed, 55 skipped (63 new tests in design-system.unit.test.ts)
+- Source evidence (dovelite):
+  - Consulted: /home/nick/dev/dovelite/components/AdminLayout.tsx — adopted sidebar (240px) + bottom tab bar (mobile) dual-zone layout for AppShell rewrite
+  - Consulted: /home/nick/dev/dovelite/components/Button.tsx, Input.tsx, Skeleton.tsx — adopted variant/size/loading prop shape; reimplemented against ai-fsm CSS token system
+  - Active nav style (left accent border + bg highlight) from AdminLayout
+- Source evidence (myprogram):
+  - No domain changes — all P7-T1 work is presentation-layer only per ADR decision
+- Adoption decisions:
+  - CSS custom properties as single source of truth (no raw hex in P7 components)
+  - P7 CSS class prefix convention (p7-*) to avoid collision with deprecated legacy classes
+  - All existing CSS class names preserved in layout.css + components.css with @deprecated comments for zero regression risk
+  - typedRoutes: true compatibility: all dynamic string hrefs cast as `href={value as Route}` with `import type { Route } from "next"`
+  - Node-environment vitest (no jsdom/RTL): tests use pure logic extraction pattern
+  - Dashboard (/app) exact-match nav active state to prevent matching /app/jobs, /app/visits, etc.
+  - ToastProvider wraps AppShell (client component) to provide toast context to all pages
+- Risks or follow-ups:
+  - P7-T2 (Jobs + Visits workspace rewrite) can now build on all p7- primitives
+  - Legacy CSS aliases in layout.css and components.css can be pruned once all pages migrate to p7- classes
+  - window.confirm-based ConfirmDialog falls back to Modal — existing delete components (DeleteJobButton, DeleteEstimateButton) still use window.confirm; can be migrated to ConfirmDialog in P7-T2/T3
+  - RTL/jsdom component-level tests not added (no jsdom devDependency); deferred to post-P7 if needed
+
+---
+
+- Timestamp (UTC): 2026-02-23T00:00:00Z
+- Agent: agent-orchestrator
+- Branch: agent-orchestrator/P7-T0-ux-spec-freeze
+- Task ID: P7-T0
+- Summary: UX spec freeze for Phase 7 Jobber-grade rewrite. Created docs/ux/ directory with three execution-ready spec documents covering information architecture, design token system, screen decisions, and interaction patterns.
+- Files changed:
+  - docs/ux/P7_UX_SPEC.md (new) — IA, role UX, design token contract, global UX standards, component inventory
+  - docs/ux/P7_SCREEN_MAP.md (new) — route inventory with Keep/Rewrite/Merge/Remove decisions for all 15 routes
+  - docs/ux/P7_INTERACTION_PATTERNS.md (new) — 8 patterns: filter bar, detail hub, timeline, payment panel, mobile action bar, status transitions, skeleton loading, quick assign modal
+  - docs/PHASED_BACKLOG.yaml — P7-T0 marked completed
+  - docs/WORK_ASSIGNMENT.md — P7-T0 claim marked completed
+- Source evidence (dovelite):
+  - Consulted: /home/nick/dev/dovelite/components/AdminLayout.tsx
+  - Adopted: Sidebar (desktop) + bottom tab bar (mobile) dual navigation pattern for AppShell rewrite in P7-T1
+  - Adopted: Active nav item style — left accent border + background highlight
+  - Consulted: /home/nick/dev/dovelite/components/Button.tsx, Input.tsx, Skeleton.tsx
+  - Adopted: Component interface shape (variant, size, loading props); reimplemented against ai-fsm CSS token system
+- Source evidence (myprogram):
+  - Consulted: /home/nick/dev/myprogram/DOMAIN_MODEL.md (FSM transition model already adopted in prior phases; P7 adds no domain changes)
+  - Decision: All P7 changes are presentation-layer only. No API, auth, RLS, or domain changes.
+- Commands run:
+  - mkdir -p docs/ux
+  - git checkout -b agent-orchestrator/P7-T0-ux-spec-freeze
+  - pnpm gate
+- Gate results: lint ✓ / typecheck ✓ / build ✓ / test ✓ (242 passed, 55 skipped/intentional — all pre-existing)
+- Risks or follow-ups:
+  - Branch protection drift: required_approving_review_count is 0, should be 1 per CI_GOVERNANCE.md. Needs patch before first P7 merge.
+  - P7-T1 (design system + app shell) is unblocked and should be claimed next.
+  - AssignModal (Pattern 8) requires one new read-only query for tech list; no API route change needed.
+  - Dashboard activity feed (P7-T4) may require audit_log query — confirm table is readable before P7-T4 starts.
+
+---
+
 - Timestamp (UTC): 2026-02-16T00:00:00Z
 - Agent: codex
 - Branch: local-uncommitted
