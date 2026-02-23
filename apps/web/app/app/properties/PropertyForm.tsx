@@ -94,8 +94,12 @@ export function PropertyForm({ mode, actionUrl, cancelHref, clients, initialValu
       }
       toast.success(mode === "create" ? "Property created" : "Property updated");
       const nextId = data.data?.id ?? propertyId;
-      if (mode === "create" && nextId) router.push((`/app/properties/${nextId}`) as Route);
-      else router.refresh();
+      if (mode === "create" && nextId) {
+        router.push((`/app/properties/${nextId}`) as Route);
+      } else {
+        setPending(false);
+        router.refresh();
+      }
     } catch {
       setError(`Failed to ${mode} property`);
       setPending(false);

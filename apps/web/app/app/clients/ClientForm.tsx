@@ -75,8 +75,12 @@ export function ClientForm({ mode, actionUrl, cancelHref, initialValues, clientI
       }
       toast.success(mode === "create" ? `Client created: ${form.name.trim()}` : "Client updated");
       const nextId = data.data?.id ?? clientId;
-      if (mode === "create" && nextId) router.push((`/app/clients/${nextId}`) as Route);
-      else router.refresh();
+      if (mode === "create" && nextId) {
+        router.push((`/app/clients/${nextId}`) as Route);
+      } else {
+        setPending(false);
+        router.refresh();
+      }
     } catch {
       setError(`Failed to ${mode} client`);
       setPending(false);

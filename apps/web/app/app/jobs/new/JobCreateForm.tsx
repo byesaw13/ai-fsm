@@ -46,7 +46,6 @@ export function JobCreateForm({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
-  const [selectedClientId, setSelectedClientId] = useState("");
 
   const [form, setForm] = useState({
     title: "",
@@ -61,12 +60,8 @@ export function JobCreateForm({
     scheduled_end: "",
   });
 
-  useEffect(() => {
-    setSelectedClientId(form.client_id);
-  }, [form.client_id]);
-
   const filteredProperties = properties.filter(
-    (p) => p.client_id === selectedClientId
+    (p) => p.client_id === form.client_id
   );
 
   useEffect(() => {
@@ -191,9 +186,9 @@ export function JobCreateForm({
           label="Property"
           value={form.property_id}
           onChange={(e) => setForm({ ...form, property_id: e.target.value })}
-          disabled={pending || !selectedClientId}
+          disabled={pending || !form.client_id}
           hint={
-            selectedClientId && filteredProperties.length === 0
+            form.client_id && filteredProperties.length === 0
               ? "No properties for this client."
               : undefined
           }
