@@ -201,14 +201,19 @@ export default async function JobsPage({ searchParams }: PageProps) {
             hasFilter
               ? "Try adjusting your search or filters."
               : isAdmin
-                ? "Create your first job to start tracking work."
+                ? "You'll need a client before creating a job."
                 : "Jobs will appear here when you're assigned to visits."
           }
           action={
             canCreate && !hasFilter ? (
-              <LinkButton href="/app/jobs/new" variant="primary">
-                Create First Job
-              </LinkButton>
+              <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", justifyContent: "center" }}>
+                <LinkButton href="/app/clients/new" variant="secondary">
+                  + New Client
+                </LinkButton>
+                <LinkButton href="/app/jobs/new" variant="primary">
+                  + New Job
+                </LinkButton>
+              </div>
             ) : undefined
           }
           data-testid="jobs-empty"

@@ -133,6 +133,11 @@ export const clientSchema = z.object({
   email: z.string().email().nullable().optional(),
   phone: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  company_name: z.string().nullable().optional(),
+  address_line1: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  zip: z.string().nullable().optional(),
   created_at: timestampField,
   updated_at: timestampField,
 });

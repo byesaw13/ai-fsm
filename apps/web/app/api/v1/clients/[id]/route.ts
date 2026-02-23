@@ -14,6 +14,11 @@ const patchClientBody = z
     email: z.string().email().optional().or(z.literal("")),
     phone: z.string().max(50).optional().or(z.literal("")),
     notes: z.string().max(5000).optional().or(z.literal("")),
+    company_name: z.string().max(255).optional().or(z.literal("")),
+    address_line1: z.string().max(500).optional().or(z.literal("")),
+    city: z.string().max(100).optional().or(z.literal("")),
+    state: z.string().max(100).optional().or(z.literal("")),
+    zip: z.string().max(20).optional().or(z.literal("")),
   })
   .refine((v) => Object.keys(v).length > 0, { message: "At least one field is required" });
 
@@ -100,6 +105,26 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
     if (patch.notes !== undefined) {
       setClauses.push(`notes = $${idx++}`);
       params.push(patch.notes || null);
+    }
+    if (patch.company_name !== undefined) {
+      setClauses.push(`company_name = $${idx++}`);
+      params.push(patch.company_name || null);
+    }
+    if (patch.address_line1 !== undefined) {
+      setClauses.push(`address_line1 = $${idx++}`);
+      params.push(patch.address_line1 || null);
+    }
+    if (patch.city !== undefined) {
+      setClauses.push(`city = $${idx++}`);
+      params.push(patch.city || null);
+    }
+    if (patch.state !== undefined) {
+      setClauses.push(`state = $${idx++}`);
+      params.push(patch.state || null);
+    }
+    if (patch.zip !== undefined) {
+      setClauses.push(`zip = $${idx++}`);
+      params.push(patch.zip || null);
     }
     params.push(id, session.accountId);
 

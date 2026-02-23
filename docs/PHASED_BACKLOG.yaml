@@ -304,6 +304,16 @@ epics:
           - Owner/admin create and edit flows for clients/properties with explicit validation and feedback
           - Quick actions link client/property context into job creation flow
           - Unit and E2E tests cover client/property -> job path
+      - id: P7-T2.6
+        title: Dashboard onboarding and client profile enrichment
+        status: completed
+        completed_by: agent-orchestrator
+        acceptance:
+          - Dashboard shows actionable onboarding and real admin metrics using P7 primitives
+          - Jobs empty state links users to client creation as well as job creation
+          - Clients support optional company and mailing address fields (schema + API + UI)
+          - Client list/detail surfaces show enriched company/address information
+          - Additive DB migration provided for client address fields
       - id: P7-T3
         title: Estimates, invoices, and payments workspace rewrite
         status: pending

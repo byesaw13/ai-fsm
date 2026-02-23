@@ -12,6 +12,11 @@ interface ClientFormValues {
   email: string;
   phone: string;
   notes: string;
+  company_name: string;
+  address_line1: string;
+  city: string;
+  state: string;
+  zip: string;
 }
 
 interface ClientFormProps {
@@ -27,6 +32,11 @@ interface FormErrors {
   email?: string;
   phone?: string;
   notes?: string;
+  company_name?: string;
+  address_line1?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
 }
 
 export function ClientForm({ mode, actionUrl, cancelHref, initialValues, clientId }: ClientFormProps) {
@@ -40,6 +50,11 @@ export function ClientForm({ mode, actionUrl, cancelHref, initialValues, clientI
     email: initialValues?.email ?? "",
     phone: initialValues?.phone ?? "",
     notes: initialValues?.notes ?? "",
+    company_name: initialValues?.company_name ?? "",
+    address_line1: initialValues?.address_line1 ?? "",
+    city: initialValues?.city ?? "",
+    state: initialValues?.state ?? "",
+    zip: initialValues?.zip ?? "",
   });
 
   function validate() {
@@ -64,6 +79,11 @@ export function ClientForm({ mode, actionUrl, cancelHref, initialValues, clientI
           email: form.email.trim(),
           phone: form.phone.trim(),
           notes: form.notes.trim(),
+          company_name: form.company_name.trim(),
+          address_line1: form.address_line1.trim(),
+          city: form.city.trim(),
+          state: form.state.trim(),
+          zip: form.zip.trim(),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -94,6 +114,7 @@ export function ClientForm({ mode, actionUrl, cancelHref, initialValues, clientI
           <p style={{ margin: 0 }}>{error}</p>
         </Card>
       ) : null}
+
       <div className="p7-form-grid p7-form-grid-2">
         <Input
           id="name"
@@ -104,7 +125,7 @@ export function ClientForm({ mode, actionUrl, cancelHref, initialValues, clientI
           error={errors.name}
           disabled={pending}
           containerClassName="p7-form-grid-span-2"
-          placeholder="Acme Property Group"
+          placeholder="Full name or business name"
         />
         <Input
           id="email"
@@ -125,18 +146,79 @@ export function ClientForm({ mode, actionUrl, cancelHref, initialValues, clientI
           disabled={pending}
           placeholder="(555) 555-5555"
         />
-        <Textarea
-          id="notes"
-          label="Notes"
-          value={form.notes}
-          onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-          error={errors.notes}
-          disabled={pending}
-          rows={4}
-          containerClassName="p7-form-grid-span-2"
-          placeholder="Access preferences, billing notes, contact instructions..."
-        />
       </div>
+
+      {/* Company & Address */}
+      <div style={{
+        borderTop: "1px solid var(--border)",
+        paddingTop: "var(--space-4)",
+        marginTop: "var(--space-2)",
+      }}>
+        <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-xs)", fontWeight: "var(--font-semibold)", color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          Company &amp; Address <span style={{ fontWeight: "normal", textTransform: "none", letterSpacing: "normal" }}>(optional)</span>
+        </p>
+        <div className="p7-form-grid p7-form-grid-2">
+          <Input
+            id="company_name"
+            label="Company Name"
+            value={form.company_name}
+            onChange={(e) => setForm((f) => ({ ...f, company_name: e.target.value }))}
+            error={errors.company_name}
+            disabled={pending}
+            containerClassName="p7-form-grid-span-2"
+            placeholder="Acme Property Group"
+          />
+          <Input
+            id="address_line1"
+            label="Street Address"
+            value={form.address_line1}
+            onChange={(e) => setForm((f) => ({ ...f, address_line1: e.target.value }))}
+            error={errors.address_line1}
+            disabled={pending}
+            containerClassName="p7-form-grid-span-2"
+            placeholder="123 Main St"
+          />
+          <Input
+            id="city"
+            label="City"
+            value={form.city}
+            onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+            error={errors.city}
+            disabled={pending}
+            placeholder="Springfield"
+          />
+          <Input
+            id="state"
+            label="State"
+            value={form.state}
+            onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}
+            error={errors.state}
+            disabled={pending}
+            placeholder="IL"
+          />
+          <Input
+            id="zip"
+            label="ZIP Code"
+            value={form.zip}
+            onChange={(e) => setForm((f) => ({ ...f, zip: e.target.value }))}
+            error={errors.zip}
+            disabled={pending}
+            placeholder="62701"
+          />
+        </div>
+      </div>
+
+      <Textarea
+        id="notes"
+        label="Notes"
+        value={form.notes}
+        onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+        error={errors.notes}
+        disabled={pending}
+        rows={3}
+        placeholder="Access preferences, billing notes, contact instructions..."
+      />
+
       <div className="p7-form-actions">
         <LinkButton href={cancelHref} variant="secondary">Cancel</LinkButton>
         <Button type="submit" loading={pending} disabled={pending} data-testid={`submit-client-${mode}-btn`}>

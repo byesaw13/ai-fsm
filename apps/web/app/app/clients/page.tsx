@@ -25,6 +25,7 @@ type ClientRow = {
   email: string | null;
   phone: string | null;
   notes: string | null;
+  company_name: string | null;
   created_at: string;
   property_count: number | string;
   job_count: number | string;
@@ -80,6 +81,11 @@ export default async function ClientsPage({ searchParams }: PageProps) {
           <Link href={`/app/clients/${row.id}` as Route} style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>
             {row.name}
           </Link>
+          {row.company_name && (
+            <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", fontStyle: "italic" }}>
+              {row.company_name}
+            </div>
+          )}
           <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
             {formatClientContact(row)}
           </div>
@@ -152,6 +158,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                 title={row.name}
                 meta={
                   <>
+                    {row.company_name && <div style={{ fontStyle: "italic" }}>{row.company_name}</div>}
                     <div>{formatClientContact(row)}</div>
                     <div>{Number(row.property_count)} properties • {Number(row.job_count)} jobs</div>
                   </>

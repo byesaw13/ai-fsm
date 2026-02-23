@@ -765,3 +765,47 @@ Each AI run must append one record. Keep entries factual and short.
   - Tech role currently has no read-only clients/properties workspace; if needed, add filtered read-only pages based on assigned jobs/visits in a follow-on task
   - No API route unit/integration tests yet for clients/properties endpoints; current coverage is UI helper unit tests + E2E smoke spec only
   - P7-T3 (commercial workspace rewrite) should add client/property context links consistently on estimate/invoice screens
+
+---
+
+- Timestamp (UTC): 2026-02-23T23:48:43Z
+- Agent: agent-orchestrator
+- Branch: agent-orchestrator/P7-T2.6-dashboard-onboarding-client-address
+- Task ID: P7-T2.6
+- Summary: Reworked `/app` dashboard into an actionable owner/admin home surface with real metrics, time-aware greeting, onboarding card (first-client flow), next-step nudges, quick actions, and recent jobs/upcoming visits panels. Improved jobs empty state to point users to client creation. Extended client schema/domain/API/UI with optional company and mailing address fields (company_name, address_line1, city, state, zip) plus additive migration `006_client_address.sql`. Updated client list/detail/form to display and edit the new fields.
+- Files changed:
+  - apps/web/app/app/page.tsx (dashboard rewrite with onboarding/metrics/recent activity)
+  - apps/web/app/app/jobs/page.tsx (empty state adds New Client CTA)
+  - apps/web/app/app/clients/ClientForm.tsx (company/address fields)
+  - apps/web/app/app/clients/page.tsx (company name display in list/card)
+  - apps/web/app/app/clients/[id]/page.tsx (company/address display + edit prefill)
+  - apps/web/app/api/v1/clients/route.ts (POST supports company/address fields)
+  - apps/web/app/api/v1/clients/[id]/route.ts (PATCH supports company/address fields)
+  - packages/domain/src/index.ts (client schema extended)
+  - db/migrations/006_client_address.sql (new additive migration)
+  - docs/PHASED_BACKLOG.yaml (P7-T2.6 added/completed)
+  - docs/WORK_ASSIGNMENT.md (P7-T2.6 claim completed)
+  - docs/CHANGELOG_AI.md (this entry)
+- Commands run:
+  - pnpm gate
+- Gate results:
+  - lint: ✅
+  - typecheck: ✅
+  - build: ✅
+  - test: ✅ packages/domain 38 pass; services/worker 45 pass / 16 skip; apps/web 322 pass / 55 skip
+- Source evidence (dovelite):
+  - Consulted: /home/nick/dev/dovelite/app/admin/clients/page.tsx (actionable header + empty-state CTA sequencing)
+  - Consulted: /home/nick/dev/dovelite/app/admin/clients/[id]/page.tsx (client profile as next-step oriented workspace)
+  - Adopted: onboarding/next-step CTA emphasis, but reimplemented using ai-fsm P7 primitives and FSM navigation
+- Source evidence (myprogram):
+  - Consulted: /home/nick/dev/myprogram/frontend/apps/admin/src/app/(dashboard)/dashboard/clients/page.tsx (search/create affordances and dashboard-first admin flow expectations)
+  - Consulted: /home/nick/dev/myprogram/DOMAIN_MODEL.md (client fields stay additive and optional)
+  - Adopted: additive CRM field enrichment without changing tenancy/RBAC boundaries
+- Adoption decisions:
+  - Added optional client mailing/company fields via additive migration rather than introducing a separate client_profile table for MVP continuity
+  - Dashboard onboarding is role-aware and only shows owner/admin business setup prompts; tech dashboard remains task-focused metrics
+  - Jobs empty state now routes users toward client creation to prevent dead-end onboarding
+- Risks or follow-ups:
+  - Migration `db/migrations/006_client_address.sql` must be applied before new client address fields persist correctly in production/Pi
+  - Client list/detail currently uses single-line address field (`address_line1`) only; future enhancement can add `address_line2` if needed
+  - P7-T3 should surface client company/address context in estimate/invoice headers and print/send views
