@@ -20,10 +20,15 @@ interface Property {
   [key: string]: unknown;
 }
 
-export default async function NewJobPage() {
+interface PageProps {
+  searchParams: Promise<{ client_id?: string; property_id?: string }>;
+}
+
+export default async function NewJobPage({ searchParams }: PageProps) {
   const session = await getSession();
   if (!session) redirect("/login");
   if (!canTransitionJob(session.role)) redirect("/app/jobs");
+  const { client_id, property_id } = await searchParams;
 
   const [clients, properties] = await Promise.all([
     query<Client>(
@@ -40,7 +45,12 @@ export default async function NewJobPage() {
     <PageContainer>
       <PageHeader title="New Job" backHref="/app/jobs" backLabel="Jobs" />
       <Card>
-        <JobCreateForm clients={clients} properties={properties} />
+        <JobCreateForm
+          clients={clients}
+          properties={properties}
+          initialClientId={client_id}
+          initialPropertyId={property_id}
+        />
       </Card>
     </PageContainer>
   );

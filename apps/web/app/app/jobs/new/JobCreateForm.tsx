@@ -32,9 +32,16 @@ const PRIORITY_OPTIONS = [
 interface JobCreateFormProps {
   clients: Client[];
   properties: Property[];
+  initialClientId?: string;
+  initialPropertyId?: string;
 }
 
-export function JobCreateForm({ clients, properties }: JobCreateFormProps) {
+export function JobCreateForm({
+  clients,
+  properties,
+  initialClientId,
+  initialPropertyId,
+}: JobCreateFormProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,8 +50,11 @@ export function JobCreateForm({ clients, properties }: JobCreateFormProps) {
 
   const [form, setForm] = useState({
     title: "",
-    client_id: "",
-    property_id: "",
+    client_id: initialClientId && clients.some((c) => c.id === initialClientId) ? initialClientId : "",
+    property_id:
+      initialPropertyId && properties.some((p) => p.id === initialPropertyId)
+        ? initialPropertyId
+        : "",
     description: "",
     priority: 0,
     scheduled_start: "",
@@ -58,6 +68,14 @@ export function JobCreateForm({ clients, properties }: JobCreateFormProps) {
   const filteredProperties = properties.filter(
     (p) => p.client_id === selectedClientId
   );
+
+  useEffect(() => {
+    if (!form.property_id) return;
+    const exists = filteredProperties.some((p) => p.id === form.property_id);
+    if (!exists) {
+      setForm((prev) => ({ ...prev, property_id: "" }));
+    }
+  }, [filteredProperties, form.property_id]);
 
   function validate(): boolean {
     const errs: FormErrors = {};
