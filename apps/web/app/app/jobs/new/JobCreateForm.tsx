@@ -112,8 +112,8 @@ export function JobCreateForm({
         property_id: form.property_id || undefined,
         description: form.description.trim() || undefined,
         priority: form.priority,
-        scheduled_start: form.scheduled_start || undefined,
-        scheduled_end: form.scheduled_end || undefined,
+        scheduled_start: form.scheduled_start ? new Date(form.scheduled_start).toISOString() : undefined,
+        scheduled_end: form.scheduled_end ? new Date(form.scheduled_end).toISOString() : undefined,
       };
 
       const res = await fetch("/api/v1/jobs", {
