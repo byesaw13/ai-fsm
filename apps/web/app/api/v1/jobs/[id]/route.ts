@@ -81,7 +81,7 @@ export const PATCH = withRole(
     try {
       await client.query("BEGIN");
       await client.query(
-        `SET LOCAL app.current_user_id = $1; SET LOCAL app.current_account_id = $2; SET LOCAL app.current_role = $3`,
+        `SELECT set_config('app.current_user_id', $1, true), set_config('app.current_account_id', $2, true), set_config('app.current_role', $3, true)`,
         [session.userId, session.accountId, session.role]
       );
 
@@ -166,7 +166,7 @@ export const DELETE = withRole(
     try {
       await client.query("BEGIN");
       await client.query(
-        `SET LOCAL app.current_user_id = $1; SET LOCAL app.current_account_id = $2; SET LOCAL app.current_role = $3`,
+        `SELECT set_config('app.current_user_id', $1, true), set_config('app.current_account_id', $2, true), set_config('app.current_role', $3, true)`,
         [session.userId, session.accountId, session.role]
       );
 
