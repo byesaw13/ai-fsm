@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
-import { queryOne } from "@/lib/db";
+import { query, queryOne } from "@/lib/db";
 import {
   canTransitionVisit,
   canAssignVisit,
@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth/permissions";
 import { visitTransitions } from "@ai-fsm/domain";
 import type { Visit, VisitStatus } from "@ai-fsm/domain";
+import { VisitAssignForm } from "./VisitAssignForm";
 import { VisitTransitionForm } from "./VisitTransitionForm";
 import { VisitNotesForm } from "./VisitNotesForm";
 import {
@@ -70,6 +71,13 @@ export default async function VisitDetailPage({
   const canTransition = canTransitionVisit(session.role);
   const canAssign = canAssignVisit(session.role);
   const canNotes = canUpdateVisitNotes(session.role);
+
+  const assignableUsers = canAssign
+    ? await query<{ id: string; full_name: string; role: string; [key: string]: unknown }>(
+        `SELECT id, full_name, role FROM users WHERE account_id = $1 ORDER BY full_name ASC`,
+        [session.accountId]
+      )
+    : [];
 
   const overdue = isVisitOverdue(visit);
 
@@ -160,7 +168,13 @@ export default async function VisitDetailPage({
         <div className="p7-detail-sidebar">
           <Card>
             <SectionHeader title="Assignment" />
-            {visit.assigned_user_name ? (
+            {canAssign ? (
+              <VisitAssignForm
+                visitId={visit.id}
+                users={assignableUsers}
+                currentAssignedId={visit.assigned_user_id ?? null}
+              />
+            ) : visit.assigned_user_name ? (
               <dl className="p7-detail-list">
                 <div className="p7-detail-row">
                   <dt>Assigned To</dt>
@@ -170,15 +184,9 @@ export default async function VisitDetailPage({
             ) : (
               <EmptyState
                 title="Unassigned"
-                description="No technician is assigned to this visit yet."
+                description="No technician has been assigned to this visit."
                 data-testid="unassigned-badge"
               />
-            )}
-            {canAssign && (
-              <p className="p7-field-hint" data-testid="assign-note">
-                Assignment can be updated from the visits API and will be surfaced
-                as a quick action in later P7 tasks.
-              </p>
             )}
           </Card>
 
