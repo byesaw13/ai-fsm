@@ -109,7 +109,6 @@ export const POST = withAuth(
       //   2. arrived   → in_progress
       // The visit is never visible in 'arrived' state outside this tx.
       // -----------------------------------------------------------------------
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let updated: any;
       let effectiveStatus: VisitStatus;
 
