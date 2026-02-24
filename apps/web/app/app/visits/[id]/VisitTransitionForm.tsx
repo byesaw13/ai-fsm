@@ -1,89 +1,99 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { VisitStatus } from "@ai-fsm/domain";
 import { Button, useToast } from "@/components/ui";
+import type { ButtonVariant } from "@/components/ui";
 
 interface Props {
   visitId: string;
-  allowedTransitions: VisitStatus[];
-  statusLabels: Record<VisitStatus, string>;
+  currentStatus: VisitStatus;
+  role: string;
 }
 
-export function VisitTransitionForm({
-  visitId,
-  allowedTransitions,
-  statusLabels,
-}: Props) {
+// What the tech sees: plain-English action buttons sized for a phone screen.
+// "arrived" is still sent to the API — the server auto-advances to in_progress
+// and records arrived_at in the same transaction.
+const TECH_ACTIONS: Partial<Record<VisitStatus, { label: string; next: VisitStatus; variant: ButtonVariant }>> = {
+  scheduled:   { label: "Start Job",    next: "arrived",   variant: "primary"   },
+  in_progress: { label: "Complete Job", next: "completed", variant: "secondary" },
+};
+
+export function VisitTransitionForm({ visitId, currentStatus, role }: Props) {
   const router = useRouter();
   const toast = useToast();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
-  useEffect(() => {
-    if (!success) return;
-    const t = setTimeout(() => setSuccess(""), 3000);
-    return () => clearTimeout(t);
-  }, [success]);
-
-  async function handleTransition(targetStatus: VisitStatus) {
+  async function transition(targetStatus: VisitStatus) {
     setLoading(true);
-    setError("");
-    setSuccess("");
     try {
       const res = await fetch(`/api/v1/visits/${visitId}/transition`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: targetStatus }),
       });
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
-        const message = data.error?.message ?? "Transition failed";
-        setError(message);
-        toast.error(message);
+        toast.error(data.error?.message ?? "Could not update status");
       } else {
-        const message = `Status updated to ${statusLabels[targetStatus]}`;
-        setSuccess(message);
-        toast.success(message);
+        const labels: Record<string, string> = {
+          arrived:     "Job started — on site",
+          in_progress: "Job started — on site",
+          completed:   "Visit completed",
+          cancelled:   "Visit cancelled",
+        };
+        toast.success(labels[targetStatus] ?? "Status updated");
         router.refresh();
       }
     } catch {
-      const message = "Unexpected error";
-      setError(message);
-      toast.error(message);
+      toast.error("Unexpected error");
     } finally {
       setLoading(false);
     }
   }
 
-  return (
-    <div data-testid="visit-transition-buttons">
-      {error && (
-        <p className="p7-field-error" data-testid="visit-transition-error">
-          {error}
-        </p>
-      )}
-      {success && (
-        <p className="success-inline" data-testid="visit-transition-success">
-          {success}
-        </p>
-      )}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
-        {allowedTransitions.map((status) => (
-          <Button
-            key={status}
-            onClick={() => handleTransition(status)}
-            disabled={loading}
-            variant={status === "cancelled" ? "danger" : "secondary"}
-            size="sm"
-            data-testid={`visit-transition-btn-${status}`}
-          >
-            {loading ? "Updating…" : `→ ${statusLabels[status]}`}
-          </Button>
-        ))}
+  // ── Tech view ──────────────────────────────────────────────────────────────
+  if (role === "tech") {
+    const action = TECH_ACTIONS[currentStatus];
+    if (!action) return null; // completed / cancelled — nothing to do
+
+    return (
+      <div data-testid="visit-transition-buttons">
+        <Button
+          onClick={() => transition(action.next)}
+          disabled={loading}
+          variant={action.variant}
+          style={{ width: "100%", padding: "var(--space-4)", fontSize: "var(--text-lg)" }}
+          data-testid={`visit-transition-btn-${action.next}`}
+        >
+          {loading ? "Updating…" : action.label}
+        </Button>
       </div>
-    </div>
-  );
+    );
+  }
+
+  // ── Admin / owner view ─────────────────────────────────────────────────────
+  // Admins can see the timeline but should not be advancing status on behalf
+  // of a tech.  The only override available is cancelling the visit.
+  if (currentStatus === "scheduled" || currentStatus === "in_progress") {
+    return (
+      <div data-testid="visit-transition-buttons">
+        <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+          Status updates are made by the assigned technician.
+        </p>
+        <Button
+          onClick={() => transition("cancelled")}
+          disabled={loading}
+          variant="danger"
+          size="sm"
+          data-testid="visit-transition-btn-cancelled"
+        >
+          {loading ? "Cancelling…" : "Cancel Visit"}
+        </Button>
+      </div>
+    );
+  }
+
+  return null;
 }
