@@ -212,21 +212,22 @@ describe("PATCH /api/v1/visits/[id]", () => {
 // POST /api/v1/visits/[id]/transition — status transitions
 // ---------------------------------------------------------------------------
 describe("POST /api/v1/visits/[id]/transition", () => {
-  it("scheduled → arrived with assigned tech → 200", async () => {
-    const updated = { ...SAMPLE_VISIT, status: "arrived", arrived_at: NOW };
+  it("scheduled → arrived with assigned tech → 200 (auto-advances to in_progress)", async () => {
+    // The API does two updates: scheduled→arrived then arrived→in_progress
+    const updatedInProgress = { ...SAMPLE_VISIT, status: "in_progress", arrived_at: NOW };
     mockClientQuery
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
-      .mockResolvedValueOnce({ rows: [{ ...SAMPLE_VISIT, status: "scheduled", assigned_user_id: USER_ID }] }) // SELECT
-      .mockResolvedValueOnce({ rows: [updated] }) // UPDATE
-      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+      .mockResolvedValueOnce({ rows: [] }) // set_config
+      .mockResolvedValueOnce({ rows: [{ ...SAMPLE_VISIT, status: "scheduled", assigned_user_id: USER_ID }] }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE 1: scheduled → arrived (no RETURNING)
+      .mockResolvedValueOnce({ rows: [updatedInProgress] }); // UPDATE 2: arrived → in_progress RETURNING
 
     const res = await visitTransition(
       makeRequest("POST", `${VISITS_BASE}/${VISIT_ID}/transition`, { status: "arrived" })
     );
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json.data.status).toBe("arrived");
+    expect(json.data.status).toBe("in_progress");
   });
 
   it("arrived → in_progress → 200", async () => {

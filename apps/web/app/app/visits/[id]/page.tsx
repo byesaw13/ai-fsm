@@ -6,7 +6,6 @@ import {
   canAssignVisit,
   canUpdateVisitNotes,
 } from "@/lib/auth/permissions";
-import { visitTransitions } from "@ai-fsm/domain";
 import type { Visit, VisitStatus } from "@ai-fsm/domain";
 import { VisitAssignForm } from "./VisitAssignForm";
 import { VisitTransitionForm } from "./VisitTransitionForm";
@@ -67,7 +66,6 @@ export default async function VisitDetailPage({
   }
 
   const currentStatus = visit.status as VisitStatus;
-  const allowedTransitions = visitTransitions[currentStatus] as VisitStatus[];
   const canTransition = canTransitionVisit(session.role);
   const canAssign = canAssignVisit(session.role);
   const canNotes = canUpdateVisitNotes(session.role);
@@ -146,13 +144,13 @@ export default async function VisitDetailPage({
             <Timeline entries={timelineEntries} />
           </Card>
 
-          {canTransition && allowedTransitions.length > 0 && (
+          {canTransition && currentStatus !== "completed" && currentStatus !== "cancelled" && (
             <Card data-testid="visit-transition-panel">
-              <SectionHeader title="Status Actions" />
+              <SectionHeader title={session.role === "tech" ? "Actions" : "Status Actions"} />
               <VisitTransitionForm
                 visitId={visit.id}
-                allowedTransitions={allowedTransitions}
-                statusLabels={VISIT_STATUS_LABELS}
+                currentStatus={currentStatus}
+                role={session.role}
               />
             </Card>
           )}

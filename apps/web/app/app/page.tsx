@@ -33,6 +33,13 @@ interface RecentJobRow {
   client_name: string | null;
   [key: string]: unknown;
 }
+interface ReadyToInvoiceRow {
+  id: string;
+  title: string;
+  client_name: string | null;
+  updated_at: string;
+  [key: string]: unknown;
+}
 interface UpcomingVisitRow {
   id: string;
   scheduled_start: string;
@@ -86,6 +93,7 @@ export default async function HomePage() {
     outstandingRows,
     recentJobs,
     upcomingVisits,
+    readyToInvoice,
   ] = await Promise.all([
     query<UserRow>(`SELECT full_name FROM users WHERE id = $1`, [session.userId]),
 
@@ -157,6 +165,20 @@ export default async function HomePage() {
            ORDER BY v.scheduled_start ASC LIMIT 5`,
           [session.accountId, session.userId, now.toISOString()]
         ),
+
+    // Jobs that are 'completed' but have no invoice yet — ready to bill
+    isAdmin
+      ? query<ReadyToInvoiceRow>(
+          `SELECT j.id, j.title, j.updated_at, c.name AS client_name
+           FROM jobs j
+           LEFT JOIN clients c ON c.id = j.client_id
+           WHERE j.account_id = $1 AND j.status = 'completed'
+             AND NOT EXISTS (SELECT 1 FROM invoices i WHERE i.job_id = j.id AND i.account_id = j.account_id)
+           ORDER BY j.updated_at DESC
+           LIMIT 10`,
+          [session.accountId]
+        )
+      : Promise.resolve([] as ReadyToInvoiceRow[]),
   ]);
 
   const firstName = (userRows[0]?.full_name ?? "").split(" ")[0] || "there";
@@ -268,6 +290,45 @@ export default async function HomePage() {
             <QuickActionCard href="/app/jobs/new" icon="📋" label="New Job" />
             <QuickActionCard href="/app/visits" icon="📅" label="Schedule" />
             <QuickActionCard href="/app/invoices" icon="💰" label="Invoices" />
+          </div>
+        </div>
+      )}
+
+      {/* Ready to Invoice */}
+      {isAdmin && readyToInvoice.length > 0 && (
+        <div style={{ marginTop: "var(--space-8)" }}>
+          <SectionHeader
+            title="Ready to Invoice"
+            count={readyToInvoice.length}
+            as="h2"
+            action={
+              <Link href="/app/invoices" style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}>
+                All invoices →
+              </Link>
+            }
+          />
+          <div style={{ marginTop: "var(--space-3)", display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            {readyToInvoice.map((job) => (
+              <Link key={job.id} href={`/app/jobs/${job.id}` as Route} style={{ textDecoration: "none" }}>
+                <Card hover padding="sm" style={{ borderLeft: "3px solid var(--accent)" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)" }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: "var(--font-medium)", fontSize: "var(--text-sm)", color: "var(--fg)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {job.title}
+                      </div>
+                      {job.client_name && (
+                        <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: "2px" }}>
+                          {job.client_name}
+                        </div>
+                      )}
+                    </div>
+                    <span style={{ fontSize: "var(--text-xs)", fontWeight: "var(--font-semibold)", color: "var(--accent)", whiteSpace: "nowrap", flexShrink: 0 }}>
+                      Invoice →
+                    </span>
+                  </div>
+                </Card>
+              </Link>
+            ))}
           </div>
         </div>
       )}
