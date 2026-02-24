@@ -87,6 +87,21 @@ export const POST = withAuth(
         );
       }
 
+      // Precondition: a visit must have an assigned technician before it can be started.
+      if (targetStatus === "arrived" && !visit.assigned_user_id) {
+        await client.query("ROLLBACK");
+        return NextResponse.json(
+          {
+            error: {
+              code: "PRECONDITION_FAILED",
+              message: "Visit must have an assigned technician before it can be started",
+              traceId: session.traceId,
+            },
+          },
+          { status: 422 }
+        );
+      }
+
       // -----------------------------------------------------------------------
       // "Start Job" — when tech taps arrived, skip straight to in_progress and
       // record the arrived_at timestamp.  The 'arrived' status never persists;
@@ -123,33 +138,30 @@ export const POST = withAuth(
       });
 
       // -----------------------------------------------------------------------
-      // When a visit completes, auto-advance the parent job to 'completed' if:
-      //   • the job is currently 'in_progress'
-      //   • every sibling visit is now completed or cancelled
-      // This puts the job in the "ready to invoice" queue for the admin.
+      // Job auto-advancement:
+      //
+      // • When a visit starts (arrived → in_progress), advance the parent job
+      //   from 'scheduled' to 'in_progress' so the job reflects active work.
+      //
+      // • When a visit completes, auto-advance the parent job to 'completed'
+      //   if every sibling visit is now completed or cancelled. This puts the
+      //   job in the "ready to invoice" queue for the admin.
       // -----------------------------------------------------------------------
-      if (effectiveStatus === "completed" && updated.job_id) {
+      if (updated.job_id) {
         const jobRow = await client.query(
           `SELECT id, status FROM jobs WHERE id = $1 AND account_id = $2 FOR UPDATE`,
           [updated.job_id, session.accountId]
         );
         const job = jobRow.rows[0];
 
-        if (job && job.status === "in_progress") {
-          const pendingVisits = await client.query(
-            `SELECT COUNT(*) FROM visits
-             WHERE job_id = $1 AND account_id = $2
-               AND status NOT IN ('completed', 'cancelled')`,
-            [updated.job_id, session.accountId]
-          );
-
-          if (parseInt(pendingVisits.rows[0].count) === 0) {
+        if (job) {
+          if (effectiveStatus === "in_progress" && job.status === "scheduled") {
+            // Visit started — advance job from scheduled → in_progress
             await client.query(
-              `UPDATE jobs SET status = 'completed', updated_at = now()
+              `UPDATE jobs SET status = 'in_progress', updated_at = now()
                WHERE id = $1 AND account_id = $2`,
               [updated.job_id, session.accountId]
             );
-
             await appendAuditLog(client, {
               account_id: session.accountId,
               entity_type: "job",
@@ -157,9 +169,38 @@ export const POST = withAuth(
               action: "update",
               actor_id: session.userId,
               trace_id: session.traceId,
-              old_value: { status: "in_progress" },
-              new_value: { status: "completed" },
+              old_value: { status: "scheduled" },
+              new_value: { status: "in_progress" },
             });
+          } else if (
+            effectiveStatus === "completed" &&
+            (job.status === "in_progress" || job.status === "scheduled")
+          ) {
+            // Visit completed — check if all sibling visits are done
+            const pendingVisits = await client.query(
+              `SELECT COUNT(*) FROM visits
+               WHERE job_id = $1 AND account_id = $2
+                 AND status NOT IN ('completed', 'cancelled')`,
+              [updated.job_id, session.accountId]
+            );
+
+            if (parseInt(pendingVisits.rows[0].count) === 0) {
+              await client.query(
+                `UPDATE jobs SET status = 'completed', updated_at = now()
+                 WHERE id = $1 AND account_id = $2`,
+                [updated.job_id, session.accountId]
+              );
+              await appendAuditLog(client, {
+                account_id: session.accountId,
+                entity_type: "job",
+                entity_id: updated.job_id,
+                action: "update",
+                actor_id: session.userId,
+                trace_id: session.traceId,
+                old_value: { status: job.status },
+                new_value: { status: "completed" },
+              });
+            }
           }
         }
       }
