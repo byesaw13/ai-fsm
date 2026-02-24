@@ -103,28 +103,50 @@ export const POST = withAuth(
       }
 
       // -----------------------------------------------------------------------
-      // "Start Job" — when tech taps arrived, skip straight to in_progress and
-      // record the arrived_at timestamp.  The 'arrived' status never persists;
-      // it is only used as a signal that the tech is on site.
+      // "Start Job" — when tech taps arrived, we step through two valid DB
+      // transitions in one transaction to satisfy the trigger:
+      //   1. scheduled → arrived  (records arrived_at)
+      //   2. arrived   → in_progress
+      // The visit is never visible in 'arrived' state outside this tx.
       // -----------------------------------------------------------------------
-      const effectiveStatus: VisitStatus =
-        targetStatus === "arrived" ? "in_progress" : targetStatus;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let updated: any;
+      let effectiveStatus: VisitStatus;
 
-      const arrivedClause = targetStatus === "arrived" ? ", arrived_at = now()" : "";
-      const completedClause = targetStatus === "completed" ? ", completed_at = now()" : "";
-      const noteClause = techNotes !== undefined ? `, tech_notes = $4` : "";
-      const params: unknown[] = [effectiveStatus, id, session.accountId];
-      if (techNotes !== undefined) params.push(techNotes);
-
-      const { rows } = await client.query(
-        `UPDATE visits
-         SET status = $1, updated_at = now()${arrivedClause}${completedClause}${noteClause}
-         WHERE id = $2 AND account_id = $3
-         RETURNING *`,
-        params
-      );
-
-      const updated = rows[0];
+      if (targetStatus === "arrived") {
+        // Step 1: scheduled → arrived (DB trigger allows this)
+        await client.query(
+          `UPDATE visits SET status = 'arrived', arrived_at = now(), updated_at = now()
+           WHERE id = $1 AND account_id = $2`,
+          [id, session.accountId]
+        );
+        // Step 2: arrived → in_progress (DB trigger allows this)
+        const noteClause2 = techNotes !== undefined ? `, tech_notes = $3` : "";
+        const params2: unknown[] = [id, session.accountId];
+        if (techNotes !== undefined) params2.push(techNotes);
+        const { rows: rows2 } = await client.query(
+          `UPDATE visits SET status = 'in_progress', updated_at = now()${noteClause2}
+           WHERE id = $1 AND account_id = $2
+           RETURNING *`,
+          params2
+        );
+        updated = rows2[0];
+        effectiveStatus = "in_progress";
+      } else {
+        const completedClause = targetStatus === "completed" ? ", completed_at = now()" : "";
+        const noteClause = techNotes !== undefined ? `, tech_notes = $4` : "";
+        const params: unknown[] = [targetStatus, id, session.accountId];
+        if (techNotes !== undefined) params.push(techNotes);
+        const { rows } = await client.query(
+          `UPDATE visits
+           SET status = $1, updated_at = now()${completedClause}${noteClause}
+           WHERE id = $2 AND account_id = $3
+           RETURNING *`,
+          params
+        );
+        updated = rows[0];
+        effectiveStatus = targetStatus;
+      }
 
       await appendAuditLog(client, {
         account_id: session.accountId,

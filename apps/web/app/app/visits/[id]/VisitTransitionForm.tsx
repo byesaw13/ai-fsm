@@ -13,11 +13,14 @@ interface Props {
 }
 
 // What the tech sees: plain-English action buttons sized for a phone screen.
-// "arrived" is still sent to the API — the server auto-advances to in_progress
-// and records arrived_at in the same transaction.
+// "arrived" is sent to the API — the server atomically advances
+// scheduled→arrived→in_progress, recording arrived_at in the same transaction.
+// The "arrived" entry here handles the rare case where a visit is already in
+// arrived state (e.g. if the tech was on an older app version).
 const TECH_ACTIONS: Partial<Record<VisitStatus, { label: string; next: VisitStatus; variant: ButtonVariant }>> = {
-  scheduled:   { label: "Start Job",    next: "arrived",   variant: "primary"   },
-  in_progress: { label: "Complete Job", next: "completed", variant: "secondary" },
+  scheduled:   { label: "Start Job",    next: "arrived",     variant: "primary"   },
+  arrived:     { label: "Start Job",    next: "in_progress", variant: "primary"   },
+  in_progress: { label: "Complete Job", next: "completed",   variant: "secondary" },
 };
 
 export function VisitTransitionForm({ visitId, currentStatus, role }: Props) {
@@ -76,7 +79,7 @@ export function VisitTransitionForm({ visitId, currentStatus, role }: Props) {
   // ── Admin / owner view ─────────────────────────────────────────────────────
   // Admins can see the timeline but should not be advancing status on behalf
   // of a tech.  The only override available is cancelling the visit.
-  if (currentStatus === "scheduled" || currentStatus === "in_progress") {
+  if (currentStatus === "scheduled" || currentStatus === "arrived" || currentStatus === "in_progress") {
     return (
       <div data-testid="visit-transition-buttons">
         <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
