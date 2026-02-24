@@ -1,6 +1,9 @@
 services:
   web:
-    image: ghcr.io/your-org/ai-fsm-web:latest
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    image: ai-fsm-web:local
     platform: linux/arm64
     container_name: ai-fsm-web
     restart: unless-stopped
@@ -27,7 +30,10 @@ services:
         max-file: "3"
 
   worker:
-    image: ghcr.io/your-org/ai-fsm-worker:latest
+    build:
+      context: ..
+      dockerfile: services/worker/Dockerfile
+    image: ai-fsm-worker:local
     platform: linux/arm64
     container_name: ai-fsm-worker
     restart: unless-stopped
