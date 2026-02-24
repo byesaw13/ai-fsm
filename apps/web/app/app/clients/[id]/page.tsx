@@ -125,7 +125,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       `SELECT
          COALESCE((SELECT SUM(total_cents) FROM estimates WHERE client_id = $1 AND account_id = $2), 0)::text AS estimate_total_cents,
          COALESCE((SELECT SUM(total_cents) FROM invoices WHERE client_id = $1 AND account_id = $2), 0)::text AS invoice_total_cents,
-         COALESCE((SELECT SUM(total_paid_cents) FROM invoices WHERE client_id = $1 AND account_id = $2), 0)::text AS paid_total_cents`,
+         COALESCE((SELECT SUM(paid_cents) FROM invoices WHERE client_id = $1 AND account_id = $2), 0)::text AS paid_total_cents`,
       [id, session.accountId]
     ),
   ]);
