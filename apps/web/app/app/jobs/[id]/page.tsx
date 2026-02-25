@@ -12,6 +12,7 @@ import { jobTransitions } from "@ai-fsm/domain";
 import type { Job, Visit, JobStatus } from "@ai-fsm/domain";
 import { JobTransitionForm } from "./JobTransitionForm";
 import { DeleteJobButton } from "./DeleteJobButton";
+import { JobEditForm } from "./JobEditForm";
 import {
   PageContainer,
   PageHeader,
@@ -242,6 +243,18 @@ export default async function JobDetailPage({
                 )}
               </dl>
             </Card>
+
+            {/* Edit form — admin/owner only */}
+            <JobEditForm
+              jobId={job.id}
+              initialTitle={job.title}
+              initialClientId={job.client_id ?? null}
+              initialPropertyId={job.property_id ?? null}
+              initialDescription={job.description ?? null}
+              initialPriority={job.priority ?? 0}
+              initialScheduledStart={job.scheduled_start ?? null}
+              initialScheduledEnd={job.scheduled_end ?? null}
+            />
 
             {/* Commercial links */}
             <Card>
