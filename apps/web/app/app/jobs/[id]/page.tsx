@@ -17,6 +17,7 @@ import {
   PageContainer,
   PageHeader,
   StatusBadge,
+  StatusStepper,
   LinkButton,
   Timeline,
   Card,
@@ -159,6 +160,24 @@ export default async function JobDetailPage({
         }
       />
 
+      {/* Pipeline progress stepper — admin/owner only */}
+      {!isTech && (
+        <Card style={{ marginBottom: "var(--space-4)" }}>
+          <StatusStepper
+            steps={[
+              { key: "draft", label: "Draft" },
+              { key: "quoted", label: "Quoted" },
+              { key: "scheduled", label: "Scheduled" },
+              { key: "in_progress", label: "In Progress" },
+              { key: "completed", label: "Completed" },
+              { key: "invoiced", label: "Invoiced" },
+            ]}
+            currentStep={currentStatus}
+            data-testid="job-status-stepper"
+          />
+        </Card>
+      )}
+
       {/* Detail Hub Layout: two-column on desktop, stacked on mobile */}
       <div className="p7-detail-layout">
         {/* LEFT: Visits Timeline + Danger Zone */}
@@ -258,7 +277,19 @@ export default async function JobDetailPage({
 
             {/* Commercial links */}
             <Card>
-              <SectionHeader title="Commercial" />
+              <SectionHeader
+                title="Commercial"
+                action={
+                  <LinkButton
+                    href={`/app/estimates/new?job_id=${job.id}&client_id=${job.client_id ?? ""}`}
+                    variant="secondary"
+                    size="sm"
+                    data-testid="new-estimate-btn"
+                  >
+                    + New Estimate
+                  </LinkButton>
+                }
+              />
               <dl className="p7-detail-list">
                 <div className="p7-detail-row">
                   <dt>Estimates</dt>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 interface ClientOption {
@@ -40,11 +40,15 @@ function formatDollars(cents: number): string {
 
 export default function NewEstimatePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const prefilledJobId = searchParams.get("job_id") ?? "";
+  const prefilledClientId = searchParams.get("client_id") ?? "";
+
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [jobs, setJobs] = useState<JobOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
-  const [clientId, setClientId] = useState("");
-  const [jobId, setJobId] = useState("");
+  const [clientId, setClientId] = useState(prefilledClientId);
+  const [jobId, setJobId] = useState(prefilledJobId);
   const [notes, setNotes] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [lineItems, setLineItems] = useState<LineItemRow[]>([

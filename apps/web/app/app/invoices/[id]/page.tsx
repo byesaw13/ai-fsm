@@ -8,6 +8,8 @@ import type { InvoiceStatus } from "@ai-fsm/domain";
 import { InvoiceTransitionForm } from "./InvoiceTransitionForm";
 import { RecordPaymentForm } from "./RecordPaymentForm";
 import { PaymentHistory } from "./PaymentHistory";
+import { InvoiceEditForm } from "./InvoiceEditForm";
+import { StatusStepper } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -124,6 +126,22 @@ export default async function InvoiceDetailPage({
         </span>
       </div>
 
+      {/* Status Stepper — main path only */}
+      {(["draft", "sent", "partial", "paid"] as InvoiceStatus[]).includes(currentStatus) && (
+        <div className="card" style={{ marginBottom: "var(--space-4)" }}>
+          <StatusStepper
+            steps={[
+              { key: "draft", label: "Draft" },
+              { key: "sent", label: "Sent" },
+              { key: "partial", label: "Partial" },
+              { key: "paid", label: "Paid" },
+            ]}
+            currentStep={currentStatus}
+            data-testid="invoice-status-stepper"
+          />
+        </div>
+      )}
+
       {/* Summary */}
       <div className="card detail-card">
         <h2>Summary</h2>
@@ -236,6 +254,15 @@ export default async function InvoiceDetailPage({
         )}
       </div>
 
+      {/* Edit Invoice — owner/admin only, draft only */}
+      {canTransition && currentStatus === "draft" && (
+        <InvoiceEditForm
+          invoiceId={invoice.id}
+          initialNotes={invoice.notes}
+          initialDueDate={invoice.due_date}
+        />
+      )}
+
       {/* Record Payment — owner/admin only, on payable invoices */}
       {canRecordPayments(session.role) &&
         ["sent", "partial", "overdue"].includes(currentStatus) &&
@@ -253,7 +280,11 @@ export default async function InvoiceDetailPage({
       {currentStatus !== "draft" && (
         <div className="card" data-testid="payment-history-panel">
           <h2>Payment History</h2>
-          <PaymentHistory invoiceId={invoice.id} />
+          <PaymentHistory
+            invoiceId={invoice.id}
+            invoiceStatus={currentStatus}
+            role={session.role}
+          />
         </div>
       )}
 
