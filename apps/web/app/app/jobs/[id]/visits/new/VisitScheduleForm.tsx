@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, Input, LinkButton, Select } from "@/components/ui";
+import {
+  Button,
+  Card,
+  LinkButton,
+  ScheduleFields,
+  Select,
+} from "@/components/ui";
+import type { ScheduleValue } from "@/components/ui";
+import { scheduleToISOPair } from "@/components/ui";
 
 interface User {
   id: string;
@@ -11,8 +19,8 @@ interface User {
 }
 
 interface FormErrors {
-  scheduled_start?: string;
-  scheduled_end?: string;
+  schedule_date?: string;
+  schedule_time?: string;
 }
 
 interface VisitScheduleFormProps {
@@ -27,31 +35,17 @@ export function VisitScheduleForm({ jobId, users, canAssign }: VisitScheduleForm
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
 
-  const [form, setForm] = useState({
-    scheduled_start: "",
-    scheduled_end: "",
-    assigned_user_id: "",
+  const [schedule, setSchedule] = useState<ScheduleValue>({
+    date: "",
+    startTime: "",
+    duration: 60,
   });
+  const [assignedUserId, setAssignedUserId] = useState("");
 
   function validate(): boolean {
     const errs: FormErrors = {};
-
-    if (!form.scheduled_start) {
-      errs.scheduled_start = "Start time is required";
-    }
-
-    if (!form.scheduled_end) {
-      errs.scheduled_end = "End time is required";
-    }
-
-    if (form.scheduled_start && form.scheduled_end) {
-      const start = new Date(form.scheduled_start);
-      const end = new Date(form.scheduled_end);
-      if (end <= start) {
-        errs.scheduled_end = "End time must be after start time";
-      }
-    }
-
+    if (!schedule.date) errs.schedule_date = "Date is required";
+    if (!schedule.startTime) errs.schedule_time = "Start time is required";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
@@ -65,10 +59,11 @@ export function VisitScheduleForm({ jobId, users, canAssign }: VisitScheduleForm
     setPending(true);
 
     try {
+      const { start, end } = scheduleToISOPair(schedule);
       const body = {
-        scheduled_start: new Date(form.scheduled_start).toISOString(),
-        scheduled_end: new Date(form.scheduled_end).toISOString(),
-        assigned_user_id: form.assigned_user_id || undefined,
+        scheduled_start: start!,
+        scheduled_end: end!,
+        assigned_user_id: assignedUserId || undefined,
       };
 
       const res = await fetch(`/api/v1/jobs/${jobId}/visits`, {
@@ -100,7 +95,9 @@ export function VisitScheduleForm({ jobId, users, canAssign }: VisitScheduleForm
     }
   }
 
-  const techUsers = users.filter((u) => u.role === "tech" || u.role === "admin" || u.role === "owner");
+  const techUsers = users.filter(
+    (u) => u.role === "tech" || u.role === "admin" || u.role === "owner"
+  );
 
   return (
     <form onSubmit={handleSubmit} className="p7-form-stack" data-testid="visit-schedule-form">
@@ -111,26 +108,13 @@ export function VisitScheduleForm({ jobId, users, canAssign }: VisitScheduleForm
       )}
 
       <div className="p7-form-grid p7-form-grid-2">
-        <Input
-          id="scheduled_start"
-          label="Start Time"
+        <ScheduleFields
+          value={schedule}
+          onChange={setSchedule}
           required
-          type="datetime-local"
-          value={form.scheduled_start}
-          onChange={(e) => setForm({ ...form, scheduled_start: e.target.value })}
           disabled={pending}
-          error={errors.scheduled_start}
-        />
-
-        <Input
-          id="scheduled_end"
-          label="End Time"
-          required
-          type="datetime-local"
-          value={form.scheduled_end}
-          onChange={(e) => setForm({ ...form, scheduled_end: e.target.value })}
-          disabled={pending}
-          error={errors.scheduled_end}
+          dateError={errors.schedule_date}
+          timeError={errors.schedule_time}
         />
       </div>
 
@@ -138,10 +122,14 @@ export function VisitScheduleForm({ jobId, users, canAssign }: VisitScheduleForm
         <Select
           id="assigned_user_id"
           label="Assign To"
-          value={form.assigned_user_id}
-          onChange={(e) => setForm({ ...form, assigned_user_id: e.target.value })}
+          value={assignedUserId}
+          onChange={(e) => setAssignedUserId(e.target.value)}
           disabled={pending}
-          hint={users.length === 0 ? "No users available. Create users first." : undefined}
+          hint={
+            users.length === 0
+              ? "No users available. Create users first."
+              : undefined
+          }
           options={techUsers.map((u) => ({
             value: u.id,
             label: `${u.full_name} (${u.role})`,

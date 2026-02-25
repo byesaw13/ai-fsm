@@ -2,7 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, Input, LinkButton, Select, Textarea } from "@/components/ui";
+import {
+  Button,
+  Card,
+  Input,
+  LinkButton,
+  ScheduleFields,
+  Select,
+  Textarea,
+} from "@/components/ui";
+import type { ScheduleValue } from "@/components/ui";
+import { scheduleToISOPair } from "@/components/ui";
 
 interface Client {
   id: string;
@@ -18,7 +28,8 @@ interface Property {
 interface FormErrors {
   title?: string;
   client_id?: string;
-  scheduled_end?: string;
+  schedule_date?: string;
+  schedule_time?: string;
 }
 
 const PRIORITY_OPTIONS = [
@@ -56,8 +67,12 @@ export function JobCreateForm({
         : "",
     description: "",
     priority: 0,
-    scheduled_start: "",
-    scheduled_end: "",
+  });
+
+  const [schedule, setSchedule] = useState<ScheduleValue>({
+    date: "",
+    startTime: "",
+    duration: 120,
   });
 
   const filteredProperties = properties.filter(
@@ -85,12 +100,12 @@ export function JobCreateForm({
       errs.client_id = "Client is required";
     }
 
-    if (form.scheduled_start && form.scheduled_end) {
-      const start = new Date(form.scheduled_start);
-      const end = new Date(form.scheduled_end);
-      if (end <= start) {
-        errs.scheduled_end = "End time must be after start time";
-      }
+    // Schedule is optional, but date and time must be provided together
+    if (schedule.date && !schedule.startTime) {
+      errs.schedule_time = "Please select a start time";
+    }
+    if (!schedule.date && schedule.startTime) {
+      errs.schedule_date = "Please select a date";
     }
 
     setErrors(errs);
@@ -106,14 +121,15 @@ export function JobCreateForm({
     setPending(true);
 
     try {
+      const { start, end } = scheduleToISOPair(schedule);
       const body = {
         title: form.title.trim(),
         client_id: form.client_id,
         property_id: form.property_id || undefined,
         description: form.description.trim() || undefined,
         priority: form.priority,
-        scheduled_start: form.scheduled_start || undefined,
-        scheduled_end: form.scheduled_end || undefined,
+        scheduled_start: start,
+        scheduled_end: end,
       };
 
       const res = await fetch("/api/v1/jobs", {
@@ -218,23 +234,12 @@ export function JobCreateForm({
 
         <div />
 
-        <Input
-          id="scheduled_start"
-          label="Scheduled Start"
-          type="datetime-local"
-          value={form.scheduled_start}
-          onChange={(e) => setForm({ ...form, scheduled_start: e.target.value })}
+        <ScheduleFields
+          value={schedule}
+          onChange={setSchedule}
           disabled={pending}
-        />
-
-        <Input
-          id="scheduled_end"
-          label="Scheduled End"
-          type="datetime-local"
-          value={form.scheduled_end}
-          onChange={(e) => setForm({ ...form, scheduled_end: e.target.value })}
-          disabled={pending}
-          error={errors.scheduled_end}
+          dateError={errors.schedule_date}
+          timeError={errors.schedule_time}
         />
       </div>
 
