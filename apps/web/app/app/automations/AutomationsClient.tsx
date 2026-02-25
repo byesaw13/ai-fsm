@@ -58,6 +58,148 @@ function summarizeEvent(event: AuditEventRow): string {
   return `${event.entity_type} event`;
 }
 
+// ---------------------------------------------------------------------------
+// CreateAutomationForm — inline form for creating a new automation
+// ---------------------------------------------------------------------------
+
+function CreateVisitReminderForm() {
+  const [hoursBefore, setHoursBefore] = useState(24);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setPending(true);
+    try {
+      const res = await fetch("/api/v1/automations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "visit_reminder",
+          config: { hours_before: hoursBefore },
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error?.message ?? "Failed to create automation");
+        return;
+      }
+      window.location.reload();
+    } catch {
+      setError("Unexpected error");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} data-testid="create-visit-reminder-form">
+      <div className="form-field">
+        <label htmlFor="hours-before">
+          Send reminder this many hours before the visit
+        </label>
+        <input
+          id="hours-before"
+          type="number"
+          min={1}
+          max={168}
+          value={hoursBefore}
+          onChange={e => setHoursBefore(parseInt(e.target.value) || 24)}
+          disabled={pending}
+          style={{ width: 100 }}
+        />
+        <span className="hint" style={{ marginLeft: "var(--space-2)" }}>hours (default: 24)</span>
+      </div>
+      {error && <p className="error-inline" role="alert">{error}</p>}
+      <button
+        type="submit"
+        className="btn btn-primary btn-sm"
+        disabled={pending}
+        data-testid="submit-create-visit-reminder"
+      >
+        {pending ? "Creating…" : "Enable Visit Reminders"}
+      </button>
+    </form>
+  );
+}
+
+function CreateInvoiceFollowupForm() {
+  const [daysInput, setDaysInput] = useState("7, 14, 30");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+
+    const days = daysInput
+      .split(",")
+      .map(s => parseInt(s.trim()))
+      .filter(n => !isNaN(n) && n > 0);
+
+    if (days.length === 0) {
+      setError("Enter at least one day threshold (e.g., 7, 14, 30)");
+      return;
+    }
+
+    setPending(true);
+    try {
+      const res = await fetch("/api/v1/automations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "invoice_followup",
+          config: { days_overdue: days },
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error?.message ?? "Failed to create automation");
+        return;
+      }
+      window.location.reload();
+    } catch {
+      setError("Unexpected error");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} data-testid="create-invoice-followup-form">
+      <div className="form-field">
+        <label htmlFor="days-overdue">
+          Follow up when invoices are overdue by (days)
+        </label>
+        <input
+          id="days-overdue"
+          type="text"
+          value={daysInput}
+          onChange={e => setDaysInput(e.target.value)}
+          disabled={pending}
+          placeholder="7, 14, 30"
+          style={{ width: 160 }}
+        />
+        <span className="hint" style={{ marginLeft: "var(--space-2)" }}>comma-separated</span>
+      </div>
+      {error && <p className="error-inline" role="alert">{error}</p>}
+      <button
+        type="submit"
+        className="btn btn-primary btn-sm"
+        disabled={pending}
+        data-testid="submit-create-invoice-followup"
+      >
+        {pending ? "Creating…" : "Enable Invoice Follow-ups"}
+      </button>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
 export default function AutomationsClient({
   visitReminder,
   invoiceFollowup,
@@ -72,7 +214,7 @@ export default function AutomationsClient({
 
   async function handleRun(automationId: string, type: string) {
     if (!isAdmin) return;
-    
+
     setRunningId(automationId);
     setError(null);
     setSuccess(null);
@@ -90,7 +232,7 @@ export default function AutomationsClient({
         setSuccess(data.data?.message ?? `${type} triggered successfully`);
         setTimeout(() => window.location.reload(), 1500);
       }
-    } catch (err) {
+    } catch {
       setError("Network error");
     } finally {
       setRunningId(null);
@@ -143,7 +285,7 @@ export default function AutomationsClient({
           ) : (
             <div className="empty-card">
               <p>No visit reminder automation configured.</p>
-              {isAdmin && <p className="hint">Create one via the API or database.</p>}
+              {isAdmin && <CreateVisitReminderForm />}
             </div>
           )}
         </section>
@@ -170,7 +312,7 @@ export default function AutomationsClient({
           ) : (
             <div className="empty-card">
               <p>No invoice follow-up automation configured.</p>
-              {isAdmin && <p className="hint">Create one via the API or database.</p>}
+              {isAdmin && <CreateInvoiceFollowupForm />}
             </div>
           )}
         </section>
