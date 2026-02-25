@@ -17,6 +17,7 @@ import {
   priorityLabel,
 } from "@/components/ui";
 import type { FilterDef, StatusVariant, PriorityVariant } from "@/components/ui";
+import { JobBoard } from "./JobBoard";
 
 export const dynamic = "force-dynamic";
 
@@ -64,11 +65,12 @@ const JOB_FILTERS: FilterDef[] = [
 ];
 
 interface PageProps {
-  searchParams: Promise<{ q?: string; status?: string; priority?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; priority?: string; view?: string }>;
 }
 
 export default async function JobsPage({ searchParams }: PageProps) {
-  const { q, status, priority } = await searchParams;
+  const { q, status, priority, view } = await searchParams;
+  const isBoardView = view === "board";
   const session = await getSession();
   if (!session) redirect("/login");
 
@@ -173,11 +175,39 @@ export default async function JobsPage({ searchParams }: PageProps) {
             : `Your assigned jobs — ${jobs.length} total`
         }
         actions={
-          canCreate ? (
-            <LinkButton href="/app/jobs/new" variant="primary" data-testid="create-job-btn">
-              + New Job
-            </LinkButton>
-          ) : undefined
+          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+            {/* View toggle */}
+            <div
+              style={{
+                display: "flex",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius)",
+                overflow: "hidden",
+              }}
+            >
+              <LinkButton
+                href="/app/jobs"
+                variant={!isBoardView ? "primary" : "ghost"}
+                size="sm"
+                data-testid="view-list-btn"
+              >
+                List
+              </LinkButton>
+              <LinkButton
+                href="/app/jobs?view=board"
+                variant={isBoardView ? "primary" : "ghost"}
+                size="sm"
+                data-testid="view-board-btn"
+              >
+                Board
+              </LinkButton>
+            </div>
+            {canCreate && (
+              <LinkButton href="/app/jobs/new" variant="primary" data-testid="create-job-btn">
+                + New Job
+              </LinkButton>
+            )}
+          </div>
         }
       />
 
@@ -217,6 +247,13 @@ export default async function JobsPage({ searchParams }: PageProps) {
             ) : undefined
           }
           data-testid="jobs-empty"
+        />
+      ) : isBoardView ? (
+        // Kanban pipeline board
+        <JobBoard
+          jobs={jobs}
+          statusLabels={JOB_STATUS_LABELS}
+          statusOrder={JOB_STATUS_ORDER}
         />
       ) : hasFilter ? (
         // Flat list when filtered

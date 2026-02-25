@@ -20,5 +20,6 @@ export * from "./Select";
 export * from "./Skeleton";
 export * from "./StatusSection";
 export * from "./Textarea";
+export * from "./StatusStepper";
 export * from "./Timeline";
 export * from "./Toast";
