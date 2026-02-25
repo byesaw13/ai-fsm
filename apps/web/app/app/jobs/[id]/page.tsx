@@ -12,10 +12,12 @@ import { jobTransitions } from "@ai-fsm/domain";
 import type { Job, Visit, JobStatus } from "@ai-fsm/domain";
 import { JobTransitionForm } from "./JobTransitionForm";
 import { DeleteJobButton } from "./DeleteJobButton";
+import { JobEditForm } from "./JobEditForm";
 import {
   PageContainer,
   PageHeader,
   StatusBadge,
+  StatusStepper,
   LinkButton,
   Timeline,
   Card,
@@ -158,6 +160,24 @@ export default async function JobDetailPage({
         }
       />
 
+      {/* Pipeline progress stepper — admin/owner only */}
+      {!isTech && (
+        <Card style={{ marginBottom: "var(--space-4)" }}>
+          <StatusStepper
+            steps={[
+              { key: "draft", label: "Draft" },
+              { key: "quoted", label: "Quoted" },
+              { key: "scheduled", label: "Scheduled" },
+              { key: "in_progress", label: "In Progress" },
+              { key: "completed", label: "Completed" },
+              { key: "invoiced", label: "Invoiced" },
+            ]}
+            currentStep={currentStatus}
+            data-testid="job-status-stepper"
+          />
+        </Card>
+      )}
+
       {/* Detail Hub Layout: two-column on desktop, stacked on mobile */}
       <div className="p7-detail-layout">
         {/* LEFT: Visits Timeline + Danger Zone */}
@@ -243,9 +263,33 @@ export default async function JobDetailPage({
               </dl>
             </Card>
 
+            {/* Edit form — admin/owner only */}
+            <JobEditForm
+              jobId={job.id}
+              initialTitle={job.title}
+              initialClientId={job.client_id ?? null}
+              initialPropertyId={job.property_id ?? null}
+              initialDescription={job.description ?? null}
+              initialPriority={job.priority ?? 0}
+              initialScheduledStart={job.scheduled_start ?? null}
+              initialScheduledEnd={job.scheduled_end ?? null}
+            />
+
             {/* Commercial links */}
             <Card>
-              <SectionHeader title="Commercial" />
+              <SectionHeader
+                title="Commercial"
+                action={
+                  <LinkButton
+                    href={`/app/estimates/new?job_id=${job.id}&client_id=${job.client_id ?? ""}`}
+                    variant="secondary"
+                    size="sm"
+                    data-testid="new-estimate-btn"
+                  >
+                    + New Estimate
+                  </LinkButton>
+                }
+              />
               <dl className="p7-detail-list">
                 <div className="p7-detail-row">
                   <dt>Estimates</dt>

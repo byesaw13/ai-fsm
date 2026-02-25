@@ -12,6 +12,8 @@ import { EstimateTransitionForm } from "./EstimateTransitionForm";
 import { EstimateInternalNotesForm } from "./EstimateInternalNotesForm";
 import { EstimateConvertButton } from "./EstimateConvertButton";
 import { DeleteEstimateButton } from "./DeleteEstimateButton";
+import { EstimateEditForm } from "./EstimateEditForm";
+import { StatusStepper } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -126,6 +128,21 @@ export default async function EstimateDetailPage({
         </span>
       </div>
 
+      {/* Status Stepper — main path only */}
+      {(["draft", "sent", "approved"] as EstimateStatus[]).includes(currentStatus) && (
+        <div className="card" style={{ marginBottom: "var(--space-4)" }}>
+          <StatusStepper
+            steps={[
+              { key: "draft", label: "Draft" },
+              { key: "sent", label: "Sent" },
+              { key: "approved", label: "Approved" },
+            ]}
+            currentStep={currentStatus}
+            data-testid="estimate-status-stepper"
+          />
+        </div>
+      )}
+
       {/* Summary */}
       <div className="card detail-card">
         <h2>Summary</h2>
@@ -218,6 +235,23 @@ export default async function EstimateDetailPage({
           </table>
         )}
       </div>
+
+      {/* Edit form — owner/admin only, draft only */}
+      {canTransition && currentStatus === "draft" && (
+        <EstimateEditForm
+          estimateId={estimate.id}
+          initialClientId={estimate.client_id}
+          initialJobId={estimate.job_id}
+          initialNotes={estimate.notes}
+          initialExpiresAt={estimate.expires_at}
+          initialLineItems={lineItems.map(item => ({
+            description: item.description,
+            quantity: item.quantity,
+            unit_price_cents: item.unit_price_cents,
+            sort_order: item.sort_order,
+          }))}
+        />
+      )}
 
       {/* Status Transitions — owner/admin only */}
       {canTransition && allowedTransitions.length > 0 && (

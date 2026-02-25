@@ -9,6 +9,7 @@ import { InvoiceTransitionForm } from "./InvoiceTransitionForm";
 import { RecordPaymentForm } from "./RecordPaymentForm";
 import { PaymentHistory } from "./PaymentHistory";
 import { InvoiceEditForm } from "./InvoiceEditForm";
+import { StatusStepper } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -124,6 +125,22 @@ export default async function InvoiceDetailPage({
           {STATUS_LABELS[currentStatus]}
         </span>
       </div>
+
+      {/* Status Stepper — main path only */}
+      {(["draft", "sent", "partial", "paid"] as InvoiceStatus[]).includes(currentStatus) && (
+        <div className="card" style={{ marginBottom: "var(--space-4)" }}>
+          <StatusStepper
+            steps={[
+              { key: "draft", label: "Draft" },
+              { key: "sent", label: "Sent" },
+              { key: "partial", label: "Partial" },
+              { key: "paid", label: "Paid" },
+            ]}
+            currentStep={currentStatus}
+            data-testid="invoice-status-stepper"
+          />
+        </div>
+      )}
 
       {/* Summary */}
       <div className="card detail-card">
