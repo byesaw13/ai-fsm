@@ -93,6 +93,8 @@ const patchEstimateSchema = z.object({
   expires_at: z.string().datetime().nullable().optional(),
   tax_rate: z.number().min(0).max(100).optional(),
   line_items: z.array(lineItemInputSchema).optional(),
+  // Flat-rate mode: set this instead of line_items
+  flat_rate_cents: z.number().int().nonnegative().optional(),
 });
 
 export const PATCH = withRole(["owner", "admin"], async (request, session) => {
@@ -168,6 +170,7 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
           "notes",
           "expires_at",
           "line_items",
+          "flat_rate_cents",
         ] as const;
         for (const key of disallowedKeys) {
           if (patch[key] !== undefined) {
@@ -232,9 +235,12 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         params.push(patch.expires_at);
       }
 
-      // Replace line items if provided
-      if (patch.line_items !== undefined) {
-        const { subtotal_cents } = calcTotals(patch.line_items);
+      // Replace totals + line items if pricing fields are provided
+      if (patch.line_items !== undefined || patch.flat_rate_cents !== undefined) {
+        const subtotal_cents =
+          patch.flat_rate_cents !== undefined
+            ? patch.flat_rate_cents
+            : calcTotals(patch.line_items!).subtotal_cents;
         const taxRate = patch.tax_rate ?? 0;
         const tax_cents = Math.round((subtotal_cents * taxRate) / 100);
         const total_cents = subtotal_cents + tax_cents;
@@ -251,9 +257,10 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
           [id]
         );
 
-        // Insert new line items
-        for (let i = 0; i < patch.line_items.length; i++) {
-          const item = patch.line_items[i];
+        // Insert new line items (skipped in flat-rate mode)
+        const itemsToInsert = patch.flat_rate_cents !== undefined ? [] : patch.line_items!;
+        for (let i = 0; i < itemsToInsert.length; i++) {
+          const item = itemsToInsert[i];
           await client.query(
             `INSERT INTO estimate_line_items
                (estimate_id, description, quantity, unit_price_cents, total_cents, sort_order)
