@@ -242,8 +242,10 @@ export default async function EstimateDetailPage({
           estimateId={estimate.id}
           initialClientId={estimate.client_id}
           initialJobId={estimate.job_id}
+          initialPropertyId={estimate.property_id}
           initialNotes={estimate.notes}
           initialExpiresAt={estimate.expires_at}
+          initialTaxCents={estimate.tax_cents}
           initialLineItems={lineItems.map(item => ({
             description: item.description,
             quantity: item.quantity,
