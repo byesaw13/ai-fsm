@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 // === List Estimates (GET /api/v1/estimates) ===
 
 const listQuerySchema = z.object({
+  q: z.string().optional(),
   status: estimateStatusSchema.optional(),
   client_id: z.string().uuid().optional(),
   job_id: z.string().uuid().optional(),
@@ -25,6 +26,7 @@ const listQuerySchema = z.object({
 export const GET = withAuth(async (request, session) => {
   const { searchParams } = new URL(request.url);
   const parseResult = listQuerySchema.safeParse({
+    q: searchParams.get("q") ?? undefined,
     status: searchParams.get("status") ?? undefined,
     client_id: searchParams.get("client_id") ?? undefined,
     job_id: searchParams.get("job_id") ?? undefined,
@@ -46,7 +48,7 @@ export const GET = withAuth(async (request, session) => {
     );
   }
 
-  const { status, client_id, job_id, page, limit } = parseResult.data;
+  const { q, status, client_id, job_id, page, limit } = parseResult.data;
   const offset = (page - 1) * limit;
 
   try {
@@ -54,6 +56,14 @@ export const GET = withAuth(async (request, session) => {
     const params: unknown[] = [session.accountId];
     let idx = 2;
 
+    if (q) {
+      const pattern = `%${q.toLowerCase()}%`;
+      conditions.push(
+        `(LOWER(c.name) LIKE $${idx} OR LOWER(COALESCE(e.notes, '')) LIKE $${idx})`
+      );
+      params.push(pattern);
+      idx++;
+    }
     if (status) {
       conditions.push(`e.status = $${idx++}`);
       params.push(status);
@@ -72,7 +82,10 @@ export const GET = withAuth(async (request, session) => {
     const countParams = [...params];
     const countResult = await withEstimateContext(session, async (client) => {
       const r = await client.query<{ total: string }>(
-        `SELECT COUNT(*) AS total FROM estimates e WHERE ${where}`,
+        `SELECT COUNT(*) AS total
+         FROM estimates e
+         LEFT JOIN clients c ON c.id = e.client_id
+         WHERE ${where}`,
         countParams
       );
       return r.rows[0]?.total ?? "0";
@@ -132,6 +145,7 @@ const createEstimateSchema = z.object({
   notes: z.string().nullable().optional(),
   internal_notes: z.string().nullable().optional(),
   expires_at: z.string().datetime().nullable().optional(),
+  tax_rate: z.number().min(0).max(100).default(0),
   line_items: z.array(lineItemInputSchema).default([]),
 });
 
@@ -174,10 +188,13 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     notes,
     internal_notes,
     expires_at,
+    tax_rate,
     line_items,
   } = parseResult.data;
 
-  const { subtotal_cents, tax_cents, total_cents } = calcTotals(line_items);
+  const { subtotal_cents } = calcTotals(line_items);
+  const tax_cents = Math.round((subtotal_cents * tax_rate) / 100);
+  const total_cents = subtotal_cents + tax_cents;
 
   try {
     const estimate = await withEstimateContext(session, async (client) => {

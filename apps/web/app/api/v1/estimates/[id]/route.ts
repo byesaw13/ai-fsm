@@ -91,6 +91,7 @@ const patchEstimateSchema = z.object({
   notes: z.string().nullable().optional(),
   internal_notes: z.string().nullable().optional(),
   expires_at: z.string().datetime().nullable().optional(),
+  tax_rate: z.number().min(0).max(100).optional(),
   line_items: z.array(lineItemInputSchema).optional(),
 });
 
@@ -233,13 +234,16 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
 
       // Replace line items if provided
       if (patch.line_items !== undefined) {
-        const totals = calcTotals(patch.line_items);
+        const { subtotal_cents } = calcTotals(patch.line_items);
+        const taxRate = patch.tax_rate ?? 0;
+        const tax_cents = Math.round((subtotal_cents * taxRate) / 100);
+        const total_cents = subtotal_cents + tax_cents;
         setClauses.push(`subtotal_cents = $${idx++}`);
-        params.push(totals.subtotal_cents);
+        params.push(subtotal_cents);
         setClauses.push(`tax_cents = $${idx++}`);
-        params.push(totals.tax_cents);
+        params.push(tax_cents);
         setClauses.push(`total_cents = $${idx++}`);
-        params.push(totals.total_cents);
+        params.push(total_cents);
 
         // Delete existing line items
         await client.query(
