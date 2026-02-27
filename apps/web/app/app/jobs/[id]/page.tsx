@@ -12,7 +12,7 @@ import { jobTransitions } from "@ai-fsm/domain";
 import type { Job, Visit, JobStatus } from "@ai-fsm/domain";
 import { JobTransitionForm } from "./JobTransitionForm";
 import { DeleteJobButton } from "./DeleteJobButton";
-import { JobEditForm } from "./JobEditForm";
+import { JobEditForm } from "./JobEditFormWrapper";
 import {
   PageContainer,
   PageHeader,
