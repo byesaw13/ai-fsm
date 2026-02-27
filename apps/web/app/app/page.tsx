@@ -40,6 +40,7 @@ interface ReadyToInvoiceRow {
   updated_at: string;
   [key: string]: unknown;
 }
+interface OpenEstimateRow { count: string; expiring_soon: string; [key: string]: unknown }
 interface UpcomingVisitRow {
   id: string;
   scheduled_start: string;
@@ -94,6 +95,7 @@ export default async function HomePage() {
     recentJobs,
     upcomingVisits,
     readyToInvoice,
+    openEstimateRows,
   ] = await Promise.all([
     query<UserRow>(`SELECT full_name FROM users WHERE id = $1`, [session.userId]),
 
@@ -179,6 +181,22 @@ export default async function HomePage() {
           [session.accountId]
         )
       : Promise.resolve([] as ReadyToInvoiceRow[]),
+
+    // Open estimates (draft + sent) + count expiring within 7 days
+    isAdmin
+      ? query<OpenEstimateRow>(
+          `SELECT
+             COUNT(*)::text AS count,
+             COUNT(*) FILTER (
+               WHERE status = 'sent'
+                 AND expires_at IS NOT NULL
+                 AND expires_at <= NOW() + INTERVAL '7 days'
+             )::text AS expiring_soon
+           FROM estimates
+           WHERE account_id = $1 AND status IN ('draft','sent')`,
+          [session.accountId]
+        )
+      : Promise.resolve([{ count: "0", expiring_soon: "0" }] as OpenEstimateRow[]),
   ]);
 
   const firstName = (userRows[0]?.full_name ?? "").split(" ")[0] || "there";
@@ -186,6 +204,8 @@ export default async function HomePage() {
   const openJobCount = parseInt(openJobCountRows[0]?.count || "0", 10);
   const todayVisitCount = parseInt(todayVisitRows[0]?.count || "0", 10);
   const outstandingCents = parseInt(outstandingRows[0]?.amount_cents || "0", 10);
+  const openEstimateCount = parseInt(openEstimateRows[0]?.count || "0", 10);
+  const expiringSoonCount = parseInt(openEstimateRows[0]?.expiring_soon || "0", 10);
 
   const showOnboarding = isAdminOrOwner && clientCount === 0;
   const showNextStep = isAdminOrOwner && clientCount > 0 && openJobCount === 0;
@@ -200,6 +220,13 @@ export default async function HomePage() {
           value: formatCurrency(outstandingCents),
           href: "/app/invoices",
           variant: (outstandingCents > 0 ? "alert" : "default") as MetricCardData["variant"],
+        },
+        {
+          label: "Open Estimates",
+          value: openEstimateCount,
+          href: "/app/estimates",
+          sub: expiringSoonCount > 0 ? `${expiringSoonCount} expiring soon` : undefined,
+          variant: (expiringSoonCount > 0 ? "alert" : "default") as MetricCardData["variant"],
         },
       ]
     : [

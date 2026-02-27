@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import { queryOne, query } from "@/lib/db";
 import { formatVisitTime, isVisitOverdue } from "@/lib/visits/p7";
 import {
+  canCreateInvoices,
   canTransitionJob,
   canCreateVisit,
   canDeleteRecords,
@@ -105,6 +106,7 @@ export default async function JobDetailPage({
   const canTransition = canTransitionJob(session.role);
   const canAddVisit = canCreateVisit(session.role);
   const canDelete = canDeleteRecords(session.role);
+  const canCreateInvoice = canCreateInvoices(session.role);
   const isTech = session.role === "tech";
 
   const estimateCount = commercialCounts ? parseInt(commercialCounts.estimate_count) : 0;
@@ -316,6 +318,15 @@ export default async function JobDetailPage({
                       >
                         {invoiceCount} invoice{invoiceCount !== 1 ? "s" : ""} →
                       </Link>
+                    ) : canCreateInvoice && ["completed", "in_progress"].includes(currentStatus) ? (
+                      <LinkButton
+                        href={`/app/invoices/new?job_id=${job.id}${job.client_id ? `&client_id=${job.client_id}` : ""}`}
+                        variant="primary"
+                        size="sm"
+                        data-testid="create-invoice-from-job-btn"
+                      >
+                        + Create Invoice
+                      </LinkButton>
                     ) : (
                       <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>None</span>
                     )}

@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
-import { canManageClients, canTransitionJob } from "@/lib/auth/permissions";
+import { canCreateEstimates, canManageClients, canTransitionJob } from "@/lib/auth/permissions";
 import { query, queryOne } from "@/lib/db";
 import { buildJobCreateHref, formatClientContact, formatPropertyAddress } from "@/lib/crm/p7";
 import {
@@ -141,6 +141,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   }));
 
   const canCreateJobs = canTransitionJob(session.role);
+  const canCreateEstimate = canCreateEstimates(session.role);
   const estimateTotal = Number(finance?.estimate_total_cents ?? 0);
   const invoiceTotal = Number(finance?.invoice_total_cents ?? 0);
   const paidTotal = Number(finance?.paid_total_cents ?? 0);
@@ -157,6 +158,11 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             <LinkButton href={`/app/properties/new?client_id=${client.id}`} variant="secondary" size="sm" data-testid="add-property-btn">
               + Property
             </LinkButton>
+            {canCreateEstimate ? (
+              <LinkButton href={`/app/estimates/new?client_id=${client.id}`} variant="secondary" size="sm" data-testid="create-estimate-from-client-btn">
+                + Estimate
+              </LinkButton>
+            ) : null}
             {canCreateJobs ? (
               <LinkButton href={buildJobCreateHref(client.id)} variant="primary" size="sm" data-testid="create-job-from-client-btn">
                 + Job
