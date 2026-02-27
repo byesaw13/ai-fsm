@@ -147,6 +147,8 @@ const createEstimateSchema = z.object({
   expires_at: z.string().datetime().nullable().optional(),
   tax_rate: z.number().min(0).max(100).default(0),
   line_items: z.array(lineItemInputSchema).default([]),
+  // Flat-rate mode: set this instead of line_items to store a single price with no breakdown
+  flat_rate_cents: z.number().int().nonnegative().optional(),
 });
 
 export const POST = withRole(["owner", "admin"], async (request, session) => {
@@ -190,11 +192,17 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     expires_at,
     tax_rate,
     line_items,
+    flat_rate_cents,
   } = parseResult.data;
 
-  const { subtotal_cents } = calcTotals(line_items);
+  const subtotal_cents =
+    flat_rate_cents !== undefined
+      ? flat_rate_cents
+      : calcTotals(line_items).subtotal_cents;
   const tax_cents = Math.round((subtotal_cents * tax_rate) / 100);
   const total_cents = subtotal_cents + tax_cents;
+  // In flat-rate mode, ignore any line_items that were mistakenly sent
+  const itemsToInsert = flat_rate_cents !== undefined ? [] : line_items;
 
   try {
     const estimate = await withEstimateContext(session, async (client) => {
@@ -230,9 +238,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       );
       const estimateId = result.rows[0].id;
 
-      // Insert line items
-      for (let i = 0; i < line_items.length; i++) {
-        const item = line_items[i];
+      // Insert line items (skipped in flat-rate mode)
+      for (let i = 0; i < itemsToInsert.length; i++) {
+        const item = itemsToInsert[i];
         const itemTotal = lineItemTotal(item);
         await client.query(
           `INSERT INTO estimate_line_items

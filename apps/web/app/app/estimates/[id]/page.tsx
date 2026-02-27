@@ -176,13 +176,42 @@ export default async function EstimateDetailPage({
         )}
       </div>
 
-      {/* Line Items */}
+      {/* Line Items (or flat rate summary) */}
       <div className="card">
         <h2>Line Items</h2>
-        {lineItems.length === 0 ? (
+        {lineItems.length === 0 && estimate.subtotal_cents === 0 ? (
           <p className="muted" data-testid="line-items-empty">
             No line items.
           </p>
+        ) : lineItems.length === 0 ? (
+          /* Flat-rate estimate — no breakdown rows */
+          <table className="line-items-table" data-testid="line-items-table">
+            <tbody>
+              <tr data-testid="line-item-row">
+                <td>Flat rate</td>
+                <td colSpan={2}></td>
+                <td>{formatDollars(estimate.subtotal_cents)}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              {estimate.tax_cents > 0 && (
+                <tr>
+                  <td colSpan={2}></td>
+                  <td className="subtotal-label">Tax</td>
+                  <td>{formatDollars(estimate.tax_cents)}</td>
+                </tr>
+              )}
+              <tr>
+                <td colSpan={2}></td>
+                <td className="subtotal-label"><strong>Total</strong></td>
+                <td>
+                  <strong data-testid="estimate-total-footer">
+                    {formatDollars(estimate.total_cents)}
+                  </strong>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
         ) : (
           <table className="line-items-table" data-testid="line-items-table">
             <thead>
@@ -245,6 +274,7 @@ export default async function EstimateDetailPage({
           initialPropertyId={estimate.property_id}
           initialNotes={estimate.notes}
           initialExpiresAt={estimate.expires_at}
+          initialSubtotalCents={estimate.subtotal_cents}
           initialTaxCents={estimate.tax_cents}
           initialLineItems={lineItems.map(item => ({
             description: item.description,

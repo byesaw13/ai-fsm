@@ -40,6 +40,7 @@ interface EstimateEditFormProps {
   initialPropertyId: string | null;
   initialNotes: string | null;
   initialExpiresAt: string | null;
+  initialSubtotalCents: number;
   initialTaxCents: number;
   initialLineItems: InitialLineItem[];
 }
@@ -86,6 +87,7 @@ export function EstimateEditForm({
   initialPropertyId,
   initialNotes,
   initialExpiresAt,
+  initialSubtotalCents,
   initialTaxCents,
   initialLineItems,
 }: EstimateEditFormProps) {
@@ -98,6 +100,15 @@ export function EstimateEditForm({
   const [jobs, setJobs] = useState<JobOption[]>([]);
   const [properties, setProperties] = useState<PropertyOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
+
+  // Detect initial mode: flat rate = no line items but subtotal > 0
+  const isFlatRateInitially = initialLineItems.length === 0 && initialSubtotalCents > 0;
+  const [mode, setMode] = useState<"itemized" | "flat_rate">(
+    isFlatRateInitially ? "flat_rate" : "itemized"
+  );
+  const [flatRate, setFlatRate] = useState(
+    isFlatRateInitially ? centsToDisplayDollars(initialSubtotalCents) : "0.00"
+  );
 
   const [clientId, setClientId] = useState(initialClientId);
   const [jobId, setJobId] = useState(initialJobId ?? "");
@@ -115,10 +126,6 @@ export function EstimateEditForm({
   );
 
   // Derive initial tax rate from stored tax/subtotal
-  const initialSubtotalCents = initialLineItems.reduce(
-    (sum, item) => sum + Math.round(item.quantity * item.unit_price_cents),
-    0
-  );
   const derivedTaxRate =
     initialSubtotalCents > 0
       ? ((initialTaxCents / initialSubtotalCents) * 100).toFixed(2)
@@ -161,10 +168,23 @@ export function EstimateEditForm({
   }, [filteredProperties, propertyId]);
 
   // Live totals
-  const subtotalCents = lineItems.reduce((sum, row) => sum + lineTotal(row), 0);
   const taxRateNum = parseFloat(taxRate) || 0;
+  const subtotalCents =
+    mode === "flat_rate"
+      ? parseCents(flatRate)
+      : lineItems.reduce((sum, row) => sum + lineTotal(row), 0);
   const taxCents = Math.round((subtotalCents * taxRateNum) / 100);
   const totalCents = subtotalCents + taxCents;
+
+  function handleModeChange(newMode: "itemized" | "flat_rate") {
+    if (newMode === "flat_rate") {
+      const current = lineItems.reduce((sum, row) => sum + lineTotal(row), 0);
+      setFlatRate((current / 100).toFixed(2));
+    } else {
+      if (lineItems.length === 0) setLineItems([{ ...EMPTY_ROW }]);
+    }
+    setMode(newMode);
+  }
 
   function addLineItem() {
     setLineItems((prev) => [...prev, { ...EMPTY_ROW }]);
@@ -192,25 +212,37 @@ export function EstimateEditForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!clientId) { setError("Please select a client."); return; }
-    if (lineItems.length === 0) { setError("Add at least one line item."); return; }
+    if (mode === "itemized" && lineItems.length === 0) { setError("Add at least one line item."); return; }
     setError(null);
     setPending(true);
 
     try {
-      const payload = {
-        client_id: clientId,
-        job_id: jobId || null,
-        property_id: propertyId || null,
-        notes: notes.trim() || null,
-        expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
-        tax_rate: taxRateNum,
-        line_items: lineItems.map((row, i) => ({
-          description: row.description,
-          quantity: parseFloat(row.quantity) || 1,
-          unit_price_cents: parseCents(row.unit_price),
-          sort_order: i,
-        })),
-      };
+      const payload =
+        mode === "flat_rate"
+          ? {
+              client_id: clientId,
+              job_id: jobId || null,
+              property_id: propertyId || null,
+              notes: notes.trim() || null,
+              expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+              tax_rate: taxRateNum,
+              flat_rate_cents: parseCents(flatRate),
+              line_items: [],
+            }
+          : {
+              client_id: clientId,
+              job_id: jobId || null,
+              property_id: propertyId || null,
+              notes: notes.trim() || null,
+              expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+              tax_rate: taxRateNum,
+              line_items: lineItems.map((row, i) => ({
+                description: row.description,
+                quantity: parseFloat(row.quantity) || 1,
+                unit_price_cents: parseCents(row.unit_price),
+                sort_order: i,
+              })),
+            };
 
       const res = await fetch(`/api/v1/estimates/${estimateId}`, {
         method: "PATCH",
@@ -310,122 +342,172 @@ export function EstimateEditForm({
           />
         </div>
 
-        {/* Line Items */}
+        {/* Pricing Mode Toggle + Line Items */}
         <div style={{ marginTop: "var(--space-4)" }}>
-          <SectionHeader
-            title="Line Items"
-            count={lineItems.length}
-            as="h3"
-            action={
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={addLineItem}
-                disabled={pending}
-                data-testid="edit-add-line-item-btn"
-              >
-                + Add Item
-              </Button>
-            }
-          />
-
-          {lineItems.length === 0 ? (
-            <p style={{ color: "var(--fg-muted)" }}>No line items. Add at least one.</p>
-          ) : (
-            <div style={{ overflowX: "auto" }}>
-              <table className="line-items-table" style={{ width: "100%" }}>
-                <thead>
-                  <tr>
-                    <th>Description</th>
-                    <th style={{ width: 80 }}>Qty</th>
-                    <th style={{ width: 120 }}>Unit Price ($)</th>
-                    <th style={{ width: 100 }}>Total</th>
-                    <th style={{ width: 70 }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lineItems.map((row, i) => (
-                    <tr key={i}>
-                      <td>
-                        <input
-                          className="p7-input"
-                          type="text"
-                          value={row.description}
-                          onChange={(e) => updateLineItem(i, "description", e.target.value)}
-                          placeholder="Description"
-                          required
-                          disabled={pending}
-                          data-testid={`edit-line-item-desc-${i}`}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          className="p7-input"
-                          type="number"
-                          min="0.01"
-                          step="0.01"
-                          value={row.quantity}
-                          onChange={(e) => updateLineItem(i, "quantity", e.target.value)}
-                          disabled={pending}
-                          data-testid={`edit-line-item-qty-${i}`}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          className="p7-input"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={row.unit_price}
-                          onChange={(e) => updateLineItem(i, "unit_price", e.target.value)}
-                          disabled={pending}
-                          data-testid={`edit-line-item-price-${i}`}
-                        />
-                      </td>
-                      <td
-                        style={{
-                          color: "var(--fg-muted)",
-                          fontSize: "var(--text-sm)",
-                          paddingLeft: "var(--space-2)",
-                        }}
-                      >
-                        {formatDollars(lineTotal(row))}
-                      </td>
-                      <td>
-                        <div style={{ display: "flex", gap: "var(--space-1)" }}>
-                          <button
-                            type="button"
-                            className="p7-btn p7-btn-ghost p7-btn-sm"
-                            title="Duplicate row"
-                            onClick={() => duplicateLineItem(i)}
-                            disabled={pending}
-                            data-testid={`edit-duplicate-line-item-${i}`}
-                            aria-label={`Duplicate line item ${i + 1}`}
-                          >
-                            ⧉
-                          </button>
-                          {lineItems.length > 1 && (
-                            <button
-                              type="button"
-                              className="p7-btn p7-btn-ghost p7-btn-sm"
-                              title="Remove row"
-                              onClick={() => removeLineItem(i)}
-                              disabled={pending}
-                              data-testid={`edit-remove-line-item-${i}`}
-                              aria-label={`Remove line item ${i + 1}`}
-                              style={{ color: "var(--color-danger)" }}
-                            >
-                              ×
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-3)" }}>
+            <SectionHeader
+              title={mode === "flat_rate" ? "Flat Rate" : "Line Items"}
+              count={mode === "itemized" ? lineItems.length : undefined}
+              as="h3"
+            />
+            <div
+              style={{
+                display: "flex",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius)",
+                overflow: "hidden",
+              }}
+            >
+              {(["itemized", "flat_rate"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => handleModeChange(m)}
+                  disabled={pending}
+                  style={{
+                    padding: "var(--space-1) var(--space-3)",
+                    background: mode === m ? "var(--accent)" : "transparent",
+                    color: mode === m ? "#fff" : "var(--fg-muted)",
+                    border: "none",
+                    cursor: pending ? "default" : "pointer",
+                    fontSize: "var(--text-sm)",
+                    fontWeight: mode === m ? 600 : 400,
+                    lineHeight: 1.4,
+                  }}
+                  data-testid={`edit-mode-${m}`}
+                >
+                  {m === "itemized" ? "Itemized" : "Flat Rate"}
+                </button>
+              ))}
             </div>
+          </div>
+
+          {mode === "flat_rate" ? (
+            <div className="p7-form-grid p7-form-grid-2" style={{ marginBottom: "var(--space-3)" }}>
+              <Input
+                id="edit-flat-rate"
+                label="Price ($)"
+                type="number"
+                min="0"
+                step="0.01"
+                value={flatRate}
+                onChange={(e) => setFlatRate(e.target.value)}
+                disabled={pending}
+                data-testid="edit-flat-rate-input"
+              />
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--space-2)" }}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={addLineItem}
+                  disabled={pending}
+                  data-testid="edit-add-line-item-btn"
+                >
+                  + Add Item
+                </Button>
+              </div>
+              {lineItems.length === 0 ? (
+                <p style={{ color: "var(--fg-muted)" }}>No line items. Add at least one.</p>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table className="line-items-table" style={{ width: "100%" }}>
+                    <thead>
+                      <tr>
+                        <th>Description</th>
+                        <th style={{ width: 80 }}>Qty</th>
+                        <th style={{ width: 120 }}>Unit Price ($)</th>
+                        <th style={{ width: 100 }}>Total</th>
+                        <th style={{ width: 70 }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lineItems.map((row, i) => (
+                        <tr key={i}>
+                          <td>
+                            <input
+                              className="p7-input"
+                              type="text"
+                              value={row.description}
+                              onChange={(e) => updateLineItem(i, "description", e.target.value)}
+                              placeholder="Description"
+                              required
+                              disabled={pending}
+                              data-testid={`edit-line-item-desc-${i}`}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              className="p7-input"
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={row.quantity}
+                              onChange={(e) => updateLineItem(i, "quantity", e.target.value)}
+                              disabled={pending}
+                              data-testid={`edit-line-item-qty-${i}`}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              className="p7-input"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={row.unit_price}
+                              onChange={(e) => updateLineItem(i, "unit_price", e.target.value)}
+                              disabled={pending}
+                              data-testid={`edit-line-item-price-${i}`}
+                            />
+                          </td>
+                          <td
+                            style={{
+                              color: "var(--fg-muted)",
+                              fontSize: "var(--text-sm)",
+                              paddingLeft: "var(--space-2)",
+                            }}
+                          >
+                            {formatDollars(lineTotal(row))}
+                          </td>
+                          <td>
+                            <div style={{ display: "flex", gap: "var(--space-1)" }}>
+                              <button
+                                type="button"
+                                className="p7-btn p7-btn-ghost p7-btn-sm"
+                                title="Duplicate row"
+                                onClick={() => duplicateLineItem(i)}
+                                disabled={pending}
+                                data-testid={`edit-duplicate-line-item-${i}`}
+                                aria-label={`Duplicate line item ${i + 1}`}
+                              >
+                                ⧉
+                              </button>
+                              {lineItems.length > 1 && (
+                                <button
+                                  type="button"
+                                  className="p7-btn p7-btn-ghost p7-btn-sm"
+                                  title="Remove row"
+                                  onClick={() => removeLineItem(i)}
+                                  disabled={pending}
+                                  data-testid={`edit-remove-line-item-${i}`}
+                                  aria-label={`Remove line item ${i + 1}`}
+                                  style={{ color: "var(--color-danger)" }}
+                                >
+                                  ×
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
 
           {/* Totals */}
@@ -446,8 +528,12 @@ export function EstimateEditForm({
                 textAlign: "right",
               }}
             >
-              <span style={{ color: "var(--fg-muted)" }}>Subtotal</span>
-              <span data-testid="edit-subtotal">{formatDollars(subtotalCents)}</span>
+              {mode === "itemized" && (
+                <>
+                  <span style={{ color: "var(--fg-muted)" }}>Subtotal</span>
+                  <span data-testid="edit-subtotal">{formatDollars(subtotalCents)}</span>
+                </>
+              )}
 
               <label
                 htmlFor="edit-tax-rate"

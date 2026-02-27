@@ -95,7 +95,9 @@ export function NewEstimateForm({
   const [propertyId, setPropertyId] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [notes, setNotes] = useState("");
+  const [mode, setMode] = useState<"itemized" | "flat_rate">("itemized");
   const [lineItems, setLineItems] = useState<LineItemRow[]>([{ ...EMPTY_ROW }]);
+  const [flatRate, setFlatRate] = useState("0.00");
   const [taxRate, setTaxRate] = useState("0");
   const [sendImmediately, setSendImmediately] = useState(false);
 
@@ -122,10 +124,25 @@ export function NewEstimateForm({
   }, [filteredProperties, propertyId]);
 
   // Live totals
-  const subtotalCents = lineItems.reduce((sum, row) => sum + lineTotal(row), 0);
   const taxRateNum = parseFloat(taxRate) || 0;
+  const subtotalCents =
+    mode === "flat_rate"
+      ? parseCents(flatRate)
+      : lineItems.reduce((sum, row) => sum + lineTotal(row), 0);
   const taxCents = Math.round((subtotalCents * taxRateNum) / 100);
   const totalCents = subtotalCents + taxCents;
+
+  function handleModeChange(newMode: "itemized" | "flat_rate") {
+    if (newMode === "flat_rate") {
+      // Pre-fill flat rate with current itemized subtotal
+      const current = lineItems.reduce((sum, row) => sum + lineTotal(row), 0);
+      setFlatRate((current / 100).toFixed(2));
+    } else {
+      // Ensure at least one empty row when switching back
+      if (lineItems.length === 0) setLineItems([{ ...EMPTY_ROW }]);
+    }
+    setMode(newMode);
+  }
 
   // Line item actions
   function addLineItem() {
@@ -157,7 +174,7 @@ export function NewEstimateForm({
       setError("Please select a client.");
       return;
     }
-    if (lineItems.length === 0) {
+    if (mode === "itemized" && lineItems.length === 0) {
       setError("Add at least one line item.");
       return;
     }
@@ -166,20 +183,32 @@ export function NewEstimateForm({
     setError(null);
 
     try {
-      const payload = {
-        client_id: clientId,
-        job_id: jobId || null,
-        property_id: propertyId || null,
-        notes: notes.trim() || null,
-        expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
-        tax_rate: taxRateNum,
-        line_items: lineItems.map((row, i) => ({
-          description: row.description,
-          quantity: parseFloat(row.quantity) || 1,
-          unit_price_cents: parseCents(row.unit_price),
-          sort_order: i,
-        })),
-      };
+      const payload =
+        mode === "flat_rate"
+          ? {
+              client_id: clientId,
+              job_id: jobId || null,
+              property_id: propertyId || null,
+              notes: notes.trim() || null,
+              expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+              tax_rate: taxRateNum,
+              flat_rate_cents: parseCents(flatRate),
+              line_items: [],
+            }
+          : {
+              client_id: clientId,
+              job_id: jobId || null,
+              property_id: propertyId || null,
+              notes: notes.trim() || null,
+              expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+              tax_rate: taxRateNum,
+              line_items: lineItems.map((row, i) => ({
+                description: row.description,
+                quantity: parseFloat(row.quantity) || 1,
+                unit_price_cents: parseCents(row.unit_price),
+                sort_order: i,
+              })),
+            };
 
       const res = await fetch("/api/v1/estimates", {
         method: "POST",
@@ -290,12 +319,65 @@ export function NewEstimateForm({
         />
       </div>
 
-      {/* Line Items */}
+      {/* Pricing Mode Toggle + Line Items */}
       <div>
-        <SectionHeader
-          title="Line Items"
-          count={lineItems.length}
-          action={
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-3)" }}>
+          <SectionHeader
+            title={mode === "flat_rate" ? "Flat Rate" : "Line Items"}
+            count={mode === "itemized" ? lineItems.length : undefined}
+            as="h3"
+          />
+          <div
+            style={{
+              display: "flex",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius)",
+              overflow: "hidden",
+            }}
+          >
+            {(["itemized", "flat_rate"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => handleModeChange(m)}
+                disabled={pending}
+                style={{
+                  padding: "var(--space-1) var(--space-3)",
+                  background: mode === m ? "var(--accent)" : "transparent",
+                  color: mode === m ? "#fff" : "var(--fg-muted)",
+                  border: "none",
+                  cursor: pending ? "default" : "pointer",
+                  fontSize: "var(--text-sm)",
+                  fontWeight: mode === m ? 600 : 400,
+                  lineHeight: 1.4,
+                }}
+                data-testid={`mode-${m}`}
+              >
+                {m === "itemized" ? "Itemized" : "Flat Rate"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {mode === "flat_rate" ? (
+          /* Flat Rate mode: single price field */
+          <div className="p7-form-grid p7-form-grid-2" style={{ marginBottom: "var(--space-3)" }}>
+            <Input
+              id="flat_rate"
+              label="Price ($)"
+              type="number"
+              min="0"
+              step="0.01"
+              value={flatRate}
+              onChange={(e) => setFlatRate(e.target.value)}
+              disabled={pending}
+              data-testid="flat-rate-input"
+            />
+          </div>
+        ) : (
+          /* Itemized mode */
+          <>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--space-2)" }}>
             <Button
               type="button"
               variant="secondary"
@@ -306,16 +388,12 @@ export function NewEstimateForm({
             >
               + Add Item
             </Button>
-          }
-        />
-
-        {lineItems.length === 0 ? (
-          <p
-            style={{ color: "var(--fg-muted)", padding: "var(--space-3) 0" }}
-          >
-            No line items. Add at least one.
-          </p>
-        ) : (
+          </div>
+          {lineItems.length === 0 ? (
+            <p style={{ color: "var(--fg-muted)", padding: "var(--space-3) 0" }}>
+              No line items. Add at least one.
+            </p>
+          ) : (
           <div style={{ overflowX: "auto" }}>
             <table className="line-items-table" style={{ width: "100%" }}>
               <thead>
@@ -409,6 +487,8 @@ export function NewEstimateForm({
               </tbody>
             </table>
           </div>
+          )}
+          </>
         )}
 
         {/* Totals */}
@@ -430,8 +510,12 @@ export function NewEstimateForm({
               textAlign: "right",
             }}
           >
-            <span style={{ color: "var(--fg-muted)" }}>Subtotal</span>
-            <span data-testid="subtotal">{formatDollars(subtotalCents)}</span>
+            {mode === "itemized" && (
+              <>
+                <span style={{ color: "var(--fg-muted)" }}>Subtotal</span>
+                <span data-testid="subtotal">{formatDollars(subtotalCents)}</span>
+              </>
+            )}
 
             <label
               htmlFor="tax_rate"
