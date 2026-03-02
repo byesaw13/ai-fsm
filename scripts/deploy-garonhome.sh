@@ -23,6 +23,8 @@ set +a
 
 cd "${REPO_ROOT}"
 
+git pull origin main
+
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" up -d postgres redis
 
 while ! docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T postgres \
@@ -30,13 +32,60 @@ while ! docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T pos
   sleep 2
 done
 
-for file in db/migrations/*.sql; do
-  if [[ "${file}" == *"seed"* ]]; then
+# Helper: run psql inside the postgres container
+pg_exec() {
+  docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T postgres \
+    psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" "$@"
+}
+
+# Ensure migration tracking table exists
+pg_exec -v ON_ERROR_STOP=1 -c "
+  CREATE TABLE IF NOT EXISTS schema_migrations (
+    filename   TEXT PRIMARY KEY,
+    applied_at TIMESTAMPTZ DEFAULT now()
+  )
+"
+
+# Detect transition case: existing schema with no tracking history
+# If schema_migrations is empty AND the core schema already exists,
+# seed every migration filename as applied (they ran before tracking was added).
+MIGRATE_MODE="$(pg_exec -tAc "
+  SELECT CASE
+    WHEN (SELECT COUNT(*) FROM schema_migrations) = 0
+         AND EXISTS (
+           SELECT 1 FROM information_schema.tables
+           WHERE table_schema = 'public' AND table_name = 'clients'
+         )
+    THEN 'seed'
+    ELSE 'migrate'
+  END
+" 2>/dev/null | tr -d '[:space:]' || echo 'migrate')"
+
+echo "migration mode: ${MIGRATE_MODE}"
+
+for file in "${REPO_ROOT}"/db/migrations/*.sql; do
+  filename="$(basename "${file}")"
+  if [[ "${filename}" == *"seed"* ]]; then
     continue
   fi
-  echo "applying migration: ${file}"
-  docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T postgres \
-    psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -v ON_ERROR_STOP=1 < "${file}"
+
+  if [[ "${MIGRATE_MODE}" == "seed" ]]; then
+    echo "seeding tracking record (pre-existing migration): ${filename}"
+    pg_exec -c "INSERT INTO schema_migrations (filename) VALUES ('${filename}') ON CONFLICT DO NOTHING"
+    continue
+  fi
+
+  applied="$(pg_exec -tAc "SELECT COUNT(*) FROM schema_migrations WHERE filename = '${filename}'" \
+    | tr -d '[:space:]')"
+
+  if [[ "${applied}" == "1" ]]; then
+    echo "skipping (already applied): ${filename}"
+    continue
+  fi
+
+  echo "applying migration: ${filename}"
+  pg_exec -v ON_ERROR_STOP=1 < "${file}"
+  pg_exec -c "INSERT INTO schema_migrations (filename) VALUES ('${filename}')"
 done
 
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" build web worker

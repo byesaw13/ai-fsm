@@ -833,4 +833,24 @@ Each AI run must append one record. Keep entries factual and short.
   - access debugging
   - phase execution
   - release sync
+
+---
+
+- Timestamp (UTC): 2026-02-27T00:00:00Z
+- Agent: deploy-sre
+- Branch: infra/idempotent-migrations
+- Task ID: (ad-hoc — garonhome migration replay fix)
+- Summary: Fixed deploy-garonhome.sh blindly replaying all SQL migrations on every redeploy. Added schema_migrations tracking table. Deploy script now seeds the table from existing filenames when the schema already exists (transition from pre-tracking to tracking), and skips already-applied migrations on subsequent deploys. Updated db-migrate.sh (dev) with the same idempotent logic. Added git pull origin main to deploy-garonhome.sh per ai-fsm-release-sync skill requirement.
+- Files changed:
+  - scripts/deploy-garonhome.sh (replaced inline migration loop with pg_exec helper + tracking table logic)
+  - scripts/db-migrate.sh (same tracking table approach for dev use)
+- Commands run:
+  - bash -n scripts/deploy-garonhome.sh (syntax check)
+  - bash -n scripts/db-migrate.sh (syntax check)
+- Gate results:
+  - syntax: ✅ both scripts pass bash -n
+  - shellcheck: not available in environment
+- Risks or follow-ups:
+  - First run on garonhome.local will create schema_migrations table and seed all existing migration filenames (MIGRATE_MODE=seed path). No migrations will re-run. Verify with: docker compose ... exec -T postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -c "SELECT * FROM schema_migrations ORDER BY filename"
+  - Operator must run: cd /opt/business/ai-fsm/repo && bash scripts/deploy-garonhome.sh
 - Updated bootstrap/orchestration docs to require explicit role + skill selection before execution.
