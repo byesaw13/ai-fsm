@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
-import { canCreateEstimates } from "@/lib/auth/permissions";
+import { canCreateInvoices } from "@/lib/auth/permissions";
 import { query } from "@/lib/db";
 import { Card, PageContainer, PageHeader } from "@/components/ui";
-import { NewEstimateForm } from "./NewEstimateForm";
+import { NewInvoiceForm } from "./NewInvoiceForm";
 
 export const dynamic = "force-dynamic";
 
@@ -31,10 +31,10 @@ interface PageProps {
   searchParams: Promise<{ client_id?: string; job_id?: string }>;
 }
 
-export default async function NewEstimatePage({ searchParams }: PageProps) {
+export default async function NewInvoicePage({ searchParams }: PageProps) {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (!canCreateEstimates(session.role)) redirect("/app/estimates");
+  if (!canCreateInvoices(session.role)) redirect("/app/invoices");
 
   const { client_id, job_id } = await searchParams;
 
@@ -44,7 +44,7 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
       [session.accountId]
     ),
     query<Job>(
-      `SELECT id, title, client_id FROM jobs WHERE account_id = $1 AND status NOT IN ('completed','cancelled','invoiced') ORDER BY title ASC`,
+      `SELECT id, title, client_id FROM jobs WHERE account_id = $1 ORDER BY title ASC`,
       [session.accountId]
     ),
     query<Property>(
@@ -55,9 +55,9 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
 
   return (
     <PageContainer>
-      <PageHeader title="New Estimate" backHref="/app/estimates" backLabel="Estimates" />
+      <PageHeader title="New Invoice" backHref="/app/invoices" backLabel="Invoices" />
       <Card>
-        <NewEstimateForm
+        <NewInvoiceForm
           clients={clients}
           jobs={jobs}
           properties={properties}

@@ -809,3 +809,48 @@ Each AI run must append one record. Keep entries factual and short.
   - Migration `db/migrations/006_client_address.sql` must be applied before new client address fields persist correctly in production/Pi
   - Client list/detail currently uses single-line address field (`address_line1`) only; future enhancement can add `address_line2` if needed
   - P7-T3 should surface client company/address context in estimate/invoice headers and print/send views
+## 2026-02-28 — Garonhome portable deployment target
+
+- Added `infra/compose.garonhome.yml` for x86 host deployment with internal app network + external proxy network.
+- Added `infra/garonhome.env.example` to separate host config from repo defaults.
+- Added `scripts/setup-garonhome.sh`, `scripts/deploy-garonhome.sh`, `scripts/backup-garonhome.sh`, and `scripts/restore-garonhome.sh`.
+- Added `docs/GARONHOME_DEPLOYMENT.md` documenting host layout, NPM proxy strategy, deploy flow, backup/restore, and relocation procedure.
+- Updated `scripts/deploy-garonhome.sh` to wait for Docker health instead of assuming host port `3000` is exposed.
+- Updated `services/worker/Dockerfile` to build and run compiled worker output instead of `tsx` dev mode.
+- Decision: use bind-mounted data under `/opt/business/ai-fsm/data` instead of Docker named volumes to make relocation simpler.
+## 2026-03-02 — Agent and skill framework
+
+- Added `docs/AGENT_SYSTEM.md` as the top-level agent/skill execution model.
+- Added role docs under `docs/agents/` for:
+  - orchestrator
+  - repo-manager
+  - deploy-sre
+  - network-diagnosis
+  - product-engineer
+- Added workflow docs under `docs/skills/` for:
+  - git governance
+  - garonhome deployment
+  - access debugging
+  - phase execution
+  - release sync
+
+---
+
+- Timestamp (UTC): 2026-02-27T00:00:00Z
+- Agent: deploy-sre
+- Branch: infra/idempotent-migrations
+- Task ID: (ad-hoc — garonhome migration replay fix)
+- Summary: Fixed deploy-garonhome.sh blindly replaying all SQL migrations on every redeploy. Added schema_migrations tracking table. Deploy script now seeds the table from existing filenames when the schema already exists (transition from pre-tracking to tracking), and skips already-applied migrations on subsequent deploys. Updated db-migrate.sh (dev) with the same idempotent logic. Added git pull origin main to deploy-garonhome.sh per ai-fsm-release-sync skill requirement.
+- Files changed:
+  - scripts/deploy-garonhome.sh (replaced inline migration loop with pg_exec helper + tracking table logic)
+  - scripts/db-migrate.sh (same tracking table approach for dev use)
+- Commands run:
+  - bash -n scripts/deploy-garonhome.sh (syntax check)
+  - bash -n scripts/db-migrate.sh (syntax check)
+- Gate results:
+  - syntax: ✅ both scripts pass bash -n
+  - shellcheck: not available in environment
+- Risks or follow-ups:
+  - First run on garonhome.local will create schema_migrations table and seed all existing migration filenames (MIGRATE_MODE=seed path). No migrations will re-run. Verify with: docker compose ... exec -T postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -c "SELECT * FROM schema_migrations ORDER BY filename"
+  - Operator must run: cd /opt/business/ai-fsm/repo && bash scripts/deploy-garonhome.sh
+- Updated bootstrap/orchestration docs to require explicit role + skill selection before execution.

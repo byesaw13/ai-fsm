@@ -1,0 +1,101 @@
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    image: ai-fsm-web:garonhome
+    restart: unless-stopped
+    env_file:
+      - ${FSM_ENV_FILE:-../.env}
+    environment:
+      NODE_ENV: production
+      APP_PORT: 3000
+      SECURE_COOKIES: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null 2>&1 || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 6
+    networks:
+      internal: {}
+      proxy:
+        aliases:
+          - ai-fsm-web
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  worker:
+    build:
+      context: ..
+      dockerfile: services/worker/Dockerfile
+    image: ai-fsm-worker:garonhome
+    restart: unless-stopped
+    env_file:
+      - ${FSM_ENV_FILE:-../.env}
+    environment:
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - internal
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    env_file:
+      - ${FSM_ENV_FILE:-../.env}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+    volumes:
+      - ${FSM_DATA_ROOT:-/opt/business/ai-fsm/data}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+    networks:
+      - internal
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  redis:
+    image: redis:7
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ${FSM_DATA_ROOT:-/opt/business/ai-fsm/data}/redis:/data
+    networks:
+      - internal
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "2"
+
+networks:
+  internal:
+    name: ${COMPOSE_PROJECT_NAME:-ai-fsm}_internal
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-business_proxy}

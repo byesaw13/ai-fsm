@@ -3,6 +3,7 @@
 Copy one block per AI instance.
 
 Prompt directory for all roles: `docs/prompts/`
+Agent/skill framework: `docs/AGENT_SYSTEM.md`, `docs/agents/`, `docs/skills/`
 
 ## Orchestrator Launch Block
 You are `agent-orchestrator`.
