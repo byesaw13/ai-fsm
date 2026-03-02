@@ -854,3 +854,28 @@ Each AI run must append one record. Keep entries factual and short.
   - First run on garonhome.local will create schema_migrations table and seed all existing migration filenames (MIGRATE_MODE=seed path). No migrations will re-run. Verify with: docker compose ... exec -T postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -c "SELECT * FROM schema_migrations ORDER BY filename"
   - Operator must run: cd /opt/business/ai-fsm/repo && bash scripts/deploy-garonhome.sh
 - Updated bootstrap/orchestration docs to require explicit role + skill selection before execution.
+
+---
+
+- Timestamp (UTC): 2026-03-02T00:00:00Z
+- Agent: deploy-sre
+- Branch: deploy-sre/infra-garonhome-primary
+- Task ID: infra/garonhome-primary (ad-hoc)
+- Summary: Promoted garonhome.local to primary deployment target. Demoted Pi to secondary/legacy. Restructured DEPLOYMENT_RUNBOOK.md with garonhome first. Updated GARONHOME_DEPLOYMENT.md to reflect idempotent migration tracking in the deploy script. Marked PI4_DEPLOYMENT.md as secondary/legacy. Updated docs/agents/deploy-sre.md and docs/skills/ai-fsm-garonhome-deploy.md to list garonhome first. Added ADR-013 to DECISION_LOG.md.
+- Files changed:
+  - docs/DEPLOYMENT_RUNBOOK.md (garonhome-primary section added at top; Pi section retained as secondary/legacy)
+  - docs/GARONHOME_DEPLOYMENT.md (step 3 of deploy script description updated to reflect idempotent migration tracking; git pull added as step 1)
+  - docs/PI4_DEPLOYMENT.md (marked secondary/legacy, cross-reference to DEPLOYMENT_RUNBOOK.md added)
+  - docs/agents/deploy-sre.md (garonhome listed first, Pi listed as secondary/legacy)
+  - docs/skills/ai-fsm-garonhome-deploy.md (redeploy rules updated: single script command, migration tracking documented)
+  - docs/DECISION_LOG.md (ADR-013 added)
+  - docs/CHANGELOG_AI.md (this entry)
+  - docs/WORK_ASSIGNMENT.md (claim added)
+- Commands run:
+  - bash -n scripts/deploy-garonhome.sh (syntax check — passes, no script changes in this PR)
+- Gate results:
+  - All changes are documentation only. No application code or scripts were modified.
+  - No lint/typecheck/build gates apply.
+- Risks or follow-ups:
+  - Operator must run deploy-garonhome.sh on garonhome.local to apply PR #79 migration tracking changes if not already done.
+  - Pi is still running and functional; no action required to demote it operationally — it just shifts to secondary status in docs and agent instructions.

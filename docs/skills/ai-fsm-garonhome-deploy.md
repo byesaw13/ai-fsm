@@ -29,10 +29,26 @@ Use this skill for:
 
 ## Redeploy rules
 
-Use redeploy flow for normal updates:
+Normal redeploy after a merge is a single command:
 
-1. `git pull origin main`
-2. `docker compose ... build web worker`
-3. `docker compose ... up -d web worker`
+```bash
+cd /opt/business/ai-fsm/repo
+bash scripts/deploy-garonhome.sh
+```
 
-Do not replay bootstrap SQL migrations blindly on every redeploy.
+The script handles: git pull, postgres/redis up, idempotent migration (new files only), build, up, healthcheck.
+
+Do not replay bootstrap SQL migrations blindly on every redeploy. The deploy script prevents this via a `schema_migrations` tracking table — already-applied files are skipped automatically.
+
+## Migration tracking
+
+On first run against an existing database the script detects the pre-existing schema (checks for the `clients` table) and seeds all migration filenames into `schema_migrations` without re-running them. On fresh installs, migrations run normally and are recorded as they apply. Future migrations are applied once and skipped on all subsequent deploys.
+
+Verify tracking table after deploy:
+
+```bash
+docker compose --env-file /opt/business/ai-fsm/env/.env \
+  -f /opt/business/ai-fsm/repo/infra/compose.garonhome.yml \
+  exec -T postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" \
+  -c "SELECT filename, applied_at FROM schema_migrations ORDER BY filename"
+```
