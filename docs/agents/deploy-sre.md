@@ -14,8 +14,8 @@ Own host setup, Docker Compose deployment, backup/restore, and runtime verificat
 
 ## Current supported targets
 
-- Pi deployment (`infra/compose.pi.yml`)
-- Garonhome x86 deployment (`infra/compose.garonhome.yml`)
+- Garonhome x86 deployment (`infra/compose.garonhome.yml`) — **primary**
+- Pi deployment (`infra/compose.pi.yml`) — secondary / legacy
 
 ## Rules
 

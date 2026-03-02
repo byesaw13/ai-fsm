@@ -106,13 +106,14 @@ bash scripts/deploy-garonhome.sh
 
 What the deploy script does:
 
-1. start `postgres` and `redis`
-2. wait for postgres health
-3. apply all SQL migrations in `db/migrations`
-4. build `web` and `worker` from source
-5. start `web` and `worker`
-6. wait for the web container healthcheck to report `healthy`
-7. print service status and a container-internal web health response
+1. `git pull origin main`
+2. start `postgres` and `redis`
+3. wait for postgres health
+4. create `schema_migrations` tracking table if absent; apply only new migration files (already-applied files are skipped — no replay on redeploy)
+5. build `web` and `worker` from source
+6. start `web` and `worker`
+7. wait for the web container healthcheck to report `healthy`
+8. print service status and a container-internal web health response
 
 The deployment is intentionally internal-only. The script does not assume `localhost:3000` is reachable from the host.
 
