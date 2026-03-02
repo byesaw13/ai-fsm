@@ -809,3 +809,12 @@ Each AI run must append one record. Keep entries factual and short.
   - Migration `db/migrations/006_client_address.sql` must be applied before new client address fields persist correctly in production/Pi
   - Client list/detail currently uses single-line address field (`address_line1`) only; future enhancement can add `address_line2` if needed
   - P7-T3 should surface client company/address context in estimate/invoice headers and print/send views
+## 2026-02-28 — Garonhome portable deployment target
+
+- Added `infra/compose.garonhome.yml` for x86 host deployment with internal app network + external proxy network.
+- Added `infra/garonhome.env.example` to separate host config from repo defaults.
+- Added `scripts/setup-garonhome.sh`, `scripts/deploy-garonhome.sh`, `scripts/backup-garonhome.sh`, and `scripts/restore-garonhome.sh`.
+- Added `docs/GARONHOME_DEPLOYMENT.md` documenting host layout, NPM proxy strategy, deploy flow, backup/restore, and relocation procedure.
+- Updated `scripts/deploy-garonhome.sh` to wait for Docker health instead of assuming host port `3000` is exposed.
+- Updated `services/worker/Dockerfile` to build and run compiled worker output instead of `tsx` dev mode.
+- Decision: use bind-mounted data under `/opt/business/ai-fsm/data` instead of Docker named volumes to make relocation simpler.
