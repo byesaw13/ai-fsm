@@ -16,6 +16,7 @@
 - Orchestrator assigns tasks from `docs/EXECUTION_GRAPH.yaml`.
 - Specialists execute in parallel where dependencies allow.
 - Shared files require lock from `docs/WORK_ASSIGNMENT.md`.
+- Use `docs/AGENT_SYSTEM.md` to select the active role and the matching workflow skill before starting.
 
 ## Handoff Contract
 Each agent output must include:
@@ -36,3 +37,11 @@ Project complete only when Release Manager confirms:
 - all phase gates green
 - staging burn-in complete
 - production deploy + rollback drill successful
+
+## Separation Rule
+- Source-control decisions belong to the repo manager path.
+- Deployment decisions belong to the deploy SRE path.
+- Client access/DNS/proxy debugging belongs to the network diagnosis path.
+- Product implementation belongs to the product engineer path.
+
+Do not collapse all four into a single undifferentiated workstream unless the task is trivial.

@@ -818,3 +818,19 @@ Each AI run must append one record. Keep entries factual and short.
 - Updated `scripts/deploy-garonhome.sh` to wait for Docker health instead of assuming host port `3000` is exposed.
 - Updated `services/worker/Dockerfile` to build and run compiled worker output instead of `tsx` dev mode.
 - Decision: use bind-mounted data under `/opt/business/ai-fsm/data` instead of Docker named volumes to make relocation simpler.
+## 2026-03-02 — Agent and skill framework
+
+- Added `docs/AGENT_SYSTEM.md` as the top-level agent/skill execution model.
+- Added role docs under `docs/agents/` for:
+  - orchestrator
+  - repo-manager
+  - deploy-sre
+  - network-diagnosis
+  - product-engineer
+- Added workflow docs under `docs/skills/` for:
+  - git governance
+  - garonhome deployment
+  - access debugging
+  - phase execution
+  - release sync
+- Updated bootstrap/orchestration docs to require explicit role + skill selection before execution.

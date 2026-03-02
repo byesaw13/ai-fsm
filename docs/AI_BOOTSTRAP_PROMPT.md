@@ -29,6 +29,13 @@ Constraints:
 
 Additional required read:
 7. docs/SOURCE_STRENGTHS_MAP.md
+8. docs/AGENT_SYSTEM.md
+
+Then choose:
+- one role file from `docs/agents/`
+- any matching workflow file from `docs/skills/`
+
+Do not proceed until the active role and active skill set are explicit.
 
 For every major task, record in changelog:
 - source paths used from dovelite
