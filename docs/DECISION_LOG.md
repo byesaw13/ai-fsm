@@ -148,6 +148,20 @@ Append-only log of technical decisions made by AI agents.
 - Consequences: Clear single authoritative path per deliverable. Operators should update the three new files going forward; old files are read-only references.
 - Rollback plan: N/A (documentation only — no code or schema changed).
 
+### ADR-013: Promote garonhome.local to primary deployment target; demote Pi to secondary/legacy
+- Date (UTC): 2026-03-02T00:00:00Z
+- Agent: deploy-sre
+- Task ID: infra/garonhome-primary (ad-hoc)
+- Context: Deployment was bootstrapped Pi-first (ADR-001 MVP target). garonhome.local (x86, `/opt/business/ai-fsm`) is now operational with a proper compose file, setup script, backup/restore scripts, Nginx Proxy Manager integration, and idempotent migration tracking (PR #79). The Pi remains running but the x86 host is the better long-term target (no ARM build constraints, no SD card wear, no memory limits, better network throughput).
+- Decision: garonhome.local is the primary deployment target for all future releases. DEPLOYMENT_RUNBOOK.md is restructured garonhome-first. docs/agents/deploy-sre.md and docs/skills/ai-fsm-garonhome-deploy.md are updated to reflect this. Pi docs are retained but marked secondary/legacy.
+- Alternatives considered:
+  - Keep Pi as primary: rejected — x86 is operationally superior and the host is already running; Pi SD card write wear is a long-term reliability risk.
+  - Decommission Pi entirely: rejected — Pi is still useful as a secondary/test target and its compose file + runbook have value as reference documentation.
+- Consequences: All AI agents and release instructions now default to garonhome.local. Pi-specific guidance remains in DEPLOYMENT_RUNBOOK.md (Pi section) and PI4_DEPLOYMENT.md.
+- Rollback plan: Documentation-only change. Reversing means updating the same files. No code, schema, or infra was modified.
+
+---
+
 - Timestamp (UTC): 2026-02-19T21:27:09Z
 - Decision ID: DRILL-2026-02-19
 - Type: Restore Drill Evidence
