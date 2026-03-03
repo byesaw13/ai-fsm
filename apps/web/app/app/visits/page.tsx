@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { query } from "@/lib/db";
@@ -59,7 +60,7 @@ interface VisitCardProps {
 
 function VisitItemCard({ visit, showTech = false, showOverdue = false }: VisitCardProps) {
   const overdue = isVisitOverdue(visit);
-  const metaParts: React.ReactNode[] = [];
+  const metaParts: ReactNode[] = [];
 
   metaParts.push(
     <span key="date" className="p7-item-meta-text">

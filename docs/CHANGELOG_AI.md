@@ -15,6 +15,37 @@ Each AI run must append one record. Keep entries factual and short.
 
 ---
 
+- Timestamp (UTC): 2026-03-02T20:50:00Z
+- Agent: agent-orchestrator
+- Branch: product-engineer/P8-T1-expense-ledger
+- Task ID: P7-T2 completion + P8-T1 bootstrap
+- Summary: Completed remaining P7-T2 items (visits list ReactNode import fix, detail-route loading.tsx skeletons for /app/jobs/[id] and /app/visits/[id]) and fixed two test regressions introduced during P8-T1 bootstrap: updated nav-items test from 8→9 to account for new Expenses nav entry, and corrected expenses rounding test expectation for IEEE-754 floating point behavior. P8-T1 domain bootstrap (expense categories, permissions, DB migration 007, expense math/db helpers) was already present on branch.
+- Files changed:
+  - apps/web/app/app/visits/page.tsx (fix ReactNode import — React.ReactNode → ReactNode)
+  - apps/web/app/app/jobs/[id]/loading.tsx (new — detail route skeleton)
+  - apps/web/app/app/visits/[id]/loading.tsx (new — detail route skeleton)
+  - apps/web/components/ui/__tests__/design-system.unit.test.ts (update nav item count 8→9; add /app/expenses assertion)
+  - apps/web/lib/expenses/__tests__/expenses.unit.test.ts (fix IEEE-754 rounding expectation)
+  - packages/domain/src/index.ts (P8-T1: expense categories + ExpenseCategory type)
+  - apps/web/lib/auth/permissions.ts (P8-T1: canCreateExpense, canViewExpenses guards)
+  - apps/web/components/AppShell.tsx (P8-T1: Expenses nav item)
+  - docs/CHANGELOG_AI.md (this entry; corrected P7-T2 test count from 316→338)
+- Commands run:
+  - pnpm --filter @ai-fsm/web typecheck
+  - pnpm --filter @ai-fsm/web lint
+  - pnpm --filter @ai-fsm/web build
+  - pnpm test
+- Gate results:
+  - lint: ✅
+  - typecheck: ✅
+  - build: ✅ (38 routes)
+  - test: ✅ apps/web 338 pass / 55 skip
+- Risks or follow-ups:
+  - P8-T1 expense ledger UI (list page, detail page, form) not yet built — this entry covers bootstrap only
+  - P7-T2 detail loading skeletons use inline styles for the layout grid; can be refactored to CSS classes in a follow-up
+
+---
+
 - Timestamp (UTC): 2026-02-23T16:06:03Z
 - Agent: agent-orchestrator
 - Branch: agent-orchestrator/P7-T2-jobs-visits-rewrite
@@ -51,7 +82,7 @@ Each AI run must append one record. Keep entries factual and short.
   - lint: ✅
   - typecheck: ✅
   - build: ✅
-  - test: ✅ packages/domain 38 pass; services/worker 45 pass / 16 skip; apps/web 316 pass / 55 skip
+  - test: ✅ packages/domain 38 pass; services/worker 45 pass / 16 skip; apps/web 338 pass / 55 skip
 - Source evidence (dovelite):
   - Consulted: /home/nick/dev/dovelite app admin jobs/visits surfaces for grouped sections and dense operational cards
   - Adopted: segmented list presentation (today/upcoming/overdue) and action-forward card structure; reimplemented with ai-fsm P7 primitives
