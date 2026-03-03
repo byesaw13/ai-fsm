@@ -4,6 +4,7 @@ import { withAuth, withRole } from "@/lib/auth/middleware";
 import { withExpenseContext } from "@/lib/expenses/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
+import { isValidMonthKey } from "@/lib/expenses/ui";
 import { expenseCategorySchema } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ const listQuerySchema = z.object({
   job_id: z.string().uuid().optional(),
   month: z
     .string()
-    .regex(/^\d{4}-\d{2}$/)
+    .refine(isValidMonthKey, "Month must be a valid YYYY-MM value")
     .optional(), // e.g. "2026-03"
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -92,7 +93,9 @@ export const GET = withAuth(async (request, session) => {
         [...params, limit, offset]
       );
 
-      // Current-month summary totals (always against the full account, ignoring list filters)
+      const summaryMonth = month ?? new Date().toISOString().slice(0, 7);
+
+      // Summary totals for the requested month, ignoring list-only filters like category/job.
       const summaryResult = await client.query<{
         current_month_total: string | null;
         current_month_count: string;
@@ -102,9 +105,9 @@ export const GET = withAuth(async (request, session) => {
            COUNT(*) AS current_month_count
          FROM expenses
          WHERE account_id = $1
-           AND expense_date >= date_trunc('month', CURRENT_DATE)::date
-           AND expense_date < (date_trunc('month', CURRENT_DATE) + interval '1 month')::date`,
-        [session.accountId]
+           AND expense_date >= $2::date
+           AND expense_date < ($2::date + interval '1 month')`,
+        [session.accountId, `${summaryMonth}-01`]
       );
 
       const categoryTotals = await client.query<{
@@ -114,11 +117,11 @@ export const GET = withAuth(async (request, session) => {
         `SELECT category, SUM(amount_cents) AS total_cents
          FROM expenses
          WHERE account_id = $1
-           AND expense_date >= date_trunc('month', CURRENT_DATE)::date
-           AND expense_date < (date_trunc('month', CURRENT_DATE) + interval '1 month')::date
+           AND expense_date >= $2::date
+           AND expense_date < ($2::date + interval '1 month')
          GROUP BY category
          ORDER BY total_cents DESC`,
-        [session.accountId]
+        [session.accountId, `${summaryMonth}-01`]
       );
 
       return {

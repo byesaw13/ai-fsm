@@ -8,6 +8,7 @@ import {
   currentMonthKey,
   formatExpenseDate,
   formatMonthLabel,
+  isValidMonthKey,
   recentMonthOptions,
 } from "@/lib/expenses/ui";
 import type { ExpenseCategory } from "@ai-fsm/domain";
@@ -36,7 +37,7 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
   if (!session) redirect("/login");
 
   const canManage = canManageExpenses(session.role);
-  const activeMonth = monthParam ?? currentMonthKey();
+  const activeMonth = monthParam && isValidMonthKey(monthParam) ? monthParam : currentMonthKey();
 
   // Validate category filter
   const categoryFilter =

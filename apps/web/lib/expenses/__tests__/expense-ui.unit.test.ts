@@ -4,6 +4,7 @@ import {
   formatMonthLabel,
   currentMonthKey,
   categoryLabel,
+  isValidMonthKey,
   recentMonthOptions,
 } from "../ui";
 
@@ -28,6 +29,20 @@ describe("formatMonthLabel", () => {
     expect(formatMonthLabel("2026-03")).toBe("March 2026");
     expect(formatMonthLabel("2026-01")).toBe("January 2026");
     expect(formatMonthLabel("2025-12")).toBe("December 2025");
+  });
+});
+
+describe("isValidMonthKey", () => {
+  it("accepts valid calendar month keys", () => {
+    expect(isValidMonthKey("2026-03")).toBe(true);
+    expect(isValidMonthKey("2026-12")).toBe(true);
+  });
+
+  it("rejects malformed or impossible month keys", () => {
+    expect(isValidMonthKey("2026-3")).toBe(false);
+    expect(isValidMonthKey("2026-00")).toBe(false);
+    expect(isValidMonthKey("2026-13")).toBe(false);
+    expect(isValidMonthKey("not-a-month")).toBe(false);
   });
 });
 

@@ -1,6 +1,15 @@
 import type { ExpenseCategory } from "@ai-fsm/domain";
 import { EXPENSE_CATEGORY_LABELS } from "@ai-fsm/domain";
 
+export function isValidMonthKey(monthKey: string): boolean {
+  if (!/^\d{4}-\d{2}$/.test(monthKey)) {
+    return false;
+  }
+
+  const [year, month] = monthKey.split("-").map(Number);
+  return Number.isInteger(year) && month >= 1 && month <= 12;
+}
+
 /**
  * Format a YYYY-MM-DD expense date to a short readable label.
  * e.g. "2026-03-15" → "Mar 15, 2026"
