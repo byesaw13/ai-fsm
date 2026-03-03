@@ -343,3 +343,32 @@ epics:
           - docs/TEST_MATRIX.md updated with P7 coverage and skip conditions
           - docs/PHASED_BACKLOG.yaml, docs/WORK_ASSIGNMENT.md, and docs/CHANGELOG_AI.md reconciled to merged P7 state
           - pnpm gate passes on final P7 integration branch
+
+  - id: E8
+    name: Expense Ledger
+    phase: 8
+    tasks:
+      - id: P8-T1
+        title: Expense ledger domain bootstrap
+        status: completed
+        completed_by: product-engineer
+        acceptance:
+          - ExpenseCategory type and EXPENSE_CATEGORIES constant in domain package
+          - canCreateExpense and canViewExpenses permission guards (owner/admin only)
+          - Expenses nav item visible to owner/admin
+          - parseDollarsToCents and formatCentsToDollars helpers with unit tests
+          - db/migrations/007_expenses.sql with expenses table, CHECK constraint, and RLS policies
+          - pnpm gate passes
+      - id: P8-T2
+        title: Expense ledger UI and API
+        status: completed
+        completed_by: product-engineer
+        acceptance:
+          - /app/expenses list page with P7 design system (owner/admin only)
+          - /app/expenses/[id] detail page with inline edit form for owner/admin
+          - /app/expenses/new create form with category selector and amount input
+          - /api/v1/expenses GET (list with summary totals) and POST (create) routes with RBAC
+          - /api/v1/expenses/[id] GET (detail) and PATCH (update) routes with RBAC
+          - Client-side validation with inline errors using P7 primitives
+          - 10 unit tests for UI helpers (formatExpenseDate, currentMonthKey, etc.)
+          - pnpm gate passes (348 pass / 55 skip)

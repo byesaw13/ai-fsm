@@ -48,6 +48,39 @@ export const automationTypeSchema = z.enum([
   "visit_reminder",
   "invoice_followup",
 ]);
+
+export const expenseCategorySchema = z.enum([
+  "materials",
+  "tools",
+  "fuel",
+  "vehicle",
+  "subcontractors",
+  "office",
+  "insurance",
+  "utilities",
+  "marketing",
+  "meals",
+  "travel",
+  "other",
+]);
+export type ExpenseCategory = z.infer<typeof expenseCategorySchema>;
+
+export const EXPENSE_CATEGORIES = expenseCategorySchema.options;
+
+export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
+  materials: "Materials",
+  tools: "Tools & Equipment",
+  fuel: "Fuel",
+  vehicle: "Vehicle",
+  subcontractors: "Subcontractors",
+  office: "Office & Admin",
+  insurance: "Insurance",
+  utilities: "Utilities",
+  marketing: "Marketing",
+  meals: "Meals & Entertainment",
+  travel: "Travel",
+  other: "Other",
+};
 export type AutomationType = z.infer<typeof automationTypeSchema>;
 
 export const auditActionSchema = z.enum(["insert", "update", "delete"]);

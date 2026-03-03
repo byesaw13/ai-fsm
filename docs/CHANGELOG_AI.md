@@ -36,6 +36,32 @@ Each AI run must append one record. Keep entries factual and short.
 - Risks or follow-ups:
   - Loading skeletons use inline style for the grid gap; a follow-on can extract to a p7-detail-skeleton CSS class
 
+- Timestamp (UTC): 2026-03-02T22:00:00Z
+- Agent: product-engineer
+- Branch: product-engineer/P8-T2-expense-ledger-ui-api
+- Task ID: P8-T2
+- Summary: Expense ledger UI + API completion. Adds all four API routes (GET/POST /api/v1/expenses, GET/PATCH /api/v1/expenses/[id]) with RBAC, Zod validation, RLS context, and audit logging. Adds three UI pages (/app/expenses list with month filter + category grouping + MetricGrid summary, /app/expenses/new create form, /app/expenses/[id] detail with inline edit for owner/admin). Adds expense-ui helpers (formatExpenseDate, formatMonthLabel, currentMonthKey, categoryLabel, recentMonthOptions) with 10 unit tests. Includes loading.tsx skeletons for both list and detail routes. Gate: lint ✅ typecheck ✅ build ✅ test 348/55. This branch cherry-picks P8-T1 (943fbe9) so it is self-contained. P8-T1 and P8-T2 can be merged in order.
+- Files changed:
+  - apps/web/app/api/v1/expenses/route.ts (new — GET list with summary totals, POST create)
+  - apps/web/app/api/v1/expenses/[id]/route.ts (new — GET detail, PATCH update)
+  - apps/web/app/app/expenses/page.tsx (new — list page: month+category filter, MetricGrid, category sections)
+  - apps/web/app/app/expenses/loading.tsx (new — list skeleton)
+  - apps/web/app/app/expenses/new/page.tsx (new — create page, owner/admin only)
+  - apps/web/app/app/expenses/new/ExpenseForm.tsx (new — client create form)
+  - apps/web/app/app/expenses/[id]/page.tsx (new — detail hub: detail list + edit form in sidebar)
+  - apps/web/app/app/expenses/[id]/ExpenseEditForm.tsx (new — client edit form)
+  - apps/web/app/app/expenses/[id]/loading.tsx (new — detail skeleton)
+  - apps/web/lib/expenses/ui.ts (new — pure UI helpers)
+  - apps/web/lib/expenses/__tests__/expense-ui.unit.test.ts (new — 10 unit tests)
+  - [cherry-picked] packages/domain/src/index.ts, apps/web/lib/auth/permissions.ts, apps/web/components/AppShell.tsx, apps/web/lib/expenses/math.ts, apps/web/lib/expenses/db.ts, apps/web/lib/expenses/__tests__/expenses.unit.test.ts, db/migrations/007_expenses.sql, apps/web/components/ui/__tests__/design-system.unit.test.ts (from P8-T1 commit 943fbe9)
+- Commands run: pnpm gate
+- Gate results: lint ✅ typecheck ✅ build ✅ (41 routes) test ✅ 348 pass / 55 skip
+- Risks or follow-ups:
+  - Migration 007_expenses.sql must be run before deploying (additive, safe)
+  - No E2E tests for expense flow — covered by P7-T5 scope
+  - Tech role has read-only access to /app/expenses (nav hidden, but URL accessible)
+  - No bulk-delete or export — intentionally deferred
+
 ---
 
 - Timestamp (UTC): 2026-02-23T16:06:03Z
