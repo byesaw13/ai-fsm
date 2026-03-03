@@ -32,6 +32,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { href: "/app/invoices" as const,    label: "Invoices",    icon: "💰", adminOnly: true },
   { href: "/app/estimates" as const,   label: "Estimates",   icon: "📄", adminOnly: true },
   { href: "/app/properties" as const,  label: "Properties",  icon: "🏠", adminOnly: true },
+  { href: "/app/expenses" as const,    label: "Expenses",    icon: "🧾", adminOnly: true },
   { href: "/app/automations" as const, label: "Automations", icon: "⚙", adminOnly: true },
 ];
 

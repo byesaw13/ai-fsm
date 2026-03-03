@@ -167,3 +167,17 @@ export function canViewAllJobs(role: Role): boolean {
 export function canViewAllVisits(role: Role): boolean {
   return hasRole(role, ["owner", "admin"]);
 }
+
+/**
+ * Can view expenses — all roles can read expense records
+ */
+export function canViewExpenses(role: Role): boolean {
+  return hasRole(role, ["owner", "admin", "tech"]);
+}
+
+/**
+ * Can create/update expenses (owner, admin)
+ */
+export function canManageExpenses(role: Role): boolean {
+  return hasRole(role, ["owner", "admin"]);
+}
