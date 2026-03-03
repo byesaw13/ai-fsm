@@ -15,6 +15,38 @@ Each AI run must append one record. Keep entries factual and short.
 
 ---
 
+- Timestamp (UTC): 2026-03-02T21:20:00Z
+- Agent: product-engineer
+- Branch: product-engineer/P8-T1-expense-ledger-clean
+- Task ID: P8-T1
+- Summary: Expense ledger domain bootstrap. Adds the locked category enum, typed domain exports, RBAC guards, Expenses nav item (admin-only), domain-layer math and DB helpers, and the DB migration with RLS. No UI (list page, detail, form, API routes) in this PR — those are P8-T2. This PR is intentionally limited to the domain/infrastructure layer so the expense feature can be unblocked for UI work on a subsequent branch. See PHASED_BACKLOG.yaml: P8-T1 status=started.
+- Files changed:
+  - packages/domain/src/index.ts (ExpenseCategory type, EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS)
+  - apps/web/lib/auth/permissions.ts (canCreateExpense, canViewExpenses)
+  - apps/web/components/AppShell.tsx (Expenses nav item, adminOnly)
+  - apps/web/lib/expenses/math.ts (new — parseDollarsToCents, formatCentsToDollars, isValidCategory)
+  - apps/web/lib/expenses/db.ts (new — typed getExpenses, getExpense query helpers)
+  - apps/web/lib/expenses/__tests__/expenses.unit.test.ts (new — 15 unit tests for math helpers)
+  - db/migrations/007_expenses.sql (new — expenses table + CHECK category + RLS policies)
+  - apps/web/components/ui/__tests__/design-system.unit.test.ts (update nav count 8→9, add /app/expenses assertion; fix IEEE-754 rounding expectation)
+  - docs/CHANGELOG_AI.md (this entry)
+- Commands run:
+  - pnpm --filter @ai-fsm/web typecheck
+  - pnpm --filter @ai-fsm/web lint
+  - pnpm --filter @ai-fsm/web build
+  - pnpm test
+- Gate results:
+  - lint: ✅
+  - typecheck: ✅
+  - build: ✅ (38 routes — no expense UI routes yet)
+  - test: ✅ 338 pass / 55 skip
+- Risks or follow-ups:
+  - Expenses table FK to job_id/client_id/property_id uses ON DELETE SET NULL — cascade deletes will null-out references
+  - P8-T2 (expense list, detail, form, API routes) must be implemented before feature is user-visible
+  - Migration 007 must be run on all environments before deploying any P8-T2 UI
+
+---
+
 - Timestamp (UTC): 2026-02-23T16:06:03Z
 - Agent: agent-orchestrator
 - Branch: agent-orchestrator/P7-T2-jobs-visits-rewrite
