@@ -15,6 +15,27 @@ Each AI run must append one record. Keep entries factual and short.
 
 ---
 
+- Timestamp (UTC): 2026-03-02T21:15:00Z
+- Agent: agent-orchestrator
+- Branch: agent-orchestrator/P7-T2-detail-skeletons
+- Task ID: P7-T2 (completion — detail-route loading skeletons)
+- Summary: Completes P7-T2 Pattern 7 requirement for detail routes. Adds hub-layout loading.tsx skeletons for /app/jobs/[id] and /app/visits/[id] (both use the p7-detail-layout two-column structure with SkeletonCard placeholders). Fixes React.ReactNode TypeScript import error in visits/page.tsx (was using React.ReactNode without importing React; corrected to named ReactNode import).
+- Files changed:
+  - apps/web/app/app/jobs/[id]/loading.tsx (new — detail hub skeleton)
+  - apps/web/app/app/visits/[id]/loading.tsx (new — detail hub skeleton)
+  - apps/web/app/app/visits/page.tsx (fix ReactNode import: React.ReactNode → ReactNode)
+  - docs/CHANGELOG_AI.md (this entry)
+- Commands run:
+  - pnpm --filter @ai-fsm/web typecheck
+  - pnpm --filter @ai-fsm/web build
+  - pnpm test
+- Gate results:
+  - typecheck: ✅
+  - build: ✅ (38 routes)
+  - test: ✅ 338 pass / 55 skip
+- Risks or follow-ups:
+  - Loading skeletons use inline style for the grid gap; a follow-on can extract to a p7-detail-skeleton CSS class
+
 - Timestamp (UTC): 2026-03-02T21:20:00Z
 - Agent: product-engineer
 - Branch: product-engineer/P8-T1-expense-ledger-clean
