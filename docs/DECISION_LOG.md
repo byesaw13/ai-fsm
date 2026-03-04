@@ -199,3 +199,35 @@ Append-only log of technical decisions made by AI agents.
 - Decision: Invoice revenue for each job is aggregated across all time (no month filter on invoices join). Mileage is filtered to the selected month.
 - Rationale: Jobs often span multiple months. An invoice created in month N reflects work from a job started in month N-1. Restricting invoices to the month would show $0 revenue for jobs billed in a different month, making the table misleading.
 - Tradeoffs: Asymmetry between revenue (all-time) and mileage (month-scoped) is documented in the UI with a footnote.
+
+### ADR-016: period_month stored as TEXT CHECK (YYYY-MM), not DATE
+
+- Date: 2026-03-04
+- Context: period_closes table (P8-T6) needed a column type for the calendar month being closed.
+- Decision: Use TEXT with a CHECK constraint (`period_month ~ '^\d{4}-(0[1-9]|1[0-2])$'`), not a DATE column.
+- Rationale: A month is not a point-in-time; using DATE (e.g. 2026-03-01) requires choosing a day and handling timezone offsets. TEXT 'YYYY-MM' is self-documenting, matches URL params directly, and avoids ambiguity. CHECK constraint enforces format at the DB level.
+- Tradeoffs: Slightly less flexible for date arithmetic, but month-boundary queries are always done as `$month-01::date` in SQL, which is explicit and unambiguous.
+
+### ADR-017: CSV export streams directly from API response — no server-side file storage
+
+- Date: 2026-03-04
+- Context: P8-T6 needed to deliver CSV exports to the operator browser.
+- Decision: The `/api/v1/reports/month-end-export` route queries the DB, formats the CSV in memory, and returns it as a streaming response with `Content-Disposition: attachment`.
+- Rationale: Self-hosted deployment (Raspberry Pi / garonhome) has no object storage. In-memory export is simple, stateless, and sufficient for the data volumes expected (hundreds of rows per month). No temp files to clean up.
+- Tradeoffs: Large exports (thousands of rows) would hold the connection open. Acceptable for current scale; can switch to streaming row-by-row if needed.
+
+### ADR-018: Closed-month flag is advisory — server does not block mutations on closed months
+
+- Date: 2026-03-04
+- Context: P8-T6 needed to decide whether closing a period should prevent further data changes.
+- Decision: The period_closes record is a flag only. The API, DB triggers, and RLS policies do NOT block inserts/updates/deletes on expenses, invoices, or payments for a closed month.
+- Rationale: Operator-responsibility model — the close record signals "reviewed and exported" without adding enforcement complexity. Blocking mutations would require cross-table trigger logic, complicating migrations and future feature work.
+- Tradeoffs: An operator could inadvertently modify closed-period data. The UI shows a "closed" banner as a warning. Can be hardened with DB-level blocks in a future sprint if needed.
+
+### ADR-019: Reopen is owner-only; close is admin+
+
+- Date: 2026-03-04
+- Context: P8-T6 needed role gates for period close and reopen actions.
+- Decision: Closing a period requires admin or owner role. Reopening requires owner role only.
+- Rationale: Closing is a routine bookkeeping step (any admin can do it). Reopening is a higher-risk reversal — it implies overriding a completed review — and should require the account owner's explicit action.
+- Tradeoffs: A multi-admin shop where the owner is unavailable would need to request the owner reopen. Acceptable given the advisory nature of the close record.

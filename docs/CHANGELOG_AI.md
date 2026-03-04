@@ -960,3 +960,31 @@ Each AI run must append one record. Keep entries factual and short.
 - Risks or follow-ups:
   - Operator must run deploy-garonhome.sh on garonhome.local to apply PR #79 migration tracking changes if not already done.
   - Pi is still running and functional; no action required to demote it operationally — it just shifts to secondary status in docs and agent instructions.
+
+---
+
+## P8-T6: Month-End Close and Export
+
+- Branch: agent-orchestrator/P8-T6-month-end-close
+- Task ID: P8-T6
+- Summary: Added a month-end close workflow and CSV export surface for bookkeeping/accountant handoff. Operators can review a data-driven checklist for any month, download CSV exports of invoices, payments, expenses, and mileage, then mark the period as closed. Only owners can reopen a closed period.
+- Files changed:
+  - db/migrations/009_period_closes.sql (new — period_closes table with UNIQUE(account_id, period_month), TEXT CHECK format, RLS)
+  - packages/domain/src/index.ts (additive — periodCloseSchema, PeriodClose type)
+  - apps/web/lib/auth/permissions.ts (additive — canCloseMonth, canReopenMonth)
+  - apps/web/lib/reports/db.ts (new — withReportContext DB helper)
+  - apps/web/lib/reports/export.ts (new — objectsToCsv, formatExpensesCsv, formatInvoicesCsv, formatPaymentsCsv, formatMileageCsv)
+  - apps/web/lib/reports/__tests__/export.unit.test.ts (new — 35 Tier 1/2 unit tests)
+  - apps/web/lib/reports/__tests__/period-closes.integration.test.ts (new — 16 Tier 3 integration tests, skip pattern)
+  - apps/web/app/api/v1/reports/period-closes/route.ts (new — GET/POST/DELETE with RBAC)
+  - apps/web/app/api/v1/reports/month-end-export/route.ts (new — GET CSV streaming, mileage graceful fallback)
+  - apps/web/app/app/reports/close/page.tsx (new — month-end close server component)
+  - apps/web/app/app/reports/close/CloseActions.tsx (new — client component with ConfirmDialog)
+  - apps/web/app/app/reports/close/loading.tsx (new)
+  - apps/web/app/app/reports/page.tsx (additive — "Month-End Close →" link in page header)
+  - docs/PHASED_BACKLOG.yaml (P8-T6 entry)
+  - docs/WORK_ASSIGNMENT.md (P8-T6 claim)
+  - docs/DECISION_LOG.md (ADR-016 through ADR-019)
+  - docs/CHANGELOG_AI.md (this entry)
+- Gate results: pending (run pnpm gate after writing)
+- ADRs: ADR-016 (period_month as TEXT CHECK), ADR-017 (CSV streaming, no file storage), ADR-018 (close is advisory), ADR-019 (reopen is owner-only)
