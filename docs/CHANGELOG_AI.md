@@ -15,6 +15,38 @@ Each AI run must append one record. Keep entries factual and short.
 
 ---
 
+- Timestamp (UTC): 2026-03-03T04:00:00Z
+- Agent: agent-orchestrator
+- Branch: agent-orchestrator/P8-T5-profitability-dashboard
+- Task ID: P8-T5
+- Summary: Profitability Dashboard — adds /api/v1/reports/profitability (revenue by status, mileage, job-level table with partial-data flag) and /app/reports dashboard (month filter, KPI cards, revenue/mileage/job-profitability sections). Builds on existing P8-T1/T2 expense data. Reports nav item added (adminOnly). canViewReports permission added (owner/admin). Pure helper module lib/reports/profitability.ts. Unit and integration test suites. Design-system nav count 9→10 for admin/owner.
+- Source evidence:
+  - ai-fsm: apps/web/app/api/v1/expenses/route.ts — withRole pattern, query helper, monthly aggregation
+  - ai-fsm: apps/web/app/app/expenses/page.tsx — FilterBar, MetricGrid, DataTable page pattern
+  - ai-fsm: apps/web/lib/expenses/math.ts — pure helper module pattern
+- Files changed:
+  - apps/web/app/api/v1/reports/profitability/route.ts (new)
+  - apps/web/app/app/reports/page.tsx (new)
+  - apps/web/app/app/reports/loading.tsx (new)
+  - apps/web/lib/reports/profitability.ts (new)
+  - apps/web/lib/reports/__tests__/profitability.unit.test.ts (new)
+  - apps/web/lib/reports/__tests__/profitability.integration.test.ts (new)
+  - apps/web/lib/auth/permissions.ts (added canViewReports)
+  - apps/web/components/AppShell.tsx (added Reports nav item)
+  - apps/web/components/ui/__tests__/design-system.unit.test.ts (nav count 9→10)
+  - docs/PHASED_BACKLOG.yaml (added P8-T5 entry)
+  - docs/WORK_ASSIGNMENT.md (claimed P8-T5)
+  - docs/CHANGELOG_AI.md (this entry)
+  - docs/DECISION_LOG.md (added ADR-014, ADR-015)
+- Commands run: pnpm gate
+- Gate results: pending (see gate run below)
+- Risks or follow-ups:
+  - Revenue bucketed by invoice created_at month (ADR-014). Job revenue uses all-time invoices (ADR-015).
+  - Expense cost data appears in job profitability table when expenses exist with matching job_id (leverages P8-T1/T2 data).
+  - Tech role cannot view reports (financial data, owner/admin only).
+
+---
+
 - Timestamp (UTC): 2026-03-02T21:15:00Z
 - Agent: agent-orchestrator
 - Branch: agent-orchestrator/P7-T2-detail-skeletons

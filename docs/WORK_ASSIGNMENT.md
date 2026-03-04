@@ -93,3 +93,4 @@ These files require explicit lock entry in `Active Claims` before edits:
 3. Estimates/invoices
 4. Automations/worker
 5. Shared-file reconciliation PR
+| `agent-orchestrator` | `P8-T5` | `agent-orchestrator/P8-T5-profitability-dashboard` | `apps/web/app/api/v1/reports/profitability/route.ts`, `apps/web/app/app/reports/page.tsx`, `apps/web/app/app/reports/loading.tsx`, `apps/web/lib/reports/profitability.ts`, `apps/web/lib/reports/__tests__/profitability.unit.test.ts`, `apps/web/lib/reports/__tests__/profitability.integration.test.ts`, `apps/web/lib/auth/permissions.ts`, `apps/web/components/AppShell.tsx`, `apps/web/components/ui/__tests__/design-system.unit.test.ts`, `docs/PHASED_BACKLOG.yaml`, `docs/WORK_ASSIGNMENT.md`, `docs/CHANGELOG_AI.md`, `docs/DECISION_LOG.md` | `2026-03-03T04:00:00Z` | `completed` |

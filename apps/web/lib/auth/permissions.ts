@@ -181,3 +181,10 @@ export function canViewExpenses(role: Role): boolean {
 export function canManageExpenses(role: Role): boolean {
   return hasRole(role, ["owner", "admin"]);
 }
+
+/**
+ * Can view profitability reports — owner and admin only
+ */
+export function canViewReports(role: Role): boolean {
+  return hasRole(role, ["owner", "admin"]);
+}
