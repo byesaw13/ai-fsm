@@ -183,3 +183,19 @@ Append-only log of technical decisions made by AI agents.
   - Initial attempt failed with `DROP DATABASE cannot run inside a transaction block`; corrected by issuing terminate/drop/create as separate `psql -c` commands.
 
 
+
+### ADR-014: Revenue bucketed by invoice created_at month
+
+- Date: 2026-03-03
+- Context: Profitability dashboard (P8-T5) needed a canonical bucketing field for monthly revenue.
+- Decision: Use `to_char(created_at, 'YYYY-MM')` as the bucketing field for invoices in the profitability report (not paid_at or due_date).
+- Rationale: created_at is always set, never null. paid_at is null for unpaid invoices; due_date is set by users and unreliable for aggregation. created_at gives a stable, deterministic monthly view.
+- Tradeoffs: Paid-at bucketing is sometimes preferred for cash-basis accounting. Can be added as a filter option in a follow-up.
+
+### ADR-015: Job profitability revenue uses all-time invoices, not month-scoped
+
+- Date: 2026-03-03
+- Context: Profitability dashboard job-level table joins jobs with invoices and mileage.
+- Decision: Invoice revenue for each job is aggregated across all time (no month filter on invoices join). Mileage is filtered to the selected month.
+- Rationale: Jobs often span multiple months. An invoice created in month N reflects work from a job started in month N-1. Restricting invoices to the month would show $0 revenue for jobs billed in a different month, making the table misleading.
+- Tradeoffs: Asymmetry between revenue (all-time) and mileage (month-scoped) is documented in the UI with a footnote.

@@ -34,6 +34,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { href: "/app/properties" as const,  label: "Properties",  icon: "🏠", adminOnly: true },
   { href: "/app/expenses" as const,    label: "Expenses",    icon: "🧾", adminOnly: true },
   { href: "/app/automations" as const, label: "Automations", icon: "⚙", adminOnly: true },
+  { href: "/app/reports" as const,     label: "Reports",     icon: "📊", adminOnly: true },
 ];
 
 /** Pure function — returns filtered nav items for a given role */

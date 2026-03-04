@@ -372,3 +372,20 @@ epics:
           - Client-side validation with inline errors using P7 primitives
           - 10 unit tests for UI helpers (formatExpenseDate, currentMonthKey, etc.)
           - pnpm gate passes (348 pass / 55 skip)
+
+      - id: P8-T5
+        title: Profitability Dashboard
+        status: completed
+        completed_by: agent-orchestrator
+        acceptance:
+          - canViewReports (owner/admin) added to permissions.ts
+          - GET /api/v1/reports/profitability?month=YYYY-MM (owner/admin only) — revenue by status, mileage summary, job profitability (invoices + mileage)
+          - /app/reports profitability dashboard with month filter, KPI MetricGrid (revenue paid, total invoiced, outstanding AR, trip count), revenue by status table, mileage summary, job profitability table
+          - Job profitability table shows partial/incomplete flag (*) when no invoice linked
+          - Reports nav item added to AppShell (adminOnly — visible to owner/admin only)
+          - lib/reports/profitability.ts pure helper module (formatCents, netRevenueCents, jobNetCents, jobProfitabilityStatus, isValidMonth, resolveMonth, sumCents, outstandingCents)
+          - Unit tests for reporting math helpers and canViewReports permission (Tier 1)
+          - Integration tests for profitability report endpoint RBAC and month filtering (Tier 3)
+          - design-system nav count tests updated (9+1=10 for admin/owner, 3 for tech)
+          - pnpm gate passes
+          - NOTE: builds on existing P8-T1/T2 expense data; expense cost data available in job profitability when expense_date falls within selected month
