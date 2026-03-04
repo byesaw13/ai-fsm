@@ -202,3 +202,11 @@ export function canCloseMonth(role: Role): boolean {
 export function canReopenMonth(role: Role): boolean {
   return role === "owner";
 }
+
+/**
+ * Can link/unlink Paperless documents to ai-fsm records (owner, admin).
+ * Techs can view linked documents but cannot add or remove links.
+ */
+export function canLinkDocuments(role: Role): boolean {
+  return hasRole(role, ["owner", "admin"]);
+}

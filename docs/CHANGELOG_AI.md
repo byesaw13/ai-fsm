@@ -988,3 +988,48 @@ Each AI run must append one record. Keep entries factual and short.
   - docs/CHANGELOG_AI.md (this entry)
 - Gate results: pending (run pnpm gate after writing)
 - ADRs: ADR-016 (period_month as TEXT CHECK), ADR-017 (CSV streaming, no file storage), ADR-018 (close is advisory), ADR-019 (reopen is owner-only)
+
+---
+
+## P9-T1: Paperless-ngx Integration Foundation
+
+- Date: 2026-03-04
+- Agent: product-engineer
+- Branch: product-engineer/P9-T1-paperless-integration
+- Source evidence: No dovelite/myprogram paths adopted — integration design is original to ai-fsm.
+
+### What changed
+
+Integration of Paperless-ngx as a supporting document/receipt store, with ai-fsm as the source of truth.
+
+#### New files
+- `db/migrations/010_document_links.sql` — `document_links` table: stores links from any ai-fsm entity (expense/job/client/property/invoice/estimate) to a Paperless document ID; UNIQUE(account_id, entity_type, entity_id, paperless_doc_id), RLS isolation, cached title/filename for offline display
+- `apps/web/lib/paperless/client.ts` — Paperless API client: getPaperlessConfig (returns null if not configured), isPaperlessEnabled, fetchPaperlessDocument (single doc), searchPaperlessDocuments (search with 5s timeout); all methods degrade gracefully to null/empty if Paperless unavailable
+- `apps/web/lib/paperless/db.ts` — DB helpers: withDocumentContext (RLS transaction context), listDocumentLinks, getDocumentLink, createDocumentLink (throws 23505 on duplicate), deleteDocumentLink
+- `apps/web/app/api/v1/documents/route.ts` — GET (list links, any auth role) + POST (create link with audit, owner/admin)
+- `apps/web/app/api/v1/documents/[id]/route.ts` — DELETE (unlink with audit, owner/admin, 404 if not found)
+- `apps/web/app/api/v1/documents/paperless/route.ts` — proxy GET: ?q= search or ?id= fetch; returns {enabled:false} if not configured
+- `apps/web/app/app/expenses/[id]/DocumentPanel.tsx` — client component: shows linked docs, search-and-link flow, unlink, graceful "not configured" notice
+- `apps/web/lib/paperless/__tests__/paperless.unit.test.ts` — 40+ unit tests covering getPaperlessConfig, isPaperlessEnabled, fetchPaperlessDocument, searchPaperlessDocuments, documentLinkSchema, createDocumentLinkSchema, canLinkDocuments; all mock fetch, no live Paperless required
+
+#### Modified files
+- `packages/domain/src/index.ts` — added documentLinkEntityTypeSchema, documentLinkSchema, createDocumentLinkSchema, DocumentLink type
+- `apps/web/lib/env.ts` — added optional PAPERLESS_URL and PAPERLESS_API_TOKEN fields
+- `apps/web/lib/auth/permissions.ts` — added canLinkDocuments (owner/admin)
+- `apps/web/app/app/expenses/[id]/page.tsx` — server-fetches initial document links, renders DocumentPanel in sidebar
+
+### Files touched
+16 files, new or modified
+
+### Gate results
+pnpm gate: pending (to be recorded after run)
+
+### ADRs
+- ADR-020: Paperless uses integer IDs → paperless_doc_id stored as INTEGER
+- ADR-021: Paperless is a supporting service; ai-fsm owns the integration data; graceful degradation if unavailable
+
+### Risks / follow-ups
+- P9-T2: Add document panel to job detail page (additional high-value surface)
+- P9-T3: Integration tests for document link API (Tier 3, skip pattern)
+- Document metadata (title, filename) cached at link time; no sync job to refresh if renamed in Paperless
+- Paperless download proxy (passthrough of binary with auth header) not yet implemented — browser cannot directly download because Paperless requires token auth; can add in follow-up

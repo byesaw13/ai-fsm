@@ -411,3 +411,27 @@ epics:
           - Integration tests (Tier 3, skip pattern) for period-closes RBAC and export endpoint
           - ADR-016 through ADR-019 added to DECISION_LOG.md
           - pnpm gate passes
+
+  - id: E9
+    name: Paperless-ngx Integration
+    phase: 9
+    tasks:
+      - id: P9-T1
+        title: Paperless-ngx Integration Foundation
+        status: completed
+        completed_by: product-engineer
+        acceptance:
+          - db/migrations/010_document_links.sql — document_links table (entity_type, entity_id, paperless_doc_id, title, original_filename) with UNIQUE constraint and RLS
+          - documentLinkSchema, documentLinkEntityTypeSchema, createDocumentLinkSchema in packages/domain/src/index.ts
+          - PAPERLESS_URL and PAPERLESS_API_TOKEN added as optional vars in apps/web/lib/env.ts
+          - apps/web/lib/paperless/client.ts — getPaperlessConfig, isPaperlessEnabled, fetchPaperlessDocument, searchPaperlessDocuments (graceful degradation)
+          - apps/web/lib/paperless/db.ts — withDocumentContext, listDocumentLinks, getDocumentLink, createDocumentLink, deleteDocumentLink
+          - canLinkDocuments (owner/admin) added to permissions.ts
+          - GET /api/v1/documents?entity_type=&entity_id= — list links (any auth role)
+          - POST /api/v1/documents — create link with audit log (owner/admin)
+          - DELETE /api/v1/documents/[id] — unlink with audit log (owner/admin)
+          - GET /api/v1/documents/paperless?q= or ?id= — proxy search/fetch (owner/admin)
+          - DocumentPanel client component on expense detail page (server-fetched initial links + CSR link/unlink)
+          - 40+ unit tests in lib/paperless/__tests__/paperless.unit.test.ts (mocked fetch, no live Paperless required)
+          - ADR-020 and ADR-021 added to DECISION_LOG.md
+          - pnpm gate passes
