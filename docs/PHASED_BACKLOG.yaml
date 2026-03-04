@@ -389,3 +389,25 @@ epics:
           - design-system nav count tests updated (9+1=10 for admin/owner, 3 for tech)
           - pnpm gate passes
           - NOTE: builds on existing P8-T1/T2 expense data; expense cost data available in job profitability when expense_date falls within selected month
+
+      - id: P8-T6
+        title: Month-End Close and Export
+        status: completed
+        completed_by: agent-orchestrator
+        acceptance:
+          - db/migrations/009_period_closes.sql — period_closes table with UNIQUE(account_id, period_month), RLS, advisory close record pattern (ADR-018)
+          - periodCloseSchema added to packages/domain/src/index.ts
+          - canCloseMonth (owner/admin) and canReopenMonth (owner only) added to permissions.ts
+          - GET /api/v1/reports/period-closes?month=YYYY-MM — returns closed status
+          - POST /api/v1/reports/period-closes — closes a period (409 if already closed)
+          - DELETE /api/v1/reports/period-closes?month=YYYY-MM — reopens a period (owner only, 404 if not found)
+          - GET /api/v1/reports/month-end-export?month=YYYY-MM&type=expenses|invoices|payments|mileage — streams CSV
+          - /app/reports/close — month-end close page with month selector, data-driven checklist, CSV export links, close status banner, close/reopen actions
+          - CloseActions.tsx client component — close/reopen with ConfirmDialog + toast feedback + router.refresh()
+          - lib/reports/export.ts — pure CSV formatters (objectsToCsv, formatExpensesCsv, formatInvoicesCsv, formatPaymentsCsv, formatMileageCsv)
+          - lib/reports/db.ts — withReportContext helper (transaction + RLS session vars)
+          - "Month-End Close →" link added to /app/reports page header
+          - Export unit tests (Tier 1/2) for all CSV formatters including RFC 4180 escaping
+          - Integration tests (Tier 3, skip pattern) for period-closes RBAC and export endpoint
+          - ADR-016 through ADR-019 added to DECISION_LOG.md
+          - pnpm gate passes

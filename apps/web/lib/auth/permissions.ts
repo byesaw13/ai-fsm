@@ -188,3 +188,17 @@ export function canManageExpenses(role: Role): boolean {
 export function canViewReports(role: Role): boolean {
   return hasRole(role, ["owner", "admin"]);
 }
+
+/**
+ * Can close a period month for bookkeeping handoff (owner, admin)
+ */
+export function canCloseMonth(role: Role): boolean {
+  return hasRole(role, ["owner", "admin"]);
+}
+
+/**
+ * Can reopen a closed period month (owner only — higher-risk reversal)
+ */
+export function canReopenMonth(role: Role): boolean {
+  return role === "owner";
+}

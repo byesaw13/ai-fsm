@@ -234,6 +234,11 @@ export default async function ReportsPage({ searchParams }: PageProps) {
       <PageHeader
         title="Profitability"
         subtitle={monthLabel}
+        actions={
+          <Link href={"/app/reports/close" as Route} style={{ color: "var(--accent)", fontSize: "var(--text-sm)" }}>
+            Month-End Close →
+          </Link>
+        }
       />
 
       {/* Month filter */}

@@ -331,6 +331,16 @@ export const auditLogSchema = z.object({
 });
 export type AuditLog = z.infer<typeof auditLogSchema>;
 
+export const periodCloseSchema = z.object({
+  id: uuidField,
+  account_id: uuidField,
+  period_month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+  closed_by: uuidField,
+  closed_at: timestampField,
+  notes: z.string().nullable().optional(),
+});
+export type PeriodClose = z.infer<typeof periodCloseSchema>;
+
 // === API Error Model ===
 
 export const apiErrorSchema = z.object({
