@@ -61,7 +61,10 @@ begin
       and policyname = 'mileage_logs_insert'
   ) then
     create policy mileage_logs_insert on mileage_logs
-      for insert with check (account_id = app_account_id() and is_account_member());
+      for insert with check (
+        account_id = app_account_id()
+        and app_role() in ('owner', 'admin', 'tech')
+      );
   end if;
 
   if not exists (
@@ -71,7 +74,10 @@ begin
       and policyname = 'mileage_logs_update'
   ) then
     create policy mileage_logs_update on mileage_logs
-      for update using (account_id = app_account_id() and is_account_member());
+      for update using (
+        account_id = app_account_id()
+        and app_role() in ('owner', 'admin', 'tech')
+      );
   end if;
 
   if not exists (
