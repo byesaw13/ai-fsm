@@ -1033,3 +1033,23 @@ pnpm gate: pending (to be recorded after run)
 - P9-T3: Integration tests for document link API (Tier 3, skip pattern)
 - Document metadata (title, filename) cached at link time; no sync job to refresh if renamed in Paperless
 - Paperless download proxy (passthrough of binary with auth header) not yet implemented — browser cannot directly download because Paperless requires token auth; can add in follow-up
+
+---
+
+## Hotfix: Missing Mileage Migration (Reports Crash)
+
+- Date: 2026-03-05
+- Agent: orchestrator
+- Branch: fix/missing-008-mileage
+
+### What changed
+- Added missing migration file `db/migrations/008_mileage_logs.sql`.
+- Migration creates `mileage_logs` with indexes, `updated_at` trigger, and account-scoped RLS policies.
+- Trigger and policy creation use guard checks (`DO $$`) to stay idempotent in partially-applied environments.
+
+### Why
+- `/app/reports` and month-end mileage export query `mileage_logs`.
+- Environments without this table throw `relation "mileage_logs" does not exist`.
+
+### Follow-up
+- Deploy and run `scripts/deploy-garonhome.sh` so migration tracking is consistent across environments.
