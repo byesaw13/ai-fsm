@@ -1,15 +1,64 @@
+# =============================================================================
+# ai-fsm — garonhome.local production stack
+# =============================================================================
+#
+# Host layout:
+#   /opt/business/ai-fsm/
+#     repo/          ← this repository
+#     env/           ← secrets (.env lives here, never in repo)
+#     data/
+#       postgres/    ← postgres data (bind mount)
+#       redis/       ← redis data (bind mount)
+#     backups/       ← pg_dump output
+#
+# Networks:
+#   ${COMPOSE_PROJECT_NAME}-internal  — private bridge (internal: true)
+#                                       web, worker, postgres, redis only
+#   business_proxy                    — external shared with nginx-proxy-manager
+#                                       web joins via ai-fsm-web alias
+#
+# Traffic flow:
+#   Browser → Nginx Proxy Manager → ai-fsm-web:3000 (business_proxy alias)
+#   web     → postgres, redis (internal network only)
+#   worker  → postgres, redis (internal network only)
+#   postgres + redis: no host port binding, internal network only
+#
+# Deploy (single entrypoint):
+#   bash scripts/deploy-garonhome.sh
+#   Handles: git pull → postgres up → migrations → build → up → healthcheck
+#
+# Verify (before first deploy):
+#   docker network inspect business_proxy >/dev/null
+#   docker compose --env-file /opt/business/ai-fsm/env/.env -f infra/compose.garonhome.yml config >/dev/null
+#
+# NPM proxy host settings:
+#   Forward Hostname: ai-fsm-web   (network alias — stable, not container name)
+#   Forward Port:     3000
+#   Websockets:       On
+#   Block Exploits:   On
+#   SSL:              None for .local LAN (enable if real cert later)
+# =============================================================================
+
+name: ai-fsm
+
 services:
+
+  # ---------------------------------------------------------------------------
+  # web — Next.js app (UI + API routes)
+  # Joins business_proxy under alias ai-fsm-web so NPM can route to it.
+  # Health endpoint: GET /api/health → { status: "ok"|"degraded", checks: { db } }
+  # ---------------------------------------------------------------------------
   web:
     build:
       context: ..
       dockerfile: apps/web/Dockerfile
-    image: ai-fsm-web:garonhome
+    image: ai-fsm-web:${APP_TAG:-latest}
     restart: unless-stopped
     env_file:
-      - ${FSM_ENV_FILE:-../.env}
+      - ${FSM_ENV_FILE:-/opt/business/ai-fsm/env/.env}
     environment:
       NODE_ENV: production
-      APP_PORT: 3000
+      APP_PORT: "3000"
       SECURE_COOKIES: "true"
     depends_on:
       postgres:
@@ -18,12 +67,13 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null 2>&1 || exit 1"]
-      interval: 20s
-      timeout: 5s
-      retries: 6
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
     networks:
       internal: {}
-      proxy:
+      business_proxy:
         aliases:
           - ai-fsm-web
     logging:
@@ -32,14 +82,20 @@ services:
         max-size: "50m"
         max-file: "3"
 
+  # ---------------------------------------------------------------------------
+  # worker — background job processor
+  # Runs compiled JS (node services/worker/dist/src/index.js).
+  # Handles: visit reminders, overdue invoice follow-ups.
+  # Internal only — no inbound traffic, not on proxy network.
+  # ---------------------------------------------------------------------------
   worker:
     build:
       context: ..
       dockerfile: services/worker/Dockerfile
-    image: ai-fsm-worker:garonhome
+    image: ai-fsm-worker:${APP_TAG:-latest}
     restart: unless-stopped
     env_file:
-      - ${FSM_ENV_FILE:-../.env}
+      - ${FSM_ENV_FILE:-/opt/business/ai-fsm/env/.env}
     environment:
       NODE_ENV: production
     depends_on:
@@ -55,15 +111,18 @@ services:
         max-size: "50m"
         max-file: "3"
 
+  # ---------------------------------------------------------------------------
+  # postgres — primary database
+  # Source of truth for all app data.
+  # Internal only — no host port binding, not on proxy network.
+  # ---------------------------------------------------------------------------
   postgres:
     image: postgres:16
     restart: unless-stopped
-    env_file:
-      - ${FSM_ENV_FILE:-../.env}
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:?required}
-      POSTGRES_USER: ${POSTGRES_USER:?required}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required in .env}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in .env}
     volumes:
       - ${FSM_DATA_ROOT:-/opt/business/ai-fsm/data}/postgres:/var/lib/postgresql/data
     healthcheck:
@@ -71,6 +130,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 8
+      start_period: 10s
     networks:
       - internal
     logging:
@@ -79,12 +139,25 @@ services:
         max-size: "50m"
         max-file: "3"
 
+  # ---------------------------------------------------------------------------
+  # redis — queue / cache / worker coordination
+  # Internal only — no host port binding, not on proxy network.
+  # ---------------------------------------------------------------------------
   redis:
-    image: redis:7
+    image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    command:
+      - redis-server
+      - --appendonly yes
+      - --maxmemory 256mb
+      - --maxmemory-policy allkeys-lru
     volumes:
       - ${FSM_DATA_ROOT:-/opt/business/ai-fsm/data}/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     networks:
       - internal
     logging:
@@ -93,9 +166,22 @@ services:
         max-size: "20m"
         max-file: "2"
 
+# =============================================================================
+# Networks
+# =============================================================================
 networks:
+
   internal:
-    name: ${COMPOSE_PROJECT_NAME:-ai-fsm}_internal
-  proxy:
+    # Private bridge — scoped to this compose project by name.
+    # internal: true means Docker blocks all external routing on this network.
+    # postgres and redis are invisible outside this network.
+    driver: bridge
+    internal: true
+    name: ${COMPOSE_PROJECT_NAME:-ai-fsm}-internal
+
+  business_proxy:
+    # Shared external network — created once on the host, used by all
+    # compose projects that need nginx-proxy-manager access.
+    # Create with: docker network create business_proxy
     external: true
     name: ${PROXY_NETWORK:-business_proxy}

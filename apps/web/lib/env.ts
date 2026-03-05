@@ -11,6 +11,17 @@ const schema = z.object({
     .string()
     .min(32, "AUTH_SECRET must be at least 32 characters — generate with: openssl rand -hex 32"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  /**
+   * Paperless-ngx integration — optional.
+   * If omitted, the document panel degrades gracefully (shows cached link
+   * metadata only; live Paperless search/fetch is disabled).
+   *
+   * PAPERLESS_URL: base URL of your Paperless-ngx instance
+   *   e.g. http://192.168.1.10:8000
+   * PAPERLESS_API_TOKEN: API token from Paperless Settings → API Authentication
+   */
+  PAPERLESS_URL: z.string().url().optional(),
+  PAPERLESS_API_TOKEN: z.string().optional(),
 });
 
 let cachedEnv: ReturnType<typeof schema.parse> | null = null;

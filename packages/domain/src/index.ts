@@ -341,6 +341,39 @@ export const periodCloseSchema = z.object({
 });
 export type PeriodClose = z.infer<typeof periodCloseSchema>;
 
+// === Paperless-ngx Integration ===
+
+export const documentLinkEntityTypeSchema = z.enum([
+  "expense",
+  "job",
+  "client",
+  "property",
+  "invoice",
+  "estimate",
+]);
+export type DocumentLinkEntityType = z.infer<typeof documentLinkEntityTypeSchema>;
+
+export const documentLinkSchema = z.object({
+  id: uuidField,
+  account_id: uuidField,
+  entity_type: documentLinkEntityTypeSchema,
+  entity_id: uuidField,
+  paperless_doc_id: z.number().int().positive(),
+  title: z.string().nullable().optional(),
+  original_filename: z.string().nullable().optional(),
+  created_by: uuidField,
+  created_at: timestampField,
+});
+export type DocumentLink = z.infer<typeof documentLinkSchema>;
+
+export const createDocumentLinkSchema = z.object({
+  entity_type: documentLinkEntityTypeSchema,
+  entity_id: z.string().uuid(),
+  paperless_doc_id: z.number().int().positive(),
+  title: z.string().max(500).nullable().optional(),
+  original_filename: z.string().max(500).nullable().optional(),
+});
+
 // === API Error Model ===
 
 export const apiErrorSchema = z.object({

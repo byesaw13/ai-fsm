@@ -231,3 +231,19 @@ Append-only log of technical decisions made by AI agents.
 - Decision: Closing a period requires admin or owner role. Reopening requires owner role only.
 - Rationale: Closing is a routine bookkeeping step (any admin can do it). Reopening is a higher-risk reversal — it implies overriding a completed review — and should require the account owner's explicit action.
 - Tradeoffs: A multi-admin shop where the owner is unavailable would need to request the owner reopen. Acceptable given the advisory nature of the close record.
+
+### ADR-020: Paperless-ngx uses integer document IDs; stored as INTEGER in document_links
+
+- Date: 2026-03-04
+- Context: P9-T1 needed to store a reference to a Paperless document. Paperless uses sequential integer primary keys, not UUIDs.
+- Decision: `paperless_doc_id` in `document_links` is an INTEGER column, not UUID.
+- Rationale: Matching Paperless's actual ID type avoids unnecessary casting, simplifies join semantics if needed, and makes it immediately clear to developers that this is a Paperless-native ID.
+- Tradeoffs: If a future document system uses UUIDs, a schema change would be needed. This is acceptable — the table is specific to the Paperless integration.
+
+### ADR-021: Paperless is a supporting service — ai-fsm is the source of truth
+
+- Date: 2026-03-04
+- Context: P9-T1 integrates Paperless-ngx for document/receipt storage alongside ai-fsm financial records.
+- Decision: ai-fsm owns the `document_links` table. Paperless stores documents only. No business logic, status, or financial data lives in Paperless. If Paperless is unavailable, ai-fsm continues to operate normally; the document panel degrades gracefully (no Paperless search, cached link metadata still shown).
+- Rationale: Self-hosted deployment resilience — Paperless may be on a different host or restart independently. Core FSM workflows (jobs, visits, invoices, expenses) must not depend on Paperless availability.
+- Tradeoffs: Document metadata (title, filename) cached at link-creation time may become stale if the document is renamed in Paperless. Acceptable for the current use case (receipt filing). A future sync job could refresh cached metadata.

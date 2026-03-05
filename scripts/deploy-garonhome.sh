@@ -1,4 +1,49 @@
 #!/usr/bin/env bash
+# =============================================================================
+# deploy-garonhome.sh — single entrypoint for all garonhome.local deployments
+# =============================================================================
+#
+# What this script does (in order):
+#   1. Validate repo and env file exist
+#   2. git pull origin main
+#   3. Start postgres + redis, wait for postgres healthy
+#   4. Run SQL migrations (idempotent, tracked in schema_migrations table)
+#   5. Build and start web + worker
+#   6. Wait for web healthcheck to pass
+#   7. Print service status + health endpoint response
+#
+# Pre-flight checks (run once before first deploy):
+#   docker network inspect business_proxy >/dev/null
+#   docker network inspect ai-fsm-internal >/dev/null || true
+#   docker compose --env-file /opt/business/ai-fsm/env/.env \
+#     -f infra/compose.garonhome.yml config >/dev/null
+#
+# Full deploy:
+#   bash scripts/deploy-garonhome.sh
+#
+# Verify after deploy:
+#   curl -sf http://fsm.garonhome.local/api/health
+#   curl -I  http://fsm.garonhome.local/login
+#   Expected: /api/health → {"status":"ok",...}   /login → HTTP 200
+#
+# Nginx Proxy Manager settings for fsm.garonhome.local:
+#   Forward Hostname:  ai-fsm-web   (network alias on business_proxy — not container name)
+#   Forward Port:      3000
+#   Scheme:            http
+#   Websockets:        On
+#   Block Exploits:    On
+#   Cache Assets:      Off
+#   SSL Certificate:   None (plain HTTP for LAN .local)
+#   Force SSL:         Off
+#   HSTS:              Off
+#   Advanced (optional):
+#     proxy_set_header Host $host;
+#     proxy_set_header X-Forwarded-Proto $scheme;
+#     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#
+# Connect NPM to the proxy network if not already done:
+#   docker network connect business_proxy nginx-proxy-manager
+# =============================================================================
 set -euo pipefail
 
 DEPLOY_ROOT="${FSM_DEPLOY_ROOT:-/opt/business/ai-fsm}"
