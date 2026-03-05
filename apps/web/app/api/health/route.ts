@@ -8,8 +8,8 @@
  *   503 { status: "degraded", checks: { db: "fail" }, ... } — at least one check failed
  *
  * Used by:
- *   - Docker Compose healthcheck (compose.prod.yml, compose.pi.yml)
- *   - Load balancer / reverse proxy liveness probe
+ *   - Docker Compose healthcheck (compose.garonhome.yml, compose.prod.yml)
+ *   - Nginx Proxy Manager liveness probe
  *   - Uptime monitors
  *
  * The DB check runs a lightweight `SELECT 1` on a pooled connection.
