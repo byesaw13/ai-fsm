@@ -247,3 +247,11 @@ Append-only log of technical decisions made by AI agents.
 - Decision: ai-fsm owns the `document_links` table. Paperless stores documents only. No business logic, status, or financial data lives in Paperless. If Paperless is unavailable, ai-fsm continues to operate normally; the document panel degrades gracefully (no Paperless search, cached link metadata still shown).
 - Rationale: Self-hosted deployment resilience — Paperless may be on a different host or restart independently. Core FSM workflows (jobs, visits, invoices, expenses) must not depend on Paperless availability.
 - Tradeoffs: Document metadata (title, filename) cached at link-creation time may become stale if the document is renamed in Paperless. Acceptable for the current use case (receipt filing). A future sync job could refresh cached metadata.
+
+### ADR-022: Checklist items seeded lazily on first GET, not at visit creation
+
+- Date: 2026-03-05
+- Context: P10-T1 adds a 28-item walkthrough checklist to every visit, stored in `visit_checklist_items`. The question is when to create these rows: at visit creation or on first read.
+- Decision: Lazy seeding — the GET `/api/v1/visits/[id]/checklist` route checks COUNT and inserts the full template if 0 rows exist (`ON CONFLICT (visit_id, item_key) DO NOTHING`). Visit creation is unchanged.
+- Rationale: (1) Historical visits (created before migration 011) would have no rows if we only seeded at creation. Lazy seeding handles them transparently. (2) Avoids adding checklist logic to the visit creation path, keeping that mutation simple and reducing cross-concern coupling. (3) ON CONFLICT DO NOTHING makes repeated seeding safe across retries or race conditions.
+- Tradeoffs: The first GET for any visit is slightly slower (COUNT + INSERT). With 28 items in one multi-row INSERT this is one extra round-trip, acceptable at human-interactive latency.

@@ -5,11 +5,13 @@ import {
   canTransitionVisit,
   canAssignVisit,
   canUpdateVisitNotes,
+  canUpdateChecklist,
 } from "@/lib/auth/permissions";
 import type { Visit, VisitStatus } from "@ai-fsm/domain";
 import { VisitAssignForm } from "./VisitAssignForm";
 import { VisitTransitionForm } from "./VisitTransitionForm";
 import { VisitNotesForm } from "./VisitNotesForm";
+import { VisitChecklistForm } from "./VisitChecklistForm";
 import {
   Card,
   EmptyState,
@@ -26,6 +28,7 @@ import {
   formatVisitTime,
   isVisitOverdue,
 } from "@/lib/visits/p7";
+import { withChecklistContext, getOrSeedChecklist } from "@/lib/visits/checklist";
 
 export const dynamic = "force-dynamic";
 
@@ -69,6 +72,7 @@ export default async function VisitDetailPage({
   const canTransition = canTransitionVisit(session.role);
   const canAssign = canAssignVisit(session.role);
   const canNotes = canUpdateVisitNotes(session.role);
+  const canChecklist = canUpdateChecklist(session.role);
 
   const assignableUsers = canAssign
     ? await query<{ id: string; full_name: string; role: string; [key: string]: unknown }>(
@@ -76,6 +80,14 @@ export default async function VisitDetailPage({
         [session.accountId]
       )
     : [];
+
+  // Load checklist (lazy-seeded on first access) unless visit is cancelled
+  const checklistItems =
+    currentStatus !== "cancelled"
+      ? await withChecklistContext(session, (client) =>
+          getOrSeedChecklist(client, session.accountId, id)
+        )
+      : [];
 
   const overdue = isVisitOverdue(visit);
 
@@ -143,6 +155,17 @@ export default async function VisitDetailPage({
             <SectionHeader title="Visit Timeline" />
             <Timeline entries={timelineEntries} />
           </Card>
+
+          {currentStatus !== "cancelled" && checklistItems.length > 0 && (
+            <Card data-testid="visit-checklist-panel">
+              <SectionHeader title="Walkthrough Checklist" />
+              <VisitChecklistForm
+                visitId={visit.id}
+                initialItems={checklistItems}
+                canUpdate={canChecklist}
+              />
+            </Card>
+          )}
 
           {canTransition && currentStatus !== "completed" && currentStatus !== "cancelled" && (
             <Card data-testid="visit-transition-panel">

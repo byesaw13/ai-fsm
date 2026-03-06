@@ -1053,3 +1053,48 @@ pnpm gate: pending (to be recorded after run)
 
 ### Follow-up
 - Deploy and run `scripts/deploy-garonhome.sh` so migration tracking is consistent across environments.
+
+---
+
+## P10-T1: Visit Walkthrough Checklist
+
+- Date: 2026-03-05
+- Agent: product-engineer
+- Branch: product-engineer/P10-T1-visit-checklist
+
+### What changed
+
+**Migration**
+- `db/migrations/011_visit_checklist.sql` — new `visit_checklist_items` table with `UNIQUE (visit_id, item_key)`, `CHECK (disposition IN (...))`, RLS policy, and `updated_at` trigger (reusing existing `update_updated_at_column()` function).
+
+**Domain**
+- `packages/domain/src/index.ts` — added `checklistDispositionSchema` (ok/fix_now/monitor/optional/refer), `CHECKLIST_DISPOSITION_LABELS`, `CHECKLIST_SECTIONS` (6 SOP sections, `as const`), `visitChecklistItemSchema`, `VisitChecklistItem`, `updateChecklistItemSchema` (refine: requires at least one field).
+
+**Permissions**
+- `apps/web/lib/auth/permissions.ts` — added `canUpdateChecklist` (all roles; tech limited to assigned visits server-side).
+
+**Business logic**
+- `apps/web/lib/visits/checklist.ts` — `DEFAULT_CHECKLIST_TEMPLATE` (28 items across 6 sections matching Playbook v1.2 §4.2), `withChecklistContext`, `seedChecklistItems` (idempotent multi-row INSERT ON CONFLICT DO NOTHING), `getOrSeedChecklist` (lazy seed on first access), `updateChecklistItem`.
+
+**API routes**
+- `GET /api/v1/visits/[id]/checklist` — lazy-seeds default template on first access; tech users restricted to assigned visits; returns full item list.
+- `PATCH /api/v1/visits/[id]/checklist/[itemId]` — updates disposition and/or note; validates via `updateChecklistItemSchema`; tech restricted to assigned visits.
+
+**UI**
+- `VisitChecklistForm.tsx` — client component with progress bar (reviewed count), section headers, disposition select (auto-save on change), note textarea (auto-save on blur), color-coded disposition badges.
+- `apps/web/app/app/visits/[id]/page.tsx` — added Walkthrough Checklist card between Timeline and Status Actions, hidden for cancelled visits.
+
+**Tests**
+- `apps/web/lib/visits/__tests__/checklist.unit.test.ts` — 35+ unit tests covering template structure (28 items, 6 sections, unique keys), seeding behavior, update logic, and API route handlers (200/404/403/422 paths).
+- `apps/web/lib/visits/__tests__/checklist.integration.test.ts` — HTTP integration tests (skipIf pattern): seed, idempotency, PATCH update, RBAC, 401 unauthenticated.
+
+### Why
+P10-T1 per Dovetail Home Services Growth & Operations Playbook v1.2 §B.5, B.9, and 4.2 — structured room-by-room walkthrough checklist required for every visit to document property condition and flag items for follow-up.
+
+### ADRs
+- ADR-022: Checklist items seeded lazily on first GET (not at visit creation). Avoids migration complexity for historical visits; ON CONFLICT DO NOTHING keeps seeding idempotent across retries.
+
+### Risks / follow-ups
+- P10-T2: Add checklist to visit list page (inline progress indicator per visit card)
+- P10-T3: Section filtering / "show only items needing action" view
+- Photo attachments per item (Paperless integration follow-up)
