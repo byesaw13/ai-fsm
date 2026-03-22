@@ -210,3 +210,10 @@ export function canReopenMonth(role: Role): boolean {
 export function canLinkDocuments(role: Role): boolean {
   return hasRole(role, ["owner", "admin"]);
 }
+
+/**
+ * Can update visit checklist items — all roles; tech limited to assigned visits server-side.
+ */
+export function canUpdateChecklist(role: Role): boolean {
+  return hasRole(role, ["owner", "admin", "tech"]);
+}

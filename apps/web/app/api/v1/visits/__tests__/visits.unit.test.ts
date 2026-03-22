@@ -31,6 +31,13 @@ vi.mock("../../../../../lib/db", () => ({
   getPool: () => mockPool,
 }));
 
+// Also mock the @/ alias path used by lib/visits/checklist.ts
+vi.mock("@/lib/db", () => ({
+  query: (...args: unknown[]) => mockQuery(...args),
+  queryOne: (...args: unknown[]) => mockQueryOne(...args),
+  getPool: () => mockPool,
+}));
+
 vi.mock("../../../../../lib/db/audit", () => ({
   appendAuditLog: vi.fn(),
 }));
@@ -41,6 +48,8 @@ vi.mock("../../../../../lib/db/audit", () => ({
 import { GET as visitList, POST as visitCreate } from "../../jobs/[id]/visits/route";
 import { GET as visitGet, PATCH as visitPatch } from "../[id]/route";
 import { POST as visitTransition } from "../[id]/transition/route";
+import { GET as checklistGet } from "../[id]/checklist/route";
+import { PATCH as checklistPatch } from "../[id]/checklist/[itemId]/route";
 
 function makeRequest(method: string, url: string, body?: unknown): NextRequest {
   return new NextRequest(url, {
@@ -334,5 +343,184 @@ describe("POST /api/v1/visits/[id]/transition", () => {
     expect(res.status).toBe(404);
     const json = await res.json();
     expect(json.error.code).toBe("NOT_FOUND");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/visits/[id]/checklist
+// ---------------------------------------------------------------------------
+describe("GET /api/v1/visits/[id]/checklist", () => {
+  const CHECKLIST_ITEM = {
+    id: "item-1",
+    item_key: "ext_roof_condition",
+    section: "Exterior",
+    label: "Roof condition (visible)",
+    disposition: null,
+    note: null,
+    sort_order: 0,
+    account_id: mockSession.accountId,
+    visit_id: VISIT_ID,
+    created_at: NOW,
+    updated_at: NOW,
+  };
+
+  function withChecklistContextMocks() {
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // set_config user
+      .mockResolvedValueOnce({ rows: [] }) // set_config account
+      .mockResolvedValueOnce({ rows: [] }); // set_config role
+  }
+
+  it("returns 200 with seeded items on first access", async () => {
+    withChecklistContextMocks();
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [{ id: VISIT_ID, assigned_user_id: null }] }) // visit SELECT
+      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // COUNT
+      .mockResolvedValueOnce({ rows: [] }) // INSERT seed
+      .mockResolvedValueOnce({ rows: [CHECKLIST_ITEM] }) // SELECT items
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await checklistGet(makeRequest("GET", `${VISITS_BASE}/${VISIT_ID}/checklist`));
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(Array.isArray(json.data)).toBe(true);
+  });
+
+  it("returns 200 with existing items when already seeded", async () => {
+    withChecklistContextMocks();
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [{ id: VISIT_ID, assigned_user_id: null }] })
+      .mockResolvedValueOnce({ rows: [{ count: "28" }] }) // COUNT → already seeded
+      .mockResolvedValueOnce({ rows: [CHECKLIST_ITEM] }) // SELECT items
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await checklistGet(makeRequest("GET", `${VISITS_BASE}/${VISIT_ID}/checklist`));
+    expect(res.status).toBe(200);
+  });
+
+  it("returns 404 when visit not found", async () => {
+    withChecklistContextMocks();
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // visit SELECT → not found
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await checklistGet(makeRequest("GET", `${VISITS_BASE}/${VISIT_ID}/checklist`));
+    expect(res.status).toBe(404);
+    const json = await res.json();
+    expect(json.error.code).toBe("NOT_FOUND");
+  });
+
+  it("returns 404 for tech accessing unassigned visit", async () => {
+    Object.assign(mockSession, { role: "tech" });
+    withChecklistContextMocks();
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [{ id: VISIT_ID, assigned_user_id: "other-user" }] })
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await checklistGet(makeRequest("GET", `${VISITS_BASE}/${VISIT_ID}/checklist`));
+    expect(res.status).toBe(404);
+
+    Object.assign(mockSession, { role: "owner" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/v1/visits/[id]/checklist/[itemId]
+// ---------------------------------------------------------------------------
+describe("PATCH /api/v1/visits/[id]/checklist/[itemId]", () => {
+  const ITEM_ID = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+
+  function withChecklistContextMocks() {
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // set_config user
+      .mockResolvedValueOnce({ rows: [] }) // set_config account
+      .mockResolvedValueOnce({ rows: [] }); // set_config role
+  }
+
+  it("returns 200 with updated item on valid body", async () => {
+    withChecklistContextMocks();
+    const updated = { id: ITEM_ID, disposition: "ok", note: null };
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [{ id: VISIT_ID, assigned_user_id: null }] }) // visit SELECT
+      .mockResolvedValueOnce({ rows: [updated] }) // UPDATE
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await checklistPatch(
+      makeRequest("PATCH", `${VISITS_BASE}/${VISIT_ID}/checklist/${ITEM_ID}`, {
+        disposition: "ok",
+      })
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.disposition).toBe("ok");
+  });
+
+  it("returns 422 when body has neither disposition nor note", async () => {
+    const res = await checklistPatch(
+      makeRequest("PATCH", `${VISITS_BASE}/${VISIT_ID}/checklist/${ITEM_ID}`, {})
+    );
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("returns 422 when disposition value is invalid", async () => {
+    const res = await checklistPatch(
+      makeRequest("PATCH", `${VISITS_BASE}/${VISIT_ID}/checklist/${ITEM_ID}`, {
+        disposition: "excellent",
+      })
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("returns 404 when visit not found", async () => {
+    withChecklistContextMocks();
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // visit SELECT → not found
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await checklistPatch(
+      makeRequest("PATCH", `${VISITS_BASE}/${VISIT_ID}/checklist/${ITEM_ID}`, {
+        disposition: "ok",
+      })
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 403 for tech accessing unassigned visit", async () => {
+    Object.assign(mockSession, { role: "tech" });
+    withChecklistContextMocks();
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [{ id: VISIT_ID, assigned_user_id: "different-user" }] })
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await checklistPatch(
+      makeRequest("PATCH", `${VISITS_BASE}/${VISIT_ID}/checklist/${ITEM_ID}`, {
+        disposition: "ok",
+      })
+    );
+    expect(res.status).toBe(403);
+
+    Object.assign(mockSession, { role: "owner" });
+  });
+
+  it("accepts note-only patch", async () => {
+    withChecklistContextMocks();
+    const updated = { id: ITEM_ID, disposition: null, note: "needs attention" };
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [{ id: VISIT_ID, assigned_user_id: null }] })
+      .mockResolvedValueOnce({ rows: [updated] })
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await checklistPatch(
+      makeRequest("PATCH", `${VISITS_BASE}/${VISIT_ID}/checklist/${ITEM_ID}`, {
+        note: "needs attention",
+      })
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.note).toBe("needs attention");
   });
 });

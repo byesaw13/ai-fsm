@@ -435,3 +435,25 @@ epics:
           - 40+ unit tests in lib/paperless/__tests__/paperless.unit.test.ts (mocked fetch, no live Paperless required)
           - ADR-020 and ADR-021 added to DECISION_LOG.md
           - pnpm gate passes
+
+  - id: E10
+    name: Visit Walkthrough Checklist
+    phase: 10
+    tasks:
+      - id: P10-T1
+        title: Walkthrough Checklist System
+        status: completed
+        completed_by: product-engineer
+        acceptance:
+          - db/migrations/011_visit_checklist.sql — visit_checklist_items table with UNIQUE (visit_id, item_key), CHECK on disposition, RLS policy, updated_at trigger
+          - checklistDispositionSchema, CHECKLIST_DISPOSITION_LABELS, CHECKLIST_SECTIONS, visitChecklistItemSchema, updateChecklistItemSchema in packages/domain/src/index.ts
+          - canUpdateChecklist (all roles; tech restricted server-side) in permissions.ts
+          - apps/web/lib/visits/checklist.ts — DEFAULT_CHECKLIST_TEMPLATE (28 items, 6 sections), withChecklistContext, seedChecklistItems, getOrSeedChecklist, updateChecklistItem
+          - GET /api/v1/visits/[id]/checklist — lazy-seeds on first access, returns items; tech restricted to assigned visits
+          - PATCH /api/v1/visits/[id]/checklist/[itemId] — updates disposition and/or note; validates via updateChecklistItemSchema
+          - VisitChecklistForm client component with progress bar, section grouping, disposition select (auto-save), note textarea (auto-save on blur), color-coded badges
+          - Visit detail page (/app/app/visits/[id]/page.tsx) includes Walkthrough Checklist card in primary column (hidden when cancelled)
+          - Unit tests in apps/web/lib/visits/__tests__/checklist.unit.test.ts covering template structure, seeding, update logic, API routes
+          - Integration tests in apps/web/lib/visits/__tests__/checklist.integration.test.ts (skipIf pattern)
+          - ADR-022 added to DECISION_LOG.md
+          - pnpm gate passes
