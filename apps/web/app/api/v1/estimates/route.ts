@@ -7,7 +7,7 @@ import {
   calcTotals,
   lineItemTotal,
 } from "@/lib/estimates/db";
-import { estimateStatusSchema } from "@ai-fsm/domain";
+import { estimateStatusSchema, DEPOSIT_RATE } from "@ai-fsm/domain";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -201,6 +201,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       : calcTotals(line_items).subtotal_cents;
   const tax_cents = Math.round((subtotal_cents * tax_rate) / 100);
   const total_cents = subtotal_cents + tax_cents;
+  const deposit_cents = Math.round(total_cents * DEPOSIT_RATE);
+  const balance_cents = total_cents - deposit_cents;
   // In flat-rate mode, ignore any line_items that were mistakenly sent
   const itemsToInsert = flat_rate_cents !== undefined ? [] : line_items;
 
@@ -218,9 +220,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       const result = await client.query<{ id: string }>(
         `INSERT INTO estimates
            (account_id, client_id, job_id, property_id, status,
-            subtotal_cents, tax_cents, total_cents,
+            subtotal_cents, tax_cents, total_cents, deposit_cents, balance_cents,
             notes, internal_notes, expires_at, created_by)
-         VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, $9, $10, $11)
+         VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, $9, $10, $11, $12, $13)
          RETURNING id`,
         [
           session.accountId,
@@ -230,6 +232,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           subtotal_cents,
           tax_cents,
           total_cents,
+          deposit_cents,
+          balance_cents,
           notes ?? null,
           internal_notes ?? null,
           expires_at ?? null,

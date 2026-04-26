@@ -204,7 +204,7 @@ describe('estimateSchema', () => {
   it('accepts a valid estimate', () => {
     expect(() => estimateSchema.parse({
       id: UUID, account_id: UUID, client_id: UUID, status: 'draft',
-      subtotal_cents: 0, tax_cents: 0, total_cents: 0,
+      subtotal_cents: 0, tax_cents: 0, total_cents: 0, deposit_cents: 0, balance_cents: 0,
       created_by: UUID, created_at: NOW, updated_at: NOW,
     })).not.toThrow()
   })
@@ -222,7 +222,7 @@ describe('invoiceSchema', () => {
     expect(() => invoiceSchema.parse({
       id: UUID, account_id: UUID, client_id: UUID, status: 'draft',
       invoice_number: 'INV-001',
-      subtotal_cents: 0, tax_cents: 0, total_cents: 0, paid_cents: 0,
+      subtotal_cents: 0, tax_cents: 0, total_cents: 0, paid_cents: 0, deposit_cents: 0, balance_cents: 0,
       created_by: UUID, created_at: NOW, updated_at: NOW,
     })).not.toThrow()
   })

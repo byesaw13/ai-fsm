@@ -191,6 +191,9 @@ export const propertySchema = z.object({
 });
 export type Property = z.infer<typeof propertySchema>;
 
+export const jobTypeSchema = z.enum(["painting", "maintenance", "repair", "custom"]);
+export type JobType = z.infer<typeof jobTypeSchema>;
+
 export const jobSchema = z.object({
   id: uuidField,
   account_id: uuidField,
@@ -199,9 +202,12 @@ export const jobSchema = z.object({
   title: z.string().min(1),
   description: z.string().nullable().optional(),
   status: jobStatusSchema,
+  job_type: jobTypeSchema.default("custom"),
   priority: z.number().int().default(0),
   scheduled_start: timestampField.nullable().optional(),
   scheduled_end: timestampField.nullable().optional(),
+  actual_cost_cents: centsField.nullable().optional(),
+  travel_miles: z.number().nonnegative().nullable().optional(),
   created_by: uuidField,
   created_at: timestampField,
   updated_at: timestampField,
@@ -224,6 +230,12 @@ export const visitSchema = z.object({
 });
 export type Visit = z.infer<typeof visitSchema>;
 
+export const lineItemTypeSchema = z.enum(["labor", "materials", "handling_fee", "adjustment"]);
+export type LineItemType = z.infer<typeof lineItemTypeSchema>;
+
+export const pricingModeSchema = z.enum(["flat_rate", "hourly_internal"]);
+export type PricingMode = z.infer<typeof pricingModeSchema>;
+
 export const estimateLineItemSchema = z.object({
   id: uuidField,
   estimate_id: uuidField,
@@ -231,6 +243,8 @@ export const estimateLineItemSchema = z.object({
   quantity: z.number().positive(),
   unit_price_cents: centsField,
   total_cents: centsField,
+  line_item_type: lineItemTypeSchema.default("labor"),
+  visible_to_customer: z.boolean().default(true),
   sort_order: z.number().int().default(0),
   created_at: timestampField,
 });
@@ -243,9 +257,21 @@ export const estimateSchema = z.object({
   job_id: uuidField.nullable().optional(),
   property_id: uuidField.nullable().optional(),
   status: estimateStatusSchema,
+  pricing_mode: pricingModeSchema.default("flat_rate"),
   subtotal_cents: centsField,
   tax_cents: centsField,
   total_cents: centsField,
+  deposit_cents: centsField,
+  balance_cents: centsField,
+  // Painting engine fields
+  sq_ft: z.number().positive().nullable().optional(),
+  prep_level: z.number().int().min(1).max(10).nullable().optional(),
+  includes_trim: z.boolean().default(false),
+  includes_ceiling: z.boolean().default(false),
+  // Internal cost tracking (never shown to customer)
+  internal_labor_cost_cents: centsField.nullable().optional(),
+  internal_material_cost_cents: centsField.nullable().optional(),
+  target_margin_pct: z.number().min(0).max(100).nullable().optional(),
   notes: z.string().nullable().optional(),
   internal_notes: z.string().nullable().optional(),
   sent_at: timestampField.nullable().optional(),
@@ -264,6 +290,8 @@ export const invoiceLineItemSchema = z.object({
   quantity: z.number().positive(),
   unit_price_cents: centsField,
   total_cents: centsField,
+  line_item_type: lineItemTypeSchema.default("labor"),
+  visible_to_customer: z.boolean().default(true),
   sort_order: z.number().int().default(0),
   created_at: timestampField,
 });
@@ -282,6 +310,9 @@ export const invoiceSchema = z.object({
   tax_cents: centsField,
   total_cents: centsField,
   paid_cents: centsField,
+  deposit_cents: centsField,
+  deposit_paid_at: timestampField.nullable().optional(),
+  balance_cents: centsField,
   notes: z.string().nullable().optional(),
   due_date: timestampField.nullable().optional(),
   sent_at: timestampField.nullable().optional(),
@@ -469,3 +500,5 @@ export const updateChecklistItemSchema = z.object({
   (d) => d.disposition !== undefined || d.note !== undefined,
   { message: "At least one of disposition or note is required" }
 );
+
+export * from "./dovetails";
