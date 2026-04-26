@@ -21,3 +21,13 @@ docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T postgres \
   > "${FILE}"
 
 echo "backup written: ${FILE}"
+
+# Offsite copy to Google Drive
+RCLONE_REMOTE="${FSM_RCLONE_REMOTE:-googledrive}"
+RCLONE_DEST="${RCLONE_REMOTE}:ai-fsm-backups"
+rclone copy "${FILE}" "${RCLONE_DEST}/" --log-level INFO
+echo "offsite copy complete: ${RCLONE_DEST}/$(basename "${FILE}")"
+
+# Prune local backups older than 7 days
+find "${BACKUP_DIR}" -name "ai_fsm_*.dump" -mtime +7 -delete
+echo "old local backups pruned"
