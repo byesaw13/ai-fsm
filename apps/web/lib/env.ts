@@ -22,6 +22,18 @@ const schema = z.object({
    */
   PAPERLESS_URL: z.string().url().optional(),
   PAPERLESS_API_TOKEN: z.string().optional(),
+  /**
+   * Homebox integration — optional.
+   * If omitted, the asset panel degrades gracefully (cached data only).
+   *
+   * HOMEBOX_URL: base URL of your Homebox instance
+   *   e.g. http://172.20.0.1:3100
+   * HOMEBOX_USER: Homebox login email
+   * HOMEBOX_PASSWORD: Homebox login password
+   */
+  HOMEBOX_URL: z.string().url().optional(),
+  HOMEBOX_USER: z.string().optional(),
+  HOMEBOX_PASSWORD: z.string().optional(),
 });
 
 let cachedEnv: ReturnType<typeof schema.parse> | null = null;

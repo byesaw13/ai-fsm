@@ -374,6 +374,28 @@ export const createDocumentLinkSchema = z.object({
   original_filename: z.string().max(500).nullable().optional(),
 });
 
+// === Homebox Asset Integration ===
+
+export const assetLinkEntityTypeSchema = z.enum(["job", "visit"]);
+export type AssetLinkEntityType = z.infer<typeof assetLinkEntityTypeSchema>;
+
+export const assetLinkStatusSchema = z.enum(["planned", "on_site", "returned"]);
+export type AssetLinkStatus = z.infer<typeof assetLinkStatusSchema>;
+
+export const assetLinkSchema = z.object({
+  id: uuidField,
+  account_id: uuidField,
+  entity_type: assetLinkEntityTypeSchema,
+  entity_id: uuidField,
+  homebox_item_id: z.string().uuid(),
+  cached_name: z.string().nullable().optional(),
+  cached_location: z.string().nullable().optional(),
+  status: assetLinkStatusSchema,
+  created_by: uuidField,
+  created_at: timestampField,
+});
+export type AssetLink = z.infer<typeof assetLinkSchema>;
+
 // === API Error Model ===
 
 export const apiErrorSchema = z.object({
