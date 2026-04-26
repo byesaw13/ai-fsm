@@ -8,9 +8,22 @@ import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
+const uuidSchema = z.string().uuid();
+
+function extractId(request: NextRequest): string | null {
+  const raw = request.nextUrl.pathname.split("/").at(-1) ?? "";
+  return uuidSchema.safeParse(raw).success ? raw : null;
+}
+
 // DELETE /api/v1/assets/[id]
 export const DELETE = withRole(["owner", "admin"], async (request: NextRequest, session) => {
-  const id = request.nextUrl.pathname.split("/").at(-1)!;
+  const id = extractId(request);
+  if (!id) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: "Invalid asset link ID", traceId: session.traceId } },
+      { status: 400 }
+    );
+  }
 
   try {
     const deleted = await withAssetContext(session, async (client) => {
@@ -51,7 +64,13 @@ export const DELETE = withRole(["owner", "admin"], async (request: NextRequest, 
 const patchBodySchema = z.object({ status: assetLinkStatusSchema });
 
 export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, session) => {
-  const id = request.nextUrl.pathname.split("/").at(-1)!;
+  const id = extractId(request);
+  if (!id) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: "Invalid asset link ID", traceId: session.traceId } },
+      { status: 400 }
+    );
+  }
 
   let body: unknown;
   try {
