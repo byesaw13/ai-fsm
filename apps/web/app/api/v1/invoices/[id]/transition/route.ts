@@ -26,7 +26,7 @@ const transitionSchema = z.object({
  * (trg_payment_sync_invoice). Manual void is allowed here per contract.
  */
 export const POST = withRole(["owner", "admin"], async (request, session) => {
-  const id = request.nextUrl.pathname.split("/").at(-3)!;
+  const id = request.nextUrl.pathname.split("/").at(-2)!;
 
   let body: unknown;
   try {

@@ -11,9 +11,10 @@ interface InvoiceEditFormProps {
 }
 
 // "2024-01-15T00:00:00.000Z" → "2024-01-15"
-function isoToDateString(iso: string | null): string {
+function isoToDateString(iso: string | Date | null): string {
   if (!iso) return "";
-  return iso.slice(0, 10);
+  const str = iso instanceof Date ? iso.toISOString() : iso;
+  return str.slice(0, 10);
 }
 
 export function InvoiceEditForm({ invoiceId, initialNotes, initialDueDate }: InvoiceEditFormProps) {

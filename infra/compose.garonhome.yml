@@ -59,7 +59,7 @@ services:
     environment:
       NODE_ENV: production
       APP_PORT: "3000"
-      SECURE_COOKIES: "true"
+      SECURE_COOKIES: "${SECURE_COOKIES:-true}"
     depends_on:
       postgres:
         condition: service_healthy
