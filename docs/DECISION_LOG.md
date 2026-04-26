@@ -256,6 +256,19 @@ Append-only log of technical decisions made by AI agents.
 - Rationale: (1) Historical visits (created before migration 011) would have no rows if we only seeded at creation. Lazy seeding handles them transparently. (2) Avoids adding checklist logic to the visit creation path, keeping that mutation simple and reducing cross-concern coupling. (3) ON CONFLICT DO NOTHING makes repeated seeding safe across retries or race conditions.
 - Tradeoffs: The first GET for any visit is slightly slower (COUNT + INSERT). With 28 items in one multi-row INSERT this is one extra round-trip, acceptable at human-interactive latency.
 
+### DRILL-2026-04-26b: Rollback rehearsal (P5-T4)
+- Date: 2026-04-26T16:30:00Z
+- Trigger: Simulated bad deploy — health route hardcoded `status: "degraded"`
+- Steps:
+  1. Tagged known-good image: `docker tag ai-fsm-web:latest ai-fsm-web:v1.0.0`
+  2. Injected bad change, rebuilt and deployed — confirmed degraded health response
+  3. Rolled back: `docker tag ai-fsm-web:v1.0.0 ai-fsm-web:latest && docker compose up -d web`
+  4. Health confirmed ok: `{"status":"ok","service":"web","checks":{"db":"ok"}}`
+  5. Reverted source change, rebuilt clean, re-tagged v1.0.0
+- Rollback duration: ~2 minutes (image swap, no rebuild needed)
+- Outcome: PASS — rollback procedure works; tagged images are the recovery mechanism
+- Notes: Rollback requires tagged image to exist before bad deploy. Tag before every significant deploy. Port exec workaround required on garonhome (host port 3000 occupied by Open WebUI).
+
 ### DRILL-2026-04-26: Backup restore validation
 - Date: 2026-04-26T13:33:00Z
 - Backup file: ai_fsm_20260426T133200Z.dump
