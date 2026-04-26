@@ -255,3 +255,12 @@ Append-only log of technical decisions made by AI agents.
 - Decision: Lazy seeding — the GET `/api/v1/visits/[id]/checklist` route checks COUNT and inserts the full template if 0 rows exist (`ON CONFLICT (visit_id, item_key) DO NOTHING`). Visit creation is unchanged.
 - Rationale: (1) Historical visits (created before migration 011) would have no rows if we only seeded at creation. Lazy seeding handles them transparently. (2) Avoids adding checklist logic to the visit creation path, keeping that mutation simple and reducing cross-concern coupling. (3) ON CONFLICT DO NOTHING makes repeated seeding safe across retries or race conditions.
 - Tradeoffs: The first GET for any visit is slightly slower (COUNT + INSERT). With 28 items in one multi-row INSERT this is one extra round-trip, acceptable at human-interactive latency.
+
+### DRILL-2026-04-26: Backup restore validation
+- Date: 2026-04-26T13:33:00Z
+- Backup file: ai_fsm_20260426T133200Z.dump
+- Restore duration: ~1 minute
+- Row counts (pre and post): users=1, jobs=2, visits=2, estimates=0, invoices=0
+- Health check: ok ({"status":"ok","service":"web","checks":{"db":"ok"}})
+- Login smoke test: skipped (no seed password on garonhome)
+- Notes: Port 3000 is occupied by Open WebUI on the host; health check must be run from inside the web container (`docker exec ai-fsm-web-1 wget -qO- http://localhost:3000/api/health`). Restore script's final wget fails because web port is not exposed to host — this is expected on garonhome. All containers healthy post-restore.
