@@ -119,9 +119,35 @@ async function hbFetch(cfg: HomeboxConfig, path: string, retried = false): Promi
 // Public API
 // ---------------------------------------------------------------------------
 
+export interface HomeboxTag {
+  id: string;
+  name: string;
+}
+
+export async function fetchHomeboxTags(): Promise<HomeboxTag[]> {
+  const cfg = getHomeboxConfig();
+  if (!cfg) return [];
+  try {
+    const res = await hbFetch(cfg, "/tags");
+    if (!res.ok) return [];
+    const data = (await res.json()) as Array<{ id: string; name: string }>;
+    // Homebox creates duplicate tag names per-item; deduplicate by name keeping earliest id
+    const seen = new Map<string, HomeboxTag>();
+    for (const t of data) {
+      const key = t.name.toLowerCase();
+      if (!seen.has(key)) seen.set(key, { id: t.id, name: t.name });
+    }
+    return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name));
+  } catch (err) {
+    logger.error("homebox: fetchTags failed", err);
+    return [];
+  }
+}
+
 export async function searchHomeboxItems(
   q: string,
-  pageSize = 20
+  pageSize = 20,
+  tagId?: string
 ): Promise<HomeboxSearchResult> {
   const cfg = getHomeboxConfig();
   if (!cfg) return { total: 0, items: [] };
@@ -131,6 +157,7 @@ export async function searchHomeboxItems(
       page: "1",
       pageSize: String(pageSize),
     });
+    if (tagId) params.set("tags", tagId);
     const res = await hbFetch(cfg, `/items?${params}`);
     if (!res.ok) return { total: 0, items: [] };
     const data = (await res.json()) as {

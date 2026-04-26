@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui";
 
 // ---------------------------------------------------------------------------
@@ -27,6 +27,11 @@ interface HomeboxItem {
 interface ConflictInfo {
   entity_type: string;
   entity_id: string;
+}
+
+interface HomeboxTag {
+  id: string;
+  name: string;
 }
 
 interface AssetLinksPanelProps {
@@ -68,6 +73,8 @@ export function AssetLinksPanel({
 }: AssetLinksPanelProps) {
   const [links, setLinks] = useState<AssetLinkRow[]>(initialLinks);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTag, setSelectedTag] = useState<string>("");
+  const [tags, setTags] = useState<HomeboxTag[]>([]);
   const [searchResults, setSearchResults] = useState<HomeboxItem[]>([]);
   const [searching, setSearching] = useState(false);
   const [linking, setLinking] = useState(false);
@@ -77,15 +84,24 @@ export function AssetLinksPanel({
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
 
+  // Load tags once when search panel opens
+  useEffect(() => {
+    if (!showSearch || !homeboxEnabled || tags.length > 0) return;
+    fetch("/api/v1/assets/homebox?tags_only=1")
+      .then((r) => r.ok ? r.json() : { tags: [] })
+      .then((d: { tags: HomeboxTag[] }) => setTags(d.tags ?? []))
+      .catch(() => {});
+  }, [showSearch, homeboxEnabled, tags.length]);
+
   // ---- Search Homebox ----
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) return;
     setSearching(true);
     setError(null);
     try {
-      const res = await fetch(
-        `/api/v1/assets/homebox?q=${encodeURIComponent(searchQuery.trim())}`
-      );
+      const params = new URLSearchParams({ q: searchQuery.trim() });
+      if (selectedTag) params.set("tag", selectedTag);
+      const res = await fetch(`/api/v1/assets/homebox?${params}`);
       if (!res.ok) {
         setError("Search failed. Homebox may be unavailable.");
         return;
@@ -97,7 +113,7 @@ export function AssetLinksPanel({
     } finally {
       setSearching(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery, selectedTag]);
 
   // ---- Link an asset ----
   const handleLink = useCallback(
@@ -261,6 +277,21 @@ export function AssetLinksPanel({
             marginBottom: "var(--space-3)",
           }}
         >
+          {tags.length > 0 && (
+            <div style={{ marginBottom: "var(--space-2)" }}>
+              <select
+                className="p7-input"
+                value={selectedTag}
+                onChange={(e) => setSelectedTag(e.target.value)}
+                style={{ width: "100%", fontSize: "var(--text-sm)" }}
+              >
+                <option value="">All tags</option>
+                {tags.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-2)" }}>
             <input
               type="text"
