@@ -269,6 +269,7 @@ Append-only log of technical decisions made by AI agents.
 - Outcome: PASS — rollback procedure works; tagged images are the recovery mechanism
 - Notes: Rollback requires tagged image to exist before bad deploy. Tag before every significant deploy. Port exec workaround required on garonhome (host port 3000 occupied by Open WebUI).
 
+
 ### DRILL-2026-04-26: Backup restore validation
 - Date: 2026-04-26T13:33:00Z
 - Backup file: ai_fsm_20260426T133200Z.dump
