@@ -27,7 +27,7 @@ const transitionSchema = z.object({
  *   AI-FSM: domain/estimateTransitions, db/migrations/004_workflow_invariants.sql
  */
 export const POST = withRole(["owner", "admin"], async (request, session) => {
-  const id = request.nextUrl.pathname.split("/").at(-3)!;
+  const id = request.nextUrl.pathname.split("/").at(-2)!;
 
   let body: unknown;
   try {

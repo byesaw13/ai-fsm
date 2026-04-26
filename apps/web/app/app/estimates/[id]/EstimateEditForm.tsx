@@ -69,9 +69,10 @@ function centsToDisplayDollars(cents: number): string {
   return (cents / 100).toFixed(2);
 }
 
-function isoToDateString(iso: string | null): string {
+function isoToDateString(iso: string | Date | null): string {
   if (!iso) return "";
-  return iso.slice(0, 10);
+  const str = iso instanceof Date ? iso.toISOString() : iso;
+  return str.slice(0, 10);
 }
 
 const EMPTY_ROW: LineItemRow = { description: "", quantity: "1", unit_price: "0.00" };
