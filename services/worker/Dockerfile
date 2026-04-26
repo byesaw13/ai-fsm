@@ -19,5 +19,6 @@ COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/services/worker/package.json ./services/worker/package.json
+COPY --from=build /app/services/worker/node_modules ./services/worker/node_modules
 COPY --from=build /app/services/worker/dist ./services/worker/dist
-CMD ["node", "services/worker/dist/src/index.js"]
+CMD ["node", "services/worker/dist/index.js"]
