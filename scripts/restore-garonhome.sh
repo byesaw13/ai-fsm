@@ -38,5 +38,18 @@ cat "${DUMP_FILE}" | docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}
   pg_restore -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" --no-owner --no-privileges
 
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" up -d web worker
-docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T web \
-  wget -qO- http://localhost:3000/api/health
+
+# Wait for web to be healthy, then verify from inside the container
+# (host port 3000 may be occupied by another service)
+WEB_CONTAINER=$(docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" ps -q web)
+echo "waiting for web to be healthy..."
+for i in $(seq 1 30); do
+  STATUS=$(docker inspect --format='{{.State.Health.Status}}' "${WEB_CONTAINER}" 2>/dev/null || echo "unknown")
+  if [[ "${STATUS}" == "healthy" ]]; then
+    break
+  fi
+  sleep 2
+done
+
+docker exec "${WEB_CONTAINER}" wget -qO- http://localhost:3000/api/health
+echo ""
