@@ -77,7 +77,7 @@ export function calculatePaintingEstimate(
   // Ceiling adds 30% more paintable surface at same rate
   const effective_sq_ft = includes_ceiling ? sq_ft * 1.3 : sq_ft;
 
-  const trim_add_cents = includes_trim ? Math.round(effective_sq_ft * PAINTING_TRIM_ADD_CENTS) : 0;
+  const trim_add_cents = includes_trim ? Math.round(sq_ft * PAINTING_TRIM_ADD_CENTS) : 0;
 
   const labor_flat_rate_cents = Math.round(effective_sq_ft * effective_rate) + trim_add_cents;
 
@@ -86,7 +86,7 @@ export function calculatePaintingEstimate(
 
   const total_cents = labor_flat_rate_cents + material_subtotal_cents + material_handling_cents;
   const deposit_cents = Math.round(total_cents * DEPOSIT_RATE);
-  const balance_cents = Math.round(total_cents * BALANCE_RATE);
+  const balance_cents = total_cents - deposit_cents;
 
   const internal_labor_cost_cents = Math.round(labor_hours_estimate * LABOR_RATE_CENTS_PER_HOUR);
   const gross_margin_cents = labor_flat_rate_cents - internal_labor_cost_cents;
@@ -145,7 +145,7 @@ export function calculateEstimateTotals(items: LineItemInput[]): EstimateTotals 
   const subtotal_cents = labor_cents + materials_cents + handling_cents + adjustment_cents;
   const total_cents = subtotal_cents;
   const deposit_cents = Math.round(total_cents * DEPOSIT_RATE);
-  const balance_cents = Math.round(total_cents * BALANCE_RATE);
+  const balance_cents = total_cents - deposit_cents;
 
   return {
     subtotal_cents,

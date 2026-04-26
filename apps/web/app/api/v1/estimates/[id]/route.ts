@@ -7,6 +7,7 @@ import {
   calcTotals,
   lineItemTotal,
 } from "@/lib/estimates/db";
+import { DEPOSIT_RATE } from "@ai-fsm/domain";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -244,12 +245,18 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         const taxRate = patch.tax_rate ?? 0;
         const tax_cents = Math.round((subtotal_cents * taxRate) / 100);
         const total_cents = subtotal_cents + tax_cents;
+        const deposit_cents = Math.round(total_cents * DEPOSIT_RATE);
+        const balance_cents = total_cents - deposit_cents;
         setClauses.push(`subtotal_cents = $${idx++}`);
         params.push(subtotal_cents);
         setClauses.push(`tax_cents = $${idx++}`);
         params.push(tax_cents);
         setClauses.push(`total_cents = $${idx++}`);
         params.push(total_cents);
+        setClauses.push(`deposit_cents = $${idx++}`);
+        params.push(deposit_cents);
+        setClauses.push(`balance_cents = $${idx++}`);
+        params.push(balance_cents);
 
         // Delete existing line items
         await client.query(
