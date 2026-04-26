@@ -14,6 +14,9 @@ import type { Job, Visit, JobStatus } from "@ai-fsm/domain";
 import { JobTransitionForm } from "./JobTransitionForm";
 import { DeleteJobButton } from "./DeleteJobButton";
 import { JobEditForm } from "./JobEditFormWrapper";
+import { AssetLinksPanel } from "./AssetLinksPanel";
+import { isHomeboxEnabled } from "@/lib/homebox/client";
+import { withAssetContext, listAssetLinks } from "@/lib/homebox/db";
 import {
   PageContainer,
   PageHeader,
@@ -72,7 +75,9 @@ export default async function JobDetailPage({
     if (!assigned) notFound();
   }
 
-  const [visits, commercialCounts] = await Promise.all([
+  const homeboxEnabled = isHomeboxEnabled();
+
+  const [visits, commercialCounts, assetLinks] = await Promise.all([
     session.role === "tech"
       ? query<VisitRow>(
           `SELECT v.*, u.full_name AS assigned_user_name
@@ -99,6 +104,9 @@ export default async function JobDetailPage({
           [id, session.accountId]
         )
       : Promise.resolve(null),
+    withAssetContext(session, (client) =>
+      listAssetLinks(client, session.accountId, "job", id)
+    ).catch(() => []),
   ]);
 
   const currentStatus = job.status as JobStatus;
@@ -334,6 +342,15 @@ export default async function JobDetailPage({
                 </div>
               </dl>
             </Card>
+
+            {/* Asset links (Homebox) */}
+            <AssetLinksPanel
+              entityType="job"
+              entityId={job.id}
+              initialLinks={assetLinks}
+              homeboxEnabled={homeboxEnabled}
+              canLink={!isTech}
+            />
           </div>
         )}
 
