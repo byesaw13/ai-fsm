@@ -175,9 +175,14 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
         subtitle={`${formatMonthLabel(activeMonth)} — ${formatCentsToDollars(summary.total_cents)} across ${summary.count} expense${summary.count === 1 ? "" : "s"}`}
         actions={
           canManage ? (
-            <LinkButton href="/app/expenses/new" variant="primary" data-testid="create-expense-btn">
-              + New Expense
-            </LinkButton>
+            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+              <LinkButton href="/app/mileage" variant="ghost" size="sm">
+                Mileage →
+              </LinkButton>
+              <LinkButton href="/app/expenses/new" variant="primary" data-testid="create-expense-btn">
+                + New Expense
+              </LinkButton>
+            </div>
           ) : undefined
         }
       />

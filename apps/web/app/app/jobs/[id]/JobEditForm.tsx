@@ -27,6 +27,8 @@ interface JobEditFormProps {
   initialPriority: number;
   initialScheduledStart: string | null;
   initialScheduledEnd: string | null;
+  initialActualCostCents: number | null;
+  initialTravelMiles: number | null;
 }
 
 const PRIORITY_OPTIONS = [
@@ -66,6 +68,8 @@ export function JobEditForm({
   initialPriority,
   initialScheduledStart,
   initialScheduledEnd,
+  initialActualCostCents,
+  initialTravelMiles,
 }: JobEditFormProps) {
   const router = useRouter();
   const toast = useToast();
@@ -79,6 +83,8 @@ export function JobEditForm({
     property_id: initialPropertyId ?? "",
     description: initialDescription ?? "",
     priority: initialPriority,
+    actual_cost_dollars: initialActualCostCents !== null ? (initialActualCostCents / 100).toFixed(2) : "",
+    travel_miles: initialTravelMiles !== null ? String(initialTravelMiles) : "",
   });
   const [schedule, setSchedule] = useState<ScheduleValue>(
     isoToScheduleValue(initialScheduledStart, initialScheduledEnd)
@@ -113,6 +119,12 @@ export function JobEditForm({
     setPending(true);
     try {
       const { start, end } = scheduleToISOPair(schedule);
+      const actualCostCents = form.actual_cost_dollars.trim()
+        ? Math.round(parseFloat(form.actual_cost_dollars) * 100)
+        : null;
+      const travelMiles = form.travel_miles.trim()
+        ? parseFloat(form.travel_miles)
+        : null;
       const res = await fetch(`/api/v1/jobs/${jobId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -124,6 +136,8 @@ export function JobEditForm({
           priority: form.priority,
           scheduled_start: start ?? null,
           scheduled_end: end ?? null,
+          actual_cost_cents: actualCostCents,
+          travel_miles: travelMiles,
         }),
       });
       const data = await res.json();
@@ -194,7 +208,28 @@ export function JobEditForm({
             disabled={pending}
             options={PRIORITY_OPTIONS}
           />
-          <div />
+          <Input
+            id="edit-job-actual-cost"
+            label="Actual Cost ($)"
+            type="number"
+            step="0.01"
+            min="0"
+            value={form.actual_cost_dollars}
+            onChange={e => setForm(f => ({ ...f, actual_cost_dollars: e.target.value }))}
+            disabled={pending}
+            placeholder="e.g. 320.00"
+          />
+          <Input
+            id="edit-job-travel-miles"
+            label="Travel Miles"
+            type="number"
+            step="0.1"
+            min="0"
+            value={form.travel_miles}
+            onChange={e => setForm(f => ({ ...f, travel_miles: e.target.value }))}
+            disabled={pending}
+            placeholder="e.g. 24.5"
+          />
           <ScheduleFields value={schedule} onChange={setSchedule} disabled={pending} />
         </div>
         <div className="p7-form-actions">

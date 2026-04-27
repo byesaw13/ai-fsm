@@ -281,6 +281,7 @@ export default function AutomationsClient({
               onRun={() => handleRun(visitReminder.id, "Visit reminder")}
               isRunning={runningId === visitReminder.id}
               canRun={isAdmin && visitReminder.enabled}
+              isAdmin={isAdmin}
             />
           ) : (
             <div className="empty-card">
@@ -308,6 +309,7 @@ export default function AutomationsClient({
               onRun={() => handleRun(invoiceFollowup.id, "Invoice follow-up")}
               isRunning={runningId === invoiceFollowup.id}
               canRun={isAdmin && invoiceFollowup.enabled}
+              isAdmin={isAdmin}
             />
           ) : (
             <div className="empty-card">
@@ -361,18 +363,55 @@ function AutomationCard({
   onRun,
   isRunning,
   canRun,
+  isAdmin,
 }: {
   automation: AutomationRow;
   stats: EventStats;
   onRun: () => void;
   isRunning: boolean;
   canRun: boolean;
+  isAdmin: boolean;
 }) {
+  const [enabled, setEnabled] = useState(automation.enabled);
+  const [toggling, setToggling] = useState(false);
+
   const hoursBefore = (automation.config?.hours_before as number | undefined) ?? 24;
   const daysOverdue = (automation.config?.days_overdue as number[] | undefined) ?? [7, 14, 30];
 
+  async function handleToggle() {
+    if (!isAdmin || toggling) return;
+    setToggling(true);
+    try {
+      const res = await fetch(`/api/v1/automations/${automation.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !enabled }),
+      });
+      if (res.ok) setEnabled(e => !e);
+    } finally {
+      setToggling(false);
+    }
+  }
+
   return (
     <div className="automation-card">
+      {isAdmin && (
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-3)" }}>
+          <button
+            type="button"
+            className={`btn btn-sm ${enabled ? "btn-danger" : "btn-primary"}`}
+            onClick={handleToggle}
+            disabled={toggling}
+            data-testid={`toggle-${automation.type}`}
+          >
+            {toggling ? "…" : enabled ? "Disable" : "Enable"}
+          </button>
+          <span style={{ fontSize: "var(--text-sm)", color: enabled ? "var(--status-success, green)" : "var(--fg-muted)" }}>
+            {enabled ? "Active" : "Disabled"}
+          </span>
+        </div>
+      )}
+
       <div className="automation-stats">
         <div className="stat-group">
           <h4>Last 24 hours</h4>
@@ -417,7 +456,7 @@ function AutomationCard({
         )}
       </div>
 
-      {canRun && (
+      {canRun && enabled && (
         <button
           className="btn btn-primary run-btn"
           onClick={onRun}
