@@ -16,6 +16,8 @@ const updateJobBody = z.object({
   priority: z.number().int().min(0).optional(),
   scheduled_start: z.string().datetime().nullable().optional(),
   scheduled_end: z.string().datetime().nullable().optional(),
+  actual_cost_cents: z.number().int().nonnegative().nullable().optional(),
+  travel_miles: z.number().nonnegative().nullable().optional(),
 });
 
 export const GET = withAuth(
