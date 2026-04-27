@@ -9,6 +9,7 @@ import {
 } from "@/lib/auth/permissions";
 import type { Visit, VisitStatus } from "@ai-fsm/domain";
 import { VisitAssignForm } from "./VisitAssignForm";
+import { VisitRescheduleForm } from "./VisitRescheduleForm";
 import { VisitTransitionForm } from "./VisitTransitionForm";
 import { VisitNotesForm } from "./VisitNotesForm";
 import { VisitChecklistForm } from "./VisitChecklistForm";
@@ -74,6 +75,7 @@ export default async function VisitDetailPage({
   const canAssign = canAssignVisit(session.role);
   const canNotes = canUpdateVisitNotes(session.role);
   const canChecklist = canUpdateChecklist(session.role);
+  const canReschedule = canAssign && !["completed", "cancelled"].includes(currentStatus);
 
   const assignableUsers = canAssign
     ? await query<{ id: string; full_name: string; role: string; [key: string]: unknown }>(
@@ -222,6 +224,14 @@ export default async function VisitDetailPage({
               />
             )}
           </Card>
+
+          {canReschedule && (
+            <VisitRescheduleForm
+              visitId={visit.id}
+              initialStart={visit.scheduled_start}
+              initialEnd={visit.scheduled_end}
+            />
+          )}
 
           <Card>
             <SectionHeader title="Visit Details" />
