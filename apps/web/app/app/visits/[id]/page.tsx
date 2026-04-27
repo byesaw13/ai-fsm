@@ -12,6 +12,7 @@ import { VisitAssignForm } from "./VisitAssignForm";
 import { VisitTransitionForm } from "./VisitTransitionForm";
 import { VisitNotesForm } from "./VisitNotesForm";
 import { VisitChecklistForm } from "./VisitChecklistForm";
+import { MaterialsUsedForm } from "./MaterialsUsedForm";
 import {
   Card,
   EmptyState,
@@ -182,6 +183,17 @@ export default async function VisitDetailPage({
             <Card data-testid="visit-notes-panel">
               <SectionHeader title="Tech Notes" />
               <VisitNotesForm visitId={visit.id} initialNotes={visit.tech_notes ?? ""} />
+            </Card>
+          )}
+
+          {currentStatus !== "cancelled" && (
+            <Card data-testid="materials-used-panel">
+              <SectionHeader title="Materials Used" />
+              <MaterialsUsedForm
+                visitId={visit.id}
+                initialValue={(visit as Visit & { materials_used?: string | null }).materials_used ?? null}
+                canUpdate={canNotes}
+              />
             </Card>
           )}
         </div>
