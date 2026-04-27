@@ -256,7 +256,7 @@ export default async function HomePage() {
         <Card style={{ marginBottom: "var(--space-6)", borderLeft: "4px solid var(--accent)" }}>
           <div style={{ padding: "var(--space-5)" }}>
             <h2 style={{ margin: "0 0 var(--space-1)", fontSize: "var(--text-lg)", fontWeight: "var(--font-semibold)" }}>
-              Welcome to FieldSync!
+              Welcome to Dovetails Services LLC!
             </h2>
             <p style={{ margin: "0 0 var(--space-5)", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
               Follow these steps to start managing your field service business.

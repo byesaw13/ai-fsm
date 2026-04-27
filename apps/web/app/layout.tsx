@@ -2,8 +2,8 @@ import "./globals.css";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "AI-FSM",
-  description: "AI-built field service app",
+  title: "Dovetails",
+  description: "Dovetails Services LLC — field service management",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

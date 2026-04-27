@@ -41,7 +41,7 @@ export default function LoginPage() {
   return (
     <div className="login-container">
       <div className="login-card">
-        <h1>AI-FSM</h1>
+        <h1>Dovetails</h1>
         <p>Sign in to your account</p>
 
         {error && (
@@ -86,14 +86,6 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="login-help">
-          <p>Demo accounts:</p>
-          <ul>
-            <li>owner@test.com / password</li>
-            <li>admin@test.com / password</li>
-            <li>tech@test.com / password</li>
-          </ul>
-        </div>
       </div>
     </div>
   );
