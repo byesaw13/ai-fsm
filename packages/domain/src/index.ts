@@ -225,6 +225,7 @@ export const visitSchema = z.object({
   arrived_at: timestampField.nullable().optional(),
   completed_at: timestampField.nullable().optional(),
   tech_notes: z.string().nullable().optional(),
+  materials_used: z.string().nullable().optional(),
   created_at: timestampField,
   updated_at: timestampField,
 });

@@ -120,12 +120,23 @@ export default async function EstimateDetailPage({
             <p className="page-subtitle">Job: {estimate.job_title}</p>
           )}
         </div>
-        <span
-          className={`status-pill status-${estimate.status}`}
-          data-testid="estimate-status"
-        >
-          {STATUS_LABELS[currentStatus]}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+          <Link
+            href={`/app/estimates/${estimate.id}/print`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}
+            data-testid="estimate-print-link"
+          >
+            Print / PDF →
+          </Link>
+          <span
+            className={`status-pill status-${estimate.status}`}
+            data-testid="estimate-status"
+          >
+            {STATUS_LABELS[currentStatus]}
+          </span>
+        </div>
       </div>
 
       {/* Status Stepper — main path only */}
