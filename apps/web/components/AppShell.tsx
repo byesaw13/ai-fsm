@@ -5,52 +5,51 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import type { Route } from "next";
 import { ToastProvider } from "./ui/Toast";
+import {
+  IconDashboard,
+  IconJobs,
+  IconVisits,
+  IconClients,
+  IconInvoices,
+  IconEstimates,
+  IconProperties,
+  IconExpenses,
+  IconAutomations,
+  IconReports,
+} from "./NavIcons";
 
-// ---------------------------------------------------------------------------
-// AppShell — P7 sidebar-based navigation shell
-//
-// Desktop (≥1024px): Fixed left sidebar 240px.
-// Tablet (768–1023px): Collapsed sidebar 56px, icon only with tooltips.
-// Mobile (<768px): Fixed bottom tab bar, hidden sidebar.
-//
-// Source: Dovelite AdminLayout.tsx — sidebar + bottom nav dual pattern.
-// Active state: left accent border + background highlight.
-// ---------------------------------------------------------------------------
+type IconComponent = (props: { size?: number }) => React.ReactElement;
 
 interface NavItem {
   href: string;
   label: string;
-  icon: string;
+  Icon: IconComponent;
   adminOnly?: boolean;
 }
 
 const ALL_NAV_ITEMS: NavItem[] = [
-  { href: "/app" as const,             label: "Dashboard",   icon: "⊞" },
-  { href: "/app/jobs" as const,        label: "Jobs",        icon: "📋" },
-  { href: "/app/visits" as const,      label: "Visits",      icon: "📅" },
-  { href: "/app/clients" as const,     label: "Clients",     icon: "👥", adminOnly: true },
-  { href: "/app/invoices" as const,    label: "Invoices",    icon: "💰", adminOnly: true },
-  { href: "/app/estimates" as const,   label: "Estimates",   icon: "📄", adminOnly: true },
-  { href: "/app/properties" as const,  label: "Properties",  icon: "🏠", adminOnly: true },
-  { href: "/app/expenses" as const,    label: "Expenses",    icon: "🧾", adminOnly: true },
-  { href: "/app/automations" as const, label: "Automations", icon: "⚙", adminOnly: true },
-  { href: "/app/reports" as const,     label: "Reports",     icon: "📊", adminOnly: true },
+  { href: "/app",             label: "Dashboard",   Icon: IconDashboard },
+  { href: "/app/jobs",        label: "Jobs",        Icon: IconJobs },
+  { href: "/app/visits",      label: "Visits",      Icon: IconVisits },
+  { href: "/app/clients",     label: "Clients",     Icon: IconClients,     adminOnly: true },
+  { href: "/app/invoices",    label: "Invoices",    Icon: IconInvoices,    adminOnly: true },
+  { href: "/app/estimates",   label: "Estimates",   Icon: IconEstimates,   adminOnly: true },
+  { href: "/app/properties",  label: "Properties",  Icon: IconProperties,  adminOnly: true },
+  { href: "/app/expenses",    label: "Expenses",    Icon: IconExpenses,    adminOnly: true },
+  { href: "/app/automations", label: "Automations", Icon: IconAutomations, adminOnly: true },
+  { href: "/app/reports",     label: "Reports",     Icon: IconReports,     adminOnly: true },
 ];
 
 /** Pure function — returns filtered nav items for a given role */
 export function getNavItems(role: string): NavItem[] {
-  const isTech = role === "tech";
-  return isTech
+  return role === "tech"
     ? ALL_NAV_ITEMS.filter((item) => !item.adminOnly)
     : ALL_NAV_ITEMS;
 }
 
 /** Pure function — returns true if href is the active nav route for pathname */
 export function isNavActive(pathname: string, href: string): boolean {
-  // Dashboard: exact match only (so /app is not active when on /app/jobs)
-  if (href === "/app") {
-    return pathname === "/app";
-  }
+  if (href === "/app") return pathname === "/app";
   return pathname === href || pathname.startsWith(href + "/");
 }
 
@@ -62,8 +61,6 @@ interface AppShellProps {
 export function AppShell({ role, children }: AppShellProps) {
   const pathname = usePathname();
   const navItems = getNavItems(role);
-
-  // Mobile bottom tab shows max 5 items
   const bottomItems = navItems.slice(0, 5);
 
   return (
@@ -74,9 +71,9 @@ export function AppShell({ role, children }: AppShellProps) {
           {/* Brand */}
           <Link href={"/app" as Route} className="p7-sidebar-brand">
             <div className="p7-brand-logo" aria-hidden="true">
-              <span className="p7-brand-logo-text">FS</span>
+              <span className="p7-brand-logo-text">DV</span>
             </div>
-            <span className="p7-brand-name">FieldSync</span>
+            <span className="p7-brand-name">Dovetails</span>
           </Link>
 
           {/* Nav */}
@@ -92,7 +89,7 @@ export function AppShell({ role, children }: AppShellProps) {
                   title={item.label}
                 >
                   <span className="p7-nav-icon" aria-hidden="true">
-                    {item.icon}
+                    <item.Icon size={18} />
                   </span>
                   <span className="p7-nav-label">{item.label}</span>
                 </Link>
@@ -132,7 +129,7 @@ export function AppShell({ role, children }: AppShellProps) {
                   aria-current={active ? "page" : undefined}
                 >
                   <span className="p7-bottom-nav-icon" aria-hidden="true">
-                    {item.icon}
+                    <item.Icon size={20} />
                   </span>
                   <span>{item.label}</span>
                 </Link>

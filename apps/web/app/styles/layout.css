@@ -120,7 +120,6 @@
   width: 20px;
   height: 20px;
   flex-shrink: 0;
-  font-size: 16px;
 }
 
 .p7-nav-label {
@@ -326,7 +325,9 @@
 }
 
 .p7-bottom-nav-icon {
-  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
 }
 
