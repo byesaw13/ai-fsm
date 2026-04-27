@@ -24,6 +24,7 @@ interface MileageRow {
   job_id: string | null;
   job_title: string | null;
   created_by_name: string | null;
+  [key: string]: unknown;
 }
 
 interface PageProps {
