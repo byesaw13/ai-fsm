@@ -95,12 +95,32 @@ export default async function JobDetailPage({
            ORDER BY v.scheduled_start ASC`,
           [id, session.accountId]
         ),
-    // Count estimates and invoices linked to this job
+    // Count estimates and invoices + profitability snapshot (owner/admin only)
     session.role !== "tech"
-      ? queryOne<{ estimate_count: string; invoice_count: string }>(
+      ? queryOne<{
+          estimate_count: string;
+          invoice_count: string;
+          actual_cost_cents: number | null;
+          travel_miles: number | null;
+          estimated_labor_cost_cents: number | null;
+          estimated_total_cents: number | null;
+          invoice_total_cents: number | null;
+        }>(
           `SELECT
              (SELECT COUNT(*) FROM estimates WHERE job_id = $1 AND account_id = $2) AS estimate_count,
-             (SELECT COUNT(*) FROM invoices WHERE job_id = $1 AND account_id = $2) AS invoice_count`,
+             (SELECT COUNT(*) FROM invoices  WHERE job_id = $1 AND account_id = $2) AS invoice_count,
+             j.actual_cost_cents,
+             j.travel_miles,
+             (SELECT internal_labor_cost_cents FROM estimates
+              WHERE job_id = $1 AND account_id = $2 AND status = 'approved'
+              ORDER BY created_at DESC LIMIT 1) AS estimated_labor_cost_cents,
+             (SELECT total_cents FROM estimates
+              WHERE job_id = $1 AND account_id = $2 AND status = 'approved'
+              ORDER BY created_at DESC LIMIT 1) AS estimated_total_cents,
+             (SELECT total_cents FROM invoices
+              WHERE job_id = $1 AND account_id = $2 AND status != 'void'
+              ORDER BY created_at DESC LIMIT 1) AS invoice_total_cents
+           FROM jobs j WHERE j.id = $1 AND j.account_id = $2`,
           [id, session.accountId]
         )
       : Promise.resolve(null),
@@ -119,6 +139,16 @@ export default async function JobDetailPage({
 
   const estimateCount = commercialCounts ? parseInt(commercialCounts.estimate_count) : 0;
   const invoiceCount = commercialCounts ? parseInt(commercialCounts.invoice_count) : 0;
+
+  // Profitability (owner/admin only)
+  const revenueCents = commercialCounts?.invoice_total_cents ?? commercialCounts?.estimated_total_cents ?? null;
+  const costCents = commercialCounts?.actual_cost_cents ?? commercialCounts?.estimated_labor_cost_cents ?? null;
+  const grossMarginCents = revenueCents !== null && costCents !== null ? revenueCents - costCents : null;
+  const grossMarginPct =
+    grossMarginCents !== null && revenueCents !== null && revenueCents > 0
+      ? Math.round((grossMarginCents / revenueCents) * 1000) / 10
+      : null;
+  const hasActualCost = (commercialCounts?.actual_cost_cents ?? null) !== null;
 
   // Build timeline entries from visits
   const timelineEntries: TimelineEntryData[] = visits.map((v) => {
@@ -342,6 +372,51 @@ export default async function JobDetailPage({
                 </div>
               </dl>
             </Card>
+
+            {/* Profitability (owner/admin only) */}
+            {!isTech && revenueCents !== null && (
+              <Card data-testid="profitability-card">
+                <SectionHeader title="Profitability" />
+                <dl className="p7-detail-list">
+                  <div className="p7-detail-row">
+                    <dt>Revenue</dt>
+                    <dd>${((revenueCents) / 100).toFixed(2)}</dd>
+                  </div>
+                  {costCents !== null && (
+                    <div className="p7-detail-row">
+                      <dt>{hasActualCost ? "Actual Cost" : "Est. Labor Cost"}</dt>
+                      <dd>${(costCents / 100).toFixed(2)}</dd>
+                    </div>
+                  )}
+                  {grossMarginCents !== null && (
+                    <div className="p7-detail-row">
+                      <dt>Gross Margin</dt>
+                      <dd
+                        style={{ color: grossMarginCents >= 0 ? "var(--color-success, green)" : "var(--color-error, red)" }}
+                        data-testid="gross-margin"
+                      >
+                        ${(grossMarginCents / 100).toFixed(2)}
+                        {grossMarginPct !== null && ` (${grossMarginPct}%)`}
+                      </dd>
+                    </div>
+                  )}
+                  {commercialCounts?.travel_miles !== null && commercialCounts?.travel_miles !== undefined && (
+                    <div className="p7-detail-row">
+                      <dt>Travel Miles</dt>
+                      <dd>{commercialCounts.travel_miles} mi</dd>
+                    </div>
+                  )}
+                  {!hasActualCost && (
+                    <div className="p7-detail-row">
+                      <dt></dt>
+                      <dd style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+                        Based on estimate — update with actual after completion
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </Card>
+            )}
 
             {/* Asset links (Homebox) */}
             <AssetLinksPanel

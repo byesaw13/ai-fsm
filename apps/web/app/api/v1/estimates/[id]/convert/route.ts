@@ -32,7 +32,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       // 1. Fetch estimate with line items
       const estimateResult = await client.query(
         `SELECT e.id, e.status, e.client_id, e.job_id, e.property_id,
-                e.subtotal_cents, e.tax_cents, e.total_cents,
+                e.subtotal_cents, e.tax_cents, e.total_cents, e.deposit_cents,
                 e.notes, e.created_by
          FROM estimates e
          WHERE e.id = $1 AND e.account_id = $2`,
@@ -54,6 +54,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         subtotal_cents: number;
         tax_cents: number;
         total_cents: number;
+        deposit_cents: number;
         notes: string | null;
         created_by: string;
       };
@@ -116,12 +117,12 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         `INSERT INTO invoices
            (account_id, client_id, job_id, estimate_id, property_id,
             status, invoice_number,
-            subtotal_cents, tax_cents, total_cents, paid_cents,
+            subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
             notes, created_by)
          VALUES ($1, $2, $3, $4, $5,
                  'draft', $6,
-                 $7, $8, $9, 0,
-                 $10, $11)
+                 $7, $8, $9, 0, $10,
+                 $11, $12)
          RETURNING id`,
         [
           session.accountId,
@@ -133,6 +134,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           estimate.subtotal_cents,
           estimate.tax_cents,
           estimate.total_cents,
+          estimate.deposit_cents,
           estimate.notes,
           session.userId,
         ]

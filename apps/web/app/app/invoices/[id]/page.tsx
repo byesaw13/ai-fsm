@@ -9,6 +9,7 @@ import { InvoiceTransitionForm } from "./InvoiceTransitionForm";
 import { RecordPaymentForm } from "./RecordPaymentForm";
 import { PaymentHistory } from "./PaymentHistory";
 import { InvoiceEditForm } from "./InvoiceEditForm";
+import { MarkDepositReceivedButton } from "./MarkDepositReceivedButton";
 import { StatusStepper } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,9 @@ interface InvoiceRow {
   tax_cents: number;
   total_cents: number;
   paid_cents: number;
+  deposit_cents: number;
+  balance_cents: number;
+  deposit_paid_at: string | null;
   notes: string | null;
   due_date: string | null;
   sent_at: string | null;
@@ -105,6 +109,8 @@ export default async function InvoiceDetailPage({
   const allowedTransitions = invoiceTransitions[currentStatus];
   const canTransition = canCreateInvoices(session.role);
   const amountDue = invoice.total_cents - invoice.paid_cents;
+  const depositPending = invoice.deposit_cents > 0 && !invoice.deposit_paid_at;
+  const canMarkDeposit = canTransition && !["paid", "void"].includes(currentStatus);
 
   return (
     <div className="page-container">
@@ -149,6 +155,27 @@ export default async function InvoiceDetailPage({
           <strong>Total:</strong>{" "}
           <span data-testid="invoice-total">{formatDollars(invoice.total_cents)}</span>
         </p>
+        {invoice.deposit_cents > 0 && (
+          <p>
+            <strong>Deposit (30%):</strong>{" "}
+            <span data-testid="invoice-deposit">{formatDollars(invoice.deposit_cents)}</span>
+            {invoice.deposit_paid_at ? (
+              <span style={{ marginLeft: 8, color: "var(--color-success, green)", fontSize: "0.85em" }}>
+                ✓ received {new Date(invoice.deposit_paid_at).toLocaleDateString()}
+              </span>
+            ) : (
+              <span style={{ marginLeft: 8, color: "var(--color-warning, orange)", fontSize: "0.85em" }}>
+                pending
+              </span>
+            )}
+          </p>
+        )}
+        {invoice.balance_cents > 0 && (
+          <p>
+            <strong>Balance Due:</strong>{" "}
+            <span data-testid="invoice-balance">{formatDollars(invoice.balance_cents)}</span>
+          </p>
+        )}
         {invoice.paid_cents > 0 && (
           <p>
             <strong>Paid:</strong>{" "}
@@ -157,7 +184,7 @@ export default async function InvoiceDetailPage({
         )}
         {amountDue > 0 && (
           <p>
-            <strong>Amount Due:</strong>{" "}
+            <strong>Remaining:</strong>{" "}
             <span data-testid="invoice-due">{formatDollars(amountDue)}</span>
           </p>
         )}
@@ -193,6 +220,14 @@ export default async function InvoiceDetailPage({
           <p>
             <strong>Notes:</strong> {invoice.notes}
           </p>
+        )}
+        {canMarkDeposit && depositPending && (
+          <div style={{ marginTop: "var(--space-3)" }}>
+            <MarkDepositReceivedButton
+              invoiceId={invoice.id}
+              depositCents={invoice.deposit_cents}
+            />
+          </div>
         )}
       </div>
 

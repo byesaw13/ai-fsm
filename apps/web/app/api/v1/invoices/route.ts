@@ -4,7 +4,7 @@ import { withAuth, withRole } from "@/lib/auth/middleware";
 import { withInvoiceContext, generateInvoiceNumber } from "@/lib/invoices/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
-import { invoiceStatusSchema } from "@ai-fsm/domain";
+import { invoiceStatusSchema, DEPOSIT_RATE } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -163,6 +163,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
   );
   const tax_cents = Math.round((subtotal_cents * tax_rate) / 100);
   const total_cents = subtotal_cents + tax_cents;
+  const deposit_cents = Math.round(total_cents * DEPOSIT_RATE);
 
   try {
     const invoice = await withInvoiceContext(session, async (client) => {
@@ -181,9 +182,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         `INSERT INTO invoices
            (account_id, client_id, job_id, property_id,
             status, invoice_number,
-            subtotal_cents, tax_cents, total_cents, paid_cents,
+            subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
             notes, due_date, created_by)
-         VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, 0, $9, $10, $11)
+         VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, 0, $9, $10, $11, $12)
          RETURNING id`,
         [
           session.accountId,
@@ -194,6 +195,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           subtotal_cents,
           tax_cents,
           total_cents,
+          deposit_cents,
           notes ?? null,
           due_date ?? null,
           session.userId,

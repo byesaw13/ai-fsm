@@ -16,6 +16,7 @@ export const GET = withAuth(async (request, session) => {
       const invoiceResult = await client.query(
         `SELECT i.id, i.status, i.invoice_number,
                 i.subtotal_cents, i.tax_cents, i.total_cents, i.paid_cents,
+                i.deposit_cents, i.balance_cents, i.deposit_paid_at,
                 i.notes, i.due_date, i.sent_at, i.paid_at,
                 i.estimate_id, i.client_id, i.job_id, i.property_id,
                 i.created_by, i.created_at, i.updated_at,
@@ -74,8 +75,9 @@ export const GET = withAuth(async (request, session) => {
 });
 
 // === Update Invoice (PATCH /api/v1/invoices/[id]) ===
-// Only draft invoices may be updated via this endpoint.
-// Paid/void are terminal; sent/partial/overdue only allow paid_cents changes (via payments).
+// - notes, due_date: draft only
+// - deposit_paid_at: any non-terminal status (draft/sent/partial/overdue)
+// - paid/void are fully terminal
 
 export const PATCH = withRole(["owner", "admin"], async (request, session) => {
   const id = request.nextUrl.pathname.split("/").at(-1)!;
@@ -96,6 +98,10 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
     );
   }
 
+  const TERMINAL = ["paid", "void"];
+  const DRAFT_ONLY_FIELDS = ["notes", "due_date"] as const;
+  const NON_TERMINAL_FIELDS = ["deposit_paid_at"] as const;
+
   try {
     await withInvoiceContext(session, async (client) => {
       const existing = await client.query<{ id: string; status: string }>(
@@ -109,20 +115,29 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
 
       const inv = existing.rows[0];
 
-      if (inv.status !== "draft") {
+      if (TERMINAL.includes(inv.status)) {
         throw Object.assign(
-          new Error(`Invoice in ${inv.status} state cannot be edited directly`),
+          new Error(`Invoice in ${inv.status} state cannot be edited`),
           { code: "IMMUTABLE_ENTITY" }
         );
       }
 
-      // Build SET clauses for draft update
       const setClauses: string[] = [];
       const params: unknown[] = [];
       let idx = 1;
 
-      const allowed = ["notes", "due_date"] as const;
-      for (const key of allowed) {
+      // draft-only fields
+      if (inv.status === "draft") {
+        for (const key of DRAFT_ONLY_FIELDS) {
+          if (key in body) {
+            setClauses.push(`${key} = $${idx++}`);
+            params.push(body[key] ?? null);
+          }
+        }
+      }
+
+      // fields settable on any non-terminal invoice
+      for (const key of NON_TERMINAL_FIELDS) {
         if (key in body) {
           setClauses.push(`${key} = $${idx++}`);
           params.push(body[key] ?? null);
