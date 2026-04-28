@@ -61,8 +61,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       ]);
 
       const base = appUrl();
-      const approveUrl = `${base}/api/v1/estimates/${id}/respond?action=approve&token=${encodeURIComponent(approveToken)}`;
-      const declineUrl = `${base}/api/v1/estimates/${id}/respond?action=decline&token=${encodeURIComponent(declineToken)}`;
+      // Links go to the confirmation page (GET read-only), not the API.
+      // The confirmation page renders a POST form to do the actual mutation.
+      const approveUrl = `${base}/estimate/respond?action=approve&token=${encodeURIComponent(approveToken)}`;
+      const declineUrl = `${base}/estimate/respond?action=decline&token=${encodeURIComponent(declineToken)}`;
       const viewUrl = `${base}/app/estimates/${id}`;
       const estimateRef = id.slice(0, 8).toUpperCase();
 

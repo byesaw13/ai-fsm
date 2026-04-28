@@ -7,21 +7,43 @@ import { getEnv } from "@/lib/env";
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/v1/estimates/[id]/respond?action=approve|decline&token=<jwt>
+ * POST /api/v1/estimates/[id]/respond
  *
- * Public endpoint — no session required. Client clicks link from email.
- * Verifies the HMAC-signed JWT, transitions the estimate, redirects to
- * the thank-you page.
+ * Public endpoint — no session required. Called by the /estimate/respond
+ * confirmation page (the client clicks "Approve/Decline" there, which
+ * submits a form POST, keeping GET read-only and safe from bot prefetch).
+ *
+ * Body (form-encoded or JSON): { action: "approve"|"decline", token: "<jwt>" }
+ *
+ * Uses an atomic UPDATE ... WHERE status IN ('draft','sent') RETURNING id
+ * to enforce first-writer-wins with no TOCTOU race.
  */
-export async function GET(request: NextRequest): Promise<NextResponse> {
+export async function POST(request: NextRequest): Promise<NextResponse> {
   const parts = request.nextUrl.pathname.split("/");
   const id = parts.at(-2)!;
-  const action = request.nextUrl.searchParams.get("action");
-  const token = request.nextUrl.searchParams.get("token");
 
   const origin = (process.env.APP_URL ?? "").replace(/\/$/, "") || request.nextUrl.origin;
   const thanksUrl = (a: string) => `${origin}/estimate/thanks?action=${a}`;
   const errorUrl = `${origin}/estimate/thanks?action=error`;
+
+  let action: string | null = null;
+  let token: string | null = null;
+
+  const ct = request.headers.get("content-type") ?? "";
+  if (ct.includes("application/x-www-form-urlencoded")) {
+    const text = await request.text();
+    const params = new URLSearchParams(text);
+    action = params.get("action");
+    token = params.get("token");
+  } else {
+    try {
+      const body = await request.json() as { action?: string; token?: string };
+      action = body.action ?? null;
+      token = body.token ?? null;
+    } catch {
+      return NextResponse.redirect(errorUrl);
+    }
+  }
 
   if (!token || (action !== "approve" && action !== "decline")) {
     return NextResponse.redirect(errorUrl);
@@ -40,49 +62,38 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const client = await getPool().connect();
   try {
-    await client.query("BEGIN");
-
-    const { rows, rowCount } = await client.query(
-      `SELECT id, account_id, status FROM estimates WHERE id = $1`,
-      [id]
-    );
-
-    if (!rowCount || rowCount === 0) {
-      await client.query("ROLLBACK");
-      return NextResponse.redirect(errorUrl);
-    }
-
-    const est = rows[0] as { id: string; account_id: string; status: string };
-
-    if (!["draft", "sent"].includes(est.status)) {
-      await client.query("ROLLBACK");
-      return NextResponse.redirect(thanksUrl(action));
-    }
-
     const newStatus = action === "approve" ? "approved" : "declined";
 
-    await client.query(
-      `UPDATE estimates SET status = $1, updated_at = now() WHERE id = $2`,
+    // Atomic first-writer-wins: only transitions from draft/sent.
+    // If status is already approved/declined/expired, RETURNING returns nothing
+    // and we treat it as idempotent success.
+    const { rows } = await client.query<{ id: string; account_id: string; old_status: string }>(
+      `UPDATE estimates
+       SET status = $1, updated_at = now()
+       WHERE id = $2 AND status IN ('draft', 'sent')
+       RETURNING id, account_id, status AS old_status`,
       [newStatus, id]
     );
 
-    await client.query(
-      `INSERT INTO audit_log
-         (account_id, entity_type, entity_id, action, actor_id, old_value, new_value)
-       VALUES ($1, 'estimate', $2, 'client_respond', NULL, $3, $4)`,
-      [
-        est.account_id,
-        id,
-        JSON.stringify({ status: est.status }),
-        JSON.stringify({ status: newStatus, responded_at: new Date().toISOString(), via: "email_link" }),
-      ]
-    );
+    if (rows.length > 0) {
+      const { account_id } = rows[0];
+      // Fire-and-forget audit log (non-critical, don't block redirect)
+      client.query(
+        `INSERT INTO audit_log
+           (account_id, entity_type, entity_id, action, actor_id, old_value, new_value)
+         VALUES ($1, 'estimate', $2, 'update', NULL, $3, $4)`,
+        [
+          account_id,
+          id,
+          JSON.stringify({ status: "draft_or_sent" }),
+          JSON.stringify({ status: newStatus, responded_at: new Date().toISOString(), via: "email_link" }),
+        ]
+      ).catch((err) => logger.error("estimate respond: audit log failed", err, { estimateId: id }));
+    }
 
-    await client.query("COMMIT");
     return NextResponse.redirect(thanksUrl(action));
   } catch (error) {
-    await client.query("ROLLBACK").catch(() => {});
-    logger.error("GET /api/v1/estimates/[id]/respond error", error, { estimateId: id, action });
+    logger.error("POST /api/v1/estimates/[id]/respond error", error, { estimateId: id, action });
     return NextResponse.redirect(errorUrl);
   } finally {
     client.release();
