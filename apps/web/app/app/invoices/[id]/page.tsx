@@ -10,7 +10,9 @@ import { RecordPaymentForm } from "./RecordPaymentForm";
 import { PaymentHistory } from "./PaymentHistory";
 import { InvoiceEditForm } from "./InvoiceEditForm";
 import { MarkDepositReceivedButton } from "./MarkDepositReceivedButton";
+import { SendInvoiceButton } from "./SendInvoiceButton";
 import { StatusStepper } from "@/components/ui";
+import { isEmailConfigured } from "@/lib/email/mailer";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +40,7 @@ interface InvoiceRow {
   created_at: string;
   updated_at: string;
   client_name: string | null;
+  client_email: string | null;
   job_title: string | null;
 }
 
@@ -77,7 +80,7 @@ export default async function InvoiceDetailPage({
 
   const result = await withInvoiceContext(session, async (client) => {
     const invoiceResult = await client.query(
-      `SELECT i.*, c.name AS client_name, j.title AS job_title
+      `SELECT i.*, c.name AS client_name, c.email AS client_email, j.title AS job_title
        FROM invoices i
        LEFT JOIN clients c ON c.id = i.client_id
        LEFT JOIN jobs j ON j.id = i.job_id
@@ -319,6 +322,19 @@ export default async function InvoiceDetailPage({
             invoiceId={invoice.id}
             invoiceStatus={currentStatus}
             role={session.role}
+          />
+        </div>
+      )}
+
+      {/* Send to Client — owner/admin only, non-terminal invoices */}
+      {canTransition && !["paid", "void"].includes(currentStatus) && (
+        <div className="card action-card">
+          <h2>Send to Client</h2>
+          <SendInvoiceButton
+            invoiceId={invoice.id}
+            clientEmail={invoice.client_email}
+            sentAt={invoice.sent_at}
+            emailConfigured={isEmailConfigured()}
           />
         </div>
       )}

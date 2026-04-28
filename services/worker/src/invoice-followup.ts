@@ -1,5 +1,6 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
+import { sendEmail, isEmailConfigured, invoiceFollowupHtml, appUrl } from "./mailer.js";
 
 /**
  * Overdue Invoice Follow-Up Automation
@@ -49,6 +50,7 @@ export interface OverdueInvoice {
   paid_cents: number;
   due_date: string;
   client_name: string | null;
+  client_email: string | null;
 }
 
 export interface FollowupResult {
@@ -91,7 +93,7 @@ export async function findOverdueInvoices(
   const { rows } = await client.query<OverdueInvoice>(
     `SELECT i.id, i.account_id, i.client_id, i.invoice_number,
             i.status, i.total_cents, i.paid_cents,
-            i.due_date::text, c.name AS client_name
+            i.due_date::text, c.name AS client_name, c.email AS client_email
      FROM invoices i
      JOIN clients c ON c.id = i.client_id
      WHERE i.account_id = $1
@@ -179,6 +181,26 @@ export async function emitInvoiceFollowup(
       }),
     ]
   );
+
+  if (isEmailConfigured() && invoice.client_email && invoice.client_name) {
+    const balanceCents = invoice.total_cents - invoice.paid_cents;
+    const viewUrl = `${appUrl()}/app/invoices/${invoice.id}`;
+    const emailResult = await sendEmail({
+      to: invoice.client_email,
+      subject: `Payment reminder: Invoice ${invoice.invoice_number} is ${cadenceStep} days overdue`,
+      html: invoiceFollowupHtml({
+        clientName: invoice.client_name,
+        invoiceNumber: invoice.invoice_number,
+        totalCents: invoice.total_cents,
+        balanceCents,
+        daysOverdue: cadenceStep,
+        viewUrl,
+      }),
+    });
+    if (!emailResult.ok) {
+      logger.warn("invoice-followup: email send failed", { invoiceId: invoice.id, error: emailResult.error });
+    }
+  }
 
   return true;
 }

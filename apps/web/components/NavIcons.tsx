@@ -119,3 +119,13 @@ export function IconReports(props: IconProps) {
     </Icon>
   );
 }
+
+export function IconSchedule(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="2" y="4" width="16" height="14" rx="2" />
+      <path d="M14 2v4M6 2v4M2 9h16" />
+      <path d="M6 13h2M10 13h4M6 16h3" />
+    </Icon>
+  );
+}

@@ -41,6 +41,24 @@ interface ReadyToInvoiceRow {
   [key: string]: unknown;
 }
 interface OpenEstimateRow { count: string; expiring_soon: string; [key: string]: unknown }
+interface AttentionItem {
+  kind: "overdue_invoice" | "expiring_estimate" | "draft_unsent";
+  id: string;
+  label: string;
+  sub: string;
+  href: string;
+  urgency: "high" | "medium" | "low";
+  [key: string]: unknown;
+}
+interface OverdueInvoiceRow {
+  id: string; invoice_number: string; client_name: string | null;
+  due_date: string | null; total_cents: string; paid_cents: string;
+  [key: string]: unknown;
+}
+interface ExpiringEstimateRow {
+  id: string; client_name: string | null; expires_at: string;
+  total_cents: string; [key: string]: unknown;
+}
 interface UpcomingVisitRow {
   id: string;
   scheduled_start: string;
@@ -96,6 +114,8 @@ export default async function HomePage() {
     upcomingVisits,
     readyToInvoice,
     openEstimateRows,
+    overdueInvoiceRows,
+    expiringEstimateRows,
   ] = await Promise.all([
     query<UserRow>(`SELECT full_name FROM users WHERE id = $1`, [session.userId]),
 
@@ -197,6 +217,40 @@ export default async function HomePage() {
           [session.accountId]
         )
       : Promise.resolve([{ count: "0", expiring_soon: "0" }] as OpenEstimateRow[]),
+
+    // Needs Attention: overdue invoices
+    isAdmin
+      ? query<OverdueInvoiceRow>(
+          `SELECT i.id, i.invoice_number, c.name AS client_name,
+                  i.due_date::text, i.total_cents::text, i.paid_cents::text
+           FROM invoices i
+           LEFT JOIN clients c ON c.id = i.client_id
+           WHERE i.account_id = $1
+             AND i.status IN ('overdue', 'sent', 'partial')
+             AND i.due_date IS NOT NULL
+             AND i.due_date < now()
+           ORDER BY i.due_date ASC
+           LIMIT 5`,
+          [session.accountId]
+        )
+      : Promise.resolve([] as OverdueInvoiceRow[]),
+
+    // Needs Attention: estimates expiring within 7 days
+    isAdmin
+      ? query<ExpiringEstimateRow>(
+          `SELECT e.id, c.name AS client_name, e.expires_at::text, e.total_cents::text
+           FROM estimates e
+           LEFT JOIN clients c ON c.id = e.client_id
+           WHERE e.account_id = $1
+             AND e.status = 'sent'
+             AND e.expires_at IS NOT NULL
+             AND e.expires_at <= now() + INTERVAL '7 days'
+             AND e.expires_at > now()
+           ORDER BY e.expires_at ASC
+           LIMIT 5`,
+          [session.accountId]
+        )
+      : Promise.resolve([] as ExpiringEstimateRow[]),
   ]);
 
   const firstName = (userRows[0]?.full_name ?? "").split(" ")[0] || "there";
@@ -209,6 +263,35 @@ export default async function HomePage() {
 
   const showOnboarding = isAdminOrOwner && clientCount === 0;
   const showNextStep = isAdminOrOwner && clientCount > 0 && openJobCount === 0;
+
+  // Build "Needs Attention" priority inbox items
+  const attentionItems: AttentionItem[] = [];
+
+  if (isAdmin) {
+    for (const inv of overdueInvoiceRows) {
+      const daysOverdue = Math.floor((Date.now() - new Date(inv.due_date!).getTime()) / 86_400_000);
+      const balance = parseInt(inv.total_cents) - parseInt(inv.paid_cents);
+      attentionItems.push({
+        kind: "overdue_invoice",
+        id: inv.id,
+        label: `Invoice ${inv.invoice_number}${inv.client_name ? ` — ${inv.client_name}` : ""}`,
+        sub: `${formatCurrency(balance)} overdue ${daysOverdue}d`,
+        href: `/app/invoices/${inv.id}`,
+        urgency: daysOverdue >= 30 ? "high" : daysOverdue >= 7 ? "medium" : "low",
+      });
+    }
+    for (const est of expiringEstimateRows) {
+      const daysLeft = Math.ceil((new Date(est.expires_at).getTime() - Date.now()) / 86_400_000);
+      attentionItems.push({
+        kind: "expiring_estimate",
+        id: est.id,
+        label: `Estimate${est.client_name ? ` — ${est.client_name}` : ""} awaiting response`,
+        sub: `${formatCurrency(parseInt(est.total_cents))} · expires in ${daysLeft}d`,
+        href: `/app/estimates/${est.id}`,
+        urgency: daysLeft <= 2 ? "high" : "medium",
+      });
+    }
+  }
 
   const metrics: MetricCardData[] = isAdmin
     ? [
@@ -250,6 +333,39 @@ export default async function HomePage() {
           {isAdmin ? "Here's what's happening with your business today." : "Here's your work for today."}
         </p>
       </div>
+
+      {/* Needs Attention — priority inbox */}
+      {isAdmin && attentionItems.length > 0 && (
+        <div style={{ marginBottom: "var(--space-6)" }}>
+          <SectionHeader title="Needs Attention" count={attentionItems.length} as="h2" />
+          <div style={{ marginTop: "var(--space-3)", display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            {attentionItems.map((item) => {
+              const borderColor = item.urgency === "high" ? "#dc2626" : item.urgency === "medium" ? "#d97706" : "#2563eb";
+              const dotColor = borderColor;
+              return (
+                <Link key={`${item.kind}-${item.id}`} href={item.href as Route} style={{ textDecoration: "none" }}>
+                  <Card hover padding="sm" style={{ borderLeft: `3px solid ${borderColor}` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: "var(--font-medium)", fontSize: "var(--text-sm)", color: "var(--fg)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {item.label}
+                        </div>
+                        <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
+                          {item.sub}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: "var(--text-xs)", color: borderColor, fontWeight: 600, flexShrink: 0 }}>
+                        {item.urgency === "high" ? "Urgent" : "Follow up"} →
+                      </span>
+                    </div>
+                  </Card>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Onboarding — no clients yet */}
       {showOnboarding && (

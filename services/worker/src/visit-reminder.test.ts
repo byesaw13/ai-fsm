@@ -36,6 +36,9 @@ const VISIT: EligibleVisit = {
   scheduled_start: "2026-02-18T09:00:00Z",
   job_title: "Lawn Mowing",
   client_name: "John Doe",
+  client_email: null,
+  property_address: null,
+  tech_name: null,
 };
 
 describe("findDueReminders", () => {
