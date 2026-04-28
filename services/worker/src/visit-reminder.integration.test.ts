@@ -155,6 +155,9 @@ describe.skipIf(!shouldRun)("Visit Reminder Integration Tests", () => {
       scheduled_start: new Date(Date.now() + 12 * 3600000).toISOString(),
       job_title: "Reminder Test Job",
       client_name: "Reminder Test Client",
+      client_email: null,
+      property_address: null,
+      tech_name: null,
     };
 
     const emitted = await emitVisitReminder(client, visit, testAutomationId);
@@ -185,6 +188,9 @@ describe.skipIf(!shouldRun)("Visit Reminder Integration Tests", () => {
       scheduled_start: new Date(Date.now() + 12 * 3600000).toISOString(),
       job_title: "Reminder Test Job",
       client_name: "Reminder Test Client",
+      client_email: null,
+      property_address: null,
+      tech_name: null,
     };
 
     // First call: should emit

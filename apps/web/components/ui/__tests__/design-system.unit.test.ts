@@ -136,9 +136,9 @@ describe("getButtonClass", () => {
 import { getNavItems, isNavActive } from "../../AppShell";
 
 describe("getNavItems (role filtering)", () => {
-  it("returns all 10 items for admin role", () => {
+  it("returns all 11 items for admin role", () => {
     const items = getNavItems("admin");
-    expect(items).toHaveLength(10);
+    expect(items).toHaveLength(11);
     expect(items.map((i) => i.href)).toContain("/app/clients");
     expect(items.map((i) => i.href)).toContain("/app/properties");
     expect(items.map((i) => i.href)).toContain("/app/estimates");
@@ -146,20 +146,22 @@ describe("getNavItems (role filtering)", () => {
     expect(items.map((i) => i.href)).toContain("/app/automations");
     expect(items.map((i) => i.href)).toContain("/app/expenses");
     expect(items.map((i) => i.href)).toContain("/app/reports");
+    expect(items.map((i) => i.href)).toContain("/app/schedule");
   });
 
-  it("returns all 10 items for owner role", () => {
+  it("returns all 11 items for owner role", () => {
     const items = getNavItems("owner");
-    expect(items).toHaveLength(10);
+    expect(items).toHaveLength(11);
   });
 
-  it("returns only 3 items for tech role (no admin-only routes)", () => {
+  it("returns only 4 items for tech role (no admin-only routes)", () => {
     const items = getNavItems("tech");
-    expect(items).toHaveLength(3);
+    expect(items).toHaveLength(4);
     const hrefs = items.map((i) => i.href);
     expect(hrefs).toContain("/app");
     expect(hrefs).toContain("/app/jobs");
     expect(hrefs).toContain("/app/visits");
+    expect(hrefs).toContain("/app/schedule");
     expect(hrefs).not.toContain("/app/estimates");
     expect(hrefs).not.toContain("/app/invoices");
     expect(hrefs).not.toContain("/app/automations");

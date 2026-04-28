@@ -1,5 +1,6 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
+import { sendEmail, isEmailConfigured, visitReminderHtml } from "./mailer.js";
 
 /**
  * Visit Reminder Automation
@@ -41,6 +42,9 @@ export interface EligibleVisit {
   scheduled_start: string;
   job_title: string | null;
   client_name: string | null;
+  client_email: string | null;
+  property_address: string | null;
+  tech_name: string | null;
 }
 
 export interface ReminderResult {
@@ -82,10 +86,15 @@ export async function findEligibleVisits(
 
   const { rows } = await client.query<EligibleVisit>(
     `SELECT v.id, v.account_id, v.job_id, v.assigned_user_id,
-            v.scheduled_start::text, j.title AS job_title, c.name AS client_name
+            v.scheduled_start::text, j.title AS job_title,
+            c.name AS client_name, c.email AS client_email,
+            p.address AS property_address,
+            u.full_name AS tech_name
      FROM visits v
      JOIN jobs j ON j.id = v.job_id
      JOIN clients c ON c.id = j.client_id
+     LEFT JOIN properties p ON p.id = j.property_id
+     LEFT JOIN users u ON u.id = v.assigned_user_id
      WHERE v.account_id = $1
        AND v.status = 'scheduled'
        AND v.scheduled_start > now()
@@ -126,6 +135,31 @@ export async function emitVisitReminder(
 
   if (rowCount && rowCount > 0) {
     return false; // Already sent
+  }
+
+  // Send email BEFORE writing the audit log. The audit log is the dedupe
+  // guard — writing it first would permanently suppress retries on SMTP failure.
+  if (isEmailConfigured() && visit.client_email && visit.client_name && visit.job_title) {
+    const when = new Date(visit.scheduled_start).toLocaleString("en-US", {
+      weekday: "long", month: "long", day: "numeric", year: "numeric",
+      hour: "numeric", minute: "2-digit",
+    });
+    const emailResult = await sendEmail({
+      to: visit.client_email,
+      subject: `Reminder: ${visit.job_title} visit on ${when}`,
+      html: visitReminderHtml({
+        clientName: visit.client_name,
+        jobTitle: visit.job_title,
+        when,
+        propertyAddress: visit.property_address,
+        techName: visit.tech_name,
+      }),
+    });
+    if (!emailResult.ok) {
+      // Don't write the audit log — let the next run retry delivery.
+      logger.warn("visit-reminder: email send failed, skipping dedupe mark", { visitId: visit.id, error: emailResult.error });
+      return false;
+    }
   }
 
   await client.query(

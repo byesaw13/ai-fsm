@@ -39,6 +39,7 @@ const INVOICE: OverdueInvoice = {
   paid_cents: 10000,
   due_date: "2026-01-20T00:00:00Z", // ~28 days ago from Feb 17
   client_name: "Acme Corp",
+  client_email: null,
 };
 
 describe("findDueFollowups", () => {

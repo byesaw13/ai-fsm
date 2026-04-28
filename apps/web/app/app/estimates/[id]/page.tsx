@@ -13,7 +13,9 @@ import { EstimateInternalNotesForm } from "./EstimateInternalNotesForm";
 import { EstimateConvertButton } from "./EstimateConvertButton";
 import { DeleteEstimateButton } from "./DeleteEstimateButton";
 import { EstimateEditForm } from "./EstimateEditForm";
+import { SendEstimateButton } from "./SendEstimateButton";
 import { StatusStepper } from "@/components/ui";
+import { isEmailConfigured } from "@/lib/email/mailer";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,7 @@ interface EstimateRow {
   created_at: string;
   updated_at: string;
   client_name: string | null;
+  client_email: string | null;
   job_title: string | null;
 }
 
@@ -72,7 +75,7 @@ export default async function EstimateDetailPage({
 
   const result = await withEstimateContext(session, async (client) => {
     const estimateResult = await client.query(
-      `SELECT e.*, c.name AS client_name, j.title AS job_title
+      `SELECT e.*, c.name AS client_name, c.email AS client_email, j.title AS job_title
        FROM estimates e
        LEFT JOIN clients c ON c.id = e.client_id
        LEFT JOIN jobs j ON j.id = e.job_id
@@ -294,6 +297,19 @@ export default async function EstimateDetailPage({
             sort_order: item.sort_order,
           }))}
         />
+      )}
+
+      {/* Send to Client — owner/admin only, non-terminal estimates */}
+      {canTransition && !["approved", "declined", "expired"].includes(currentStatus) && (
+        <div className="card action-card">
+          <h2>Send to Client</h2>
+          <SendEstimateButton
+            estimateId={estimate.id}
+            clientEmail={estimate.client_email}
+            sentAt={estimate.sent_at}
+            emailConfigured={isEmailConfigured()}
+          />
+        </div>
       )}
 
       {/* Status Transitions — owner/admin only */}

@@ -123,6 +123,7 @@ describe.skipIf(!shouldRun)("invoice-followup integration", () => {
       paid_cents: 10000,
       due_date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
       client_name: "Follow-Up Test Client",
+      client_email: null,
     };
 
     const emitted = await emitInvoiceFollowup(client, invoice, automationId, 7);
@@ -148,6 +149,7 @@ describe.skipIf(!shouldRun)("invoice-followup integration", () => {
       paid_cents: 10000,
       due_date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
       client_name: "Follow-Up Test Client",
+      client_email: null,
     };
 
     // Second attempt at same step should return false
