@@ -158,6 +158,30 @@ export async function emitInvoiceFollowup(
     return false; // Already sent for this cadence step
   }
 
+  // Send email BEFORE writing the audit log. The audit log is the dedupe
+  // guard — writing it first would permanently suppress retries on SMTP failure.
+  if (isEmailConfigured() && invoice.client_email && invoice.client_name) {
+    const balanceCents = invoice.total_cents - invoice.paid_cents;
+    const viewUrl = `${appUrl()}/app/invoices/${invoice.id}`;
+    const emailResult = await sendEmail({
+      to: invoice.client_email,
+      subject: `Payment reminder: Invoice ${invoice.invoice_number} is ${cadenceStep} days overdue`,
+      html: invoiceFollowupHtml({
+        clientName: invoice.client_name,
+        invoiceNumber: invoice.invoice_number,
+        totalCents: invoice.total_cents,
+        balanceCents,
+        daysOverdue: cadenceStep,
+        viewUrl,
+      }),
+    });
+    if (!emailResult.ok) {
+      // Don't write the audit log — let the next run retry delivery.
+      logger.warn("invoice-followup: email send failed, skipping dedupe mark", { invoiceId: invoice.id, error: emailResult.error });
+      return false;
+    }
+  }
+
   await client.query(
     `INSERT INTO audit_log
        (account_id, entity_type, entity_id, action, actor_id, old_value, new_value)
@@ -181,26 +205,6 @@ export async function emitInvoiceFollowup(
       }),
     ]
   );
-
-  if (isEmailConfigured() && invoice.client_email && invoice.client_name) {
-    const balanceCents = invoice.total_cents - invoice.paid_cents;
-    const viewUrl = `${appUrl()}/app/invoices/${invoice.id}`;
-    const emailResult = await sendEmail({
-      to: invoice.client_email,
-      subject: `Payment reminder: Invoice ${invoice.invoice_number} is ${cadenceStep} days overdue`,
-      html: invoiceFollowupHtml({
-        clientName: invoice.client_name,
-        invoiceNumber: invoice.invoice_number,
-        totalCents: invoice.total_cents,
-        balanceCents,
-        daysOverdue: cadenceStep,
-        viewUrl,
-      }),
-    });
-    if (!emailResult.ok) {
-      logger.warn("invoice-followup: email send failed", { invoiceId: invoice.id, error: emailResult.error });
-    }
-  }
 
   return true;
 }

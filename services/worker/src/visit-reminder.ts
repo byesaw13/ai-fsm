@@ -137,6 +137,31 @@ export async function emitVisitReminder(
     return false; // Already sent
   }
 
+  // Send email BEFORE writing the audit log. The audit log is the dedupe
+  // guard — writing it first would permanently suppress retries on SMTP failure.
+  if (isEmailConfigured() && visit.client_email && visit.client_name && visit.job_title) {
+    const when = new Date(visit.scheduled_start).toLocaleString("en-US", {
+      weekday: "long", month: "long", day: "numeric", year: "numeric",
+      hour: "numeric", minute: "2-digit",
+    });
+    const emailResult = await sendEmail({
+      to: visit.client_email,
+      subject: `Reminder: ${visit.job_title} visit on ${when}`,
+      html: visitReminderHtml({
+        clientName: visit.client_name,
+        jobTitle: visit.job_title,
+        when,
+        propertyAddress: visit.property_address,
+        techName: visit.tech_name,
+      }),
+    });
+    if (!emailResult.ok) {
+      // Don't write the audit log — let the next run retry delivery.
+      logger.warn("visit-reminder: email send failed, skipping dedupe mark", { visitId: visit.id, error: emailResult.error });
+      return false;
+    }
+  }
+
   await client.query(
     `INSERT INTO audit_log
        (account_id, entity_type, entity_id, action, actor_id, old_value, new_value)
@@ -156,27 +181,6 @@ export async function emitVisitReminder(
       }),
     ]
   );
-
-  if (isEmailConfigured() && visit.client_email && visit.client_name && visit.job_title) {
-    const when = new Date(visit.scheduled_start).toLocaleString("en-US", {
-      weekday: "long", month: "long", day: "numeric", year: "numeric",
-      hour: "numeric", minute: "2-digit",
-    });
-    const emailResult = await sendEmail({
-      to: visit.client_email,
-      subject: `Reminder: ${visit.job_title} visit on ${when}`,
-      html: visitReminderHtml({
-        clientName: visit.client_name,
-        jobTitle: visit.job_title,
-        when,
-        propertyAddress: visit.property_address,
-        techName: visit.tech_name,
-      }),
-    });
-    if (!emailResult.ok) {
-      logger.warn("visit-reminder: email send failed", { visitId: visit.id, error: emailResult.error });
-    }
-  }
 
   return true;
 }
