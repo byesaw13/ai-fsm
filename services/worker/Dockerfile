@@ -4,11 +4,14 @@ RUN corepack enable
 
 FROM base AS deps
 COPY package.json pnpm-workspace.yaml ./
+COPY apps/web/package.json apps/web/package.json
+COPY packages/domain/package.json packages/domain/package.json
 COPY services/worker/package.json services/worker/package.json
 RUN pnpm install --frozen-lockfile=false
 
 FROM deps AS build
-COPY services/worker services/worker
+COPY services/worker/src services/worker/src
+COPY services/worker/tsconfig.json services/worker/tsconfig.json
 RUN pnpm --filter @ai-fsm/worker build
 
 FROM node:20-alpine AS run
