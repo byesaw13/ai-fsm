@@ -34,6 +34,9 @@ const schema = z.object({
   HOMEBOX_URL: z.string().url().optional(),
   HOMEBOX_USER: z.string().optional(),
   HOMEBOX_PASSWORD: z.string().optional(),
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
 });
 
 let cachedEnv: ReturnType<typeof schema.parse> | null = null;
