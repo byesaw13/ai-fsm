@@ -17,6 +17,7 @@ import {
   IconExpenses,
   IconAutomations,
   IconReports,
+  IconSettings,
 } from "./NavIcons";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
@@ -40,6 +41,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { href: "/app/expenses",    label: "Expenses",    Icon: IconExpenses,    adminOnly: true },
   { href: "/app/automations", label: "Automations", Icon: IconAutomations, adminOnly: true },
   { href: "/app/reports",     label: "Reports",     Icon: IconReports,     adminOnly: true },
+  { href: "/app/settings",    label: "Settings",    Icon: IconSettings },
 ];
 
 /** Pure function — returns filtered nav items for a given role */
