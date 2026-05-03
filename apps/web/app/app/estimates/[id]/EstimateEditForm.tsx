@@ -11,6 +11,13 @@ import {
   Textarea,
   useToast,
 } from "@/components/ui";
+import {
+  calculatePaintingEstimate,
+  formatCents,
+} from "@/lib/estimates/pricing";
+import {
+  PREP_LEVEL_MULTIPLIERS,
+} from "@ai-fsm/domain";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -43,6 +50,13 @@ interface EstimateEditFormProps {
   initialSubtotalCents: number;
   initialTaxCents: number;
   initialLineItems: InitialLineItem[];
+  // Painting fields
+  initialSqFt?: number | null;
+  initialPrepLevel?: number | null;
+  initialIncludesTrim?: boolean;
+  initialIncludesCeiling?: boolean;
+  initialMaterialCostCents?: number | null;
+  initialLaborHours?: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -91,6 +105,12 @@ export function EstimateEditForm({
   initialSubtotalCents,
   initialTaxCents,
   initialLineItems,
+  initialSqFt,
+  initialPrepLevel,
+  initialIncludesTrim,
+  initialIncludesCeiling,
+  initialMaterialCostCents,
+  initialLaborHours,
 }: EstimateEditFormProps) {
   const router = useRouter();
   const toast = useToast();
@@ -102,8 +122,12 @@ export function EstimateEditForm({
   const [properties, setProperties] = useState<PropertyOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(true);
 
-  // Detect initial mode: flat rate = no line items but subtotal > 0
-  const isFlatRateInitially = initialLineItems.length === 0 && initialSubtotalCents > 0;
+  // Detect initial mode
+  const hasPaintingData = initialSqFt !== null && initialSqFt !== undefined;
+  const isFlatRateInitially = !hasPaintingData && initialLineItems.length === 0 && initialSubtotalCents > 0;
+  const [serviceType, setServiceType] = useState<"painting" | "generic">(
+    hasPaintingData ? "painting" : "generic"
+  );
   const [mode, setMode] = useState<"itemized" | "flat_rate">(
     isFlatRateInitially ? "flat_rate" : "itemized"
   );
@@ -132,6 +156,16 @@ export function EstimateEditForm({
       ? ((initialTaxCents / initialSubtotalCents) * 100).toFixed(2)
       : "0";
   const [taxRate, setTaxRate] = useState(derivedTaxRate);
+
+  // Painting state
+  const [sqFt, setSqFt] = useState(initialSqFt?.toString() ?? "");
+  const [prepLevel, setPrepLevel] = useState(initialPrepLevel ?? 5);
+  const [includesTrim, setIncludesTrim] = useState(initialIncludesTrim ?? true);
+  const [includesCeiling, setIncludesCeiling] = useState(initialIncludesCeiling ?? false);
+  const [materialCostDollars, setMaterialCostDollars] = useState(
+    initialMaterialCostCents ? (initialMaterialCostCents / 100).toFixed(2) : ""
+  );
+  const [laborHours, setLaborHours] = useState(initialLaborHours?.toString() ?? "");
 
   useEffect(() => {
     let cancelled = false;
@@ -177,6 +211,22 @@ export function EstimateEditForm({
   const taxCents = Math.round((subtotalCents * taxRateNum) / 100);
   const totalCents = subtotalCents + taxCents;
 
+  // Live painting estimate calculation
+  const paintingResult = useMemo(() => {
+    const sq = parseFloat(sqFt);
+    const mat = parseCents(materialCostDollars);
+    const hrs = parseFloat(laborHours);
+    if (isNaN(sq) || sq <= 0 || isNaN(hrs) || hrs <= 0) return null;
+    return calculatePaintingEstimate({
+      sq_ft: sq,
+      prep_level: prepLevel,
+      includes_trim: includesTrim,
+      includes_ceiling: includesCeiling,
+      material_cost_cents: mat,
+      labor_hours_estimate: hrs,
+    });
+  }, [sqFt, prepLevel, includesTrim, includesCeiling, materialCostDollars, laborHours]);
+
   function handleModeChange(newMode: "itemized" | "flat_rate") {
     if (newMode === "flat_rate") {
       const current = lineItems.reduce((sum, row) => sum + lineTotal(row), 0);
@@ -218,32 +268,78 @@ export function EstimateEditForm({
     setPending(true);
 
     try {
-      const payload =
-        mode === "flat_rate"
-          ? {
-              client_id: clientId,
-              job_id: jobId || null,
-              property_id: propertyId || null,
-              notes: notes.trim() || null,
-              expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
-              tax_rate: taxRateNum,
-              flat_rate_cents: parseCents(flatRate),
-              line_items: [],
-            }
-          : {
-              client_id: clientId,
-              job_id: jobId || null,
-              property_id: propertyId || null,
-              notes: notes.trim() || null,
-              expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
-              tax_rate: taxRateNum,
-              line_items: lineItems.map((row, i) => ({
-                description: row.description,
-                quantity: parseFloat(row.quantity) || 1,
-                unit_price_cents: parseCents(row.unit_price),
-                sort_order: i,
-              })),
-            };
+      let payload: Record<string, unknown>;
+
+      if (serviceType === "painting" && paintingResult) {
+        payload = {
+          client_id: clientId,
+          job_id: jobId || null,
+          property_id: propertyId || null,
+          notes: notes.trim() || null,
+          expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+          tax_rate: taxRateNum,
+          sq_ft: parseFloat(sqFt),
+          prep_level: prepLevel,
+          includes_trim: includesTrim,
+          includes_ceiling: includesCeiling,
+          material_cost_cents: parseCents(materialCostDollars),
+          labor_hours_estimate: parseFloat(laborHours),
+          line_items: [
+            {
+              description: `Painting labor — ${parseFloat(sqFt).toLocaleString()} sq ft${includesCeiling ? " + ceiling" : ""}${includesTrim ? " + trim" : ""} (prep level ${prepLevel})`,
+              quantity: 1,
+              unit_price_cents: paintingResult.labor_flat_rate_cents,
+              sort_order: 0,
+            },
+            ...(parseCents(materialCostDollars) > 0
+              ? [
+                  {
+                    description: "Materials",
+                    quantity: 1,
+                    unit_price_cents: parseCents(materialCostDollars),
+                    sort_order: 1,
+                  },
+                ]
+              : []),
+            ...(paintingResult.material_handling_cents > 0
+              ? [
+                  {
+                    description: "Material handling fee (15%)",
+                    quantity: 1,
+                    unit_price_cents: paintingResult.material_handling_cents,
+                    sort_order: 2,
+                  },
+                ]
+              : []),
+          ],
+        };
+      } else if (mode === "flat_rate") {
+        payload = {
+          client_id: clientId,
+          job_id: jobId || null,
+          property_id: propertyId || null,
+          notes: notes.trim() || null,
+          expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+          tax_rate: taxRateNum,
+          flat_rate_cents: parseCents(flatRate),
+          line_items: [],
+        };
+      } else {
+        payload = {
+          client_id: clientId,
+          job_id: jobId || null,
+          property_id: propertyId || null,
+          notes: notes.trim() || null,
+          expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+          tax_rate: taxRateNum,
+          line_items: lineItems.map((row, i) => ({
+            description: row.description,
+            quantity: parseFloat(row.quantity) || 1,
+            unit_price_cents: parseCents(row.unit_price),
+            sort_order: i,
+          })),
+        };
+      }
 
       const res = await fetch(`/api/v1/estimates/${estimateId}`, {
         method: "PATCH",
@@ -343,7 +439,174 @@ export function EstimateEditForm({
           />
         </div>
 
-        {/* Pricing Mode Toggle + Line Items */}
+        {/* Service Type Toggle */}
+        <div>
+          <SectionHeader title="Service Type" as="h3" />
+          <div
+            style={{
+              display: "flex",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius)",
+              overflow: "hidden",
+              width: "fit-content",
+            }}
+          >
+            {(["painting", "generic"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setServiceType(t)}
+                disabled={pending}
+                style={{
+                  padding: "var(--space-1) var(--space-3)",
+                  background: serviceType === t ? "var(--accent)" : "transparent",
+                  color: serviceType === t ? "#fff" : "var(--fg-muted)",
+                  border: "none",
+                  cursor: pending ? "default" : "pointer",
+                  fontSize: "var(--text-sm)",
+                  fontWeight: serviceType === t ? 600 : 400,
+                  lineHeight: 1.4,
+                }}
+              >
+                {t === "painting" ? "Painting" : "Generic"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Painting Estimator */}
+        {serviceType === "painting" && (
+          <div style={{ marginTop: "var(--space-4)" }}>
+            <SectionHeader title="Painting Estimator" as="h3" />
+
+            <div className="p7-form-grid p7-form-grid-2">
+              <Input
+                id="edit-sq-ft"
+                label="Square Footage"
+                type="number"
+                min="1"
+                step="1"
+                value={sqFt}
+                onChange={(e) => setSqFt(e.target.value)}
+                disabled={pending}
+                placeholder="e.g. 1200"
+              />
+
+              <Input
+                id="edit-labor-hours"
+                label="Estimated Labor Hours"
+                type="number"
+                min="0.5"
+                step="0.5"
+                value={laborHours}
+                onChange={(e) => setLaborHours(e.target.value)}
+                disabled={pending}
+                placeholder="Internal only"
+                hint="Used for margin calculation"
+              />
+
+              <Input
+                id="edit-material-cost"
+                label="Material Cost ($)"
+                type="number"
+                min="0"
+                step="0.01"
+                value={materialCostDollars}
+                onChange={(e) => setMaterialCostDollars(e.target.value)}
+                disabled={pending}
+                placeholder="e.g. 350.00"
+              />
+
+              <div className="p7-field">
+                <label className="p7-label" htmlFor="edit-prep-level">Prep Level</label>
+                <select
+                  id="edit-prep-level"
+                  className="p7-select"
+                  value={prepLevel}
+                  onChange={(e) => setPrepLevel(Number(e.target.value))}
+                  disabled={pending}
+                >
+                  {Object.entries(PREP_LEVEL_MULTIPLIERS).map(([level, mult]) => (
+                    <option key={level} value={level}>
+                      Level {level} ({mult}x)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "var(--space-4)", marginTop: "var(--space-2)" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={includesTrim}
+                  onChange={(e) => setIncludesTrim(e.target.checked)}
+                  disabled={pending}
+                />
+                <span>Include trim (+$0.20/sq ft)</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={includesCeiling}
+                  onChange={(e) => setIncludesCeiling(e.target.checked)}
+                  disabled={pending}
+                />
+                <span>Include ceiling (+30% surface)</span>
+              </label>
+            </div>
+
+            {paintingResult && (
+              <div style={{ marginTop: "var(--space-4)" }}>
+                <Card padding="sm" style={{ background: "var(--bg-subtle)" }}>
+                  <SectionHeader title="Estimate Preview" as="h4" />
+                  <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "var(--space-1) var(--space-4)", textAlign: "right" }}>
+                    <span style={{ color: "var(--fg-muted)" }}>Labor (flat rate)</span>
+                    <span>{formatCents(paintingResult.labor_flat_rate_cents)}</span>
+
+                    {parseCents(materialCostDollars) > 0 && (
+                      <>
+                        <span style={{ color: "var(--fg-muted)" }}>Materials</span>
+                        <span>{formatCents(parseCents(materialCostDollars))}</span>
+
+                        <span style={{ color: "var(--fg-muted)" }}>Handling fee (15%)</span>
+                        <span>{formatCents(paintingResult.material_handling_cents)}</span>
+                      </>
+                    )}
+
+                    <strong>Total</strong>
+                    <strong>{formatCents(paintingResult.total_cents)}</strong>
+
+                    <span style={{ color: "var(--fg-muted)" }}>Deposit (30%)</span>
+                    <span>{formatCents(paintingResult.deposit_cents)}</span>
+
+                    <span style={{ color: "var(--fg-muted)" }}>Balance (70%)</span>
+                    <span>{formatCents(paintingResult.balance_cents)}</span>
+                  </div>
+
+                  <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
+                    <SectionHeader title="Internal Margin" as="h4" />
+                    <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "var(--space-1) var(--space-4)", textAlign: "right" }}>
+                      <span style={{ color: "var(--fg-muted)" }}>Internal labor cost ($85/hr)</span>
+                      <span>{formatCents(paintingResult.internal_labor_cost_cents)}</span>
+
+                      <span style={{ color: "var(--fg-muted)" }}>Gross margin</span>
+                      <span style={{
+                        color: paintingResult.gross_margin_pct >= 30 ? "var(--color-success)" : paintingResult.gross_margin_pct >= 15 ? "var(--color-warning)" : "var(--color-danger)",
+                        fontWeight: 600,
+                      }}>
+                        {paintingResult.gross_margin_pct}% ({formatCents(paintingResult.gross_margin_cents)})
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Generic Pricing */}
+        {serviceType === "generic" && (
         <div style={{ marginTop: "var(--space-4)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-3)" }}>
             <SectionHeader
@@ -568,6 +831,7 @@ export function EstimateEditForm({
             </div>
           </div>
         </div>
+        )}
 
         <div className="p7-form-actions" style={{ marginTop: "var(--space-4)" }}>
           <Button

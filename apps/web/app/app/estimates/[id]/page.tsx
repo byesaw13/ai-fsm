@@ -6,7 +6,7 @@ import {
   canDeleteRecords,
 } from "@/lib/auth/permissions";
 import { withEstimateContext } from "@/lib/estimates/db";
-import { estimateTransitions } from "@ai-fsm/domain";
+import { estimateTransitions, PREP_LEVEL_MULTIPLIERS } from "@ai-fsm/domain";
 import type { EstimateStatus } from "@ai-fsm/domain";
 import { EstimateTransitionForm } from "./EstimateTransitionForm";
 import { EstimateInternalNotesForm } from "./EstimateInternalNotesForm";
@@ -30,11 +30,19 @@ interface EstimateRow {
   subtotal_cents: number;
   tax_cents: number;
   total_cents: number;
+  deposit_cents: number;
+  balance_cents: number;
   notes: string | null;
   internal_notes: string | null;
   sent_at: string | null;
   expires_at: string | null;
   share_token: string;
+  sq_ft: number | null;
+  prep_level: number | null;
+  includes_trim: boolean;
+  includes_ceiling: boolean;
+  internal_labor_cost_cents: number | null;
+  internal_material_cost_cents: number | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -171,6 +179,16 @@ export default async function EstimateDetailPage({
             {formatDollars(estimate.total_cents)}
           </span>
         </p>
+        {estimate.deposit_cents > 0 && (
+          <p>
+            <strong>Deposit (30%):</strong> {formatDollars(estimate.deposit_cents)}
+          </p>
+        )}
+        {estimate.balance_cents > 0 && (
+          <p>
+            <strong>Balance (70%):</strong> {formatDollars(estimate.balance_cents)}
+          </p>
+        )}
         {estimate.sent_at && (
           <p>
             <strong>Sent:</strong>{" "}
@@ -188,6 +206,47 @@ export default async function EstimateDetailPage({
             <strong>Notes:</strong> {estimate.notes}
           </p>
         )}
+
+        {/* Painting scope details */}
+        {estimate.sq_ft !== null && (
+          <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px solid var(--border)" }}>
+            <p style={{ fontWeight: 600, marginBottom: "var(--space-1)" }}>Painting Scope</p>
+            <p><strong>Square footage:</strong> {Number(estimate.sq_ft).toLocaleString()} sq ft</p>
+            {estimate.prep_level !== null && (
+              <p><strong>Prep level:</strong> {estimate.prep_level} ({PREP_LEVEL_MULTIPLIERS[estimate.prep_level]?.toFixed(2)}x multiplier)</p>
+            )}
+            <p><strong>Trim:</strong> {estimate.includes_trim ? "Included" : "Not included"}</p>
+            <p><strong>Ceiling:</strong> {estimate.includes_ceiling ? "Included (+30% surface)" : "Not included"}</p>
+          </div>
+        )}
+
+        {/* Internal margin (owner/admin only) */}
+        {(session.role === "owner" || session.role === "admin") && estimate.internal_labor_cost_cents !== null && estimate.sq_ft !== null && (
+          <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
+            <p style={{ fontWeight: 600, marginBottom: "var(--space-1)", color: "var(--fg-muted)" }}>Internal Margin</p>
+            {(() => {
+              // Recompute gross margin from stored data
+              const laborRevenue = estimate.subtotal_cents - (estimate.internal_material_cost_cents ?? 0) - Math.round((estimate.internal_material_cost_cents ?? 0) * 0.15);
+              const internalCost = estimate.internal_labor_cost_cents;
+              const marginCents = laborRevenue - internalCost;
+              const marginPct = laborRevenue > 0 ? Math.round((marginCents / laborRevenue) * 100 * 10) / 10 : 0;
+              const marginColor = marginPct >= 30 ? "var(--color-success)" : marginPct >= 15 ? "var(--color-warning)" : "var(--color-danger)";
+              return (
+                <>
+                  <p><strong>Internal labor cost:</strong> {formatDollars(estimate.internal_labor_cost_cents)}</p>
+                  <p><strong>Labor revenue:</strong> {formatDollars(laborRevenue)}</p>
+                  <p>
+                    <strong>Gross margin:</strong>{" "}
+                    <span style={{ color: marginColor, fontWeight: 700 }}>
+                      {marginPct}% ({formatDollars(marginCents)})
+                    </span>
+                  </p>
+                </>
+              );
+            })()}
+          </div>
+        )}
+
         {estimate.internal_notes && session.role !== "tech" && (
           <p>
             <strong>Internal Notes:</strong> {estimate.internal_notes}
@@ -301,6 +360,14 @@ export default async function EstimateDetailPage({
             unit_price_cents: item.unit_price_cents,
             sort_order: item.sort_order,
           }))}
+          initialSqFt={estimate.sq_ft}
+          initialPrepLevel={estimate.prep_level}
+          initialIncludesTrim={estimate.includes_trim}
+          initialIncludesCeiling={estimate.includes_ceiling}
+          initialMaterialCostCents={estimate.internal_material_cost_cents}
+          initialLaborHours={estimate.internal_labor_cost_cents !== null && estimate.sq_ft !== null
+            ? Math.round((estimate.internal_labor_cost_cents / 8500) * 10) / 10
+            : null}
         />
       )}
 
