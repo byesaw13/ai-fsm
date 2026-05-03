@@ -11,6 +11,15 @@ import {
   SectionHeader,
   Textarea,
 } from "@/components/ui";
+import {
+  calculatePaintingEstimate,
+  formatCents,
+  getStandardEstimateTerms,
+} from "@/lib/estimates/pricing";
+import {
+  PAINTING_RATE_STANDARD_CENTS,
+  PREP_LEVEL_MULTIPLIERS,
+} from "@ai-fsm/domain";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,11 +72,20 @@ function lineTotal(row: LineItemRow): number {
   return Math.round(qty * parseCents(row.unit_price));
 }
 
-function formatDollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
 const EMPTY_ROW: LineItemRow = { description: "", quantity: "1", unit_price: "0.00" };
+
+const PREP_LEVEL_LABELS: Record<number, string> = {
+  1: "1 — Light dusting",
+  2: "2 — Wipe down",
+  3: "3 — Minor touch-ups",
+  4: "4 — Small patch repairs",
+  5: "5 — Standard prep",
+  6: "6 — Moderate repair",
+  7: "7 — Heavy patching",
+  8: "8 — Extensive repair",
+  9: "9 — Major restoration",
+  10: "10 — Full restoration",
+};
 
 // ---------------------------------------------------------------------------
 // Component
@@ -84,6 +102,10 @@ export function NewEstimateForm({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Service type: painting vs generic
+  const [serviceType, setServiceType] = useState<"painting" | "generic">("painting");
+
+  // Shared fields
   const [clientId, setClientId] = useState(
     initialClientId && clients.some((c) => c.id === initialClientId)
       ? initialClientId
@@ -95,11 +117,21 @@ export function NewEstimateForm({
   const [propertyId, setPropertyId] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [notes, setNotes] = useState("");
+  const [taxRate, setTaxRate] = useState("0");
+  const [sendImmediately, setSendImmediately] = useState(false);
+
+  // Painting fields
+  const [sqFt, setSqFt] = useState("");
+  const [prepLevel, setPrepLevel] = useState(5);
+  const [includesTrim, setIncludesTrim] = useState(true);
+  const [includesCeiling, setIncludesCeiling] = useState(false);
+  const [materialCostDollars, setMaterialCostDollars] = useState("");
+  const [laborHours, setLaborHours] = useState("");
+
+  // Generic fields
   const [mode, setMode] = useState<"itemized" | "flat_rate">("itemized");
   const [lineItems, setLineItems] = useState<LineItemRow[]>([{ ...EMPTY_ROW }]);
   const [flatRate, setFlatRate] = useState("0.00");
-  const [taxRate, setTaxRate] = useState("0");
-  const [sendImmediately, setSendImmediately] = useState(false);
 
   const filteredJobs = useMemo(
     () => (clientId ? jobs.filter((j) => j.client_id === clientId) : jobs),
@@ -123,39 +155,43 @@ export function NewEstimateForm({
     }
   }, [filteredProperties, propertyId]);
 
-  // Live totals
+  // Live painting estimate calculation
+  const paintingResult = useMemo(() => {
+    const sq = parseFloat(sqFt);
+    const mat = parseCents(materialCostDollars);
+    const hrs = parseFloat(laborHours);
+    if (isNaN(sq) || sq <= 0 || isNaN(hrs) || hrs <= 0) return null;
+    return calculatePaintingEstimate({
+      sq_ft: sq,
+      prep_level: prepLevel,
+      includes_trim: includesTrim,
+      includes_ceiling: includesCeiling,
+      material_cost_cents: mat,
+      labor_hours_estimate: hrs,
+    });
+  }, [sqFt, prepLevel, includesTrim, includesCeiling, materialCostDollars, laborHours]);
+
+  // Generic live totals
   const taxRateNum = parseFloat(taxRate) || 0;
-  const subtotalCents =
+  const genericSubtotalCents =
     mode === "flat_rate"
       ? parseCents(flatRate)
       : lineItems.reduce((sum, row) => sum + lineTotal(row), 0);
-  const taxCents = Math.round((subtotalCents * taxRateNum) / 100);
-  const totalCents = subtotalCents + taxCents;
+  const genericTaxCents = Math.round((genericSubtotalCents * taxRateNum) / 100);
+  const genericTotalCents = genericSubtotalCents + genericTaxCents;
 
   function handleModeChange(newMode: "itemized" | "flat_rate") {
     if (newMode === "flat_rate") {
-      // Pre-fill flat rate with current itemized subtotal
       const current = lineItems.reduce((sum, row) => sum + lineTotal(row), 0);
       setFlatRate((current / 100).toFixed(2));
     } else {
-      // Ensure at least one empty row when switching back
       if (lineItems.length === 0) setLineItems([{ ...EMPTY_ROW }]);
     }
     setMode(newMode);
   }
 
-  // Line item actions
   function addLineItem() {
     setLineItems((prev) => [...prev, { ...EMPTY_ROW }]);
-  }
-
-  function duplicateLineItem(index: number) {
-    setLineItems((prev) => {
-      const copy = { ...prev[index] };
-      const next = [...prev];
-      next.splice(index + 1, 0, copy);
-      return next;
-    });
   }
 
   function removeLineItem(index: number) {
@@ -174,41 +210,92 @@ export function NewEstimateForm({
       setError("Please select a client.");
       return;
     }
-    if (mode === "itemized" && lineItems.length === 0) {
-      setError("Add at least one line item.");
-      return;
-    }
 
     setPending(true);
     setError(null);
 
     try {
-      const payload =
-        mode === "flat_rate"
-          ? {
-              client_id: clientId,
-              job_id: jobId || null,
-              property_id: propertyId || null,
-              notes: notes.trim() || null,
-              expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
-              tax_rate: taxRateNum,
-              flat_rate_cents: parseCents(flatRate),
-              line_items: [],
-            }
-          : {
-              client_id: clientId,
-              job_id: jobId || null,
-              property_id: propertyId || null,
-              notes: notes.trim() || null,
-              expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
-              tax_rate: taxRateNum,
-              line_items: lineItems.map((row, i) => ({
-                description: row.description,
-                quantity: parseFloat(row.quantity) || 1,
-                unit_price_cents: parseCents(row.unit_price),
-                sort_order: i,
-              })),
-            };
+      let payload: Record<string, unknown>;
+
+      if (serviceType === "painting" && paintingResult) {
+        payload = {
+          client_id: clientId,
+          job_id: jobId || null,
+          property_id: propertyId || null,
+          notes: notes.trim() || getStandardEstimateTerms().notes,
+          expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+          tax_rate: taxRateNum,
+          // Painting engine fields
+          sq_ft: parseFloat(sqFt),
+          prep_level: prepLevel,
+          includes_trim: includesTrim,
+          includes_ceiling: includesCeiling,
+          material_cost_cents: parseCents(materialCostDollars),
+          labor_hours_estimate: parseFloat(laborHours),
+          // Derived from painting engine
+          line_items: [
+            {
+              description: `Painting labor — ${parseFloat(sqFt).toLocaleString()} sq ft${includesCeiling ? " + ceiling" : ""}${includesTrim ? " + trim" : ""} (prep level ${prepLevel})`,
+              quantity: 1,
+              unit_price_cents: paintingResult.labor_flat_rate_cents,
+              sort_order: 0,
+            },
+            ...(parseCents(materialCostDollars) > 0
+              ? [
+                  {
+                    description: "Materials",
+                    quantity: 1,
+                    unit_price_cents: parseCents(materialCostDollars),
+                    sort_order: 1,
+                  },
+                ]
+              : []),
+            ...(paintingResult.material_handling_cents > 0
+              ? [
+                  {
+                    description: "Material handling fee (15%)",
+                    quantity: 1,
+                    unit_price_cents: paintingResult.material_handling_cents,
+                    sort_order: 2,
+                    visible_to_customer: true,
+                  },
+                ]
+              : []),
+          ],
+          internal_notes: `Internal labor: ${formatCents(paintingResult.internal_labor_cost_cents)} | Gross margin: ${paintingResult.gross_margin_pct}% (${formatCents(paintingResult.gross_margin_cents)})`,
+        };
+      } else if (mode === "flat_rate") {
+        payload = {
+          client_id: clientId,
+          job_id: jobId || null,
+          property_id: propertyId || null,
+          notes: notes.trim() || null,
+          expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+          tax_rate: taxRateNum,
+          flat_rate_cents: parseCents(flatRate),
+          line_items: [],
+        };
+      } else {
+        if (lineItems.length === 0) {
+          setError("Add at least one line item.");
+          setPending(false);
+          return;
+        }
+        payload = {
+          client_id: clientId,
+          job_id: jobId || null,
+          property_id: propertyId || null,
+          notes: notes.trim() || null,
+          expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+          tax_rate: taxRateNum,
+          line_items: lineItems.map((row, i) => ({
+            description: row.description,
+            quantity: parseFloat(row.quantity) || 1,
+            unit_price_cents: parseCents(row.unit_price),
+            sort_order: i,
+          })),
+        };
+      }
 
       const res = await fetch("/api/v1/estimates", {
         method: "POST",
@@ -249,6 +336,41 @@ export function NewEstimateForm({
           </p>
         </Card>
       )}
+
+      {/* Service Type Toggle */}
+      <div>
+        <SectionHeader title="Service Type" as="h3" />
+        <div
+          style={{
+            display: "flex",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            overflow: "hidden",
+            width: "fit-content",
+          }}
+        >
+          {(["painting", "generic"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setServiceType(t)}
+              disabled={pending}
+              style={{
+                padding: "var(--space-1) var(--space-3)",
+                background: serviceType === t ? "var(--accent)" : "transparent",
+                color: serviceType === t ? "#fff" : "var(--fg-muted)",
+                border: "none",
+                cursor: pending ? "default" : "pointer",
+                fontSize: "var(--text-sm)",
+                fontWeight: serviceType === t ? 600 : 400,
+                lineHeight: 1.4,
+              }}
+            >
+              {t === "painting" ? "Painting" : "Generic"}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Details */}
       <div className="p7-form-grid p7-form-grid-2">
@@ -319,236 +441,370 @@ export function NewEstimateForm({
         />
       </div>
 
-      {/* Pricing Mode Toggle + Line Items */}
-      <div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-3)" }}>
-          <SectionHeader
-            title={mode === "flat_rate" ? "Flat Rate" : "Line Items"}
-            count={mode === "itemized" ? lineItems.length : undefined}
-            as="h3"
-          />
+      {/* Painting Estimator */}
+      {serviceType === "painting" && (
+        <div>
+          <SectionHeader title="Painting Estimator" as="h3" />
+
+          <div className="p7-form-grid p7-form-grid-2">
+            <Input
+              id="sq_ft"
+              label="Square Footage"
+              type="number"
+              min="1"
+              step="1"
+              value={sqFt}
+              onChange={(e) => setSqFt(e.target.value)}
+              disabled={pending}
+              placeholder="e.g. 1200"
+            />
+
+            <Input
+              id="labor_hours"
+              label="Estimated Labor Hours"
+              type="number"
+              min="0.5"
+              step="0.5"
+              value={laborHours}
+              onChange={(e) => setLaborHours(e.target.value)}
+              disabled={pending}
+              placeholder="Internal only, not shown to client"
+              hint="Used for margin calculation"
+            />
+
+            <Input
+              id="material_cost"
+              label="Material Cost ($)"
+              type="number"
+              min="0"
+              step="0.01"
+              value={materialCostDollars}
+              onChange={(e) => setMaterialCostDollars(e.target.value)}
+              disabled={pending}
+              placeholder="e.g. 350.00"
+            />
+
+            <div className="p7-field">
+              <label className="p7-label">Prep Level</label>
+              <select
+                id="prep_level"
+                className="p7-select"
+                value={prepLevel}
+                onChange={(e) => setPrepLevel(Number(e.target.value))}
+                disabled={pending}
+              >
+                {Object.entries(PREP_LEVEL_MULTIPLIERS).map(([level, mult]) => (
+                  <option key={level} value={level}>
+                    {PREP_LEVEL_LABELS[Number(level)] ?? `Level ${level} (${mult}x)`}
+                  </option>
+                ))}
+              </select>
+              <span className="p7-field-hint">
+                Multiplier: {PREP_LEVEL_MULTIPLIERS[prepLevel]?.toFixed(2)}x base rate
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: "var(--space-4)", marginTop: "var(--space-2)" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={includesTrim}
+                onChange={(e) => setIncludesTrim(e.target.checked)}
+                disabled={pending}
+              />
+              <span>Include trim (+$0.20/sq ft)</span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={includesCeiling}
+                onChange={(e) => setIncludesCeiling(e.target.checked)}
+                disabled={pending}
+              />
+              <span>Include ceiling (+30% surface)</span>
+            </label>
+          </div>
+
+          {/* Live Preview */}
+          {paintingResult && (
+            <div style={{ marginTop: "var(--space-4)" }}>
+              <Card padding="sm" style={{ background: "var(--bg-subtle)" }}>
+                <SectionHeader title="Estimate Preview" as="h4" />
+                <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "var(--space-1) var(--space-4)", textAlign: "right" }}>
+                  <span style={{ color: "var(--fg-muted)" }}>Labor (flat rate)</span>
+                  <span>{formatCents(paintingResult.labor_flat_rate_cents)}</span>
+
+                  {parseCents(materialCostDollars) > 0 && (
+                    <>
+                      <span style={{ color: "var(--fg-muted)" }}>Materials</span>
+                      <span>{formatCents(parseCents(materialCostDollars))}</span>
+
+                      <span style={{ color: "var(--fg-muted)" }}>Handling fee (15%)</span>
+                      <span>{formatCents(paintingResult.material_handling_cents)}</span>
+                    </>
+                  )}
+
+                  <strong>Total</strong>
+                  <strong>{formatCents(paintingResult.total_cents)}</strong>
+
+                  <span style={{ color: "var(--fg-muted)" }}>Deposit (30%)</span>
+                  <span>{formatCents(paintingResult.deposit_cents)}</span>
+
+                  <span style={{ color: "var(--fg-muted)" }}>Balance (70%)</span>
+                  <span>{formatCents(paintingResult.balance_cents)}</span>
+                </div>
+
+                {/* Internal margin section */}
+                <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
+                    <SectionHeader title="Internal Margin" as="h4" />
+                  <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "var(--space-1) var(--space-4)", textAlign: "right" }}>
+                    <span style={{ color: "var(--fg-muted)" }}>Internal labor cost ($85/hr)</span>
+                    <span>{formatCents(paintingResult.internal_labor_cost_cents)}</span>
+
+                    <span style={{ color: "var(--fg-muted)" }}>Gross margin</span>
+                    <span style={{
+                      color: paintingResult.gross_margin_pct >= 30 ? "var(--color-success)" : paintingResult.gross_margin_pct >= 15 ? "var(--color-warning)" : "var(--color-danger)",
+                      fontWeight: 600,
+                    }}>
+                      {paintingResult.gross_margin_pct}% ({formatCents(paintingResult.gross_margin_cents)})
+                    </span>
+
+                    <span style={{ color: "var(--fg-muted)" }}>Effective rate</span>
+                    <span>${(paintingResult.effective_sq_ft_rate_cents / 100).toFixed(2)}/sq ft</span>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {!paintingResult && (parseFloat(sqFt) > 0 || parseFloat(laborHours) > 0) && (
+            <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: "var(--space-2)" }}>
+              Enter both square footage and labor hours to see the estimate preview.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Generic Pricing */}
+      {serviceType === "generic" && (
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-3)" }}>
+            <SectionHeader
+              title={mode === "flat_rate" ? "Flat Rate" : "Line Items"}
+              count={mode === "itemized" ? lineItems.length : undefined}
+              as="h3"
+            />
+            <div
+              style={{
+                display: "flex",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius)",
+                overflow: "hidden",
+              }}
+            >
+              {(["itemized", "flat_rate"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => handleModeChange(m)}
+                  disabled={pending}
+                  style={{
+                    padding: "var(--space-1) var(--space-3)",
+                    background: mode === m ? "var(--accent)" : "transparent",
+                    color: mode === m ? "#fff" : "var(--fg-muted)",
+                    border: "none",
+                    cursor: pending ? "default" : "pointer",
+                    fontSize: "var(--text-sm)",
+                    fontWeight: mode === m ? 600 : 400,
+                    lineHeight: 1.4,
+                  }}
+                  data-testid={`mode-${m}`}
+                >
+                  {m === "itemized" ? "Itemized" : "Flat Rate"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {mode === "flat_rate" ? (
+            <div className="p7-form-grid p7-form-grid-2" style={{ marginBottom: "var(--space-3)" }}>
+              <Input
+                id="flat_rate"
+                label="Price ($)"
+                type="number"
+                min="0"
+                step="0.01"
+                value={flatRate}
+                onChange={(e) => setFlatRate(e.target.value)}
+                disabled={pending}
+                data-testid="flat-rate-input"
+              />
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--space-2)" }}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={addLineItem}
+                  disabled={pending}
+                  data-testid="add-line-item-btn"
+                >
+                  + Add Item
+                </Button>
+              </div>
+              {lineItems.length === 0 ? (
+                <p style={{ color: "var(--fg-muted)", padding: "var(--space-3) 0" }}>
+                  No line items. Add at least one.
+                </p>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table className="line-items-table" style={{ width: "100%" }}>
+                    <thead>
+                      <tr>
+                        <th>Description</th>
+                        <th style={{ width: 80 }}>Qty</th>
+                        <th style={{ width: 120 }}>Unit Price ($)</th>
+                        <th style={{ width: 100 }}>Total</th>
+                        <th style={{ width: 70 }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lineItems.map((row, i) => (
+                        <tr key={i}>
+                          <td>
+                            <input
+                              className="p7-input"
+                              type="text"
+                              value={row.description}
+                              onChange={(e) => updateLineItem(i, "description", e.target.value)}
+                              placeholder="Description"
+                              required
+                              disabled={pending}
+                              data-testid={`line-item-desc-${i}`}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              className="p7-input"
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={row.quantity}
+                              onChange={(e) => updateLineItem(i, "quantity", e.target.value)}
+                              disabled={pending}
+                              data-testid={`line-item-qty-${i}`}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              className="p7-input"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={row.unit_price}
+                              onChange={(e) => updateLineItem(i, "unit_price", e.target.value)}
+                              disabled={pending}
+                              data-testid={`line-item-price-${i}`}
+                            />
+                          </td>
+                          <td
+                            style={{
+                              color: "var(--fg-muted)",
+                              fontSize: "var(--text-sm)",
+                              paddingLeft: "var(--space-2)",
+                            }}
+                          >
+                            {formatCents(lineTotal(row))}
+                          </td>
+                          <td>
+                            <div style={{ display: "flex", gap: "var(--space-1)" }}>
+                              {lineItems.length > 1 && (
+                                <button
+                                  type="button"
+                                  className="p7-btn p7-btn-ghost p7-btn-sm"
+                                  title="Remove row"
+                                  onClick={() => removeLineItem(i)}
+                                  disabled={pending}
+                                  data-testid={`remove-line-item-${i}`}
+                                  aria-label={`Remove line item ${i + 1}`}
+                                  style={{ color: "var(--color-danger)" }}
+                                >
+                                  ×
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Generic totals */}
           <div
             style={{
               display: "flex",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius)",
-              overflow: "hidden",
+              flexDirection: "column",
+              alignItems: "flex-end",
+              gap: "var(--space-2)",
+              marginTop: "var(--space-3)",
             }}
           >
-            {(["itemized", "flat_rate"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => handleModeChange(m)}
-                disabled={pending}
-                style={{
-                  padding: "var(--space-1) var(--space-3)",
-                  background: mode === m ? "var(--accent)" : "transparent",
-                  color: mode === m ? "#fff" : "var(--fg-muted)",
-                  border: "none",
-                  cursor: pending ? "default" : "pointer",
-                  fontSize: "var(--text-sm)",
-                  fontWeight: mode === m ? 600 : 400,
-                  lineHeight: 1.4,
-                }}
-                data-testid={`mode-${m}`}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "auto auto",
+                gap: "var(--space-2) var(--space-4)",
+                alignItems: "center",
+                textAlign: "right",
+              }}
+            >
+              {mode === "itemized" && (
+                <>
+                  <span style={{ color: "var(--fg-muted)" }}>Subtotal</span>
+                  <span data-testid="subtotal">{formatCents(genericSubtotalCents)}</span>
+                </>
+              )}
+
+              <label
+                htmlFor="tax_rate"
+                style={{ color: "var(--fg-muted)", whiteSpace: "nowrap" }}
               >
-                {m === "itemized" ? "Itemized" : "Flat Rate"}
-              </button>
-            ))}
+                Tax Rate (%)
+              </label>
+              <input
+                id="tax_rate"
+                className="p7-input"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={taxRate}
+                onChange={(e) => setTaxRate(e.target.value)}
+                disabled={pending}
+                style={{ width: 90, textAlign: "right" }}
+                data-testid="tax-rate-input"
+              />
+
+              {genericTaxCents > 0 && (
+                <>
+                  <span style={{ color: "var(--fg-muted)" }}>Tax</span>
+                  <span data-testid="tax-amount">{formatCents(genericTaxCents)}</span>
+                </>
+              )}
+
+              <strong>Total</strong>
+              <strong data-testid="total">{formatCents(genericTotalCents)}</strong>
+            </div>
           </div>
         </div>
-
-        {mode === "flat_rate" ? (
-          /* Flat Rate mode: single price field */
-          <div className="p7-form-grid p7-form-grid-2" style={{ marginBottom: "var(--space-3)" }}>
-            <Input
-              id="flat_rate"
-              label="Price ($)"
-              type="number"
-              min="0"
-              step="0.01"
-              value={flatRate}
-              onChange={(e) => setFlatRate(e.target.value)}
-              disabled={pending}
-              data-testid="flat-rate-input"
-            />
-          </div>
-        ) : (
-          /* Itemized mode */
-          <>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--space-2)" }}>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={addLineItem}
-              disabled={pending}
-              data-testid="add-line-item-btn"
-            >
-              + Add Item
-            </Button>
-          </div>
-          {lineItems.length === 0 ? (
-            <p style={{ color: "var(--fg-muted)", padding: "var(--space-3) 0" }}>
-              No line items. Add at least one.
-            </p>
-          ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table className="line-items-table" style={{ width: "100%" }}>
-              <thead>
-                <tr>
-                  <th>Description</th>
-                  <th style={{ width: 80 }}>Qty</th>
-                  <th style={{ width: 120 }}>Unit Price ($)</th>
-                  <th style={{ width: 100 }}>Total</th>
-                  <th style={{ width: 70 }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {lineItems.map((row, i) => (
-                  <tr key={i}>
-                    <td>
-                      <input
-                        className="p7-input"
-                        type="text"
-                        value={row.description}
-                        onChange={(e) => updateLineItem(i, "description", e.target.value)}
-                        placeholder="Description"
-                        required
-                        disabled={pending}
-                        data-testid={`line-item-desc-${i}`}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="p7-input"
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        value={row.quantity}
-                        onChange={(e) => updateLineItem(i, "quantity", e.target.value)}
-                        disabled={pending}
-                        data-testid={`line-item-qty-${i}`}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="p7-input"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={row.unit_price}
-                        onChange={(e) => updateLineItem(i, "unit_price", e.target.value)}
-                        disabled={pending}
-                        data-testid={`line-item-price-${i}`}
-                      />
-                    </td>
-                    <td
-                      style={{
-                        color: "var(--fg-muted)",
-                        fontSize: "var(--text-sm)",
-                        paddingLeft: "var(--space-2)",
-                      }}
-                    >
-                      {formatDollars(lineTotal(row))}
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", gap: "var(--space-1)" }}>
-                        <button
-                          type="button"
-                          className="p7-btn p7-btn-ghost p7-btn-sm"
-                          title="Duplicate row"
-                          onClick={() => duplicateLineItem(i)}
-                          disabled={pending}
-                          data-testid={`duplicate-line-item-${i}`}
-                          aria-label={`Duplicate line item ${i + 1}`}
-                        >
-                          ⧉
-                        </button>
-                        {lineItems.length > 1 && (
-                          <button
-                            type="button"
-                            className="p7-btn p7-btn-ghost p7-btn-sm"
-                            title="Remove row"
-                            onClick={() => removeLineItem(i)}
-                            disabled={pending}
-                            data-testid={`remove-line-item-${i}`}
-                            aria-label={`Remove line item ${i + 1}`}
-                            style={{ color: "var(--color-danger)" }}
-                          >
-                            ×
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          )}
-          </>
-        )}
-
-        {/* Totals */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-end",
-            gap: "var(--space-2)",
-            marginTop: "var(--space-3)",
-          }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "auto auto",
-              gap: "var(--space-2) var(--space-4)",
-              alignItems: "center",
-              textAlign: "right",
-            }}
-          >
-            {mode === "itemized" && (
-              <>
-                <span style={{ color: "var(--fg-muted)" }}>Subtotal</span>
-                <span data-testid="subtotal">{formatDollars(subtotalCents)}</span>
-              </>
-            )}
-
-            <label
-              htmlFor="tax_rate"
-              style={{ color: "var(--fg-muted)", whiteSpace: "nowrap" }}
-            >
-              Tax Rate (%)
-            </label>
-            <input
-              id="tax_rate"
-              className="p7-input"
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              value={taxRate}
-              onChange={(e) => setTaxRate(e.target.value)}
-              disabled={pending}
-              style={{ width: 90, textAlign: "right" }}
-              data-testid="tax-rate-input"
-            />
-
-            {taxCents > 0 && (
-              <>
-                <span style={{ color: "var(--fg-muted)" }}>Tax</span>
-                <span data-testid="tax-amount">{formatDollars(taxCents)}</span>
-              </>
-            )}
-
-            <strong>Total</strong>
-            <strong data-testid="total">{formatDollars(totalCents)}</strong>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Options */}
       <div>
@@ -580,7 +836,7 @@ export function NewEstimateForm({
         <Button
           type="submit"
           variant="primary"
-          disabled={pending || !clientId}
+          disabled={pending || !clientId || (serviceType === "painting" && !paintingResult)}
           loading={pending}
           data-testid="submit-estimate-btn"
         >

@@ -7,6 +7,7 @@ import {
   calcTotals,
   lineItemTotal,
 } from "@/lib/estimates/db";
+import { calculatePaintingEstimate } from "@/lib/estimates/pricing";
 import { estimateStatusSchema, DEPOSIT_RATE } from "@ai-fsm/domain";
 import { logger } from "@/lib/logger";
 
@@ -149,6 +150,13 @@ const createEstimateSchema = z.object({
   line_items: z.array(lineItemInputSchema).default([]),
   // Flat-rate mode: set this instead of line_items to store a single price with no breakdown
   flat_rate_cents: z.number().int().nonnegative().optional(),
+  // Painting engine fields
+  sq_ft: z.number().positive().optional(),
+  prep_level: z.number().int().min(1).max(10).optional(),
+  includes_trim: z.boolean().default(false),
+  includes_ceiling: z.boolean().default(false),
+  material_cost_cents: z.number().int().nonnegative().default(0),
+  labor_hours_estimate: z.number().positive().optional(),
 });
 
 export const POST = withRole(["owner", "admin"], async (request, session) => {
@@ -193,12 +201,37 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     tax_rate,
     line_items,
     flat_rate_cents,
+    sq_ft,
+    prep_level,
+    includes_trim,
+    includes_ceiling,
+    material_cost_cents,
+    labor_hours_estimate,
   } = parseResult.data;
 
-  const subtotal_cents =
-    flat_rate_cents !== undefined
-      ? flat_rate_cents
-      : calcTotals(line_items).subtotal_cents;
+  const is_painting = sq_ft !== undefined && prep_level !== undefined && labor_hours_estimate !== undefined;
+
+  let subtotal_cents: number;
+  let computed_line_items = line_items;
+  let internal_labor_cost_cents: number | null = null;
+
+  if (is_painting) {
+    const result = calculatePaintingEstimate({
+      sq_ft,
+      prep_level,
+      includes_trim,
+      includes_ceiling,
+      material_cost_cents: material_cost_cents ?? 0,
+      labor_hours_estimate,
+    });
+    subtotal_cents = result.total_cents;
+    internal_labor_cost_cents = result.internal_labor_cost_cents;
+  } else {
+    subtotal_cents =
+      flat_rate_cents !== undefined
+        ? flat_rate_cents
+        : calcTotals(line_items).subtotal_cents;
+  }
   const tax_cents = Math.round((subtotal_cents * tax_rate) / 100);
   const total_cents = subtotal_cents + tax_cents;
   const deposit_cents = Math.round(total_cents * DEPOSIT_RATE);
@@ -221,9 +254,12 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         `INSERT INTO estimates
            (account_id, client_id, job_id, property_id, status,
             subtotal_cents, tax_cents, total_cents, deposit_cents, balance_cents,
-            notes, internal_notes, expires_at, created_by)
-         VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, $9, $10, $11, $12, $13)
-         RETURNING id`,
+            notes, internal_notes, expires_at, created_by,
+            sq_ft, prep_level, includes_trim, includes_ceiling,
+            internal_labor_cost_cents, internal_material_cost_cents)
+          VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, $9, $10, $11, $12, $13,
+                  $14, $15, $16, $17, $18, $19)
+          RETURNING id`,
         [
           session.accountId,
           client_id,
@@ -238,6 +274,12 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           internal_notes ?? null,
           expires_at ?? null,
           session.userId,
+          sq_ft ?? null,
+          prep_level ?? null,
+          includes_trim ?? false,
+          includes_ceiling ?? false,
+          internal_labor_cost_cents,
+          material_cost_cents ?? null,
         ]
       );
       const estimateId = result.rows[0].id;

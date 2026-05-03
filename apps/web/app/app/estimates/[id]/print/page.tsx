@@ -20,6 +20,10 @@ interface EstimateRow {
   sent_at: string | null;
   expires_at: string | null;
   created_at: string;
+  sq_ft: number | null;
+  prep_level: number | null;
+  includes_trim: boolean;
+  includes_ceiling: boolean;
   client_name: string | null;
   client_email: string | null;
   client_phone: string | null;
@@ -73,6 +77,7 @@ export default async function EstimatePrintPage({
          COALESCE(e.deposit_cents, 0) AS deposit_cents,
          COALESCE(e.balance_cents, 0) AS balance_cents,
          e.notes, e.sent_at, e.expires_at, e.created_at,
+         e.sq_ft, e.prep_level, e.includes_trim, e.includes_ceiling,
          c.name   AS client_name,
          c.email  AS client_email,
          c.phone  AS client_phone,
@@ -89,8 +94,7 @@ export default async function EstimatePrintPage({
        LEFT JOIN clients    c ON c.id = e.client_id
        LEFT JOIN properties p ON p.id = e.property_id
        LEFT JOIN jobs       j ON j.id = e.job_id
-       WHERE e.id = $1 AND e.account_id = $2`,
-      [id, session.accountId]
+       WHERE e.id = $1 AND e.account_id = $2`
     );
 
     if (estResult.rowCount === 0) return null;
@@ -203,6 +207,17 @@ export default async function EstimatePrintPage({
           <div className="section-block">
             <h2>Scope of Work</h2>
             <p>{estimate.job_title}</p>
+          </div>
+        )}
+
+        {/* Painting Scope */}
+        {estimate.sq_ft !== null && (
+          <div className="section-block">
+            <h2>Painting Scope</h2>
+            <p><strong>Area:</strong> {Number(estimate.sq_ft).toLocaleString()} square feet</p>
+            <p><strong>Prep Level:</strong> {estimate.prep_level} of 10</p>
+            <p><strong>Trim:</strong> {estimate.includes_trim ? "Included" : "Not included"}</p>
+            <p><strong>Ceiling:</strong> {estimate.includes_ceiling ? "Included" : "Not included"}</p>
           </div>
         )}
 

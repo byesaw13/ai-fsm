@@ -7,6 +7,7 @@ import {
   calcTotals,
   lineItemTotal,
 } from "@/lib/estimates/db";
+import { calculatePaintingEstimate } from "@/lib/estimates/pricing";
 import { DEPOSIT_RATE } from "@ai-fsm/domain";
 import { logger } from "@/lib/logger";
 
@@ -96,6 +97,13 @@ const patchEstimateSchema = z.object({
   line_items: z.array(lineItemInputSchema).optional(),
   // Flat-rate mode: set this instead of line_items
   flat_rate_cents: z.number().int().nonnegative().optional(),
+  // Painting engine fields
+  sq_ft: z.number().positive().optional(),
+  prep_level: z.number().int().min(1).max(10).optional(),
+  includes_trim: z.boolean().optional(),
+  includes_ceiling: z.boolean().optional(),
+  material_cost_cents: z.number().int().nonnegative().optional(),
+  labor_hours_estimate: z.number().positive().optional(),
 });
 
 export const PATCH = withRole(["owner", "admin"], async (request, session) => {
@@ -172,6 +180,12 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
           "expires_at",
           "line_items",
           "flat_rate_cents",
+          "sq_ft",
+          "prep_level",
+          "includes_trim",
+          "includes_ceiling",
+          "material_cost_cents",
+          "labor_hours_estimate",
         ] as const;
         for (const key of disallowedKeys) {
           if (patch[key] !== undefined) {
@@ -235,13 +249,55 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         setClauses.push(`expires_at = $${idx++}`);
         params.push(patch.expires_at);
       }
+      if (patch.sq_ft !== undefined) {
+        setClauses.push(`sq_ft = $${idx++}`);
+        params.push(patch.sq_ft);
+      }
+      if (patch.prep_level !== undefined) {
+        setClauses.push(`prep_level = $${idx++}`);
+        params.push(patch.prep_level);
+      }
+      if (patch.includes_trim !== undefined) {
+        setClauses.push(`includes_trim = $${idx++}`);
+        params.push(patch.includes_trim);
+      }
+      if (patch.includes_ceiling !== undefined) {
+        setClauses.push(`includes_ceiling = $${idx++}`);
+        params.push(patch.includes_ceiling);
+      }
 
       // Replace totals + line items if pricing fields are provided
-      if (patch.line_items !== undefined || patch.flat_rate_cents !== undefined) {
-        const subtotal_cents =
-          patch.flat_rate_cents !== undefined
-            ? patch.flat_rate_cents
-            : calcTotals(patch.line_items!).subtotal_cents;
+      const has_painting_fields =
+        patch.sq_ft !== undefined &&
+        patch.prep_level !== undefined &&
+        patch.labor_hours_estimate !== undefined;
+
+      if (patch.line_items !== undefined || patch.flat_rate_cents !== undefined || has_painting_fields) {
+        let subtotal_cents: number;
+        let itemsToInsert = patch.line_items ?? [];
+        let new_internal_labor: number | null = null;
+        let new_internal_material: number | null = null;
+
+        if (has_painting_fields) {
+          const result = calculatePaintingEstimate({
+            sq_ft: patch.sq_ft!,
+            prep_level: patch.prep_level!,
+            includes_trim: patch.includes_trim ?? false,
+            includes_ceiling: patch.includes_ceiling ?? false,
+            material_cost_cents: patch.material_cost_cents ?? 0,
+            labor_hours_estimate: patch.labor_hours_estimate!,
+          });
+          subtotal_cents = result.total_cents;
+          new_internal_labor = result.internal_labor_cost_cents;
+          new_internal_material = patch.material_cost_cents ?? null;
+        } else {
+          subtotal_cents =
+            patch.flat_rate_cents !== undefined
+              ? patch.flat_rate_cents
+              : calcTotals(patch.line_items!).subtotal_cents;
+          itemsToInsert = patch.flat_rate_cents !== undefined ? [] : patch.line_items!;
+        }
+
         const taxRate = patch.tax_rate ?? 0;
         const tax_cents = Math.round((subtotal_cents * taxRate) / 100);
         const total_cents = subtotal_cents + tax_cents;
@@ -258,6 +314,15 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         setClauses.push(`balance_cents = $${idx++}`);
         params.push(balance_cents);
 
+        if (new_internal_labor !== null) {
+          setClauses.push(`internal_labor_cost_cents = $${idx++}`);
+          params.push(new_internal_labor);
+        }
+        if (new_internal_material !== null) {
+          setClauses.push(`internal_material_cost_cents = $${idx++}`);
+          params.push(new_internal_material);
+        }
+
         // Delete existing line items
         await client.query(
           `DELETE FROM estimate_line_items WHERE estimate_id = $1`,
@@ -265,7 +330,6 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         );
 
         // Insert new line items (skipped in flat-rate mode)
-        const itemsToInsert = patch.flat_rate_cents !== undefined ? [] : patch.line_items!;
         for (let i = 0; i < itemsToInsert.length; i++) {
           const item = itemsToInsert[i];
           await client.query(
