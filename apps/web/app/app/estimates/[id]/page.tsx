@@ -13,6 +13,7 @@ import { EstimateInternalNotesForm } from "./EstimateInternalNotesForm";
 import { EstimateConvertButton } from "./EstimateConvertButton";
 import { DeleteEstimateButton } from "./DeleteEstimateButton";
 import { EstimateEditForm } from "./EstimateEditForm";
+import { EstimateReviewPanel } from "./EstimateReviewPanel";
 import { SendEstimateButton } from "./SendEstimateButton";
 import { StatusStepper } from "@/components/ui";
 import { isEmailConfigured } from "@/lib/email/mailer";
@@ -369,6 +370,11 @@ export default async function EstimateDetailPage({
             ? Math.round((estimate.internal_labor_cost_cents / 8500) * 10) / 10
             : null}
         />
+      )}
+
+      {/* Review — owner/admin only, active estimates */}
+      {canTransition && !["declined", "expired"].includes(currentStatus) && (
+        <EstimateReviewPanel estimateId={estimate.id} />
       )}
 
       {/* Send to Client — owner/admin only, non-terminal estimates */}
