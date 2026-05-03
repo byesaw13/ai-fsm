@@ -15,12 +15,14 @@ const ownerUpdateBody = z.object({
   scheduled_end: z.string().datetime().optional(),
   tech_notes: z.string().nullable().optional(),
   materials_used: z.string().nullable().optional(),
+  issue_description: z.string().nullable().optional(),
 });
 
-// Tech can update notes and materials — unknown keys stripped by Zod
+// Tech can update notes, materials, and issue description — unknown keys stripped by Zod
 const techUpdateBody = z.object({
   tech_notes: z.string().nullable().optional(),
   materials_used: z.string().nullable().optional(),
+  issue_description: z.string().nullable().optional(),
 });
 
 export const GET = withAuth(

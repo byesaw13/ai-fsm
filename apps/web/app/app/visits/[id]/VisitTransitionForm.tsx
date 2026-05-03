@@ -10,6 +10,10 @@ interface Props {
   visitId: string;
   currentStatus: VisitStatus;
   role: string;
+  jobType?: string;
+  beforePhotoCount?: number;
+  afterPhotoCount?: number;
+  closingAllDone?: boolean;
 }
 
 // What the tech sees: plain-English action buttons sized for a phone screen.
@@ -23,7 +27,15 @@ const TECH_ACTIONS: Partial<Record<VisitStatus, { label: string; next: VisitStat
   in_progress: { label: "Complete Job", next: "completed",   variant: "secondary" },
 };
 
-export function VisitTransitionForm({ visitId, currentStatus, role }: Props) {
+export function VisitTransitionForm({
+  visitId,
+  currentStatus,
+  role,
+  jobType,
+  beforePhotoCount = 0,
+  afterPhotoCount = 0,
+  closingAllDone = false,
+}: Props) {
   const router = useRouter();
   const toast = useToast();
   const [loading, setLoading] = useState(false);
@@ -61,11 +73,42 @@ export function VisitTransitionForm({ visitId, currentStatus, role }: Props) {
     const action = TECH_ACTIONS[currentStatus];
     if (!action) return null; // completed / cancelled — nothing to do
 
+    const isRepairFlow = jobType !== undefined && jobType !== "maintenance";
+    const isCompletionAction = action.next === "completed";
+
+    // Hard gates for completing a repair-flow visit
+    const blockers: string[] = [];
+    if (isRepairFlow && isCompletionAction) {
+      if (afterPhotoCount === 0) blockers.push("Add at least one photo of the completed work");
+      if (!closingAllDone) blockers.push("Check off all closing checklist steps");
+    }
+    const isBlocked = blockers.length > 0;
+
     return (
       <div data-testid="visit-transition-buttons">
+        {isBlocked && (
+          <div
+            style={{
+              marginBottom: "var(--space-3)",
+              padding: "var(--space-3)",
+              borderRadius: "var(--radius-sm)",
+              background: "#fef2f2",
+              border: "1px solid #fca5a5",
+            }}
+          >
+            <p style={{ fontSize: "var(--text-sm)", fontWeight: 500, color: "#991b1b", marginBottom: "var(--space-1)" }}>
+              Required before closing:
+            </p>
+            <ul style={{ margin: 0, paddingLeft: "var(--space-4)", fontSize: "var(--text-sm)", color: "#b91c1c" }}>
+              {blockers.map((b) => (
+                <li key={b}>{b}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <Button
           onClick={() => transition(action.next)}
-          disabled={loading}
+          disabled={loading || isBlocked}
           variant={action.variant}
           style={{ width: "100%", padding: "var(--space-4)", fontSize: "var(--text-lg)" }}
           data-testid={`visit-transition-btn-${action.next}`}
