@@ -138,3 +138,14 @@ export function IconSettings(props: IconProps) {
     </Icon>
   );
 }
+
+export function IconPriceBook(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="2" y="2" width="16" height="16" rx="2" />
+      <path d="M2 6h16" />
+      <path d="M6 2v4" />
+      <path d="M7 10h3M7 13h6" />
+    </Icon>
+  );
+}

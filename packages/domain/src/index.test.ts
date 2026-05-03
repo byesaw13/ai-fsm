@@ -19,6 +19,11 @@ import {
   visitTransitions,
   estimateTransitions,
   invoiceTransitions,
+  priceBookTierSchema,
+  priceBookCategorySchema,
+  priceBookItemSchema,
+  priceFromMargin,
+  PRICE_BOOK_TIER_MARGINS,
 } from './index'
 
 // ---------------------------------------------------------------------------
@@ -269,5 +274,95 @@ describe('apiErrorSchema', () => {
     expect(() => apiErrorSchema.parse({
       error: { code: 'NOT_FOUND', message: 'not found', traceId: 'not-a-uuid' },
     })).toThrow()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Price Book
+// ---------------------------------------------------------------------------
+
+describe('priceBookTierSchema', () => {
+  it('accepts valid tiers', () => {
+    expect(priceBookTierSchema.parse('core')).toBe('core')
+    expect(priceBookTierSchema.parse('standard')).toBe('standard')
+    expect(priceBookTierSchema.parse('specialty')).toBe('specialty')
+  })
+  it('rejects invalid tiers', () => {
+    expect(() => priceBookTierSchema.parse('premium')).toThrow()
+  })
+})
+
+describe('priceBookCategorySchema', () => {
+  it('accepts valid categories', () => {
+    expect(priceBookCategorySchema.parse('general_repairs')).toBe('general_repairs')
+    expect(priceBookCategorySchema.parse('plumbing')).toBe('plumbing')
+    expect(priceBookCategorySchema.parse('painting_finishes')).toBe('painting_finishes')
+  })
+  it('rejects invalid categories', () => {
+    expect(() => priceBookCategorySchema.parse('roofing')).toThrow()
+  })
+})
+
+describe('priceBookItemSchema', () => {
+  it('accepts a valid price book item', () => {
+    expect(() => priceBookItemSchema.parse({
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      code: '1001',
+      name: 'Drywall patch',
+      category: 'general_repairs',
+      tier: 'core',
+      price_min_cents: 15000,
+      price_max_cents: 17500,
+      description: 'Small patch',
+      notes: null,
+      default_labor_hours: 1,
+      requires_materials: true,
+      upsell_codes: [],
+      is_active: true,
+      created_at: '2025-01-01T00:00:00Z',
+      updated_at: '2025-01-01T00:00:00Z',
+    })).not.toThrow()
+  })
+  it('accepts open-ended pricing (null price_max_cents)', () => {
+    expect(() => priceBookItemSchema.parse({
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      code: '9001',
+      name: 'Specialty project',
+      category: 'specialty_expansion',
+      tier: 'specialty',
+      price_min_cents: 49500,
+      price_max_cents: null,
+      description: null,
+      notes: 'Custom work',
+      default_labor_hours: null,
+      requires_materials: false,
+      upsell_codes: [],
+      is_active: true,
+      created_at: '2025-01-01T00:00:00Z',
+      updated_at: '2025-01-01T00:00:00Z',
+    })).not.toThrow()
+  })
+})
+
+describe('priceFromMargin', () => {
+  it('calculates price from cost and margin correctly', () => {
+    // Cost $120, margin 25% => Price = $120 / (1 - 0.25) = $160
+    expect(priceFromMargin(12000, 0.25)).toBe(16000)
+    // Cost $200, margin 30% => Price = $200 / 0.70 = $286
+    expect(priceFromMargin(20000, 0.30)).toBe(28571)
+    // Cost $100, margin 0% => Price = $100
+    expect(priceFromMargin(10000, 0)).toBe(10000)
+  })
+  it('handles edge case of margin >= 1', () => {
+    expect(priceFromMargin(5000, 1)).toBe(5000)
+    expect(priceFromMargin(5000, 1.5)).toBe(5000)
+  })
+})
+
+describe('PRICE_BOOK_TIER_MARGINS', () => {
+  it('has margins for all three tiers', () => {
+    expect(PRICE_BOOK_TIER_MARGINS.core).toEqual({ min: 0.25, max: 0.35 })
+    expect(PRICE_BOOK_TIER_MARGINS.standard).toEqual({ min: 0.20, max: 0.30 })
+    expect(PRICE_BOOK_TIER_MARGINS.specialty).toEqual({ min: 0.15, max: 0.25 })
   })
 })
