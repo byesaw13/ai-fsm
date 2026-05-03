@@ -46,7 +46,7 @@ export const POST = withAuth(async (request, session) => {
       };
     });
 
-    const review = reviewEstimate({
+    const review = await reviewEstimate({
       sq_ft: estimate.sq_ft !== null ? Number(estimate.sq_ft) : null,
       prep_level: estimate.prep_level !== null ? Number(estimate.prep_level) : null,
       includes_trim: estimate.includes_trim ?? false,

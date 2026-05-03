@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { reviewEstimate } from "../review";
 
 describe("estimate review engine", () => {
-  it("returns no warnings for a well-formed painting estimate", () => {
-    const result = reviewEstimate({
+  it("returns no warnings for a well-formed painting estimate", async () => {
+    const result = await reviewEstimate({
       sq_ft: 1200,
       prep_level: 5,
       includes_trim: true,
@@ -19,8 +19,8 @@ describe("estimate review engine", () => {
     expect(result.score).toBeGreaterThan(80);
   });
 
-  it("warns when trim is not included", () => {
-    const result = reviewEstimate({
+  it("warns when trim is not included", async () => {
+    const result = await reviewEstimate({
       sq_ft: 1000,
       prep_level: 5,
       includes_trim: false,
@@ -39,8 +39,8 @@ describe("estimate review engine", () => {
     expect(trimWarning?.message).toContain("Trim is not included");
   });
 
-  it("warns when prep level is too low for large area", () => {
-    const result = reviewEstimate({
+  it("warns when prep level is too low for large area", async () => {
+    const result = await reviewEstimate({
       sq_ft: 1500,
       prep_level: 2,
       includes_trim: true,
@@ -59,8 +59,8 @@ describe("estimate review engine", () => {
     expect(prepWarning?.message).toContain("too low");
   });
 
-  it("suggests ceiling for large rooms", () => {
-    const result = reviewEstimate({
+  it("suggests ceiling for large rooms", async () => {
+    const result = await reviewEstimate({
       sq_ft: 800,
       prep_level: 5,
       includes_trim: true,
@@ -78,8 +78,8 @@ describe("estimate review engine", () => {
     expect(ceilingTip).toBeDefined();
   });
 
-  it("warns when margin is critically low", () => {
-    const result = reviewEstimate({
+  it("warns when margin is critically low", async () => {
+    const result = await reviewEstimate({
       sq_ft: 500,
       prep_level: 5,
       includes_trim: true,
@@ -98,36 +98,37 @@ describe("estimate review engine", () => {
     expect(marginWarning?.message).toContain("critically low");
   });
 
-  it("scores lower with more warnings", () => {
-    const badEstimate = reviewEstimate({
-      sq_ft: 1500,
-      prep_level: 2,
-      includes_trim: false,
-      includes_ceiling: false,
-      subtotal_cents: 100000,
-      total_cents: 100000,
-      internal_labor_cost_cents: 95000,
-      internal_material_cost_cents: null,
-      line_item_count: 0,
-    });
-
-    const goodEstimate = reviewEstimate({
-      sq_ft: 1200,
-      prep_level: 5,
-      includes_trim: true,
-      includes_ceiling: false,
-      subtotal_cents: 295200,
-      total_cents: 295200,
-      internal_labor_cost_cents: 127500,
-      internal_material_cost_cents: 35000,
-      line_item_count: 3,
-    });
+  it("scores lower with more warnings", async () => {
+    const [badEstimate, goodEstimate] = await Promise.all([
+      reviewEstimate({
+        sq_ft: 1500,
+        prep_level: 2,
+        includes_trim: false,
+        includes_ceiling: false,
+        subtotal_cents: 100000,
+        total_cents: 100000,
+        internal_labor_cost_cents: 95000,
+        internal_material_cost_cents: null,
+        line_item_count: 0,
+      }),
+      reviewEstimate({
+        sq_ft: 1200,
+        prep_level: 5,
+        includes_trim: true,
+        includes_ceiling: false,
+        subtotal_cents: 295200,
+        total_cents: 295200,
+        internal_labor_cost_cents: 127500,
+        internal_material_cost_cents: 35000,
+        line_item_count: 3,
+      }),
+    ]);
 
     expect(badEstimate.score).toBeLessThan(goodEstimate.score);
   });
 
-  it("handles generic (non-painting) estimates", () => {
-    const result = reviewEstimate({
+  it("handles generic (non-painting) estimates", async () => {
+    const result = await reviewEstimate({
       sq_ft: null,
       prep_level: null,
       includes_trim: false,
@@ -139,12 +140,11 @@ describe("estimate review engine", () => {
       line_item_count: 2,
     });
 
-    // Generic estimates get minimal checks
     expect(result.summary).toContain("Generic estimate");
   });
 
-  it("warns on flat-rate generic with no line items", () => {
-    const result = reviewEstimate({
+  it("warns on flat-rate generic with no line items", async () => {
+    const result = await reviewEstimate({
       sq_ft: null,
       prep_level: null,
       includes_trim: false,
@@ -156,14 +156,12 @@ describe("estimate review engine", () => {
       line_item_count: 0,
     });
 
-    const info = result.suggestions.find(
-      (s) => s.field === "line_items"
-    );
+    const info = result.suggestions.find((s) => s.field === "line_items");
     expect(info).toBeDefined();
   });
 
-  it("warns when estimate is priced below the expected rate range", () => {
-    const result = reviewEstimate({
+  it("warns when estimate is priced below the expected rate range", async () => {
+    const result = await reviewEstimate({
       sq_ft: 1000,
       prep_level: 5,
       includes_trim: false,
@@ -182,8 +180,8 @@ describe("estimate review engine", () => {
     expect(pricingWarning?.message).toContain("below minimum");
   });
 
-  it("warns when prep level is high for small area", () => {
-    const result = reviewEstimate({
+  it("warns when prep level is high for small area", async () => {
+    const result = await reviewEstimate({
       sq_ft: 200,
       prep_level: 9,
       includes_trim: true,

@@ -1,11 +1,4 @@
-/**
- * Rule-based estimate reviewer.
- *
- * Analyzes an estimate against Dovetails business rules and returns
- * actionable suggestions. Designed to be swapped for an LLM backend
- * later — just replace `reviewEstimate()` with an API call.
- */
-
+import Anthropic from "@anthropic-ai/sdk";
 import {
   PAINTING_RATE_STANDARD_CENTS,
   PREP_LEVEL_MULTIPLIERS,
@@ -40,13 +33,138 @@ interface EstimateInput {
   line_item_count: number;
 }
 
-export function reviewEstimate(estimate: EstimateInput): EstimateReviewResult {
+// ---------------------------------------------------------------------------
+// Prompt & tool definition (static — cached by Anthropic prefix caching)
+// ---------------------------------------------------------------------------
+
+const SYSTEM_PROMPT = `You are an expert business analyst for Dovetails Services LLC, a painting and general contracting company. Your job is to review estimates and provide clear, actionable feedback.
+
+## Dovetails Pricing Rules
+
+### Painting rates (per sq ft, in cents)
+- Standard base rate: ${PAINTING_RATE_STANDARD_CENTS}¢/sq ft ($${(PAINTING_RATE_STANDARD_CENTS / 100).toFixed(2)}/sq ft)
+- Trim addon: +${PAINTING_TRIM_ADD_CENTS}¢/sq ft (+$${(PAINTING_TRIM_ADD_CENTS / 100).toFixed(2)}/sq ft of base sq ft)
+- Ceiling inclusion: adds 30% to effective surface area (effective_sq_ft = sq_ft × 1.3)
+
+### Prep level multipliers (1–10 scale)
+${Object.entries(PREP_LEVEL_MULTIPLIERS).map(([k, v]) => `- Level ${k}: ${v.toFixed(2)}x`).join("\n")}
+
+### Pricing formula
+expected_labor = (effective_sq_ft × base_rate × prep_multiplier) + (sq_ft × trim_addon if trim included)
+expected_rate_per_sq_ft = expected_labor / sq_ft
+
+### Internal cost calculations
+labor_revenue = subtotal_cents − material_cost_cents − (material_cost_cents × 0.15 handling fee)
+gross_margin_pct = (labor_revenue − internal_labor_cost) / labor_revenue × 100
+
+### Business targets
+- Internal labor rate: $85.00/hr
+- Target gross margin: 30% minimum (warn below 30%, critical below 15%)
+- Material handling fee: 15% of material cost
+
+## Scoring
+Start at 100. Deduct 20 per "warning" type suggestion, 5 per "info" type. Tips do not reduce score. Floor at 0.
+
+## Field names
+Use these exact field values in suggestions: "pricing", "margin", "prep_level", "includes_trim", "includes_ceiling", "line_items", "notes", "scope".
+
+Be concise and dollar-specific. Flag issues that would hurt profitability or leave money on the table.`;
+
+const REVIEW_TOOL: Anthropic.Tool = {
+  name: "review_estimate",
+  description: "Return a structured review of the estimate with suggestions, score, and summary",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      suggestions: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            type: { type: "string", enum: ["warning", "info", "tip"] },
+            field: { type: "string" },
+            message: { type: "string" },
+            suggestion: { type: "string" },
+          },
+          required: ["type", "field", "message", "suggestion"],
+          additionalProperties: false,
+        },
+      },
+      score: {
+        type: "integer",
+        minimum: 0,
+        maximum: 100,
+        description: "Overall estimate quality score (0-100, higher is better)",
+      },
+      summary: {
+        type: "string",
+        description: "One or two sentence summary of the review",
+      },
+    },
+    required: ["suggestions", "score", "summary"],
+    additionalProperties: false,
+  },
+};
+
+let _client: Anthropic | null = null;
+function getClient(): Anthropic {
+  if (!_client) _client = new Anthropic();
+  return _client;
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+export async function reviewEstimate(estimate: EstimateInput): Promise<EstimateReviewResult> {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return reviewEstimateRuleBased(estimate);
+  }
+  try {
+    const client = getClient();
+    const response = await client.messages
+      .stream({
+        model: "claude-opus-4-7",
+        max_tokens: 4096,
+        system: [
+          {
+            type: "text",
+            text: SYSTEM_PROMPT,
+            cache_control: { type: "ephemeral" },
+          },
+        ] as Anthropic.TextBlockParam[],
+        tools: [REVIEW_TOOL],
+        tool_choice: { type: "tool", name: "review_estimate" },
+        messages: [
+          {
+            role: "user",
+            content: `Review this estimate and identify all pricing, margin, and scope issues:\n\n${JSON.stringify(estimate, null, 2)}`,
+          },
+        ],
+      })
+      .finalMessage();
+
+    const toolUse = response.content.find(
+      (b): b is Anthropic.ToolUseBlock => b.type === "tool_use"
+    );
+    if (!toolUse) throw new Error("No tool_use block in review response");
+    return toolUse.input as EstimateReviewResult;
+  } catch (err) {
+    console.error("[reviewEstimate] Claude API error, falling back to rule-based:", err);
+    return reviewEstimateRuleBased(estimate);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Rule-based fallback (used when ANTHROPIC_API_KEY is unset or API errors)
+// ---------------------------------------------------------------------------
+
+function reviewEstimateRuleBased(estimate: EstimateInput): EstimateReviewResult {
   const suggestions: EstimateReviewSuggestion[] = [];
 
   const is_painting = estimate.sq_ft !== null && estimate.prep_level !== null;
 
   if (!is_painting) {
-    // Generic estimate — minimal checks
     if (estimate.line_item_count === 0 && estimate.subtotal_cents > 0) {
       suggestions.push({
         type: "info",
@@ -76,13 +194,10 @@ export function reviewEstimate(estimate: EstimateInput): EstimateReviewResult {
     return buildResult(suggestions, "Generic estimate reviewed.");
   }
 
-  // --- Painting-specific checks ---
-
   const sqFt = estimate.sq_ft!;
   const prepLevel = estimate.prep_level!;
   const effectiveRate = computeEffectiveRate(estimate);
 
-  // 1. Trim check
   if (!estimate.includes_trim) {
     suggestions.push({
       type: "warning",
@@ -92,7 +207,6 @@ export function reviewEstimate(estimate: EstimateInput): EstimateReviewResult {
     });
   }
 
-  // 2. Prep level check
   if (prepLevel <= 3 && sqFt > 800) {
     suggestions.push({
       type: "warning",
@@ -111,7 +225,6 @@ export function reviewEstimate(estimate: EstimateInput): EstimateReviewResult {
     });
   }
 
-  // 3. Ceiling check
   if (!estimate.includes_ceiling && sqFt > 500) {
     suggestions.push({
       type: "tip",
@@ -121,7 +234,6 @@ export function reviewEstimate(estimate: EstimateInput): EstimateReviewResult {
     });
   }
 
-  // 4. Effective rate check — compare actual implied rate against expected formula rate
   const actualRate = computeActualRatePerSqFt(estimate);
   const minAcceptableRate = Math.round(effectiveRate * 0.7);
   const maxReasonableRate = Math.round(effectiveRate * 1.5);
@@ -142,7 +254,6 @@ export function reviewEstimate(estimate: EstimateInput): EstimateReviewResult {
     });
   }
 
-  // 5. Margin check
   if (estimate.internal_labor_cost_cents !== null) {
     const marginPct = computeMargin(
       estimate.subtotal_cents,
@@ -174,7 +285,6 @@ export function reviewEstimate(estimate: EstimateInput): EstimateReviewResult {
     }
   }
 
-  // 6. Line item check for painting
   if (estimate.line_item_count === 0 && estimate.subtotal_cents > 0) {
     suggestions.push({
       type: "info",
@@ -187,22 +297,17 @@ export function reviewEstimate(estimate: EstimateInput): EstimateReviewResult {
   return buildResult(suggestions, "Painting estimate reviewed.");
 }
 
-// Expected rate per base sq ft from standard pricing rules (ceiling + trim included).
 function computeEffectiveRate(estimate: EstimateInput): number {
   const sqFt = estimate.sq_ft!;
   const prepLevel = estimate.prep_level!;
   const prepMultiplier = PREP_LEVEL_MULTIPLIERS[Math.max(1, Math.min(10, prepLevel))] ?? 1;
-  const baseRate = PAINTING_RATE_STANDARD_CENTS;
-  const ratePerSqFt = Math.round(baseRate * prepMultiplier);
-
+  const ratePerSqFt = Math.round(PAINTING_RATE_STANDARD_CENTS * prepMultiplier);
   const effectiveSqFt = estimate.includes_ceiling ? sqFt * 1.3 : sqFt;
   const trimAdd = estimate.includes_trim ? Math.round(sqFt * PAINTING_TRIM_ADD_CENTS) : 0;
   const expectedLabor = Math.round(effectiveSqFt * ratePerSqFt) + trimAdd;
-
   return Math.round(expectedLabor / sqFt);
 }
 
-// Actual implied labor rate per base sq ft from the estimate's subtotal (materials backed out).
 function computeActualRatePerSqFt(estimate: EstimateInput): number {
   const sqFt = estimate.sq_ft!;
   const materialCents = estimate.internal_material_cost_cents ?? 0;
@@ -229,13 +334,16 @@ function buildResult(
   summary: string
 ): EstimateReviewResult {
   const warningCount = suggestions.filter((s) => s.type === "warning").length;
-  const score = Math.max(0, 100 - warningCount * 20 - suggestions.filter((s) => s.type === "info").length * 5);
-
+  const score = Math.max(
+    0,
+    100 - warningCount * 20 - suggestions.filter((s) => s.type === "info").length * 5
+  );
   return {
     suggestions,
     score,
-    summary: warningCount === 0
-      ? `${summary} No issues found.`
-      : `${summary} ${warningCount} warning(s) need attention.`,
+    summary:
+      warningCount === 0
+        ? `${summary} No issues found.`
+        : `${summary} ${warningCount} warning(s) need attention.`,
   };
 }
