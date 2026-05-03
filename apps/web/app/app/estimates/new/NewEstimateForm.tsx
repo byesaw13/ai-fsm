@@ -548,6 +548,11 @@ export function NewEstimateForm({
                     {scopeResult.parsed.confidence}% confidence
                   </span>
                 </div>
+                {scopeResult.parsed.confidence < 60 && (
+                  <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--status-warning)", fontWeight: 500 }}>
+                    ⚠ Low confidence — review all fields carefully before submitting.
+                  </p>
+                )}
                 <ul style={{ margin: 0, padding: "0 0 0 var(--space-4)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
                   {scopeResult.parsed.parsed_items.map((item, i) => (
                     <li key={i}>{item}</li>

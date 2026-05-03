@@ -125,7 +125,7 @@ const createInvoiceSchema = z.object({
   due_date: z.string().datetime().nullable().optional(),
   notes: z.string().nullable().optional(),
   tax_rate: z.number().min(0).max(100).default(0),
-  line_items: z.array(lineItemInputSchema).default([]),
+  line_items: z.array(lineItemInputSchema).min(1, "At least one line item is required"),
 });
 
 export const POST = withRole(["owner", "admin"], async (request, session) => {

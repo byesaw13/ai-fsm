@@ -156,3 +156,86 @@ export const PATCH = withAuth(
     }
   }
 );
+
+export const DELETE = withAuth(
+  async (request: NextRequest, session: AuthSession) => {
+    if (!["owner", "admin"].includes(session.role)) {
+      return NextResponse.json(
+        { error: { code: "FORBIDDEN", message: "Owner or admin role required to delete visits", traceId: session.traceId } },
+        { status: 403 }
+      );
+    }
+
+    const id = request.url.match(/\/visits\/([^/]+)/)?.[1];
+
+    if (!id) {
+      return NextResponse.json(
+        { error: { code: "NOT_FOUND", message: "Visit not found", traceId: session.traceId } },
+        { status: 404 }
+      );
+    }
+
+    const pool = getPool();
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `SELECT set_config('app.current_user_id', $1, true), set_config('app.current_account_id', $2, true), set_config('app.current_role', $3, true)`,
+        [session.userId, session.accountId, session.role]
+      );
+
+      const existing = await client.query<{ id: string; status: string }>(
+        `SELECT id, status FROM visits WHERE id = $1 AND account_id = $2 FOR UPDATE`,
+        [id, session.accountId]
+      );
+
+      if (!existing.rows[0]) {
+        await client.query("ROLLBACK");
+        return NextResponse.json(
+          { error: { code: "NOT_FOUND", message: "Visit not found", traceId: session.traceId } },
+          { status: 404 }
+        );
+      }
+
+      const visit = existing.rows[0];
+      if (["completed", "cancelled"].includes(visit.status)) {
+        await client.query("ROLLBACK");
+        return NextResponse.json(
+          {
+            error: {
+              code: "IMMUTABLE_ENTITY",
+              message: `Cannot delete a visit in "${visit.status}" state.`,
+              traceId: session.traceId,
+            },
+          },
+          { status: 422 }
+        );
+      }
+
+      await client.query(`DELETE FROM visits WHERE id = $1`, [id]);
+
+      await appendAuditLog(client, {
+        account_id: session.accountId,
+        entity_type: "visit",
+        entity_id: id,
+        action: "delete",
+        actor_id: session.userId,
+        trace_id: session.traceId,
+        old_value: { status: visit.status },
+      });
+
+      await client.query("COMMIT");
+      return NextResponse.json({ deleted: true });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      logger.error("[visits DELETE]", err, { traceId: session.traceId });
+      return NextResponse.json(
+        { error: { code: "INTERNAL_ERROR", message: "Failed to delete visit", traceId: session.traceId } },
+        { status: 500 }
+      );
+    } finally {
+      client.release();
+    }
+  }
+);
