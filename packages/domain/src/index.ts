@@ -191,7 +191,22 @@ export const propertySchema = z.object({
 });
 export type Property = z.infer<typeof propertySchema>;
 
-export const jobTypeSchema = z.enum(["painting", "maintenance", "repair", "custom"]);
+export const jobTypeSchema = z.enum([
+  "maintenance",
+  "painting",
+  "repair",
+  "custom",
+  "plumbing",
+  "electrical",
+  "hvac",
+  "carpentry",
+  "roofing",
+  "flooring",
+  "windows_doors",
+  "appliances",
+  "drywall",
+  "landscaping",
+]);
 export type JobType = z.infer<typeof jobTypeSchema>;
 
 export const jobSchema = z.object({
