@@ -61,6 +61,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
   }
 
   const { status: targetStatus } = parseResult.data;
+  let createdDepositInvoiceId: string | null = null;
 
   try {
     await withEstimateContext(session, async (client) => {
@@ -95,6 +96,64 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         [targetStatus, id]
       );
 
+      // Auto-create deposit invoice when estimate is approved
+      if (targetStatus === "approved") {
+        const estData = await client.query<{
+          client_id: string;
+          job_id: string | null;
+          property_id: string | null;
+          deposit_cents: number;
+          notes: string | null;
+        }>(
+          `SELECT client_id, job_id, property_id, deposit_cents, notes
+           FROM estimates WHERE id = $1`,
+          [id]
+        );
+        const est = estData.rows[0];
+
+        if (est && est.deposit_cents > 0) {
+          const existingDeposit = await client.query<{ id: string }>(
+            `SELECT id FROM invoices
+             WHERE estimate_id = $1 AND account_id = $2 AND notes LIKE 'Deposit: %'
+             LIMIT 1`,
+            [id, session.accountId]
+          );
+
+          if (existingDeposit.rowCount === 0) {
+            const countResult = await client.query<{ count: string }>(
+              `SELECT COUNT(*) AS count FROM invoices WHERE account_id = $1`,
+              [session.accountId]
+            );
+            const count = parseInt(countResult.rows[0]?.count ?? "0", 10) + 1;
+            const invoiceNumber = `INV-${String(count).padStart(4, "0")}`;
+            const depositResult = await client.query<{ id: string }>(
+              `INSERT INTO invoices
+                 (account_id, client_id, job_id, estimate_id, property_id,
+                  status, invoice_number,
+                  subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
+                  notes, created_by)
+               VALUES ($1, $2, $3, $4, $5,
+                       'sent', $6,
+                       $7, 0, $7, 0, $7,
+                       $8, $9)
+               RETURNING id`,
+              [
+                session.accountId,
+                est.client_id,
+                est.job_id,
+                id,
+                est.property_id,
+                invoiceNumber,
+                est.deposit_cents,
+                `Deposit: ${est.notes ?? "Estimate approved"}`,
+                session.userId,
+              ]
+            );
+            createdDepositInvoiceId = depositResult.rows[0].id;
+          }
+        }
+      }
+
       // Audit log
       await appendAuditLog(client, {
         account_id: session.accountId,
@@ -104,11 +163,15 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         actor_id: session.userId,
         trace_id: session.traceId,
         old_value: { status: currentStatus },
-        new_value: { status: targetStatus },
+        new_value: { status: targetStatus, deposit_invoice_id: createdDepositInvoiceId },
       });
     });
 
-    return NextResponse.json({ status: targetStatus });
+    const response: Record<string, unknown> = { status: targetStatus };
+    if (createdDepositInvoiceId) {
+      response.deposit_invoice_id = createdDepositInvoiceId;
+    }
+    return NextResponse.json(response);
   } catch (error) {
     const err = error as Error & { code?: string };
 
