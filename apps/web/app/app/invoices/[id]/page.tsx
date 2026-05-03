@@ -13,6 +13,7 @@ import { MarkDepositReceivedButton } from "./MarkDepositReceivedButton";
 import { SendInvoiceButton } from "./SendInvoiceButton";
 import { StatusStepper } from "@/components/ui";
 import { isEmailConfigured } from "@/lib/email/mailer";
+import { CopyPortalLinkButton } from "@/components/CopyPortalLinkButton";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,7 @@ interface InvoiceRow {
   due_date: string | null;
   sent_at: string | null;
   paid_at: string | null;
+  share_token: string;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -127,12 +129,18 @@ export default async function InvoiceDetailPage({
             <p className="page-subtitle">{invoice.client_name}</p>
           )}
         </div>
-        <span
-          className={`status-pill status-${invoice.status}`}
-          data-testid="invoice-status"
-        >
-          {STATUS_LABELS[currentStatus]}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+          <CopyPortalLinkButton
+            url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/invoices/${invoice.share_token}`}
+            label="Copy client link"
+          />
+          <span
+            className={`status-pill status-${invoice.status}`}
+            data-testid="invoice-status"
+          >
+            {STATUS_LABELS[currentStatus]}
+          </span>
+        </div>
       </div>
 
       {/* Status Stepper — main path only */}

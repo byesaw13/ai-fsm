@@ -14,10 +14,15 @@ import { VisitTransitionForm } from "./VisitTransitionForm";
 import { VisitNotesForm } from "./VisitNotesForm";
 import { VisitChecklistForm } from "./VisitChecklistForm";
 import { MaterialsUsedForm } from "./MaterialsUsedForm";
+import { VisitIssuePanel } from "./VisitIssuePanel";
+import { VisitResolutionPanel } from "./VisitResolutionPanel";
+import { VisitPartsPanel } from "./VisitPartsPanel";
+import { VisitClosingChecklist } from "./VisitClosingChecklist";
 import {
   Card,
   EmptyState,
   LinkButton,
+  LocalTime,
   PageContainer,
   PageHeader,
   SectionHeader,
@@ -34,9 +39,26 @@ import { withChecklistContext, getOrSeedChecklist } from "@/lib/visits/checklist
 
 export const dynamic = "force-dynamic";
 
+interface PhotoMeta extends Record<string, unknown> {
+  id: string;
+  original_name: string;
+  created_at: string;
+}
+
+interface PartRow extends Record<string, unknown> {
+  id: string;
+  name: string;
+  quantity: number;
+  actual_cost_cents: number;
+  customer_price_cents: number;
+  receipt_media_id: string | null;
+}
+
 type VisitRow = Visit & {
   job_title: string | null;
   assigned_user_name: string | null;
+  job_type: string | null;
+  job_description: string | null;
 };
 
 const VISIT_STATUS_LABELS: Record<VisitStatus, string> = {
@@ -57,7 +79,7 @@ export default async function VisitDetailPage({
   if (!session) redirect("/login");
 
   const visit = await queryOne<VisitRow>(
-    `SELECT v.*, j.title AS job_title, u.full_name AS assigned_user_name
+    `SELECT v.*, j.title AS job_title, j.job_type AS job_type, j.description AS job_description, u.full_name AS assigned_user_name
      FROM visits v
      LEFT JOIN jobs j ON j.id = v.job_id
      LEFT JOIN users u ON u.id = v.assigned_user_id
@@ -76,6 +98,7 @@ export default async function VisitDetailPage({
   const canNotes = canUpdateVisitNotes(session.role);
   const canChecklist = canUpdateChecklist(session.role);
   const canReschedule = canAssign && !["completed", "cancelled"].includes(currentStatus);
+  const canDeleteMedia = session.role !== "tech";
 
   const assignableUsers = canAssign
     ? await query<{ id: string; full_name: string; role: string; [key: string]: unknown }>(
@@ -84,24 +107,53 @@ export default async function VisitDetailPage({
       )
     : [];
 
+  const isRepairFlow = visit.job_type !== null && visit.job_type !== "maintenance";
+
   // Load checklist (lazy-seeded on first access) unless visit is cancelled
   const checklistItems =
     currentStatus !== "cancelled"
       ? await withChecklistContext(session, (client) =>
-          getOrSeedChecklist(client, session.accountId, id)
+          getOrSeedChecklist(client, session.accountId, id, visit.job_type ?? undefined)
         )
       : [];
 
+  // Load media and parts for repair/painting/custom visits
+  const [beforePhotos, afterPhotos, visitParts] =
+    isRepairFlow && currentStatus !== "cancelled"
+      ? await Promise.all([
+          query<PhotoMeta>(
+            `SELECT id, original_name, created_at FROM visit_media
+             WHERE visit_id = $1 AND account_id = $2 AND category = 'before'
+             ORDER BY created_at`,
+            [id, session.accountId]
+          ),
+          query<PhotoMeta>(
+            `SELECT id, original_name, created_at FROM visit_media
+             WHERE visit_id = $1 AND account_id = $2 AND category = 'after'
+             ORDER BY created_at`,
+            [id, session.accountId]
+          ),
+          query<PartRow>(
+            `SELECT id, name, quantity, actual_cost_cents, customer_price_cents, receipt_media_id
+             FROM visit_parts WHERE visit_id = $1 AND account_id = $2
+             ORDER BY created_at`,
+            [id, session.accountId]
+          ),
+        ])
+      : [[] as PhotoMeta[], [] as PhotoMeta[], [] as PartRow[]];
+
   const overdue = isVisitOverdue(visit);
+
+  // pg returns timestamptz as Date objects — normalise to ISO strings throughout
+  const toISO = (v: unknown): string =>
+    v instanceof Date ? v.toISOString() : String(v);
 
   const timelineEntries: TimelineEntryData[] = [
     {
       id: "scheduled",
-      timestamp: visit.scheduled_start,
+      timestamp: toISO(visit.scheduled_start),
       title: `Scheduled · ${formatVisitDateLabel(visit.scheduled_start)}`,
-      subtitle: `${formatVisitTime(visit.scheduled_start)}–${formatVisitTime(
-        visit.scheduled_end
-      )}`,
+      subtitle: `${formatVisitTime(visit.scheduled_start)}–${formatVisitTime(visit.scheduled_end)}`,
       status: "scheduled",
       badge: overdue ? (
         <span className="p7-badge p7-badge-status-overdue">Overdue</span>
@@ -112,9 +164,9 @@ export default async function VisitDetailPage({
       ? [
           {
             id: "arrived",
-            timestamp: visit.arrived_at,
+            timestamp: toISO(visit.arrived_at),
             title: "Arrived on site",
-            subtitle: new Date(visit.arrived_at).toLocaleString(),
+            subtitle: <LocalTime iso={toISO(visit.arrived_at)} />,
             status: "arrived",
             isCompleted: true,
           } satisfies TimelineEntryData,
@@ -124,9 +176,9 @@ export default async function VisitDetailPage({
       ? [
           {
             id: "completed",
-            timestamp: visit.completed_at,
+            timestamp: toISO(visit.completed_at),
             title: "Visit completed",
-            subtitle: new Date(visit.completed_at).toLocaleString(),
+            subtitle: <LocalTime iso={toISO(visit.completed_at)} />,
             status: "completed",
             isCompleted: true,
           } satisfies TimelineEntryData,
@@ -159,7 +211,8 @@ export default async function VisitDetailPage({
             <Timeline entries={timelineEntries} />
           </Card>
 
-          {currentStatus !== "cancelled" && checklistItems.length > 0 && (
+          {/* ── Maintenance flow: full 28-item walkthrough ── */}
+          {!isRepairFlow && currentStatus !== "cancelled" && checklistItems.length > 0 && (
             <Card data-testid="visit-checklist-panel">
               <SectionHeader title="Walkthrough Checklist" />
               <VisitChecklistForm
@@ -170,6 +223,54 @@ export default async function VisitDetailPage({
             </Card>
           )}
 
+          {/* ── Repair / painting / custom flow ── */}
+          {isRepairFlow && currentStatus !== "cancelled" && (
+            <>
+              <Card>
+                <SectionHeader title="Issue" />
+                <VisitIssuePanel
+                  visitId={visit.id}
+                  initialDescription={(visit as VisitRow & { issue_description?: string | null }).issue_description ?? null}
+                  jobDescription={visit.job_description}
+                  initialPhotos={beforePhotos}
+                  canUpdate={canNotes}
+                  canDelete={canDeleteMedia}
+                />
+              </Card>
+
+              <Card>
+                <SectionHeader title="Parts" />
+                <VisitPartsPanel
+                  visitId={visit.id}
+                  initialParts={visitParts}
+                  canUpdate={canNotes}
+                />
+              </Card>
+
+              <Card>
+                <SectionHeader title="Resolution" />
+                <VisitResolutionPanel
+                  visitId={visit.id}
+                  initialNotes={visit.tech_notes ?? null}
+                  initialPhotos={afterPhotos}
+                  canUpdate={canNotes}
+                  canDelete={canDeleteMedia}
+                />
+              </Card>
+
+              {currentStatus !== "completed" && (
+                <Card>
+                  <SectionHeader title="Closing Checklist" />
+                  <VisitClosingChecklist
+                    visitId={visit.id}
+                    initialItems={checklistItems}
+                    canUpdate={canChecklist}
+                  />
+                </Card>
+              )}
+            </>
+          )}
+
           {canTransition && currentStatus !== "completed" && currentStatus !== "cancelled" && (
             <Card data-testid="visit-transition-panel">
               <SectionHeader title={session.role === "tech" ? "Actions" : "Status Actions"} />
@@ -177,18 +278,23 @@ export default async function VisitDetailPage({
                 visitId={visit.id}
                 currentStatus={currentStatus}
                 role={session.role}
+                jobType={visit.job_type ?? undefined}
+                beforePhotoCount={beforePhotos.length}
+                afterPhotoCount={afterPhotos.length}
+                closingAllDone={checklistItems.length > 0 && checklistItems.every((i) => i.disposition === "ok")}
               />
             </Card>
           )}
 
-          {canNotes && (
+          {/* ── Maintenance: show notes and materials panels ── */}
+          {!isRepairFlow && canNotes && (
             <Card data-testid="visit-notes-panel">
               <SectionHeader title="Tech Notes" />
               <VisitNotesForm visitId={visit.id} initialNotes={visit.tech_notes ?? ""} />
             </Card>
           )}
 
-          {currentStatus !== "cancelled" && (
+          {!isRepairFlow && currentStatus !== "cancelled" && (
             <Card data-testid="materials-used-panel">
               <SectionHeader title="Materials Used" />
               <MaterialsUsedForm
@@ -250,24 +356,30 @@ export default async function VisitDetailPage({
                   </dd>
                 </div>
               )}
+              {visit.job_type && (
+                <div className="p7-detail-row">
+                  <dt>Type</dt>
+                  <dd style={{ textTransform: "capitalize" }}>{visit.job_type}</dd>
+                </div>
+              )}
               <div className="p7-detail-row">
                 <dt>Scheduled</dt>
-                <dd>{new Date(visit.scheduled_start).toLocaleString()}</dd>
+                <dd><LocalTime iso={toISO(visit.scheduled_start)} /></dd>
               </div>
               <div className="p7-detail-row">
                 <dt>Ends</dt>
-                <dd>{new Date(visit.scheduled_end).toLocaleString()}</dd>
+                <dd><LocalTime iso={toISO(visit.scheduled_end)} /></dd>
               </div>
               {visit.arrived_at && (
                 <div className="p7-detail-row">
                   <dt>Arrived</dt>
-                  <dd>{new Date(visit.arrived_at).toLocaleString()}</dd>
+                  <dd><LocalTime iso={toISO(visit.arrived_at)} /></dd>
                 </div>
               )}
               {visit.completed_at && (
                 <div className="p7-detail-row">
                   <dt>Completed</dt>
-                  <dd>{new Date(visit.completed_at).toLocaleString()}</dd>
+                  <dd><LocalTime iso={toISO(visit.completed_at)} /></dd>
                 </div>
               )}
             </dl>

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui";
 import { ClientForm } from "../ClientForm";
 import type { TimelineEntryData } from "@/components/ui";
+import { CopyPortalLinkButton } from "@/components/CopyPortalLinkButton";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ type ClientRow = {
   city: string | null;
   state: string | null;
   zip: string | null;
+  portal_token: string;
   created_at: string;
   updated_at: string;
   property_count: number | string;
@@ -154,7 +156,11 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         backHref="/app/clients"
         backLabel="Clients"
         actions={
-          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
+            <CopyPortalLinkButton
+              url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/${client.portal_token}`}
+              label="Copy portal link"
+            />
             <LinkButton href={`/app/properties/new?client_id=${client.id}`} variant="secondary" size="sm" data-testid="add-property-btn">
               + Property
             </LinkButton>

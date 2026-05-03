@@ -93,26 +93,160 @@ export const DEFAULT_CHECKLIST_TEMPLATE: ChecklistTemplateItem[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Trade-specific closing checklists
+// Every template ends with universal closing steps (cleanup → secured).
+// ---------------------------------------------------------------------------
+
+function universal(offset: number): ChecklistTemplateItem[] {
+  return [
+    { section: "Closing", item_key: "close_cleanup",     label: "Work area cleaned and debris removed",     sort_order: offset },
+    { section: "Closing", item_key: "close_photos",      label: "Before and after photos captured",         sort_order: offset + 1 },
+    { section: "Closing", item_key: "close_parts",       label: "All parts documented with receipt",        sort_order: offset + 2 },
+    { section: "Closing", item_key: "close_walkthrough", label: "Client walkthrough completed",             sort_order: offset + 3 },
+    { section: "Closing", item_key: "close_approval",    label: "Client verbal approval received",          sort_order: offset + 4 },
+    { section: "Closing", item_key: "close_secured",     label: "Property secured (doors, gates, garage)",  sort_order: offset + 5 },
+  ];
+}
+
+export const CLOSING_CHECKLIST_TEMPLATES: Record<string, ChecklistTemplateItem[]> = {
+
+  plumbing: [
+    { section: "Closing", item_key: "plumb_no_leaks",      label: "All fixtures tested — no drips or leaks",           sort_order: 0 },
+    { section: "Closing", item_key: "plumb_hot_cold",      label: "Hot and cold water running correctly",              sort_order: 1 },
+    { section: "Closing", item_key: "plumb_drainage",      label: "Drainage flowing freely — no slow drains",          sort_order: 2 },
+    { section: "Closing", item_key: "plumb_shutoffs",      label: "Shutoff valves exercised and operating",            sort_order: 3 },
+    { section: "Closing", item_key: "plumb_no_moisture",   label: "No visible moisture or water damage remaining",     sort_order: 4 },
+    { section: "Closing", item_key: "plumb_water_on",      label: "Main water supply verified on before leaving",      sort_order: 5 },
+    ...universal(10),
+  ],
+
+  electrical: [
+    { section: "Closing", item_key: "elec_outlets",        label: "All outlets and switches tested and functioning",   sort_order: 0 },
+    { section: "Closing", item_key: "elec_breaker",        label: "Circuit breaker labeled if new circuit added",      sort_order: 1 },
+    { section: "Closing", item_key: "elec_no_exposed",     label: "No exposed wiring visible",                        sort_order: 2 },
+    { section: "Closing", item_key: "elec_gfci",           label: "GFCI outlets tested if applicable",                sort_order: 3 },
+    { section: "Closing", item_key: "elec_covers",         label: "All covers and face plates reinstalled",            sort_order: 4 },
+    { section: "Closing", item_key: "elec_smoke_co",       label: "Smoke/CO detectors tested near work area",         sort_order: 5 },
+    ...universal(10),
+  ],
+
+  hvac: [
+    { section: "Closing", item_key: "hvac_tested",         label: "System tested — heating/cooling confirmed working", sort_order: 0 },
+    { section: "Closing", item_key: "hvac_thermostat",     label: "Thermostat set back to client preference",         sort_order: 1 },
+    { section: "Closing", item_key: "hvac_filter",         label: "Filter replaced and old filter disposed",          sort_order: 2 },
+    { section: "Closing", item_key: "hvac_condensate",     label: "Condensate drain checked and clear",               sort_order: 3 },
+    { section: "Closing", item_key: "hvac_panels",         label: "All access panels reinstalled and secured",        sort_order: 4 },
+    { section: "Closing", item_key: "hvac_vents",          label: "Vents and registers clear — not blocked",          sort_order: 5 },
+    ...universal(10),
+  ],
+
+  carpentry: [
+    { section: "Closing", item_key: "carp_fasteners",      label: "All fasteners driven, filled, and countersunk",    sort_order: 0 },
+    { section: "Closing", item_key: "carp_trim_tight",     label: "Trim and moldings tight — no gaps",                sort_order: 1 },
+    { section: "Closing", item_key: "carp_operation",      label: "Doors and drawers operate smoothly",               sort_order: 2 },
+    { section: "Closing", item_key: "carp_hardware",       label: "Hardware installed and functioning",               sort_order: 3 },
+    { section: "Closing", item_key: "carp_touchup",        label: "Paint/stain touch-up applied if needed",           sort_order: 4 },
+    ...universal(10),
+  ],
+
+  painting: [
+    { section: "Closing", item_key: "paint_edges",         label: "All edges and lines clean — no bleeding",          sort_order: 0 },
+    { section: "Closing", item_key: "paint_dry",           label: "Final coat fully dry before handoff",              sort_order: 1 },
+    { section: "Closing", item_key: "paint_covers",        label: "Outlet covers and switch plates reinstalled",      sort_order: 2 },
+    { section: "Closing", item_key: "paint_furniture",     label: "Furniture and fixtures moved back",                sort_order: 3 },
+    { section: "Closing", item_key: "paint_dropcloths",    label: "Drop cloths and tape removed and disposed",        sort_order: 4 },
+    { section: "Closing", item_key: "paint_cans",          label: "Paint stored or disposed per client preference",   sort_order: 5 },
+    ...universal(10),
+  ],
+
+  roofing: [
+    { section: "Closing", item_key: "roof_secured",        label: "All shingles/materials secured — no loose edges",  sort_order: 0 },
+    { section: "Closing", item_key: "roof_flashing",       label: "Flashing sealed and watertight",                   sort_order: 1 },
+    { section: "Closing", item_key: "roof_debris",         label: "No nails or debris on lawn or driveway",           sort_order: 2 },
+    { section: "Closing", item_key: "roof_gutters",        label: "Gutters cleared of roofing debris",                sort_order: 3 },
+    { section: "Closing", item_key: "roof_interior",       label: "Interior checked for water intrusion signs",       sort_order: 4 },
+    ...universal(10),
+  ],
+
+  flooring: [
+    { section: "Closing", item_key: "floor_seams",         label: "All seams tight and transitions installed",        sort_order: 0 },
+    { section: "Closing", item_key: "floor_gaps",          label: "Expansion gaps maintained at perimeter",           sort_order: 1 },
+    { section: "Closing", item_key: "floor_squeaks",       label: "Floor tested — no squeaks or loose areas",         sort_order: 2 },
+    { section: "Closing", item_key: "floor_cure",          label: "Client informed of adhesive/grout cure time",      sort_order: 3 },
+    { section: "Closing", item_key: "floor_packaging",     label: "Debris and packaging removed",                     sort_order: 4 },
+    ...universal(10),
+  ],
+
+  windows_doors: [
+    { section: "Closing", item_key: "wd_operation",        label: "Window/door opens, closes, and locks correctly",   sort_order: 0 },
+    { section: "Closing", item_key: "wd_weatherstrip",     label: "Weatherstripping seated and sealing properly",     sort_order: 1 },
+    { section: "Closing", item_key: "wd_no_draft",         label: "No drafts felt around frame",                      sort_order: 2 },
+    { section: "Closing", item_key: "wd_glass_clean",      label: "Glass cleaned — free of smudges and prints",       sort_order: 3 },
+    { section: "Closing", item_key: "wd_hardware",         label: "Hardware functioning and all screws tightened",    sort_order: 4 },
+    ...universal(10),
+  ],
+
+  appliances: [
+    { section: "Closing", item_key: "appl_powered",        label: "Appliance powers on and tested through full cycle", sort_order: 0 },
+    { section: "Closing", item_key: "appl_connections",    label: "All water/gas/electrical connections verified",    sort_order: 1 },
+    { section: "Closing", item_key: "appl_level",          label: "Appliance leveled and secured in place",           sort_order: 2 },
+    { section: "Closing", item_key: "appl_old_unit",       label: "Old appliance removed or noted as client's responsibility", sort_order: 3 },
+    { section: "Closing", item_key: "appl_docs",           label: "Manufacturer documentation left with client",      sort_order: 4 },
+    ...universal(10),
+  ],
+
+  drywall: [
+    { section: "Closing", item_key: "dry_seams",           label: "All seams and fasteners taped, mudded, sanded smooth", sort_order: 0 },
+    { section: "Closing", item_key: "dry_texture",         label: "Texture matched to existing wall (if applicable)", sort_order: 1 },
+    { section: "Closing", item_key: "dry_primed",          label: "Primer coat applied — ready for paint",            sort_order: 2 },
+    { section: "Closing", item_key: "dry_no_ridges",       label: "No visible ridges or bubbles",                     sort_order: 3 },
+    { section: "Closing", item_key: "dry_dust",            label: "Drywall dust cleaned from all surfaces and floors", sort_order: 4 },
+    ...universal(10),
+  ],
+
+  landscaping: [
+    { section: "Closing", item_key: "land_depth",          label: "All plant material installed at correct depth",    sort_order: 0 },
+    { section: "Closing", item_key: "land_mulch",          label: "Mulch or stone spread evenly",                    sort_order: 1 },
+    { section: "Closing", item_key: "land_irrigation",     label: "Irrigation/drainage connections verified",        sort_order: 2 },
+    { section: "Closing", item_key: "land_debris",         label: "All debris and packaging removed from site",      sort_order: 3 },
+    { section: "Closing", item_key: "land_tools",          label: "Tools and equipment fully loaded out",            sort_order: 4 },
+    ...universal(10),
+  ],
+
+  // Generic fallback for 'repair', 'custom', and any unknown types
+  _default: universal(0),
+};
+
+/** Return the correct closing template for a given job type. */
+export function getClosingTemplate(jobType: string): ChecklistTemplateItem[] {
+  return CLOSING_CHECKLIST_TEMPLATES[jobType] ?? CLOSING_CHECKLIST_TEMPLATES._default;
+}
+
+/** Backwards-compat alias used by existing code. */
+export const CLOSING_CHECKLIST_TEMPLATE = CLOSING_CHECKLIST_TEMPLATES._default;
+
+// ---------------------------------------------------------------------------
 // Seeding
 // ---------------------------------------------------------------------------
 
 /**
- * Insert the default template for a visit.
+ * Insert a template into visit_checklist_items for a visit.
  * Uses ON CONFLICT DO NOTHING for idempotency — safe to call multiple times.
  */
 export async function seedChecklistItems(
   client: PoolClient,
   accountId: string,
-  visitId: string
+  visitId: string,
+  template: ChecklistTemplateItem[] = DEFAULT_CHECKLIST_TEMPLATE
 ): Promise<void> {
-  if (DEFAULT_CHECKLIST_TEMPLATE.length === 0) return;
+  if (template.length === 0) return;
 
-  // Build a multi-row INSERT to seed all 28 items in one round-trip.
+  // Build a multi-row INSERT to seed all items in one round-trip.
   const placeholders: string[] = [];
   const values: unknown[] = [];
   let i = 1;
 
-  for (const item of DEFAULT_CHECKLIST_TEMPLATE) {
+  for (const item of template) {
     placeholders.push(`($${i}, $${i + 1}, $${i + 2}, $${i + 3}, $${i + 4}, $${i + 5})`);
     values.push(accountId, visitId, item.section, item.item_key, item.label, item.sort_order);
     i += 6;
@@ -132,23 +266,44 @@ export async function seedChecklistItems(
 // ---------------------------------------------------------------------------
 
 /**
- * Return checklist items for a visit, seeding from the default template if
+ * Return checklist items for a visit, seeding from the appropriate template if
  * no items exist yet.  The seed is idempotent — ON CONFLICT DO NOTHING.
+ *
+ * jobType === 'maintenance' (or undefined) → DEFAULT_CHECKLIST_TEMPLATE (28 items)
+ * any other jobType → CLOSING_CHECKLIST_TEMPLATE (6 closing steps)
  */
 export async function getOrSeedChecklist(
   client: PoolClient,
   accountId: string,
-  visitId: string
+  visitId: string,
+  jobType?: string
 ): Promise<VisitChecklistItem[]> {
-  const countResult = await client.query<{ count: string }>(
-    `SELECT COUNT(*) AS count FROM visit_checklist_items WHERE visit_id = $1 AND account_id = $2`,
+  const isMaintenance = jobType === undefined || jobType === "maintenance";
+  const template = isMaintenance ? DEFAULT_CHECKLIST_TEMPLATE : getClosingTemplate(jobType!);
+
+  // Detect wrong-type seeds: maintenance visits should have walkthrough sections,
+  // non-maintenance visits should have a Closing section.
+  const existingResult = await client.query<{ section: string }>(
+    `SELECT DISTINCT section FROM visit_checklist_items WHERE visit_id = $1 AND account_id = $2`,
     [visitId, accountId]
   );
+  const existingSections = existingResult.rows.map((r) => r.section);
+  const hasClosing = existingSections.includes("Closing");
+  const hasWalkthrough = existingSections.some((s) => s !== "Closing");
+  const wrongType =
+    existingSections.length > 0 &&
+    ((isMaintenance && hasClosing && !hasWalkthrough) ||
+     (!isMaintenance && hasWalkthrough));
 
-  const count = parseInt(countResult.rows[0]?.count ?? "0", 10);
-
-  if (count === 0) {
-    await seedChecklistItems(client, accountId, visitId);
+  if (wrongType) {
+    // Clear and re-seed with correct template
+    await client.query(
+      `DELETE FROM visit_checklist_items WHERE visit_id = $1 AND account_id = $2`,
+      [visitId, accountId]
+    );
+    await seedChecklistItems(client, accountId, visitId, template);
+  } else if (existingSections.length === 0) {
+    await seedChecklistItems(client, accountId, visitId, template);
   }
 
   const { rows } = await client.query<VisitChecklistItem>(

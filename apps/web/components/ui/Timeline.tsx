@@ -10,7 +10,7 @@ export interface TimelineEntryData {
   id: string;
   timestamp: string;
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   status?: string;
   badge?: ReactNode;
   href?: string;

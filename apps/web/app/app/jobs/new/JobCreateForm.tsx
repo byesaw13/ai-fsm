@@ -32,6 +32,22 @@ interface FormErrors {
   schedule_time?: string;
 }
 
+const JOB_TYPE_OPTIONS = [
+  { value: "maintenance",   label: "Home Maintenance (Walkthrough)" },
+  { value: "plumbing",      label: "Plumbing" },
+  { value: "electrical",    label: "Electrical" },
+  { value: "hvac",          label: "HVAC" },
+  { value: "carpentry",     label: "Carpentry / Woodwork" },
+  { value: "painting",      label: "Painting" },
+  { value: "roofing",       label: "Roofing" },
+  { value: "flooring",      label: "Flooring" },
+  { value: "windows_doors", label: "Windows & Doors" },
+  { value: "appliances",    label: "Appliances" },
+  { value: "drywall",       label: "Drywall" },
+  { value: "landscaping",   label: "Landscaping / Exterior" },
+  { value: "custom",        label: "Other / Custom" },
+];
+
 const PRIORITY_OPTIONS = [
   { value: 0, label: "None" },
   { value: 1, label: "Low" },
@@ -66,6 +82,7 @@ export function JobCreateForm({
         ? initialPropertyId
         : "",
     description: "",
+    job_type: "custom",
     priority: 0,
   });
 
@@ -127,6 +144,7 @@ export function JobCreateForm({
         client_id: form.client_id,
         property_id: form.property_id || undefined,
         description: form.description.trim() || undefined,
+        job_type: form.job_type,
         priority: form.priority,
         scheduled_start: start,
         scheduled_end: end,
@@ -221,6 +239,15 @@ export function JobCreateForm({
           rows={4}
           disabled={pending}
           containerClassName="p7-form-grid-span-2"
+        />
+
+        <Select
+          id="job_type"
+          label="Job Type"
+          value={form.job_type}
+          onChange={(e) => setForm({ ...form, job_type: e.target.value })}
+          disabled={pending}
+          options={JOB_TYPE_OPTIONS}
         />
 
         <Select

@@ -16,6 +16,7 @@ import { EstimateEditForm } from "./EstimateEditForm";
 import { SendEstimateButton } from "./SendEstimateButton";
 import { StatusStepper } from "@/components/ui";
 import { isEmailConfigured } from "@/lib/email/mailer";
+import { CopyPortalLinkButton } from "@/components/CopyPortalLinkButton";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,7 @@ interface EstimateRow {
   internal_notes: string | null;
   sent_at: string | null;
   expires_at: string | null;
+  share_token: string;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -124,6 +126,9 @@ export default async function EstimateDetailPage({
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+          <CopyPortalLinkButton
+            url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/estimates/${estimate.share_token}`}
+          />
           <Link
             href={`/app/estimates/${estimate.id}/print`}
             target="_blank"

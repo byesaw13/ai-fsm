@@ -71,6 +71,8 @@ services:
       timeout: 10s
       retries: 5
       start_period: 20s
+    volumes:
+      - ${FSM_DATA_ROOT:-/opt/business/ai-fsm/data}/uploads:/app/uploads
     networks:
       internal: {}
       business_proxy:
@@ -138,6 +140,33 @@ services:
       options:
         max-size: "50m"
         max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # stripe-cli — forwards Stripe webhook events to the web container
+  # Required because fsm.garonhome.local is not publicly reachable.
+  # On first start, check logs for the webhook signing secret:
+  #   docker logs ai-fsm-stripe-cli-1 2>&1 | grep "signing secret"
+  # Copy that value to STRIPE_WEBHOOK_SECRET in .env, then restart web.
+  # ---------------------------------------------------------------------------
+  stripe-cli:
+    image: stripe/stripe-cli:latest
+    restart: unless-stopped
+    command:
+      - listen
+      - --api-key=${STRIPE_SECRET_KEY}
+      - --forward-to=http://ai-fsm-web:3000/api/webhooks/stripe
+      - --events=payment_intent.succeeded,payment_intent.payment_failed
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      - internal
+      - business_proxy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "2"
 
   # ---------------------------------------------------------------------------
   # redis — queue / cache / worker coordination

@@ -130,9 +130,14 @@ export default async function ClientsPage({ searchParams }: PageProps) {
         title="Clients"
         subtitle={`${clients.length} client${clients.length === 1 ? "" : "s"}`}
         actions={
-          <LinkButton href="/app/clients/new" variant="primary" data-testid="create-client-btn">
-            + New Client
-          </LinkButton>
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <LinkButton href="/app/clients/import" variant="secondary">
+              Import CSV
+            </LinkButton>
+            <LinkButton href="/app/clients/new" variant="primary" data-testid="create-client-btn">
+              + New Client
+            </LinkButton>
+          </div>
         }
       />
 
