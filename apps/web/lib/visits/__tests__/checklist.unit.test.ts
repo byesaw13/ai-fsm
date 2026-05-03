@@ -229,7 +229,7 @@ describe("seedChecklistItems", () => {
 // ---------------------------------------------------------------------------
 
 describe("getOrSeedChecklist", () => {
-  it("seeds when count is 0, then returns items", async () => {
+  it("seeds when no items exist, then returns items", async () => {
     const client = { query: mockClientQuery } as any;
     const itemRow = {
       id: "item-1",
@@ -246,7 +246,7 @@ describe("getOrSeedChecklist", () => {
     };
 
     mockClientQuery
-      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // COUNT
+      .mockResolvedValueOnce({ rows: [] }) // SELECT DISTINCT section → empty
       .mockResolvedValueOnce({ rows: [], rowCount: 28 }) // INSERT seed
       .mockResolvedValueOnce({ rows: [itemRow] }); // SELECT
 
@@ -254,8 +254,8 @@ describe("getOrSeedChecklist", () => {
     expect(items).toHaveLength(1);
     expect(items[0].item_key).toBe("ext_roof_condition");
 
-    // Verify COUNT was first
-    expect(mockClientQuery.mock.calls[0][0]).toContain("COUNT(*)");
+    // Verify section check was first
+    expect(mockClientQuery.mock.calls[0][0]).toContain("DISTINCT section");
     // Verify INSERT was called
     expect(
       mockClientQuery.mock.calls.some((args: unknown[]) =>
@@ -268,7 +268,7 @@ describe("getOrSeedChecklist", () => {
     const client = { query: mockClientQuery } as any;
 
     mockClientQuery
-      .mockResolvedValueOnce({ rows: [{ count: "28" }] }) // COUNT → already seeded
+      .mockResolvedValueOnce({ rows: [{ section: "Exterior" }] }) // has existing sections
       .mockResolvedValueOnce({ rows: [] }); // SELECT
 
     await getOrSeedChecklist(client, ACCOUNT_ID, VISIT_ID);
@@ -283,7 +283,7 @@ describe("getOrSeedChecklist", () => {
     const client = { query: mockClientQuery } as any;
 
     mockClientQuery
-      .mockResolvedValueOnce({ rows: [{ count: "28" }] })
+      .mockResolvedValueOnce({ rows: [{ section: "Exterior" }] })
       .mockResolvedValueOnce({ rows: [] });
 
     await getOrSeedChecklist(client, ACCOUNT_ID, VISIT_ID);
