@@ -45,7 +45,7 @@ export const POST = withAuth(async (request: NextRequest, session) => {
 
   try {
     const { notes } = parseResult.data;
-    const parsed = translateScope(notes);
+    const parsed = await translateScope(notes);
 
     // If it's a painting estimate and we have enough data, compute a preview
     let estimate_preview: Record<string, string> | null = null;
