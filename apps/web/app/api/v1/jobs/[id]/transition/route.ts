@@ -94,6 +94,72 @@ export const POST = withRole(
 
       const updated = rows[0];
 
+      // Auto-create balance invoice when job is completed
+      let balance_invoice_id: string | null = null;
+      if (targetStatus === "completed") {
+        const approvedEstimate = await client.query<{
+          id: string;
+          client_id: string;
+          property_id: string | null;
+          balance_cents: number;
+          notes: string | null;
+        }>(
+          `SELECT id, client_id, property_id, balance_cents, notes
+           FROM estimates
+           WHERE job_id = $1 AND account_id = $2 AND status = 'approved'
+           ORDER BY created_at DESC
+           LIMIT 1`,
+          [id, session.accountId]
+        );
+
+        if (approvedEstimate.rowCount !== null && approvedEstimate.rowCount > 0) {
+          const est = approvedEstimate.rows[0];
+
+          if (est.balance_cents > 0) {
+            const existingBalance = await client.query<{ id: string }>(
+              `SELECT id FROM invoices
+               WHERE estimate_id = $1 AND account_id = $2 AND notes LIKE 'Balance: %'
+               LIMIT 1`,
+              [est.id, session.accountId]
+            );
+
+            if (existingBalance.rowCount === 0) {
+              const countResult = await client.query<{ count: string }>(
+                `SELECT COUNT(*) AS count FROM invoices WHERE account_id = $1`,
+                [session.accountId]
+              );
+              const count = parseInt(countResult.rows[0]?.count ?? "0", 10) + 1;
+              const invoiceNumber = `INV-${String(count).padStart(4, "0")}`;
+
+              const balanceResult = await client.query<{ id: string }>(
+                `INSERT INTO invoices
+                   (account_id, client_id, job_id, estimate_id, property_id,
+                    status, invoice_number,
+                    subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
+                    notes, created_by)
+                 VALUES ($1, $2, $3, $4, $5,
+                         'sent', $6,
+                         $7, 0, $7, 0, 0,
+                         $8, $9)
+                 RETURNING id`,
+                [
+                  session.accountId,
+                  est.client_id,
+                  id,
+                  est.id,
+                  est.property_id,
+                  invoiceNumber,
+                  est.balance_cents,
+                  `Balance: ${est.notes ?? "Job completed"}`,
+                  session.userId,
+                ]
+              );
+              balance_invoice_id = balanceResult.rows[0].id;
+            }
+          }
+        }
+      }
+
       await appendAuditLog(client, {
         account_id: session.accountId,
         entity_type: "job",
@@ -102,11 +168,16 @@ export const POST = withRole(
         actor_id: session.userId,
         trace_id: session.traceId,
         old_value: { status: currentStatus },
-        new_value: { status: targetStatus },
+        new_value: { status: targetStatus, balance_invoice_id },
       });
 
       await client.query("COMMIT");
-      return NextResponse.json({ data: updated });
+
+      const response: Record<string, unknown> = { data: updated };
+      if (balance_invoice_id) {
+        response.balance_invoice_id = balance_invoice_id;
+      }
+      return NextResponse.json(response);
     } catch (err) {
       await client.query("ROLLBACK");
       logger.error("[jobs transition POST]", err, { traceId: session.traceId });
