@@ -48,6 +48,24 @@ interface LineItemRow {
   unit_price: string;
 }
 
+interface ParsedScope {
+  sq_ft: number | null;
+  prep_level: number | null;
+  includes_trim: boolean;
+  includes_ceiling: boolean;
+  labor_hours_estimate: number | null;
+  material_cost_cents: number | null;
+  suggested_job_type: string;
+  confidence: number;
+  parsed_items: string[];
+  warnings: string[];
+}
+
+interface ScopeResult {
+  parsed: ParsedScope;
+  estimate_preview: Record<string, string> | null;
+}
+
 interface NewEstimateFormProps {
   clients: Client[];
   jobs: Job[];
@@ -128,6 +146,12 @@ export function NewEstimateForm({
   const [materialCostDollars, setMaterialCostDollars] = useState("");
   const [laborHours, setLaborHours] = useState("");
 
+  // Scope parser
+  const [scopeNotes, setScopeNotes] = useState("");
+  const [scopeParsing, setScopeParsing] = useState(false);
+  const [scopeResult, setScopeResult] = useState<ScopeResult | null>(null);
+  const [scopeError, setScopeError] = useState<string | null>(null);
+
   // Generic fields
   const [mode, setMode] = useState<"itemized" | "flat_rate">("itemized");
   const [lineItems, setLineItems] = useState<LineItemRow[]>([{ ...EMPTY_ROW }]);
@@ -202,6 +226,37 @@ export function NewEstimateForm({
     setLineItems((prev) =>
       prev.map((row, i) => (i === index ? { ...row, [field]: value } : row))
     );
+  }
+
+  async function handleParseScope() {
+    setScopeParsing(true);
+    setScopeError(null);
+    setScopeResult(null);
+    try {
+      const res = await fetch("/api/v1/estimates/ai-scope", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: scopeNotes }),
+      });
+      const json = await res.json() as ScopeResult & { error?: { message?: string } };
+      if (!res.ok) {
+        setScopeError(json.error?.message ?? "Failed to parse notes.");
+        return;
+      }
+      const { parsed } = json;
+      setScopeResult(json);
+      if (parsed.sq_ft !== null) setSqFt(parsed.sq_ft.toString());
+      if (parsed.prep_level !== null) setPrepLevel(parsed.prep_level);
+      setIncludesTrim(parsed.includes_trim);
+      setIncludesCeiling(parsed.includes_ceiling);
+      if (parsed.labor_hours_estimate !== null) setLaborHours(parsed.labor_hours_estimate.toString());
+      if (parsed.material_cost_cents !== null) setMaterialCostDollars((parsed.material_cost_cents / 100).toFixed(2));
+      if (parsed.suggested_job_type === "custom") setServiceType("generic");
+    } catch {
+      setScopeError("Network error — could not parse notes.");
+    } finally {
+      setScopeParsing(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -445,6 +500,70 @@ export function NewEstimateForm({
       {serviceType === "painting" && (
         <div>
           <SectionHeader title="Painting Estimator" as="h3" />
+
+          {/* Scope parser */}
+          <div style={{ marginBottom: "var(--space-4)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
+            <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", fontWeight: 600 }}>
+              Parse from description
+            </p>
+            <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+              Paste the customer&apos;s job description to auto-fill the fields below.
+            </p>
+            <Textarea
+              id="scope_notes"
+              label=""
+              value={scopeNotes}
+              onChange={(e) => setScopeNotes(e.target.value)}
+              placeholder="e.g. Paint 3 bedrooms, patch some holes and sand walls, include ceiling and trim, about $350 for materials"
+              rows={3}
+              disabled={pending || scopeParsing}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "var(--space-2)" }}>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleParseScope}
+                disabled={!scopeNotes.trim() || scopeParsing || pending}
+                loading={scopeParsing}
+              >
+                {scopeParsing ? "Parsing…" : "Parse Notes"}
+              </Button>
+            </div>
+
+            {scopeError && (
+              <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--status-error)" }}>
+                {scopeError}
+              </p>
+            )}
+
+            {scopeResult && (
+              <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-2)", borderTop: "1px solid var(--border)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-1)" }}>
+                  <span style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>Parsed</span>
+                  <span style={{
+                    padding: "2px 8px", borderRadius: 99, fontSize: "var(--text-xs)", fontWeight: 600, color: "#fff",
+                    background: scopeResult.parsed.confidence >= 70 ? "var(--status-success)" : scopeResult.parsed.confidence >= 40 ? "var(--status-warning)" : "var(--status-error)",
+                  }}>
+                    {scopeResult.parsed.confidence}% confidence
+                  </span>
+                </div>
+                <ul style={{ margin: 0, padding: "0 0 0 var(--space-4)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                  {scopeResult.parsed.parsed_items.map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+                {scopeResult.parsed.warnings.map((w, i) => (
+                  <p key={i} style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--status-warning)", fontWeight: 500 }}>
+                    ⚠ {w}
+                  </p>
+                ))}
+                <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                  Fields applied below — review and adjust as needed.
+                </p>
+              </div>
+            )}
+          </div>
 
           <div className="p7-form-grid p7-form-grid-2">
             <Input
