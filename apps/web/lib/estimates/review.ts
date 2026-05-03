@@ -125,8 +125,7 @@ export async function reviewEstimate(estimate: EstimateInput): Promise<EstimateR
     const response = await client.messages
       .stream({
         model: "claude-opus-4-7",
-        max_tokens: 8192,
-        thinking: { type: "adaptive" },
+        max_tokens: 4096,
         system: [
           {
             type: "text",

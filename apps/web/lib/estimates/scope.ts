@@ -145,7 +145,6 @@ export async function translateScope(notes: string): Promise<ScopeTranslation> {
       .stream({
         model: "claude-opus-4-7",
         max_tokens: 4096,
-        thinking: { type: "adaptive" },
         system: [
           {
             type: "text",
