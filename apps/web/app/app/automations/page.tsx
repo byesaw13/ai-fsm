@@ -34,8 +34,10 @@ async function getAutomationStats(
   accountId: string,
   type: "visit_reminder" | "invoice_followup"
 ): Promise<EventStats> {
-  const last24h = await query<{ sent: number }>(
-    `SELECT COUNT(*)::int AS sent
+  const last24h = await query<{ sent: number; errors: number }>(
+    `SELECT
+       COUNT(*) FILTER (WHERE action = 'insert')::int AS sent,
+       COUNT(*) FILTER (WHERE action = 'error')::int AS errors
      FROM audit_log
      WHERE account_id = $1 
        AND entity_type = $2
@@ -43,8 +45,10 @@ async function getAutomationStats(
     [accountId, type]
   );
 
-  const last7d = await query<{ sent: number }>(
-    `SELECT COUNT(*)::int AS sent
+  const last7d = await query<{ sent: number; errors: number }>(
+    `SELECT
+       COUNT(*) FILTER (WHERE action = 'insert')::int AS sent,
+       COUNT(*) FILTER (WHERE action = 'error')::int AS errors
      FROM audit_log
      WHERE account_id = $1 
        AND entity_type = $2
@@ -53,8 +57,8 @@ async function getAutomationStats(
   );
 
   return {
-    last_24h: { sent: last24h[0]?.sent ?? 0, skipped: 0, errors: 0 },
-    last_7d: { sent: last7d[0]?.sent ?? 0, skipped: 0, errors: 0 },
+    last_24h: { sent: last24h[0]?.sent ?? 0, skipped: 0, errors: last24h[0]?.errors ?? 0 },
+    last_7d: { sent: last7d[0]?.sent ?? 0, skipped: 0, errors: last7d[0]?.errors ?? 0 },
   };
 }
 

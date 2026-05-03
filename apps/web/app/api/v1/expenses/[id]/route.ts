@@ -215,3 +215,63 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
     );
   }
 });
+
+// === Delete Expense (DELETE /api/v1/expenses/[id]) ===
+
+export const DELETE = withRole(["owner", "admin"], async (request, session) => {
+  const id = request.nextUrl.pathname.split("/").at(-1)!;
+
+  try {
+    await withExpenseContext(session, async (client) => {
+      const existing = await client.query<{ id: string; vendor_name: string }>(
+        `SELECT id, vendor_name FROM expenses WHERE id = $1 AND account_id = $2`,
+        [id, session.accountId]
+      );
+
+      if (existing.rowCount === 0) {
+        throw Object.assign(new Error("Expense not found"), { code: "NOT_FOUND" });
+      }
+
+      await client.query(`DELETE FROM expenses WHERE id = $1`, [id]);
+
+      await appendAuditLog(client, {
+        account_id: session.accountId,
+        entity_type: "expense",
+        entity_id: id,
+        action: "delete",
+        actor_id: session.userId,
+        trace_id: session.traceId,
+        old_value: { vendor_name: existing.rows[0].vendor_name },
+      });
+    });
+
+    return NextResponse.json({ deleted: true });
+  } catch (error) {
+    const err = error as Error & { code?: string };
+    if (err.code === "NOT_FOUND") {
+      return NextResponse.json(
+        {
+          error: {
+            code: "NOT_FOUND",
+            message: "Expense not found",
+            traceId: session.traceId,
+          },
+        },
+        { status: 404 }
+      );
+    }
+    logger.error("DELETE /api/v1/expenses/[id] error", error, {
+      traceId: session.traceId,
+    });
+    return NextResponse.json(
+      {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Failed to delete expense",
+          traceId: session.traceId,
+        },
+      },
+      { status: 500 }
+    );
+  }
+});

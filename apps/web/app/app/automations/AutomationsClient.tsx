@@ -374,6 +374,7 @@ function AutomationCard({
 }) {
   const [enabled, setEnabled] = useState(automation.enabled);
   const [toggling, setToggling] = useState(false);
+  const [editingConfig, setEditingConfig] = useState(false);
 
   const hoursBefore = (automation.config?.hours_before as number | undefined) ?? 24;
   const daysOverdue = (automation.config?.days_overdue as number[] | undefined) ?? [7, 14, 30];
@@ -393,6 +394,18 @@ function AutomationCard({
     }
   }
 
+  async function handleConfigUpdate(newConfig: Record<string, unknown>) {
+    const res = await fetch(`/api/v1/automations/${automation.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ config: newConfig }),
+    });
+    if (res.ok) {
+      setEditingConfig(false);
+      window.location.reload();
+    }
+  }
+
   return (
     <div className="automation-card">
       {isAdmin && (
@@ -406,9 +419,38 @@ function AutomationCard({
           >
             {toggling ? "…" : enabled ? "Disable" : "Enable"}
           </button>
+          {!editingConfig && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setEditingConfig(true)}
+              data-testid={`edit-config-${automation.type}`}
+            >
+              Edit config
+            </button>
+          )}
           <span style={{ fontSize: "var(--text-sm)", color: enabled ? "var(--status-success, green)" : "var(--fg-muted)" }}>
             {enabled ? "Active" : "Disabled"}
           </span>
+        </div>
+      )}
+
+      {editingConfig && isAdmin && (
+        <div style={{ marginBottom: "var(--space-3)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
+          {automation.type === "visit_reminder" && (
+            <EditVisitReminderConfig
+              initialHours={hoursBefore}
+              onSave={handleConfigUpdate}
+              onCancel={() => setEditingConfig(false)}
+            />
+          )}
+          {automation.type === "invoice_followup" && (
+            <EditInvoiceFollowupConfig
+              initialDays={daysOverdue}
+              onSave={handleConfigUpdate}
+              onCancel={() => setEditingConfig(false)}
+            />
+          )}
         </div>
       )}
 
@@ -421,6 +463,12 @@ function AutomationCard({
               {stats.last_24h.sent}
             </span>
           </div>
+          <div className="stat-row">
+            <span className="stat-label">Errors:</span>
+            <span className="stat-value" data-testid="stat-24h-errors">
+              {stats.last_24h.errors}
+            </span>
+          </div>
         </div>
         <div className="stat-group">
           <h4>Last 7 days</h4>
@@ -428,6 +476,12 @@ function AutomationCard({
             <span className="stat-label">Sent:</span>
             <span className="stat-value" data-testid="stat-7d-sent">
               {stats.last_7d.sent}
+            </span>
+          </div>
+          <div className="stat-row">
+            <span className="stat-label">Errors:</span>
+            <span className="stat-value" data-testid="stat-7d-errors">
+              {stats.last_7d.errors}
             </span>
           </div>
         </div>
@@ -466,6 +520,117 @@ function AutomationCard({
           {isRunning ? "Running..." : "Run now"}
         </button>
       )}
+    </div>
+  );
+}
+
+function EditVisitReminderConfig({
+  initialHours,
+  onSave,
+  onCancel,
+}: {
+  initialHours: number;
+  onSave: (config: Record<string, unknown>) => void;
+  onCancel: () => void;
+}) {
+  const [hours, setHours] = useState(initialHours);
+  const [saving, setSaving] = useState(false);
+
+  return (
+    <div>
+      <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", fontWeight: 600 }}>
+        Edit Visit Reminder Config
+      </p>
+      <div className="form-field">
+        <label htmlFor="edit-hours-before">Hours before visit</label>
+        <input
+          id="edit-hours-before"
+          type="number"
+          min={1}
+          max={168}
+          value={hours}
+          onChange={e => setHours(parseInt(e.target.value) || 24)}
+          disabled={saving}
+          style={{ width: 100 }}
+        />
+      </div>
+      <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={() => { setSaving(true); onSave({ hours_before: hours }); }}
+          disabled={saving}
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={onCancel}
+          disabled={saving}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EditInvoiceFollowupConfig({
+  initialDays,
+  onSave,
+  onCancel,
+}: {
+  initialDays: number[];
+  onSave: (config: Record<string, unknown>) => void;
+  onCancel: () => void;
+}) {
+  const [daysInput, setDaysInput] = useState(initialDays.join(", "));
+  const [saving, setSaving] = useState(false);
+
+  return (
+    <div>
+      <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", fontWeight: 600 }}>
+        Edit Invoice Follow-up Config
+      </p>
+      <div className="form-field">
+        <label htmlFor="edit-days-overdue">Overdue days (comma-separated)</label>
+        <input
+          id="edit-days-overdue"
+          type="text"
+          value={daysInput}
+          onChange={e => setDaysInput(e.target.value)}
+          disabled={saving}
+          placeholder="7, 14, 30"
+          style={{ width: 160 }}
+        />
+      </div>
+      <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={() => {
+            const days = daysInput
+              .split(",")
+              .map(s => parseInt(s.trim()))
+              .filter(n => !isNaN(n) && n > 0);
+            if (days.length === 0) return;
+            setSaving(true);
+            onSave({ days_overdue: days });
+          }}
+          disabled={saving}
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={onCancel}
+          disabled={saving}
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

@@ -205,3 +205,85 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
     );
   }
 });
+
+// === Delete Invoice (DELETE /api/v1/invoices/[id]) ===
+
+export const DELETE = withRole(["owner"], async (request, session) => {
+  const id = request.nextUrl.pathname.split("/").at(-1)!;
+
+  try {
+    await withInvoiceContext(session, async (client) => {
+      const existing = await client.query<{ id: string; status: string; invoice_number: string }>(
+        `SELECT id, status, invoice_number FROM invoices WHERE id = $1 AND account_id = $2`,
+        [id, session.accountId]
+      );
+
+      if (existing.rowCount === 0) {
+        throw Object.assign(new Error("Not found"), { code: "NOT_FOUND" });
+      }
+
+      const inv = existing.rows[0];
+      if (inv.status !== "draft") {
+        throw Object.assign(
+          new Error(`Only draft invoices may be deleted (current: ${inv.status})`),
+          { code: "IMMUTABLE_ENTITY" }
+        );
+      }
+
+      // Delete line items first
+      await client.query(`DELETE FROM invoice_line_items WHERE invoice_id = $1`, [id]);
+
+      // Delete the invoice
+      await client.query(`DELETE FROM invoices WHERE id = $1`, [id]);
+
+      await appendAuditLog(client, {
+        account_id: session.accountId,
+        entity_type: "invoice",
+        entity_id: id,
+        action: "delete",
+        actor_id: session.userId,
+        trace_id: session.traceId,
+        old_value: { status: inv.status, invoice_number: inv.invoice_number },
+      });
+    });
+
+    return NextResponse.json({ deleted: true });
+  } catch (error) {
+    const err = error as Error & { code?: string };
+    if (err.code === "NOT_FOUND") {
+      return NextResponse.json(
+        {
+          error: {
+            code: "NOT_FOUND",
+            message: "Invoice not found",
+            traceId: session.traceId,
+          },
+        },
+        { status: 404 }
+      );
+    }
+    if (err.code === "IMMUTABLE_ENTITY") {
+      return NextResponse.json(
+        {
+          error: {
+            code: "IMMUTABLE_ENTITY",
+            message: err.message,
+            traceId: session.traceId,
+          },
+        },
+        { status: 422 }
+      );
+    }
+    logger.error("DELETE /api/v1/invoices/[id] error", error, { traceId: session.traceId });
+    return NextResponse.json(
+      {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Failed to delete invoice",
+          traceId: session.traceId,
+        },
+      },
+      { status: 500 }
+    );
+  }
+});
