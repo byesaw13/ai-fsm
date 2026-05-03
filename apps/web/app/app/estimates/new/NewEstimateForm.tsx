@@ -11,6 +11,7 @@ import {
   SectionHeader,
   Textarea,
 } from "@/components/ui";
+import { PriceBookSelector, type PriceBookService } from "@/components/PriceBookSelector";
 import {
   calculatePaintingEstimate,
   formatCents,
@@ -156,6 +157,28 @@ export function NewEstimateForm({
   const [mode, setMode] = useState<"itemized" | "flat_rate">("itemized");
   const [lineItems, setLineItems] = useState<LineItemRow[]>([{ ...EMPTY_ROW }]);
   const [flatRate, setFlatRate] = useState("0.00");
+
+  // Price book line items
+  const [priceBookItems, setPriceBookItems] = useState<{ service: PriceBookService; priceCents: number }[]>([]);
+
+  function handleAddPriceBookItem(service: PriceBookService, priceCents: number) {
+    setPriceBookItems((prev) => [...prev, { service, priceCents }]);
+  }
+
+  function removePriceBookItem(index: number) {
+    setPriceBookItems((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  const priceBookLineItems = useMemo(
+    () =>
+      priceBookItems.map((item, i) => ({
+        description: `${item.service.code} — ${item.service.name}`,
+        quantity: 1,
+        unit_price_cents: item.priceCents,
+        sort_order: i,
+      })),
+    [priceBookItems]
+  );
 
   const filteredJobs = useMemo(
     () => (clientId ? jobs.filter((j) => j.client_id === clientId) : jobs),
@@ -331,7 +354,14 @@ export function NewEstimateForm({
           line_items: [],
         };
       } else {
-        if (lineItems.length === 0) {
+        const manualItems = lineItems.filter((r) => r.description.trim() || parseCents(r.unit_price) > 0);
+        const allItems = [...priceBookLineItems, ...manualItems.map((row, i) => ({
+          description: row.description,
+          quantity: parseFloat(row.quantity) || 1,
+          unit_price_cents: parseCents(row.unit_price),
+          sort_order: priceBookLineItems.length + i,
+        }))];
+        if (allItems.length === 0) {
           setError("Add at least one line item.");
           setPending(false);
           return;
@@ -343,12 +373,7 @@ export function NewEstimateForm({
           notes: notes.trim() || null,
           expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
           tax_rate: taxRateNum,
-          line_items: lineItems.map((row, i) => ({
-            description: row.description,
-            quantity: parseFloat(row.quantity) || 1,
-            unit_price_cents: parseCents(row.unit_price),
-            sort_order: i,
-          })),
+          line_items: allItems,
         };
       }
 
@@ -426,6 +451,63 @@ export function NewEstimateForm({
           ))}
         </div>
       </div>
+
+      {/* Price Book Quick Add — only in generic itemized mode */}
+      {serviceType === "generic" && mode === "itemized" && (
+        <div>
+          <SectionHeader title="Quick Add from Price Book" as="h3" />
+          <PriceBookSelector onAddToEstimate={handleAddPriceBookItem} />
+
+          {priceBookItems.length > 0 && (
+            <div style={{ marginTop: "var(--space-3)" }}>
+              <p style={{ fontSize: "var(--text-sm)", fontWeight: 600, marginBottom: "var(--space-2)" }}>
+                Selected Services ({priceBookItems.length})
+              </p>
+              {priceBookItems.map((item, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "var(--space-1) var(--space-2)",
+                    background: "var(--bg-subtle)",
+                    borderRadius: "var(--radius)",
+                    marginBottom: "var(--space-1)",
+                    fontSize: "var(--text-sm)",
+                  }}
+                >
+                  <div>
+                    <span style={{ fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                      {item.service.code}
+                    </span>{" "}
+                    <span>{item.service.name}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                    <span style={{ fontWeight: 600 }}>{formatCents(item.priceCents)}</span>
+                    <button
+                      type="button"
+                      onClick={() => removePriceBookItem(i)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "var(--color-danger)",
+                        fontSize: "var(--text-sm)",
+                        padding: 0,
+                        lineHeight: 1,
+                      }}
+                      aria-label={`Remove ${item.service.name}`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Details */}
       <div className="p7-form-grid p7-form-grid-2">
