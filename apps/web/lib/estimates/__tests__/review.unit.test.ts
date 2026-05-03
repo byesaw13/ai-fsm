@@ -162,6 +162,26 @@ describe("estimate review engine", () => {
     expect(info).toBeDefined();
   });
 
+  it("warns when estimate is priced below the expected rate range", () => {
+    const result = reviewEstimate({
+      sq_ft: 1000,
+      prep_level: 5,
+      includes_trim: false,
+      includes_ceiling: false,
+      subtotal_cents: 80000, // $0.80/sqft — well below $2.05 standard
+      total_cents: 80000,
+      internal_labor_cost_cents: null,
+      internal_material_cost_cents: null,
+      line_item_count: 1,
+    });
+
+    const pricingWarning = result.suggestions.find(
+      (s) => s.field === "pricing" && s.type === "warning"
+    );
+    expect(pricingWarning).toBeDefined();
+    expect(pricingWarning?.message).toContain("below minimum");
+  });
+
   it("warns when prep level is high for small area", () => {
     const result = reviewEstimate({
       sq_ft: 200,

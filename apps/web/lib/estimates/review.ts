@@ -121,23 +121,24 @@ export function reviewEstimate(estimate: EstimateInput): EstimateReviewResult {
     });
   }
 
-  // 4. Effective rate check
-  const minAcceptableRate = PAINTING_RATE_STANDARD_CENTS * 0.8;
-  const maxReasonableRate = PAINTING_RATE_STANDARD_CENTS * 2.0;
-  if (effectiveRate < minAcceptableRate) {
+  // 4. Effective rate check — compare actual implied rate against expected formula rate
+  const actualRate = computeActualRatePerSqFt(estimate);
+  const minAcceptableRate = Math.round(effectiveRate * 0.7);
+  const maxReasonableRate = Math.round(effectiveRate * 1.5);
+  if (actualRate < minAcceptableRate) {
     suggestions.push({
       type: "warning",
       field: "pricing",
-      message: `Effective rate of $${(effectiveRate / 100).toFixed(2)}/sq ft is below minimum.`,
-      suggestion: `Standard rate is $${(PAINTING_RATE_STANDARD_CENTS / 100).toFixed(2)}/sq ft. Verify this is intentional.`,
+      message: `Effective rate of $${(actualRate / 100).toFixed(2)}/sq ft is below minimum.`,
+      suggestion: `Expected ~$${(effectiveRate / 100).toFixed(2)}/sq ft for this scope. Verify this is intentional.`,
     });
   }
-  if (effectiveRate > maxReasonableRate) {
+  if (actualRate > maxReasonableRate) {
     suggestions.push({
       type: "info",
       field: "pricing",
-      message: `Effective rate of $${(effectiveRate / 100).toFixed(2)}/sq ft is unusually high.`,
-      suggestion: "Double-check the prep level and sq ft values — the rate may be inflated.",
+      message: `Effective rate of $${(actualRate / 100).toFixed(2)}/sq ft is unusually high.`,
+      suggestion: `Expected ~$${(effectiveRate / 100).toFixed(2)}/sq ft for this scope. Double-check prep level and sq ft values.`,
     });
   }
 
@@ -186,18 +187,28 @@ export function reviewEstimate(estimate: EstimateInput): EstimateReviewResult {
   return buildResult(suggestions, "Painting estimate reviewed.");
 }
 
+// Expected rate per base sq ft from standard pricing rules (ceiling + trim included).
 function computeEffectiveRate(estimate: EstimateInput): number {
   const sqFt = estimate.sq_ft!;
   const prepLevel = estimate.prep_level!;
   const prepMultiplier = PREP_LEVEL_MULTIPLIERS[Math.max(1, Math.min(10, prepLevel))] ?? 1;
   const baseRate = PAINTING_RATE_STANDARD_CENTS;
-  const effectiveRate = Math.round(baseRate * prepMultiplier);
+  const ratePerSqFt = Math.round(baseRate * prepMultiplier);
 
   const effectiveSqFt = estimate.includes_ceiling ? sqFt * 1.3 : sqFt;
   const trimAdd = estimate.includes_trim ? Math.round(sqFt * PAINTING_TRIM_ADD_CENTS) : 0;
-  const laborTotal = Math.round(effectiveSqFt * effectiveRate) + trimAdd;
+  const expectedLabor = Math.round(effectiveSqFt * ratePerSqFt) + trimAdd;
 
-  return Math.round(laborTotal / sqFt);
+  return Math.round(expectedLabor / sqFt);
+}
+
+// Actual implied labor rate per base sq ft from the estimate's subtotal (materials backed out).
+function computeActualRatePerSqFt(estimate: EstimateInput): number {
+  const sqFt = estimate.sq_ft!;
+  const materialCents = estimate.internal_material_cost_cents ?? 0;
+  const materialHandling = Math.round(materialCents * 0.15);
+  const laborRevenue = estimate.subtotal_cents - materialCents - materialHandling;
+  return Math.round(Math.max(0, laborRevenue) / sqFt);
 }
 
 function computeMargin(

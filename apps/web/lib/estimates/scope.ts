@@ -87,9 +87,7 @@ export function translateScope(notes: string): ScopeTranslation {
 
     if (totalSqFt > 0) {
       sq_ft = totalSqFt;
-      if (roomCount === 0 && !sqFtMatch) {
-        warningsList.push("Room types detected but sq ft is estimated. Verify with client.");
-      }
+      warningsList.push("Sq ft estimated from room count — verify exact measurements with client.");
     }
   }
 
