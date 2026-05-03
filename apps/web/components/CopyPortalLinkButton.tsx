@@ -10,8 +10,24 @@ interface Props {
 export function CopyPortalLinkButton({ url, label = "Copy client link" }: Props) {
   const [copied, setCopied] = useState(false);
 
-  async function handleClick() {
-    await navigator.clipboard.writeText(url);
+  function handleClick() {
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(url).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+      return;
+    }
+    // Fallback for HTTP (non-secure) contexts
+    const ta = document.createElement("textarea");
+    ta.value = url;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
