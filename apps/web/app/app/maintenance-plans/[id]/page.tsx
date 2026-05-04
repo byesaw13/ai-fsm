@@ -20,12 +20,20 @@ interface MaintenancePlan {
   client_id: string;
   property_id: string | null;
   name: string;
+  membership_tier: string;
   frequency: string;
   services: string[];
   price_cents: number;
+  annual_visit_count: number;
+  included_labor_minutes_per_visit: number;
+  billing_cadence: string;
+  annual_price_cents: number;
   status: string;
   next_scheduled_date: string | null;
+  renewal_date: string | null;
+  routing_zone: string;
   notes: string | null;
+  membership_terms: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -39,6 +47,9 @@ interface VisitRow {
   scheduled_start: string | null;
   scheduled_end: string | null;
   status: string;
+  included_labor_cap_minutes: number | null;
+  included_labor_minutes_used: number;
+  membership_cap_status: string;
   job_title: string | null;
   [key: string]: unknown;
 }
@@ -66,7 +77,9 @@ export default async function MaintenancePlanDetailPage({
 
   // Get visits generated from this plan
   const visits = await query<VisitRow>(
-    `SELECT v.id, v.scheduled_start, v.scheduled_end, v.status, j.title AS job_title
+    `SELECT v.id, v.scheduled_start, v.scheduled_end, v.status,
+            v.included_labor_cap_minutes, v.included_labor_minutes_used,
+            v.membership_cap_status, j.title AS job_title
      FROM visits v
      LEFT JOIN jobs j ON j.id = v.job_id
       WHERE v.generated_from_plan_id = $1 AND v.account_id = $2
@@ -80,6 +93,23 @@ export default async function MaintenancePlanDetailPage({
     quarterly: "Quarterly",
     biannual: "Bi-annual",
     annual: "Annual",
+  };
+
+  const tierLabels: Record<string, string> = {
+    essential: "Essential",
+    plus: "Plus",
+    premier: "Premier",
+  };
+
+  const billingLabels: Record<string, string> = {
+    annual: "Annual",
+    monthly: "Monthly",
+  };
+
+  const zoneLabels: Record<string, string> = {
+    core: "Core Zone",
+    extended: "Extended Zone",
+    out_of_area: "Out of Area",
   };
 
   return (
@@ -126,20 +156,50 @@ export default async function MaintenancePlanDetailPage({
               </div>
             )}
             <div>
+              <dt style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Tier</dt>
+              <dd style={{ margin: "2px 0 0", fontSize: "var(--text-sm)", fontWeight: "var(--font-semibold)" }}>
+                {tierLabels[plan.membership_tier] || "Plus"}
+              </dd>
+            </div>
+            <div>
               <dt style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Frequency</dt>
               <dd style={{ margin: "2px 0 0", fontSize: "var(--text-sm)" }}>{frequencyLabels[plan.frequency] || plan.frequency}</dd>
             </div>
             <div>
-              <dt style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Price</dt>
+              <dt style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Annual Price</dt>
               <dd style={{ margin: "2px 0 0", fontSize: "var(--text-sm)", fontWeight: "var(--font-semibold)" }}>
-                ${(plan.price_cents / 100).toFixed(2)}
+                ${((plan.annual_price_cents || plan.price_cents * (plan.annual_visit_count || 1)) / 100).toFixed(2)}
               </dd>
+            </div>
+            <div>
+              <dt style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Billing</dt>
+              <dd style={{ margin: "2px 0 0", fontSize: "var(--text-sm)" }}>{billingLabels[plan.billing_cadence] || "Annual"}</dd>
+            </div>
+            <div>
+              <dt style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Visits Per Year</dt>
+              <dd style={{ margin: "2px 0 0", fontSize: "var(--text-sm)" }}>{plan.annual_visit_count || 2}</dd>
+            </div>
+            <div>
+              <dt style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Included Labor Cap</dt>
+              <dd style={{ margin: "2px 0 0", fontSize: "var(--text-sm)" }}>{plan.included_labor_minutes_per_visit || 60} minutes / visit</dd>
+            </div>
+            <div>
+              <dt style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Routing Zone</dt>
+              <dd style={{ margin: "2px 0 0", fontSize: "var(--text-sm)" }}>{zoneLabels[plan.routing_zone] || "Core Zone"}</dd>
             </div>
             {plan.next_scheduled_date && (
               <div>
                 <dt style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Next Scheduled</dt>
                 <dd style={{ margin: "2px 0 0", fontSize: "var(--text-sm)" }}>
                   {new Date(plan.next_scheduled_date).toLocaleDateString()}
+                </dd>
+              </div>
+            )}
+            {plan.renewal_date && (
+              <div>
+                <dt style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Renewal Date</dt>
+                <dd style={{ margin: "2px 0 0", fontSize: "var(--text-sm)" }}>
+                  {new Date(plan.renewal_date).toLocaleDateString()}
                 </dd>
               </div>
             )}
@@ -165,6 +225,14 @@ export default async function MaintenancePlanDetailPage({
                 Notes
               </h4>
               <p style={{ margin: 0, fontSize: "var(--text-sm)", whiteSpace: "pre-wrap" }}>{plan.notes}</p>
+            </>
+          )}
+          {plan.membership_terms && (
+            <>
+              <h4 style={{ margin: "var(--space-4) 0 var(--space-2)", fontSize: "var(--text-xs)", fontWeight: "var(--font-semibold)", color: "var(--fg-muted)", textTransform: "uppercase" }}>
+                Membership Terms
+              </h4>
+              <p style={{ margin: 0, fontSize: "var(--text-sm)", whiteSpace: "pre-wrap" }}>{plan.membership_terms}</p>
             </>
           )}
         </Card>
@@ -249,6 +317,9 @@ export default async function MaintenancePlanDetailPage({
                     {visit.scheduled_start
                       ? new Date(visit.scheduled_start).toLocaleDateString()
                       : "Not scheduled"}
+                    {visit.included_labor_cap_minutes !== null && (
+                      <> &middot; Cap: {visit.included_labor_minutes_used}/{visit.included_labor_cap_minutes} min</>
+                    )}
                   </div>
                 </div>
                 <StatusBadge variant={visit.status as StatusVariant}>

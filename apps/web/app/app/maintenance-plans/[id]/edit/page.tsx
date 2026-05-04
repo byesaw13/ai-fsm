@@ -10,12 +10,20 @@ export const dynamic = "force-dynamic";
 interface MaintenancePlanRow {
   id: string;
   name: string;
+  membership_tier: "essential" | "plus" | "premier";
   frequency: "monthly" | "quarterly" | "biannual" | "annual";
   services: string[];
   price_cents: number;
+  annual_visit_count: number;
+  included_labor_minutes_per_visit: number;
+  billing_cadence: "annual" | "monthly";
+  annual_price_cents: number;
   status: "active" | "paused" | "cancelled";
   next_scheduled_date: string | null;
+  renewal_date: string | null;
+  routing_zone: "core" | "extended" | "out_of_area";
   notes: string | null;
+  membership_terms: string | null;
   client_name: string;
   property_address: string | null;
   [key: string]: unknown;
@@ -53,12 +61,19 @@ export default async function EditMaintenancePlanPage({
         <EditPlanForm
           id={id}
           initialName={plan.name}
+          initialMembershipTier={plan.membership_tier ?? "plus"}
           initialFrequency={plan.frequency}
           initialServices={plan.services}
-          initialPrice={(plan.price_cents / 100).toFixed(2)}
+          initialAnnualVisitCount={plan.annual_visit_count ?? 2}
+          initialIncludedLaborMinutes={plan.included_labor_minutes_per_visit ?? 60}
+          initialAnnualPrice={((plan.annual_price_cents || plan.price_cents * (plan.annual_visit_count || 1)) / 100).toFixed(2)}
+          initialBillingCadence={plan.billing_cadence ?? "annual"}
           initialStatus={plan.status}
           initialStartDate={plan.next_scheduled_date ?? ""}
+          initialRenewalDate={plan.renewal_date ?? ""}
+          initialRoutingZone={plan.routing_zone ?? "core"}
           initialNotes={plan.notes ?? ""}
+          initialMembershipTerms={plan.membership_terms ?? ""}
         />
       </Card>
     </PageContainer>

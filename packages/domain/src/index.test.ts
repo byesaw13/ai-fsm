@@ -24,6 +24,13 @@ import {
   priceBookItemSchema,
   priceFromMargin,
   PRICE_BOOK_TIER_MARGINS,
+  MINIMUM_SERVICE_FEE_CENTS,
+  MATERIAL_HANDLING_RATE,
+  DEPOSIT_RATE,
+  MEMBERSHIP_INCLUDED_LABOR_MINUTES_PER_VISIT,
+  MEMBERSHIP_TIER_VISITS_PER_YEAR,
+  MEMBERSHIP_TIERS,
+  MEMBERSHIP_ROUTING_ZONES,
 } from './index'
 
 // ---------------------------------------------------------------------------
@@ -364,5 +371,24 @@ describe('PRICE_BOOK_TIER_MARGINS', () => {
     expect(PRICE_BOOK_TIER_MARGINS.core).toEqual({ min: 0.25, max: 0.35 })
     expect(PRICE_BOOK_TIER_MARGINS.standard).toEqual({ min: 0.20, max: 0.30 })
     expect(PRICE_BOOK_TIER_MARGINS.specialty).toEqual({ min: 0.15, max: 0.25 })
+  })
+})
+
+describe('Dovetails standards', () => {
+  it('exposes canonical pricing standards', () => {
+    expect(MINIMUM_SERVICE_FEE_CENTS).toBe(15000)
+    expect(MATERIAL_HANDLING_RATE).toBe(0.15)
+    expect(DEPOSIT_RATE).toBe(0.30)
+  })
+
+  it('exposes canonical membership tier defaults', () => {
+    expect(MEMBERSHIP_TIERS).toEqual(['essential', 'plus', 'premier'])
+    expect(MEMBERSHIP_TIER_VISITS_PER_YEAR).toEqual({
+      essential: 1,
+      plus: 2,
+      premier: 4,
+    })
+    expect(MEMBERSHIP_INCLUDED_LABOR_MINUTES_PER_VISIT).toBe(60)
+    expect(MEMBERSHIP_ROUTING_ZONES).toEqual(['core', 'extended', 'out_of_area'])
   })
 })
