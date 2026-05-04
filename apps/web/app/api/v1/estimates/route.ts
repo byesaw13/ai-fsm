@@ -8,8 +8,16 @@ import {
   lineItemTotal,
 } from "@/lib/estimates/db";
 import { calculatePaintingEstimate } from "@/lib/estimates/pricing";
-import { estimateStatusSchema, DEPOSIT_RATE } from "@ai-fsm/domain";
+import {
+  estimateAdjustmentTypeSchema,
+  estimateFinishExpectationSchema,
+  estimateMinimumOverrideReasonSchema,
+  estimateStatusSchema,
+  estimateTripCountSchema,
+  DEPOSIT_RATE,
+} from "@ai-fsm/domain";
 import { logger } from "@/lib/logger";
+import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
 
 export const dynamic = "force-dynamic";
 
@@ -136,6 +144,9 @@ const lineItemInputSchema = z.object({
   description: z.string().min(1),
   quantity: z.number().positive(),
   unit_price_cents: z.number().int().nonnegative(),
+  line_item_type: z.enum(["labor", "materials", "handling_fee", "adjustment"]).default("labor"),
+  visible_to_customer: z.boolean().default(true),
+  adjustment_type: estimateAdjustmentTypeSchema.nullable().optional(),
   sort_order: z.number().int().default(0),
 });
 
@@ -168,6 +179,17 @@ const createEstimateSchema = z.object({
   includes_ceiling: z.boolean().default(false),
   material_cost_cents: z.number().int().nonnegative().default(0),
   labor_hours_estimate: z.number().positive().optional(),
+  // Pricing guardrails
+  trip_count: estimateTripCountSchema.default("one_trip"),
+  requires_drying_or_curing: z.boolean().default(false),
+  difficult_access: z.boolean().default(false),
+  old_house_risk: z.boolean().default(false),
+  coordination_required: z.boolean().default(false),
+  finish_expectation: estimateFinishExpectationSchema.default("clean"),
+  travel_surcharge_cents: z.number().int().nonnegative().default(0),
+  risk_adjustment_cents: z.number().int().nonnegative().default(0),
+  minimum_service_override_reason: estimateMinimumOverrideReasonSchema.nullable().optional(),
+  minimum_service_override_note: z.string().nullable().optional(),
 });
 
 export const POST = withRole(["owner", "admin"], async (request, session) => {
@@ -220,6 +242,16 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     includes_ceiling,
     material_cost_cents,
     labor_hours_estimate,
+    trip_count,
+    requires_drying_or_curing,
+    difficult_access,
+    old_house_risk,
+    coordination_required,
+    finish_expectation,
+    travel_surcharge_cents,
+    risk_adjustment_cents,
+    minimum_service_override_reason,
+    minimum_service_override_note,
   } = parseResult.data;
 
   const is_painting = sq_ft !== undefined && prep_level !== undefined && labor_hours_estimate !== undefined;
@@ -261,10 +293,23 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         ? flat_rate_cents
         : calcTotals(line_items).subtotal_cents;
   }
+  subtotal_cents += travel_surcharge_cents + risk_adjustment_cents;
   const tax_cents = Math.round((subtotal_cents * tax_rate) / 100);
   const total_cents = subtotal_cents + tax_cents;
   const deposit_cents = Math.round(total_cents * DEPOSIT_RATE);
   const balance_cents = total_cents - deposit_cents;
+  const pricingReview = reviewEstimateGuardrails({
+    total_cents,
+    trip_count,
+    requires_drying_or_curing,
+    difficult_access,
+    old_house_risk,
+    coordination_required,
+    finish_expectation,
+    travel_surcharge_cents,
+    risk_adjustment_cents,
+    minimum_service_override_reason: minimum_service_override_reason ?? null,
+  });
   // In flat-rate mode, ignore any line_items that were mistakenly sent
   const itemsToInsert = flat_rate_cents !== undefined ? [] : line_items;
 
@@ -285,9 +330,14 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             subtotal_cents, tax_cents, total_cents, deposit_cents, balance_cents,
             notes, internal_notes, expires_at, created_by,
             sq_ft, prep_level, includes_trim, includes_ceiling,
-            internal_labor_cost_cents, internal_material_cost_cents)
+            internal_labor_cost_cents, internal_material_cost_cents,
+            trip_count, requires_drying_or_curing, difficult_access, old_house_risk,
+            coordination_required, finish_expectation, travel_surcharge_cents,
+            risk_adjustment_cents, minimum_service_override_reason,
+            minimum_service_override_note, pricing_review_status)
           VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-                  $15, $16, $17, $18, $19, $20)
+                  $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27,
+                  $28, $29, $30, $31)
           RETURNING id`,
         [
           session.accountId,
@@ -310,6 +360,17 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           includes_ceiling ?? false,
           internal_labor_cost_cents,
           material_cost_cents ?? null,
+          trip_count,
+          requires_drying_or_curing,
+          difficult_access,
+          old_house_risk,
+          coordination_required,
+          finish_expectation,
+          travel_surcharge_cents,
+          risk_adjustment_cents,
+          minimum_service_override_reason ?? null,
+          minimum_service_override_note ?? null,
+          pricingReview.status,
         ]
       );
       const estimateId = result.rows[0].id;
@@ -336,9 +397,21 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             const itemTotal = lineItemTotal(item);
             await client.query(
               `INSERT INTO estimate_line_items
-                 (estimate_id, option_id, description, quantity, unit_price_cents, total_cents, sort_order)
-               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-              [estimateId, optionId, item.description, item.quantity, item.unit_price_cents, itemTotal, item.sort_order ?? li]
+                 (estimate_id, option_id, description, quantity, unit_price_cents, total_cents,
+                  line_item_type, visible_to_customer, adjustment_type, sort_order)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+              [
+                estimateId,
+                optionId,
+                item.description,
+                item.quantity,
+                item.unit_price_cents,
+                itemTotal,
+                item.line_item_type,
+                item.visible_to_customer,
+                item.adjustment_type ?? null,
+                item.sort_order ?? li,
+              ]
             );
           }
         }
@@ -349,14 +422,18 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           const itemTotal = lineItemTotal(item);
           await client.query(
             `INSERT INTO estimate_line_items
-               (estimate_id, description, quantity, unit_price_cents, total_cents, sort_order)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
+               (estimate_id, description, quantity, unit_price_cents, total_cents,
+                line_item_type, visible_to_customer, adjustment_type, sort_order)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
             [
               estimateId,
               item.description,
               item.quantity,
               item.unit_price_cents,
               itemTotal,
+              item.line_item_type,
+              item.visible_to_customer,
+              item.adjustment_type ?? null,
               item.sort_order ?? i,
             ]
           );

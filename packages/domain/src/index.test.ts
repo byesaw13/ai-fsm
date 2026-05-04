@@ -12,6 +12,11 @@ import {
   jobSchema,
   visitSchema,
   estimateSchema,
+  estimateAdjustmentTypeSchema,
+  estimateFinishExpectationSchema,
+  estimateMinimumOverrideReasonSchema,
+  estimatePricingReviewStatusSchema,
+  estimateTripCountSchema,
   invoiceSchema,
   auditLogSchema,
   apiErrorSchema,
@@ -27,6 +32,11 @@ import {
   MINIMUM_SERVICE_FEE_CENTS,
   MATERIAL_HANDLING_RATE,
   DEPOSIT_RATE,
+  ESTIMATE_ADJUSTMENT_TYPES,
+  ESTIMATE_FINISH_EXPECTATIONS,
+  ESTIMATE_MINIMUM_OVERRIDE_REASONS,
+  ESTIMATE_PRICING_REVIEW_STATUSES,
+  ESTIMATE_TRIP_COUNT_OPTIONS,
   MEMBERSHIP_INCLUDED_LABOR_MINUTES_PER_VISIT,
   MEMBERSHIP_TIER_VISITS_PER_YEAR,
   MEMBERSHIP_TIERS,
@@ -226,6 +236,38 @@ describe('estimateSchema', () => {
       subtotal_cents: -1, tax_cents: 0, total_cents: 0,
       created_by: UUID, created_at: NOW, updated_at: NOW,
     })).toThrow()
+  })
+})
+
+describe('Dovetails estimate guardrail standards', () => {
+  it('keeps estimate guardrail enum schemas aligned with canonical constants', () => {
+    expect(estimateTripCountSchema.options).toEqual(ESTIMATE_TRIP_COUNT_OPTIONS)
+    expect(estimateFinishExpectationSchema.options).toEqual(ESTIMATE_FINISH_EXPECTATIONS)
+    expect(estimateMinimumOverrideReasonSchema.options).toEqual(ESTIMATE_MINIMUM_OVERRIDE_REASONS)
+    expect(estimateAdjustmentTypeSchema.options).toEqual(ESTIMATE_ADJUSTMENT_TYPES)
+    expect(estimatePricingReviewStatusSchema.options).toEqual(ESTIMATE_PRICING_REVIEW_STATUSES)
+  })
+
+  it('accepts pricing guardrail fields on estimates', () => {
+    expect(() => estimateSchema.parse({
+      id: UUID, account_id: UUID, client_id: UUID, status: 'draft',
+      subtotal_cents: MINIMUM_SERVICE_FEE_CENTS,
+      tax_cents: 0,
+      total_cents: MINIMUM_SERVICE_FEE_CENTS,
+      deposit_cents: 4500,
+      balance_cents: 10500,
+      created_by: UUID, created_at: NOW, updated_at: NOW,
+      trip_count: 'multi_trip',
+      requires_drying_or_curing: true,
+      difficult_access: true,
+      old_house_risk: true,
+      coordination_required: true,
+      finish_expectation: 'premium',
+      travel_surcharge_cents: 2500,
+      risk_adjustment_cents: 5000,
+      minimum_service_override_reason: 'owner_approved',
+      pricing_review_status: 'needs_review',
+    })).not.toThrow()
   })
 })
 

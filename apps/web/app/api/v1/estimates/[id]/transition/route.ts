@@ -6,6 +6,7 @@ import { withEstimateContext } from "@/lib/estimates/db";
 import { logger } from "@/lib/logger";
 import { estimateStatusSchema, estimateTransitions } from "@ai-fsm/domain";
 import type { EstimateStatus } from "@ai-fsm/domain";
+import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
 
 export const dynamic = "force-dynamic";
 
@@ -66,8 +67,25 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
   try {
     await withEstimateContext(session, async (client) => {
       // Fetch current estimate
-      const existing = await client.query<{ id: string; status: EstimateStatus }>(
-        `SELECT id, status FROM estimates WHERE id = $1 AND account_id = $2`,
+      const existing = await client.query<{
+        id: string;
+        status: EstimateStatus;
+        total_cents: number;
+        trip_count: "one_trip" | "multi_trip";
+        requires_drying_or_curing: boolean;
+        difficult_access: boolean;
+        old_house_risk: boolean;
+        coordination_required: boolean;
+        finish_expectation: "basic" | "clean" | "premium";
+        travel_surcharge_cents: number;
+        risk_adjustment_cents: number;
+        minimum_service_override_reason: "bundled" | "membership_included" | "promo" | "owner_approved" | null;
+      }>(
+        `SELECT id, status, total_cents, trip_count, requires_drying_or_curing,
+                difficult_access, old_house_risk, coordination_required,
+                finish_expectation, travel_surcharge_cents, risk_adjustment_cents,
+                minimum_service_override_reason
+         FROM estimates WHERE id = $1 AND account_id = $2`,
         [id, session.accountId]
       );
 
@@ -88,6 +106,25 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           ),
           { code: "INVALID_TRANSITION" }
         );
+      }
+
+      if (targetStatus === "sent") {
+        const pricingReview = reviewEstimateGuardrails(existing.rows[0]);
+        await client.query(
+          `UPDATE estimates
+           SET pricing_review_status = $1,
+               pricing_reviewed_at = now(),
+               pricing_reviewed_by = $2,
+               updated_at = now()
+           WHERE id = $3`,
+          [pricingReview.status, session.userId, id]
+        );
+        if (pricingReview.blockers.length > 0) {
+          throw Object.assign(
+            new Error(pricingReview.blockers.map((b) => b.message).join(" ")),
+            { code: "PRICING_REVIEW_BLOCKED" }
+          );
+        }
       }
 
       // Execute the transition; DB triggers enforce at storage layer too
@@ -198,6 +235,19 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           },
         },
         { status: 400 }
+      );
+    }
+
+    if (err.code === "PRICING_REVIEW_BLOCKED") {
+      return NextResponse.json(
+        {
+          error: {
+            code: "PRICING_REVIEW_BLOCKED",
+            message: err.message,
+            traceId: session.traceId,
+          },
+        },
+        { status: 409 }
       );
     }
 

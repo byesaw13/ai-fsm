@@ -66,6 +66,51 @@ Validation for PR #114:
 - GitHub checks passed: lint, typecheck, build, test.
 - Production health check passed after deploy.
 
+### Implemented in Estimate Guardrails Release
+
+PR: `TBD`
+Merge commit: `TBD`
+Production deploy: `TBD`
+Migration: `026_estimate_pricing_guardrails.sql`
+
+Completed in that release:
+
+- Added canonical estimate guardrail constants for:
+  - trip count
+  - finish expectation
+  - minimum-service override reasons
+  - typed estimate adjustments
+  - pricing review status
+- Added canonical client document constants for:
+  - document types
+  - document statuses
+- Added estimate fields for:
+  - one-trip vs multi-trip
+  - drying/curing required
+  - difficult access
+  - old-house risk
+  - coordination required
+  - finish expectation
+  - travel surcharge
+  - risk adjustment
+  - minimum-service override reason and note
+  - pricing review status, reviewer, and reviewed timestamp
+- Added typed adjustment support on estimate line items.
+- Added rule-based pricing guardrail review helper.
+- Enforced the `$150` minimum service value before an estimate can be sent unless a structured override is recorded.
+- Added the same pricing guard to the estimate status transition path so `draft -> sent` cannot bypass the review.
+- Added estimate create/edit UI fields for the pricing guardrails.
+- Added owner-facing estimate summary display for pricing guardrails and generated document filename.
+- Added estimate document filename generator using:
+  - `YYYY-MM-DD_CLIENTLASTNAME_JOBTYPE_DOCTYPE_STATUS`
+- Added the generated filename to estimate detail and print/PDF views.
+- Fixed the estimate print query so it passes the required estimate/account parameters.
+- Added tests for guardrail constants, minimum-service enforcement, risk warnings, and filename generation.
+
+Validation for this release:
+
+- `pnpm gate` passed locally.
+
 ## Status Legend
 
 - `Done`: implemented, tested, and shipped.
@@ -93,22 +138,14 @@ Done:
   - Optional
   - Refer to Trade
 - Business-rule tests exist for the new pricing and membership standards.
+- Document type constants exist.
+- Document status constants exist.
+- Pricing adjustment constants exist.
 
 Still needed:
 
 - Rename or align `Optional` to the business-facing label `Optional Improvements` where appropriate.
-- Add formal document-standard constants:
-  - document types
-  - document statuses
-  - filename format rules
-- Add formal pricing adjustment constants:
-  - bundle credit
-  - member credit
-  - promo
-  - travel surcharge
-  - risk adjustment
-  - return-trip charge
-  - coordination fee
+- Move filename format rules into a formal domain-level document standard if additional document types need generation outside estimates.
 
 ## Phase 2: Job Intake and Acceptance Control
 
@@ -147,6 +184,7 @@ Status: `Partial`
 Done:
 
 - `$150` minimum service fee exists as a canonical constant.
+- `$150` minimum service fee is enforced before estimates can be sent unless a structured override is recorded.
 - Existing estimate pricing already supports:
   - 15% materials handling
   - 30% deposit
@@ -154,38 +192,24 @@ Done:
   - painting square-foot logic
   - margin review warnings
 - Existing price book already has service code families and tiers.
+- Estimate risk/modifier fields exist on estimates.
+- Estimate create/edit UI supports risk/modifier fields.
+- Typed estimate adjustment constants exist.
+- Estimate line items can store typed adjustment metadata.
+- Pre-send pricing review gate exists on both the send endpoint and the `draft -> sent` transition endpoint.
 
 Still needed:
 
-- Enforce `$150` minimum service fee unless:
-  - bundled
-  - membership-included
-  - promo
-  - owner-approved
-- Add estimate risk/modifier fields:
-  - one-trip vs multi-trip
-  - drying/curing required
-  - difficult access
-  - old-house risk
-  - premium finish expectation
-  - coordination burden
-  - travel surcharge
-  - risk adjustment
-- Add typed adjustments:
-  - bundle credit
-  - member credit
-  - promo
-  - travel surcharge
-  - risk adjustment
-  - return-trip charge
-  - coordination fee
 - Upgrade price book records with:
   - default trip count
   - return-trip flag
   - additional-unit pricing
   - material inclusion rule
   - risk flags
-- Add pre-send pricing review gate.
+- Add richer pricing review dashboard metrics:
+  - estimates below minimum
+  - override frequency
+  - surcharge/risk-adjustment usage
 
 ## Phase 4: Estimate and Invoice Document Standards
 
@@ -204,6 +228,9 @@ Done:
   - master template flag
   - archive flag
   - property link
+- Estimate document filename generator exists.
+- Estimate detail and print/PDF pages show the generated filename.
+- Document status constants exist.
 
 Still needed:
 
@@ -216,15 +243,7 @@ Still needed:
   - client responsibilities
 - Ensure invoices show labor/service cost, not labor hours, unless intentionally overridden.
 - Add consistent estimate and invoice terms as versioned standards.
-- Add document filename generator:
-  - `YYYY-MM-DD_CLIENTLASTNAME_JOBTYPE_DOCTYPE_STATUS`
-- Add document status:
-  - Draft
-  - Sent
-  - Approved
-  - Final
-  - Superseded
-  - Archived
+- Expand document filename generator to invoices, membership enrollment/plan summaries, and visit reports.
 - Add one-active-master-template rule per category.
 
 ## Phase 5: Membership Model Rebuild
@@ -384,27 +403,27 @@ Target deliverables:
 
 Current recommended order from this point:
 
-1. Pricing minimums and estimate review gate.
-2. Membership visit workflow and labor-cap controls.
-3. Client visit snapshot report.
-4. Digital Home Vault foundation.
-5. Document naming/archive/master-template controls.
-6. Job intake and calendar protection.
-7. Realtor/concierge/routing workflows.
-8. Dashboards and enforcement.
+1. Membership visit workflow and labor-cap controls.
+2. Client visit snapshot report.
+3. Digital Home Vault foundation.
+4. Expand document naming/archive/master-template controls beyond estimates.
+5. Job intake and calendar protection.
+6. Realtor/concierge/routing workflows.
+7. Dashboards and enforcement.
 
 ## Next Suggested Release
 
 Highest-leverage next release:
 
-- Enforce the `$150` minimum service fee on estimates.
-- Add estimate risk fields.
-- Add pre-send estimate review gate.
-- Add document filename generator.
+- Build membership visit workflow and labor-cap controls.
+- Add technician controls for included labor minutes used.
+- Add cap-reached workflow.
+- Convert remaining visit items into quoted follow-up, monitor, referral, or optional improvement.
+- Require a visit snapshot report structure.
 
 Reason:
 
-These changes protect margin and document quality before more data-heavy vault work begins.
+The membership product now has tier and cap fields, but the field workflow does not yet force the assessment/action/cap model. This is the next place where the app needs to enforce the Dovetails operating standard instead of just storing supporting data.
 
 ## Update Rule
 

@@ -8,7 +8,13 @@ import {
   lineItemTotal,
 } from "@/lib/estimates/db";
 import { calculatePaintingEstimate } from "@/lib/estimates/pricing";
-import { DEPOSIT_RATE } from "@ai-fsm/domain";
+import {
+  estimateAdjustmentTypeSchema,
+  estimateFinishExpectationSchema,
+  estimateMinimumOverrideReasonSchema,
+  estimateTripCountSchema,
+  DEPOSIT_RATE,
+} from "@ai-fsm/domain";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +32,11 @@ export const GET = withAuth(async (request, session) => {
                 e.client_id, e.job_id, e.property_id,
                 e.created_by, e.created_at, e.updated_at,
                 e.presentation_mode,
+                e.trip_count, e.requires_drying_or_curing, e.difficult_access,
+                e.old_house_risk, e.coordination_required, e.finish_expectation,
+                e.travel_surcharge_cents, e.risk_adjustment_cents,
+                e.minimum_service_override_reason, e.minimum_service_override_note,
+                e.pricing_review_status, e.pricing_reviewed_at, e.pricing_reviewed_by,
                 c.name AS client_name
          FROM estimates e
          LEFT JOIN clients c ON c.id = e.client_id
@@ -36,7 +47,8 @@ export const GET = withAuth(async (request, session) => {
       if (estimateResult.rowCount === 0) return null;
 
       const lineItemsResult = await client.query(
-        `SELECT id, estimate_id, option_id, description, quantity, unit_price_cents, total_cents, sort_order, created_at
+        `SELECT id, estimate_id, option_id, description, quantity, unit_price_cents,
+                total_cents, line_item_type, visible_to_customer, adjustment_type, sort_order, created_at
          FROM estimate_line_items
          WHERE estimate_id = $1
          ORDER BY sort_order ASC, created_at ASC`,
@@ -102,6 +114,9 @@ const lineItemInputSchema = z.object({
   description: z.string().min(1),
   quantity: z.number().positive(),
   unit_price_cents: z.number().int().nonnegative(),
+  line_item_type: z.enum(["labor", "materials", "handling_fee", "adjustment"]).default("labor"),
+  visible_to_customer: z.boolean().default(true),
+  adjustment_type: estimateAdjustmentTypeSchema.nullable().optional(),
   sort_order: z.number().int().default(0),
 });
 
@@ -134,6 +149,17 @@ const patchEstimateSchema = z.object({
   includes_ceiling: z.boolean().optional(),
   material_cost_cents: z.number().int().nonnegative().optional(),
   labor_hours_estimate: z.number().positive().optional(),
+  // Pricing guardrails
+  trip_count: estimateTripCountSchema.optional(),
+  requires_drying_or_curing: z.boolean().optional(),
+  difficult_access: z.boolean().optional(),
+  old_house_risk: z.boolean().optional(),
+  coordination_required: z.boolean().optional(),
+  finish_expectation: estimateFinishExpectationSchema.optional(),
+  travel_surcharge_cents: z.number().int().nonnegative().optional(),
+  risk_adjustment_cents: z.number().int().nonnegative().optional(),
+  minimum_service_override_reason: estimateMinimumOverrideReasonSchema.nullable().optional(),
+  minimum_service_override_note: z.string().nullable().optional(),
 });
 
 export const PATCH = withRole(["owner", "admin"], async (request, session) => {
@@ -180,8 +206,11 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         subtotal_cents: number;
         tax_cents: number;
         total_cents: number;
+        travel_surcharge_cents: number;
+        risk_adjustment_cents: number;
       }>(
-        `SELECT id, status, subtotal_cents, tax_cents, total_cents
+        `SELECT id, status, subtotal_cents, tax_cents, total_cents,
+                travel_surcharge_cents, risk_adjustment_cents
          FROM estimates WHERE id = $1 AND account_id = $2`,
         [id, session.accountId]
       );
@@ -218,6 +247,16 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
           "labor_hours_estimate",
           "presentation_mode",
           "options",
+          "trip_count",
+          "requires_drying_or_curing",
+          "difficult_access",
+          "old_house_risk",
+          "coordination_required",
+          "finish_expectation",
+          "travel_surcharge_cents",
+          "risk_adjustment_cents",
+          "minimum_service_override_reason",
+          "minimum_service_override_note",
         ] as const;
         for (const key of disallowedKeys) {
           if (patch[key] !== undefined) {
@@ -301,6 +340,46 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         setClauses.push(`presentation_mode = $${idx++}`);
         params.push(patch.presentation_mode);
       }
+      if (patch.trip_count !== undefined) {
+        setClauses.push(`trip_count = $${idx++}`);
+        params.push(patch.trip_count);
+      }
+      if (patch.requires_drying_or_curing !== undefined) {
+        setClauses.push(`requires_drying_or_curing = $${idx++}`);
+        params.push(patch.requires_drying_or_curing);
+      }
+      if (patch.difficult_access !== undefined) {
+        setClauses.push(`difficult_access = $${idx++}`);
+        params.push(patch.difficult_access);
+      }
+      if (patch.old_house_risk !== undefined) {
+        setClauses.push(`old_house_risk = $${idx++}`);
+        params.push(patch.old_house_risk);
+      }
+      if (patch.coordination_required !== undefined) {
+        setClauses.push(`coordination_required = $${idx++}`);
+        params.push(patch.coordination_required);
+      }
+      if (patch.finish_expectation !== undefined) {
+        setClauses.push(`finish_expectation = $${idx++}`);
+        params.push(patch.finish_expectation);
+      }
+      if (patch.travel_surcharge_cents !== undefined) {
+        setClauses.push(`travel_surcharge_cents = $${idx++}`);
+        params.push(patch.travel_surcharge_cents);
+      }
+      if (patch.risk_adjustment_cents !== undefined) {
+        setClauses.push(`risk_adjustment_cents = $${idx++}`);
+        params.push(patch.risk_adjustment_cents);
+      }
+      if (patch.minimum_service_override_reason !== undefined) {
+        setClauses.push(`minimum_service_override_reason = $${idx++}`);
+        params.push(patch.minimum_service_override_reason);
+      }
+      if (patch.minimum_service_override_note !== undefined) {
+        setClauses.push(`minimum_service_override_note = $${idx++}`);
+        params.push(patch.minimum_service_override_note);
+      }
 
       // Replace totals + line items if pricing fields are provided
       const has_painting_fields =
@@ -308,7 +387,11 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         patch.prep_level !== undefined &&
         patch.labor_hours_estimate !== undefined;
 
-      if (patch.line_items !== undefined || patch.flat_rate_cents !== undefined || has_painting_fields) {
+      const has_guardrail_amounts =
+        patch.travel_surcharge_cents !== undefined ||
+        patch.risk_adjustment_cents !== undefined;
+
+      if (patch.line_items !== undefined || patch.flat_rate_cents !== undefined || has_painting_fields || has_guardrail_amounts) {
         let subtotal_cents: number;
         let itemsToInsert = patch.line_items ?? [];
         let new_internal_labor: number | null = null;
@@ -327,12 +410,22 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
           new_internal_labor = result.internal_labor_cost_cents;
           new_internal_material = patch.material_cost_cents ?? null;
         } else {
-          subtotal_cents =
-            patch.flat_rate_cents !== undefined
-              ? patch.flat_rate_cents
-              : calcTotals(patch.line_items!).subtotal_cents;
-          itemsToInsert = patch.flat_rate_cents !== undefined ? [] : patch.line_items!;
+          if (patch.flat_rate_cents !== undefined) {
+            subtotal_cents = patch.flat_rate_cents;
+            itemsToInsert = [];
+          } else if (patch.line_items !== undefined) {
+            subtotal_cents = calcTotals(patch.line_items).subtotal_cents;
+            itemsToInsert = patch.line_items;
+          } else {
+            subtotal_cents =
+              est.subtotal_cents -
+              est.travel_surcharge_cents -
+              est.risk_adjustment_cents;
+            itemsToInsert = [];
+          }
         }
+        subtotal_cents += patch.travel_surcharge_cents ?? est.travel_surcharge_cents;
+        subtotal_cents += patch.risk_adjustment_cents ?? est.risk_adjustment_cents;
 
         const taxRate = patch.tax_rate ?? 0;
         const tax_cents = Math.round((subtotal_cents * taxRate) / 100);
@@ -359,28 +452,34 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
           params.push(new_internal_material);
         }
 
-        // Delete existing line items
-        await client.query(
-          `DELETE FROM estimate_line_items WHERE estimate_id = $1`,
-          [id]
-        );
-
-        // Insert new line items (skipped in flat-rate mode)
-        for (let i = 0; i < itemsToInsert.length; i++) {
-          const item = itemsToInsert[i];
+        if (patch.line_items !== undefined || patch.flat_rate_cents !== undefined || has_painting_fields) {
+          // Delete existing line items
           await client.query(
-            `INSERT INTO estimate_line_items
-               (estimate_id, description, quantity, unit_price_cents, total_cents, sort_order)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [
-              id,
-              item.description,
-              item.quantity,
-              item.unit_price_cents,
-              lineItemTotal(item),
-              item.sort_order ?? i,
-            ]
+            `DELETE FROM estimate_line_items WHERE estimate_id = $1`,
+            [id]
           );
+
+          // Insert new line items (skipped in flat-rate mode)
+          for (let i = 0; i < itemsToInsert.length; i++) {
+            const item = itemsToInsert[i];
+            await client.query(
+              `INSERT INTO estimate_line_items
+                 (estimate_id, description, quantity, unit_price_cents, total_cents,
+                  line_item_type, visible_to_customer, adjustment_type, sort_order)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+              [
+                id,
+                item.description,
+                item.quantity,
+                item.unit_price_cents,
+                lineItemTotal(item),
+                item.line_item_type,
+                item.visible_to_customer,
+                item.adjustment_type ?? null,
+                item.sort_order ?? i,
+              ]
+            );
+          }
         }
       }
 
@@ -421,9 +520,21 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
             const item = option.line_items[li];
             await client.query(
               `INSERT INTO estimate_line_items
-                 (estimate_id, option_id, description, quantity, unit_price_cents, total_cents, sort_order)
-               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-              [id, optionId, item.description, item.quantity, item.unit_price_cents, lineItemTotal(item), item.sort_order ?? li]
+                 (estimate_id, option_id, description, quantity, unit_price_cents, total_cents,
+                  line_item_type, visible_to_customer, adjustment_type, sort_order)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+              [
+                id,
+                optionId,
+                item.description,
+                item.quantity,
+                item.unit_price_cents,
+                lineItemTotal(item),
+                item.line_item_type,
+                item.visible_to_customer,
+                item.adjustment_type ?? null,
+                item.sort_order ?? li,
+              ]
             );
           }
         }
@@ -448,6 +559,27 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
           setClauses.push(`balance_cents = $${idx++}`);
           params.push(balance_cents);
         }
+      }
+
+      if (
+        patch.line_items !== undefined ||
+        patch.flat_rate_cents !== undefined ||
+        has_painting_fields ||
+        patch.options !== undefined ||
+        patch.trip_count !== undefined ||
+        patch.requires_drying_or_curing !== undefined ||
+        patch.difficult_access !== undefined ||
+        patch.old_house_risk !== undefined ||
+        patch.coordination_required !== undefined ||
+        patch.finish_expectation !== undefined ||
+        patch.travel_surcharge_cents !== undefined ||
+        patch.risk_adjustment_cents !== undefined ||
+        patch.minimum_service_override_reason !== undefined
+      ) {
+        setClauses.push(`pricing_review_status = $${idx++}`);
+        params.push("needs_review");
+        setClauses.push(`pricing_reviewed_at = NULL`);
+        setClauses.push(`pricing_reviewed_by = NULL`);
       }
 
       if (setClauses.length > 0) {

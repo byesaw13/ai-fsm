@@ -162,3 +162,86 @@ export type PricingMode = typeof PRICING_MODES[number];
 
 export const LINE_ITEM_TYPES = ["labor", "materials", "handling_fee", "adjustment"] as const;
 export type LineItemType = typeof LINE_ITEM_TYPES[number];
+
+// ---------------------------------------------------------------------------
+// Estimate guardrails
+// ---------------------------------------------------------------------------
+
+export const ESTIMATE_TRIP_COUNT_OPTIONS = ["one_trip", "multi_trip"] as const;
+export type EstimateTripCount = typeof ESTIMATE_TRIP_COUNT_OPTIONS[number];
+
+export const ESTIMATE_TRIP_COUNT_LABELS: Record<EstimateTripCount, string> = {
+  one_trip: "One Trip",
+  multi_trip: "Multi-Trip",
+};
+
+export const ESTIMATE_FINISH_EXPECTATIONS = ["basic", "clean", "premium"] as const;
+export type EstimateFinishExpectation = typeof ESTIMATE_FINISH_EXPECTATIONS[number];
+
+export const ESTIMATE_FINISH_EXPECTATION_LABELS: Record<EstimateFinishExpectation, string> = {
+  basic: "Basic",
+  clean: "Clean",
+  premium: "Premium",
+};
+
+export const ESTIMATE_MINIMUM_OVERRIDE_REASONS = [
+  "bundled",
+  "membership_included",
+  "promo",
+  "owner_approved",
+] as const;
+export type EstimateMinimumOverrideReason = typeof ESTIMATE_MINIMUM_OVERRIDE_REASONS[number];
+
+export const ESTIMATE_MINIMUM_OVERRIDE_REASON_LABELS: Record<EstimateMinimumOverrideReason, string> = {
+  bundled: "Bundled",
+  membership_included: "Membership Included",
+  promo: "Promotion",
+  owner_approved: "Owner Approved",
+};
+
+export const ESTIMATE_ADJUSTMENT_TYPES = [
+  "bundle_credit",
+  "member_credit",
+  "promo",
+  "travel_surcharge",
+  "risk_adjustment",
+  "return_trip_charge",
+  "coordination_fee",
+] as const;
+export type EstimateAdjustmentType = typeof ESTIMATE_ADJUSTMENT_TYPES[number];
+
+export const ESTIMATE_ADJUSTMENT_TYPE_LABELS: Record<EstimateAdjustmentType, string> = {
+  bundle_credit: "Bundle Credit",
+  member_credit: "Member Credit",
+  promo: "Promotion",
+  travel_surcharge: "Travel Surcharge",
+  risk_adjustment: "Risk Adjustment",
+  return_trip_charge: "Return Trip Charge",
+  coordination_fee: "Coordination Fee",
+};
+
+export const ESTIMATE_PRICING_REVIEW_STATUSES = ["needs_review", "passed", "blocked"] as const;
+export type EstimatePricingReviewStatus = typeof ESTIMATE_PRICING_REVIEW_STATUSES[number];
+
+// ---------------------------------------------------------------------------
+// Client document standards
+// ---------------------------------------------------------------------------
+
+export const CLIENT_DOCUMENT_STATUSES = [
+  "draft",
+  "sent",
+  "approved",
+  "final",
+  "superseded",
+  "archived",
+] as const;
+export type ClientDocumentStatus = typeof CLIENT_DOCUMENT_STATUSES[number];
+
+export const CLIENT_DOCUMENT_TYPES = [
+  "estimate",
+  "invoice",
+  "membership_plan",
+  "visit_report",
+  "pricing_codebook",
+] as const;
+export type ClientDocumentType = typeof CLIENT_DOCUMENT_TYPES[number];
