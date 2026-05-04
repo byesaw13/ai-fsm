@@ -65,6 +65,17 @@ const DEFAULT_TIERS: OptionTier[] = [
   { label: "Best", description: "Premium service with full coverage", is_recommended: false, line_items: [{ description: "", quantity: "1", unit_price: "0.00" }] },
 ];
 
+interface EditableSuggestion {
+  code: string;
+  price_book_id: string;
+  name: string;
+  description: string | null;
+  quantity: number;
+  unit_price_cents: number;
+  reason: string;
+  accepted: boolean;
+}
+
 interface ParsedScope {
   sq_ft: number | null;
   prep_level: number | null;
@@ -163,13 +174,19 @@ export function NewEstimateForm({
   const [materialCostDollars, setMaterialCostDollars] = useState("");
   const [laborHours, setLaborHours] = useState("");
 
-  // Scope parser
+  // Scope parser (painting)
   const [scopeNotes, setScopeNotes] = useState("");
   const [scopeParsing, setScopeParsing] = useState(false);
   const [scopeResult, setScopeResult] = useState<ScopeResult | null>(null);
   const [scopeError, setScopeError] = useState<string | null>(null);
   const [resolvedJobType, setResolvedJobType] = useState<string>("");
   const [addedMaterials, setAddedMaterials] = useState<Set<string>>(new Set());
+
+  // Item suggester (generic mode)
+  const [itemDescription, setItemDescription] = useState("");
+  const [itemSuggesting, setItemSuggesting] = useState(false);
+  const [itemSuggestError, setItemSuggestError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<EditableSuggestion[]>([]);
 
   // Generic fields
   const [mode, setMode] = useState<"itemized" | "flat_rate" | "multi_option">("itemized");
@@ -361,6 +378,48 @@ export function NewEstimateForm({
     } finally {
       setScopeParsing(false);
     }
+  }
+
+  async function handleSuggestItems() {
+    setItemSuggesting(true);
+    setItemSuggestError(null);
+    setSuggestions([]);
+    try {
+      const res = await fetch("/api/v1/estimates/ai-items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: itemDescription }),
+      });
+      const json = await res.json() as { suggestions?: unknown[]; error?: { message?: string } };
+      if (!res.ok) {
+        setItemSuggestError(json.error?.message ?? "Failed to get suggestions.");
+        return;
+      }
+      const raw = (json.suggestions ?? []) as Array<{
+        code: string; price_book_id: string; name: string; description: string | null;
+        quantity: number; unit_price_cents: number; reason: string;
+      }>;
+      setSuggestions(raw.map((s) => ({ ...s, accepted: true })));
+    } catch {
+      setItemSuggestError("Network error — could not get suggestions.");
+    } finally {
+      setItemSuggesting(false);
+    }
+  }
+
+  function handleAcceptSuggestions() {
+    const toAdd = suggestions.filter((s) => s.accepted);
+    if (toAdd.length === 0) return;
+    setLineItems((prev) => [
+      ...prev.filter((r) => r.description.trim()),
+      ...toAdd.map((s) => ({
+        description: `${s.code} — ${s.name}`,
+        quantity: s.quantity.toString(),
+        unit_price: (s.unit_price_cents / 100).toFixed(2),
+      })),
+    ]);
+    setSuggestions([]);
+    setItemDescription("");
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -1146,6 +1205,179 @@ export function NewEstimateForm({
             </div>
           ) : (
             <>
+              {/* Item Suggester */}
+              <div style={{ marginBottom: "var(--space-4)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
+                <p style={{ margin: "0 0 var(--space-1)", fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                  Suggest from description
+                </p>
+                <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                  Describe the job and Claude will match price book services automatically.
+                </p>
+                <Textarea
+                  id="item_description"
+                  label=""
+                  value={itemDescription}
+                  onChange={(e) => setItemDescription(e.target.value)}
+                  placeholder="e.g. Fix a leaky kitchen faucet, replace the shutoff valve under the sink, and patch the drywall where the pipe was leaking"
+                  rows={3}
+                  disabled={pending || itemSuggesting}
+                />
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "var(--space-2)" }}>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleSuggestItems}
+                    disabled={!itemDescription.trim() || itemSuggesting || pending}
+                    loading={itemSuggesting}
+                  >
+                    {itemSuggesting ? "Suggesting…" : "Suggest Items"}
+                  </Button>
+                </div>
+
+                {itemSuggestError && (
+                  <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--status-error)" }}>
+                    {itemSuggestError}
+                  </p>
+                )}
+
+                {suggestions.length > 0 && (
+                  <div style={{ marginTop: "var(--space-3)", borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
+                      <span style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                        {suggestions.filter((s) => s.accepted).length} of {suggestions.length} selected
+                      </span>
+                      <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                        <button
+                          type="button"
+                          onClick={() => setSuggestions((prev) => prev.map((s) => ({ ...s, accepted: true })))}
+                          style={{ background: "none", border: "none", fontSize: "var(--text-sm)", color: "var(--color-primary)", cursor: "pointer", padding: 0 }}
+                        >
+                          Select all
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSuggestions((prev) => prev.map((s) => ({ ...s, accepted: false })))}
+                          style={{ background: "none", border: "none", fontSize: "var(--text-sm)", color: "var(--fg-muted)", cursor: "pointer", padding: 0 }}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                      {suggestions.map((s, i) => (
+                        <div
+                          key={s.code}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "auto 1fr auto auto auto",
+                            gap: "var(--space-2)",
+                            alignItems: "start",
+                            padding: "var(--space-2) var(--space-3)",
+                            background: s.accepted ? "var(--color-surface-overlay)" : "transparent",
+                            border: `1px solid ${s.accepted ? "var(--color-primary-alpha)" : "var(--border)"}`,
+                            borderRadius: "var(--radius-sm)",
+                            opacity: s.accepted ? 1 : 0.5,
+                          }}
+                        >
+                          {/* Checkbox */}
+                          <input
+                            type="checkbox"
+                            checked={s.accepted}
+                            onChange={(e) =>
+                              setSuggestions((prev) =>
+                                prev.map((item, idx) =>
+                                  idx === i ? { ...item, accepted: e.target.checked } : item
+                                )
+                              )
+                            }
+                            style={{ marginTop: 2 }}
+                          />
+
+                          {/* Name + reason */}
+                          <div>
+                            <div style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                              <span style={{ color: "var(--fg-muted)", fontWeight: 400, marginRight: "var(--space-1)" }}>{s.code}</span>
+                              {s.name}
+                            </div>
+                            <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
+                              {s.reason}
+                            </div>
+                          </div>
+
+                          {/* Qty */}
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                            <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Qty</label>
+                            <input
+                              className="p7-input"
+                              type="number"
+                              min="1"
+                              step="1"
+                              value={s.quantity}
+                              onChange={(e) =>
+                                setSuggestions((prev) =>
+                                  prev.map((item, idx) =>
+                                    idx === i
+                                      ? { ...item, quantity: Math.max(1, parseInt(e.target.value) || 1) }
+                                      : item
+                                  )
+                                )
+                              }
+                              disabled={!s.accepted}
+                              style={{ width: 56, fontSize: "var(--text-sm)" }}
+                            />
+                          </div>
+
+                          {/* Unit price */}
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                            <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Price ($)</label>
+                            <input
+                              className="p7-input"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={(s.unit_price_cents / 100).toFixed(2)}
+                              onChange={(e) =>
+                                setSuggestions((prev) =>
+                                  prev.map((item, idx) =>
+                                    idx === i
+                                      ? {
+                                          ...item,
+                                          unit_price_cents: Math.round(parseFloat(e.target.value || "0") * 100),
+                                        }
+                                      : item
+                                  )
+                                )
+                              }
+                              disabled={!s.accepted}
+                              style={{ width: 80, fontSize: "var(--text-sm)" }}
+                            />
+                          </div>
+
+                          {/* Line total */}
+                          <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", textAlign: "right", minWidth: 64, paddingTop: 20 }}>
+                            {formatCents(s.quantity * s.unit_price_cents)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "var(--space-3)" }}>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        onClick={handleAcceptSuggestions}
+                        disabled={suggestions.filter((s) => s.accepted).length === 0 || pending}
+                      >
+                        Add {suggestions.filter((s) => s.accepted).length} item{suggestions.filter((s) => s.accepted).length !== 1 ? "s" : ""} to estimate
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--space-2)" }}>
                 <Button
                   type="button"
