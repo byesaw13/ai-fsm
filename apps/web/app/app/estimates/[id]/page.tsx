@@ -19,6 +19,7 @@ import { SendEstimateButton } from "./SendEstimateButton";
 import { StatusStepper } from "@/components/ui";
 import { isEmailConfigured } from "@/lib/email/mailer";
 import { CopyPortalLinkButton } from "@/components/CopyPortalLinkButton";
+import { buildClientDocumentFilename } from "@/lib/estimates/guardrails";
 
 import { ChangeOrdersClient } from "./ChangeOrdersClient";
 
@@ -48,6 +49,17 @@ interface EstimateRow {
   includes_ceiling: boolean;
   internal_labor_cost_cents: number | null;
   internal_material_cost_cents: number | null;
+  trip_count: "one_trip" | "multi_trip";
+  requires_drying_or_curing: boolean;
+  difficult_access: boolean;
+  old_house_risk: boolean;
+  coordination_required: boolean;
+  finish_expectation: "basic" | "clean" | "premium";
+  travel_surcharge_cents: number;
+  risk_adjustment_cents: number;
+  minimum_service_override_reason: "bundled" | "membership_included" | "promo" | "owner_approved" | null;
+  minimum_service_override_note: string | null;
+  pricing_review_status: "needs_review" | "passed" | "blocked";
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -224,6 +236,13 @@ export default async function EstimateDetailPage({
   const canDelete = canDeleteRecords(session.role);
   const canEditInternalNotes =
     canCreateEstimates(session.role) && currentStatus === "sent";
+  const documentFilename = buildClientDocumentFilename({
+    date: estimate.sent_at ?? estimate.created_at,
+    clientName: estimate.client_name,
+    jobType: estimate.job_title ?? "Job",
+    documentType: "estimate",
+    status: estimate.status === "declined" || estimate.status === "expired" ? "archived" : estimate.status,
+  });
 
   return (
     <div className="page-container">
@@ -307,6 +326,12 @@ export default async function EstimateDetailPage({
             {new Date(estimate.expires_at).toLocaleDateString()}
           </p>
         )}
+        {(session.role === "owner" || session.role === "admin") && (
+          <p>
+            <strong>Document Filename:</strong>{" "}
+            <code>{documentFilename}</code>
+          </p>
+        )}
         {estimate.notes && (
           <p>
             <strong>Notes:</strong> {estimate.notes}
@@ -357,6 +382,24 @@ export default async function EstimateDetailPage({
           <p>
             <strong>Internal Notes:</strong> {estimate.internal_notes}
           </p>
+        )}
+
+        {(session.role === "owner" || session.role === "admin") && (
+          <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
+            <p style={{ fontWeight: 600, marginBottom: "var(--space-1)", color: "var(--fg-muted)" }}>Pricing Guardrails</p>
+            <p><strong>Review:</strong> {estimate.pricing_review_status.replace(/_/g, " ")}</p>
+            <p><strong>Trips:</strong> {estimate.trip_count === "multi_trip" ? "Multi-trip" : "One trip"}</p>
+            <p><strong>Finish:</strong> {estimate.finish_expectation}</p>
+            {(estimate.travel_surcharge_cents > 0 || estimate.risk_adjustment_cents > 0) && (
+              <p>
+                <strong>Adjustments:</strong>{" "}
+                {formatDollars(estimate.travel_surcharge_cents + estimate.risk_adjustment_cents)}
+              </p>
+            )}
+            {estimate.minimum_service_override_reason && (
+              <p><strong>Minimum override:</strong> {estimate.minimum_service_override_reason.replace(/_/g, " ")}</p>
+            )}
+          </div>
         )}
       </div>
 
@@ -539,6 +582,16 @@ export default async function EstimateDetailPage({
           initialLaborHours={estimate.internal_labor_cost_cents !== null && estimate.sq_ft !== null
             ? Math.round((estimate.internal_labor_cost_cents / 8500) * 10) / 10
             : null}
+          initialTripCount={estimate.trip_count}
+          initialRequiresDryingOrCuring={estimate.requires_drying_or_curing}
+          initialDifficultAccess={estimate.difficult_access}
+          initialOldHouseRisk={estimate.old_house_risk}
+          initialCoordinationRequired={estimate.coordination_required}
+          initialFinishExpectation={estimate.finish_expectation}
+          initialTravelSurchargeCents={estimate.travel_surcharge_cents}
+          initialRiskAdjustmentCents={estimate.risk_adjustment_cents}
+          initialMinimumServiceOverrideReason={estimate.minimum_service_override_reason}
+          initialMinimumServiceOverrideNote={estimate.minimum_service_override_note}
         />
       )}
 

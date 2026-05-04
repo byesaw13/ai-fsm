@@ -7,6 +7,7 @@ import { logger } from "@/lib/logger";
 import { sendEmail, appUrl, isEmailConfigured } from "@/lib/email/mailer";
 import { estimateEmailHtml, estimateEmailText } from "@/lib/email/templates";
 import { getEnv } from "@/lib/env";
+import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       const { rows, rowCount } = await client.query(
         `SELECT e.id, e.status, e.total_cents, e.deposit_cents, e.balance_cents,
                 e.expires_at, e.notes, e.sent_at,
+                e.trip_count, e.requires_drying_or_curing, e.difficult_access,
+                e.old_house_risk, e.coordination_required, e.finish_expectation,
+                e.travel_surcharge_cents, e.risk_adjustment_cents,
+                e.minimum_service_override_reason,
                 c.name AS client_name, c.email AS client_email
          FROM estimates e
          JOIN clients c ON c.id = e.client_id
@@ -39,6 +44,15 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         id: string; status: string; total_cents: number;
         deposit_cents: number; balance_cents: number;
         expires_at: string | null; notes: string | null; sent_at: string | null;
+        trip_count: "one_trip" | "multi_trip";
+        requires_drying_or_curing: boolean;
+        difficult_access: boolean;
+        old_house_risk: boolean;
+        coordination_required: boolean;
+        finish_expectation: "basic" | "clean" | "premium";
+        travel_surcharge_cents: number;
+        risk_adjustment_cents: number;
+        minimum_service_override_reason: "bundled" | "membership_included" | "promo" | "owner_approved" | null;
         client_name: string; client_email: string | null;
       };
 
@@ -48,6 +62,26 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
       if (!est.client_email) {
         return { status: 422, message: "Client has no email address on file" };
+      }
+
+      const pricingReview = reviewEstimateGuardrails(est);
+      await client.query(
+        `UPDATE estimates
+         SET pricing_review_status = $1,
+             pricing_reviewed_at = now(),
+             pricing_reviewed_by = $2,
+             updated_at = now()
+         WHERE id = $3`,
+        [pricingReview.status, session.userId, id]
+      );
+
+      if (pricingReview.blockers.length > 0) {
+        return {
+          status: 409,
+          code: "PRICING_REVIEW_BLOCKED",
+          message: pricingReview.blockers.map((b) => b.message).join(" "),
+          details: pricingReview,
+        };
       }
 
       if (!isEmailConfigured()) {
@@ -129,7 +163,16 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       return NextResponse.json({ error: { code: "NOT_FOUND", message: "Estimate not found" } }, { status: 404 });
     }
     if (result.status !== 200) {
-      return NextResponse.json({ error: { code: "SEND_ERROR", message: result.message } }, { status: result.status });
+      return NextResponse.json(
+        {
+          error: {
+            code: result.code ?? "SEND_ERROR",
+            message: result.message,
+            details: result.details,
+          },
+        },
+        { status: result.status }
+      );
     }
 
     return NextResponse.json({ sent: true, sentTo: result.sentTo });

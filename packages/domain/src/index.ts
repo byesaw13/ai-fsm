@@ -252,8 +252,36 @@ export type Visit = z.infer<typeof visitSchema>;
 export const lineItemTypeSchema = z.enum(["labor", "materials", "handling_fee", "adjustment"]);
 export type LineItemType = z.infer<typeof lineItemTypeSchema>;
 
+export const estimateAdjustmentTypeSchema = z.enum([
+  "bundle_credit",
+  "member_credit",
+  "promo",
+  "travel_surcharge",
+  "risk_adjustment",
+  "return_trip_charge",
+  "coordination_fee",
+]);
+export type EstimateAdjustmentType = z.infer<typeof estimateAdjustmentTypeSchema>;
+
 export const pricingModeSchema = z.enum(["flat_rate", "hourly_internal"]);
 export type PricingMode = z.infer<typeof pricingModeSchema>;
+
+export const estimateTripCountSchema = z.enum(["one_trip", "multi_trip"]);
+export type EstimateTripCount = z.infer<typeof estimateTripCountSchema>;
+
+export const estimateFinishExpectationSchema = z.enum(["basic", "clean", "premium"]);
+export type EstimateFinishExpectation = z.infer<typeof estimateFinishExpectationSchema>;
+
+export const estimateMinimumOverrideReasonSchema = z.enum([
+  "bundled",
+  "membership_included",
+  "promo",
+  "owner_approved",
+]);
+export type EstimateMinimumOverrideReason = z.infer<typeof estimateMinimumOverrideReasonSchema>;
+
+export const estimatePricingReviewStatusSchema = z.enum(["needs_review", "passed", "blocked"]);
+export type EstimatePricingReviewStatus = z.infer<typeof estimatePricingReviewStatusSchema>;
 
 export const estimateLineItemSchema = z.object({
   id: uuidField,
@@ -265,6 +293,7 @@ export const estimateLineItemSchema = z.object({
   total_cents: centsField,
   line_item_type: lineItemTypeSchema.default("labor"),
   visible_to_customer: z.boolean().default(true),
+  adjustment_type: estimateAdjustmentTypeSchema.nullable().optional(),
   sort_order: z.number().int().default(0),
   created_at: timestampField,
 });
@@ -308,6 +337,20 @@ export const estimateSchema = z.object({
   internal_labor_cost_cents: centsField.nullable().optional(),
   internal_material_cost_cents: centsField.nullable().optional(),
   target_margin_pct: z.number().min(0).max(100).nullable().optional(),
+  // Pricing guardrail fields
+  trip_count: estimateTripCountSchema.default("one_trip"),
+  requires_drying_or_curing: z.boolean().default(false),
+  difficult_access: z.boolean().default(false),
+  old_house_risk: z.boolean().default(false),
+  coordination_required: z.boolean().default(false),
+  finish_expectation: estimateFinishExpectationSchema.default("clean"),
+  travel_surcharge_cents: centsField.default(0),
+  risk_adjustment_cents: centsField.default(0),
+  minimum_service_override_reason: estimateMinimumOverrideReasonSchema.nullable().optional(),
+  minimum_service_override_note: z.string().nullable().optional(),
+  pricing_review_status: estimatePricingReviewStatusSchema.default("needs_review"),
+  pricing_reviewed_at: timestampField.nullable().optional(),
+  pricing_reviewed_by: uuidField.nullable().optional(),
   notes: z.string().nullable().optional(),
   internal_notes: z.string().nullable().optional(),
   sent_at: timestampField.nullable().optional(),

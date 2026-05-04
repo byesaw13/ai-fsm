@@ -5,6 +5,7 @@ import { getStandardEstimateTerms, formatCents } from "@/lib/estimates/pricing";
 import { PAYMENT_OPTIONS } from "@ai-fsm/domain";
 import type { EstimateStatus } from "@ai-fsm/domain";
 import { PrintButton } from "./PrintButton";
+import { buildClientDocumentFilename } from "@/lib/estimates/guardrails";
 
 export const dynamic = "force-dynamic";
 
@@ -94,7 +95,8 @@ export default async function EstimatePrintPage({
        LEFT JOIN clients    c ON c.id = e.client_id
        LEFT JOIN properties p ON p.id = e.property_id
        LEFT JOIN jobs       j ON j.id = e.job_id
-       WHERE e.id = $1 AND e.account_id = $2`
+       WHERE e.id = $1 AND e.account_id = $2`,
+      [id, session.accountId]
     );
 
     if (estResult.rowCount === 0) return null;
@@ -125,6 +127,13 @@ export default async function EstimatePrintPage({
   const estimateNumber = `EST-${estimate.id.slice(0, 8).toUpperCase()}`;
   const issuedDate = fmtDate(estimate.sent_at ?? estimate.created_at);
   const expiryDate = fmtDate(estimate.expires_at);
+  const documentFilename = buildClientDocumentFilename({
+    date: estimate.sent_at ?? estimate.created_at,
+    clientName: estimate.client_name,
+    jobType: estimate.job_title ?? "Job",
+    documentType: "estimate",
+    status: estimate.status === "declined" || estimate.status === "expired" ? "archived" : estimate.status,
+  });
 
   const serviceAddress = estimate.property_address
     ? addr(estimate.property_address, estimate.property_city, estimate.property_state, estimate.property_zip)
@@ -176,6 +185,7 @@ export default async function EstimatePrintPage({
           <div style={{ textAlign: "right" }}>
             <h1>Estimate</h1>
             <p className="meta-label">{estimateNumber}</p>
+            <p className="meta-label no-print">{documentFilename}</p>
             <p className="meta-label">Issued: {issuedDate}</p>
             {estimate.expires_at && (
               <p className="meta-label">Valid through: {expiryDate}</p>

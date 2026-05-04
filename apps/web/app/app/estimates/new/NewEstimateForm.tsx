@@ -196,6 +196,18 @@ export function NewEstimateForm({
   // Multi-option tiers (Good/Better/Best)
   const [tiers, setTiers] = useState<OptionTier[]>(() => DEFAULT_TIERS.map(t => ({ ...t, line_items: [{ ...EMPTY_ROW }] })));
 
+  // Pricing guardrails
+  const [tripCount, setTripCount] = useState<"one_trip" | "multi_trip">("one_trip");
+  const [requiresDryingOrCuring, setRequiresDryingOrCuring] = useState(false);
+  const [difficultAccess, setDifficultAccess] = useState(false);
+  const [oldHouseRisk, setOldHouseRisk] = useState(false);
+  const [coordinationRequired, setCoordinationRequired] = useState(false);
+  const [finishExpectation, setFinishExpectation] = useState<"basic" | "clean" | "premium">("clean");
+  const [travelSurcharge, setTravelSurcharge] = useState("0.00");
+  const [riskAdjustment, setRiskAdjustment] = useState("0.00");
+  const [minimumOverrideReason, setMinimumOverrideReason] = useState("");
+  const [minimumOverrideNote, setMinimumOverrideNote] = useState("");
+
   // Price book line items
   const [priceBookItems, setPriceBookItems] = useState<{ service: PriceBookService; priceCents: number }[]>([]);
 
@@ -281,13 +293,13 @@ export function NewEstimateForm({
     mode === "flat_rate"
       ? parseCents(flatRate)
       : lineItems.reduce((sum, row) => sum + lineTotal(row), 0) + materialHandlingCents;
-  const genericTaxCents = Math.round((genericSubtotalCents * taxRateNum) / 100);
+  const guardrailAdjustmentCents = parseCents(travelSurcharge) + parseCents(riskAdjustment);
+  const adjustedGenericSubtotalCents = genericSubtotalCents + guardrailAdjustmentCents;
+  const genericTaxCents = Math.round((adjustedGenericSubtotalCents * taxRateNum) / 100);
 
-  // Deposit is 30% of subtotal (business rule)
-  const depositCents = Math.round(genericSubtotalCents * 0.30);
-  const balanceDueCents = genericSubtotalCents + genericTaxCents - depositCents;
-
-  const genericTotalCents = genericSubtotalCents + genericTaxCents;
+  const genericTotalCents = adjustedGenericSubtotalCents + genericTaxCents;
+  const depositCents = Math.round(genericTotalCents * 0.30);
+  const balanceDueCents = genericTotalCents - depositCents;
 
   function handleModeChange(newMode: "itemized" | "flat_rate" | "multi_option") {
     if (newMode === "flat_rate") {
@@ -575,6 +587,19 @@ export function NewEstimateForm({
         };
       }
 
+      Object.assign(payload, {
+        trip_count: tripCount,
+        requires_drying_or_curing: requiresDryingOrCuring,
+        difficult_access: difficultAccess,
+        old_house_risk: oldHouseRisk,
+        coordination_required: coordinationRequired,
+        finish_expectation: finishExpectation,
+        travel_surcharge_cents: parseCents(travelSurcharge),
+        risk_adjustment_cents: parseCents(riskAdjustment),
+        minimum_service_override_reason: minimumOverrideReason || null,
+        minimum_service_override_note: minimumOverrideNote.trim() || null,
+      });
+
       const res = await fetch("/api/v1/estimates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -774,6 +799,95 @@ export function NewEstimateForm({
           disabled={pending}
           containerClassName="p7-form-grid-span-2"
         />
+      </div>
+
+      <div>
+        <SectionHeader title="Pricing Guardrails" as="h3" />
+        <div className="p7-form-grid p7-form-grid-2">
+          <Select
+            id="trip_count"
+            label="Trip Count"
+            value={tripCount}
+            onChange={(e) => setTripCount(e.target.value as "one_trip" | "multi_trip")}
+            disabled={pending}
+            options={[
+              { value: "one_trip", label: "One Trip" },
+              { value: "multi_trip", label: "Multi-Trip" },
+            ]}
+          />
+          <Select
+            id="finish_expectation"
+            label="Finish Expectation"
+            value={finishExpectation}
+            onChange={(e) => setFinishExpectation(e.target.value as "basic" | "clean" | "premium")}
+            disabled={pending}
+            options={[
+              { value: "basic", label: "Basic" },
+              { value: "clean", label: "Clean" },
+              { value: "premium", label: "Premium" },
+            ]}
+          />
+          <Input
+            id="travel_surcharge"
+            label="Travel Surcharge ($)"
+            type="number"
+            min="0"
+            step="0.01"
+            value={travelSurcharge}
+            onChange={(e) => setTravelSurcharge(e.target.value)}
+            disabled={pending}
+          />
+          <Input
+            id="risk_adjustment"
+            label="Risk / Return Adjustment ($)"
+            type="number"
+            min="0"
+            step="0.01"
+            value={riskAdjustment}
+            onChange={(e) => setRiskAdjustment(e.target.value)}
+            disabled={pending}
+          />
+          <Select
+            id="minimum_override_reason"
+            label="Minimum Override"
+            value={minimumOverrideReason}
+            onChange={(e) => setMinimumOverrideReason(e.target.value)}
+            disabled={pending}
+            placeholder="None"
+            options={[
+              { value: "bundled", label: "Bundled" },
+              { value: "membership_included", label: "Membership Included" },
+              { value: "promo", label: "Promotion" },
+              { value: "owner_approved", label: "Owner Approved" },
+            ]}
+          />
+          <Input
+            id="minimum_override_note"
+            label="Override Note"
+            value={minimumOverrideNote}
+            onChange={(e) => setMinimumOverrideNote(e.target.value)}
+            disabled={pending}
+            placeholder="Internal reason"
+          />
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)", marginTop: "var(--space-2)" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
+            <input type="checkbox" checked={requiresDryingOrCuring} onChange={(e) => setRequiresDryingOrCuring(e.target.checked)} disabled={pending} />
+            <span>Drying/curing required</span>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
+            <input type="checkbox" checked={difficultAccess} onChange={(e) => setDifficultAccess(e.target.checked)} disabled={pending} />
+            <span>Difficult access</span>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
+            <input type="checkbox" checked={oldHouseRisk} onChange={(e) => setOldHouseRisk(e.target.checked)} disabled={pending} />
+            <span>Old-house risk</span>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
+            <input type="checkbox" checked={coordinationRequired} onChange={(e) => setCoordinationRequired(e.target.checked)} disabled={pending} />
+            <span>Coordination required</span>
+          </label>
+        </div>
       </div>
 
       {/* Painting Estimator */}
@@ -1539,6 +1653,13 @@ export function NewEstimateForm({
 
                     <span style={{ color: "var(--fg-muted)" }}>Subtotal with materials</span>
                     <span data-testid="subtotal-with-materials">{formatCents(genericSubtotalCents)}</span>
+
+                    {guardrailAdjustmentCents > 0 && (
+                      <>
+                        <span style={{ color: "var(--fg-muted)" }}>Pricing adjustments</span>
+                        <span>{formatCents(guardrailAdjustmentCents)}</span>
+                      </>
+                    )}
 
                     <span style={{ color: "var(--fg-muted)" }}>Deposit (30%)</span>
                     <span data-testid="deposit">{formatCents(depositCents)}</span>

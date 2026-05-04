@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, type Dispatch, type SetStateAction } from "react";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -57,6 +57,16 @@ interface EstimateEditFormProps {
   initialIncludesCeiling?: boolean;
   initialMaterialCostCents?: number | null;
   initialLaborHours?: number | null;
+  initialTripCount?: "one_trip" | "multi_trip";
+  initialRequiresDryingOrCuring?: boolean;
+  initialDifficultAccess?: boolean;
+  initialOldHouseRisk?: boolean;
+  initialCoordinationRequired?: boolean;
+  initialFinishExpectation?: "basic" | "clean" | "premium";
+  initialTravelSurchargeCents?: number;
+  initialRiskAdjustmentCents?: number;
+  initialMinimumServiceOverrideReason?: "bundled" | "membership_included" | "promo" | "owner_approved" | null;
+  initialMinimumServiceOverrideNote?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -111,6 +121,16 @@ export function EstimateEditForm({
   initialIncludesCeiling,
   initialMaterialCostCents,
   initialLaborHours,
+  initialTripCount,
+  initialRequiresDryingOrCuring,
+  initialDifficultAccess,
+  initialOldHouseRisk,
+  initialCoordinationRequired,
+  initialFinishExpectation,
+  initialTravelSurchargeCents,
+  initialRiskAdjustmentCents,
+  initialMinimumServiceOverrideReason,
+  initialMinimumServiceOverrideNote,
 }: EstimateEditFormProps) {
   const router = useRouter();
   const toast = useToast();
@@ -166,6 +186,16 @@ export function EstimateEditForm({
     initialMaterialCostCents ? (initialMaterialCostCents / 100).toFixed(2) : ""
   );
   const [laborHours, setLaborHours] = useState(initialLaborHours?.toString() ?? "");
+  const [tripCount, setTripCount] = useState<"one_trip" | "multi_trip">(initialTripCount ?? "one_trip");
+  const [requiresDryingOrCuring, setRequiresDryingOrCuring] = useState(initialRequiresDryingOrCuring ?? false);
+  const [difficultAccess, setDifficultAccess] = useState(initialDifficultAccess ?? false);
+  const [oldHouseRisk, setOldHouseRisk] = useState(initialOldHouseRisk ?? false);
+  const [coordinationRequired, setCoordinationRequired] = useState(initialCoordinationRequired ?? false);
+  const [finishExpectation, setFinishExpectation] = useState<"basic" | "clean" | "premium">(initialFinishExpectation ?? "clean");
+  const [travelSurcharge, setTravelSurcharge] = useState(centsToDisplayDollars(initialTravelSurchargeCents ?? 0));
+  const [riskAdjustment, setRiskAdjustment] = useState(centsToDisplayDollars(initialRiskAdjustmentCents ?? 0));
+  const [minimumOverrideReason, setMinimumOverrideReason] = useState(initialMinimumServiceOverrideReason ?? "");
+  const [minimumOverrideNote, setMinimumOverrideNote] = useState(initialMinimumServiceOverrideNote ?? "");
 
   useEffect(() => {
     let cancelled = false;
@@ -208,8 +238,10 @@ export function EstimateEditForm({
     mode === "flat_rate"
       ? parseCents(flatRate)
       : lineItems.reduce((sum, row) => sum + lineTotal(row), 0);
-  const taxCents = Math.round((subtotalCents * taxRateNum) / 100);
-  const totalCents = subtotalCents + taxCents;
+  const guardrailAdjustmentCents = parseCents(travelSurcharge) + parseCents(riskAdjustment);
+  const adjustedSubtotalCents = subtotalCents + guardrailAdjustmentCents;
+  const taxCents = Math.round((adjustedSubtotalCents * taxRateNum) / 100);
+  const totalCents = adjustedSubtotalCents + taxCents;
 
   // Live painting estimate calculation
   const paintingResult = useMemo(() => {
@@ -312,6 +344,16 @@ export function EstimateEditForm({
                 ]
               : []),
           ],
+          trip_count: tripCount,
+          requires_drying_or_curing: requiresDryingOrCuring,
+          difficult_access: difficultAccess,
+          old_house_risk: oldHouseRisk,
+          coordination_required: coordinationRequired,
+          finish_expectation: finishExpectation,
+          travel_surcharge_cents: parseCents(travelSurcharge),
+          risk_adjustment_cents: parseCents(riskAdjustment),
+          minimum_service_override_reason: minimumOverrideReason || null,
+          minimum_service_override_note: minimumOverrideNote.trim() || null,
         };
       } else if (mode === "flat_rate") {
         payload = {
@@ -323,6 +365,16 @@ export function EstimateEditForm({
           tax_rate: taxRateNum,
           flat_rate_cents: parseCents(flatRate),
           line_items: [],
+          trip_count: tripCount,
+          requires_drying_or_curing: requiresDryingOrCuring,
+          difficult_access: difficultAccess,
+          old_house_risk: oldHouseRisk,
+          coordination_required: coordinationRequired,
+          finish_expectation: finishExpectation,
+          travel_surcharge_cents: parseCents(travelSurcharge),
+          risk_adjustment_cents: parseCents(riskAdjustment),
+          minimum_service_override_reason: minimumOverrideReason || null,
+          minimum_service_override_note: minimumOverrideNote.trim() || null,
         };
       } else {
         payload = {
@@ -338,6 +390,16 @@ export function EstimateEditForm({
             unit_price_cents: parseCents(row.unit_price),
             sort_order: i,
           })),
+          trip_count: tripCount,
+          requires_drying_or_curing: requiresDryingOrCuring,
+          difficult_access: difficultAccess,
+          old_house_risk: oldHouseRisk,
+          coordination_required: coordinationRequired,
+          finish_expectation: finishExpectation,
+          travel_surcharge_cents: parseCents(travelSurcharge),
+          risk_adjustment_cents: parseCents(riskAdjustment),
+          minimum_service_override_reason: minimumOverrideReason || null,
+          minimum_service_override_note: minimumOverrideNote.trim() || null,
         };
       }
 
@@ -437,6 +499,95 @@ export function EstimateEditForm({
             disabled={pending}
             containerClassName="p7-form-grid-span-2"
           />
+        </div>
+
+        <div>
+          <SectionHeader title="Pricing Guardrails" as="h3" />
+          <div className="p7-form-grid p7-form-grid-2">
+            <Select
+              id="edit-trip-count"
+              label="Trip Count"
+              value={tripCount}
+              onChange={(e) => setTripCount(e.target.value as "one_trip" | "multi_trip")}
+              disabled={pending}
+              options={[
+                { value: "one_trip", label: "One Trip" },
+                { value: "multi_trip", label: "Multi-Trip" },
+              ]}
+            />
+            <Select
+              id="edit-finish-expectation"
+              label="Finish Expectation"
+              value={finishExpectation}
+              onChange={(e) => setFinishExpectation(e.target.value as "basic" | "clean" | "premium")}
+              disabled={pending}
+              options={[
+                { value: "basic", label: "Basic" },
+                { value: "clean", label: "Clean" },
+                { value: "premium", label: "Premium" },
+              ]}
+            />
+            <Input
+              id="edit-travel-surcharge"
+              label="Travel Surcharge ($)"
+              type="number"
+              min="0"
+              step="0.01"
+              value={travelSurcharge}
+              onChange={(e) => setTravelSurcharge(e.target.value)}
+              disabled={pending}
+            />
+            <Input
+              id="edit-risk-adjustment"
+              label="Risk / Return Adjustment ($)"
+              type="number"
+              min="0"
+              step="0.01"
+              value={riskAdjustment}
+              onChange={(e) => setRiskAdjustment(e.target.value)}
+              disabled={pending}
+            />
+            <Select
+              id="edit-minimum-override"
+              label="Minimum Override"
+              value={minimumOverrideReason}
+              onChange={(e) => setMinimumOverrideReason(e.target.value)}
+              disabled={pending}
+              placeholder="None"
+              options={[
+                { value: "bundled", label: "Bundled" },
+                { value: "membership_included", label: "Membership Included" },
+                { value: "promo", label: "Promotion" },
+                { value: "owner_approved", label: "Owner Approved" },
+              ]}
+            />
+            <Input
+              id="edit-minimum-override-note"
+              label="Override Note"
+              value={minimumOverrideNote}
+              onChange={(e) => setMinimumOverrideNote(e.target.value)}
+              disabled={pending}
+              placeholder="Internal reason"
+            />
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)", marginTop: "var(--space-2)" }}>
+            {[
+              ["drying", "Drying/curing required", requiresDryingOrCuring, setRequiresDryingOrCuring],
+              ["access", "Difficult access", difficultAccess, setDifficultAccess],
+              ["old-house", "Old-house risk", oldHouseRisk, setOldHouseRisk],
+              ["coordination", "Coordination required", coordinationRequired, setCoordinationRequired],
+            ].map(([key, label, checked, setter]) => (
+              <label key={key as string} style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={checked as boolean}
+                  onChange={(e) => (setter as Dispatch<SetStateAction<boolean>>)(e.target.checked)}
+                  disabled={pending}
+                />
+                <span>{label as string}</span>
+              </label>
+            ))}
+          </div>
         </div>
 
         {/* Service Type Toggle */}
@@ -796,6 +947,13 @@ export function EstimateEditForm({
                 <>
                   <span style={{ color: "var(--fg-muted)" }}>Subtotal</span>
                   <span data-testid="edit-subtotal">{formatDollars(subtotalCents)}</span>
+                </>
+              )}
+
+              {guardrailAdjustmentCents > 0 && (
+                <>
+                  <span style={{ color: "var(--fg-muted)" }}>Pricing Adjustments</span>
+                  <span>{formatDollars(guardrailAdjustmentCents)}</span>
                 </>
               )}
 
