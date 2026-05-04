@@ -8,7 +8,6 @@ import {
   LinkButton,
   PageContainer,
   PageHeader,
-  Select,
   StatusBadge,
   type StatusVariant,
 } from "@/components/ui";
@@ -47,8 +46,9 @@ interface VisitRow {
 export default async function MaintenancePlanDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const session = await getSession();
   if (!session) redirect("/login");
   if (!canManageClients(session.role)) redirect("/app");
@@ -59,7 +59,7 @@ export default async function MaintenancePlanDetailPage({
      JOIN clients c ON c.id = mp.client_id
      LEFT JOIN properties p ON p.id = mp.property_id
      WHERE mp.id = $1 AND mp.account_id = $2`,
-    [params.id, session.accountId]
+    [id, session.accountId]
   );
 
   if (!plan) notFound();
@@ -69,10 +69,10 @@ export default async function MaintenancePlanDetailPage({
     `SELECT v.id, v.scheduled_start, v.scheduled_end, v.status, j.title AS job_title
      FROM visits v
      LEFT JOIN jobs j ON j.id = v.job_id
-     WHERE v.generated_from_plan_id = $1 AND v.account_id = $2
-     ORDER BY v.scheduled_start DESC
-     LIMIT 20`,
-    [params.id, session.accountId]
+      WHERE v.generated_from_plan_id = $1 AND v.account_id = $2
+      ORDER BY v.scheduled_start DESC
+      LIMIT 20`,
+    [id, session.accountId]
   );
 
   const frequencyLabels: Record<string, string> = {
@@ -90,7 +90,7 @@ export default async function MaintenancePlanDetailPage({
         backLabel="Plans"
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)" }}>
-            <LinkButton href={`/app/maintenance-plans/${plan.id}/edit`} variant="secondary" size="sm">
+            <LinkButton href={`/app/maintenance-plans/${id}/edit`} variant="secondary" size="sm">
               Edit
             </LinkButton>
           </div>
@@ -176,12 +176,13 @@ export default async function MaintenancePlanDetailPage({
           <form
             action={async () => {
               "use server";
-              await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ""}/api/v1/maintenance-plans/${plan.id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "paused" }),
-              });
-              redirect(`/app/maintenance-plans/${plan.id}`);
+              await query(
+                `UPDATE maintenance_plans
+                 SET status = $1, updated_at = now()
+                 WHERE id = $2 AND account_id = $3`,
+                ["paused", id, session.accountId]
+              );
+              redirect(`/app/maintenance-plans/${id}`);
             }}
           >
             <button type="submit" className="p7-btn p7-btn-secondary p7-btn-md">
@@ -193,12 +194,13 @@ export default async function MaintenancePlanDetailPage({
           <form
             action={async () => {
               "use server";
-              await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ""}/api/v1/maintenance-plans/${plan.id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "active" }),
-              });
-              redirect(`/app/maintenance-plans/${plan.id}`);
+              await query(
+                `UPDATE maintenance_plans
+                 SET status = $1, updated_at = now()
+                 WHERE id = $2 AND account_id = $3`,
+                ["active", id, session.accountId]
+              );
+              redirect(`/app/maintenance-plans/${id}`);
             }}
           >
             <button type="submit" className="p7-btn p7-btn-primary p7-btn-md">
@@ -210,12 +212,13 @@ export default async function MaintenancePlanDetailPage({
           <form
             action={async () => {
               "use server";
-              await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ""}/api/v1/maintenance-plans/${plan.id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "cancelled" }),
-              });
-              redirect(`/app/maintenance-plans/${plan.id}`);
+              await query(
+                `UPDATE maintenance_plans
+                 SET status = $1, updated_at = now()
+                 WHERE id = $2 AND account_id = $3`,
+                ["cancelled", id, session.accountId]
+              );
+              redirect(`/app/maintenance-plans/${id}`);
             }}
           >
             <button type="submit" className="p7-btn p7-btn-danger p7-btn-md">

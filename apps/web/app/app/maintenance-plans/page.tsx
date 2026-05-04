@@ -33,13 +33,14 @@ interface MaintenancePlanRow {
 export default async function MaintenancePlansPage({
   searchParams,
 }: {
-  searchParams: { status?: string };
+  searchParams: Promise<{ status?: string }>;
 }) {
+  const { status } = await searchParams;
   const session = await getSession();
   if (!session) return null;
   if (!canManageClients(session.role)) return null;
 
-  const statusFilter = searchParams.status || "all";
+  const statusFilter = status || "all";
 
   let sql = `
     SELECT mp.*, c.name AS client_name, p.address AS property_address

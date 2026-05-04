@@ -17,9 +17,10 @@ FROM node:20-alpine AS run
 WORKDIR /app
 ENV NODE_ENV=production
 RUN corepack enable
-COPY --from=build /app/apps/web/.next ./apps/web/.next
-COPY --from=build /app/apps/web/package.json ./apps/web/package.json
-COPY --from=build /app/apps/web/node_modules ./apps/web/node_modules
-COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/apps/web/.next /app/apps/web/.next
+COPY --from=build /app/apps/web/package.json /app/apps/web/package.json
+COPY --from=build /app/apps/web/node_modules /app/apps/web/node_modules
+COPY --from=build /app/node_modules /app/node_modules
+WORKDIR /app/apps/web
 EXPOSE 3000
-CMD ["pnpm", "--filter", "@ai-fsm/web", "start"]
+CMD ["/app/apps/web/node_modules/.bin/next", "start", "--port", "3000"]
