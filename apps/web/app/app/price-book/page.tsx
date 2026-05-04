@@ -13,6 +13,9 @@ type PriceBookRow = {
   tier: string;
   price_min_cents: number;
   price_max_cents: number | null;
+  default_price_cents: number | null;
+  add_on_price_cents: number | null;
+  unit_type: string | null;
   description: string | null;
   notes: string | null;
   default_labor_hours: number | null;
@@ -29,6 +32,7 @@ export default async function PriceBookPage() {
 
   const services = await query<PriceBookRow>(
     `SELECT id, code, name, category, tier, price_min_cents, price_max_cents,
+            default_price_cents, add_on_price_cents, unit_type,
             description, notes, default_labor_hours::float, requires_materials,
             upsell_codes, is_active, created_at::text, updated_at::text
      FROM price_book

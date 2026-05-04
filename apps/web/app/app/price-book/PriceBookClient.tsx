@@ -15,6 +15,9 @@ interface Service {
   tier: string;
   price_min_cents: number;
   price_max_cents: number | null;
+  default_price_cents: number | null;
+  add_on_price_cents: number | null;
+  unit_type: string | null;
   description: string | null;
   notes: string | null;
   default_labor_hours: number | null;
@@ -282,6 +285,30 @@ export default function PriceBookClient({ services }: Props) {
                           <span style={{ color: "var(--fg-muted)" }}>Materials:</span>
                           <span>{service.requires_materials ? "Typically required" : "Not typically needed"}</span>
                           <span></span>
+
+                          {service.default_price_cents !== null && (
+                            <>
+                              <span style={{ color: "var(--fg-muted)" }}>Default price:</span>
+                              <span>${((service.default_price_cents || 0) / 100).toFixed(2)}</span>
+                              <span></span>
+                            </>
+                          )}
+
+                          {service.add_on_price_cents !== null && (
+                            <>
+                              <span style={{ color: "var(--fg-muted)" }}>Add-on price:</span>
+                              <span>${((service.add_on_price_cents || 0) / 100).toFixed(2)}</span>
+                              <span></span>
+                            </>
+                          )}
+
+                          {service.unit_type && service.unit_type !== "flat" && (
+                            <>
+                              <span style={{ color: "var(--fg-muted)" }}>Unit type:</span>
+                              <span>{service.unit_type.replace("_", " ")}</span>
+                              <span></span>
+                            </>
+                          )}
 
                           {upsellItems.length > 0 && (
                             <>

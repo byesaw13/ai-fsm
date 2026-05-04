@@ -20,6 +20,7 @@ import {
   IconSettings,
   IconPriceBook,
   IconMyDay,
+  IconMileage,
 } from "./NavIcons";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
@@ -45,12 +46,15 @@ const OPERATIONS_ITEMS: NavItem[] = [
 ];
 
 const BUSINESS_ITEMS: NavItem[] = [
+  { href: "/app/owner-dashboard", label: "Command Center", Icon: IconReports, adminOnly: true },
   { href: "/app/clients",     label: "Clients",    Icon: IconClients,     adminOnly: true },
   { href: "/app/properties",  label: "Properties", Icon: IconProperties,  adminOnly: true },
   { href: "/app/invoices",    label: "Invoices",   Icon: IconInvoices,    adminOnly: true },
   { href: "/app/estimates",   label: "Estimates",  Icon: IconEstimates,   adminOnly: true },
   { href: "/app/price-book",  label: "Price Book", Icon: IconPriceBook,   adminOnly: true },
   { href: "/app/expenses",    label: "Expenses",   Icon: IconExpenses,    adminOnly: true },
+  { href: "/app/mileage",     label: "Mileage",    Icon: IconMileage,    adminOnly: true },
+  { href: "/app/maintenance-plans", label: "Maintenance Plans", Icon: IconSchedule, adminOnly: true },
   { href: "/app/automations", label: "Automations",Icon: IconAutomations, adminOnly: true },
   { href: "/app/reports",     label: "Reports",    Icon: IconReports,     adminOnly: true },
 ];

@@ -46,6 +46,10 @@ export interface DocumentLinkRow {
   paperless_doc_id: number;
   title: string | null;
   original_filename: string | null;
+  document_type: string | null;
+  property_id: string | null;
+  is_master_template: boolean;
+  is_archived: boolean;
   created_by: string;
   created_at: string;
 }
@@ -62,7 +66,8 @@ export async function listDocumentLinks(
 ): Promise<DocumentLinkRow[]> {
   const { rows } = await client.query<DocumentLinkRow>(
     `SELECT id, entity_type, entity_id, paperless_doc_id,
-            title, original_filename, created_by, created_at
+            title, original_filename, document_type, property_id,
+            is_master_template, is_archived, created_by, created_at
      FROM document_links
      WHERE account_id = $1
        AND entity_type = $2
@@ -83,7 +88,8 @@ export async function getDocumentLink(
 ): Promise<DocumentLinkRow | null> {
   const { rows } = await client.query<DocumentLinkRow>(
     `SELECT id, entity_type, entity_id, paperless_doc_id,
-            title, original_filename, created_by, created_at
+            title, original_filename, document_type, property_id,
+            is_master_template, is_archived, created_by, created_at
      FROM document_links
      WHERE id = $1 AND account_id = $2`,
     [linkId, accountId]
@@ -101,6 +107,10 @@ export interface CreateDocumentLinkInput {
   paperlessDocId: number;
   title?: string | null;
   originalFilename?: string | null;
+  documentType?: string | null;
+  propertyId?: string | null;
+  isMasterTemplate?: boolean;
+  isArchived?: boolean;
   createdBy: string;
 }
 
@@ -116,10 +126,12 @@ export async function createDocumentLink(
   const { rows } = await client.query<DocumentLinkRow>(
     `INSERT INTO document_links
        (account_id, entity_type, entity_id, paperless_doc_id,
-        title, original_filename, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+        title, original_filename, document_type, property_id,
+        is_master_template, is_archived, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING id, entity_type, entity_id, paperless_doc_id,
-               title, original_filename, created_by, created_at`,
+               title, original_filename, document_type, property_id,
+               is_master_template, is_archived, created_by, created_at`,
     [
       accountId,
       input.entityType,
@@ -127,6 +139,10 @@ export async function createDocumentLink(
       input.paperlessDocId,
       input.title ?? null,
       input.originalFilename ?? null,
+      input.documentType ?? null,
+      input.propertyId ?? null,
+      input.isMasterTemplate ?? false,
+      input.isArchived ?? false,
       input.createdBy,
     ]
   );

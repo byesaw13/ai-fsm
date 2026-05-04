@@ -201,6 +201,16 @@ export function NewEstimateForm({
 
   function handleAddPriceBookItem(service: PriceBookService, priceCents: number) {
     setPriceBookItems((prev) => [...prev, { service, priceCents }]);
+
+    // Auto-fill generic line items with price book data
+    // Use default_price_cents if available, otherwise use provided priceCents
+    const unitPrice = service.default_price_cents ?? priceCents;
+    const description = `${service.code} — ${service.name}${service.description ? ` — ${service.description}` : ""}`;
+
+    setLineItems((prev) => [
+      ...prev.filter((r) => r.description.trim()),
+      { description, quantity: "1", unit_price: (unitPrice / 100).toFixed(2) },
+    ]);
   }
 
   function removePriceBookItem(index: number) {
@@ -258,11 +268,25 @@ export function NewEstimateForm({
 
   // Generic live totals
   const taxRateNum = parseFloat(taxRate) || 0;
+
+  // Calculate material handling (15% of material line items)
+  // For now, treat all line items as labor unless they contain "material" in description
+  const materialLineItems = lineItems.filter((row) =>
+    row.description.toLowerCase().includes("material")
+  );
+  const materialSubtotalCents = materialLineItems.reduce((sum, row) => sum + lineTotal(row), 0);
+  const materialHandlingCents = Math.round(materialSubtotalCents * 0.15);
+
   const genericSubtotalCents =
     mode === "flat_rate"
       ? parseCents(flatRate)
-      : lineItems.reduce((sum, row) => sum + lineTotal(row), 0);
+      : lineItems.reduce((sum, row) => sum + lineTotal(row), 0) + materialHandlingCents;
   const genericTaxCents = Math.round((genericSubtotalCents * taxRateNum) / 100);
+
+  // Deposit is 30% of subtotal (business rule)
+  const depositCents = Math.round(genericSubtotalCents * 0.30);
+  const balanceDueCents = genericSubtotalCents + genericTaxCents - depositCents;
+
   const genericTotalCents = genericSubtotalCents + genericTaxCents;
 
   function handleModeChange(newMode: "itemized" | "flat_rate" | "multi_option") {
@@ -1504,7 +1528,23 @@ export function NewEstimateForm({
                 {mode === "itemized" && (
                   <>
                     <span style={{ color: "var(--fg-muted)" }}>Subtotal</span>
-                    <span data-testid="subtotal">{formatCents(genericSubtotalCents)}</span>
+                    <span data-testid="subtotal">{formatCents(genericSubtotalCents - materialHandlingCents)}</span>
+
+                    {materialHandlingCents > 0 && (
+                      <>
+                        <span style={{ color: "var(--fg-muted)" }}>Material handling (15%)</span>
+                        <span data-testid="material-handling">{formatCents(materialHandlingCents)}</span>
+                      </>
+                    )}
+
+                    <span style={{ color: "var(--fg-muted)" }}>Subtotal with materials</span>
+                    <span data-testid="subtotal-with-materials">{formatCents(genericSubtotalCents)}</span>
+
+                    <span style={{ color: "var(--fg-muted)" }}>Deposit (30%)</span>
+                    <span data-testid="deposit">{formatCents(depositCents)}</span>
+
+                    <span style={{ fontWeight: "var(--font-semibold)" }}>Balance due</span>
+                    <span data-testid="balance-due" style={{ fontWeight: "var(--font-semibold)" }}>{formatCents(balanceDueCents)}</span>
                   </>
                 )}
 
@@ -1528,15 +1568,26 @@ export function NewEstimateForm({
                 data-testid="tax-rate-input"
               />
 
-              {genericTaxCents > 0 && (
+                {genericTaxCents > 0 && (
+                  <>
+                    <span style={{ color: "var(--fg-muted)" }}>Tax</span>
+                    <span data-testid="tax-amount">{formatCents(genericTaxCents)}</span>
+                  </>
+                )}
+
+              <strong>Total (incl. tax)</strong>
+              <strong data-testid="total">{formatCents(genericTotalCents)}</strong>
+
+              {mode === "itemized" && (
                 <>
-                  <span style={{ color: "var(--fg-muted)" }}>Tax</span>
-                  <span data-testid="tax-amount">{formatCents(genericTaxCents)}</span>
+                  <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+                    Balance due after deposit
+                  </span>
+                  <span data-testid="balance-due" style={{ fontSize: "var(--text-sm)" }}>
+                    {formatCents(balanceDueCents)}
+                  </span>
                 </>
               )}
-
-              <strong>Total</strong>
-              <strong data-testid="total">{formatCents(genericTotalCents)}</strong>
             </div>
           </div>
           )}
