@@ -68,7 +68,7 @@ Validation for PR #114:
 
 ### Implemented in Estimate Guardrails Release
 
-PR: `TBD`
+PR: https://github.com/byesaw13/ai-fsm/pull/116
 Merge commit: `TBD`
 Production deploy: `TBD`
 Migration: `026_estimate_pricing_guardrails.sql`
