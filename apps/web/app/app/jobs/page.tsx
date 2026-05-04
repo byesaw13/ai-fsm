@@ -171,8 +171,8 @@ export default async function JobsPage({ searchParams }: PageProps) {
         title="Jobs"
         subtitle={
           isAdmin
-            ? `All jobs — ${jobs.length} total`
-            : `Your assigned jobs — ${jobs.length} total`
+            ? `${jobs.length} job${jobs.length !== 1 ? "s" : ""}`
+            : `${jobs.length} assigned job${jobs.length !== 1 ? "s" : ""}`
         }
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
@@ -181,7 +181,7 @@ export default async function JobsPage({ searchParams }: PageProps) {
               style={{
                 display: "flex",
                 border: "1px solid var(--border)",
-                borderRadius: "var(--radius)",
+                borderRadius: "var(--radius-md)",
                 overflow: "hidden",
               }}
             >
@@ -286,6 +286,15 @@ function JobItemCard({ job }: { job: JobRow }) {
   const pv: PriorityVariant | null = priorityNumToVariant(job.priority);
   const pl: string = priorityLabel(job.priority);
 
+  const jobStatusOrder: JobStatus[] = ["draft", "quoted", "scheduled", "in_progress", "completed", "invoiced"];
+  const currentIdx = jobStatusOrder.indexOf(job.status as JobStatus);
+  const progressPct = Math.round(((currentIdx) / (jobStatusOrder.length - 1)) * 100);
+  const progressColor = job.status === "invoiced" || job.status === "completed"
+    ? "var(--color-success)"
+    : job.status === "in_progress" || job.status === "scheduled"
+    ? "var(--color-primary)"
+    : "var(--fg-muted)";
+
   const meta = (
     <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "center" }}>
       {job.client_name && (
@@ -312,9 +321,21 @@ function JobItemCard({ job }: { job: JobRow }) {
       }
       meta={meta}
       actions={
-        <StatusBadge variant={job.status as StatusVariant}>
-          {JOB_STATUS_LABELS[job.status as JobStatus]}
-        </StatusBadge>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+          <StatusBadge variant={job.status as StatusVariant}>
+            {JOB_STATUS_LABELS[job.status as JobStatus]}
+          </StatusBadge>
+          {progressPct > 0 && progressPct < 100 && (
+            <div style={{ width: 60, height: 3, background: "var(--color-border)", borderRadius: 2, overflow: "hidden" }}>
+              <div style={{ width: `${progressPct}%`, height: "100%", background: progressColor, borderRadius: 2, transition: "width 0.3s ease" }} />
+            </div>
+          )}
+          {progressPct === 100 && (
+            <div style={{ fontSize: "var(--text-xs)", color: "var(--color-success)", fontWeight: 600 }}>
+              ✓ Done
+            </div>
+          )}
+        </div>
       }
       data-testid="job-card"
     />

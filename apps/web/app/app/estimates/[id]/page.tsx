@@ -6,6 +6,7 @@ import {
   canDeleteRecords,
 } from "@/lib/auth/permissions";
 import { withEstimateContext } from "@/lib/estimates/db";
+import { getPool } from "@/lib/db";
 import { estimateTransitions, PREP_LEVEL_MULTIPLIERS } from "@ai-fsm/domain";
 import type { EstimateStatus } from "@ai-fsm/domain";
 import { EstimateTransitionForm } from "./EstimateTransitionForm";
@@ -19,6 +20,8 @@ import { StatusStepper } from "@/components/ui";
 import { isEmailConfigured } from "@/lib/email/mailer";
 import { CopyPortalLinkButton } from "@/components/CopyPortalLinkButton";
 
+import { ChangeOrdersClient } from "./ChangeOrdersClient";
+
 export const dynamic = "force-dynamic";
 
 interface EstimateRow {
@@ -28,6 +31,7 @@ interface EstimateRow {
   job_id: string | null;
   property_id: string | null;
   status: EstimateStatus;
+  presentation_mode: "standard" | "multi_option";
   subtotal_cents: number;
   tax_cents: number;
   total_cents: number;
@@ -55,12 +59,51 @@ interface EstimateRow {
 interface LineItemRow {
   id: string;
   estimate_id: string;
+  option_id: string | null;
   description: string;
   quantity: number;
   unit_price_cents: number;
   total_cents: number;
   sort_order: number;
   created_at: string;
+}
+
+interface OptionRow {
+  id: string;
+  estimate_id: string;
+  label: string;
+  description: string | null;
+  sort_order: number;
+  subtotal_cents: number;
+  tax_cents: number;
+  total_cents: number;
+  is_recommended: boolean;
+  created_at: string;
+}
+
+interface ChangeOrderLineItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unit_price_cents: number;
+  total_cents: number;
+  sort_order: number;
+}
+
+interface ChangeOrder {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  subtotal_cents: number;
+  tax_cents: number;
+  total_cents: number;
+  notes: string | null;
+  approved_by_name: string | null;
+  approved_at: string | null;
+  declined_at: string | null;
+  created_at: string;
+  line_items: ChangeOrderLineItem[];
 }
 
 const STATUS_LABELS: Record<EstimateStatus, string> = {
@@ -97,22 +140,84 @@ export default async function EstimateDetailPage({
     if (estimateResult.rowCount === 0) return null;
 
     const lineItemsResult = await client.query(
-      `SELECT id, estimate_id, description, quantity, unit_price_cents, total_cents, sort_order, created_at
+      `SELECT id, estimate_id, option_id, description, quantity, unit_price_cents, total_cents, sort_order, created_at
        FROM estimate_line_items
        WHERE estimate_id = $1
        ORDER BY sort_order ASC, created_at ASC`,
       [id]
     );
 
+    const optionsResult = await client.query(
+      `SELECT id, estimate_id, label, description, sort_order, subtotal_cents, tax_cents, total_cents, is_recommended, created_at
+       FROM estimate_options
+       WHERE estimate_id = $1
+       ORDER BY sort_order ASC, created_at ASC`,
+      [id]
+    );
+
+    const allLineItems = lineItemsResult.rows as LineItemRow[];
+    const options = optionsResult.rows as OptionRow[];
+
+    const optionsWithItems = options.map((opt) => ({
+      ...opt,
+      line_items: allLineItems.filter((li) => li.option_id === opt.id),
+    }));
+
     return {
       estimate: estimateResult.rows[0] as EstimateRow,
-      lineItems: lineItemsResult.rows as LineItemRow[],
+      lineItems: allLineItems.filter((li) => !li.option_id),
+      options: optionsWithItems,
     };
   });
 
   if (!result) notFound();
 
-  const { estimate, lineItems } = result;
+  const { estimate, lineItems, options } = result;
+
+  // Fetch change orders for this estimate
+  let changeOrders: unknown[] = [];
+  try {
+    const pool = getPool();
+    const coRows = await pool.query<{
+      id: string;
+      title: string;
+      description: string | null;
+      status: string;
+      subtotal_cents: number;
+      tax_cents: number;
+      total_cents: number;
+      notes: string | null;
+      approved_by_name: string | null;
+      approved_at: string | null;
+      declined_at: string | null;
+      created_at: string;
+    }>(
+      `SELECT id, title, description, status, subtotal_cents, tax_cents, total_cents, notes,
+              u2.full_name as approved_by_name,
+              co.approved_at, co.declined_at, co.created_at
+       FROM change_orders co
+       LEFT JOIN users u2 ON u2.id = co.approved_by
+       WHERE co.estimate_id = $1 AND co.account_id = $2
+       ORDER BY co.created_at DESC`,
+      [id, session.accountId]
+    );
+    changeOrders = coRows.rows;
+
+    // Fetch line items for each change order
+    for (const co of changeOrders) {
+      const items = await pool.query(
+        `SELECT id, description, quantity, unit_price_cents, total_cents, sort_order
+         FROM change_order_line_items
+         WHERE change_order_id = $1
+         ORDER BY sort_order ASC`,
+        [(co as { id: string }).id]
+      );
+      (co as Record<string, unknown>).line_items = items.rows;
+    }
+  } catch {
+    // Change orders table may not exist yet
+  }
+
   const currentStatus = estimate.status;
   const allowedTransitions = estimateTransitions[currentStatus];
   const canTransition = canCreateEstimates(session.role);
@@ -256,6 +361,70 @@ export default async function EstimateDetailPage({
       </div>
 
       {/* Line Items (or flat rate summary) */}
+      {estimate.presentation_mode === "multi_option" && options.length > 0 ? (
+        <div>
+          <div className="card">
+            <h2>Options</h2>
+            <p className="muted">Compare options and choose the one that best fits your needs.</p>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${options.length}, 1fr)`, gap: "var(--space-4)" }}>
+            {options.map((option) => (
+              <div
+                key={option.id}
+                className="card"
+                style={{
+                  border: option.is_recommended ? "2px solid var(--accent)" : "1px solid var(--border)",
+                  position: "relative",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                {option.is_recommended && (
+                  <div style={{
+                    position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)",
+                    background: "var(--accent)", color: "#fff", padding: "2px 12px", borderRadius: 99,
+                    fontSize: "var(--text-xs)", fontWeight: 600, whiteSpace: "nowrap", zIndex: 1,
+                  }}>
+                    Recommended
+                  </div>
+                )}
+                <div style={{ marginBottom: "var(--space-3)" }}>
+                  <h2 style={{ margin: "0 0 var(--space-1)" }}>{option.label}</h2>
+                  {option.description && (
+                    <p className="muted" style={{ margin: 0, fontSize: "var(--text-sm)" }}>{option.description}</p>
+                  )}
+                </div>
+
+                <table className="line-items-table" style={{ flex: 1 }}>
+                  <tbody>
+                    {option.line_items.map((item) => (
+                      <tr key={item.id}>
+                        <td>{item.description}</td>
+                        <td>{item.quantity}</td>
+                        <td>{formatDollars(item.unit_price_cents)}</td>
+                        <td>{formatDollars(item.total_cents)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-2)", marginTop: "var(--space-3)" }}>
+                  {option.tax_cents > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                      <span>Tax</span>
+                      <span>{formatDollars(option.tax_cents)}</span>
+                    </div>
+                  )}
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: "var(--space-1)" }}>
+                    <strong>Total</strong>
+                    <strong>{formatDollars(option.total_cents)}</strong>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
       <div className="card">
         <h2>Line Items</h2>
         {lineItems.length === 0 && estimate.subtotal_cents === 0 ? (
@@ -343,6 +512,7 @@ export default async function EstimateDetailPage({
           </table>
         )}
       </div>
+      )}
 
       {/* Edit form — owner/admin only, draft only */}
       {canTransition && currentStatus === "draft" && (
@@ -414,6 +584,14 @@ export default async function EstimateDetailPage({
             initialNotes={estimate.internal_notes}
           />
         </div>
+      )}
+
+      {/* Change Orders — owner/admin only, approved estimates */}
+      {canTransition && currentStatus === "approved" && (
+        <ChangeOrdersClient
+          estimateId={estimate.id}
+          initialChangeOrders={changeOrders as ChangeOrder[]}
+        />
       )}
 
       {/* Convert to Invoice — owner/admin only, approved status only */}

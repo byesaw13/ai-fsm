@@ -66,6 +66,29 @@ type EstimateMarginRow = {
   created_at: string;
 };
 
+type RevenueByJobTypeRow = {
+  job_type: string;
+  job_count: number;
+  revenue_cents: string;
+  paid_cents: string;
+  avg_job_cents: string;
+};
+
+type TechPerformanceRow = {
+  user_id: string;
+  user_name: string;
+  visits_completed: number;
+  total_visits: number;
+  completion_rate: string;
+  avg_visits_per_tech: string;
+};
+
+type EstimateConversionRow = {
+  status: string;
+  count: number;
+  pct_of_total: string;
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -253,6 +276,74 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     [session.accountId]
   );
 
+  // === Revenue by job type (month-scoped) ===
+  const revenueByJobType = await query<RevenueByJobTypeRow>(
+    `SELECT j.job_type,
+            COUNT(DISTINCT j.id)::int as job_count,
+            COALESCE(SUM(inv.total_cents), 0)::bigint as revenue_cents,
+            COALESCE(SUM(inv.paid_cents), 0)::bigint as paid_cents,
+            CASE WHEN COUNT(DISTINCT j.id) > 0
+              THEN (COALESCE(SUM(inv.total_cents), 0) / COUNT(DISTINCT j.id))::bigint
+              ELSE 0
+            END as avg_job_cents
+     FROM jobs j
+     LEFT JOIN invoices inv ON inv.job_id = j.id AND inv.status != 'void'
+     WHERE j.account_id = $1
+       AND j.job_type IS NOT NULL
+       AND (to_char(j.created_at, 'YYYY-MM') = $2 OR to_char(inv.created_at, 'YYYY-MM') = $2)
+     GROUP BY j.job_type
+     ORDER BY revenue_cents DESC`,
+    [session.accountId, targetMonth]
+  );
+
+  // === Tech performance (month-scoped) ===
+  const techPerformance = await query<TechPerformanceRow>(
+    `SELECT u.id as user_id,
+            u.full_name as user_name,
+            COUNT(*) FILTER (WHERE v.status = 'completed')::int as visits_completed,
+            COUNT(*)::int as total_visits,
+            ROUND(
+              CASE WHEN COUNT(*) > 0
+                THEN (COUNT(*) FILTER (WHERE v.status = 'completed')::numeric / COUNT(*) * 100)
+                ELSE 0
+              END, 1
+            ) as completion_rate,
+            ROUND(
+              AVG(COUNT(*) FILTER (WHERE v.status = 'completed')) OVER (), 1
+            ) as avg_visits_per_tech
+     FROM visits v
+     JOIN users u ON u.id = v.assigned_user_id
+     WHERE v.account_id = $1
+       AND to_char(v.scheduled_start, 'YYYY-MM') = $2
+       AND u.role = 'tech'
+     GROUP BY u.id, u.full_name
+     ORDER BY visits_completed DESC`,
+    [session.accountId, targetMonth]
+  );
+
+  // === Estimate conversion funnel (all-time, but can be scoped to month) ===
+  const estimateConversion = await query<EstimateConversionRow>(
+    `SELECT status,
+            COUNT(*)::int as count,
+            ROUND(
+              COUNT(*)::numeric / NULLIF(SUM(COUNT(*)) OVER (), 0) * 100, 1
+            ) as pct_of_total
+     FROM estimates
+     WHERE account_id = $1
+       AND to_char(created_at, 'YYYY-MM') = $2
+     GROUP BY status
+     ORDER BY
+       CASE status
+         WHEN 'draft' THEN 1
+         WHEN 'sent' THEN 2
+         WHEN 'approved' THEN 3
+         WHEN 'declined' THEN 4
+         WHEN 'expired' THEN 5
+         ELSE 6
+       END`,
+    [session.accountId, targetMonth]
+  );
+
   const currentValues: Record<string, string> = {};
   if (month) currentValues.month = month;
 
@@ -261,6 +352,12 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     year: "numeric",
     month: "long",
   });
+
+  // Derived metrics
+  const totalEstimates = estimateConversion.reduce((sum, r) => sum + r.count, 0);
+  const approvedEstimates = estimateConversion.find((r) => r.status === "approved")?.count ?? 0;
+  const conversionRate = totalEstimates > 0 ? Math.round((approvedEstimates / totalEstimates) * 100) : 0;
+  const totalJobs = jobProfitRows.length;
 
   return (
     <PageContainer>
@@ -302,6 +399,16 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             value: formatCents(revenue_outstanding_cents),
             variant: revenue_outstanding_cents > 0 ? "alert" : "default",
           },
+          {
+            label: "Estimate Conversion",
+            value: `${conversionRate}%`,
+            variant: conversionRate >= 30 ? "success" : conversionRate > 0 ? "default" : "alert",
+          },
+          {
+            label: "Active Jobs",
+            value: String(totalJobs),
+            variant: "default",
+          },
         ]}
       />
 
@@ -316,6 +423,133 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         </div>
       ) : (
         <>
+          {/* === Estimate Conversion Funnel === */}
+          {estimateConversion.length > 0 && (
+            <Card>
+              <SectionHeader title="Estimate Conversion Funnel" />
+              <p style={{ padding: "0 var(--space-3) var(--space-2)", color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+                How estimates move through the pipeline for {monthLabel}. Target: 30%+ conversion rate.
+              </p>
+              <div style={{ padding: "0 var(--space-3) var(--space-3)" }}>
+                <div style={{ display: "flex", alignItems: "stretch", gap: 4, marginBottom: 12 }}>
+                  {estimateConversion.map((row) => {
+                    const colors: Record<string, string> = {
+                      draft: "var(--fg-muted)",
+                      sent: "#60a5fa",
+                      approved: "var(--status-success)",
+                      declined: "var(--status-error)",
+                      expired: "var(--status-warning)",
+                    };
+                    return (
+                      <div
+                        key={row.status}
+                        style={{
+                          flex: row.count,
+                          background: colors[row.status] ?? "var(--border)",
+                          borderRadius: 4,
+                          padding: "8px 6px",
+                          textAlign: "center",
+                          color: "#fff",
+                          fontSize: "var(--text-xs)",
+                          fontWeight: 600,
+                          minWidth: 40,
+                        }}
+                        title={`${row.status}: ${row.count} (${row.pct_of_total}%)`}
+                      >
+                        <div style={{ fontSize: "var(--text-xs)", textTransform: "capitalize" }}>{row.status}</div>
+                        <div style={{ fontSize: 18 }}>{row.count}</div>
+                        <div style={{ fontSize: 10, opacity: 0.8 }}>{row.pct_of_total}%</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                  <span>Total: {totalEstimates} estimates</span>
+                  <span style={{ color: conversionRate >= 30 ? "var(--status-success)" : conversionRate > 0 ? "var(--status-warning)" : "var(--status-error)" }}>
+                    Conversion rate: {conversionRate}%
+                  </span>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* === Revenue by Job Type === */}
+          {revenueByJobType.length > 0 && (
+            <Card style={{ marginTop: "var(--space-4)" }}>
+              <SectionHeader title="Revenue by Job Type" />
+              <p style={{ padding: "0 var(--space-3) var(--space-2)", color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+                Revenue attributed to jobs created or invoiced in {monthLabel}, grouped by type.
+              </p>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                    <th style={{ textAlign: "left", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Job Type</th>
+                    <th style={{ textAlign: "right", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Jobs</th>
+                    <th style={{ textAlign: "right", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Revenue</th>
+                    <th style={{ textAlign: "right", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Collected</th>
+                    <th style={{ textAlign: "right", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Avg/Job</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {revenueByJobType.map((row) => {
+                    const typeLabels: Record<string, string> = {
+                      painting: "Painting",
+                      maintenance: "Maintenance",
+                      repair: "Repair",
+                      custom: "Custom",
+                    };
+                    return (
+                      <tr key={row.job_type} style={{ borderBottom: "1px solid var(--border)" }}>
+                        <td style={{ padding: "var(--space-2) var(--space-3)", fontWeight: 600, textTransform: "capitalize" }}>
+                          {typeLabels[row.job_type] ?? row.job_type}
+                        </td>
+                        <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{row.job_count}</td>
+                        <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{formatCents(row.revenue_cents)}</td>
+                        <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{formatCents(row.paid_cents)}</td>
+                        <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right", color: "var(--fg-muted)" }}>{formatCents(row.avg_job_cents)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </Card>
+          )}
+
+          {/* === Tech Performance === */}
+          {techPerformance.length > 0 && (
+            <Card style={{ marginTop: "var(--space-4)" }}>
+              <SectionHeader title="Tech Performance" />
+              <p style={{ padding: "0 var(--space-3) var(--space-2)", color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+                Visit completion stats for technicians in {monthLabel}.
+              </p>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                    <th style={{ textAlign: "left", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Technician</th>
+                    <th style={{ textAlign: "right", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Completed</th>
+                    <th style={{ textAlign: "right", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Total</th>
+                    <th style={{ textAlign: "right", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Completion Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {techPerformance.map((row) => {
+                    const rate = parseFloat(row.completion_rate);
+                    const rateColor = rate >= 80 ? "var(--status-success)" : rate >= 50 ? "var(--status-warning)" : "var(--status-error)";
+                    return (
+                      <tr key={row.user_id} style={{ borderBottom: "1px solid var(--border)" }}>
+                        <td style={{ padding: "var(--space-2) var(--space-3)", fontWeight: 600 }}>{row.user_name}</td>
+                        <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{row.visits_completed}</td>
+                        <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{row.total_visits}</td>
+                        <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right", fontWeight: 700, color: rateColor }}>
+                          {row.completion_rate}%
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </Card>
+          )}
           {/* === Revenue Section === */}
           <Card style={{ marginTop: "var(--space-6)" }}>
             <SectionHeader title="Revenue" />

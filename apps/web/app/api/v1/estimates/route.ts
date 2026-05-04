@@ -139,6 +139,14 @@ const lineItemInputSchema = z.object({
   sort_order: z.number().int().default(0),
 });
 
+const estimateOptionInputSchema = z.object({
+  label: z.string().min(1),
+  description: z.string().nullable().optional(),
+  sort_order: z.number().int().default(0),
+  line_items: z.array(lineItemInputSchema).default([]),
+  is_recommended: z.boolean().default(false),
+});
+
 const createEstimateSchema = z.object({
   client_id: z.string().uuid(),
   job_id: z.string().uuid().nullable().optional(),
@@ -150,6 +158,9 @@ const createEstimateSchema = z.object({
   line_items: z.array(lineItemInputSchema).default([]),
   // Flat-rate mode: set this instead of line_items to store a single price with no breakdown
   flat_rate_cents: z.number().int().nonnegative().optional(),
+  // Multi-option mode (Good/Better/Best)
+  presentation_mode: z.enum(["standard", "multi_option"]).default("standard"),
+  options: z.array(estimateOptionInputSchema).optional(),
   // Painting engine fields
   sq_ft: z.number().positive().optional(),
   prep_level: z.number().int().min(1).max(10).optional(),
@@ -201,6 +212,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     tax_rate,
     line_items,
     flat_rate_cents,
+    presentation_mode,
+    options,
     sq_ft,
     prep_level,
     includes_trim,
@@ -210,6 +223,20 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
   } = parseResult.data;
 
   const is_painting = sq_ft !== undefined && prep_level !== undefined && labor_hours_estimate !== undefined;
+  const is_multi_option = presentation_mode === "multi_option" && options && options.length > 0;
+
+  if (is_multi_option && is_painting) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Painting estimates cannot use multi-option mode",
+          traceId: session.traceId,
+        },
+      },
+      { status: 400 }
+    );
+  }
 
   let subtotal_cents: number;
   let computed_line_items = line_items;
@@ -226,6 +253,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     });
     subtotal_cents = result.total_cents;
     internal_labor_cost_cents = result.internal_labor_cost_cents;
+  } else if (is_multi_option) {
+    subtotal_cents = 0;
   } else {
     subtotal_cents =
       flat_rate_cents !== undefined
@@ -252,19 +281,20 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
       const result = await client.query<{ id: string }>(
         `INSERT INTO estimates
-           (account_id, client_id, job_id, property_id, status,
+           (account_id, client_id, job_id, property_id, status, presentation_mode,
             subtotal_cents, tax_cents, total_cents, deposit_cents, balance_cents,
             notes, internal_notes, expires_at, created_by,
             sq_ft, prep_level, includes_trim, includes_ceiling,
             internal_labor_cost_cents, internal_material_cost_cents)
-          VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, $9, $10, $11, $12, $13,
-                  $14, $15, $16, $17, $18, $19)
+          VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+                  $15, $16, $17, $18, $19, $20)
           RETURNING id`,
         [
           session.accountId,
           client_id,
           job_id ?? null,
           property_id ?? null,
+          is_multi_option ? "multi_option" : "standard",
           subtotal_cents,
           tax_cents,
           total_cents,
@@ -284,23 +314,53 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       );
       const estimateId = result.rows[0].id;
 
-      // Insert line items (skipped in flat-rate mode)
-      for (let i = 0; i < itemsToInsert.length; i++) {
-        const item = itemsToInsert[i];
-        const itemTotal = lineItemTotal(item);
-        await client.query(
-          `INSERT INTO estimate_line_items
-             (estimate_id, description, quantity, unit_price_cents, total_cents, sort_order)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [
-            estimateId,
-            item.description,
-            item.quantity,
-            item.unit_price_cents,
-            itemTotal,
-            item.sort_order ?? i,
-          ]
-        );
+      if (is_multi_option && options) {
+        // Create options with their line items
+        for (let oi = 0; oi < options.length; oi++) {
+          const option = options[oi];
+          const optionSubtotal = calcTotals(option.line_items).subtotal_cents;
+          const optionTax = Math.round((optionSubtotal * tax_rate) / 100);
+          const optionTotal = optionSubtotal + optionTax;
+
+          const optionResult = await client.query<{ id: string }>(
+            `INSERT INTO estimate_options
+               (estimate_id, label, description, sort_order, subtotal_cents, tax_cents, total_cents, is_recommended)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             RETURNING id`,
+            [estimateId, option.label, option.description ?? null, option.sort_order ?? oi, optionSubtotal, optionTax, optionTotal, option.is_recommended]
+          );
+          const optionId = optionResult.rows[0].id;
+
+          for (let li = 0; li < option.line_items.length; li++) {
+            const item = option.line_items[li];
+            const itemTotal = lineItemTotal(item);
+            await client.query(
+              `INSERT INTO estimate_line_items
+                 (estimate_id, option_id, description, quantity, unit_price_cents, total_cents, sort_order)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+              [estimateId, optionId, item.description, item.quantity, item.unit_price_cents, itemTotal, item.sort_order ?? li]
+            );
+          }
+        }
+      } else {
+        // Insert line items (skipped in flat-rate mode)
+        for (let i = 0; i < itemsToInsert.length; i++) {
+          const item = itemsToInsert[i];
+          const itemTotal = lineItemTotal(item);
+          await client.query(
+            `INSERT INTO estimate_line_items
+               (estimate_id, description, quantity, unit_price_cents, total_cents, sort_order)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [
+              estimateId,
+              item.description,
+              item.quantity,
+              item.unit_price_cents,
+              itemTotal,
+              item.sort_order ?? i,
+            ]
+          );
+        }
       }
 
       // Audit log
@@ -311,7 +371,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         action: "insert",
         actor_id: session.userId,
         trace_id: session.traceId,
-        new_value: { client_id, status: "draft", total_cents },
+        new_value: { client_id, status: "draft", total_cents, presentation_mode },
       });
 
       return estimateId;

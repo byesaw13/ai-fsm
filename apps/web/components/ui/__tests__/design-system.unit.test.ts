@@ -133,12 +133,18 @@ describe("getButtonClass", () => {
 // AppShell — getNavItems, isNavActive
 // ---------------------------------------------------------------------------
 
-import { getNavItems, isNavActive } from "../../AppShell";
+import { getNavSections, getBottomNavItems, isNavActive } from "../../AppShell";
 
-describe("getNavItems (role filtering)", () => {
-  it("returns all 13 items for admin role", () => {
-    const items = getNavItems("admin");
-    expect(items).toHaveLength(13);
+function flattenSections(sections: ReturnType<typeof getNavSections>) {
+  return sections.flatMap((s) => s.items);
+}
+
+describe("getNavSections (role filtering)", () => {
+  it("returns 14 items across 3 sections for admin role", () => {
+    const sections = getNavSections("admin");
+    const items = flattenSections(sections);
+    expect(sections).toHaveLength(3); // Operations, Business, System
+    expect(items).toHaveLength(14);
     expect(items.map((i) => i.href)).toContain("/app/clients");
     expect(items.map((i) => i.href)).toContain("/app/properties");
     expect(items.map((i) => i.href)).toContain("/app/estimates");
@@ -151,14 +157,16 @@ describe("getNavItems (role filtering)", () => {
     expect(items.map((i) => i.href)).toContain("/app/price-book");
   });
 
-  it("returns all 13 items for owner role", () => {
-    const items = getNavItems("owner");
-    expect(items).toHaveLength(13);
+  it("returns 14 items for owner role", () => {
+    const sections = getNavSections("owner");
+    const items = flattenSections(sections);
+    expect(items).toHaveLength(14);
   });
 
-  it("returns only 5 items for tech role (no admin-only routes)", () => {
-    const items = getNavItems("tech");
-    expect(items).toHaveLength(5);
+  it("returns only 6 items for tech role", () => {
+    const sections = getNavSections("tech");
+    const items = flattenSections(sections);
+    expect(items).toHaveLength(6);
     const hrefs = items.map((i) => i.href);
     expect(hrefs).toContain("/app");
     expect(hrefs).toContain("/app/jobs");
@@ -170,11 +178,24 @@ describe("getNavItems (role filtering)", () => {
     expect(hrefs).not.toContain("/app/automations");
   });
 
-  it("includes dashboard as first item for all roles", () => {
+  it("includes My Day as first item for all roles", () => {
     for (const role of ["admin", "owner", "tech"]) {
-      const items = getNavItems(role);
-      expect(items[0].href).toBe("/app");
+      const sections = getNavSections(role);
+      const items = flattenSections(sections);
+      expect(items[0].href).toBe("/app/my-day");
     }
+  });
+});
+
+describe("getBottomNavItems (mobile)", () => {
+  it("returns 5 items for admin role", () => {
+    const items = getBottomNavItems("admin");
+    expect(items).toHaveLength(5);
+  });
+
+  it("returns 4 items for tech role", () => {
+    const items = getBottomNavItems("tech");
+    expect(items).toHaveLength(4);
   });
 });
 

@@ -25,6 +25,7 @@ export const GET = withAuth(async (request, session) => {
                 e.notes, e.internal_notes, e.sent_at, e.expires_at,
                 e.client_id, e.job_id, e.property_id,
                 e.created_by, e.created_at, e.updated_at,
+                e.presentation_mode,
                 c.name AS client_name
          FROM estimates e
          LEFT JOIN clients c ON c.id = e.client_id
@@ -35,17 +36,35 @@ export const GET = withAuth(async (request, session) => {
       if (estimateResult.rowCount === 0) return null;
 
       const lineItemsResult = await client.query(
-        `SELECT id, description, quantity, unit_price_cents, total_cents, sort_order, created_at
+        `SELECT id, estimate_id, option_id, description, quantity, unit_price_cents, total_cents, sort_order, created_at
          FROM estimate_line_items
          WHERE estimate_id = $1
          ORDER BY sort_order ASC, created_at ASC`,
         [id]
       );
 
-      return {
+      const optionsResult = await client.query(
+        `SELECT id, estimate_id, label, description, sort_order, subtotal_cents, tax_cents, total_cents, is_recommended, created_at
+         FROM estimate_options
+         WHERE estimate_id = $1
+         ORDER BY sort_order ASC, created_at ASC`,
+        [id]
+      );
+
+      const estimate = {
         ...estimateResult.rows[0],
-        line_items: lineItemsResult.rows,
+        line_items: lineItemsResult.rows.filter((r: { option_id: string | null }) => !r.option_id),
       };
+
+      // Attach line items to their options
+      if (optionsResult.rows.length > 0) {
+        estimate.options = optionsResult.rows.map((opt: { id: string }) => ({
+          ...opt,
+          line_items: lineItemsResult.rows.filter((r: { option_id: string | null }) => r.option_id === opt.id),
+        }));
+      }
+
+      return estimate;
     });
 
     if (!data) {
@@ -86,6 +105,14 @@ const lineItemInputSchema = z.object({
   sort_order: z.number().int().default(0),
 });
 
+const estimateOptionInputSchema = z.object({
+  label: z.string().min(1),
+  description: z.string().nullable().optional(),
+  sort_order: z.number().int().default(0),
+  line_items: z.array(lineItemInputSchema).default([]),
+  is_recommended: z.boolean().default(false),
+});
+
 const patchEstimateSchema = z.object({
   client_id: z.string().uuid().optional(),
   job_id: z.string().uuid().nullable().optional(),
@@ -97,6 +124,9 @@ const patchEstimateSchema = z.object({
   line_items: z.array(lineItemInputSchema).optional(),
   // Flat-rate mode: set this instead of line_items
   flat_rate_cents: z.number().int().nonnegative().optional(),
+  // Multi-option mode
+  presentation_mode: z.enum(["standard", "multi_option"]).optional(),
+  options: z.array(estimateOptionInputSchema).optional(),
   // Painting engine fields
   sq_ft: z.number().positive().optional(),
   prep_level: z.number().int().min(1).max(10).optional(),
@@ -186,6 +216,8 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
           "includes_ceiling",
           "material_cost_cents",
           "labor_hours_estimate",
+          "presentation_mode",
+          "options",
         ] as const;
         for (const key of disallowedKeys) {
           if (patch[key] !== undefined) {
@@ -264,6 +296,10 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
       if (patch.includes_ceiling !== undefined) {
         setClauses.push(`includes_ceiling = $${idx++}`);
         params.push(patch.includes_ceiling);
+      }
+      if (patch.presentation_mode !== undefined) {
+        setClauses.push(`presentation_mode = $${idx++}`);
+        params.push(patch.presentation_mode);
       }
 
       // Replace totals + line items if pricing fields are provided
@@ -345,6 +381,72 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
               item.sort_order ?? i,
             ]
           );
+        }
+      }
+
+      // Handle multi-option updates
+      if (patch.options !== undefined) {
+        const taxRate = patch.tax_rate ?? 0;
+        // Delete existing options and their line items (cascade)
+        await client.query(
+          `DELETE FROM estimate_options WHERE estimate_id = $1`,
+          [id]
+        );
+
+        // Also delete any orphaned line items (those without an option_id)
+        if (patch.presentation_mode === "standard") {
+          await client.query(
+            `DELETE FROM estimate_line_items WHERE estimate_id = $1 AND option_id IS NOT NULL`,
+            [id]
+          );
+        }
+
+        // Recreate options
+        for (let oi = 0; oi < patch.options.length; oi++) {
+          const option = patch.options[oi];
+          const optionSubtotal = calcTotals(option.line_items).subtotal_cents;
+          const optionTax = Math.round((optionSubtotal * taxRate) / 100);
+          const optionTotal = optionSubtotal + optionTax;
+
+          const optionResult = await client.query<{ id: string }>(
+            `INSERT INTO estimate_options
+               (estimate_id, label, description, sort_order, subtotal_cents, tax_cents, total_cents, is_recommended)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             RETURNING id`,
+            [id, option.label, option.description ?? null, option.sort_order ?? oi, optionSubtotal, optionTax, optionTotal, option.is_recommended]
+          );
+          const optionId = optionResult.rows[0].id;
+
+          for (let li = 0; li < option.line_items.length; li++) {
+            const item = option.line_items[li];
+            await client.query(
+              `INSERT INTO estimate_line_items
+                 (estimate_id, option_id, description, quantity, unit_price_cents, total_cents, sort_order)
+               VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+              [id, optionId, item.description, item.quantity, item.unit_price_cents, lineItemTotal(item), item.sort_order ?? li]
+            );
+          }
+        }
+
+        // Recalculate estimate totals from options
+        if (patch.options.length > 0) {
+          const maxOptionTotal = Math.max(...patch.options.map((o) => {
+            const sub = calcTotals(o.line_items).subtotal_cents;
+            const tax = Math.round((sub * taxRate) / 100);
+            return sub + tax;
+          }));
+          const deposit_cents = Math.round(maxOptionTotal * DEPOSIT_RATE);
+          const balance_cents = maxOptionTotal - deposit_cents;
+          setClauses.push(`subtotal_cents = $${idx++}`);
+          params.push(calcTotals(patch.options[0].line_items).subtotal_cents);
+          setClauses.push(`tax_cents = $${idx++}`);
+          params.push(Math.round((calcTotals(patch.options[0].line_items).subtotal_cents * taxRate) / 100));
+          setClauses.push(`total_cents = $${idx++}`);
+          params.push(maxOptionTotal);
+          setClauses.push(`deposit_cents = $${idx++}`);
+          params.push(deposit_cents);
+          setClauses.push(`balance_cents = $${idx++}`);
+          params.push(balance_cents);
         }
       }
 

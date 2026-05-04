@@ -95,6 +95,7 @@ function formatCurrency(cents: number): string {
 export default async function HomePage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.role === "tech") redirect("/app/my-day");
 
   const isAdmin = canViewAllJobs(session.role);
   const isAdminOrOwner = canManageClients(session.role);
@@ -188,7 +189,6 @@ export default async function HomePage() {
           [session.accountId, session.userId, now.toISOString()]
         ),
 
-    // Jobs that are 'completed' but have no invoice yet — ready to bill
     isAdmin
       ? query<ReadyToInvoiceRow>(
           `SELECT j.id, j.title, j.updated_at, c.name AS client_name
@@ -202,7 +202,6 @@ export default async function HomePage() {
         )
       : Promise.resolve([] as ReadyToInvoiceRow[]),
 
-    // Open estimates (draft + sent) + count expiring within 7 days
     isAdmin
       ? query<OpenEstimateRow>(
           `SELECT
@@ -218,7 +217,6 @@ export default async function HomePage() {
         )
       : Promise.resolve([{ count: "0", expiring_soon: "0" }] as OpenEstimateRow[]),
 
-    // Needs Attention: overdue invoices
     isAdmin
       ? query<OverdueInvoiceRow>(
           `SELECT i.id, i.invoice_number, c.name AS client_name,
@@ -235,7 +233,6 @@ export default async function HomePage() {
         )
       : Promise.resolve([] as OverdueInvoiceRow[]),
 
-    // Needs Attention: estimates expiring within 7 days
     isAdmin
       ? query<ExpiringEstimateRow>(
           `SELECT e.id, c.name AS client_name, e.expires_at::text, e.total_cents::text
@@ -319,7 +316,7 @@ export default async function HomePage() {
 
   return (
     <PageContainer>
-      {/* Greeting */}
+      {/* Greeting + role */}
       <div style={{ marginBottom: "var(--space-6)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap", marginBottom: "var(--space-1)" }}>
           <h1 style={{ margin: 0, fontSize: "var(--text-2xl)", fontWeight: "var(--font-bold)", color: "var(--fg)" }}>
@@ -340,13 +337,12 @@ export default async function HomePage() {
           <SectionHeader title="Needs Attention" count={attentionItems.length} as="h2" />
           <div style={{ marginTop: "var(--space-3)", display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
             {attentionItems.map((item) => {
-              const borderColor = item.urgency === "high" ? "#dc2626" : item.urgency === "medium" ? "#d97706" : "#2563eb";
-              const dotColor = borderColor;
+              const borderColor = item.urgency === "high" ? "var(--color-red-500)" : item.urgency === "medium" ? "var(--color-amber-500)" : "var(--color-blue-500)";
               return (
                 <Link key={`${item.kind}-${item.id}`} href={item.href as Route} style={{ textDecoration: "none" }}>
                   <Card hover padding="sm" style={{ borderLeft: `3px solid ${borderColor}` }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: borderColor, flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: "var(--font-medium)", fontSize: "var(--text-sm)", color: "var(--fg)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {item.label}
@@ -419,7 +415,7 @@ export default async function HomePage() {
       {/* Metrics */}
       <MetricGrid metrics={metrics} />
 
-      {/* Quick Actions */}
+      {/* Quick Actions — refined with better visual hierarchy */}
       {isAdminOrOwner && (
         <div style={{ marginTop: "var(--space-6)" }}>
           <SectionHeader title="Quick Actions" as="h2" />
@@ -429,10 +425,10 @@ export default async function HomePage() {
             gap: "var(--space-3)",
             marginTop: "var(--space-3)",
           }}>
-            <QuickActionCard href="/app/clients/new" icon="👤" label="New Client" />
-            <QuickActionCard href="/app/jobs/new" icon="📋" label="New Job" />
-            <QuickActionCard href="/app/visits" icon="📅" label="Schedule" />
-            <QuickActionCard href="/app/invoices" icon="💰" label="Invoices" />
+            <QuickActionCard href="/app/clients/new" icon="user-plus" label="New Client" />
+            <QuickActionCard href="/app/jobs/new" icon="briefcase" label="New Job" />
+            <QuickActionCard href="/app/visits" icon="calendar" label="Schedule" />
+            <QuickActionCard href="/app/invoices" icon="dollar" label="Invoices" />
           </div>
         </div>
       )}
@@ -591,7 +587,7 @@ function StepDot({ n, active }: { n: number; active: boolean }) {
       height: 28,
       borderRadius: "50%",
       background: active ? "var(--accent)" : "var(--border)",
-      color: active ? "#fff" : "var(--fg-muted)",
+      color: active ? "var(--fg-inverse)" : "var(--fg-muted)",
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
@@ -604,11 +600,41 @@ function StepDot({ n, active }: { n: number; active: boolean }) {
   );
 }
 
+const ICON_PATHS: Record<string, React.ReactNode> = {
+  "user-plus": (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="8" cy="7" r="3" />
+      <path d="M2 18c0-3.3 2.7-6 6-6" />
+      <path d="M15 11h6M18 8v6" />
+    </svg>
+  ),
+  "briefcase": (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="16" height="10" rx="2" />
+      <path d="M6 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  ),
+  "calendar": (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="4" width="16" height="14" rx="2" />
+      <path d="M14 2v4M6 2v4M2 9h16" />
+    </svg>
+  ),
+  "dollar": (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="10" cy="10" r="8" />
+      <path d="M10 4v12M13 7.5c0-1.4-1.3-2.5-3-2.5s-3 1.1-3 2.5 1.3 2.5 3 2.5 3 1.1 3 2.5-1.3 2.5-3 2.5" />
+    </svg>
+  ),
+};
+
 function QuickActionCard({ href, icon, label }: { href: Route; icon: string; label: string }) {
   return (
     <Link href={href} style={{ textDecoration: "none" }}>
       <Card hover padding="default" style={{ textAlign: "center", cursor: "pointer" }}>
-        <div style={{ fontSize: "1.5rem", marginBottom: "var(--space-2)", lineHeight: 1 }}>{icon}</div>
+        <div style={{ color: "var(--accent)", marginBottom: "var(--space-2)", lineHeight: 1 }}>
+          {ICON_PATHS[icon]}
+        </div>
         <div style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-medium)", color: "var(--fg)" }}>{label}</div>
       </Card>
     </Link>

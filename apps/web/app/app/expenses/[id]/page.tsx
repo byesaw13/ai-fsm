@@ -13,6 +13,8 @@ import {
   PageContainer,
   PageHeader,
   LinkButton,
+  Card,
+  SectionHeader,
 } from "@/components/ui";
 import { ExpenseEditForm } from "./ExpenseEditForm";
 import { DocumentPanel } from "./DocumentPanel";
@@ -93,90 +95,74 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
       <div className="p7-detail-layout">
         {/* Primary — expense details */}
         <div className="p7-detail-primary">
-          <div className="p7-card">
-            <div className="p7-detail-list">
+          <Card>
+            <SectionHeader title="Expense Details" />
+            <dl className="p7-detail-list">
               <div className="p7-detail-row">
-                <span className="p7-detail-row-label">Amount</span>
-                <span
-                  className="p7-detail-row-value"
-                  style={{ fontSize: "var(--text-lg)", fontWeight: "var(--font-semibold)" }}
-                >
+                <dt>Amount</dt>
+                <dd style={{ fontSize: "var(--text-lg)", fontWeight: "var(--font-semibold)" }}>
                   {formatCentsToDollars(expense.amount_cents)}
-                </span>
+                </dd>
               </div>
               <div className="p7-detail-row">
-                <span className="p7-detail-row-label">Category</span>
-                <span className="p7-detail-row-value">{categoryLabel(cat)}</span>
+                <dt>Category</dt>
+                <dd>{categoryLabel(cat)}</dd>
               </div>
               <div className="p7-detail-row">
-                <span className="p7-detail-row-label">Date</span>
-                <span className="p7-detail-row-value">{formatExpenseDate(dateStr)}</span>
+                <dt>Date</dt>
+                <dd>{formatExpenseDate(dateStr)}</dd>
               </div>
               {expense.job_title && (
                 <div className="p7-detail-row">
-                  <span className="p7-detail-row-label">Job</span>
-                  <span className="p7-detail-row-value">
+                  <dt>Job</dt>
+                  <dd>
                     <a
                       href={`/app/jobs/${expense.job_id}`}
-                      style={{ color: "var(--color-primary)", textDecoration: "none" }}
+                      style={{ color: "var(--accent)", textDecoration: "none" }}
                     >
                       {expense.job_title}
                     </a>
-                  </span>
+                  </dd>
                 </div>
               )}
               {expense.client_name && (
                 <div className="p7-detail-row">
-                  <span className="p7-detail-row-label">Client</span>
-                  <span className="p7-detail-row-value">
+                  <dt>Client</dt>
+                  <dd>
                     <a
                       href={`/app/clients/${expense.client_id}`}
-                      style={{ color: "var(--color-primary)", textDecoration: "none" }}
+                      style={{ color: "var(--accent)", textDecoration: "none" }}
                     >
                       {expense.client_name}
                     </a>
-                  </span>
+                  </dd>
                 </div>
               )}
               {expense.notes && (
-                <div className="p7-detail-row" style={{ alignItems: "flex-start" }}>
-                  <span className="p7-detail-row-label">Notes</span>
-                  <span
-                    className="p7-detail-row-value"
-                    style={{ whiteSpace: "pre-wrap", textAlign: "left" }}
-                  >
-                    {expense.notes}
-                  </span>
+                <div className="p7-detail-row">
+                  <dt>Notes</dt>
+                  <dd style={{ whiteSpace: "pre-wrap" }}>{expense.notes}</dd>
                 </div>
               )}
               <div className="p7-detail-row">
-                <span className="p7-detail-row-label">Recorded</span>
-                <span className="p7-detail-row-value">
+                <dt>Recorded</dt>
+                <dd>
                   {new Date(expense.created_at).toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
                     year: "numeric",
                   })}
-                </span>
+                </dd>
               </div>
-            </div>
-          </div>
+            </dl>
+          </Card>
         </div>
 
         {/* Sidebar — edit form + document panel */}
         <div className="p7-detail-sidebar">
           {canManage && (
-            <div className="p7-card">
-              <div
-                style={{
-                  fontWeight: "var(--font-semibold)",
-                  fontSize: "var(--text-sm)",
-                  marginBottom: "var(--space-3)",
-                  color: "var(--fg-muted)",
-                }}
-              >
-                Edit Expense
-              </div>
+            <Card>
+              <SectionHeader title="Edit Expense" />
               <ExpenseEditForm
                 expense={{
                   id: expense.id,
@@ -195,7 +181,7 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
                   label: EXPENSE_CATEGORY_LABELS[c],
                 }))}
               />
-            </div>
+            </Card>
           )}
 
           {/* Document panel — visible to all roles */}

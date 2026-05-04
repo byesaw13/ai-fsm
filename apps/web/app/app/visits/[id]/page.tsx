@@ -244,6 +244,7 @@ export default async function VisitDetailPage({
                   visitId={visit.id}
                   initialParts={visitParts}
                   canUpdate={canNotes}
+                  jobType={visit.job_type}
                 />
               </Card>
 

@@ -1,8 +1,17 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import type { InvoiceStatus } from "@ai-fsm/domain";
+import {
+  PageContainer,
+  PageHeader,
+  ItemCard,
+  StatusSection,
+  EmptyState,
+  StatusBadge,
+  MetricGrid,
+} from "@/components/ui";
+import type { StatusVariant, MetricCardData } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -106,95 +115,106 @@ export default async function InvoicesPage() {
 
   const totalPaid = grouped.paid.reduce((sum, i) => sum + i.paid_cents, 0);
 
-  return (
-    <div className="page-container">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Invoices</h1>
-          <p className="page-subtitle">{invoices.length} total</p>
-        </div>
-      </div>
+  const metrics: MetricCardData[] = [
+    {
+      label: "Outstanding",
+      value: formatDollars(totalOutstanding),
+      sub: `${grouped.sent.length + grouped.partial.length + grouped.overdue.length} unpaid`,
+    },
+    {
+      label: "Overdue",
+      value: formatDollars(totalOverdue),
+      sub: `${grouped.overdue.length} invoices`,
+      variant: totalOverdue > 0 ? "alert" : "default",
+    },
+    {
+      label: "Collected",
+      value: formatDollars(totalPaid),
+      sub: `${grouped.paid.length} paid`,
+      variant: totalPaid > 0 ? "success" : "default",
+    },
+  ];
 
-      {invoices.length > 0 && (
-        <div className="grid metrics-grid">
-          <div className={`card metric-card ${totalOverdue > 0 ? "metric-alert" : ""}`}>
-            <p className="muted">Outstanding</p>
-            <p className="metric-value">{formatDollars(totalOutstanding)}</p>
-            <p className="metric-sub">
-              {grouped.sent.length + grouped.partial.length + grouped.overdue.length} unpaid
-            </p>
-          </div>
-          <div className="card metric-card">
-            <p className="muted">Overdue</p>
-            <p className="metric-value">{formatDollars(totalOverdue)}</p>
-            <p className="metric-sub">{grouped.overdue.length} invoices</p>
-          </div>
-          <div className="card metric-card metric-success">
-            <p className="muted">Collected</p>
-            <p className="metric-value">{formatDollars(totalPaid)}</p>
-            <p className="metric-sub">{grouped.paid.length} paid</p>
-          </div>
-        </div>
-      )}
+  return (
+    <PageContainer>
+      <PageHeader
+        title="Invoices"
+        subtitle={`${invoices.length} total`}
+      />
+
+      {invoices.length > 0 && <MetricGrid metrics={metrics} />}
 
       {invoices.length === 0 ? (
-        <div className="empty-state" data-testid="invoices-empty">
-          <div className="empty-state-icon">📄</div>
-          <p className="empty-state-title">No invoices yet</p>
-          <p className="empty-state-desc">Convert an approved estimate to create an invoice.</p>
-        </div>
+        <EmptyState
+          title="No invoices yet"
+          description="Convert an approved estimate to create an invoice."
+          data-testid="invoices-empty"
+        />
       ) : (
-        <div className="status-sections">
+        <div>
           {activeStatuses.map((status) => (
-            <section key={status} className="status-section">
-              <h2 className="status-heading" data-status={status}>
-                {STATUS_LABELS[status]}
-                <span className="count-badge">{grouped[status].length}</span>
-              </h2>
-              <div className="job-list">
-                {grouped[status].map((inv) => {
-                  const amountDue = inv.total_cents - inv.paid_cents;
-                  const daysUntilDue = getDaysUntilDue(inv.due_date);
-                  const aging = formatAging(daysUntilDue);
-                  const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
-                  const isDueSoon = daysUntilDue !== null && daysUntilDue >= 0 && daysUntilDue <= 7;
+            <StatusSection
+              key={status}
+              title={STATUS_LABELS[status]}
+              count={grouped[status].length}
+            >
+              {grouped[status].map((inv) => {
+                const amountDue = inv.total_cents - inv.paid_cents;
+                const daysUntilDue = getDaysUntilDue(inv.due_date);
+                const aging = formatAging(daysUntilDue);
+                const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
+                const isDueSoon = daysUntilDue !== null && daysUntilDue >= 0 && daysUntilDue <= 7;
 
-                  return (
-                    <Link
-                      key={inv.id}
-                      href={{ pathname: `/app/invoices/${inv.id}` }}
-                      className={`job-card ${isOverdue && inv.status !== 'overdue' ? 'overdue-card' : ''}`}
-                      data-testid="invoice-card"
-                      data-status={inv.status}
-                    >
-                      <div className="job-card-header">
-                        <span className="job-title">
-                          {inv.invoice_number}
-                          {inv.client_name && ` — ${inv.client_name}`}
-                        </span>
-                        <span className={`status-pill status-${inv.status}`}>
+                return (
+                  <ItemCard
+                    key={inv.id}
+                    href={`/app/invoices/${inv.id}`}
+                    title={inv.invoice_number}
+                    titleBadge={
+                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                        {inv.client_name && (
+                          <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+                            — {inv.client_name}
+                          </span>
+                        )}
+                        <StatusBadge variant={inv.status as StatusVariant}>
                           {STATUS_LABELS[inv.status]}
-                        </span>
+                        </StatusBadge>
                       </div>
-                      <div className="invoice-amounts">
-                        <span className="invoice-total">{formatDollars(inv.total_cents)}</span>
+                    }
+                    meta={
+                      inv.due_date && (
+                        <span
+                          style={{
+                            color: isOverdue ? "var(--color-danger)" : isDueSoon ? "var(--color-warning)" : "var(--fg-muted)",
+                            fontSize: "var(--text-sm)",
+                          }}
+                        >
+                          {aging || `Due: ${new Date(inv.due_date).toLocaleDateString()}`}
+                        </span>
+                      )
+                    }
+                    overdue={isOverdue && inv.status !== "overdue"}
+                    actions={
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontWeight: "var(--font-semibold)", fontSize: "var(--text-sm)" }}>
+                          {formatDollars(inv.total_cents)}
+                        </div>
                         {amountDue > 0 && amountDue !== inv.total_cents && (
-                          <span className="invoice-due">{formatDollars(amountDue)} due</span>
+                          <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                            {formatDollars(amountDue)} due
+                          </div>
                         )}
                       </div>
-                      {inv.due_date && (
-                        <p className={`job-date ${isOverdue ? 'text-danger' : isDueSoon ? 'text-warning' : ''}`}>
-                          {aging || `Due: ${new Date(inv.due_date).toLocaleDateString()}`}
-                        </p>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
-            </section>
+                    }
+                    data-testid="invoice-card"
+                  />
+                );
+              })}
+            </StatusSection>
           ))}
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

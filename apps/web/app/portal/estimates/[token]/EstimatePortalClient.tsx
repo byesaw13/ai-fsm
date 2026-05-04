@@ -4,14 +4,30 @@ import { useState, useRef, useEffect } from "react";
 
 interface LineItem {
   id: string;
+  estimate_id: string;
+  option_id: string | null;
   description: string;
   quantity: string;
   unit_price_cents: number;
   total_cents: number;
 }
 
+interface EstimateOption {
+  id: string;
+  estimate_id: string;
+  label: string;
+  description: string | null;
+  sort_order: number;
+  subtotal_cents: number;
+  tax_cents: number;
+  total_cents: number;
+  is_recommended: boolean;
+  line_items: LineItem[];
+}
+
 interface Estimate {
   status: string;
+  presentation_mode: "standard" | "multi_option";
   subtotal_cents: number;
   tax_cents: number;
   total_cents: number;
@@ -32,6 +48,7 @@ interface Props {
   token: string;
   estimate: Estimate;
   lineItems: LineItem[];
+  options?: EstimateOption[];
 }
 
 function cents(n: number) {
@@ -135,7 +152,7 @@ function SignaturePad({ onSave }: { onSave: (svg: string) => void }) {
   );
 }
 
-export function EstimatePortalClient({ token, estimate, lineItems }: Props) {
+export function EstimatePortalClient({ token, estimate, lineItems, options = [] }: Props) {
   const [status, setStatus] = useState(estimate.status);
   const [approvedName, setApprovedName] = useState(estimate.client_approved_name ?? "");
   const [name, setName] = useState("");
@@ -206,7 +223,63 @@ export function EstimatePortalClient({ token, estimate, lineItems }: Props) {
           </div>
         ) : null}
 
-        {/* Line items */}
+        {/* Options (multi_option mode) */}
+        {estimate.presentation_mode === "multi_option" && options.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${options.length}, 1fr)`, gap: 16, marginBottom: 24 }}>
+            {options.map((option) => (
+              <div
+                key={option.id}
+                style={{
+                  background: "#fff",
+                  border: option.is_recommended ? "2px solid #2563eb" : "1px solid #e5e7eb",
+                  borderRadius: 8,
+                  overflow: "hidden",
+                  position: "relative",
+                }}
+              >
+                {option.is_recommended && (
+                  <div style={{
+                    background: "#2563eb", color: "#fff", textAlign: "center",
+                    padding: "4px 0", fontSize: 12, fontWeight: 600,
+                  }}>
+                    Recommended
+                  </div>
+                )}
+                <div style={{ padding: "16px 16px 8px" }}>
+                  <h2 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 4px" }}>{option.label}</h2>
+                  {option.description && (
+                    <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 12px" }}>{option.description}</p>
+                  )}
+                </div>
+
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <tbody>
+                    {option.line_items.map((item) => (
+                      <tr key={item.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                        <td style={{ padding: "8px 16px" }}>{item.description}</td>
+                        <td style={{ padding: "8px 16px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>{cents(item.total_cents)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div style={{ padding: "12px 16px", borderTop: "1px solid #e5e7eb" }}>
+                  {option.tax_cents > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6b7280", marginBottom: 2 }}>
+                      <span>Tax</span><span>{cents(option.tax_cents)}</span>
+                    </div>
+                  )}
+                  <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 18 }}>
+                    <span>Total</span><span>{cents(option.total_cents)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Line items (standard mode) */}
+        {estimate.presentation_mode !== "multi_option" && (
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden", marginBottom: 24 }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
@@ -247,6 +320,7 @@ export function EstimatePortalClient({ token, estimate, lineItems }: Props) {
             </div>
           </div>
         </div>
+        )}
 
         {/* Notes */}
         {estimate.notes && (
