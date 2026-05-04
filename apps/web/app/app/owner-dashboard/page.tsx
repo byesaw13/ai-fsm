@@ -53,8 +53,13 @@ export default async function OwnerDashboardPage() {
     query<CountRow>(
       `SELECT COUNT(*)::text AS count FROM jobs j
        WHERE j.account_id = $1 AND j.status IN ('quoted', 'draft')
-         AND j.source_estimate_id IS NOT NULL
-         AND j.source_estimate_id IN (SELECT id FROM estimates WHERE status = 'approved')
+         AND EXISTS (
+           SELECT 1
+           FROM estimates e
+           WHERE e.job_id = j.id
+             AND e.account_id = j.account_id
+             AND e.status = 'approved'
+         )
          AND NOT EXISTS (
            SELECT 1 FROM visits v WHERE v.job_id = j.id AND v.account_id = j.account_id AND v.scheduled_start IS NOT NULL
          )`,
