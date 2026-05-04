@@ -11,6 +11,9 @@ export interface PriceBookEntry {
   category: string;
   price_min_cents: number;
   price_max_cents: number | null;
+  default_price_cents: number | null;
+  add_on_price_cents: number | null;
+  unit_type: string | null;
   description: string | null;
   default_labor_hours: number | null;
   requires_materials: boolean;
@@ -164,21 +167,21 @@ export async function suggestLineItems(
 
     const raw = (toolUse.input as { items: Array<{ code: string; quantity: number; unit_price_cents: number; reason: string }> }).items ?? [];
 
-    return raw
-      .filter((s) => byCode.has(s.code))
-      .map((s) => {
-        const pb = byCode.get(s.code)!;
-        return {
-          code: s.code,
-          price_book_id: pb.id,
-          name: pb.name,
-          description: pb.description,
-          // Clamp to at least price_min; never let Claude go below catalog floor
-          unit_price_cents: Math.max(pb.price_min_cents, s.unit_price_cents),
-          quantity: Math.max(1, Math.round(s.quantity)),
-          reason: s.reason,
-        };
-      });
+     return raw
+       .filter((s) => byCode.has(s.code))
+       .map((s) => {
+         const pb = byCode.get(s.code)!;
+         return {
+           code: s.code,
+           price_book_id: pb.id,
+           name: pb.name,
+           description: pb.description,
+           // Use default_price_cents if set, otherwise fall back to price_min_cents
+           unit_price_cents: pb.default_price_cents ?? Math.max(pb.price_min_cents, s.unit_price_cents),
+           quantity: Math.max(1, Math.round(s.quantity)),
+           reason: s.reason,
+         };
+       });
   } catch (err) {
     console.error("[suggestLineItems] Claude API error:", err);
     return [];

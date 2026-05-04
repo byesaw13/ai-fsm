@@ -157,3 +157,12 @@ export function IconMyDay(props: IconProps) {
     </Icon>
   );
 }
+
+export function IconMileage(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="10" cy="10" r="7" />
+      <path d="M10 6v4l3 2" />
+    </Icon>
+  );
+}

@@ -12,6 +12,9 @@ export interface PriceBookService {
   tier: string;
   price_min_cents: number;
   price_max_cents: number | null;
+  default_price_cents: number | null;
+  add_on_price_cents: number | null;
+  unit_type: string | null;
   description: string | null;
   notes: string | null;
   default_labor_hours: number | null;
@@ -71,7 +74,9 @@ export function PriceBookSelector({ onAddToEstimate }: PriceBookSelectorProps) {
       setCustomPrice("");
     } else {
       setSelectedService(service);
-      setCustomPrice((service.price_min_cents / 100).toFixed(2));
+      // Use default_price_cents if available, otherwise fall back to price_min_cents
+      const defaultPrice = service.default_price_cents ?? service.price_min_cents;
+      setCustomPrice((defaultPrice / 100).toFixed(2));
     }
   }
 

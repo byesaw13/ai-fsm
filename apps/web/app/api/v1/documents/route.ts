@@ -79,6 +79,14 @@ const createBodySchema = z.object({
   paperless_doc_id: z.number().int().positive("paperless_doc_id must be a positive integer"),
   title: z.string().max(500).nullable().optional(),
   original_filename: z.string().max(500).nullable().optional(),
+  document_type: z.enum([
+    'estimate_pdf','estimate_docx','invoice_pdf','invoice_docx',
+    'receipt','photo','signed_approval','insurance','contract',
+    'client_file','sop','template','other'
+  ]).default('other'),
+  property_id: z.string().uuid().optional().nullable(),
+  is_master_template: z.boolean().default(false),
+  is_archived: z.boolean().default(false),
 });
 
 export const POST = withRole(["owner", "admin"], async (request: NextRequest, session) => {
@@ -109,7 +117,8 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     );
   }
 
-  const { entity_type, entity_id, paperless_doc_id, title, original_filename } = parsed.data;
+  const { entity_type, entity_id, paperless_doc_id, title, original_filename,
+          document_type, property_id, is_master_template, is_archived } = parsed.data;
 
   try {
     const link = await withDocumentContext(session, async (client) => {
@@ -119,6 +128,10 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
         paperlessDocId: paperless_doc_id,
         title: title ?? null,
         originalFilename: original_filename ?? null,
+        documentType: document_type,
+        propertyId: property_id ?? null,
+        isMasterTemplate: is_master_template,
+        isArchived: is_archived,
         createdBy: session.userId,
       });
 
