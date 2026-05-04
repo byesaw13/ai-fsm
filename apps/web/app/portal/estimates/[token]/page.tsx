@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 interface EstimateRow extends Record<string, unknown> {
   id: string;
   status: string;
+  presentation_mode: "standard" | "multi_option";
   subtotal_cents: number;
   tax_cents: number;
   total_cents: number;
@@ -25,11 +26,25 @@ interface EstimateRow extends Record<string, unknown> {
 
 interface LineItemRow extends Record<string, unknown> {
   id: string;
+  estimate_id: string;
+  option_id: string | null;
   description: string;
   quantity: string;
   unit_price_cents: number;
   total_cents: number;
   sort_order: number;
+}
+
+interface OptionRow extends Record<string, unknown> {
+  id: string;
+  estimate_id: string;
+  label: string;
+  description: string | null;
+  sort_order: number;
+  subtotal_cents: number;
+  tax_cents: number;
+  total_cents: number;
+  is_recommended: boolean;
 }
 
 export default async function EstimatePortalPage({
@@ -41,7 +56,7 @@ export default async function EstimatePortalPage({
 
   const estimate = await queryOne<EstimateRow>(
     `SELECT
-       e.id, e.status, e.subtotal_cents, e.tax_cents, e.total_cents,
+       e.id, e.status, e.presentation_mode, e.subtotal_cents, e.tax_cents, e.total_cents,
        e.deposit_cents, e.notes, e.expires_at, e.responded_at,
        e.client_approved_name,
        c.name AS client_name,
@@ -59,18 +74,34 @@ export default async function EstimatePortalPage({
   if (!estimate) notFound();
 
   const lineItems = await query<LineItemRow>(
-    `SELECT id, description, quantity, unit_price_cents, total_cents, sort_order
+    `SELECT id, estimate_id, option_id, description, quantity, unit_price_cents, total_cents, sort_order
      FROM estimate_line_items
-     WHERE estimate_id = $1 AND visible_to_customer = true
+     WHERE estimate_id = $1 AND (visible_to_customer IS NULL OR visible_to_customer = true)
      ORDER BY sort_order`,
     [estimate.id]
   );
+
+  const options = await query<OptionRow>(
+    `SELECT id, estimate_id, label, description, sort_order, subtotal_cents, tax_cents, total_cents, is_recommended
+     FROM estimate_options
+     WHERE estimate_id = $1
+     ORDER BY sort_order`,
+    [estimate.id]
+  );
+
+  const optionsWithItems = options.map((opt) => ({
+    ...opt,
+    line_items: lineItems.filter((li) => li.option_id === opt.id),
+  }));
+
+  const standardLineItems = lineItems.filter((li) => !li.option_id);
 
   return (
     <EstimatePortalClient
       token={token}
       estimate={estimate}
-      lineItems={lineItems}
+      lineItems={standardLineItems}
+      options={optionsWithItems}
     />
   );
 }

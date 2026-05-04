@@ -34,6 +34,9 @@ export const estimateStatusSchema = z.enum([
 ]);
 export type EstimateStatus = z.infer<typeof estimateStatusSchema>;
 
+export const presentationModeSchema = z.enum(["standard", "multi_option"]);
+export type PresentationMode = z.infer<typeof presentationModeSchema>;
+
 export const invoiceStatusSchema = z.enum([
   "draft",
   "sent",
@@ -255,6 +258,7 @@ export type PricingMode = z.infer<typeof pricingModeSchema>;
 export const estimateLineItemSchema = z.object({
   id: uuidField,
   estimate_id: uuidField,
+  option_id: uuidField.nullable().optional(),
   description: z.string().min(1),
   quantity: z.number().positive(),
   unit_price_cents: centsField,
@@ -266,6 +270,21 @@ export const estimateLineItemSchema = z.object({
 });
 export type EstimateLineItem = z.infer<typeof estimateLineItemSchema>;
 
+export const estimateOptionSchema = z.object({
+  id: uuidField,
+  estimate_id: uuidField,
+  label: z.string().min(1),
+  description: z.string().nullable().optional(),
+  sort_order: z.number().int().default(0),
+  subtotal_cents: centsField,
+  tax_cents: centsField,
+  total_cents: centsField,
+  is_recommended: z.boolean().default(false),
+  line_items: z.array(estimateLineItemSchema).default([]),
+  created_at: timestampField,
+});
+export type EstimateOption = z.infer<typeof estimateOptionSchema>;
+
 export const estimateSchema = z.object({
   id: uuidField,
   account_id: uuidField,
@@ -273,6 +292,7 @@ export const estimateSchema = z.object({
   job_id: uuidField.nullable().optional(),
   property_id: uuidField.nullable().optional(),
   status: estimateStatusSchema,
+  presentation_mode: presentationModeSchema.default("standard"),
   pricing_mode: pricingModeSchema.default("flat_rate"),
   subtotal_cents: centsField,
   tax_cents: centsField,
@@ -295,6 +315,8 @@ export const estimateSchema = z.object({
   created_by: uuidField,
   created_at: timestampField,
   updated_at: timestampField,
+  // Multi-option estimates
+  options: z.array(estimateOptionSchema).default([]),
 });
 export type Estimate = z.infer<typeof estimateSchema>;
 
@@ -586,3 +608,4 @@ export function priceFromMargin(costCents: number, margin: number): number {
 }
 
 export * from "./dovetails";
+export * from "./job-materials";

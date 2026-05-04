@@ -20,6 +20,9 @@ import {
 import {
   PAINTING_RATE_STANDARD_CENTS,
   PREP_LEVEL_MULTIPLIERS,
+  JOB_TYPE_MATERIALS,
+  getMaterialsByCategory,
+  type MaterialSuggestion,
 } from "@ai-fsm/domain";
 
 // ---------------------------------------------------------------------------
@@ -48,6 +51,19 @@ interface LineItemRow {
   quantity: string;
   unit_price: string;
 }
+
+interface OptionTier {
+  label: string;
+  description: string;
+  is_recommended: boolean;
+  line_items: LineItemRow[];
+}
+
+const DEFAULT_TIERS: OptionTier[] = [
+  { label: "Good", description: "Essential services to get the job done", is_recommended: false, line_items: [{ description: "", quantity: "1", unit_price: "0.00" }] },
+  { label: "Better", description: "Recommended upgrade with better materials", is_recommended: true, line_items: [{ description: "", quantity: "1", unit_price: "0.00" }] },
+  { label: "Best", description: "Premium service with full coverage", is_recommended: false, line_items: [{ description: "", quantity: "1", unit_price: "0.00" }] },
+];
 
 interface ParsedScope {
   sq_ft: number | null;
@@ -152,11 +168,16 @@ export function NewEstimateForm({
   const [scopeParsing, setScopeParsing] = useState(false);
   const [scopeResult, setScopeResult] = useState<ScopeResult | null>(null);
   const [scopeError, setScopeError] = useState<string | null>(null);
+  const [resolvedJobType, setResolvedJobType] = useState<string>("");
+  const [addedMaterials, setAddedMaterials] = useState<Set<string>>(new Set());
 
   // Generic fields
-  const [mode, setMode] = useState<"itemized" | "flat_rate">("itemized");
+  const [mode, setMode] = useState<"itemized" | "flat_rate" | "multi_option">("itemized");
   const [lineItems, setLineItems] = useState<LineItemRow[]>([{ ...EMPTY_ROW }]);
   const [flatRate, setFlatRate] = useState("0.00");
+
+  // Multi-option tiers (Good/Better/Best)
+  const [tiers, setTiers] = useState<OptionTier[]>(() => DEFAULT_TIERS.map(t => ({ ...t, line_items: [{ ...EMPTY_ROW }] })));
 
   // Price book line items
   const [priceBookItems, setPriceBookItems] = useState<{ service: PriceBookService; priceCents: number }[]>([]);
@@ -227,12 +248,14 @@ export function NewEstimateForm({
   const genericTaxCents = Math.round((genericSubtotalCents * taxRateNum) / 100);
   const genericTotalCents = genericSubtotalCents + genericTaxCents;
 
-  function handleModeChange(newMode: "itemized" | "flat_rate") {
+  function handleModeChange(newMode: "itemized" | "flat_rate" | "multi_option") {
     if (newMode === "flat_rate") {
       const current = lineItems.reduce((sum, row) => sum + lineTotal(row), 0);
       setFlatRate((current / 100).toFixed(2));
-    } else {
+    } else if (newMode === "itemized") {
       if (lineItems.length === 0) setLineItems([{ ...EMPTY_ROW }]);
+    } else if (newMode === "multi_option") {
+      setTiers(DEFAULT_TIERS.map(t => ({ ...t, line_items: [{ ...EMPTY_ROW }] })));
     }
     setMode(newMode);
   }
@@ -249,6 +272,61 @@ export function NewEstimateForm({
     setLineItems((prev) =>
       prev.map((row, i) => (i === index ? { ...row, [field]: value } : row))
     );
+  }
+
+  // Multi-option tier helpers
+  function updateTier(tierIndex: number, updates: Partial<OptionTier>) {
+    setTiers((prev) =>
+      prev.map((t, i) => (i === tierIndex ? { ...t, ...updates } : t))
+    );
+  }
+
+  function addTierLineItem(tierIndex: number) {
+    setTiers((prev) =>
+      prev.map((t, i) =>
+        i === tierIndex ? { ...t, line_items: [...t.line_items, { ...EMPTY_ROW }] } : t
+      )
+    );
+  }
+
+  function removeTierLineItem(tierIndex: number, lineIndex: number) {
+    setTiers((prev) =>
+      prev.map((t, i) =>
+        i === tierIndex
+          ? { ...t, line_items: t.line_items.filter((_, li) => li !== lineIndex) }
+          : t
+      )
+    );
+  }
+
+  function updateTierLineItem(tierIndex: number, lineIndex: number, field: keyof LineItemRow, value: string) {
+    setTiers((prev) =>
+      prev.map((t, i) =>
+        i === tierIndex
+          ? {
+              ...t,
+              line_items: t.line_items.map((row, li) =>
+                li === lineIndex ? { ...row, [field]: value } : row
+              ),
+            }
+          : t
+      )
+    );
+  }
+
+  function tierSubtotalCents(tier: OptionTier): number {
+    return tier.line_items.reduce((sum, row) => sum + lineTotal(row), 0);
+  }
+
+  function handleAddMaterial(mat: MaterialSuggestion) {
+    const key = mat.name.toLowerCase();
+    if (addedMaterials.has(key)) return;
+    setAddedMaterials((prev) => new Set([...prev, key]));
+    const desc = mat.notes ? `${mat.name} (${mat.notes})` : mat.name;
+    setLineItems((prev) => [
+      ...prev.filter((r) => r.description.trim()),
+      { description: desc, quantity: mat.typicalQty.toString(), unit_price: "0.00" },
+    ]);
   }
 
   async function handleParseScope() {
@@ -275,6 +353,9 @@ export function NewEstimateForm({
       if (parsed.labor_hours_estimate !== null) setLaborHours(parsed.labor_hours_estimate.toString());
       if (parsed.material_cost_cents !== null) setMaterialCostDollars((parsed.material_cost_cents / 100).toFixed(2));
       if (parsed.suggested_job_type === "custom") setServiceType("generic");
+      else if (parsed.suggested_job_type && JOB_TYPE_MATERIALS[parsed.suggested_job_type]) {
+        setResolvedJobType(parsed.suggested_job_type);
+      }
     } catch {
       setScopeError("Network error — could not parse notes.");
     } finally {
@@ -352,6 +433,40 @@ export function NewEstimateForm({
           tax_rate: taxRateNum,
           flat_rate_cents: parseCents(flatRate),
           line_items: [],
+        };
+      } else if (mode === "multi_option") {
+        const options = tiers.map((tier, ti) => {
+          const items = tier.line_items.filter((r) => r.description.trim() || parseCents(r.unit_price) > 0);
+          return {
+            label: tier.label,
+            description: tier.description || null,
+            sort_order: ti,
+            is_recommended: tier.is_recommended,
+            line_items: items.map((row, li) => ({
+              description: row.description,
+              quantity: parseFloat(row.quantity) || 1,
+              unit_price_cents: parseCents(row.unit_price),
+              sort_order: li,
+            })),
+          };
+        });
+
+        const hasAnyItems = options.some((o) => o.line_items.length > 0);
+        if (!hasAnyItems) {
+          setError("Add at least one line item to at least one option.");
+          setPending(false);
+          return;
+        }
+
+        payload = {
+          client_id: clientId,
+          job_id: jobId || null,
+          property_id: propertyId || null,
+          notes: notes.trim() || null,
+          expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+          tax_rate: taxRateNum,
+          presentation_mode: "multi_option",
+          options,
         };
       } else {
         const manualItems = lineItems.filter((r) => r.description.trim() || parseCents(r.unit_price) > 0);
@@ -792,12 +907,67 @@ export function NewEstimateForm({
         </div>
       )}
 
+      {/* Suggested Materials — shown when scope parser resolves a job type */}
+      {serviceType === "generic" && mode === "itemized" && resolvedJobType && Object.keys(getMaterialsByCategory(resolvedJobType)).length > 0 && (
+        <div>
+          <SectionHeader title={`Suggested Materials — ${resolvedJobType.replace("_", " ")}`} as="h3" />
+          <Card padding="sm" style={{ background: "var(--bg-subtle)" }}>
+            {Object.entries(getMaterialsByCategory(resolvedJobType)).map(([category, materials]) => (
+              <div key={category} style={{ marginBottom: "var(--space-3)" }}>
+                <div style={{ fontSize: "var(--text-xs)", fontWeight: 500, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-1)" }}>
+                  {category}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
+                  {materials.map((mat) => {
+                    const key = mat.name.toLowerCase();
+                    const alreadyAdded = addedMaterials.has(key) || lineItems.some((r) => r.description.toLowerCase().includes(key));
+                    return (
+                      <button
+                        key={mat.name}
+                        type="button"
+                        disabled={alreadyAdded}
+                        onClick={() => handleAddMaterial(mat)}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "var(--space-1)",
+                          padding: "var(--space-1) var(--space-2)",
+                          fontSize: "var(--text-sm)",
+                          background: alreadyAdded ? "var(--color-surface-raised)" : "var(--color-surface-overlay)",
+                          border: `1px solid ${alreadyAdded ? "var(--color-border)" : "var(--color-primary-alpha)"}`,
+                          borderRadius: "var(--radius-sm)",
+                          cursor: alreadyAdded ? "default" : "pointer",
+                          color: alreadyAdded ? "var(--fg-muted)" : "var(--fg-primary)",
+                        }}
+                      >
+                        <span>{mat.name}</span>
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                          {mat.typicalQty} {mat.unit}
+                        </span>
+                        {alreadyAdded ? (
+                          <span style={{ fontSize: "var(--text-xs)", color: "var(--color-success)" }}>✓</span>
+                        ) : (
+                          <span style={{ fontSize: "var(--text-xs)", color: "var(--color-primary)" }}>+</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            <p style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", margin: "var(--space-2) 0 0" }}>
+              Click to add as a line item. Set prices before submitting.
+            </p>
+          </Card>
+        </div>
+      )}
+
       {/* Generic Pricing */}
       {serviceType === "generic" && (
         <div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-3)" }}>
             <SectionHeader
-              title={mode === "flat_rate" ? "Flat Rate" : "Line Items"}
+              title={mode === "flat_rate" ? "Flat Rate" : mode === "multi_option" ? "Good / Better / Best" : "Line Items"}
               count={mode === "itemized" ? lineItems.length : undefined}
               as="h3"
             />
@@ -809,7 +979,7 @@ export function NewEstimateForm({
                 overflow: "hidden",
               }}
             >
-              {(["itemized", "flat_rate"] as const).map((m) => (
+              {(["itemized", "flat_rate", "multi_option"] as const).map((m) => (
                 <button
                   key={m}
                   type="button"
@@ -827,7 +997,7 @@ export function NewEstimateForm({
                   }}
                   data-testid={`mode-${m}`}
                 >
-                  {m === "itemized" ? "Itemized" : "Flat Rate"}
+                  {m === "itemized" ? "Itemized" : m === "flat_rate" ? "Flat Rate" : "Multi-Option"}
                 </button>
               ))}
             </div>
@@ -846,6 +1016,133 @@ export function NewEstimateForm({
                 disabled={pending}
                 data-testid="flat-rate-input"
               />
+            </div>
+          ) : mode === "multi_option" ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--space-4)", marginBottom: "var(--space-3)" }}>
+              {tiers.map((tier, ti) => {
+                const tierSub = tierSubtotalCents(tier);
+                const tierTax = Math.round((tierSub * taxRateNum) / 100);
+                const tierTotal = tierSub + tierTax;
+                return (
+                  <Card key={ti} padding="sm" style={{
+                    border: tier.is_recommended ? "2px solid var(--accent)" : "1px solid var(--border)",
+                    position: "relative",
+                  }}>
+                    {tier.is_recommended && (
+                      <div style={{
+                        position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)",
+                        background: "var(--accent)", color: "#fff", padding: "2px 12px", borderRadius: 99,
+                        fontSize: "var(--text-xs)", fontWeight: 600, whiteSpace: "nowrap",
+                      }}>
+                        Recommended
+                      </div>
+                    )}
+                    <div style={{ marginBottom: "var(--space-2)" }}>
+                      <input
+                        className="p7-input"
+                        type="text"
+                        value={tier.label}
+                        onChange={(e) => updateTier(ti, { label: e.target.value })}
+                        placeholder="Option label"
+                        disabled={pending}
+                        style={{ fontWeight: 700, fontSize: "var(--text-lg)", marginBottom: "var(--space-1)" }}
+                      />
+                      <input
+                        className="p7-input"
+                        type="text"
+                        value={tier.description}
+                        onChange={(e) => updateTier(ti, { description: e.target.value })}
+                        placeholder="Brief description"
+                        disabled={pending}
+                        style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}
+                      />
+                    </div>
+
+                    <label style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", cursor: "pointer", marginBottom: "var(--space-2)", fontSize: "var(--text-sm)" }}>
+                      <input
+                        type="checkbox"
+                        checked={tier.is_recommended}
+                        onChange={(e) => updateTier(ti, { is_recommended: e.target.checked })}
+                        disabled={pending}
+                      />
+                      <span>Mark as recommended</span>
+                    </label>
+
+                    <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-2)", marginTop: "var(--space-2)" }}>
+                      {tier.line_items.map((row, li) => (
+                        <div key={li} style={{ marginBottom: "var(--space-2)" }}>
+                          <input
+                            className="p7-input"
+                            type="text"
+                            value={row.description}
+                            onChange={(e) => updateTierLineItem(ti, li, "description", e.target.value)}
+                            placeholder="Description"
+                            disabled={pending}
+                            style={{ marginBottom: "var(--space-1)", fontSize: "var(--text-sm)" }}
+                          />
+                          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                            <input
+                              className="p7-input"
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={row.quantity}
+                              onChange={(e) => updateTierLineItem(ti, li, "quantity", e.target.value)}
+                              disabled={pending}
+                              style={{ width: 60, fontSize: "var(--text-sm)" }}
+                            />
+                            <input
+                              className="p7-input"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={row.unit_price}
+                              onChange={(e) => updateTierLineItem(ti, li, "unit_price", e.target.value)}
+                              disabled={pending}
+                              style={{ width: 90, fontSize: "var(--text-sm)" }}
+                            />
+                            <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", lineHeight: "var(--space-5)" }}>
+                              {formatCents(lineTotal(row))}
+                            </span>
+                            {tier.line_items.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeTierLineItem(ti, li)}
+                                disabled={pending}
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-danger)", fontSize: "var(--text-sm)", padding: 0, lineHeight: 1 }}
+                                aria-label={`Remove line item`}
+                              >
+                                ×
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => addTierLineItem(ti)}
+                        disabled={pending}
+                        style={{ width: "100%", marginTop: "var(--space-1)" }}
+                      >
+                        + Add item
+                      </Button>
+                    </div>
+
+                    <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-2)", marginTop: "var(--space-3)", textAlign: "right" }}>
+                      {tierTax > 0 && (
+                        <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                          Tax: {formatCents(tierTax)}
+                        </div>
+                      )}
+                      <div style={{ fontSize: "var(--text-lg)", fontWeight: 700 }}>
+                        {formatCents(tierTotal)}
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
           ) : (
             <>
@@ -953,30 +1250,31 @@ export function NewEstimateForm({
           )}
 
           {/* Generic totals */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
-              gap: "var(--space-2)",
-              marginTop: "var(--space-3)",
-            }}
-          >
+          {mode !== "multi_option" && (
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: "auto auto",
-                gap: "var(--space-2) var(--space-4)",
-                alignItems: "center",
-                textAlign: "right",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-end",
+                gap: "var(--space-2)",
+                marginTop: "var(--space-3)",
               }}
             >
-              {mode === "itemized" && (
-                <>
-                  <span style={{ color: "var(--fg-muted)" }}>Subtotal</span>
-                  <span data-testid="subtotal">{formatCents(genericSubtotalCents)}</span>
-                </>
-              )}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "auto auto",
+                  gap: "var(--space-2) var(--space-4)",
+                  alignItems: "center",
+                  textAlign: "right",
+                }}
+              >
+                {mode === "itemized" && (
+                  <>
+                    <span style={{ color: "var(--fg-muted)" }}>Subtotal</span>
+                    <span data-testid="subtotal">{formatCents(genericSubtotalCents)}</span>
+                  </>
+                )}
 
               <label
                 htmlFor="tax_rate"
@@ -1009,6 +1307,7 @@ export function NewEstimateForm({
               <strong data-testid="total">{formatCents(genericTotalCents)}</strong>
             </div>
           </div>
+          )}
         </div>
       )}
 

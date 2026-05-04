@@ -3,7 +3,8 @@ import { getSession } from "@/lib/auth/session";
 import { canTransitionJob } from "@/lib/auth/permissions";
 import { query } from "@/lib/db";
 import { JobCreateForm } from "./JobCreateForm";
-import { Card, PageContainer, PageHeader } from "@/components/ui";
+import { QuickJobForm } from "./QuickJobForm";
+import { Card, PageContainer, PageHeader, SectionHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,31 @@ export default async function NewJobPage({ searchParams }: PageProps) {
   return (
     <PageContainer>
       <PageHeader title="New Job" backHref="/app/jobs" backLabel="Jobs" />
+
+      {/* Quick Job — primary path */}
       <Card>
+        <SectionHeader title="Quick Job" />
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", marginTop: "-8px", marginBottom: "var(--space-3)" }}>
+          Title + client, done. Fill in details later.
+        </p>
+        <QuickJobForm
+          clients={clients}
+          properties={properties}
+          initialClientId={client_id}
+          initialPropertyId={property_id}
+          onSwitchToFull={() => {
+            const el = document.getElementById("full-setup");
+            el?.scrollIntoView({ behavior: "smooth" });
+          }}
+        />
+      </Card>
+
+      {/* Full Setup — secondary path */}
+      <Card id="full-setup" style={{ marginTop: "var(--space-4)" }}>
+        <SectionHeader title="Full Setup" as="h2" />
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", marginTop: "-8px", marginBottom: "var(--space-3)" }}>
+          Set type, priority, and schedule upfront.
+        </p>
         <JobCreateForm
           clients={clients}
           properties={properties}

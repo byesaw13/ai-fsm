@@ -132,7 +132,13 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
       <PageHeader
         title="Properties"
         subtitle={`${properties.length} propert${properties.length === 1 ? "y" : "ies"}`}
-        actions={<LinkButton href="/app/properties/new" data-testid="create-property-btn">+ New Property</LinkButton>}
+        actions={
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <LinkButton href="/app/properties/new" variant="primary" data-testid="create-property-btn">
+              + New Property
+            </LinkButton>
+          </div>
+        }
       />
 
       <FilterBar filters={filters} baseHref="/app/properties" currentValues={currentValues} />

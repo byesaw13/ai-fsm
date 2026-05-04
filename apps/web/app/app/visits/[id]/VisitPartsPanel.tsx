@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui";
+import { JOB_TYPE_MATERIALS, getMaterialsByCategory } from "@ai-fsm/domain";
 
 interface PartRow {
   id: string;
@@ -17,13 +18,14 @@ interface Props {
   visitId: string;
   initialParts: PartRow[];
   canUpdate: boolean;
+  jobType?: string | null;
 }
 
 function formatDollars(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-export function VisitPartsPanel({ visitId, initialParts, canUpdate }: Props) {
+export function VisitPartsPanel({ visitId, initialParts, canUpdate, jobType }: Props) {
   const router = useRouter();
   const toast = useToast();
   const receiptInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -35,6 +37,10 @@ export function VisitPartsPanel({ visitId, initialParts, canUpdate }: Props) {
   const [adding, setAdding] = useState(false);
   const [uploadingReceiptFor, setUploadingReceiptFor] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [addedSuggestions, setAddedSuggestions] = useState<Set<string>>(new Set());
+
+  const materialSuggestions = jobType ? getMaterialsByCategory(jobType) : {};
+  const hasSuggestions = Object.keys(materialSuggestions).length > 0;
 
   const totalActual = parts.reduce((sum, p) => sum + Math.round(p.actual_cost_cents * p.quantity), 0);
   const totalCustomer = parts.reduce((sum, p) => sum + Math.round(p.customer_price_cents * p.quantity), 0);
@@ -95,6 +101,35 @@ export function VisitPartsPanel({ visitId, initialParts, canUpdate }: Props) {
     }
   }
 
+  async function handleAddSuggestion(name: string, qty: number) {
+    const normalizedName = name.toLowerCase();
+    if (addedSuggestions.has(normalizedName)) {
+      toast.error("Already added");
+      return;
+    }
+    setAdding(true);
+    try {
+      const res = await fetch(`/api/v1/visits/${visitId}/parts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, quantity: qty, actual_cost_cents: 0 }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error?.message ?? "Failed to add part");
+      } else {
+        setParts((prev) => [...prev, data.data]);
+        setAddedSuggestions((prev) => new Set([...prev, normalizedName]));
+        router.refresh();
+        toast.success(`${name} added`);
+      }
+    } catch {
+      toast.error("Unexpected error");
+    } finally {
+      setAdding(false);
+    }
+  }
+
   async function handleReceiptUpload(partId: string, file: File) {
     setUploadingReceiptFor(partId);
     try {
@@ -137,6 +172,58 @@ export function VisitPartsPanel({ visitId, initialParts, canUpdate }: Props) {
 
   return (
     <div>
+      {/* Suggested materials */}
+      {canUpdate && hasSuggestions && (
+        <div style={{ marginBottom: "var(--space-4)" }}>
+          <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, marginBottom: "var(--space-2)", color: "var(--fg-secondary)" }}>
+            Suggested materials
+          </div>
+          {Object.entries(materialSuggestions).map(([category, materials]) => (
+            <div key={category} style={{ marginBottom: "var(--space-3)" }}>
+              <div style={{ fontSize: "var(--text-xs)", fontWeight: 500, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-1)" }}>
+                {category}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
+                {materials.map((mat) => {
+                  const normalizedName = mat.name.toLowerCase();
+                  const alreadyAdded = addedSuggestions.has(normalizedName) || parts.some((p) => p.name.toLowerCase() === normalizedName);
+                  return (
+                    <button
+                      key={mat.name}
+                      type="button"
+                      disabled={alreadyAdded || adding}
+                      onClick={() => handleAddSuggestion(mat.name, mat.typicalQty)}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "var(--space-1)",
+                        padding: "var(--space-1) var(--space-2)",
+                        fontSize: "var(--text-sm)",
+                        background: alreadyAdded ? "var(--color-surface-raised)" : "var(--color-surface-overlay)",
+                        border: `1px solid ${alreadyAdded ? "var(--color-border)" : "var(--color-primary-alpha)"}`,
+                        borderRadius: "var(--radius-sm)",
+                        cursor: alreadyAdded ? "default" : "pointer",
+                        color: alreadyAdded ? "var(--fg-muted)" : "var(--fg-primary)",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      <span>{mat.name}</span>
+                      <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                        {mat.typicalQty} {mat.unit}
+                      </span>
+                      {alreadyAdded ? (
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--color-success)" }}>✓</span>
+                      ) : (
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--color-primary)" }}>+</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {parts.length > 0 && (
         <div style={{ marginBottom: "var(--space-4)" }}>
           {parts.map((part) => (

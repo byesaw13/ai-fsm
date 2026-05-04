@@ -1,6 +1,7 @@
 import { Client } from "pg";
 import { runVisitReminders } from "./visit-reminder.js";
 import { runInvoiceFollowups } from "./invoice-followup.js";
+import { processMaintenanceScheduling } from "./maintenance-scheduling.js";
 import { logger } from "./logger.js";
 
 const pollMs = Number(process.env.WORKER_POLL_MS ?? "30000");
@@ -47,6 +48,18 @@ async function runPollIteration(client: Client): Promise<void> {
           errors: totalErrors,
         });
       }
+    }
+
+    // Process maintenance plans independently (not automation-based)
+    const maintenanceResults = await processMaintenanceScheduling(client);
+    if (maintenanceResults.length > 0) {
+      const totalCreated = maintenanceResults.filter((r) => r.action === "created").length;
+      const totalErrors = maintenanceResults.filter((r) => r.action === "error").length;
+      logger.info("maintenance-scheduling dispatch complete", {
+        plans: maintenanceResults.length,
+        created: totalCreated,
+        errors: totalErrors,
+      });
     }
   } catch (error) {
     logger.error("worker poll failed", error);
