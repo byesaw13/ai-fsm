@@ -13,6 +13,9 @@
 /** Internal labor cost. Never shown on customer-facing output. */
 export const LABOR_RATE_CENTS_PER_HOUR = 85_00; // $85.00/hr
 
+/** Minimum customer-facing service value unless intentionally bundled or credited. */
+export const MINIMUM_SERVICE_FEE_CENTS = 150_00; // $150.00
+
 // ---------------------------------------------------------------------------
 // Painting pricing (per square foot, in cents)
 // ---------------------------------------------------------------------------
@@ -86,6 +89,58 @@ This estimate covers the scope of work as described above.
 Unforeseen conditions (e.g., hidden damage, additional prep) may affect final cost
 and will be communicated before proceeding.
 `.trim();
+
+// ---------------------------------------------------------------------------
+// Membership standards
+// ---------------------------------------------------------------------------
+
+export const MEMBERSHIP_TIERS = ["essential", "plus", "premier"] as const;
+export type MembershipTier = typeof MEMBERSHIP_TIERS[number];
+
+export const MEMBERSHIP_TIER_LABELS: Record<MembershipTier, string> = {
+  essential: "Essential",
+  plus: "Plus",
+  premier: "Premier",
+};
+
+export const MEMBERSHIP_TIER_VISITS_PER_YEAR: Record<MembershipTier, number> = {
+  essential: 1,
+  plus: 2,
+  premier: 4,
+};
+
+/** Included minor preventive/correction work after the health-check phase. */
+export const MEMBERSHIP_INCLUDED_LABOR_MINUTES_PER_VISIT = 60;
+
+export const MEMBERSHIP_BILLING_CADENCES = ["annual", "monthly"] as const;
+export type MembershipBillingCadence = typeof MEMBERSHIP_BILLING_CADENCES[number];
+
+export const MEMBERSHIP_ROUTING_ZONES = ["core", "extended", "out_of_area"] as const;
+export type MembershipRoutingZone = typeof MEMBERSHIP_ROUTING_ZONES[number];
+
+export const MEMBERSHIP_ROUTING_ZONE_LABELS: Record<MembershipRoutingZone, string> = {
+  core: "Core Zone",
+  extended: "Extended Zone",
+  out_of_area: "Out of Area",
+};
+
+export const MEMBERSHIP_VISIT_PHASES = ["health_check", "included_action", "reporting"] as const;
+export type MembershipVisitPhase = typeof MEMBERSHIP_VISIT_PHASES[number];
+
+export const MEMBERSHIP_CAP_STATUSES = ["within_cap", "cap_reached", "approval_required"] as const;
+export type MembershipCapStatus = typeof MEMBERSHIP_CAP_STATUSES[number];
+
+// ---------------------------------------------------------------------------
+// Operations standards
+// ---------------------------------------------------------------------------
+
+export const JOB_ACCEPTANCE_CATEGORIES = [
+  "membership",
+  "realtor_baseline",
+  "high_margin_project",
+  "reactive_low_quality",
+] as const;
+export type JobAcceptanceCategory = typeof JOB_ACCEPTANCE_CATEGORIES[number];
 
 // ---------------------------------------------------------------------------
 // Job types

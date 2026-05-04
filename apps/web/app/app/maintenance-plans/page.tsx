@@ -19,9 +19,15 @@ interface MaintenancePlanRow {
   client_id: string;
   property_id: string | null;
   name: string;
+  membership_tier: string;
   frequency: string;
   services: string[];
   price_cents: number;
+  annual_visit_count: number;
+  included_labor_minutes_per_visit: number;
+  annual_price_cents: number;
+  renewal_date: string | null;
+  routing_zone: string;
   status: string;
   next_scheduled_date: string | null;
   created_at: string;
@@ -65,6 +71,18 @@ export default async function MaintenancePlansPage({
     quarterly: "Quarterly",
     biannual: "Bi-annual",
     annual: "Annual",
+  };
+
+  const tierLabels: Record<string, string> = {
+    essential: "Essential",
+    plus: "Plus",
+    premier: "Premier",
+  };
+
+  const zoneLabels: Record<string, string> = {
+    core: "Core Zone",
+    extended: "Extended Zone",
+    out_of_area: "Out of Area",
   };
 
   const statusVariant: Record<string, StatusVariant> = {
@@ -134,14 +152,29 @@ export default async function MaintenancePlansPage({
                     {plan.property_address && <> &middot; {plan.property_address}</>}
                   </div>
                   <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: "var(--space-1)" }}>
+                    {tierLabels[plan.membership_tier] || "Plus"}
+                    {" · "}
+                    {plan.annual_visit_count || 2} visit{(plan.annual_visit_count || 2) === 1 ? "" : "s"}/yr
+                    {" · "}
+                    {plan.included_labor_minutes_per_visit || 60} min cap
+                  </div>
+                  <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: "var(--space-1)" }}>
                     {frequencyLabels[plan.frequency] || plan.frequency}
+                    {" · "}
+                    {zoneLabels[plan.routing_zone] || "Core Zone"}
                     {plan.next_scheduled_date && (
                       <> &middot; Next: {new Date(plan.next_scheduled_date).toLocaleDateString()}</>
+                    )}
+                    {plan.renewal_date && (
+                      <> &middot; Renewal: {new Date(plan.renewal_date).toLocaleDateString()}</>
                     )}
                   </div>
                 </div>
                 <div style={{ fontWeight: "var(--font-semibold)", fontSize: "var(--text-lg)", color: "var(--fg)", flexShrink: 0 }}>
-                  ${(plan.price_cents / 100).toFixed(2)}
+                  ${((plan.annual_price_cents || plan.price_cents * (plan.annual_visit_count || 1)) / 100).toFixed(2)}
+                  <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: "var(--font-medium)", textAlign: "right" }}>
+                    annual
+                  </div>
                 </div>
               </div>
             </Card>

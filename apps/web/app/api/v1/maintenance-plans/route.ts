@@ -10,12 +10,20 @@ const planBody = z.object({
   client_id: z.string().uuid(),
   property_id: z.string().uuid().optional().nullable(),
   name: z.string().min(1).max(255),
+  membership_tier: z.enum(["essential", "plus", "premier"]).default("plus"),
   frequency: z.enum(["monthly", "quarterly", "biannual", "annual"]),
   services: z.array(z.string()).default([]),
   price_cents: z.number().int().min(0),
+  annual_visit_count: z.number().int().positive().default(2),
+  included_labor_minutes_per_visit: z.number().int().min(0).default(60),
+  billing_cadence: z.enum(["annual", "monthly"]).default("annual"),
+  annual_price_cents: z.number().int().min(0).default(0),
   status: z.enum(["active", "paused", "cancelled"]).default("active"),
   next_scheduled_date: z.string().optional().nullable(),
+  renewal_date: z.string().optional().nullable(),
+  routing_zone: z.enum(["core", "extended", "out_of_area"]).default("core"),
   notes: z.string().optional().nullable(),
+  membership_terms: z.string().optional().nullable(),
 });
 
 export const GET = withRole(["owner", "admin"], async (_request: NextRequest, session: AuthSession) => {
@@ -38,15 +46,56 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     return NextResponse.json({ error: { code: "VALIDATION_ERROR", details: parsed.error.flatten().fieldErrors } }, { status: 422 });
   }
 
-  const { client_id, property_id, name, frequency, services, price_cents, status, next_scheduled_date, notes } = parsed.data;
+  const {
+    client_id,
+    property_id,
+    name,
+    membership_tier,
+    frequency,
+    services,
+    price_cents,
+    annual_visit_count,
+    included_labor_minutes_per_visit,
+    billing_cadence,
+    annual_price_cents,
+    status,
+    next_scheduled_date,
+    renewal_date,
+    routing_zone,
+    notes,
+    membership_terms,
+  } = parsed.data;
 
   const pool = getPool();
   const result = await pool.query(
     `INSERT INTO maintenance_plans
-       (account_id, client_id, property_id, name, frequency, services, price_cents, status, next_scheduled_date, notes, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       (account_id, client_id, property_id, name, membership_tier, frequency,
+        services, price_cents, annual_visit_count, included_labor_minutes_per_visit,
+        billing_cadence, annual_price_cents, status, next_scheduled_date,
+        renewal_date, routing_zone, notes, membership_terms, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
      RETURNING *`,
-    [session.accountId, client_id, property_id ?? null, name, frequency, services, price_cents, status, next_scheduled_date ?? null, notes ?? null, session.userId]
+    [
+      session.accountId,
+      client_id,
+      property_id ?? null,
+      name,
+      membership_tier,
+      frequency,
+      services,
+      price_cents,
+      annual_visit_count,
+      included_labor_minutes_per_visit,
+      billing_cadence,
+      annual_price_cents,
+      status,
+      next_scheduled_date ?? null,
+      renewal_date ?? null,
+      routing_zone,
+      notes ?? null,
+      membership_terms ?? null,
+      session.userId,
+    ]
   );
 
   return NextResponse.json(result.rows[0], { status: 201 });

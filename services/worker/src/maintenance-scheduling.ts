@@ -14,6 +14,7 @@ export interface MaintenancePlan {
   frequency: "monthly" | "quarterly" | "biannual" | "annual";
   services: string[];
   price_cents: number;
+  included_labor_minutes_per_visit: number;
   status: "active" | "paused" | "cancelled";
   next_scheduled_date: string | null;
   last_generated_at: string | null;
@@ -70,6 +71,7 @@ async function findDuePlans(client: Client): Promise<MaintenancePlan[]> {
   const { rows } = await client.query<MaintenancePlan>(
     `SELECT id, account_id, client_id, property_id, name, frequency,
             services, price_cents, status, next_scheduled_date::text,
+            included_labor_minutes_per_visit,
             last_generated_at::text, notes
      FROM maintenance_plans
      WHERE status = 'active'
@@ -130,10 +132,17 @@ async function createPlanVisit(
     `INSERT INTO visits
        (account_id, job_id, assigned_user_id,
         scheduled_start, scheduled_end, status,
-        generated_from_plan_id)
-     VALUES ($1, $2, NULL, $3, $4, 'scheduled', $5)
+        generated_from_plan_id, included_labor_cap_minutes)
+     VALUES ($1, $2, NULL, $3, $4, 'scheduled', $5, $6)
      RETURNING id`,
-    [plan.account_id, jobId, scheduledStart.toISOString(), scheduledEnd.toISOString(), plan.id]
+    [
+      plan.account_id,
+      jobId,
+      scheduledStart.toISOString(),
+      scheduledEnd.toISOString(),
+      plan.id,
+      plan.included_labor_minutes_per_visit,
+    ]
   );
 
   return visit.rows[0].id;

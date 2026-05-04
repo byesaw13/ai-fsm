@@ -8,12 +8,20 @@ export const dynamic = "force-dynamic";
 
 const patchBody = z.object({
   name: z.string().min(1).max(255).optional(),
+  membership_tier: z.enum(["essential", "plus", "premier"]).optional(),
   frequency: z.enum(["monthly", "quarterly", "biannual", "annual"]).optional(),
   services: z.array(z.string()).optional(),
   price_cents: z.number().int().min(0).optional(),
+  annual_visit_count: z.number().int().positive().optional(),
+  included_labor_minutes_per_visit: z.number().int().min(0).optional(),
+  billing_cadence: z.enum(["annual", "monthly"]).optional(),
+  annual_price_cents: z.number().int().min(0).optional(),
   status: z.enum(["active", "paused", "cancelled"]).optional(),
   next_scheduled_date: z.string().nullable().optional(),
+  renewal_date: z.string().nullable().optional(),
+  routing_zone: z.enum(["core", "extended", "out_of_area"]).optional(),
   notes: z.string().nullable().optional(),
+  membership_terms: z.string().nullable().optional(),
 });
 
 export const GET = withRole(["owner", "admin"], async (request: NextRequest, session: AuthSession) => {
