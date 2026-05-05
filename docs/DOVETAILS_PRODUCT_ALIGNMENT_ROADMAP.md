@@ -158,6 +158,26 @@ Validation for this release:
 - `pnpm gate` passed locally (535 unit tests).
 - GitHub CI passed: lint, typecheck, build, test.
 
+### Implemented in Fix Now → Estimate Release
+
+PR: https://github.com/byesaw13/ai-fsm/pull/125
+Merge commit: `826e619a2851cf2cc95f996df878882aa54253bc`
+Production deploy: May 5, 2026
+Migration: none
+
+Completed in that release:
+
+- Added `FixNowEstimateButton` client component on Fix Now items in the membership visit snapshot panel (reporting phase and completed visits).
+- Owner and admin roles see a "Create Estimate" button next to each Fix Now item; tech role sees the existing read-only view.
+- Button POSTs a draft estimate pre-filled with the item label/note as a $0 labor line item; notes field records the visit date and item label for traceability.
+- On success, navigates directly to the estimate detail page for pricing and sending.
+- Extended the visit page SQL query with `j.client_id` (required by the estimate POST endpoint).
+
+Validation for this release:
+
+- `pnpm gate` passed locally (535 unit tests).
+- GitHub CI passed: lint, typecheck, build, test.
+
 ### Implemented in Digital Home Vault Release
 
 PR: https://github.com/byesaw13/ai-fsm/pull/123
@@ -363,10 +383,10 @@ Done:
 - `membership_cap_status` auto-computed server-side on every labor-minutes save.
 - Visit snapshot (reporting phase and completed visits) groups checklist items into: Work Completed, Fix Now, Monitor, Optional Improvements, Refer to Trade.
 - Checklist walkthrough hidden in Reporting phase and replaced by the snapshot.
+- Fix Now items show a "Create Estimate" button for owner/admin, creating a pre-filled draft estimate and navigating to the estimate detail page.
 
 Still needed:
 
-- Convert flagged checklist items into quoted follow-up estimates from within the visit.
 - Enforce same-day/next-day snapshot delivery (block visit completion without snapshot sent).
 
 ## Phase 7: Digital Home Vault
@@ -449,7 +469,7 @@ Current recommended order from this point:
 1. ~~Membership visit workflow and labor-cap controls.~~ Done (PR #119)
 2. ~~Client visit snapshot report.~~ Done (PR #121)
 3. ~~Digital Home Vault foundation.~~ Done (PR #123)
-4. Convert flagged visit items into quoted follow-up estimates.
+4. ~~Convert flagged visit items into quoted follow-up estimates.~~ Done (PR #125)
 5. Expand document naming/archive/master-template controls beyond estimates.
 6. Job intake and calendar protection.
 7. Realtor/concierge/routing workflows.
@@ -459,12 +479,11 @@ Current recommended order from this point:
 
 Highest-leverage next release:
 
-- Convert flagged checklist items (Fix Now) into quoted follow-up estimates directly from the visit reporting view — add a "Create Estimate" action on Fix Now items in the snapshot panel.
 - Add job intake fields: strategy fit, scope clarity, margin confidence, schedule impact, job category (Membership / Realtor Baseline / High-Margin / Reactive). Wire existing category constants into the job create/edit flow.
 
 Reason:
 
-The visit workflow is complete end-to-end. The two highest-value gaps now are: (1) closing the loop from a flagged item to a quoted estimate without leaving the app, and (2) giving the intake filter teeth so low-value work stops entering the pipeline unchecked.
+The visit workflow is now complete end-to-end — Fix Now items can be converted to draft estimates in one click. The highest-value remaining gap is giving the intake filter teeth so low-value work stops entering the pipeline unchecked.
 
 ## Update Rule
 
