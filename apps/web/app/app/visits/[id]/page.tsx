@@ -7,7 +7,7 @@ import {
   canUpdateVisitNotes,
   canUpdateChecklist,
 } from "@/lib/auth/permissions";
-import type { Visit, VisitStatus } from "@ai-fsm/domain";
+import type { Visit, VisitStatus, MembershipVisitPhase, MembershipCapStatus } from "@ai-fsm/domain";
 import { VisitAssignForm } from "./VisitAssignForm";
 import { VisitRescheduleForm } from "./VisitRescheduleForm";
 import { VisitTransitionForm } from "./VisitTransitionForm";
@@ -18,6 +18,8 @@ import { VisitIssuePanel } from "./VisitIssuePanel";
 import { VisitResolutionPanel } from "./VisitResolutionPanel";
 import { VisitPartsPanel } from "./VisitPartsPanel";
 import { VisitClosingChecklist } from "./VisitClosingChecklist";
+import { MembershipVisitPanel } from "./MembershipVisitPanel";
+import { VisitSnapshotPanel } from "./VisitSnapshotPanel";
 import {
   Card,
   EmptyState,
@@ -59,6 +61,11 @@ type VisitRow = Visit & {
   assigned_user_name: string | null;
   job_type: string | null;
   job_description: string | null;
+  generated_from_plan_id: string | null;
+  membership_visit_phase: MembershipVisitPhase;
+  included_labor_cap_minutes: number | null;
+  included_labor_minutes_used: number;
+  membership_cap_status: MembershipCapStatus;
 };
 
 const VISIT_STATUS_LABELS: Record<VisitStatus, string> = {
@@ -79,7 +86,9 @@ export default async function VisitDetailPage({
   if (!session) redirect("/login");
 
   const visit = await queryOne<VisitRow>(
-    `SELECT v.*, j.title AS job_title, j.job_type AS job_type, j.description AS job_description, u.full_name AS assigned_user_name
+    `SELECT v.*,
+            j.title AS job_title, j.job_type AS job_type, j.description AS job_description,
+            u.full_name AS assigned_user_name
      FROM visits v
      LEFT JOIN jobs j ON j.id = v.job_id
      LEFT JOIN users u ON u.id = v.assigned_user_id
@@ -108,6 +117,7 @@ export default async function VisitDetailPage({
     : [];
 
   const isRepairFlow = visit.job_type !== null && visit.job_type !== "maintenance";
+  const isMembershipVisit = visit.generated_from_plan_id !== null;
 
   // Load checklist (lazy-seeded on first access) unless visit is cancelled
   const checklistItems =
@@ -211,14 +221,43 @@ export default async function VisitDetailPage({
             <Timeline entries={timelineEntries} />
           </Card>
 
-          {/* ── Maintenance flow: full 28-item walkthrough ── */}
-          {!isRepairFlow && currentStatus !== "cancelled" && checklistItems.length > 0 && (
+          {/* ── Membership visit: phase stepper + labor cap ── */}
+          {isMembershipVisit && !isRepairFlow && currentStatus !== "cancelled" && (
+            <Card data-testid="membership-visit-phase-card">
+              <SectionHeader title="Membership Visit" />
+              <MembershipVisitPanel
+                visitId={visit.id}
+                phase={visit.membership_visit_phase ?? "health_check"}
+                capMinutes={visit.included_labor_cap_minutes}
+                minutesUsed={visit.included_labor_minutes_used ?? 0}
+                capStatus={visit.membership_cap_status ?? "within_cap"}
+                canUpdate={canNotes}
+                visitStatus={currentStatus}
+              />
+            </Card>
+          )}
+
+          {/* ── Maintenance flow: full 28-item walkthrough (health_check / included_action phases) ── */}
+          {!isRepairFlow && currentStatus !== "cancelled" && checklistItems.length > 0 &&
+            visit.membership_visit_phase !== "reporting" && (
             <Card data-testid="visit-checklist-panel">
               <SectionHeader title="Walkthrough Checklist" />
               <VisitChecklistForm
                 visitId={visit.id}
                 initialItems={checklistItems}
                 canUpdate={canChecklist}
+              />
+            </Card>
+          )}
+
+          {/* ── Membership reporting phase + completed membership visits: visit snapshot ── */}
+          {isMembershipVisit && !isRepairFlow &&
+            (visit.membership_visit_phase === "reporting" || currentStatus === "completed") && (
+            <Card data-testid="visit-snapshot-card">
+              <SectionHeader title="Visit Summary" />
+              <VisitSnapshotPanel
+                checklistItems={checklistItems}
+                techNotes={visit.tech_notes ?? null}
               />
             </Card>
           )}

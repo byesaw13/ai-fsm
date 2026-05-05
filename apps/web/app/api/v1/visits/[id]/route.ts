@@ -5,8 +5,14 @@ import type { AuthSession } from "../../../../../lib/auth/middleware";
 import { queryOne, getPool } from "../../../../../lib/db";
 import { appendAuditLog } from "../../../../../lib/db/audit";
 import { logger } from "../../../../../lib/logger";
+import { computeCapStatus } from "../../../../../lib/visits/membership-cap";
+import { MEMBERSHIP_VISIT_PHASES } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
+
+const membershipVisitPhaseSchema = z.enum(
+  MEMBERSHIP_VISIT_PHASES as unknown as [string, ...string[]]
+);
 
 // Owner/admin can update all mutable fields
 const ownerUpdateBody = z.object({
@@ -16,13 +22,17 @@ const ownerUpdateBody = z.object({
   tech_notes: z.string().nullable().optional(),
   materials_used: z.string().nullable().optional(),
   issue_description: z.string().nullable().optional(),
+  membership_visit_phase: membershipVisitPhaseSchema.optional(),
+  included_labor_minutes_used: z.number().int().nonnegative().optional(),
 });
 
-// Tech can update notes, materials, and issue description — unknown keys stripped by Zod
+// Tech can update notes, materials, issue description, and membership visit fields
 const techUpdateBody = z.object({
   tech_notes: z.string().nullable().optional(),
   materials_used: z.string().nullable().optional(),
   issue_description: z.string().nullable().optional(),
+  membership_visit_phase: membershipVisitPhaseSchema.optional(),
+  included_labor_minutes_used: z.number().int().nonnegative().optional(),
 });
 
 export const GET = withAuth(
@@ -117,6 +127,14 @@ export const PATCH = withAuth(
           fields.push(`${key} = $${idx++}`);
           values.push(val);
         }
+      }
+
+      // Auto-compute membership_cap_status when labor minutes are updated
+      if (parsed.data.included_labor_minutes_used !== undefined) {
+        const capMinutes = old.included_labor_cap_minutes as number | null;
+        const capStatus = computeCapStatus(parsed.data.included_labor_minutes_used, capMinutes);
+        fields.push(`membership_cap_status = $${idx++}`);
+        values.push(capStatus);
       }
 
       if (fields.length === 0) {
