@@ -345,6 +345,8 @@ export default async function VisitDetailPage({
                 beforePhotoCount={beforePhotos.length}
                 afterPhotoCount={afterPhotos.length}
                 closingAllDone={checklistItems.length > 0 && checklistItems.every((i) => i.disposition === "ok")}
+                isMembershipVisit={isMembershipVisit}
+                membershipPhase={visit.membership_visit_phase ?? "health_check"}
               />
             </Card>
           )}
