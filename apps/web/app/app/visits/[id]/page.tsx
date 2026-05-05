@@ -61,6 +61,7 @@ type VisitRow = Visit & {
   assigned_user_name: string | null;
   job_type: string | null;
   job_description: string | null;
+  job_property_id: string | null;
   generated_from_plan_id: string | null;
   membership_visit_phase: MembershipVisitPhase;
   included_labor_cap_minutes: number | null;
@@ -88,6 +89,7 @@ export default async function VisitDetailPage({
   const visit = await queryOne<VisitRow>(
     `SELECT v.*,
             j.title AS job_title, j.job_type AS job_type, j.description AS job_description,
+            j.property_id AS job_property_id,
             u.full_name AS assigned_user_name
      FROM visits v
      LEFT JOIN jobs j ON j.id = v.job_id
@@ -246,6 +248,7 @@ export default async function VisitDetailPage({
                 capStatus={visit.membership_cap_status ?? "within_cap"}
                 canUpdate={canNotes}
                 visitStatus={currentStatus}
+                propertyId={visit.job_property_id ?? null}
               />
             </Card>
           )}

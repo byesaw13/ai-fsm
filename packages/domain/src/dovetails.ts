@@ -224,6 +224,31 @@ export const ESTIMATE_PRICING_REVIEW_STATUSES = ["needs_review", "passed", "bloc
 export type EstimatePricingReviewStatus = typeof ESTIMATE_PRICING_REVIEW_STATUSES[number];
 
 // ---------------------------------------------------------------------------
+// Digital Home Vault
+// ---------------------------------------------------------------------------
+
+export const VAULT_CATEGORIES = [
+  "mechanical",
+  "appliance",
+  "filter",
+  "paint_finish",
+  "monitor",
+  "vendor",
+  "other",
+] as const;
+export type VaultCategory = typeof VAULT_CATEGORIES[number];
+
+export const VAULT_CATEGORY_LABELS: Record<VaultCategory, string> = {
+  mechanical:   "Mechanical Systems",
+  appliance:    "Appliances",
+  filter:       "Filters & Consumables",
+  paint_finish: "Paint & Finishes",
+  monitor:      "Monitor Items",
+  vendor:       "Vendors & Referrals",
+  other:        "Other",
+};
+
+// ---------------------------------------------------------------------------
 // Client document standards
 // ---------------------------------------------------------------------------
 
