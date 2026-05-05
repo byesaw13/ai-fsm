@@ -15,8 +15,7 @@ export function InlineClientForm({ onCreated, onCancel }: InlineClientFormProps)
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit() {
     if (!name.trim()) return;
     setPending(true);
     setError(null);
@@ -57,7 +56,7 @@ export function InlineClientForm({ onCreated, onCancel }: InlineClientFormProps)
           {error}
         </p>
       )}
-      <form onSubmit={handleSubmit}>
+      <div>
         <div className="p7-form-grid p7-form-grid-2" style={{ marginBottom: "var(--space-3)" }}>
           <Input
             id="new-client-name"
@@ -86,14 +85,14 @@ export function InlineClientForm({ onCreated, onCancel }: InlineClientFormProps)
           />
         </div>
         <div style={{ display: "flex", gap: "var(--space-2)" }}>
-          <Button type="submit" size="sm" disabled={pending || !name.trim()} loading={pending}>
+          <Button type="button" size="sm" disabled={pending || !name.trim()} loading={pending} onClick={handleSubmit}>
             Create Client
           </Button>
           <Button type="button" variant="secondary" size="sm" onClick={onCancel} disabled={pending}>
             Cancel
           </Button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

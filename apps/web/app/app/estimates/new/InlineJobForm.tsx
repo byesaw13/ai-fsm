@@ -14,8 +14,7 @@ export function InlineJobForm({ clientId, onCreated, onCancel }: InlineJobFormPr
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit() {
     if (!title.trim()) return;
     setPending(true);
     setError(null);
@@ -56,7 +55,7 @@ export function InlineJobForm({ clientId, onCreated, onCancel }: InlineJobFormPr
           {error}
         </p>
       )}
-      <form onSubmit={handleSubmit}>
+      <div>
         <div style={{ marginBottom: "var(--space-3)" }}>
           <Input
             id="new-job-title"
@@ -69,14 +68,14 @@ export function InlineJobForm({ clientId, onCreated, onCancel }: InlineJobFormPr
           />
         </div>
         <div style={{ display: "flex", gap: "var(--space-2)" }}>
-          <Button type="submit" size="sm" disabled={pending || !title.trim()} loading={pending}>
+          <Button type="button" size="sm" disabled={pending || !title.trim()} loading={pending} onClick={handleSubmit}>
             Create Job
           </Button>
           <Button type="button" variant="secondary" size="sm" onClick={onCancel} disabled={pending}>
             Cancel
           </Button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }

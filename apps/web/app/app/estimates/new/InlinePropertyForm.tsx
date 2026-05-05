@@ -17,8 +17,7 @@ export function InlinePropertyForm({ clientId, onCreated, onCancel }: InlineProp
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit() {
     if (!address.trim()) return;
     setPending(true);
     setError(null);
@@ -65,7 +64,7 @@ export function InlinePropertyForm({ clientId, onCreated, onCancel }: InlineProp
           {error}
         </p>
       )}
-      <form onSubmit={handleSubmit}>
+      <div>
         <div className="p7-form-grid p7-form-grid-2" style={{ marginBottom: "var(--space-3)" }}>
           <Input
             id="new-property-address"
@@ -100,14 +99,14 @@ export function InlinePropertyForm({ clientId, onCreated, onCancel }: InlineProp
           />
         </div>
         <div style={{ display: "flex", gap: "var(--space-2)" }}>
-          <Button type="submit" size="sm" disabled={pending || !address.trim()} loading={pending}>
+          <Button type="button" size="sm" disabled={pending || !address.trim()} loading={pending} onClick={handleSubmit}>
             Create Property
           </Button>
           <Button type="button" variant="secondary" size="sm" onClick={onCancel} disabled={pending}>
             Cancel
           </Button>
         </div>
-      </form>
+      </div>
     </div>
   );
 }
