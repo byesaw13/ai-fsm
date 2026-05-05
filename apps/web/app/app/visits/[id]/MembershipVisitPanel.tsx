@@ -18,6 +18,7 @@ interface Props {
   capStatus: MembershipCapStatus;
   canUpdate: boolean;
   visitStatus: string;
+  propertyId: string | null;
 }
 
 const PHASES: MembershipVisitPhase[] = ["health_check", "included_action", "reporting"];
@@ -30,6 +31,7 @@ export function MembershipVisitPanel({
   capStatus,
   canUpdate,
   visitStatus,
+  propertyId,
 }: Props) {
   const router = useRouter();
   const toast = useToast();
@@ -302,6 +304,22 @@ export function MembershipVisitPanel({
             ? "Advancing…"
             : `Complete ${MEMBERSHIP_PHASE_LABELS[phase]} → ${MEMBERSHIP_PHASE_LABELS[next]}`}
         </button>
+      )}
+
+      {/* Property vault shortcut */}
+      {propertyId && (
+        <div style={{ marginTop: "var(--space-4)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--color-border)" }}>
+          <a
+            href={`/app/properties/${propertyId}`}
+            className="p7-btn p7-btn-ghost p7-btn-sm"
+            data-testid="property-vault-link"
+          >
+            View Property Vault →
+          </a>
+          <p style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)", marginTop: "var(--space-1)" }}>
+            Log systems, appliances, and materials found during this visit.
+          </p>
+        </div>
       )}
     </div>
   );

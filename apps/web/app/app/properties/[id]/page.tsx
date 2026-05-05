@@ -16,6 +16,7 @@ import {
 } from "@/components/ui";
 import type { TimelineEntryData } from "@/components/ui";
 import { PropertyForm } from "../PropertyForm";
+import { PropertyVaultSection } from "../PropertyVaultSection";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,14 @@ type PropertyRow = {
 type ClientOption = { id: string; name: string };
 type JobRow = { id: string; title: string; status: string; created_at: string };
 type VisitRow = { id: string; status: string; scheduled_start: string; job_title: string };
+import type { VaultCategory } from "@ai-fsm/domain";
+
+type VaultItemRow = {
+  id: string; category: VaultCategory; name: string; location: string | null;
+  manufacturer: string | null; model_number: string | null; serial_number: string | null;
+  install_date: string | null; last_serviced_date: string | null; next_service_date: string | null;
+  notes: string | null;
+};
 
 export default async function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -59,7 +68,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
   );
   if (!property) notFound();
 
-  const [clients, jobs, visits] = await Promise.all([
+  const [clients, jobs, visits, vaultItems] = await Promise.all([
     query<ClientOption>(`SELECT id, name FROM clients WHERE account_id = $1 ORDER BY name ASC`, [session.accountId]),
     query<JobRow>(
       `SELECT id, title, status, created_at
@@ -76,6 +85,14 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
        WHERE j.property_id = $1 AND v.account_id = $2
        ORDER BY v.scheduled_start DESC
        LIMIT 10`,
+      [id, session.accountId]
+    ),
+    query<VaultItemRow>(
+      `SELECT id, category, name, location, manufacturer, model_number,
+              serial_number, install_date, last_serviced_date, next_service_date, notes
+       FROM property_vault_items
+       WHERE property_id = $1 AND account_id = $2
+       ORDER BY category ASC, name ASC`,
       [id, session.accountId]
     ),
   ]);
@@ -124,6 +141,15 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
           <Card>
             <SectionHeader title="Visit History" />
             <Timeline entries={activityEntries} emptyMessage="No visits scheduled at this property yet." />
+          </Card>
+
+          <Card data-testid="property-vault-card">
+            <SectionHeader title="Digital Home Vault" count={vaultItems.length} />
+            <PropertyVaultSection
+              propertyId={property.id}
+              initialItems={vaultItems}
+              canEdit={canManageClients(session.role)}
+            />
           </Card>
 
           <Card>
