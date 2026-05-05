@@ -179,6 +179,28 @@ Validation for this release:
 - `pnpm gate` passed locally (535 unit tests).
 - GitHub CI passed: lint, typecheck, build, test.
 
+### Implemented in Intake Gate Enforcement Release
+
+PR: https://github.com/byesaw13/ai-fsm/pull/130
+Merge commit: `c6acc87`
+Production deploy: May 5, 2026
+Migration: none (all columns ship in migration 028)
+
+Completed in that release:
+
+- Added `lib/jobs/intake-guard.ts`: pure `reviewJobIntakeGate()` helper returning `passed`, `blocked`, or `warning`.
+- Gate fires only on `draft → quoted` transition — no other status paths are affected.
+- Hard block (409 `INTAKE_GATE_BLOCKED`): transition rejected when `intake_decision = 'decline'`. Owner must update the intake decision before advancing.
+- Soft warning: when `intake_decision` is NULL, the transition still succeeds but the success response includes a `warning` string. `JobTransitionForm` renders this as amber `.warning-inline` text below the buttons.
+- Existing jobs with NULL intake fields continue to flow normally — only an explicit `decline` produces a hard stop.
+- Jobs list now shows `job_category` (italic muted label) and `intake_decision` (color-coded: accept = green, decline = red, defer/reframe = amber) on each job card.
+- Added 5 unit tests covering all gate outcomes (decline, null, accept, defer, reframe).
+
+Validation for this release:
+
+- `pnpm gate` passed locally (540 unit tests).
+- GitHub CI passed: lint, typecheck, build, test.
+
 ### Implemented in Fix Now → Estimate Release
 
 PR: https://github.com/byesaw13/ai-fsm/pull/125
@@ -270,13 +292,14 @@ Done:
 - Intake notes field exists.
 - `JobIntakePanel` on job detail page gives owners a live acceptance score and one-click decision recording.
 - Category and intake constants added to domain package.
+- Intake gate enforced on `draft → quoted`: hard block on `decline`, amber warning on NULL decision (existing jobs unaffected).
+- Intake category and decision surfaced on the jobs list with color-coded labels.
 
 Still needed:
 
-- Add warnings or owner override when a job scores poorly (e.g., block moving to Quoted without intake decision recorded).
 - Add Wednesday protection logic for maintenance/baseline work.
 - Add schedule policy warnings for random project work on protected maintenance days.
-- Surface intake category and decision on the jobs list and owner dashboard.
+- Surface intake decision on the owner dashboard (Phase 9).
 
 ## Phase 3: Pricing System Upgrade
 
