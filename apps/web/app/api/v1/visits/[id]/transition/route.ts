@@ -102,6 +102,25 @@ export const POST = withAuth(
         );
       }
 
+      // Precondition: membership visits must reach the Reporting phase before completion.
+      if (
+        targetStatus === "completed" &&
+        visit.generated_from_plan_id &&
+        visit.membership_visit_phase !== "reporting"
+      ) {
+        await client.query("ROLLBACK");
+        return NextResponse.json(
+          {
+            error: {
+              code: "PRECONDITION_FAILED",
+              message: "Complete the Reporting phase before marking this membership visit as done",
+              traceId: session.traceId,
+            },
+          },
+          { status: 422 }
+        );
+      }
+
       // -----------------------------------------------------------------------
       // "Start Job" — when tech taps arrived, we step through two valid DB
       // transitions in one transaction to satisfy the trigger:

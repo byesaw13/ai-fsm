@@ -14,6 +14,8 @@ interface Props {
   beforePhotoCount?: number;
   afterPhotoCount?: number;
   closingAllDone?: boolean;
+  isMembershipVisit?: boolean;
+  membershipPhase?: string;
 }
 
 // What the tech sees: plain-English action buttons sized for a phone screen.
@@ -35,6 +37,8 @@ export function VisitTransitionForm({
   beforePhotoCount = 0,
   afterPhotoCount = 0,
   closingAllDone = false,
+  isMembershipVisit = false,
+  membershipPhase,
 }: Props) {
   const router = useRouter();
   const toast = useToast();
@@ -76,11 +80,14 @@ export function VisitTransitionForm({
     const isRepairFlow = jobType !== undefined && jobType !== "maintenance";
     const isCompletionAction = action.next === "completed";
 
-    // Hard gates for completing a repair-flow visit
+    // Hard gates for completing a visit
     const blockers: string[] = [];
     if (isRepairFlow && isCompletionAction) {
       if (afterPhotoCount === 0) blockers.push("Add at least one photo of the completed work");
       if (!closingAllDone) blockers.push("Check off all closing checklist steps");
+    }
+    if (isMembershipVisit && isCompletionAction && membershipPhase !== "reporting") {
+      blockers.push("Advance to the Reporting phase and complete the visit summary before closing");
     }
     const isBlocked = blockers.length > 0;
 
