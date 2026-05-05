@@ -142,6 +142,40 @@ export const JOB_ACCEPTANCE_CATEGORIES = [
 ] as const;
 export type JobAcceptanceCategory = typeof JOB_ACCEPTANCE_CATEGORIES[number];
 
+export const JOB_ACCEPTANCE_CATEGORY_LABELS: Record<JobAcceptanceCategory, string> = {
+  membership:           "Membership Work",
+  realtor_baseline:     "Realtor Baseline",
+  high_margin_project:  "High-Margin Project",
+  reactive_low_quality: "Reactive / Low-Quality",
+};
+
+export const JOB_INTAKE_DECISIONS = ["accept", "decline", "defer", "reframe"] as const;
+export type JobIntakeDecision = typeof JOB_INTAKE_DECISIONS[number];
+
+export const JOB_INTAKE_DECISION_LABELS: Record<JobIntakeDecision, string> = {
+  accept:  "Accept",
+  decline: "Decline",
+  defer:   "Defer",
+  reframe: "Reframe",
+};
+
+export const JOB_INTAKE_RATING_FIELDS = [
+  "strategy_fit",
+  "scope_clarity",
+  "margin_confidence",
+  "schedule_impact",
+  "quality_fit",
+] as const;
+export type JobIntakeRatingField = typeof JOB_INTAKE_RATING_FIELDS[number];
+
+export const JOB_INTAKE_RATING_LABELS: Record<JobIntakeRatingField, string> = {
+  strategy_fit:      "Strategy Fit",
+  scope_clarity:     "Scope Clarity",
+  margin_confidence: "Margin Confidence",
+  schedule_impact:   "Schedule Impact",
+  quality_fit:       "Quality Fit",
+};
+
 // ---------------------------------------------------------------------------
 // Job types
 // ---------------------------------------------------------------------------

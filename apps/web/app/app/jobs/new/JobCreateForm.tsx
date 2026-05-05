@@ -13,6 +13,7 @@ import {
 } from "@/components/ui";
 import type { ScheduleValue } from "@/components/ui";
 import { scheduleToISOPair } from "@/components/ui";
+import { JOB_ACCEPTANCE_CATEGORIES, JOB_ACCEPTANCE_CATEGORY_LABELS } from "@ai-fsm/domain";
 
 interface Client {
   id: string;
@@ -83,6 +84,7 @@ export function JobCreateForm({
         : "",
     description: "",
     job_type: "custom",
+    job_category: "",
     priority: 0,
   });
 
@@ -145,6 +147,7 @@ export function JobCreateForm({
         property_id: form.property_id || undefined,
         description: form.description.trim() || undefined,
         job_type: form.job_type,
+        job_category: form.job_category || undefined,
         priority: form.priority,
         scheduled_start: start,
         scheduled_end: end,
@@ -248,6 +251,16 @@ export function JobCreateForm({
           onChange={(e) => setForm({ ...form, job_type: e.target.value })}
           disabled={pending}
           options={JOB_TYPE_OPTIONS}
+        />
+
+        <Select
+          id="job_category"
+          label="Job Category"
+          value={form.job_category}
+          onChange={(e) => setForm({ ...form, job_category: e.target.value })}
+          disabled={pending}
+          options={JOB_ACCEPTANCE_CATEGORIES.map((c) => ({ value: c, label: JOB_ACCEPTANCE_CATEGORY_LABELS[c] }))}
+          placeholder="Select category (optional)"
         />
 
         <Select
