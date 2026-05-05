@@ -11,6 +11,7 @@ import {
 } from "@/components/ui";
 import type { ScheduleValue } from "@/components/ui";
 import { scheduleToISOPair } from "@/components/ui";
+import { reviewScheduleDay } from "@/lib/jobs/schedule-guard";
 
 interface User {
   id: string;
@@ -27,13 +28,15 @@ interface VisitScheduleFormProps {
   jobId: string;
   users: User[];
   canAssign: boolean;
+  jobCategory?: string | null;
 }
 
-export function VisitScheduleForm({ jobId, users, canAssign }: VisitScheduleFormProps) {
+export function VisitScheduleForm({ jobId, users, canAssign, jobCategory }: VisitScheduleFormProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
+  const [scheduleWarning, setScheduleWarning] = useState("");
 
   const [schedule, setSchedule] = useState<ScheduleValue>({
     date: "",
@@ -110,13 +113,20 @@ export function VisitScheduleForm({ jobId, users, canAssign }: VisitScheduleForm
       <div className="p7-form-grid p7-form-grid-2">
         <ScheduleFields
           value={schedule}
-          onChange={setSchedule}
+          onChange={(s) => {
+            setSchedule(s);
+            setScheduleWarning(reviewScheduleDay(s.date, jobCategory ?? null).warning ?? "");
+          }}
           required
           disabled={pending}
           dateError={errors.schedule_date}
           timeError={errors.schedule_time}
         />
       </div>
+
+      {scheduleWarning && (
+        <p className="warning-inline" data-testid="schedule-day-warning">{scheduleWarning}</p>
+      )}
 
       {canAssign && (
         <Select

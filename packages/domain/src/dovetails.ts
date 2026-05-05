@@ -177,6 +177,13 @@ export const JOB_INTAKE_RATING_LABELS: Record<JobIntakeRatingField, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// Scheduling policy
+// ---------------------------------------------------------------------------
+
+export const MAINTENANCE_SCHEDULE_DAY_OF_WEEK = 3; // Wednesday (JS Date.getDay(), 0=Sun)
+export const MAINTENANCE_JOB_CATEGORIES: JobAcceptanceCategory[] = ["membership", "realtor_baseline"];
+
+// ---------------------------------------------------------------------------
 // Job types
 // ---------------------------------------------------------------------------
 

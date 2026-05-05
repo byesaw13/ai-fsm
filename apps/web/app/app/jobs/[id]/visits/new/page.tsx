@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 interface Job {
   id: string;
   title: string | null;
+  job_category: string | null;
   [key: string]: unknown;
 }
 
@@ -31,7 +32,7 @@ export default async function NewVisitPage({
   if (!canCreateVisit(session.role)) redirect(`/app/jobs/${id}`);
 
   const job = await queryOne<Job>(
-    `SELECT id, title FROM jobs WHERE id = $1 AND account_id = $2`,
+    `SELECT id, title, job_category FROM jobs WHERE id = $1 AND account_id = $2`,
     [id, session.accountId]
   );
 
@@ -55,7 +56,7 @@ export default async function NewVisitPage({
         backLabel={job.title ?? "Job"}
       />
       <Card>
-        <VisitScheduleForm jobId={id} users={users} canAssign={canAssign} />
+        <VisitScheduleForm jobId={id} users={users} canAssign={canAssign} jobCategory={job.job_category ?? null} />
       </Card>
     </PageContainer>
   );

@@ -41,6 +41,7 @@ export default async function OwnerDashboardPage() {
     openInvoices,
     overdueInvoices,
     expensesMissingJob,
+    draftsNeedingIntake,
   ] = await Promise.all([
     query<CountRow>(
       `SELECT COUNT(*)::text AS count FROM estimates WHERE account_id = $1 AND status = 'draft'`,
@@ -91,13 +92,26 @@ export default async function OwnerDashboardPage() {
       `SELECT COUNT(*)::text AS count FROM expenses WHERE account_id = $1 AND job_id IS NULL`,
       [session.accountId]
     ),
+    query<CountRow>(
+      `SELECT COUNT(*)::text AS count FROM jobs
+       WHERE account_id = $1 AND status = 'draft' AND intake_decision IS NULL`,
+      [session.accountId]
+    ),
   ]);
+
+  const draftsNeedingIntakeCount = parseInt(draftsNeedingIntake[0]?.count || "0", 10);
 
   const metrics: MetricCardData[] = [
     {
       label: "Draft Estimates",
       value: parseInt(draftEstimates[0]?.count || "0", 10),
       href: "/app/estimates?status=draft",
+    },
+    {
+      label: "Drafts Needing Intake",
+      value: draftsNeedingIntakeCount,
+      href: "/app/jobs?status=draft",
+      variant: draftsNeedingIntakeCount > 0 ? "alert" : "default",
     },
     {
       label: "Sent — Awaiting Approval",
