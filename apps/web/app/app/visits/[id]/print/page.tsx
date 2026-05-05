@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 interface VisitReportRow extends Record<string, unknown> {
   id: string;
   status: string;
+  assigned_user_id: string | null;
   scheduled_start: Date;
   scheduled_end: Date;
   completed_at: Date | null;
@@ -103,7 +104,7 @@ export default async function VisitReportPrintPage({
 
   const visit = await queryOne<VisitReportRow>(
     `SELECT
-       v.id, v.status,
+       v.id, v.status, v.assigned_user_id,
        v.scheduled_start, v.scheduled_end, v.completed_at,
        v.tech_notes, v.materials_used,
        v.membership_visit_phase,
@@ -129,6 +130,15 @@ export default async function VisitReportPrintPage({
   );
 
   if (!visit) notFound();
+
+  // Techs can only access their own assigned visits
+  if (session.role === "tech" && visit.assigned_user_id !== session.userId) notFound();
+
+  // Report is only valid for completed visits or membership visits in reporting phase
+  const isReportable =
+    visit.status === "completed" ||
+    (visit.job_type === "maintenance" && visit.membership_visit_phase === "reporting");
+  if (!isReportable) notFound();
 
   const checklistItems = await query<ChecklistRow>(
     `SELECT id, label, disposition, note, section, sort_order
