@@ -7,6 +7,7 @@ import { appendAuditLog } from "../../../../../../lib/db/audit";
 import { logger } from "../../../../../../lib/logger";
 import { jobTransitions, jobStatusSchema } from "@ai-fsm/domain";
 import type { JobStatus } from "@ai-fsm/domain";
+import { reviewJobIntakeGate } from "../../../../../../lib/jobs/intake-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -85,6 +86,26 @@ export const POST = withRole(
           },
           { status: 422 }
         );
+      }
+
+      // Intake gate: fires only on draft → quoted
+      let intakeWarning: string | null = null;
+      if (currentStatus === "draft" && targetStatus === "quoted") {
+        const gate = reviewJobIntakeGate(job);
+        if (gate.status === "blocked") {
+          await client.query("ROLLBACK");
+          return NextResponse.json(
+            {
+              error: {
+                code: "INTAKE_GATE_BLOCKED",
+                message: gate.blocker,
+                traceId: session.traceId,
+              },
+            },
+            { status: 409 }
+          );
+        }
+        intakeWarning = gate.warning;
       }
 
       const { rows } = await client.query(
@@ -176,6 +197,9 @@ export const POST = withRole(
       const response: Record<string, unknown> = { data: updated };
       if (balance_invoice_id) {
         response.balance_invoice_id = balance_invoice_id;
+      }
+      if (intakeWarning) {
+        response.warning = intakeWarning;
       }
       return NextResponse.json(response);
     } catch (err) {
