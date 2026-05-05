@@ -252,8 +252,9 @@ Done:
 
 Still needed:
 
-- Rename or align `Optional` to the business-facing label `Optional Improvements` where appropriate.
 - Move filename format rules into a formal domain-level document standard if additional document types need generation outside estimates.
+
+Note: `Optional Improvements` label is already in use in `VisitSnapshotPanel` — no rename needed.
 
 ## Phase 2: Job Intake and Acceptance Control
 
@@ -345,7 +346,7 @@ Still needed:
   - client responsibilities
 - Ensure invoices show labor/service cost, not labor hours, unless intentionally overridden.
 - Add consistent estimate and invoice terms as versioned standards.
-- Expand document filename generator to invoices, membership enrollment/plan summaries, and visit reports.
+- Expand document filename generator to invoices and membership enrollment/plan summaries (visit report filename already ships via `buildClientDocumentFilename` in PR #121).
 - Add one-active-master-template rule per category.
 
 ## Phase 5: Membership Model Rebuild
