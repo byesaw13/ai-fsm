@@ -133,7 +133,7 @@ export default function NewPlanForm({
             const tier = e.target.value;
             setSelectedTier(tier);
             const pricing = publishedPricing[tier];
-            if (pricing) setAnnualPrice((pricing.annual / 100).toFixed(2));
+            setAnnualPrice(pricing ? (pricing.annual / 100).toFixed(2) : "");
           }}
           options={[
             { value: "essential", label: "Essential" },

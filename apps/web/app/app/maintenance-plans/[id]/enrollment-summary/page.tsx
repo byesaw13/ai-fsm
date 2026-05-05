@@ -1,5 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
+import { canManageClients } from "@/lib/auth/permissions";
 import { queryOne } from "@/lib/db";
 import { PrintButton } from "./PrintButton";
 
@@ -73,6 +74,7 @@ export default async function EnrollmentSummaryPage({
   const { id } = await params;
   const session = await getSession();
   if (!session) redirect("/login");
+  if (!canManageClients(session.role)) redirect("/app");
 
   const plan = await queryOne<PlanRow>(
     `SELECT
