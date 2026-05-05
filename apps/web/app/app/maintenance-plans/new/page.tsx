@@ -25,6 +25,13 @@ interface PropertyRow {
   [key: string]: unknown;
 }
 
+interface PricingRow {
+  tier: string;
+  annual_price_cents: number;
+  monthly_price_cents: number;
+  [key: string]: unknown;
+}
+
 export default async function NewMaintenancePlanPage() {
   const session = await getSession();
   if (!session) redirect("/login");
@@ -43,6 +50,18 @@ export default async function NewMaintenancePlanPage() {
      ORDER BY p.address`,
     [session.accountId]
   );
+
+  const publishedPricing = await query<PricingRow>(
+    `SELECT tier, annual_price_cents, monthly_price_cents
+     FROM membership_pricing_structures
+     WHERE account_id = $1 AND is_published = true`,
+    [session.accountId]
+  );
+
+  const pricingByTier: Record<string, { annual: number; monthly: number }> = {};
+  for (const row of publishedPricing) {
+    pricingByTier[row.tier] = { annual: row.annual_price_cents, monthly: row.monthly_price_cents };
+  }
 
   const clientOptions = clients.map((c) => ({ value: c.id, label: c.name }));
   const propertyOptions = properties.map((p) => ({
@@ -65,6 +84,7 @@ export default async function NewMaintenancePlanPage() {
           clientOptions={clientOptions}
           propertyOptions={[{ value: "", label: "None" }, ...propertyOptions]}
           frequencyOptions={frequencyOptions}
+          publishedPricing={pricingByTier}
         />
       </Card>
     </PageContainer>

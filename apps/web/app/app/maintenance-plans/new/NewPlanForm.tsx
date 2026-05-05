@@ -21,14 +21,21 @@ export default function NewPlanForm({
   clientOptions,
   propertyOptions,
   frequencyOptions,
+  publishedPricing = {},
 }: {
   clientOptions: Option[];
   propertyOptions: Option[];
   frequencyOptions: Option[];
+  publishedPricing?: Record<string, { annual: number; monthly: number }>;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTier, setSelectedTier] = useState("plus");
+  const [annualPrice, setAnnualPrice] = useState(() => {
+    const pricing = publishedPricing["plus"];
+    return pricing ? (pricing.annual / 100).toFixed(2) : "";
+  });
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -121,7 +128,13 @@ export default function NewPlanForm({
           id="membership_tier"
           name="membership_tier"
           label="Membership Tier"
-          defaultValue="plus"
+          value={selectedTier}
+          onChange={(e) => {
+            const tier = e.target.value;
+            setSelectedTier(tier);
+            const pricing = publishedPricing[tier];
+            if (pricing) setAnnualPrice((pricing.annual / 100).toFixed(2));
+          }}
           options={[
             { value: "essential", label: "Essential" },
             { value: "plus", label: "Plus" },
@@ -205,8 +218,15 @@ export default function NewPlanForm({
             className="p7-input"
             style={{ paddingLeft: "var(--space-6)" }}
             placeholder="0.00"
+            value={annualPrice}
+            onChange={(e) => setAnnualPrice(e.target.value)}
           />
         </div>
+        {publishedPricing[selectedTier] && (
+          <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+            Pre-filled from published pricing for this tier
+          </p>
+        )}
       </div>
 
       <Select
