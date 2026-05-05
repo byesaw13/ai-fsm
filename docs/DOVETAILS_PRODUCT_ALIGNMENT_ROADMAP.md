@@ -158,6 +158,27 @@ Validation for this release:
 - `pnpm gate` passed locally (535 unit tests).
 - GitHub CI passed: lint, typecheck, build, test.
 
+### Implemented in Job Intake Fields Release
+
+PR: https://github.com/byesaw13/ai-fsm/pull/127
+Merge commit: `53eeffa0b517cae64bec0f3d0d085d03f307212f`
+Production deploy: May 5, 2026
+Migration: `028_job_intake_fields.sql`
+
+Completed in that release:
+
+- Added migration 028: `job_category`, `strategy_fit`, `scope_clarity`, `margin_confidence`, `schedule_impact`, `quality_fit` (smallint 1–5), `intake_decision` (accept/decline/defer/reframe), and `intake_notes` columns to the `jobs` table. All nullable.
+- Added domain constants: `JOB_ACCEPTANCE_CATEGORY_LABELS`, `JOB_INTAKE_DECISIONS`, `JOB_INTAKE_DECISION_LABELS`, `JOB_INTAKE_RATING_FIELDS`, `JOB_INTAKE_RATING_LABELS`.
+- PATCH `/api/v1/jobs/[id]`: all intake fields added to the update schema.
+- POST `/api/v1/jobs`: `job_category` added to the create schema.
+- Added `JobIntakePanel` client component on the job detail page (owner/admin only): category dropdown, five 1–5 button-group rating fields, decision toggle (Accept/Decline/Defer/Reframe), intake notes, and a live acceptance score (average of filled ratings, color-coded green ≥4 / amber ≥2.5 / red <2.5).
+- Added `job_category` dropdown to `JobCreateForm` alongside job type.
+
+Validation for this release:
+
+- `pnpm gate` passed locally (535 unit tests).
+- GitHub CI passed: lint, typecheck, build, test.
+
 ### Implemented in Fix Now → Estimate Release
 
 PR: https://github.com/byesaw13/ai-fsm/pull/125
@@ -238,29 +259,23 @@ Still needed:
 
 Goal: Make the system protect the calendar and margin before work enters the pipeline.
 
-Status: `Not Started`
+Status: `Partial`
 
-Target deliverables:
+Done:
 
-- Add job acceptance fields:
-  - strategy fit
-  - scope clarity
-  - margin confidence
-  - schedule impact
-  - quality fit
-- Add job category:
-  - Membership Work
-  - Realtor Baseline
-  - High-Margin Project
-  - Reactive / Low-Quality
-- Add decline/defer/reframe status.
-- Add warnings or owner override when a job fails the acceptance filter.
+- Job acceptance rating fields exist on jobs: strategy fit, scope clarity, margin confidence, schedule impact, quality fit (1–5 scale).
+- Job category field exists and is wired into job create and edit flows.
+- Decline/defer/reframe/accept intake decision field exists on jobs.
+- Intake notes field exists.
+- `JobIntakePanel` on job detail page gives owners a live acceptance score and one-click decision recording.
+- Category and intake constants added to domain package.
+
+Still needed:
+
+- Add warnings or owner override when a job scores poorly (e.g., block moving to Quoted without intake decision recorded).
 - Add Wednesday protection logic for maintenance/baseline work.
 - Add schedule policy warnings for random project work on protected maintenance days.
-
-Notes:
-
-- Category constants were added in Phase 1, but they are not yet wired into jobs, forms, scheduling, dashboards, or acceptance enforcement.
+- Surface intake category and decision on the jobs list and owner dashboard.
 
 ## Phase 3: Pricing System Upgrade
 
@@ -470,20 +485,21 @@ Current recommended order from this point:
 2. ~~Client visit snapshot report.~~ Done (PR #121)
 3. ~~Digital Home Vault foundation.~~ Done (PR #123)
 4. ~~Convert flagged visit items into quoted follow-up estimates.~~ Done (PR #125)
-5. Expand document naming/archive/master-template controls beyond estimates.
-6. Job intake and calendar protection.
-7. Realtor/concierge/routing workflows.
-8. Dashboards and enforcement.
+5. ~~Job intake fields and acceptance filter.~~ Done (PR #127)
+6. Expand document naming/archive/master-template controls beyond estimates.
+7. Job intake enforcement and calendar protection (Wednesday rule, intake gate before Quoted).
+8. Realtor/concierge/routing workflows.
+9. Dashboards and enforcement.
 
 ## Next Suggested Release
 
 Highest-leverage next release:
 
-- Add job intake fields: strategy fit, scope clarity, margin confidence, schedule impact, job category (Membership / Realtor Baseline / High-Margin / Reactive). Wire existing category constants into the job create/edit flow.
+- Add an intake enforcement gate: warn or block when a job moves from Draft → Quoted without an intake decision recorded. Surface job category and intake decision on the jobs list so the owner can see the pipeline composition at a glance.
 
 Reason:
 
-Fix Now items can now be converted to draft estimates in one click, closing the main revenue loop from flagged item to quoted work. Phase 6 remains Partial (snapshot delivery enforcement is still needed), but the highest-value next gap is giving the intake filter teeth so low-value work stops entering the pipeline unchecked.
+The intake fields are now in the DB, API, and UI — but they have no enforcement teeth. A job can move to Quoted and be scheduled without anyone filling in the intake filter. The next step is making that visible: a warning on the status transition and a category column on the jobs list turns the intake panel from optional metadata into a real pipeline gate.
 
 ## Update Rule
 
