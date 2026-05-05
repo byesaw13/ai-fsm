@@ -62,6 +62,7 @@ type VisitRow = Visit & {
   job_type: string | null;
   job_description: string | null;
   job_property_id: string | null;
+  job_client_id: string | null;
   generated_from_plan_id: string | null;
   membership_visit_phase: MembershipVisitPhase;
   included_labor_cap_minutes: number | null;
@@ -89,7 +90,7 @@ export default async function VisitDetailPage({
   const visit = await queryOne<VisitRow>(
     `SELECT v.*,
             j.title AS job_title, j.job_type AS job_type, j.description AS job_description,
-            j.property_id AS job_property_id,
+            j.property_id AS job_property_id, j.client_id AS job_client_id,
             u.full_name AS assigned_user_name
      FROM visits v
      LEFT JOIN jobs j ON j.id = v.job_id
@@ -120,6 +121,7 @@ export default async function VisitDetailPage({
 
   const isRepairFlow = visit.job_type !== null && visit.job_type !== "maintenance";
   const isMembershipVisit = visit.generated_from_plan_id !== null;
+  const canCreateEstimate = session.role === "owner" || session.role === "admin";
 
   // Load checklist (lazy-seeded on first access) unless visit is cancelled
   const checklistItems =
@@ -274,6 +276,11 @@ export default async function VisitDetailPage({
               <VisitSnapshotPanel
                 checklistItems={checklistItems}
                 techNotes={visit.tech_notes ?? null}
+                jobId={visit.job_id ?? null}
+                clientId={visit.job_client_id ?? null}
+                propertyId={visit.job_property_id ?? null}
+                canCreateEstimate={canCreateEstimate}
+                visitDate={toISO(visit.scheduled_start)}
               />
             </Card>
           )}
