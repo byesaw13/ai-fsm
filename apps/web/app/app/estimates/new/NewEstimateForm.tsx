@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -24,6 +24,9 @@ import {
   getMaterialsByCategory,
   type MaterialSuggestion,
 } from "@ai-fsm/domain";
+import { InlineClientForm } from "./InlineClientForm";
+import { InlineJobForm } from "./InlineJobForm";
+import { InlinePropertyForm } from "./InlinePropertyForm";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -148,17 +151,25 @@ export function NewEstimateForm({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Mutable entity lists — new entities added inline are appended here
+  const [clientList, setClientList] = useState<Client[]>(clients);
+  const [jobList, setJobList] = useState<Job[]>(jobs);
+  const [propertyList, setPropertyList] = useState<Property[]>(properties);
+
+  // Which inline quick-create form is open (at most one at a time)
+  const [inlineForm, setInlineForm] = useState<"client" | "job" | "property" | null>(null);
+
   // Service type: painting vs generic
   const [serviceType, setServiceType] = useState<"painting" | "generic">("painting");
 
   // Shared fields
   const [clientId, setClientId] = useState(
-    initialClientId && clients.some((c) => c.id === initialClientId)
+    initialClientId && clientList.some((c) => c.id === initialClientId)
       ? initialClientId
       : ""
   );
   const [jobId, setJobId] = useState(
-    initialJobId && jobs.some((j) => j.id === initialJobId) ? initialJobId : ""
+    initialJobId && jobList.some((j) => j.id === initialJobId) ? initialJobId : ""
   );
   const [propertyId, setPropertyId] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
@@ -241,13 +252,33 @@ export function NewEstimateForm({
   );
 
   const filteredJobs = useMemo(
-    () => (clientId ? jobs.filter((j) => j.client_id === clientId) : jobs),
-    [clientId, jobs]
+    () => (clientId ? jobList.filter((j) => j.client_id === clientId) : jobList),
+    [clientId, jobList]
   );
   const filteredProperties = useMemo(
-    () => (clientId ? properties.filter((p) => p.client_id === clientId) : []),
-    [clientId, properties]
+    () => (clientId ? propertyList.filter((p) => p.client_id === clientId) : []),
+    [clientId, propertyList]
   );
+
+  const handleClientCreated = useCallback((client: { id: string; name: string }) => {
+    setClientList((prev) => [...prev, client].sort((a, b) => a.name.localeCompare(b.name)));
+    setClientId(client.id);
+    setJobId("");
+    setPropertyId("");
+    setInlineForm(null);
+  }, []);
+
+  const handleJobCreated = useCallback((job: { id: string; title: string; client_id: string }) => {
+    setJobList((prev) => [...prev, job]);
+    setJobId(job.id);
+    setInlineForm(null);
+  }, []);
+
+  const handlePropertyCreated = useCallback((property: { id: string; address: string; client_id: string }) => {
+    setPropertyList((prev) => [...prev, property]);
+    setPropertyId(property.id);
+    setInlineForm(null);
+  }, []);
 
   // Clear job/property when client changes
   useEffect(() => {
@@ -734,51 +765,120 @@ export function NewEstimateForm({
 
       {/* Details */}
       <div className="p7-form-grid p7-form-grid-2">
-        <Select
-          id="client_id"
-          label="Client"
-          required
-          value={clientId}
-          onChange={(e) => {
-            setClientId(e.target.value);
-            setJobId("");
-            setPropertyId("");
-          }}
-          disabled={pending}
-          options={clients.map((c) => ({ value: c.id, label: c.name }))}
-          placeholder="Select a client"
-          hint={clients.length === 0 ? "No clients yet. Create one first." : undefined}
-        />
+        <div>
+          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-end" }}>
+            <div style={{ flex: 1 }}>
+              <Select
+                id="client_id"
+                label="Client"
+                required
+                value={clientId}
+                onChange={(e) => {
+                  setClientId(e.target.value);
+                  setJobId("");
+                  setPropertyId("");
+                  setInlineForm(null);
+                }}
+                disabled={pending}
+                options={clientList.map((c) => ({ value: c.id, label: c.name }))}
+                placeholder="Select a client"
+              />
+            </div>
+            <button
+              type="button"
+              className="p7-btn p7-btn-secondary p7-btn-sm"
+              onClick={() => setInlineForm(inlineForm === "client" ? null : "client")}
+              disabled={pending}
+              style={{ flexShrink: 0, marginBottom: "1px" }}
+            >
+              + New
+            </button>
+          </div>
+          {inlineForm === "client" && (
+            <InlineClientForm
+              onCreated={handleClientCreated}
+              onCancel={() => setInlineForm(null)}
+            />
+          )}
+        </div>
 
-        <Select
-          id="job_id"
-          label="Job (optional)"
-          value={jobId}
-          onChange={(e) => setJobId(e.target.value)}
-          disabled={pending || !clientId}
-          options={filteredJobs.map((j) => ({ value: j.id, label: j.title }))}
-          placeholder="None"
-          hint={
-            clientId && filteredJobs.length === 0
-              ? "No open jobs for this client."
-              : undefined
-          }
-        />
+        <div>
+          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-end" }}>
+            <div style={{ flex: 1 }}>
+              <Select
+                id="job_id"
+                label="Job (optional)"
+                value={jobId}
+                onChange={(e) => setJobId(e.target.value)}
+                disabled={pending || !clientId}
+                options={filteredJobs.map((j) => ({ value: j.id, label: j.title }))}
+                placeholder="None"
+                hint={
+                  clientId && filteredJobs.length === 0
+                    ? "No open jobs for this client."
+                    : undefined
+                }
+              />
+            </div>
+            {clientId && (
+              <button
+                type="button"
+                className="p7-btn p7-btn-secondary p7-btn-sm"
+                onClick={() => setInlineForm(inlineForm === "job" ? null : "job")}
+                disabled={pending}
+                style={{ flexShrink: 0, marginBottom: "1px" }}
+              >
+                + New
+              </button>
+            )}
+          </div>
+          {inlineForm === "job" && clientId && (
+            <InlineJobForm
+              clientId={clientId}
+              onCreated={handleJobCreated}
+              onCancel={() => setInlineForm(null)}
+            />
+          )}
+        </div>
 
-        <Select
-          id="property_id"
-          label="Property (optional)"
-          value={propertyId}
-          onChange={(e) => setPropertyId(e.target.value)}
-          disabled={pending || !clientId}
-          options={filteredProperties.map((p) => ({ value: p.id, label: p.address }))}
-          placeholder="None"
-          hint={
-            clientId && filteredProperties.length === 0
-              ? "No properties for this client."
-              : undefined
-          }
-        />
+        <div>
+          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-end" }}>
+            <div style={{ flex: 1 }}>
+              <Select
+                id="property_id"
+                label="Property (optional)"
+                value={propertyId}
+                onChange={(e) => setPropertyId(e.target.value)}
+                disabled={pending || !clientId}
+                options={filteredProperties.map((p) => ({ value: p.id, label: p.address }))}
+                placeholder="None"
+                hint={
+                  clientId && filteredProperties.length === 0
+                    ? "No properties for this client."
+                    : undefined
+                }
+              />
+            </div>
+            {clientId && (
+              <button
+                type="button"
+                className="p7-btn p7-btn-secondary p7-btn-sm"
+                onClick={() => setInlineForm(inlineForm === "property" ? null : "property")}
+                disabled={pending}
+                style={{ flexShrink: 0, marginBottom: "1px" }}
+              >
+                + New
+              </button>
+            )}
+          </div>
+          {inlineForm === "property" && clientId && (
+            <InlinePropertyForm
+              clientId={clientId}
+              onCreated={handlePropertyCreated}
+              onCancel={() => setInlineForm(null)}
+            />
+          )}
+        </div>
 
         <Input
           id="expires_at"
