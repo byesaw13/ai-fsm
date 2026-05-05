@@ -11,6 +11,7 @@ import {
   StatusBadge,
   type StatusVariant,
 } from "@/components/ui";
+import { computeRenewalStatus, MEMBER_PRIORITY_LABELS } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ interface MaintenancePlan {
   routing_zone: string;
   notes: string | null;
   membership_terms: string | null;
+  member_priority: string;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -87,6 +89,64 @@ export default async function MaintenancePlanDetailPage({
       LIMIT 20`,
     [id, session.accountId]
   );
+
+  // Membership value summary — aggregate stats across all plan visits
+  interface ValueSummaryRow {
+    visits_completed: string;
+    issues_caught: string;
+    recommended_follow_ups: string;
+    work_minutes_logged: string;
+    [key: string]: unknown;
+  }
+  const valueSummaryRows = await query<ValueSummaryRow>(
+    `SELECT
+       COUNT(DISTINCT v.id) FILTER (WHERE v.status = 'completed')::text         AS visits_completed,
+       COUNT(DISTINCT vci.id)
+         FILTER (WHERE vci.disposition IN ('fix_now','monitor','refer'))::text   AS issues_caught,
+       COUNT(DISTINCT vci.id) FILTER (WHERE vci.disposition = 'fix_now')::text  AS recommended_follow_ups,
+       COALESCE((
+         SELECT SUM(v2.included_labor_minutes_used)
+         FROM visits v2
+         WHERE v2.generated_from_plan_id = $1
+           AND v2.account_id = $2
+           AND v2.status = 'completed'
+       ), 0)::text                                                               AS work_minutes_logged
+     FROM visits v
+     LEFT JOIN visit_checklist_items vci
+       ON vci.visit_id = v.id AND vci.account_id = v.account_id
+     WHERE v.generated_from_plan_id = $1 AND v.account_id = $2`,
+    [id, session.accountId]
+  );
+
+  interface VaultCountRow { vault_records: string; [key: string]: unknown }
+  const vaultRows = plan.property_id
+    ? await query<VaultCountRow>(
+        `SELECT COUNT(*)::text AS vault_records
+         FROM property_vault_items
+         WHERE property_id = $1 AND account_id = $2`,
+        [plan.property_id, session.accountId]
+      )
+    : [];
+
+  const vs = valueSummaryRows[0];
+  const valueSummary = vs
+    ? {
+        visitsCompleted: parseInt(vs.visits_completed, 10),
+        issuesCaught: parseInt(vs.issues_caught, 10),
+        recommendedFollowUps: parseInt(vs.recommended_follow_ups, 10),
+        workMinutesLogged: parseInt(vs.work_minutes_logged, 10),
+        vaultRecords: parseInt(vaultRows[0]?.vault_records ?? "0", 10),
+      }
+    : null;
+
+  function formatMinutes(mins: number) {
+    if (mins < 60) return `${mins}m`;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  }
+
+  const renewalStatus = computeRenewalStatus(plan.renewal_date);
 
   const frequencyLabels: Record<string, string> = {
     monthly: "Monthly",
@@ -162,6 +222,12 @@ export default async function MaintenancePlanDetailPage({
               </dd>
             </div>
             <div>
+              <dt style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Member Priority</dt>
+              <dd style={{ margin: "2px 0 0", fontSize: "var(--text-sm)" }}>
+                {MEMBER_PRIORITY_LABELS[plan.member_priority as keyof typeof MEMBER_PRIORITY_LABELS] ?? "Standard"}
+              </dd>
+            </div>
+            <div>
               <dt style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Frequency</dt>
               <dd style={{ margin: "2px 0 0", fontSize: "var(--text-sm)" }}>{frequencyLabels[plan.frequency] || plan.frequency}</dd>
             </div>
@@ -198,8 +264,17 @@ export default async function MaintenancePlanDetailPage({
             {plan.renewal_date && (
               <div>
                 <dt style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Renewal Date</dt>
-                <dd style={{ margin: "2px 0 0", fontSize: "var(--text-sm)" }}>
+                <dd style={{ margin: "2px 0 0", fontSize: "var(--text-sm)", display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
                   {new Date(plan.renewal_date).toLocaleDateString()}
+                  {renewalStatus === "approaching" && (
+                    <span style={{ fontSize: "var(--text-xs)", fontWeight: "var(--font-semibold)", padding: "1px 6px", borderRadius: "var(--radius-sm)", background: "#fef3c7", color: "#92400e" }}>Soon</span>
+                  )}
+                  {renewalStatus === "expired" && (
+                    <span style={{ fontSize: "var(--text-xs)", fontWeight: "var(--font-semibold)", padding: "1px 6px", borderRadius: "var(--radius-sm)", background: "#fee2e2", color: "#991b1b" }}>Overdue</span>
+                  )}
+                  {renewalStatus === "active" && (
+                    <span style={{ fontSize: "var(--text-xs)", fontWeight: "var(--font-semibold)", padding: "1px 6px", borderRadius: "var(--radius-sm)", background: "#dcfce7", color: "#166534" }}>Active</span>
+                  )}
                 </dd>
               </div>
             )}
@@ -237,6 +312,29 @@ export default async function MaintenancePlanDetailPage({
           )}
         </Card>
       </div>
+
+      {/* Membership value summary */}
+      {valueSummary !== null && (
+        <Card padding="default" style={{ marginBottom: "var(--space-4)" }}>
+          <h3 style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", fontWeight: "var(--font-semibold)", color: "var(--fg-muted)", textTransform: "uppercase" }}>
+            Membership Value
+          </h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "var(--space-4)" }}>
+            {[
+              { label: "Visits Completed", value: valueSummary.visitsCompleted },
+              { label: "Issues Caught", value: valueSummary.issuesCaught },
+              { label: "Follow-Ups Flagged", value: valueSummary.recommendedFollowUps },
+              { label: "Work Logged", value: formatMinutes(valueSummary.workMinutesLogged) },
+              ...(plan.property_id ? [{ label: "Vault Records", value: valueSummary.vaultRecords }] : []),
+            ].map(({ label, value }) => (
+              <div key={label} style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "var(--text-2xl)", fontWeight: "var(--font-bold)", color: "var(--fg)" }}>{value}</div>
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: "2px" }}>{label}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Action buttons */}
       <div style={{ display: "flex", gap: "var(--space-3)", marginBottom: "var(--space-6)" }}>

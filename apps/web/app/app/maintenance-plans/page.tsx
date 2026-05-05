@@ -11,6 +11,7 @@ import {
   StatusBadge,
 } from "@/components/ui";
 import type { StatusVariant } from "@/components/ui";
+import { computeRenewalStatus } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ interface MaintenancePlanRow {
   included_labor_minutes_per_visit: number;
   annual_price_cents: number;
   renewal_date: string | null;
+  member_priority: string;
   routing_zone: string;
   status: string;
   next_scheduled_date: string | null;
@@ -141,11 +143,23 @@ export default async function MaintenancePlansPage({
             <Card hover padding="default">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "var(--space-3)" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-1)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-1)", flexWrap: "wrap" }}>
                     <span style={{ fontWeight: "var(--font-semibold)", fontSize: "var(--text-base)" }}>{plan.name}</span>
                     <StatusBadge variant={plan.status as StatusVariant}>
                       {plan.status}
                     </StatusBadge>
+                    {plan.member_priority === "vip" && (
+                      <span style={{ fontSize: "var(--text-xs)", fontWeight: "var(--font-semibold)", padding: "1px 6px", borderRadius: "var(--radius-sm)", background: "#fef3c7", color: "#92400e" }}>VIP</span>
+                    )}
+                    {plan.member_priority === "priority" && (
+                      <span style={{ fontSize: "var(--text-xs)", fontWeight: "var(--font-semibold)", padding: "1px 6px", borderRadius: "var(--radius-sm)", background: "#dbeafe", color: "#1e40af" }}>Priority</span>
+                    )}
+                    {(() => {
+                      const rs = computeRenewalStatus(plan.renewal_date);
+                      if (rs === "approaching") return <span style={{ fontSize: "var(--text-xs)", fontWeight: "var(--font-semibold)", padding: "1px 6px", borderRadius: "var(--radius-sm)", background: "#fef3c7", color: "#92400e" }}>Renewal Soon</span>;
+                      if (rs === "expired") return <span style={{ fontSize: "var(--text-xs)", fontWeight: "var(--font-semibold)", padding: "1px 6px", borderRadius: "var(--radius-sm)", background: "#fee2e2", color: "#991b1b" }}>Renewal Overdue</span>;
+                      return null;
+                    })()}
                   </div>
                   <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
                     {plan.client_name}

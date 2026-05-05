@@ -24,6 +24,7 @@ interface MaintenancePlanRow {
   routing_zone: "core" | "extended" | "out_of_area";
   notes: string | null;
   membership_terms: string | null;
+  member_priority: "standard" | "priority" | "vip";
   client_name: string;
   property_address: string | null;
   [key: string]: unknown;
@@ -74,6 +75,7 @@ export default async function EditMaintenancePlanPage({
           initialRoutingZone={plan.routing_zone ?? "core"}
           initialNotes={plan.notes ?? ""}
           initialMembershipTerms={plan.membership_terms ?? ""}
+          initialMemberPriority={plan.member_priority ?? "standard"}
         />
       </Card>
     </PageContainer>

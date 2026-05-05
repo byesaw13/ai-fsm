@@ -21,6 +21,7 @@ interface EditPlanFormProps {
   initialRoutingZone: "core" | "extended" | "out_of_area";
   initialNotes: string;
   initialMembershipTerms: string;
+  initialMemberPriority: "standard" | "priority" | "vip";
 }
 
 export default function EditPlanForm({
@@ -39,6 +40,7 @@ export default function EditPlanForm({
   initialRoutingZone,
   initialNotes,
   initialMembershipTerms,
+  initialMemberPriority,
 }: EditPlanFormProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -71,6 +73,7 @@ export default function EditPlanForm({
       routing_zone: formData.get("routing_zone") as string,
       notes: (formData.get("notes") as string) || null,
       membership_terms: (formData.get("membership_terms") as string) || null,
+      member_priority: formData.get("member_priority") as string,
     };
 
     try {
@@ -109,18 +112,32 @@ export default function EditPlanForm({
         />
       </div>
 
-      <Select
-        id="membership_tier"
-        name="membership_tier"
-        label="Membership Tier"
-        defaultValue={initialMembershipTier}
-        required
-        options={[
-          { value: "essential", label: "Essential" },
-          { value: "plus", label: "Plus" },
-          { value: "premier", label: "Premier" },
-        ]}
-      />
+      <div className="p7-form-grid p7-form-grid-2">
+        <Select
+          id="membership_tier"
+          name="membership_tier"
+          label="Membership Tier"
+          defaultValue={initialMembershipTier}
+          required
+          options={[
+            { value: "essential", label: "Essential" },
+            { value: "plus", label: "Plus" },
+            { value: "premier", label: "Premier" },
+          ]}
+        />
+        <Select
+          id="member_priority"
+          name="member_priority"
+          label="Member Priority"
+          defaultValue={initialMemberPriority}
+          required
+          options={[
+            { value: "standard", label: "Standard" },
+            { value: "priority", label: "Priority" },
+            { value: "vip", label: "VIP" },
+          ]}
+        />
+      </div>
 
       <Select
         id="frequency"

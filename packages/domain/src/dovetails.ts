@@ -130,6 +130,24 @@ export type MembershipVisitPhase = typeof MEMBERSHIP_VISIT_PHASES[number];
 export const MEMBERSHIP_CAP_STATUSES = ["within_cap", "cap_reached", "approval_required"] as const;
 export type MembershipCapStatus = typeof MEMBERSHIP_CAP_STATUSES[number];
 
+export const MEMBER_PRIORITY_LEVELS = ["standard", "priority", "vip"] as const;
+export type MemberPriorityLevel = typeof MEMBER_PRIORITY_LEVELS[number];
+export const MEMBER_PRIORITY_LABELS: Record<MemberPriorityLevel, string> = {
+  standard: "Standard",
+  priority: "Priority",
+  vip: "VIP",
+};
+
+export type MemberRenewalStatus = "active" | "approaching" | "expired" | "not_set";
+
+export function computeRenewalStatus(renewalDate: string | null | undefined): MemberRenewalStatus {
+  if (!renewalDate) return "not_set";
+  const daysUntil = Math.ceil((new Date(renewalDate).getTime() - Date.now()) / 86_400_000);
+  if (daysUntil < 0) return "expired";
+  if (daysUntil <= 30) return "approaching";
+  return "active";
+}
+
 // ---------------------------------------------------------------------------
 // Operations standards
 // ---------------------------------------------------------------------------
