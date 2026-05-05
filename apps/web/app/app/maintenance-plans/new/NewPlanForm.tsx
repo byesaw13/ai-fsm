@@ -60,6 +60,7 @@ export default function NewPlanForm({
       routing_zone: formData.get("routing_zone") as string,
       notes: (formData.get("notes") as string) || null,
       membership_terms: (formData.get("membership_terms") as string) || null,
+      member_priority: formData.get("member_priority") as string,
     };
 
     try {
@@ -115,18 +116,32 @@ export default function NewPlanForm({
         />
       </div>
 
-      <Select
-        id="membership_tier"
-        name="membership_tier"
-        label="Membership Tier"
-        defaultValue="plus"
-        options={[
-          { value: "essential", label: "Essential" },
-          { value: "plus", label: "Plus" },
-          { value: "premier", label: "Premier" },
-        ]}
-        required
-      />
+      <div className="p7-form-grid p7-form-grid-2">
+        <Select
+          id="membership_tier"
+          name="membership_tier"
+          label="Membership Tier"
+          defaultValue="plus"
+          options={[
+            { value: "essential", label: "Essential" },
+            { value: "plus", label: "Plus" },
+            { value: "premier", label: "Premier" },
+          ]}
+          required
+        />
+        <Select
+          id="member_priority"
+          name="member_priority"
+          label="Member Priority"
+          defaultValue="standard"
+          options={[
+            { value: "standard", label: "Standard" },
+            { value: "priority", label: "Priority" },
+            { value: "vip", label: "VIP" },
+          ]}
+          required
+        />
+      </div>
 
       <Select
         id="frequency"

@@ -22,6 +22,7 @@ const patchBody = z.object({
   routing_zone: z.enum(["core", "extended", "out_of_area"]).optional(),
   notes: z.string().nullable().optional(),
   membership_terms: z.string().nullable().optional(),
+  member_priority: z.enum(["standard", "priority", "vip"]).optional(),
 });
 
 export const GET = withRole(["owner", "admin"], async (request: NextRequest, session: AuthSession) => {

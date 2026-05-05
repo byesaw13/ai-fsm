@@ -24,6 +24,7 @@ const planBody = z.object({
   routing_zone: z.enum(["core", "extended", "out_of_area"]).default("core"),
   notes: z.string().optional().nullable(),
   membership_terms: z.string().optional().nullable(),
+  member_priority: z.enum(["standard", "priority", "vip"]).default("standard"),
 });
 
 export const GET = withRole(["owner", "admin"], async (_request: NextRequest, session: AuthSession) => {
@@ -64,6 +65,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     routing_zone,
     notes,
     membership_terms,
+    member_priority,
   } = parsed.data;
 
   const pool = getPool();
@@ -72,8 +74,8 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
        (account_id, client_id, property_id, name, membership_tier, frequency,
         services, price_cents, annual_visit_count, included_labor_minutes_per_visit,
         billing_cadence, annual_price_cents, status, next_scheduled_date,
-        renewal_date, routing_zone, notes, membership_terms, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+        renewal_date, routing_zone, notes, membership_terms, member_priority, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
      RETURNING *`,
     [
       session.accountId,
@@ -94,6 +96,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       routing_zone,
       notes ?? null,
       membership_terms ?? null,
+      member_priority,
       session.userId,
     ]
   );
