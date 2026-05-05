@@ -137,6 +137,27 @@ Validation for this release:
 - `pnpm gate` passed locally (535 unit tests).
 - GitHub CI passed: lint, typecheck, build, test.
 
+### Implemented in Visit Report Release
+
+PR: https://github.com/byesaw13/ai-fsm/pull/121
+Merge commit: `049c040a3a9765f33fb9f82a6c3de4cdee3a5eb5`
+Production deploy: May 5, 2026
+Migration: none
+
+Completed in that release:
+
+- Added `/app/visits/[id]/print` — server-rendered printable visit report following the estimate print pattern.
+- Sections: Dovetails header, Prepared For + Service Address, Visit Details (date/time/tech/labor cap bar), Work Completed, Findings & Recommendations (Fix Now / Monitor / Optional Improvements / Refer to Trade, each with an intro sentence), Tech Notes, Materials Used, Next Steps, footer.
+- Document filename generated via `buildClientDocumentFilename` → `YYYY-MM-DD_LASTNAME_maintenance_Visit_Report_Final`.
+- Added "Print Report" link in the visit detail page header — shown for maintenance visits that are completed or in reporting phase with checklist items.
+- Tech access control: techs can only access print page for their own assigned visits.
+- Phase guard: print page returns 404 for visits not in a reportable state (not completed and not in reporting phase).
+
+Validation for this release:
+
+- `pnpm gate` passed locally (535 unit tests).
+- GitHub CI passed: lint, typecheck, build, test.
+
 ## Status Legend
 
 - `Done`: implemented, tested, and shipped.
@@ -327,7 +348,6 @@ Still needed:
 
 - Convert flagged checklist items into quoted follow-up estimates from within the visit.
 - Enforce same-day/next-day snapshot delivery (block visit completion without snapshot sent).
-- Add client-facing visit report output (printable/emailable summary).
 
 ## Phase 7: Digital Home Vault
 
@@ -416,25 +436,26 @@ Target deliverables:
 
 Current recommended order from this point:
 
-1. Membership visit workflow and labor-cap controls.
-2. Client visit snapshot report.
+1. ~~Membership visit workflow and labor-cap controls.~~ Done (PR #119)
+2. ~~Client visit snapshot report.~~ Done (PR #121)
 3. Digital Home Vault foundation.
-4. Expand document naming/archive/master-template controls beyond estimates.
-5. Job intake and calendar protection.
-6. Realtor/concierge/routing workflows.
-7. Dashboards and enforcement.
+4. Convert flagged visit items into quoted follow-up estimates.
+5. Expand document naming/archive/master-template controls beyond estimates.
+6. Job intake and calendar protection.
+7. Realtor/concierge/routing workflows.
+8. Dashboards and enforcement.
 
 ## Next Suggested Release
 
 Highest-leverage next release:
 
-- Add client-facing visit report output: printable/emailable summary generated from the snapshot panel.
-- Convert flagged checklist items into quoted follow-up estimates directly from the visit.
-- Begin Digital Home Vault foundation: vault tables for mechanicals, appliances, filter sizes, paint/finish notes, install dates.
+- Begin Digital Home Vault foundation: migration + vault tables for mechanicals, appliances, filter sizes, paint/finish notes, install dates, serial/model numbers, and recurring monitor items.
+- Add property vault page showing vault records linked to the property.
+- Add vault update output after each membership visit (prompt to log any new vault data found during the health check).
 
 Reason:
 
-The membership visit workflow now enforces the assessment/action/cap model in the UI. The immediate gap is the output side: members need a client-facing summary of what was found and what comes next, and flagged items need a clear path to a quoted estimate. The Digital Home Vault is the next greenfield phase with the most compounding value.
+The membership visit workflow and client-facing report are complete. The next compounding investment is the Digital Home Vault — it's the long-term differentiator for the membership product and the foundation for future visit-to-vault linking, follow-up conversion, and the membership value summary.
 
 ## Update Rule
 
