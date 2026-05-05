@@ -111,6 +111,32 @@ Validation for this release:
 
 - `pnpm gate` passed locally.
 
+### Implemented in Membership Visit Workflow Release
+
+PR: https://github.com/byesaw13/ai-fsm/pull/119
+Merge commit: `4e2e66c5f5ea8b062852e3b91d94b92e7a1e3f6e`
+Production deploy: May 5, 2026
+Migration: none (all DB fields shipped in PR #114)
+
+Completed in that release:
+
+- Added membership-cap domain helpers: `computeCapStatus`, `nextMembershipPhase`, phase labels and descriptions.
+- Wired `membership_visit_phase` and `included_labor_minutes_used` into the PATCH API for both owner and tech roles.
+- Added server-side auto-computation of `membership_cap_status` whenever `included_labor_minutes_used` is saved — never trusted from the client.
+- Added `MembershipVisitPanel` to the visit detail page (shown only for visits generated from a membership plan):
+  - 3-step phase stepper: Health Check → Included Action → Reporting.
+  - Phase advance button PATCHes `membership_visit_phase`.
+  - Labor cap tracker in Included Action phase: minutes used input, progress bar, cap-reached banner.
+- Added `VisitSnapshotPanel`: groups checklist items by disposition into Work Completed / Fix Now / Monitor / Optional Improvements / Refer to Trade.
+  - Shown in Reporting phase and on completed membership visits.
+  - Checklist walkthrough hidden and replaced by snapshot in Reporting phase.
+- Added 8 unit tests for cap calculation and phase transition helpers.
+
+Validation for this release:
+
+- `pnpm gate` passed locally (535 unit tests).
+- GitHub CI passed: lint, typecheck, build, test.
+
 ## Status Legend
 
 - `Done`: implemented, tested, and shipped.
@@ -288,33 +314,20 @@ Status: `Partial`
 
 Done:
 
-- Visit schema now has:
-  - membership visit phase
-  - included labor cap minutes
-  - included labor minutes used
-  - cap status
+- Visit schema has: membership visit phase, included labor cap minutes, included labor minutes used, cap status.
 - Generated membership visits inherit the plan labor cap.
+- Visit detail page shows a 3-step phase stepper (Health Check → Included Action → Reporting) for membership visits.
+- Phase advance button PATCHes membership_visit_phase.
+- Labor cap tracker in Included Action phase: tech inputs minutes used, progress bar updates, cap-reached banner fires when limit is hit.
+- `membership_cap_status` auto-computed server-side on every labor-minutes save.
+- Visit snapshot (reporting phase and completed visits) groups checklist items into: Work Completed, Fix Now, Monitor, Optional Improvements, Refer to Trade.
+- Checklist walkthrough hidden in Reporting phase and replaced by the snapshot.
 
 Still needed:
 
-- Split visit UI into:
-  - Phase 1: Health Check
-  - Phase 2: Included Action
-- Add technician controls for labor minutes used.
-- Add cap-reached workflow.
-- Convert remaining items into:
-  - quoted follow-up
-  - monitor item
-  - referral
-  - optional improvement
-- Require same-day/next-day visit snapshot.
-- Add report categories:
-  - work completed
-  - Fix Now
-  - Monitor
-  - Optional Improvements
-  - Refer
-  - next steps
+- Convert flagged checklist items into quoted follow-up estimates from within the visit.
+- Enforce same-day/next-day snapshot delivery (block visit completion without snapshot sent).
+- Add client-facing visit report output (printable/emailable summary).
 
 ## Phase 7: Digital Home Vault
 
@@ -415,15 +428,13 @@ Current recommended order from this point:
 
 Highest-leverage next release:
 
-- Build membership visit workflow and labor-cap controls.
-- Add technician controls for included labor minutes used.
-- Add cap-reached workflow.
-- Convert remaining visit items into quoted follow-up, monitor, referral, or optional improvement.
-- Require a visit snapshot report structure.
+- Add client-facing visit report output: printable/emailable summary generated from the snapshot panel.
+- Convert flagged checklist items into quoted follow-up estimates directly from the visit.
+- Begin Digital Home Vault foundation: vault tables for mechanicals, appliances, filter sizes, paint/finish notes, install dates.
 
 Reason:
 
-The membership product now has tier and cap fields, but the field workflow does not yet force the assessment/action/cap model. This is the next place where the app needs to enforce the Dovetails operating standard instead of just storing supporting data.
+The membership visit workflow now enforces the assessment/action/cap model in the UI. The immediate gap is the output side: members need a client-facing summary of what was found and what comes next, and flagged items need a clear path to a quoted estimate. The Digital Home Vault is the next greenfield phase with the most compounding value.
 
 ## Update Rule
 
