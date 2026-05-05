@@ -104,8 +104,13 @@ export default async function MaintenancePlanDetailPage({
        COUNT(DISTINCT vci.id)
          FILTER (WHERE vci.disposition IN ('fix_now','monitor','refer'))::text   AS issues_caught,
        COUNT(DISTINCT vci.id) FILTER (WHERE vci.disposition = 'fix_now')::text  AS recommended_follow_ups,
-       COALESCE(SUM(v.included_labor_minutes_used)
-         FILTER (WHERE v.status = 'completed'), 0)::text                        AS work_minutes_logged
+       COALESCE((
+         SELECT SUM(v2.included_labor_minutes_used)
+         FROM visits v2
+         WHERE v2.generated_from_plan_id = $1
+           AND v2.account_id = $2
+           AND v2.status = 'completed'
+       ), 0)::text                                                               AS work_minutes_logged
      FROM visits v
      LEFT JOIN visit_checklist_items vci
        ON vci.visit_id = v.id AND vci.account_id = v.account_id
