@@ -1,8 +1,14 @@
 import type { VisitChecklistItem, ChecklistDisposition } from "@ai-fsm/domain";
+import { FixNowEstimateButton } from "./FixNowEstimateButton";
 
 interface Props {
   checklistItems: VisitChecklistItem[];
   techNotes: string | null;
+  jobId?: string | null;
+  clientId?: string | null;
+  propertyId?: string | null;
+  canCreateEstimate?: boolean;
+  visitDate?: string;
 }
 
 interface Section {
@@ -67,9 +73,18 @@ function ItemList({ items }: { items: VisitChecklistItem[] }) {
   );
 }
 
-export function VisitSnapshotPanel({ checklistItems, techNotes }: Props) {
+export function VisitSnapshotPanel({
+  checklistItems,
+  techNotes,
+  jobId,
+  clientId,
+  propertyId,
+  canCreateEstimate,
+  visitDate,
+}: Props) {
   const completedItems = checklistItems.filter((i) => i.disposition === "ok");
   const unreviewed = checklistItems.filter((i) => !i.disposition);
+  const showEstimateButton = !!(canCreateEstimate && clientId && jobId && visitDate);
 
   return (
     <div data-testid="visit-snapshot-panel">
@@ -121,7 +136,65 @@ export function VisitSnapshotPanel({ checklistItems, techNotes }: Props) {
               <span className={BADGE_CLASS[disposition]}>{label}</span>
               <span style={{ fontWeight: 400 }}>({items.length})</span>
             </h3>
-            <ItemList items={items} />
+
+            {/* Fix Now items get a Create Estimate button for owner/admin */}
+            {disposition === "fix_now" && showEstimateButton ? (
+              <ul
+                style={{
+                  listStyle: "none",
+                  padding: 0,
+                  margin: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "var(--space-2)",
+                }}
+              >
+                {items.map((item) => (
+                  <li
+                    key={item.id}
+                    style={{
+                      padding: "var(--space-3)",
+                      borderRadius: "var(--radius-sm)",
+                      background: "var(--color-surface)",
+                      border: "1px solid var(--color-border)",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      gap: "var(--space-3)",
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontWeight: 500, fontSize: "var(--font-size-sm)" }}>
+                        {item.label}
+                      </span>
+                      {item.note && (
+                        <p
+                          style={{
+                            marginTop: "var(--space-1)",
+                            fontSize: "var(--font-size-sm)",
+                            color: "var(--color-text-secondary)",
+                          }}
+                        >
+                          {item.note}
+                        </p>
+                      )}
+                    </div>
+                    <div style={{ flexShrink: 0 }}>
+                      <FixNowEstimateButton
+                        label={item.label}
+                        note={item.note ?? null}
+                        jobId={jobId!}
+                        clientId={clientId!}
+                        propertyId={propertyId ?? null}
+                        visitDate={visitDate!}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <ItemList items={items} />
+            )}
           </div>
         );
       })}
