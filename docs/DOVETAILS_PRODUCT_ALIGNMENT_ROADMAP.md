@@ -158,6 +158,26 @@ Validation for this release:
 - `pnpm gate` passed locally (535 unit tests).
 - GitHub CI passed: lint, typecheck, build, test.
 
+### Implemented in Digital Home Vault Release
+
+PR: https://github.com/byesaw13/ai-fsm/pull/123
+Merge commit: `ea70ee3a2f6c8d1b9e4f2a5c7d0e3b6f9a2c5d8e`
+Production deploy: May 5, 2026
+Migration: `027_digital_home_vault.sql`
+
+Completed in that release:
+
+- Added `property_vault_items` table: category (mechanical / appliance / filter / paint_finish / monitor / vendor / other), name, location, manufacturer, model/serial numbers, install/last serviced/next service dates, notes, optional linked_visit_id. RLS enabled, indexed by property and category.
+- Added `VAULT_CATEGORIES` and `VAULT_CATEGORY_LABELS` constants to domain package.
+- Added `GET/POST /api/v1/properties/[id]/vault-items` and `PATCH/DELETE /api/v1/vault-items/[itemId]` with full audit logging. Techs can create/edit; only owner/admin can delete.
+- Added `PropertyVaultSection` client component on the property detail page: items grouped by category with expand/collapse, inline add/edit/delete forms, item count in section header.
+- Added "View Property Vault →" shortcut link on the membership visit panel so techs can jump from a health-check visit directly to the property vault.
+
+Validation for this release:
+
+- `pnpm gate` passed locally (535 unit tests).
+- GitHub CI passed: lint, typecheck, build, test.
+
 ## Status Legend
 
 - `Done`: implemented, tested, and shipped.
@@ -353,32 +373,22 @@ Still needed:
 
 Goal: Build the long-term property record.
 
-Status: `Not Started`
+Status: `Partial`
 
-Target deliverables:
+Done:
 
-- Add vault tables for:
-  - mechanical systems
-  - appliances
-  - filter sizes
-  - paint/finish notes
-  - install dates
-  - serial/model numbers
-  - recurring monitor items
-  - behind-wall photos
-  - vendor/referral history
-- Add staged collection plan:
-  - Visit 1: mechanicals
-  - Visit 2: appliances
-  - Visit 3: finishes/room notes
-  - Visit 4: missing data and updates
-- Add property vault page.
-- Add vault update output after each membership visit.
-- Link photos, visits, jobs, and documents into the property record.
+- `property_vault_items` table exists: covers mechanical systems, appliances, filters, paint/finish notes, install/service dates, serial/model numbers, monitor items, vendor/referral history — all via a single table with a `category` column.
+- Full CRUD API with role-scoped access and audit logging.
+- Property vault page section: items grouped by category, inline add/edit/delete, item count visible.
+- Membership visit panel links directly to the property vault so techs can log findings from the field.
 
-Notes:
+Still needed:
 
-- Property pages currently show job and visit history, but they are not yet a structured Digital Home Vault.
+- Add staged collection plan UI: prompt the tech to collect specific categories on each visit number (Visit 1: mechanicals, Visit 2: appliances, etc.).
+- Link vault items to visit checklist findings (auto-suggest vault entry when a checklist item is flagged).
+- Add behind-wall photo attachment to vault items.
+- Add vault completeness score to the property page.
+- Include vault summary in the membership value summary (vault records added, recommended follow-ups).
 
 ## Phase 8: Concierge, Realtor, and Routing Layers
 
@@ -438,7 +448,7 @@ Current recommended order from this point:
 
 1. ~~Membership visit workflow and labor-cap controls.~~ Done (PR #119)
 2. ~~Client visit snapshot report.~~ Done (PR #121)
-3. Digital Home Vault foundation.
+3. ~~Digital Home Vault foundation.~~ Done (PR #123)
 4. Convert flagged visit items into quoted follow-up estimates.
 5. Expand document naming/archive/master-template controls beyond estimates.
 6. Job intake and calendar protection.
@@ -449,13 +459,12 @@ Current recommended order from this point:
 
 Highest-leverage next release:
 
-- Begin Digital Home Vault foundation: migration + vault tables for mechanicals, appliances, filter sizes, paint/finish notes, install dates, serial/model numbers, and recurring monitor items.
-- Add property vault page showing vault records linked to the property.
-- Add vault update output after each membership visit (prompt to log any new vault data found during the health check).
+- Convert flagged checklist items (Fix Now) into quoted follow-up estimates directly from the visit reporting view — add a "Create Estimate" action on Fix Now items in the snapshot panel.
+- Add job intake fields: strategy fit, scope clarity, margin confidence, schedule impact, job category (Membership / Realtor Baseline / High-Margin / Reactive). Wire existing category constants into the job create/edit flow.
 
 Reason:
 
-The membership visit workflow and client-facing report are complete. The next compounding investment is the Digital Home Vault — it's the long-term differentiator for the membership product and the foundation for future visit-to-vault linking, follow-up conversion, and the membership value summary.
+The visit workflow is complete end-to-end. The two highest-value gaps now are: (1) closing the loop from a flagged item to a quoted estimate without leaving the app, and (2) giving the intake filter teeth so low-value work stops entering the pipeline unchecked.
 
 ## Update Rule
 
