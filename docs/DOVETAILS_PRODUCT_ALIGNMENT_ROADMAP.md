@@ -483,7 +483,7 @@ Highest-leverage next release:
 
 Reason:
 
-The visit workflow is now complete end-to-end — Fix Now items can be converted to draft estimates in one click. The highest-value remaining gap is giving the intake filter teeth so low-value work stops entering the pipeline unchecked.
+Fix Now items can now be converted to draft estimates in one click, closing the main revenue loop from flagged item to quoted work. Phase 6 remains Partial (snapshot delivery enforcement is still needed), but the highest-value next gap is giving the intake filter teeth so low-value work stops entering the pipeline unchecked.
 
 ## Update Rule
 
