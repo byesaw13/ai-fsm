@@ -206,11 +206,24 @@ export default async function VisitDetailPage({
         backHref={visit.job_id ? `/app/jobs/${visit.job_id}` : "/app/visits"}
         backLabel={visit.job_title ?? "Visits"}
         actions={
-          <span data-testid="visit-status">
-            <StatusBadge variant={visit.status as StatusVariant}>
-              {VISIT_STATUS_LABELS[currentStatus]}
-            </StatusBadge>
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+            {!isRepairFlow && checklistItems.length > 0 &&
+              (currentStatus === "completed" || visit.membership_visit_phase === "reporting") && (
+              <LinkButton
+                href={`/app/visits/${visit.id}/print`}
+                variant="ghost"
+                size="sm"
+                data-testid="print-report-link"
+              >
+                Print Report
+              </LinkButton>
+            )}
+            <span data-testid="visit-status">
+              <StatusBadge variant={visit.status as StatusVariant}>
+                {VISIT_STATUS_LABELS[currentStatus]}
+              </StatusBadge>
+            </span>
+          </div>
         }
       />
 
