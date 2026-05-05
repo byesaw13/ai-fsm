@@ -1143,6 +1143,7 @@
 .empty-state { padding: 32px; text-align: center; background: var(--bg-card); border: 1px dashed var(--border); border-radius: 8px; color: var(--fg-muted); }
 .muted { color: var(--fg-muted); font-size: 13px; margin: 4px 0 0; }
 .error-inline { color: var(--color-red-600); font-size: 13px; margin: 0 0 8px; }
+.warning-inline { color: var(--color-amber-600, #d97706); font-size: 13px; margin: 0 0 8px; }
 .success-inline { color: #065f46; font-size: 13px; margin: 0 0 8px; }
 .error-message { background: var(--color-red-100); border: 1px solid #fecaca; color: #991b1b; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
 .line-items-table { width: 100%; border-collapse: collapse; font-size: 14px; }

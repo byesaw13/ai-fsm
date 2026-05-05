@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { query } from "@/lib/db";
 import { canTransitionJob, canViewAllJobs } from "@/lib/auth/permissions";
 import type { Job, JobStatus } from "@ai-fsm/domain";
+import { JOB_ACCEPTANCE_CATEGORY_LABELS, JOB_INTAKE_DECISION_LABELS } from "@ai-fsm/domain";
 import {
   PageContainer,
   PageHeader,
@@ -21,7 +22,11 @@ import { JobBoard } from "./JobBoard";
 
 export const dynamic = "force-dynamic";
 
-type JobRow = Job & { client_name: string | null };
+type JobRow = Job & {
+  client_name: string | null;
+  job_category: string | null;
+  intake_decision: string | null;
+};
 
 const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   draft: "Draft",
@@ -104,7 +109,7 @@ export default async function JobsPage({ searchParams }: PageProps) {
     }
 
     jobs = await query<JobRow>(
-      `SELECT j.*, c.name AS client_name
+      `SELECT j.*, c.name AS client_name, j.job_category, j.intake_decision
        FROM jobs j
        LEFT JOIN clients c ON c.id = j.client_id
        WHERE ${conditions.join(" AND ")}
@@ -134,7 +139,7 @@ export default async function JobsPage({ searchParams }: PageProps) {
     }
 
     jobs = await query<JobRow>(
-      `SELECT DISTINCT j.*, c.name AS client_name
+      `SELECT DISTINCT j.*, c.name AS client_name, j.job_category, j.intake_decision
        FROM jobs j
        LEFT JOIN clients c ON c.id = j.client_id
        JOIN visits v ON v.job_id = j.id
@@ -295,6 +300,13 @@ function JobItemCard({ job }: { job: JobRow }) {
     ? "var(--color-primary)"
     : "var(--fg-muted)";
 
+  const intakeDecisionColor: Record<string, string> = {
+    accept: "var(--color-green-600)",
+    decline: "var(--color-red-600)",
+    defer: "var(--color-amber-600, #d97706)",
+    reframe: "var(--color-amber-600, #d97706)",
+  };
+
   const meta = (
     <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", alignItems: "center" }}>
       {job.client_name && (
@@ -305,6 +317,20 @@ function JobItemCard({ job }: { job: JobRow }) {
       {job.scheduled_start && (
         <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
           {new Date(job.scheduled_start).toLocaleDateString()}
+        </span>
+      )}
+      {job.job_category && (
+        <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", fontStyle: "italic" }}>
+          {JOB_ACCEPTANCE_CATEGORY_LABELS[job.job_category as keyof typeof JOB_ACCEPTANCE_CATEGORY_LABELS] ?? job.job_category}
+        </span>
+      )}
+      {job.intake_decision && (
+        <span style={{
+          fontSize: "var(--text-sm)",
+          fontWeight: 600,
+          color: intakeDecisionColor[job.intake_decision] ?? "var(--fg-muted)",
+        }}>
+          {JOB_INTAKE_DECISION_LABELS[job.intake_decision as keyof typeof JOB_INTAKE_DECISION_LABELS] ?? job.intake_decision}
         </span>
       )}
     </div>

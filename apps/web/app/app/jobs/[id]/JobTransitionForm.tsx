@@ -18,6 +18,7 @@ export function JobTransitionForm({ jobId, allowedTransitions, statusLabels }: P
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [warning, setWarning] = useState("");
   const [confirmTarget, setConfirmTarget] = useState<JobStatus | null>(null);
 
   useEffect(() => {
@@ -38,16 +39,18 @@ export function JobTransitionForm({ jobId, allowedTransitions, statusLabels }: P
     setLoading(true);
     setError("");
     setSuccess("");
+    setWarning("");
     try {
       const res = await fetch(`/api/v1/jobs/${jobId}/transition`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: targetStatus }),
       });
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
         setError(data.error?.message ?? "Transition failed");
       } else {
+        if (data.warning) setWarning(data.warning);
         setSuccess(`Status updated to ${statusLabels[targetStatus]}`);
         router.refresh();
       }
@@ -61,6 +64,7 @@ export function JobTransitionForm({ jobId, allowedTransitions, statusLabels }: P
   return (
     <div className="transition-buttons" data-testid="transition-buttons">
       {error && <p className="error-inline" data-testid="transition-error">{error}</p>}
+      {warning && <p className="warning-inline" data-testid="transition-warning">{warning}</p>}
       {success && <p className="success-inline" data-testid="transition-success">{success}</p>}
       <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
         {allowedTransitions.map((status) => (
