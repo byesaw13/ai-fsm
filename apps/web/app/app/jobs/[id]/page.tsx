@@ -10,10 +10,12 @@ import {
   canDeleteRecords,
 } from "@/lib/auth/permissions";
 import { jobTransitions } from "@ai-fsm/domain";
-import type { Job, Visit, JobStatus } from "@ai-fsm/domain";
+import type { Job, Visit, JobStatus, JobAcceptanceCategory, JobIntakeDecision, JobIntakeRatingField } from "@ai-fsm/domain";
+import { JOB_INTAKE_RATING_FIELDS } from "@ai-fsm/domain";
 import { JobTransitionForm } from "./JobTransitionForm";
 import { DeleteJobButton } from "./DeleteJobButton";
 import { JobEditForm } from "./JobEditFormWrapper";
+import { JobIntakePanel } from "./JobIntakePanel";
 import { AssetLinksPanel } from "./AssetLinksPanel";
 import { isHomeboxEnabled } from "@/lib/homebox/client";
 import { withAssetContext, listAssetLinks } from "@/lib/homebox/db";
@@ -32,7 +34,17 @@ import type { TimelineEntryData, StatusVariant } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-type JobRow = Job & { client_name: string | null };
+type JobRow = Job & {
+  client_name: string | null;
+  job_category: JobAcceptanceCategory | null;
+  strategy_fit: number | null;
+  scope_clarity: number | null;
+  margin_confidence: number | null;
+  schedule_impact: number | null;
+  quality_fit: number | null;
+  intake_decision: JobIntakeDecision | null;
+  intake_notes: string | null;
+};
 type VisitRow = Visit & {
   assigned_user_name: string | null;
 };
@@ -316,6 +328,20 @@ export default async function JobDetailPage({
               initialActualCostCents={job.actual_cost_cents ?? null}
               initialTravelMiles={job.travel_miles ?? null}
             />
+
+            {/* Intake panel — admin/owner only */}
+            <Card data-testid="job-intake-card">
+              <SectionHeader title="Job Intake" />
+              <JobIntakePanel
+                jobId={job.id}
+                initialCategory={job.job_category}
+                initialRatings={Object.fromEntries(
+                  JOB_INTAKE_RATING_FIELDS.map((f) => [f, (job as Record<string, unknown>)[f] as number | null])
+                ) as Record<JobIntakeRatingField, number | null>}
+                initialDecision={job.intake_decision}
+                initialNotes={job.intake_notes ?? null}
+              />
+            </Card>
 
             {/* Commercial links */}
             <Card>
