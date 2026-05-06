@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui";
 import { computeVaultCompleteness, VAULT_CATEGORIES, VAULT_CATEGORY_LABELS } from "@ai-fsm/domain";
 import type { VaultCategory } from "@ai-fsm/domain";
+import { VaultItemPhotoPanel } from "./VaultItemPhotoPanel";
 
 interface VaultItem {
   id: string;
@@ -364,15 +365,18 @@ export function PropertyVaultSection({ propertyId, initialItems, canEdit }: Prop
                             )}
                           </div>
                           {expandedId === item.id && (
-                            <dl className="p7-detail-list" style={{ marginTop: "var(--space-2)" }}>
-                              {item.manufacturer && <div className="p7-detail-row"><dt>Manufacturer</dt><dd>{item.manufacturer}</dd></div>}
-                              {item.model_number && <div className="p7-detail-row"><dt>Model</dt><dd>{item.model_number}</dd></div>}
-                              {item.serial_number && <div className="p7-detail-row"><dt>Serial</dt><dd>{item.serial_number}</dd></div>}
-                              {item.install_date && <div className="p7-detail-row"><dt>Installed</dt><dd>{fmtDate(item.install_date)}</dd></div>}
-                              {item.last_serviced_date && <div className="p7-detail-row"><dt>Last Serviced</dt><dd>{fmtDate(item.last_serviced_date)}</dd></div>}
-                              {item.next_service_date && <div className="p7-detail-row"><dt>Next Service</dt><dd>{fmtDate(item.next_service_date)}</dd></div>}
-                              {item.notes && <div className="p7-detail-row"><dt>Notes</dt><dd style={{ whiteSpace: "pre-wrap" }}>{item.notes}</dd></div>}
-                            </dl>
+                            <>
+                              <dl className="p7-detail-list" style={{ marginTop: "var(--space-2)" }}>
+                                {item.manufacturer && <div className="p7-detail-row"><dt>Manufacturer</dt><dd>{item.manufacturer}</dd></div>}
+                                {item.model_number && <div className="p7-detail-row"><dt>Model</dt><dd>{item.model_number}</dd></div>}
+                                {item.serial_number && <div className="p7-detail-row"><dt>Serial</dt><dd>{item.serial_number}</dd></div>}
+                                {item.install_date && <div className="p7-detail-row"><dt>Installed</dt><dd>{fmtDate(item.install_date)}</dd></div>}
+                                {item.last_serviced_date && <div className="p7-detail-row"><dt>Last Serviced</dt><dd>{fmtDate(item.last_serviced_date)}</dd></div>}
+                                {item.next_service_date && <div className="p7-detail-row"><dt>Next Service</dt><dd>{fmtDate(item.next_service_date)}</dd></div>}
+                                {item.notes && <div className="p7-detail-row"><dt>Notes</dt><dd style={{ whiteSpace: "pre-wrap" }}>{item.notes}</dd></div>}
+                              </dl>
+                              <VaultItemPhotoPanel itemId={item.id} canEdit={canEdit} />
+                            </>
                           )}
                         </div>
                         <div style={{ display: "flex", gap: "var(--space-2)", flexShrink: 0, alignItems: "center" }}>
