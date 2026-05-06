@@ -10,7 +10,6 @@ import {
   IconSchedule,
   IconJobs,
   IconVisits,
-  IconSchedule,
   IconClients,
   IconInvoices,
   IconEstimates,
@@ -44,6 +43,7 @@ const OPERATIONS_ITEMS: NavItem[] = [
   { href: "/app/schedule",    label: "Schedule",   Icon: IconSchedule },
   { href: "/app/jobs",        label: "Jobs",       Icon: IconJobs },
   { href: "/app/visits",      label: "Visits",     Icon: IconVisits },
+];
 
 const BUSINESS_ITEMS: NavItem[] = [
   { href: "/app/owner-dashboard", label: "Command Center", Icon: IconReports, adminOnly: true },
