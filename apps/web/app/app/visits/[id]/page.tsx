@@ -7,7 +7,15 @@ import {
   canUpdateVisitNotes,
   canUpdateChecklist,
 } from "@/lib/auth/permissions";
-import type { Visit, VisitStatus, MembershipVisitPhase, MembershipCapStatus } from "@ai-fsm/domain";
+import {
+  getVaultCollectionStep,
+  type Visit,
+  type VisitStatus,
+  type MembershipVisitPhase,
+  type MembershipCapStatus,
+  type VaultCategory,
+  type VaultCollectionStep,
+} from "@ai-fsm/domain";
 import { VisitAssignForm } from "./VisitAssignForm";
 import { VisitRescheduleForm } from "./VisitRescheduleForm";
 import { VisitTransitionForm } from "./VisitTransitionForm";
@@ -64,12 +72,16 @@ type VisitRow = Visit & {
   job_property_id: string | null;
   job_client_id: string | null;
   generated_from_plan_id: string | null;
+  plan_annual_visit_count: number | null;
   membership_visit_phase: MembershipVisitPhase;
   included_labor_cap_minutes: number | null;
   included_labor_minutes_used: number;
   membership_cap_status: MembershipCapStatus;
   membership_snapshot_sent_at: string | Date | null;
 };
+
+type CountRow = { membership_visit_number: number | string };
+type VaultCategoryRow = { category: VaultCategory };
 
 const VISIT_STATUS_LABELS: Record<VisitStatus, string> = {
   scheduled: "Scheduled",
@@ -92,9 +104,11 @@ export default async function VisitDetailPage({
     `SELECT v.*,
             j.title AS job_title, j.job_type AS job_type, j.description AS job_description,
             j.property_id AS job_property_id, j.client_id AS job_client_id,
+            mp.annual_visit_count AS plan_annual_visit_count,
             u.full_name AS assigned_user_name
      FROM visits v
      LEFT JOIN jobs j ON j.id = v.job_id
+     LEFT JOIN maintenance_plans mp ON mp.id = v.generated_from_plan_id AND mp.account_id = v.account_id
      LEFT JOIN users u ON u.id = v.assigned_user_id
      WHERE v.id = $1 AND v.account_id = $2`,
     [id, session.accountId]
@@ -123,6 +137,38 @@ export default async function VisitDetailPage({
   const isRepairFlow = visit.job_type !== null && visit.job_type !== "maintenance";
   const isMembershipVisit = visit.generated_from_plan_id !== null;
   const canCreateEstimate = session.role === "owner" || session.role === "admin";
+
+  const [membershipVisitNumberRow, propertyVaultRows] = isMembershipVisit
+    ? await Promise.all([
+        queryOne<CountRow>(
+          `SELECT COUNT(*)::int AS membership_visit_number
+           FROM visits v2
+           WHERE v2.generated_from_plan_id = $1
+             AND v2.account_id = $2
+             AND (
+               v2.scheduled_start < $3
+               OR (v2.scheduled_start = $3 AND v2.id <= $4)
+             )`,
+          [visit.generated_from_plan_id, session.accountId, visit.scheduled_start, visit.id]
+        ),
+        visit.job_property_id
+          ? query<VaultCategoryRow>(
+              `SELECT DISTINCT category
+               FROM property_vault_items
+               WHERE property_id = $1 AND account_id = $2`,
+              [visit.job_property_id, session.accountId]
+            )
+          : Promise.resolve([] as VaultCategoryRow[]),
+      ])
+    : [null, [] as VaultCategoryRow[]];
+
+  const membershipVaultCollection: VaultCollectionStep | null = isMembershipVisit
+    ? getVaultCollectionStep({
+        annualVisitCount: visit.plan_annual_visit_count ?? 1,
+        visitNumber: Number(membershipVisitNumberRow?.membership_visit_number ?? 1),
+        recordedCategories: propertyVaultRows.map((row) => row.category),
+      })
+    : null;
 
   // Load checklist (lazy-seeded on first access) unless visit is cancelled
   const checklistItems =
@@ -252,6 +298,7 @@ export default async function VisitDetailPage({
                 canUpdate={canNotes}
                 visitStatus={currentStatus}
                 propertyId={visit.job_property_id ?? null}
+                vaultCollection={membershipVaultCollection}
               />
             </Card>
           )}

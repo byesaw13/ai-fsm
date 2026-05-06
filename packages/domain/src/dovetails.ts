@@ -338,6 +338,75 @@ export const VAULT_COMPLETENESS_TARGET_CATEGORIES = [
   "monitor",
   "vendor",
 ] as const satisfies readonly VaultCategory[];
+export type VaultCompletenessCategory = typeof VAULT_COMPLETENESS_TARGET_CATEGORIES[number];
+
+const VAULT_COLLECTION_STAGE_GROUPS = [
+  ["mechanical", "filter"],
+  ["appliance"],
+  ["paint_finish", "monitor"],
+  ["vendor"],
+] as const satisfies readonly (readonly VaultCompletenessCategory[])[];
+
+export interface VaultCollectionStep {
+  visitNumber: number;
+  annualVisitCount: number;
+  cycleVisitNumber: number;
+  cycleYear: number;
+  focusCategories: VaultCompletenessCategory[];
+  completedFocusCategories: VaultCompletenessCategory[];
+  missingFocusCategories: VaultCompletenessCategory[];
+  missingCoreCategories: VaultCompletenessCategory[];
+}
+
+function buildVaultCollectionStages(annualVisitCount: number): VaultCompletenessCategory[][] {
+  const bucketCount = Math.max(1, Math.min(Math.trunc(annualVisitCount) || 1, VAULT_COLLECTION_STAGE_GROUPS.length));
+  const baseSize = Math.floor(VAULT_COLLECTION_STAGE_GROUPS.length / bucketCount);
+  const extraBuckets = VAULT_COLLECTION_STAGE_GROUPS.length % bucketCount;
+  const groupedStages: VaultCompletenessCategory[][] = [];
+  let cursor = 0;
+
+  for (let bucket = 0; bucket < bucketCount; bucket += 1) {
+    const size = baseSize + (bucket < extraBuckets ? 1 : 0);
+    groupedStages.push(
+      VAULT_COLLECTION_STAGE_GROUPS.slice(cursor, cursor + size).flatMap((stage) => [...stage])
+    );
+    cursor += size;
+  }
+
+  return groupedStages;
+}
+
+export function getVaultCollectionStep(input: {
+  annualVisitCount: number;
+  visitNumber: number;
+  recordedCategories: ReadonlyArray<VaultCategory>;
+}): VaultCollectionStep {
+  const annualVisitCount = Math.max(1, Math.trunc(input.annualVisitCount) || 1);
+  const visitNumber = Math.max(1, Math.trunc(input.visitNumber) || 1);
+  const stages = buildVaultCollectionStages(annualVisitCount);
+  const cycleVisitNumber = ((visitNumber - 1) % stages.length) + 1;
+  const cycleYear = Math.floor((visitNumber - 1) / stages.length) + 1;
+  const recordedCategories = VAULT_COMPLETENESS_TARGET_CATEGORIES.filter((category) =>
+    input.recordedCategories.includes(category)
+  );
+  const focusCategories = stages[cycleVisitNumber - 1] ?? [];
+  const completedFocusCategories = focusCategories.filter((category) => recordedCategories.includes(category));
+  const missingFocusCategories = focusCategories.filter((category) => !recordedCategories.includes(category));
+  const missingCoreCategories = VAULT_COMPLETENESS_TARGET_CATEGORIES.filter(
+    (category) => !recordedCategories.includes(category)
+  );
+
+  return {
+    visitNumber,
+    annualVisitCount,
+    cycleVisitNumber,
+    cycleYear,
+    focusCategories,
+    completedFocusCategories,
+    missingFocusCategories,
+    missingCoreCategories,
+  };
+}
 
 export function computeVaultCompleteness(items: ReadonlyArray<{ category: VaultCategory }>) {
   const coveredCategories = VAULT_COMPLETENESS_TARGET_CATEGORIES.filter((category) =>

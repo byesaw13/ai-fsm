@@ -45,6 +45,7 @@ import {
   ESTIMATE_DOCUMENT_SECTIONS,
   STANDARD_INVOICE_TERMS,
   VAULT_COMPLETENESS_TARGET_CATEGORIES,
+  getVaultCollectionStep,
   computeVaultCompleteness,
   buildClientDocumentFilename,
 } from './index'
@@ -481,6 +482,44 @@ describe('Dovetails standards', () => {
         VAULT_COMPLETENESS_TARGET_CATEGORIES.map((category) => ({ category }))
       ).percent
     ).toBe(100)
+  })
+
+  it('builds staged vault collection prompts from visit number', () => {
+    expect(getVaultCollectionStep({
+      annualVisitCount: 4,
+      visitNumber: 1,
+      recordedCategories: [],
+    })).toMatchObject({
+      visitNumber: 1,
+      annualVisitCount: 4,
+      cycleVisitNumber: 1,
+      cycleYear: 1,
+      focusCategories: ['mechanical', 'filter'],
+      missingFocusCategories: ['mechanical', 'filter'],
+    })
+
+    expect(getVaultCollectionStep({
+      annualVisitCount: 2,
+      visitNumber: 2,
+      recordedCategories: ['mechanical', 'appliance'],
+    })).toMatchObject({
+      cycleVisitNumber: 2,
+      cycleYear: 1,
+      focusCategories: ['paint_finish', 'monitor', 'vendor'],
+      missingFocusCategories: ['paint_finish', 'monitor', 'vendor'],
+      missingCoreCategories: ['filter', 'paint_finish', 'monitor', 'vendor'],
+    })
+
+    expect(getVaultCollectionStep({
+      annualVisitCount: 4,
+      visitNumber: 5,
+      recordedCategories: ['mechanical', 'filter'],
+    })).toMatchObject({
+      cycleVisitNumber: 1,
+      cycleYear: 2,
+      completedFocusCategories: ['mechanical', 'filter'],
+      missingFocusCategories: [],
+    })
   })
 
   it('builds client document filenames across document types', () => {
