@@ -147,8 +147,9 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
       if (setClauses.length > 0) {
         setClauses.push(`updated_at = now()`);
         params.push(id);
+        params.push(session.accountId);
         await client.query(
-          `UPDATE invoices SET ${setClauses.join(", ")} WHERE id = $${idx}`,
+          `UPDATE invoices SET ${setClauses.join(", ")} WHERE id = $${idx} AND account_id = $${idx + 1}`,
           params
         );
       }
@@ -234,7 +235,7 @@ export const DELETE = withRole(["owner"], async (request, session) => {
       await client.query(`DELETE FROM invoice_line_items WHERE invoice_id = $1`, [id]);
 
       // Delete the invoice
-      await client.query(`DELETE FROM invoices WHERE id = $1`, [id]);
+      await client.query(`DELETE FROM invoices WHERE id = $1 AND account_id = $2`, [id, session.accountId]);
 
       await appendAuditLog(client, {
         account_id: session.accountId,

@@ -232,7 +232,7 @@ export const DELETE = withRole(["owner", "admin"], async (request, session) => {
         throw Object.assign(new Error("Expense not found"), { code: "NOT_FOUND" });
       }
 
-      await client.query(`DELETE FROM expenses WHERE id = $1`, [id]);
+      await client.query(`DELETE FROM expenses WHERE id = $1 AND account_id = $2`, [id, session.accountId]);
 
       await appendAuditLog(client, {
         account_id: session.accountId,
