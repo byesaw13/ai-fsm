@@ -84,6 +84,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         };
       }
 
+
       if (!isEmailConfigured()) {
         return { status: 503, message: "Email is not configured on this server" };
       }
