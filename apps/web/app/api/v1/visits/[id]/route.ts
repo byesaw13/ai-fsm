@@ -24,6 +24,7 @@ const ownerUpdateBody = z.object({
   issue_description: z.string().nullable().optional(),
   membership_visit_phase: membershipVisitPhaseSchema.optional(),
   included_labor_minutes_used: z.number().int().nonnegative().optional(),
+  membership_snapshot_sent: z.literal(true).optional(),
 });
 
 // Tech can update notes, materials, issue description, and membership visit fields
@@ -33,6 +34,7 @@ const techUpdateBody = z.object({
   issue_description: z.string().nullable().optional(),
   membership_visit_phase: membershipVisitPhaseSchema.optional(),
   included_labor_minutes_used: z.number().int().nonnegative().optional(),
+  membership_snapshot_sent: z.literal(true).optional(),
 });
 
 export const GET = withAuth(
@@ -121,8 +123,9 @@ export const PATCH = withAuth(
       const fields: string[] = [];
       const values: unknown[] = [];
       let idx = 3;
+      const { membership_snapshot_sent, ...patchData } = parsed.data;
 
-      for (const [key, val] of Object.entries(parsed.data)) {
+      for (const [key, val] of Object.entries(patchData)) {
         if (val !== undefined) {
           fields.push(`${key} = $${idx++}`);
           values.push(val);
@@ -135,6 +138,38 @@ export const PATCH = withAuth(
         const capStatus = computeCapStatus(parsed.data.included_labor_minutes_used, capMinutes);
         fields.push(`membership_cap_status = $${idx++}`);
         values.push(capStatus);
+      }
+
+      if (membership_snapshot_sent) {
+        if (!old.generated_from_plan_id) {
+          await client.query("ROLLBACK");
+          return NextResponse.json(
+            {
+              error: {
+                code: "PRECONDITION_FAILED",
+                message: "Only membership visits can have a visit summary marked as sent",
+                traceId: session.traceId,
+              },
+            },
+            { status: 422 }
+          );
+        }
+
+        if (old.membership_visit_phase !== "reporting") {
+          await client.query("ROLLBACK");
+          return NextResponse.json(
+            {
+              error: {
+                code: "PRECONDITION_FAILED",
+                message: "Advance to the Reporting phase before marking the visit summary as sent",
+                traceId: session.traceId,
+              },
+            },
+            { status: 422 }
+          );
+        }
+
+        fields.push("membership_snapshot_sent_at = COALESCE(membership_snapshot_sent_at, now())");
       }
 
       if (fields.length === 0) {

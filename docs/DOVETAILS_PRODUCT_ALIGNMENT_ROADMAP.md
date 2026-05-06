@@ -305,7 +305,7 @@ Completed in that release:
 
 Goal: Create one internal source of truth in the app for Dovetails standards.
 
-Status: `Partial`
+Status: `Done`
 
 Done:
 
@@ -324,10 +324,7 @@ Done:
 - Document type constants exist.
 - Document status constants exist.
 - Pricing adjustment constants exist.
-
-Still needed:
-
-- Move filename format rules into a formal domain-level document standard if additional document types need generation outside estimates.
+- Document filename format rules live in the domain standards layer through `DOCUMENT_STANDARD_VERSION`, `CLIENT_DOCUMENT_TYPES`, and `buildClientDocumentFilename`.
 
 Note: `Optional Improvements` label is already in use in `VisitSnapshotPanel` — no rename needed.
 
@@ -453,7 +450,7 @@ Done:
 
 Goal: Make each membership visit follow the assessment/action/cap model.
 
-Status: `Partial`
+Status: `Done`
 
 Done:
 
@@ -466,10 +463,10 @@ Done:
 - Visit snapshot (reporting phase and completed visits) groups checklist items into: Work Completed, Fix Now, Monitor, Optional Improvements, Refer to Trade.
 - Checklist walkthrough hidden in Reporting phase and replaced by the snapshot.
 - Fix Now items show a "Create Estimate" button for owner/admin, creating a pre-filled draft estimate and navigating to the estimate detail page.
-
-Still needed:
-
-- Enforce same-day/next-day snapshot delivery (block visit completion without snapshot sent).
+- Snapshot delivery is persisted on visits through `membership_snapshot_sent_at`.
+- Visit summary panel includes a "Mark Summary Sent" action.
+- Membership visit completion is blocked server-side unless the visit is in Reporting and the summary has been marked sent.
+- Tech completion UI shows the same blocker before allowing the Complete Job action.
 
 ## Phase 7: Digital Home Vault
 
@@ -548,25 +545,31 @@ Target deliverables:
 
 Current recommended order from this point:
 
-1. ~~Membership visit workflow and labor-cap controls.~~ Done (PR #119)
-2. ~~Client visit snapshot report.~~ Done (PR #121)
-3. ~~Digital Home Vault foundation.~~ Done (PR #123)
-4. ~~Convert flagged visit items into quoted follow-up estimates.~~ Done (PR #125)
-5. ~~Job intake fields and acceptance filter.~~ Done (PR #127)
-6. ~~Expand document naming/archive/master-template controls beyond estimates.~~ Done
-7. ~~Job intake enforcement and calendar protection (Wednesday rule, intake gate before Quoted).~~ Done (PR #130, PR #132)
-8. Realtor/concierge/routing workflows.
-9. Dashboards and enforcement.
+1. ~~Roadmap hygiene: close Phase 1 now that filename standards are in the domain layer.~~ Done
+2. ~~Finish Phase 6: enforce snapshot delivery before membership visit completion.~~ Done
+3. Finish Phase 7A: add vault completeness score to the property page.
+4. Finish Phase 7B: add staged vault collection prompts by membership visit number.
+5. Finish Phase 7C: suggest vault entries from flagged checklist findings.
+6. Finish Phase 7D: add behind-wall / vault photo attachments.
+7. Finish Phase 3A: upgrade price book records with trip, return-trip, additional-unit, material-inclusion, and risk fields.
+8. Finish Phase 3B: add pricing review dashboard metrics.
+9. Phase 8A: add realtor baseline workflow.
+10. Phase 8B: add concierge / vendor coordination mode and fee.
+11. Phase 8C: add extended-zone routing and route-quality acceptance warnings.
+12. Phase 9A: add membership dashboard.
+13. Phase 9B: add pricing dashboard.
+14. Phase 9C: add operations dashboard.
+15. Phase 9D: add document dashboard.
 
 ## Next Suggested Release
 
 Highest-leverage next release:
 
-- Add the next Digital Home Vault enforcement layer: staged collection prompts, checklist-to-vault suggestions, behind-wall photo support, and a vault completeness score on the property page.
+- Add the Phase 7 vault enforcement layer: vault completeness score, staged collection prompts, checklist-to-vault suggestions, and behind-wall photo support.
 
 Reason:
 
-The membership model now has visits, reporting, follow-up estimates, published pricing, and enrollment summaries. The next compounding value is making the property record more complete and easier to build during real field visits.
+The membership model now has a completion gate for client summary delivery. The next compounding value is making the property record more complete and easier to build during real field visits.
 
 ## Update Rule
 

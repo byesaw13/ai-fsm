@@ -16,6 +16,7 @@ interface Props {
   closingAllDone?: boolean;
   isMembershipVisit?: boolean;
   membershipPhase?: string;
+  membershipSnapshotSentAt?: string | null;
 }
 
 // What the tech sees: plain-English action buttons sized for a phone screen.
@@ -39,6 +40,7 @@ export function VisitTransitionForm({
   closingAllDone = false,
   isMembershipVisit = false,
   membershipPhase,
+  membershipSnapshotSentAt = null,
 }: Props) {
   const router = useRouter();
   const toast = useToast();
@@ -88,6 +90,9 @@ export function VisitTransitionForm({
     }
     if (isMembershipVisit && isCompletionAction && membershipPhase !== "reporting") {
       blockers.push("Advance to the Reporting phase and complete the visit summary before closing");
+    }
+    if (isMembershipVisit && isCompletionAction && membershipPhase === "reporting" && !membershipSnapshotSentAt) {
+      blockers.push("Mark the visit summary as sent before closing");
     }
     const isBlocked = blockers.length > 0;
 

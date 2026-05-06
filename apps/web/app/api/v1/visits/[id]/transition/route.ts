@@ -121,6 +121,26 @@ export const POST = withAuth(
         );
       }
 
+      // Precondition: membership visits must have the client summary/snapshot sent
+      // or explicitly marked sent before the visit can be closed.
+      if (
+        targetStatus === "completed" &&
+        visit.generated_from_plan_id &&
+        !visit.membership_snapshot_sent_at
+      ) {
+        await client.query("ROLLBACK");
+        return NextResponse.json(
+          {
+            error: {
+              code: "PRECONDITION_FAILED",
+              message: "Send or mark the visit summary as sent before completing this membership visit",
+              traceId: session.traceId,
+            },
+          },
+          { status: 422 }
+        );
+      }
+
       // -----------------------------------------------------------------------
       // "Start Job" — when tech taps arrived, we step through two valid DB
       // transitions in one transaction to satisfy the trigger:

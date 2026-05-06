@@ -68,6 +68,7 @@ type VisitRow = Visit & {
   included_labor_cap_minutes: number | null;
   included_labor_minutes_used: number;
   membership_cap_status: MembershipCapStatus;
+  membership_snapshot_sent_at: string | Date | null;
 };
 
 const VISIT_STATUS_LABELS: Record<VisitStatus, string> = {
@@ -274,13 +275,16 @@ export default async function VisitDetailPage({
             <Card data-testid="visit-snapshot-card">
               <SectionHeader title="Visit Summary" />
               <VisitSnapshotPanel
+                visitId={visit.id}
                 checklistItems={checklistItems}
                 techNotes={visit.tech_notes ?? null}
                 jobId={visit.job_id ?? null}
                 clientId={visit.job_client_id ?? null}
                 propertyId={visit.job_property_id ?? null}
                 canCreateEstimate={canCreateEstimate}
+                canUpdateDelivery={canNotes}
                 visitDate={toISO(visit.scheduled_start)}
+                snapshotSentAt={visit.membership_snapshot_sent_at ? toISO(visit.membership_snapshot_sent_at) : null}
               />
             </Card>
           )}
@@ -347,6 +351,9 @@ export default async function VisitDetailPage({
                 closingAllDone={checklistItems.length > 0 && checklistItems.every((i) => i.disposition === "ok")}
                 isMembershipVisit={isMembershipVisit}
                 membershipPhase={visit.membership_visit_phase ?? "health_check"}
+                membershipSnapshotSentAt={
+                  visit.membership_snapshot_sent_at ? toISO(visit.membership_snapshot_sent_at) : null
+                }
               />
             </Card>
           )}
