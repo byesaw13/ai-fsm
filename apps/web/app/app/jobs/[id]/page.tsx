@@ -446,6 +446,7 @@ export default async function JobDetailPage({
               </Card>
             )}
 
+
             {/* Asset links (Homebox) */}
             <AssetLinksPanel
               entityType="job"
