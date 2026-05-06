@@ -17,6 +17,9 @@ import {
   STANDARD_ESTIMATE_NOTES,
   STANDARD_PAYMENT_TERMS,
   STANDARD_DISCLAIMER,
+  STANDARD_INVOICE_TERMS,
+  DOCUMENT_STANDARD_VERSION,
+  ESTIMATE_DOCUMENT_SECTIONS,
 } from "@ai-fsm/domain";
 
 // ---------------------------------------------------------------------------
@@ -169,9 +172,18 @@ function sum(items: LineItemInput[], type: LineItemInput["line_item_type"]): num
 
 export function getStandardEstimateTerms() {
   return {
+    version: DOCUMENT_STANDARD_VERSION,
     notes: STANDARD_ESTIMATE_NOTES,
     payment_terms: STANDARD_PAYMENT_TERMS,
     disclaimer: STANDARD_DISCLAIMER,
+    sections: ESTIMATE_DOCUMENT_SECTIONS,
+  };
+}
+
+export function getStandardInvoiceTerms() {
+  return {
+    version: DOCUMENT_STANDARD_VERSION,
+    terms: STANDARD_INVOICE_TERMS,
   };
 }
 

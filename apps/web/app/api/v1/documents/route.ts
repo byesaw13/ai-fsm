@@ -122,6 +122,18 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
 
   try {
     const link = await withDocumentContext(session, async (client) => {
+      if (is_master_template && !is_archived) {
+        await client.query(
+          `UPDATE document_links
+           SET is_archived = true
+           WHERE account_id = $1
+             AND document_type = $2
+             AND is_master_template = true
+             AND is_archived = false`,
+          [session.accountId, document_type]
+        );
+      }
+
       const created = await createDocumentLink(client, session.accountId, {
         entityType: entity_type,
         entityId: entity_id,
@@ -147,6 +159,9 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
           entity_id,
           paperless_doc_id,
           title: title ?? null,
+          document_type,
+          is_master_template,
+          is_archived,
         },
       });
 

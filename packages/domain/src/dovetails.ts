@@ -73,6 +73,8 @@ export const PAYMENT_OPTIONS = [
 // Standard estimate terms (auto-included on all estimates)
 // ---------------------------------------------------------------------------
 
+export const DOCUMENT_STANDARD_VERSION = "2026.05";
+
 export const STANDARD_ESTIMATE_NOTES = `
 All work performed by licensed and insured professionals.
 Price is valid for 30 days from estimate date.
@@ -89,6 +91,27 @@ This estimate covers the scope of work as described above.
 Unforeseen conditions (e.g., hidden damage, additional prep) may affect final cost
 and will be communicated before proceeding.
 `.trim();
+
+export const STANDARD_INVOICE_TERMS = `
+Invoices show customer-facing service and material costs, not internal labor hours.
+Payment is due by the listed due date unless alternate terms are agreed in writing.
+Past-due balances may pause future scheduling until resolved.
+`.trim();
+
+export const ESTIMATE_DOCUMENT_SECTIONS = {
+  preparation:
+    "Preparation includes site protection, access setup, surface or work-area readiness, and confirming conditions before work begins.",
+  repair_install_work:
+    "Repair or installation work includes the customer-facing labor and service scope described in the line items above.",
+  finish_work:
+    "Finish work includes cleanup, touch-up, and reasonable presentation standards for the selected finish expectation.",
+  materials:
+    "Materials include listed customer-facing materials and applicable handling. Substitutions use comparable quality when availability changes.",
+  exclusions:
+    "Excluded work includes concealed damage, scope not listed, permit fees, hazardous materials, and owner-requested changes unless quoted separately.",
+  client_responsibilities:
+    "Client responsibilities include timely approvals, clear access to work areas, securing pets and valuables, and completing payment according to the terms.",
+} as const;
 
 // ---------------------------------------------------------------------------
 // Membership standards
@@ -329,3 +352,46 @@ export const CLIENT_DOCUMENT_TYPES = [
   "pricing_codebook",
 ] as const;
 export type ClientDocumentType = typeof CLIENT_DOCUMENT_TYPES[number];
+
+function sanitizeFilenamePart(value: string, fallback: string): string {
+  const sanitized = value
+    .trim()
+    .replace(/[^A-Za-z0-9]+/g, "")
+    .slice(0, 48);
+  return sanitized || fallback;
+}
+
+function clientLastName(clientName: string | null | undefined): string {
+  if (!clientName) return "UnknownClient";
+  const parts = clientName.trim().split(/\s+/);
+  return sanitizeFilenamePart(parts.at(-1) ?? clientName, "UnknownClient");
+}
+
+function titleToken(value: string): string {
+  return value
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join("");
+}
+
+export function buildClientDocumentFilename(input: {
+  date: string | Date;
+  clientName: string | null | undefined;
+  jobType: string | null | undefined;
+  documentType: ClientDocumentType;
+  status: ClientDocumentStatus;
+}): string {
+  const date =
+    input.date instanceof Date
+      ? input.date.toISOString().slice(0, 10)
+      : input.date.slice(0, 10);
+
+  return [
+    date,
+    clientLastName(input.clientName),
+    sanitizeFilenamePart(titleToken(input.jobType ?? "Job"), "Job"),
+    sanitizeFilenamePart(titleToken(input.documentType), "Document"),
+    sanitizeFilenamePart(titleToken(input.status), "Status"),
+  ].join("_");
+}

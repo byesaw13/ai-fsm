@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { canManageClients } from "@/lib/auth/permissions";
 import { queryOne } from "@/lib/db";
+import { buildClientDocumentFilename, DOCUMENT_STANDARD_VERSION } from "@ai-fsm/domain";
 import { PrintButton } from "./PrintButton";
 
 export const dynamic = "force-dynamic";
@@ -113,6 +114,14 @@ export default async function EnrollmentSummaryPage({
   );
 
   const planRef = `PLAN-${plan.id.slice(0, 8).toUpperCase()}`;
+  const issuedAt = new Date().toISOString();
+  const documentFilename = buildClientDocumentFilename({
+    date: issuedAt,
+    clientName: plan.client_name,
+    jobType: plan.name,
+    documentType: "membership_plan",
+    status: "final",
+  });
   const tierLabel = TIER_LABELS[plan.membership_tier] ?? plan.membership_tier;
   const freqLabel = FREQUENCY_LABELS[plan.frequency] ?? plan.frequency;
   const zoneLabel = ZONE_LABELS[plan.routing_zone] ?? plan.routing_zone;
@@ -176,7 +185,9 @@ export default async function EnrollmentSummaryPage({
               <span className="tier-badge">{tierLabel}</span>
             </h1>
             <p className="meta-label">{planRef}</p>
-            <p className="meta-label">{fmtDate(new Date().toISOString())}</p>
+            <p className="meta-label no-print">{documentFilename}</p>
+            <p className="meta-label">Document standard: {DOCUMENT_STANDARD_VERSION}</p>
+            <p className="meta-label">{fmtDate(issuedAt)}</p>
           </div>
         </div>
 
