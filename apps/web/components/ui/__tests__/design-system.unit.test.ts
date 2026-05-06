@@ -130,7 +130,7 @@ describe("getButtonClass", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AppShell — getNavItems, isNavActive
+// AppShell — getNavSections, getBottomNavItems, isNavActive
 // ---------------------------------------------------------------------------
 
 import { getNavSections, getBottomNavItems, isNavActive } from "../../AppShell";

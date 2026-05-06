@@ -1,12 +1,19 @@
+<<<<<<< HEAD
 import Link from "next/link";
 import type { Route } from "next";
+=======
+>>>>>>> origin/feat/settings-page
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { query, queryOne } from "@/lib/db";
 import { CompanyForm } from "./CompanyForm";
 import { TeamPanel, type TeamMember } from "./TeamPanel";
 import { ProfileForm } from "./ProfileForm";
+<<<<<<< HEAD
 import { Card, PageContainer, PageHeader } from "@/components/ui";
+=======
+import { PageContainer, PageHeader } from "@/components/ui";
+>>>>>>> origin/feat/settings-page
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +84,7 @@ export default async function SettingsPage() {
           </section>
         )}
 
+<<<<<<< HEAD
         {isAdmin && (
           <section>
             <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Membership Pricing</h2>
@@ -94,6 +102,8 @@ export default async function SettingsPage() {
           </section>
         )}
 
+=======
+>>>>>>> origin/feat/settings-page
         <section>
           <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Your profile</h2>
           <ProfileForm
