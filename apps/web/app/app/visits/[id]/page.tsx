@@ -312,6 +312,7 @@ export default async function VisitDetailPage({
                 visitId={visit.id}
                 initialItems={checklistItems}
                 canUpdate={canChecklist}
+                propertyId={visit.job_property_id ?? null}
               />
             </Card>
           )}
