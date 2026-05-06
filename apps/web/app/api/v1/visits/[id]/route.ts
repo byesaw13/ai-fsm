@@ -213,7 +213,7 @@ export const DELETE = withAuth(
         );
       }
 
-      await client.query(`DELETE FROM visits WHERE id = $1`, [id]);
+      await client.query(`DELETE FROM visits WHERE id = $1 AND account_id = $2`, [id, session.accountId]);
 
       await appendAuditLog(client, {
         account_id: session.accountId,
