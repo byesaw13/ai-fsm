@@ -241,6 +241,44 @@ Validation for this release:
 - `pnpm gate` passed locally (535 unit tests).
 - GitHub CI passed: lint, typecheck, build, test.
 
+### Implemented in Vault Completeness Release
+
+PR: https://github.com/byesaw13/ai-fsm/pull/140
+Merge commit: `83fb526`
+Production deploy: pending
+Migration: none
+
+Completed in that release:
+
+- Added `computeVaultCompleteness` and canonical core-category targets in the domain standards layer.
+- Added a vault completeness KPI to the property detail page.
+- Added an in-section Digital Home Vault completeness summary with missing categories called out explicitly.
+- Added tests covering the completeness scoring rules.
+
+Validation for this release:
+
+- `pnpm gate` passed locally.
+- GitHub CI passed: lint, typecheck, build, test.
+
+### Implemented in Vault Collection Prompt Release
+
+PR: https://github.com/byesaw13/ai-fsm/pull/141
+Merge commit: `de81a96`
+Production deploy: pending
+Migration: none
+
+Completed in that release:
+
+- Added staged vault collection rules that map membership visit number and plan cadence to focused vault categories.
+- Membership visit detail now computes the visit's position within the membership cycle.
+- Membership visit panel now shows a `Vault Collection Focus` prompt with target categories, already-covered categories, and remaining core categories.
+- Added tests covering the staged collection helper across different visit cadences and repeat years.
+
+Validation for this release:
+
+- `pnpm gate` passed locally.
+- GitHub CI passed: lint, typecheck, build, test.
+
 ### Implemented in Membership Model Phase 5B Release
 
 PR: https://github.com/byesaw13/ai-fsm/pull/137
@@ -481,13 +519,13 @@ Done:
 - Property vault page section: items grouped by category, inline add/edit/delete, item count visible.
 - Membership visit panel links directly to the property vault so techs can log findings from the field.
 - Membership value summary includes vault records and recommended follow-ups.
+- Vault completeness score exists on the property page and in the vault section. (PR #140)
+- Membership visits show staged vault collection prompts by visit number and plan cadence. (PR #141)
 
 Still needed:
 
-- Add staged collection plan UI: prompt the tech to collect specific categories on each visit number (Visit 1: mechanicals, Visit 2: appliances, etc.).
 - Link vault items to visit checklist findings (auto-suggest vault entry when a checklist item is flagged).
 - Add behind-wall photo attachment to vault items.
-- Add vault completeness score to the property page.
 
 ## Phase 8: Concierge, Realtor, and Routing Layers
 
@@ -547,8 +585,8 @@ Current recommended order from this point:
 
 1. ~~Roadmap hygiene: close Phase 1 now that filename standards are in the domain layer.~~ Done
 2. ~~Finish Phase 6: enforce snapshot delivery before membership visit completion.~~ Done
-3. Finish Phase 7A: add vault completeness score to the property page.
-4. Finish Phase 7B: add staged vault collection prompts by membership visit number.
+3. ~~Finish Phase 7A: add vault completeness score to the property page.~~ Done
+4. ~~Finish Phase 7B: add staged vault collection prompts by membership visit number.~~ Done
 5. Finish Phase 7C: suggest vault entries from flagged checklist findings.
 6. Finish Phase 7D: add behind-wall / vault photo attachments.
 7. Finish Phase 3A: upgrade price book records with trip, return-trip, additional-unit, material-inclusion, and risk fields.
@@ -565,11 +603,11 @@ Current recommended order from this point:
 
 Highest-leverage next release:
 
-- Add the Phase 7 vault enforcement layer: vault completeness score, staged collection prompts, checklist-to-vault suggestions, and behind-wall photo support.
+- Finish the remaining Phase 7 vault enforcement layer: checklist-to-vault suggestions and behind-wall photo support.
 
 Reason:
 
-The membership model now has a completion gate for client summary delivery. The next compounding value is making the property record more complete and easier to build during real field visits.
+The property page now shows completeness and membership visits now stage collection work. The next compounding value is reducing friction further by turning flagged findings into vault records directly from the field workflow.
 
 ## Update Rule
 

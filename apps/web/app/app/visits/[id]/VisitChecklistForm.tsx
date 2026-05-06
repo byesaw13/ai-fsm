@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui";
 import type { VisitChecklistItem, ChecklistDisposition } from "@ai-fsm/domain";
 import { CHECKLIST_DISPOSITION_LABELS, CHECKLIST_SECTIONS } from "@ai-fsm/domain";
+import { VaultSuggestionButton } from "./VaultSuggestionButton";
 
 interface Props {
   visitId: string;
   initialItems: VisitChecklistItem[];
   canUpdate: boolean;
+  propertyId: string | null;
 }
 
 type ItemState = {
@@ -49,7 +51,7 @@ function buildInitialState(items: VisitChecklistItem[]): Record<string, ItemStat
   return state;
 }
 
-export function VisitChecklistForm({ visitId, initialItems, canUpdate }: Props) {
+export function VisitChecklistForm({ visitId, initialItems, canUpdate, propertyId }: Props) {
   const router = useRouter();
   const toast = useToast();
   const [itemStates, setItemStates] = useState<Record<string, ItemState>>(
@@ -266,6 +268,18 @@ export function VisitChecklistForm({ visitId, initialItems, canUpdate }: Props) 
                                 {state.error}
                               </p>
                             )}
+
+                            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                              <VaultSuggestionButton
+                                propertyId={propertyId}
+                                visitId={visitId}
+                                item={{
+                                  ...item,
+                                  disposition: state.disposition,
+                                  note: state.note,
+                                }}
+                              />
+                            </div>
                           </div>
                         ) : (
                           <div>
