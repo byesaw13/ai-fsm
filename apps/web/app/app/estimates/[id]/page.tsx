@@ -23,6 +23,8 @@ import { buildClientDocumentFilename } from "@/lib/estimates/guardrails";
 
 import { ChangeOrdersClient } from "./ChangeOrdersClient";
 
+import { ChangeOrdersClient } from "./ChangeOrdersClient";
+
 export const dynamic = "force-dynamic";
 
 interface EstimateRow {
