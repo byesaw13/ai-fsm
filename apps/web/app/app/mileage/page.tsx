@@ -48,6 +48,7 @@ function recentMonths(count = 6): TabDef[] {
   return months;
 }
 
+
 export default async function MileagePage({ searchParams }: PageProps) {
   const session = await getSession();
   if (!session) redirect("/login");
