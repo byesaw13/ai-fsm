@@ -1,5 +1,6 @@
 import type { VisitChecklistItem, ChecklistDisposition } from "@ai-fsm/domain";
 import { FixNowEstimateButton } from "./FixNowEstimateButton";
+import { SnapshotDeliveryButton } from "./SnapshotDeliveryButton";
 
 interface Props {
   checklistItems: VisitChecklistItem[];
@@ -8,7 +9,10 @@ interface Props {
   clientId?: string | null;
   propertyId?: string | null;
   canCreateEstimate?: boolean;
+  canUpdateDelivery?: boolean;
+  visitId?: string;
   visitDate?: string;
+  snapshotSentAt?: string | null;
 }
 
 interface Section {
@@ -80,7 +84,10 @@ export function VisitSnapshotPanel({
   clientId,
   propertyId,
   canCreateEstimate,
+  canUpdateDelivery,
+  visitId,
   visitDate,
+  snapshotSentAt,
 }: Props) {
   const completedItems = checklistItems.filter((i) => i.disposition === "ok");
   const unreviewed = checklistItems.filter((i) => !i.disposition);
@@ -88,6 +95,42 @@ export function VisitSnapshotPanel({
 
   return (
     <div data-testid="visit-snapshot-panel">
+      {visitId && (
+        <div
+          style={{
+            marginBottom: "var(--space-5)",
+            padding: "var(--space-3)",
+            borderRadius: "var(--radius-sm)",
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: "var(--space-3)",
+          }}
+        >
+          <div>
+            <p style={{ margin: 0, fontWeight: 600, fontSize: "var(--font-size-sm)" }}>
+              Client Summary Delivery
+            </p>
+            <p
+              style={{
+                margin: "var(--space-1) 0 0",
+                fontSize: "var(--font-size-sm)",
+                color: "var(--color-text-secondary)",
+              }}
+            >
+              Required before completing a membership visit.
+            </p>
+          </div>
+          <SnapshotDeliveryButton
+            visitId={visitId}
+            sentAt={snapshotSentAt ?? null}
+            canUpdate={canUpdateDelivery}
+          />
+        </div>
+      )}
+
       {/* Work completed */}
       {completedItems.length > 0 && (
         <div data-testid="snapshot-completed" style={{ marginBottom: "var(--space-5)" }}>

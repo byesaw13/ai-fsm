@@ -84,6 +84,7 @@ const SAMPLE_VISIT = {
 beforeEach(() => {
   // resetAllMocks drains mockResolvedValueOnce queues between tests
   vi.resetAllMocks();
+  Object.assign(mockSession, { role: "owner" });
   mockPool.connect.mockResolvedValue({ query: mockClientQuery, release: mockClientRelease });
   mockClientQuery.mockResolvedValue({ rows: [] });
 });
@@ -212,8 +213,33 @@ describe("PATCH /api/v1/visits/[id]", () => {
     const json = await res.json();
     expect(json.data.tech_notes).toBe("Done!");
 
-    // Restore session role
-    Object.assign(mockSession, { role: "owner" });
+  });
+
+  it("can mark a reporting membership visit summary as sent → 200", async () => {
+    const membershipVisit = {
+      ...SAMPLE_VISIT,
+      generated_from_plan_id: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+      membership_visit_phase: "reporting",
+      membership_snapshot_sent_at: null,
+    };
+    const updated = { ...membershipVisit, membership_snapshot_sent_at: NOW };
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
+      .mockResolvedValueOnce({ rows: [membershipVisit] }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [updated] }) // UPDATE
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await visitPatch(
+      makeRequest("PATCH", `${VISITS_BASE}/${VISIT_ID}`, { membership_snapshot_sent: true })
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.membership_snapshot_sent_at).toBe(NOW);
+    expect(mockClientQuery).toHaveBeenCalledWith(
+      expect.stringContaining("membership_snapshot_sent_at = COALESCE(membership_snapshot_sent_at, now())"),
+      expect.any(Array)
+    );
   });
 });
 
@@ -319,6 +345,32 @@ describe("POST /api/v1/visits/[id]/transition", () => {
     expect(res.status).toBe(422);
     const json = await res.json();
     expect(json.error.code).toBe("PRECONDITION_FAILED");
+  });
+
+  it("membership completion without a sent summary → 422 PRECONDITION_FAILED", async () => {
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            ...SAMPLE_VISIT,
+            status: "in_progress",
+            generated_from_plan_id: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            membership_visit_phase: "reporting",
+            membership_snapshot_sent_at: null,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+    const res = await visitTransition(
+      makeRequest("POST", `${VISITS_BASE}/${VISIT_ID}/transition`, { status: "completed" })
+    );
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.error.code).toBe("PRECONDITION_FAILED");
+    expect(json.error.message).toContain("visit summary");
   });
 
   it("unknown target status → 422 VALIDATION_ERROR", async () => {
