@@ -244,7 +244,7 @@ Validation for this release:
 ### Implemented in Membership Model Phase 5B Release
 
 PR: https://github.com/byesaw13/ai-fsm/pull/137
-Merge commit: pending
+Merge commit: `8a6246b55dc66461769b4233de2964521f5a94f0`
 Production deploy: pending
 Migrations:
 - `029_member_priority.sql`
@@ -273,8 +273,8 @@ Validation for this release:
 
 ### Implemented in Phase 4 Document Standards Release
 
-PR: pending
-Merge commit: pending
+PR: https://github.com/byesaw13/ai-fsm/pull/137
+Merge commit: `8a6246b55dc66461769b4233de2964521f5a94f0`
 Production deploy: pending
 Migration: `031_document_master_template_uniqueness.sql`
 
