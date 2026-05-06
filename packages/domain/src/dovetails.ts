@@ -330,6 +330,32 @@ export const VAULT_CATEGORY_LABELS: Record<VaultCategory, string> = {
   other:        "Other",
 };
 
+export const VAULT_COMPLETENESS_TARGET_CATEGORIES = [
+  "mechanical",
+  "appliance",
+  "filter",
+  "paint_finish",
+  "monitor",
+  "vendor",
+] as const satisfies readonly VaultCategory[];
+
+export function computeVaultCompleteness(items: ReadonlyArray<{ category: VaultCategory }>) {
+  const coveredCategories = VAULT_COMPLETENESS_TARGET_CATEGORIES.filter((category) =>
+    items.some((item) => item.category === category)
+  );
+  const missingCategories = VAULT_COMPLETENESS_TARGET_CATEGORIES.filter(
+    (category) => !coveredCategories.includes(category)
+  );
+
+  return {
+    percent: Math.round((coveredCategories.length / VAULT_COMPLETENESS_TARGET_CATEGORIES.length) * 100),
+    coveredCount: coveredCategories.length,
+    totalCount: VAULT_COMPLETENESS_TARGET_CATEGORIES.length,
+    coveredCategories,
+    missingCategories,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Client document standards
 // ---------------------------------------------------------------------------

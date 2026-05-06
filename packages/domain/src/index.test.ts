@@ -44,6 +44,8 @@ import {
   DOCUMENT_STANDARD_VERSION,
   ESTIMATE_DOCUMENT_SECTIONS,
   STANDARD_INVOICE_TERMS,
+  VAULT_COMPLETENESS_TARGET_CATEGORIES,
+  computeVaultCompleteness,
   buildClientDocumentFilename,
 } from './index'
 
@@ -449,6 +451,36 @@ describe('Dovetails standards', () => {
       'exclusions',
       'client_responsibilities',
     ])
+  })
+
+  it('scores vault completeness from core category coverage', () => {
+    expect(VAULT_COMPLETENESS_TARGET_CATEGORIES).toEqual([
+      'mechanical',
+      'appliance',
+      'filter',
+      'paint_finish',
+      'monitor',
+      'vendor',
+    ])
+
+    expect(computeVaultCompleteness([
+      { category: 'mechanical' },
+      { category: 'mechanical' },
+      { category: 'filter' },
+      { category: 'other' },
+    ])).toEqual({
+      percent: 33,
+      coveredCount: 2,
+      totalCount: 6,
+      coveredCategories: ['mechanical', 'filter'],
+      missingCategories: ['appliance', 'paint_finish', 'monitor', 'vendor'],
+    })
+
+    expect(
+      computeVaultCompleteness(
+        VAULT_COMPLETENESS_TARGET_CATEGORIES.map((category) => ({ category }))
+      ).percent
+    ).toBe(100)
   })
 
   it('builds client document filenames across document types', () => {
