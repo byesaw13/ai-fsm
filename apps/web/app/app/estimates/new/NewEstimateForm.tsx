@@ -219,14 +219,13 @@ export function NewEstimateForm({
   const [minimumOverrideReason, setMinimumOverrideReason] = useState("");
   const [minimumOverrideNote, setMinimumOverrideNote] = useState("");
 
+
   // Price book line items
   const [priceBookItems, setPriceBookItems] = useState<{ service: PriceBookService; priceCents: number }[]>([]);
 
   function handleAddPriceBookItem(service: PriceBookService, priceCents: number) {
     setPriceBookItems((prev) => [...prev, { service, priceCents }]);
 
-    // Auto-fill generic line items with price book data
-    // Use default_price_cents if available, otherwise use provided priceCents
     const unitPrice = service.default_price_cents ?? priceCents;
     const description = `${service.code} — ${service.name}${service.description ? ` — ${service.description}` : ""}`;
 
