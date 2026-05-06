@@ -136,11 +136,25 @@ export const GET = withAuth(async (request, session) => {
     let query = `
       SELECT co.*, e.client_id,
              u.full_name as created_by_name,
-             u2.full_name as approved_by_name
+             u2.full_name as approved_by_name,
+             COALESCE(
+               json_agg(
+                 json_build_object(
+                   'id', li.id,
+                   'description', li.description,
+                   'quantity', li.quantity,
+                   'unit_price_cents', li.unit_price_cents,
+                   'total_cents', li.total_cents,
+                   'sort_order', li.sort_order
+                 ) ORDER BY li.sort_order
+               ) FILTER (WHERE li.id IS NOT NULL),
+               '[]'::json
+             ) AS line_items
       FROM change_orders co
       JOIN estimates e ON e.id = co.estimate_id
       LEFT JOIN users u ON u.id = co.created_by
       LEFT JOIN users u2 ON u2.id = co.approved_by
+      LEFT JOIN change_order_line_items li ON li.change_order_id = co.id
       WHERE co.account_id = $1
     `;
     const params: unknown[] = [session.accountId];
@@ -150,21 +164,9 @@ export const GET = withAuth(async (request, session) => {
       params.push(estimateId);
     }
 
-    query += ` ORDER BY co.created_at DESC`;
+    query += ` GROUP BY co.id, e.client_id, u.full_name, u2.full_name ORDER BY co.created_at DESC`;
 
     const { rows } = await getPool().query(query, params);
-
-    // Fetch line items for each change order
-    for (const co of rows) {
-      const { rows: items } = await getPool().query(
-        `SELECT id, description, quantity, unit_price_cents, total_cents, sort_order
-         FROM change_order_line_items
-         WHERE change_order_id = $1
-         ORDER BY sort_order ASC`,
-        [co.id]
-      );
-      co.line_items = items;
-    }
 
     return NextResponse.json({ data: rows });
   } catch (error) {

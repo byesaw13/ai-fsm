@@ -93,7 +93,7 @@ export function ChangeOrdersClient({ estimateId, initialChangeOrders }: ChangeOr
       const url = editingId
         ? `/api/v1/change-orders?id=${editingId}`
         : "/api/v1/change-orders";
-      const method = "POST";
+      const method = editingId ? "PATCH" : "POST";
 
       const body = editingId
         ? { title: title.trim(), description: description.trim() || null, notes: notes.trim() || null, line_items: validItems.map((item, i) => ({ ...item, description: item.description.trim(), sort_order: i })) }

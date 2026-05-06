@@ -67,10 +67,11 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
   try {
     await client.query("BEGIN");
 
-    const existing = await queryOne<{ id: string; status: string; subtotal_cents: number; tax_cents: number }>(
+    const { rows: existingRows } = await client.query<{ id: string; status: string; subtotal_cents: number; tax_cents: number }>(
       `SELECT id, status, subtotal_cents, tax_cents FROM change_orders WHERE id = $1 AND account_id = $2`,
       [id, session.accountId]
     );
+    const existing = existingRows[0] ?? null;
 
     if (!existing) {
       await client.query("ROLLBACK");
@@ -168,10 +169,11 @@ async function handleAction(id: string, action: string, session: { accountId: st
   try {
     await client.query("BEGIN");
 
-    const existing = await queryOne<{ id: string; status: string; estimate_id: string; total_cents: number }>(
+    const { rows: existingRows } = await client.query<{ id: string; status: string; estimate_id: string; total_cents: number }>(
       `SELECT id, status, estimate_id, total_cents FROM change_orders WHERE id = $1 AND account_id = $2`,
       [id, session.accountId]
     );
+    const existing = existingRows[0] ?? null;
 
     if (!existing) {
       await client.query("ROLLBACK");
