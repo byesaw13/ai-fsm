@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
 import { z } from "zod";
 import { withAuth } from "../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../lib/auth/middleware";
@@ -141,6 +143,14 @@ export const DELETE = withAuth(
       });
 
       await client.query("COMMIT");
+
+      const uploadDir = path.join("/app/uploads/vault-items", id);
+      try {
+        fs.rmSync(uploadDir, { recursive: true, force: true });
+      } catch (err) {
+        logger.warn("[vault-items DELETE] failed to remove media directory", { uploadDir, err, traceId: session.traceId });
+      }
+
       return NextResponse.json({ deleted: true });
     } catch (err) {
       await client.query("ROLLBACK");

@@ -279,6 +279,26 @@ Validation for this release:
 - `pnpm gate` passed locally.
 - GitHub CI passed: lint, typecheck, build, test.
 
+### Implemented in Vault Suggestion Release
+
+PR: https://github.com/byesaw13/ai-fsm/pull/142
+Merge commit: `e9b5c6d`
+Production deploy: pending
+Migration: none
+
+Completed in that release:
+
+- Added checklist-to-vault suggestion rules that infer vault category, default location, and notes from a checklist finding.
+- Added a reusable `Add to Vault` action for flagged `fix_now`, `monitor`, and `refer` findings.
+- Visit walkthrough checklist now shows the vault suggestion action inline while a tech is documenting the visit.
+- Membership visit snapshot now shows the same action alongside flagged findings, next to estimate creation where applicable.
+- Created vault items now link back to the originating visit through `linked_visit_id`.
+
+Validation for this release:
+
+- `pnpm gate` passed locally.
+- GitHub CI passed: lint, typecheck, build, test.
+
 ### Implemented in Membership Model Phase 5B Release
 
 PR: https://github.com/byesaw13/ai-fsm/pull/137
@@ -521,10 +541,10 @@ Done:
 - Membership value summary includes vault records and recommended follow-ups.
 - Vault completeness score exists on the property page and in the vault section. (PR #140)
 - Membership visits show staged vault collection prompts by visit number and plan cadence. (PR #141)
+- Flagged checklist findings can be turned into vault items directly from the walkthrough and visit snapshot. (PR #142)
 
 Still needed:
 
-- Link vault items to visit checklist findings (auto-suggest vault entry when a checklist item is flagged).
 - Add behind-wall photo attachment to vault items.
 
 ## Phase 8: Concierge, Realtor, and Routing Layers
@@ -587,7 +607,7 @@ Current recommended order from this point:
 2. ~~Finish Phase 6: enforce snapshot delivery before membership visit completion.~~ Done
 3. ~~Finish Phase 7A: add vault completeness score to the property page.~~ Done
 4. ~~Finish Phase 7B: add staged vault collection prompts by membership visit number.~~ Done
-5. Finish Phase 7C: suggest vault entries from flagged checklist findings.
+5. ~~Finish Phase 7C: suggest vault entries from flagged checklist findings.~~ Done
 6. Finish Phase 7D: add behind-wall / vault photo attachments.
 7. Finish Phase 3A: upgrade price book records with trip, return-trip, additional-unit, material-inclusion, and risk fields.
 8. Finish Phase 3B: add pricing review dashboard metrics.
@@ -603,11 +623,11 @@ Current recommended order from this point:
 
 Highest-leverage next release:
 
-- Finish the remaining Phase 7 vault enforcement layer: checklist-to-vault suggestions and behind-wall photo support.
+- Finish Phase 7D: behind-wall photo attachments for vault items.
 
 Reason:
 
-The property page now shows completeness and membership visits now stage collection work. The next compounding value is reducing friction further by turning flagged findings into vault records directly from the field workflow.
+The vault can now be built directly from field findings. The next compounding value is attaching behind-wall evidence and long-term photo records to those vault entries so future visits have richer property context.
 
 ## Update Rule
 
