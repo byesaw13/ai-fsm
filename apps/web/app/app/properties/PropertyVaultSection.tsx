@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui";
-import { VAULT_CATEGORIES, VAULT_CATEGORY_LABELS } from "@ai-fsm/domain";
+import { computeVaultCompleteness, VAULT_CATEGORIES, VAULT_CATEGORY_LABELS } from "@ai-fsm/domain";
 import type { VaultCategory } from "@ai-fsm/domain";
 
 interface VaultItem {
@@ -61,6 +61,13 @@ export function PropertyVaultSection({ propertyId, initialItems, canEdit }: Prop
     (acc, cat) => { acc[cat] = items.filter((i) => i.category === cat); return acc; },
     {} as Record<VaultCategory, VaultItem[]>
   );
+  const completeness = computeVaultCompleteness(items);
+  const completenessColor =
+    completeness.percent === 100
+      ? "var(--color-success)"
+      : completeness.percent >= 50
+      ? "var(--color-primary)"
+      : "var(--color-text-secondary)";
 
   async function handleAdd() {
     if (!form.name.trim()) { toast.error("Name is required"); return; }
@@ -255,6 +262,43 @@ export function PropertyVaultSection({ propertyId, initialItems, canEdit }: Prop
 
   return (
     <div data-testid="property-vault-section">
+      <div
+        data-testid="property-vault-completeness"
+        style={{
+          marginBottom: "var(--space-4)",
+          padding: "var(--space-3)",
+          borderRadius: "var(--radius-md)",
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              Vault Completeness
+            </div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-2)", flexWrap: "wrap", marginTop: "var(--space-1)" }}>
+              <span style={{ fontSize: "var(--font-size-xl)", fontWeight: 700, color: completenessColor }}>
+                {completeness.percent}%
+              </span>
+              <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+                {completeness.coveredCount} of {completeness.totalCount} core categories documented
+              </span>
+            </div>
+          </div>
+          {completeness.percent === 100 ? (
+            <span style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-success)" }}>
+              Complete
+            </span>
+          ) : null}
+        </div>
+        <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+          {completeness.missingCategories.length === 0
+            ? "All core categories are represented in the vault."
+            : `Missing: ${completeness.missingCategories.map((category) => VAULT_CATEGORY_LABELS[category]).join(", ")}`}
+        </p>
+      </div>
+
       {canEdit && !showAdd && (
         <div style={{ marginBottom: "var(--space-4)" }}>
           <button className="p7-btn p7-btn-primary" onClick={() => setShowAdd(true)} data-testid="add-vault-item-btn">

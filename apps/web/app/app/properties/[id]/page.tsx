@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { canManageClients, canTransitionJob } from "@/lib/auth/permissions";
 import { query, queryOne } from "@/lib/db";
 import { buildJobCreateHref, formatPropertyAddress } from "@/lib/crm/p7";
+import { computeVaultCompleteness, type VaultCategory } from "@ai-fsm/domain";
 import {
   Card,
   EmptyState,
@@ -39,7 +40,6 @@ type PropertyRow = {
 type ClientOption = { id: string; name: string };
 type JobRow = { id: string; title: string; status: string; created_at: string };
 type VisitRow = { id: string; status: string; scheduled_start: string; job_title: string };
-import type { VaultCategory } from "@ai-fsm/domain";
 
 type VaultItemRow = {
   id: string; category: VaultCategory; name: string; location: string | null;
@@ -106,6 +106,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
     href: `/app/visits/${v.id}`,
     isCompleted: v.status === "completed" || v.status === "cancelled",
   }));
+  const vaultCompleteness = computeVaultCompleteness(vaultItems);
 
   return (
     <PageContainer>
@@ -132,6 +133,15 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
         metrics={[
           { label: "Jobs", value: Number(property.job_count) },
           { label: "Visits", value: Number(property.visit_count) },
+          {
+            label: "Vault",
+            value: `${vaultCompleteness.percent}%`,
+            sub:
+              vaultCompleteness.percent === 100
+                ? "All core categories logged"
+                : `${vaultCompleteness.coveredCount}/${vaultCompleteness.totalCount} core categories logged`,
+            variant: vaultCompleteness.percent === 100 ? "success" : "default",
+          },
           { label: "Client", value: property.client_name, href: `/app/clients/${property.client_id}` },
         ]}
       />
