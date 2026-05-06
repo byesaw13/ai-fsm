@@ -164,6 +164,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             <LinkButton href={`/app/properties/new?client_id=${client.id}`} variant="secondary" size="sm" data-testid="add-property-btn">
               + Property
             </LinkButton>
+            <LinkButton href={`/app/maintenance-plans/new?client_id=${client.id}`} variant="secondary" size="sm">
+              + Plan
+            </LinkButton>
             {canCreateEstimate ? (
               <LinkButton href={`/app/estimates/new?client_id=${client.id}`} variant="secondary" size="sm" data-testid="create-estimate-from-client-btn">
                 + Estimate

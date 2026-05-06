@@ -32,7 +32,12 @@ interface PricingRow {
   [key: string]: unknown;
 }
 
-export default async function NewMaintenancePlanPage() {
+export default async function NewMaintenancePlanPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ client_id?: string }>;
+}) {
+  const { client_id: defaultClientId } = await searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
   if (!canManageClients(session.role)) redirect("/app/maintenance-plans");
@@ -85,6 +90,7 @@ export default async function NewMaintenancePlanPage() {
           propertyOptions={[{ value: "", label: "None" }, ...propertyOptions]}
           frequencyOptions={frequencyOptions}
           publishedPricing={pricingByTier}
+          defaultClientId={defaultClientId}
         />
       </Card>
     </PageContainer>
