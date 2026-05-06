@@ -1,11 +1,11 @@
 import {
   MINIMUM_SERVICE_FEE_CENTS,
-  type ClientDocumentStatus,
-  type ClientDocumentType,
   type EstimateFinishExpectation,
   type EstimateMinimumOverrideReason,
   type EstimateTripCount,
 } from "@ai-fsm/domain";
+
+export { buildClientDocumentFilename } from "@ai-fsm/domain";
 
 export interface EstimateGuardrailInput {
   total_cents: number;
@@ -87,47 +87,4 @@ export function reviewEstimateGuardrails(input: EstimateGuardrailInput): Estimat
     blockers,
     warnings,
   };
-}
-
-function sanitizeFilenamePart(value: string, fallback: string): string {
-  const sanitized = value
-    .trim()
-    .replace(/[^A-Za-z0-9]+/g, "")
-    .slice(0, 48);
-  return sanitized || fallback;
-}
-
-function clientLastName(clientName: string | null | undefined): string {
-  if (!clientName) return "UnknownClient";
-  const parts = clientName.trim().split(/\s+/);
-  return sanitizeFilenamePart(parts.at(-1) ?? clientName, "UnknownClient");
-}
-
-function titleToken(value: string): string {
-  return value
-    .split(/[_\s-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join("");
-}
-
-export function buildClientDocumentFilename(input: {
-  date: string | Date;
-  clientName: string | null | undefined;
-  jobType: string | null | undefined;
-  documentType: ClientDocumentType;
-  status: ClientDocumentStatus;
-}): string {
-  const date =
-    input.date instanceof Date
-      ? input.date.toISOString().slice(0, 10)
-      : input.date.slice(0, 10);
-
-  return [
-    date,
-    clientLastName(input.clientName),
-    sanitizeFilenamePart(titleToken(input.jobType ?? "Job"), "Job"),
-    sanitizeFilenamePart(titleToken(input.documentType), "Document"),
-    sanitizeFilenamePart(titleToken(input.status), "Status"),
-  ].join("_");
 }

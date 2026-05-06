@@ -41,6 +41,10 @@ import {
   MEMBERSHIP_TIER_VISITS_PER_YEAR,
   MEMBERSHIP_TIERS,
   MEMBERSHIP_ROUTING_ZONES,
+  DOCUMENT_STANDARD_VERSION,
+  ESTIMATE_DOCUMENT_SECTIONS,
+  STANDARD_INVOICE_TERMS,
+  buildClientDocumentFilename,
 } from './index'
 
 // ---------------------------------------------------------------------------
@@ -432,5 +436,28 @@ describe('Dovetails standards', () => {
     })
     expect(MEMBERSHIP_INCLUDED_LABOR_MINUTES_PER_VISIT).toBe(60)
     expect(MEMBERSHIP_ROUTING_ZONES).toEqual(['core', 'extended', 'out_of_area'])
+  })
+
+  it('exposes versioned document standards', () => {
+    expect(DOCUMENT_STANDARD_VERSION).toBe('2026.05')
+    expect(STANDARD_INVOICE_TERMS).toContain('not internal labor hours')
+    expect(Object.keys(ESTIMATE_DOCUMENT_SECTIONS)).toEqual([
+      'preparation',
+      'repair_install_work',
+      'finish_work',
+      'materials',
+      'exclusions',
+      'client_responsibilities',
+    ])
+  })
+
+  it('builds client document filenames across document types', () => {
+    expect(buildClientDocumentFilename({
+      date: '2026-05-06T12:00:00Z',
+      clientName: 'Ada Lovelace',
+      jobType: 'membership plan',
+      documentType: 'membership_plan',
+      status: 'final',
+    })).toBe('2026-05-06_Lovelace_MembershipPlan_MembershipPlan_Final')
   })
 })

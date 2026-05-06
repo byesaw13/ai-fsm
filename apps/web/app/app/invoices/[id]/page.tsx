@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { canCreateInvoices, canRecordPayments } from "@/lib/auth/permissions";
 import { withInvoiceContext } from "@/lib/invoices/db";
-import { invoiceTransitions } from "@ai-fsm/domain";
+import { buildClientDocumentFilename, invoiceTransitions } from "@ai-fsm/domain";
 import type { InvoiceStatus } from "@ai-fsm/domain";
 import { InvoiceTransitionForm } from "./InvoiceTransitionForm";
 import { RecordPaymentForm } from "./RecordPaymentForm";
@@ -126,6 +126,13 @@ export default async function InvoiceDetailPage({
   const amountDue = invoice.total_cents - invoice.paid_cents;
   const depositPending = invoice.deposit_cents > 0 && !invoice.deposit_paid_at;
   const canMarkDeposit = canTransition && !["paid", "void"].includes(currentStatus);
+  const documentFilename = buildClientDocumentFilename({
+    date: invoice.sent_at ?? invoice.created_at,
+    clientName: invoice.client_name,
+    jobType: invoice.job_title ?? "Invoice",
+    documentType: "invoice",
+    status: currentStatus === "void" ? "archived" : currentStatus === "paid" ? "final" : currentStatus === "overdue" || currentStatus === "partial" ? "sent" : currentStatus,
+  });
 
   return (
     <PageContainer>
@@ -176,36 +183,29 @@ export default async function InvoiceDetailPage({
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border)" }}>
                     <th style={{ textAlign: "left", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Description</th>
-                    <th style={{ width: 80, textAlign: "right", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Qty</th>
-                    <th style={{ width: 120, textAlign: "right", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Unit Price</th>
-                    <th style={{ width: 100, textAlign: "right", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Total</th>
+                    <th style={{ width: 140, textAlign: "right", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Amount</th>
                   </tr>
                 </thead>
                 <tbody>
                   {lineItems.map((item) => (
                     <tr key={item.id} style={{ borderBottom: "1px solid var(--border)" }} data-testid="invoice-line-item-row">
                       <td style={{ padding: "var(--space-2) var(--space-3)" }}>{item.description}</td>
-                      <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{item.quantity}</td>
-                      <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{formatDollars(item.unit_price_cents)}</td>
                       <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{formatDollars(item.total_cents)}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr style={{ borderTop: "2px solid var(--border)" }}>
-                    <td colSpan={2}></td>
                     <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right", fontWeight: 600 }}>Subtotal</td>
                     <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{formatDollars(invoice.subtotal_cents)}</td>
                   </tr>
                   {invoice.tax_cents > 0 && (
                     <tr>
-                      <td colSpan={2}></td>
                       <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>Tax</td>
                       <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{formatDollars(invoice.tax_cents)}</td>
                     </tr>
                   )}
                   <tr style={{ fontWeight: 700 }}>
-                    <td colSpan={2}></td>
                     <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>Total</td>
                     <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }} data-testid="invoice-total-footer">{formatDollars(invoice.total_cents)}</td>
                   </tr>
@@ -238,6 +238,10 @@ export default async function InvoiceDetailPage({
                 <dd style={{ fontSize: "var(--text-lg)", fontWeight: "var(--font-semibold)" }} data-testid="invoice-total">
                   {formatDollars(invoice.total_cents)}
                 </dd>
+              </div>
+              <div className="p7-detail-row">
+                <dt>Document filename</dt>
+                <dd><code>{documentFilename}</code></dd>
               </div>
               {invoice.deposit_cents > 0 && (
                 <div className="p7-detail-row">

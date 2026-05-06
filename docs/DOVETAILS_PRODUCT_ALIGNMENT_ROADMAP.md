@@ -241,6 +241,59 @@ Validation for this release:
 - `pnpm gate` passed locally (535 unit tests).
 - GitHub CI passed: lint, typecheck, build, test.
 
+### Implemented in Membership Model Phase 5B Release
+
+PR: https://github.com/byesaw13/ai-fsm/pull/137
+Merge commit: pending
+Production deploy: pending
+Migrations:
+- `029_member_priority.sql`
+- `030_membership_pricing_structures.sql`
+
+Completed in that release:
+
+- Added member priority levels: standard, priority, VIP.
+- Added member priority to maintenance-plan create/edit/detail/list flows.
+- Added renewal status display on maintenance-plan detail.
+- Added membership value summary:
+  - visits completed
+  - issues caught
+  - work logged
+  - vault records
+  - recommended follow-ups
+- Added published membership pricing control in Settings > Membership Pricing.
+- Added `membership_pricing_structures` with a partial unique index so only one published price exists per tier/account.
+- New membership plans pre-fill annual price from the published tier price.
+- Added client-facing membership enrollment/plan summary print page.
+
+Validation for this release:
+
+- `pnpm gate` passed locally.
+- GitHub CI passed: lint, typecheck, build, test.
+
+### Implemented in Phase 4 Document Standards Release
+
+PR: pending
+Merge commit: pending
+Production deploy: pending
+Migration: `031_document_master_template_uniqueness.sql`
+
+Completed in that release:
+
+- Moved client document filename generation into the domain standards layer.
+- Added a versioned document standard: `2026.05`.
+- Added required estimate document sections:
+  - preparation
+  - repair/install work
+  - finish work
+  - materials
+  - exclusions
+  - client responsibilities
+- Added versioned standard invoice terms.
+- Updated invoice customer-facing line-item displays to show service/material amount instead of labor-hour-style quantity/unit columns.
+- Expanded filename generation to invoice and membership enrollment/plan summary outputs.
+- Added one-active-master-template enforcement per account/document category.
+
 ## Status Legend
 
 - `Done`: implemented, tested, and shipped.
@@ -337,7 +390,7 @@ Still needed:
 
 Goal: Bring customer-facing documents into the v2.0 standard.
 
-Status: `Partial`
+Status: `Done`
 
 Done:
 
@@ -353,26 +406,23 @@ Done:
 - Estimate document filename generator exists.
 - Estimate detail and print/PDF pages show the generated filename.
 - Document status constants exist.
-
-Still needed:
-
-- Add required estimate sections:
+- Required estimate sections exist:
   - preparation
   - repair/install work
   - finish work
   - materials
   - exclusions
   - client responsibilities
-- Ensure invoices show labor/service cost, not labor hours, unless intentionally overridden.
-- Add consistent estimate and invoice terms as versioned standards.
-- Expand document filename generator to invoices and membership enrollment/plan summaries (visit report filename already ships via `buildClientDocumentFilename` in PR #121).
-- Add one-active-master-template rule per category.
+- Invoices show service/material amount, not labor-hour-style quantity/unit columns, on customer-facing outputs.
+- Estimate and invoice terms are tied to a versioned document standard.
+- Document filename generator supports estimates, invoices, membership plan summaries, and visit reports.
+- One-active-master-template rule exists per account/document category.
 
 ## Phase 5: Membership Model Rebuild
 
 Goal: Replace generic maintenance plans with real memberships.
 
-Status: `Partial`
+Status: `Done`
 
 Done:
 
@@ -388,19 +438,16 @@ Done:
 - Renewal date exists.
 - Routing zone exists.
 - Maintenance plan UI now shows and edits the new membership fields.
-
-Still needed:
-
-- Add member priority indicator.
-- Add renewal status.
-- Add membership value summary:
+- Member priority indicator exists.
+- Renewal status exists.
+- Membership value summary exists:
   - visits completed
   - issues caught
   - work completed
   - vault records added
   - recommended follow-ups
-- Add published pricing control so only one active pricing structure is used.
-- Add client-facing enrollment/plan summary output.
+- Published pricing control ensures only one active pricing structure is used per tier/account.
+- Client-facing enrollment/plan summary output exists.
 
 ## Phase 6: Membership Visit Workflow
 
@@ -436,6 +483,7 @@ Done:
 - Full CRUD API with role-scoped access and audit logging.
 - Property vault page section: items grouped by category, inline add/edit/delete, item count visible.
 - Membership visit panel links directly to the property vault so techs can log findings from the field.
+- Membership value summary includes vault records and recommended follow-ups.
 
 Still needed:
 
@@ -443,7 +491,6 @@ Still needed:
 - Link vault items to visit checklist findings (auto-suggest vault entry when a checklist item is flagged).
 - Add behind-wall photo attachment to vault items.
 - Add vault completeness score to the property page.
-- Include vault summary in the membership value summary (vault records added, recommended follow-ups).
 
 ## Phase 8: Concierge, Realtor, and Routing Layers
 
@@ -506,8 +553,8 @@ Current recommended order from this point:
 3. ~~Digital Home Vault foundation.~~ Done (PR #123)
 4. ~~Convert flagged visit items into quoted follow-up estimates.~~ Done (PR #125)
 5. ~~Job intake fields and acceptance filter.~~ Done (PR #127)
-6. Expand document naming/archive/master-template controls beyond estimates.
-7. Job intake enforcement and calendar protection (Wednesday rule, intake gate before Quoted).
+6. ~~Expand document naming/archive/master-template controls beyond estimates.~~ Done
+7. ~~Job intake enforcement and calendar protection (Wednesday rule, intake gate before Quoted).~~ Done (PR #130, PR #132)
 8. Realtor/concierge/routing workflows.
 9. Dashboards and enforcement.
 
@@ -515,11 +562,11 @@ Current recommended order from this point:
 
 Highest-leverage next release:
 
-- Add an intake enforcement gate: warn or block when a job moves from Draft → Quoted without an intake decision recorded. Surface job category and intake decision on the jobs list so the owner can see the pipeline composition at a glance.
+- Add the next Digital Home Vault enforcement layer: staged collection prompts, checklist-to-vault suggestions, behind-wall photo support, and a vault completeness score on the property page.
 
 Reason:
 
-The intake fields are now in the DB, API, and UI — but they have no enforcement teeth. A job can move to Quoted and be scheduled without anyone filling in the intake filter. The next step is making that visible: a warning on the status transition and a category column on the jobs list turns the intake panel from optional metadata into a real pipeline gate.
+The membership model now has visits, reporting, follow-up estimates, published pricing, and enrollment summaries. The next compounding value is making the property record more complete and easier to build during real field visits.
 
 ## Update Rule
 

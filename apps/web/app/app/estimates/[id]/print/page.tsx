@@ -164,6 +164,9 @@ export default async function EstimatePrintPage({
         tfoot tr.total-row td { font-size: 16px; }
         tfoot tr.deposit-row td { color: #444; font-size: 13px; }
         .terms { font-size: 13px; color: #444; line-height: 1.6; white-space: pre-wrap; }
+        .standard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 28px; }
+        .standard-grid h3 { font-size: 12px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+        .standard-grid p { font-size: 13px; color: #444; margin: 0; }
         .section-block { margin-top: 24px; }
         .header-row { display: flex; justify-content: space-between; align-items: flex-start; }
         .company-name { font-size: 20px; font-weight: 700; }
@@ -186,6 +189,7 @@ export default async function EstimatePrintPage({
             <h1>Estimate</h1>
             <p className="meta-label">{estimateNumber}</p>
             <p className="meta-label no-print">{documentFilename}</p>
+            <p className="meta-label">Document standard: {terms.version}</p>
             <p className="meta-label">Issued: {issuedDate}</p>
             {estimate.expires_at && (
               <p className="meta-label">Valid through: {expiryDate}</p>
@@ -230,6 +234,36 @@ export default async function EstimatePrintPage({
             <p><strong>Ceiling:</strong> {estimate.includes_ceiling ? "Included" : "Not included"}</p>
           </div>
         )}
+
+        <div className="section-block">
+          <h2>Project Standards</h2>
+          <div className="standard-grid">
+            <div>
+              <h3>Preparation</h3>
+              <p>{terms.sections.preparation}</p>
+            </div>
+            <div>
+              <h3>Repair / Install Work</h3>
+              <p>{terms.sections.repair_install_work}</p>
+            </div>
+            <div>
+              <h3>Finish Work</h3>
+              <p>{terms.sections.finish_work}</p>
+            </div>
+            <div>
+              <h3>Materials</h3>
+              <p>{terms.sections.materials}</p>
+            </div>
+            <div>
+              <h3>Exclusions</h3>
+              <p>{terms.sections.exclusions}</p>
+            </div>
+            <div>
+              <h3>Client Responsibilities</h3>
+              <p>{terms.sections.client_responsibilities}</p>
+            </div>
+          </div>
+        </div>
 
         {/* Line Items */}
         {customerItems.length > 0 && (

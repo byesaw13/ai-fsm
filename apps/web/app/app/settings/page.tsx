@@ -1,10 +1,12 @@
+import Link from "next/link";
+import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { query, queryOne } from "@/lib/db";
 import { CompanyForm } from "./CompanyForm";
 import { TeamPanel, type TeamMember } from "./TeamPanel";
 import { ProfileForm } from "./ProfileForm";
-import { PageContainer, PageHeader } from "@/components/ui";
+import { Card, PageContainer, PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +74,23 @@ export default async function SettingsPage() {
               currentUserId={session.userId}
               currentRole={session.role}
             />
+          </section>
+        )}
+
+        {isAdmin && (
+          <section>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Membership Pricing</h2>
+            <Card padding="default">
+              <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                Manage published prices for each membership tier. Published prices pre-fill when creating new maintenance plans.
+              </p>
+              <Link
+                href={"/app/settings/membership-pricing" as unknown as Route}
+                style={{ fontSize: "var(--text-sm)", color: "var(--accent)", fontWeight: "var(--font-medium)" }}
+              >
+                Manage Membership Pricing &rarr;
+              </Link>
+            </Card>
           </section>
         )}
 

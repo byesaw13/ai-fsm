@@ -8,6 +8,7 @@ import {
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
+import { DOCUMENT_STANDARD_VERSION, STANDARD_INVOICE_TERMS } from "@ai-fsm/domain";
 
 interface LineItem {
   id: string;
@@ -134,6 +135,7 @@ export function InvoicePortalClient({ token, invoice, lineItems, stripePublishab
 
   const propertyLine = [invoice.property_address, invoice.property_city, invoice.property_state, invoice.property_zip]
     .filter(Boolean).join(", ");
+  const invoiceTerms = invoice.account_settings?.invoice_terms ?? STANDARD_INVOICE_TERMS;
 
   return (
     <div style={{ minHeight: "100vh", background: "#f9fafb", padding: "24px 16px" }}>
@@ -175,17 +177,13 @@ export function InvoicePortalClient({ token, invoice, lineItems, stripePublishab
             <thead>
               <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
                 <th style={{ textAlign: "left", padding: "10px 16px", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Description</th>
-                <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Qty</th>
-                <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Unit</th>
-                <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Total</th>
+                <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Amount</th>
               </tr>
             </thead>
             <tbody>
               {lineItems.map((item) => (
                 <tr key={item.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
                   <td style={{ padding: "10px 16px" }}>{item.description}</td>
-                  <td style={{ padding: "10px 16px", textAlign: "right", color: "#6b7280" }}>{item.quantity}</td>
-                  <td style={{ padding: "10px 16px", textAlign: "right", color: "#6b7280" }}>{cents(item.unit_price_cents)}</td>
                   <td style={{ padding: "10px 16px", textAlign: "right", fontWeight: 500 }}>{cents(item.total_cents)}</td>
                 </tr>
               ))}
@@ -221,10 +219,12 @@ export function InvoicePortalClient({ token, invoice, lineItems, stripePublishab
         )}
 
         {/* Invoice terms */}
-        {invoice.account_settings?.invoice_terms && (
+        {invoiceTerms && (
           <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, marginBottom: 24 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 6 }}>TERMS</div>
-            <div style={{ whiteSpace: "pre-wrap", color: "#6b7280", fontSize: 13 }}>{invoice.account_settings.invoice_terms}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 6 }}>
+              TERMS · STANDARD {DOCUMENT_STANDARD_VERSION}
+            </div>
+            <div style={{ whiteSpace: "pre-wrap", color: "#6b7280", fontSize: 13 }}>{invoiceTerms}</div>
           </div>
         )}
 

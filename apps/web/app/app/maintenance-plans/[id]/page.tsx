@@ -180,6 +180,9 @@ export default async function MaintenancePlanDetailPage({
         backLabel="Plans"
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <LinkButton href={`/app/maintenance-plans/${id}/enrollment-summary`} variant="ghost" size="sm">
+              Print Summary
+            </LinkButton>
             <LinkButton href={`/app/maintenance-plans/${id}/edit`} variant="secondary" size="sm">
               Edit
             </LinkButton>
