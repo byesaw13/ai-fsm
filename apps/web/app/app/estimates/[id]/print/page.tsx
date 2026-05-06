@@ -265,6 +265,7 @@ export default async function EstimatePrintPage({
           </div>
         </div>
 
+
         {/* Line Items */}
         {customerItems.length > 0 && (
           <div className="section-block">
