@@ -33,7 +33,7 @@ export const DELETE = withRole(["owner", "admin"], async (request: NextRequest, 
       );
     }
 
-    await client.query(`DELETE FROM mileage_logs WHERE id = $1`, [id]);
+    await client.query(`DELETE FROM mileage_logs WHERE id = $1 AND account_id = $2`, [id, session.accountId]);
 
     await appendAuditLog(client, {
       account_id: session.accountId,

@@ -600,6 +600,7 @@ export default async function EstimateDetailPage({
         <EstimateReviewPanel estimateId={estimate.id} />
       )}
 
+
       {/* Send to Client — owner/admin only, non-terminal estimates */}
       {canTransition && !["approved", "declined", "expired"].includes(currentStatus) && (
         <div className="card action-card">

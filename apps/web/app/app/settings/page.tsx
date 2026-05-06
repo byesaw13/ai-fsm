@@ -94,6 +94,7 @@ export default async function SettingsPage() {
           </section>
         )}
 
+
         <section>
           <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Your profile</h2>
           <ProfileForm

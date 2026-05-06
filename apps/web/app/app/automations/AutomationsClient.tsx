@@ -406,6 +406,7 @@ function AutomationCard({
     }
   }
 
+
   return (
     <div className="automation-card">
       {isAdmin && (
@@ -453,6 +454,7 @@ function AutomationCard({
           )}
         </div>
       )}
+
 
       <div className="automation-stats">
         <div className="stat-group">

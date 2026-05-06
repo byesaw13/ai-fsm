@@ -310,6 +310,7 @@ export default function PriceBookClient({ services }: Props) {
                             </>
                           )}
 
+
                           {upsellItems.length > 0 && (
                             <>
                               <span style={{ color: "var(--fg-muted)" }}>Also consider:</span>

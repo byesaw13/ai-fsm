@@ -74,7 +74,6 @@ export function PriceBookSelector({ onAddToEstimate }: PriceBookSelectorProps) {
       setCustomPrice("");
     } else {
       setSelectedService(service);
-      // Use default_price_cents if available, otherwise fall back to price_min_cents
       const defaultPrice = service.default_price_cents ?? service.price_min_cents;
       setCustomPrice((defaultPrice / 100).toFixed(2));
     }
