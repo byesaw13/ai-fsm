@@ -2,7 +2,7 @@
 
 **Version:** 1.1
 **Last updated:** 2026-02-19
-**Target deployment:** Raspberry Pi 4 (compose.pi.yml) and VPS (compose.prod.yml)
+**Target deployment:** garonhome.local (compose.garonhome.yml)
 
 This checklist is the single authoritative go/no-go gate before any production cutover or major release.
 Every item must have an explicit **PASS** or **FAIL** recorded before sign-off.
@@ -103,31 +103,22 @@ docker exec -it ai-fsm-postgres psql -U postgres -d ai_fsm \
 
 ## Section 4 — Infrastructure and Deployment Gates
 
-### 4a — Pi4 Operating Limits
+### 4a — garonhome Operating Checks
 
-The Pi4 deployment profile (`infra/compose.pi.yml`) enforces hard memory limits. Verify these are respected.
+Verify all services are up and healthy on garonhome.local (`infra/compose.garonhome.yml`).
 
-| Service | Memory limit | Acceptable usage at idle |
-|---------|-------------|--------------------------|
-| `web` | 700 MB | < 300 MB |
-| `worker` | 256 MB | < 128 MB |
-| `postgres` | 900 MB | < 500 MB |
-| `redis` | 128 MB | < 64 MB |
-| **Total** | **~2 GB** | **< 1 GB at idle** |
-
-**Check usage:**
 ```bash
-docker stats --no-stream
+docker compose --env-file /opt/business/ai-fsm/env/.env \
+  -f /opt/business/ai-fsm/repo/infra/compose.garonhome.yml ps
 ```
 
 | # | Check | Pass Criteria | Result |
 |---|-------|---------------|--------|
-| 4.1 | **All containers running** | `docker compose -f infra/compose.pi.yml ps` shows all four services `Up` | ☐ PASS / ☐ FAIL |
-| 4.2 | **Memory within limits** | `docker stats --no-stream` shows no service exceeding its limit | ☐ PASS / ☐ FAIL |
+| 4.1 | **All containers running** | `docker compose -f infra/compose.garonhome.yml ps` shows all four services `Up` | ☐ PASS / ☐ FAIL |
+| 4.2 | **Resource usage reasonable** | `docker stats --no-stream` shows no container in an obvious memory or CPU spike | ☐ PASS / ☐ FAIL |
 | 4.3 | **Postgres healthcheck green** | Postgres service shows `healthy` in `docker compose ps` | ☐ PASS / ☐ FAIL |
-| 4.4 | **Swap enabled on Pi4** | `free -h` shows swap > 0 (recommended: ≥ 1 GB via dphys-swapfile) | ☐ PASS / ☐ FAIL |
-| 4.5 | **Storage headroom** | `df -h /` shows < 70% usage; `/var/lib/docker` has ≥ 5 GB free | ☐ PASS / ☐ FAIL |
-| 4.6 | **ARM64 images** | All images were built with `platform: linux/arm64` | ☐ PASS / ☐ FAIL |
+| 4.4 | **Storage headroom** | `df -h /` shows < 70% usage; `/var/lib/docker` has ≥ 5 GB free | ☐ PASS / ☐ FAIL |
+| 4.5 | **Worker heartbeat visible** | `docker compose logs --tail=20 worker` shows polling/heartbeat lines, no crash loop | ☐ PASS / ☐ FAIL |
 
 ### 4b — Smoke Tests (post-deploy)
 
@@ -137,43 +128,42 @@ docker stats --no-stream
 | 4.8 | **Login smoke test** | `POST /api/v1/auth/login` with valid credentials returns 200 and a `Set-Cookie` header | ☐ PASS / ☐ FAIL |
 | 4.9 | **Protected route redirect** | Unauthenticated `GET /app/jobs` returns HTTP 307 with `Location: /login` | ☐ PASS / ☐ FAIL |
 | 4.10 | **Jobs list accessible** | Authenticated admin user can load `/app/jobs` and receives HTTP 200 | ☐ PASS / ☐ FAIL |
-| 4.11 | **Worker alive** | `docker compose -f infra/compose.pi.yml logs worker` shows polling heartbeat messages, no crash loop | ☐ PASS / ☐ FAIL |
+| 4.11 | **Worker alive** | `docker compose -f infra/compose.garonhome.yml logs worker` shows polling heartbeat messages, no crash loop | ☐ PASS / ☐ FAIL |
 
 **Verification commands:**
 ```bash
 # 4.1 — Container status
-docker compose -f infra/compose.pi.yml ps
+docker compose --env-file /opt/business/ai-fsm/env/.env \
+  -f /opt/business/ai-fsm/repo/infra/compose.garonhome.yml ps
 # Expected: all four services show "Up" and postgres shows "(healthy)"
 
-# 4.2 — Memory usage
+# 4.2 — Resource usage
 docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}\t{{.MemPerc}}"
-# Expected: no service at or near its limit (web <700MB, worker <256MB, postgres <900MB, redis <128MB)
+# Expected: no obvious memory spike
 
-# 4.4 — Swap
-free -h
-# Expected: Swap row shows non-zero total (≥ 1.0Gi)
-
-# 4.5 — Disk
+# 4.4 — Disk
 df -h / && df -h /var/lib/docker 2>/dev/null || df -h /var
 # Expected: < 70% usage
 
-# 4.7 — Health endpoint
-curl -sf http://localhost:3000/api/health
+# 4.7 — Health endpoint (port 3000 not exposed to host on garonhome — use container exec)
+docker exec ai-fsm-web wget -qO- http://localhost:3000/api/health
+# Or via reverse proxy: curl -sf http://fsm.garonhome.local/api/health
 # Expected output:
 # {"status":"ok","service":"web","checks":{"db":"ok"},"ts":"<ISO-timestamp>","traceId":"<uuid>"}
 
-# 4.8 — Login smoke test
-curl -si -X POST http://localhost:3000/api/v1/auth/login \
+# 4.8 — Login smoke test (via reverse proxy)
+curl -si -X POST http://fsm.garonhome.local/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@example.com","password":"<seed-password>"}' | head -20
 # Expected: HTTP/1.1 200 OK, Set-Cookie: session=...
 
 # 4.9 — Redirect for unauthenticated request
-curl -so /dev/null -w "%{http_code} %{redirect_url}\n" http://localhost:3000/app/jobs
-# Expected: 307 http://localhost:3000/login
+curl -so /dev/null -w "%{http_code} %{redirect_url}\n" http://fsm.garonhome.local/app/jobs
+# Expected: 307 http://fsm.garonhome.local/login
 
-# 4.11 — Worker heartbeat
-docker compose -f infra/compose.pi.yml logs --tail=20 worker
+# 4.5 — Worker heartbeat
+docker compose --env-file /opt/business/ai-fsm/env/.env \
+  -f /opt/business/ai-fsm/repo/infra/compose.garonhome.yml logs --tail=20 worker
 # Expected: JSON log lines with msg containing "poll" or "heartbeat", no ERROR-level crash loops
 
 ---
@@ -182,9 +172,9 @@ docker compose -f infra/compose.pi.yml logs --tail=20 worker
 
 | # | Check | Pass Criteria | Result |
 |---|-------|---------------|--------|
-| 5.1 | **Docker log rotation in compose files** | `infra/compose.pi.yml` and `infra/compose.prod.yml` each have `logging.driver: json-file` with `max-size: 50m` / `max-file: 3` on web, worker, postgres (pre-configured as of post-P5 hardening PR) | ☐ PASS / ☐ FAIL |
-| 5.2 | **Backup cron installed** | `crontab -l` on Pi4 host shows `0 2 * * * /home/pi/scripts/backup_db.sh` (or equivalent) | ☐ PASS / ☐ FAIL |
-| 5.3 | **Backup script executable** | `/home/pi/scripts/backup_db.sh` exists and `bash -n` reports no syntax errors | ☐ PASS / ☐ FAIL |
+| 5.1 | **Docker log rotation in compose files** | `infra/compose.garonhome.yml` and `infra/compose.prod.yml` each have `logging.driver: json-file` with `max-size: 50m` / `max-file: 3` on web, worker, postgres (pre-configured as of post-P5 hardening PR) | ☐ PASS / ☐ FAIL |
+| 5.2 | **Backup cron installed** | `crontab -l` on garonhome.local shows `0 2 * * * cd /opt/business/ai-fsm/repo && bash scripts/backup-garonhome.sh` (or equivalent) | ☐ PASS / ☐ FAIL |
+| 5.3 | **Backup script executable** | `/opt/business/ai-fsm/repo/scripts/backup-garonhome.sh` exists and `bash -n` reports no syntax errors | ☐ PASS / ☐ FAIL |
 | 5.4 | **Test backup runs clean** | Manual run of backup script writes a `.dump` file and exits 0 | ☐ PASS / ☐ FAIL |
 | 5.5 | **Offsite copy configured** | `rclone` or `rsync` offsite copy succeeds or is explicitly waived with justification | ☐ PASS / ☐ FAIL |
 | 5.6 | **Retention policy enforced** | Backup dir contains at most 7 `.dump` files (old ones pruned by script) | ☐ PASS / ☐ FAIL |
@@ -199,19 +189,19 @@ docker inspect ai-fsm-worker --format '{{.HostConfig.LogConfig}}'
 # Expected: {json-file map[max-file:3 max-size:50m]}
 
 # 5.2 — Backup cron
-crontab -l | grep backup_db
-# Expected: 0 2 * * * /home/pi/scripts/backup_db.sh ...
+crontab -l | grep backup-garonhome
+# Expected: 0 2 * * * cd /opt/business/ai-fsm/repo && bash scripts/backup-garonhome.sh ...
 
 # 5.3 — Backup script syntax check
-bash -n /home/pi/scripts/backup_db.sh && echo "OK"
+bash -n /opt/business/ai-fsm/repo/scripts/backup-garonhome.sh && echo "OK"
 # Expected: OK (no output from bash -n means no syntax errors)
 
 # 5.4 — Run backup manually
-/home/pi/scripts/backup_db.sh
-# Expected: "[<timestamp>] Backup written: /home/pi/backups/ai_fsm_<ts>.dump (<size>)"
+/opt/business/ai-fsm/repo/scripts/backup-garonhome.sh
+# Expected: "[<timestamp>] Backup written: /opt/business/ai-fsm/backups/ai_fsm_<ts>.dump (<size>)"
 
 # 5.6 — Dump count
-ls /home/pi/backups/ai_fsm_*.dump | wc -l
+ls /opt/business/ai-fsm/backups/ai_fsm_*.dump | wc -l
 # Expected: ≤ 7
 ```
 
@@ -226,12 +216,12 @@ This drill must be completed before go-live and repeated at least monthly in pro
 
 | # | Step | Pass Criteria | Result |
 |---|------|---------------|--------|
-| 6.1 | **Stop app services** | `docker compose -f infra/compose.pi.yml stop web worker` exits cleanly | ☐ PASS / ☐ FAIL |
-| 6.2 | **Take pre-restore snapshot** | `pg_dump` of current state written to `/home/pi/backups/pre_restore_<timestamp>.dump` | ☐ PASS / ☐ FAIL |
+| 6.1 | **Stop app services** | `docker compose -f infra/compose.garonhome.yml stop web worker` exits cleanly | ☐ PASS / ☐ FAIL |
+| 6.2 | **Take pre-restore snapshot** | `pg_dump` of current state written to `/opt/business/ai-fsm/backups/pre_restore_<timestamp>.dump` | ☐ PASS / ☐ FAIL |
 | 6.3 | **Drop and recreate DB** | `DROP DATABASE ai_fsm; CREATE DATABASE ai_fsm;` succeeds with no active connections | ☐ PASS / ☐ FAIL |
 | 6.4 | **Restore from dump** | `pg_restore` completes without fatal errors | ☐ PASS / ☐ FAIL |
 | 6.5 | **Row counts reasonable** | Users, jobs, visits, estimates, invoices, payments counts match pre-restore snapshot | ☐ PASS / ☐ FAIL |
-| 6.6 | **Health endpoint after restart** | `curl http://localhost:3000/api/health` returns `{"status":"ok","checks":{"db":"ok"}}` | ☐ PASS / ☐ FAIL |
+| 6.6 | **Health endpoint after restart** | `docker exec ai-fsm-web wget -qO- http://localhost:3000/api/health` returns `{"status":"ok","checks":{"db":"ok"}}` | ☐ PASS / ☐ FAIL |
 | 6.7 | **Login smoke test after restore** | Admin login succeeds | ☐ PASS / ☐ FAIL |
 | 6.8 | **Drill result recorded** | Entry appended to `docs/DECISION_LOG.md` under `DRILL-<date>` | ☐ PASS / ☐ FAIL |
 
@@ -245,7 +235,7 @@ Complete this template immediately after each drill and paste it into `docs/DECI
 ### DRILL-<YYYY-MM-DD>: Restore validation drill
 - Date (UTC):
 - Operator (agent/human):
-- Environment: Pi4 / VPS / local
+- Environment: garonhome.local / VPS / local
 - Dump file used: ai_fsm_<timestamp>.dump
 - Dump file size:
 - Restore start time (UTC):
@@ -266,7 +256,7 @@ Row counts match pre-restore snapshot: YES / NO
   (If NO, describe discrepancy here)
 
 Health check result:
-  curl http://localhost:3000/api/health
+  docker exec ai-fsm-web wget -qO- http://localhost:3000/api/health
   Output: <paste JSON response>
   Status: ok / degraded / unreachable
 
@@ -299,12 +289,12 @@ SELECT
   (SELECT count(*) FROM payments)   AS payments,
   (SELECT count(*) FROM audit_log)  AS audit_log;"
 
-# Health check (after restarting web + worker)
-curl -sf http://localhost:3000/api/health
+# Health check (after restarting web + worker — port 3000 not exposed on garonhome)
+docker exec ai-fsm-web wget -qO- http://localhost:3000/api/health
 # Expected: {"status":"ok","checks":{"db":"ok"},...}
 
-# Login smoke test
-curl -si -X POST http://localhost:3000/api/v1/auth/login \
+# Login smoke test (via reverse proxy)
+curl -si -X POST http://fsm.garonhome.local/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@example.com","password":"<seed-password>"}' \
   | head -5
@@ -319,7 +309,7 @@ curl -si -X POST http://localhost:3000/api/v1/auth/login \
 |---|-------|---------------|--------|
 | 7.1 | **Structured JSON logs** | `docker compose logs web \| head -5 \| jq .` parses successfully | ☐ PASS / ☐ FAIL |
 | 7.2 | **Error log filtering works** | `docker compose logs web \| jq 'select(.level=="error")'` returns valid JSON for any error-level events | ☐ PASS / ☐ FAIL |
-| 7.3 | **Health-check cron configured** | `/home/pi/scripts/healthcheck.sh` is installed and runs via cron every 5 minutes | ☐ PASS / ☐ FAIL |
+| 7.3 | **Health-check cron configured** | `/opt/business/ai-fsm/repo/scripts/healthcheck-garonhome.sh` is installed and runs via cron every 5 minutes | ☐ PASS / ☐ FAIL |
 | 7.4 | **Incident response runbook accessible** | [docs/INCIDENT_RESPONSE.md](INCIDENT_RESPONSE.md) is current, covers all known failure modes | ☐ PASS / ☐ FAIL |
 | 7.5 | **Rollback plan rehearsed** | Rollback drill (re-deploy previous image tag) has been tested end-to-end | ☐ PASS / ☐ FAIL |
 

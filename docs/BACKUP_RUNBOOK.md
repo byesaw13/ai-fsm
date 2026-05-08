@@ -3,7 +3,8 @@
 ## Overview
 
 This runbook covers backup, restore, and validation procedures for the ai-fsm PostgreSQL database.
-Target deployment: Raspberry Pi 4 running Docker Compose (compose.pi.yml).
+Target deployment: garonhome.local running Docker Compose (`infra/compose.garonhome.yml`).
+Deploy root: `/opt/business/ai-fsm/`
 
 ---
 
@@ -23,58 +24,26 @@ Target deployment: Raspberry Pi 4 running Docker Compose (compose.pi.yml).
 ### Manual backup
 
 ```bash
-# Run from Pi4 host
-docker exec ai-fsm-db pg_dump \
-  --username=postgres \
-  --format=custom \
-  --compress=9 \
-  --file=/var/lib/postgresql/data/backups/ai_fsm_$(date +%Y%m%d_%H%M%S).dump \
-  ai_fsm
+# Run from garonhome.local deploy root
+cd /opt/business/ai-fsm/repo
+bash scripts/backup-garonhome.sh
 ```
 
-Or dump to host filesystem:
-
-```bash
-docker exec ai-fsm-db pg_dump \
-  --username=postgres \
-  --format=custom \
-  --compress=9 \
-  ai_fsm > /home/pi/backups/ai_fsm_$(date +%Y%m%d_%H%M%S).dump
-```
+The script writes a compressed Postgres custom-format dump to `/opt/business/ai-fsm/backups/` and prunes files older than 7 days.
 
 ### Automated backup (cron)
 
-Add to Pi4 crontab (`crontab -e`):
+Add to crontab (`crontab -e`):
 
 ```cron
-# Daily backup at 02:00, keep 7 days
-0 2 * * * /home/pi/scripts/backup_db.sh >> /home/pi/logs/backup.log 2>&1
+# Daily backup at 02:00
+0 2 * * * cd /opt/business/ai-fsm/repo && bash scripts/backup-garonhome.sh >> /opt/business/ai-fsm/logs/backup.log 2>&1
 ```
 
-`/home/pi/scripts/backup_db.sh`:
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-BACKUP_DIR="/home/pi/backups"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-FILE="${BACKUP_DIR}/ai_fsm_${TIMESTAMP}.dump"
-
-mkdir -p "$BACKUP_DIR"
-
-docker exec ai-fsm-db pg_dump \
-  --username=postgres \
-  --format=custom \
-  --compress=9 \
-  ai_fsm > "$FILE"
-
-echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Backup written: $FILE ($(du -h "$FILE" | cut -f1))"
-
-# Remove backups older than 7 days
-find "$BACKUP_DIR" -name "ai_fsm_*.dump" -mtime +7 -delete
-echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Old backups pruned"
-```
+The backup script (`scripts/backup-garonhome.sh`) performs:
+1. `pg_dump` from the running postgres container to `/opt/business/ai-fsm/backups/ai_fsm_YYYYMMDDTHHMMSSZ.dump`
+2. Prints a timestamped confirmation line with file size
+3. Prunes `.dump` files older than 7 days
 
 ---
 
@@ -84,7 +53,7 @@ Push to a remote destination after local backup completes.
 Example using `rclone` to S3-compatible storage:
 
 ```bash
-rclone copy /home/pi/backups/ remote:ai-fsm-backups/ \
+rclone copy /opt/business/ai-fsm/backups/ remote:ai-fsm-backups/ \
   --include "ai_fsm_*.dump" \
   --min-age 0s
 ```
@@ -92,23 +61,42 @@ rclone copy /home/pi/backups/ remote:ai-fsm-backups/ \
 Or `rsync` to a secondary host:
 
 ```bash
-rsync -avz /home/pi/backups/ backup-host:/backups/ai-fsm/
+rsync -avz /opt/business/ai-fsm/backups/ backup-host:/backups/ai-fsm/
 ```
 
 ---
 
 ## Restore Procedure
 
-### 1. Stop the application (prevent writes during restore)
+Use the restore script for the full restore sequence:
 
 ```bash
-docker compose -f compose.pi.yml stop web worker
+cd /opt/business/ai-fsm/repo
+bash scripts/restore-garonhome.sh /opt/business/ai-fsm/backups/ai_fsm_YYYYMMDDTHHMMSSZ.dump
 ```
 
-### 2. Drop and recreate the target database
+The restore script handles the full sequence automatically:
+1. Stops `web` and `worker` containers (prevents writes during restore)
+2. Terminates active DB sessions
+3. Drops and recreates the `ai_fsm` database
+4. Restores from the specified dump file via `pg_restore`
+5. Restarts `web` and `worker`
+6. Verifies the health endpoint
+
+### Manual restore steps (if script is unavailable)
+
+#### 1. Stop the application
 
 ```bash
-docker exec -it ai-fsm-db psql --username=postgres <<'SQL'
+docker compose --env-file /opt/business/ai-fsm/env/.env \
+  -f /opt/business/ai-fsm/repo/infra/compose.garonhome.yml \
+  stop web worker
+```
+
+#### 2. Drop and recreate the target database
+
+```bash
+docker exec -it ai-fsm-postgres psql --username=postgres <<'SQL'
 SELECT pg_terminate_backend(pid)
   FROM pg_stat_activity
  WHERE datname = 'ai_fsm' AND pid <> pg_backend_pid();
@@ -118,13 +106,12 @@ CREATE DATABASE ai_fsm OWNER postgres;
 SQL
 ```
 
-### 3. Restore from dump
+#### 3. Restore from dump
 
 ```bash
-# Adjust DUMP_FILE to the file you want to restore from
-DUMP_FILE="/home/pi/backups/ai_fsm_20260219_020000.dump"
+DUMP_FILE="/opt/business/ai-fsm/backups/ai_fsm_YYYYMMDDTHHMMSSZ.dump"
 
-docker exec -i ai-fsm-db pg_restore \
+docker exec -i ai-fsm-postgres pg_restore \
   --username=postgres \
   --dbname=ai_fsm \
   --verbose \
@@ -133,22 +120,15 @@ docker exec -i ai-fsm-db pg_restore \
   < "$DUMP_FILE"
 ```
 
-### 4. Re-apply RLS session variable grants (if migrating across Postgres versions)
+#### 4. Restart the application
 
 ```bash
-docker exec -it ai-fsm-db psql --username=postgres --dbname=ai_fsm \
-  -f /docker-entrypoint-initdb.d/001_core_schema.sql
+docker compose --env-file /opt/business/ai-fsm/env/.env \
+  -f /opt/business/ai-fsm/repo/infra/compose.garonhome.yml \
+  start web worker
 ```
 
-> Usually not needed if restoring to the same Postgres version. Run only if you see missing roles/permissions errors.
-
-### 5. Restart the application
-
-```bash
-docker compose -f compose.pi.yml start web worker
-```
-
-### 6. Verify (see Validation Drill below)
+#### 5. Verify (see Validation Drill below)
 
 ---
 
@@ -159,7 +139,7 @@ Run this after every restore and at least monthly as a fire drill.
 ### Step 1 — Basic connectivity
 
 ```bash
-docker exec -it ai-fsm-db psql \
+docker exec -it ai-fsm-postgres psql \
   --username=postgres \
   --dbname=ai_fsm \
   -c "SELECT version();"
@@ -170,7 +150,7 @@ Expected: PostgreSQL version string printed, no error.
 ### Step 2 — Row counts look reasonable
 
 ```bash
-docker exec -it ai-fsm-db psql \
+docker exec -it ai-fsm-postgres psql \
   --username=postgres \
   --dbname=ai_fsm \
   -c "SELECT
@@ -187,8 +167,10 @@ Compare against last known good counts (record them after each planned backup).
 
 ### Step 3 — Health endpoint returns 200
 
+On garonhome, port 3000 is not exposed to the host. Run the health check from inside the container:
+
 ```bash
-curl -sf http://localhost:3000/api/health | jq .
+docker exec ai-fsm-web wget -qO- http://localhost:3000/api/health | jq .
 ```
 
 Expected response:
@@ -196,10 +178,16 @@ Expected response:
 { "status": "ok", "service": "web", "checks": { "db": "ok" }, "ts": "..." }
 ```
 
+Or via the reverse proxy:
+
+```bash
+curl -sf http://fsm.garonhome.local/api/health | jq .
+```
+
 ### Step 4 — Smoke test login
 
 ```bash
-curl -s -X POST http://localhost:3000/api/v1/auth/login \
+curl -s -X POST http://fsm.garonhome.local/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@example.com","password":"<seed-password>"}' | jq .user.role
 ```
@@ -228,6 +216,7 @@ Append to `docs/DECISION_LOG.md` under a new `DRILL-<date>` entry:
 Quick check that the dump file is not corrupted:
 
 ```bash
+DUMP_FILE="/opt/business/ai-fsm/backups/ai_fsm_<timestamp>.dump"
 pg_restore --list "$DUMP_FILE" | head -20
 ```
 
@@ -239,16 +228,14 @@ No error output = file is structurally valid.
 
 | Database size | Estimated restore time |
 |---------------|------------------------|
-| < 100 MB | 2–5 minutes |
-| 100 MB – 1 GB | 5–20 minutes |
-| > 1 GB | 20+ minutes |
-
-For Pi4 with SD card I/O, expect restore at ~10 MB/s.
+| < 100 MB | 1–3 minutes |
+| 100 MB – 1 GB | 3–15 minutes |
+| > 1 GB | 15+ minutes |
 
 ---
 
 ## Known Limitations (MVP)
 
 1. **No point-in-time recovery (PITR)** — WAL archiving not configured. Maximum data loss = 24 hours (last backup).
-2. **No replication / standby** — single-node PostgreSQL. If the Pi4 hardware fails, restore from offsite backup.
-3. **Backup encryption** — dump files are not encrypted at rest. If the Pi4 is physically accessible to untrusted parties, add `gpg --encrypt` to the backup script.
+2. **No replication / standby** — single-node PostgreSQL. If garonhome.local hardware fails, restore from offsite backup to another x86 host.
+3. **Backup encryption** — dump files are not encrypted at rest. If the host is physically accessible to untrusted parties, add `gpg --encrypt` to the backup script.

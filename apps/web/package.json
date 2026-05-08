@@ -8,7 +8,9 @@
     "start": "next start --port 3000",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@ai-fsm/domain": "workspace:*",

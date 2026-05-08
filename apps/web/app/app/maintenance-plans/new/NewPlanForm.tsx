@@ -22,11 +22,13 @@ export default function NewPlanForm({
   propertyOptions,
   frequencyOptions,
   publishedPricing = {},
+  defaultClientId,
 }: {
   clientOptions: Option[];
   propertyOptions: Option[];
   frequencyOptions: Option[];
   publishedPricing?: Record<string, { annual: number; monthly: number }>;
+  defaultClientId?: string;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -102,6 +104,7 @@ export default function NewPlanForm({
         options={clientOptions}
         required
         placeholder="Select a client"
+        defaultValue={defaultClientId}
       />
 
       <Select

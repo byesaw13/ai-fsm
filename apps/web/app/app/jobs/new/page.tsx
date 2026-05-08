@@ -57,10 +57,6 @@ export default async function NewJobPage({ searchParams }: PageProps) {
           properties={properties}
           initialClientId={client_id}
           initialPropertyId={property_id}
-          onSwitchToFull={() => {
-            const el = document.getElementById("full-setup");
-            el?.scrollIntoView({ behavior: "smooth" });
-          }}
         />
       </Card>
 

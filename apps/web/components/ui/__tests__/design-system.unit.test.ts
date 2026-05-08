@@ -140,11 +140,11 @@ function flattenSections(sections: ReturnType<typeof getNavSections>) {
 }
 
 describe("getNavSections (role filtering)", () => {
-  it("returns 17 items across 3 sections for admin role", () => {
+  it("returns 18 items across 3 sections for admin role", () => {
     const sections = getNavSections("admin");
     const items = flattenSections(sections);
     expect(sections).toHaveLength(3); // Operations, Business, System
-    expect(items).toHaveLength(17);
+    expect(items).toHaveLength(18);
     expect(items.map((i) => i.href)).toContain("/app/clients");
     expect(items.map((i) => i.href)).toContain("/app/properties");
     expect(items.map((i) => i.href)).toContain("/app/estimates");
@@ -157,13 +157,14 @@ describe("getNavSections (role filtering)", () => {
     expect(items.map((i) => i.href)).toContain("/app/price-book");
     expect(items.map((i) => i.href)).toContain("/app/mileage");
     expect(items.map((i) => i.href)).toContain("/app/maintenance-plans");
+    expect(items.map((i) => i.href)).toContain("/app/membership-dashboard");
     expect(items.map((i) => i.href)).toContain("/app/owner-dashboard");
   });
 
-  it("returns 17 items for owner role", () => {
+  it("returns 18 items for owner role", () => {
     const sections = getNavSections("owner");
     const items = flattenSections(sections);
-    expect(items).toHaveLength(17);
+    expect(items).toHaveLength(18);
   });
 
   it("returns only 6 items for tech role", () => {

@@ -20,4 +20,4 @@
 
 ## Deployment
 - Development: `infra/compose.dev.yml`
-- Raspberry Pi: `infra/compose.pi.yml` with ARM64 images and memory limits
+- garonhome.local: `infra/compose.garonhome.yml` (x86, bind-mount data at /opt/business/ai-fsm/data)

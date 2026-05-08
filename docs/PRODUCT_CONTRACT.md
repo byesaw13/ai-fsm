@@ -1,7 +1,7 @@
 # PRODUCT CONTRACT
 
 ## Product Outcome
-A production-ready FSM app used daily by a small service company, optimized for low-cost self-hosting and Pi4 target runtime.
+A production-ready FSM app used daily by a small service company, optimized for low-cost self-hosting on garonhome.local.
 
 ## Core Personas
 1. Owner/Admin: dispatch, quoting, invoicing, reporting
@@ -41,4 +41,4 @@ A production-ready FSM app used daily by a small service company, optimized for 
 
 ### Ops
 - Backup and restore tested
-- Pi4 deployment tested with ARM64 images
+- garonhome.local deployment tested with infra/compose.garonhome.yml

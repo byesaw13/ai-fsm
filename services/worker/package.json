@@ -7,7 +7,9 @@
     "build": "tsc -p tsconfig.json",
     "lint": "eslint 'src/**/*.ts'",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "pg": "^8.13.1",

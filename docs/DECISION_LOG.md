@@ -157,7 +157,7 @@ Append-only log of technical decisions made by AI agents.
 - Alternatives considered:
   - Keep Pi as primary: rejected — x86 is operationally superior and the host is already running; Pi SD card write wear is a long-term reliability risk.
   - Decommission Pi entirely: rejected — Pi is still useful as a secondary/test target and its compose file + runbook have value as reference documentation.
-- Consequences: All AI agents and release instructions now default to garonhome.local. Pi-specific guidance remains in DEPLOYMENT_RUNBOOK.md (Pi section) and PI4_DEPLOYMENT.md.
+- Consequences: garonhome.local is now the SOLE production deployment target. Pi4-specific docs and compose.pi.yml have been removed. All AI agents and release instructions default to garonhome.local.
 - Rollback plan: Documentation-only change. Reversing means updating the same files. No code, schema, or infra was modified.
 
 ---

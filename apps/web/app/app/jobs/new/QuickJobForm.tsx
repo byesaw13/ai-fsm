@@ -18,7 +18,6 @@ interface Property {
 interface QuickJobFormProps {
   clients: Client[];
   properties: Property[];
-  onSwitchToFull: () => void;
   initialClientId?: string;
   initialPropertyId?: string;
 }
@@ -26,10 +25,12 @@ interface QuickJobFormProps {
 export function QuickJobForm({
   clients,
   properties,
-  onSwitchToFull,
   initialClientId,
   initialPropertyId,
 }: QuickJobFormProps) {
+  function onSwitchToFull() {
+    document.getElementById("full-setup")?.scrollIntoView({ behavior: "smooth" });
+  }
   const router = useRouter();
   const titleRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);

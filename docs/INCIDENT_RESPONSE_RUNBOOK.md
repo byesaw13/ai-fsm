@@ -1,9 +1,9 @@
-# Incident Response Runbook — Pi4 Self-Hosted Deployment
+# Incident Response Runbook — garonhome Self-Hosted Deployment
 
 ## Scope
 
 This runbook covers triage, diagnosis, and recovery for the ai-fsm application running on a
-Raspberry Pi 4 with Docker Compose. It is intended for a single-operator environment.
+garonhome.local with Docker Compose. It is intended for a single-operator environment.
 
 ---
 
@@ -23,7 +23,7 @@ Since there is no external alerting infrastructure in the MVP, monitoring relies
 sends a notification (e.g. email, SMS via ntfy.sh, or Slack webhook) on failure:
 
 ```bash
-# /home/pi/scripts/healthcheck.sh
+# /opt/business/ai-fsm/repo/scripts/healthcheck.sh
 #!/usr/bin/env bash
 STATUS=$(curl -sf http://localhost:3000/api/health | jq -r '.status' 2>/dev/null || echo "unreachable")
 if [ "$STATUS" != "ok" ]; then
@@ -31,7 +31,7 @@ if [ "$STATUS" != "ok" ]; then
 fi
 ```
 
-Add to crontab: `*/5 * * * * /home/pi/scripts/healthcheck.sh`
+Add to crontab: `*/5 * * * * /opt/business/ai-fsm/repo/scripts/healthcheck.sh`
 
 ---
 
@@ -56,11 +56,11 @@ Add to crontab: `*/5 * * * * /home/pi/scripts/healthcheck.sh`
 
 ```bash
 # 1. Check container status
-docker compose -f compose.pi.yml ps
+docker compose -f compose.garonhome.yml ps
 
 # 2. Check recent logs for crash cause
-docker compose -f compose.pi.yml logs --tail=200 web
-docker compose -f compose.pi.yml logs --tail=200 worker
+docker compose -f compose.garonhome.yml logs --tail=200 web
+docker compose -f compose.garonhome.yml logs --tail=200 worker
 
 # 3. Check system resources
 df -h          # disk full?
@@ -72,15 +72,14 @@ htop           # CPU pegged?
 
 ```bash
 # Restart all services
-docker compose -f compose.pi.yml restart
+docker compose -f compose.garonhome.yml restart
 
 # If disk full — clear Docker build cache / old images
 docker system prune -f
 
-# If OOM — check and increase swap on Pi4
-sudo dphys-swapfile swapoff
-sudo nano /etc/dphys-swapfile   # CONF_SWAPSIZE=1024
-sudo dphys-swapfile swapon
+# If OOM — restart the offending container and investigate
+docker stats --no-stream
+docker compose -f compose.garonhome.yml restart
 ```
 
 ---
@@ -95,8 +94,8 @@ sudo dphys-swapfile swapon
 
 ```bash
 # 1. Check DB container
-docker compose -f compose.pi.yml ps db
-docker compose -f compose.pi.yml logs --tail=100 db
+docker compose -f compose.garonhome.yml ps db
+docker compose -f compose.garonhome.yml logs --tail=100 db
 
 # 2. Can we connect?
 docker exec -it ai-fsm-db psql --username=postgres --dbname=ai_fsm -c "SELECT 1;"
@@ -113,7 +112,7 @@ docker exec -it ai-fsm-db psql --username=postgres --dbname=ai_fsm \
 
 ```bash
 # Restart DB container
-docker compose -f compose.pi.yml restart db
+docker compose -f compose.garonhome.yml restart db
 sleep 10
 
 # Verify health
@@ -135,7 +134,7 @@ curl http://localhost:3000/api/health | jq .
 
 ```bash
 # 1. Check worker logs (structured JSON)
-docker compose -f compose.pi.yml logs worker | jq 'select(.level=="error")'
+docker compose -f compose.garonhome.yml logs worker | jq 'select(.level=="error")'
 
 # 2. Check automation table for stuck next_run_at
 docker exec -it ai-fsm-db psql --username=postgres --dbname=ai_fsm \
@@ -156,7 +155,7 @@ docker exec -it ai-fsm-db psql --username=postgres --dbname=ai_fsm \
 
 ```bash
 # Restart worker
-docker compose -f compose.pi.yml restart worker
+docker compose -f compose.garonhome.yml restart worker
 
 # Manually reset a stuck automation's next_run_at if needed
 docker exec -it ai-fsm-db psql --username=postgres --dbname=ai_fsm \
@@ -165,7 +164,7 @@ docker exec -it ai-fsm-db psql --username=postgres --dbname=ai_fsm \
 
 ---
 
-## Runbook: High Memory / OOM on Pi4 (P2)
+## Runbook: High Memory / OOM on garonhome (P2)
 
 ### Symptoms
 - Services randomly restarting
@@ -182,17 +181,12 @@ docker stats --no-stream
 ### Recovery
 
 ```bash
-# Reduce Next.js worker threads (if not already done)
-# Set in compose.pi.yml environment:
-#   NODE_OPTIONS: "--max-old-space-size=256"
+# Restart web to reclaim memory
+docker compose -f compose.garonhome.yml restart web
 
-# Restart to reclaim memory
-docker compose -f compose.pi.yml restart web
-
-# Add/increase swap
-sudo dphys-swapfile swapoff
-# Edit /etc/dphys-swapfile: CONF_SWAPSIZE=1024
-sudo dphys-swapfile setup && sudo dphys-swapfile swapon
+# If a single container is spiking, inspect and restart it
+docker stats --no-stream
+docker compose -f compose.garonhome.yml restart <service>
 ```
 
 ---
@@ -218,11 +212,11 @@ docker system df
 docker system prune -af --volumes
 
 # Remove old backup files
-find /home/pi/backups -name "*.dump" -mtime +3 -delete
+find /opt/business/ai-fsm/backups -name "*.dump" -mtime +3 -delete
 
 # If logs are filling disk
-docker compose -f compose.pi.yml logs --no-log-prefix web > /dev/null  # just to flush buffer
-# Configure log rotation in compose.pi.yml:
+docker compose -f compose.garonhome.yml logs --no-log-prefix web > /dev/null  # just to flush buffer
+# Configure log rotation in compose.garonhome.yml:
 # logging:
 #   driver: json-file
 #   options:
@@ -241,7 +235,7 @@ docker compose -f compose.pi.yml logs --no-log-prefix web > /dev/null  # just to
 ### Triage
 
 ```bash
-docker compose -f compose.pi.yml logs web | jq 'select(.msg | contains("Login")) | {ts, level, traceId}'
+docker compose -f compose.garonhome.yml logs web | jq 'select(.msg | contains("Login")) | {ts, level, traceId}'
 ```
 
 ### Recovery
@@ -249,7 +243,7 @@ docker compose -f compose.pi.yml logs web | jq 'select(.msg | contains("Login"))
 The rate limiter is **in-process** (Map-based, not Redis). A simple web container restart clears all rate limit state:
 
 ```bash
-docker compose -f compose.pi.yml restart web
+docker compose -f compose.garonhome.yml restart web
 ```
 
 > Note: This also clears any other in-memory state. No data is lost (DB-backed).
@@ -262,12 +256,12 @@ docker compose -f compose.pi.yml restart web
 
 1. **Stop the application** to prevent further writes:
    ```bash
-   docker compose -f compose.pi.yml stop web worker
+   docker compose -f compose.garonhome.yml stop web worker
    ```
 2. **Take a snapshot** of the current (possibly corrupt) state:
    ```bash
    docker exec ai-fsm-db pg_dump --username=postgres --format=custom ai_fsm \
-     > /home/pi/backups/incident_$(date +%Y%m%d_%H%M%S).dump
+     > /opt/business/ai-fsm/backups/incident_$(date +%Y%m%d_%H%M%S).dump
    ```
 3. **Assess scope**: inspect audit_log for unexpected deletes or modifications.
    ```bash
@@ -294,13 +288,13 @@ docker compose -f compose.pi.yml restart web
 
 ```bash
 # Container status
-docker compose -f compose.pi.yml ps
+docker compose -f compose.garonhome.yml ps
 
 # Tail all logs (JSON)
-docker compose -f compose.pi.yml logs -f | jq .
+docker compose -f compose.garonhome.yml logs -f | jq .
 
 # Filter errors only
-docker compose -f compose.pi.yml logs web | jq 'select(.level=="error")'
+docker compose -f compose.garonhome.yml logs web | jq 'select(.level=="error")'
 
 # Health check
 curl -s http://localhost:3000/api/health | jq .
