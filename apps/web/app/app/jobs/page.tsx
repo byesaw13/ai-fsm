@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { query } from "@/lib/db";
 import { canTransitionJob, canViewAllJobs } from "@/lib/auth/permissions";
 import type { Job, JobStatus } from "@ai-fsm/domain";
-import { JOB_ACCEPTANCE_CATEGORY_LABELS, JOB_INTAKE_DECISION_LABELS } from "@ai-fsm/domain";
+import { JOB_ACCEPTANCE_CATEGORY_LABELS, JOB_INTAKE_DECISION_LABELS, deriveCustomerStage, CUSTOMER_STAGE_LABELS, CUSTOMER_STAGE_COLORS } from "@ai-fsm/domain";
 import {
   PageContainer,
   PageHeader,
@@ -26,6 +26,8 @@ type JobRow = Job & {
   client_name: string | null;
   job_category: string | null;
   intake_decision: string | null;
+  has_approved_estimate: boolean;
+  has_active_visit: boolean;
 };
 
 const JOB_STATUS_LABELS: Record<JobStatus, string> = {
@@ -109,7 +111,9 @@ export default async function JobsPage({ searchParams }: PageProps) {
     }
 
     jobs = await query<JobRow>(
-      `SELECT j.*, c.name AS client_name, j.job_category, j.intake_decision
+      `SELECT j.*, c.name AS client_name, j.job_category, j.intake_decision,
+              EXISTS(SELECT 1 FROM estimates e WHERE e.job_id = j.id AND e.account_id = j.account_id AND e.status = 'approved') AS has_approved_estimate,
+              EXISTS(SELECT 1 FROM visits va WHERE va.job_id = j.id AND va.account_id = j.account_id AND va.status NOT IN ('cancelled','completed')) AS has_active_visit
        FROM jobs j
        LEFT JOIN clients c ON c.id = j.client_id
        WHERE ${conditions.join(" AND ")}
@@ -139,7 +143,9 @@ export default async function JobsPage({ searchParams }: PageProps) {
     }
 
     jobs = await query<JobRow>(
-      `SELECT DISTINCT j.*, c.name AS client_name, j.job_category, j.intake_decision
+      `SELECT DISTINCT j.*, c.name AS client_name, j.job_category, j.intake_decision,
+              EXISTS(SELECT 1 FROM estimates e WHERE e.job_id = j.id AND e.account_id = j.account_id AND e.status = 'approved') AS has_approved_estimate,
+              EXISTS(SELECT 1 FROM visits va WHERE va.job_id = j.id AND va.account_id = j.account_id AND va.status NOT IN ('cancelled','completed')) AS has_active_visit
        FROM jobs j
        LEFT JOIN clients c ON c.id = j.client_id
        JOIN visits v ON v.job_id = j.id

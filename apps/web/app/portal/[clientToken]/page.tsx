@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { queryOne, query } from "@/lib/db";
+import { derivePortalStage, CUSTOMER_STAGE_ORDER, CUSTOMER_STAGE_LABELS, CUSTOMER_STAGE_COLORS } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,7 @@ export default async function ClientPortalPage({
 
   if (!client) notFound();
 
-  const [estimates, invoices, plans, maintenanceJobs] = await Promise.all([
+  const [estimates, invoices, plans, maintenanceJobs, activeVisitRows] = await Promise.all([
     query<EstimateRow>(
       `SELECT e.id, e.status, e.total_cents, e.sent_at, e.expires_at,
               e.share_token, p.address AS property_address
@@ -123,6 +124,14 @@ export default async function ClientPortalPage({
        LIMIT 20`,
       [client.id]
     ),
+    // Active (non-completed) visits for any job — used to derive scheduled stage
+    query<{ id: string }>(
+      `SELECT v.id FROM visits v
+       JOIN jobs j ON j.id = v.job_id
+       WHERE j.client_id = $1 AND v.status IN ('scheduled','arrived','in_progress')
+       LIMIT 1`,
+      [client.id]
+    ),
   ]);
 
   const openInvoices = invoices.filter((i) => !["paid", "void"].includes(i.status as string));
@@ -130,6 +139,14 @@ export default async function ClientPortalPage({
     (s, i) => s + ((i.total_cents as number) - (i.paid_cents as number)),
     0
   );
+
+  const activeStage = derivePortalStage({
+    hasOpenInvoice:      openInvoices.length > 0,
+    hasPaidInvoice:      invoices.some((i) => i.status === "paid"),
+    hasApprovedEstimate: estimates.some((e) => e.status === "approved"),
+    hasSentEstimate:     estimates.some((e) => e.status === "sent"),
+    hasScheduledVisit:   activeVisitRows.length > 0,
+  });
 
   return (
     <div style={{ minHeight: "100vh", background: "#f9fafb", padding: "24px 16px" }}>
@@ -140,6 +157,35 @@ export default async function ClientPortalPage({
           <h1 style={{ fontSize: 24, fontWeight: 700, margin: "4px 0 0" }}>
             Welcome, {(client.name as string).split(" ")[0]}
           </h1>
+        </div>
+
+        {/* Stage progress bar */}
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", gap: 4 }}>
+            {CUSTOMER_STAGE_ORDER.map((stage) => {
+              const isActive = stage === activeStage;
+              const isPast = CUSTOMER_STAGE_ORDER.indexOf(stage) < CUSTOMER_STAGE_ORDER.indexOf(activeStage);
+              const color = CUSTOMER_STAGE_COLORS[stage];
+              return (
+                <div
+                  key={stage}
+                  style={{
+                    flex: 1,
+                    textAlign: "center",
+                    padding: "6px 4px",
+                    borderRadius: 6,
+                    background: isActive ? color.bg : isPast ? "#f0fdf4" : "#f9fafb",
+                    border: isActive ? `1.5px solid ${color.fg}` : "1.5px solid transparent",
+                    opacity: isPast ? 0.6 : 1,
+                  }}
+                >
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: isActive ? color.fg : "#9ca3af" }}>
+                    {CUSTOMER_STAGE_LABELS[stage]}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {totalOwed > 0 && (

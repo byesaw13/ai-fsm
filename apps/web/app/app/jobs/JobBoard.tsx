@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { StatusBadge, PriorityBadge, priorityNumToVariant, priorityLabel } from "@/components/ui";
 import type { StatusVariant, PriorityVariant } from "@/components/ui";
+import { deriveCustomerStage, CUSTOMER_STAGE_LABELS, CUSTOMER_STAGE_COLORS } from "@ai-fsm/domain";
 
 interface JobRow {
   id: string;
@@ -11,6 +12,8 @@ interface JobRow {
   priority: number;
   client_name: string | null;
   scheduled_start?: string | null;
+  has_approved_estimate?: boolean;
+  has_active_visit?: boolean;
 }
 
 interface JobBoardProps {
@@ -113,6 +116,12 @@ export function JobBoard({ jobs, statusLabels, statusOrder }: JobBoardProps) {
 function BoardCard({ job }: { job: JobRow }) {
   const pv: PriorityVariant | null = priorityNumToVariant(job.priority);
   const pl: string = priorityLabel(job.priority);
+  const stage = deriveCustomerStage({
+    jobStatus: job.status,
+    hasApprovedEstimate: job.has_approved_estimate,
+    hasActiveVisit: job.has_active_visit,
+  });
+  const stageColor = CUSTOMER_STAGE_COLORS[stage];
 
   return (
     <Link
@@ -172,6 +181,21 @@ function BoardCard({ job }: { job: JobRow }) {
               })}
             </span>
           )}
+          <span
+            style={{
+              marginLeft: "auto",
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+              background: stageColor.bg,
+              color: stageColor.fg,
+              borderRadius: 8,
+              padding: "1px 6px",
+            }}
+          >
+            {CUSTOMER_STAGE_LABELS[stage]}
+          </span>
         </div>
       </div>
     </Link>
