@@ -236,14 +236,14 @@ export default async function HomePage() {
       [accountId]
     ),
 
-    // Approved → not scheduled (count + estimated value)
+    // Approved → not scheduled (count + estimated value) — quoted jobs only
     query<PipelineRow>(
       `SELECT COUNT(*)::text AS count, COALESCE(SUM(max_cents), 0)::text AS total_cents
        FROM (
          SELECT j.id, MAX(e.total_cents) AS max_cents
          FROM jobs j
          JOIN estimates e ON e.job_id = j.id AND e.account_id = j.account_id AND e.status = 'approved'
-         WHERE j.account_id = $1 AND j.status IN ('quoted','draft')
+         WHERE j.account_id = $1 AND j.status = 'quoted'
            AND NOT EXISTS (
              SELECT 1 FROM visits v WHERE v.job_id = j.id AND v.account_id = j.account_id AND v.scheduled_start IS NOT NULL
            )
@@ -637,7 +637,7 @@ export default async function HomePage() {
             const stageHrefs: Record<string, string> = {
               intake:    "/app/jobs?status=draft",
               estimate:  "/app/estimates?status=sent",
-              accepted:  "/app/jobs?status=quoted",
+              accepted:  "/app/estimates?status=approved",
               scheduled: "/app/jobs?status=scheduled",
               completed: "/app/jobs?status=completed",
             };
