@@ -40,13 +40,12 @@ export const GET = withRole(["owner", "admin"], async (request: NextRequest, ses
       status: string;
       actual_cost_cents: number | null;
       travel_miles: number | null;
-      // from best estimate
       estimated_labor_cost_cents: number | null;
       estimated_total_cents: number | null;
-      // from linked invoice
       invoice_total_cents: number | null;
       invoice_paid_cents: number | null;
       invoice_status: string | null;
+      parts_cost_cents: number;
     }>(
       `SELECT
          j.id, j.title, j.status,
@@ -55,7 +54,13 @@ export const GET = withRole(["owner", "admin"], async (request: NextRequest, ses
          e.total_cents                 AS estimated_total_cents,
          i.total_cents                 AS invoice_total_cents,
          i.paid_cents                  AS invoice_paid_cents,
-         i.status                      AS invoice_status
+         i.status                      AS invoice_status,
+         COALESCE((
+           SELECT SUM(vp.actual_cost_cents * vp.quantity)
+           FROM visit_parts vp
+           JOIN visits v ON v.id = vp.visit_id
+           WHERE v.job_id = j.id AND vp.account_id = j.account_id
+         ), 0)::int                   AS parts_cost_cents
        FROM jobs j
        LEFT JOIN LATERAL (
          SELECT total_cents, internal_labor_cost_cents
@@ -85,7 +90,11 @@ export const GET = withRole(["owner", "admin"], async (request: NextRequest, ses
     const row = jobResult.rows[0];
 
     const revenue_cents = row.invoice_total_cents ?? row.estimated_total_cents ?? null;
-    const cost_cents = row.actual_cost_cents ?? row.estimated_labor_cost_cents ?? null;
+    const labor_cost_cents = row.actual_cost_cents ?? row.estimated_labor_cost_cents ?? null;
+    const parts_cost_cents = row.parts_cost_cents ?? 0;
+    const cost_cents = labor_cost_cents !== null
+      ? labor_cost_cents + parts_cost_cents
+      : parts_cost_cents > 0 ? parts_cost_cents : null;
     const gross_margin_cents =
       revenue_cents !== null && cost_cents !== null ? revenue_cents - cost_cents : null;
     const gross_margin_pct =
@@ -98,17 +107,19 @@ export const GET = withRole(["owner", "admin"], async (request: NextRequest, ses
         job_id: row.id,
         job_title: row.title,
         job_status: row.status,
-        // Cost
+        // Cost breakdown
         estimated_labor_cost_cents: row.estimated_labor_cost_cents,
         actual_cost_cents: row.actual_cost_cents,
+        parts_cost_cents,
         travel_miles: row.travel_miles,
         // Revenue
         estimated_total_cents: row.estimated_total_cents,
         invoice_total_cents: row.invoice_total_cents,
         invoice_paid_cents: row.invoice_paid_cents,
         invoice_status: row.invoice_status,
-        // Margin (uses actual cost if available, else estimate)
+        // Margin (labor + parts vs revenue)
         revenue_cents,
+        labor_cost_cents,
         cost_cents,
         gross_margin_cents,
         gross_margin_pct,

@@ -117,6 +117,7 @@ export default async function JobDetailPage({
           estimated_labor_cost_cents: number | null;
           estimated_total_cents: number | null;
           invoice_total_cents: number | null;
+          parts_cost_cents: number | null;
         }>(
           `SELECT
              (SELECT COUNT(*) FROM estimates WHERE job_id = $1 AND account_id = $2) AS estimate_count,
@@ -131,7 +132,11 @@ export default async function JobDetailPage({
               ORDER BY created_at DESC LIMIT 1) AS estimated_total_cents,
              (SELECT total_cents FROM invoices
               WHERE job_id = $1 AND account_id = $2 AND status != 'void'
-              ORDER BY created_at DESC LIMIT 1) AS invoice_total_cents
+              ORDER BY created_at DESC LIMIT 1) AS invoice_total_cents,
+             (SELECT COALESCE(SUM(vp.actual_cost_cents * vp.quantity), 0)
+              FROM visit_parts vp
+              JOIN visits v ON v.id = vp.visit_id
+              WHERE v.job_id = $1 AND vp.account_id = $2) AS parts_cost_cents
            FROM jobs j WHERE j.id = $1 AND j.account_id = $2`,
           [id, session.accountId]
         )
@@ -154,7 +159,9 @@ export default async function JobDetailPage({
 
   // Profitability (owner/admin only)
   const revenueCents = commercialCounts?.invoice_total_cents ?? commercialCounts?.estimated_total_cents ?? null;
-  const costCents = commercialCounts?.actual_cost_cents ?? commercialCounts?.estimated_labor_cost_cents ?? null;
+  const partsCostCents = Number(commercialCounts?.parts_cost_cents ?? 0);
+  const laborCostCents = commercialCounts?.actual_cost_cents ?? commercialCounts?.estimated_labor_cost_cents ?? null;
+  const costCents = laborCostCents !== null ? laborCostCents + partsCostCents : (partsCostCents > 0 ? partsCostCents : null);
   const grossMarginCents = revenueCents !== null && costCents !== null ? revenueCents - costCents : null;
   const grossMarginPct =
     grossMarginCents !== null && revenueCents !== null && revenueCents > 0
@@ -402,17 +409,31 @@ export default async function JobDetailPage({
             </Card>
 
             {/* Profitability (owner/admin only) */}
-            {!isTech && revenueCents !== null && (
+            {!isTech && (revenueCents !== null || costCents !== null) && (
               <Card data-testid="profitability-card">
                 <SectionHeader title="Profitability" />
                 <dl className="p7-detail-list">
-                  <div className="p7-detail-row">
-                    <dt>Revenue</dt>
-                    <dd>${((revenueCents) / 100).toFixed(2)}</dd>
-                  </div>
-                  {costCents !== null && (
+                  {revenueCents !== null && (
                     <div className="p7-detail-row">
-                      <dt>{hasActualCost ? "Actual Cost" : "Est. Labor Cost"}</dt>
+                      <dt>Revenue</dt>
+                      <dd>${(revenueCents / 100).toFixed(2)}</dd>
+                    </div>
+                  )}
+                  {laborCostCents !== null && (
+                    <div className="p7-detail-row">
+                      <dt>{hasActualCost ? "Labor Cost" : "Est. Labor Cost"}</dt>
+                      <dd>${(laborCostCents / 100).toFixed(2)}</dd>
+                    </div>
+                  )}
+                  {partsCostCents > 0 && (
+                    <div className="p7-detail-row">
+                      <dt>Parts Cost</dt>
+                      <dd>${(partsCostCents / 100).toFixed(2)}</dd>
+                    </div>
+                  )}
+                  {costCents !== null && (laborCostCents !== null || partsCostCents > 0) && (laborCostCents !== null && partsCostCents > 0) && (
+                    <div className="p7-detail-row" style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-1)" }}>
+                      <dt>Total Cost</dt>
                       <dd>${(costCents / 100).toFixed(2)}</dd>
                     </div>
                   )}
@@ -420,7 +441,7 @@ export default async function JobDetailPage({
                     <div className="p7-detail-row">
                       <dt>Gross Margin</dt>
                       <dd
-                        style={{ color: grossMarginCents >= 0 ? "var(--color-success, green)" : "var(--color-error, red)" }}
+                        style={{ color: grossMarginCents >= 0 ? "var(--color-success, green)" : "var(--color-error, red)", fontWeight: 600 }}
                         data-testid="gross-margin"
                       >
                         ${(grossMarginCents / 100).toFixed(2)}
@@ -434,7 +455,7 @@ export default async function JobDetailPage({
                       <dd>{commercialCounts.travel_miles} mi</dd>
                     </div>
                   )}
-                  {!hasActualCost && (
+                  {!hasActualCost && !partsCostCents && (
                     <div className="p7-detail-row">
                       <dt></dt>
                       <dd style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
