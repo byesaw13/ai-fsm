@@ -28,6 +28,7 @@ import { VisitPartsPanel } from "./VisitPartsPanel";
 import { VisitClosingChecklist } from "./VisitClosingChecklist";
 import { MembershipVisitPanel } from "./MembershipVisitPanel";
 import { VisitSnapshotPanel } from "./VisitSnapshotPanel";
+import { OnMyWayButton } from "./OnMyWayButton";
 import {
   Card,
   EmptyState,
@@ -283,6 +284,11 @@ export default async function VisitDetailPage({
           <Card>
             <SectionHeader title="Visit Timeline" />
             <Timeline entries={timelineEntries} />
+            {currentStatus === "scheduled" && (
+              <div style={{ marginTop: "var(--space-4)" }}>
+                <OnMyWayButton visitId={visit.id} />
+              </div>
+            )}
           </Card>
 
           {/* ── Membership visit: phase stepper + labor cap ── */}

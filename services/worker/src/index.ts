@@ -1,6 +1,8 @@
 import { Client } from "pg";
 import { runVisitReminders } from "./visit-reminder.js";
 import { runInvoiceFollowups } from "./invoice-followup.js";
+import { runBookingConfirmations } from "./booking-confirmed.js";
+import { runReviewRequests } from "./review-request.js";
 import { processMaintenanceScheduling } from "./maintenance-scheduling.js";
 import { logger } from "./logger.js";
 
@@ -43,6 +45,34 @@ async function runPollIteration(client: Client): Promise<void> {
         const totalErrors = followupResults.reduce((sum, r) => sum + r.errors, 0);
         logger.info("invoice-followup dispatch complete", {
           automations: followupResults.length,
+          sent: totalSent,
+          skipped: totalSkipped,
+          errors: totalErrors,
+        });
+      }
+
+      // Dispatch booking confirmations
+      const bookingResults = await runBookingConfirmations(client);
+      if (bookingResults.length > 0) {
+        const totalSent = bookingResults.reduce((sum, r) => sum + r.sent, 0);
+        const totalSkipped = bookingResults.reduce((sum, r) => sum + r.skipped, 0);
+        const totalErrors = bookingResults.reduce((sum, r) => sum + r.errors, 0);
+        logger.info("booking-confirmed dispatch complete", {
+          automations: bookingResults.length,
+          sent: totalSent,
+          skipped: totalSkipped,
+          errors: totalErrors,
+        });
+      }
+
+      // Dispatch review requests
+      const reviewResults = await runReviewRequests(client);
+      if (reviewResults.length > 0) {
+        const totalSent = reviewResults.reduce((sum, r) => sum + r.sent, 0);
+        const totalSkipped = reviewResults.reduce((sum, r) => sum + r.skipped, 0);
+        const totalErrors = reviewResults.reduce((sum, r) => sum + r.errors, 0);
+        logger.info("review-request dispatch complete", {
+          automations: reviewResults.length,
           sent: totalSent,
           skipped: totalSkipped,
           errors: totalErrors,

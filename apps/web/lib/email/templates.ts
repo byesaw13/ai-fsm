@@ -163,3 +163,77 @@ export function invoiceFollowupEmailHtml(d: InvoiceFollowupEmailData): string {
     <p style="margin:16px 0 0;font-size:12px;color:#a1a1aa;">Please contact us if you have any questions about this invoice.</p>
   `);
 }
+
+// ── On My Way ──────────────────────────────────────────────────────────────
+
+export interface OnMyWayEmailData {
+  clientName: string;
+  jobTitle: string;
+  when: string;
+  propertyAddress: string | null;
+  techName: string | null;
+}
+
+export function onMyWayEmailHtml(d: OnMyWayEmailData): string {
+  return wrap(`
+    <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">On My Way!</h2>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi ${d.clientName}, your technician is on their way to your service appointment.</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Service:</td><td style="padding:4px 0;font-size:13px;font-weight:600;">${d.jobTitle}</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Scheduled:</td><td style="padding:4px 0;font-size:13px;">${d.when}</td></tr>
+      ${d.propertyAddress ? `<tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Location:</td><td style="padding:4px 0;font-size:13px;">${d.propertyAddress}</td></tr>` : ""}
+      ${d.techName ? `<tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Technician:</td><td style="padding:4px 0;font-size:13px;">${d.techName}</td></tr>` : ""}
+    </table>
+    <p style="margin:0;font-size:14px;color:#52525b;">Please ensure someone is available to provide access. Questions? Contact us and we'll be happy to help.</p>
+  `);
+}
+
+// ── Booking Confirmed ──────────────────────────────────────────────────────
+
+export interface BookingConfirmedEmailData {
+  clientName: string;
+  jobTitle: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  propertyAddress: string | null;
+  techName: string | null;
+}
+
+export function bookingConfirmedEmailHtml(d: BookingConfirmedEmailData): string {
+  const start = new Date(d.scheduledStart).toLocaleString("en-US", {
+    weekday: "long", month: "long", day: "numeric", year: "numeric",
+    hour: "numeric", minute: "2-digit",
+  });
+  const end = new Date(d.scheduledEnd).toLocaleTimeString("en-US", {
+    hour: "numeric", minute: "2-digit",
+  });
+  return wrap(`
+    <h2 style="margin:0 0 8px;font-size:22px;color:#16a34a;">Booking Confirmed</h2>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi ${d.clientName}, your appointment with ${BRAND} is confirmed. We look forward to seeing you!</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Service:</td><td style="padding:4px 0;font-size:13px;font-weight:600;">${d.jobTitle}</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Date &amp; Time:</td><td style="padding:4px 0;font-size:13px;">${start} – ${end}</td></tr>
+      ${d.propertyAddress ? `<tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Location:</td><td style="padding:4px 0;font-size:13px;">${d.propertyAddress}</td></tr>` : ""}
+      ${d.techName ? `<tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Technician:</td><td style="padding:4px 0;font-size:13px;">${d.techName}</td></tr>` : ""}
+    </table>
+    <p style="margin:0;font-size:14px;color:#52525b;">Need to reschedule or have questions? Just reply to this email or give us a call — we're happy to help.</p>
+  `);
+}
+
+// ── Review Request ─────────────────────────────────────────────────────────
+
+export interface ReviewRequestEmailData {
+  clientName: string;
+  jobTitle: string;
+  techName: string | null;
+}
+
+export function reviewRequestEmailHtml(d: ReviewRequestEmailData): string {
+  return wrap(`
+    <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">How Did We Do?</h2>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi ${d.clientName}, thank you for choosing ${BRAND}${d.techName ? ` and working with ${d.techName}` : ""}. We hope everything went smoothly with your ${d.jobTitle} service.</p>
+    <p style="margin:0 0 16px;font-size:15px;color:#18181b;">Your feedback means the world to a small, local business like ours. If you had a great experience, we'd really appreciate a quick review — it helps other homeowners find us.</p>
+    <p style="margin:0 0 24px;font-size:14px;color:#52525b;">And if anything wasn't perfect, please reach out directly — we want to make it right.</p>
+    <p style="margin:0;font-size:13px;color:#71717a;">Thank you again for your business — we appreciate you!</p>
+  `);
+}
