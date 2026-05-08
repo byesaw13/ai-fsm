@@ -12,6 +12,7 @@ import {
   SectionHeader,
 } from "@/components/ui";
 import type { MetricCardData } from "@/components/ui";
+import { CUSTOMER_STAGE_ORDER, CUSTOMER_STAGE_LABELS, CUSTOMER_STAGE_COLORS } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ type InvoiceRow    = { open_count: string; open_balance: string; overdue_count: 
 type PipelineRow   = { count: string; total_cents: string };
 type MemberPlanRow = { active_count: string; overdue_count: string };
 type MemberVisitRow= { cap_overrun_count: string; snapshot_count: string };
+type StageCountRow = { quoted: string; scheduled: string; completed: string };
 
 type TodayVisit = {
   id: string;
@@ -160,6 +162,7 @@ export default async function HomePage() {
     bookingPending,
     memberPlanRows,
     memberVisitRows,
+    stageCountRows,
   ] = await Promise.all([
     query<UserRow>(`SELECT full_name FROM users WHERE id = $1`, [session.userId]),
 
@@ -315,6 +318,16 @@ export default async function HomePage() {
        FROM visits WHERE account_id = $1 AND generated_from_plan_id IS NOT NULL`,
       [accountId]
     ),
+
+    // Stage pipeline counts (quoted split into estimate vs accepted below)
+    query<StageCountRow>(
+      `SELECT
+         COUNT(*) FILTER (WHERE status = 'quoted')::text AS quoted,
+         COUNT(*) FILTER (WHERE status IN ('scheduled','in_progress'))::text AS scheduled,
+         COUNT(*) FILTER (WHERE status IN ('completed','invoiced'))::text AS completed
+       FROM jobs WHERE account_id = $1 AND status != 'cancelled'`,
+      [accountId]
+    ),
   ]);
 
   // ---------------------------------------------------------------------------
@@ -357,6 +370,16 @@ export default async function HomePage() {
   const memberOverdue  = parseInt(memberPlan.overdue_count, 10);
   const memberCapOverrun = parseInt(memberVisit.cap_overrun_count, 10);
   const memberSnapshot = parseInt(memberVisit.snapshot_count, 10);
+
+  const sc = stageCountRows[0] ?? { quoted: "0", scheduled: "0", completed: "0" };
+  const quotedTotal = parseInt(sc.quoted, 10);
+  const stageCounts: Record<string, number> = {
+    intake:    intakeNeeded + bookingCount,
+    estimate:  Math.max(0, quotedTotal - approvedNotSchedCount),
+    accepted:  approvedNotSchedCount,
+    scheduled: parseInt(sc.scheduled, 10),
+    completed: parseInt(sc.completed, 10),
+  };
 
   // ---------------------------------------------------------------------------
   // Attention items
@@ -596,6 +619,54 @@ export default async function HomePage() {
           </div>
         </div>
       )}
+
+      {/* ── Pipeline by Stage ───────────────────────────────────────────── */}
+      <div style={{ marginBottom: "var(--space-6)" }}>
+        <SectionHeader title="Pipeline" as="h2" />
+        <div
+          style={{
+            marginTop: "var(--space-3)",
+            display: "grid",
+            gridTemplateColumns: "repeat(5, 1fr)",
+            gap: "var(--space-2)",
+          }}
+        >
+          {CUSTOMER_STAGE_ORDER.map((stage) => {
+            const count = stageCounts[stage] ?? 0;
+            const color = CUSTOMER_STAGE_COLORS[stage];
+            const stageHrefs: Record<string, string> = {
+              intake:    "/app/jobs?status=draft",
+              estimate:  "/app/estimates?status=sent",
+              accepted:  "/app/jobs?status=quoted",
+              scheduled: "/app/jobs?status=scheduled",
+              completed: "/app/jobs?status=completed",
+            };
+            return (
+              <Link key={stage} href={stageHrefs[stage] as Route} style={{ textDecoration: "none" }}>
+                <div
+                  style={{
+                    background: color.bg,
+                    borderRadius: "var(--radius-md)",
+                    padding: "var(--space-3) var(--space-2)",
+                    textAlign: "center",
+                    border: `1px solid ${color.bg}`,
+                    transition: "filter 0.1s",
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.filter = "brightness(0.95)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.filter = "none"; }}
+                >
+                  <div style={{ fontSize: "var(--text-xl)", fontWeight: "var(--font-bold)", color: color.fg, fontVariantNumeric: "tabular-nums", lineHeight: 1.1 }}>
+                    {count}
+                  </div>
+                  <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: color.fg, opacity: 0.8, marginTop: 4 }}>
+                    {CUSTOMER_STAGE_LABELS[stage]}
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
 
       {/* ── Today's Schedule ────────────────────────────────────────────── */}
       {todayVisits.length > 0 && (

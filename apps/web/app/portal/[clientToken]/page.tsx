@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { queryOne, query } from "@/lib/db";
+import { derivePortalStage, CUSTOMER_STAGE_ORDER, CUSTOMER_STAGE_LABELS, CUSTOMER_STAGE_COLORS } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -131,6 +132,16 @@ export default async function ClientPortalPage({
     0
   );
 
+  const activeStage = derivePortalStage({
+    hasOpenInvoice:      openInvoices.length > 0,
+    hasPaidInvoice:      invoices.some((i) => i.status === "paid"),
+    hasApprovedEstimate: estimates.some((e) => e.status === "approved"),
+    hasSentEstimate:     estimates.some((e) => e.status === "sent"),
+    hasScheduledVisit:   maintenanceJobs.some((j) =>
+      (j.visits as VisitRow[]).some((v) => v.completed_at === null)
+    ),
+  });
+
   return (
     <div style={{ minHeight: "100vh", background: "#f9fafb", padding: "24px 16px" }}>
       <div style={{ maxWidth: 800, margin: "0 auto" }}>
@@ -140,6 +151,35 @@ export default async function ClientPortalPage({
           <h1 style={{ fontSize: 24, fontWeight: 700, margin: "4px 0 0" }}>
             Welcome, {(client.name as string).split(" ")[0]}
           </h1>
+        </div>
+
+        {/* Stage progress bar */}
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", gap: 4 }}>
+            {CUSTOMER_STAGE_ORDER.map((stage) => {
+              const isActive = stage === activeStage;
+              const isPast = CUSTOMER_STAGE_ORDER.indexOf(stage) < CUSTOMER_STAGE_ORDER.indexOf(activeStage);
+              const color = CUSTOMER_STAGE_COLORS[stage];
+              return (
+                <div
+                  key={stage}
+                  style={{
+                    flex: 1,
+                    textAlign: "center",
+                    padding: "6px 4px",
+                    borderRadius: 6,
+                    background: isActive ? color.bg : isPast ? "#f0fdf4" : "#f9fafb",
+                    border: isActive ? `1.5px solid ${color.fg}` : "1.5px solid transparent",
+                    opacity: isPast ? 0.6 : 1,
+                  }}
+                >
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: isActive ? color.fg : "#9ca3af" }}>
+                    {CUSTOMER_STAGE_LABELS[stage]}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {totalOwed > 0 && (

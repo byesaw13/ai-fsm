@@ -652,3 +652,4 @@ export function priceFromMargin(costCents: number, margin: number): number {
 
 export * from "./dovetails";
 export * from "./job-materials";
+export * from "./stages";
