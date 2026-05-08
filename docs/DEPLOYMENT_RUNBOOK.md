@@ -1,16 +1,11 @@
 # Deployment Runbook — ai-fsm
 
-**Primary target:** `garonhome.local` (x86, `infra/compose.garonhome.yml`)
-**Secondary / Legacy target:** Raspberry Pi 4 (`infra/compose.pi.yml`)
-
-All releases go to garonhome first. Pi is kept as a secondary reference target.
+**Target:** `garonhome.local` (x86, `infra/compose.garonhome.yml`)
 
 > **Source evidence**
 > - `docs/GARONHOME_DEPLOYMENT.md`: full garonhome setup blueprint and host layout.
-> - `docs/PI4_DEPLOYMENT.md`: Pi4 hardware notes (secondary reference).
 > - `docs/BACKUP_RUNBOOK.md`: backup strategy and retention policy (canonical reference).
 > - `infra/compose.garonhome.yml`: garonhome service definitions.
-> - `infra/compose.pi.yml`: Pi service definitions and memory limits.
 
 ---
 
@@ -173,184 +168,14 @@ Log rollbacks in `docs/DECISION_LOG.md` using the ROLLBACK entry format.
 
 ---
 
-## Secondary Target: Raspberry Pi 4 (Legacy)
-
-> **Note:** The Pi is a secondary/legacy target. Use garonhome.local for active deployments. These instructions are kept for reference and fallback use. Authoritative Pi-specific details: [docs/PI4_DEPLOYMENT.md](PI4_DEPLOYMENT.md).
-
-### Pi4 Hardware and Operating Limits
-
-| Resource | Recommended | Minimum |
-|----------|-------------|---------|
-| RAM | 8 GB | 4 GB |
-| Storage (SD / SSD) | External SSD (64 GB+) | SD 32 GB (risk: high write wear) |
-| CPU | Cortex-A72 (ARMv8) | Same |
-| OS | Raspberry Pi OS 64-bit (Bookworm) | Ubuntu Server 22.04 arm64 |
-
-**Strongly recommended:** Use an external SSD for PostgreSQL data.
-
-### Docker Compose Memory Limits (compose.pi.yml)
-
-| Service | Limit | Expected idle |
-|---------|-------|---------------|
-| `web` (Next.js) | 700 MB | ~200 MB |
-| `worker` | 256 MB | ~64 MB |
-| `postgres` | 900 MB | ~150 MB |
-| `redis` | 128 MB | ~30 MB |
-| **Total headroom** | **~2 GB** | **~444 MB idle** |
-
----
-
-### First Deploy (Pi4)
-
-```bash
-# 1. Install Docker Engine
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker pi   # then log out/in
-
-# 2. Set swap ≥ 1 GB (essential for 4 GB Pi4)
-sudo dphys-swapfile swapoff
-sudo nano /etc/dphys-swapfile   # CONF_SWAPSIZE=1024
-sudo dphys-swapfile setup && sudo dphys-swapfile swapon
-
-# 3. Copy and fill .env
-cp .env.example .env && nano .env
-
-# 4. Start all services
-docker compose -f infra/compose.pi.yml up -d
-
-# 5. Run migrations (first deploy only)
-for f in $(ls db/migrations/*.sql | sort); do
-  [[ "$f" == *seed* ]] && continue
-  echo "Applying $f..."
-  docker exec -i ai-fsm-postgres psql \
-    --username="${POSTGRES_USER}" --dbname="${POSTGRES_DB}" < "$f"
-done
-```
-
-Required env vars (same as garonhome): `DATABASE_URL`, `AUTH_SECRET`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `REDIS_URL`, `NODE_OPTIONS=--max-old-space-size=256`
-
----
-
-### Redeploy (Pi4)
-
-```bash
-# 1. Pull latest images
-docker compose -f infra/compose.pi.yml pull
-
-# 2. Pre-upgrade backup
-/home/pi/scripts/backup_db.sh
-
-# 3. Apply only new migrations manually (check which have already been applied)
-
-# 4. Recreate containers
-docker compose -f infra/compose.pi.yml up -d --force-recreate web worker
-
-# 5. Verify
-curl -sf http://localhost:3000/api/health
-```
-
----
-
-### Health Verification (Pi4)
-
-```bash
-docker compose -f infra/compose.pi.yml ps
-curl -sf http://localhost:3000/api/health
-# Expected: {"status":"ok","checks":{"db":"ok"},...}
-docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}\t{{.MemPerc}}"
-```
-
----
-
-### Backup (Pi4)
-
-```bash
-mkdir -p /home/pi/scripts /home/pi/backups
-
-cat > /home/pi/scripts/backup_db.sh << 'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-BACKUP_DIR="/home/pi/backups"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-FILE="${BACKUP_DIR}/ai_fsm_${TIMESTAMP}.dump"
-mkdir -p "$BACKUP_DIR"
-docker exec ai-fsm-postgres pg_dump \
-  --username=postgres --format=custom --compress=9 ai_fsm > "$FILE"
-echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Backup written: $FILE ($(du -h "$FILE" | cut -f1))"
-find "$BACKUP_DIR" -name "ai_fsm_*.dump" -mtime +7 -delete
-EOF
-
-chmod +x /home/pi/scripts/backup_db.sh
-
-# Cron (daily at 02:00)
-(crontab -l 2>/dev/null; echo "0 2 * * * /home/pi/scripts/backup_db.sh >> /home/pi/logs/backup.log 2>&1") | crontab -
-```
-
----
-
-### Restore (Pi4)
-
-```bash
-# Stop app
-docker compose -f infra/compose.pi.yml stop web worker
-
-# Drop and recreate DB
-docker exec ai-fsm-postgres psql --username=postgres -c \
-  "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='ai_fsm' AND pid<>pg_backend_pid()"
-docker exec ai-fsm-postgres psql --username=postgres -c "DROP DATABASE IF EXISTS ai_fsm"
-docker exec ai-fsm-postgres psql --username=postgres -c "CREATE DATABASE ai_fsm OWNER postgres"
-
-# Restore
-DUMP_FILE="/home/pi/backups/ai_fsm_<timestamp>.dump"
-docker exec -i ai-fsm-postgres pg_restore \
-  --username=postgres --dbname=ai_fsm --no-owner --no-acl < "$DUMP_FILE"
-
-# Restart and verify
-docker compose -f infra/compose.pi.yml start web worker
-curl -sf http://localhost:3000/api/health | jq .
-```
-
----
-
-### Rollback (Pi4)
-
-```bash
-# Identify previous image tag
-docker image ls ghcr.io/your-org/ai-fsm-web --format "{{.Tag}}\t{{.CreatedAt}}"
-
-# Edit infra/compose.pi.yml to pin the previous tag, then:
-docker compose -f infra/compose.pi.yml up -d --force-recreate web worker
-curl -sf http://localhost:3000/api/health
-```
-
-Log in `docs/DECISION_LOG.md` using the ROLLBACK entry format.
-
----
-
-### Pi4-Specific Constraints
-
-| Constraint | Value |
-|-----------|-------|
-| Architecture | `linux/arm64` |
-| Max total memory | ~2 GB allocated to Docker |
-| Swap | ≥ 1 GB recommended |
-| Next.js heap | `--max-old-space-size=256` (`NODE_OPTIONS`) |
-| Docker Compose | v2.x required |
-| Concurrent workers | 1 (`WORKER_CONCURRENCY=1`) |
-| Log rotation | 50 MB × 3 per service |
-| Backup retention | 7 days local / 30 days offsite target |
-| RPO | 24 hours |
-
----
-
-## Rollback Entry Format (both targets)
+## Rollback Entry Format
 
 Record in `docs/DECISION_LOG.md`:
 
 ```
 ### ROLLBACK-<YYYY-MM-DD>: <reason>
 - Date (UTC): <datetime>
-- Target: garonhome.local | Pi4
+- Target: garonhome.local
 - Previous commit/tag: <ref>
 - Rolled-back commit/tag: <ref>
 - Reason: <describe the incident>

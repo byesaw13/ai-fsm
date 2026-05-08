@@ -12,9 +12,12 @@
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
+    "test:unit": "pnpm -r test:unit",
+    "test:integration": "pnpm -r --if-present test:integration",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "gate": "pnpm lint && pnpm typecheck && pnpm build && pnpm test",
+    "gate": "bash scripts/gate.sh",
+    "gate:fast": "bash scripts/gate.sh --fast",
     "db:migrate": "bash scripts/db-migrate.sh",
     "db:seed": "bash scripts/db-seed.sh"
   },

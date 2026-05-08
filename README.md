@@ -5,7 +5,7 @@ AI-first Field Service Management MVP focused on:
 - Estimates & invoices
 - Automations
 
-Runtime target: Raspberry Pi 4 (ARM64). Development happens on a workstation.
+Runtime target: garonhome.local (x86 mini PC, Docker Compose at /opt/business/ai-fsm). Development happens on a workstation.
 
 ## Quick Start
 
