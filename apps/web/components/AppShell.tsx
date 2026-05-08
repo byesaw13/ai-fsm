@@ -46,7 +46,6 @@ const OPERATIONS_ITEMS: NavItem[] = [
 ];
 
 const BUSINESS_ITEMS: NavItem[] = [
-  { href: "/app/owner-dashboard", label: "Command Center", Icon: IconReports, adminOnly: true },
   { href: "/app/clients",     label: "Clients",    Icon: IconClients,     adminOnly: true },
   { href: "/app/properties",  label: "Properties", Icon: IconProperties,  adminOnly: true },
   { href: "/app/invoices",    label: "Invoices",   Icon: IconInvoices,    adminOnly: true },
@@ -82,8 +81,14 @@ export function getNavSections(role: string): NavSection[] {
 
 /** Pure function — returns flat list of nav items for mobile bottom nav */
 export function getBottomNavItems(role: string): NavItem[] {
-  if (role === "tech") return [OPERATIONS_ITEMS[0], OPERATIONS_ITEMS[2], OPERATIONS_ITEMS[3], OPERATIONS_ITEMS[4]];
-  return [OPERATIONS_ITEMS[0], OPERATIONS_ITEMS[2], OPERATIONS_ITEMS[4], BUSINESS_ITEMS[2], BUSINESS_ITEMS[3]];
+  if (role === "tech") {
+    // My Day, Jobs, Visits, Schedule
+    return [OPERATIONS_ITEMS[0], OPERATIONS_ITEMS[3], OPERATIONS_ITEMS[4], OPERATIONS_ITEMS[2]];
+  }
+  // admin/owner: My Day, Jobs, Visits, Clients, Invoices
+  const clients  = BUSINESS_ITEMS.find((i) => i.href === "/app/clients")!;
+  const invoices = BUSINESS_ITEMS.find((i) => i.href === "/app/invoices")!;
+  return [OPERATIONS_ITEMS[0], OPERATIONS_ITEMS[3], OPERATIONS_ITEMS[4], clients, invoices];
 }
 
 /** Pure function — returns true if href is the active nav route for pathname */
