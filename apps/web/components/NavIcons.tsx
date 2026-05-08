@@ -166,3 +166,12 @@ export function IconMileage(props: IconProps) {
     </Icon>
   );
 }
+
+export function IconBooking(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="4" width="14" height="14" rx="2" />
+      <path d="M3 9h14M8 4v2M12 4v2" />
+    </Icon>
+  );
+}

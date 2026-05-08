@@ -21,6 +21,7 @@ import {
   IconPriceBook,
   IconMyDay,
   IconMileage,
+  IconBooking,
 } from "./NavIcons";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
@@ -38,15 +39,15 @@ interface NavSection {
 }
 
 const OPERATIONS_ITEMS: NavItem[] = [
-  { href: "/app/my-day",     label: "My Day",     Icon: IconMyDay },
-  { href: "/app",             label: "Dashboard",  Icon: IconDashboard },
-  { href: "/app/schedule",    label: "Schedule",   Icon: IconSchedule },
-  { href: "/app/jobs",        label: "Jobs",       Icon: IconJobs },
-  { href: "/app/visits",      label: "Visits",     Icon: IconVisits },
+  { href: "/app/my-day",              label: "My Day",         Icon: IconMyDay },
+  { href: "/app",                      label: "Dashboard",      Icon: IconDashboard },
+  { href: "/app/schedule",             label: "Schedule",       Icon: IconSchedule },
+  { href: "/app/jobs",                 label: "Jobs",           Icon: IconJobs },
+  { href: "/app/visits",               label: "Visits",         Icon: IconVisits },
+  { href: "/app/booking-requests",     label: "Booking",        Icon: IconBooking, adminOnly: true },
 ];
 
 const BUSINESS_ITEMS: NavItem[] = [
-  { href: "/app/booking-requests", label: "Requests", Icon: IconJobs, adminOnly: true },
   { href: "/app/clients",     label: "Clients",    Icon: IconClients,     adminOnly: true },
   { href: "/app/properties",  label: "Properties", Icon: IconProperties,  adminOnly: true },
   { href: "/app/invoices",    label: "Invoices",   Icon: IconInvoices,    adminOnly: true },
@@ -68,7 +69,8 @@ const ADMIN_ITEMS: NavItem[] = [
 export function getNavSections(role: string): NavSection[] {
   const sections: NavSection[] = [];
 
-  if (OPERATIONS_ITEMS.length > 0) sections.push({ label: "Operations", items: OPERATIONS_ITEMS });
+  const opsItems = role === "tech" ? OPERATIONS_ITEMS.filter((item) => !item.adminOnly) : OPERATIONS_ITEMS;
+  if (opsItems.length > 0) sections.push({ label: "Operations", items: opsItems });
 
   if (role !== "tech") {
     const bizItems = BUSINESS_ITEMS.filter((item) => !item.adminOnly || role !== "tech");

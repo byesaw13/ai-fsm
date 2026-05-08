@@ -35,34 +35,20 @@ const bookingSchema = z.object({
   access_notes: z.string().max(500).nullable().optional(),
 });
 
-type QueryableClient = {
-  query<T = unknown>(text: string, params?: unknown[]): Promise<{ rows: T[] }>;
-};
+const ACCOUNT_ID = process.env.BOOKING_ACCOUNT_ID;
 
-async function resolveBookingAccountId(client: QueryableClient): Promise<string | null> {
-  const configuredAccountId = process.env.BOOKING_ACCOUNT_ID;
-  if (configuredAccountId) {
-    return configuredAccountId;
-  }
-
-  const { rows } = await client.query<{ id: string }>(
-    `SELECT id
-       FROM accounts
-      ORDER BY created_at ASC
-      LIMIT 2`
-  );
-
-  if (rows.length === 1) {
-    return rows[0].id;
-  }
-
-  logger.warn("BOOKING_ACCOUNT_ID is not set and a single booking account could not be inferred", {
-    accountCount: rows.length,
-  });
-  return null;
+if (!ACCOUNT_ID) {
+  logger.warn("BOOKING_ACCOUNT_ID is not set — booking submissions will fail");
 }
 
 export async function POST(request: NextRequest) {
+  if (!ACCOUNT_ID) {
+    return NextResponse.json(
+      { error: { message: "Booking is not currently available." } },
+      { status: 503 }
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -85,35 +71,109 @@ export async function POST(request: NextRequest) {
 
   const pool = getPool();
   const client = await pool.connect();
-  let transactionStarted = false;
 
   try {
-    const accountId = await resolveBookingAccountId(client);
-    if (!accountId) {
-      return NextResponse.json(
-        { error: { message: "Booking is not currently available." } },
-        { status: 503 }
+    await client.query("BEGIN");
+
+    // Check if client already exists (by email or phone)
+    let clientId: string | null = null;
+    if (data.email) {
+      const { rows } = await client.query<{ id: string }>(
+        `SELECT id FROM clients WHERE account_id = $1 AND email = $2`,
+        [ACCOUNT_ID, data.email]
       );
+      if (rows.length > 0) clientId = rows[0].id;
+    }
+    if (!clientId && data.phone) {
+      const { rows } = await client.query<{ id: string }>(
+        `SELECT id FROM clients WHERE account_id = $1 AND phone = $2`,
+        [ACCOUNT_ID, data.phone]
+      );
+      if (rows.length > 0) clientId = rows[0].id;
     }
 
-    await client.query("BEGIN");
-    transactionStarted = true;
+    // Create client if not found
+    if (!clientId) {
+      const { rows } = await client.query<{ id: string }>(
+        `INSERT INTO clients (account_id, name, email, phone)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id`,
+        [ACCOUNT_ID, data.name, data.email || null, data.phone || null]
+      );
+      clientId = rows[0].id;
+    }
 
-    // Public booking captures an intake request only. Staff review creates
-    // the client/property/job records and scheduling remains explicit.
+    // Check if property exists for this client at this address
+    let propertyId: string | null = null;
+    {
+      const { rows } = await client.query<{ id: string }>(
+        `SELECT id FROM properties WHERE client_id = $1 AND address = $2`,
+        [clientId, data.address]
+      );
+      if (rows.length > 0) {
+        propertyId = rows[0].id;
+      }
+    }
+
+    if (!propertyId) {
+      const { rows } = await client.query<{ id: string }>(
+        `INSERT INTO properties (account_id, client_id, name, address, city, state, zip)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id`,
+        [
+          ACCOUNT_ID,
+          clientId,
+          data.address,
+          data.address,
+          data.city || null,
+          data.state || null,
+          data.zip || null,
+        ]
+      );
+      propertyId = rows[0].id;
+    }
+
+    // Determine job type from service category
+    const jobTypeMap: Record<string, string> = {
+      painting_finishes: "painting",
+      maintenance_small: "maintenance",
+      general_repairs: "repair",
+      plumbing: "repair",
+      electrical: "repair",
+      carpentry_furniture: "custom",
+      outdoor_seasonal: "maintenance",
+      mounting_installs: "custom",
+      specialty_expansion: "custom",
+    };
+    const jobType = jobTypeMap[data.service_category] || "custom";
+
+    const categoryLabel = data.service_category
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+
+    // Create a job
+    const { rows: jobRows } = await client.query<{ id: string }>(
+      `INSERT INTO jobs (account_id, client_id, property_id, title, description, status, job_type)
+       VALUES ($1, $2, $3, $4, $5, 'draft', $6)
+       RETURNING id`,
+      [ACCOUNT_ID, clientId, propertyId, `${categoryLabel} — ${data.name}`, data.service_description, jobType]
+    );
+    const jobId = jobRows[0].id;
+
+    // Create the booking request record.
+    // Visit is NOT created here — staff create it after reviewing the request.
     const { rows: bookingRows } = await client.query<{ id: string }>(
       `INSERT INTO booking_requests
-         (account_id, client_id, property_id, job_id, visit_id,
+         (account_id, client_id, property_id, job_id,
           name, email, phone, service_category, service_description,
           preferred_date, preferred_time_slot, address, city, state, zip, access_notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-      RETURNING id`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+       RETURNING id`,
       [
-        accountId,
-        null,
-        null,
-        null,
-        null,
+        ACCOUNT_ID,
+        clientId,
+        propertyId,
+        jobId,
         data.name,
         data.email || null,
         data.phone || null,
@@ -136,9 +196,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    if (transactionStarted) {
-      await client.query("ROLLBACK");
-    }
+    await client.query("ROLLBACK");
     logger.error("POST /api/booking error", error as Error);
     return NextResponse.json(
       { error: { message: "Failed to submit booking request." } },
