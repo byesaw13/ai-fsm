@@ -112,7 +112,7 @@ export default async function JobDetailPage({
       ? queryOne<{
           estimate_count: string;
           invoice_count: string;
-          actual_cost_cents: number | null;
+          parts_cost_cents: number | null;
           travel_miles: number | null;
           estimated_labor_cost_cents: number | null;
           estimated_total_cents: number | null;
@@ -121,7 +121,7 @@ export default async function JobDetailPage({
           `SELECT
              (SELECT COUNT(*) FROM estimates WHERE job_id = $1 AND account_id = $2) AS estimate_count,
              (SELECT COUNT(*) FROM invoices  WHERE job_id = $1 AND account_id = $2) AS invoice_count,
-             j.actual_cost_cents,
+             j.actual_cost_cents AS parts_cost_cents,
              j.travel_miles,
              (SELECT internal_labor_cost_cents FROM estimates
               WHERE job_id = $1 AND account_id = $2 AND status = 'approved'
@@ -153,14 +153,19 @@ export default async function JobDetailPage({
   const invoiceCount = commercialCounts ? parseInt(commercialCounts.invoice_count) : 0;
 
   // Profitability (owner/admin only)
+  // actual_cost_cents on jobs is maintained as the parts rollup by visit-parts write paths.
   const revenueCents = commercialCounts?.invoice_total_cents ?? commercialCounts?.estimated_total_cents ?? null;
-  const costCents = commercialCounts?.actual_cost_cents ?? commercialCounts?.estimated_labor_cost_cents ?? null;
+  const partsCostCents = commercialCounts?.parts_cost_cents ?? 0;
+  const estimatedLaborCents = commercialCounts?.estimated_labor_cost_cents ?? null;
+  const costCents =
+    estimatedLaborCents !== null || partsCostCents > 0
+      ? (estimatedLaborCents ?? 0) + partsCostCents
+      : null;
   const grossMarginCents = revenueCents !== null && costCents !== null ? revenueCents - costCents : null;
   const grossMarginPct =
     grossMarginCents !== null && revenueCents !== null && revenueCents > 0
       ? Math.round((grossMarginCents / revenueCents) * 1000) / 10
       : null;
-  const hasActualCost = (commercialCounts?.actual_cost_cents ?? null) !== null;
 
   // Build timeline entries from visits
   const timelineEntries: TimelineEntryData[] = visits.map((v) => {
@@ -402,17 +407,31 @@ export default async function JobDetailPage({
             </Card>
 
             {/* Profitability (owner/admin only) */}
-            {!isTech && revenueCents !== null && (
+            {!isTech && (revenueCents !== null || costCents !== null) && (
               <Card data-testid="profitability-card">
                 <SectionHeader title="Profitability" />
                 <dl className="p7-detail-list">
-                  <div className="p7-detail-row">
-                    <dt>Revenue</dt>
-                    <dd>${((revenueCents) / 100).toFixed(2)}</dd>
-                  </div>
-                  {costCents !== null && (
+                  {revenueCents !== null && (
                     <div className="p7-detail-row">
-                      <dt>{hasActualCost ? "Actual Cost" : "Est. Labor Cost"}</dt>
+                      <dt>Revenue</dt>
+                      <dd>${(revenueCents / 100).toFixed(2)}</dd>
+                    </div>
+                  )}
+                  {estimatedLaborCents !== null && (
+                    <div className="p7-detail-row">
+                      <dt>Est. Labor Cost</dt>
+                      <dd>${(estimatedLaborCents / 100).toFixed(2)}</dd>
+                    </div>
+                  )}
+                  {partsCostCents > 0 && (
+                    <div className="p7-detail-row">
+                      <dt>Parts Cost</dt>
+                      <dd>${(partsCostCents / 100).toFixed(2)}</dd>
+                    </div>
+                  )}
+                  {costCents !== null && estimatedLaborCents !== null && partsCostCents > 0 && (
+                    <div className="p7-detail-row" style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-1)" }}>
+                      <dt>Total Cost</dt>
                       <dd>${(costCents / 100).toFixed(2)}</dd>
                     </div>
                   )}
@@ -420,7 +439,7 @@ export default async function JobDetailPage({
                     <div className="p7-detail-row">
                       <dt>Gross Margin</dt>
                       <dd
-                        style={{ color: grossMarginCents >= 0 ? "var(--color-success, green)" : "var(--color-error, red)" }}
+                        style={{ color: grossMarginCents >= 0 ? "var(--color-success, green)" : "var(--color-error, red)", fontWeight: 600 }}
                         data-testid="gross-margin"
                       >
                         ${(grossMarginCents / 100).toFixed(2)}
@@ -434,11 +453,11 @@ export default async function JobDetailPage({
                       <dd>{commercialCounts.travel_miles} mi</dd>
                     </div>
                   )}
-                  {!hasActualCost && (
+                  {estimatedLaborCents === null && !partsCostCents && (
                     <div className="p7-detail-row">
                       <dt></dt>
                       <dd style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
-                        Based on estimate — update with actual after completion
+                        No approved estimate or parts logged yet
                       </dd>
                     </div>
                   )}

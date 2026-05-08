@@ -40,8 +40,19 @@ interface InitialLineItem {
   sort_order: number;
 }
 
+interface InitialOption {
+  id: string;
+  label: string;
+  description: string;
+  is_recommended: boolean;
+  sort_order: number;
+  line_items: { description: string; quantity: number; unit_price_cents: number }[];
+}
+
 interface EstimateEditFormProps {
   estimateId: string;
+  presentationMode?: "standard" | "multi_option";
+  initialOptions?: InitialOption[];
   initialClientId: string;
   initialJobId: string | null;
   initialPropertyId: string | null;
@@ -105,7 +116,27 @@ const EMPTY_ROW: LineItemRow = { description: "", quantity: "1", unit_price: "0.
 // Component
 // ---------------------------------------------------------------------------
 
-export function EstimateEditForm({
+// Public export — routes to TierEditor or standard form based on mode
+export function EstimateEditForm(props: EstimateEditFormProps) {
+  if (props.presentationMode === "multi_option") {
+    const initialTaxRate =
+      props.initialSubtotalCents > 0
+        ? Math.round((props.initialTaxCents / props.initialSubtotalCents) * 10000) / 100
+        : 0;
+    return (
+      <TierEditor
+        estimateId={props.estimateId}
+        initialOptions={props.initialOptions ?? []}
+        initialNotes={props.initialNotes}
+        initialExpiresAt={props.initialExpiresAt}
+        initialTaxRate={initialTaxRate}
+      />
+    );
+  }
+  return <StandardEstimateEditForm {...props} />;
+}
+
+function StandardEstimateEditForm({
   estimateId,
   initialClientId,
   initialJobId,
@@ -999,6 +1030,267 @@ export function EstimateEditForm({
             data-testid="submit-estimate-edit-btn"
           >
             {pending ? "Saving…" : "Save Changes"}
+          </Button>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TierEditor — edit Good/Better/Best options on a multi_option estimate
+// ---------------------------------------------------------------------------
+
+interface TierLineItem { description: string; quantity: string; unit_price: string; }
+interface TierDraft {
+  id: string;
+  label: string;
+  description: string;
+  is_recommended: boolean;
+  line_items: TierLineItem[];
+}
+
+function tierSubtotal(tier: TierDraft): number {
+  return tier.line_items.reduce((sum, row) => {
+    const qty = parseFloat(row.quantity) || 0;
+    const price = parseFloat(row.unit_price) || 0;
+    return sum + Math.round(qty * price * 100);
+  }, 0);
+}
+
+function TierEditor({
+  estimateId,
+  initialOptions,
+  initialNotes,
+  initialExpiresAt,
+  initialTaxRate,
+}: {
+  estimateId: string;
+  initialOptions: InitialOption[];
+  initialNotes: string | null;
+  initialExpiresAt: string | null;
+  initialTaxRate: number;
+}) {
+  const toast = useToast();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notes, setNotes] = useState(initialNotes ?? "");
+  const [expiresAt, setExpiresAt] = useState(isoToDateString(initialExpiresAt));
+
+  const [tiers, setTiers] = useState<TierDraft[]>(
+    initialOptions.map((opt) => ({
+      id: opt.id,
+      label: opt.label,
+      description: opt.description,
+      is_recommended: opt.is_recommended,
+      line_items: opt.line_items.length > 0
+        ? opt.line_items.map((li) => ({
+            description: li.description,
+            quantity: String(li.quantity),
+            unit_price: centsToDisplayDollars(li.unit_price_cents),
+          }))
+        : [{ description: "", quantity: "1", unit_price: "0.00" }],
+    }))
+  );
+
+  function updateTier(i: number, patch: Partial<TierDraft>) {
+    setTiers((prev) => prev.map((t, idx) => idx === i ? { ...t, ...patch } : t));
+  }
+
+  function updateLineItem(tierIdx: number, liIdx: number, field: keyof TierLineItem, val: string) {
+    setTiers((prev) => prev.map((t, i) =>
+      i !== tierIdx ? t : {
+        ...t,
+        line_items: t.line_items.map((li, j) => j === liIdx ? { ...li, [field]: val } : li),
+      }
+    ));
+  }
+
+  function addLineItem(tierIdx: number) {
+    setTiers((prev) => prev.map((t, i) =>
+      i !== tierIdx ? t : { ...t, line_items: [...t.line_items, { description: "", quantity: "1", unit_price: "0.00" }] }
+    ));
+  }
+
+  function removeLineItem(tierIdx: number, liIdx: number) {
+    setTiers((prev) => prev.map((t, i) =>
+      i !== tierIdx ? t : { ...t, line_items: t.line_items.filter((_, j) => j !== liIdx) }
+    ));
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setPending(true);
+    setError(null);
+    try {
+      const options = tiers.map((tier, idx) => ({
+        label: tier.label,
+        description: tier.description || null,
+        is_recommended: tier.is_recommended,
+        sort_order: idx,
+        line_items: tier.line_items
+          .filter((li) => li.description.trim())
+          .map((li, liIdx) => ({
+            description: li.description.trim(),
+            quantity: parseFloat(li.quantity) || 1,
+            unit_price_cents: Math.round((parseFloat(li.unit_price) || 0) * 100),
+            sort_order: liIdx,
+          })),
+      }));
+
+      const res = await fetch(`/api/v1/estimates/${estimateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          presentation_mode: "multi_option",
+          options,
+          notes: notes.trim() || null,
+          expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+          tax_rate: initialTaxRate,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error?.message ?? "Failed to save");
+        return;
+      }
+      toast.success("Estimate saved");
+      window.location.reload();
+    } catch {
+      setError("Network error — try again");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Card>
+      <SectionHeader title="Edit Tiers" />
+      <form onSubmit={handleSave} className="p7-form-stack">
+        {error && <div className="p7-card-danger" role="alert">{error}</div>}
+
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${tiers.length}, 1fr)`, gap: "var(--space-4)" }}>
+          {tiers.map((tier, ti) => (
+            <div
+              key={tier.id}
+              style={{
+                border: tier.is_recommended ? "2px solid var(--accent, #2563eb)" : "1px solid var(--border)",
+                borderRadius: "var(--radius-md)",
+                padding: "var(--space-4)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--space-3)",
+              }}
+            >
+              <Input
+                id={`tier-label-${ti}`}
+                label="Tier Name"
+                value={tier.label}
+                onChange={(e) => updateTier(ti, { label: e.target.value })}
+                disabled={pending}
+              />
+              <Input
+                id={`tier-desc-${ti}`}
+                label="Description"
+                value={tier.description}
+                onChange={(e) => updateTier(ti, { description: e.target.value })}
+                placeholder="What's included…"
+                disabled={pending}
+              />
+              <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontSize: "var(--text-sm)" }}>
+                <input
+                  type="checkbox"
+                  checked={tier.is_recommended}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setTiers((prev) => prev.map((t, i) => ({ ...t, is_recommended: i === ti ? checked : false })));
+                  }}
+                  disabled={pending}
+                />
+                Recommended
+              </label>
+
+              <div>
+                <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", fontWeight: 600 }}>Line Items</p>
+                {tier.line_items.map((li, liIdx) => (
+                  <div key={liIdx} style={{ display: "grid", gridTemplateColumns: "1fr 60px 80px 24px", gap: "var(--space-1)", marginBottom: "var(--space-1)", alignItems: "end" }}>
+                    <input
+                      type="text"
+                      value={li.description}
+                      onChange={(e) => updateLineItem(ti, liIdx, "description", e.target.value)}
+                      placeholder="Description"
+                      disabled={pending}
+                      style={{ padding: "6px 8px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "var(--text-sm)" }}
+                    />
+                    <input
+                      type="number"
+                      value={li.quantity}
+                      onChange={(e) => updateLineItem(ti, liIdx, "quantity", e.target.value)}
+                      min="0.01"
+                      step="0.01"
+                      disabled={pending}
+                      style={{ padding: "6px 8px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "var(--text-sm)" }}
+                    />
+                    <input
+                      type="number"
+                      value={li.unit_price}
+                      onChange={(e) => updateLineItem(ti, liIdx, "unit_price", e.target.value)}
+                      min="0"
+                      step="0.01"
+                      placeholder="Price"
+                      disabled={pending}
+                      style={{ padding: "6px 8px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "var(--text-sm)" }}
+                    />
+                    {tier.line_items.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeLineItem(ti, liIdx)}
+                        disabled={pending}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}
+                      >×</button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="p7-btn p7-btn-ghost p7-btn-sm"
+                  onClick={() => addLineItem(ti)}
+                  disabled={pending}
+                  style={{ marginTop: "var(--space-1)" }}
+                >
+                  + Add line
+                </button>
+              </div>
+
+              <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--fg)" }}>
+                Subtotal: ${(tierSubtotal(tier) / 100).toFixed(2)}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <Input
+          id="tier-expires"
+          label="Expires (optional)"
+          type="date"
+          value={expiresAt}
+          onChange={(e) => setExpiresAt(e.target.value)}
+          disabled={pending}
+        />
+
+        <Textarea
+          id="tier-notes"
+          label="Client notes (optional)"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={3}
+          disabled={pending}
+        />
+
+        <div className="p7-form-actions">
+          <Button type="submit" variant="primary" loading={pending} disabled={pending}>
+            {pending ? "Saving…" : "Save Tiers"}
           </Button>
         </div>
       </form>
