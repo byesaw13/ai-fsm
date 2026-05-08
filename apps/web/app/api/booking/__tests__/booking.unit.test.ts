@@ -19,7 +19,25 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 const ACCOUNT_ID = "00000000-0000-0000-0000-000000000002";
+const CLIENT_ID  = "11111111-1111-1111-1111-111111111111";
+const PROPERTY_ID = "22222222-2222-2222-2222-222222222222";
+const JOB_ID     = "33333333-3333-3333-3333-333333333333";
 const BOOKING_ID = "44444444-4444-4444-4444-444444444444";
+
+const VALID_BODY = {
+  name: "Jane Client",
+  email: "jane@example.com",
+  phone: null,
+  service_category: "general_repairs",
+  service_description: "Door latch is loose and needs adjustment.",
+  preferred_date: "2026-05-12",
+  preferred_time_slot: "morning",
+  address: "123 Main St",
+  city: "Springfield",
+  state: "MA",
+  zip: "01103",
+  access_notes: "Use side entrance.",
+};
 
 function makeRequest(body: unknown): NextRequest {
   return new NextRequest("http://localhost:3000/api/booking", {
@@ -44,30 +62,20 @@ afterEach(() => {
 });
 
 describe("POST /api/booking", () => {
-  it("captures only an intake request without creating operational records", async () => {
+  it("creates client, property, job, and booking request but not a visit", async () => {
     const { POST } = await import("../route");
 
     mockClientQuery
-      .mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ rows: [{ id: BOOKING_ID }] }) // insert booking request
-      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+      .mockResolvedValueOnce({ rows: [] })                  // BEGIN
+      .mockResolvedValueOnce({ rows: [] })                  // SELECT client by email → not found
+      .mockResolvedValueOnce({ rows: [{ id: CLIENT_ID }] }) // INSERT client
+      .mockResolvedValueOnce({ rows: [] })                  // SELECT property → not found
+      .mockResolvedValueOnce({ rows: [{ id: PROPERTY_ID }] }) // INSERT property
+      .mockResolvedValueOnce({ rows: [{ id: JOB_ID }] })   // INSERT job
+      .mockResolvedValueOnce({ rows: [{ id: BOOKING_ID }] }) // INSERT booking_request
+      .mockResolvedValueOnce({ rows: [] });                 // COMMIT
 
-    const res = await POST(
-      makeRequest({
-        name: "Jane Client",
-        email: "jane@example.com",
-        phone: null,
-        service_category: "general_repairs",
-        service_description: "Door latch is loose and needs adjustment.",
-        preferred_date: "2026-05-12",
-        preferred_time_slot: "morning",
-        address: "123 Main St",
-        city: "Springfield",
-        state: "MA",
-        zip: "01103",
-        access_notes: "Use side entrance.",
-      })
-    );
+    const res = await POST(makeRequest(VALID_BODY));
 
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toEqual({
@@ -75,96 +83,55 @@ describe("POST /api/booking", () => {
       booking_id: BOOKING_ID,
     });
 
-    const sqlStatements = mockClientQuery.mock.calls
-      .map((call) => String(call[0]))
-      .join("\n");
+    const sql = mockClientQuery.mock.calls.map((c) => String(c[0])).join("\n");
+    expect(sql).toContain("INSERT INTO clients");
+    expect(sql).toContain("INSERT INTO properties");
+    expect(sql).toContain("INSERT INTO jobs");
+    expect(sql).toContain("INSERT INTO booking_requests");
+    expect(sql).not.toContain("INSERT INTO visits");
 
-    expect(sqlStatements).toContain("INSERT INTO booking_requests");
-    expect(sqlStatements).not.toContain("INSERT INTO clients");
-    expect(sqlStatements).not.toContain("INSERT INTO properties");
-    expect(sqlStatements).not.toContain("INSERT INTO jobs");
-    expect(sqlStatements).not.toContain("INSERT INTO visits");
-
-    const bookingInsertCall = mockClientQuery.mock.calls.find((call) =>
-      String(call[0]).includes("INSERT INTO booking_requests")
+    const brInsert = mockClientQuery.mock.calls.find((c) =>
+      String(c[0]).includes("INSERT INTO booking_requests")
     );
-    expect(bookingInsertCall?.[1]?.[0]).toBe(ACCOUNT_ID);
-    expect(bookingInsertCall?.[1]?.slice(1, 5)).toEqual([null, null, null, null]);
+    expect(brInsert?.[1]?.[0]).toBe(ACCOUNT_ID);   // account_id
+    expect(brInsert?.[1]?.[1]).toBe(CLIENT_ID);    // client_id
+    expect(brInsert?.[1]?.[2]).toBe(PROPERTY_ID);  // property_id
+    expect(brInsert?.[1]?.[3]).toBe(JOB_ID);       // job_id
   });
 
-  it("infers the booking account when exactly one account exists", async () => {
-    delete process.env.BOOKING_ACCOUNT_ID;
-    const inferredAccountId = "11111111-1111-1111-1111-111111111111";
+  it("reuses an existing client found by email", async () => {
     const { POST } = await import("../route");
 
     mockClientQuery
-      .mockResolvedValueOnce({ rows: [{ id: inferredAccountId }] }) // account lookup
-      .mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ rows: [{ id: BOOKING_ID }] }) // insert booking request
-      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+      .mockResolvedValueOnce({ rows: [] })                    // BEGIN
+      .mockResolvedValueOnce({ rows: [{ id: CLIENT_ID }] })  // SELECT client by email → found
+      .mockResolvedValueOnce({ rows: [] })                    // SELECT property → not found
+      .mockResolvedValueOnce({ rows: [{ id: PROPERTY_ID }] }) // INSERT property
+      .mockResolvedValueOnce({ rows: [{ id: JOB_ID }] })     // INSERT job
+      .mockResolvedValueOnce({ rows: [{ id: BOOKING_ID }] }) // INSERT booking_request
+      .mockResolvedValueOnce({ rows: [] });                   // COMMIT
 
-    const res = await POST(
-      makeRequest({
-        name: "Jane Client",
-        email: "jane@example.com",
-        phone: null,
-        service_category: "general_repairs",
-        service_description: "Door latch is loose and needs adjustment.",
-        preferred_date: "2026-05-12",
-        preferred_time_slot: "morning",
-        address: "123 Main St",
-        city: "Springfield",
-        state: "MA",
-        zip: "01103",
-        access_notes: "Use side entrance.",
-      })
-    );
+    const res = await POST(makeRequest(VALID_BODY));
 
     expect(res.status).toBe(201);
-
-    const bookingInsertCall = mockClientQuery.mock.calls.find((call) =>
-      String(call[0]).includes("INSERT INTO booking_requests")
-    );
-    expect(bookingInsertCall?.[1]?.[0]).toBe(inferredAccountId);
+    const sql = mockClientQuery.mock.calls.map((c) => String(c[0])).join("\n");
+    expect(sql).not.toContain("INSERT INTO clients");
   });
 
-  it("returns 503 when no booking account can be inferred", async () => {
+  it("returns 503 when BOOKING_ACCOUNT_ID is not set", async () => {
     delete process.env.BOOKING_ACCOUNT_ID;
     const { POST } = await import("../route");
 
-    mockClientQuery.mockResolvedValueOnce({ rows: [] }); // account lookup
-
-    const res = await POST(
-      makeRequest({
-        name: "Jane Client",
-        email: "jane@example.com",
-        phone: null,
-        service_category: "general_repairs",
-        service_description: "Door latch is loose and needs adjustment.",
-        preferred_date: "2026-05-12",
-        preferred_time_slot: "morning",
-        address: "123 Main St",
-        city: "Springfield",
-        state: "MA",
-        zip: "01103",
-        access_notes: "Use side entrance.",
-      })
-    );
+    const res = await POST(makeRequest(VALID_BODY));
 
     expect(res.status).toBe(503);
-    expect(mockClientQuery).toHaveBeenCalledTimes(1);
-    expect(String(mockClientQuery.mock.calls[0][0])).toContain("FROM accounts");
+    expect(mockClientQuery).not.toHaveBeenCalled();
   });
 
   it("returns 400 for invalid request bodies", async () => {
     const { POST } = await import("../route");
 
-    const res = await POST(
-      makeRequest({
-        name: "Jane Client",
-        service_category: "general_repairs",
-      })
-    );
+    const res = await POST(makeRequest({ name: "Jane Client", service_category: "general_repairs" }));
 
     expect(res.status).toBe(400);
     const json = await res.json();

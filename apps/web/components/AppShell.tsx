@@ -48,7 +48,6 @@ const OPERATIONS_ITEMS: NavItem[] = [
 ];
 
 const BUSINESS_ITEMS: NavItem[] = [
-  { href: "/app/booking-requests", label: "Requests", Icon: IconJobs, adminOnly: true },
   { href: "/app/clients",     label: "Clients",    Icon: IconClients,     adminOnly: true },
   { href: "/app/properties",  label: "Properties", Icon: IconProperties,  adminOnly: true },
   { href: "/app/invoices",    label: "Invoices",   Icon: IconInvoices,    adminOnly: true },
