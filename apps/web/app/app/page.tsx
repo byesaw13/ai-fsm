@@ -427,7 +427,7 @@ export default async function HomePage() {
       kind: "booking",
       id: "booking",
       label: `${bookingCount} new booking request${bookingCount > 1 ? "s" : ""} pending`,
-      sub: "Review intake details before scheduling",
+      sub: "Review and schedule via the Booking Requests queue",
       href: "/app/booking-requests",
       urgency: "medium",
     });
