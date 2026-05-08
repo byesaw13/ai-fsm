@@ -404,8 +404,8 @@ export default async function HomePage() {
       kind: "booking",
       id: "booking",
       label: `${bookingCount} new booking request${bookingCount > 1 ? "s" : ""} pending`,
-      sub: "Convert to jobs before clients lose interest",
-      href: "/app/jobs",
+      sub: "Review intake details before scheduling",
+      href: "/app/booking-requests",
       urgency: "medium",
     });
   }

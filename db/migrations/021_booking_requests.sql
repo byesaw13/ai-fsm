@@ -1,5 +1,5 @@
 -- Migration 021: Online booking requests
--- Public booking page that creates jobs and visits automatically.
+-- Public booking page that captures intake requests for staff review.
 
 CREATE TABLE IF NOT EXISTS booking_requests (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -86,9 +86,9 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
       <div style={{ minHeight: "100vh", background: "#f9fafb", padding: "32px 16px" }}>
         <div style={{ maxWidth: 560, margin: "60px auto", background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: 40, textAlign: "center" }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>✓</div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Booking Request Received</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Service Request Received</h1>
           <p style={{ color: "#6b7280", marginBottom: 24 }}>
-            Thanks, {name}! We&apos;ll review your request and reach out to confirm the details.
+            Thanks, {name}! We&apos;ll review your request and reach out before anything is scheduled.
           </p>
           <div style={{ background: "#f9fafb", borderRadius: 8, padding: 16, textAlign: "left", marginBottom: 24 }}>
             <p style={{ margin: "0 0 8px", fontSize: 14 }}><strong>Service:</strong> {serviceCategories.find((c) => c.id === serviceCategory)?.label}</p>
@@ -116,8 +116,8 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
 
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 4 }}>Book a Service</h1>
-          <p style={{ color: "#6b7280", fontSize: 16 }}>Tell us what you need and we&apos;ll get back to you quickly.</p>
+          <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 4 }}>Request Service</h1>
+          <p style={{ color: "#6b7280", fontSize: 16 }}>Tell us what you need and we&apos;ll confirm the next step.</p>
         </div>
 
         {/* Progress */}
@@ -271,10 +271,10 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
           </div>
         )}
 
-        {/* Step 3: Location & Scheduling */}
+        {/* Step 3: Location & preferred timing */}
         {step === 3 && (
           <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: 32 }}>
-            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>Location & Schedule</h2>
+            <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>Location & Preferred Timing</h2>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 24 }}>
               <label style={{ display: "block" }}>

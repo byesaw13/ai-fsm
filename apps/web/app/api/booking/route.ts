@@ -75,111 +75,8 @@ export async function POST(request: NextRequest) {
   try {
     await client.query("BEGIN");
 
-    // Check if client already exists (by email or phone)
-    let clientId: string | null = null;
-    if (data.email) {
-      const { rows } = await client.query<{ id: string }>(
-        `SELECT id FROM clients WHERE account_id = $1 AND email = $2`,
-        [ACCOUNT_ID, data.email]
-      );
-      if (rows.length > 0) clientId = rows[0].id;
-    }
-    if (!clientId && data.phone) {
-      const { rows } = await client.query<{ id: string }>(
-        `SELECT id FROM clients WHERE account_id = $1 AND phone = $2`,
-        [ACCOUNT_ID, data.phone]
-      );
-      if (rows.length > 0) clientId = rows[0].id;
-    }
-
-    // Create client if not found
-    if (!clientId) {
-      const { rows } = await client.query<{ id: string }>(
-        `INSERT INTO clients (account_id, name, email, phone)
-         VALUES ($1, $2, $3, $4)
-         RETURNING id`,
-        [ACCOUNT_ID, data.name, data.email || null, data.phone || null]
-      );
-      clientId = rows[0].id;
-    }
-
-    // Check if property exists for this client at this address
-    let propertyId: string | null = null;
-    {
-      const { rows } = await client.query<{ id: string }>(
-        `SELECT id FROM properties WHERE client_id = $1 AND address = $2`,
-        [clientId, data.address]
-      );
-      if (rows.length > 0) {
-        propertyId = rows[0].id;
-      }
-    }
-
-    if (!propertyId) {
-      const { rows } = await client.query<{ id: string }>(
-        `INSERT INTO properties (account_id, client_id, name, address, city, state, zip)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING id`,
-        [
-          ACCOUNT_ID,
-          clientId,
-          data.address,
-          data.address,
-          data.city || null,
-          data.state || null,
-          data.zip || null,
-        ]
-      );
-      propertyId = rows[0].id;
-    }
-
-    // Determine job type from service category
-    const jobTypeMap: Record<string, string> = {
-      painting_finishes: "painting",
-      maintenance_small: "maintenance",
-      general_repairs: "repair",
-      plumbing: "repair",
-      electrical: "repair",
-      carpentry_furniture: "custom",
-      outdoor_seasonal: "maintenance",
-      mounting_installs: "custom",
-      specialty_expansion: "custom",
-    };
-    const jobType = jobTypeMap[data.service_category] || "custom";
-
-    const categoryLabel = data.service_category
-      .replace(/_/g, " ")
-      .replace(/\b\w/g, (c) => c.toUpperCase());
-
-    // Create a job
-    const { rows: jobRows } = await client.query<{ id: string }>(
-      `INSERT INTO jobs (account_id, client_id, property_id, title, description, status, job_type)
-       VALUES ($1, $2, $3, $4, $5, 'draft', $6)
-       RETURNING id`,
-      [ACCOUNT_ID, clientId, propertyId, `${categoryLabel} — ${data.name}`, data.service_description, jobType]
-    );
-    const jobId = jobRows[0].id;
-
-    // Calculate a 2-hour visit window on the preferred date
-    const preferredDate = new Date(data.preferred_date);
-    let startHour = 9;
-    if (data.preferred_time_slot === "afternoon") startHour = 13;
-    if (data.preferred_time_slot === "evening") startHour = 16;
-    const visitStart = new Date(preferredDate);
-    visitStart.setHours(startHour, 0, 0, 0);
-    const visitEnd = new Date(visitStart);
-    visitEnd.setHours(startHour + 2, 0, 0, 0);
-
-    // Create a visit
-    const { rows: visitRows } = await client.query<{ id: string }>(
-      `INSERT INTO visits (account_id, job_id, scheduled_start, scheduled_end, status, tech_notes)
-       VALUES ($1, $2, $3, $4, 'scheduled', $5)
-       RETURNING id`,
-      [ACCOUNT_ID, jobId, visitStart.toISOString(), visitEnd.toISOString(), data.access_notes || null]
-    );
-    const visitId = visitRows[0].id;
-
-    // Create the booking request record
+    // Public booking captures an intake request only. Staff review creates
+    // the client/property/job records and scheduling remains explicit.
     const { rows: bookingRows } = await client.query<{ id: string }>(
       `INSERT INTO booking_requests
          (account_id, client_id, property_id, job_id, visit_id,
@@ -189,10 +86,10 @@ export async function POST(request: NextRequest) {
        RETURNING id`,
       [
         ACCOUNT_ID,
-        clientId,
-        propertyId,
-        jobId,
-        visitId,
+        null,
+        null,
+        null,
+        null,
         data.name,
         data.email || null,
         data.phone || null,
