@@ -119,12 +119,17 @@ const EMPTY_ROW: LineItemRow = { description: "", quantity: "1", unit_price: "0.
 // Public export — routes to TierEditor or standard form based on mode
 export function EstimateEditForm(props: EstimateEditFormProps) {
   if (props.presentationMode === "multi_option") {
+    const initialTaxRate =
+      props.initialSubtotalCents > 0
+        ? Math.round((props.initialTaxCents / props.initialSubtotalCents) * 10000) / 100
+        : 0;
     return (
       <TierEditor
         estimateId={props.estimateId}
         initialOptions={props.initialOptions ?? []}
         initialNotes={props.initialNotes}
         initialExpiresAt={props.initialExpiresAt}
+        initialTaxRate={initialTaxRate}
       />
     );
   }
@@ -1058,11 +1063,13 @@ function TierEditor({
   initialOptions,
   initialNotes,
   initialExpiresAt,
+  initialTaxRate,
 }: {
   estimateId: string;
   initialOptions: InitialOption[];
   initialNotes: string | null;
   initialExpiresAt: string | null;
+  initialTaxRate: number;
 }) {
   const toast = useToast();
   const [pending, setPending] = useState(false);
@@ -1138,7 +1145,8 @@ function TierEditor({
           presentation_mode: "multi_option",
           options,
           notes: notes.trim() || null,
-          expires_at: expiresAt || null,
+          expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+          tax_rate: initialTaxRate,
         }),
       });
 
