@@ -42,8 +42,9 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       [session.userId, session.accountId, session.role]
     );
 
+    // Lock the row to serialize concurrent convert requests
     const { rows: brRows } = await client.query(
-      `SELECT * FROM booking_requests WHERE id = $1 AND account_id = $2`,
+      `SELECT * FROM booking_requests WHERE id = $1 AND account_id = $2 FOR UPDATE`,
       [id, session.accountId]
     );
     if (brRows.length === 0) {
@@ -59,6 +60,10 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     if (br.status === "cancelled") {
       await client.query("ROLLBACK");
       return NextResponse.json({ error: { code: "CONFLICT", message: "Cannot convert a cancelled request", traceId: session.traceId } }, { status: 409 });
+    }
+    if (br.visit_id) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: { code: "CONFLICT", message: "A visit is already linked to this booking request", traceId: session.traceId } }, { status: 409 });
     }
 
     // Ensure there's a job to attach the visit to
