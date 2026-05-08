@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 // ---------------------------------------------------------------------------
@@ -40,8 +40,11 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
   const [state, setState] = useState("");
   const [zip, setZip] = useState("");
   const [accessNotes, setAccessNotes] = useState("");
+  const [today, setToday] = useState("");
 
-  const today = new Date().toISOString().split("T")[0];
+  useEffect(() => {
+    setToday(formatDateInputValue(new Date()));
+  }, []);
 
   async function handleSubmit() {
     setError(null);
@@ -405,4 +408,11 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
       </div>
     </div>
   );
+}
+
+function formatDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }

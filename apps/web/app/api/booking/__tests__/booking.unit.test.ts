@@ -88,7 +88,72 @@ describe("POST /api/booking", () => {
     const bookingInsertCall = mockClientQuery.mock.calls.find((call) =>
       String(call[0]).includes("INSERT INTO booking_requests")
     );
+    expect(bookingInsertCall?.[1]?.[0]).toBe(ACCOUNT_ID);
     expect(bookingInsertCall?.[1]?.slice(1, 5)).toEqual([null, null, null, null]);
+  });
+
+  it("infers the booking account when exactly one account exists", async () => {
+    delete process.env.BOOKING_ACCOUNT_ID;
+    const inferredAccountId = "11111111-1111-1111-1111-111111111111";
+    const { POST } = await import("../route");
+
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [{ id: inferredAccountId }] }) // account lookup
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [{ id: BOOKING_ID }] }) // insert booking request
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await POST(
+      makeRequest({
+        name: "Jane Client",
+        email: "jane@example.com",
+        phone: null,
+        service_category: "general_repairs",
+        service_description: "Door latch is loose and needs adjustment.",
+        preferred_date: "2026-05-12",
+        preferred_time_slot: "morning",
+        address: "123 Main St",
+        city: "Springfield",
+        state: "MA",
+        zip: "01103",
+        access_notes: "Use side entrance.",
+      })
+    );
+
+    expect(res.status).toBe(201);
+
+    const bookingInsertCall = mockClientQuery.mock.calls.find((call) =>
+      String(call[0]).includes("INSERT INTO booking_requests")
+    );
+    expect(bookingInsertCall?.[1]?.[0]).toBe(inferredAccountId);
+  });
+
+  it("returns 503 when no booking account can be inferred", async () => {
+    delete process.env.BOOKING_ACCOUNT_ID;
+    const { POST } = await import("../route");
+
+    mockClientQuery.mockResolvedValueOnce({ rows: [] }); // account lookup
+
+    const res = await POST(
+      makeRequest({
+        name: "Jane Client",
+        email: "jane@example.com",
+        phone: null,
+        service_category: "general_repairs",
+        service_description: "Door latch is loose and needs adjustment.",
+        preferred_date: "2026-05-12",
+        preferred_time_slot: "morning",
+        address: "123 Main St",
+        city: "Springfield",
+        state: "MA",
+        zip: "01103",
+        access_notes: "Use side entrance.",
+      })
+    );
+
+    expect(res.status).toBe(503);
+    expect(mockClientQuery).toHaveBeenCalledTimes(1);
+    expect(String(mockClientQuery.mock.calls[0][0])).toContain("FROM accounts");
   });
 
   it("returns 400 for invalid request bodies", async () => {
