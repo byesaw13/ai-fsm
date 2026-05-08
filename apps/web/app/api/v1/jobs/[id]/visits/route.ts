@@ -13,6 +13,7 @@ const createVisitBody = z.object({
   scheduled_start: z.string().datetime(),
   scheduled_end: z.string().datetime(),
   tech_notes: z.string().optional(),
+  booking_request_id: z.string().uuid().optional(),
 });
 
 export const GET = withAuth(
@@ -70,7 +71,13 @@ export const POST = withRole(
       );
     }
 
-    const { assigned_user_id, scheduled_start, scheduled_end, tech_notes } = parsed.data;
+    const {
+      assigned_user_id,
+      scheduled_start,
+      scheduled_end,
+      tech_notes,
+      booking_request_id,
+    } = parsed.data;
 
     const pool = getPool();
     const client = await pool.connect();
@@ -97,6 +104,38 @@ export const POST = withRole(
       );
 
       const visit = rows[0];
+
+      if (booking_request_id) {
+        const bookingRequest = await client.query(
+          `UPDATE booking_requests
+           SET status = 'converted',
+               reviewed_by = COALESCE(reviewed_by, $3),
+               reviewed_at = COALESCE(reviewed_at, now()),
+               job_id = COALESCE(job_id, $4),
+               visit_id = COALESCE(visit_id, $5),
+               updated_at = now()
+           WHERE id = $1
+             AND account_id = $2
+             AND job_id = $4
+             AND status IN ('pending', 'reviewed')
+           RETURNING *`,
+          [booking_request_id, session.accountId, session.userId, jobId, visit.id]
+        );
+
+        if (!bookingRequest.rows[0]) {
+          await client.query("ROLLBACK");
+          return NextResponse.json(
+            {
+              error: {
+                code: "PRECONDITION_FAILED",
+                message: "The booking request could not be converted for this visit.",
+                traceId: session.traceId,
+              },
+            },
+            { status: 422 }
+          );
+        }
+      }
 
       await appendAuditLog(client, {
         account_id: session.accountId,

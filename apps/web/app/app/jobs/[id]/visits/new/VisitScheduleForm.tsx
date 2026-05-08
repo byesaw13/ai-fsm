@@ -68,6 +68,7 @@ export function VisitScheduleForm({ jobId, users, canAssign, jobCategory, bookin
         scheduled_start: start!,
         scheduled_end: end!,
         assigned_user_id: assignedUserId || undefined,
+        booking_request_id: bookingRequestId,
       };
 
       const res = await fetch(`/api/v1/jobs/${jobId}/visits`, {
@@ -93,21 +94,6 @@ export function VisitScheduleForm({ jobId, users, canAssign, jobCategory, bookin
       }
 
       const visitId = data.data.id;
-
-      if (bookingRequestId) {
-        const conversionRes = await fetch(`/api/v1/booking-requests/${bookingRequestId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "converted", visit_id: visitId }),
-        });
-
-        if (!conversionRes.ok) {
-          const conversionData = await conversionRes.json().catch(() => null);
-          setError(conversionData?.error?.message || "Visit was scheduled, but the booking request was not converted.");
-          setPending(false);
-          return;
-        }
-      }
 
       router.push(`/app/visits/${visitId}`);
     } catch {

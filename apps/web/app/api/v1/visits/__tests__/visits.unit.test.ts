@@ -63,6 +63,7 @@ const JOBS_BASE = "http://localhost:3000/api/v1/jobs";
 const VISITS_BASE = "http://localhost:3000/api/v1/visits";
 const JOB_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const VISIT_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+const BOOKING_REQUEST_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
 const USER_ID = "00000000-0000-0000-0000-000000000001";
 const NOW = new Date().toISOString();
 
@@ -131,6 +132,58 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
     expect(res.status).toBe(201);
     const json = await res.json();
     expect(json.data.id).toBe(VISIT_ID);
+  });
+
+  it("converts a booking request atomically when booking_request_id is provided", async () => {
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
+      .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // INSERT visit
+      .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // UPDATE booking request
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await visitCreate(
+      makeRequest("POST", `${JOBS_BASE}/${JOB_ID}/visits`, {
+        scheduled_start: NOW,
+        scheduled_end: NOW,
+        booking_request_id: BOOKING_REQUEST_ID,
+      })
+    );
+
+    expect(res.status).toBe(201);
+    expect(mockClientQuery.mock.calls.some((call) =>
+      String(call[0]).includes("UPDATE booking_requests")
+    )).toBe(true);
+    expect(mockClientQuery.mock.calls.find((call) =>
+      String(call[0]).includes("UPDATE booking_requests")
+    )?.[1]).toEqual([
+      BOOKING_REQUEST_ID,
+      mockSession.accountId,
+      mockSession.userId,
+      JOB_ID,
+      VISIT_ID,
+    ]);
+  });
+
+  it("returns 422 when booking_request_id does not match the job", async () => {
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
+      .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // INSERT visit
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE booking request missing
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+    const res = await visitCreate(
+      makeRequest("POST", `${JOBS_BASE}/${JOB_ID}/visits`, {
+        scheduled_start: NOW,
+        scheduled_end: NOW,
+        booking_request_id: BOOKING_REQUEST_ID,
+      })
+    );
+
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.error.code).toBe("PRECONDITION_FAILED");
   });
 
   it("returns 422 when scheduled_start is missing", async () => {
