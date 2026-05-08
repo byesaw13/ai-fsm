@@ -29,9 +29,10 @@ interface VisitScheduleFormProps {
   users: User[];
   canAssign: boolean;
   jobCategory?: string | null;
+  bookingRequestId?: string;
 }
 
-export function VisitScheduleForm({ jobId, users, canAssign, jobCategory }: VisitScheduleFormProps) {
+export function VisitScheduleForm({ jobId, users, canAssign, jobCategory, bookingRequestId }: VisitScheduleFormProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,7 +92,24 @@ export function VisitScheduleForm({ jobId, users, canAssign, jobCategory }: Visi
         return;
       }
 
-      router.push(`/app/visits/${data.data.id}`);
+      const visitId = data.data.id;
+
+      if (bookingRequestId) {
+        const conversionRes = await fetch(`/api/v1/booking-requests/${bookingRequestId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "converted", visit_id: visitId }),
+        });
+
+        if (!conversionRes.ok) {
+          const conversionData = await conversionRes.json().catch(() => null);
+          setError(conversionData?.error?.message || "Visit was scheduled, but the booking request was not converted.");
+          setPending(false);
+          return;
+        }
+      }
+
+      router.push(`/app/visits/${visitId}`);
     } catch {
       setError("An unexpected error occurred");
       setPending(false);

@@ -23,10 +23,13 @@ interface User {
 
 export default async function NewVisitPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ bookingRequestId?: string }>;
 }) {
   const { id } = await params;
+  const { bookingRequestId } = await searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
   if (!canCreateVisit(session.role)) redirect(`/app/jobs/${id}`);
@@ -56,7 +59,13 @@ export default async function NewVisitPage({
         backLabel={job.title ?? "Job"}
       />
       <Card>
-        <VisitScheduleForm jobId={id} users={users} canAssign={canAssign} jobCategory={job.job_category ?? null} />
+        <VisitScheduleForm
+          jobId={id}
+          users={users}
+          canAssign={canAssign}
+          jobCategory={job.job_category ?? null}
+          bookingRequestId={bookingRequestId}
+        />
       </Card>
     </PageContainer>
   );
