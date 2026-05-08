@@ -561,6 +561,7 @@ export default async function EstimateDetailPage({
       {canTransition && currentStatus === "draft" && (
         <EstimateEditForm
           estimateId={estimate.id}
+          presentationMode={estimate.presentation_mode}
           initialClientId={estimate.client_id}
           initialJobId={estimate.job_id}
           initialPropertyId={estimate.property_id}
@@ -573,6 +574,18 @@ export default async function EstimateDetailPage({
             quantity: item.quantity,
             unit_price_cents: item.unit_price_cents,
             sort_order: item.sort_order,
+          }))}
+          initialOptions={options.map(opt => ({
+            id: opt.id,
+            label: opt.label,
+            description: opt.description ?? "",
+            is_recommended: opt.is_recommended,
+            sort_order: opt.sort_order,
+            line_items: opt.line_items.map(li => ({
+              description: li.description,
+              quantity: li.quantity,
+              unit_price_cents: li.unit_price_cents,
+            })),
           }))}
           initialSqFt={estimate.sq_ft}
           initialPrepLevel={estimate.prep_level}

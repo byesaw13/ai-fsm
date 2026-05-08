@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { Input, Select, Textarea, Button } from "@/components/ui";
@@ -31,6 +31,37 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId }: Pr
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Receipt scanning
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const receiptInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleScanReceipt(file: File) {
+    setScanning(true);
+    setScanError(null);
+    try {
+      const formData = new FormData();
+      formData.append("receipt", file);
+      const res = await fetch("/api/v1/expenses/scan-receipt", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) {
+        setScanError(data.error?.message ?? "Scan failed — try a clearer photo");
+        return;
+      }
+      const { vendor_name, amount_cents, expense_date, category: cat, notes: n } = data.data;
+      if (vendor_name) setVendorName(vendor_name);
+      if (amount_cents) setAmountStr((amount_cents / 100).toFixed(2));
+      if (expense_date) setExpenseDate(expense_date);
+      if (cat) setCategory(cat);
+      if (n) setNotes(n);
+    } catch {
+      setScanError("Network error — try again");
+    } finally {
+      setScanning(false);
+      if (receiptInputRef.current) receiptInputRef.current.value = "";
+    }
+  }
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
@@ -99,6 +130,52 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId }: Pr
 
   return (
     <form onSubmit={handleSubmit} className="p7-form-stack" style={{ maxWidth: "560px" }}>
+      {/* Receipt scan */}
+      <div
+        style={{
+          padding: "var(--space-4)",
+          background: "var(--bg-subtle, #f8f8f9)",
+          borderRadius: "var(--radius-md)",
+          border: "1px dashed var(--border)",
+        }}
+      >
+        <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", fontWeight: 600 }}>
+          Scan a Receipt
+        </p>
+        <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+          Take a photo or upload a receipt image to auto-fill the form below.
+        </p>
+        <input
+          ref={receiptInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleScanReceipt(file);
+          }}
+        />
+        <button
+          type="button"
+          className="p7-btn p7-btn-secondary p7-btn-sm"
+          onClick={() => receiptInputRef.current?.click()}
+          disabled={scanning || pending}
+          data-testid="scan-receipt-btn"
+        >
+          {scanning ? "Scanning…" : "Choose Photo"}
+        </button>
+        {scanError && (
+          <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--color-error, red)" }} role="alert">
+            {scanError}
+          </p>
+        )}
+        {scanning && (
+          <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+            Reading receipt with AI…
+          </p>
+        )}
+      </div>
+
       {error && (
         <div className="p7-card-danger" role="alert">
           {error}
