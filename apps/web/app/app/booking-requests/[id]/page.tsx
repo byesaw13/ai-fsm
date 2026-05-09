@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
-import { queryOne } from "@/lib/db";
+import { query, queryOne } from "@/lib/db";
 import { PageContainer, PageHeader, Card, SectionHeader, StatusBadge, LinkButton } from "@/components/ui";
 import type { StatusVariant } from "@/components/ui";
 import { ReviewActions } from "./ReviewActions";
@@ -62,6 +62,14 @@ type BookingRow = {
   job_status: string | null;
   visit_id: string | null;
   client_id: string | null;
+  duplicate_candidate_ids: string[] | null;
+};
+
+type DuplicateBookingRow = {
+  id: string;
+  name: string;
+  created_at: string;
+  status: string;
 };
 
 export default async function BookingRequestDetailPage({
@@ -85,6 +93,17 @@ export default async function BookingRequestDetailPage({
   );
 
   if (!br) notFound();
+
+  const duplicateIds = br.duplicate_candidate_ids ?? [];
+  const duplicateRows = duplicateIds.length > 0
+    ? await query<DuplicateBookingRow>(
+      `SELECT id, name, created_at, status
+       FROM booking_requests
+       WHERE account_id = $1 AND id = ANY($2::uuid[])
+       ORDER BY created_at DESC`,
+      [session.accountId, duplicateIds]
+    )
+    : [];
 
   const received = new Date(br.created_at).toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
@@ -110,6 +129,26 @@ export default async function BookingRequestDetailPage({
 
         {/* Left — request details */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+          {duplicateRows.length > 0 && (
+            <div className="p7-alert p7-alert-warning" role="alert">
+              <div>
+                <p style={{ margin: "0 0 var(--space-2)", fontWeight: 600 }}>
+                  Possible duplicate — {duplicateRows.length} similar request{duplicateRows.length === 1 ? "" : "s"} found in the last 90 days.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+                  {duplicateRows.map((duplicate) => (
+                    <Link
+                      key={duplicate.id}
+                      href={`/app/booking-requests/${duplicate.id}`}
+                      style={{ color: "inherit", fontWeight: 600 }}
+                    >
+                      {duplicate.name} · {new Date(duplicate.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · {STATUS_LABELS[duplicate.status] ?? duplicate.status}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           <Card>
             <SectionHeader title="Contact" />
