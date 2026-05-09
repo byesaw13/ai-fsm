@@ -37,6 +37,8 @@ const VALID_BODY = {
   state: "MA",
   zip: "01103",
   access_notes: "Use side entrance.",
+  preferred_contact: "email",
+  sms_consent: false,
 };
 
 function makeRequest(body: unknown): NextRequest {
@@ -97,6 +99,8 @@ describe("POST /api/booking", () => {
     expect(brInsert?.[1]?.[1]).toBe(CLIENT_ID);    // client_id
     expect(brInsert?.[1]?.[2]).toBe(PROPERTY_ID);  // property_id
     expect(brInsert?.[1]?.[3]).toBe(JOB_ID);       // job_id
+    expect(brInsert?.[1]?.[16]).toBe("email");     // preferred_contact
+    expect(brInsert?.[1]?.[17]).toBe(false);       // sms_consent
   });
 
   it("reuses an existing client found by email", async () => {
@@ -105,6 +109,7 @@ describe("POST /api/booking", () => {
     mockClientQuery
       .mockResolvedValueOnce({ rows: [] })                    // BEGIN
       .mockResolvedValueOnce({ rows: [{ id: CLIENT_ID }] })  // SELECT client by email → found
+      .mockResolvedValueOnce({ rows: [] })                    // UPDATE contact preferences
       .mockResolvedValueOnce({ rows: [] })                    // SELECT property → not found
       .mockResolvedValueOnce({ rows: [{ id: PROPERTY_ID }] }) // INSERT property
       .mockResolvedValueOnce({ rows: [{ id: JOB_ID }] })     // INSERT job

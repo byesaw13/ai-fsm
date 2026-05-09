@@ -5,6 +5,9 @@ import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
+const SMS_CONSENT_TEXT =
+  "By checking this box you consent to receive text messages from Dovetails Services LLC about your service requests. Message & data rates may apply. Reply STOP to opt out.";
+
 const bookingSchema = z.object({
   name: z.string().min(1).max(255),
   email: z.string().email().nullable().optional(),
@@ -33,6 +36,25 @@ const bookingSchema = z.object({
   state: z.string().max(50).nullable().optional(),
   zip: z.string().max(20).nullable().optional(),
   access_notes: z.string().max(500).nullable().optional(),
+  preferred_contact: z.enum(["sms", "email", "phone"]).default("email"),
+  sms_consent: z.boolean().default(false),
+}).superRefine((data, ctx) => {
+  if (data.preferred_contact === "sms") {
+    if (!data.phone) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["phone"],
+        message: "Phone is required when SMS is the preferred contact method",
+      });
+    }
+    if (!data.sms_consent) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["sms_consent"],
+        message: "SMS consent is required when SMS is the preferred contact method",
+      });
+    }
+  }
 });
 
 const ACCOUNT_ID = process.env.BOOKING_ACCOUNT_ID;
@@ -95,12 +117,42 @@ export async function POST(request: NextRequest) {
     // Create client if not found
     if (!clientId) {
       const { rows } = await client.query<{ id: string }>(
-        `INSERT INTO clients (account_id, name, email, phone)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO clients (
+           account_id, name, email, phone, preferred_contact,
+           sms_consent, sms_consent_at, sms_consent_source, sms_consent_text
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $6 THEN NOW() ELSE NULL END, $7, $8)
          RETURNING id`,
-        [ACCOUNT_ID, data.name, data.email || null, data.phone || null]
+        [
+          ACCOUNT_ID,
+          data.name,
+          data.email || null,
+          data.phone || null,
+          data.preferred_contact,
+          data.sms_consent,
+          data.sms_consent ? "booking_form" : null,
+          data.sms_consent ? SMS_CONSENT_TEXT : null,
+        ]
       );
       clientId = rows[0].id;
+    } else {
+      await client.query(
+        `UPDATE clients
+         SET preferred_contact = $2,
+             sms_consent = CASE WHEN $3 THEN true ELSE sms_consent END,
+             sms_consent_at = CASE WHEN $3 THEN NOW() ELSE sms_consent_at END,
+             sms_consent_source = CASE WHEN $3 THEN $4 ELSE sms_consent_source END,
+             sms_consent_text = CASE WHEN $3 THEN $5 ELSE sms_consent_text END
+         WHERE id = $1 AND account_id = $6`,
+        [
+          clientId,
+          data.preferred_contact,
+          data.sms_consent,
+          "booking_form",
+          SMS_CONSENT_TEXT,
+          ACCOUNT_ID,
+        ]
+      );
     }
 
     // Check if property exists for this client at this address
@@ -166,8 +218,10 @@ export async function POST(request: NextRequest) {
       `INSERT INTO booking_requests
          (account_id, client_id, property_id, job_id,
           name, email, phone, service_category, service_description,
-          preferred_date, preferred_time_slot, address, city, state, zip, access_notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+          preferred_date, preferred_time_slot, address, city, state, zip, access_notes,
+          preferred_contact, sms_consent, sms_consent_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+               $17, $18, CASE WHEN $18 THEN NOW() ELSE NULL END)
        RETURNING id`,
       [
         ACCOUNT_ID,
@@ -186,6 +240,8 @@ export async function POST(request: NextRequest) {
         data.state || null,
         data.zip || null,
         data.access_notes || null,
+        data.preferred_contact,
+        data.sms_consent,
       ]
     );
 
