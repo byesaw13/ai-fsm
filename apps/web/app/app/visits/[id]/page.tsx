@@ -26,6 +26,7 @@ import { VisitIssuePanel } from "./VisitIssuePanel";
 import { VisitResolutionPanel } from "./VisitResolutionPanel";
 import { VisitPartsPanel } from "./VisitPartsPanel";
 import { VisitClosingChecklist } from "./VisitClosingChecklist";
+import { CompletionChecklist } from "./CompletionChecklist";
 import { MembershipVisitPanel } from "./MembershipVisitPanel";
 import { VisitSnapshotPanel } from "./VisitSnapshotPanel";
 import { OnMyWayButton } from "./OnMyWayButton";
@@ -63,6 +64,13 @@ interface PartRow extends Record<string, unknown> {
   actual_cost_cents: number;
   customer_price_cents: number;
   receipt_media_id: string | null;
+}
+
+interface CompletionPacketRow extends Record<string, unknown> {
+  photo_urls: string[];
+  signature_url: string | null;
+  signature_waiver: boolean;
+  notes: string | null;
 }
 
 type VisitRow = Visit & {
@@ -203,6 +211,16 @@ export default async function VisitDetailPage({
           ),
         ])
       : [[] as PhotoMeta[], [] as PhotoMeta[], [] as PartRow[]];
+
+  const completionPacket =
+    currentStatus !== "cancelled"
+      ? await queryOne<CompletionPacketRow>(
+          `SELECT photo_urls, signature_url, signature_waiver, notes
+           FROM completion_packets
+           WHERE visit_id = $1 AND account_id = $2`,
+          [id, session.accountId]
+        )
+      : null;
 
   const overdue = isVisitOverdue(visit);
 
@@ -392,7 +410,20 @@ export default async function VisitDetailPage({
             </>
           )}
 
-          {canTransition && currentStatus !== "completed" && currentStatus !== "cancelled" && (
+          {currentStatus === "in_progress" && (
+            <Card data-testid="completion-checklist-panel">
+              <SectionHeader title="Completion Checklist" />
+              <CompletionChecklist
+                visitId={visit.id}
+                initialPacket={completionPacket}
+                canUpdate={canNotes}
+                canComplete={canTransition}
+              />
+            </Card>
+          )}
+
+          {canTransition && currentStatus !== "completed" && currentStatus !== "cancelled" &&
+            !(session.role === "tech" && currentStatus === "in_progress") && (
             <Card data-testid="visit-transition-panel">
               <SectionHeader title={session.role === "tech" ? "Actions" : "Status Actions"} />
               <VisitTransitionForm

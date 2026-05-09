@@ -5,6 +5,7 @@ import type { AuthSession } from "../../../../../../lib/auth/middleware";
 import { getPool } from "../../../../../../lib/db";
 import { appendAuditLog } from "../../../../../../lib/db/audit";
 import { logger } from "../../../../../../lib/logger";
+import { checkCompletionPacket } from "../../../../../../lib/completion-guard";
 import { visitTransitions, visitStatusSchema } from "@ai-fsm/domain";
 import type { VisitStatus } from "@ai-fsm/domain";
 
@@ -139,6 +140,27 @@ export const POST = withAuth(
           },
           { status: 422 }
         );
+      }
+
+      if (targetStatus === "completed") {
+        const packetResult = await client.query(
+          `SELECT photo_urls, signature_url, signature_waiver
+           FROM completion_packets
+           WHERE visit_id = $1 AND account_id = $2`,
+          [id, session.accountId]
+        );
+        const guard = checkCompletionPacket(packetResult.rows[0] ?? null);
+
+        if (!guard.ok) {
+          await client.query("ROLLBACK");
+          const message = guard.error === "MISSING_PHOTO"
+            ? "At least one photo is required before completing this visit"
+            : "A signature or waiver is required before completing this visit";
+          return NextResponse.json(
+            { error: { code: guard.error, message, traceId: session.traceId } },
+            { status: 422 }
+          );
+        }
       }
 
       // -----------------------------------------------------------------------
