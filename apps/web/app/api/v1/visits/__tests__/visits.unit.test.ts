@@ -397,7 +397,7 @@ describe("POST /api/v1/visits/[id]/transition", () => {
     );
     expect(res.status).toBe(422);
     const json = await res.json();
-    expect(json.error).toBe("MISSING_PHOTO");
+    expect(json.error.code).toBe("MISSING_PHOTO");
   });
 
   it("arrived → completed is invalid → 422 INVALID_TRANSITION", async () => {

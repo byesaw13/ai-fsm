@@ -54,7 +54,7 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     );
 
     const visitResult = await client.query(
-      `SELECT id, assigned_user_id FROM visits WHERE id = $1 AND account_id = $2`,
+      `SELECT id, assigned_user_id, status FROM visits WHERE id = $1 AND account_id = $2`,
       [id, session.accountId]
     );
     const visit = visitResult.rows[0];
@@ -64,6 +64,14 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       return NextResponse.json(
         { error: { code: "NOT_FOUND", message: "Visit not found", traceId: session.traceId } },
         { status: 404 }
+      );
+    }
+
+    if (visit.status === "completed" || visit.status === "cancelled") {
+      await client.query("ROLLBACK");
+      return NextResponse.json(
+        { error: { code: "IMMUTABLE_ENTITY", message: "Cannot update completion packet for a closed visit", traceId: session.traceId } },
+        { status: 409 }
       );
     }
 

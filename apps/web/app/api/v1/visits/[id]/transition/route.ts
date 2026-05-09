@@ -153,7 +153,13 @@ export const POST = withAuth(
 
         if (!guard.ok) {
           await client.query("ROLLBACK");
-          return NextResponse.json({ error: guard.error }, { status: 422 });
+          const message = guard.error === "MISSING_PHOTO"
+            ? "At least one photo is required before completing this visit"
+            : "A signature or waiver is required before completing this visit";
+          return NextResponse.json(
+            { error: { code: guard.error, message, traceId: session.traceId } },
+            { status: 422 }
+          );
         }
       }
 
