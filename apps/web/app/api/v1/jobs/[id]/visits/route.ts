@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { checkSchedulingPreconditions } from "@ai-fsm/domain";
 import { withAuth, withRole } from "../../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../../lib/auth/middleware";
 import { query, getPool } from "../../../../../../lib/db";
@@ -88,6 +89,24 @@ export const POST = withRole(
         `SELECT set_config('app.current_user_id', $1, true), set_config('app.current_account_id', $2, true), set_config('app.current_role', $3, true)`,
         [session.userId, session.accountId, session.role]
       );
+
+      const { rows: jobRows } = await client.query<{ status: string }>(
+        `SELECT status FROM jobs WHERE id = $1 AND account_id = $2 FOR UPDATE`,
+        [jobId, session.accountId]
+      );
+      const { rows: activeVisitRows } = await client.query<{ count: string }>(
+        `SELECT COUNT(*) FROM visits WHERE job_id = $1 AND status IN ('scheduled','arrived','in_progress')`,
+        [jobId]
+      );
+      const guard = checkSchedulingPreconditions({
+        jobStatus: jobRows[0]?.status ?? null,
+        activeVisitCount: parseInt(activeVisitRows[0]?.count ?? "0", 10),
+      });
+
+      if (!guard.ok) {
+        await client.query("ROLLBACK");
+        return NextResponse.json({ error: guard.error }, { status: 422 });
+      }
 
       const { rows } = await client.query(
         `INSERT INTO visits (account_id, job_id, assigned_user_id, scheduled_start, scheduled_end, tech_notes)

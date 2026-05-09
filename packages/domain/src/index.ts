@@ -1,4 +1,6 @@
 import { z } from "zod";
+export { checkSchedulingPreconditions } from "./scheduling-guard";
+export type { SchedulingGuardError, SchedulingGuardResult } from "./scheduling-guard";
 
 // === Enums ===
 

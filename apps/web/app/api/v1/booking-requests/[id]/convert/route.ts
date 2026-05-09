@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { checkSchedulingPreconditions } from "@ai-fsm/domain";
 import { withRole } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
@@ -78,6 +79,19 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       [br.job_id, session.accountId]
     );
     const previousJobStatus = jobRows[0]?.status ?? null;
+    const { rows: activeVisitRows } = await client.query<{ count: string }>(
+      `SELECT COUNT(*) FROM visits WHERE job_id = $1 AND status IN ('scheduled','arrived','in_progress')`,
+      [br.job_id]
+    );
+    const guard = checkSchedulingPreconditions({
+      jobStatus: previousJobStatus,
+      activeVisitCount: parseInt(activeVisitRows[0]?.count ?? "0", 10),
+    });
+
+    if (!guard.ok) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: guard.error }, { status: 422 });
+    }
 
     // Build visit window from preferred date/time
     const dateStr = parsed.data.preferred_date ?? br.preferred_date;

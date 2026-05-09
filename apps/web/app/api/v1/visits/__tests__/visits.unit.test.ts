@@ -120,6 +120,8 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
     mockClientQuery
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
       .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
+      .mockResolvedValueOnce({ rows: [{ status: "quoted" }] }) // SELECT job status
+      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
       .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // INSERT
       .mockResolvedValueOnce({ rows: [] }); // COMMIT
 
@@ -138,6 +140,8 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
     mockClientQuery
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
       .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
+      .mockResolvedValueOnce({ rows: [{ status: "quoted" }] }) // SELECT job status
+      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
       .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // INSERT visit
       .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // UPDATE booking request
       .mockResolvedValueOnce({ rows: [] }); // COMMIT
@@ -169,6 +173,8 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
     mockClientQuery
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
       .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
+      .mockResolvedValueOnce({ rows: [{ status: "quoted" }] }) // SELECT job status
+      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
       .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // INSERT visit
       .mockResolvedValueOnce({ rows: [] }) // UPDATE booking request missing
       .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
@@ -184,6 +190,28 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
     expect(res.status).toBe(422);
     const json = await res.json();
     expect(json.error.code).toBe("PRECONDITION_FAILED");
+  });
+
+  it("returns 422 when the job is not approved for scheduling", async () => {
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
+      .mockResolvedValueOnce({ rows: [{ status: "draft" }] }) // SELECT job status
+      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+    const res = await visitCreate(
+      makeRequest("POST", `${JOBS_BASE}/${JOB_ID}/visits`, {
+        scheduled_start: NOW,
+        scheduled_end: NOW,
+      })
+    );
+
+    expect(res.status).toBe(422);
+    await expect(res.json()).resolves.toEqual({ error: "ESTIMATE_NOT_APPROVED" });
+    expect(mockClientQuery.mock.calls.some((call) =>
+      String(call[0]).includes("INSERT INTO visits")
+    )).toBe(false);
   });
 
   it("returns 422 when scheduled_start is missing", async () => {

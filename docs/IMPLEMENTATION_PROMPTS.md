@@ -10,8 +10,8 @@ These 10 prompts represent the full remaining implementation roadmap for ai-fsm,
 | 2 | ~~Consent & contact prefs~~ | `037_consent_contact_prefs.sql` + booking form fields | Done |
 | 3 | ~~Assisted intake screen~~ | `/app/intake/new` + `IntakeForm.tsx` | Done |
 | 4 | ~~Duplicate detection~~ | `duplicate_candidate_ids` column + warning UI | Done |
-| 5 | Scheduling gates | `scheduling-guard.ts` + visit creation wire-in | pnpm gate:fast |
-| 6 | Completion packets | `039_completion_packets.sql` + checklist UI | pnpm gate:fast |
+| 5 | ~~Scheduling gates~~ | `scheduling-guard.ts` + visit creation wire-in | Done |
+| 6 | ~~Completion packets~~ | `039_completion_packets.sql` + checklist UI | Done |
 | 7 | Exception lanes (sub-statuses) | `040_sub_statuses.sql` + badge UI | pnpm gate:fast |
 | 8 | Communications log | `041_communications_log.sql` + `logCommunication()` | pnpm gate:fast |
 | 9 | Operations dashboard | `/app/operations/page.tsx` (9 parallel queries) | pnpm gate:fast |
@@ -191,7 +191,9 @@ Status: Done on 2026-05-09.
 
 ---
 
-## Prompt 5 — Scheduling Gates
+## ~~Prompt 5 — Scheduling Gates~~ — Done
+
+Status: Done on 2026-05-09.
 
 **Context**: Same repo. A visit must not be creatable unless the parent job has an approved estimate (status `quoted` or later) and no other visit for that job is already active (status `scheduled`, `arrived`, or `in_progress`). These rules must be enforced at the API layer.
 
@@ -243,7 +245,9 @@ Status: Done on 2026-05-09.
 
 ---
 
-## Prompt 6 — Completion Packets
+## ~~Prompt 6 — Completion Packets~~ — Done
+
+Status: Done on 2026-05-09.
 
 **Context**: Same repo. A visit cannot be marked `completed` unless required evidence has been attached: at minimum one photo and a client signature (or explicit waiver). This prevents incomplete job records and supports invoicing.
 
