@@ -4,6 +4,7 @@ import { query } from "@/lib/db";
 import { canTransitionJob, canViewAllJobs } from "@/lib/auth/permissions";
 import type { Job, JobStatus } from "@ai-fsm/domain";
 import { JOB_ACCEPTANCE_CATEGORY_LABELS, JOB_INTAKE_DECISION_LABELS, deriveCustomerStage, CUSTOMER_STAGE_LABELS, CUSTOMER_STAGE_COLORS } from "@ai-fsm/domain";
+import { SUB_STATUS_LABELS } from "@ai-fsm/domain";
 import {
   PageContainer,
   PageHeader,
@@ -28,6 +29,7 @@ type JobRow = Job & {
   intake_decision: string | null;
   has_approved_estimate: boolean;
   has_active_visit: boolean;
+  sub_status: string | null;
 };
 
 const JOB_STATUS_LABELS: Record<JobStatus, string> = {
@@ -357,6 +359,11 @@ function JobItemCard({ job }: { job: JobRow }) {
           <StatusBadge variant={job.status as StatusVariant}>
             {JOB_STATUS_LABELS[job.status as JobStatus]}
           </StatusBadge>
+          {job.sub_status && (
+            <StatusBadge variant="overdue">
+              {SUB_STATUS_LABELS[job.sub_status] ?? job.sub_status}
+            </StatusBadge>
+          )}
           {progressPct > 0 && progressPct < 100 && (
             <div style={{ width: 60, height: 3, background: "var(--color-border)", borderRadius: 2, overflow: "hidden" }}>
               <div style={{ width: `${progressPct}%`, height: "100%", background: progressColor, borderRadius: 2, transition: "width 0.3s ease" }} />

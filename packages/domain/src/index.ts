@@ -1,6 +1,12 @@
 import { z } from "zod";
 export { checkSchedulingPreconditions } from "./scheduling-guard";
 export type { SchedulingGuardError, SchedulingGuardResult } from "./scheduling-guard";
+export {
+  JOB_SUB_STATUSES,
+  VISIT_SUB_STATUSES,
+  SUB_STATUS_LABELS,
+} from "./sub-statuses";
+export type { JobSubStatus, VisitSubStatus } from "./sub-statuses";
 
 // === Enums ===
 

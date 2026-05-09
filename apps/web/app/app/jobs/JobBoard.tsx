@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { StatusBadge, PriorityBadge, priorityNumToVariant, priorityLabel } from "@/components/ui";
 import type { StatusVariant, PriorityVariant } from "@/components/ui";
-import { deriveCustomerStage, CUSTOMER_STAGE_LABELS, CUSTOMER_STAGE_COLORS } from "@ai-fsm/domain";
+import { deriveCustomerStage, CUSTOMER_STAGE_LABELS, CUSTOMER_STAGE_COLORS, SUB_STATUS_LABELS } from "@ai-fsm/domain";
 
 interface JobRow {
   id: string;
@@ -14,6 +14,7 @@ interface JobRow {
   scheduled_start?: string | null;
   has_approved_estimate?: boolean;
   has_active_visit?: boolean;
+  sub_status?: string | null;
 }
 
 interface JobBoardProps {
@@ -173,6 +174,11 @@ function BoardCard({ job }: { job: JobRow }) {
           }}
         >
           {pv && <PriorityBadge variant={pv}>{pl}</PriorityBadge>}
+          {job.sub_status && (
+            <StatusBadge variant="overdue">
+              {SUB_STATUS_LABELS[job.sub_status] ?? job.sub_status}
+            </StatusBadge>
+          )}
           {job.scheduled_start && (
             <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
               {new Date(job.scheduled_start).toLocaleDateString(undefined, {
