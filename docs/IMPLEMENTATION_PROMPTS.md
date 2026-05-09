@@ -7,7 +7,7 @@ These 10 prompts represent the full remaining implementation roadmap for ai-fsm,
 | # | Feature | Key Deliverable | Gate |
 |---|---------|-----------------|------|
 | 1 | ~~Status history / audit trail~~ | `036_status_history.sql` + `recordStatusChange()` | Done |
-| 2 | Consent & contact prefs | `037_consent_contact_prefs.sql` + booking form fields | pnpm gate:fast |
+| 2 | ~~Consent & contact prefs~~ | `037_consent_contact_prefs.sql` + booking form fields | Done |
 | 3 | Assisted intake screen | `/app/intake/new` + `IntakeForm.tsx` | pnpm gate:fast |
 | 4 | Duplicate detection | `duplicate_candidate_ids` column + warning UI | pnpm gate:fast |
 | 5 | Scheduling gates | `scheduling-guard.ts` + visit creation wire-in | pnpm gate:fast |
@@ -75,7 +75,9 @@ Status: Done on 2026-05-09.
 
 ---
 
-## Prompt 2 — Consent & Contact Preference Fields
+## ~~Prompt 2 — Consent & Contact Preference Fields~~ — Done
+
+Status: Done on 2026-05-09.
 
 **Context**: Same repo. FCC / A2P 10DLC compliance requires storing SMS consent with timestamp, source, and verbatim disclosure text. Contact preferences govern which channels (SMS, email, phone) may be used for each client.
 

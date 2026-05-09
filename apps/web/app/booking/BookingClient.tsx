@@ -18,6 +18,9 @@ interface BookingClientProps {
   serviceCategories: ServiceCategory[];
 }
 
+const SMS_CONSENT_TEXT =
+  "By checking this box you consent to receive text messages from Dovetails Services LLC about your service requests. Message & data rates may apply. Reply STOP to opt out.";
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -35,6 +38,8 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [preferredContact, setPreferredContact] = useState<"email" | "sms" | "phone">("email");
+  const [smsConsent, setSmsConsent] = useState(false);
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
@@ -67,6 +72,8 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
           state: state || null,
           zip: zip || null,
           access_notes: accessNotes || null,
+          preferred_contact: preferredContact,
+          sms_consent: preferredContact === "sms" && smsConsent,
         }),
       });
 
@@ -110,7 +117,10 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
   }
 
   const canProceedStep1 = serviceCategory.trim() !== "" && serviceDescription.trim().length >= 10;
-  const canProceedStep2 = name.trim() !== "" && (email.trim() !== "" || phone.trim() !== "");
+  const canProceedStep2 =
+    name.trim() !== "" &&
+    (email.trim() !== "" || phone.trim() !== "") &&
+    (preferredContact !== "sms" || (phone.trim() !== "" && smsConsent));
   const canProceedStep3 = address.trim() !== "" && preferredDate !== "";
 
   return (
@@ -248,6 +258,59 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
               <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>
                 We need at least one way to reach you (email or phone).
               </p>
+
+              <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+                <legend style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Preferred contact method</legend>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {([
+                    ["email", "Email"],
+                    ["sms", "SMS"],
+                    ["phone", "Phone"],
+                  ] as const).map(([value, label]) => (
+                    <label
+                      key={value}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "8px 12px",
+                        border: preferredContact === value ? "2px solid #2563eb" : "1px solid #d1d5db",
+                        borderRadius: 8,
+                        background: preferredContact === value ? "#eff6ff" : "#fff",
+                        cursor: "pointer",
+                        fontSize: 14,
+                        fontWeight: preferredContact === value ? 600 : 400,
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="preferred_contact"
+                        value={value}
+                        checked={preferredContact === value}
+                        onChange={() => {
+                          setPreferredContact(value);
+                          if (value !== "sms") setSmsConsent(false);
+                        }}
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              {preferredContact === "sms" && (
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: 12, border: "1px solid #d1d5db", borderRadius: 8, background: "#f9fafb" }}>
+                  <input
+                    type="checkbox"
+                    checked={smsConsent}
+                    onChange={(e) => setSmsConsent(e.target.checked)}
+                    style={{ marginTop: 3 }}
+                  />
+                  <span style={{ fontSize: 13, color: "#374151", lineHeight: 1.45 }}>
+                    {SMS_CONSENT_TEXT}
+                  </span>
+                </label>
+              )}
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24 }}>
@@ -378,6 +441,9 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
               </p>
               <p style={{ fontSize: 13, margin: 0, color: "#374151" }}>
                 <strong>Contact:</strong> {name} — {email || phone || "none"}
+              </p>
+              <p style={{ fontSize: 13, margin: "4px 0 0", color: "#374151" }}>
+                <strong>Preferred contact:</strong> {preferredContact.toUpperCase()}
               </p>
             </div>
 

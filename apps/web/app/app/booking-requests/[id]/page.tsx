@@ -29,6 +29,12 @@ const CATEGORY_LABELS: Record<string, string> = {
   specialty_expansion: "Specialty / Expansion",
 };
 
+const CONTACT_LABELS: Record<string, string> = {
+  email: "Email",
+  sms: "SMS",
+  phone: "Phone",
+};
+
 type BookingRow = {
   id: string;
   status: string;
@@ -44,6 +50,9 @@ type BookingRow = {
   state: string | null;
   zip: string | null;
   access_notes: string | null;
+  preferred_contact: string;
+  sms_consent: boolean;
+  sms_consent_at: string | null;
   review_notes: string | null;
   reviewed_at: string | null;
   reviewed_by_name: string | null;
@@ -109,6 +118,33 @@ export default async function BookingRequestDetailPage({
               {br.email && <div className="p7-detail-row"><dt>Email</dt><dd><a href={`mailto:${br.email}`} style={{ color: "var(--accent)" }}>{br.email}</a></dd></div>}
               {br.phone && <div className="p7-detail-row"><dt>Phone</dt><dd><a href={`tel:${br.phone}`} style={{ color: "var(--accent)" }}>{br.phone}</a></dd></div>}
               {!br.email && !br.phone && <div className="p7-detail-row"><dt>Contact</dt><dd style={{ color: "var(--fg-muted)" }}>None provided</dd></div>}
+            </dl>
+          </Card>
+
+          <Card>
+            <SectionHeader title="Contact Preferences" />
+            <dl className="p7-detail-list">
+              <div className="p7-detail-row">
+                <dt>Preferred Method</dt>
+                <dd>{CONTACT_LABELS[br.preferred_contact] ?? br.preferred_contact}</dd>
+              </div>
+              <div className="p7-detail-row">
+                <dt>SMS Consent</dt>
+                <dd>
+                  {br.sms_consent ? "Granted" : "Not granted"}
+                  {br.sms_consent_at && (
+                    <span style={{ display: "block", color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginTop: 2 }}>
+                      Recorded {new Date(br.sms_consent_at).toLocaleString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  )}
+                </dd>
+              </div>
             </dl>
           </Card>
 
