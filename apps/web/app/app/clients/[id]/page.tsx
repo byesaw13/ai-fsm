@@ -70,6 +70,26 @@ type FinancialSummary = {
   paid_total_cents: string;
 };
 
+type CommunicationRow = {
+  id: string;
+  channel: "sms" | "email" | "phone";
+  direction: "outbound" | "inbound";
+  outcome: string;
+  body_preview: string | null;
+  created_at: string;
+};
+
+const CHANNEL_ICON: Record<CommunicationRow["channel"], string> = {
+  sms: "SMS",
+  email: "Email",
+  phone: "Phone",
+};
+
+const DIRECTION_ARROW: Record<CommunicationRow["direction"], string> = {
+  outbound: "->",
+  inbound: "<-",
+};
+
 function dollars(cents: number): string {
   return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(cents / 100);
 }
@@ -97,7 +117,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   );
   if (!client) notFound();
 
-  const [properties, recentJobs, recentVisits, finance] = await Promise.all([
+  const [properties, recentJobs, recentVisits, finance, communications] = await Promise.all([
     query<PropertyRow>(
       `SELECT id, name, address, city, state, zip, created_at
        FROM properties
@@ -128,6 +148,14 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
          COALESCE((SELECT SUM(total_cents) FROM estimates WHERE client_id = $1 AND account_id = $2), 0)::text AS estimate_total_cents,
          COALESCE((SELECT SUM(total_cents) FROM invoices WHERE client_id = $1 AND account_id = $2), 0)::text AS invoice_total_cents,
          COALESCE((SELECT SUM(paid_cents) FROM invoices WHERE client_id = $1 AND account_id = $2), 0)::text AS paid_total_cents`,
+      [id, session.accountId]
+    ),
+    query<CommunicationRow>(
+      `SELECT id, channel, direction, outcome, body_preview, created_at
+       FROM communications_log
+       WHERE client_id = $1 AND account_id = $2
+       ORDER BY created_at DESC
+       LIMIT 20`,
       [id, session.accountId]
     ),
   ]);
@@ -233,6 +261,45 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                     meta={<div>Status: {job.status.replaceAll("_", " ")}</div>}
                   />
                 ))}
+              </div>
+            )}
+          </Card>
+
+          <Card>
+            <SectionHeader title="Communications" count={communications.length} />
+            {communications.length === 0 ? (
+              <EmptyState title="No communications yet" description="Emails, texts, and phone attempts will appear here." />
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                {communications.map((log) => {
+                  const preview = log.body_preview && log.body_preview.length > 80
+                    ? `${log.body_preview.slice(0, 77)}...`
+                    : log.body_preview;
+                  return (
+                    <div
+                      key={log.id}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "90px 32px 96px 120px 1fr",
+                        gap: "var(--space-2)",
+                        alignItems: "center",
+                        padding: "var(--space-2) 0",
+                        borderBottom: "1px solid var(--border)",
+                        fontSize: "var(--text-sm)",
+                      }}
+                    >
+                      <span>{CHANNEL_ICON[log.channel]}</span>
+                      <span style={{ color: "var(--fg-muted)" }}>{DIRECTION_ARROW[log.direction]}</span>
+                      <span className="p7-badge p7-badge-count">{log.outcome.replaceAll("_", " ")}</span>
+                      <span style={{ color: "var(--fg-muted)" }}>
+                        {new Date(log.created_at).toLocaleDateString()}
+                      </span>
+                      <span style={{ color: preview ? "var(--fg)" : "var(--fg-muted)" }}>
+                        {preview || "No preview"}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </Card>

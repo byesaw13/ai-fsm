@@ -32,6 +32,7 @@ const VISIT: EligibleVisit = {
   id: "visit-1",
   account_id: "acct-1",
   job_id: "job-1",
+  client_id: "client-1",
   assigned_user_id: "user-1",
   scheduled_start: "2026-02-18T09:00:00Z",
   job_title: "Lawn Mowing",

@@ -2,6 +2,7 @@ import type { Client } from "pg";
 import { logger } from "./logger.js";
 import { sendEmail, isEmailConfigured, reviewRequestHtml } from "./mailer.js";
 import type { AutomationRow, ReminderResult } from "./visit-reminder.js";
+import { logWorkerCommunication } from "./communications-log.js";
 
 /**
  * Review Request Automation
@@ -20,6 +21,7 @@ import type { AutomationRow, ReminderResult } from "./visit-reminder.js";
 interface EligibleJob {
   id: string;
   account_id: string;
+  client_id: string;
   title: string | null;
   client_name: string | null;
   client_email: string | null;
@@ -44,7 +46,7 @@ export async function findEligibleJobs(
   const daysAfter = (automation.config as { days_after?: number }).days_after ?? 1;
 
   const { rows } = await client.query<EligibleJob>(
-    `SELECT j.id, j.account_id, j.title,
+    `SELECT j.id, j.account_id, c.id AS client_id, j.title,
             c.name AS client_name, c.email AS client_email,
             u.full_name AS tech_name
      FROM jobs j
@@ -104,9 +106,29 @@ async function emitReviewRequest(
       }),
     });
     if (!emailResult.ok) {
+      await logWorkerCommunication(client, {
+        accountId: job.account_id,
+        channel: "email",
+        direction: "outbound",
+        outcome: "failed",
+        clientId: job.client_id,
+        jobId: job.id,
+        bodyPreview: `How did we do? — ${job.title}`,
+        externalId: automationId,
+      });
       logger.warn("review-request: email send failed", { jobId: job.id, error: emailResult.error });
       return false;
     }
+    await logWorkerCommunication(client, {
+      accountId: job.account_id,
+      channel: "email",
+      direction: "outbound",
+      outcome: "sent",
+      clientId: job.client_id,
+      jobId: job.id,
+      bodyPreview: `How did we do? — ${job.title}`,
+      externalId: automationId,
+    });
   }
 
   await client.query(
