@@ -8,6 +8,7 @@ import { sendEmail, appUrl, isEmailConfigured } from "@/lib/email/mailer";
 import { estimateEmailHtml, estimateEmailText } from "@/lib/email/templates";
 import { getEnv } from "@/lib/env";
 import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
+import { logCommunication } from "@/lib/communications-log";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
                 e.old_house_risk, e.coordination_required, e.finish_expectation,
                 e.travel_surcharge_cents, e.risk_adjustment_cents,
                 e.minimum_service_override_reason,
-                c.name AS client_name, c.email AS client_email
+                c.id AS client_id, c.name AS client_name, c.email AS client_email
          FROM estimates e
          JOIN clients c ON c.id = e.client_id
          WHERE e.id = $1 AND e.account_id = $2`,
@@ -53,7 +54,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         travel_surcharge_cents: number;
         risk_adjustment_cents: number;
         minimum_service_override_reason: "bundled" | "membership_included" | "promo" | "owner_approved" | null;
-        client_name: string; client_email: string | null;
+        client_id: string; client_name: string; client_email: string | null;
       };
 
       if (["approved", "declined", "expired"].includes(est.status)) {
@@ -137,8 +138,28 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       });
 
       if (!emailResult.ok) {
+        await logCommunication({
+          accountId: session.accountId,
+          channel: "email",
+          direction: "outbound",
+          outcome: "failed",
+          clientId: est.client_id,
+          bodyPreview: `Estimate ${estimateRef} from Dovetails Services LLC`,
+          initiatedBy: session.userId,
+          externalId: emailResult.error ?? null,
+        });
         return { status: 502, message: `Email send failed: ${emailResult.error}` };
       }
+
+      await logCommunication({
+        accountId: session.accountId,
+        channel: "email",
+        direction: "outbound",
+        outcome: "sent",
+        clientId: est.client_id,
+        bodyPreview: `Estimate ${estimateRef} from Dovetails Services LLC`,
+        initiatedBy: session.userId,
+      });
 
       const setClauses = est.status === "draft"
         ? "status = 'sent', sent_at = now(), updated_at = now()"

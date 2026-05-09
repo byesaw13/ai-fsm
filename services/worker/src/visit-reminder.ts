@@ -1,6 +1,7 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
 import { sendEmail, isEmailConfigured, visitReminderHtml } from "./mailer.js";
+import { logWorkerCommunication } from "./communications-log.js";
 
 /**
  * Visit Reminder Automation
@@ -38,6 +39,7 @@ export interface EligibleVisit {
   id: string;
   account_id: string;
   job_id: string;
+  client_id: string;
   assigned_user_id: string | null;
   scheduled_start: string;
   job_title: string | null;
@@ -85,7 +87,7 @@ export async function findEligibleVisits(
   const hoursBefore = automation.config.hours_before ?? 24;
 
   const { rows } = await client.query<EligibleVisit>(
-    `SELECT v.id, v.account_id, v.job_id, v.assigned_user_id,
+    `SELECT v.id, v.account_id, v.job_id, c.id AS client_id, v.assigned_user_id,
             v.scheduled_start::text, j.title AS job_title,
             c.name AS client_name, c.email AS client_email,
             p.address AS property_address,
@@ -156,10 +158,32 @@ export async function emitVisitReminder(
       }),
     });
     if (!emailResult.ok) {
+      await logWorkerCommunication(client, {
+        accountId: visit.account_id,
+        channel: "email",
+        direction: "outbound",
+        outcome: "failed",
+        clientId: visit.client_id,
+        jobId: visit.job_id,
+        visitId: visit.id,
+        bodyPreview: `Reminder: ${visit.job_title} visit on ${when}`,
+        externalId: automationId,
+      });
       // Don't write the audit log — let the next run retry delivery.
       logger.warn("visit-reminder: email send failed, skipping dedupe mark", { visitId: visit.id, error: emailResult.error });
       return false;
     }
+    await logWorkerCommunication(client, {
+      accountId: visit.account_id,
+      channel: "email",
+      direction: "outbound",
+      outcome: "sent",
+      clientId: visit.client_id,
+      jobId: visit.job_id,
+      visitId: visit.id,
+      bodyPreview: `Reminder: ${visit.job_title} visit on ${when}`,
+      externalId: automationId,
+    });
   }
 
   await client.query(

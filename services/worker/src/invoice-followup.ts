@@ -1,6 +1,7 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
 import { sendEmail, isEmailConfigured, invoiceFollowupHtml, appUrl } from "./mailer.js";
+import { logWorkerCommunication } from "./communications-log.js";
 
 /**
  * Overdue Invoice Follow-Up Automation
@@ -176,10 +177,28 @@ export async function emitInvoiceFollowup(
       }),
     });
     if (!emailResult.ok) {
+      await logWorkerCommunication(client, {
+        accountId: invoice.account_id,
+        channel: "email",
+        direction: "outbound",
+        outcome: "failed",
+        clientId: invoice.client_id,
+        bodyPreview: `Payment reminder: Invoice ${invoice.invoice_number} is ${cadenceStep} days overdue`,
+        externalId: automationId,
+      });
       // Don't write the audit log — let the next run retry delivery.
       logger.warn("invoice-followup: email send failed, skipping dedupe mark", { invoiceId: invoice.id, error: emailResult.error });
       return false;
     }
+    await logWorkerCommunication(client, {
+      accountId: invoice.account_id,
+      channel: "email",
+      direction: "outbound",
+      outcome: "sent",
+      clientId: invoice.client_id,
+      bodyPreview: `Payment reminder: Invoice ${invoice.invoice_number} is ${cadenceStep} days overdue`,
+      externalId: automationId,
+    });
   }
 
   await client.query(

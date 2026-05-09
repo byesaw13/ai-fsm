@@ -6,6 +6,7 @@ import { appendAuditLog } from "../../../../../../lib/db/audit";
 import { logger } from "../../../../../../lib/logger";
 import { sendEmail, isEmailConfigured } from "../../../../../../lib/email/mailer";
 import { onMyWayEmailHtml } from "../../../../../../lib/email/templates";
+import { logCommunication } from "../../../../../../lib/communications-log";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,8 @@ export const POST = withAuth(
     try {
       const { rows } = await client.query(
         `SELECT v.id, v.account_id, v.status, v.scheduled_start, v.scheduled_end,
-                j.title AS job_title,
+                j.id AS job_id, j.title AS job_title,
+                c.id AS client_id,
                 c.name AS client_name, c.email AS client_email,
                 p.address AS property_address,
                 u.full_name AS tech_name
@@ -78,6 +80,18 @@ export const POST = withAuth(
           }),
         });
         if (!emailResult.ok) {
+          await logCommunication({
+            accountId: session.accountId,
+            channel: "email",
+            direction: "outbound",
+            outcome: "failed",
+            clientId: visit.client_id,
+            jobId: visit.job_id,
+            visitId: id,
+            bodyPreview: `On My Way — ${visit.job_title}`,
+            initiatedBy: session.userId,
+            externalId: emailResult.error ?? null,
+          });
           logger.warn("[on-my-way] email send failed", { visitId: id, error: emailResult.error });
           return NextResponse.json(
             {
@@ -90,6 +104,17 @@ export const POST = withAuth(
             { status: 502 }
           );
         }
+        await logCommunication({
+          accountId: session.accountId,
+          channel: "email",
+          direction: "outbound",
+          outcome: "sent",
+          clientId: visit.client_id,
+          jobId: visit.job_id,
+          visitId: id,
+          bodyPreview: `On My Way — ${visit.job_title}`,
+          initiatedBy: session.userId,
+        });
       }
 
       await appendAuditLog(client, {

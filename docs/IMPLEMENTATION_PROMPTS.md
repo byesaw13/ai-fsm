@@ -13,7 +13,7 @@ These 10 prompts represent the full remaining implementation roadmap for ai-fsm,
 | 5 | ~~Scheduling gates~~ | `scheduling-guard.ts` + visit creation wire-in | Done |
 | 6 | ~~Completion packets~~ | `039_completion_packets.sql` + checklist UI | Done |
 | 7 | ~~Exception lanes (sub-statuses)~~ | `040_sub_statuses.sql` + badge UI | Done |
-| 8 | Communications log | `041_communications_log.sql` + `logCommunication()` | pnpm gate:fast |
+| 8 | ~~Communications log~~ | `041_communications_log.sql` + `logCommunication()` | Done |
 | 9 | Operations dashboard | `/app/operations/page.tsx` (9 parallel queries) | pnpm gate:fast |
 | 10 | Portal updates + channel continuity | Contact prefs in portal + SMS opt-out | pnpm gate:fast |
 
@@ -359,7 +359,9 @@ Status: Done on 2026-05-09.
 
 ---
 
-## Prompt 8 — Communications Log
+## ~~Prompt 8 — Communications Log~~ — Done
+
+Status: Done on 2026-05-09.
 
 **Context**: Same repo. FCC and business policy require a complete audit trail of every SMS, email, and phone-call attempt made for each client. This log is write-once (no updates, no deletes) and must capture channel, direction, outcome, and the session user who initiated it.
 

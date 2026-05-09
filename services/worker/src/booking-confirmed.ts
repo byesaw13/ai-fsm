@@ -2,6 +2,7 @@ import type { Client } from "pg";
 import { logger } from "./logger.js";
 import { sendEmail, isEmailConfigured, bookingConfirmedHtml } from "./mailer.js";
 import type { AutomationRow, ReminderResult } from "./visit-reminder.js";
+import { logWorkerCommunication } from "./communications-log.js";
 
 /**
  * Booking Confirmation Automation
@@ -20,6 +21,7 @@ interface EligibleBooking {
   id: string;
   account_id: string;
   job_id: string;
+  client_id: string;
   scheduled_start: string;
   scheduled_end: string;
   job_title: string | null;
@@ -47,7 +49,7 @@ export async function findEligibleBookings(
   const hoursWindow = (automation.config as { hours_window?: number }).hours_window ?? 48;
 
   const { rows } = await client.query<EligibleBooking>(
-    `SELECT v.id, v.account_id, v.job_id,
+    `SELECT v.id, v.account_id, v.job_id, c.id AS client_id,
             v.scheduled_start::text, v.scheduled_end::text,
             j.title AS job_title,
             c.name AS client_name, c.email AS client_email,
@@ -107,9 +109,31 @@ async function emitBookingConfirmation(
       }),
     });
     if (!emailResult.ok) {
+      await logWorkerCommunication(client, {
+        accountId: booking.account_id,
+        channel: "email",
+        direction: "outbound",
+        outcome: "failed",
+        clientId: booking.client_id,
+        jobId: booking.job_id,
+        visitId: booking.id,
+        bodyPreview: `Appointment Confirmed — ${booking.job_title}`,
+        externalId: automationId,
+      });
       logger.warn("booking-confirmed: email send failed", { visitId: booking.id, error: emailResult.error });
       return false;
     }
+    await logWorkerCommunication(client, {
+      accountId: booking.account_id,
+      channel: "email",
+      direction: "outbound",
+      outcome: "sent",
+      clientId: booking.client_id,
+      jobId: booking.job_id,
+      visitId: booking.id,
+      bodyPreview: `Appointment Confirmed — ${booking.job_title}`,
+      externalId: automationId,
+    });
   }
 
   await client.query(

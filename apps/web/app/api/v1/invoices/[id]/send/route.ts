@@ -5,6 +5,7 @@ import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
 import { sendEmail, appUrl, isEmailConfigured } from "@/lib/email/mailer";
 import { invoiceEmailHtml, invoiceEmailText } from "@/lib/email/templates";
+import { logCommunication } from "@/lib/communications-log";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       const { rows, rowCount } = await client.query(
         `SELECT i.id, i.status, i.invoice_number, i.total_cents, i.balance_cents,
                 i.deposit_cents, i.due_date, i.notes, i.sent_at,
-                c.name AS client_name, c.email AS client_email
+                c.id AS client_id, c.name AS client_name, c.email AS client_email
          FROM invoices i
          JOIN clients c ON c.id = i.client_id
          WHERE i.id = $1 AND i.account_id = $2`,
@@ -29,7 +30,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         id: string; status: string; invoice_number: string;
         total_cents: number; balance_cents: number; deposit_cents: number;
         due_date: string | null; notes: string | null; sent_at: string | null;
-        client_name: string; client_email: string | null;
+        client_id: string; client_name: string; client_email: string | null;
       };
 
       if (["paid", "void"].includes(inv.status)) {
@@ -73,8 +74,28 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       });
 
       if (!emailResult.ok) {
+        await logCommunication({
+          accountId: session.accountId,
+          channel: "email",
+          direction: "outbound",
+          outcome: "failed",
+          clientId: inv.client_id,
+          bodyPreview: `Invoice ${inv.invoice_number} from Dovetails Services LLC`,
+          initiatedBy: session.userId,
+          externalId: emailResult.error ?? null,
+        });
         return { status: 502, message: `Email send failed: ${emailResult.error}` };
       }
+
+      await logCommunication({
+        accountId: session.accountId,
+        channel: "email",
+        direction: "outbound",
+        outcome: "sent",
+        clientId: inv.client_id,
+        bodyPreview: `Invoice ${inv.invoice_number} from Dovetails Services LLC`,
+        initiatedBy: session.userId,
+      });
 
       // If draft, transition to sent; otherwise just update sent_at timestamp
       const setClauses = inv.status === "draft"
