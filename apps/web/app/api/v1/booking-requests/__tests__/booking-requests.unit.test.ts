@@ -41,15 +41,19 @@ beforeEach(() => {
   });
 });
 
-// Route query order: 1) set_config, 2) SELECT status, 3) UPDATE RETURNING *
+// Route query order: 1) BEGIN, 2) set_config, 3) SELECT status,
+// 4) UPDATE RETURNING *, 5) optional status_history INSERT, 6) COMMIT/ROLLBACK
 
 describe("PATCH /api/v1/booking-requests/[id]", () => {
   it("marks a pending booking request as reviewed", async () => {
     const updated = { id: REQUEST_ID, status: "reviewed" };
     mockClientQuery
+      .mockResolvedValueOnce({ rows: [] })                       // BEGIN
       .mockResolvedValueOnce({ rows: [] })                       // set_config
       .mockResolvedValueOnce({ rows: [{ status: "pending" }] }) // SELECT status
-      .mockResolvedValueOnce({ rows: [updated] });               // UPDATE RETURNING
+      .mockResolvedValueOnce({ rows: [updated] })                // UPDATE RETURNING
+      .mockResolvedValueOnce({ rows: [] })                       // status_history INSERT
+      .mockResolvedValueOnce({ rows: [] });                      // COMMIT
 
     const res = await PATCH(makeRequest({ status: "reviewed" }));
 
@@ -57,7 +61,7 @@ describe("PATCH /api/v1/booking-requests/[id]", () => {
     const json = await res.json();
     expect(json.data.status).toBe("reviewed");
 
-    const updateCall = mockClientQuery.mock.calls[2];
+    const updateCall = mockClientQuery.mock.calls[3];
     expect(updateCall[0]).toContain("UPDATE booking_requests");
     expect(updateCall[1]).toEqual([
       REQUEST_ID,
@@ -65,14 +69,28 @@ describe("PATCH /api/v1/booking-requests/[id]", () => {
       "reviewed",
       mockSession.userId,
     ]);
+
+    const statusHistoryCall = mockClientQuery.mock.calls[4];
+    expect(statusHistoryCall[0]).toContain("INSERT INTO status_history");
+    expect(statusHistoryCall[1]).toEqual([
+      mockSession.accountId,
+      "booking_request",
+      REQUEST_ID,
+      "pending",
+      "reviewed",
+      mockSession.userId,
+      null,
+    ]);
   });
 
   it("saves review_notes without changing status", async () => {
     const updated = { id: REQUEST_ID, status: "pending", review_notes: "Called, left message." };
     mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ status: "pending" }] })
-      .mockResolvedValueOnce({ rows: [updated] });
+      .mockResolvedValueOnce({ rows: [updated] })
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
 
     const res = await PATCH(makeRequest({ review_notes: "Called, left message." }));
 
@@ -97,8 +115,10 @@ describe("PATCH /api/v1/booking-requests/[id]", () => {
 
   it("blocks updates to already-converted booking requests", async () => {
     mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ status: "converted" }] });
+      .mockResolvedValueOnce({ rows: [{ status: "converted" }] })
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
 
     const res = await PATCH(makeRequest({ status: "cancelled" }));
 
@@ -109,8 +129,10 @@ describe("PATCH /api/v1/booking-requests/[id]", () => {
 
   it("returns 404 when the booking request does not exist", async () => {
     mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
       .mockResolvedValueOnce({ rows: [] }) // set_config
-      .mockResolvedValueOnce({ rows: [] }); // SELECT → not found
+      .mockResolvedValueOnce({ rows: [] }) // SELECT → not found
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
 
     const res = await PATCH(makeRequest({ status: "reviewed" }));
 

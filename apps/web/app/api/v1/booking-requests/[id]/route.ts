@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withRole } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { recordStatusChange } from "../../../../../lib/status-history";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,7 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
   const pool = getPool();
   const client = await pool.connect();
   try {
+    await client.query("BEGIN");
     await client.query(
       `SELECT set_config('app.current_user_id', $1, true),
               set_config('app.current_account_id', $2, true),
@@ -82,9 +84,11 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
       [id, session.accountId]
     );
     if (existing.length === 0) {
+      await client.query("ROLLBACK");
       return NextResponse.json({ error: { code: "NOT_FOUND", message: "Booking request not found", traceId: session.traceId } }, { status: 404 });
     }
     if (existing[0].status === "converted") {
+      await client.query("ROLLBACK");
       return NextResponse.json({ error: { code: "CONFLICT", message: "Cannot update a converted booking request", traceId: session.traceId } }, { status: 409 });
     }
 
@@ -111,8 +115,22 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
       params
     );
 
+    if (status !== undefined && status !== existing[0].status) {
+      await recordStatusChange(client, {
+        accountId: session.accountId,
+        entityType: "booking_request",
+        entityId: id,
+        fromStatus: existing[0].status,
+        toStatus: status,
+        changedBy: session.userId,
+        note: review_notes ?? null,
+      });
+    }
+
+    await client.query("COMMIT");
     return NextResponse.json({ data: rows[0] });
   } catch (err) {
+    await client.query("ROLLBACK");
     logger.error("PATCH /api/v1/booking-requests/[id] error", err, { traceId: session.traceId });
     return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: "Failed to update booking request", traceId: session.traceId } }, { status: 500 });
   } finally {
