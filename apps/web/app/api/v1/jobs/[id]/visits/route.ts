@@ -91,7 +91,7 @@ export const POST = withRole(
       );
 
       const { rows: jobRows } = await client.query<{ status: string }>(
-        `SELECT status FROM jobs WHERE id = $1 AND account_id = $2`,
+        `SELECT status FROM jobs WHERE id = $1 AND account_id = $2 FOR UPDATE`,
         [jobId, session.accountId]
       );
       const { rows: activeVisitRows } = await client.query<{ count: string }>(
