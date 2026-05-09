@@ -1,0 +1,105 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { withAuth } from "../../../../../../lib/auth/middleware";
+import type { AuthSession } from "../../../../../../lib/auth/middleware";
+import { getPool } from "../../../../../../lib/db";
+import { logger } from "../../../../../../lib/logger";
+
+export const dynamic = "force-dynamic";
+
+const completionPacketBody = z.object({
+  photo_urls: z.array(z.string().url()).default([]),
+  signature_url: z.string().url().nullable().optional(),
+  signature_waiver: z.boolean().default(false),
+  notes: z.string().max(2000).nullable().optional(),
+});
+
+export const PATCH = withAuth(async (request: NextRequest, session: AuthSession) => {
+  const id = request.url.match(/\/visits\/([^/]+)\/completion-packet/)?.[1];
+
+  if (!id) {
+    return NextResponse.json(
+      { error: { code: "NOT_FOUND", message: "Visit not found", traceId: session.traceId } },
+      { status: 404 }
+    );
+  }
+
+  const body = await request.json().catch(() => null);
+  const parsed = completionPacketBody.safeParse(body);
+
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Invalid request body",
+          details: parsed.error.flatten().fieldErrors,
+          traceId: session.traceId,
+        },
+      },
+      { status: 422 }
+    );
+  }
+
+  const pool = getPool();
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `SELECT set_config('app.current_user_id', $1, true),
+              set_config('app.current_account_id', $2, true),
+              set_config('app.current_role', $3, true)`,
+      [session.userId, session.accountId, session.role]
+    );
+
+    const visitResult = await client.query(
+      `SELECT id, assigned_user_id FROM visits WHERE id = $1 AND account_id = $2`,
+      [id, session.accountId]
+    );
+    const visit = visitResult.rows[0];
+
+    if (!visit || (session.role === "tech" && visit.assigned_user_id !== session.userId)) {
+      await client.query("ROLLBACK");
+      return NextResponse.json(
+        { error: { code: "NOT_FOUND", message: "Visit not found", traceId: session.traceId } },
+        { status: 404 }
+      );
+    }
+
+    const data = parsed.data;
+    const result = await client.query(
+      `INSERT INTO completion_packets (
+         account_id, visit_id, photo_urls, signature_url, signature_waiver, notes, created_by
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (visit_id) DO UPDATE
+       SET photo_urls = EXCLUDED.photo_urls,
+           signature_url = EXCLUDED.signature_url,
+           signature_waiver = EXCLUDED.signature_waiver,
+           notes = EXCLUDED.notes
+       RETURNING *`,
+      [
+        session.accountId,
+        id,
+        data.photo_urls,
+        data.signature_url || null,
+        data.signature_waiver,
+        data.notes || null,
+        session.userId,
+      ]
+    );
+
+    await client.query("COMMIT");
+    return NextResponse.json({ data: result.rows[0] });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    logger.error("[completion packet PATCH]", err, { traceId: session.traceId });
+    return NextResponse.json(
+      { error: { code: "INTERNAL_ERROR", message: "Failed to save completion packet", traceId: session.traceId } },
+      { status: 500 }
+    );
+  } finally {
+    client.release();
+  }
+});
