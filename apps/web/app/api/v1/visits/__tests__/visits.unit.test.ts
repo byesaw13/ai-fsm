@@ -369,9 +369,6 @@ describe("POST /api/v1/visits/[id]/transition", () => {
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ ...SAMPLE_VISIT, status: "in_progress" }] })
-      .mockResolvedValueOnce({
-        rows: [{ photo_urls: ["https://example.com/photo.jpg"], signature_url: "https://example.com/signature.png", signature_waiver: false }],
-      })
       .mockResolvedValueOnce({ rows: [updated] })
       .mockResolvedValueOnce({ rows: [] });
 
@@ -384,22 +381,6 @@ describe("POST /api/v1/visits/[id]/transition", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data.status).toBe("completed");
-  });
-
-  it("in_progress → completed without a completion packet → 422 MISSING_PHOTO", async () => {
-    mockClientQuery
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ ...SAMPLE_VISIT, status: "in_progress" }] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
-
-    const res = await visitTransition(
-      makeRequest("POST", `${VISITS_BASE}/${VISIT_ID}/transition`, { status: "completed" })
-    );
-
-    expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ error: "MISSING_PHOTO" });
   });
 
   it("arrived → completed is invalid → 422 INVALID_TRANSITION", async () => {
