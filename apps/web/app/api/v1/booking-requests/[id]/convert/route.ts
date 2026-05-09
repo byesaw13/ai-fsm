@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withRole } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { recordStatusChange } from "../../../../../../lib/status-history";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +73,12 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       return NextResponse.json({ error: { code: "CONFLICT", message: "No job linked to this booking request", traceId: session.traceId } }, { status: 409 });
     }
 
+    const { rows: jobRows } = await client.query(
+      `SELECT status FROM jobs WHERE id = $1 AND account_id = $2 FOR UPDATE`,
+      [br.job_id, session.accountId]
+    );
+    const previousJobStatus = jobRows[0]?.status ?? null;
+
     // Build visit window from preferred date/time
     const dateStr = parsed.data.preferred_date ?? br.preferred_date;
     const slot    = parsed.data.preferred_time_slot ?? br.preferred_time_slot ?? "morning";
@@ -99,12 +106,38 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     );
     const visitId = visitRows[0].id;
 
+    await recordStatusChange(client, {
+      accountId: session.accountId,
+      entityType: "visit",
+      entityId: visitId,
+      fromStatus: null,
+      toStatus: "scheduled",
+      changedBy: session.userId,
+      note: "Created from booking request conversion",
+    });
+
     // Transition job to scheduled
-    await client.query(
+    const { rowCount: updatedJobCount } = await client.query(
       `UPDATE jobs SET status = 'scheduled', updated_at = now()
        WHERE id = $1 AND account_id = $2 AND status IN ('draft','quoted')`,
       [br.job_id, session.accountId]
     );
+
+    if (
+      (updatedJobCount ?? 0) > 0 &&
+      previousJobStatus !== null &&
+      previousJobStatus !== "scheduled"
+    ) {
+      await recordStatusChange(client, {
+        accountId: session.accountId,
+        entityType: "job",
+        entityId: br.job_id,
+        fromStatus: previousJobStatus,
+        toStatus: "scheduled",
+        changedBy: session.userId,
+        note: "Scheduled from booking request conversion",
+      });
+    }
 
     // Mark booking request as converted
     const { rows: updatedRows } = await client.query(
@@ -117,6 +150,16 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
        RETURNING *`,
       [id, session.accountId, visitId, session.userId, parsed.data.review_notes ?? null]
     );
+
+    await recordStatusChange(client, {
+      accountId: session.accountId,
+      entityType: "booking_request",
+      entityId: id,
+      fromStatus: br.status,
+      toStatus: "converted",
+      changedBy: session.userId,
+      note: parsed.data.review_notes ?? null,
+    });
 
     await client.query("COMMIT");
     return NextResponse.json({ data: { booking_request: updatedRows[0], visit_id: visitId } }, { status: 201 });
