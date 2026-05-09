@@ -9,6 +9,8 @@ import {
 } from "@/lib/auth/permissions";
 import {
   getVaultCollectionStep,
+  VISIT_SUB_STATUSES,
+  SUB_STATUS_LABELS,
   type Visit,
   type VisitStatus,
   type MembershipVisitPhase,
@@ -27,6 +29,7 @@ import { VisitResolutionPanel } from "./VisitResolutionPanel";
 import { VisitPartsPanel } from "./VisitPartsPanel";
 import { VisitClosingChecklist } from "./VisitClosingChecklist";
 import { CompletionChecklist } from "./CompletionChecklist";
+import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { MembershipVisitPanel } from "./MembershipVisitPanel";
 import { VisitSnapshotPanel } from "./VisitSnapshotPanel";
 import { OnMyWayButton } from "./OnMyWayButton";
@@ -87,6 +90,7 @@ type VisitRow = Visit & {
   included_labor_minutes_used: number;
   membership_cap_status: MembershipCapStatus;
   membership_snapshot_sent_at: string | Date | null;
+  sub_status: string | null;
 };
 
 type CountRow = { membership_visit_number: number | string };
@@ -292,6 +296,13 @@ export default async function VisitDetailPage({
               <StatusBadge variant={visit.status as StatusVariant}>
                 {VISIT_STATUS_LABELS[currentStatus]}
               </StatusBadge>
+              {visit.sub_status && (
+                <span style={{ marginLeft: "var(--space-2)" }}>
+                  <StatusBadge variant="overdue">
+                    {SUB_STATUS_LABELS[visit.sub_status] ?? visit.sub_status}
+                  </StatusBadge>
+                </span>
+              )}
             </span>
           </div>
         }
@@ -523,6 +534,21 @@ export default async function VisitDetailPage({
                 <dt>Scheduled</dt>
                 <dd><LocalTime iso={toISO(visit.scheduled_start)} /></dd>
               </div>
+              {session.role !== "tech" && (
+                <div className="p7-detail-row">
+                  <dt>Exception</dt>
+                  <dd>
+                    <SubStatusSelect
+                      endpoint={`/api/v1/visits/${visit.id}/sub-status`}
+                      initialValue={visit.sub_status}
+                      options={VISIT_SUB_STATUSES.map((value) => ({
+                        value,
+                        label: SUB_STATUS_LABELS[value],
+                      }))}
+                    />
+                  </dd>
+                </div>
+              )}
               <div className="p7-detail-row">
                 <dt>Ends</dt>
                 <dd><LocalTime iso={toISO(visit.scheduled_end)} /></dd>

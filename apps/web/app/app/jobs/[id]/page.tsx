@@ -11,12 +11,13 @@ import {
 } from "@/lib/auth/permissions";
 import { jobTransitions } from "@ai-fsm/domain";
 import type { Job, Visit, JobStatus, JobAcceptanceCategory, JobIntakeDecision, JobIntakeRatingField } from "@ai-fsm/domain";
-import { JOB_INTAKE_RATING_FIELDS } from "@ai-fsm/domain";
+import { JOB_INTAKE_RATING_FIELDS, JOB_SUB_STATUSES, SUB_STATUS_LABELS } from "@ai-fsm/domain";
 import { JobTransitionForm } from "./JobTransitionForm";
 import { DeleteJobButton } from "./DeleteJobButton";
 import { JobEditForm } from "./JobEditFormWrapper";
 import { JobIntakePanel } from "./JobIntakePanel";
 import { AssetLinksPanel } from "./AssetLinksPanel";
+import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { isHomeboxEnabled } from "@/lib/homebox/client";
 import { withAssetContext, listAssetLinks } from "@/lib/homebox/db";
 import {
@@ -44,6 +45,7 @@ type JobRow = Job & {
   quality_fit: number | null;
   intake_decision: JobIntakeDecision | null;
   intake_notes: string | null;
+  sub_status: string | null;
 };
 type VisitRow = Visit & {
   assigned_user_name: string | null;
@@ -209,10 +211,15 @@ export default async function JobDetailPage({
         backHref="/app/jobs"
         backLabel="Jobs"
         actions={
-          <span data-testid="job-status">
+          <span data-testid="job-status" style={{ display: "inline-flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
             <StatusBadge variant={currentStatus as StatusVariant}>
               {JOB_STATUS_LABELS[currentStatus]}
             </StatusBadge>
+            {job.sub_status && (
+              <StatusBadge variant="overdue">
+                {SUB_STATUS_LABELS[job.sub_status] ?? job.sub_status}
+              </StatusBadge>
+            )}
           </span>
         }
       />
@@ -297,6 +304,26 @@ export default async function JobDetailPage({
                     <StatusBadge variant={currentStatus as StatusVariant}>
                       {JOB_STATUS_LABELS[currentStatus]}
                     </StatusBadge>
+                    {job.sub_status && (
+                      <span style={{ marginLeft: "var(--space-2)" }}>
+                        <StatusBadge variant="overdue">
+                          {SUB_STATUS_LABELS[job.sub_status] ?? job.sub_status}
+                        </StatusBadge>
+                      </span>
+                    )}
+                  </dd>
+                </div>
+                <div className="p7-detail-row">
+                  <dt>Exception</dt>
+                  <dd>
+                    <SubStatusSelect
+                      endpoint={`/api/v1/jobs/${job.id}/sub-status`}
+                      initialValue={job.sub_status}
+                      options={JOB_SUB_STATUSES.map((value) => ({
+                        value,
+                        label: SUB_STATUS_LABELS[value],
+                      }))}
+                    />
                   </dd>
                 </div>
                 {job.description && (

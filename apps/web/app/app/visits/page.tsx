@@ -10,6 +10,7 @@ import {
   isVisitOverdue,
 } from "@/lib/visits/p7";
 import type { Visit, VisitStatus } from "@ai-fsm/domain";
+import { SUB_STATUS_LABELS } from "@ai-fsm/domain";
 import {
   PageContainer,
   PageHeader,
@@ -34,6 +35,7 @@ type VisitRow = Visit & {
   assigned_user_name: string | null;
   client_name: string | null;
   property_address: string | null;
+  sub_status: string | null;
 };
 
 const VISIT_STATUS_LABELS: Record<VisitStatus, string> = {
@@ -109,9 +111,16 @@ function VisitItemCard({ visit, showTech = false, showOverdue = false }: VisitCa
       href={`/app/visits/${visit.id}`}
       title={visit.job_title ?? "Untitled job"}
       titleBadge={
-        <StatusBadge variant={visit.status as StatusVariant}>
-          {VISIT_STATUS_LABELS[visit.status as VisitStatus]}
-        </StatusBadge>
+        <span style={{ display: "inline-flex", gap: "var(--space-1)", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          <StatusBadge variant={visit.status as StatusVariant}>
+            {VISIT_STATUS_LABELS[visit.status as VisitStatus]}
+          </StatusBadge>
+          {visit.sub_status && (
+            <StatusBadge variant="overdue">
+              {SUB_STATUS_LABELS[visit.sub_status] ?? visit.sub_status}
+            </StatusBadge>
+          )}
+        </span>
       }
       meta={metaParts.length > 0 ? <>{metaParts}</> : undefined}
       overdue={overdue}

@@ -12,7 +12,7 @@ These 10 prompts represent the full remaining implementation roadmap for ai-fsm,
 | 4 | ~~Duplicate detection~~ | `duplicate_candidate_ids` column + warning UI | Done |
 | 5 | ~~Scheduling gates~~ | `scheduling-guard.ts` + visit creation wire-in | Done |
 | 6 | ~~Completion packets~~ | `039_completion_packets.sql` + checklist UI | Done |
-| 7 | Exception lanes (sub-statuses) | `040_sub_statuses.sql` + badge UI | pnpm gate:fast |
+| 7 | ~~Exception lanes (sub-statuses)~~ | `040_sub_statuses.sql` + badge UI | Done |
 | 8 | Communications log | `041_communications_log.sql` + `logCommunication()` | pnpm gate:fast |
 | 9 | Operations dashboard | `/app/operations/page.tsx` (9 parallel queries) | pnpm gate:fast |
 | 10 | Portal updates + channel continuity | Contact prefs in portal + SMS opt-out | pnpm gate:fast |
@@ -302,7 +302,9 @@ Status: Done on 2026-05-09.
 
 ---
 
-## Prompt 7 — Exception Lanes (Sub-statuses)
+## ~~Prompt 7 — Exception Lanes (Sub-statuses)~~ — Done
+
+Status: Done on 2026-05-09.
 
 **Context**: Same repo. Occasionally a job or visit is in an exceptional state (waiting for parts, customer no-show, weather hold, dispute) that does not change the core status but needs to be visible to staff. Sub-statuses are internal exception lanes that overlay the main status without modifying the frozen status enums.
 
