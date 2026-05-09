@@ -8,8 +8,8 @@ These 10 prompts represent the full remaining implementation roadmap for ai-fsm,
 |---|---------|-----------------|------|
 | 1 | ~~Status history / audit trail~~ | `036_status_history.sql` + `recordStatusChange()` | Done |
 | 2 | ~~Consent & contact prefs~~ | `037_consent_contact_prefs.sql` + booking form fields | Done |
-| 3 | Assisted intake screen | `/app/intake/new` + `IntakeForm.tsx` | pnpm gate:fast |
-| 4 | Duplicate detection | `duplicate_candidate_ids` column + warning UI | pnpm gate:fast |
+| 3 | ~~Assisted intake screen~~ | `/app/intake/new` + `IntakeForm.tsx` | Done |
+| 4 | ~~Duplicate detection~~ | `duplicate_candidate_ids` column + warning UI | Done |
 | 5 | Scheduling gates | `scheduling-guard.ts` + visit creation wire-in | pnpm gate:fast |
 | 6 | Completion packets | `039_completion_packets.sql` + checklist UI | pnpm gate:fast |
 | 7 | Exception lanes (sub-statuses) | `040_sub_statuses.sql` + badge UI | pnpm gate:fast |
@@ -118,7 +118,9 @@ Status: Done on 2026-05-09.
 
 ---
 
-## Prompt 3 — Assisted Intake Screen
+## ~~Prompt 3 — Assisted Intake Screen~~ — Done
+
+Status: Done on 2026-05-09.
 
 **Context**: Same repo. When the business owner takes a call or walks a job, they need a staff-side intake form that creates a booking_request directly (bypassing the public form). The form should be a 2-step flow with a read-back confirmation step before submission.
 
@@ -148,7 +150,9 @@ Status: Done on 2026-05-09.
 
 ---
 
-## Prompt 4 — Duplicate Detection
+## ~~Prompt 4 — Duplicate Detection~~ — Done
+
+Status: Done on 2026-05-09.
 
 **Context**: Same repo. When a new booking request arrives (public form or staff intake), the system should flag potential duplicates — same client name + phone/email within the past 90 days — so staff can review before converting.
 

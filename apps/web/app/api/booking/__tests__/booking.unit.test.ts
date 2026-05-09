@@ -75,6 +75,7 @@ describe("POST /api/booking", () => {
       .mockResolvedValueOnce({ rows: [{ id: PROPERTY_ID }] }) // INSERT property
       .mockResolvedValueOnce({ rows: [{ id: JOB_ID }] })   // INSERT job
       .mockResolvedValueOnce({ rows: [{ id: BOOKING_ID }] }) // INSERT booking_request
+      .mockResolvedValueOnce({ rows: [] })                  // SELECT duplicate candidates
       .mockResolvedValueOnce({ rows: [] });                 // COMMIT
 
     const res = await POST(makeRequest(VALID_BODY));
@@ -101,6 +102,17 @@ describe("POST /api/booking", () => {
     expect(brInsert?.[1]?.[3]).toBe(JOB_ID);       // job_id
     expect(brInsert?.[1]?.[16]).toBe("email");     // preferred_contact
     expect(brInsert?.[1]?.[17]).toBe(false);       // sms_consent
+
+    const duplicateSelect = mockClientQuery.mock.calls.find((c) =>
+      String(c[0]).includes("status NOT IN ('cancelled','converted')")
+    );
+    expect(duplicateSelect?.[1]).toEqual([
+      ACCOUNT_ID,
+      BOOKING_ID,
+      "jane@example.com",
+      null,
+      "Jane Client",
+    ]);
   });
 
   it("reuses an existing client found by email", async () => {
@@ -114,6 +126,7 @@ describe("POST /api/booking", () => {
       .mockResolvedValueOnce({ rows: [{ id: PROPERTY_ID }] }) // INSERT property
       .mockResolvedValueOnce({ rows: [{ id: JOB_ID }] })     // INSERT job
       .mockResolvedValueOnce({ rows: [{ id: BOOKING_ID }] }) // INSERT booking_request
+      .mockResolvedValueOnce({ rows: [] })                    // SELECT duplicate candidates
       .mockResolvedValueOnce({ rows: [] });                   // COMMIT
 
     const res = await POST(makeRequest(VALID_BODY));

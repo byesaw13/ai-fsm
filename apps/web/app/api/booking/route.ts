@@ -244,11 +244,42 @@ export async function POST(request: NextRequest) {
         data.sms_consent,
       ]
     );
+    const bookingId = bookingRows[0].id;
+
+    const { rows: duplicateRows } = await client.query<{ id: string }>(
+      `SELECT id FROM booking_requests
+       WHERE account_id = $1
+         AND id != $2
+         AND status NOT IN ('cancelled','converted')
+         AND created_at > NOW() - INTERVAL '90 days'
+         AND (
+           (email IS NOT NULL AND email = $3) OR
+           (phone IS NOT NULL AND phone = $4) OR
+           (lower(name) = lower($5))
+         )
+       LIMIT 5`,
+      [
+        ACCOUNT_ID,
+        bookingId,
+        data.email || null,
+        data.phone || null,
+        data.name,
+      ]
+    );
+
+    if (duplicateRows.length > 0) {
+      await client.query(
+        `UPDATE booking_requests
+         SET duplicate_candidate_ids = $1
+         WHERE id = $2 AND account_id = $3`,
+        [duplicateRows.map((row) => row.id), bookingId, ACCOUNT_ID]
+      );
+    }
 
     await client.query("COMMIT");
 
     return NextResponse.json(
-      { success: true, booking_id: bookingRows[0].id },
+      { success: true, booking_id: bookingId },
       { status: 201 }
     );
   } catch (error) {

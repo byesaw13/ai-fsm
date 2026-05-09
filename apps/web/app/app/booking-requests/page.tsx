@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { getSession } from "@/lib/auth/session";
 import { query } from "@/lib/db";
-import { PageContainer, PageHeader, Card, SectionHeader, EmptyState, StatusBadge } from "@/components/ui";
+import { PageContainer, PageHeader, Card, EmptyState, StatusBadge, LinkButton } from "@/components/ui";
 import type { StatusVariant } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -93,6 +93,7 @@ export default async function BookingRequestsPage({ searchParams }: PageProps) {
       <PageHeader
         title="Booking Requests"
         subtitle={`${rows.length} request${rows.length !== 1 ? "s" : ""}${validStatus ? ` · ${STATUS_LABELS[validStatus]}` : ""}`}
+        actions={<LinkButton href="/app/intake/new">New Intake</LinkButton>}
       />
 
       {/* Status filter tabs */}
