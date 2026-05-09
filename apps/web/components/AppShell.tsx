@@ -40,7 +40,7 @@ interface NavSection {
 
 const OPERATIONS_ITEMS: NavItem[] = [
   { href: "/app/my-day",              label: "My Day",         Icon: IconMyDay },
-  { href: "/app",                      label: "Dashboard",      Icon: IconDashboard },
+  { href: "/app/operations",          label: "Dashboard",      Icon: IconDashboard },
   { href: "/app/schedule",             label: "Schedule",       Icon: IconSchedule },
   { href: "/app/jobs",                 label: "Jobs",           Icon: IconJobs },
   { href: "/app/visits",               label: "Visits",         Icon: IconVisits },
@@ -96,7 +96,6 @@ export function getBottomNavItems(role: string): NavItem[] {
 
 /** Pure function — returns true if href is the active nav route for pathname */
 export function isNavActive(pathname: string, href: string): boolean {
-  if (href === "/app") return pathname === "/app";
   return pathname === href || pathname.startsWith(href + "/");
 }
 

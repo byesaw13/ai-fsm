@@ -14,7 +14,7 @@ These 10 prompts represent the full remaining implementation roadmap for ai-fsm,
 | 6 | ~~Completion packets~~ | `039_completion_packets.sql` + checklist UI | Done |
 | 7 | ~~Exception lanes (sub-statuses)~~ | `040_sub_statuses.sql` + badge UI | Done |
 | 8 | ~~Communications log~~ | `041_communications_log.sql` + `logCommunication()` | Done |
-| 9 | Operations dashboard | `/app/operations/page.tsx` (9 parallel queries) | pnpm gate:fast |
+| 9 | ~~Operations dashboard~~ | `/app/operations/page.tsx` (9 parallel queries) | Done |
 | 10 | Portal updates + channel continuity | Contact prefs in portal + SMS opt-out | pnpm gate:fast |
 
 ---
@@ -440,7 +440,9 @@ Status: Done on 2026-05-09.
 
 ---
 
-## Prompt 9 — Operations Dashboard
+## ~~Prompt 9 — Operations Dashboard~~ — Done
+
+Status: Done on 2026-05-09.
 
 **Context**: Same repo. The current dashboard at `/app` shows basic counts. The operations pipeline doc (`docs/operationpipeline`) defines a richer view: pipeline stage counts, today's schedule, alerts/exceptions, booking queue, and revenue summary. This prompt builds that full operations dashboard.
 

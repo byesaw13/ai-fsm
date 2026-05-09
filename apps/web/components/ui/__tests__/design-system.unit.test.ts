@@ -173,7 +173,7 @@ describe("getNavSections (role filtering)", () => {
     const items = flattenSections(sections);
     expect(items).toHaveLength(6);
     const hrefs = items.map((i) => i.href);
-    expect(hrefs).toContain("/app");
+    expect(hrefs).toContain("/app/operations");
     expect(hrefs).toContain("/app/jobs");
     expect(hrefs).toContain("/app/visits");
     expect(hrefs).toContain("/app/schedule");
@@ -206,16 +206,16 @@ describe("getBottomNavItems (mobile)", () => {
 
 describe("isNavActive (route detection)", () => {
   // Dashboard — exact match only
-  it("returns true for /app when pathname is exactly /app", () => {
-    expect(isNavActive("/app", "/app")).toBe(true);
+  it("returns true for /app/operations when pathname is exactly /app/operations", () => {
+    expect(isNavActive("/app/operations", "/app/operations")).toBe(true);
   });
 
-  it("returns false for /app when pathname is /app/jobs", () => {
-    expect(isNavActive("/app/jobs", "/app")).toBe(false);
+  it("returns false for /app/operations when pathname is /app/jobs", () => {
+    expect(isNavActive("/app/jobs", "/app/operations")).toBe(false);
   });
 
-  it("returns false for /app when pathname is /app/visits", () => {
-    expect(isNavActive("/app/visits", "/app")).toBe(false);
+  it("returns false for /app/operations when pathname is /app/visits", () => {
+    expect(isNavActive("/app/visits", "/app/operations")).toBe(false);
   });
 
   // Jobs — prefix match

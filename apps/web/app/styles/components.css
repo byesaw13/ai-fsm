@@ -677,6 +677,195 @@
 }
 
 /* -------------------------------------------------------------------------
+   Operations dashboard — summary cards and alerts
+   ---------------------------------------------------------------------- */
+.ops-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.ops-wide-card {
+  margin-bottom: var(--space-6);
+}
+
+.ops-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.ops-section-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--fg);
+}
+
+.ops-section-count {
+  min-width: 2rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-full);
+  background: var(--bg-subtle);
+  color: var(--fg-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-align: center;
+}
+
+.ops-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 100%;
+}
+
+.ops-panel-title {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.ops-panel-sub {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+  line-height: 1.4;
+}
+
+.ops-panel-alert {
+  border-color: var(--color-red-200);
+  background: var(--color-red-50);
+}
+
+.ops-panel-success {
+  border-color: var(--color-green-200);
+  background: var(--color-green-50);
+}
+
+.ops-visit-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ops-visit-row {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: inherit;
+}
+
+.ops-visit-time {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-visit-time span:last-child {
+  color: var(--fg-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.ops-visit-body {
+  min-width: 0;
+}
+
+.ops-visit-client {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ops-visit-job {
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ops-alert-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.ops-alert-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  min-height: 100%;
+}
+
+.ops-alert-label {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.ops-alert-value {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  line-height: 1;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-alert-sub {
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
+}
+
+.ops-alert-links {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.ops-alert-link {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+@media (max-width: 900px) {
+  .ops-grid,
+  .ops-alert-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ops-visit-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+}
+
+/* -------------------------------------------------------------------------
    Item card — unified job/visit/estimate/invoice card
    ---------------------------------------------------------------------- */
 .p7-item-card {
