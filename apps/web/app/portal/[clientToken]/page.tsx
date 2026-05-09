@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { queryOne, query } from "@/lib/db";
 import { derivePortalStage, CUSTOMER_STAGE_ORDER, CUSTOMER_STAGE_LABELS, CUSTOMER_STAGE_COLORS } from "@ai-fsm/domain";
+import { SmsOptOutButton } from "./SmsOptOutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +58,17 @@ interface ClientRow extends Record<string, unknown> {
   id: string;
   name: string;
   email: string;
+  account_id: string;
   account_name: string;
+  preferred_contact: string;
+  sms_consent: boolean;
+}
+
+interface CommRow extends Record<string, unknown> {
+  channel: string;
+  outcome: string;
+  body_preview: string | null;
+  created_at: string;
 }
 
 export default async function ClientPortalPage({
@@ -68,7 +79,8 @@ export default async function ClientPortalPage({
   const { clientToken } = await params;
 
   const client = await queryOne<ClientRow>(
-    `SELECT c.id, c.name, c.email, a.name AS account_name
+    `SELECT c.id, c.name, c.email, c.account_id, c.preferred_contact, c.sms_consent,
+            a.name AS account_name
      FROM clients c
      JOIN accounts a ON a.id = c.account_id
      WHERE c.portal_token = $1`,
@@ -77,7 +89,7 @@ export default async function ClientPortalPage({
 
   if (!client) notFound();
 
-  const [estimates, invoices, plans, maintenanceJobs, activeVisitRows] = await Promise.all([
+  const [estimates, invoices, plans, maintenanceJobs, activeVisitRows, recentComms] = await Promise.all([
     query<EstimateRow>(
       `SELECT e.id, e.status, e.total_cents, e.sent_at, e.expires_at,
               e.share_token, p.address AS property_address
@@ -130,6 +142,14 @@ export default async function ClientPortalPage({
        JOIN jobs j ON j.id = v.job_id
        WHERE j.client_id = $1 AND v.status IN ('scheduled','arrived','in_progress')
        LIMIT 1`,
+      [client.id]
+    ),
+    query<CommRow>(
+      `SELECT channel, outcome, body_preview, created_at
+       FROM communications_log
+       WHERE client_id = $1 AND direction = 'outbound'
+       ORDER BY created_at DESC
+       LIMIT 5`,
       [client.id]
     ),
   ]);
@@ -310,6 +330,51 @@ export default async function ClientPortalPage({
                       )}
                     </div>
                   ))}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Contact Preferences */}
+        <section style={{ marginBottom: 32 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Contact Preferences</h2>
+          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 4 }}>Preferred contact method</div>
+                <div style={{ fontWeight: 500, textTransform: "capitalize" }}>{client.preferred_contact as string}</div>
+                {client.sms_consent ? (
+                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>SMS messaging is enabled.</div>
+                ) : (
+                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>SMS messaging is disabled.</div>
+                )}
+              </div>
+              {(client.sms_consent as boolean) && (
+                <SmsOptOutButton clientToken={clientToken} />
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Message History */}
+        {recentComms.length > 0 && (
+          <section style={{ marginBottom: 32 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Message History</h2>
+            <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+              {recentComms.map((msg, idx) => (
+                <div key={idx} style={{ padding: "12px 16px", borderBottom: idx < recentComms.length - 1 ? "1px solid #f3f4f6" : "none" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>
+                      {msg.channel as string}
+                    </span>
+                    <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                      {new Date(msg.created_at as string).toLocaleDateString()}
+                    </span>
+                  </div>
+                  {msg.body_preview && (
+                    <div style={{ fontSize: 13, color: "#374151" }}>{msg.body_preview as string}</div>
+                  )}
                 </div>
               ))}
             </div>
