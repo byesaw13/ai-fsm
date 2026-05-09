@@ -15,7 +15,7 @@ These 10 prompts represent the full remaining implementation roadmap for ai-fsm,
 | 7 | ~~Exception lanes (sub-statuses)~~ | `040_sub_statuses.sql` + badge UI | Done |
 | 8 | ~~Communications log~~ | `041_communications_log.sql` + `logCommunication()` | Done |
 | 9 | ~~Operations dashboard~~ | `/app/operations/page.tsx` (9 parallel queries) | Done |
-| 10 | Portal updates + channel continuity | Contact prefs in portal + SMS opt-out | pnpm gate:fast |
+| 10 | ~~Portal updates + channel continuity~~ | Contact prefs in portal + SMS opt-out | Done |
 
 ---
 
@@ -476,7 +476,7 @@ Status: Done on 2026-05-09.
 
 ---
 
-## Prompt 10 — Portal Updates & Channel Continuity
+## ~~Prompt 10 — Portal Updates & Channel Continuity~~ — Done
 
 **Context**: Same repo. The client portal at `/portal/[clientToken]` currently shows job/visit status. This prompt adds: contact preference display and opt-out, SMS opt-out endpoint (required by FCC/A2P 10DLC), and a communications history section so clients can see what was sent to them.
 
