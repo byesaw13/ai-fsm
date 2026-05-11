@@ -1,5 +1,9 @@
 import {
   MINIMUM_SERVICE_FEE_CENTS,
+  BUNDLE_MARGIN_FLOOR,
+  BUNDLE_DISCOUNT_MIN_TASKS,
+  HALF_DAY_RATE_CENTS,
+  FULL_DAY_RATE_CENTS,
   type EstimateFinishExpectation,
   type EstimateMinimumOverrideReason,
   type EstimateTripCount,
@@ -18,6 +22,10 @@ export interface EstimateGuardrailInput {
   travel_surcharge_cents: number;
   risk_adjustment_cents: number;
   minimum_service_override_reason: EstimateMinimumOverrideReason | null;
+  // New in pricing upgrade
+  margin_pct: number | null;
+  has_ma_regulated_items: boolean;
+  line_item_count: number;
 }
 
 export interface EstimateGuardrailIssue {
@@ -41,7 +49,29 @@ export function reviewEstimateGuardrails(input: EstimateGuardrailInput): Estimat
   ) {
     blockers.push({
       field: "minimum_service_override_reason",
-      message: "Estimate is below the $150 minimum service value and needs a structured override.",
+      message: "Estimate is below the $185 minimum service value and needs a structured override.",
+    });
+  }
+
+  if (input.margin_pct !== null && input.margin_pct < BUNDLE_MARGIN_FLOOR) {
+    blockers.push({
+      field: "margin_pct",
+      message: `Estimate is below the 30% margin floor (current: ${Math.round(input.margin_pct * 100)}%). Raise pricing or reduce scope before sending.`,
+    });
+  }
+
+  if (input.has_ma_regulated_items) {
+    warnings.push({
+      field: "legal",
+      message:
+        "One or more line items involve licensed-trade gray areas in Massachusetts. Confirm authorization to perform this work or route to a licensed subcontractor.",
+    });
+  }
+
+  if (input.line_item_count >= BUNDLE_DISCOUNT_MIN_TASKS) {
+    warnings.push({
+      field: "pricing",
+      message: `${input.line_item_count} tasks detected. Consider half-day ($${(HALF_DAY_RATE_CENTS / 100).toFixed(0)}) or full-day ($${(FULL_DAY_RATE_CENTS / 100).toFixed(0)}) block pricing instead of per-task rates.`,
     });
   }
 

@@ -53,9 +53,10 @@ export const POST = withAuth(async (request: NextRequest, session) => {
 
     const { rows: priceBook } = await getPool().query<PriceBookEntry>(
       `SELECT id, code, name, category,
-              price_min_cents, price_max_cents,
-              description, default_labor_hours,
-              requires_materials, upsell_codes
+              price_min_cents, price_max_cents, default_price_cents, add_on_price_cents,
+              unit_type, description, default_labor_hours, requires_materials, upsell_codes,
+              labor_hours_typical, scope_description, excluded_items,
+              legal_status_ma, legal_status_nh, quote_trigger
        FROM price_book
        WHERE ${conditions.join(" AND ")}
        ORDER BY code ASC`,

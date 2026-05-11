@@ -77,6 +77,8 @@ interface EditableSuggestion {
   unit_price_cents: number;
   reason: string;
   accepted: boolean;
+  labor_hours_typical: number | null;
+  legal_flag: "gray" | "restricted" | null;
 }
 
 interface ParsedScope {
@@ -464,6 +466,7 @@ export function NewEstimateForm({
       const raw = (json.suggestions ?? []) as Array<{
         code: string; price_book_id: string; name: string; description: string | null;
         quantity: number; unit_price_cents: number; reason: string;
+        labor_hours_typical: number | null; legal_flag: "gray" | "restricted" | null;
       }>;
       setSuggestions(raw.map((s) => ({ ...s, accepted: true })));
     } catch {
@@ -1532,7 +1535,7 @@ export function NewEstimateForm({
                             style={{ marginTop: 2 }}
                           />
 
-                          {/* Name + reason */}
+                          {/* Name + reason + badges */}
                           <div>
                             <div style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
                               <span style={{ color: "var(--fg-muted)", fontWeight: 400, marginRight: "var(--space-1)" }}>{s.code}</span>
@@ -1541,6 +1544,42 @@ export function NewEstimateForm({
                             <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
                               {s.reason}
                             </div>
+                            {(s.labor_hours_typical !== null || s.legal_flag) && (
+                              <div style={{ display: "flex", gap: "var(--space-1)", marginTop: 4, flexWrap: "wrap" }}>
+                                {s.labor_hours_typical !== null && (
+                                  <span style={{
+                                    fontSize: "var(--text-xs)", padding: "1px 6px",
+                                    background: "var(--color-surface-overlay)",
+                                    borderRadius: "var(--radius-sm)",
+                                    color: "var(--fg-muted)", border: "1px solid var(--border)",
+                                  }}>
+                                    ~{s.labor_hours_typical}h
+                                  </span>
+                                )}
+                                {s.legal_flag === "gray" && (
+                                  <span style={{
+                                    fontSize: "var(--text-xs)", padding: "1px 6px",
+                                    background: "var(--color-warning-subtle, #fef9c3)",
+                                    borderRadius: "var(--radius-sm)",
+                                    color: "var(--color-warning-fg, #854d0e)",
+                                    border: "1px solid var(--color-warning-border, #fde68a)",
+                                  }}>
+                                    MA: verify authorization
+                                  </span>
+                                )}
+                                {s.legal_flag === "restricted" && (
+                                  <span style={{
+                                    fontSize: "var(--text-xs)", padding: "1px 6px",
+                                    background: "var(--color-danger-subtle, #fee2e2)",
+                                    borderRadius: "var(--radius-sm)",
+                                    color: "var(--color-danger-fg, #991b1b)",
+                                    border: "1px solid var(--color-danger-border, #fca5a5)",
+                                  }}>
+                                    MA: licensed trade required
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
 
                           {/* Qty */}

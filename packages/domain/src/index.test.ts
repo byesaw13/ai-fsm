@@ -425,7 +425,7 @@ describe('PRICE_BOOK_TIER_MARGINS', () => {
 
 describe('Dovetails standards', () => {
   it('exposes canonical pricing standards', () => {
-    expect(MINIMUM_SERVICE_FEE_CENTS).toBe(15000)
+    expect(MINIMUM_SERVICE_FEE_CENTS).toBe(18500)
     expect(MATERIAL_HANDLING_RATE).toBe(0.15)
     expect(DEPOSIT_RATE).toBe(0.30)
   })

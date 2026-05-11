@@ -6,7 +6,7 @@
  */
 
 import {
-  LABOR_RATE_CENTS_PER_HOUR,
+  LABOR_COST_CENTS_PER_HOUR,
   PAINTING_RATE_MIN_CENTS,
   PAINTING_RATE_STANDARD_CENTS,
   PAINTING_TRIM_ADD_CENTS,
@@ -91,7 +91,7 @@ export function calculatePaintingEstimate(
   const deposit_cents = Math.round(total_cents * DEPOSIT_RATE);
   const balance_cents = total_cents - deposit_cents;
 
-  const internal_labor_cost_cents = Math.round(labor_hours_estimate * LABOR_RATE_CENTS_PER_HOUR);
+  const internal_labor_cost_cents = Math.round(labor_hours_estimate * LABOR_COST_CENTS_PER_HOUR);
   const gross_margin_cents = labor_flat_rate_cents - internal_labor_cost_cents;
   const gross_margin_pct =
     labor_flat_rate_cents > 0
