@@ -18,6 +18,13 @@ export interface PriceBookEntry {
   default_labor_hours: number | null;
   requires_materials: boolean;
   upsell_codes: string[];
+  // Migration 042 enrichment fields
+  labor_hours_typical: number | null;
+  scope_description: string | null;
+  excluded_items: string | null;
+  legal_status_ma: "legal" | "gray" | "restricted";
+  legal_status_nh: "legal" | "gray" | "restricted";
+  quote_trigger: boolean;
 }
 
 export interface SuggestedItem {
@@ -28,23 +35,40 @@ export interface SuggestedItem {
   quantity: number;
   unit_price_cents: number;
   reason: string;
+  labor_hours_typical: number | null;
+  legal_flag: "gray" | "restricted" | null;
 }
 
 // ---------------------------------------------------------------------------
 // Prompt & tool (system prompt is static — cached; catalog block also cached)
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `You are an estimating assistant for Dovetails Services LLC, a painting and general handyman company. Given a client job description, suggest the most relevant services from the price book catalog to include on the estimate.
+const SYSTEM_PROMPT = `You are an estimating assistant for Dovetails Services LLC, a handyman and painting company serving southern New Hampshire and the Merrimack Valley in Massachusetts. Given a client job description, suggest the most relevant services from the price book catalog.
 
 ## Rules
 - Only suggest services that appear in the catalog — never invent codes or names
-- Choose the most specific match available; avoid catch-all specialty codes unless nothing else fits
-- Set quantity to 1 unless the description clearly implies multiple units (e.g. "3 TVs" → quantity 3 for TV mounting)
+- Choose the most specific match available; avoid catch-all specialty (9000-series) codes unless nothing else fits
+- Set quantity to 1 unless the description clearly implies multiple units (e.g. "3 TVs" → quantity 3)
 - Set unit_price_cents to the price_min_cents of the matching item as the starting point
-- Include upsell services only when they are directly implied by the description (e.g. touch-up painting always follows a drywall patch)
+- Include upsell services only when directly implied (e.g. touch-up painting always follows a drywall patch)
 - Prefer core and standard tier items over specialty unless the scope clearly calls for specialty work
 - Limit to 8 suggestions maximum — quality over quantity
-- Write a one-sentence reason for each suggestion so the estimator can verify the match`;
+- Write a one-sentence reason for each suggestion so the estimator can verify the match
+
+## Scope awareness
+Each catalog entry includes a scope description (what's included) and excluded items (what is not). Use these to match the job description precisely. If the description mentions work that falls in the "excluded" list for an item, do not suggest that item — find the more specific one, or note in the reason that the item covers only part of the described work.
+
+## Quote-trigger items
+If a suggested item has [QUOTE] in the catalog listing, include it but note in the reason that it requires an on-site assessment before pricing.
+
+## Legal flags
+Items marked [MA:gray] or [MA:restricted] involve licensed-trade gray areas in Massachusetts. Note this in the reason so the estimator can confirm authorization before quoting.
+
+## Bundle detection
+If 4 or more distinct tasks are being suggested, note in the last item's reason that half-day ($515) or full-day ($980) block pricing may be worth considering instead of per-task rates.
+
+## Modifier keywords
+If the job description contains words like: plaster, pre-1978, crawl space, attic, second story, galvanized — flag the relevant modifier in the affected item's reason (e.g. "Note: plaster walls modifier may apply — add 0.5h").`;
 
 const SUGGEST_TOOL: Anthropic.Tool = {
   name: "suggest_line_items",
@@ -98,14 +122,22 @@ function buildCatalogText(items: PriceBookEntry[]): string {
   return items
     .map((item) => {
       const priceRange = item.price_max_cents
-        ? `$${(item.price_min_cents / 100).toFixed(0)}–${(item.price_max_cents / 100).toFixed(0)}`
+        ? `$${(item.price_min_cents / 100).toFixed(0)}–$${(item.price_max_cents / 100).toFixed(0)}`
         : `$${(item.price_min_cents / 100).toFixed(0)}+`;
-      const hours = item.default_labor_hours ? ` | ${item.default_labor_hours}h labor` : "";
+      const hours = item.labor_hours_typical
+        ? ` | ${item.labor_hours_typical}h typical`
+        : item.default_labor_hours
+          ? ` | ${item.default_labor_hours}h labor`
+          : "";
+      const scope = item.scope_description ? ` | scope: ${item.scope_description}` : "";
+      const excl = item.excluded_items ? ` | excl: ${item.excluded_items}` : "";
       const mats = item.requires_materials ? " | needs materials" : "";
       const upsell =
         item.upsell_codes.length > 0 ? ` | upsells: ${item.upsell_codes.join(",")}` : "";
+      const legalMa = item.legal_status_ma !== "legal" ? ` | [MA:${item.legal_status_ma}]` : "";
+      const qt = item.quote_trigger ? " | [QUOTE]" : "";
       const desc = item.description ? ` — ${item.description}` : "";
-      return `${item.code} | ${item.category} | ${item.name}${desc} | ${priceRange}${hours}${mats}${upsell}`;
+      return `${item.code} | ${item.category} | ${item.name}${desc} | ${priceRange}${hours}${scope}${excl}${mats}${upsell}${legalMa}${qt}`;
     })
     .join("\n");
 }
@@ -171,15 +203,22 @@ export async function suggestLineItems(
        .filter((s) => byCode.has(s.code))
        .map((s) => {
          const pb = byCode.get(s.code)!;
+         const legalFlag: "gray" | "restricted" | null =
+           pb.legal_status_ma === "restricted"
+             ? "restricted"
+             : pb.legal_status_ma === "gray"
+               ? "gray"
+               : null;
          return {
            code: s.code,
            price_book_id: pb.id,
            name: pb.name,
            description: pb.description,
-           // Use default_price_cents if set, otherwise fall back to price_min_cents
            unit_price_cents: pb.default_price_cents ?? Math.max(pb.price_min_cents, s.unit_price_cents),
            quantity: Math.max(1, Math.round(s.quantity)),
            reason: s.reason,
+           labor_hours_typical: pb.labor_hours_typical ?? null,
+           legal_flag: legalFlag,
          };
        });
   } catch (err) {

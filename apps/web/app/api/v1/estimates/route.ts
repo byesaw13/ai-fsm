@@ -273,6 +273,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
   let subtotal_cents: number;
   let computed_line_items = line_items;
   let internal_labor_cost_cents: number | null = null;
+  let painting_margin_pct: number | null = null;
 
   if (is_painting) {
     const result = calculatePaintingEstimate({
@@ -285,6 +286,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     });
     subtotal_cents = result.total_cents;
     internal_labor_cost_cents = result.internal_labor_cost_cents;
+    painting_margin_pct = result.gross_margin_pct / 100;
   } else if (is_multi_option) {
     subtotal_cents = 0;
   } else {
@@ -309,6 +311,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     travel_surcharge_cents,
     risk_adjustment_cents,
     minimum_service_override_reason: minimum_service_override_reason ?? null,
+    margin_pct: painting_margin_pct,
+    has_ma_regulated_items: false,
+    line_item_count: line_items?.length ?? 0,
   });
   // In flat-rate mode, ignore any line_items that were mistakenly sent
   const itemsToInsert = flat_rate_cents !== undefined ? [] : line_items;

@@ -80,11 +80,14 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         travel_surcharge_cents: number;
         risk_adjustment_cents: number;
         minimum_service_override_reason: "bundled" | "membership_included" | "promo" | "owner_approved" | null;
+        line_item_count: number;
       }>(
         `SELECT id, status, total_cents, trip_count, requires_drying_or_curing,
                 difficult_access, old_house_risk, coordination_required,
                 finish_expectation, travel_surcharge_cents, risk_adjustment_cents,
-                minimum_service_override_reason
+                minimum_service_override_reason,
+                (SELECT COUNT(*)::int FROM estimate_line_items eli
+                 WHERE eli.estimate_id = estimates.id AND eli.visible_to_customer = true) AS line_item_count
          FROM estimates WHERE id = $1 AND account_id = $2`,
         [id, session.accountId]
       );
@@ -109,7 +112,12 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       }
 
       if (targetStatus === "sent") {
-        const pricingReview = reviewEstimateGuardrails(existing.rows[0]);
+        const pricingReview = reviewEstimateGuardrails({
+          ...existing.rows[0],
+          margin_pct: null,
+          has_ma_regulated_items: false,
+          line_item_count: existing.rows[0].line_item_count,
+        });
         await client.query(
           `UPDATE estimates
            SET pricing_review_status = $1,

@@ -32,7 +32,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
                 e.old_house_risk, e.coordination_required, e.finish_expectation,
                 e.travel_surcharge_cents, e.risk_adjustment_cents,
                 e.minimum_service_override_reason,
-                c.id AS client_id, c.name AS client_name, c.email AS client_email
+                c.id AS client_id, c.name AS client_name, c.email AS client_email,
+                (SELECT COUNT(*)::int FROM estimate_line_items eli
+                 WHERE eli.estimate_id = e.id AND eli.visible_to_customer = true) AS line_item_count
          FROM estimates e
          JOIN clients c ON c.id = e.client_id
          WHERE e.id = $1 AND e.account_id = $2`,
@@ -55,6 +57,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         risk_adjustment_cents: number;
         minimum_service_override_reason: "bundled" | "membership_included" | "promo" | "owner_approved" | null;
         client_id: string; client_name: string; client_email: string | null;
+        line_item_count: number;
       };
 
       if (["approved", "declined", "expired"].includes(est.status)) {
@@ -65,7 +68,12 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         return { status: 422, message: "Client has no email address on file" };
       }
 
-      const pricingReview = reviewEstimateGuardrails(est);
+      const pricingReview = reviewEstimateGuardrails({
+        ...est,
+        margin_pct: null,
+        has_ma_regulated_items: false,
+        line_item_count: est.line_item_count,
+      });
       await client.query(
         `UPDATE estimates
          SET pricing_review_status = $1,

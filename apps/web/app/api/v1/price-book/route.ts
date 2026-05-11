@@ -33,6 +33,16 @@ type PriceBookRow = {
   requires_materials: boolean;
   upsell_codes: string[];
   is_active: boolean;
+  // Migration 042 enrichment
+  labor_hours_low: number | null;
+  labor_hours_typical: number | null;
+  labor_hours_high: number | null;
+  scope_description: string | null;
+  excluded_items: string | null;
+  legal_status_ma: "legal" | "gray" | "restricted";
+  legal_status_nh: "legal" | "gray" | "restricted";
+  two_person_required: boolean;
+  quote_trigger: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -94,7 +104,11 @@ export const GET = withAuth(async (request: NextRequest, session: AuthSession) =
       `SELECT id, code, name, category, tier, price_min_cents, price_max_cents,
               default_price_cents, add_on_price_cents, unit_type,
               description, notes, default_labor_hours, requires_materials,
-              upsell_codes, is_active, created_at::text, updated_at::text
+              upsell_codes, is_active,
+              labor_hours_low, labor_hours_typical, labor_hours_high,
+              scope_description, excluded_items,
+              legal_status_ma, legal_status_nh, two_person_required, quote_trigger,
+              created_at::text, updated_at::text
        FROM price_book
        ${where}
        ORDER BY code ASC

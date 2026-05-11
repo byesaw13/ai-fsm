@@ -10,11 +10,64 @@
 // Labor
 // ---------------------------------------------------------------------------
 
-/** Internal labor cost. Never shown on customer-facing output. */
-export const LABOR_RATE_CENTS_PER_HOUR = 85_00; // $85.00/hr
+/** Internal burdened cost of labor. Never shown on customer-facing output. */
+export const LABOR_COST_CENTS_PER_HOUR = 85_00; // $85.00/hr
+
+/**
+ * Customer-facing additional labor rate (solo technician, 0.25-hr increments).
+ * @deprecated Use LABOR_COST_CENTS_PER_HOUR for internal margin math.
+ */
+export const LABOR_RATE_CENTS_PER_HOUR = LABOR_COST_CENTS_PER_HOUR;
+
+/** Customer-facing hourly rate for T&M or add-on labor line items. */
+export const LABOR_CUSTOMER_RATE_CENTS_PER_HOUR = 115_00; // $115.00/hr
 
 /** Minimum customer-facing service value unless intentionally bundled or credited. */
-export const MINIMUM_SERVICE_FEE_CENTS = 150_00; // $150.00
+export const MINIMUM_SERVICE_FEE_CENTS = 185_00; // $185.00 (2026 rate)
+
+// ---------------------------------------------------------------------------
+// Block pricing
+// ---------------------------------------------------------------------------
+
+/** Half-day labor block (up to 4 book hours). */
+export const HALF_DAY_RATE_CENTS = 515_00;
+export const BLOCK_PRICING_HALF_DAY_HOURS = 4;
+
+/** Full-day labor block (up to 7–8 book hours). */
+export const FULL_DAY_RATE_CENTS = 980_00;
+export const BLOCK_PRICING_FULL_DAY_HOURS = 7;
+
+// ---------------------------------------------------------------------------
+// Bundle discount
+// ---------------------------------------------------------------------------
+
+/** 12% discount when 4+ distinct tasks are combined in one visit. */
+export const BUNDLE_DISCOUNT_RATE = 0.12;
+export const BUNDLE_DISCOUNT_MIN_TASKS = 4;
+
+/** Gross margin floor — estimates below 30% are blocked. */
+export const BUNDLE_MARGIN_FLOOR = 0.30;
+
+// ---------------------------------------------------------------------------
+// Regional pricing deltas
+// ---------------------------------------------------------------------------
+
+/** MA labor premium above NH baseline (heavier regulation, longer drive patterns). */
+export const MA_LABOR_RATE_DELTA = 0.15; // +15%
+
+// ---------------------------------------------------------------------------
+// Emergency & after-hours multipliers
+// ---------------------------------------------------------------------------
+
+export const EMERGENCY_RATE_MULTIPLIERS = {
+  saturday_daytime:  1.40,
+  sunday_daytime:    1.50,
+  weekday_evenings:  1.50,  // 5pm–10pm
+  overnight:         2.00,  // 10pm–6am, 2-hr min, +$150 dispatch
+  federal_holiday:   2.00,  // 2-hr min
+  true_emergency:    2.00,  // active water/electrical hazard, +$200 dispatch
+} as const;
+export type EmergencyRateWindow = keyof typeof EMERGENCY_RATE_MULTIPLIERS;
 
 // ---------------------------------------------------------------------------
 // Painting pricing (per square foot, in cents)
@@ -46,8 +99,29 @@ export const PREP_LEVEL_MULTIPLIERS: Record<number, number> = {
 // Materials
 // ---------------------------------------------------------------------------
 
-/** Material handling / service fee: 15% of material subtotal. */
+/**
+ * Flat material handling rate used by the painting estimate engine only.
+ * New code should use MATERIAL_MARKUP_TIERS for tiered markup logic.
+ */
 export const MATERIAL_HANDLING_RATE = 0.15;
+
+/**
+ * Tiered material markup rates.
+ * - Under $25: bundled into labor, no separate markup
+ * - $25–$250: 30% markup
+ * - Over $250: 22.5% markup (midpoint of 20–25% range)
+ */
+export const MATERIAL_MARKUP_TIERS = [
+  { maxCents: 25_00,       rate: 0    },
+  { maxCents: 250_00,      rate: 0.30 },
+  { maxCents: Infinity,    rate: 0.225 },
+] as const;
+
+/** Calculate material markup for a given material cost in cents. */
+export function calculateMaterialMarkup(materialCostCents: number): number {
+  const tier = MATERIAL_MARKUP_TIERS.find((t) => materialCostCents <= t.maxCents);
+  return Math.round(materialCostCents * (tier?.rate ?? 0.225));
+}
 
 // ---------------------------------------------------------------------------
 // Deposits & payment terms
