@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withRole } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { createIntakeRecords } from "../../../../lib/intake/records";
 
 export const dynamic = "force-dynamic";
 
@@ -83,65 +84,25 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       [session.userId, session.accountId, session.role]
     );
 
-    const { rows } = await client.query<{ id: string }>(
-      `INSERT INTO booking_requests (
-         account_id, name, email, phone, service_category, service_description,
-         preferred_date, preferred_time_slot, address, city,
-         preferred_contact, sms_consent, sms_consent_at, sms_consent_source
-       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-               $11, $12, CASE WHEN $12 THEN NOW() ELSE NULL END, CASE WHEN $12 THEN $13 ELSE NULL END)
-       RETURNING id`,
-      [
-        session.accountId,
-        data.name,
-        data.email || null,
-        data.phone || null,
-        data.service_category,
-        data.service_description,
-        data.preferred_date,
-        data.preferred_time_slot,
-        data.address,
-        data.city || null,
-        data.preferred_contact,
-        data.sms_consent,
-        "staff_intake",
-      ]
-    );
-    const bookingId = rows[0].id;
-
-    const { rows: duplicateRows } = await client.query<{ id: string }>(
-      `SELECT id FROM booking_requests
-       WHERE account_id = $1
-         AND id != $2
-         AND status NOT IN ('cancelled','converted')
-         AND created_at > NOW() - INTERVAL '90 days'
-         AND (
-           (email IS NOT NULL AND email = $3) OR
-           (phone IS NOT NULL AND phone = $4) OR
-           (lower(name) = lower($5))
-         )
-       LIMIT 5`,
-      [
-        session.accountId,
-        bookingId,
-        data.email || null,
-        data.phone || null,
-        data.name,
-      ]
-    );
-
-    if (duplicateRows.length > 0) {
-      await client.query(
-        `UPDATE booking_requests
-         SET duplicate_candidate_ids = $1
-         WHERE id = $2 AND account_id = $3`,
-        [duplicateRows.map((row) => row.id), bookingId, session.accountId]
-      );
-    }
+    const { bookingId, clientId, propertyId, jobId } = await createIntakeRecords(client, {
+      accountId: session.accountId,
+      createdByUserId: session.userId,
+      name: data.name,
+      email: data.email || null,
+      phone: data.phone || null,
+      serviceCategory: data.service_category,
+      serviceDescription: data.service_description,
+      preferredDate: data.preferred_date,
+      preferredTimeSlot: data.preferred_time_slot,
+      address: data.address,
+      city: data.city || null,
+      preferredContact: data.preferred_contact,
+      smsConsent: data.sms_consent,
+      smsConsentSource: "staff_intake",
+    });
 
     await client.query("COMMIT");
-    return NextResponse.json({ id: bookingId }, { status: 201 });
+    return NextResponse.json({ id: bookingId, clientId, propertyId, jobId }, { status: 201 });
   } catch (err) {
     await client.query("ROLLBACK");
     logger.error("POST /api/v1/intake error", err as Error, { traceId: session.traceId });

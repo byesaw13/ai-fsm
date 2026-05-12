@@ -14,6 +14,7 @@ const ENV_KEYS = [
   "AUTH_SECRET",
   "NODE_ENV",
   "NEXT_PHASE",
+  "BOOKING_ACCOUNT_ID",
 ] as const;
 
 describe("getEnv validation", () => {
@@ -60,6 +61,11 @@ describe("getEnv validation", () => {
     const env = getEnv();
     expect(env.DATABASE_URL).toBe(VALID_ENV.DATABASE_URL);
     expect(env.AUTH_SECRET).toBe(VALID_ENV.AUTH_SECRET);
+  });
+
+  it("throws when BOOKING_ACCOUNT_ID is present but not a UUID", () => {
+    Object.assign(process.env, { ...VALID_ENV, BOOKING_ACCOUNT_ID: "not-a-uuid" });
+    expect(() => getEnv()).toThrow(/BOOKING_ACCOUNT_ID/);
   });
 
   it("error message includes [startup] prefix for visibility", () => {

@@ -17,10 +17,11 @@ import { DeleteJobButton } from "./DeleteJobButton";
 import { JobEditForm } from "./JobEditFormWrapper";
 import { JobIntakePanel } from "./JobIntakePanel";
 import { AssetLinksPanel } from "./AssetLinksPanel";
-import { WhatNextBanner } from "./WhatNextBanner";
+import { JobCommandPanel } from "./JobCommandPanel";
 import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { isHomeboxEnabled } from "@/lib/homebox/client";
 import { withAssetContext, listAssetLinks } from "@/lib/homebox/db";
+import { derivePipelineStage } from "@/lib/pipeline/stages";
 import {
   PageContainer,
   PageHeader,
@@ -127,6 +128,8 @@ export default async function JobDetailPage({
           deposit_paid: boolean;
           has_unpaid_invoice: boolean;
           has_paid_invoice: boolean;
+          booking_request_id: string | null;
+          booking_status: string | null;
         }>(
           `SELECT
              (SELECT COUNT(*) FROM estimates WHERE job_id = $1 AND account_id = $2) AS estimate_count,
@@ -148,7 +151,13 @@ export default async function JobDetailPage({
              EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND notes LIKE 'Deposit: %') AS has_deposit_invoice,
              EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND notes LIKE 'Deposit: %' AND status IN ('partial','paid')) AS deposit_paid,
              EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND status IN ('sent','partial','overdue')) AS has_unpaid_invoice,
-             EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND status = 'paid') AS has_paid_invoice
+             EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND status = 'paid') AS has_paid_invoice,
+             (SELECT id FROM booking_requests
+              WHERE job_id = $1 AND account_id = $2
+              ORDER BY created_at DESC LIMIT 1) AS booking_request_id,
+             (SELECT status FROM booking_requests
+              WHERE job_id = $1 AND account_id = $2
+              ORDER BY created_at DESC LIMIT 1) AS booking_status
            FROM jobs j WHERE j.id = $1 AND j.account_id = $2`,
           [id, session.accountId]
         )
@@ -168,6 +177,21 @@ export default async function JobDetailPage({
 
   const estimateCount = commercialCounts ? parseInt(commercialCounts.estimate_count) : 0;
   const invoiceCount = commercialCounts ? parseInt(commercialCounts.invoice_count) : 0;
+  const activeVisits = visits.filter((v) => !["completed", "cancelled"].includes(v.status));
+  const latestVisit = visits[0] ?? null;
+  const pipelineStage = derivePipelineStage({
+    jobStatus: currentStatus,
+    bookingStatus: commercialCounts?.booking_status ?? null,
+    hasBookingRequest: !!commercialCounts?.booking_request_id,
+    estimateCount,
+    sentEstimateCount: commercialCounts?.has_sent_estimate ? 1 : 0,
+    approvedEstimateCount: commercialCounts?.has_approved_estimate ? 1 : 0,
+    activeVisitCount: activeVisits.length,
+    inProgressVisitCount: visits.filter((v) => v.status === "in_progress").length,
+    completedVisitCount: visits.filter((v) => v.status === "completed").length,
+    unpaidInvoiceCount: commercialCounts?.has_unpaid_invoice ? 1 : 0,
+    paidInvoiceCount: commercialCounts?.has_paid_invoice ? 1 : 0,
+  });
 
   // Profitability (owner/admin only)
   // actual_cost_cents on jobs is maintained as the parts rollup by visit-parts write paths.
@@ -239,22 +263,14 @@ export default async function JobDetailPage({
         }
       />
 
-      {/* What's Next banner — admin/owner only */}
       {!isTech && commercialCounts && (
-        <WhatNextBanner
+        <JobCommandPanel
+          stage={pipelineStage}
           jobId={job.id}
           clientId={job.client_id ?? null}
-          jobStatus={currentStatus}
-          estimateCount={estimateCount}
-          hasSentEstimate={commercialCounts.has_sent_estimate}
-          lastEstimateSentAt={commercialCounts.last_estimate_sent_at}
-          hasApprovedEstimate={commercialCounts.has_approved_estimate}
-          hasDepositInvoice={commercialCounts.has_deposit_invoice}
-          depositPaid={commercialCounts.deposit_paid}
-          hasActiveVisit={visits.some((v) => !["completed", "cancelled"].includes(v.status))}
-          invoiceCount={invoiceCount}
-          hasUnpaidInvoice={commercialCounts.has_unpaid_invoice}
-          hasPaidInvoice={commercialCounts.has_paid_invoice}
+          bookingRequestId={commercialCounts.booking_request_id}
+          activeVisitId={activeVisits[0]?.id ?? null}
+          latestVisitId={latestVisit?.id ?? null}
         />
       )}
 
@@ -304,7 +320,10 @@ export default async function JobDetailPage({
           {/* Status Transitions — admin/owner only */}
           {canTransition && allowedTransitions.length > 0 && (
             <Card data-testid="job-transition-panel">
-              <SectionHeader title="Status Actions" />
+              <SectionHeader title="Manual Status Override" />
+              <p style={{ marginTop: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+                Use these only when the procedural action above does not fit the real-world state.
+              </p>
               <JobTransitionForm
                 jobId={job.id}
                 allowedTransitions={allowedTransitions as JobStatus[]}

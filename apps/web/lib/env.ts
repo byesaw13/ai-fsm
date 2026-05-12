@@ -37,6 +37,11 @@ const schema = z.object({
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
+  /**
+   * Account used by the public booking page when unauthenticated customers
+   * submit intake requests.
+   */
+  BOOKING_ACCOUNT_ID: z.string().uuid().optional(),
 });
 
 let cachedEnv: ReturnType<typeof schema.parse> | null = null;
