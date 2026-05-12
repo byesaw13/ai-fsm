@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withRole } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { createIntakeRecords } from "../../../../lib/intake/records";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
   const pool = getPool();
   const client = await pool.connect();
   try {
+    await client.query("BEGIN");
     await client.query(
       `SELECT set_config('app.current_user_id', $1, true),
               set_config('app.current_account_id', $2, true),
@@ -42,17 +44,27 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       [session.userId, session.accountId, session.role]
     );
 
-    const { rows } = await client.query<{ id: string }>(
-      `INSERT INTO booking_requests
-         (account_id, name, phone, email, service_category, service_description,
-          preferred_date, address, status)
-       VALUES ($1, $2, $3, $4, 'general', $5, CURRENT_DATE, 'TBD', 'pending')
-       RETURNING id`,
-      [session.accountId, name, phone ?? null, email || null, service_description ?? null]
-    );
+    const { bookingId, clientId, propertyId, jobId } = await createIntakeRecords(client, {
+      accountId: session.accountId,
+      createdByUserId: session.userId,
+      name,
+      phone: phone ?? null,
+      email: email || null,
+      serviceCategory: "general_repairs",
+      serviceDescription: service_description || "Quick lead captured for follow-up.",
+      preferredDate: new Date().toISOString().slice(0, 10),
+      preferredTimeSlot: "flexible",
+      address: "TBD",
+      preferredContact: phone ? "phone" : "email",
+      smsConsent: false,
+      smsConsentSource: "quick_lead",
+    });
 
-    return NextResponse.json({ id: rows[0].id }, { status: 201 });
+    await client.query("COMMIT");
+
+    return NextResponse.json({ id: bookingId, clientId, propertyId, jobId }, { status: 201 });
   } catch (err) {
+    await client.query("ROLLBACK").catch(() => undefined);
     logger.error("POST /api/v1/booking-requests error", err, { traceId: session.traceId });
     return NextResponse.json(
       { error: { code: "INTERNAL_ERROR", message: "Failed to create lead", traceId: session.traceId } },

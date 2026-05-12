@@ -89,6 +89,31 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, jobId, p
     }
   }
 
+  async function handleRepair() {
+    setPending("repair");
+    setError(null);
+    try {
+      const res = await fetch(`/api/v1/booking-requests/${bookingId}/repair`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const d = await res.json();
+      if (!res.ok) {
+        setError(d.error?.message ?? "Failed to create pipeline job");
+        return;
+      }
+      if (d.data?.jobId) {
+        router.push(`/app/jobs/${d.data.jobId}`);
+      } else {
+        router.refresh();
+      }
+    } catch {
+      setError("Network error — try again");
+    } finally {
+      setPending(null);
+    }
+  }
+
   async function saveNotes() {
     setPending("notes");
     setError(null);
@@ -141,6 +166,22 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, jobId, p
               </Button>
             ))}
           </div>
+
+          {!jobId && (currentStatus === "reviewed" || currentStatus === "pending" || currentStatus === "needs_info") && (
+            <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-3)", borderTop: "1px solid var(--border)" }}>
+              <Button
+                variant="primary"
+                onClick={handleRepair}
+                loading={pending === "repair"}
+                disabled={!!pending}
+              >
+                Create Pipeline Job →
+              </Button>
+              <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                Links this intake to a client, property, and draft job so it appears on the pipeline.
+              </p>
+            </div>
+          )}
 
           {jobId && (currentStatus === "reviewed" || currentStatus === "pending" || currentStatus === "needs_info") && (
             <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-3)", borderTop: "1px solid var(--border)" }}>

@@ -50,6 +50,9 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 const BOOKING_ID = "11111111-1111-1111-1111-111111111111";
+const CLIENT_ID = "22222222-2222-2222-2222-222222222222";
+const PROPERTY_ID = "33333333-3333-3333-3333-333333333333";
+const JOB_ID = "44444444-4444-4444-4444-444444444444";
 
 const VALID_BODY = {
   name: "Jane Client",
@@ -87,44 +90,60 @@ beforeEach(() => {
 });
 
 describe("POST /api/v1/intake", () => {
-  it("creates a booking request", async () => {
+  it("creates linked client, property, job, and booking request records", async () => {
     const { POST } = await import("../route");
 
     mockClientQuery
-      .mockResolvedValueOnce({ rows: [] })                 // BEGIN
-      .mockResolvedValueOnce({ rows: [] })                 // set_config
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // set_config
+      .mockResolvedValueOnce({ rows: [] }) // SELECT client by email
+      .mockResolvedValueOnce({ rows: [] }) // SELECT client by phone
+      .mockResolvedValueOnce({ rows: [{ id: CLIENT_ID }] }) // INSERT client
+      .mockResolvedValueOnce({ rows: [] }) // SELECT property
+      .mockResolvedValueOnce({ rows: [{ id: PROPERTY_ID }] }) // INSERT property
+      .mockResolvedValueOnce({ rows: [{ id: JOB_ID }] }) // INSERT job
       .mockResolvedValueOnce({ rows: [{ id: BOOKING_ID }] }) // INSERT booking_request
-      .mockResolvedValueOnce({ rows: [] })                 // SELECT duplicate candidates
-      .mockResolvedValueOnce({ rows: [] });                // COMMIT
+      .mockResolvedValueOnce({ rows: [] }) // SELECT duplicate candidates
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
 
     const res = await POST(makeRequest(VALID_BODY));
 
     expect(res.status).toBe(201);
-    await expect(res.json()).resolves.toEqual({ id: BOOKING_ID });
+    await expect(res.json()).resolves.toEqual({
+      id: BOOKING_ID,
+      clientId: CLIENT_ID,
+      propertyId: PROPERTY_ID,
+      jobId: JOB_ID,
+    });
 
     const sql = mockClientQuery.mock.calls.map((call) => String(call[0])).join("\n");
     expect(sql).toContain("INSERT INTO booking_requests");
-    expect(sql).not.toContain("INSERT INTO clients");
-    expect(sql).not.toContain("INSERT INTO properties");
-    expect(sql).not.toContain("INSERT INTO jobs");
+    expect(sql).toContain("INSERT INTO clients");
+    expect(sql).toContain("INSERT INTO properties");
+    expect(sql).toContain("INSERT INTO jobs");
 
     const insertCall = mockClientQuery.mock.calls.find((call) =>
       String(call[0]).includes("INSERT INTO booking_requests")
     );
-    expect(insertCall?.[1]).toEqual([
+    expect(insertCall?.[1]?.[0]).toBe(OWNER_SESSION.accountId);
+    expect(insertCall?.[1]?.[1]).toBe(CLIENT_ID);
+    expect(insertCall?.[1]?.[2]).toBe(PROPERTY_ID);
+    expect(insertCall?.[1]?.[3]).toBe(JOB_ID);
+    expect(insertCall?.[1]?.[16]).toBe("email");
+    expect(insertCall?.[1]?.[17]).toBe(false);
+    expect(insertCall?.[1]?.[18]).toBe("staff_intake");
+
+    const jobInsert = mockClientQuery.mock.calls.find((call) =>
+      String(call[0]).includes("INSERT INTO jobs")
+    );
+    expect(jobInsert?.[1]).toEqual([
       OWNER_SESSION.accountId,
-      "Jane Client",
-      "jane@example.com",
-      "(555) 123-4567",
-      "general_repairs",
+      CLIENT_ID,
+      PROPERTY_ID,
+      "General Repairs - Jane Client",
       "Door latch is loose and needs adjustment.",
-      "2026-05-12",
-      "flexible",
-      "123 Main St",
-      "Springfield",
-      "email",
-      false,
-      "staff_intake",
+      "repair",
+      OWNER_SESSION.userId,
     ]);
 
     const duplicateSelect = mockClientQuery.mock.calls.find((call) =>

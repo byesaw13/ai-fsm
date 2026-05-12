@@ -15,12 +15,16 @@ interface JobRow {
   has_approved_estimate?: boolean;
   has_active_visit?: boolean;
   sub_status?: string | null;
+  pipeline_stage?: string;
+  pipeline_stage_label?: string;
+  next_action?: string;
 }
 
 interface JobBoardProps {
   jobs: JobRow[];
   statusLabels: Record<string, string>;
   statusOrder: string[];
+  groupBy?: "status" | "pipeline_stage";
 }
 
 // ---------------------------------------------------------------------------
@@ -31,15 +35,16 @@ interface JobBoardProps {
 // Cards are read-only — click goes to the job detail page.
 // ---------------------------------------------------------------------------
 
-export function JobBoard({ jobs, statusLabels, statusOrder }: JobBoardProps) {
+export function JobBoard({ jobs, statusLabels, statusOrder, groupBy = "status" }: JobBoardProps) {
   // Group jobs by status, only include statuses with jobs
   const grouped: Record<string, JobRow[]> = {};
   for (const status of statusOrder) {
     grouped[status] = [];
   }
   for (const job of jobs) {
-    if (grouped[job.status]) {
-      grouped[job.status].push(job);
+    const groupKey = groupBy === "pipeline_stage" ? job.pipeline_stage : job.status;
+    if (groupKey && grouped[groupKey]) {
+      grouped[groupKey].push(job);
     }
   }
 
@@ -87,9 +92,15 @@ export function JobBoard({ jobs, statusLabels, statusOrder }: JobBoardProps) {
               border: "1px solid var(--border)",
             }}
           >
-            <StatusBadge variant={status as StatusVariant}>
-              {statusLabels[status] ?? status}
-            </StatusBadge>
+          <span
+            style={{
+              fontSize: "var(--text-xs)",
+              fontWeight: "var(--font-semibold)",
+              color: "var(--fg)",
+            }}
+          >
+            {statusLabels[status] ?? status}
+          </span>
             <span
               style={{
                 marginLeft: "auto",
@@ -164,6 +175,18 @@ function BoardCard({ job }: { job: JobRow }) {
             {job.client_name}
           </p>
         )}
+        {job.next_action && (
+          <p
+            style={{
+              margin: "var(--space-2) 0 0",
+              fontSize: "var(--text-xs)",
+              color: "var(--accent)",
+              fontWeight: 600,
+            }}
+          >
+            {job.next_action}
+          </p>
+        )}
         <div
           style={{
             display: "flex",
@@ -200,7 +223,7 @@ function BoardCard({ job }: { job: JobRow }) {
               padding: "1px 6px",
             }}
           >
-            {CUSTOMER_STAGE_LABELS[stage]}
+            {job.pipeline_stage_label ?? CUSTOMER_STAGE_LABELS[stage]}
           </span>
         </div>
       </div>

@@ -19,6 +19,7 @@ vi.mock("@/lib/logger", () => ({
 }));
 
 const ACCOUNT_ID = "00000000-0000-0000-0000-000000000002";
+const OWNER_USER_ID = "00000000-0000-0000-0000-000000000001";
 const CLIENT_ID  = "11111111-1111-1111-1111-111111111111";
 const PROPERTY_ID = "22222222-2222-2222-2222-222222222222";
 const JOB_ID     = "33333333-3333-3333-3333-333333333333";
@@ -69,6 +70,7 @@ describe("POST /api/booking", () => {
 
     mockClientQuery
       .mockResolvedValueOnce({ rows: [] })                  // BEGIN
+      .mockResolvedValueOnce({ rows: [{ id: OWNER_USER_ID }] }) // SELECT owner/admin user
       .mockResolvedValueOnce({ rows: [] })                  // SELECT client by email → not found
       .mockResolvedValueOnce({ rows: [{ id: CLIENT_ID }] }) // INSERT client
       .mockResolvedValueOnce({ rows: [] })                  // SELECT property → not found
@@ -102,6 +104,12 @@ describe("POST /api/booking", () => {
     expect(brInsert?.[1]?.[3]).toBe(JOB_ID);       // job_id
     expect(brInsert?.[1]?.[16]).toBe("email");     // preferred_contact
     expect(brInsert?.[1]?.[17]).toBe(false);       // sms_consent
+    expect(brInsert?.[1]?.[18]).toBe("booking_form"); // sms_consent_source
+
+    const jobInsert = mockClientQuery.mock.calls.find((c) =>
+      String(c[0]).includes("INSERT INTO jobs")
+    );
+    expect(jobInsert?.[1]?.[6]).toBe(OWNER_USER_ID);
 
     const duplicateSelect = mockClientQuery.mock.calls.find((c) =>
       String(c[0]).includes("status NOT IN ('cancelled','converted')")
@@ -120,6 +128,7 @@ describe("POST /api/booking", () => {
 
     mockClientQuery
       .mockResolvedValueOnce({ rows: [] })                    // BEGIN
+      .mockResolvedValueOnce({ rows: [{ id: OWNER_USER_ID }] }) // SELECT owner/admin user
       .mockResolvedValueOnce({ rows: [{ id: CLIENT_ID }] })  // SELECT client by email → found
       .mockResolvedValueOnce({ rows: [] })                    // UPDATE contact preferences
       .mockResolvedValueOnce({ rows: [] })                    // SELECT property → not found

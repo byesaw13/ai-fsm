@@ -2,11 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { createIntakeRecords } from "../../../lib/intake/records";
 
 export const dynamic = "force-dynamic";
-
-const SMS_CONSENT_TEXT =
-  "By checking this box you consent to receive text messages from Dovetails Services LLC about your service requests. Message & data rates may apply. Reply STOP to opt out.";
 
 const bookingSchema = z.object({
   name: z.string().min(1).max(255),
@@ -97,184 +95,24 @@ export async function POST(request: NextRequest) {
   try {
     await client.query("BEGIN");
 
-    // Check if client already exists (by email or phone)
-    let clientId: string | null = null;
-    if (data.email) {
-      const { rows } = await client.query<{ id: string }>(
-        `SELECT id FROM clients WHERE account_id = $1 AND email = $2`,
-        [ACCOUNT_ID, data.email]
-      );
-      if (rows.length > 0) clientId = rows[0].id;
-    }
-    if (!clientId && data.phone) {
-      const { rows } = await client.query<{ id: string }>(
-        `SELECT id FROM clients WHERE account_id = $1 AND phone = $2`,
-        [ACCOUNT_ID, data.phone]
-      );
-      if (rows.length > 0) clientId = rows[0].id;
-    }
-
-    // Create client if not found
-    if (!clientId) {
-      const { rows } = await client.query<{ id: string }>(
-        `INSERT INTO clients (
-           account_id, name, email, phone, preferred_contact,
-           sms_consent, sms_consent_at, sms_consent_source, sms_consent_text
-         )
-         VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $6 THEN NOW() ELSE NULL END, $7, $8)
-         RETURNING id`,
-        [
-          ACCOUNT_ID,
-          data.name,
-          data.email || null,
-          data.phone || null,
-          data.preferred_contact,
-          data.sms_consent,
-          data.sms_consent ? "booking_form" : null,
-          data.sms_consent ? SMS_CONSENT_TEXT : null,
-        ]
-      );
-      clientId = rows[0].id;
-    } else {
-      await client.query(
-        `UPDATE clients
-         SET preferred_contact = $2,
-             sms_consent = CASE WHEN $3 THEN true ELSE sms_consent END,
-             sms_consent_at = CASE WHEN $3 THEN NOW() ELSE sms_consent_at END,
-             sms_consent_source = CASE WHEN $3 THEN $4 ELSE sms_consent_source END,
-             sms_consent_text = CASE WHEN $3 THEN $5 ELSE sms_consent_text END
-         WHERE id = $1 AND account_id = $6`,
-        [
-          clientId,
-          data.preferred_contact,
-          data.sms_consent,
-          "booking_form",
-          SMS_CONSENT_TEXT,
-          ACCOUNT_ID,
-        ]
-      );
-    }
-
-    // Check if property exists for this client at this address
-    let propertyId: string | null = null;
-    {
-      const { rows } = await client.query<{ id: string }>(
-        `SELECT id FROM properties WHERE client_id = $1 AND address = $2`,
-        [clientId, data.address]
-      );
-      if (rows.length > 0) {
-        propertyId = rows[0].id;
-      }
-    }
-
-    if (!propertyId) {
-      const { rows } = await client.query<{ id: string }>(
-        `INSERT INTO properties (account_id, client_id, name, address, city, state, zip)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING id`,
-        [
-          ACCOUNT_ID,
-          clientId,
-          data.address,
-          data.address,
-          data.city || null,
-          data.state || null,
-          data.zip || null,
-        ]
-      );
-      propertyId = rows[0].id;
-    }
-
-    // Determine job type from service category
-    const jobTypeMap: Record<string, string> = {
-      painting_finishes: "painting",
-      maintenance_small: "maintenance",
-      general_repairs: "repair",
-      plumbing: "repair",
-      electrical: "repair",
-      carpentry_furniture: "custom",
-      outdoor_seasonal: "maintenance",
-      mounting_installs: "custom",
-      specialty_expansion: "custom",
-    };
-    const jobType = jobTypeMap[data.service_category] || "custom";
-
-    const categoryLabel = data.service_category
-      .replace(/_/g, " ")
-      .replace(/\b\w/g, (c) => c.toUpperCase());
-
-    // Create a job
-    const { rows: jobRows } = await client.query<{ id: string }>(
-      `INSERT INTO jobs (account_id, client_id, property_id, title, description, status, job_type)
-       VALUES ($1, $2, $3, $4, $5, 'draft', $6)
-       RETURNING id`,
-      [ACCOUNT_ID, clientId, propertyId, `${categoryLabel} — ${data.name}`, data.service_description, jobType]
-    );
-    const jobId = jobRows[0].id;
-
-    // Create the booking request record.
-    // Visit is NOT created here — staff create it after reviewing the request.
-    const { rows: bookingRows } = await client.query<{ id: string }>(
-      `INSERT INTO booking_requests
-         (account_id, client_id, property_id, job_id,
-          name, email, phone, service_category, service_description,
-          preferred_date, preferred_time_slot, address, city, state, zip, access_notes,
-          preferred_contact, sms_consent, sms_consent_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-               $17, $18, CASE WHEN $18 THEN NOW() ELSE NULL END)
-       RETURNING id`,
-      [
-        ACCOUNT_ID,
-        clientId,
-        propertyId,
-        jobId,
-        data.name,
-        data.email || null,
-        data.phone || null,
-        data.service_category,
-        data.service_description,
-        data.preferred_date,
-        data.preferred_time_slot || null,
-        data.address,
-        data.city || null,
-        data.state || null,
-        data.zip || null,
-        data.access_notes || null,
-        data.preferred_contact,
-        data.sms_consent,
-      ]
-    );
-    const bookingId = bookingRows[0].id;
-
-    const { rows: duplicateRows } = await client.query<{ id: string }>(
-      `SELECT id FROM booking_requests
-       WHERE account_id = $1
-         AND id != $2
-         AND status NOT IN ('cancelled','converted')
-         AND created_at > NOW() - INTERVAL '90 days'
-         AND (
-           (email IS NOT NULL AND email = $3) OR
-           (phone IS NOT NULL AND phone = $4) OR
-           (lower(name) = lower($5))
-         )
-       LIMIT 5`,
-      [
-        ACCOUNT_ID,
-        bookingId,
-        data.email || null,
-        data.phone || null,
-        data.name,
-      ]
-    );
-
-    if (duplicateRows.length > 0) {
-      await client.query(
-        `UPDATE booking_requests
-         SET duplicate_candidate_ids = $1
-         WHERE id = $2 AND account_id = $3`,
-        [duplicateRows.map((row) => row.id), bookingId, ACCOUNT_ID]
-      );
-    }
+    const { bookingId } = await createIntakeRecords(client, {
+      accountId: ACCOUNT_ID,
+      name: data.name,
+      email: data.email || null,
+      phone: data.phone || null,
+      serviceCategory: data.service_category,
+      serviceDescription: data.service_description,
+      preferredDate: data.preferred_date,
+      preferredTimeSlot: data.preferred_time_slot || null,
+      address: data.address,
+      city: data.city || null,
+      state: data.state || null,
+      zip: data.zip || null,
+      accessNotes: data.access_notes || null,
+      preferredContact: data.preferred_contact,
+      smsConsent: data.sms_consent,
+      smsConsentSource: "booking_form",
+    });
 
     await client.query("COMMIT");
 
