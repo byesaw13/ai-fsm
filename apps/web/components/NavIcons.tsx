@@ -175,3 +175,22 @@ export function IconBooking(props: IconProps) {
     </Icon>
   );
 }
+
+export function IconPipeline(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="2" y="4" width="4" height="12" rx="1" />
+      <rect x="8" y="6" width="4" height="10" rx="1" />
+      <rect x="14" y="2" width="4" height="14" rx="1" />
+    </Icon>
+  );
+}
+
+export function IconField(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M10 2a6 6 0 0 1 6 6c0 4-6 10-6 10S4 12 4 8a6 6 0 0 1 6-6Z" />
+      <circle cx="10" cy="8" r="2" />
+    </Icon>
+  );
+}

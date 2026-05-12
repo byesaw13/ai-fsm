@@ -22,6 +22,8 @@ import {
   IconMyDay,
   IconMileage,
   IconBooking,
+  IconPipeline,
+  IconField,
 } from "./NavIcons";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
@@ -39,12 +41,14 @@ interface NavSection {
 }
 
 const OPERATIONS_ITEMS: NavItem[] = [
+  { href: "/app/pipeline",             label: "Pipeline",       Icon: IconPipeline,  adminOnly: true },
   { href: "/app/my-day",              label: "My Day",         Icon: IconMyDay },
+  { href: "/app/field",               label: "Field Mode",     Icon: IconField },
   { href: "/app/operations",          label: "Dashboard",      Icon: IconDashboard },
   { href: "/app/schedule",             label: "Schedule",       Icon: IconSchedule },
   { href: "/app/jobs",                 label: "Jobs",           Icon: IconJobs },
   { href: "/app/visits",               label: "Visits",         Icon: IconVisits },
-  { href: "/app/booking-requests",     label: "Booking",        Icon: IconBooking, adminOnly: true },
+  { href: "/app/booking-requests",     label: "Booking",        Icon: IconBooking,   adminOnly: true },
 ];
 
 const BUSINESS_ITEMS: NavItem[] = [
@@ -84,14 +88,19 @@ export function getNavSections(role: string): NavSection[] {
 
 /** Pure function — returns flat list of nav items for mobile bottom nav */
 export function getBottomNavItems(role: string): NavItem[] {
+  const pipeline = OPERATIONS_ITEMS.find((i) => i.href === "/app/pipeline")!;
+  const myDay    = OPERATIONS_ITEMS.find((i) => i.href === "/app/my-day")!;
+  const field    = OPERATIONS_ITEMS.find((i) => i.href === "/app/field")!;
+  const jobs     = OPERATIONS_ITEMS.find((i) => i.href === "/app/jobs")!;
+  const visits   = OPERATIONS_ITEMS.find((i) => i.href === "/app/visits")!;
+
   if (role === "tech") {
-    // My Day, Jobs, Visits, Schedule
-    return [OPERATIONS_ITEMS[0], OPERATIONS_ITEMS[3], OPERATIONS_ITEMS[4], OPERATIONS_ITEMS[2]];
+    // My Day, Field, Jobs, Visits
+    return [myDay, field, jobs, visits];
   }
-  // admin/owner: My Day, Jobs, Visits, Clients, Invoices
-  const clients  = BUSINESS_ITEMS.find((i) => i.href === "/app/clients")!;
-  const invoices = BUSINESS_ITEMS.find((i) => i.href === "/app/invoices")!;
-  return [OPERATIONS_ITEMS[0], OPERATIONS_ITEMS[3], OPERATIONS_ITEMS[4], clients, invoices];
+  // admin/owner: Pipeline, Field, Jobs, Visits, Schedule
+  const schedule = OPERATIONS_ITEMS.find((i) => i.href === "/app/schedule")!;
+  return [pipeline, field, jobs, visits, schedule];
 }
 
 /** Pure function — returns true if href is the active nav route for pathname */
