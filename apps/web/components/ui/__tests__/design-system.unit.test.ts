@@ -140,49 +140,52 @@ function flattenSections(sections: ReturnType<typeof getNavSections>) {
 }
 
 describe("getNavSections (role filtering)", () => {
-  it("returns 20 items across 3 sections for admin role", () => {
+  it("returns a focused primary nav across 3 sections for admin role", () => {
     const sections = getNavSections("admin");
     const items = flattenSections(sections);
     expect(sections).toHaveLength(3); // Operations, Business, System
-    expect(items).toHaveLength(20);
+    expect(items).toHaveLength(12);
     expect(items.map((i) => i.href)).toContain("/app/pipeline");
     expect(items.map((i) => i.href)).toContain("/app/field");
     expect(items.map((i) => i.href)).toContain("/app/booking-requests");
     expect(items.map((i) => i.href)).toContain("/app/clients");
-    expect(items.map((i) => i.href)).toContain("/app/properties");
     expect(items.map((i) => i.href)).toContain("/app/estimates");
     expect(items.map((i) => i.href)).toContain("/app/invoices");
-    expect(items.map((i) => i.href)).toContain("/app/automations");
     expect(items.map((i) => i.href)).toContain("/app/expenses");
     expect(items.map((i) => i.href)).toContain("/app/reports");
     expect(items.map((i) => i.href)).toContain("/app/schedule");
     expect(items.map((i) => i.href)).toContain("/app/settings");
     expect(items.map((i) => i.href)).toContain("/app/price-book");
-    expect(items.map((i) => i.href)).toContain("/app/mileage");
-    expect(items.map((i) => i.href)).toContain("/app/maintenance-plans");
-    expect(items.map((i) => i.href)).toContain("/app/membership-dashboard");
+    expect(items.map((i) => i.href)).not.toContain("/app/my-day");
+    expect(items.map((i) => i.href)).not.toContain("/app/visits");
+    expect(items.map((i) => i.href)).not.toContain("/app/operations");
+    expect(items.map((i) => i.href)).not.toContain("/app/properties");
+    expect(items.map((i) => i.href)).not.toContain("/app/automations");
+    expect(items.map((i) => i.href)).not.toContain("/app/mileage");
+    expect(items.map((i) => i.href)).not.toContain("/app/maintenance-plans");
+    expect(items.map((i) => i.href)).not.toContain("/app/membership-dashboard");
     expect(items.map((i) => i.href)).not.toContain("/app/owner-dashboard");
   });
 
-  it("returns 20 items for owner role", () => {
+  it("returns the same focused primary nav for owner role", () => {
     const sections = getNavSections("owner");
     const items = flattenSections(sections);
-    expect(items).toHaveLength(20);
+    expect(items).toHaveLength(12);
   });
 
-  it("returns only 7 items for tech role", () => {
+  it("returns only 6 items for tech role", () => {
     const sections = getNavSections("tech");
     const items = flattenSections(sections);
-    expect(items).toHaveLength(7);
+    expect(items).toHaveLength(6);
     const hrefs = items.map((i) => i.href);
     expect(hrefs).toContain("/app/my-day");
     expect(hrefs).toContain("/app/field");
-    expect(hrefs).toContain("/app/operations");
     expect(hrefs).toContain("/app/jobs");
     expect(hrefs).toContain("/app/visits");
     expect(hrefs).toContain("/app/schedule");
     expect(hrefs).toContain("/app/settings");
     expect(hrefs).not.toContain("/app/pipeline");
+    expect(hrefs).not.toContain("/app/operations");
     expect(hrefs).not.toContain("/app/estimates");
     expect(hrefs).not.toContain("/app/invoices");
     expect(hrefs).not.toContain("/app/automations");

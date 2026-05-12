@@ -208,6 +208,31 @@ export const POST = withAuth(
         effectiveStatus = targetStatus;
       }
 
+      if (effectiveStatus === "in_progress" && currentStatus !== "in_progress") {
+        await client.query(
+          `INSERT INTO visit_time_logs (account_id, visit_id, job_id, user_id, started_at)
+           SELECT $1, $2, $3, $4, now()
+           WHERE NOT EXISTS (
+             SELECT 1 FROM visit_time_logs
+             WHERE account_id = $1 AND visit_id = $2 AND ended_at IS NULL
+           )`,
+          [session.accountId, id, updated.job_id ?? null, updated.assigned_user_id ?? session.userId]
+        );
+      }
+
+      if (effectiveStatus === "completed") {
+        await client.query(
+          `UPDATE visit_time_logs
+           SET ended_at = now(),
+               notes = COALESCE($3, notes),
+               updated_at = now()
+           WHERE account_id = $1
+             AND visit_id = $2
+             AND ended_at IS NULL`,
+          [session.accountId, id, techNotes ?? null]
+        );
+      }
+
       await appendAuditLog(client, {
         account_id: session.accountId,
         entity_type: "visit",
