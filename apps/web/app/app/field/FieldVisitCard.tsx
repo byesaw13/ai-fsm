@@ -8,6 +8,7 @@ interface FieldVisit {
   id: string;
   status: string;
   scheduled_start: string | null;
+  active_time_started_at: string | null;
   job_id: string | null;
   job_title: string | null;
   client_name: string | null;
@@ -40,6 +41,10 @@ export function FieldVisitCard({ visit: initialVisit }: FieldVisitCardProps) {
 
   useEffect(() => {
     if (isActive) {
+      const startedAt = visit.active_time_started_at
+        ? new Date(visit.active_time_started_at).getTime()
+        : Date.now();
+      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
       timerRef.current = setInterval(() => {
         setElapsedSeconds((s) => s + 1);
       }, 1000);
@@ -48,7 +53,7 @@ export function FieldVisitCard({ visit: initialVisit }: FieldVisitCardProps) {
       setElapsedSeconds(0);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [isActive]);
+  }, [isActive, visit.active_time_started_at]);
 
   function formatElapsed(secs: number) {
     const h = Math.floor(secs / 3600);
@@ -74,7 +79,11 @@ export function FieldVisitCard({ visit: initialVisit }: FieldVisitCardProps) {
         toastError(data?.error?.message ?? "Could not update visit status");
         return;
       }
-      setVisit({ ...visit, status: t.effectiveStatus });
+      setVisit({
+        ...visit,
+        status: t.effectiveStatus,
+        active_time_started_at: t.effectiveStatus === "in_progress" ? new Date().toISOString() : null,
+      });
       success(t.effectiveStatus === "completed" ? "Visit completed!" : "Visit started");
     } catch {
       toastError("Network error");

@@ -340,10 +340,13 @@ describe("POST /api/v1/visits/[id]/transition", () => {
 
     const res = await visitTransition(
       makeRequest("POST", `${VISITS_BASE}/${VISIT_ID}/transition`, { status: "arrived" })
-    );
-    expect(res.status).toBe(200);
+	    );
+	    expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data.status).toBe("in_progress");
+    expect(mockClientQuery.mock.calls.some((call) =>
+      String(call[0]).includes("INSERT INTO visit_time_logs")
+    )).toBe(true);
   });
 
   it("arrived → in_progress → 200", async () => {
@@ -357,10 +360,13 @@ describe("POST /api/v1/visits/[id]/transition", () => {
 
     const res = await visitTransition(
       makeRequest("POST", `${VISITS_BASE}/${VISIT_ID}/transition`, { status: "in_progress" })
-    );
-    expect(res.status).toBe(200);
+	    );
+	    expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data.status).toBe("in_progress");
+    expect(mockClientQuery.mock.calls.some((call) =>
+      String(call[0]).includes("INSERT INTO visit_time_logs")
+    )).toBe(true);
   });
 
   it("in_progress → completed → 200", async () => {
@@ -378,10 +384,15 @@ describe("POST /api/v1/visits/[id]/transition", () => {
         status: "completed",
         tech_notes: "All done",
       })
-    );
-    expect(res.status).toBe(200);
+	    );
+	    expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data.status).toBe("completed");
+    const closeLogCall = mockClientQuery.mock.calls.find((call) =>
+      String(call[0]).includes("UPDATE visit_time_logs")
+    );
+    expect(closeLogCall).toBeTruthy();
+    expect(closeLogCall?.[1]).toEqual([mockSession.accountId, VISIT_ID, "All done"]);
   });
 
   it("in_progress → completed without a completion packet → 422 MISSING_PHOTO", async () => {

@@ -12,6 +12,7 @@ type VisitRow = {
   id: string;
   status: string;
   scheduled_start: string | null;
+  active_time_started_at: string | null;
   job_id: string | null;
   job_title: string | null;
   client_name: string | null;
@@ -24,9 +25,10 @@ export default async function FieldPage() {
 
   const isAdmin = canViewAllVisits(session.role);
 
-  const visits = await query<VisitRow>(
-    `SELECT
+	  const visits = await query<VisitRow>(
+	    `SELECT
        v.id, v.status, v.scheduled_start, v.job_id,
+       vtl.started_at AS active_time_started_at,
        j.title AS job_title,
        c.name AS client_name,
        p.address AS property_address
@@ -34,6 +36,10 @@ export default async function FieldPage() {
      LEFT JOIN jobs j ON j.id = v.job_id
      LEFT JOIN clients c ON c.id = j.client_id
      LEFT JOIN properties p ON p.id = j.property_id
+     LEFT JOIN visit_time_logs vtl
+       ON vtl.visit_id = v.id
+      AND vtl.account_id = v.account_id
+      AND vtl.ended_at IS NULL
      WHERE v.account_id = $1
        ${!isAdmin ? "AND v.assigned_user_id = $2" : ""}
        AND v.status NOT IN ('cancelled','completed')

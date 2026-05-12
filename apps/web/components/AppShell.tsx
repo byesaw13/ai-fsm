@@ -6,21 +6,17 @@ import { useState, type ReactNode } from "react";
 import type { Route } from "next";
 import { ToastProvider } from "./ui/Toast";
 import {
-  IconDashboard,
   IconSchedule,
   IconJobs,
   IconVisits,
   IconClients,
   IconInvoices,
   IconEstimates,
-  IconProperties,
   IconExpenses,
-  IconAutomations,
   IconReports,
   IconSettings,
   IconPriceBook,
   IconMyDay,
-  IconMileage,
   IconBooking,
   IconPipeline,
   IconField,
@@ -44,7 +40,6 @@ const OPERATIONS_ITEMS: NavItem[] = [
   { href: "/app/pipeline",             label: "Pipeline",       Icon: IconPipeline,  adminOnly: true },
   { href: "/app/my-day",              label: "My Day",         Icon: IconMyDay },
   { href: "/app/field",               label: "Field Mode",     Icon: IconField },
-  { href: "/app/operations",          label: "Dashboard",      Icon: IconDashboard },
   { href: "/app/schedule",             label: "Schedule",       Icon: IconSchedule },
   { href: "/app/jobs",                 label: "Jobs",           Icon: IconJobs },
   { href: "/app/visits",               label: "Visits",         Icon: IconVisits },
@@ -53,15 +48,10 @@ const OPERATIONS_ITEMS: NavItem[] = [
 
 const BUSINESS_ITEMS: NavItem[] = [
   { href: "/app/clients",     label: "Clients",    Icon: IconClients,     adminOnly: true },
-  { href: "/app/properties",  label: "Properties", Icon: IconProperties,  adminOnly: true },
-  { href: "/app/invoices",    label: "Invoices",   Icon: IconInvoices,    adminOnly: true },
   { href: "/app/estimates",   label: "Estimates",  Icon: IconEstimates,   adminOnly: true },
+  { href: "/app/invoices",    label: "Invoices",   Icon: IconInvoices,    adminOnly: true },
   { href: "/app/price-book",  label: "Price Book", Icon: IconPriceBook,   adminOnly: true },
   { href: "/app/expenses",    label: "Expenses",   Icon: IconExpenses,    adminOnly: true },
-  { href: "/app/mileage",     label: "Mileage",    Icon: IconMileage,    adminOnly: true },
-  { href: "/app/maintenance-plans", label: "Maintenance Plans", Icon: IconSchedule, adminOnly: true },
-  { href: "/app/membership-dashboard", label: "Membership", Icon: IconReports, adminOnly: true },
-  { href: "/app/automations", label: "Automations",Icon: IconAutomations, adminOnly: true },
   { href: "/app/reports",     label: "Reports",    Icon: IconReports,     adminOnly: true },
 ];
 
@@ -73,7 +63,9 @@ const ADMIN_ITEMS: NavItem[] = [
 export function getNavSections(role: string): NavSection[] {
   const sections: NavSection[] = [];
 
-  const opsItems = role === "tech" ? OPERATIONS_ITEMS.filter((item) => !item.adminOnly) : OPERATIONS_ITEMS;
+  const opsItems = role === "tech"
+    ? OPERATIONS_ITEMS.filter((item) => !item.adminOnly)
+    : OPERATIONS_ITEMS.filter((item) => item.href !== "/app/my-day" && item.href !== "/app/visits");
   if (opsItems.length > 0) sections.push({ label: "Operations", items: opsItems });
 
   if (role !== "tech") {
