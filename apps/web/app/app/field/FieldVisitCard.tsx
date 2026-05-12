@@ -18,10 +18,13 @@ interface FieldVisitCardProps {
   visit: FieldVisit;
 }
 
-const STATUS_TRANSITIONS: Record<string, { label: string; nextStatus: string; color: string } | null> = {
-  scheduled:   { label: "Start Visit",   nextStatus: "arrived",     color: "#2563eb" },
-  arrived:     { label: "Begin Work",    nextStatus: "in_progress", color: "#d97706" },
-  in_progress: { label: "End Visit",     nextStatus: "completed",   color: "#16a34a" },
+// Each entry maps current DB status → the transition target to POST to /transition.
+// "Start Visit" on a scheduled visit targets "arrived"; the transition endpoint
+// collapses scheduled→arrived→in_progress in one transaction and returns in_progress.
+const STATUS_TRANSITIONS: Record<string, { label: string; transitionTarget: string; effectiveStatus: string; color: string } | null> = {
+  scheduled:   { label: "Start Visit", transitionTarget: "arrived",   effectiveStatus: "in_progress", color: "#2563eb" },
+  arrived:     { label: "Begin Work",  transitionTarget: "in_progress", effectiveStatus: "in_progress", color: "#d97706" },
+  in_progress: { label: "End Visit",   transitionTarget: "completed",  effectiveStatus: "completed",   color: "#16a34a" },
   completed:   null,
   cancelled:   null,
 };
@@ -61,17 +64,18 @@ export function FieldVisitCard({ visit: initialVisit }: FieldVisitCardProps) {
     if (!t) return;
     setTransitioning(true);
     try {
-      const res = await fetch(`/api/v1/visits/${visit.id}`, {
-        method: "PATCH",
+      const res = await fetch(`/api/v1/visits/${visit.id}/transition`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: t.nextStatus }),
+        body: JSON.stringify({ status: t.transitionTarget }),
       });
       if (!res.ok) {
-        toastError("Could not update visit status");
+        const data = await res.json().catch(() => ({}));
+        toastError(data?.error?.message ?? "Could not update visit status");
         return;
       }
-      setVisit({ ...visit, status: t.nextStatus });
-      success(t.nextStatus === "completed" ? "Visit completed!" : `Status updated to ${t.nextStatus}`);
+      setVisit({ ...visit, status: t.effectiveStatus });
+      success(t.effectiveStatus === "completed" ? "Visit completed!" : "Visit started");
     } catch {
       toastError("Network error");
     } finally {

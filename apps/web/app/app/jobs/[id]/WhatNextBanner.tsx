@@ -44,8 +44,8 @@ function computeBanner(props: WhatNextBannerProps): BannerContent | null {
   const days = daysSince(lastEstimateSentAt);
   const clientParam = clientId ? `&client_id=${clientId}` : "";
 
-  // Paid — all done
-  if (hasPaidInvoice && jobStatus === "invoiced") {
+  // Paid — all done (only when no remaining unpaid invoices)
+  if (hasPaidInvoice && !hasUnpaidInvoice && jobStatus === "invoiced") {
     return {
       color: "#065f46",
       bg: "#d1fae5",
@@ -66,7 +66,7 @@ function computeBanner(props: WhatNextBannerProps): BannerContent | null {
   }
 
   // Completed, no invoice yet
-  if ((jobStatus === "completed" || jobStatus === "in_progress") && invoiceCount === 0) {
+  if (jobStatus === "completed" && invoiceCount === 0) {
     return {
       color: "#1e40af",
       bg: "#dbeafe",
