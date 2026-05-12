@@ -140,11 +140,13 @@ function flattenSections(sections: ReturnType<typeof getNavSections>) {
 }
 
 describe("getNavSections (role filtering)", () => {
-  it("returns 18 items across 3 sections for admin role", () => {
+  it("returns 20 items across 3 sections for admin role", () => {
     const sections = getNavSections("admin");
     const items = flattenSections(sections);
     expect(sections).toHaveLength(3); // Operations, Business, System
-    expect(items).toHaveLength(18);
+    expect(items).toHaveLength(20);
+    expect(items.map((i) => i.href)).toContain("/app/pipeline");
+    expect(items.map((i) => i.href)).toContain("/app/field");
     expect(items.map((i) => i.href)).toContain("/app/booking-requests");
     expect(items.map((i) => i.href)).toContain("/app/clients");
     expect(items.map((i) => i.href)).toContain("/app/properties");
@@ -162,33 +164,39 @@ describe("getNavSections (role filtering)", () => {
     expect(items.map((i) => i.href)).not.toContain("/app/owner-dashboard");
   });
 
-  it("returns 18 items for owner role", () => {
+  it("returns 20 items for owner role", () => {
     const sections = getNavSections("owner");
     const items = flattenSections(sections);
-    expect(items).toHaveLength(18);
+    expect(items).toHaveLength(20);
   });
 
-  it("returns only 6 items for tech role", () => {
+  it("returns only 7 items for tech role", () => {
     const sections = getNavSections("tech");
     const items = flattenSections(sections);
-    expect(items).toHaveLength(6);
+    expect(items).toHaveLength(7);
     const hrefs = items.map((i) => i.href);
+    expect(hrefs).toContain("/app/my-day");
+    expect(hrefs).toContain("/app/field");
     expect(hrefs).toContain("/app/operations");
     expect(hrefs).toContain("/app/jobs");
     expect(hrefs).toContain("/app/visits");
     expect(hrefs).toContain("/app/schedule");
     expect(hrefs).toContain("/app/settings");
+    expect(hrefs).not.toContain("/app/pipeline");
     expect(hrefs).not.toContain("/app/estimates");
     expect(hrefs).not.toContain("/app/invoices");
     expect(hrefs).not.toContain("/app/automations");
   });
 
-  it("includes My Day as first item for all roles", () => {
-    for (const role of ["admin", "owner", "tech"]) {
+  it("includes Pipeline first for admin/owner, My Day first for tech", () => {
+    for (const role of ["admin", "owner"]) {
       const sections = getNavSections(role);
       const items = flattenSections(sections);
-      expect(items[0].href).toBe("/app/my-day");
+      expect(items[0].href).toBe("/app/pipeline");
     }
+    const techSections = getNavSections("tech");
+    const techItems = flattenSections(techSections);
+    expect(techItems[0].href).toBe("/app/my-day");
   });
 });
 

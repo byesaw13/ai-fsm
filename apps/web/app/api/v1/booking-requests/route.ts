@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { withRole } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
@@ -6,6 +7,61 @@ import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const VALID_STATUSES = ["pending", "needs_info", "duplicate", "reviewed", "converted", "cancelled"];
+
+const quickLeadSchema = z.object({
+  name: z.string().min(1).max(200),
+  phone: z.string().max(50).optional(),
+  email: z.string().email().optional().or(z.literal("")),
+  service_description: z.string().max(2000).optional(),
+});
+
+export const POST = withRole(["owner", "admin"], async (request: NextRequest, session) => {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: { code: "VALIDATION_ERROR", message: "Invalid JSON" } }, { status: 400 });
+  }
+
+  const parsed = quickLeadSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: "Invalid request", details: parsed.error.issues } },
+      { status: 400 }
+    );
+  }
+
+  const { name, phone, email, service_description } = parsed.data;
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.query(
+      `SELECT set_config('app.current_user_id', $1, true),
+              set_config('app.current_account_id', $2, true),
+              set_config('app.current_role', $3, true)`,
+      [session.userId, session.accountId, session.role]
+    );
+
+    const { rows } = await client.query<{ id: string }>(
+      `INSERT INTO booking_requests
+         (account_id, name, phone, email, service_category, service_description,
+          preferred_date, address, status)
+       VALUES ($1, $2, $3, $4, 'general', $5, CURRENT_DATE, 'TBD', 'pending')
+       RETURNING id`,
+      [session.accountId, name, phone ?? null, email || null, service_description ?? null]
+    );
+
+    return NextResponse.json({ id: rows[0].id }, { status: 201 });
+  } catch (err) {
+    logger.error("POST /api/v1/booking-requests error", err, { traceId: session.traceId });
+    return NextResponse.json(
+      { error: { code: "INTERNAL_ERROR", message: "Failed to create lead", traceId: session.traceId } },
+      { status: 500 }
+    );
+  } finally {
+    client.release();
+  }
+});
 
 export const GET = withRole(["owner", "admin"], async (request: NextRequest, session) => {
   const { searchParams } = new URL(request.url);

@@ -17,6 +17,7 @@ import { DeleteJobButton } from "./DeleteJobButton";
 import { JobEditForm } from "./JobEditFormWrapper";
 import { JobIntakePanel } from "./JobIntakePanel";
 import { AssetLinksPanel } from "./AssetLinksPanel";
+import { WhatNextBanner } from "./WhatNextBanner";
 import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { isHomeboxEnabled } from "@/lib/homebox/client";
 import { withAssetContext, listAssetLinks } from "@/lib/homebox/db";
@@ -109,7 +110,7 @@ export default async function JobDetailPage({
            ORDER BY v.scheduled_start ASC`,
           [id, session.accountId]
         ),
-    // Count estimates and invoices + profitability snapshot (owner/admin only)
+    // Count estimates and invoices + profitability snapshot + pipeline state (owner/admin only)
     session.role !== "tech"
       ? queryOne<{
           estimate_count: string;
@@ -119,6 +120,13 @@ export default async function JobDetailPage({
           estimated_labor_cost_cents: number | null;
           estimated_total_cents: number | null;
           invoice_total_cents: number | null;
+          has_sent_estimate: boolean;
+          last_estimate_sent_at: string | null;
+          has_approved_estimate: boolean;
+          has_deposit_invoice: boolean;
+          deposit_paid: boolean;
+          has_unpaid_invoice: boolean;
+          has_paid_invoice: boolean;
         }>(
           `SELECT
              (SELECT COUNT(*) FROM estimates WHERE job_id = $1 AND account_id = $2) AS estimate_count,
@@ -133,7 +141,14 @@ export default async function JobDetailPage({
               ORDER BY created_at DESC LIMIT 1) AS estimated_total_cents,
              (SELECT total_cents FROM invoices
               WHERE job_id = $1 AND account_id = $2 AND status != 'void'
-              ORDER BY created_at DESC LIMIT 1) AS invoice_total_cents
+              ORDER BY created_at DESC LIMIT 1) AS invoice_total_cents,
+             EXISTS(SELECT 1 FROM estimates WHERE job_id = $1 AND account_id = $2 AND status IN ('sent','approved')) AS has_sent_estimate,
+             (SELECT sent_at FROM estimates WHERE job_id = $1 AND account_id = $2 AND status IN ('sent','approved') ORDER BY created_at DESC LIMIT 1) AS last_estimate_sent_at,
+             EXISTS(SELECT 1 FROM estimates WHERE job_id = $1 AND account_id = $2 AND status = 'approved') AS has_approved_estimate,
+             EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND notes LIKE 'Deposit: %') AS has_deposit_invoice,
+             EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND notes LIKE 'Deposit: %' AND status IN ('partial','paid')) AS deposit_paid,
+             EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND status IN ('sent','partial','overdue')) AS has_unpaid_invoice,
+             EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND status = 'paid') AS has_paid_invoice
            FROM jobs j WHERE j.id = $1 AND j.account_id = $2`,
           [id, session.accountId]
         )
@@ -223,6 +238,25 @@ export default async function JobDetailPage({
           </span>
         }
       />
+
+      {/* What's Next banner — admin/owner only */}
+      {!isTech && commercialCounts && (
+        <WhatNextBanner
+          jobId={job.id}
+          clientId={job.client_id ?? null}
+          jobStatus={currentStatus}
+          estimateCount={estimateCount}
+          hasSentEstimate={commercialCounts.has_sent_estimate}
+          lastEstimateSentAt={commercialCounts.last_estimate_sent_at}
+          hasApprovedEstimate={commercialCounts.has_approved_estimate}
+          hasDepositInvoice={commercialCounts.has_deposit_invoice}
+          depositPaid={commercialCounts.deposit_paid}
+          hasActiveVisit={visits.some((v) => !["completed", "cancelled"].includes(v.status))}
+          invoiceCount={invoiceCount}
+          hasUnpaidInvoice={commercialCounts.has_unpaid_invoice}
+          hasPaidInvoice={commercialCounts.has_paid_invoice}
+        />
+      )}
 
       {/* Pipeline progress stepper — admin/owner only */}
       {!isTech && (

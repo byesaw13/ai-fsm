@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -293,6 +293,65 @@ export function NewEstimateForm({
       setPropertyId("");
     }
   }, [filteredProperties, propertyId]);
+
+  // Auto-trigger: scope parser debounce (1.5s after typing stops)
+  const scopeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!scopeNotes.trim() || scopeParsing || pending) return;
+    if (scopeDebounceRef.current) clearTimeout(scopeDebounceRef.current);
+    scopeDebounceRef.current = setTimeout(() => {
+      void handleParseScope();
+    }, 1500);
+    return () => {
+      if (scopeDebounceRef.current) clearTimeout(scopeDebounceRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeNotes]);
+
+  // Auto-trigger: item suggester debounce (2s after typing stops)
+  const itemDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!itemDescription.trim() || itemSuggesting || pending) return;
+    if (itemDebounceRef.current) clearTimeout(itemDebounceRef.current);
+    itemDebounceRef.current = setTimeout(() => {
+      void handleSuggestItems();
+    }, 2000);
+    return () => {
+      if (itemDebounceRef.current) clearTimeout(itemDebounceRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemDescription]);
+
+  // Inline suggestion helpers
+  function handleAddSuggestion(index: number) {
+    const s = suggestions[index];
+    if (!s) return;
+    setLineItems((prev) => [
+      ...prev.filter((r) => r.description.trim()),
+      {
+        description: `${s.code} — ${s.name}`,
+        quantity: s.quantity.toString(),
+        unit_price: (s.unit_price_cents / 100).toFixed(2),
+      },
+    ]);
+    setSuggestions((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function handleSkipSuggestion(index: number) {
+    setSuggestions((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  // Bundle nudge: 4+ distinct code-prefix categories
+  const bundleCategories = useMemo(() => {
+    const prefixes = new Set(suggestions.map((s) => s.code.split("-")[0]).filter(Boolean));
+    return prefixes.size;
+  }, [suggestions]);
+
+  // Legal flag warning: any suggestion with a legal flag
+  const hasLegalFlagSuggestions = useMemo(
+    () => suggestions.some((s) => s.legal_flag !== null),
+    [suggestions]
+  );
 
   // Live painting estimate calculation
   const paintingResult = useMemo(() => {
@@ -999,11 +1058,18 @@ export function NewEstimateForm({
 
           {/* Scope parser */}
           <div style={{ marginBottom: "var(--space-4)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
-            <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", fontWeight: 600 }}>
-              Parse from description
-            </p>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
+              <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                Parse from description
+              </p>
+              {scopeParsing && (
+                <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontStyle: "italic" }}>
+                  Analyzing…
+                </span>
+              )}
+            </div>
             <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-              Paste the customer&apos;s job description to auto-fill the fields below.
+              Describe the job — fields auto-fill after you stop typing.
             </p>
             <Textarea
               id="scope_notes"
@@ -1014,18 +1080,6 @@ export function NewEstimateForm({
               rows={3}
               disabled={pending || scopeParsing}
             />
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "var(--space-2)" }}>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={handleParseScope}
-                disabled={!scopeNotes.trim() || scopeParsing || pending}
-                loading={scopeParsing}
-              >
-                {scopeParsing ? "Parsing…" : "Parse Notes"}
-              </Button>
-            </div>
 
             {scopeError && (
               <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--status-error)" }}>
@@ -1447,11 +1501,18 @@ export function NewEstimateForm({
             <>
               {/* Item Suggester */}
               <div style={{ marginBottom: "var(--space-4)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
-                <p style={{ margin: "0 0 var(--space-1)", fontSize: "var(--text-sm)", fontWeight: 600 }}>
-                  Suggest from description
-                </p>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-1)" }}>
+                  <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                    Suggest from description
+                  </p>
+                  {itemSuggesting && (
+                    <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontStyle: "italic" }}>
+                      Matching…
+                    </span>
+                  )}
+                </div>
                 <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                  Describe the job and Claude will match price book services automatically.
+                  Describe the job — Claude matches price book services after you stop typing.
                 </p>
                 <Textarea
                   id="item_description"
@@ -1462,18 +1523,6 @@ export function NewEstimateForm({
                   rows={3}
                   disabled={pending || itemSuggesting}
                 />
-                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "var(--space-2)" }}>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleSuggestItems}
-                    disabled={!itemDescription.trim() || itemSuggesting || pending}
-                    loading={itemSuggesting}
-                  >
-                    {itemSuggesting ? "Suggesting…" : "Suggest Items"}
-                  </Button>
-                </div>
 
                 {itemSuggestError && (
                   <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--status-error)" }}>
@@ -1481,62 +1530,67 @@ export function NewEstimateForm({
                   </p>
                 )}
 
+                {/* Bundle nudge */}
+                {bundleCategories >= 4 && (
+                  <div style={{
+                    marginTop: "var(--space-2)",
+                    padding: "var(--space-2) var(--space-3)",
+                    background: "#fef3c7",
+                    borderRadius: "var(--radius)",
+                    fontSize: "var(--text-sm)",
+                    color: "#92400e",
+                    fontWeight: 500,
+                  }}>
+                    ★ You have {bundleCategories} task categories — consider half-day block pricing ($515)
+                  </div>
+                )}
+
+                {/* Legal flag warning */}
+                {hasLegalFlagSuggestions && (
+                  <div style={{
+                    marginTop: "var(--space-2)",
+                    padding: "var(--space-2) var(--space-3)",
+                    background: "#fef3c7",
+                    borderRadius: "var(--radius)",
+                    fontSize: "var(--text-sm)",
+                    color: "#92400e",
+                    fontWeight: 500,
+                  }}>
+                    ⚠ One or more items may require a licensed contractor in some jurisdictions — verify before quoting
+                  </div>
+                )}
+
                 {suggestions.length > 0 && (
                   <div style={{ marginTop: "var(--space-3)", borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
                       <span style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
-                        {suggestions.filter((s) => s.accepted).length} of {suggestions.length} selected
+                        {suggestions.length} suggestion{suggestions.length !== 1 ? "s" : ""} — add or skip each
                       </span>
-                      <div style={{ display: "flex", gap: "var(--space-2)" }}>
-                        <button
-                          type="button"
-                          onClick={() => setSuggestions((prev) => prev.map((s) => ({ ...s, accepted: true })))}
-                          style={{ background: "none", border: "none", fontSize: "var(--text-sm)", color: "var(--color-primary)", cursor: "pointer", padding: 0 }}
-                        >
-                          Select all
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSuggestions((prev) => prev.map((s) => ({ ...s, accepted: false })))}
-                          style={{ background: "none", border: "none", fontSize: "var(--text-sm)", color: "var(--fg-muted)", cursor: "pointer", padding: 0 }}
-                        >
-                          Clear
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSuggestions([])}
+                        style={{ background: "none", border: "none", fontSize: "var(--text-sm)", color: "var(--fg-muted)", cursor: "pointer", padding: 0 }}
+                      >
+                        Dismiss all
+                      </button>
                     </div>
 
                     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
                       {suggestions.map((s, i) => (
                         <div
-                          key={s.code}
+                          key={`${s.code}-${i}`}
                           style={{
-                            display: "grid",
-                            gridTemplateColumns: "auto 1fr auto auto auto",
-                            gap: "var(--space-2)",
-                            alignItems: "start",
-                            padding: "var(--space-2) var(--space-3)",
-                            background: s.accepted ? "var(--color-surface-overlay)" : "transparent",
-                            border: `1px solid ${s.accepted ? "var(--color-primary-alpha)" : "var(--border)"}`,
-                            borderRadius: "var(--radius-sm)",
-                            opacity: s.accepted ? 1 : 0.5,
+                            display: "flex",
+                            gap: "var(--space-3)",
+                            alignItems: "flex-start",
+                            padding: "var(--space-3)",
+                            background: "var(--bg-card)",
+                            border: "1px solid var(--border)",
+                            borderRadius: "var(--radius)",
                           }}
                         >
-                          {/* Checkbox */}
-                          <input
-                            type="checkbox"
-                            checked={s.accepted}
-                            onChange={(e) =>
-                              setSuggestions((prev) =>
-                                prev.map((item, idx) =>
-                                  idx === i ? { ...item, accepted: e.target.checked } : item
-                                )
-                              )
-                            }
-                            style={{ marginTop: 2 }}
-                          />
-
-                          {/* Name + reason + badges */}
-                          <div>
+                          {/* Info */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
                               <span style={{ color: "var(--fg-muted)", fontWeight: 400, marginRight: "var(--space-1)" }}>{s.code}</span>
                               {s.name}
@@ -1544,111 +1598,83 @@ export function NewEstimateForm({
                             <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
                               {s.reason}
                             </div>
-                            {(s.labor_hours_typical !== null || s.legal_flag) && (
-                              <div style={{ display: "flex", gap: "var(--space-1)", marginTop: 4, flexWrap: "wrap" }}>
-                                {s.labor_hours_typical !== null && (
-                                  <span style={{
-                                    fontSize: "var(--text-xs)", padding: "1px 6px",
-                                    background: "var(--color-surface-overlay)",
-                                    borderRadius: "var(--radius-sm)",
-                                    color: "var(--fg-muted)", border: "1px solid var(--border)",
-                                  }}>
-                                    ~{s.labor_hours_typical}h
-                                  </span>
-                                )}
-                                {s.legal_flag === "gray" && (
-                                  <span style={{
-                                    fontSize: "var(--text-xs)", padding: "1px 6px",
-                                    background: "var(--color-warning-subtle, #fef9c3)",
-                                    borderRadius: "var(--radius-sm)",
-                                    color: "var(--color-warning-fg, #854d0e)",
-                                    border: "1px solid var(--color-warning-border, #fde68a)",
-                                  }}>
-                                    MA: verify authorization
-                                  </span>
-                                )}
-                                {s.legal_flag === "restricted" && (
-                                  <span style={{
-                                    fontSize: "var(--text-xs)", padding: "1px 6px",
-                                    background: "var(--color-danger-subtle, #fee2e2)",
-                                    borderRadius: "var(--radius-sm)",
-                                    color: "var(--color-danger-fg, #991b1b)",
-                                    border: "1px solid var(--color-danger-border, #fca5a5)",
-                                  }}>
-                                    MA: licensed trade required
-                                  </span>
-                                )}
-                              </div>
-                            )}
+                            <div style={{ display: "flex", gap: "var(--space-1)", marginTop: 4, flexWrap: "wrap", alignItems: "center" }}>
+                              <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                                {formatCents(s.quantity * s.unit_price_cents)}
+                              </span>
+                              {s.labor_hours_typical !== null && (
+                                <span style={{
+                                  fontSize: "var(--text-xs)", padding: "1px 6px",
+                                  background: "var(--color-surface-overlay)",
+                                  borderRadius: "var(--radius-sm)",
+                                  color: "var(--fg-muted)", border: "1px solid var(--border)",
+                                }}>
+                                  ~{s.labor_hours_typical}h
+                                </span>
+                              )}
+                              {s.legal_flag === "gray" && (
+                                <span style={{
+                                  fontSize: "var(--text-xs)", padding: "1px 6px",
+                                  background: "#fef9c3",
+                                  borderRadius: "var(--radius-sm)",
+                                  color: "#854d0e",
+                                  border: "1px solid #fde68a",
+                                }}>
+                                  ⚠ verify auth
+                                </span>
+                              )}
+                              {s.legal_flag === "restricted" && (
+                                <span style={{
+                                  fontSize: "var(--text-xs)", padding: "1px 6px",
+                                  background: "#fee2e2",
+                                  borderRadius: "var(--radius-sm)",
+                                  color: "#991b1b",
+                                  border: "1px solid #fca5a5",
+                                }}>
+                                  ⛔ licensed trade
+                                </span>
+                              )}
+                            </div>
                           </div>
 
-                          {/* Qty */}
-                          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-                            <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Qty</label>
-                            <input
-                              className="p7-input"
-                              type="number"
-                              min="1"
-                              step="1"
-                              value={s.quantity}
-                              onChange={(e) =>
-                                setSuggestions((prev) =>
-                                  prev.map((item, idx) =>
-                                    idx === i
-                                      ? { ...item, quantity: Math.max(1, parseInt(e.target.value) || 1) }
-                                      : item
-                                  )
-                                )
-                              }
-                              disabled={!s.accepted}
-                              style={{ width: 56, fontSize: "var(--text-sm)" }}
-                            />
-                          </div>
-
-                          {/* Unit price */}
-                          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
-                            <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Price ($)</label>
-                            <input
-                              className="p7-input"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={(s.unit_price_cents / 100).toFixed(2)}
-                              onChange={(e) =>
-                                setSuggestions((prev) =>
-                                  prev.map((item, idx) =>
-                                    idx === i
-                                      ? {
-                                          ...item,
-                                          unit_price_cents: Math.round(parseFloat(e.target.value || "0") * 100),
-                                        }
-                                      : item
-                                  )
-                                )
-                              }
-                              disabled={!s.accepted}
-                              style={{ width: 80, fontSize: "var(--text-sm)" }}
-                            />
-                          </div>
-
-                          {/* Line total */}
-                          <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", textAlign: "right", minWidth: 64, paddingTop: 20 }}>
-                            {formatCents(s.quantity * s.unit_price_cents)}
+                          {/* Add / Skip */}
+                          <div style={{ display: "flex", gap: "var(--space-1)", flexShrink: 0, paddingTop: 2 }}>
+                            <button
+                              type="button"
+                              onClick={() => handleAddSuggestion(i)}
+                              disabled={pending}
+                              style={{
+                                padding: "var(--space-1) var(--space-3)",
+                                background: "var(--accent)",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: "var(--radius)",
+                                fontSize: "var(--text-sm)",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Add
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSkipSuggestion(i)}
+                              disabled={pending}
+                              style={{
+                                padding: "var(--space-1) var(--space-2)",
+                                background: "none",
+                                color: "var(--fg-muted)",
+                                border: "1px solid var(--border)",
+                                borderRadius: "var(--radius)",
+                                fontSize: "var(--text-sm)",
+                                cursor: "pointer",
+                              }}
+                            >
+                              Skip
+                            </button>
                           </div>
                         </div>
                       ))}
-                    </div>
-
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "var(--space-3)" }}>
-                      <Button
-                        type="button"
-                        variant="primary"
-                        size="sm"
-                        onClick={handleAcceptSuggestions}
-                        disabled={suggestions.filter((s) => s.accepted).length === 0 || pending}
-                      >
-                        Add {suggestions.filter((s) => s.accepted).length} item{suggestions.filter((s) => s.accepted).length !== 1 ? "s" : ""} to estimate
-                      </Button>
                     </div>
                   </div>
                 )}
