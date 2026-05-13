@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withRole } from "@/lib/auth/middleware";
 import type { AuthSession } from "@/lib/auth/middleware";
 import { getPool, queryOne } from "@/lib/db";
+import { normalizeClientName } from "@/lib/crm/p7";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
 
@@ -92,7 +93,7 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
     let idx = 1;
     if (patch.name !== undefined) {
       setClauses.push(`name = $${idx++}`);
-      params.push(patch.name.trim());
+      params.push(normalizeClientName(patch.name));
     }
     if (patch.email !== undefined) {
       setClauses.push(`email = $${idx++}`);

@@ -12,6 +12,20 @@ export interface PropertyLike {
   zip?: string | null;
 }
 
+/**
+ * Normalizes a client name to title case, but only when the input is entirely
+ * uppercase or entirely lowercase — preserving intentional mixed-case names
+ * like "McDonald" or "O'Brien".
+ */
+export function normalizeClientName(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return trimmed;
+  const up = trimmed.toUpperCase();
+  const lo = trimmed.toLowerCase();
+  if (trimmed !== up && trimmed !== lo) return trimmed;
+  return trimmed.replace(/\S+/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+}
+
 export function normalizeSearch(input?: string | null): string {
   return (input ?? "").trim().toLowerCase();
 }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withAuth } from "../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../lib/auth/middleware";
 import { getPool } from "../../../../../lib/db";
+import { normalizeClientName } from "../../../../../lib/crm/p7";
 
 export const dynamic = "force-dynamic";
 
@@ -85,7 +86,7 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
       await client.query(
         `INSERT INTO clients (account_id, name, email, phone, company_name, address_line1, city, state, zip, notes)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-        [session.accountId, row.name, row.email, row.phone, row.company_name, row.address_line1, row.city, row.state, row.zip, row.notes]
+        [session.accountId, normalizeClientName(row.name), row.email, row.phone, row.company_name, row.address_line1, row.city, row.state, row.zip, row.notes]
       );
       imported++;
     }
