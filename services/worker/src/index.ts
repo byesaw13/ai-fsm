@@ -4,6 +4,7 @@ import { runInvoiceFollowups } from "./invoice-followup.js";
 import { runBookingConfirmations } from "./booking-confirmed.js";
 import { runReviewRequests } from "./review-request.js";
 import { processMaintenanceScheduling } from "./maintenance-scheduling.js";
+import { expireEstimates } from "./expire-estimates.js";
 import { logger } from "./logger.js";
 
 const pollMs = Number(process.env.WORKER_POLL_MS ?? "30000");
@@ -78,6 +79,12 @@ async function runPollIteration(client: Client): Promise<void> {
           errors: totalErrors,
         });
       }
+    }
+
+    // Expire sent estimates whose expiry date has passed
+    const expireResult = await expireEstimates(client);
+    if (expireResult.expired > 0) {
+      logger.info("expire-estimates complete", { expired: expireResult.expired });
     }
 
     // Process maintenance plans independently (not automation-based)

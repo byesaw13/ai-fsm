@@ -280,6 +280,77 @@ export default async function EstimateDetailPage({
         </div>
       </div>
 
+      {/* Approved next-steps banner */}
+      {currentStatus === "approved" && canTransition && (
+        <div
+          className="card"
+          style={{
+            marginBottom: "var(--space-4)",
+            borderLeft: "4px solid #059669",
+            background: "#f0fdf4",
+          }}
+          data-testid="approved-banner"
+        >
+          <p style={{ margin: 0, fontWeight: 600, color: "#065f46" }}>
+            Estimate approved — ready to schedule work or invoice.
+          </p>
+          <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-2)", flexWrap: "wrap" }}>
+            {estimate.job_id && (
+              <Link
+                href={`/app/jobs/${estimate.job_id}`}
+                style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}
+              >
+                Go to job / schedule visits →
+              </Link>
+            )}
+            <a
+              href="#convert-invoice"
+              style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}
+            >
+              Convert to invoice ↓
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* Expired recovery banner */}
+      {currentStatus === "expired" && (
+        <div
+          className="card"
+          style={{
+            marginBottom: "var(--space-4)",
+            borderLeft: "4px solid #d97706",
+            background: "#fffbeb",
+          }}
+          data-testid="expired-banner"
+        >
+          <p style={{ margin: 0, fontWeight: 600, color: "#92400e" }}>
+            This estimate expired
+            {estimate.expires_at
+              ? ` on ${new Date(estimate.expires_at).toLocaleDateString()}`
+              : ""}
+            .
+          </p>
+          <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)", color: "#78350f" }}>
+            To re-engage this client, go to the job and create a new estimate.
+          </p>
+          {estimate.job_id && (
+            <Link
+              href={`/app/jobs/${estimate.job_id}`}
+              style={{
+                display: "inline-block",
+                marginTop: "var(--space-2)",
+                fontSize: "var(--text-sm)",
+                color: "var(--accent)",
+                textDecoration: "none",
+              }}
+            >
+              Go to job →
+            </Link>
+          )}
+        </div>
+      )}
+
       {/* Status Stepper — main path only */}
       {(["draft", "sent", "approved"] as EstimateStatus[]).includes(currentStatus) && (
         <div className="card" style={{ marginBottom: "var(--space-4)" }}>
@@ -663,7 +734,7 @@ export default async function EstimateDetailPage({
 
       {/* Convert to Invoice — owner/admin only, approved status only */}
       {canTransition && currentStatus === "approved" && (
-        <div className="card action-card" data-testid="convert-panel-wrapper">
+        <div id="convert-invoice" className="card action-card" data-testid="convert-panel-wrapper">
           <h2>Convert to Invoice</h2>
           <p className="muted">
             Create a draft invoice from this approved estimate. Idempotent —
