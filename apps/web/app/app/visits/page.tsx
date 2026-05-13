@@ -197,11 +197,11 @@ export default async function VisitsPage() {
     (v) => v.status === "in_progress" || v.status === "arrived"
   );
 
-  const overdueIds = new Set(overdueVisits.map((v) => v.id));
+  // Overdue visits are shown in the dedicated admin overdue section above —
+  // exclude them from status sections only for admins to avoid duplicate listing.
+  // Tech users have no overdue section, so they must see all visits here.
+  const overdueIds = isAdmin ? new Set(overdueVisits.map((v) => v.id)) : new Set<string>();
 
-  // Group all visits by status for status-section breakdown.
-  // Overdue visits are already shown in the dedicated overdue section above,
-  // so exclude them here to avoid duplicate listing.
   const grouped = STATUS_ORDER.reduce<Record<string, VisitRow[]>>(
     (acc, s) => ({ ...acc, [s]: [] }),
     {}
