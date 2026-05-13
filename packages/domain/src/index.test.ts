@@ -150,8 +150,8 @@ describe('visitTransitions', () => {
   it('completed is terminal', () => {
     expect(visitTransitions.completed).toHaveLength(0)
   })
-  it('in_progress cannot be cancelled directly', () => {
-    expect(visitTransitions.in_progress).not.toContain('cancelled')
+  it('in_progress can be cancelled (to dismiss missed/abandoned visits)', () => {
+    expect(visitTransitions.in_progress).toContain('cancelled')
   })
 })
 
