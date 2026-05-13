@@ -121,7 +121,7 @@ export const jobTransitions: Record<JobStatus, readonly JobStatus[]> = {
 export const visitTransitions: Record<VisitStatus, readonly VisitStatus[]> = {
   scheduled: ["arrived", "cancelled"],
   arrived: ["in_progress", "cancelled"],
-  in_progress: ["completed"],
+  in_progress: ["completed", "cancelled"],
   completed: [],
   cancelled: [],
 };

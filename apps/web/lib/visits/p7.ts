@@ -2,6 +2,7 @@ import type { VisitStatus } from "@ai-fsm/domain";
 
 export interface VisitLikeForUi {
   scheduled_start: string;
+  scheduled_end?: string | null;
   status: VisitStatus | string;
 }
 
@@ -29,11 +30,16 @@ export function isVisitOverdue(
   visit: VisitLikeForUi,
   nowMs = Date.now()
 ): boolean {
-  const scheduledTime = new Date(visit.scheduled_start).getTime();
-  return (
-    scheduledTime < nowMs &&
-    (visit.status === "scheduled" || visit.status === "arrived")
-  );
+  if (visit.status === "scheduled" || visit.status === "arrived") {
+    return new Date(visit.scheduled_start).getTime() < nowMs;
+  }
+  if (visit.status === "in_progress") {
+    const endTime = visit.scheduled_end
+      ? new Date(visit.scheduled_end).getTime()
+      : new Date(visit.scheduled_start).getTime() + 4 * 60 * 60 * 1000;
+    return endTime < nowMs;
+  }
+  return false;
 }
 
 export function isSameCalendarDay(iso: string, ref = new Date()): boolean {

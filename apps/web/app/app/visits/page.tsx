@@ -9,6 +9,7 @@ import {
   isSameCalendarDay,
   isVisitOverdue,
 } from "@/lib/visits/p7";
+import { CancelVisitButton } from "./CancelVisitButton";
 import type { Visit, VisitStatus } from "@ai-fsm/domain";
 import { SUB_STATUS_LABELS } from "@ai-fsm/domain";
 import {
@@ -196,13 +197,19 @@ export default async function VisitsPage() {
     (v) => v.status === "in_progress" || v.status === "arrived"
   );
 
-  // Group all visits by status for status-section breakdown
+  // Overdue visits are shown in the dedicated admin overdue section above —
+  // exclude them from status sections only for admins to avoid duplicate listing.
+  // Tech users have no overdue section, so they must see all visits here.
+  const overdueIds = isAdmin ? new Set(overdueVisits.map((v) => v.id)) : new Set<string>();
+
   const grouped = STATUS_ORDER.reduce<Record<string, VisitRow[]>>(
     (acc, s) => ({ ...acc, [s]: [] }),
     {}
   );
   for (const visit of visits) {
-    grouped[visit.status]?.push(visit);
+    if (!overdueIds.has(visit.id)) {
+      grouped[visit.status]?.push(visit);
+    }
   }
   const activeStatuses = STATUS_ORDER.filter((s) => grouped[s].length > 0);
 
@@ -259,7 +266,12 @@ export default async function VisitsPage() {
       {isAdmin && overdueVisits.length > 0 && (
         <StatusSection title="Overdue" count={overdueVisits.length}>
           {overdueVisits.map((v) => (
-            <VisitItemCard key={v.id} visit={v} showTech showOverdue />
+            <div key={v.id} style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <VisitItemCard visit={v} showTech showOverdue />
+              </div>
+              <CancelVisitButton visitId={v.id} />
+            </div>
           ))}
         </StatusSection>
       )}
