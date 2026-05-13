@@ -166,6 +166,28 @@ export const POST = withRole(
         new_value: visit,
       });
 
+      // Auto-advance job to 'scheduled' when a visit is created for it.
+      // Keeps downstream auto-advances (visit started → in_progress, visit
+      // completed → completed) reliable regardless of how the job was created.
+      const jobStatus = jobRows[0]?.status;
+      if (jobStatus === "draft" || jobStatus === "quoted") {
+        await client.query(
+          `UPDATE jobs SET status = 'scheduled', updated_at = now()
+           WHERE id = $1 AND account_id = $2`,
+          [jobId, session.accountId]
+        );
+        await appendAuditLog(client, {
+          account_id: session.accountId,
+          entity_type: "job",
+          entity_id: jobId,
+          action: "update",
+          actor_id: session.userId,
+          trace_id: session.traceId,
+          old_value: { status: jobStatus },
+          new_value: { status: "scheduled" },
+        });
+      }
+
       await client.query("COMMIT");
       return NextResponse.json({ data: visit }, { status: 201 });
     } catch (err) {
