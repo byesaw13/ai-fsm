@@ -94,6 +94,23 @@ export default async function SettingsPage() {
           </section>
         )}
 
+        {isAdmin && (
+          <section>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>System Health</h2>
+            <Card padding="default">
+              <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                Check booking, email, AI, Stripe, portal-link, and database configuration.
+              </p>
+              <Link
+                href={"/app/settings/system-health" as unknown as Route}
+                style={{ fontSize: "var(--text-sm)", color: "var(--accent)", fontWeight: "var(--font-medium)" }}
+              >
+                View System Health &rarr;
+              </Link>
+            </Card>
+          </section>
+        )}
+
 
         <section>
           <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Your profile</h2>
