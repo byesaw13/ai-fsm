@@ -32,6 +32,7 @@ import { CompletionChecklist } from "./CompletionChecklist";
 import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { MembershipVisitPanel } from "./MembershipVisitPanel";
 import { VisitSnapshotPanel } from "./VisitSnapshotPanel";
+import { VisitCommandBanner } from "./VisitCommandBanner";
 import { OnMyWayButton } from "./OnMyWayButton";
 import {
   Card,
@@ -228,6 +229,16 @@ export default async function VisitDetailPage({
 
   const overdue = isVisitOverdue(visit);
 
+  const issueDescription = (visit as VisitRow & { issue_description?: string | null }).issue_description;
+  const checklistDone = checklistItems.filter((i) => i.disposition === "ok").length;
+  const closingAllDoneForBanner =
+    checklistItems.length > 0 && checklistItems.every((i) => i.disposition === "ok");
+  // Tech on scheduled/arrived gets the transition card moved to the top
+  const showTransitionEarly =
+    canTransition &&
+    session.role === "tech" &&
+    (currentStatus === "scheduled" || currentStatus === "arrived");
+
   // pg returns timestamptz as Date objects — normalise to ISO strings throughout
   const toISO = (v: unknown): string =>
     v instanceof Date ? v.toISOString() : String(v);
@@ -308,8 +319,43 @@ export default async function VisitDetailPage({
         }
       />
 
+      <VisitCommandBanner
+        status={currentStatus}
+        isRepairFlow={isRepairFlow}
+        isMembershipVisit={isMembershipVisit}
+        membershipPhase={visit.membership_visit_phase ?? null}
+        beforePhotoCount={beforePhotos.length}
+        afterPhotoCount={afterPhotos.length}
+        hasIssueDescription={!!issueDescription}
+        hasTechNotes={!!visit.tech_notes}
+        closingAllDone={closingAllDoneForBanner}
+        checklistDone={checklistDone}
+        checklistTotal={checklistItems.length}
+      />
+
       <div className="p7-detail-layout">
         <div className="p7-detail-primary">
+          {/* For tech on scheduled/arrived: surface the action first, above all work panels */}
+          {showTransitionEarly && (
+            <Card data-testid="visit-transition-panel">
+              <SectionHeader title="Actions" />
+              <VisitTransitionForm
+                visitId={visit.id}
+                currentStatus={currentStatus}
+                role={session.role}
+                jobType={visit.job_type ?? undefined}
+                beforePhotoCount={beforePhotos.length}
+                afterPhotoCount={afterPhotos.length}
+                closingAllDone={checklistItems.length > 0 && checklistItems.every((i) => i.disposition === "ok")}
+                isMembershipVisit={isMembershipVisit}
+                membershipPhase={visit.membership_visit_phase ?? "health_check"}
+                membershipSnapshotSentAt={
+                  visit.membership_snapshot_sent_at ? toISO(visit.membership_snapshot_sent_at) : null
+                }
+              />
+            </Card>
+          )}
+
           <Card>
             <SectionHeader title="Visit Timeline" />
             <Timeline entries={timelineEntries} />
@@ -433,7 +479,7 @@ export default async function VisitDetailPage({
             </Card>
           )}
 
-          {canTransition && currentStatus !== "completed" && currentStatus !== "cancelled" &&
+          {!showTransitionEarly && canTransition && currentStatus !== "completed" && currentStatus !== "cancelled" &&
             !(session.role === "tech" && currentStatus === "in_progress") && (
             <Card data-testid="visit-transition-panel">
               <SectionHeader title={session.role === "tech" ? "Actions" : "Status Actions"} />
