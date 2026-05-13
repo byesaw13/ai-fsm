@@ -31,7 +31,7 @@ const VALID_BODY = {
   phone: null,
   service_category: "general_repairs",
   service_description: "Door latch is loose and needs adjustment.",
-  preferred_date: "2026-05-12",
+  preferred_date: "2099-05-12",
   preferred_time_slot: "morning",
   address: "123 Main St",
   city: "Springfield",
