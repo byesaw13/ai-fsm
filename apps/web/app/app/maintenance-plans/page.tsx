@@ -96,11 +96,20 @@ export default async function MaintenancePlansPage({
   return (
     <PageContainer>
       <PageHeader
-        title="Maintenance Plans"
+        title="Subscriptions"
+        subtitle="Active client memberships"
         actions={
-          <LinkButton href="/app/maintenance-plans/new" variant="primary" size="sm">
-            + New Plan
-          </LinkButton>
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <LinkButton href="/app/maintenance-plans/templates" variant="ghost" size="sm">
+              Plan Templates
+            </LinkButton>
+            <LinkButton href="/app/maintenance-plans/addons" variant="ghost" size="sm">
+              Add-ons
+            </LinkButton>
+            <LinkButton href="/app/maintenance-plans/new" variant="primary" size="sm">
+              + Enroll Client
+            </LinkButton>
+          </div>
         }
       />
 
