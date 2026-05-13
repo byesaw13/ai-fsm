@@ -68,7 +68,7 @@ export default async function PipelinePage() {
      FROM jobs j
      LEFT JOIN clients c ON c.id = j.client_id
      LEFT JOIN LATERAL (
-       SELECT status
+       SELECT id, status
        FROM booking_requests br
        WHERE br.job_id = j.id AND br.account_id = j.account_id
        ORDER BY br.created_at DESC
