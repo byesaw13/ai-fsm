@@ -21,6 +21,31 @@ interface BookingClientProps {
 const SMS_CONSENT_TEXT =
   "By checking this box you consent to receive text messages from Dovetails Services LLC about your service requests. Message & data rates may apply. Reply STOP to opt out.";
 
+const NEXT_STEPS = [
+  { title: "We review your request", body: "We look at every submission within 1 business day." },
+  { title: "We reach out to confirm", body: "We'll contact you to confirm scope, timing, and pricing before anything is scheduled." },
+  { title: "We schedule your visit", body: "Once details are agreed, we book your appointment and send a confirmation." },
+];
+
+function BookingLogo() {
+  return (
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
+      <div style={{
+        width: 40, height: 40, borderRadius: 10,
+        background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.18)",
+      }}>
+        <span style={{ color: "#fff", fontWeight: 800, fontSize: 16, letterSpacing: "-0.5px" }}>DV</span>
+      </div>
+      <div style={{ textAlign: "left" }}>
+        <div style={{ fontWeight: 800, fontSize: 18, color: "#111827", lineHeight: 1.1 }}>Dovetails</div>
+        <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.1 }}>Services LLC</div>
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -94,17 +119,43 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
   if (submitted) {
     return (
       <div style={{ minHeight: "100vh", background: "#f9fafb", padding: "32px 16px" }}>
-        <div style={{ maxWidth: 560, margin: "60px auto", background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: 40, textAlign: "center" }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>✓</div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Service Request Received</h1>
+        {/* Brand header */}
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <BookingLogo />
+        </div>
+
+        <div style={{ maxWidth: 560, margin: "0 auto", background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: 40, textAlign: "center" }}>
+          <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 28 }}>✓</div>
+          <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Request Received!</h1>
           <p style={{ color: "#6b7280", marginBottom: 24 }}>
-            Thanks, {name}! We&apos;ll review your request and reach out before anything is scheduled.
+            Thanks, {name}! We&apos;ll review your request and be in touch within 1 business day.
           </p>
-          <div style={{ background: "#f9fafb", borderRadius: 8, padding: 16, textAlign: "left", marginBottom: 24 }}>
+
+          {/* Request summary */}
+          <div style={{ background: "#f9fafb", borderRadius: 8, padding: 16, textAlign: "left", marginBottom: 28 }}>
             <p style={{ margin: "0 0 8px", fontSize: 14 }}><strong>Service:</strong> {serviceCategories.find((c) => c.id === serviceCategory)?.label}</p>
             <p style={{ margin: "0 0 8px", fontSize: 14 }}><strong>Preferred Date:</strong> {new Date(preferredDate + "T00:00:00").toLocaleDateString()}</p>
             <p style={{ margin: 0, fontSize: 14 }}><strong>Time:</strong> {preferredTimeSlot === "morning" ? "Morning (9 AM – 11 AM)" : preferredTimeSlot === "afternoon" ? "Afternoon (1 PM – 3 PM)" : "Evening (4 PM – 6 PM)"}</p>
           </div>
+
+          {/* What happens next */}
+          <div style={{ textAlign: "left", marginBottom: 28 }}>
+            <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>What happens next</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {NEXT_STEPS.map((step, i) => (
+                <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                  <div style={{ minWidth: 28, height: 28, borderRadius: "50%", background: "#eff6ff", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#2563eb" }}>
+                    {i + 1}
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{step.title}</p>
+                    <p style={{ margin: "2px 0 0", fontSize: 13, color: "#6b7280" }}>{step.body}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <Link
             href="/"
             style={{ display: "inline-block", padding: "10px 24px", background: "#2563eb", color: "#fff", borderRadius: 8, textDecoration: "none", fontWeight: 600 }}
@@ -127,10 +178,25 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
     <div style={{ minHeight: "100vh", background: "#f9fafb", padding: "32px 16px" }}>
       <div style={{ maxWidth: 640, margin: "0 auto" }}>
 
-        {/* Header */}
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 4 }}>Request Service</h1>
-          <p style={{ color: "#6b7280", fontSize: 16 }}>Tell us what you need and we&apos;ll confirm the next step.</p>
+        {/* Brand header */}
+        <div style={{ textAlign: "center", marginBottom: 8 }}>
+          <BookingLogo />
+        </div>
+
+        {/* Page title */}
+        <div style={{ textAlign: "center", marginBottom: 16 }}>
+          <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 4 }}>Request Service</h1>
+          <p style={{ color: "#6b7280", fontSize: 15, margin: 0 }}>Tell us what you need and we&apos;ll confirm the details before scheduling.</p>
+        </div>
+
+        {/* How it works — collapsed blurb */}
+        <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "12px 16px", marginBottom: 24, display: "flex", gap: 16, flexWrap: "wrap", justifyContent: "center" }}>
+          {NEXT_STEPS.map((step, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#1d4ed8" }}>
+              <span style={{ fontWeight: 700, background: "#2563eb", color: "#fff", borderRadius: "50%", width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
+              <span>{step.title}</span>
+            </div>
+          ))}
         </div>
 
         {/* Progress */}
