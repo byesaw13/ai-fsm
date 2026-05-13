@@ -113,7 +113,7 @@ describe("PATCH /api/v1/booking-requests/[id]", () => {
           phone: "555-0199",
           service_category: "general",
           service_description: "Old quick lead needs pipeline repair.",
-          preferred_date: "2026-05-12",
+          preferred_date: "2099-05-12",
           preferred_time_slot: "flexible",
           address: "TBD",
           city: null,

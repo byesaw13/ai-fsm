@@ -1,5 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth/session";
 import { queryOne, query } from "@/lib/db";
 import { formatVisitTime, isVisitOverdue } from "@/lib/visits/p7";
@@ -26,7 +27,6 @@ import {
   PageContainer,
   PageHeader,
   StatusBadge,
-  StatusStepper,
   LinkButton,
   Timeline,
   Card,
@@ -62,6 +62,33 @@ const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   invoiced: "Invoiced",
   cancelled: "Cancelled",
 };
+
+function AdvancedDetails({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <details
+      style={{
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius)",
+        background: "var(--bg-card)",
+        padding: "var(--space-3)",
+      }}
+    >
+      <summary
+        style={{
+          cursor: "pointer",
+          fontSize: "var(--text-sm)",
+          fontWeight: 700,
+          color: "var(--fg)",
+        }}
+      >
+        {title}
+      </summary>
+      <div style={{ marginTop: "var(--space-3)" }}>
+        {children}
+      </div>
+    </details>
+  );
+}
 
 export default async function JobDetailPage({
   params,
@@ -274,24 +301,6 @@ export default async function JobDetailPage({
         />
       )}
 
-      {/* Pipeline progress stepper — admin/owner only */}
-      {!isTech && (
-        <Card style={{ marginBottom: "var(--space-4)" }}>
-          <StatusStepper
-            steps={[
-              { key: "draft", label: "Draft" },
-              { key: "quoted", label: "Quoted" },
-              { key: "scheduled", label: "Scheduled" },
-              { key: "in_progress", label: "In Progress" },
-              { key: "completed", label: "Completed" },
-              { key: "invoiced", label: "Invoiced" },
-            ]}
-            currentStep={currentStatus}
-            data-testid="job-status-stepper"
-          />
-        </Card>
-      )}
-
       {/* Detail Hub Layout: two-column on desktop, stacked on mobile */}
       <div className="p7-detail-layout">
         {/* LEFT: Visits Timeline + Danger Zone */}
@@ -319,28 +328,30 @@ export default async function JobDetailPage({
 
           {/* Status Transitions — admin/owner only */}
           {canTransition && allowedTransitions.length > 0 && (
-            <Card data-testid="job-transition-panel">
-              <SectionHeader title="Manual Status Override" />
-              <p style={{ marginTop: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-                Use these only when the procedural action above does not fit the real-world state.
-              </p>
-              <JobTransitionForm
-                jobId={job.id}
-                allowedTransitions={allowedTransitions as JobStatus[]}
-                statusLabels={JOB_STATUS_LABELS}
-              />
-            </Card>
+            <AdvancedDetails title="Manual Status Override">
+              <Card data-testid="job-transition-panel">
+                <p style={{ marginTop: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+                  Use these only when the procedural action above does not fit the real-world state.
+                </p>
+                <JobTransitionForm
+                  jobId={job.id}
+                  allowedTransitions={allowedTransitions as JobStatus[]}
+                  statusLabels={JOB_STATUS_LABELS}
+                />
+              </Card>
+            </AdvancedDetails>
           )}
 
           {/* Danger Zone — owner only, draft only */}
           {canDelete && currentStatus === "draft" && (
-            <Card className="p7-card-danger" data-testid="danger-zone">
-              <SectionHeader title="Danger Zone" />
-              <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginBottom: "var(--space-3)" }}>
-                Delete this job permanently. Only available for draft jobs.
-              </p>
-              <DeleteJobButton jobId={job.id} />
-            </Card>
+            <AdvancedDetails title="Danger Zone">
+              <Card className="p7-card-danger" data-testid="danger-zone">
+                <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginBottom: "var(--space-3)" }}>
+                  Delete this job permanently. Only available for draft jobs.
+                </p>
+                <DeleteJobButton jobId={job.id} />
+              </Card>
+            </AdvancedDetails>
           )}
         </div>
 
@@ -401,32 +412,35 @@ export default async function JobDetailPage({
             </Card>
 
             {/* Edit form — admin/owner only */}
-            <JobEditForm
-              jobId={job.id}
-              initialTitle={job.title}
-              initialClientId={job.client_id ?? null}
-              initialPropertyId={job.property_id ?? null}
-              initialDescription={job.description ?? null}
-              initialPriority={job.priority ?? 0}
-              initialScheduledStart={job.scheduled_start ?? null}
-              initialScheduledEnd={job.scheduled_end ?? null}
-              initialActualCostCents={job.actual_cost_cents ?? null}
-              initialTravelMiles={job.travel_miles ?? null}
-            />
+            <AdvancedDetails title="Edit Job Details">
+              <JobEditForm
+                jobId={job.id}
+                initialTitle={job.title}
+                initialClientId={job.client_id ?? null}
+                initialPropertyId={job.property_id ?? null}
+                initialDescription={job.description ?? null}
+                initialPriority={job.priority ?? 0}
+                initialScheduledStart={job.scheduled_start ?? null}
+                initialScheduledEnd={job.scheduled_end ?? null}
+                initialActualCostCents={job.actual_cost_cents ?? null}
+                initialTravelMiles={job.travel_miles ?? null}
+              />
+            </AdvancedDetails>
 
             {/* Intake panel — admin/owner only */}
-            <Card data-testid="job-intake-card">
-              <SectionHeader title="Job Intake" />
-              <JobIntakePanel
-                jobId={job.id}
-                initialCategory={job.job_category}
-                initialRatings={Object.fromEntries(
-                  JOB_INTAKE_RATING_FIELDS.map((f) => [f, (job as Record<string, unknown>)[f] as number | null])
-                ) as Record<JobIntakeRatingField, number | null>}
-                initialDecision={job.intake_decision}
-                initialNotes={job.intake_notes ?? null}
-              />
-            </Card>
+            <AdvancedDetails title="Intake Scoring">
+              <Card data-testid="job-intake-card">
+                <JobIntakePanel
+                  jobId={job.id}
+                  initialCategory={job.job_category}
+                  initialRatings={Object.fromEntries(
+                    JOB_INTAKE_RATING_FIELDS.map((f) => [f, (job as Record<string, unknown>)[f] as number | null])
+                  ) as Record<JobIntakeRatingField, number | null>}
+                  initialDecision={job.intake_decision}
+                  initialNotes={job.intake_notes ?? null}
+                />
+              </Card>
+            </AdvancedDetails>
 
             {/* Commercial links */}
             <Card>
@@ -547,13 +561,15 @@ export default async function JobDetailPage({
 
 
             {/* Asset links (Homebox) */}
-            <AssetLinksPanel
-              entityType="job"
-              entityId={job.id}
-              initialLinks={assetLinks}
-              homeboxEnabled={homeboxEnabled}
-              canLink={!isTech}
-            />
+            <AdvancedDetails title="Home Assets">
+              <AssetLinksPanel
+                entityType="job"
+                entityId={job.id}
+                initialLinks={assetLinks}
+                homeboxEnabled={homeboxEnabled}
+                canLink={!isTech}
+              />
+            </AdvancedDetails>
           </div>
         )}
 

@@ -60,7 +60,7 @@ const VALID_BODY = {
   email: "jane@example.com",
   service_category: "general_repairs",
   service_description: "Door latch is loose and needs adjustment.",
-  preferred_date: "2026-05-12",
+  preferred_date: "2099-05-12",
   preferred_time_slot: "flexible",
   address: "123 Main St",
   city: "Springfield",

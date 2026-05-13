@@ -192,11 +192,11 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
     expect(json.error.code).toBe("PRECONDITION_FAILED");
   });
 
-  it("returns 422 when the job is not approved for scheduling", async () => {
+  it("returns 422 when the job is no longer schedulable", async () => {
     mockClientQuery
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
       .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
-      .mockResolvedValueOnce({ rows: [{ status: "draft" }] }) // SELECT job status
+      .mockResolvedValueOnce({ rows: [{ status: "completed" }] }) // SELECT job status
       .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
       .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
 
@@ -208,7 +208,7 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
     );
 
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ error: "ESTIMATE_NOT_APPROVED" });
+    await expect(res.json()).resolves.toEqual({ error: "JOB_NOT_SCHEDULABLE" });
     expect(mockClientQuery.mock.calls.some((call) =>
       String(call[0]).includes("INSERT INTO visits")
     )).toBe(false);
