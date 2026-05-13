@@ -11,8 +11,8 @@ import {
   canDeleteRecords,
 } from "@/lib/auth/permissions";
 import { jobTransitions } from "@ai-fsm/domain";
-import type { Job, Visit, JobStatus, JobAcceptanceCategory, JobIntakeDecision, JobIntakeRatingField } from "@ai-fsm/domain";
-import { JOB_INTAKE_RATING_FIELDS, JOB_SUB_STATUSES, SUB_STATUS_LABELS } from "@ai-fsm/domain";
+import type { Job, Visit, JobStatus, JobAcceptanceCategory, JobIntakeDecision } from "@ai-fsm/domain";
+import { JOB_SUB_STATUSES, SUB_STATUS_LABELS } from "@ai-fsm/domain";
 import { JobTransitionForm } from "./JobTransitionForm";
 import { DeleteJobButton } from "./DeleteJobButton";
 import { JobEditForm } from "./JobEditFormWrapper";
@@ -433,9 +433,6 @@ export default async function JobDetailPage({
                 <JobIntakePanel
                   jobId={job.id}
                   initialCategory={job.job_category}
-                  initialRatings={Object.fromEntries(
-                    JOB_INTAKE_RATING_FIELDS.map((f) => [f, (job as Record<string, unknown>)[f] as number | null])
-                  ) as Record<JobIntakeRatingField, number | null>}
                   initialDecision={job.intake_decision}
                   initialNotes={job.intake_notes ?? null}
                 />

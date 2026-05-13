@@ -9,8 +9,6 @@ import { JOB_ACCEPTANCE_CATEGORIES, JOB_INTAKE_DECISIONS } from "@ai-fsm/domain"
 
 export const dynamic = "force-dynamic";
 
-const intakeRating = z.number().int().min(1).max(5).nullable().optional();
-
 const updateJobBody = z.object({
   client_id: z.string().uuid().optional(),
   property_id: z.string().uuid().nullable().optional(),
@@ -21,13 +19,7 @@ const updateJobBody = z.object({
   scheduled_end: z.string().datetime().nullable().optional(),
   actual_cost_cents: z.number().int().nonnegative().nullable().optional(),
   travel_miles: z.number().nonnegative().nullable().optional(),
-  // Intake fields
   job_category: z.enum(JOB_ACCEPTANCE_CATEGORIES).nullable().optional(),
-  strategy_fit: intakeRating,
-  scope_clarity: intakeRating,
-  margin_confidence: intakeRating,
-  schedule_impact: intakeRating,
-  quality_fit: intakeRating,
   intake_decision: z.enum(JOB_INTAKE_DECISIONS).nullable().optional(),
   intake_notes: z.string().nullable().optional(),
 });
