@@ -10,6 +10,7 @@ const planBody = z.object({
   client_id: z.string().uuid(),
   property_id: z.string().uuid().optional().nullable(),
   name: z.string().min(1).max(255),
+  plan_template_id: z.string().uuid().optional().nullable(),
   membership_tier: z.enum(["essential", "plus", "premier"]).default("plus"),
   frequency: z.enum(["monthly", "quarterly", "biannual", "annual"]),
   services: z.array(z.string()).default([]),
@@ -25,6 +26,7 @@ const planBody = z.object({
   notes: z.string().optional().nullable(),
   membership_terms: z.string().optional().nullable(),
   member_priority: z.enum(["standard", "priority", "vip"]).default("standard"),
+  addon_ids: z.array(z.string().uuid()).default([]),
 });
 
 export const GET = withRole(["owner", "admin"], async (_request: NextRequest, session: AuthSession) => {
@@ -48,58 +50,56 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
   }
 
   const {
-    client_id,
-    property_id,
-    name,
-    membership_tier,
-    frequency,
-    services,
-    price_cents,
-    annual_visit_count,
-    included_labor_minutes_per_visit,
-    billing_cadence,
-    annual_price_cents,
-    status,
-    next_scheduled_date,
-    renewal_date,
-    routing_zone,
-    notes,
-    membership_terms,
-    member_priority,
+    client_id, property_id, name, plan_template_id, membership_tier, frequency,
+    services, price_cents, annual_visit_count, included_labor_minutes_per_visit,
+    billing_cadence, annual_price_cents, status, next_scheduled_date, renewal_date,
+    routing_zone, notes, membership_terms, member_priority, addon_ids,
   } = parsed.data;
 
   const pool = getPool();
-  const result = await pool.query(
-    `INSERT INTO maintenance_plans
-       (account_id, client_id, property_id, name, membership_tier, frequency,
-        services, price_cents, annual_visit_count, included_labor_minutes_per_visit,
-        billing_cadence, annual_price_cents, status, next_scheduled_date,
-        renewal_date, routing_zone, notes, membership_terms, member_priority, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
-     RETURNING *`,
-    [
-      session.accountId,
-      client_id,
-      property_id ?? null,
-      name,
-      membership_tier,
-      frequency,
-      services,
-      price_cents,
-      annual_visit_count,
-      included_labor_minutes_per_visit,
-      billing_cadence,
-      annual_price_cents,
-      status,
-      next_scheduled_date ?? null,
-      renewal_date ?? null,
-      routing_zone,
-      notes ?? null,
-      membership_terms ?? null,
-      member_priority,
-      session.userId,
-    ]
-  );
+  const client = await pool.connect();
 
-  return NextResponse.json(result.rows[0], { status: 201 });
+  try {
+    await client.query("BEGIN");
+
+    const { rows } = await client.query(
+      `INSERT INTO maintenance_plans
+         (account_id, client_id, property_id, name, plan_template_id, membership_tier, frequency,
+          services, price_cents, annual_visit_count, included_labor_minutes_per_visit,
+          billing_cadence, annual_price_cents, status, next_scheduled_date,
+          renewal_date, routing_zone, notes, membership_terms, member_priority, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+       RETURNING *`,
+      [
+        session.accountId, client_id, property_id ?? null, name, plan_template_id ?? null,
+        membership_tier, frequency, services, price_cents, annual_visit_count,
+        included_labor_minutes_per_visit, billing_cadence, annual_price_cents, status,
+        next_scheduled_date ?? null, renewal_date ?? null, routing_zone,
+        notes ?? null, membership_terms ?? null, member_priority, session.userId,
+      ]
+    );
+    const subscription = rows[0];
+
+    if (addon_ids.length > 0) {
+      const addonRows = await client.query(
+        `SELECT id, annual_price_cents FROM plan_addons WHERE id = ANY($1) AND account_id = $2`,
+        [addon_ids, session.accountId]
+      );
+      for (const addon of addonRows.rows) {
+        await client.query(
+          `INSERT INTO subscription_addons (account_id, subscription_id, addon_id, annual_price_cents)
+           VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+          [session.accountId, subscription.id, addon.id, addon.annual_price_cents]
+        );
+      }
+    }
+
+    await client.query("COMMIT");
+    return NextResponse.json(subscription, { status: 201 });
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 });
