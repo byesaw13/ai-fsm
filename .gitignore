@@ -12,3 +12,8 @@ apps/*/.env.local
 .vscode/
 .idea/
 tsconfig.tsbuildinfo
+
+# Local research and reference docs
+docs/*.pdf
+docs/deep-research-report.md
+docs/research
