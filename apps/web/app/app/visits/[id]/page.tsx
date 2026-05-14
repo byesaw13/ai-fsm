@@ -19,6 +19,7 @@ import {
   type VaultCollectionStep,
 } from "@ai-fsm/domain";
 import { VisitAssignForm } from "./VisitAssignForm";
+import { OverdueVisitModal } from "./OverdueVisitModal";
 import { VisitRescheduleForm } from "./VisitRescheduleForm";
 import { VisitTransitionForm } from "./VisitTransitionForm";
 import { VisitNotesForm } from "./VisitNotesForm";
@@ -283,6 +284,14 @@ export default async function VisitDetailPage({
 
   return (
     <PageContainer>
+      {overdue && canReschedule && (
+        <OverdueVisitModal
+          visitId={visit.id}
+          scheduledStart={toISO(visit.scheduled_start)}
+          scheduledEnd={toISO(visit.scheduled_end)}
+          jobTitle={visit.job_title}
+        />
+      )}
       <PageHeader
         title={`Visit — ${formatVisitDateLabel(visit.scheduled_start)}`}
         subtitle={`${formatVisitTime(visit.scheduled_start)} – ${formatVisitTime(
