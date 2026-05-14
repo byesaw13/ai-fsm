@@ -284,7 +284,7 @@ export default async function VisitDetailPage({
 
   return (
     <PageContainer>
-      {overdue && canReschedule && (
+      {overdue && canReschedule && (currentStatus === "scheduled" || currentStatus === "arrived") && (
         <OverdueVisitModal
           visitId={visit.id}
           scheduledStart={toISO(visit.scheduled_start)}
