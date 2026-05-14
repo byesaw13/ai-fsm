@@ -18,6 +18,8 @@ import {
 } from "@ai-fsm/domain";
 import { logger } from "@/lib/logger";
 import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
+import { computeAndPersist } from "@/lib/estimates/compute";
+import type { EstimateSpec } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -190,6 +192,8 @@ const createEstimateSchema = z.object({
   risk_adjustment_cents: z.number().int().nonnegative().default(0),
   minimum_service_override_reason: estimateMinimumOverrideReasonSchema.nullable().optional(),
   minimum_service_override_note: z.string().nullable().optional(),
+  // Engine v2: room-by-room spec — when present, computeAndPersist() runs after insert
+  engine_spec: z.record(z.unknown()).optional(),
 });
 
 export const POST = withRole(["owner", "admin"], async (request, session) => {
@@ -252,6 +256,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     risk_adjustment_cents,
     minimum_service_override_reason,
     minimum_service_override_note,
+    engine_spec,
   } = parseResult.data;
 
   const is_painting = sq_ft !== undefined && prep_level !== undefined && labor_hours_estimate !== undefined;
@@ -459,7 +464,25 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       return estimateId;
     });
 
-    return NextResponse.json({ id: estimate }, { status: 201 });
+    // If an engine spec was provided, run the engine and persist the result
+    let engineResult: Awaited<ReturnType<typeof computeAndPersist>> | null = null;
+    if (engine_spec) {
+      try {
+        engineResult = await computeAndPersist({
+          estimateId: estimate,
+          accountId: session.accountId,
+          spec: engine_spec as unknown as EstimateSpec,
+        });
+      } catch (engErr) {
+        logger.error("Engine compute failed after insert", engErr, { estimateId: estimate });
+        // Non-fatal: the estimate row exists; caller can trigger recompute
+      }
+    }
+
+    return NextResponse.json({
+      id: estimate,
+      ...(engineResult ? { engineResult: engineResult.result } : {}),
+    }, { status: 201 });
   } catch (error) {
     const err = error as Error & { code?: string };
     if (err.code === "NOT_FOUND") {
