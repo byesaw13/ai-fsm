@@ -20,6 +20,7 @@ import {
   IconBooking,
   IconPipeline,
   IconField,
+  IconMembership,
 } from "./NavIcons";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
@@ -47,12 +48,13 @@ const OPERATIONS_ITEMS: NavItem[] = [
 ];
 
 const BUSINESS_ITEMS: NavItem[] = [
-  { href: "/app/clients",     label: "Clients",    Icon: IconClients,     adminOnly: true },
-  { href: "/app/estimates",   label: "Estimates",  Icon: IconEstimates,   adminOnly: true },
-  { href: "/app/invoices",    label: "Invoices",   Icon: IconInvoices,    adminOnly: true },
-  { href: "/app/price-book",  label: "Price Book", Icon: IconPriceBook,   adminOnly: true },
-  { href: "/app/expenses",    label: "Expenses",   Icon: IconExpenses,    adminOnly: true },
-  { href: "/app/reports",     label: "Reports",    Icon: IconReports,     adminOnly: true },
+  { href: "/app/clients",            label: "Clients",     Icon: IconClients,     adminOnly: true },
+  { href: "/app/estimates",          label: "Estimates",   Icon: IconEstimates,   adminOnly: true },
+  { href: "/app/invoices",           label: "Invoices",    Icon: IconInvoices,    adminOnly: true },
+  { href: "/app/maintenance-plans",  label: "Memberships", Icon: IconMembership,  adminOnly: true },
+  { href: "/app/price-book",         label: "Price Book",  Icon: IconPriceBook,   adminOnly: true },
+  { href: "/app/expenses",           label: "Expenses",    Icon: IconExpenses,    adminOnly: true },
+  { href: "/app/reports",            label: "Reports",     Icon: IconReports,     adminOnly: true },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [

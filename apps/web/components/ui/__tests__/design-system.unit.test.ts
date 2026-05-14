@@ -144,13 +144,14 @@ describe("getNavSections (role filtering)", () => {
     const sections = getNavSections("admin");
     const items = flattenSections(sections);
     expect(sections).toHaveLength(3); // Operations, Business, System
-    expect(items).toHaveLength(12);
+    expect(items).toHaveLength(13);
     expect(items.map((i) => i.href)).toContain("/app/pipeline");
     expect(items.map((i) => i.href)).toContain("/app/field");
     expect(items.map((i) => i.href)).toContain("/app/booking-requests");
     expect(items.map((i) => i.href)).toContain("/app/clients");
     expect(items.map((i) => i.href)).toContain("/app/estimates");
     expect(items.map((i) => i.href)).toContain("/app/invoices");
+    expect(items.map((i) => i.href)).toContain("/app/maintenance-plans");
     expect(items.map((i) => i.href)).toContain("/app/expenses");
     expect(items.map((i) => i.href)).toContain("/app/reports");
     expect(items.map((i) => i.href)).toContain("/app/schedule");
@@ -162,7 +163,6 @@ describe("getNavSections (role filtering)", () => {
     expect(items.map((i) => i.href)).not.toContain("/app/properties");
     expect(items.map((i) => i.href)).not.toContain("/app/automations");
     expect(items.map((i) => i.href)).not.toContain("/app/mileage");
-    expect(items.map((i) => i.href)).not.toContain("/app/maintenance-plans");
     expect(items.map((i) => i.href)).not.toContain("/app/membership-dashboard");
     expect(items.map((i) => i.href)).not.toContain("/app/owner-dashboard");
   });
@@ -170,7 +170,7 @@ describe("getNavSections (role filtering)", () => {
   it("returns the same focused primary nav for owner role", () => {
     const sections = getNavSections("owner");
     const items = flattenSections(sections);
-    expect(items).toHaveLength(12);
+    expect(items).toHaveLength(13);
   });
 
   it("returns only 6 items for tech role", () => {
