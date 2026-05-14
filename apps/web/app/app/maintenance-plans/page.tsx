@@ -96,15 +96,15 @@ export default async function MaintenancePlansPage({
   return (
     <PageContainer>
       <PageHeader
-        title="Subscriptions"
+        title="Memberships"
         subtitle="Active client memberships"
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)" }}>
             <LinkButton href="/app/maintenance-plans/templates" variant="ghost" size="sm">
-              Plan Templates
+              Membership Templates
             </LinkButton>
             <LinkButton href="/app/maintenance-plans/addons" variant="ghost" size="sm">
-              Add-ons
+              Membership Add-ons
             </LinkButton>
             <LinkButton href="/app/maintenance-plans/new" variant="primary" size="sm">
               + Enroll Client
@@ -206,7 +206,7 @@ export default async function MaintenancePlansPage({
 
         {rows.length === 0 && (
             <Card padding="default" style={{ textAlign: "center", color: "var(--fg-muted)" }}>
-            <p style={{ margin: 0, fontSize: "var(--text-sm)" }}>No maintenance plans found.</p>
+            <p style={{ margin: 0, fontSize: "var(--text-sm)" }}>No memberships found.</p>
               <LinkButton href="/app/maintenance-plans/new" variant="primary" size="default" style={{ marginTop: "var(--space-3)" }}>
               Create your first plan
             </LinkButton>

@@ -37,11 +37,11 @@ export default async function AddonsPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Add-on Catalog"
-        subtitle="A la carte services clients can add to any membership — flat annual price per add-on"
+        title="Membership Add-ons"
+        subtitle="A la carte services clients can add to any membership — flat annual price each"
         actions={
           <LinkButton href="/app/maintenance-plans" variant="ghost" size="sm">
-            ← Subscriptions
+            ← Memberships
           </LinkButton>
         }
       />

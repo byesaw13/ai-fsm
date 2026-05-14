@@ -11,7 +11,7 @@ interface JobRow {
   status: string;
   priority: number;
   client_name: string | null;
-  scheduled_start?: string | null;
+  next_visit_start?: string | null;
   has_approved_estimate?: boolean;
   has_active_visit?: boolean;
   sub_status?: string | null;
@@ -202,9 +202,9 @@ function BoardCard({ job }: { job: JobRow }) {
               {SUB_STATUS_LABELS[job.sub_status] ?? job.sub_status}
             </StatusBadge>
           )}
-          {job.scheduled_start && (
+          {job.next_visit_start && (
             <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-              {new Date(job.scheduled_start).toLocaleDateString(undefined, {
+              Next visit {new Date(job.next_visit_start).toLocaleDateString(undefined, {
                 month: "short",
                 day: "numeric",
               })}

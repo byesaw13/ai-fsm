@@ -23,29 +23,26 @@ type Props = {
 };
 
 const STAGE_COPY: Record<PipelineStage, string> = {
-  new_intake: "Confirm the intake details before estimating or scheduling.",
-  needs_review: "Resolve the intake exception before this job moves forward.",
-  scope_ready: "Scope is ready. Build the customer estimate next.",
+  new_lead:        "Review the intake details before estimating or scheduling.",
   estimate_needed: "This job needs an estimate before the customer can approve work.",
-  estimate_sent: "The estimate is out. Follow up or review the estimate response.",
-  approved_ready: "Customer approval is in. Schedule the work.",
-  scheduled: "Work is scheduled. Open the visit to prepare or update field status.",
-  in_field: "Work is active. Keep the visit current and complete it from field mode.",
-  complete_needs_invoice: "Work is complete. Send the final invoice.",
-  invoice_sent: "Invoice is out. Track payment and follow up.",
-  paid_closed: "Payment is recorded and the job is closed.",
+  estimate_sent:   "The estimate is out. Follow up or review the customer's response.",
+  approved_ready:  "Customer approval is in. Schedule the work.",
+  scheduled:       "Work is scheduled. Open the visit to prepare or update field status.",
+  in_progress:     "Work is active. Keep the visit current and complete it from field mode.",
+  waiting:         "Job is blocked. Resolve the blocker before the visit can continue.",
+  completed:       "Work is complete. Send the final invoice.",
+  invoiced:        "Invoice is out. Track payment and follow up.",
+  archived:        "This job is closed or cancelled.",
 };
 
 function actionForStage(props: Props): CommandAction | null {
   const clientParam = props.clientId ? `&client_id=${props.clientId}` : "";
 
   switch (props.stage) {
-    case "new_intake":
-    case "needs_review":
+    case "new_lead":
       return props.bookingRequestId
-        ? { label: "Review Intake", href: `/app/booking-requests/${props.bookingRequestId}` }
-        : { label: "Open Job Intake", href: `/app/jobs/${props.jobId}` };
-    case "scope_ready":
+        ? { label: "Review Lead", href: `/app/booking-requests/${props.bookingRequestId}` }
+        : { label: "Open Job", href: `/app/jobs/${props.jobId}` };
     case "estimate_needed":
       return {
         label: "Create Estimate",
@@ -56,18 +53,19 @@ function actionForStage(props: Props): CommandAction | null {
     case "approved_ready":
       return { label: "Schedule Visit", href: `/app/jobs/${props.jobId}/visits/new` };
     case "scheduled":
-    case "in_field":
+    case "in_progress":
+    case "waiting":
       return props.activeVisitId || props.latestVisitId
         ? { label: "Open Visit", href: `/app/visits/${props.activeVisitId ?? props.latestVisitId}` }
         : { label: "Schedule Visit", href: `/app/jobs/${props.jobId}/visits/new` };
-    case "complete_needs_invoice":
+    case "completed":
       return {
         label: "Create Invoice",
         href: `/app/invoices/new?job_id=${props.jobId}${clientParam}`,
       };
-    case "invoice_sent":
+    case "invoiced":
       return { label: "View Invoices", href: `/app/invoices?job_id=${props.jobId}` };
-    case "paid_closed":
+    case "archived":
       return { label: "View Invoices", href: `/app/invoices?job_id=${props.jobId}`, variant: "secondary" };
   }
 }

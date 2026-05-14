@@ -177,7 +177,7 @@ export default async function MaintenancePlanDetailPage({
       <PageHeader
         title={plan.name}
         backHref="/app/maintenance-plans"
-        backLabel="Plans"
+        backLabel="Memberships"
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)" }}>
             <LinkButton href={`/app/maintenance-plans/${id}/enrollment-summary`} variant="ghost" size="sm">
