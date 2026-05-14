@@ -23,6 +23,7 @@ const patchBody = z.object({
   notes: z.string().nullable().optional(),
   membership_terms: z.string().nullable().optional(),
   member_priority: z.enum(["standard", "priority", "vip"]).optional(),
+  addon_ids: z.array(z.string().uuid()).optional(),
 });
 
 export const GET = withRole(["owner", "admin"], async (request: NextRequest, session: AuthSession) => {
@@ -53,12 +54,12 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
     return NextResponse.json({ error: { code: "VALIDATION_ERROR", details: parsed.error.flatten().fieldErrors } }, { status: 422 });
   }
 
-  const fields = parsed.data;
+  const { addon_ids, ...planFields } = parsed.data;
   const sets: string[] = ["updated_at = now()"];
   const values: unknown[] = [];
   let idx = 1;
 
-  for (const [key, val] of Object.entries(fields)) {
+  for (const [key, val] of Object.entries(planFields)) {
     if (val !== undefined) {
       sets.push(`${key} = $${idx++}`);
       values.push(val);
@@ -67,11 +68,44 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
   values.push(id, session.accountId);
 
   const pool = getPool();
-  const result = await pool.query(
-    `UPDATE maintenance_plans SET ${sets.join(", ")} WHERE id = $${idx++} AND account_id = $${idx} RETURNING *`,
-    values
-  );
-  return NextResponse.json(result.rows[0]);
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const result = await client.query(
+      `UPDATE maintenance_plans SET ${sets.join(", ")} WHERE id = $${idx++} AND account_id = $${idx} RETURNING *`,
+      values
+    );
+
+    if (addon_ids !== undefined) {
+      // Remove all current add-ons then re-insert the desired set
+      await client.query(
+        `DELETE FROM subscription_addons WHERE subscription_id = $1 AND account_id = $2`,
+        [id, session.accountId]
+      );
+      if (addon_ids.length > 0) {
+        const addonRows = await client.query(
+          `SELECT id, annual_price_cents FROM plan_addons WHERE id = ANY($1) AND account_id = $2`,
+          [addon_ids, session.accountId]
+        );
+        for (const addon of addonRows.rows) {
+          await client.query(
+            `INSERT INTO subscription_addons (account_id, subscription_id, addon_id, annual_price_cents)
+             VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
+            [session.accountId, id, addon.id, addon.annual_price_cents]
+          );
+        }
+      }
+    }
+
+    await client.query("COMMIT");
+    return NextResponse.json(result.rows[0]);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 });
 
 export const DELETE = withRole(["owner"], async (request: NextRequest, session: AuthSession) => {
