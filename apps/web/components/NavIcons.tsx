@@ -194,3 +194,12 @@ export function IconField(props: IconProps) {
     </Icon>
   );
 }
+
+export function IconMembership(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2 10a8 8 0 0 1 13-6.24M18 10a8 8 0 0 1-13 6.24" />
+      <path d="M15 3.76V7h-3M5 16.24V13h3" />
+    </Icon>
+  );
+}

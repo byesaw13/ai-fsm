@@ -13,11 +13,11 @@ import {
   PageContainer,
   PageHeader,
   SectionHeader,
-  Timeline,
 } from "@/components/ui";
-import type { TimelineEntryData } from "@/components/ui";
 import { PropertyForm } from "../PropertyForm";
 import { PropertyVaultSection } from "../PropertyVaultSection";
+import { PropertyTimeline } from "./PropertyTimeline";
+import type { TimelineEvent } from "./PropertyTimeline";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +39,6 @@ type PropertyRow = {
 
 type ClientOption = { id: string; name: string };
 type JobRow = { id: string; title: string; status: string; created_at: string };
-type VisitRow = { id: string; status: string; scheduled_start: string; job_title: string };
 
 type VaultItemRow = {
   id: string; category: VaultCategory; name: string; location: string | null;
@@ -68,7 +67,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
   );
   if (!property) notFound();
 
-  const [clients, jobs, visits, vaultItems] = await Promise.all([
+  const [clients, jobs, timelineEvents, vaultItems] = await Promise.all([
     query<ClientOption>(`SELECT id, name FROM clients WHERE account_id = $1 ORDER BY name ASC`, [session.accountId]),
     query<JobRow>(
       `SELECT id, title, status, created_at
@@ -78,13 +77,50 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
        LIMIT 10`,
       [id, session.accountId]
     ),
-    query<VisitRow>(
-      `SELECT v.id, v.status, v.scheduled_start, j.title AS job_title
+    query<TimelineEvent>(
+      `SELECT 'visit'::text AS event_type, v.id::text AS id,
+              COALESCE(v.completed_at, v.scheduled_start) AS ts,
+              COALESCE(j.title, 'Untitled job') AS label,
+              v.status AS detail,
+              v.id::text AS link_id,
+              NULL::int AS total_cents
        FROM visits v
        JOIN jobs j ON j.id = v.job_id
        WHERE j.property_id = $1 AND v.account_id = $2
-       ORDER BY v.scheduled_start DESC
-       LIMIT 10`,
+
+       UNION ALL
+
+       SELECT 'estimate'::text, e.id::text,
+              COALESCE(e.sent_at, e.created_at),
+              'Estimate', e.status, e.id::text, e.total_cents
+       FROM estimates e
+       WHERE e.property_id = $1 AND e.account_id = $2 AND e.status != 'draft'
+
+       UNION ALL
+
+       SELECT 'invoice'::text, i.id::text,
+              COALESCE(i.sent_at, i.created_at),
+              COALESCE('Invoice ' || i.invoice_number, 'Invoice'), i.status,
+              i.id::text, i.total_cents
+       FROM invoices i
+       WHERE i.property_id = $1 AND i.account_id = $2 AND i.status != 'draft'
+
+       UNION ALL
+
+       SELECT 'vault_item'::text, pvi.id::text, pvi.created_at,
+              pvi.name, pvi.category::text, NULL::text, NULL::int
+       FROM property_vault_items pvi
+       WHERE pvi.property_id = $1 AND pvi.account_id = $2
+
+       UNION ALL
+
+       SELECT 'membership'::text, mp.id::text, mp.created_at,
+              mp.name, mp.status, mp.id::text, NULL::int
+       FROM maintenance_plans mp
+       WHERE mp.property_id = $1 AND mp.account_id = $2
+
+       ORDER BY ts DESC NULLS LAST
+       LIMIT 50`,
       [id, session.accountId]
     ),
     query<VaultItemRow>(
@@ -97,15 +133,6 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
     ),
   ]);
 
-  const activityEntries: TimelineEntryData[] = visits.map((v) => ({
-    id: v.id,
-    timestamp: v.scheduled_start,
-    title: v.job_title,
-    subtitle: `Visit ${v.status.replaceAll("_", " ")}`,
-    status: v.status,
-    href: `/app/visits/${v.id}`,
-    isCompleted: v.status === "completed" || v.status === "cancelled",
-  }));
   const vaultCompleteness = computeVaultCompleteness(vaultItems);
 
   return (
@@ -149,8 +176,8 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
       <div className="p7-detail-layout" style={{ marginTop: "var(--space-4)" }}>
         <div className="p7-detail-primary">
           <Card>
-            <SectionHeader title="Visit History" />
-            <Timeline entries={activityEntries} emptyMessage="No visits scheduled at this property yet." />
+            <SectionHeader title="Property Timeline" count={timelineEvents.length} />
+            <PropertyTimeline events={timelineEvents} />
           </Card>
 
           <Card data-testid="property-vault-card">
