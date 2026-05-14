@@ -78,8 +78,20 @@ export default async function MyDayPage() {
 
   const now = new Date();
   const todayVisits = visits.filter((v) => isSameCalendarDay(v.scheduled_start));
+  // Past-day overdue: scheduled visits whose date was before today (not just past the hour)
+  const pastOverdueVisits = visits.filter(
+    (v) =>
+      !isSameCalendarDay(v.scheduled_start) &&
+      isVisitOverdue(v) &&
+      v.status !== "completed" &&
+      v.status !== "cancelled"
+  );
   const upcomingVisits = visits.filter(
-    (v) => !isSameCalendarDay(v.scheduled_start) && v.status !== "completed" && v.status !== "cancelled"
+    (v) =>
+      !isSameCalendarDay(v.scheduled_start) &&
+      !isVisitOverdue(v) &&
+      v.status !== "completed" &&
+      v.status !== "cancelled"
   );
 
   const activeVisit = todayVisits.find(
@@ -140,6 +152,7 @@ export default async function MyDayPage() {
           visits={pendingToday}
           completedVisits={completedToday}
           upcomingVisits={upcomingVisits}
+          pastOverdueVisits={pastOverdueVisits}
           role={session.role}
           now={nowISO}
           statusLabels={VISIT_STATUS_LABELS}

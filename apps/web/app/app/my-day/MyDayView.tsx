@@ -24,6 +24,7 @@ interface MyDayViewProps {
   visits: VisitCardData[];
   completedVisits: VisitCardData[];
   upcomingVisits: VisitCardData[];
+  pastOverdueVisits: VisitCardData[];
   role: string;
   now: string;
   statusLabels: Record<string, string>;
@@ -316,6 +317,7 @@ export function MyDayView({
   visits,
   completedVisits,
   upcomingVisits,
+  pastOverdueVisits,
   role,
   now,
 }: MyDayViewProps) {
@@ -354,6 +356,70 @@ export function MyDayView({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+      {/* Past-day overdue visits — these are from previous days and were never completed */}
+      {pastOverdueVisits.length > 0 && (
+        <div
+          style={{
+            padding: "var(--space-3) var(--space-4)",
+            background: "#fef3c7",
+            border: "1px solid #f59e0b",
+            borderRadius: "var(--radius)",
+          }}
+        >
+          <p style={{ margin: "0 0 var(--space-2)", fontWeight: 700, color: "#92400e" }}>
+            {pastOverdueVisits.length === 1
+              ? "1 visit is overdue — open it to reschedule before the customer follows up."
+              : `${pastOverdueVisits.length} visits are overdue — reschedule them before customers follow up.`}
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            {pastOverdueVisits.map((v) => {
+              const daysPast = Math.floor(
+                (Date.now() - new Date(v.scheduled_start).getTime()) / (1000 * 60 * 60 * 24)
+              );
+              const overdueLabel =
+                daysPast < 1 ? "less than a day overdue" :
+                daysPast === 1 ? "1 day overdue" :
+                daysPast < 30 ? `${daysPast} days overdue` :
+                `${Math.floor(daysPast / 30)} month${Math.floor(daysPast / 30) !== 1 ? "s" : ""} overdue`;
+              return (
+                <div
+                  key={v.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "var(--space-3)",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ fontSize: "var(--text-sm)", color: "#92400e" }}>
+                    <span style={{ fontWeight: 600 }}>
+                      {v.job_title ?? "Visit"}
+                      {v.client_name ? ` — ${v.client_name}` : ""}
+                    </span>
+                    <span style={{ marginLeft: "var(--space-2)", opacity: 0.8 }}>
+                      {overdueLabel}
+                    </span>
+                  </div>
+                  <Link
+                    href={`/app/visits/${v.id}` as Route}
+                    style={{
+                      fontSize: "var(--text-sm)",
+                      fontWeight: 600,
+                      color: "#92400e",
+                      textDecoration: "underline",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    View &amp; Reschedule →
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Active / Next visits */}
       {sortedVisits.length > 0 && (
         <>
