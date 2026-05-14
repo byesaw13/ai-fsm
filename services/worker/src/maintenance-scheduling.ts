@@ -21,6 +21,20 @@ export interface MaintenancePlan {
   notes: string | null;
 }
 
+// Cache account owner lookups within a scheduling run to avoid repeated queries
+const ownerCache = new Map<string, string>();
+
+async function getAccountOwner(client: Client, accountId: string): Promise<string> {
+  if (ownerCache.has(accountId)) return ownerCache.get(accountId)!;
+  const { rows } = await client.query<{ id: string }>(
+    `SELECT id FROM users WHERE account_id = $1 AND role = 'owner' LIMIT 1`,
+    [accountId]
+  );
+  if (!rows[0]) throw new Error(`No owner found for account ${accountId}`);
+  ownerCache.set(accountId, rows[0].id);
+  return rows[0].id;
+}
+
 export interface MaintenancePlanResult {
   planId: string;
   planName: string;
@@ -89,7 +103,8 @@ async function findDuePlans(client: Client): Promise<MaintenancePlan[]> {
 
 async function createPlanVisit(
   client: Client,
-  plan: MaintenancePlan
+  plan: MaintenancePlan,
+  actorId: string
 ): Promise<string> {
   // Calculate a 2-hour window starting at 9 AM on the scheduled date
   const scheduledDate = plan.next_scheduled_date
@@ -119,10 +134,10 @@ async function createPlanVisit(
   } else {
     const newJob = await client.query<{ id: string }>(
       `INSERT INTO jobs
-         (account_id, client_id, property_id, title, status, job_type)
-       VALUES ($1, $2, $3, $4, 'scheduled', 'maintenance')
+         (account_id, client_id, property_id, title, status, job_type, created_by)
+       VALUES ($1, $2, $3, $4, 'scheduled', 'maintenance', $5)
        RETURNING id`,
-      [plan.account_id, plan.client_id, plan.property_id, plan.name]
+      [plan.account_id, plan.client_id, plan.property_id, plan.name, actorId]
     );
     jobId = newJob.rows[0].id;
   }
@@ -164,9 +179,12 @@ export async function processMaintenanceScheduling(
 
   logger.info("maintenance-scheduling: found due plans", { count: plans.length });
 
+  ownerCache.clear();
+
   for (const plan of plans) {
     try {
-      const visitId = await createPlanVisit(client, plan);
+      const actorId = await getAccountOwner(client, plan.account_id);
+      const visitId = await createPlanVisit(client, plan, actorId);
 
       // Advance next_scheduled_date and record last_generated_at
       const currentDate = new Date();
@@ -189,7 +207,7 @@ export async function processMaintenanceScheduling(
         [
           plan.account_id,
           plan.id,
-          "automation",
+          actorId,
           JSON.stringify({
             plan_id: plan.id,
             plan_name: plan.name,
