@@ -1,4 +1,5 @@
 import { z } from "zod";
+export * from "./estimate-engine";
 export { checkSchedulingPreconditions } from "./scheduling-guard";
 export type { SchedulingGuardError, SchedulingGuardResult } from "./scheduling-guard";
 export {
