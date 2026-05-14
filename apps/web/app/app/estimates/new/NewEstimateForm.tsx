@@ -18,7 +18,6 @@ import {
   getStandardEstimateTerms,
 } from "@/lib/estimates/pricing";
 import {
-  PAINTING_RATE_STANDARD_CENTS,
   PREP_LEVEL_MULTIPLIERS,
   JOB_TYPE_MATERIALS,
   getMaterialsByCategory,
@@ -138,6 +137,8 @@ const PREP_LEVEL_LABELS: Record<number, string> = {
   10: "10 — Full restoration",
 };
 
+const STEP_LABELS = ["Who & What", "Pricing", "Adjustments", "Review & Send"] as const;
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -152,6 +153,7 @@ export function NewEstimateForm({
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState(1);
 
   // Mutable entity lists — new entities added inline are appended here
   const [clientList, setClientList] = useState<Client[]>(clients);
@@ -162,7 +164,7 @@ export function NewEstimateForm({
   const [inlineForm, setInlineForm] = useState<"client" | "job" | "property" | null>(null);
 
   // Service type: painting vs generic
-  const [serviceType, setServiceType] = useState<"painting" | "generic">("painting");
+  const [serviceType, setServiceType] = useState<"painting" | "generic">("generic");
 
   // Shared fields
   const [clientId, setClientId] = useState(
@@ -220,7 +222,6 @@ export function NewEstimateForm({
   const [riskAdjustment, setRiskAdjustment] = useState("0.00");
   const [minimumOverrideReason, setMinimumOverrideReason] = useState("");
   const [minimumOverrideNote, setMinimumOverrideNote] = useState("");
-
 
   // Price book line items
   const [priceBookItems, setPriceBookItems] = useState<{ service: PriceBookService; priceCents: number }[]>([]);
@@ -372,8 +373,6 @@ export function NewEstimateForm({
   // Generic live totals
   const taxRateNum = parseFloat(taxRate) || 0;
 
-  // Calculate material handling (15% of material line items)
-  // For now, treat all line items as labor unless they contain "material" in description
   const materialLineItems = lineItems.filter((row) =>
     row.description.toLowerCase().includes("material")
   );
@@ -387,7 +386,6 @@ export function NewEstimateForm({
   const guardrailAdjustmentCents = parseCents(travelSurcharge) + parseCents(riskAdjustment);
   const adjustedGenericSubtotalCents = genericSubtotalCents + guardrailAdjustmentCents;
   const genericTaxCents = Math.round((adjustedGenericSubtotalCents * taxRateNum) / 100);
-
   const genericTotalCents = adjustedGenericSubtotalCents + genericTaxCents;
   const depositCents = Math.round(genericTotalCents * 0.30);
   const balanceDueCents = genericTotalCents - depositCents;
@@ -418,7 +416,6 @@ export function NewEstimateForm({
     );
   }
 
-  // Multi-option tier helpers
   function updateTier(tierIndex: number, updates: Partial<OptionTier>) {
     setTiers((prev) =>
       prev.map((t, i) => (i === tierIndex ? { ...t, ...updates } : t))
@@ -550,8 +547,46 @@ export function NewEstimateForm({
     setItemDescription("");
   }
 
+  // Step navigation
+  function advanceStep() {
+    if (step === 1 && !clientId) {
+      setError("Please select a client before continuing.");
+      return;
+    }
+    setError(null);
+    setStep((s) => Math.min(s + 1, 4));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function goBack() {
+    setError(null);
+    setStep((s) => Math.max(s - 1, 1));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // Review summary helpers
+  const selectedClient = clientList.find((c) => c.id === clientId);
+  const selectedJob = jobList.find((j) => j.id === jobId);
+  const selectedProperty = propertyList.find((p) => p.id === propertyId);
+
+  function reviewTotal(): string {
+    if (serviceType === "painting" && paintingResult) {
+      return formatCents(paintingResult.total_cents);
+    }
+    if (serviceType === "generic") {
+      if (mode === "flat_rate") return formatCents(parseCents(flatRate));
+      if (mode === "multi_option") {
+        const maxTier = Math.max(...tiers.map(tierSubtotalCents));
+        return maxTier > 0 ? `up to ${formatCents(maxTier)}` : "—";
+      }
+      return formatCents(genericTotalCents);
+    }
+    return "—";
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (step !== 4) return;
     if (!clientId) {
       setError("Please select a client.");
       return;
@@ -571,14 +606,12 @@ export function NewEstimateForm({
           notes: notes.trim() || getStandardEstimateTerms().notes,
           expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
           tax_rate: taxRateNum,
-          // Painting engine fields
           sq_ft: parseFloat(sqFt),
           prep_level: prepLevel,
           includes_trim: includesTrim,
           includes_ceiling: includesCeiling,
           material_cost_cents: parseCents(materialCostDollars),
           labor_hours_estimate: parseFloat(laborHours),
-          // Derived from painting engine
           line_items: [
             {
               description: `Painting labor — ${parseFloat(sqFt).toLocaleString()} sq ft${includesCeiling ? " + ceiling" : ""}${includesTrim ? " + trim" : ""} (prep level ${prepLevel})`,
@@ -724,6 +757,40 @@ export function NewEstimateForm({
 
   return (
     <form onSubmit={handleSubmit} className="p7-form-stack" data-testid="new-estimate-form">
+      {/* Step indicator */}
+      <div style={{ display: "flex", marginBottom: "var(--space-2)", borderRadius: "var(--radius)", overflow: "hidden", border: "1px solid var(--border)" }}>
+        {STEP_LABELS.map((label, i) => {
+          const stepNum = i + 1;
+          const isActive = stepNum === step;
+          const isDone = stepNum < step;
+          return (
+            <button
+              key={stepNum}
+              type="button"
+              onClick={() => isDone && setStep(stepNum)}
+              disabled={!isDone}
+              style={{
+                flex: 1,
+                padding: "var(--space-2) var(--space-1)",
+                background: isActive ? "var(--accent)" : isDone ? "var(--bg-subtle)" : "transparent",
+                color: isActive ? "#fff" : isDone ? "var(--fg)" : "var(--fg-muted)",
+                border: "none",
+                borderRight: i < 3 ? "1px solid var(--border)" : "none",
+                cursor: isDone ? "pointer" : "default",
+                fontSize: "var(--text-xs)",
+                fontWeight: isActive ? 600 : 400,
+                textAlign: "center",
+                lineHeight: 1.3,
+              }}
+            >
+              <span style={{ display: "block", fontWeight: 700 }}>{isDone ? "✓" : stepNum}</span>
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Error banner */}
       {error && (
         <Card className="p7-card-danger" padding="sm" role="alert">
           <p style={{ margin: 0 }} data-testid="form-error">
@@ -732,1193 +799,1283 @@ export function NewEstimateForm({
         </Card>
       )}
 
-      {/* Service Type Toggle */}
-      <div>
-        <SectionHeader title="Service Type" as="h3" />
-        <div
-          style={{
-            display: "flex",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius)",
-            overflow: "hidden",
-            width: "fit-content",
-          }}
-        >
-          {(["painting", "generic"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setServiceType(t)}
-              disabled={pending}
-              style={{
-                padding: "var(--space-1) var(--space-3)",
-                background: serviceType === t ? "var(--accent)" : "transparent",
-                color: serviceType === t ? "#fff" : "var(--fg-muted)",
-                border: "none",
-                cursor: pending ? "default" : "pointer",
-                fontSize: "var(--text-sm)",
-                fontWeight: serviceType === t ? 600 : 400,
-                lineHeight: 1.4,
-              }}
-            >
-              {t === "painting" ? "Painting" : "Generic"}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Price Book Quick Add — only in generic itemized mode */}
-      {serviceType === "generic" && mode === "itemized" && (
-        <div>
-          <SectionHeader title="Quick Add from Price Book" as="h3" />
-          <PriceBookSelector onAddToEstimate={handleAddPriceBookItem} />
-
-          {priceBookItems.length > 0 && (
-            <div style={{ marginTop: "var(--space-3)" }}>
-              <p style={{ fontSize: "var(--text-sm)", fontWeight: 600, marginBottom: "var(--space-2)" }}>
-                Selected Services ({priceBookItems.length})
-              </p>
-              {priceBookItems.map((item, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "var(--space-1) var(--space-2)",
-                    background: "var(--bg-subtle)",
-                    borderRadius: "var(--radius)",
-                    marginBottom: "var(--space-1)",
-                    fontSize: "var(--text-sm)",
-                  }}
-                >
-                  <div>
-                    <span style={{ fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                      {item.service.code}
-                    </span>{" "}
-                    <span>{item.service.name}</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-                    <span style={{ fontWeight: 600 }}>{formatCents(item.priceCents)}</span>
-                    <button
-                      type="button"
-                      onClick={() => removePriceBookItem(i)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        color: "var(--color-danger)",
-                        fontSize: "var(--text-sm)",
-                        padding: 0,
-                        lineHeight: 1,
-                      }}
-                      aria-label={`Remove ${item.service.name}`}
-                    >
-                      ×
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Details */}
-      <div className="p7-form-grid p7-form-grid-2">
-        <div>
-          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-end" }}>
-            <div style={{ flex: 1 }}>
-              <Select
-                id="client_id"
-                label="Client"
-                required
-                value={clientId}
-                onChange={(e) => {
-                  setClientId(e.target.value);
-                  setJobId("");
-                  setPropertyId("");
-                  setInlineForm(null);
-                }}
-                disabled={pending}
-                options={clientList.map((c) => ({ value: c.id, label: c.name }))}
-                placeholder="Select a client"
-              />
-            </div>
-            <button
-              type="button"
-              className="p7-btn p7-btn-secondary p7-btn-sm"
-              onClick={() => setInlineForm(inlineForm === "client" ? null : "client")}
-              disabled={pending}
-              style={{ flexShrink: 0, marginBottom: "1px" }}
-            >
-              + New
-            </button>
-          </div>
-          {inlineForm === "client" && (
-            <InlineClientForm
-              onCreated={handleClientCreated}
-              onCancel={() => setInlineForm(null)}
-            />
-          )}
-        </div>
-
-        <div>
-          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-end" }}>
-            <div style={{ flex: 1 }}>
-              <Select
-                id="job_id"
-                label="Job (optional)"
-                value={jobId}
-                onChange={(e) => setJobId(e.target.value)}
-                disabled={pending || !clientId}
-                options={filteredJobs.map((j) => ({ value: j.id, label: j.title }))}
-                placeholder="None"
-                hint={
-                  clientId && filteredJobs.length === 0
-                    ? "No open jobs for this client."
-                    : undefined
-                }
-              />
-            </div>
-            {clientId && (
-              <button
-                type="button"
-                className="p7-btn p7-btn-secondary p7-btn-sm"
-                onClick={() => setInlineForm(inlineForm === "job" ? null : "job")}
-                disabled={pending}
-                style={{ flexShrink: 0, marginBottom: "1px" }}
-              >
-                + New
-              </button>
-            )}
-          </div>
-          {inlineForm === "job" && clientId && (
-            <InlineJobForm
-              clientId={clientId}
-              onCreated={handleJobCreated}
-              onCancel={() => setInlineForm(null)}
-            />
-          )}
-        </div>
-
-        <div>
-          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-end" }}>
-            <div style={{ flex: 1 }}>
-              <Select
-                id="property_id"
-                label="Property (optional)"
-                value={propertyId}
-                onChange={(e) => setPropertyId(e.target.value)}
-                disabled={pending || !clientId}
-                options={filteredProperties.map((p) => ({ value: p.id, label: p.address }))}
-                placeholder="None"
-                hint={
-                  clientId && filteredProperties.length === 0
-                    ? "No properties for this client."
-                    : undefined
-                }
-              />
-            </div>
-            {clientId && (
-              <button
-                type="button"
-                className="p7-btn p7-btn-secondary p7-btn-sm"
-                onClick={() => setInlineForm(inlineForm === "property" ? null : "property")}
-                disabled={pending}
-                style={{ flexShrink: 0, marginBottom: "1px" }}
-              >
-                + New
-              </button>
-            )}
-          </div>
-          {inlineForm === "property" && clientId && (
-            <InlinePropertyForm
-              clientId={clientId}
-              onCreated={handlePropertyCreated}
-              onCancel={() => setInlineForm(null)}
-            />
-          )}
-        </div>
-
-        <Input
-          id="expires_at"
-          label="Expires (optional)"
-          type="date"
-          value={expiresAt}
-          onChange={(e) => setExpiresAt(e.target.value)}
-          disabled={pending}
-        />
-
-        <Textarea
-          id="notes"
-          label="Client notes (optional)"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Visible to the client"
-          rows={3}
-          disabled={pending}
-          containerClassName="p7-form-grid-span-2"
-        />
-      </div>
-
-      <div>
-        <SectionHeader title="Pricing Guardrails" as="h3" />
-        <div className="p7-form-grid p7-form-grid-2">
-          <Select
-            id="trip_count"
-            label="Trip Count"
-            value={tripCount}
-            onChange={(e) => setTripCount(e.target.value as "one_trip" | "multi_trip")}
-            disabled={pending}
-            options={[
-              { value: "one_trip", label: "One Trip" },
-              { value: "multi_trip", label: "Multi-Trip" },
-            ]}
-          />
-          <Select
-            id="finish_expectation"
-            label="Finish Expectation"
-            value={finishExpectation}
-            onChange={(e) => setFinishExpectation(e.target.value as "basic" | "clean" | "premium")}
-            disabled={pending}
-            options={[
-              { value: "basic", label: "Basic" },
-              { value: "clean", label: "Clean" },
-              { value: "premium", label: "Premium" },
-            ]}
-          />
-          <Input
-            id="travel_surcharge"
-            label="Travel Surcharge ($)"
-            type="number"
-            min="0"
-            step="0.01"
-            value={travelSurcharge}
-            onChange={(e) => setTravelSurcharge(e.target.value)}
-            disabled={pending}
-          />
-          <Input
-            id="risk_adjustment"
-            label="Risk / Return Adjustment ($)"
-            type="number"
-            min="0"
-            step="0.01"
-            value={riskAdjustment}
-            onChange={(e) => setRiskAdjustment(e.target.value)}
-            disabled={pending}
-          />
-          <Select
-            id="minimum_override_reason"
-            label="Minimum Override"
-            value={minimumOverrideReason}
-            onChange={(e) => setMinimumOverrideReason(e.target.value)}
-            disabled={pending}
-            placeholder="None"
-            options={[
-              { value: "bundled", label: "Bundled" },
-              { value: "membership_included", label: "Membership Included" },
-              { value: "promo", label: "Promotion" },
-              { value: "owner_approved", label: "Owner Approved" },
-            ]}
-          />
-          <Input
-            id="minimum_override_note"
-            label="Override Note"
-            value={minimumOverrideNote}
-            onChange={(e) => setMinimumOverrideNote(e.target.value)}
-            disabled={pending}
-            placeholder="Internal reason"
-          />
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)", marginTop: "var(--space-2)" }}>
-          <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
-            <input type="checkbox" checked={requiresDryingOrCuring} onChange={(e) => setRequiresDryingOrCuring(e.target.checked)} disabled={pending} />
-            <span>Drying/curing required</span>
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
-            <input type="checkbox" checked={difficultAccess} onChange={(e) => setDifficultAccess(e.target.checked)} disabled={pending} />
-            <span>Difficult access</span>
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
-            <input type="checkbox" checked={oldHouseRisk} onChange={(e) => setOldHouseRisk(e.target.checked)} disabled={pending} />
-            <span>Old-house risk</span>
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
-            <input type="checkbox" checked={coordinationRequired} onChange={(e) => setCoordinationRequired(e.target.checked)} disabled={pending} />
-            <span>Coordination required</span>
-          </label>
-        </div>
-      </div>
-
-      {/* Painting Estimator */}
-      {serviceType === "painting" && (
-        <div>
-          <SectionHeader title="Painting Estimator" as="h3" />
-
-          {/* Scope parser */}
-          <div style={{ marginBottom: "var(--space-4)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
-              <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 600 }}>
-                Parse from description
-              </p>
-              {scopeParsing && (
-                <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontStyle: "italic" }}>
-                  Analyzing…
-                </span>
-              )}
-            </div>
-            <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-              Describe the job — fields auto-fill after you stop typing.
-            </p>
-            <Textarea
-              id="scope_notes"
-              label=""
-              value={scopeNotes}
-              onChange={(e) => setScopeNotes(e.target.value)}
-              placeholder="e.g. Paint 3 bedrooms, patch some holes and sand walls, include ceiling and trim, about $350 for materials"
-              rows={3}
-              disabled={pending || scopeParsing}
-            />
-
-            {scopeError && (
-              <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--status-error)" }}>
-                {scopeError}
-              </p>
-            )}
-
-            {scopeResult && (
-              <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-2)", borderTop: "1px solid var(--border)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-1)" }}>
-                  <span style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>Parsed</span>
-                  <span style={{
-                    padding: "2px 8px", borderRadius: 99, fontSize: "var(--text-xs)", fontWeight: 600, color: "#fff",
-                    background: scopeResult.parsed.confidence >= 70 ? "var(--status-success)" : scopeResult.parsed.confidence >= 40 ? "var(--status-warning)" : "var(--status-error)",
-                  }}>
-                    {scopeResult.parsed.confidence}% confidence
-                  </span>
-                </div>
-                {scopeResult.parsed.confidence < 60 && (
-                  <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--status-warning)", fontWeight: 500 }}>
-                    ⚠ Low confidence — review all fields carefully before submitting.
-                  </p>
-                )}
-                <ul style={{ margin: 0, padding: "0 0 0 var(--space-4)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                  {scopeResult.parsed.parsed_items.map((item, i) => (
-                    <li key={i}>{item}</li>
-                  ))}
-                </ul>
-                {scopeResult.parsed.warnings.map((w, i) => (
-                  <p key={i} style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--status-warning)", fontWeight: 500 }}>
-                    ⚠ {w}
-                  </p>
-                ))}
-                <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                  Fields applied below — review and adjust as needed.
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div className="p7-form-grid p7-form-grid-2">
-            <Input
-              id="sq_ft"
-              label="Square Footage"
-              type="number"
-              min="1"
-              step="1"
-              value={sqFt}
-              onChange={(e) => setSqFt(e.target.value)}
-              disabled={pending}
-              placeholder="e.g. 1200"
-            />
-
-            <Input
-              id="labor_hours"
-              label="Estimated Labor Hours"
-              type="number"
-              min="0.5"
-              step="0.5"
-              value={laborHours}
-              onChange={(e) => setLaborHours(e.target.value)}
-              disabled={pending}
-              placeholder="Internal only, not shown to client"
-              hint="Used for margin calculation"
-            />
-
-            <Input
-              id="material_cost"
-              label="Material Cost ($)"
-              type="number"
-              min="0"
-              step="0.01"
-              value={materialCostDollars}
-              onChange={(e) => setMaterialCostDollars(e.target.value)}
-              disabled={pending}
-              placeholder="e.g. 350.00"
-            />
-
-            <div className="p7-field">
-              <label className="p7-label">Prep Level</label>
-              <select
-                id="prep_level"
-                className="p7-select"
-                value={prepLevel}
-                onChange={(e) => setPrepLevel(Number(e.target.value))}
-                disabled={pending}
-              >
-                {Object.entries(PREP_LEVEL_MULTIPLIERS).map(([level, mult]) => (
-                  <option key={level} value={level}>
-                    {PREP_LEVEL_LABELS[Number(level)] ?? `Level ${level} (${mult}x)`}
-                  </option>
-                ))}
-              </select>
-              <span className="p7-field-hint">
-                Multiplier: {PREP_LEVEL_MULTIPLIERS[prepLevel]?.toFixed(2)}x base rate
-              </span>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: "var(--space-4)", marginTop: "var(--space-2)" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={includesTrim}
-                onChange={(e) => setIncludesTrim(e.target.checked)}
-                disabled={pending}
-              />
-              <span>Include trim (+$0.20/sq ft)</span>
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={includesCeiling}
-                onChange={(e) => setIncludesCeiling(e.target.checked)}
-                disabled={pending}
-              />
-              <span>Include ceiling (+30% surface)</span>
-            </label>
-          </div>
-
-          {/* Live Preview */}
-          {paintingResult && (
-            <div style={{ marginTop: "var(--space-4)" }}>
-              <Card padding="sm" style={{ background: "var(--bg-subtle)" }}>
-                <SectionHeader title="Estimate Preview" as="h4" />
-                <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "var(--space-1) var(--space-4)", textAlign: "right" }}>
-                  <span style={{ color: "var(--fg-muted)" }}>Labor (flat rate)</span>
-                  <span>{formatCents(paintingResult.labor_flat_rate_cents)}</span>
-
-                  {parseCents(materialCostDollars) > 0 && (
-                    <>
-                      <span style={{ color: "var(--fg-muted)" }}>Materials</span>
-                      <span>{formatCents(parseCents(materialCostDollars))}</span>
-
-                      <span style={{ color: "var(--fg-muted)" }}>Handling fee (15%)</span>
-                      <span>{formatCents(paintingResult.material_handling_cents)}</span>
-                    </>
-                  )}
-
-                  <strong>Total</strong>
-                  <strong>{formatCents(paintingResult.total_cents)}</strong>
-
-                  <span style={{ color: "var(--fg-muted)" }}>Deposit (30%)</span>
-                  <span>{formatCents(paintingResult.deposit_cents)}</span>
-
-                  <span style={{ color: "var(--fg-muted)" }}>Balance (70%)</span>
-                  <span>{formatCents(paintingResult.balance_cents)}</span>
-                </div>
-
-                {/* Internal margin section */}
-                <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
-                    <SectionHeader title="Internal Margin" as="h4" />
-                  <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "var(--space-1) var(--space-4)", textAlign: "right" }}>
-                    <span style={{ color: "var(--fg-muted)" }}>Internal labor cost ($85/hr)</span>
-                    <span>{formatCents(paintingResult.internal_labor_cost_cents)}</span>
-
-                    <span style={{ color: "var(--fg-muted)" }}>Gross margin</span>
-                    <span style={{
-                      color: paintingResult.gross_margin_pct >= 30 ? "var(--color-success)" : paintingResult.gross_margin_pct >= 15 ? "var(--color-warning)" : "var(--color-danger)",
-                      fontWeight: 600,
-                    }}>
-                      {paintingResult.gross_margin_pct}% ({formatCents(paintingResult.gross_margin_cents)})
-                    </span>
-
-                    <span style={{ color: "var(--fg-muted)" }}>Effective rate</span>
-                    <span>${(paintingResult.effective_sq_ft_rate_cents / 100).toFixed(2)}/sq ft</span>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          )}
-
-          {!paintingResult && (parseFloat(sqFt) > 0 || parseFloat(laborHours) > 0) && (
-            <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: "var(--space-2)" }}>
-              Enter both square footage and labor hours to see the estimate preview.
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Suggested Materials — shown when scope parser resolves a job type */}
-      {serviceType === "generic" && mode === "itemized" && resolvedJobType && Object.keys(getMaterialsByCategory(resolvedJobType)).length > 0 && (
-        <div>
-          <SectionHeader title={`Suggested Materials — ${resolvedJobType.replace("_", " ")}`} as="h3" />
-          <Card padding="sm" style={{ background: "var(--bg-subtle)" }}>
-            {Object.entries(getMaterialsByCategory(resolvedJobType)).map(([category, materials]) => (
-              <div key={category} style={{ marginBottom: "var(--space-3)" }}>
-                <div style={{ fontSize: "var(--text-xs)", fontWeight: 500, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-1)" }}>
-                  {category}
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
-                  {materials.map((mat) => {
-                    const key = mat.name.toLowerCase();
-                    const alreadyAdded = addedMaterials.has(key) || lineItems.some((r) => r.description.toLowerCase().includes(key));
-                    return (
-                      <button
-                        key={mat.name}
-                        type="button"
-                        disabled={alreadyAdded}
-                        onClick={() => handleAddMaterial(mat)}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "var(--space-1)",
-                          padding: "var(--space-1) var(--space-2)",
-                          fontSize: "var(--text-sm)",
-                          background: alreadyAdded ? "var(--color-surface-raised)" : "var(--color-surface-overlay)",
-                          border: `1px solid ${alreadyAdded ? "var(--color-border)" : "var(--color-primary-alpha)"}`,
-                          borderRadius: "var(--radius-sm)",
-                          cursor: alreadyAdded ? "default" : "pointer",
-                          color: alreadyAdded ? "var(--fg-muted)" : "var(--fg-primary)",
-                        }}
-                      >
-                        <span>{mat.name}</span>
-                        <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                          {mat.typicalQty} {mat.unit}
-                        </span>
-                        {alreadyAdded ? (
-                          <span style={{ fontSize: "var(--text-xs)", color: "var(--color-success)" }}>✓</span>
-                        ) : (
-                          <span style={{ fontSize: "var(--text-xs)", color: "var(--color-primary)" }}>+</span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-            <p style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", margin: "var(--space-2) 0 0" }}>
-              Click to add as a line item. Set prices before submitting.
-            </p>
-          </Card>
-        </div>
-      )}
-
-      {/* Generic Pricing */}
-      {serviceType === "generic" && (
-        <div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-3)" }}>
-            <SectionHeader
-              title={mode === "flat_rate" ? "Flat Rate" : mode === "multi_option" ? "Good / Better / Best" : "Line Items"}
-              count={mode === "itemized" ? lineItems.length : undefined}
-              as="h3"
-            />
+      {/* ------------------------------------------------------------------ */}
+      {/* Step 1: Who & What                                                  */}
+      {/* ------------------------------------------------------------------ */}
+      {step === 1 && (
+        <div className="p7-form-stack">
+          {/* Service type toggle */}
+          <div>
+            <SectionHeader title="Service Type" as="h3" />
             <div
               style={{
                 display: "flex",
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius)",
                 overflow: "hidden",
+                width: "fit-content",
               }}
             >
-              {(["itemized", "flat_rate", "multi_option"] as const).map((m) => (
+              {(["generic", "painting"] as const).map((t) => (
                 <button
-                  key={m}
+                  key={t}
                   type="button"
-                  onClick={() => handleModeChange(m)}
+                  onClick={() => setServiceType(t)}
                   disabled={pending}
                   style={{
-                    padding: "var(--space-1) var(--space-3)",
-                    background: mode === m ? "var(--accent)" : "transparent",
-                    color: mode === m ? "#fff" : "var(--fg-muted)",
+                    padding: "var(--space-1) var(--space-4)",
+                    background: serviceType === t ? "var(--accent)" : "transparent",
+                    color: serviceType === t ? "#fff" : "var(--fg-muted)",
                     border: "none",
                     cursor: pending ? "default" : "pointer",
                     fontSize: "var(--text-sm)",
-                    fontWeight: mode === m ? 600 : 400,
+                    fontWeight: serviceType === t ? 600 : 400,
                     lineHeight: 1.4,
                   }}
-                  data-testid={`mode-${m}`}
                 >
-                  {m === "itemized" ? "Itemized" : m === "flat_rate" ? "Flat Rate" : "Multi-Option"}
+                  {t === "painting" ? "Painting" : "General"}
                 </button>
               ))}
             </div>
+            {serviceType === "painting" && (
+              <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                Painting estimator — fields auto-fill from a job description.
+              </p>
+            )}
           </div>
 
-          {mode === "flat_rate" ? (
-            <div className="p7-form-grid p7-form-grid-2" style={{ marginBottom: "var(--space-3)" }}>
-              <Input
-                id="flat_rate"
-                label="Price ($)"
-                type="number"
-                min="0"
-                step="0.01"
-                value={flatRate}
-                onChange={(e) => setFlatRate(e.target.value)}
-                disabled={pending}
-                data-testid="flat-rate-input"
-              />
+          {/* Client / Job / Property */}
+          <div className="p7-form-grid p7-form-grid-2">
+            <div>
+              <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-end" }}>
+                <div style={{ flex: 1 }}>
+                  <Select
+                    id="client_id"
+                    label="Client"
+                    required
+                    value={clientId}
+                    onChange={(e) => {
+                      setClientId(e.target.value);
+                      setJobId("");
+                      setPropertyId("");
+                      setInlineForm(null);
+                    }}
+                    disabled={pending}
+                    options={clientList.map((c) => ({ value: c.id, label: c.name }))}
+                    placeholder="Select a client"
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="p7-btn p7-btn-secondary p7-btn-sm"
+                  onClick={() => setInlineForm(inlineForm === "client" ? null : "client")}
+                  disabled={pending}
+                  style={{ flexShrink: 0, marginBottom: "1px" }}
+                >
+                  + New
+                </button>
+              </div>
+              {inlineForm === "client" && (
+                <InlineClientForm
+                  onCreated={handleClientCreated}
+                  onCancel={() => setInlineForm(null)}
+                />
+              )}
             </div>
-          ) : mode === "multi_option" ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--space-4)", marginBottom: "var(--space-3)" }}>
-              {tiers.map((tier, ti) => {
-                const tierSub = tierSubtotalCents(tier);
-                const tierTax = Math.round((tierSub * taxRateNum) / 100);
-                const tierTotal = tierSub + tierTax;
-                return (
-                  <Card key={ti} padding="sm" style={{
-                    border: tier.is_recommended ? "2px solid var(--accent)" : "1px solid var(--border)",
-                    position: "relative",
-                  }}>
-                    {tier.is_recommended && (
-                      <div style={{
-                        position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)",
-                        background: "var(--accent)", color: "#fff", padding: "2px 12px", borderRadius: 99,
-                        fontSize: "var(--text-xs)", fontWeight: 600, whiteSpace: "nowrap",
-                      }}>
-                        Recommended
-                      </div>
-                    )}
-                    <div style={{ marginBottom: "var(--space-2)" }}>
-                      <input
-                        className="p7-input"
-                        type="text"
-                        value={tier.label}
-                        onChange={(e) => updateTier(ti, { label: e.target.value })}
-                        placeholder="Option label"
-                        disabled={pending}
-                        style={{ fontWeight: 700, fontSize: "var(--text-lg)", marginBottom: "var(--space-1)" }}
-                      />
-                      <input
-                        className="p7-input"
-                        type="text"
-                        value={tier.description}
-                        onChange={(e) => updateTier(ti, { description: e.target.value })}
-                        placeholder="Brief description"
-                        disabled={pending}
-                        style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}
-                      />
-                    </div>
 
-                    <label style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", cursor: "pointer", marginBottom: "var(--space-2)", fontSize: "var(--text-sm)" }}>
-                      <input
-                        type="checkbox"
-                        checked={tier.is_recommended}
-                        onChange={(e) => updateTier(ti, { is_recommended: e.target.checked })}
-                        disabled={pending}
-                      />
-                      <span>Mark as recommended</span>
-                    </label>
-
-                    <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-2)", marginTop: "var(--space-2)" }}>
-                      {tier.line_items.map((row, li) => (
-                        <div key={li} style={{ marginBottom: "var(--space-2)" }}>
-                          <input
-                            className="p7-input"
-                            type="text"
-                            value={row.description}
-                            onChange={(e) => updateTierLineItem(ti, li, "description", e.target.value)}
-                            placeholder="Description"
-                            disabled={pending}
-                            style={{ marginBottom: "var(--space-1)", fontSize: "var(--text-sm)" }}
-                          />
-                          <div style={{ display: "flex", gap: "var(--space-2)" }}>
-                            <input
-                              className="p7-input"
-                              type="number"
-                              min="0.01"
-                              step="0.01"
-                              value={row.quantity}
-                              onChange={(e) => updateTierLineItem(ti, li, "quantity", e.target.value)}
-                              disabled={pending}
-                              style={{ width: 60, fontSize: "var(--text-sm)" }}
-                            />
-                            <input
-                              className="p7-input"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={row.unit_price}
-                              onChange={(e) => updateTierLineItem(ti, li, "unit_price", e.target.value)}
-                              disabled={pending}
-                              style={{ width: 90, fontSize: "var(--text-sm)" }}
-                            />
-                            <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", lineHeight: "var(--space-5)" }}>
-                              {formatCents(lineTotal(row))}
-                            </span>
-                            {tier.line_items.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => removeTierLineItem(ti, li)}
-                                disabled={pending}
-                                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-danger)", fontSize: "var(--text-sm)", padding: 0, lineHeight: 1 }}
-                                aria-label={`Remove line item`}
-                              >
-                                ×
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => addTierLineItem(ti)}
-                        disabled={pending}
-                        style={{ width: "100%", marginTop: "var(--space-1)" }}
-                      >
-                        + Add item
-                      </Button>
-                    </div>
-
-                    <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-2)", marginTop: "var(--space-3)", textAlign: "right" }}>
-                      {tierTax > 0 && (
-                        <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                          Tax: {formatCents(tierTax)}
-                        </div>
-                      )}
-                      <div style={{ fontSize: "var(--text-lg)", fontWeight: 700 }}>
-                        {formatCents(tierTotal)}
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
+            <div>
+              <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-end" }}>
+                <div style={{ flex: 1 }}>
+                  <Select
+                    id="job_id"
+                    label="Job (optional)"
+                    value={jobId}
+                    onChange={(e) => setJobId(e.target.value)}
+                    disabled={pending || !clientId}
+                    options={filteredJobs.map((j) => ({ value: j.id, label: j.title }))}
+                    placeholder="None"
+                    hint={
+                      clientId && filteredJobs.length === 0
+                        ? "No open jobs for this client."
+                        : undefined
+                    }
+                  />
+                </div>
+                {clientId && (
+                  <button
+                    type="button"
+                    className="p7-btn p7-btn-secondary p7-btn-sm"
+                    onClick={() => setInlineForm(inlineForm === "job" ? null : "job")}
+                    disabled={pending}
+                    style={{ flexShrink: 0, marginBottom: "1px" }}
+                  >
+                    + New
+                  </button>
+                )}
+              </div>
+              {inlineForm === "job" && clientId && (
+                <InlineJobForm
+                  clientId={clientId}
+                  onCreated={handleJobCreated}
+                  onCancel={() => setInlineForm(null)}
+                />
+              )}
             </div>
-          ) : (
-            <>
-              {/* Item Suggester */}
+
+            <div>
+              <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-end" }}>
+                <div style={{ flex: 1 }}>
+                  <Select
+                    id="property_id"
+                    label="Property (optional)"
+                    value={propertyId}
+                    onChange={(e) => setPropertyId(e.target.value)}
+                    disabled={pending || !clientId}
+                    options={filteredProperties.map((p) => ({ value: p.id, label: p.address }))}
+                    placeholder="None"
+                    hint={
+                      clientId && filteredProperties.length === 0
+                        ? "No properties for this client."
+                        : undefined
+                    }
+                  />
+                </div>
+                {clientId && (
+                  <button
+                    type="button"
+                    className="p7-btn p7-btn-secondary p7-btn-sm"
+                    onClick={() => setInlineForm(inlineForm === "property" ? null : "property")}
+                    disabled={pending}
+                    style={{ flexShrink: 0, marginBottom: "1px" }}
+                  >
+                    + New
+                  </button>
+                )}
+              </div>
+              {inlineForm === "property" && clientId && (
+                <InlinePropertyForm
+                  clientId={clientId}
+                  onCreated={handlePropertyCreated}
+                  onCancel={() => setInlineForm(null)}
+                />
+              )}
+            </div>
+
+            <Input
+              id="expires_at"
+              label="Expires (optional)"
+              type="date"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+              disabled={pending}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Step 2: Pricing                                                     */}
+      {/* ------------------------------------------------------------------ */}
+      {step === 2 && (
+        <div className="p7-form-stack">
+          {/* Painting Estimator */}
+          {serviceType === "painting" && (
+            <div>
+              <SectionHeader title="Painting Estimator" as="h3" />
+
+              {/* Scope parser */}
               <div style={{ marginBottom: "var(--space-4)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-1)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
                   <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 600 }}>
-                    Suggest from description
+                    Parse from description
                   </p>
-                  {itemSuggesting && (
+                  {scopeParsing && (
                     <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontStyle: "italic" }}>
-                      Matching…
+                      Analyzing…
                     </span>
                   )}
                 </div>
                 <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                  Describe the job — Claude matches price book services after you stop typing.
+                  Describe the job — fields auto-fill after you stop typing.
                 </p>
                 <Textarea
-                  id="item_description"
+                  id="scope_notes"
                   label=""
-                  value={itemDescription}
-                  onChange={(e) => setItemDescription(e.target.value)}
-                  placeholder="e.g. Fix a leaky kitchen faucet, replace the shutoff valve under the sink, and patch the drywall where the pipe was leaking"
+                  value={scopeNotes}
+                  onChange={(e) => setScopeNotes(e.target.value)}
+                  placeholder="e.g. Paint 3 bedrooms, patch some holes and sand walls, include ceiling and trim, about $350 for materials"
                   rows={3}
-                  disabled={pending || itemSuggesting}
+                  disabled={pending || scopeParsing}
                 />
 
-                {itemSuggestError && (
+                {scopeError && (
                   <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--status-error)" }}>
-                    {itemSuggestError}
+                    {scopeError}
                   </p>
                 )}
 
-                {/* Bundle nudge */}
-                {bundleCategories >= 4 && (
-                  <div style={{
-                    marginTop: "var(--space-2)",
-                    padding: "var(--space-2) var(--space-3)",
-                    background: "#fef3c7",
-                    borderRadius: "var(--radius)",
-                    fontSize: "var(--text-sm)",
-                    color: "#92400e",
-                    fontWeight: 500,
-                  }}>
-                    ★ You have {bundleCategories} task categories — consider half-day block pricing ($515)
-                  </div>
-                )}
-
-                {/* Legal flag warning */}
-                {hasLegalFlagSuggestions && (
-                  <div style={{
-                    marginTop: "var(--space-2)",
-                    padding: "var(--space-2) var(--space-3)",
-                    background: "#fef3c7",
-                    borderRadius: "var(--radius)",
-                    fontSize: "var(--text-sm)",
-                    color: "#92400e",
-                    fontWeight: 500,
-                  }}>
-                    ⚠ One or more items may require a licensed contractor in some jurisdictions — verify before quoting
-                  </div>
-                )}
-
-                {suggestions.length > 0 && (
-                  <div style={{ marginTop: "var(--space-3)", borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
-                      <span style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
-                        {suggestions.length} suggestion{suggestions.length !== 1 ? "s" : ""} — add or skip each
+                {scopeResult && (
+                  <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-2)", borderTop: "1px solid var(--border)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-1)" }}>
+                      <span style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>Parsed</span>
+                      <span style={{
+                        padding: "2px 8px", borderRadius: 99, fontSize: "var(--text-xs)", fontWeight: 600, color: "#fff",
+                        background: scopeResult.parsed.confidence >= 70 ? "var(--status-success)" : scopeResult.parsed.confidence >= 40 ? "var(--status-warning)" : "var(--status-error)",
+                      }}>
+                        {scopeResult.parsed.confidence}% confidence
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setSuggestions([])}
-                        style={{ background: "none", border: "none", fontSize: "var(--text-sm)", color: "var(--fg-muted)", cursor: "pointer", padding: 0 }}
-                      >
-                        Dismiss all
-                      </button>
+                    </div>
+                    {scopeResult.parsed.confidence < 60 && (
+                      <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--status-warning)", fontWeight: 500 }}>
+                        ⚠ Low confidence — review all fields carefully before submitting.
+                      </p>
+                    )}
+                    <ul style={{ margin: 0, padding: "0 0 0 var(--space-4)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                      {scopeResult.parsed.parsed_items.map((item, i) => (
+                        <li key={i}>{item}</li>
+                      ))}
+                    </ul>
+                    {scopeResult.parsed.warnings.map((w, i) => (
+                      <p key={i} style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--status-warning)", fontWeight: 500 }}>
+                        ⚠ {w}
+                      </p>
+                    ))}
+                    <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                      Fields applied below — review and adjust as needed.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="p7-form-grid p7-form-grid-2">
+                <Input
+                  id="sq_ft"
+                  label="Square Footage"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={sqFt}
+                  onChange={(e) => setSqFt(e.target.value)}
+                  disabled={pending}
+                  placeholder="e.g. 1200"
+                />
+
+                <Input
+                  id="labor_hours"
+                  label="Estimated Labor Hours"
+                  type="number"
+                  min="0.5"
+                  step="0.5"
+                  value={laborHours}
+                  onChange={(e) => setLaborHours(e.target.value)}
+                  disabled={pending}
+                  placeholder="Internal only, not shown to client"
+                  hint="Used for margin calculation"
+                />
+
+                <Input
+                  id="material_cost"
+                  label="Material Cost ($)"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={materialCostDollars}
+                  onChange={(e) => setMaterialCostDollars(e.target.value)}
+                  disabled={pending}
+                  placeholder="e.g. 350.00"
+                />
+
+                <div className="p7-field">
+                  <label className="p7-label">Prep Level</label>
+                  <select
+                    id="prep_level"
+                    className="p7-select"
+                    value={prepLevel}
+                    onChange={(e) => setPrepLevel(Number(e.target.value))}
+                    disabled={pending}
+                  >
+                    {Object.entries(PREP_LEVEL_MULTIPLIERS).map(([level, mult]) => (
+                      <option key={level} value={level}>
+                        {PREP_LEVEL_LABELS[Number(level)] ?? `Level ${level} (${mult}x)`}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="p7-field-hint">
+                    Multiplier: {PREP_LEVEL_MULTIPLIERS[prepLevel]?.toFixed(2)}x base rate
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "var(--space-4)", marginTop: "var(--space-2)" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={includesTrim}
+                    onChange={(e) => setIncludesTrim(e.target.checked)}
+                    disabled={pending}
+                  />
+                  <span>Include trim (+$0.20/sq ft)</span>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={includesCeiling}
+                    onChange={(e) => setIncludesCeiling(e.target.checked)}
+                    disabled={pending}
+                  />
+                  <span>Include ceiling (+30% surface)</span>
+                </label>
+              </div>
+
+              {/* Live Preview */}
+              {paintingResult && (
+                <div style={{ marginTop: "var(--space-4)" }}>
+                  <Card padding="sm" style={{ background: "var(--bg-subtle)" }}>
+                    <SectionHeader title="Estimate Preview" as="h4" />
+                    <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "var(--space-1) var(--space-4)", textAlign: "right" }}>
+                      <span style={{ color: "var(--fg-muted)" }}>Labor (flat rate)</span>
+                      <span>{formatCents(paintingResult.labor_flat_rate_cents)}</span>
+
+                      {parseCents(materialCostDollars) > 0 && (
+                        <>
+                          <span style={{ color: "var(--fg-muted)" }}>Materials</span>
+                          <span>{formatCents(parseCents(materialCostDollars))}</span>
+
+                          <span style={{ color: "var(--fg-muted)" }}>Handling fee (15%)</span>
+                          <span>{formatCents(paintingResult.material_handling_cents)}</span>
+                        </>
+                      )}
+
+                      <strong>Total</strong>
+                      <strong>{formatCents(paintingResult.total_cents)}</strong>
+
+                      <span style={{ color: "var(--fg-muted)" }}>Deposit (30%)</span>
+                      <span>{formatCents(paintingResult.deposit_cents)}</span>
+
+                      <span style={{ color: "var(--fg-muted)" }}>Balance (70%)</span>
+                      <span>{formatCents(paintingResult.balance_cents)}</span>
                     </div>
 
-                    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                      {suggestions.map((s, i) => (
+                    <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
+                      <SectionHeader title="Internal Margin" as="h4" />
+                      <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "var(--space-1) var(--space-4)", textAlign: "right" }}>
+                        <span style={{ color: "var(--fg-muted)" }}>Internal labor cost ($85/hr)</span>
+                        <span>{formatCents(paintingResult.internal_labor_cost_cents)}</span>
+
+                        <span style={{ color: "var(--fg-muted)" }}>Gross margin</span>
+                        <span style={{
+                          color: paintingResult.gross_margin_pct >= 30 ? "var(--color-success)" : paintingResult.gross_margin_pct >= 15 ? "var(--color-warning)" : "var(--color-danger)",
+                          fontWeight: 600,
+                        }}>
+                          {paintingResult.gross_margin_pct}% ({formatCents(paintingResult.gross_margin_cents)})
+                        </span>
+
+                        <span style={{ color: "var(--fg-muted)" }}>Effective rate</span>
+                        <span>${(paintingResult.effective_sq_ft_rate_cents / 100).toFixed(2)}/sq ft</span>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              )}
+
+              {!paintingResult && (parseFloat(sqFt) > 0 || parseFloat(laborHours) > 0) && (
+                <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: "var(--space-2)" }}>
+                  Enter both square footage and labor hours to see the estimate preview.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Generic Pricing */}
+          {serviceType === "generic" && (
+            <div>
+              {/* Price Book Quick Add — itemized mode only */}
+              {mode === "itemized" && (
+                <div style={{ marginBottom: "var(--space-4)" }}>
+                  <SectionHeader title="Quick Add from Price Book" as="h3" />
+                  <PriceBookSelector onAddToEstimate={handleAddPriceBookItem} />
+
+                  {priceBookItems.length > 0 && (
+                    <div style={{ marginTop: "var(--space-3)" }}>
+                      <p style={{ fontSize: "var(--text-sm)", fontWeight: 600, marginBottom: "var(--space-2)" }}>
+                        Selected Services ({priceBookItems.length})
+                      </p>
+                      {priceBookItems.map((item, i) => (
                         <div
-                          key={`${s.code}-${i}`}
+                          key={i}
                           style={{
                             display: "flex",
-                            gap: "var(--space-3)",
-                            alignItems: "flex-start",
-                            padding: "var(--space-3)",
-                            background: "var(--bg-card)",
-                            border: "1px solid var(--border)",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "var(--space-1) var(--space-2)",
+                            background: "var(--bg-subtle)",
                             borderRadius: "var(--radius)",
+                            marginBottom: "var(--space-1)",
+                            fontSize: "var(--text-sm)",
                           }}
                         >
-                          {/* Info */}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
-                              <span style={{ color: "var(--fg-muted)", fontWeight: 400, marginRight: "var(--space-1)" }}>{s.code}</span>
-                              {s.name}
-                            </div>
-                            <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
-                              {s.reason}
-                            </div>
-                            <div style={{ display: "flex", gap: "var(--space-1)", marginTop: 4, flexWrap: "wrap", alignItems: "center" }}>
-                              <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                                {formatCents(s.quantity * s.unit_price_cents)}
-                              </span>
-                              {s.labor_hours_typical !== null && (
-                                <span style={{
-                                  fontSize: "var(--text-xs)", padding: "1px 6px",
-                                  background: "var(--color-surface-overlay)",
-                                  borderRadius: "var(--radius-sm)",
-                                  color: "var(--fg-muted)", border: "1px solid var(--border)",
-                                }}>
-                                  ~{s.labor_hours_typical}h
-                                </span>
-                              )}
-                              {s.legal_flag === "gray" && (
-                                <span style={{
-                                  fontSize: "var(--text-xs)", padding: "1px 6px",
-                                  background: "#fef9c3",
-                                  borderRadius: "var(--radius-sm)",
-                                  color: "#854d0e",
-                                  border: "1px solid #fde68a",
-                                }}>
-                                  ⚠ verify auth
-                                </span>
-                              )}
-                              {s.legal_flag === "restricted" && (
-                                <span style={{
-                                  fontSize: "var(--text-xs)", padding: "1px 6px",
-                                  background: "#fee2e2",
-                                  borderRadius: "var(--radius-sm)",
-                                  color: "#991b1b",
-                                  border: "1px solid #fca5a5",
-                                }}>
-                                  ⛔ licensed trade
-                                </span>
-                              )}
-                            </div>
+                          <div>
+                            <span style={{ fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                              {item.service.code}
+                            </span>{" "}
+                            <span>{item.service.name}</span>
                           </div>
-
-                          {/* Add / Skip */}
-                          <div style={{ display: "flex", gap: "var(--space-1)", flexShrink: 0, paddingTop: 2 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                            <span style={{ fontWeight: 600 }}>{formatCents(item.priceCents)}</span>
                             <button
                               type="button"
-                              onClick={() => handleAddSuggestion(i)}
-                              disabled={pending}
+                              onClick={() => removePriceBookItem(i)}
                               style={{
-                                padding: "var(--space-1) var(--space-3)",
-                                background: "var(--accent)",
-                                color: "#fff",
-                                border: "none",
-                                borderRadius: "var(--radius)",
-                                fontSize: "var(--text-sm)",
-                                fontWeight: 600,
-                                cursor: "pointer",
-                              }}
-                            >
-                              Add
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleSkipSuggestion(i)}
-                              disabled={pending}
-                              style={{
-                                padding: "var(--space-1) var(--space-2)",
                                 background: "none",
-                                color: "var(--fg-muted)",
-                                border: "1px solid var(--border)",
-                                borderRadius: "var(--radius)",
-                                fontSize: "var(--text-sm)",
+                                border: "none",
                                 cursor: "pointer",
+                                color: "var(--color-danger)",
+                                fontSize: "var(--text-sm)",
+                                padding: 0,
+                                lineHeight: 1,
                               }}
+                              aria-label={`Remove ${item.service.name}`}
                             >
-                              Skip
+                              ×
                             </button>
                           </div>
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
-              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--space-2)" }}>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={addLineItem}
-                  disabled={pending}
-                  data-testid="add-line-item-btn"
-                >
-                  + Add Item
-                </Button>
-              </div>
-              {lineItems.length === 0 ? (
-                <p style={{ color: "var(--fg-muted)", padding: "var(--space-3) 0" }}>
-                  No line items. Add at least one.
-                </p>
-              ) : (
-                <div style={{ overflowX: "auto" }}>
-                  <table className="line-items-table" style={{ width: "100%" }}>
-                    <thead>
-                      <tr>
-                        <th>Description</th>
-                        <th style={{ width: 80 }}>Qty</th>
-                        <th style={{ width: 120 }}>Unit Price ($)</th>
-                        <th style={{ width: 100 }}>Total</th>
-                        <th style={{ width: 70 }}></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lineItems.map((row, i) => (
-                        <tr key={i}>
-                          <td>
+              {/* Mode toggle + line items */}
+              <div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-3)" }}>
+                  <SectionHeader
+                    title={mode === "flat_rate" ? "Flat Rate" : mode === "multi_option" ? "Good / Better / Best" : "Line Items"}
+                    count={mode === "itemized" ? lineItems.length : undefined}
+                    as="h3"
+                  />
+                  <div
+                    style={{
+                      display: "flex",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {(["itemized", "flat_rate", "multi_option"] as const).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => handleModeChange(m)}
+                        disabled={pending}
+                        style={{
+                          padding: "var(--space-1) var(--space-3)",
+                          background: mode === m ? "var(--accent)" : "transparent",
+                          color: mode === m ? "#fff" : "var(--fg-muted)",
+                          border: "none",
+                          cursor: pending ? "default" : "pointer",
+                          fontSize: "var(--text-sm)",
+                          fontWeight: mode === m ? 600 : 400,
+                          lineHeight: 1.4,
+                        }}
+                        data-testid={`mode-${m}`}
+                      >
+                        {m === "itemized" ? "Itemized" : m === "flat_rate" ? "Flat Rate" : "Multi-Option"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {mode === "flat_rate" ? (
+                  <div className="p7-form-grid p7-form-grid-2" style={{ marginBottom: "var(--space-3)" }}>
+                    <Input
+                      id="flat_rate"
+                      label="Price ($)"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={flatRate}
+                      onChange={(e) => setFlatRate(e.target.value)}
+                      disabled={pending}
+                      data-testid="flat-rate-input"
+                    />
+                  </div>
+                ) : mode === "multi_option" ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "var(--space-4)", marginBottom: "var(--space-3)" }}>
+                    {tiers.map((tier, ti) => {
+                      const tierSub = tierSubtotalCents(tier);
+                      const tierTax = Math.round((tierSub * taxRateNum) / 100);
+                      const tierTotal = tierSub + tierTax;
+                      return (
+                        <Card key={ti} padding="sm" style={{
+                          border: tier.is_recommended ? "2px solid var(--accent)" : "1px solid var(--border)",
+                          position: "relative",
+                        }}>
+                          {tier.is_recommended && (
+                            <div style={{
+                              position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)",
+                              background: "var(--accent)", color: "#fff", padding: "2px 12px", borderRadius: 99,
+                              fontSize: "var(--text-xs)", fontWeight: 600, whiteSpace: "nowrap",
+                            }}>
+                              Recommended
+                            </div>
+                          )}
+                          <div style={{ marginBottom: "var(--space-2)" }}>
                             <input
                               className="p7-input"
                               type="text"
-                              value={row.description}
-                              onChange={(e) => updateLineItem(i, "description", e.target.value)}
-                              placeholder="Description"
-                              required
+                              value={tier.label}
+                              onChange={(e) => updateTier(ti, { label: e.target.value })}
+                              placeholder="Option label"
                               disabled={pending}
-                              data-testid={`line-item-desc-${i}`}
+                              style={{ fontWeight: 700, fontSize: "var(--text-lg)", marginBottom: "var(--space-1)" }}
                             />
-                          </td>
-                          <td>
                             <input
                               className="p7-input"
-                              type="number"
-                              min="0.01"
-                              step="0.01"
-                              value={row.quantity}
-                              onChange={(e) => updateLineItem(i, "quantity", e.target.value)}
+                              type="text"
+                              value={tier.description}
+                              onChange={(e) => updateTier(ti, { description: e.target.value })}
+                              placeholder="Brief description"
                               disabled={pending}
-                              data-testid={`line-item-qty-${i}`}
+                              style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}
                             />
-                          </td>
-                          <td>
+                          </div>
+
+                          <label style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", cursor: "pointer", marginBottom: "var(--space-2)", fontSize: "var(--text-sm)" }}>
                             <input
-                              className="p7-input"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={row.unit_price}
-                              onChange={(e) => updateLineItem(i, "unit_price", e.target.value)}
+                              type="checkbox"
+                              checked={tier.is_recommended}
+                              onChange={(e) => updateTier(ti, { is_recommended: e.target.checked })}
                               disabled={pending}
-                              data-testid={`line-item-price-${i}`}
                             />
-                          </td>
-                          <td
-                            style={{
-                              color: "var(--fg-muted)",
-                              fontSize: "var(--text-sm)",
-                              paddingLeft: "var(--space-2)",
-                            }}
-                          >
-                            {formatCents(lineTotal(row))}
-                          </td>
-                          <td>
-                            <div style={{ display: "flex", gap: "var(--space-1)" }}>
-                              {lineItems.length > 1 && (
-                                <button
-                                  type="button"
-                                  className="p7-btn p7-btn-ghost p7-btn-sm"
-                                  title="Remove row"
-                                  onClick={() => removeLineItem(i)}
+                            <span>Mark as recommended</span>
+                          </label>
+
+                          <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-2)", marginTop: "var(--space-2)" }}>
+                            {tier.line_items.map((row, li) => (
+                              <div key={li} style={{ marginBottom: "var(--space-2)" }}>
+                                <input
+                                  className="p7-input"
+                                  type="text"
+                                  value={row.description}
+                                  onChange={(e) => updateTierLineItem(ti, li, "description", e.target.value)}
+                                  placeholder="Description"
                                   disabled={pending}
-                                  data-testid={`remove-line-item-${i}`}
-                                  aria-label={`Remove line item ${i + 1}`}
-                                  style={{ color: "var(--color-danger)" }}
-                                >
-                                  ×
-                                </button>
-                              )}
+                                  style={{ marginBottom: "var(--space-1)", fontSize: "var(--text-sm)" }}
+                                />
+                                <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                                  <input
+                                    className="p7-input"
+                                    type="number"
+                                    min="0.01"
+                                    step="0.01"
+                                    value={row.quantity}
+                                    onChange={(e) => updateTierLineItem(ti, li, "quantity", e.target.value)}
+                                    disabled={pending}
+                                    style={{ width: 60, fontSize: "var(--text-sm)" }}
+                                  />
+                                  <input
+                                    className="p7-input"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={row.unit_price}
+                                    onChange={(e) => updateTierLineItem(ti, li, "unit_price", e.target.value)}
+                                    disabled={pending}
+                                    style={{ width: 90, fontSize: "var(--text-sm)" }}
+                                  />
+                                  <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", lineHeight: "var(--space-5)" }}>
+                                    {formatCents(lineTotal(row))}
+                                  </span>
+                                  {tier.line_items.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removeTierLineItem(ti, li)}
+                                      disabled={pending}
+                                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-danger)", fontSize: "var(--text-sm)", padding: 0, lineHeight: 1 }}
+                                      aria-label="Remove line item"
+                                    >
+                                      ×
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => addTierLineItem(ti)}
+                              disabled={pending}
+                              style={{ width: "100%", marginTop: "var(--space-1)" }}
+                            >
+                              + Add item
+                            </Button>
+                          </div>
+
+                          <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-2)", marginTop: "var(--space-3)", textAlign: "right" }}>
+                            {tierTax > 0 && (
+                              <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                                Tax: {formatCents(tierTax)}
+                              </div>
+                            )}
+                            <div style={{ fontSize: "var(--text-lg)", fontWeight: 700 }}>
+                              {formatCents(tierTotal)}
                             </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Generic totals */}
-          {mode !== "multi_option" && (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "flex-end",
-                gap: "var(--space-2)",
-                marginTop: "var(--space-3)",
-              }}
-            >
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "auto auto",
-                  gap: "var(--space-2) var(--space-4)",
-                  alignItems: "center",
-                  textAlign: "right",
-                }}
-              >
-                {mode === "itemized" && (
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                ) : (
                   <>
-                    <span style={{ color: "var(--fg-muted)" }}>Subtotal</span>
-                    <span data-testid="subtotal">{formatCents(genericSubtotalCents - materialHandlingCents)}</span>
+                    {/* Item Suggester */}
+                    <div style={{ marginBottom: "var(--space-4)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-1)" }}>
+                        <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                          Suggest from description
+                        </p>
+                        {itemSuggesting && (
+                          <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontStyle: "italic" }}>
+                            Matching…
+                          </span>
+                        )}
+                      </div>
+                      <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                        Describe the job — Claude matches price book services after you stop typing.
+                      </p>
+                      <Textarea
+                        id="item_description"
+                        label=""
+                        value={itemDescription}
+                        onChange={(e) => setItemDescription(e.target.value)}
+                        placeholder="e.g. Fix a leaky kitchen faucet, replace the shutoff valve under the sink, and patch the drywall where the pipe was leaking"
+                        rows={3}
+                        disabled={pending || itemSuggesting}
+                      />
 
-                    {materialHandlingCents > 0 && (
-                      <>
-                        <span style={{ color: "var(--fg-muted)" }}>Material handling (15%)</span>
-                        <span data-testid="material-handling">{formatCents(materialHandlingCents)}</span>
-                      </>
+                      {itemSuggestError && (
+                        <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--status-error)" }}>
+                          {itemSuggestError}
+                        </p>
+                      )}
+
+                      {bundleCategories >= 4 && (
+                        <div style={{
+                          marginTop: "var(--space-2)",
+                          padding: "var(--space-2) var(--space-3)",
+                          background: "#fef3c7",
+                          borderRadius: "var(--radius)",
+                          fontSize: "var(--text-sm)",
+                          color: "#92400e",
+                          fontWeight: 500,
+                        }}>
+                          ★ You have {bundleCategories} task categories — consider half-day block pricing ($515)
+                        </div>
+                      )}
+
+                      {hasLegalFlagSuggestions && (
+                        <div style={{
+                          marginTop: "var(--space-2)",
+                          padding: "var(--space-2) var(--space-3)",
+                          background: "#fef3c7",
+                          borderRadius: "var(--radius)",
+                          fontSize: "var(--text-sm)",
+                          color: "#92400e",
+                          fontWeight: 500,
+                        }}>
+                          ⚠ One or more items may require a licensed contractor in some jurisdictions — verify before quoting
+                        </div>
+                      )}
+
+                      {suggestions.length > 0 && (
+                        <div style={{ marginTop: "var(--space-3)", borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
+                            <span style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                              {suggestions.length} suggestion{suggestions.length !== 1 ? "s" : ""} — add or skip each
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setSuggestions([])}
+                              style={{ background: "none", border: "none", fontSize: "var(--text-sm)", color: "var(--fg-muted)", cursor: "pointer", padding: 0 }}
+                            >
+                              Dismiss all
+                            </button>
+                          </div>
+
+                          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                            {suggestions.map((s, i) => (
+                              <div
+                                key={`${s.code}-${i}`}
+                                style={{
+                                  display: "flex",
+                                  gap: "var(--space-3)",
+                                  alignItems: "flex-start",
+                                  padding: "var(--space-3)",
+                                  background: "var(--bg-card)",
+                                  border: "1px solid var(--border)",
+                                  borderRadius: "var(--radius)",
+                                }}
+                              >
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                                    <span style={{ color: "var(--fg-muted)", fontWeight: 400, marginRight: "var(--space-1)" }}>{s.code}</span>
+                                    {s.name}
+                                  </div>
+                                  <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
+                                    {s.reason}
+                                  </div>
+                                  <div style={{ display: "flex", gap: "var(--space-1)", marginTop: 4, flexWrap: "wrap", alignItems: "center" }}>
+                                    <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                                      {formatCents(s.quantity * s.unit_price_cents)}
+                                    </span>
+                                    {s.labor_hours_typical !== null && (
+                                      <span style={{
+                                        fontSize: "var(--text-xs)", padding: "1px 6px",
+                                        background: "var(--color-surface-overlay)",
+                                        borderRadius: "var(--radius-sm)",
+                                        color: "var(--fg-muted)", border: "1px solid var(--border)",
+                                      }}>
+                                        ~{s.labor_hours_typical}h
+                                      </span>
+                                    )}
+                                    {s.legal_flag === "gray" && (
+                                      <span style={{
+                                        fontSize: "var(--text-xs)", padding: "1px 6px",
+                                        background: "#fef9c3",
+                                        borderRadius: "var(--radius-sm)",
+                                        color: "#854d0e",
+                                        border: "1px solid #fde68a",
+                                      }}>
+                                        ⚠ verify auth
+                                      </span>
+                                    )}
+                                    {s.legal_flag === "restricted" && (
+                                      <span style={{
+                                        fontSize: "var(--text-xs)", padding: "1px 6px",
+                                        background: "#fee2e2",
+                                        borderRadius: "var(--radius-sm)",
+                                        color: "#991b1b",
+                                        border: "1px solid #fca5a5",
+                                      }}>
+                                        ⛔ licensed trade
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div style={{ display: "flex", gap: "var(--space-1)", flexShrink: 0, paddingTop: 2 }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddSuggestion(i)}
+                                    disabled={pending}
+                                    style={{
+                                      padding: "var(--space-1) var(--space-3)",
+                                      background: "var(--accent)",
+                                      color: "#fff",
+                                      border: "none",
+                                      borderRadius: "var(--radius)",
+                                      fontSize: "var(--text-sm)",
+                                      fontWeight: 600,
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    Add
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSkipSuggestion(i)}
+                                    disabled={pending}
+                                    style={{
+                                      padding: "var(--space-1) var(--space-2)",
+                                      background: "none",
+                                      color: "var(--fg-muted)",
+                                      border: "1px solid var(--border)",
+                                      borderRadius: "var(--radius)",
+                                      fontSize: "var(--text-sm)",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    Skip
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Suggested Materials */}
+                    {resolvedJobType && Object.keys(getMaterialsByCategory(resolvedJobType)).length > 0 && (
+                      <div style={{ marginBottom: "var(--space-4)" }}>
+                        <SectionHeader title={`Suggested Materials — ${resolvedJobType.replace("_", " ")}`} as="h3" />
+                        <Card padding="sm" style={{ background: "var(--bg-subtle)" }}>
+                          {Object.entries(getMaterialsByCategory(resolvedJobType)).map(([category, materials]) => (
+                            <div key={category} style={{ marginBottom: "var(--space-3)" }}>
+                              <div style={{ fontSize: "var(--text-xs)", fontWeight: 500, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-1)" }}>
+                                {category}
+                              </div>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
+                                {materials.map((mat) => {
+                                  const key = mat.name.toLowerCase();
+                                  const alreadyAdded = addedMaterials.has(key) || lineItems.some((r) => r.description.toLowerCase().includes(key));
+                                  return (
+                                    <button
+                                      key={mat.name}
+                                      type="button"
+                                      disabled={alreadyAdded}
+                                      onClick={() => handleAddMaterial(mat)}
+                                      style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: "var(--space-1)",
+                                        padding: "var(--space-1) var(--space-2)",
+                                        fontSize: "var(--text-sm)",
+                                        background: alreadyAdded ? "var(--color-surface-raised)" : "var(--color-surface-overlay)",
+                                        border: `1px solid ${alreadyAdded ? "var(--color-border)" : "var(--color-primary-alpha)"}`,
+                                        borderRadius: "var(--radius-sm)",
+                                        cursor: alreadyAdded ? "default" : "pointer",
+                                        color: alreadyAdded ? "var(--fg-muted)" : "var(--fg-primary)",
+                                      }}
+                                    >
+                                      <span>{mat.name}</span>
+                                      <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                                        {mat.typicalQty} {mat.unit}
+                                      </span>
+                                      {alreadyAdded ? (
+                                        <span style={{ fontSize: "var(--text-xs)", color: "var(--color-success)" }}>✓</span>
+                                      ) : (
+                                        <span style={{ fontSize: "var(--text-xs)", color: "var(--color-primary)" }}>+</span>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                          <p style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", margin: "var(--space-2) 0 0" }}>
+                            Click to add as a line item. Set prices before submitting.
+                          </p>
+                        </Card>
+                      </div>
                     )}
 
-                    <span style={{ color: "var(--fg-muted)" }}>Subtotal with materials</span>
-                    <span data-testid="subtotal-with-materials">{formatCents(genericSubtotalCents)}</span>
-
-                    {guardrailAdjustmentCents > 0 && (
-                      <>
-                        <span style={{ color: "var(--fg-muted)" }}>Pricing adjustments</span>
-                        <span>{formatCents(guardrailAdjustmentCents)}</span>
-                      </>
+                    {/* Line items table */}
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--space-2)" }}>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={addLineItem}
+                        disabled={pending}
+                        data-testid="add-line-item-btn"
+                      >
+                        + Add Item
+                      </Button>
+                    </div>
+                    {lineItems.length === 0 ? (
+                      <p style={{ color: "var(--fg-muted)", padding: "var(--space-3) 0" }}>
+                        No line items. Add at least one.
+                      </p>
+                    ) : (
+                      <div style={{ overflowX: "auto" }}>
+                        <table className="line-items-table" style={{ width: "100%" }}>
+                          <thead>
+                            <tr>
+                              <th>Description</th>
+                              <th style={{ width: 80 }}>Qty</th>
+                              <th style={{ width: 120 }}>Unit Price ($)</th>
+                              <th style={{ width: 100 }}>Total</th>
+                              <th style={{ width: 70 }}></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {lineItems.map((row, i) => (
+                              <tr key={i}>
+                                <td>
+                                  <input
+                                    className="p7-input"
+                                    type="text"
+                                    value={row.description}
+                                    onChange={(e) => updateLineItem(i, "description", e.target.value)}
+                                    placeholder="Description"
+                                    required
+                                    disabled={pending}
+                                    data-testid={`line-item-desc-${i}`}
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    className="p7-input"
+                                    type="number"
+                                    min="0.01"
+                                    step="0.01"
+                                    value={row.quantity}
+                                    onChange={(e) => updateLineItem(i, "quantity", e.target.value)}
+                                    disabled={pending}
+                                    data-testid={`line-item-qty-${i}`}
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    className="p7-input"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={row.unit_price}
+                                    onChange={(e) => updateLineItem(i, "unit_price", e.target.value)}
+                                    disabled={pending}
+                                    data-testid={`line-item-price-${i}`}
+                                  />
+                                </td>
+                                <td style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", paddingLeft: "var(--space-2)" }}>
+                                  {formatCents(lineTotal(row))}
+                                </td>
+                                <td>
+                                  {lineItems.length > 1 && (
+                                    <button
+                                      type="button"
+                                      className="p7-btn p7-btn-ghost p7-btn-sm"
+                                      title="Remove row"
+                                      onClick={() => removeLineItem(i)}
+                                      disabled={pending}
+                                      data-testid={`remove-line-item-${i}`}
+                                      aria-label={`Remove line item ${i + 1}`}
+                                      style={{ color: "var(--color-danger)" }}
+                                    >
+                                      ×
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     )}
-
-                    <span style={{ color: "var(--fg-muted)" }}>Deposit (30%)</span>
-                    <span data-testid="deposit">{formatCents(depositCents)}</span>
-
-                    <span style={{ fontWeight: "var(--font-semibold)" }}>Balance due</span>
-                    <span data-testid="balance-due" style={{ fontWeight: "var(--font-semibold)" }}>{formatCents(balanceDueCents)}</span>
                   </>
                 )}
 
-              <label
-                htmlFor="tax_rate"
-                style={{ color: "var(--fg-muted)", whiteSpace: "nowrap" }}
-              >
-                Tax Rate (%)
-              </label>
-              <input
-                id="tax_rate"
-                className="p7-input"
-                type="number"
-                min="0"
-                max="100"
-                step="0.01"
-                value={taxRate}
-                onChange={(e) => setTaxRate(e.target.value)}
-                disabled={pending}
-                style={{ width: 90, textAlign: "right" }}
-                data-testid="tax-rate-input"
-              />
+                {/* Generic totals */}
+                {mode !== "multi_option" && (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-end",
+                      gap: "var(--space-2)",
+                      marginTop: "var(--space-3)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "auto auto",
+                        gap: "var(--space-2) var(--space-4)",
+                        alignItems: "center",
+                        textAlign: "right",
+                      }}
+                    >
+                      {mode === "itemized" && (
+                        <>
+                          <span style={{ color: "var(--fg-muted)" }}>Subtotal</span>
+                          <span data-testid="subtotal">{formatCents(genericSubtotalCents - materialHandlingCents)}</span>
 
-                {genericTaxCents > 0 && (
-                  <>
-                    <span style={{ color: "var(--fg-muted)" }}>Tax</span>
-                    <span data-testid="tax-amount">{formatCents(genericTaxCents)}</span>
-                  </>
+                          {materialHandlingCents > 0 && (
+                            <>
+                              <span style={{ color: "var(--fg-muted)" }}>Material handling (15%)</span>
+                              <span data-testid="material-handling">{formatCents(materialHandlingCents)}</span>
+                            </>
+                          )}
+
+                          <span style={{ color: "var(--fg-muted)" }}>Subtotal with materials</span>
+                          <span data-testid="subtotal-with-materials">{formatCents(genericSubtotalCents)}</span>
+
+                          {guardrailAdjustmentCents > 0 && (
+                            <>
+                              <span style={{ color: "var(--fg-muted)" }}>Pricing adjustments</span>
+                              <span>{formatCents(guardrailAdjustmentCents)}</span>
+                            </>
+                          )}
+
+                          <span style={{ color: "var(--fg-muted)" }}>Deposit (30%)</span>
+                          <span data-testid="deposit">{formatCents(depositCents)}</span>
+
+                          <span style={{ fontWeight: "var(--font-semibold)" }}>Balance due</span>
+                          <span data-testid="balance-due" style={{ fontWeight: "var(--font-semibold)" }}>{formatCents(balanceDueCents)}</span>
+                        </>
+                      )}
+
+                      <label htmlFor="tax_rate" style={{ color: "var(--fg-muted)", whiteSpace: "nowrap" }}>
+                        Tax Rate (%)
+                      </label>
+                      <input
+                        id="tax_rate"
+                        className="p7-input"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={taxRate}
+                        onChange={(e) => setTaxRate(e.target.value)}
+                        disabled={pending}
+                        style={{ width: 90, textAlign: "right" }}
+                        data-testid="tax-rate-input"
+                      />
+
+                      {genericTaxCents > 0 && (
+                        <>
+                          <span style={{ color: "var(--fg-muted)" }}>Tax</span>
+                          <span data-testid="tax-amount">{formatCents(genericTaxCents)}</span>
+                        </>
+                      )}
+
+                      <strong>Total (incl. tax)</strong>
+                      <strong data-testid="total">{formatCents(genericTotalCents)}</strong>
+                    </div>
+                  </div>
                 )}
-
-              <strong>Total (incl. tax)</strong>
-              <strong data-testid="total">{formatCents(genericTotalCents)}</strong>
-
-              {mode === "itemized" && (
-                <>
-                  <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-                    Balance due after deposit
-                  </span>
-                  <span data-testid="balance-due" style={{ fontSize: "var(--text-sm)" }}>
-                    {formatCents(balanceDueCents)}
-                  </span>
-                </>
-              )}
+              </div>
             </div>
-          </div>
           )}
         </div>
       )}
 
-      {/* Options */}
-      <div>
-        <SectionHeader title="Options" as="h3" />
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--space-2)",
-            cursor: "pointer",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={sendImmediately}
-            onChange={(e) => setSendImmediately(e.target.checked)}
-            disabled={pending}
-            data-testid="send-immediately-checkbox"
-          />
-          <span>Send to client immediately</span>
-        </label>
-      </div>
+      {/* ------------------------------------------------------------------ */}
+      {/* Step 3: Adjustments                                                 */}
+      {/* ------------------------------------------------------------------ */}
+      {step === 3 && (
+        <div className="p7-form-stack">
+          <div>
+            <SectionHeader title="Pricing Guardrails" as="h3" />
+            <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+              Optional — use these to flag job complexity and add surcharges.
+            </p>
+            <div className="p7-form-grid p7-form-grid-2">
+              <Select
+                id="trip_count"
+                label="Trip Count"
+                value={tripCount}
+                onChange={(e) => setTripCount(e.target.value as "one_trip" | "multi_trip")}
+                disabled={pending}
+                options={[
+                  { value: "one_trip", label: "One Trip" },
+                  { value: "multi_trip", label: "Multi-Trip" },
+                ]}
+              />
+              <Select
+                id="finish_expectation"
+                label="Finish Expectation"
+                value={finishExpectation}
+                onChange={(e) => setFinishExpectation(e.target.value as "basic" | "clean" | "premium")}
+                disabled={pending}
+                options={[
+                  { value: "basic", label: "Basic" },
+                  { value: "clean", label: "Clean" },
+                  { value: "premium", label: "Premium" },
+                ]}
+              />
+              <Input
+                id="travel_surcharge"
+                label="Travel Surcharge ($)"
+                type="number"
+                min="0"
+                step="0.01"
+                value={travelSurcharge}
+                onChange={(e) => setTravelSurcharge(e.target.value)}
+                disabled={pending}
+              />
+              <Input
+                id="risk_adjustment"
+                label="Risk / Return Adjustment ($)"
+                type="number"
+                min="0"
+                step="0.01"
+                value={riskAdjustment}
+                onChange={(e) => setRiskAdjustment(e.target.value)}
+                disabled={pending}
+              />
+              <Select
+                id="minimum_override_reason"
+                label="Minimum Override"
+                value={minimumOverrideReason}
+                onChange={(e) => setMinimumOverrideReason(e.target.value)}
+                disabled={pending}
+                placeholder="None"
+                options={[
+                  { value: "bundled", label: "Bundled" },
+                  { value: "membership_included", label: "Membership Included" },
+                  { value: "promo", label: "Promotion" },
+                  { value: "owner_approved", label: "Owner Approved" },
+                ]}
+              />
+              <Input
+                id="minimum_override_note"
+                label="Override Note"
+                value={minimumOverrideNote}
+                onChange={(e) => setMinimumOverrideNote(e.target.value)}
+                disabled={pending}
+                placeholder="Internal reason"
+              />
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)", marginTop: "var(--space-3)" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
+                <input type="checkbox" checked={requiresDryingOrCuring} onChange={(e) => setRequiresDryingOrCuring(e.target.checked)} disabled={pending} />
+                <span>Drying/curing required</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
+                <input type="checkbox" checked={difficultAccess} onChange={(e) => setDifficultAccess(e.target.checked)} disabled={pending} />
+                <span>Difficult access</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
+                <input type="checkbox" checked={oldHouseRisk} onChange={(e) => setOldHouseRisk(e.target.checked)} disabled={pending} />
+                <span>Old-house risk</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
+                <input type="checkbox" checked={coordinationRequired} onChange={(e) => setCoordinationRequired(e.target.checked)} disabled={pending} />
+                <span>Coordination required</span>
+              </label>
+            </div>
+          </div>
 
-      {/* Actions */}
+          <Textarea
+            id="notes"
+            label="Client notes (optional)"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Visible to the client on the estimate"
+            rows={3}
+            disabled={pending}
+          />
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Step 4: Review & Send                                               */}
+      {/* ------------------------------------------------------------------ */}
+      {step === 4 && (
+        <div className="p7-form-stack">
+          <Card padding="sm" style={{ background: "var(--bg-subtle)" }}>
+            <SectionHeader title="Estimate Summary" as="h3" />
+            <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "var(--space-2) var(--space-4)", fontSize: "var(--text-sm)" }}>
+              <span style={{ color: "var(--fg-muted)" }}>Client</span>
+              <span style={{ fontWeight: 600 }}>{selectedClient?.name ?? "—"}</span>
+
+              {selectedJob && (
+                <>
+                  <span style={{ color: "var(--fg-muted)" }}>Job</span>
+                  <span>{selectedJob.title}</span>
+                </>
+              )}
+
+              {selectedProperty && (
+                <>
+                  <span style={{ color: "var(--fg-muted)" }}>Property</span>
+                  <span>{selectedProperty.address}</span>
+                </>
+              )}
+
+              <span style={{ color: "var(--fg-muted)" }}>Type</span>
+              <span style={{ textTransform: "capitalize" }}>
+                {serviceType === "painting"
+                  ? "Painting"
+                  : mode === "flat_rate"
+                  ? "Flat rate"
+                  : mode === "multi_option"
+                  ? "Good / Better / Best"
+                  : `Itemized (${lineItems.filter(r => r.description.trim()).length} item${lineItems.filter(r => r.description.trim()).length !== 1 ? "s" : ""})`}
+              </span>
+
+              <span style={{ color: "var(--fg-muted)" }}>Total</span>
+              <span style={{ fontWeight: 700, fontSize: "var(--text-lg)" }}>{reviewTotal()}</span>
+
+              {expiresAt && (
+                <>
+                  <span style={{ color: "var(--fg-muted)" }}>Expires</span>
+                  <span>{new Date(expiresAt).toLocaleDateString()}</span>
+                </>
+              )}
+            </div>
+
+            {notes.trim() && (
+              <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-3)", borderTop: "1px solid var(--border)" }}>
+                <p style={{ margin: "0 0 var(--space-1)", fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Client notes
+                </p>
+                <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg)" }}>
+                  {notes}
+                </p>
+              </div>
+            )}
+          </Card>
+
+          {serviceType === "painting" && !paintingResult && (
+            <Card className="p7-card-danger" padding="sm">
+              <p style={{ margin: 0 }}>
+                Painting estimate is incomplete — go back to Step 2 and enter square footage and labor hours.
+              </p>
+            </Card>
+          )}
+
+          <div>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--space-2)",
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={sendImmediately}
+                onChange={(e) => setSendImmediately(e.target.checked)}
+                disabled={pending}
+                data-testid="send-immediately-checkbox"
+              />
+              <span>Send to client immediately after creating</span>
+            </label>
+          </div>
+        </div>
+      )}
+
+      {/* Navigation */}
       <div className="p7-form-actions">
-        <LinkButton href="/app/estimates" variant="secondary" tabIndex={-1}>
-          Cancel
-        </LinkButton>
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={pending || !clientId || (serviceType === "painting" && !paintingResult)}
-          loading={pending}
-          data-testid="submit-estimate-btn"
-        >
-          {pending
-            ? "Creating…"
-            : sendImmediately
-            ? "Create & Send"
-            : "Create Estimate"}
-        </Button>
+        {step === 1 ? (
+          <LinkButton href="/app/estimates" variant="secondary" tabIndex={-1}>
+            Cancel
+          </LinkButton>
+        ) : (
+          <Button type="button" variant="ghost" onClick={goBack} disabled={pending}>
+            Back
+          </Button>
+        )}
+
+        {step < 4 ? (
+          <Button
+            type="button"
+            variant="primary"
+            onClick={advanceStep}
+            disabled={pending || (step === 1 && !clientId)}
+          >
+            Next
+          </Button>
+        ) : (
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={pending || !clientId || (serviceType === "painting" && !paintingResult)}
+            loading={pending}
+            data-testid="submit-estimate-btn"
+          >
+            {pending
+              ? "Creating…"
+              : sendImmediately
+              ? "Create & Send"
+              : "Create Estimate"}
+          </Button>
+        )}
       </div>
     </form>
   );
