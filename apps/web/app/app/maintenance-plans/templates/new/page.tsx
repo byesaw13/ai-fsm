@@ -13,7 +13,7 @@ export default async function NewTemplatePage() {
 
   return (
     <PageContainer>
-      <PageHeader title="New Plan Template" />
+      <PageHeader title="New Membership Template" />
       <TemplateForm />
     </PageContainer>
   );

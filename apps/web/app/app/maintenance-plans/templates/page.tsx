@@ -48,12 +48,12 @@ export default async function PlanTemplatesPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Plan Templates"
+        title="Membership Templates"
         subtitle="Define your membership tiers — visit counts, labor caps, and base pricing"
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)" }}>
             <LinkButton href="/app/maintenance-plans" variant="ghost" size="sm">
-              ← Subscriptions
+              ← Memberships
             </LinkButton>
             <LinkButton href="/app/maintenance-plans/templates/new" variant="primary" size="sm">
               + New Template

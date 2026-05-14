@@ -45,7 +45,7 @@ export default async function NewMaintenancePlanPage({
 
   return (
     <PageContainer>
-      <PageHeader title="Enroll Client" backHref="/app/maintenance-plans" backLabel="Subscriptions" />
+      <PageHeader title="Enroll Client" backHref="/app/maintenance-plans" backLabel="Memberships" />
       <Card padding="default">
         <EnrollmentForm
           clientOptions={clients.map((c) => ({ value: c.id, label: c.name }))}

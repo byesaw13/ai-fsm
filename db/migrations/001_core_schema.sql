@@ -77,6 +77,9 @@ create table if not exists jobs (
   description text,
   status text not null default 'draft' check (status in ('draft','quoted','scheduled','in_progress','completed','invoiced','cancelled')),
   priority integer not null default 0,
+  -- LEGACY: visits are the source of truth for scheduling.
+  -- Do not read these fields for display; derive scheduling from visits.scheduled_start instead.
+  -- See docs/architecture/domain-language.md — "Scheduling Truth".
   scheduled_start timestamptz,
   scheduled_end timestamptz,
   created_by uuid not null references users(id),

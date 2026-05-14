@@ -133,7 +133,7 @@ export function SubscriptionEditForm({ id, subscription, template, allAddons, cu
 
       {/* Template info — read only */}
       <div>
-        <div className="p7-label" style={{ display: "block", marginBottom: "var(--space-2)" }}>Plan Template</div>
+        <div className="p7-label" style={{ display: "block", marginBottom: "var(--space-2)" }}>Membership Template</div>
         {template ? (
           <div style={{
             background: colors.bg, border: `1px solid ${colors.border}`,
@@ -165,7 +165,7 @@ export function SubscriptionEditForm({ id, subscription, template, allAddons, cu
           </div>
         ) : (
           <div style={{ padding: "var(--space-3)", background: "var(--color-surface-raised, #f9fafb)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
-            No template linked — this subscription was created before templates were introduced.
+            No membership template linked — this membership was created before templates were introduced.
             Visit count: {subscription.annual_visit_count} · Tier: {subscription.membership_tier}
           </div>
         )}
@@ -294,7 +294,7 @@ export function SubscriptionEditForm({ id, subscription, template, allAddons, cu
 
         <div className="p7-field">
           <label htmlFor="notes" className="p7-label">Notes</label>
-          <textarea id="notes" className="p7-textarea" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any notes about this subscription" />
+          <textarea id="notes" className="p7-textarea" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any notes about this membership" />
         </div>
       </div>
 

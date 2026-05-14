@@ -131,11 +131,11 @@ export function EnrollmentForm({ clientOptions, propertyOptions, templates, addo
       {/* Step 1: Choose template */}
       <div>
         <div className="p7-label" style={{ marginBottom: "var(--space-3)", display: "block" }}>
-          1. Select Plan Template
+          1. Select Membership Template
         </div>
         {templates.length === 0 ? (
           <p style={{ color: "var(--color-text-secondary)", fontSize: "var(--font-size-sm)" }}>
-            No active templates. <Link href="/app/maintenance-plans/templates" style={{ color: "var(--color-primary)" }}>Create one first →</Link>
+            No active membership templates. <Link href="/app/maintenance-plans/templates" style={{ color: "var(--color-primary)" }}>Create one first →</Link>
           </p>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "var(--space-3)" }}>

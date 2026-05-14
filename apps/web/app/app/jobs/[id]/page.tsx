@@ -396,18 +396,6 @@ export default async function JobDetailPage({
                     <dd style={{ whiteSpace: "pre-wrap" }}>{job.description}</dd>
                   </div>
                 )}
-                {job.scheduled_start && (
-                  <div className="p7-detail-row">
-                    <dt>Starts</dt>
-                    <dd>{new Date(job.scheduled_start).toLocaleString()}</dd>
-                  </div>
-                )}
-                {job.scheduled_end && (
-                  <div className="p7-detail-row">
-                    <dt>Ends</dt>
-                    <dd>{new Date(job.scheduled_end).toLocaleString()}</dd>
-                  </div>
-                )}
               </dl>
             </Card>
 
@@ -586,12 +574,6 @@ export default async function JobDetailPage({
                   <div className="p7-detail-row">
                     <dt>Description</dt>
                     <dd style={{ whiteSpace: "pre-wrap" }}>{job.description}</dd>
-                  </div>
-                )}
-                {job.scheduled_start && (
-                  <div className="p7-detail-row">
-                    <dt>Starts</dt>
-                    <dd>{new Date(job.scheduled_start).toLocaleString()}</dd>
                   </div>
                 )}
               </dl>

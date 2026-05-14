@@ -322,11 +322,6 @@ function JobItemCard({ job }: { job: JobRow }) {
           {job.client_name}
         </span>
       )}
-      {job.scheduled_start && (
-        <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-          {new Date(job.scheduled_start).toLocaleDateString()}
-        </span>
-      )}
       {job.job_category && (
         <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", fontStyle: "italic" }}>
           {JOB_ACCEPTANCE_CATEGORY_LABELS[job.job_category as keyof typeof JOB_ACCEPTANCE_CATEGORY_LABELS] ?? job.job_category}

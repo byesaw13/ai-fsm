@@ -20,7 +20,7 @@ type JobRow = {
   status: string;
   priority: number;
   client_name: string | null;
-  scheduled_start: string | null;
+  next_visit_start: string | null;
   has_approved_estimate: boolean;
   has_active_visit: boolean;
   sub_status: string | null;
@@ -44,10 +44,16 @@ export default async function PipelinePage() {
   if (!isAdmin) redirect("/app/my-day");
 
   const rows = await query<JobRow>(
-    `SELECT j.id, j.title, j.status, j.priority, j.scheduled_start, j.sub_status,
+    `SELECT j.id, j.title, j.status, j.priority, j.sub_status,
             c.name AS client_name,
             br.status AS booking_status,
             (br.id IS NOT NULL) AS has_booking_request,
+            (SELECT v.scheduled_start::text
+               FROM visits v
+               WHERE v.job_id = j.id AND v.account_id = j.account_id
+                 AND v.status NOT IN ('cancelled','completed')
+               ORDER BY v.scheduled_start ASC LIMIT 1
+            ) AS next_visit_start,
             (SELECT COUNT(*)::int FROM estimates e
               WHERE e.job_id = j.id AND e.account_id = j.account_id) AS estimate_count,
             (SELECT COUNT(*)::int FROM estimates e
@@ -82,6 +88,7 @@ export default async function PipelinePage() {
   const jobs = rows.map((job) => {
     const pipelineStage = derivePipelineStage({
       jobStatus: job.status,
+      subStatus: job.sub_status,
       bookingStatus: job.booking_status,
       hasBookingRequest: job.has_booking_request,
       estimateCount: job.estimate_count,
@@ -105,7 +112,7 @@ export default async function PipelinePage() {
   });
 
   const totalActive = jobs.filter(
-    (j) => !["completed", "invoiced"].includes(j.status)
+    (j) => !["completed", "invoiced", "cancelled"].includes(j.status)
   ).length;
 
   return (

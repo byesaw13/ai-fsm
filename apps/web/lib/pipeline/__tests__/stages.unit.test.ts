@@ -2,20 +2,26 @@ import { describe, expect, it } from "vitest";
 import { derivePipelineStage, getPipelineNextAction } from "../stages";
 
 describe("derivePipelineStage", () => {
-  it("starts pending booking requests in New Intake", () => {
+  it("routes unreviewed booking requests to New Lead", () => {
     expect(derivePipelineStage({
       jobStatus: "draft",
       hasBookingRequest: true,
       bookingStatus: "pending",
-    })).toBe("new_intake");
+    })).toBe("new_lead");
   });
 
-  it("routes reviewed intake to Scope Ready", () => {
+  it("routes booking requests under review to New Lead", () => {
+    expect(derivePipelineStage({
+      jobStatus: "draft",
+      hasBookingRequest: true,
+      bookingStatus: "needs_info",
+    })).toBe("new_lead");
+
     expect(derivePipelineStage({
       jobStatus: "draft",
       hasBookingRequest: true,
       bookingStatus: "reviewed",
-    })).toBe("scope_ready");
+    })).toBe("new_lead");
   });
 
   it("routes manual draft jobs with no estimate to Estimate Needed", () => {
@@ -25,18 +31,79 @@ describe("derivePipelineStage", () => {
     })).toBe("estimate_needed");
   });
 
-  it("puts sent or quoted work in Estimate Sent until approval", () => {
+  it("routes quoted jobs or sent estimates to Estimate Sent", () => {
     expect(derivePipelineStage({
       jobStatus: "quoted",
       sentEstimateCount: 1,
     })).toBe("estimate_sent");
+
+    expect(derivePipelineStage({
+      jobStatus: "draft",
+      sentEstimateCount: 1,
+    })).toBe("estimate_sent");
   });
 
-  it("puts approved estimates in Approved / Ready until scheduling", () => {
+  it("routes approved estimates without a visit to Approved / Ready", () => {
     expect(derivePipelineStage({
       jobStatus: "draft",
       approvedEstimateCount: 1,
     })).toBe("approved_ready");
+  });
+
+  it("routes jobs with an active visit to Scheduled", () => {
+    expect(derivePipelineStage({
+      jobStatus: "scheduled",
+      activeVisitCount: 1,
+    })).toBe("scheduled");
+  });
+
+  it("routes blocked jobs to Waiting based on sub_status", () => {
+    expect(derivePipelineStage({
+      jobStatus: "scheduled",
+      subStatus: "waiting_parts",
+      activeVisitCount: 1,
+    })).toBe("waiting");
+
+    expect(derivePipelineStage({
+      jobStatus: "in_progress",
+      subStatus: "waiting_customer",
+    })).toBe("waiting");
+  });
+
+  it("routes in-progress visits to In Progress", () => {
+    expect(derivePipelineStage({
+      jobStatus: "in_progress",
+      inProgressVisitCount: 1,
+    })).toBe("in_progress");
+  });
+
+  it("routes completed work without an invoice to Completed", () => {
+    expect(derivePipelineStage({
+      jobStatus: "completed",
+      completedVisitCount: 1,
+    })).toBe("completed");
+  });
+
+  it("routes any invoice (paid or unpaid) to Invoiced", () => {
+    expect(derivePipelineStage({
+      jobStatus: "completed",
+      unpaidInvoiceCount: 1,
+    })).toBe("invoiced");
+
+    expect(derivePipelineStage({
+      jobStatus: "completed",
+      paidInvoiceCount: 1,
+    })).toBe("invoiced");
+
+    expect(derivePipelineStage({
+      jobStatus: "invoiced",
+    })).toBe("invoiced");
+  });
+
+  it("routes cancelled jobs to Archived", () => {
+    expect(derivePipelineStage({
+      jobStatus: "cancelled",
+    })).toBe("archived");
   });
 
   it("prioritizes field and billing states over earlier intake flags", () => {
@@ -51,29 +118,15 @@ describe("derivePipelineStage", () => {
       jobStatus: "completed",
       approvedEstimateCount: 1,
       completedVisitCount: 1,
-    })).toBe("complete_needs_invoice");
-
-    expect(derivePipelineStage({
-      jobStatus: "completed",
-      unpaidInvoiceCount: 1,
-    })).toBe("invoice_sent");
-  });
-
-  it("treats paid invoices and invoiced jobs as closed", () => {
-    expect(derivePipelineStage({
-      jobStatus: "completed",
-      paidInvoiceCount: 1,
-    })).toBe("paid_closed");
-
-    expect(derivePipelineStage({
-      jobStatus: "invoiced",
-    })).toBe("paid_closed");
+    })).toBe("completed");
   });
 });
 
 describe("getPipelineNextAction", () => {
-  it("returns procedural labels for card CTAs", () => {
-    expect(getPipelineNextAction("new_intake")).toBe("Review intake");
-    expect(getPipelineNextAction("complete_needs_invoice")).toBe("Create final invoice");
+  it("returns action labels for each stage", () => {
+    expect(getPipelineNextAction("new_lead")).toBe("Review lead");
+    expect(getPipelineNextAction("completed")).toBe("Send invoice");
+    expect(getPipelineNextAction("invoiced")).toBe("Collect payment");
+    expect(getPipelineNextAction("archived")).toBe("Closed");
   });
 });
