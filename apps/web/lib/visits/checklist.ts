@@ -222,6 +222,57 @@ export function getClosingTemplate(jobType: string): ChecklistTemplateItem[] {
   return CLOSING_CHECKLIST_TEMPLATES[jobType] ?? CLOSING_CHECKLIST_TEMPLATES._default;
 }
 
+// ---------------------------------------------------------------------------
+// Realtor Baseline checklist — pre-listing inspection walkthrough
+// ---------------------------------------------------------------------------
+
+export const REALTOR_BASELINE_CHECKLIST_TEMPLATE: ChecklistTemplateItem[] = [
+  // Curb Appeal (6)
+  { section: "Curb Appeal", item_key: "curb_front_paint",      label: "Front door + trim paint condition",      sort_order: 0 },
+  { section: "Curb Appeal", item_key: "curb_walkway",          label: "Walkway and steps — cracks or trip hazards", sort_order: 1 },
+  { section: "Curb Appeal", item_key: "curb_landscape",        label: "Landscaping — trimmed, weeded, mulched",  sort_order: 2 },
+  { section: "Curb Appeal", item_key: "curb_house_numbers",    label: "House numbers visible and intact",        sort_order: 3 },
+  { section: "Curb Appeal", item_key: "curb_mailbox",          label: "Mailbox upright, clean, readable",        sort_order: 4 },
+  { section: "Curb Appeal", item_key: "curb_lighting",         label: "Exterior lighting works and clean",       sort_order: 5 },
+
+  // Quick Wins — Interior (8)
+  { section: "Quick Wins — Interior", item_key: "qw_lightbulbs",       label: "All bulbs working, matching warmth",  sort_order: 0 },
+  { section: "Quick Wins — Interior", item_key: "qw_outlet_covers",    label: "Outlet/switch covers intact, level",  sort_order: 1 },
+  { section: "Quick Wins — Interior", item_key: "qw_door_hardware",    label: "Door knobs/hinges tight, no squeaks", sort_order: 2 },
+  { section: "Quick Wins — Interior", item_key: "qw_caulk_bathroom",   label: "Bathroom caulk — clean, no mildew",   sort_order: 3 },
+  { section: "Quick Wins — Interior", item_key: "qw_caulk_kitchen",    label: "Kitchen caulk and grout condition",   sort_order: 4 },
+  { section: "Quick Wins — Interior", item_key: "qw_wall_scuffs",      label: "Wall scuffs / nail holes / touch-ups",sort_order: 5 },
+  { section: "Quick Wins — Interior", item_key: "qw_trim_paint",       label: "Baseboards and trim paint",           sort_order: 6 },
+  { section: "Quick Wins — Interior", item_key: "qw_smoke_co",         label: "Smoke/CO detectors present + tested", sort_order: 7 },
+
+  // Red Flags — Buyer Pushback (7)
+  { section: "Red Flags", item_key: "rf_water_stains",      label: "Water stains on ceilings or walls",      sort_order: 0 },
+  { section: "Red Flags", item_key: "rf_window_seal",       label: "Failed window seals / fogged panes",      sort_order: 1 },
+  { section: "Red Flags", item_key: "rf_floor_damage",      label: "Floor damage, gaps, or squeaks",          sort_order: 2 },
+  { section: "Red Flags", item_key: "rf_door_alignment",    label: "Doors that stick or won't latch",         sort_order: 3 },
+  { section: "Red Flags", item_key: "rf_outlet_dead",       label: "Dead outlets / non-working switches",     sort_order: 4 },
+  { section: "Red Flags", item_key: "rf_plumbing_drip",     label: "Plumbing drips / slow drains",            sort_order: 5 },
+  { section: "Red Flags", item_key: "rf_hvac_filter",       label: "HVAC filter age / system runs cleanly",   sort_order: 6 },
+
+  // Mechanical Snapshot (5)
+  { section: "Mechanical Snapshot", item_key: "mech_water_heater_age", label: "Water heater age + condition",     sort_order: 0 },
+  { section: "Mechanical Snapshot", item_key: "mech_furnace_age",      label: "Furnace/AC age + last service",    sort_order: 1 },
+  { section: "Mechanical Snapshot", item_key: "mech_panel",            label: "Electrical panel — labeled, no rust", sort_order: 2 },
+  { section: "Mechanical Snapshot", item_key: "mech_water_pressure",   label: "Water pressure at fixtures",       sort_order: 3 },
+  { section: "Mechanical Snapshot", item_key: "mech_attic_basement",   label: "Attic/basement — dryness, vents",  sort_order: 4 },
+
+  // Photo Documentation (4)
+  { section: "Photo Documentation", item_key: "doc_exterior_4sides", label: "Exterior — all 4 sides photographed",     sort_order: 0 },
+  { section: "Photo Documentation", item_key: "doc_interior_rooms",  label: "Every room — at least one wide photo",    sort_order: 1 },
+  { section: "Photo Documentation", item_key: "doc_red_flags",       label: "Close-ups of every red flag item",        sort_order: 2 },
+  { section: "Photo Documentation", item_key: "doc_mechanical",      label: "Mechanical room — equipment + nameplate", sort_order: 3 },
+
+  // Handoff (3)
+  { section: "Handoff", item_key: "ho_priorities",   label: "Top-3 priority fixes identified with realtor", sort_order: 0 },
+  { section: "Handoff", item_key: "ho_estimate",     label: "Rough estimate range provided",                sort_order: 1 },
+  { section: "Handoff", item_key: "ho_followup",     label: "Follow-up scheduled or declined",              sort_order: 2 },
+];
+
 /** Backwards-compat alias used by existing code. */
 export const CLOSING_CHECKLIST_TEMPLATE = CLOSING_CHECKLIST_TEMPLATES._default;
 
@@ -269,6 +320,7 @@ export async function seedChecklistItems(
  * Return checklist items for a visit, seeding from the appropriate template if
  * no items exist yet.  The seed is idempotent — ON CONFLICT DO NOTHING.
  *
+ * visit_type === 'realtor_baseline' → REALTOR_BASELINE_CHECKLIST_TEMPLATE (33 items)
  * jobType === 'maintenance' (or undefined) → DEFAULT_CHECKLIST_TEMPLATE (28 items)
  * any other jobType → CLOSING_CHECKLIST_TEMPLATE (6 closing steps)
  */
@@ -276,24 +328,32 @@ export async function getOrSeedChecklist(
   client: PoolClient,
   accountId: string,
   visitId: string,
-  jobType?: string
+  jobType?: string,
+  visitType?: string
 ): Promise<VisitChecklistItem[]> {
-  const isMaintenance = jobType === undefined || jobType === "maintenance";
-  const template = isMaintenance ? DEFAULT_CHECKLIST_TEMPLATE : getClosingTemplate(jobType!);
+  const isRealtorBaseline = visitType === "realtor_baseline";
+  const isMaintenance = !isRealtorBaseline && (jobType === undefined || jobType === "maintenance");
+  const template = isRealtorBaseline
+    ? REALTOR_BASELINE_CHECKLIST_TEMPLATE
+    : isMaintenance
+      ? DEFAULT_CHECKLIST_TEMPLATE
+      : getClosingTemplate(jobType!);
 
-  // Detect wrong-type seeds: maintenance visits should have walkthrough sections,
-  // non-maintenance visits should have a Closing section.
+  // Detect wrong-type seeds based on section signature.
   const existingResult = await client.query<{ section: string }>(
     `SELECT DISTINCT section FROM visit_checklist_items WHERE visit_id = $1 AND account_id = $2`,
     [visitId, accountId]
   );
   const existingSections = existingResult.rows.map((r) => r.section);
   const hasClosing = existingSections.includes("Closing");
-  const hasWalkthrough = existingSections.some((s) => s !== "Closing");
+  const hasWalkthrough = existingSections.some((s) => s !== "Closing" && s !== "Curb Appeal" && s !== "Red Flags" && s !== "Handoff");
+  const hasRealtorSections = existingSections.some((s) => s === "Curb Appeal" || s === "Red Flags" || s === "Handoff");
   const wrongType =
     existingSections.length > 0 &&
-    ((isMaintenance && hasClosing && !hasWalkthrough) ||
-     (!isMaintenance && hasWalkthrough));
+    ((isRealtorBaseline && !hasRealtorSections) ||
+     (!isRealtorBaseline && hasRealtorSections) ||
+     (isMaintenance && hasClosing && !hasWalkthrough && !hasRealtorSections) ||
+     (!isMaintenance && !isRealtorBaseline && hasWalkthrough));
 
   if (wrongType) {
     // Clear and re-seed with correct template

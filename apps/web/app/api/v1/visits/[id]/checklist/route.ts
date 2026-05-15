@@ -29,8 +29,16 @@ export const GET = withAuth(
       const items = await withChecklistContext(session, async (client) => {
         // Verify the visit exists and belongs to this account.
         // Tech users may only access their assigned visits.
-        const { rows: visitRows } = await client.query(
-          `SELECT id, assigned_user_id FROM visits WHERE id = $1 AND account_id = $2`,
+        const { rows: visitRows } = await client.query<{
+          id: string;
+          assigned_user_id: string | null;
+          visit_type: string;
+          job_type: string | null;
+        }>(
+          `SELECT v.id, v.assigned_user_id, v.visit_type, j.job_type
+             FROM visits v
+             JOIN jobs   j ON j.id = v.job_id AND j.account_id = v.account_id
+            WHERE v.id = $1 AND v.account_id = $2`,
           [id, session.accountId]
         );
 
@@ -42,7 +50,13 @@ export const GET = withAuth(
           return null;
         }
 
-        return getOrSeedChecklist(client, session.accountId, id);
+        return getOrSeedChecklist(
+          client,
+          session.accountId,
+          id,
+          visitRows[0].job_type ?? undefined,
+          visitRows[0].visit_type ?? undefined
+        );
       });
 
       if (items === null) {

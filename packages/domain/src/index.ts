@@ -34,6 +34,21 @@ export const visitStatusSchema = z.enum([
 ]);
 export type VisitStatus = z.infer<typeof visitStatusSchema>;
 
+export const VISIT_TYPES = [
+  "standard",
+  "realtor_baseline",
+  "membership_health_check",
+  "punch_list",
+] as const;
+export type VisitType = typeof VISIT_TYPES[number];
+
+export const VISIT_TYPE_LABELS: Record<VisitType, string> = {
+  standard: "Standard Visit",
+  realtor_baseline: "Realtor Baseline Inspection",
+  membership_health_check: "Membership Health Check",
+  punch_list: "Punch List",
+};
+
 export const estimateStatusSchema = z.enum([
   "draft",
   "sent",

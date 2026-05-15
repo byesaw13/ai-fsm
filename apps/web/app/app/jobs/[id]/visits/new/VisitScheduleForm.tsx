@@ -12,6 +12,7 @@ import {
 import type { ScheduleValue } from "@/components/ui";
 import { scheduleToISOPair } from "@/components/ui";
 import { reviewScheduleDay } from "@/lib/jobs/schedule-guard";
+import { VISIT_TYPES, VISIT_TYPE_LABELS, type VisitType } from "@ai-fsm/domain";
 
 interface User {
   id: string;
@@ -45,6 +46,9 @@ export function VisitScheduleForm({ jobId, users, canAssign, jobCategory, bookin
     duration: 60,
   });
   const [assignedUserId, setAssignedUserId] = useState("");
+  const [visitType, setVisitType] = useState<VisitType>(
+    jobCategory === "realtor_baseline" ? "realtor_baseline" : "standard"
+  );
 
   function validate(): boolean {
     const errs: FormErrors = {};
@@ -69,6 +73,7 @@ export function VisitScheduleForm({ jobId, users, canAssign, jobCategory, bookin
         scheduled_end: end!,
         assigned_user_id: assignedUserId || undefined,
         booking_request_id: bookingRequestId,
+        visit_type: visitType,
       };
 
       const res = await fetch(`/api/v1/jobs/${jobId}/visits`, {
@@ -131,6 +136,16 @@ export function VisitScheduleForm({ jobId, users, canAssign, jobCategory, bookin
       {scheduleWarning && (
         <p className="warning-inline" data-testid="schedule-day-warning">{scheduleWarning}</p>
       )}
+
+      <Select
+        id="visit_type"
+        label="Visit Type"
+        value={visitType}
+        onChange={(e) => setVisitType(e.target.value as VisitType)}
+        disabled={pending}
+        options={VISIT_TYPES.map((t) => ({ value: t, label: VISIT_TYPE_LABELS[t] }))}
+        hint={visitType === "realtor_baseline" ? "Seeds a pre-listing inspection checklist." : undefined}
+      />
 
       {canAssign && (
         <Select

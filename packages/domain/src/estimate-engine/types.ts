@@ -45,6 +45,7 @@ export interface RoomSpec {
 export interface LineItemSpec {
   id: string;
   priceBookCode?: string;
+  priceBookId?: string;
   description: string;
   quantity: number;
   unit: GeneralUnit;
@@ -134,6 +135,7 @@ export interface ComputedLineItem {
   sourceRule: string;
   visibleToCustomer: boolean;
   roomId?: string;
+  priceBookId?: string;
 }
 
 export interface EstimateSummary {

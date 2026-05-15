@@ -28,7 +28,7 @@ interface Property {
 }
 
 interface PageProps {
-  searchParams: Promise<{ client_id?: string; job_id?: string }>;
+  searchParams: Promise<{ client_id?: string; job_id?: string; property_id?: string; vault_item_id?: string }>;
 }
 
 export default async function NewEstimatePage({ searchParams }: PageProps) {
@@ -36,7 +36,7 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
   if (!session) redirect("/login");
   if (!canCreateEstimates(session.role)) redirect("/app/estimates");
 
-  const { client_id, job_id } = await searchParams;
+  const { client_id, job_id, property_id, vault_item_id } = await searchParams;
 
   const [clients, jobs, properties] = await Promise.all([
     query<Client>(
@@ -53,6 +53,16 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
     ),
   ]);
 
+  // Fetch vault item context for pre-populating estimate notes
+  let vaultItemContext: { name: string; category: string; location: string | null } | null = null;
+  if (vault_item_id) {
+    const rows = await query<{ name: string; category: string; location: string | null }>(
+      `SELECT name, category, location FROM property_vault_items WHERE id = $1 AND account_id = $2`,
+      [vault_item_id, session.accountId]
+    );
+    vaultItemContext = rows[0] ?? null;
+  }
+
   return (
     <PageContainer>
       <PageHeader title="New Estimate" backHref="/app/estimates" backLabel="Estimates" />
@@ -63,6 +73,9 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
           properties={properties}
           initialClientId={client_id}
           initialJobId={job_id}
+          initialPropertyId={property_id}
+          initialVaultItemId={vault_item_id}
+          vaultItemContext={vaultItemContext}
         />
       </Card>
     </PageContainer>

@@ -56,6 +56,7 @@ interface LineItemRow {
   description: string;
   quantity: string;
   unit_price: string;
+  price_book_id?: string;
 }
 
 interface OptionTier {
@@ -108,6 +109,9 @@ interface NewEstimateFormProps {
   properties: Property[];
   initialClientId?: string;
   initialJobId?: string;
+  initialPropertyId?: string;
+  initialVaultItemId?: string;
+  vaultItemContext?: { name: string; category: string; location: string | null } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,6 +164,9 @@ export function NewEstimateForm({
   properties,
   initialClientId,
   initialJobId,
+  initialPropertyId,
+  initialVaultItemId,
+  vaultItemContext,
 }: NewEstimateFormProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -186,9 +193,17 @@ export function NewEstimateForm({
   const [jobId, setJobId] = useState(
     initialJobId && jobList.some((j) => j.id === initialJobId) ? initialJobId : ""
   );
-  const [propertyId, setPropertyId] = useState("");
+  const [propertyId, setPropertyId] = useState(
+    initialPropertyId && propertyList.some((p) => p.id === initialPropertyId)
+      ? initialPropertyId
+      : ""
+  );
   const [expiresAt, setExpiresAt] = useState("");
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(
+    vaultItemContext
+      ? `Service for ${vaultItemContext.name}${vaultItemContext.location ? ` (${vaultItemContext.location})` : ""} — ${vaultItemContext.category}.`
+      : ""
+  );
   const [taxRate, setTaxRate] = useState("0");
   const [sendImmediately, setSendImmediately] = useState(false);
 
@@ -245,7 +260,7 @@ export function NewEstimateForm({
 
     setLineItems((prev) => [
       ...prev.filter((r) => r.description.trim()),
-      { description, quantity: "1", unit_price: (unitPrice / 100).toFixed(2) },
+      { description, quantity: "1", unit_price: (unitPrice / 100).toFixed(2), price_book_id: service.id },
     ]);
   }
 
@@ -260,6 +275,8 @@ export function NewEstimateForm({
         quantity: 1,
         unit_price_cents: item.priceCents,
         sort_order: i,
+        price_book_id: item.service.id,
+        price_book_code: item.service.code,
       })),
     [priceBookItems]
   );
@@ -580,6 +597,7 @@ export function NewEstimateForm({
         description: `${s.code} — ${s.name}`,
         quantity: s.quantity.toString(),
         unit_price: (s.unit_price_cents / 100).toFixed(2),
+        price_book_id: s.price_book_id,
       })),
     ]);
     setSuggestions([]);
@@ -698,6 +716,7 @@ export function NewEstimateForm({
               quantity: parseFloat(row.quantity) || 1,
               unit_price_cents: parseCents(row.unit_price),
               sort_order: li,
+              ...(row.price_book_id ? { price_book_id: row.price_book_id } : {}),
             })),
           };
         });
@@ -726,6 +745,8 @@ export function NewEstimateForm({
           quantity: parseFloat(row.quantity) || 1,
           unit_price_cents: parseCents(row.unit_price),
           sort_order: priceBookLineItems.length + i,
+          price_book_id: row.price_book_id,
+          price_book_code: undefined as string | undefined,
         }))];
         if (allItems.length === 0) {
           setError("Add at least one line item.");
@@ -741,6 +762,8 @@ export function NewEstimateForm({
             quantity: item.quantity,
             unit: "unit" as const,
             unitLaborCents: item.unit_price_cents,
+            ...(item.price_book_id ? { priceBookId: item.price_book_id } : {}),
+            ...(item.price_book_code ? { priceBookCode: item.price_book_code } : {}),
           })),
         };
         payload = {
@@ -755,6 +778,7 @@ export function NewEstimateForm({
       }
 
       Object.assign(payload, {
+        ...(initialVaultItemId ? { vault_item_id: initialVaultItemId } : {}),
         trip_count: tripCount,
         requires_drying_or_curing: requiresDryingOrCuring,
         difficult_access: difficultAccess,
@@ -1036,6 +1060,36 @@ export function NewEstimateForm({
               onChange={(e) => setExpiresAt(e.target.value)}
               disabled={pending}
             />
+          </div>
+
+          {/* Live preview — visible from step 1 onward */}
+          <div
+            data-testid="estimate-live-preview"
+            style={{
+              padding: "var(--space-3)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius)",
+              background: "var(--surface-muted, var(--surface))",
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              gap: "var(--space-3)",
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                Estimate Preview
+              </div>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: "var(--space-1)" }}>
+                {reviewTotal() === "—"
+                  ? "Add pricing on the next step — the total will appear here."
+                  : "Updates live as you adjust pricing on the next step."}
+              </div>
+            </div>
+            <div style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--fg)" }}>
+              {reviewTotal()}
+            </div>
           </div>
         </div>
       )}
@@ -1321,7 +1375,7 @@ export function NewEstimateForm({
               <div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-3)" }}>
                   <SectionHeader
-                    title={mode === "flat_rate" ? "Flat Rate" : mode === "multi_option" ? "Good / Better / Best" : "Line Items"}
+                    title={mode === "flat_rate" ? "Flat Rate" : "Line Items"}
                     count={mode === "itemized" ? lineItems.length : undefined}
                     as="h3"
                   />
@@ -1333,7 +1387,7 @@ export function NewEstimateForm({
                       overflow: "hidden",
                     }}
                   >
-                    {(["itemized", "flat_rate", "multi_option"] as const).map((m) => (
+                    {(["itemized", "flat_rate"] as const).map((m) => (
                       <button
                         key={m}
                         type="button"
@@ -1351,7 +1405,7 @@ export function NewEstimateForm({
                         }}
                         data-testid={`mode-${m}`}
                       >
-                        {m === "itemized" ? "Itemized" : m === "flat_rate" ? "Flat Rate" : "Multi-Option"}
+                        {m === "itemized" ? "Itemized" : "Flat Rate"}
                       </button>
                     ))}
                   </div>

@@ -7,7 +7,14 @@ import { useToast } from "@/components/ui";
 interface VaultPhoto {
   id: string;
   original_name: string;
+  size_bytes: number;
   created_at: string;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 interface Props {
@@ -163,6 +170,9 @@ export function VaultItemPhotoPanel({ itemId, canEdit }: Props) {
               >
                 {photo.original_name}
               </a>
+              <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)" }}>
+                {formatBytes(photo.size_bytes)}
+              </span>
               {canEdit && (
                 <button
                   type="button"

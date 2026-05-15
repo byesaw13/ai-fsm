@@ -8,17 +8,10 @@ import { ToastProvider } from "./ui/Toast";
 import {
   IconSchedule,
   IconJobs,
-  IconVisits,
   IconClients,
-  IconInvoices,
   IconEstimates,
-  IconExpenses,
-  IconReports,
   IconSettings,
-  IconPriceBook,
   IconMyDay,
-  IconBooking,
-  IconPipeline,
   IconField,
   IconMembership,
 } from "./NavIcons";
@@ -38,27 +31,17 @@ interface NavSection {
 }
 
 const OPERATIONS_ITEMS: NavItem[] = [
-  { href: "/app/pipeline",             label: "Pipeline",       Icon: IconPipeline,  adminOnly: true },
-  { href: "/app/my-day",              label: "My Day",         Icon: IconMyDay },
-  { href: "/app/field",               label: "Field Mode",     Icon: IconField },
-  { href: "/app/schedule",             label: "Schedule",       Icon: IconSchedule },
-  { href: "/app/jobs",                 label: "Jobs",           Icon: IconJobs },
-  { href: "/app/visits",               label: "Visits",         Icon: IconVisits },
-  { href: "/app/booking-requests",     label: "Booking",        Icon: IconBooking,   adminOnly: true },
+  { href: "/app/my-day",    label: "My Day",   Icon: IconMyDay },
+  { href: "/app/schedule",  label: "Schedule", Icon: IconSchedule, adminOnly: true },
+  { href: "/app/jobs",      label: "Jobs",     Icon: IconJobs },
+  { href: "/app/field",     label: "Field",    Icon: IconField },
 ];
 
 const BUSINESS_ITEMS: NavItem[] = [
-  { href: "/app/clients",            label: "Clients",     Icon: IconClients,     adminOnly: true },
-  { href: "/app/estimates",          label: "Estimates",   Icon: IconEstimates,   adminOnly: true },
-  { href: "/app/invoices",           label: "Invoices",    Icon: IconInvoices,    adminOnly: true },
-  { href: "/app/maintenance-plans",  label: "Memberships", Icon: IconMembership,  adminOnly: true },
-  { href: "/app/price-book",         label: "Price Book",  Icon: IconPriceBook,   adminOnly: true },
-  { href: "/app/expenses",           label: "Expenses",    Icon: IconExpenses,    adminOnly: true },
-  { href: "/app/reports",            label: "Reports",     Icon: IconReports,     adminOnly: true },
-];
-
-const ADMIN_ITEMS: NavItem[] = [
-  { href: "/app/settings", label: "Settings", Icon: IconSettings },
+  { href: "/app/clients",           label: "Clients",     Icon: IconClients,    adminOnly: true },
+  { href: "/app/estimates",         label: "Estimates",   Icon: IconEstimates,  adminOnly: true },
+  { href: "/app/maintenance-plans", label: "Memberships", Icon: IconMembership, adminOnly: true },
+  { href: "/app/settings",          label: "Settings",    Icon: IconSettings },
 ];
 
 /** Pure function — returns filtered nav sections for a given role */
@@ -67,34 +50,31 @@ export function getNavSections(role: string): NavSection[] {
 
   const opsItems = role === "tech"
     ? OPERATIONS_ITEMS.filter((item) => !item.adminOnly)
-    : OPERATIONS_ITEMS.filter((item) => item.href !== "/app/my-day" && item.href !== "/app/visits");
+    : OPERATIONS_ITEMS;
   if (opsItems.length > 0) sections.push({ label: "Operations", items: opsItems });
 
-  if (role !== "tech") {
-    const bizItems = BUSINESS_ITEMS.filter((item) => !item.adminOnly || role !== "tech");
-    if (bizItems.length > 0) sections.push({ label: "Business", items: bizItems });
-  }
-
-  if (ADMIN_ITEMS.length > 0) sections.push({ label: "System", items: ADMIN_ITEMS });
+  const bizItems = role === "tech"
+    ? BUSINESS_ITEMS.filter((item) => !item.adminOnly)
+    : BUSINESS_ITEMS;
+  if (bizItems.length > 0) sections.push({ label: "Business", items: bizItems });
 
   return sections;
 }
 
 /** Pure function — returns flat list of nav items for mobile bottom nav */
 export function getBottomNavItems(role: string): NavItem[] {
-  const pipeline = OPERATIONS_ITEMS.find((i) => i.href === "/app/pipeline")!;
   const myDay    = OPERATIONS_ITEMS.find((i) => i.href === "/app/my-day")!;
   const field    = OPERATIONS_ITEMS.find((i) => i.href === "/app/field")!;
   const jobs     = OPERATIONS_ITEMS.find((i) => i.href === "/app/jobs")!;
-  const visits   = OPERATIONS_ITEMS.find((i) => i.href === "/app/visits")!;
 
   if (role === "tech") {
-    // My Day, Field, Jobs, Visits
-    return [myDay, field, jobs, visits];
+    return [myDay, field, jobs];
   }
-  // admin/owner: Pipeline, Field, Jobs, Visits, Schedule
-  const schedule = OPERATIONS_ITEMS.find((i) => i.href === "/app/schedule")!;
-  return [pipeline, field, jobs, visits, schedule];
+
+  const schedule  = OPERATIONS_ITEMS.find((i) => i.href === "/app/schedule")!;
+  const clients   = BUSINESS_ITEMS.find((i) => i.href === "/app/clients")!;
+  const estimates = BUSINESS_ITEMS.find((i) => i.href === "/app/estimates")!;
+  return [myDay, schedule, jobs, clients, estimates];
 }
 
 /** Pure function — returns true if href is the active nav route for pathname */

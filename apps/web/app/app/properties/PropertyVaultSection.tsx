@@ -23,6 +23,7 @@ interface VaultItem {
 
 interface Props {
   propertyId: string;
+  clientId: string;
   initialItems: VaultItem[];
   canEdit: boolean;
 }
@@ -45,7 +46,7 @@ function fmtDate(s: string | null): string {
   return new Date(s).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
-export function PropertyVaultSection({ propertyId, initialItems, canEdit }: Props) {
+export function PropertyVaultSection({ propertyId, clientId, initialItems, canEdit }: Props) {
   const router = useRouter();
   const toast = useToast();
   const [items, setItems] = useState<VaultItem[]>(initialItems);
@@ -379,7 +380,7 @@ export function PropertyVaultSection({ propertyId, initialItems, canEdit }: Prop
                             </>
                           )}
                         </div>
-                        <div style={{ display: "flex", gap: "var(--space-2)", flexShrink: 0, alignItems: "center" }}>
+                        <div style={{ display: "flex", gap: "var(--space-2)", flexShrink: 0, alignItems: "center", flexWrap: "wrap" }}>
                           <button
                             className="p7-btn p7-btn-ghost p7-btn-sm"
                             onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
@@ -388,6 +389,12 @@ export function PropertyVaultSection({ propertyId, initialItems, canEdit }: Prop
                           </button>
                           {canEdit && (
                             <>
+                              <a
+                                href={`/app/estimates/new?client_id=${encodeURIComponent(clientId)}&property_id=${encodeURIComponent(propertyId)}&vault_item_id=${encodeURIComponent(item.id)}`}
+                                className="p7-btn p7-btn-secondary p7-btn-sm"
+                              >
+                                Estimate
+                              </a>
                               <button className="p7-btn p7-btn-ghost p7-btn-sm" onClick={() => startEdit(item)}>Edit</button>
                               <button
                                 className="p7-btn p7-btn-ghost p7-btn-sm"

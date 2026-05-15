@@ -184,6 +184,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
             <SectionHeader title="Digital Home Vault" count={vaultItems.length} />
             <PropertyVaultSection
               propertyId={property.id}
+              clientId={property.client_id}
               initialItems={vaultItems}
               canEdit={canManageClients(session.role)}
             />
