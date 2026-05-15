@@ -127,3 +127,32 @@ export function reviewRequestHtml(d: {
     <p style="margin:0;font-size:13px;color:#71717a;">Thank you again for your business — we appreciate you!</p>
   `);
 }
+
+export function estimateFollowupHtml(d: {
+  clientName: string; estimateNumber: string; totalCents: number; daysSinceSent: number; viewUrl: string;
+}): string {
+  return wrap(`
+    <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">Just Checking In</h2>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi ${d.clientName}, we sent over your estimate ${d.daysSinceSent} day${d.daysSinceSent !== 1 ? "s" : ""} ago and wanted to make sure it reached you.</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Estimate #:</td><td style="padding:4px 0;font-size:13px;font-weight:600;">${d.estimateNumber}</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Total:</td><td style="padding:4px 0;font-size:13px;">${dollars(d.totalCents)}</td></tr>
+    </table>
+    <p style="margin:0 0 24px;font-size:15px;color:#18181b;"><a href="${d.viewUrl}" style="color:#0f172a;font-weight:600;">View your estimate &rarr;</a></p>
+    <p style="margin:0;font-size:13px;color:#71717a;">No rush — just let us know if you have questions or want to schedule.</p>
+  `);
+}
+
+export function membershipRenewalNudgeHtml(d: {
+  clientName: string; planName: string; renewsOn: string; daysUntilRenewal: number;
+}): string {
+  return wrap(`
+    <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">Your Membership Renews Soon</h2>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi ${d.clientName}, a friendly heads-up that your ${d.planName} renews in ${d.daysUntilRenewal} day${d.daysUntilRenewal !== 1 ? "s" : ""}.</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Plan:</td><td style="padding:4px 0;font-size:13px;font-weight:600;">${d.planName}</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Renews on:</td><td style="padding:4px 0;font-size:13px;">${d.renewsOn}</td></tr>
+    </table>
+    <p style="margin:0;font-size:14px;color:#52525b;">Nothing to do — your membership continues automatically. Reach out if you'd like to change anything.</p>
+  `);
+}

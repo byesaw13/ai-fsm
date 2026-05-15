@@ -39,6 +39,7 @@ export function computeLineItems(items: LineItemSpec[], rules: PricingRules): Ge
       marginCents: itemLaborCents - itemCostCents,
       sourceRule: item.priceBookCode ? `pricebook.${item.priceBookCode}` : "explicit",
       visibleToCustomer: visible,
+      ...(item.priceBookId ? { priceBookId: item.priceBookId } : {}),
     });
 
     if (itemMaterialCents > 0) {
@@ -54,6 +55,7 @@ export function computeLineItems(items: LineItemSpec[], rules: PricingRules): Ge
         marginCents: 0,
         sourceRule: "material.direct",
         visibleToCustomer: visible,
+        ...(item.priceBookId ? { priceBookId: item.priceBookId } : {}),
       });
       totalMaterialCents += itemMaterialCents;
     }

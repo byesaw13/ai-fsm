@@ -103,7 +103,15 @@ export const POST = withRole(
     const body = await request.json().catch(() => ({}));
     const { type, config } = body;
 
-    if (!type || !["visit_reminder", "invoice_followup"].includes(type)) {
+    if (!type || ![
+      "visit_reminder",
+      "invoice_followup",
+      "booking_confirmed",
+      "review_request",
+      "estimate_followup",
+      "membership_renewal_nudge",
+      "stale_job_nudge",
+    ].includes(type)) {
       return NextResponse.json(
         {
           error: {

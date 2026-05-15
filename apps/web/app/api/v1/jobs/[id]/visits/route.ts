@@ -15,6 +15,7 @@ const createVisitBody = z.object({
   scheduled_end: z.string().datetime(),
   tech_notes: z.string().optional(),
   booking_request_id: z.string().uuid().optional(),
+  visit_type: z.enum(["standard", "realtor_baseline", "membership_health_check", "punch_list"]).default("standard"),
 });
 
 export const GET = withAuth(
@@ -78,6 +79,7 @@ export const POST = withRole(
       scheduled_end,
       tech_notes,
       booking_request_id,
+      visit_type,
     } = parsed.data;
 
     const pool = getPool();
@@ -109,8 +111,8 @@ export const POST = withRole(
       }
 
       const { rows } = await client.query(
-        `INSERT INTO visits (account_id, job_id, assigned_user_id, scheduled_start, scheduled_end, tech_notes)
-         VALUES ($1, $2, $3, $4, $5, $6)
+        `INSERT INTO visits (account_id, job_id, assigned_user_id, scheduled_start, scheduled_end, tech_notes, visit_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING *`,
         [
           session.accountId,
@@ -119,6 +121,7 @@ export const POST = withRole(
           scheduled_start,
           scheduled_end,
           tech_notes ?? null,
+          visit_type,
         ]
       );
 

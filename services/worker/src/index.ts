@@ -3,6 +3,9 @@ import { runVisitReminders } from "./visit-reminder.js";
 import { runInvoiceFollowups } from "./invoice-followup.js";
 import { runBookingConfirmations } from "./booking-confirmed.js";
 import { runReviewRequests } from "./review-request.js";
+import { runEstimateFollowups } from "./estimate-followup.js";
+import { runRenewalNudges } from "./membership-renewal-nudge.js";
+import { runStaleJobNudges } from "./stale-job-nudge.js";
 import { processMaintenanceScheduling } from "./maintenance-scheduling.js";
 import { expireEstimates } from "./expire-estimates.js";
 import { logger } from "./logger.js";
@@ -77,6 +80,41 @@ async function runPollIteration(client: Client): Promise<void> {
           sent: totalSent,
           skipped: totalSkipped,
           errors: totalErrors,
+        });
+      }
+
+      // Dispatch estimate follow-ups
+      const estimateResults = await runEstimateFollowups(client);
+      if (estimateResults.length > 0) {
+        const totalSent = estimateResults.reduce((sum, r) => sum + r.sent, 0);
+        logger.info("estimate-followup dispatch complete", {
+          automations: estimateResults.length,
+          sent: totalSent,
+          skipped: estimateResults.reduce((sum, r) => sum + r.skipped, 0),
+          errors: estimateResults.reduce((sum, r) => sum + r.errors, 0),
+        });
+      }
+
+      // Dispatch membership renewal nudges
+      const renewalResults = await runRenewalNudges(client);
+      if (renewalResults.length > 0) {
+        const totalSent = renewalResults.reduce((sum, r) => sum + r.sent, 0);
+        logger.info("membership-renewal-nudge dispatch complete", {
+          automations: renewalResults.length,
+          sent: totalSent,
+          skipped: renewalResults.reduce((sum, r) => sum + r.skipped, 0),
+          errors: renewalResults.reduce((sum, r) => sum + r.errors, 0),
+        });
+      }
+
+      // Dispatch stale job nudges (internal alerts)
+      const staleResults = await runStaleJobNudges(client);
+      if (staleResults.length > 0) {
+        const totalFlagged = staleResults.reduce((sum, r) => sum + r.sent, 0);
+        logger.info("stale-job-nudge dispatch complete", {
+          automations: staleResults.length,
+          flagged: totalFlagged,
+          errors: staleResults.reduce((sum, r) => sum + r.errors, 0),
         });
       }
     }

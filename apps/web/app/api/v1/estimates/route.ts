@@ -150,6 +150,7 @@ const lineItemInputSchema = z.object({
   visible_to_customer: z.boolean().default(true),
   adjustment_type: estimateAdjustmentTypeSchema.nullable().optional(),
   sort_order: z.number().int().default(0),
+  price_book_id: z.string().uuid().nullable().optional(),
 });
 
 const estimateOptionInputSchema = z.object({
@@ -164,6 +165,7 @@ const createEstimateSchema = z.object({
   client_id: z.string().uuid(),
   job_id: z.string().uuid().nullable().optional(),
   property_id: z.string().uuid().nullable().optional(),
+  vault_item_id: z.string().uuid().nullable().optional(),
   notes: z.string().nullable().optional(),
   internal_notes: z.string().nullable().optional(),
   expires_at: z.string().datetime().nullable().optional(),
@@ -232,6 +234,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     client_id,
     job_id,
     property_id,
+    vault_item_id,
     notes,
     internal_notes,
     expires_at,
@@ -336,7 +339,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
       const result = await client.query<{ id: string }>(
         `INSERT INTO estimates
-           (account_id, client_id, job_id, property_id, status, presentation_mode,
+           (account_id, client_id, job_id, property_id, vault_item_id, status, presentation_mode,
             subtotal_cents, tax_cents, total_cents, deposit_cents, balance_cents,
             notes, internal_notes, expires_at, created_by,
             sq_ft, prep_level, includes_trim, includes_ceiling,
@@ -345,15 +348,16 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             coordination_required, finish_expectation, travel_surcharge_cents,
             risk_adjustment_cents, minimum_service_override_reason,
             minimum_service_override_note, pricing_review_status)
-          VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-                  $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27,
-                  $28, $29, $30, $31)
+          VALUES ($1, $2, $3, $4, $5, 'draft', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+                  $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27,
+                  $28, $29, $30, $31, $32)
           RETURNING id`,
         [
           session.accountId,
           client_id,
           job_id ?? null,
           property_id ?? null,
+          vault_item_id ?? null,
           is_multi_option ? "multi_option" : "standard",
           subtotal_cents,
           tax_cents,
@@ -408,8 +412,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             await client.query(
               `INSERT INTO estimate_line_items
                  (estimate_id, option_id, description, quantity, unit_price_cents, total_cents,
-                  line_item_type, visible_to_customer, adjustment_type, sort_order)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                  line_item_type, visible_to_customer, adjustment_type, sort_order, price_book_id)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
               [
                 estimateId,
                 optionId,
@@ -421,6 +425,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
                 item.visible_to_customer,
                 item.adjustment_type ?? null,
                 item.sort_order ?? li,
+                item.price_book_id ?? null,
               ]
             );
           }
@@ -433,8 +438,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           await client.query(
             `INSERT INTO estimate_line_items
                (estimate_id, description, quantity, unit_price_cents, total_cents,
-                line_item_type, visible_to_customer, adjustment_type, sort_order)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+                line_item_type, visible_to_customer, adjustment_type, sort_order, price_book_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
             [
               estimateId,
               item.description,
@@ -445,6 +450,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
               item.visible_to_customer,
               item.adjustment_type ?? null,
               item.sort_order ?? i,
+              item.price_book_id ?? null,
             ]
           );
         }

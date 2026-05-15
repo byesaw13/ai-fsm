@@ -13,7 +13,6 @@ import {
 } from "@/components/ui";
 import { PriceBookSelector, type PriceBookService } from "@/components/PriceBookSelector";
 import {
-  calculatePaintingEstimate,
   formatCents,
   getStandardEstimateTerms,
 } from "@/lib/estimates/pricing";
@@ -21,7 +20,12 @@ import {
   PREP_LEVEL_MULTIPLIERS,
   JOB_TYPE_MATERIALS,
   getMaterialsByCategory,
+  computeEstimate,
+  CURRENT_RULES,
+  ENGINE_VERSION,
   type MaterialSuggestion,
+  type EstimateSpec,
+  type PrepLevel,
 } from "@ai-fsm/domain";
 import { InlineClientForm } from "./InlineClientForm";
 import { InlineJobForm } from "./InlineJobForm";
@@ -52,6 +56,7 @@ interface LineItemRow {
   description: string;
   quantity: string;
   unit_price: string;
+  price_book_id?: string;
 }
 
 interface OptionTier {
@@ -104,6 +109,9 @@ interface NewEstimateFormProps {
   properties: Property[];
   initialClientId?: string;
   initialJobId?: string;
+  initialPropertyId?: string;
+  initialVaultItemId?: string;
+  vaultItemContext?: { name: string; category: string; location: string | null } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -139,6 +147,13 @@ const PREP_LEVEL_LABELS: Record<number, string> = {
 
 const STEP_LABELS = ["Who & What", "Pricing", "Adjustments", "Review & Send"] as const;
 
+function mapPrepLevel(level: number): PrepLevel {
+  if (level <= 3) return "none";
+  if (level <= 5) return "minor";
+  if (level <= 7) return "moderate";
+  return "major";
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -149,6 +164,9 @@ export function NewEstimateForm({
   properties,
   initialClientId,
   initialJobId,
+  initialPropertyId,
+  initialVaultItemId,
+  vaultItemContext,
 }: NewEstimateFormProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -175,9 +193,17 @@ export function NewEstimateForm({
   const [jobId, setJobId] = useState(
     initialJobId && jobList.some((j) => j.id === initialJobId) ? initialJobId : ""
   );
-  const [propertyId, setPropertyId] = useState("");
+  const [propertyId, setPropertyId] = useState(
+    initialPropertyId && propertyList.some((p) => p.id === initialPropertyId)
+      ? initialPropertyId
+      : ""
+  );
   const [expiresAt, setExpiresAt] = useState("");
-  const [notes, setNotes] = useState("");
+  const [notes, setNotes] = useState(
+    vaultItemContext
+      ? `Service for ${vaultItemContext.name}${vaultItemContext.location ? ` (${vaultItemContext.location})` : ""} — ${vaultItemContext.category}.`
+      : ""
+  );
   const [taxRate, setTaxRate] = useState("0");
   const [sendImmediately, setSendImmediately] = useState(false);
 
@@ -234,7 +260,7 @@ export function NewEstimateForm({
 
     setLineItems((prev) => [
       ...prev.filter((r) => r.description.trim()),
-      { description, quantity: "1", unit_price: (unitPrice / 100).toFixed(2) },
+      { description, quantity: "1", unit_price: (unitPrice / 100).toFixed(2), price_book_id: service.id },
     ]);
   }
 
@@ -249,6 +275,8 @@ export function NewEstimateForm({
         quantity: 1,
         unit_price_cents: item.priceCents,
         sort_order: i,
+        price_book_id: item.service.id,
+        price_book_code: item.service.code,
       })),
     [priceBookItems]
   );
@@ -354,21 +382,49 @@ export function NewEstimateForm({
     [suggestions]
   );
 
-  // Live painting estimate calculation
+  // Live painting estimate — powered by the pure estimate engine
   const paintingResult = useMemo(() => {
+    if (serviceType !== "painting") return null;
     const sq = parseFloat(sqFt);
-    const mat = parseCents(materialCostDollars);
-    const hrs = parseFloat(laborHours);
-    if (isNaN(sq) || sq <= 0 || isNaN(hrs) || hrs <= 0) return null;
-    return calculatePaintingEstimate({
-      sq_ft: sq,
-      prep_level: prepLevel,
-      includes_trim: includesTrim,
-      includes_ceiling: includesCeiling,
-      material_cost_cents: mat,
-      labor_hours_estimate: hrs,
-    });
-  }, [sqFt, prepLevel, includesTrim, includesCeiling, materialCostDollars, laborHours]);
+    if (isNaN(sq) || sq <= 0) return null;
+    const prep = mapPrepLevel(prepLevel);
+    const matCents = parseCents(materialCostDollars);
+    const surfaces = [
+      { type: "walls" as const, sqft: sq, condition: "good" as const, prep, prime: false, textureMatch: false },
+      ...(includesCeiling ? [{ type: "ceiling" as const, sqft: Math.round(sq * 0.35), condition: "good" as const, prep, prime: false, textureMatch: false }] : []),
+      ...(includesTrim ? [{ type: "trim" as const, linearFt: Math.round(sq / 8), condition: "good" as const, prep, prime: false, textureMatch: false }] : []),
+    ];
+    const spec: EstimateSpec = {
+      engineVersion: ENGINE_VERSION,
+      type: "painting",
+      paintQuality: "standard",
+      rooms: [{ id: "r1", name: "Main area", coats: 2, surfaces }],
+    };
+    if (matCents > 0) {
+      spec.lineItems = [{
+        id: "mat-user",
+        description: "Materials & supplies",
+        quantity: 1,
+        unit: "flat",
+        unitLaborCents: 0,
+        materialCents: matCents,
+      }];
+    }
+    const r = computeEstimate(spec, CURRENT_RULES);
+    return {
+      labor_flat_rate_cents: r.summary.laborCents,
+      material_cents: r.summary.materialCents,
+      material_handling_cents: r.summary.handlingCents,
+      total_cents: r.summary.totalCents,
+      deposit_cents: r.summary.depositCents,
+      balance_cents: r.summary.balanceDueCents,
+      internal_labor_cost_cents: r.internalSummary.estimatedCostCents,
+      gross_margin_pct: Math.round(r.internalSummary.grossMarginPct * 100),
+      gross_margin_cents: r.internalSummary.grossMarginCents,
+      effective_sq_ft_rate_cents: sq > 0 ? Math.round(r.summary.laborCents / sq) : 0,
+      _spec: spec,
+    };
+  }, [serviceType, sqFt, prepLevel, includesTrim, includesCeiling, materialCostDollars]);
 
   // Generic live totals
   const taxRateNum = parseFloat(taxRate) || 0;
@@ -541,6 +597,7 @@ export function NewEstimateForm({
         description: `${s.code} — ${s.name}`,
         quantity: s.quantity.toString(),
         unit_price: (s.unit_price_cents / 100).toFixed(2),
+        price_book_id: s.price_book_id,
       })),
     ]);
     setSuggestions([]);
@@ -597,8 +654,15 @@ export function NewEstimateForm({
 
     try {
       let payload: Record<string, unknown>;
+      let baseEngineSpec: EstimateSpec | null = null;
 
-      if (serviceType === "painting" && paintingResult) {
+      if (serviceType === "painting") {
+        if (!paintingResult) {
+          setError("Enter the square footage to create a painting estimate.");
+          setPending(false);
+          return;
+        }
+        baseEngineSpec = paintingResult._spec;
         payload = {
           client_id: clientId,
           job_id: jobId || null,
@@ -611,7 +675,7 @@ export function NewEstimateForm({
           includes_trim: includesTrim,
           includes_ceiling: includesCeiling,
           material_cost_cents: parseCents(materialCostDollars),
-          labor_hours_estimate: parseFloat(laborHours),
+          labor_hours_estimate: parseFloat(laborHours) || 0,
           line_items: [
             {
               description: `Painting labor — ${parseFloat(sqFt).toLocaleString()} sq ft${includesCeiling ? " + ceiling" : ""}${includesTrim ? " + trim" : ""} (prep level ${prepLevel})`,
@@ -619,26 +683,11 @@ export function NewEstimateForm({
               unit_price_cents: paintingResult.labor_flat_rate_cents,
               sort_order: 0,
             },
-            ...(parseCents(materialCostDollars) > 0
-              ? [
-                  {
-                    description: "Materials",
-                    quantity: 1,
-                    unit_price_cents: parseCents(materialCostDollars),
-                    sort_order: 1,
-                  },
-                ]
+            ...(paintingResult.material_cents > 0
+              ? [{ description: "Materials", quantity: 1, unit_price_cents: paintingResult.material_cents, sort_order: 1 }]
               : []),
             ...(paintingResult.material_handling_cents > 0
-              ? [
-                  {
-                    description: "Material handling fee (15%)",
-                    quantity: 1,
-                    unit_price_cents: paintingResult.material_handling_cents,
-                    sort_order: 2,
-                    visible_to_customer: true,
-                  },
-                ]
+              ? [{ description: "Material handling fee (15%)", quantity: 1, unit_price_cents: paintingResult.material_handling_cents, sort_order: 2, visible_to_customer: true }]
               : []),
           ],
           internal_notes: `Internal labor: ${formatCents(paintingResult.internal_labor_cost_cents)} | Gross margin: ${paintingResult.gross_margin_pct}% (${formatCents(paintingResult.gross_margin_cents)})`,
@@ -667,6 +716,7 @@ export function NewEstimateForm({
               quantity: parseFloat(row.quantity) || 1,
               unit_price_cents: parseCents(row.unit_price),
               sort_order: li,
+              ...(row.price_book_id ? { price_book_id: row.price_book_id } : {}),
             })),
           };
         });
@@ -695,12 +745,27 @@ export function NewEstimateForm({
           quantity: parseFloat(row.quantity) || 1,
           unit_price_cents: parseCents(row.unit_price),
           sort_order: priceBookLineItems.length + i,
+          price_book_id: row.price_book_id,
+          price_book_code: undefined as string | undefined,
         }))];
         if (allItems.length === 0) {
           setError("Add at least one line item.");
           setPending(false);
           return;
         }
+        baseEngineSpec = {
+          engineVersion: ENGINE_VERSION,
+          type: "general",
+          lineItems: allItems.map((item, i) => ({
+            id: `li-${i}`,
+            description: item.description,
+            quantity: item.quantity,
+            unit: "unit" as const,
+            unitLaborCents: item.unit_price_cents,
+            ...(item.price_book_id ? { priceBookId: item.price_book_id } : {}),
+            ...(item.price_book_code ? { priceBookCode: item.price_book_code } : {}),
+          })),
+        };
         payload = {
           client_id: clientId,
           job_id: jobId || null,
@@ -713,6 +778,7 @@ export function NewEstimateForm({
       }
 
       Object.assign(payload, {
+        ...(initialVaultItemId ? { vault_item_id: initialVaultItemId } : {}),
         trip_count: tripCount,
         requires_drying_or_curing: requiresDryingOrCuring,
         difficult_access: difficultAccess,
@@ -724,6 +790,31 @@ export function NewEstimateForm({
         minimum_service_override_reason: minimumOverrideReason || null,
         minimum_service_override_note: minimumOverrideNote.trim() || null,
       });
+
+      // Build the full engine spec with all context flags and include it in the payload
+      if (baseEngineSpec) {
+        const adjustments: NonNullable<EstimateSpec["adjustments"]> = [];
+        if (parseCents(travelSurcharge) > 0) {
+          adjustments.push({ id: "adj-travel", type: "trip_fee", label: "Travel surcharge", amountCents: parseCents(travelSurcharge) });
+        }
+        if (parseCents(riskAdjustment) > 0) {
+          adjustments.push({ id: "adj-risk", type: "surcharge", label: "Risk adjustment", amountCents: parseCents(riskAdjustment) });
+        }
+        const fullSpec: EstimateSpec = {
+          ...baseEngineSpec,
+          tripCount,
+          requiresDryingOrCuring,
+          difficultAccess,
+          oldHouseRisk,
+          coordinationRequired,
+          finishExpectation,
+          ...(adjustments.length > 0 ? { adjustments } : {}),
+          ...(minimumOverrideReason ? {
+            overrides: [{ rule: "minimum_service_fee", reason: minimumOverrideReason, approvedBy: "owner", approvedAt: new Date().toISOString() }],
+          } : {}),
+        };
+        payload.engine_spec = fullSpec;
+      }
 
       const res = await fetch("/api/v1/estimates", {
         method: "POST",
@@ -970,6 +1061,36 @@ export function NewEstimateForm({
               disabled={pending}
             />
           </div>
+
+          {/* Live preview — visible from step 1 onward */}
+          <div
+            data-testid="estimate-live-preview"
+            style={{
+              padding: "var(--space-3)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius)",
+              background: "var(--surface-muted, var(--surface))",
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              gap: "var(--space-3)",
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                Estimate Preview
+              </div>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: "var(--space-1)" }}>
+                {reviewTotal() === "—"
+                  ? "Add pricing on the next step — the total will appear here."
+                  : "Updates live as you adjust pricing on the next step."}
+              </div>
+            </div>
+            <div style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--fg)" }}>
+              {reviewTotal()}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1069,8 +1190,8 @@ export function NewEstimateForm({
                   value={laborHours}
                   onChange={(e) => setLaborHours(e.target.value)}
                   disabled={pending}
-                  placeholder="Internal only, not shown to client"
-                  hint="Used for margin calculation"
+                  placeholder="Optional — for your reference"
+                  hint="Engine estimates margin from square footage"
                 />
 
                 <Input
@@ -1133,14 +1254,18 @@ export function NewEstimateForm({
                   <Card padding="sm" style={{ background: "var(--bg-subtle)" }}>
                     <SectionHeader title="Estimate Preview" as="h4" />
                     <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "var(--space-1) var(--space-4)", textAlign: "right" }}>
-                      <span style={{ color: "var(--fg-muted)" }}>Labor (flat rate)</span>
+                      <span style={{ color: "var(--fg-muted)" }}>Labor</span>
                       <span>{formatCents(paintingResult.labor_flat_rate_cents)}</span>
 
-                      {parseCents(materialCostDollars) > 0 && (
+                      {paintingResult.material_cents > 0 && (
                         <>
                           <span style={{ color: "var(--fg-muted)" }}>Materials</span>
-                          <span>{formatCents(parseCents(materialCostDollars))}</span>
+                          <span>{formatCents(paintingResult.material_cents)}</span>
+                        </>
+                      )}
 
+                      {paintingResult.material_handling_cents > 0 && (
+                        <>
                           <span style={{ color: "var(--fg-muted)" }}>Handling fee (15%)</span>
                           <span>{formatCents(paintingResult.material_handling_cents)}</span>
                         </>
@@ -1159,7 +1284,7 @@ export function NewEstimateForm({
                     <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
                       <SectionHeader title="Internal Margin" as="h4" />
                       <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "var(--space-1) var(--space-4)", textAlign: "right" }}>
-                        <span style={{ color: "var(--fg-muted)" }}>Internal labor cost ($85/hr)</span>
+                        <span style={{ color: "var(--fg-muted)" }}>Estimated labor cost</span>
                         <span>{formatCents(paintingResult.internal_labor_cost_cents)}</span>
 
                         <span style={{ color: "var(--fg-muted)" }}>Gross margin</span>
@@ -1178,9 +1303,9 @@ export function NewEstimateForm({
                 </div>
               )}
 
-              {!paintingResult && (parseFloat(sqFt) > 0 || parseFloat(laborHours) > 0) && (
+              {!paintingResult && (
                 <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: "var(--space-2)" }}>
-                  Enter both square footage and labor hours to see the estimate preview.
+                  Enter the square footage above to see the estimate preview.
                 </p>
               )}
             </div>
@@ -1250,7 +1375,7 @@ export function NewEstimateForm({
               <div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-3)" }}>
                   <SectionHeader
-                    title={mode === "flat_rate" ? "Flat Rate" : mode === "multi_option" ? "Good / Better / Best" : "Line Items"}
+                    title={mode === "flat_rate" ? "Flat Rate" : "Line Items"}
                     count={mode === "itemized" ? lineItems.length : undefined}
                     as="h3"
                   />
@@ -1262,7 +1387,7 @@ export function NewEstimateForm({
                       overflow: "hidden",
                     }}
                   >
-                    {(["itemized", "flat_rate", "multi_option"] as const).map((m) => (
+                    {(["itemized", "flat_rate"] as const).map((m) => (
                       <button
                         key={m}
                         type="button"
@@ -1280,7 +1405,7 @@ export function NewEstimateForm({
                         }}
                         data-testid={`mode-${m}`}
                       >
-                        {m === "itemized" ? "Itemized" : m === "flat_rate" ? "Flat Rate" : "Multi-Option"}
+                        {m === "itemized" ? "Itemized" : "Flat Rate"}
                       </button>
                     ))}
                   </div>
@@ -2013,7 +2138,7 @@ export function NewEstimateForm({
           {serviceType === "painting" && !paintingResult && (
             <Card className="p7-card-danger" padding="sm">
               <p style={{ margin: 0 }}>
-                Painting estimate is incomplete — go back to Step 2 and enter square footage and labor hours.
+                Painting estimate is incomplete — go back to Step 2 and enter the square footage.
               </p>
             </Card>
           )}

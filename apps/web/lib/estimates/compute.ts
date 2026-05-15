@@ -80,7 +80,7 @@ async function syncLineItems(estimateId: string, result: EstimateResult): Promis
   for (let i = 0; i < result.lineItems.length; i++) {
     const line = result.lineItems[i];
     const dbType = toDbLineItemType(line.category);
-    rows.push(`($${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++})`);
+    rows.push(`($${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++},$${idx++})`);
     values.push(
       estimateId,
       line.description,
@@ -90,13 +90,14 @@ async function syncLineItems(estimateId: string, result: EstimateResult): Promis
       dbType,
       line.visibleToCustomer,
       i,
+      line.priceBookId ?? null,
     );
   }
 
   await query(
     `INSERT INTO estimate_line_items
        (estimate_id, description, quantity, unit_price_cents, total_cents,
-        line_item_type, visible_to_customer, sort_order)
+        line_item_type, visible_to_customer, sort_order, price_book_id)
      VALUES ${rows.join(",")}`,
     values
   );
