@@ -5,7 +5,7 @@ import type { AuthSession } from "../../../../../lib/auth/middleware";
 import { queryOne, getPool } from "../../../../../lib/db";
 import { appendAuditLog } from "../../../../../lib/db/audit";
 import { logger } from "../../../../../lib/logger";
-import { JOB_ACCEPTANCE_CATEGORIES, JOB_INTAKE_DECISIONS } from "@ai-fsm/domain";
+import { JOB_ACCEPTANCE_CATEGORIES, JOB_INTAKE_DECISIONS, VENDOR_COORDINATION_MODES } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +22,8 @@ const updateJobBody = z.object({
   job_category: z.enum(JOB_ACCEPTANCE_CATEGORIES).nullable().optional(),
   intake_decision: z.enum(JOB_INTAKE_DECISIONS).nullable().optional(),
   intake_notes: z.string().nullable().optional(),
+  vendor_coordination: z.enum(VENDOR_COORDINATION_MODES).nullable().optional(),
+  concierge_fee_cents: z.number().int().nonnegative().nullable().optional(),
 });
 
 export const GET = withAuth(
