@@ -95,7 +95,7 @@ export const GET = withRole(["owner", "admin"], async (request: NextRequest, ses
     const params: unknown[] = [session.accountId];
     let idx = 2;
 
-    if (status && VALID_STATUSES.includes(status)) {
+    if (status && (VALID_STATUSES as readonly string[]).includes(status)) {
       conditions.push(`br.status = $${idx++}`);
       params.push(status);
     }
