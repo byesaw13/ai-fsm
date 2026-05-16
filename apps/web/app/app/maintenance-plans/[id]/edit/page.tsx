@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { queryOne, query } from "@/lib/db";
 import { canManageClients } from "@/lib/auth/permissions";
 import { Card, PageContainer, PageHeader } from "@/components/ui";
-import { SubscriptionEditForm } from "./SubscriptionEditForm";
+import { MembershipEditForm } from "./MembershipEditForm";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +28,7 @@ interface SubscriptionRow {
   [key: string]: unknown;
 }
 
-export default async function EditSubscriptionPage({
+export default async function EditMembershipPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -82,9 +82,9 @@ export default async function EditSubscriptionPage({
         backLabel="Details"
       />
       <Card padding="default">
-        <SubscriptionEditForm
+        <MembershipEditForm
           id={id}
-          subscription={subscription}
+          membership={subscription}
           template={template ?? null}
           allAddons={allAddons}
           currentAddonIds={currentAddonIds.map((r) => r.addon_id)}
