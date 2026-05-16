@@ -363,6 +363,7 @@ export const POST = withAuth(
         }
       }
 
+<<<<<<< HEAD
       // Emit workflow events for automation cancellation and downstream processing
       if (effectiveStatus === "completed" || effectiveStatus === "cancelled") {
         await writeWorkflowEvent(client, {
@@ -374,6 +375,8 @@ export const POST = withAuth(
         });
       }
 
+=======
+>>>>>>> origin/main
       await client.query("COMMIT");
       return NextResponse.json({ data: updated });
     } catch (err) {

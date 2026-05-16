@@ -134,6 +134,7 @@ async function runPollIteration(client: Client): Promise<void> {
           errors: issueResults.reduce((sum, r) => sum + r.errors, 0),
         });
       }
+<<<<<<< HEAD
 
       // Dispatch client reactivation campaigns
       const reactivationResults = await runClientReactivations(client);
@@ -180,6 +181,8 @@ async function runPollIteration(client: Client): Promise<void> {
     const dispatchTotal = dispatchResult.sent + dispatchResult.failed + dispatchResult.retried + dispatchResult.delayed + dispatchResult.cancelled;
     if (dispatchTotal > 0) {
       logger.info("notification-queue dispatched", { ...dispatchResult });
+=======
+>>>>>>> origin/main
     }
 
     // Expire sent estimates whose expiry date has passed
