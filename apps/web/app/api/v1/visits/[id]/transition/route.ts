@@ -8,6 +8,7 @@ import { logger } from "../../../../../../lib/logger";
 import { checkCompletionPacket } from "../../../../../../lib/completion-guard";
 import { visitTransitions, visitStatusSchema } from "@ai-fsm/domain";
 import type { VisitStatus } from "@ai-fsm/domain";
+import { seedConditionSnapshots } from "../../../../../../lib/visits/condition-seeding";
 
 export const dynamic = "force-dynamic";
 
@@ -346,6 +347,18 @@ export const POST = withAuth(
               }
             }
           }
+        }
+      }
+
+      // Seed condition snapshots from checklist dispositions on visit completion
+      if (effectiveStatus === "completed" && updated.job_id) {
+        const jobProp = await client.query<{ property_id: string | null }>(
+          `SELECT property_id FROM jobs WHERE id = $1 AND account_id = $2`,
+          [updated.job_id, session.accountId]
+        );
+        const propertyId = jobProp.rows[0]?.property_id;
+        if (propertyId) {
+          await seedConditionSnapshots(client, id, propertyId, session.accountId);
         }
       }
 

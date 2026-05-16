@@ -6,6 +6,7 @@ import { runReviewRequests } from "./review-request.js";
 import { runEstimateFollowups } from "./estimate-followup.js";
 import { runRenewalNudges } from "./membership-renewal-nudge.js";
 import { runStaleJobNudges } from "./stale-job-nudge.js";
+import { runPropertyIssueScans } from "./property-issue-scan.js";
 import { processMaintenanceScheduling } from "./maintenance-scheduling.js";
 import { expireEstimates } from "./expire-estimates.js";
 import { logger } from "./logger.js";
@@ -115,6 +116,17 @@ async function runPollIteration(client: Client): Promise<void> {
           automations: staleResults.length,
           flagged: totalFlagged,
           errors: staleResults.reduce((sum, r) => sum + r.errors, 0),
+        });
+      }
+
+      // Scan for recurring property issues
+      const issueResults = await runPropertyIssueScans(client);
+      if (issueResults.length > 0) {
+        const totalUpserted = issueResults.reduce((sum, r) => sum + r.sent, 0);
+        logger.info("property-issue-scan complete", {
+          automations: issueResults.length,
+          upserted: totalUpserted,
+          errors: issueResults.reduce((sum, r) => sum + r.errors, 0),
         });
       }
     }

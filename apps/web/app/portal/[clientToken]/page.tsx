@@ -89,7 +89,7 @@ export default async function ClientPortalPage({
 
   if (!client) notFound();
 
-  const [estimates, invoices, plans, maintenanceJobs, activeVisitRows, recentComms] = await Promise.all([
+  const [estimates, invoices, plans, maintenanceJobs, activeVisitRows, recentComms, properties] = await Promise.all([
     query<EstimateRow>(
       `SELECT e.id, e.status, e.total_cents, e.sent_at, e.expires_at,
               e.share_token, p.address AS property_address
@@ -152,6 +152,16 @@ export default async function ClientPortalPage({
        LIMIT 5`,
       [client.id]
     ),
+    query<{ id: string; name: string | null; address: string; open_issue_count: number }>(
+      `SELECT p.id, p.name, p.address,
+              COUNT(pi.id) FILTER (WHERE pi.status IN ('open','monitoring'))::int AS open_issue_count
+       FROM properties p
+       LEFT JOIN property_issues pi ON pi.property_id = p.id AND pi.account_id = p.account_id
+       WHERE p.client_id = $1 AND p.account_id = $2
+       GROUP BY p.id
+       ORDER BY p.address`,
+      [client.id, client.account_id]
+    ),
   ]);
 
   const openInvoices = invoices.filter((i) => !["paid", "void"].includes(i.status as string));
@@ -212,6 +222,34 @@ export default async function ClientPortalPage({
           <div style={{ background: "#fef3c7", border: "1px solid #fcd34d", borderRadius: 8, padding: "12px 16px", marginBottom: 24, color: "#92400e" }}>
             You have an outstanding balance of <strong>{cents(totalOwed)}</strong>.
           </div>
+        )}
+
+        {properties.length > 0 && (
+          <section style={{ marginBottom: 32 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>My Properties</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {properties.map((p) => (
+                <a
+                  key={p.id as string}
+                  href={`/portal/${clientToken}/property/${p.id}`}
+                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: "14px 16px", textDecoration: "none", color: "inherit" }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{(p.name as string) || (p.address as string)}</div>
+                    {p.name && <div style={{ fontSize: 12, color: "#6b7280" }}>{p.address as string}</div>}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    {(p.open_issue_count as number) > 0 && (
+                      <span style={{ fontSize: 12, background: "#fee2e2", color: "#dc2626", borderRadius: 99, padding: "2px 8px", fontWeight: 600 }}>
+                        {p.open_issue_count as number} issue{(p.open_issue_count as number) !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                    <span style={{ fontSize: 13, color: "#6b7280" }}>History →</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </section>
         )}
 
         {plans.length > 0 && (

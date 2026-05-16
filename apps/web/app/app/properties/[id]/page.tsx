@@ -18,6 +18,10 @@ import { PropertyForm } from "../PropertyForm";
 import { PropertyVaultSection } from "../PropertyVaultSection";
 import { PropertyTimeline } from "./PropertyTimeline";
 import type { TimelineEvent } from "./PropertyTimeline";
+import { PropertyConditionsPanel } from "./PropertyConditionsPanel";
+import type { ConditionRow } from "./PropertyConditionsPanel";
+import { PropertyIssuesPanel } from "./PropertyIssuesPanel";
+import type { IssueRow } from "./PropertyIssuesPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +71,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
   );
   if (!property) notFound();
 
-  const [clients, jobs, timelineEvents, vaultItems] = await Promise.all([
+  const [clients, jobs, timelineEvents, vaultItems, conditions, issues] = await Promise.all([
     query<ClientOption>(`SELECT id, name FROM clients WHERE account_id = $1 ORDER BY name ASC`, [session.accountId]),
     query<JobRow>(
       `SELECT id, title, status, created_at
@@ -131,6 +135,27 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
        ORDER BY category ASC, name ASC`,
       [id, session.accountId]
     ),
+    query<ConditionRow>(
+      `SELECT DISTINCT ON (area)
+         area, condition, note, assessed_at::text AS assessed_at, visit_id::text AS visit_id,
+         '[]'::json AS trend
+       FROM property_condition_snapshots
+       WHERE account_id = $1 AND property_id = $2
+       ORDER BY area, assessed_at DESC`,
+      [session.accountId, id]
+    ),
+    query<IssueRow>(
+      `SELECT id, area, item_key, title, description, status, severity,
+              occurrence_count, first_noted_at::text AS first_noted_at,
+              last_noted_at::text AS last_noted_at, auto_detected
+       FROM property_issues
+       WHERE account_id = $1 AND property_id = $2
+         AND status IN ('open','monitoring')
+       ORDER BY
+         CASE severity WHEN 'critical' THEN 1 WHEN 'major' THEN 2 WHEN 'moderate' THEN 3 ELSE 4 END,
+         last_noted_at DESC`,
+      [session.accountId, id]
+    ),
   ]);
 
   const vaultCompleteness = computeVaultCompleteness(vaultItems);
@@ -180,6 +205,13 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
             <PropertyTimeline events={timelineEvents} />
           </Card>
 
+          {issues.length > 0 && (
+            <Card>
+              <SectionHeader title="Recurring Issues" count={issues.length} />
+              <PropertyIssuesPanel issues={issues} propertyId={property.id} />
+            </Card>
+          )}
+
           <Card data-testid="property-vault-card">
             <SectionHeader title="Digital Home Vault" count={vaultItems.length} />
             <PropertyVaultSection
@@ -210,6 +242,11 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
         </div>
 
         <div className="p7-detail-sidebar">
+          <Card>
+            <SectionHeader title="Conditions" count={conditions.length} />
+            <PropertyConditionsPanel conditions={conditions} />
+          </Card>
+
           <Card>
             <SectionHeader title="Property Details" />
             <dl className="p7-detail-list">
