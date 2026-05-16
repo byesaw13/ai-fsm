@@ -329,13 +329,6 @@ export const MAINTENANCE_SCHEDULE_DAY_OF_WEEK = 3; // Wednesday (JS Date.getDay(
 export const MAINTENANCE_JOB_CATEGORIES: JobAcceptanceCategory[] = ["membership", "realtor_baseline"];
 
 // ---------------------------------------------------------------------------
-// Job types
-// ---------------------------------------------------------------------------
-
-export const JOB_TYPES = ["painting", "maintenance", "repair", "custom"] as const;
-export type JobType = typeof JOB_TYPES[number];
-
-// ---------------------------------------------------------------------------
 // Pricing modes
 // ---------------------------------------------------------------------------
 
