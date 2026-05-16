@@ -11,12 +11,15 @@ import {
   getVaultCollectionStep,
   VISIT_SUB_STATUSES,
   SUB_STATUS_LABELS,
+  ROUTING_ZONE_WARNINGS,
+  ROUTING_ZONE_WARNING_ZONES,
   type Visit,
   type VisitStatus,
   type MembershipVisitPhase,
   type MembershipCapStatus,
   type VaultCategory,
   type VaultCollectionStep,
+  type MembershipRoutingZone,
 } from "@ai-fsm/domain";
 import { VisitAssignForm } from "./VisitAssignForm";
 import { OverdueVisitModal } from "./OverdueVisitModal";
@@ -87,12 +90,14 @@ type VisitRow = Visit & {
   job_client_id: string | null;
   generated_from_plan_id: string | null;
   plan_annual_visit_count: number | null;
+  plan_routing_zone: string | null;
   membership_visit_phase: MembershipVisitPhase;
   included_labor_cap_minutes: number | null;
   included_labor_minutes_used: number;
   membership_cap_status: MembershipCapStatus;
   membership_snapshot_sent_at: string | Date | null;
   sub_status: string | null;
+  visit_type: string | null;
 };
 
 type CountRow = { membership_visit_number: number | string };
@@ -120,6 +125,7 @@ export default async function VisitDetailPage({
             j.title AS job_title, j.job_type AS job_type, j.description AS job_description,
             j.property_id AS job_property_id, j.client_id AS job_client_id,
             mp.annual_visit_count AS plan_annual_visit_count,
+            mp.routing_zone AS plan_routing_zone,
             u.full_name AS assigned_user_name
      FROM visits v
      LEFT JOIN jobs j ON j.id = v.job_id
@@ -151,7 +157,13 @@ export default async function VisitDetailPage({
 
   const isRepairFlow = visit.job_type !== null && visit.job_type !== "maintenance";
   const isMembershipVisit = visit.generated_from_plan_id !== null;
+  const isRealtorBaseline = visit.visit_type === "realtor_baseline";
   const canCreateEstimate = session.role === "owner" || session.role === "admin";
+  const routingZoneWarning =
+    visit.plan_routing_zone &&
+    ROUTING_ZONE_WARNING_ZONES.includes(visit.plan_routing_zone as MembershipRoutingZone)
+      ? ROUTING_ZONE_WARNINGS[visit.plan_routing_zone]
+      : null;
 
   const [membershipVisitNumberRow, propertyVaultRows] = isMembershipVisit
     ? await Promise.all([
@@ -342,6 +354,21 @@ export default async function VisitDetailPage({
         checklistTotal={checklistItems.length}
       />
 
+      {/* Routing zone warning — shown for extended / out_of_area membership visits */}
+      {routingZoneWarning && (
+        <div style={{
+          margin: "0 0 var(--space-4)",
+          padding: "var(--space-3) var(--space-4)",
+          borderRadius: "var(--radius-md)",
+          background: "color-mix(in srgb, var(--color-warning, #f59e0b) 12%, transparent)",
+          border: "1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 40%, transparent)",
+          fontSize: "var(--font-size-sm)",
+          color: "var(--color-text-primary)",
+        }}>
+          <strong>Routing:</strong> {routingZoneWarning}
+        </div>
+      )}
+
       <div className="p7-detail-layout">
         <div className="p7-detail-primary">
           {/* For tech on scheduled/arrived: surface the action first, above all work panels */}
@@ -390,6 +417,31 @@ export default async function VisitDetailPage({
                 propertyId={visit.job_property_id ?? null}
                 vaultCollection={membershipVaultCollection}
               />
+            </Card>
+          )}
+
+          {/* ── Realtor baseline: membership follow-up prompt when completed ── */}
+          {isRealtorBaseline && currentStatus === "completed" && canCreateEstimate && (
+            <Card data-testid="realtor-baseline-followup">
+              <SectionHeader title="Baseline Complete" />
+              <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", marginBottom: "var(--space-3)" }}>
+                The realtor baseline inspection is done. Offer the client a maintenance membership to build on this visit.
+              </div>
+              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                {visit.job_client_id && (
+                  <a
+                    href={`/app/maintenance-plans/new?client_id=${visit.job_client_id}${visit.job_property_id ? `&property_id=${visit.job_property_id}` : ""}`}
+                    className="p7-btn p7-btn-primary p7-btn-sm"
+                  >
+                    Offer Membership
+                  </a>
+                )}
+                {visit.job_id && (
+                  <a href={`/app/jobs/${visit.job_id}`} className="p7-btn p7-btn-secondary p7-btn-sm">
+                    Back to Job
+                  </a>
+                )}
+              </div>
             </Card>
           )}
 

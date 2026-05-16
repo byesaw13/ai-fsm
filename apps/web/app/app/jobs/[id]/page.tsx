@@ -19,6 +19,7 @@ import { JobEditForm } from "./JobEditFormWrapper";
 import { JobIntakePanel } from "./JobIntakePanel";
 import { AssetLinksPanel } from "./AssetLinksPanel";
 import { JobCommandPanel } from "./JobCommandPanel";
+import { VendorCoordinationCard } from "./VendorCoordinationCard";
 import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { isHomeboxEnabled } from "@/lib/homebox/client";
 import { withAssetContext, listAssetLinks } from "@/lib/homebox/db";
@@ -48,6 +49,8 @@ type JobRow = Job & {
   intake_decision: JobIntakeDecision | null;
   intake_notes: string | null;
   sub_status: string | null;
+  vendor_coordination: "referral" | "concierge" | null;
+  concierge_fee_cents: number | null;
 };
 type VisitRow = Visit & {
   assigned_user_name: string | null;
@@ -426,6 +429,14 @@ export default async function JobDetailPage({
                 />
               </Card>
             </AdvancedDetails>
+
+            {/* Vendor coordination */}
+            <VendorCoordinationCard
+              jobId={job.id}
+              vendorCoordination={job.vendor_coordination}
+              conciergeFeeCents={job.concierge_fee_cents}
+              canEdit={canTransition}
+            />
 
             {/* Commercial links */}
             <Card>

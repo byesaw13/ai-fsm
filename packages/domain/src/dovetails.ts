@@ -292,6 +292,36 @@ export const JOB_INTAKE_RATING_LABELS: Record<JobIntakeRatingField, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// Vendor coordination
+// ---------------------------------------------------------------------------
+
+export const VENDOR_COORDINATION_MODES = ["referral", "concierge"] as const;
+export type VendorCoordinationMode = typeof VENDOR_COORDINATION_MODES[number];
+
+export const VENDOR_COORDINATION_LABELS: Record<VendorCoordinationMode, string> = {
+  referral:  "Referral",
+  concierge: "Concierge (Coordinated)",
+};
+
+export const VENDOR_COORDINATION_DESCRIPTIONS: Record<VendorCoordinationMode, string> = {
+  referral:  "Client is referred to a specialist. Dovetails is not involved in scheduling or coordination.",
+  concierge: "Dovetails coordinates the specialist on the client's behalf. A management fee applies.",
+};
+
+export const CONCIERGE_DEFAULT_FEE_CENTS = 15000; // $150
+
+// ---------------------------------------------------------------------------
+// Routing zone warnings
+// ---------------------------------------------------------------------------
+
+export const ROUTING_ZONE_WARNING_ZONES: MembershipRoutingZone[] = ["extended", "out_of_area"];
+
+export const ROUTING_ZONE_WARNINGS: Record<string, string> = {
+  extended:    "Extended zone — add travel surcharge and confirm route before scheduling.",
+  out_of_area: "Out of area — requires owner approval before accepting or scheduling.",
+};
+
+// ---------------------------------------------------------------------------
 // Scheduling policy
 // ---------------------------------------------------------------------------
 
