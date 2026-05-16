@@ -3,6 +3,7 @@ import { jwtVerify } from "jose";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { getEnv } from "@/lib/env";
+import { writeWorkflowEvent } from "@/lib/workflow-events";
 
 export const dynamic = "force-dynamic";
 
@@ -77,18 +78,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     if (rows.length > 0) {
       const { account_id } = rows[0];
-      // Fire-and-forget audit log (non-critical, don't block redirect)
-      client.query(
-        `INSERT INTO audit_log
-           (account_id, entity_type, entity_id, action, actor_id, old_value, new_value)
-         VALUES ($1, 'estimate', $2, 'update', NULL, $3, $4)`,
-        [
-          account_id,
-          id,
-          JSON.stringify({ status: "draft_or_sent" }),
-          JSON.stringify({ status: newStatus, responded_at: new Date().toISOString(), via: "email_link" }),
-        ]
-      ).catch((err) => logger.error("estimate respond: audit log failed", err, { estimateId: id }));
+      const eventType = action === "approve" ? "estimate.approved" : "estimate.declined";
+      // Fire-and-forget audit log and workflow event (non-critical, don't block redirect)
+      Promise.all([
+        client.query(
+          `INSERT INTO audit_log
+             (account_id, entity_type, entity_id, action, actor_id, old_value, new_value)
+           VALUES ($1, 'estimate', $2, 'update', NULL, $3, $4)`,
+          [
+            account_id,
+            id,
+            JSON.stringify({ status: "draft_or_sent" }),
+            JSON.stringify({ status: newStatus, responded_at: new Date().toISOString(), via: "email_link" }),
+          ]
+        ),
+        writeWorkflowEvent(client, {
+          accountId: account_id,
+          eventType,
+          entityType: "estimate",
+          entityId: id,
+        }),
+      ]).catch((err) => logger.error("estimate respond: post-update writes failed", err, { estimateId: id }));
     }
 
     return NextResponse.redirect(thanksUrl(action));

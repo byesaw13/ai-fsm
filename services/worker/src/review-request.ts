@@ -1,8 +1,9 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
-import { sendEmail, isEmailConfigured, reviewRequestHtml } from "./mailer.js";
+import { reviewRequestHtml } from "./mailer.js";
 import type { AutomationRow, ReminderResult } from "./visit-reminder.js";
-import { logWorkerCommunication } from "./communications-log.js";
+import { enqueueNotification } from "./notification/enqueue.js";
+import { PRIORITY } from "./notification/priority.js";
 
 /**
  * Review Request Automation
@@ -95,40 +96,28 @@ async function emitReviewRequest(
     return false;
   }
 
-  if (isEmailConfigured() && job.client_email && job.client_name && job.title) {
-    const emailResult = await sendEmail({
-      to: job.client_email,
+  if (job.client_email && job.client_name && job.title) {
+    const enqueueResult = await enqueueNotification(client, {
+      accountId: job.account_id,
+      clientId: job.client_id,
+      automationType: "review_request",
+      priority: PRIORITY.LOW,
+      toAddress: job.client_email,
       subject: `How did we do? — ${job.title}`,
-      html: reviewRequestHtml({
+      htmlBody: reviewRequestHtml({
         clientName: job.client_name,
         jobTitle: job.title,
         techName: job.tech_name,
       }),
+      idempotencyKey: `review_request:${job.id}`,
+      entityType: "job",
+      entityId: job.id,
+      metadata: { automationId },
     });
-    if (!emailResult.ok) {
-      await logWorkerCommunication(client, {
-        accountId: job.account_id,
-        channel: "email",
-        direction: "outbound",
-        outcome: "failed",
-        clientId: job.client_id,
-        jobId: job.id,
-        bodyPreview: `How did we do? — ${job.title}`,
-        externalId: automationId,
-      });
-      logger.warn("review-request: email send failed", { jobId: job.id, error: emailResult.error });
+    if (enqueueResult === "suppressed") {
+      logger.debug("review-request: suppressed by governor", { jobId: job.id });
       return false;
     }
-    await logWorkerCommunication(client, {
-      accountId: job.account_id,
-      channel: "email",
-      direction: "outbound",
-      outcome: "sent",
-      clientId: job.client_id,
-      jobId: job.id,
-      bodyPreview: `How did we do? — ${job.title}`,
-      externalId: automationId,
-    });
   }
 
   await client.query(
@@ -143,7 +132,7 @@ async function emitReviewRequest(
         automation_id: automationId,
         job_title: job.title,
         client_name: job.client_name,
-        sent_at: new Date().toISOString(),
+        queued_at: new Date().toISOString(),
       }),
     ]
   );

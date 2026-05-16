@@ -6,6 +6,7 @@ import { paymentMethodSchema } from "@ai-fsm/domain";
 import { validatePaymentAmount } from "@/lib/invoices/payments";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
+import { writeWorkflowEvent } from "@/lib/workflow-events";
 
 export const dynamic = "force-dynamic";
 
@@ -264,6 +265,16 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             paid_cents: newInv.paid_cents,
           },
         });
+
+        if (newInv.status === "paid") {
+          await writeWorkflowEvent(client, {
+            accountId: session.accountId,
+            eventType: "invoice.paid",
+            entityType: "invoice",
+            entityId: invoiceId,
+            payload: { amountCents: amount_cents, method },
+          });
+        }
       }
 
       return {

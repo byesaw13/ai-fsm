@@ -7,8 +7,13 @@ import { runEstimateFollowups } from "./estimate-followup.js";
 import { runRenewalNudges } from "./membership-renewal-nudge.js";
 import { runStaleJobNudges } from "./stale-job-nudge.js";
 import { runPropertyIssueScans } from "./property-issue-scan.js";
+import { runClientReactivations } from "./client-reactivation.js";
+import { runSeasonalReminders } from "./seasonal-reminder.js";
+import { runRecurringInspections } from "./recurring-inspection.js";
 import { processMaintenanceScheduling } from "./maintenance-scheduling.js";
 import { expireEstimates } from "./expire-estimates.js";
+import { processWorkflowEvents } from "./workflow-events.js";
+import { dispatchNotificationQueue } from "./notification/dispatch.js";
 import { logger } from "./logger.js";
 
 const pollMs = Number(process.env.WORKER_POLL_MS ?? "30000");
@@ -129,6 +134,52 @@ async function runPollIteration(client: Client): Promise<void> {
           errors: issueResults.reduce((sum, r) => sum + r.errors, 0),
         });
       }
+
+      // Dispatch client reactivation campaigns
+      const reactivationResults = await runClientReactivations(client);
+      if (reactivationResults.length > 0) {
+        logger.info("client-reactivation dispatch complete", {
+          automations: reactivationResults.length,
+          sent: reactivationResults.reduce((sum, r) => sum + r.sent, 0),
+          skipped: reactivationResults.reduce((sum, r) => sum + r.skipped, 0),
+          errors: reactivationResults.reduce((sum, r) => sum + r.errors, 0),
+        });
+      }
+
+      // Dispatch seasonal reminders
+      const seasonalResults = await runSeasonalReminders(client);
+      if (seasonalResults.length > 0) {
+        logger.info("seasonal-reminder dispatch complete", {
+          automations: seasonalResults.length,
+          sent: seasonalResults.reduce((sum, r) => sum + r.sent, 0),
+          skipped: seasonalResults.reduce((sum, r) => sum + r.skipped, 0),
+          errors: seasonalResults.reduce((sum, r) => sum + r.errors, 0),
+        });
+      }
+
+      // Dispatch recurring inspection nudges
+      const inspectionResults = await runRecurringInspections(client);
+      if (inspectionResults.length > 0) {
+        logger.info("recurring-inspection dispatch complete", {
+          automations: inspectionResults.length,
+          sent: inspectionResults.reduce((sum, r) => sum + r.sent, 0),
+          skipped: inspectionResults.reduce((sum, r) => sum + r.skipped, 0),
+          errors: inspectionResults.reduce((sum, r) => sum + r.errors, 0),
+        });
+      }
+    }
+
+    // Process workflow events (cancel pending notifications on state changes)
+    const processedEvents = await processWorkflowEvents(client);
+    if (processedEvents > 0) {
+      logger.info("workflow-events processed", { count: processedEvents });
+    }
+
+    // Dispatch notification queue (send emails from the queue)
+    const dispatchResult = await dispatchNotificationQueue(client);
+    const dispatchTotal = dispatchResult.sent + dispatchResult.failed + dispatchResult.retried + dispatchResult.delayed + dispatchResult.cancelled;
+    if (dispatchTotal > 0) {
+      logger.info("notification-queue dispatched", { ...dispatchResult });
     }
 
     // Expire sent estimates whose expiry date has passed

@@ -1,7 +1,8 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
-import { sendEmail, isEmailConfigured, invoiceFollowupHtml, appUrl } from "./mailer.js";
-import { logWorkerCommunication } from "./communications-log.js";
+import { invoiceFollowupHtml, appUrl } from "./mailer.js";
+import { enqueueNotification } from "./notification/enqueue.js";
+import { PRIORITY } from "./notification/priority.js";
 
 /**
  * Overdue Invoice Follow-Up Automation
@@ -159,15 +160,17 @@ export async function emitInvoiceFollowup(
     return false; // Already sent for this cadence step
   }
 
-  // Send email BEFORE writing the audit log. The audit log is the dedupe
-  // guard — writing it first would permanently suppress retries on SMTP failure.
-  if (isEmailConfigured() && invoice.client_email && invoice.client_name) {
+  if (invoice.client_email && invoice.client_name) {
     const balanceCents = invoice.total_cents - invoice.paid_cents;
     const viewUrl = `${appUrl()}/app/invoices/${invoice.id}`;
-    const emailResult = await sendEmail({
-      to: invoice.client_email,
+    const enqueueResult = await enqueueNotification(client, {
+      accountId: invoice.account_id,
+      clientId: invoice.client_id,
+      automationType: "invoice_followup",
+      priority: PRIORITY.HIGH,
+      toAddress: invoice.client_email,
       subject: `Payment reminder: Invoice ${invoice.invoice_number} is ${cadenceStep} days overdue`,
-      html: invoiceFollowupHtml({
+      htmlBody: invoiceFollowupHtml({
         clientName: invoice.client_name,
         invoiceNumber: invoice.invoice_number,
         totalCents: invoice.total_cents,
@@ -175,30 +178,16 @@ export async function emitInvoiceFollowup(
         daysOverdue: cadenceStep,
         viewUrl,
       }),
+      idempotencyKey: `invoice_followup:${invoice.id}:${cadenceStep}`,
+      entityType: "invoice",
+      entityId: invoice.id,
+      cancelOnEvents: ["invoice.paid", "invoice.void"],
+      metadata: { automationId, cadenceStep },
     });
-    if (!emailResult.ok) {
-      await logWorkerCommunication(client, {
-        accountId: invoice.account_id,
-        channel: "email",
-        direction: "outbound",
-        outcome: "failed",
-        clientId: invoice.client_id,
-        bodyPreview: `Payment reminder: Invoice ${invoice.invoice_number} is ${cadenceStep} days overdue`,
-        externalId: automationId,
-      });
-      // Don't write the audit log — let the next run retry delivery.
-      logger.warn("invoice-followup: email send failed, skipping dedupe mark", { invoiceId: invoice.id, error: emailResult.error });
+    if (enqueueResult === "suppressed") {
+      logger.debug("invoice-followup: suppressed by governor", { invoiceId: invoice.id, cadenceStep });
       return false;
     }
-    await logWorkerCommunication(client, {
-      accountId: invoice.account_id,
-      channel: "email",
-      direction: "outbound",
-      outcome: "sent",
-      clientId: invoice.client_id,
-      bodyPreview: `Payment reminder: Invoice ${invoice.invoice_number} is ${cadenceStep} days overdue`,
-      externalId: automationId,
-    });
   }
 
   await client.query(
@@ -220,7 +209,7 @@ export async function emitInvoiceFollowup(
         due_date: invoice.due_date,
         client_id: invoice.client_id,
         client_name: invoice.client_name,
-        followup_sent_at: new Date().toISOString(),
+        followup_queued_at: new Date().toISOString(),
       }),
     ]
   );
