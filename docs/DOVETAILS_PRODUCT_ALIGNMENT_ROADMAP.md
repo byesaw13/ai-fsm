@@ -563,32 +563,15 @@ Done:
 
 Goal: Add owner visibility so standards are actually followed.
 
-Status: `Not Started`
+Status: `Done`
 
-Target deliverables:
+Done:
 
-- Operations dashboard:
-  - active members
-  - membership revenue percentage
-  - maintenance day utilization
-  - schedule volatility
-  - low-value job ratio
-  - realtor baseline activity
-- Pricing dashboard:
-  - average margin
-  - estimates below minimum
-  - override frequency
-  - discount/credit usage
-  - price book usage percentage
-- Membership dashboard:
-  - upcoming renewals
-  - vault completeness
-  - cap overruns
-  - follow-up conversion
-- Document dashboard:
-  - draft/sent/final/archive counts
-  - missing filenames
-  - duplicate active templates
+- Membership dashboard (`/app/membership-dashboard`): vault completeness per plan (6 target categories), labor cap overruns, upcoming renewals (60-day window), realtor baseline conversion rate. (PR #194)
+- Pricing dashboard (`/app/pricing-dashboard`): target margin distribution, estimates below minimum fee, override reason breakdown, adjustment line items by type (credits vs surcharges), price book adoption rate. (PR #195)
+- Operations dashboard (`/app/operations-dashboard`): membership revenue % of total YTD, visit schedule utilization, cancellation/volatility rate, low-value job ratio, job category revenue mix, intake decision breakdown, vendor coordination activity. (PR #195)
+- Documents dashboard (`/app/documents-dashboard`): estimate/invoice lifecycle status counts, document library by type with missing-name flags, plan template coverage and duplicate detection, recently added documents. (PR #196)
+- Dashboards nav section added to sidebar for owner/admin roles (Membership, Pricing, Operations, Documents).
 
 ## Recommended Build Order
 
@@ -605,20 +588,20 @@ Current recommended order from this point:
 9. ~~Phase 8A: add realtor baseline workflow.~~ Done (PR #193)
 10. ~~Phase 8B: add concierge / vendor coordination mode and fee.~~ Done (PR #193)
 11. ~~Phase 8C: add extended-zone routing and route-quality acceptance warnings.~~ Done (PR #193)
-12. Phase 9A: add membership dashboard.
-13. Phase 9B: add pricing dashboard.
-14. Phase 9C: add operations dashboard.
-15. Phase 9D: add document dashboard.
+12. ~~Phase 9A: add membership dashboard.~~ Done (PR #194)
+13. ~~Phase 9B: add pricing dashboard.~~ Done (PR #195)
+14. ~~Phase 9C: add operations dashboard.~~ Done (PR #195)
+15. ~~Phase 9D: add document dashboard.~~ Done (PR #196)
 
 ## Next Suggested Release
 
 Highest-leverage next release:
 
-- Phase 9A: membership dashboard (upcoming renewals, vault completeness, cap overruns, follow-up conversion).
+- Phase 3A: upgrade price book records with trip, return-trip, additional-unit, material-inclusion, and risk fields.
 
 Reason:
 
-Phases 7D and 8 are complete. The membership system now has enough data — plans, visits, vault items, concierge fees, realtor baseline conversions — that an owner dashboard will surface actionable signals for the first time.
+Phase 9 is complete — all four dashboards are live. The pricing dashboard now surfaces low price-book adoption, which won't improve until the price book entries themselves are richer. Phase 3A adds the field-level detail needed to make the price book the default path for estimate line items.
 
 ## Update Rule
 
