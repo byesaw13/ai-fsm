@@ -1,8 +1,9 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
-import { sendEmail, isEmailConfigured, bookingConfirmedHtml } from "./mailer.js";
+import { bookingConfirmedHtml } from "./mailer.js";
 import type { AutomationRow, ReminderResult } from "./visit-reminder.js";
-import { logWorkerCommunication } from "./communications-log.js";
+import { enqueueNotification } from "./notification/enqueue.js";
+import { PRIORITY } from "./notification/priority.js";
 
 /**
  * Booking Confirmation Automation
@@ -95,11 +96,15 @@ async function emitBookingConfirmation(
     return false;
   }
 
-  if (isEmailConfigured() && booking.client_email && booking.client_name && booking.job_title) {
-    const emailResult = await sendEmail({
-      to: booking.client_email,
+  if (booking.client_email && booking.client_name && booking.job_title) {
+    const enqueueResult = await enqueueNotification(client, {
+      accountId: booking.account_id,
+      clientId: booking.client_id,
+      automationType: "booking_confirmed",
+      priority: PRIORITY.MEDIUM,
+      toAddress: booking.client_email,
       subject: `Appointment Confirmed — ${booking.job_title}`,
-      html: bookingConfirmedHtml({
+      htmlBody: bookingConfirmedHtml({
         clientName: booking.client_name,
         jobTitle: booking.job_title,
         scheduledStart: booking.scheduled_start,
@@ -107,33 +112,16 @@ async function emitBookingConfirmation(
         propertyAddress: booking.property_address,
         techName: booking.tech_name,
       }),
+      idempotencyKey: `booking_confirmed:${booking.id}`,
+      entityType: "visit",
+      entityId: booking.id,
+      cancelOnEvents: ["visit.cancelled"],
+      metadata: { automationId, jobId: booking.job_id },
     });
-    if (!emailResult.ok) {
-      await logWorkerCommunication(client, {
-        accountId: booking.account_id,
-        channel: "email",
-        direction: "outbound",
-        outcome: "failed",
-        clientId: booking.client_id,
-        jobId: booking.job_id,
-        visitId: booking.id,
-        bodyPreview: `Appointment Confirmed — ${booking.job_title}`,
-        externalId: automationId,
-      });
-      logger.warn("booking-confirmed: email send failed", { visitId: booking.id, error: emailResult.error });
+    if (enqueueResult === "suppressed") {
+      logger.debug("booking-confirmed: suppressed by governor", { visitId: booking.id });
       return false;
     }
-    await logWorkerCommunication(client, {
-      accountId: booking.account_id,
-      channel: "email",
-      direction: "outbound",
-      outcome: "sent",
-      clientId: booking.client_id,
-      jobId: booking.job_id,
-      visitId: booking.id,
-      bodyPreview: `Appointment Confirmed — ${booking.job_title}`,
-      externalId: automationId,
-    });
   }
 
   await client.query(
@@ -149,7 +137,7 @@ async function emitBookingConfirmation(
         scheduled_start: booking.scheduled_start,
         job_title: booking.job_title,
         client_name: booking.client_name,
-        confirmed_at: new Date().toISOString(),
+        queued_at: new Date().toISOString(),
       }),
     ]
   );

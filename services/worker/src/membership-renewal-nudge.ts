@@ -1,8 +1,9 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
-import { sendEmail, isEmailConfigured, membershipRenewalNudgeHtml } from "./mailer.js";
+import { membershipRenewalNudgeHtml } from "./mailer.js";
 import type { AutomationRow, ReminderResult } from "./visit-reminder.js";
-import { logWorkerCommunication } from "./communications-log.js";
+import { enqueueNotification } from "./notification/enqueue.js";
+import { PRIORITY } from "./notification/priority.js";
 
 /**
  * Membership Renewal Nudge Automation
@@ -89,29 +90,28 @@ async function emitRenewalNudge(
   );
   if (rowCount && rowCount > 0) return false;
 
-  if (isEmailConfigured() && plan.client_email && plan.client_name) {
-    const result = await sendEmail({
-      to: plan.client_email,
+  if (plan.client_email && plan.client_name) {
+    const enqueueResult = await enqueueNotification(client, {
+      accountId: plan.account_id,
+      clientId: plan.client_id,
+      automationType: "membership_renewal_nudge",
+      priority: PRIORITY.MEDIUM,
+      toAddress: plan.client_email,
       subject: `Your ${plan.name} renews in ${plan.days_until_renewal} days`,
-      html: membershipRenewalNudgeHtml({
+      htmlBody: membershipRenewalNudgeHtml({
         clientName: plan.client_name,
         planName: plan.name,
         renewsOn: plan.renewal_date,
         daysUntilRenewal: plan.days_until_renewal,
       }),
+      idempotencyKey: `membership_renewal_nudge:${plan.id}:${plan.renewal_date}`,
+      entityType: "maintenance_plan",
+      entityId: plan.id,
+      cancelOnEvents: ["membership.cancelled"],
+      metadata: { automationId },
     });
-    const outcome = result.ok ? "sent" : "failed";
-    await logWorkerCommunication(client, {
-      accountId: plan.account_id,
-      channel: "email",
-      direction: "outbound",
-      outcome,
-      clientId: plan.client_id,
-      bodyPreview: `Membership renewal nudge — ${plan.name}`,
-      externalId: automationId,
-    });
-    if (!result.ok) {
-      logger.warn("membership-renewal-nudge: email send failed", { planId: plan.id, error: result.error });
+    if (enqueueResult === "suppressed") {
+      logger.debug("membership-renewal-nudge: suppressed by governor", { planId: plan.id });
       return false;
     }
   }
@@ -129,7 +129,7 @@ async function emitRenewalNudge(
         plan_name: plan.name,
         client_name: plan.client_name,
         renewal_date: plan.renewal_date,
-        sent_at: new Date().toISOString(),
+        queued_at: new Date().toISOString(),
       }),
     ]
   );

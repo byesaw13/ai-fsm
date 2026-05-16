@@ -191,7 +191,7 @@ describe("emitInvoiceFollowup", () => {
     expect(newValue.amount_due_cents).toBe(40000);
     expect(newValue.due_date).toBe(INVOICE.due_date);
     expect(newValue.client_name).toBe(INVOICE.client_name);
-    expect(newValue.followup_sent_at).toBeDefined();
+    expect(newValue.followup_queued_at).toBeDefined();
   });
 
   it("checks idempotency using cadence step in new_value jsonb", async () => {

@@ -1,8 +1,9 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
-import { sendEmail, isEmailConfigured, estimateFollowupHtml, appUrl } from "./mailer.js";
+import { estimateFollowupHtml, appUrl } from "./mailer.js";
 import type { AutomationRow, ReminderResult } from "./visit-reminder.js";
-import { logWorkerCommunication } from "./communications-log.js";
+import { enqueueNotification } from "./notification/enqueue.js";
+import { PRIORITY } from "./notification/priority.js";
 
 /**
  * Estimate Follow-up Automation
@@ -87,30 +88,29 @@ async function emitEstimateFollowup(
   );
   if (rowCount && rowCount > 0) return false;
 
-  if (isEmailConfigured() && est.client_email && est.client_name) {
-    const result = await sendEmail({
-      to: est.client_email,
+  if (est.client_email && est.client_name) {
+    const enqueueResult = await enqueueNotification(client, {
+      accountId: est.account_id,
+      clientId: est.client_id,
+      automationType: "estimate_followup",
+      priority: PRIORITY.MEDIUM,
+      toAddress: est.client_email,
       subject: `Following up on your estimate (#${est.id.slice(0, 8)})`,
-      html: estimateFollowupHtml({
+      htmlBody: estimateFollowupHtml({
         clientName: est.client_name,
         estimateNumber: est.id.slice(0, 8),
         totalCents: est.total_cents,
         daysSinceSent: est.days_since_sent,
         viewUrl: `${appUrl()}/app/estimates/${est.id}`,
       }),
+      idempotencyKey: `estimate_followup:${est.id}`,
+      entityType: "estimate",
+      entityId: est.id,
+      cancelOnEvents: ["estimate.approved", "estimate.declined"],
+      metadata: { automationId },
     });
-    const outcome = result.ok ? "sent" : "failed";
-    await logWorkerCommunication(client, {
-      accountId: est.account_id,
-      channel: "email",
-      direction: "outbound",
-      outcome,
-      clientId: est.client_id,
-      bodyPreview: `Following up on estimate #${est.id.slice(0, 8)}`,
-      externalId: automationId,
-    });
-    if (!result.ok) {
-      logger.warn("estimate-followup: email send failed", { estimateId: est.id, error: result.error });
+    if (enqueueResult === "suppressed") {
+      logger.debug("estimate-followup: suppressed by governor", { estimateId: est.id });
       return false;
     }
   }
@@ -127,7 +127,7 @@ async function emitEstimateFollowup(
         automation_id: automationId,
         estimate_number: est.id.slice(0, 8),
         client_name: est.client_name,
-        sent_at: new Date().toISOString(),
+        queued_at: new Date().toISOString(),
       }),
     ]
   );

@@ -9,6 +9,7 @@ import { checkCompletionPacket } from "../../../../../../lib/completion-guard";
 import { visitTransitions, visitStatusSchema } from "@ai-fsm/domain";
 import type { VisitStatus } from "@ai-fsm/domain";
 import { seedConditionSnapshots } from "../../../../../../lib/visits/condition-seeding";
+import { writeWorkflowEvent } from "../../../../../../lib/workflow-events";
 
 export const dynamic = "force-dynamic";
 
@@ -360,6 +361,17 @@ export const POST = withAuth(
         if (propertyId) {
           await seedConditionSnapshots(client, id, propertyId, session.accountId);
         }
+      }
+
+      // Emit workflow events for automation cancellation and downstream processing
+      if (effectiveStatus === "completed" || effectiveStatus === "cancelled") {
+        await writeWorkflowEvent(client, {
+          accountId: session.accountId,
+          eventType: effectiveStatus === "completed" ? "visit.completed" : "visit.cancelled",
+          entityType: "visit",
+          entityId: id,
+          payload: { jobId: updated.job_id },
+        });
       }
 
       await client.query("COMMIT");

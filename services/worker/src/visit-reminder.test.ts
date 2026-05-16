@@ -169,7 +169,7 @@ describe("emitVisitReminder", () => {
     expect(newValue.job_title).toBe(VISIT.job_title);
     expect(newValue.client_name).toBe(VISIT.client_name);
     expect(newValue.assigned_user_id).toBe(VISIT.assigned_user_id);
-    expect(newValue.reminder_sent_at).toBeDefined();
+    expect(newValue.reminder_queued_at).toBeDefined();
   });
 });
 

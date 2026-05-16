@@ -1,7 +1,8 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
-import { sendEmail, isEmailConfigured, visitReminderHtml } from "./mailer.js";
-import { logWorkerCommunication } from "./communications-log.js";
+import { visitReminderHtml } from "./mailer.js";
+import { enqueueNotification } from "./notification/enqueue.js";
+import { PRIORITY } from "./notification/priority.js";
 
 /**
  * Visit Reminder Automation
@@ -139,51 +140,35 @@ export async function emitVisitReminder(
     return false; // Already sent
   }
 
-  // Send email BEFORE writing the audit log. The audit log is the dedupe
-  // guard — writing it first would permanently suppress retries on SMTP failure.
-  if (isEmailConfigured() && visit.client_email && visit.client_name && visit.job_title) {
+  if (visit.client_email && visit.client_name && visit.job_title) {
     const when = new Date(visit.scheduled_start).toLocaleString("en-US", {
       weekday: "long", month: "long", day: "numeric", year: "numeric",
       hour: "numeric", minute: "2-digit",
     });
-    const emailResult = await sendEmail({
-      to: visit.client_email,
+    const enqueueResult = await enqueueNotification(client, {
+      accountId: visit.account_id,
+      clientId: visit.client_id,
+      automationType: "visit_reminder",
+      priority: PRIORITY.MEDIUM,
+      toAddress: visit.client_email,
       subject: `Reminder: ${visit.job_title} visit on ${when}`,
-      html: visitReminderHtml({
+      htmlBody: visitReminderHtml({
         clientName: visit.client_name,
         jobTitle: visit.job_title,
         when,
         propertyAddress: visit.property_address,
         techName: visit.tech_name,
       }),
+      idempotencyKey: `visit_reminder:${visit.id}`,
+      entityType: "visit",
+      entityId: visit.id,
+      cancelOnEvents: ["visit.cancelled"],
+      metadata: { automationId, jobId: visit.job_id },
     });
-    if (!emailResult.ok) {
-      await logWorkerCommunication(client, {
-        accountId: visit.account_id,
-        channel: "email",
-        direction: "outbound",
-        outcome: "failed",
-        clientId: visit.client_id,
-        jobId: visit.job_id,
-        visitId: visit.id,
-        bodyPreview: `Reminder: ${visit.job_title} visit on ${when}`,
-        externalId: automationId,
-      });
-      // Don't write the audit log — let the next run retry delivery.
-      logger.warn("visit-reminder: email send failed, skipping dedupe mark", { visitId: visit.id, error: emailResult.error });
+    if (enqueueResult === "suppressed") {
+      logger.debug("visit-reminder: suppressed by governor", { visitId: visit.id });
       return false;
     }
-    await logWorkerCommunication(client, {
-      accountId: visit.account_id,
-      channel: "email",
-      direction: "outbound",
-      outcome: "sent",
-      clientId: visit.client_id,
-      jobId: visit.job_id,
-      visitId: visit.id,
-      bodyPreview: `Reminder: ${visit.job_title} visit on ${when}`,
-      externalId: automationId,
-    });
   }
 
   await client.query(
@@ -193,7 +178,7 @@ export async function emitVisitReminder(
     [
       visit.account_id,
       visit.id,
-      automationId, // actor_id = automation ID (system actor)
+      automationId,
       JSON.stringify({
         automation_id: automationId,
         visit_scheduled_start: visit.scheduled_start,
@@ -201,7 +186,7 @@ export async function emitVisitReminder(
         job_title: visit.job_title,
         client_name: visit.client_name,
         assigned_user_id: visit.assigned_user_id,
-        reminder_sent_at: new Date().toISOString(),
+        reminder_queued_at: new Date().toISOString(),
       }),
     ]
   );

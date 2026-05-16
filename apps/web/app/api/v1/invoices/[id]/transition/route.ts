@@ -6,6 +6,7 @@ import { withInvoiceContext } from "@/lib/invoices/db";
 import { logger } from "@/lib/logger";
 import { invoiceStatusSchema, invoiceTransitions } from "@ai-fsm/domain";
 import type { InvoiceStatus } from "@ai-fsm/domain";
+import { writeWorkflowEvent } from "@/lib/workflow-events";
 
 export const dynamic = "force-dynamic";
 
@@ -105,6 +106,15 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         old_value: { status: currentStatus },
         new_value: { status: targetStatus },
       });
+
+      if (targetStatus === "void") {
+        await writeWorkflowEvent(client, {
+          accountId: session.accountId,
+          eventType: "invoice.void",
+          entityType: "invoice",
+          entityId: id,
+        });
+      }
     });
 
     return NextResponse.json({ status: targetStatus });
