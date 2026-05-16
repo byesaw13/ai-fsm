@@ -40,5 +40,6 @@ CREATE TRIGGER trg_property_issues_updated_at
 
 ALTER TABLE property_issues ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS property_issues_account ON property_issues;
 CREATE POLICY property_issues_account ON property_issues
   USING (account_id = current_setting('app.current_account_id', true)::uuid);

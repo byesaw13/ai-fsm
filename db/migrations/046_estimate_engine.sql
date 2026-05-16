@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS pricing_rule_snapshots (
 -- RLS: only own account's snapshots visible
 ALTER TABLE pricing_rule_snapshots ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS pricing_rule_snapshots_account ON pricing_rule_snapshots;
 CREATE POLICY pricing_rule_snapshots_account
   ON pricing_rule_snapshots
   USING (account_id = current_setting('app.account_id', true)::uuid);
