@@ -127,7 +127,7 @@ export function visitReminderEmailHtml(d: VisitReminderEmailData): string {
     hour: "numeric", minute: "2-digit",
   });
   return wrap(`
-    <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">Appointment Reminder</h2>
+    <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">Visit Reminder</h2>
     <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi ${d.clientName}, this is a reminder about your upcoming service visit.</p>
     <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
       <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Service:</td><td style="padding:4px 0;font-size:13px;font-weight:600;">${d.jobTitle}</td></tr>
@@ -177,7 +177,7 @@ export interface OnMyWayEmailData {
 export function onMyWayEmailHtml(d: OnMyWayEmailData): string {
   return wrap(`
     <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">On My Way!</h2>
-    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi ${d.clientName}, your technician is on their way to your service appointment.</p>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi ${d.clientName}, your technician is on their way to your service visit.</p>
     <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
       <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Service:</td><td style="padding:4px 0;font-size:13px;font-weight:600;">${d.jobTitle}</td></tr>
       <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Scheduled:</td><td style="padding:4px 0;font-size:13px;">${d.when}</td></tr>
@@ -209,7 +209,7 @@ export function bookingConfirmedEmailHtml(d: BookingConfirmedEmailData): string 
   });
   return wrap(`
     <h2 style="margin:0 0 8px;font-size:22px;color:#16a34a;">Booking Confirmed</h2>
-    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi ${d.clientName}, your appointment with ${BRAND} is confirmed. We look forward to seeing you!</p>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi ${d.clientName}, your visit with ${BRAND} is confirmed. We look forward to seeing you!</p>
     <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
       <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Service:</td><td style="padding:4px 0;font-size:13px;font-weight:600;">${d.jobTitle}</td></tr>
       <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Date &amp; Time:</td><td style="padding:4px 0;font-size:13px;">${start} – ${end}</td></tr>
