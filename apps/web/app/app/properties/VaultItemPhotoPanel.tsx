@@ -4,10 +4,22 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui";
 
+const PHOTO_ROLES = [
+  { value: "general", label: "General" },
+  { value: "before", label: "Before" },
+  { value: "after", label: "After" },
+  { value: "during", label: "During" },
+  { value: "inspection", label: "Inspection" },
+  { value: "diagram", label: "Diagram" },
+] as const;
+
+type PhotoRole = (typeof PHOTO_ROLES)[number]["value"];
+
 interface VaultPhoto {
   id: string;
   original_name: string;
   size_bytes: number;
+  photo_role: PhotoRole;
   created_at: string;
 }
 
@@ -20,9 +32,10 @@ function formatBytes(bytes: number): string {
 interface Props {
   itemId: string;
   canEdit: boolean;
+  onPhotoCountChange?: (count: number) => void;
 }
 
-export function VaultItemPhotoPanel({ itemId, canEdit }: Props) {
+export function VaultItemPhotoPanel({ itemId, canEdit, onPhotoCountChange }: Props) {
   const router = useRouter();
   const toast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -30,6 +43,7 @@ export function VaultItemPhotoPanel({ itemId, canEdit }: Props) {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = useState<PhotoRole>("general");
 
   useEffect(() => {
     let active = true;
@@ -41,7 +55,11 @@ export function VaultItemPhotoPanel({ itemId, canEdit }: Props) {
           if (active) toast.error(data.error?.message ?? "Failed to load vault photos");
           return;
         }
-        if (active) setPhotos(data.data ?? []);
+        const loaded: VaultPhoto[] = data.data ?? [];
+        if (active) {
+          setPhotos(loaded);
+          onPhotoCountChange?.(loaded.length);
+        }
       } catch {
         if (active) toast.error("Failed to load vault photos");
       } finally {
@@ -53,7 +71,7 @@ export function VaultItemPhotoPanel({ itemId, canEdit }: Props) {
     return () => {
       active = false;
     };
-  }, [itemId, toast]);
+  }, [itemId, toast, onPhotoCountChange]);
 
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -63,6 +81,7 @@ export function VaultItemPhotoPanel({ itemId, canEdit }: Props) {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("photo_role", selectedRole);
 
       const res = await fetch(`/api/v1/vault-items/${itemId}/media`, {
         method: "POST",
@@ -74,7 +93,11 @@ export function VaultItemPhotoPanel({ itemId, canEdit }: Props) {
         return;
       }
 
-      setPhotos((prev) => [...prev, data.data]);
+      setPhotos((prev) => {
+        const next = [...prev, data.data];
+        onPhotoCountChange?.(next.length);
+        return next;
+      });
       router.refresh();
       toast.success("Vault photo uploaded");
     } catch {
@@ -97,7 +120,11 @@ export function VaultItemPhotoPanel({ itemId, canEdit }: Props) {
         return;
       }
 
-      setPhotos((prev) => prev.filter((photo) => photo.id !== photoId));
+      setPhotos((prev) => {
+        const next = prev.filter((photo) => photo.id !== photoId);
+        onPhotoCountChange?.(next.length);
+        return next;
+      });
       router.refresh();
       toast.success("Vault photo deleted");
     } catch {
@@ -114,7 +141,18 @@ export function VaultItemPhotoPanel({ itemId, canEdit }: Props) {
           Behind-Wall Photos{photos.length > 0 ? ` (${photos.length})` : ""}
         </div>
         {canEdit && (
-          <>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+            <select
+              className="p7-select"
+              style={{ fontSize: "var(--font-size-xs)", padding: "2px 6px", height: "auto" }}
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value as PhotoRole)}
+              disabled={uploading}
+            >
+              {PHOTO_ROLES.map((r) => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
             <input
               ref={fileInputRef}
               type="file"
@@ -130,7 +168,7 @@ export function VaultItemPhotoPanel({ itemId, canEdit }: Props) {
             >
               {uploading ? "Uploading…" : "+ Photo"}
             </button>
-          </>
+          </div>
         )}
       </div>
 
@@ -171,7 +209,7 @@ export function VaultItemPhotoPanel({ itemId, canEdit }: Props) {
                 {photo.original_name}
               </a>
               <span style={{ fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)" }}>
-                {formatBytes(photo.size_bytes)}
+                {PHOTO_ROLES.find((r) => r.value === photo.photo_role)?.label ?? "General"} · {formatBytes(photo.size_bytes)}
               </span>
               {canEdit && (
                 <button
