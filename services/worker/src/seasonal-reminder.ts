@@ -7,6 +7,12 @@ import { PRIORITY } from "./notification/priority.js";
 
 type Season = "spring" | "fall";
 
+// Spring: March–May (months 3–5), Fall: September–November (months 9–11)
+const SEASON_MONTHS: Record<Season, number[]> = {
+  spring: [3, 4, 5],
+  fall: [9, 10, 11],
+};
+
 interface SeasonalClient {
   id: string;
   account_id: string;
@@ -16,6 +22,19 @@ interface SeasonalClient {
 
 function getCurrentSeason(automationType: string): Season {
   return automationType.includes("spring") ? "spring" : "fall";
+}
+
+function isInSeason(season: Season): boolean {
+  const month = new Date().getMonth() + 1; // 1-12
+  return SEASON_MONTHS[season].includes(month);
+}
+
+function nextSeasonStartDate(season: Season): Date {
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const startMonth = SEASON_MONTHS[season][0]; // first month of season
+  const year = currentMonth > startMonth ? now.getFullYear() + 1 : now.getFullYear();
+  return new Date(Date.UTC(year, startMonth - 1, 1, 0, 0, 0));
 }
 
 async function findDueSeasonalRemindersForType(
@@ -136,6 +155,26 @@ async function processSeasonalReminders(
     skipped: 0,
     errors: 0,
   };
+
+  const season = getCurrentSeason(automation.type);
+
+  // Only run during the appropriate calendar months — gate prevents out-of-season
+  // sends when the automation fires immediately after seeding or re-enabling.
+  if (!isInSeason(season)) {
+    const nextStart = nextSeasonStartDate(season);
+    await client.query(
+      `UPDATE automations
+          SET last_run_at = now(), next_run_at = $1, updated_at = now()
+        WHERE id = $2`,
+      [nextStart.toISOString(), automation.id]
+    );
+    logger.info("seasonal-reminder: out of season, advancing next_run_at", {
+      automationId: automation.id,
+      season,
+      nextStart,
+    });
+    return result;
+  }
 
   const clients = await findEligibleSeasonalClients(client, automation);
   for (const c of clients) {

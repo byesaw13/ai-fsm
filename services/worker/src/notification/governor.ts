@@ -29,33 +29,27 @@ function nextWorkingHoursStart(rules: AutomationRules): Date {
   const now = new Date();
 
   // Get current hour in the target timezone
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    hour: "numeric",
-    hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const parts = formatter.formatToParts(now);
-  const hour = parseInt(parts.find((p) => p.type === "hour")?.value ?? "12");
+  const hourFmt = new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hour12: false });
+  const hour = parseInt(hourFmt.format(now));
 
   if (hour >= rules.working_hours_start && hour < rules.working_hours_end) {
     return now; // currently in window
   }
 
-  // Calculate next window start — advance to tomorrow's start if already past end
-  const day = parts.find((p) => p.type === "day")?.value;
-  const month = parts.find((p) => p.type === "month")?.value;
-  const year = parts.find((p) => p.type === "year")?.value;
-  const base = new Date(`${year}-${month}-${day}T${String(rules.working_hours_start).padStart(2, "0")}:00:00`);
-
-  // Convert from tz to UTC: build the date string with tz offset
-  // Simple approximation: add 24h if we're past the end hour today
+  // Compute hours until the next window start in the target tz, then add to
+  // UTC now. This avoids building a local-time string (which new Date() would
+  // misparse on a UTC host), and is accurate to ±1 hour across DST transitions
+  // — acceptable for a notification scheduling delay.
+  let hoursUntilStart: number;
   if (hour >= rules.working_hours_end) {
-    base.setDate(base.getDate() + 1);
+    // Past today's window — wait until tomorrow's start
+    hoursUntilStart = 24 - hour + rules.working_hours_start;
+  } else {
+    // Before today's window starts
+    hoursUntilStart = rules.working_hours_start - hour;
   }
-  return base;
+
+  return new Date(now.getTime() + hoursUntilStart * 3_600_000);
 }
 
 export async function getRules(client: Client, accountId: string): Promise<AutomationRules> {
