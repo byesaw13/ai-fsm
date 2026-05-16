@@ -4,10 +4,11 @@ import { withRole } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { createIntakeRecords } from "../../../../lib/intake/records";
+import { bookingRequestStatusSchema } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
-const VALID_STATUSES = ["pending", "needs_info", "duplicate", "reviewed", "converted", "cancelled"];
+const VALID_STATUSES = bookingRequestStatusSchema.options;
 
 const quickLeadSchema = z.object({
   name: z.string().min(1).max(200),
