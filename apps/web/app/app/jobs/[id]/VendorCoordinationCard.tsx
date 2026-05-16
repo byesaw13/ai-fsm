@@ -33,6 +33,13 @@ export function VendorCoordinationCard({ jobId, vendorCoordination, conciergeFee
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
+    if (mode === "concierge") {
+      const parsed = parseFloat(feeDollars);
+      if (isNaN(parsed) || parsed < 0) {
+        toast.error("Enter a valid management fee");
+        return;
+      }
+    }
     setSaving(true);
     try {
       const body: Record<string, unknown> = {
@@ -178,7 +185,15 @@ export function VendorCoordinationCard({ jobId, vendorCoordination, conciergeFee
         <button className="p7-btn p7-btn-primary" onClick={handleSave} disabled={saving}>
           {saving ? "Saving…" : "Save"}
         </button>
-        <button className="p7-btn p7-btn-secondary" onClick={() => { setMode(vendorCoordination ?? ""); setEditing(false); }} disabled={saving}>
+        <button
+          className="p7-btn p7-btn-secondary"
+          onClick={() => {
+            setMode(vendorCoordination ?? "");
+            setFeeDollars(conciergeFeeCents != null ? (conciergeFeeCents / 100).toFixed(2) : (CONCIERGE_DEFAULT_FEE_CENTS / 100).toFixed(2));
+            setEditing(false);
+          }}
+          disabled={saving}
+        >
           Cancel
         </button>
         {vendorCoordination && (
