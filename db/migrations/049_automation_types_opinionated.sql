@@ -11,7 +11,12 @@ ALTER TABLE automations ADD CONSTRAINT automations_type_check
     'review_request',
     'estimate_followup',
     'membership_renewal_nudge',
-    'stale_job_nudge'
+    'stale_job_nudge',
+    'property_issue_scan',
+    'client_reactivation',
+    'seasonal_reminder_spring',
+    'seasonal_reminder_fall',
+    'recurring_inspection'
   ));
 
 -- DOWN:
