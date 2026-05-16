@@ -129,7 +129,7 @@ describe("derivePipelineStage", () => {
 
 describe("getPipelineNextAction", () => {
   it("returns action labels for each stage", () => {
-    expect(getPipelineNextAction("new_lead")).toBe("Review lead");
+    expect(getPipelineNextAction("new_lead")).toBe("Review intake");
     expect(getPipelineNextAction("completed")).toBe("Send invoice");
     expect(getPipelineNextAction("invoiced")).toBe("Collect payment");
     expect(getPipelineNextAction("archived")).toBe("Closed");

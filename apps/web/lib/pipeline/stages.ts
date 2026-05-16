@@ -17,7 +17,7 @@ export const PIPELINE_STAGE_ORDER = [
 export type PipelineStage = typeof PIPELINE_STAGE_ORDER[number];
 
 export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
-  new_lead:        "New Lead",
+  new_lead:        "New Intake",
   estimate_needed: "Estimate Needed",
   estimate_sent:   "Estimate Sent",
   approved_ready:  "Approved / Ready",
@@ -30,7 +30,7 @@ export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
 };
 
 export const PIPELINE_STAGE_ACTIONS: Record<PipelineStage, string> = {
-  new_lead:        "Review lead",
+  new_lead:        "Review intake",
   estimate_needed: "Create estimate",
   estimate_sent:   "Follow up",
   approved_ready:  "Schedule visit",
