@@ -48,7 +48,7 @@ type VaultItemRow = {
   id: string; category: VaultCategory; name: string; location: string | null;
   manufacturer: string | null; model_number: string | null; serial_number: string | null;
   install_date: string | null; last_serviced_date: string | null; next_service_date: string | null;
-  notes: string | null;
+  notes: string | null; photo_count: number;
 };
 
 export default async function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -128,11 +128,14 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
       [id, session.accountId]
     ),
     query<VaultItemRow>(
-      `SELECT id, category, name, location, manufacturer, model_number,
-              serial_number, install_date, last_serviced_date, next_service_date, notes
-       FROM property_vault_items
-       WHERE property_id = $1 AND account_id = $2
-       ORDER BY category ASC, name ASC`,
+      `SELECT pvi.id, pvi.category, pvi.name, pvi.location, pvi.manufacturer, pvi.model_number,
+              pvi.serial_number, pvi.install_date, pvi.last_serviced_date, pvi.next_service_date,
+              pvi.notes, COALESCE(COUNT(m.id), 0)::int AS photo_count
+       FROM property_vault_items pvi
+       LEFT JOIN property_vault_item_media m ON m.vault_item_id = pvi.id AND m.account_id = pvi.account_id
+       WHERE pvi.property_id = $1 AND pvi.account_id = $2
+       GROUP BY pvi.id
+       ORDER BY pvi.category ASC, pvi.name ASC`,
       [id, session.accountId]
     ),
     query<ConditionRow>(

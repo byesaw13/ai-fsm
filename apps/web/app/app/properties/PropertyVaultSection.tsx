@@ -19,6 +19,7 @@ interface VaultItem {
   last_serviced_date: string | null;
   next_service_date: string | null;
   notes: string | null;
+  photo_count: number;
 }
 
 interface Props {
@@ -96,7 +97,7 @@ export function PropertyVaultSection({ propertyId, clientId, initialItems, canEd
         return;
       }
       const { data } = await res.json();
-      setItems((prev) => [...prev, data]);
+      setItems((prev) => [...prev, { ...data, photo_count: 0 }]);
       setForm(BLANK_FORM);
       setShowAdd(false);
       router.refresh();
@@ -357,11 +358,22 @@ export function PropertyVaultSection({ propertyId, clientId, initialItems, canEd
                     }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-3)" }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: "var(--font-size-sm)", marginBottom: "var(--space-1)" }}>
-                            {item.name}
-                            {item.location && (
-                              <span style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: "var(--space-2)" }}>
-                                — {item.location}
+                          <div style={{ fontWeight: 600, fontSize: "var(--font-size-sm)", marginBottom: "var(--space-1)", display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                            <span>
+                              {item.name}
+                              {item.location && (
+                                <span style={{ fontWeight: 400, color: "var(--color-text-secondary)", marginLeft: "var(--space-2)" }}>
+                                  — {item.location}
+                                </span>
+                              )}
+                            </span>
+                            {item.photo_count > 0 && (
+                              <span style={{
+                                fontSize: "var(--font-size-xs)", fontWeight: 600,
+                                color: "var(--color-primary)", background: "color-mix(in srgb, var(--color-primary) 10%, transparent)",
+                                borderRadius: "var(--radius-sm)", padding: "1px 6px",
+                              }}>
+                                {item.photo_count} photo{item.photo_count !== 1 ? "s" : ""}
                               </span>
                             )}
                           </div>
@@ -376,7 +388,15 @@ export function PropertyVaultSection({ propertyId, clientId, initialItems, canEd
                                 {item.next_service_date && <div className="p7-detail-row"><dt>Next Service</dt><dd>{fmtDate(item.next_service_date)}</dd></div>}
                                 {item.notes && <div className="p7-detail-row"><dt>Notes</dt><dd style={{ whiteSpace: "pre-wrap" }}>{item.notes}</dd></div>}
                               </dl>
-                              <VaultItemPhotoPanel itemId={item.id} canEdit={canEdit} />
+                              <VaultItemPhotoPanel
+                                itemId={item.id}
+                                canEdit={canEdit}
+                                onPhotoCountChange={(count) =>
+                                  setItems((prev) =>
+                                    prev.map((i) => i.id === item.id ? { ...i, photo_count: count } : i)
+                                  )
+                                }
+                              />
                             </>
                           )}
                         </div>
