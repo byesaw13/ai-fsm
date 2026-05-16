@@ -66,7 +66,12 @@ describe("derivePipelineStage", () => {
 
     expect(derivePipelineStage({
       jobStatus: "in_progress",
-      subStatus: "waiting_customer",
+      subStatus: "customer_hold",
+    })).toBe("waiting");
+
+    expect(derivePipelineStage({
+      jobStatus: "in_progress",
+      subStatus: "weather_hold",
     })).toBe("waiting");
   });
 

@@ -85,8 +85,8 @@ export function derivePipelineStage(facts: PipelineStageFacts): PipelineStage {
   // Waiting: blocked sub-status (parts, customer, etc.)
   if (
     facts.subStatus === "waiting_parts" ||
-    facts.subStatus === "waiting_customer" ||
-    facts.subStatus === "waiting_weather"
+    facts.subStatus === "customer_hold" ||
+    facts.subStatus === "weather_hold"
   ) {
     return "waiting";
   }
