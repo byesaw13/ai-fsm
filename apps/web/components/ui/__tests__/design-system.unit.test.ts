@@ -140,11 +140,11 @@ function flattenSections(sections: ReturnType<typeof getNavSections>) {
 }
 
 describe("getNavSections (role filtering)", () => {
-  it("returns a focused primary nav across 2 sections for admin role", () => {
+  it("returns a focused primary nav across 3 sections for admin role", () => {
     const sections = getNavSections("admin");
     const items = flattenSections(sections);
-    expect(sections).toHaveLength(2); // Operations, Business
-    expect(items).toHaveLength(8);
+    expect(sections).toHaveLength(3); // Operations, Business, Dashboards
+    expect(items).toHaveLength(9);
     const hrefs = items.map((i) => i.href);
     expect(hrefs).toContain("/app/my-day");
     expect(hrefs).toContain("/app/schedule");
@@ -154,6 +154,7 @@ describe("getNavSections (role filtering)", () => {
     expect(hrefs).toContain("/app/estimates");
     expect(hrefs).toContain("/app/maintenance-plans");
     expect(hrefs).toContain("/app/settings");
+    expect(hrefs).toContain("/app/membership-dashboard");
     expect(hrefs).not.toContain("/app/pipeline");
     expect(hrefs).not.toContain("/app/invoices");
     expect(hrefs).not.toContain("/app/expenses");
@@ -165,14 +166,13 @@ describe("getNavSections (role filtering)", () => {
     expect(hrefs).not.toContain("/app/properties");
     expect(hrefs).not.toContain("/app/automations");
     expect(hrefs).not.toContain("/app/mileage");
-    expect(hrefs).not.toContain("/app/membership-dashboard");
     expect(hrefs).not.toContain("/app/owner-dashboard");
   });
 
   it("returns the same focused primary nav for owner role", () => {
     const sections = getNavSections("owner");
     const items = flattenSections(sections);
-    expect(items).toHaveLength(8);
+    expect(items).toHaveLength(9);
   });
 
   it("returns only 4 items for tech role", () => {

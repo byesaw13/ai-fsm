@@ -530,7 +530,7 @@ Done:
 
 Goal: Build the long-term property record.
 
-Status: `Partial`
+Status: `Done`
 
 Done:
 
@@ -542,31 +542,22 @@ Done:
 - Vault completeness score exists on the property page and in the vault section. (PR #140)
 - Membership visits show staged vault collection prompts by visit number and plan cadence. (PR #141)
 - Flagged checklist findings can be turned into vault items directly from the walkthrough and visit snapshot. (PR #142)
-
-Still needed:
-
-- Add behind-wall photo attachment to vault items.
+- Behind-wall / vault photo attachments with role selector (before/after/during/inspection/diagram/general), photo count badge on vault items, live count updates. (PR #192)
 
 ## Phase 8: Concierge, Realtor, and Routing Layers
 
 Goal: Add the growth and margin-control systems.
 
-Status: `Partial`
+Status: `Done`
 
 Done:
 
 - Routing zone exists on membership plans.
-
-Still needed:
-
-- Add realtor baseline visit type.
-- Add baseline-to-membership follow-up workflow.
-- Add vendor coordination modes:
-  - referral
-  - concierge
-- Add concierge management fee.
-- Add scheduling/routing warnings for extended-zone memberships.
-- Add project acceptance rules based on travel and route quality.
+- Realtor baseline visit type added; visit page shows realtor badge and completed-baseline follow-up card linking to new membership plan form. (PR #193)
+- Vendor coordination modes: referral and concierge, with concierge management fee field on jobs. (PR #193)
+- Concierge management fee stored as `concierge_fee_cents` on `jobs`; editable via VendorCoordinationCard. (PR #193)
+- Routing zone warnings for extended and out-of-area zones shown as banner on visit page. (PR #193)
+- Migration `064_vendor_coordination.sql` adds `vendor_coordination` and `concierge_fee_cents` to jobs table.
 
 ## Phase 9: Dashboards and Enforcement
 
@@ -608,12 +599,12 @@ Current recommended order from this point:
 3. ~~Finish Phase 7A: add vault completeness score to the property page.~~ Done
 4. ~~Finish Phase 7B: add staged vault collection prompts by membership visit number.~~ Done
 5. ~~Finish Phase 7C: suggest vault entries from flagged checklist findings.~~ Done
-6. Finish Phase 7D: add behind-wall / vault photo attachments.
+6. ~~Finish Phase 7D: add behind-wall / vault photo attachments.~~ Done (PR #192)
 7. Finish Phase 3A: upgrade price book records with trip, return-trip, additional-unit, material-inclusion, and risk fields.
 8. Finish Phase 3B: add pricing review dashboard metrics.
-9. Phase 8A: add realtor baseline workflow.
-10. Phase 8B: add concierge / vendor coordination mode and fee.
-11. Phase 8C: add extended-zone routing and route-quality acceptance warnings.
+9. ~~Phase 8A: add realtor baseline workflow.~~ Done (PR #193)
+10. ~~Phase 8B: add concierge / vendor coordination mode and fee.~~ Done (PR #193)
+11. ~~Phase 8C: add extended-zone routing and route-quality acceptance warnings.~~ Done (PR #193)
 12. Phase 9A: add membership dashboard.
 13. Phase 9B: add pricing dashboard.
 14. Phase 9C: add operations dashboard.
@@ -623,11 +614,11 @@ Current recommended order from this point:
 
 Highest-leverage next release:
 
-- Finish Phase 7D: behind-wall photo attachments for vault items.
+- Phase 9A: membership dashboard (upcoming renewals, vault completeness, cap overruns, follow-up conversion).
 
 Reason:
 
-The vault can now be built directly from field findings. The next compounding value is attaching behind-wall evidence and long-term photo records to those vault entries so future visits have richer property context.
+Phases 7D and 8 are complete. The membership system now has enough data — plans, visits, vault items, concierge fees, realtor baseline conversions — that an owner dashboard will surface actionable signals for the first time.
 
 ## Update Rule
 

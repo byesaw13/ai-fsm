@@ -14,6 +14,7 @@ import {
   IconMyDay,
   IconField,
   IconMembership,
+  IconDashboard,
 } from "./NavIcons";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
@@ -44,6 +45,10 @@ const BUSINESS_ITEMS: NavItem[] = [
   { href: "/app/settings",          label: "Settings",    Icon: IconSettings },
 ];
 
+const DASHBOARD_ITEMS: NavItem[] = [
+  { href: "/app/membership-dashboard", label: "Membership", Icon: IconDashboard, adminOnly: true },
+];
+
 /** Pure function — returns filtered nav sections for a given role */
 export function getNavSections(role: string): NavSection[] {
   const sections: NavSection[] = [];
@@ -57,6 +62,10 @@ export function getNavSections(role: string): NavSection[] {
     ? BUSINESS_ITEMS.filter((item) => !item.adminOnly)
     : BUSINESS_ITEMS;
   if (bizItems.length > 0) sections.push({ label: "Business", items: bizItems });
+
+  if (role !== "tech") {
+    sections.push({ label: "Dashboards", items: DASHBOARD_ITEMS });
+  }
 
   return sections;
 }
