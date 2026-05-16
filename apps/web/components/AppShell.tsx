@@ -46,7 +46,9 @@ const BUSINESS_ITEMS: NavItem[] = [
 ];
 
 const DASHBOARD_ITEMS: NavItem[] = [
-  { href: "/app/membership-dashboard", label: "Membership", Icon: IconDashboard, adminOnly: true },
+  { href: "/app/membership-dashboard",  label: "Membership",  Icon: IconDashboard, adminOnly: true },
+  { href: "/app/pricing-dashboard",     label: "Pricing",     Icon: IconDashboard, adminOnly: true },
+  { href: "/app/operations-dashboard",  label: "Operations",  Icon: IconDashboard, adminOnly: true },
 ];
 
 /** Pure function — returns filtered nav sections for a given role */

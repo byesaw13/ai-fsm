@@ -144,7 +144,7 @@ describe("getNavSections (role filtering)", () => {
     const sections = getNavSections("admin");
     const items = flattenSections(sections);
     expect(sections).toHaveLength(3); // Operations, Business, Dashboards
-    expect(items).toHaveLength(9);
+    expect(items).toHaveLength(11);
     const hrefs = items.map((i) => i.href);
     expect(hrefs).toContain("/app/my-day");
     expect(hrefs).toContain("/app/schedule");
@@ -155,6 +155,8 @@ describe("getNavSections (role filtering)", () => {
     expect(hrefs).toContain("/app/maintenance-plans");
     expect(hrefs).toContain("/app/settings");
     expect(hrefs).toContain("/app/membership-dashboard");
+    expect(hrefs).toContain("/app/pricing-dashboard");
+    expect(hrefs).toContain("/app/operations-dashboard");
     expect(hrefs).not.toContain("/app/pipeline");
     expect(hrefs).not.toContain("/app/invoices");
     expect(hrefs).not.toContain("/app/expenses");
@@ -172,7 +174,7 @@ describe("getNavSections (role filtering)", () => {
   it("returns the same focused primary nav for owner role", () => {
     const sections = getNavSections("owner");
     const items = flattenSections(sections);
-    expect(items).toHaveLength(9);
+    expect(items).toHaveLength(11);
   });
 
   it("returns only 4 items for tech role", () => {
