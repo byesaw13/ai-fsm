@@ -121,11 +121,23 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
       [session.userId, session.accountId, session.role]
     );
 
+    const ALLOWED_ROLES = ["before", "after", "during", "inspection", "diagram", "general"];
+    const photoRole = formData.get("photo_role") as string | null;
+    const visitId = formData.get("visit_id") as string | null;
+    const pairedMediaId = formData.get("paired_media_id") as string | null;
+    const role = photoRole && ALLOWED_ROLES.includes(photoRole) ? photoRole : "general";
+
     const { rows } = await client.query(
-      `INSERT INTO property_vault_item_media (account_id, vault_item_id, filename, original_name, mime_type, size_bytes, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, vault_item_id, original_name, mime_type, size_bytes, created_at`,
-      [session.accountId, itemId, filename, file.name, file.type, file.size, session.userId]
+      `INSERT INTO property_vault_item_media
+         (account_id, vault_item_id, filename, original_name, mime_type, size_bytes,
+          photo_role, visit_id, paired_media_id, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id, vault_item_id, original_name, mime_type, size_bytes,
+                 photo_role, visit_id, paired_media_id, created_at`,
+      [
+        session.accountId, itemId, filename, file.name, file.type, file.size,
+        role, visitId ?? null, pairedMediaId ?? null, session.userId,
+      ]
     );
 
     await client.query("COMMIT");
