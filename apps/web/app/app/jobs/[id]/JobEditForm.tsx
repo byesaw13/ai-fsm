@@ -6,14 +6,11 @@ import {
   Button,
   Card,
   Input,
-  ScheduleFields,
   Select,
   SectionHeader,
   Textarea,
   useToast,
 } from "@/components/ui";
-import type { ScheduleValue } from "@/components/ui";
-import { scheduleToISOPair } from "@/components/ui";
 
 interface Client { id: string; name: string; }
 interface Property { id: string; address: string; client_id: string; }
@@ -25,8 +22,6 @@ interface JobEditFormProps {
   initialPropertyId: string | null;
   initialDescription: string | null;
   initialPriority: number;
-  initialScheduledStart: string | null;
-  initialScheduledEnd: string | null;
   initialActualCostCents: number | null;
   initialTravelMiles: number | null;
 }
@@ -39,26 +34,6 @@ const PRIORITY_OPTIONS = [
   { value: "4", label: "Urgent" },
 ];
 
-/** Convert stored ISO datetimes back into ScheduleValue for the form fields. */
-function isoToScheduleValue(startIso: string | null, endIso: string | null): ScheduleValue {
-  if (!startIso) return { date: "", startTime: "", duration: 120 };
-  const start = new Date(startIso);
-  const end = endIso ? new Date(endIso) : null;
-  const date = [
-    start.getFullYear(),
-    String(start.getMonth() + 1).padStart(2, "0"),
-    String(start.getDate()).padStart(2, "0"),
-  ].join("-");
-  const startTime = `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`;
-  const rawDuration = end ? Math.round((end.getTime() - start.getTime()) / 60_000) : 120;
-  // Snap to nearest valid duration option
-  const validDurations = [30, 60, 90, 120, 180, 240, 480];
-  const duration = validDurations.reduce((p, c) =>
-    Math.abs(c - rawDuration) < Math.abs(p - rawDuration) ? c : p
-  );
-  return { date, startTime, duration };
-}
-
 export function JobEditForm({
   jobId,
   initialTitle,
@@ -66,8 +41,6 @@ export function JobEditForm({
   initialPropertyId,
   initialDescription,
   initialPriority,
-  initialScheduledStart,
-  initialScheduledEnd,
   initialActualCostCents,
   initialTravelMiles,
 }: JobEditFormProps) {
@@ -86,10 +59,6 @@ export function JobEditForm({
     actual_cost_dollars: initialActualCostCents !== null ? (initialActualCostCents / 100).toFixed(2) : "",
     travel_miles: initialTravelMiles !== null ? String(initialTravelMiles) : "",
   });
-  const [schedule, setSchedule] = useState<ScheduleValue>(
-    isoToScheduleValue(initialScheduledStart, initialScheduledEnd)
-  );
-
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -118,7 +87,6 @@ export function JobEditForm({
     setError(null);
     setPending(true);
     try {
-      const { start, end } = scheduleToISOPair(schedule);
       const actualCostCents = form.actual_cost_dollars.trim()
         ? Math.round(parseFloat(form.actual_cost_dollars) * 100)
         : null;
@@ -134,8 +102,6 @@ export function JobEditForm({
           property_id: form.property_id || null,
           description: form.description.trim() || null,
           priority: form.priority,
-          scheduled_start: start ?? null,
-          scheduled_end: end ?? null,
           actual_cost_cents: actualCostCents,
           travel_miles: travelMiles,
         }),
@@ -230,7 +196,6 @@ export function JobEditForm({
             disabled={pending}
             placeholder="e.g. 24.5"
           />
-          <ScheduleFields value={schedule} onChange={setSchedule} disabled={pending} />
         </div>
         <div className="p7-form-actions">
           <Button type="submit" disabled={pending} loading={pending}>

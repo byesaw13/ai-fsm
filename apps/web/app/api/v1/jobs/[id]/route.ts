@@ -15,8 +15,6 @@ const updateJobBody = z.object({
   title: z.string().min(1).max(255).optional(),
   description: z.string().nullable().optional(),
   priority: z.number().int().min(0).optional(),
-  scheduled_start: z.string().datetime().nullable().optional(),
-  scheduled_end: z.string().datetime().nullable().optional(),
   actual_cost_cents: z.number().int().nonnegative().nullable().optional(),
   travel_miles: z.number().nonnegative().nullable().optional(),
   job_category: z.enum(JOB_ACCEPTANCE_CATEGORIES).nullable().optional(),

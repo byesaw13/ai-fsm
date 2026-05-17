@@ -411,8 +411,6 @@ export default async function JobDetailPage({
                 initialPropertyId={job.property_id ?? null}
                 initialDescription={job.description ?? null}
                 initialPriority={job.priority ?? 0}
-                initialScheduledStart={job.scheduled_start ?? null}
-                initialScheduledEnd={job.scheduled_end ?? null}
                 initialActualCostCents={job.actual_cost_cents ?? null}
                 initialTravelMiles={job.travel_miles ?? null}
               />

@@ -7,12 +7,9 @@ import {
   Card,
   Input,
   LinkButton,
-  ScheduleFields,
   Select,
   Textarea,
 } from "@/components/ui";
-import type { ScheduleValue } from "@/components/ui";
-import { scheduleToISOPair } from "@/components/ui";
 import { JOB_ACCEPTANCE_CATEGORIES, JOB_ACCEPTANCE_CATEGORY_LABELS } from "@ai-fsm/domain";
 
 interface Client {
@@ -29,8 +26,6 @@ interface Property {
 interface FormErrors {
   title?: string;
   client_id?: string;
-  schedule_date?: string;
-  schedule_time?: string;
 }
 
 const JOB_TYPE_OPTIONS = [
@@ -88,12 +83,6 @@ export function JobCreateForm({
     priority: 0,
   });
 
-  const [schedule, setSchedule] = useState<ScheduleValue>({
-    date: "",
-    startTime: "",
-    duration: 120,
-  });
-
   const filteredProperties = properties.filter(
     (p) => p.client_id === form.client_id
   );
@@ -119,14 +108,6 @@ export function JobCreateForm({
       errs.client_id = "Client is required";
     }
 
-    // Schedule is optional, but date and time must be provided together
-    if (schedule.date && !schedule.startTime) {
-      errs.schedule_time = "Please select a start time";
-    }
-    if (!schedule.date && schedule.startTime) {
-      errs.schedule_date = "Please select a date";
-    }
-
     setErrors(errs);
     return Object.keys(errs).length === 0;
   }
@@ -140,7 +121,6 @@ export function JobCreateForm({
     setPending(true);
 
     try {
-      const { start, end } = scheduleToISOPair(schedule);
       const body = {
         title: form.title.trim(),
         client_id: form.client_id,
@@ -149,8 +129,6 @@ export function JobCreateForm({
         job_type: form.job_type,
         job_category: form.job_category || undefined,
         priority: form.priority,
-        scheduled_start: start,
-        scheduled_end: end,
       };
 
       const res = await fetch("/api/v1/jobs", {
@@ -272,15 +250,6 @@ export function JobCreateForm({
           options={PRIORITY_OPTIONS.map((opt) => ({ value: String(opt.value), label: opt.label }))}
         />
 
-        <div />
-
-        <ScheduleFields
-          value={schedule}
-          onChange={setSchedule}
-          disabled={pending}
-          dateError={errors.schedule_date}
-          timeError={errors.schedule_time}
-        />
       </div>
 
       <div className="p7-form-actions">
