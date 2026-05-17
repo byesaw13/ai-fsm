@@ -91,3 +91,110 @@ export function derivePortalStage({
   if (hasSentEstimate) return "estimate";
   return "intake";
 }
+
+// ---------------------------------------------------------------------------
+// Operational pipeline stages — internal view of the full job lifecycle.
+// Never stored in the DB; always derived from facts.
+// CustomerStage (above) is a 5-stage simplification used in client-facing UI.
+// ---------------------------------------------------------------------------
+
+export const PIPELINE_STAGE_ORDER = [
+  "new_lead",
+  "estimate_needed",
+  "estimate_sent",
+  "approved_ready",
+  "scheduled",
+  "in_progress",
+  "waiting",
+  "completed",
+  "invoiced",
+  "archived",
+] as const;
+
+export type PipelineStage = typeof PIPELINE_STAGE_ORDER[number];
+
+export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
+  new_lead:        "New Intake",
+  estimate_needed: "Estimate Needed",
+  estimate_sent:   "Estimate Sent",
+  approved_ready:  "Approved / Ready",
+  scheduled:       "Scheduled",
+  in_progress:     "In Progress",
+  waiting:         "Waiting",
+  completed:       "Completed",
+  invoiced:        "Invoiced / Paid",
+  archived:        "Archived",
+};
+
+export const PIPELINE_STAGE_ACTIONS: Record<PipelineStage, string> = {
+  new_lead:        "Review intake",
+  estimate_needed: "Create estimate",
+  estimate_sent:   "Follow up",
+  approved_ready:  "Schedule visit",
+  scheduled:       "Prepare visit",
+  in_progress:     "Complete work",
+  waiting:         "Resolve blocker",
+  completed:       "Send invoice",
+  invoiced:        "Collect payment",
+  archived:        "Closed",
+};
+
+export type PipelineStageFacts = {
+  jobStatus: string;
+  subStatus?: string | null;
+  bookingStatus?: string | null;
+  hasBookingRequest?: boolean;
+  estimateCount?: number;
+  sentEstimateCount?: number;
+  approvedEstimateCount?: number;
+  activeVisitCount?: number;
+  inProgressVisitCount?: number;
+  completedVisitCount?: number;
+  unpaidInvoiceCount?: number;
+  paidInvoiceCount?: number;
+};
+
+function _count(value: number | undefined): number {
+  return value ?? 0;
+}
+
+export function derivePipelineStage(facts: PipelineStageFacts): PipelineStage {
+  if (facts.jobStatus === "cancelled") return "archived";
+
+  if (facts.jobStatus === "invoiced" || _count(facts.paidInvoiceCount) > 0) return "invoiced";
+  if (_count(facts.unpaidInvoiceCount) > 0) return "invoiced";
+
+  if (facts.jobStatus === "completed" || _count(facts.completedVisitCount) > 0) return "completed";
+
+  if (
+    facts.subStatus === "waiting_parts" ||
+    facts.subStatus === "customer_hold" ||
+    facts.subStatus === "weather_hold"
+  ) {
+    return "waiting";
+  }
+
+  if (facts.jobStatus === "in_progress" || _count(facts.inProgressVisitCount) > 0) return "in_progress";
+
+  if (facts.jobStatus === "scheduled" || _count(facts.activeVisitCount) > 0) return "scheduled";
+
+  if (_count(facts.approvedEstimateCount) > 0) return "approved_ready";
+
+  if (_count(facts.sentEstimateCount) > 0 || facts.jobStatus === "quoted") return "estimate_sent";
+
+  if (
+    facts.hasBookingRequest &&
+    (facts.bookingStatus === "pending" ||
+      facts.bookingStatus === "needs_info" ||
+      facts.bookingStatus === "duplicate" ||
+      facts.bookingStatus === "reviewed")
+  ) {
+    return "new_lead";
+  }
+
+  return "estimate_needed";
+}
+
+export function getPipelineNextAction(stage: PipelineStage): string {
+  return PIPELINE_STAGE_ACTIONS[stage];
+}

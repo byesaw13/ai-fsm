@@ -4,7 +4,7 @@ import {
   PIPELINE_STAGE_LABELS,
   PIPELINE_STAGE_ORDER,
   type PipelineStage,
-} from "@/lib/pipeline/stages";
+} from "@ai-fsm/domain";
 import { Card, LinkButton, SectionHeader } from "@/components/ui";
 
 type CommandAction = {

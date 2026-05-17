@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { derivePipelineStage, getPipelineNextAction } from "../stages";
+import { derivePipelineStage, getPipelineNextAction } from "@ai-fsm/domain";
 
 describe("derivePipelineStage", () => {
   it("routes unreviewed booking requests to New Lead", () => {

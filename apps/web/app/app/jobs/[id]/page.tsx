@@ -23,7 +23,7 @@ import { VendorCoordinationCard } from "./VendorCoordinationCard";
 import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { isHomeboxEnabled } from "@/lib/homebox/client";
 import { withAssetContext, listAssetLinks } from "@/lib/homebox/db";
-import { derivePipelineStage } from "@/lib/pipeline/stages";
+import { derivePipelineStage } from "@ai-fsm/domain";
 import {
   PageContainer,
   PageHeader,

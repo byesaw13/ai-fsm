@@ -9,7 +9,7 @@ import {
   getPipelineNextAction,
   PIPELINE_STAGE_LABELS,
   PIPELINE_STAGE_ORDER,
-} from "@/lib/pipeline/stages";
+} from "@ai-fsm/domain";
 import { NewLeadButton } from "./NewLeadButton";
 
 export const dynamic = "force-dynamic";
