@@ -180,7 +180,7 @@ export default async function MembershipDashboardPage() {
          ON pvi.property_id = p.id AND pvi.account_id = mp.account_id
        WHERE mp.account_id = $1 AND mp.status = 'active'
        GROUP BY mp.id, mp.name, c.name, mp.membership_tier, p.address
-       ORDER BY completeness_pct::numeric ASC, c.name ASC`,
+       ORDER BY COUNT(DISTINCT pvi.category) FILTER (WHERE pvi.category IN ('mechanical','appliance','filter','paint_finish','monitor','vendor')) ASC, c.name ASC`,
       [accountId, TARGET_COUNT]
     ),
 
