@@ -168,7 +168,7 @@ export default async function PricingDashboardPage() {
       `SELECT
          adjustment_type,
          COUNT(*)::text AS count,
-         COALESCE(SUM(total_cents), 0)::text AS total_cents
+         COALESCE(SUM(eli.total_cents), 0)::text AS total_cents
        FROM estimate_line_items eli
        JOIN estimates e ON e.id = eli.estimate_id
        WHERE e.account_id = $1
