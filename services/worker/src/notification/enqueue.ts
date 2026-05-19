@@ -38,7 +38,7 @@ export async function enqueueNotification(
       `SELECT nc.last_sent_at,
               COALESCE(ar.cooldown_hours, 4) AS cooldown_hours
        FROM notification_cooldowns nc
-       LEFT JOIN automation_rules ar ON ar.account_id = nc.account_id
+       LEFT JOIN automation_settings ar ON ar.account_id = nc.account_id
        WHERE nc.account_id = $1 AND nc.client_id = $2`,
       [opts.accountId, opts.clientId]
     );
@@ -58,7 +58,7 @@ export async function enqueueNotification(
          COUNT(nq.id)::int                           AS today_count,
          COALESCE(ar.max_per_day, 2)                 AS max_per_day
        FROM notification_queue nq
-       LEFT JOIN automation_rules ar ON ar.account_id = nq.account_id
+       LEFT JOIN automation_settings ar ON ar.account_id = nq.account_id
        WHERE nq.account_id = $1
          AND nq.client_id  = $2
          AND nq.status     = 'sent'

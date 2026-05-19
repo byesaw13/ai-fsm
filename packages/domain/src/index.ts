@@ -49,6 +49,25 @@ export const VISIT_TYPE_LABELS: Record<VisitType, string> = {
   punch_list: "Punch List",
 };
 
+export const bookingRequestStatusSchema = z.enum([
+  "pending",
+  "needs_info",
+  "duplicate",
+  "reviewed",
+  "converted",
+  "cancelled",
+]);
+export type BookingRequestStatus = z.infer<typeof bookingRequestStatusSchema>;
+
+// Statuses allowed via PATCH — "converted" is terminal and set only by /convert endpoint
+export const bookingRequestPatchStatusSchema = z.enum([
+  "pending",
+  "needs_info",
+  "duplicate",
+  "reviewed",
+  "cancelled",
+]);
+
 export const estimateStatusSchema = z.enum([
   "draft",
   "sent",

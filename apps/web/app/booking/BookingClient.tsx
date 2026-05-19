@@ -24,7 +24,7 @@ const SMS_CONSENT_TEXT =
 const NEXT_STEPS = [
   { title: "We review your request", body: "We look at every submission within 1 business day." },
   { title: "We reach out to confirm", body: "We'll contact you to confirm scope, timing, and pricing before anything is scheduled." },
-  { title: "We schedule your visit", body: "Once details are agreed, we book your appointment and send a confirmation." },
+  { title: "We schedule your visit", body: "Once details are agreed, we book your visit and send a confirmation." },
 ];
 
 function BookingLogo() {

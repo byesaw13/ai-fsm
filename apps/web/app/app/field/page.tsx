@@ -61,26 +61,26 @@ export default async function FieldPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Field Mode"
+        title="On Site"
         subtitle={
           activeVisit
-            ? `On site: ${activeVisit.job_title ?? "Visit"}`
-            : `${greeting} — ${todayVisits.length} visit${todayVisits.length !== 1 ? "s" : ""} today`
+            ? `Active: ${activeVisit.job_title ?? "Visit"}`
+            : `${greeting} — ${todayVisits.length} visit${todayVisits.length !== 1 ? "s" : ""} today · tap to start`
         }
         actions={
           <LinkButton href="/app/my-day" variant="ghost" size="sm">
-            My Day
+            Day Overview
           </LinkButton>
         }
       />
 
       {todayVisits.length === 0 && upcomingVisits.length === 0 ? (
         <EmptyState
-          title="No visits today"
-          description="Check the schedule for upcoming work."
+          title="No active visits"
+          description="Nothing to work on right now. Check your day overview or the schedule."
           action={
-            <LinkButton href="/app/schedule" variant="secondary">
-              View Schedule
+            <LinkButton href="/app/my-day" variant="secondary">
+              Day Overview
             </LinkButton>
           }
         />

@@ -4,7 +4,7 @@ import {
   PIPELINE_STAGE_LABELS,
   PIPELINE_STAGE_ORDER,
   type PipelineStage,
-} from "@/lib/pipeline/stages";
+} from "@ai-fsm/domain";
 import { Card, LinkButton, SectionHeader } from "@/components/ui";
 
 type CommandAction = {
@@ -23,7 +23,7 @@ type Props = {
 };
 
 const STAGE_COPY: Record<PipelineStage, string> = {
-  new_lead:        "Review the intake details before estimating or scheduling.",
+  new_lead:        "Review the intake before estimating or scheduling.",
   estimate_needed: "This job needs an estimate before the customer can approve work.",
   estimate_sent:   "The estimate is out. Follow up or review the customer's response.",
   approved_ready:  "Customer approval is in. Schedule the work.",
@@ -41,7 +41,7 @@ function actionForStage(props: Props): CommandAction | null {
   switch (props.stage) {
     case "new_lead":
       return props.bookingRequestId
-        ? { label: "Review Lead", href: `/app/booking-requests/${props.bookingRequestId}` }
+        ? { label: "Review Intake", href: `/app/booking-requests/${props.bookingRequestId}` }
         : { label: "Open Job", href: `/app/jobs/${props.jobId}` };
     case "estimate_needed":
       return {

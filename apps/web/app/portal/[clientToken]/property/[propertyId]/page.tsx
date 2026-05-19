@@ -52,7 +52,7 @@ export default async function PortalPropertyPage({
   );
   if (!property) notFound();
 
-  const [conditions, issues, equipment, recentVisits, pinnedNotes] = await Promise.all([
+  const [conditions, issues, vaultItems, recentVisits, pinnedNotes] = await Promise.all([
     query<{ area: string; condition: string; note: string | null; assessed_at: string }>(
       `SELECT DISTINCT ON (area) area, condition, note, assessed_at::text AS assessed_at
        FROM property_condition_snapshots
@@ -87,7 +87,7 @@ export default async function PortalPropertyPage({
               metadata->>'status'     AS detail
        FROM property_timeline_v
        WHERE account_id = $1 AND property_id = $2
-         AND event_type IN ('visit','note','equipment')
+         AND event_type IN ('visit','note','vault_item')
        ORDER BY occurred_at DESC NULLS LAST
        LIMIT 15`,
       [client.account_id, propertyId]
@@ -196,16 +196,16 @@ export default async function PortalPropertyPage({
         )}
 
         {/* Equipment */}
-        {equipment.length > 0 && (
+        {vaultItems.length > 0 && (
           <section style={{ marginBottom: 28 }}>
             <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Equipment on File</h2>
             <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
-              {equipment.map((item, idx) => (
+              {vaultItems.map((item, idx) => (
                 <div
                   key={idx}
                   style={{
                     padding: "11px 16px",
-                    borderBottom: idx < equipment.length - 1 ? "1px solid #f3f4f6" : "none",
+                    borderBottom: idx < vaultItems.length - 1 ? "1px solid #f3f4f6" : "none",
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -252,7 +252,7 @@ export default async function PortalPropertyPage({
           </section>
         )}
 
-        {conditions.length === 0 && issues.length === 0 && equipment.length === 0 && recentVisits.length === 0 && (
+        {conditions.length === 0 && issues.length === 0 && vaultItems.length === 0 && recentVisits.length === 0 && (
           <div style={{ textAlign: "center", color: "#9ca3af", padding: 48 }}>
             No history recorded for this property yet.
           </div>

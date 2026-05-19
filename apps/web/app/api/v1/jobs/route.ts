@@ -17,8 +17,6 @@ const createJobBody = z.object({
   job_type: z.string().optional(),
   job_category: z.enum(JOB_ACCEPTANCE_CATEGORIES).optional(),
   priority: z.number().int().min(0).optional().default(0),
-  scheduled_start: z.string().datetime().optional(),
-  scheduled_end: z.string().datetime().optional(),
 });
 
 export const GET = withAuth(
@@ -56,7 +54,7 @@ export const POST = withRole(
       );
     }
 
-    const { client_id, property_id, title, description, job_type, job_category, priority, scheduled_start, scheduled_end } =
+    const { client_id, property_id, title, description, job_type, job_category, priority } =
       parsed.data;
 
     const pool = getPool();
@@ -70,8 +68,8 @@ export const POST = withRole(
       );
 
       const { rows } = await client.query(
-        `INSERT INTO jobs (account_id, client_id, property_id, title, description, job_type, job_category, priority, scheduled_start, scheduled_end, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        `INSERT INTO jobs (account_id, client_id, property_id, title, description, job_type, job_category, priority, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING *`,
         [
           session.accountId,
@@ -82,8 +80,6 @@ export const POST = withRole(
           job_type ?? null,
           job_category ?? null,
           priority,
-          scheduled_start ?? null,
-          scheduled_end ?? null,
           session.userId,
         ]
       );

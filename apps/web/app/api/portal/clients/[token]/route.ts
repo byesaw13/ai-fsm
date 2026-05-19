@@ -53,8 +53,9 @@ export async function GET(
       [client.id]
     ),
     query(
-      `SELECT j.id, j.title, j.status, j.scheduled_start, j.scheduled_end,
+      `SELECT j.id, j.title, j.status,
               p.address AS property_address,
+              MAX(v.completed_at)::text AS completed_at,
               COALESCE(
                 json_agg(
                   json_build_object(
@@ -69,7 +70,7 @@ export async function GET(
        LEFT JOIN visits v ON v.job_id = j.id
        WHERE j.client_id = $1 AND j.job_type = 'maintenance' AND j.status = 'completed'
        GROUP BY j.id, p.address
-       ORDER BY j.scheduled_end DESC NULLS LAST
+       ORDER BY MAX(v.completed_at) DESC NULLS LAST
        LIMIT 20`,
       [client.id]
     ),

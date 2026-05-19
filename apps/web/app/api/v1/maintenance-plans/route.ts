@@ -78,7 +78,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
         notes ?? null, membership_terms ?? null, member_priority, session.userId,
       ]
     );
-    const subscription = rows[0];
+    const membership = rows[0];
 
     if (addon_ids.length > 0) {
       const addonRows = await client.query(
@@ -86,16 +86,17 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
         [addon_ids, session.accountId]
       );
       for (const addon of addonRows.rows) {
+        // subscription_addons is the legacy DB table name — product term is "membership addon"
         await client.query(
           `INSERT INTO subscription_addons (account_id, subscription_id, addon_id, annual_price_cents)
            VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
-          [session.accountId, subscription.id, addon.id, addon.annual_price_cents]
+          [session.accountId, membership.id, addon.id, addon.annual_price_cents]
         );
       }
     }
 
     await client.query("COMMIT");
-    return NextResponse.json(subscription, { status: 201 });
+    return NextResponse.json(membership, { status: 201 });
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;

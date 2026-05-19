@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { derivePipelineStage, getPipelineNextAction } from "../stages";
+import { derivePipelineStage, getPipelineNextAction } from "@ai-fsm/domain";
 
 describe("derivePipelineStage", () => {
   it("routes unreviewed booking requests to New Lead", () => {
@@ -66,7 +66,12 @@ describe("derivePipelineStage", () => {
 
     expect(derivePipelineStage({
       jobStatus: "in_progress",
-      subStatus: "waiting_customer",
+      subStatus: "customer_hold",
+    })).toBe("waiting");
+
+    expect(derivePipelineStage({
+      jobStatus: "in_progress",
+      subStatus: "weather_hold",
     })).toBe("waiting");
   });
 
@@ -124,7 +129,7 @@ describe("derivePipelineStage", () => {
 
 describe("getPipelineNextAction", () => {
   it("returns action labels for each stage", () => {
-    expect(getPipelineNextAction("new_lead")).toBe("Review lead");
+    expect(getPipelineNextAction("new_lead")).toBe("Review intake");
     expect(getPipelineNextAction("completed")).toBe("Send invoice");
     expect(getPipelineNextAction("invoiced")).toBe("Collect payment");
     expect(getPipelineNextAction("archived")).toBe("Closed");

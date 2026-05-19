@@ -22,7 +22,7 @@ interface Addon {
   annual_price_cents: number;
 }
 
-interface Subscription {
+interface MembershipPlan {
   id: string;
   name: string;
   frequency: string;
@@ -40,7 +40,7 @@ interface Subscription {
 
 interface Props {
   id: string;
-  subscription: Subscription;
+  membership: MembershipPlan;
   template: Template | null;
   allAddons: Addon[];
   currentAddonIds: string[];
@@ -56,24 +56,24 @@ function dollars(cents: number) {
   return (cents / 100).toFixed(0);
 }
 
-export function SubscriptionEditForm({ id, subscription, template, allAddons, currentAddonIds }: Props) {
+export function MembershipEditForm({ id, membership, template, allAddons, currentAddonIds }: Props) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [selectedAddonIds, setSelectedAddonIds] = useState<Set<string>>(new Set(currentAddonIds));
-  const [frequency, setFrequency] = useState(subscription.frequency);
-  const [billingCadence, setBillingCadence] = useState(subscription.billing_cadence);
-  const [status, setStatus] = useState(subscription.status);
-  const [nextScheduledDate, setNextScheduledDate] = useState(subscription.next_scheduled_date ?? "");
-  const [renewalDate, setRenewalDate] = useState(subscription.renewal_date ?? "");
-  const [routingZone, setRoutingZone] = useState(subscription.routing_zone);
-  const [memberPriority, setMemberPriority] = useState(subscription.member_priority);
-  const [notes, setNotes] = useState(subscription.notes ?? "");
+  const [frequency, setFrequency] = useState(membership.frequency);
+  const [billingCadence, setBillingCadence] = useState(membership.billing_cadence);
+  const [status, setStatus] = useState(membership.status);
+  const [nextScheduledDate, setNextScheduledDate] = useState(membership.next_scheduled_date ?? "");
+  const [renewalDate, setRenewalDate] = useState(membership.renewal_date ?? "");
+  const [routingZone, setRoutingZone] = useState(membership.routing_zone);
+  const [memberPriority, setMemberPriority] = useState(membership.member_priority);
+  const [notes, setNotes] = useState(membership.notes ?? "");
 
   const selectedAddons = allAddons.filter((a) => selectedAddonIds.has(a.id));
   const addonTotal = selectedAddons.reduce((s, a) => s + a.annual_price_cents, 0);
-  const basePrice = template?.base_price_cents ?? subscription.annual_price_cents;
+  const basePrice = template?.base_price_cents ?? membership.annual_price_cents;
   const totalAnnual = basePrice + addonTotal;
 
   function toggleAddon(addonId: string) {
@@ -101,7 +101,7 @@ export function SubscriptionEditForm({ id, subscription, template, allAddons, cu
       annual_price_cents: totalAnnual,
       price_cents: template
         ? Math.round(totalAnnual / Math.max(template.visit_count_per_year, 1))
-        : subscription.annual_price_cents,
+        : membership.annual_price_cents,
       addon_ids: Array.from(selectedAddonIds),
     };
 
@@ -125,7 +125,7 @@ export function SubscriptionEditForm({ id, subscription, template, allAddons, cu
     }
   }
 
-  const tier = template?.tier ?? subscription.membership_tier;
+  const tier = template?.tier ?? membership.membership_tier;
   const colors = TIER_COLORS[tier] ?? TIER_COLORS.plus;
 
   return (
@@ -166,7 +166,7 @@ export function SubscriptionEditForm({ id, subscription, template, allAddons, cu
         ) : (
           <div style={{ padding: "var(--space-3)", background: "var(--color-surface-raised, #f9fafb)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
             No membership template linked — this membership was created before templates were introduced.
-            Visit count: {subscription.annual_visit_count} · Tier: {subscription.membership_tier}
+            Visit count: {membership.annual_visit_count} · Tier: {membership.membership_tier}
           </div>
         )}
       </div>

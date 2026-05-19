@@ -23,7 +23,7 @@ interface PlanRow extends Record<string, unknown> {
 interface VisitRow { id: string; tech_notes: string | null; completed_at: string | null; }
 interface JobRow extends Record<string, unknown> {
   id: string; title: string; status: string;
-  scheduled_end: string | null; property_address: string | null;
+  completed_at: string | null; property_address: string | null;
   visits: VisitRow[];
 }
 
@@ -116,8 +116,9 @@ export default async function ClientPortalPage({
       [client.id]
     ),
     query<JobRow>(
-      `SELECT j.id, j.title, j.status, j.scheduled_start, j.scheduled_end,
+      `SELECT j.id, j.title, j.status,
               p.address AS property_address,
+              MAX(v.completed_at)::text AS completed_at,
               COALESCE(
                 json_agg(
                   json_build_object(
@@ -132,7 +133,7 @@ export default async function ClientPortalPage({
        LEFT JOIN visits v ON v.job_id = j.id
        WHERE j.client_id = $1 AND j.job_type = 'maintenance' AND j.status = 'completed'
        GROUP BY j.id, p.address
-       ORDER BY j.scheduled_end DESC NULLS LAST
+       ORDER BY MAX(v.completed_at) DESC NULLS LAST
        LIMIT 20`,
       [client.id]
     ),
@@ -352,9 +353,9 @@ export default async function ClientPortalPage({
                     <StatusBadge status={job.status as string} />
                   </div>
                   {job.property_address && <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 4 }}>{job.property_address as string}</div>}
-                  {job.scheduled_end && (
+                  {job.completed_at && (
                     <div style={{ fontSize: 12, color: "#9ca3af" }}>
-                      Completed {new Date(job.scheduled_end as string).toLocaleDateString()}
+                      Completed {new Date(job.completed_at as string).toLocaleDateString()}
                     </div>
                   )}
                   {job.visits.filter((v) => v.tech_notes).map((v) => (

@@ -35,7 +35,7 @@ const OPERATIONS_ITEMS: NavItem[] = [
   { href: "/app/my-day",    label: "My Day",   Icon: IconMyDay },
   { href: "/app/schedule",  label: "Schedule", Icon: IconSchedule, adminOnly: true },
   { href: "/app/jobs",      label: "Jobs",     Icon: IconJobs },
-  { href: "/app/field",     label: "Field",    Icon: IconField },
+  { href: "/app/field",     label: "On Site",  Icon: IconField },
 ];
 
 const BUSINESS_ITEMS: NavItem[] = [

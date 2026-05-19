@@ -4,6 +4,7 @@ import { withRole } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { recordStatusChange } from "../../../../../lib/status-history";
+import { bookingRequestPatchStatusSchema } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +50,7 @@ export const GET = withRole(["owner", "admin"], async (request: NextRequest, ses
 });
 
 const patchSchema = z.object({
-  status: z.enum(["pending", "needs_info", "duplicate", "reviewed", "cancelled"]).optional(),
+  status: bookingRequestPatchStatusSchema.optional(),
   review_notes: z.string().max(2000).nullable().optional(),
 });
 

@@ -9,7 +9,7 @@ import {
   getPipelineNextAction,
   PIPELINE_STAGE_LABELS,
   PIPELINE_STAGE_ORDER,
-} from "@/lib/pipeline/stages";
+} from "@ai-fsm/domain";
 import { NewLeadButton } from "./NewLeadButton";
 
 export const dynamic = "force-dynamic";
@@ -134,7 +134,7 @@ export default async function PipelinePage() {
             No jobs in the pipeline yet.
           </p>
           <p style={{ fontSize: "var(--text-sm)" }}>
-            Click <strong>+ New Lead</strong> to capture a lead from a text, call, or email.
+            Click <strong>+ New Intake</strong> to capture a new request from a text, call, or email.
           </p>
         </div>
       ) : (
