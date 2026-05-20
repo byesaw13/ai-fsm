@@ -55,14 +55,14 @@ const bookingSchema = z.object({
   }
 });
 
-const ACCOUNT_ID = process.env.BOOKING_ACCOUNT_ID;
-
-if (!ACCOUNT_ID) {
-  logger.warn("BOOKING_ACCOUNT_ID is not set — booking submissions will fail");
+function getBookingAccountId(): string | null {
+  return process.env.BOOKING_ACCOUNT_ID || null;
 }
 
 export async function POST(request: NextRequest) {
-  if (!ACCOUNT_ID) {
+  const accountId = getBookingAccountId();
+  if (!accountId) {
+    logger.warn("BOOKING_ACCOUNT_ID is not set — booking submissions will fail");
     return NextResponse.json(
       { error: { message: "Booking is not currently available." } },
       { status: 503 }
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     await client.query("BEGIN");
 
     const { bookingId } = await createIntakeRecords(client, {
-      accountId: ACCOUNT_ID,
+      accountId,
       name: data.name,
       email: data.email || null,
       phone: data.phone || null,

@@ -66,6 +66,21 @@ set -a
 source "${ENV_FILE}"
 set +a
 
+require_uuid_env() {
+  local name="$1"
+  local value="${!name:-}"
+  if [[ -z "${value}" ]]; then
+    echo "${name} is required in ${ENV_FILE}" >&2
+    exit 1
+  fi
+  if [[ ! "${value}" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+    echo "${name} must be a UUID in ${ENV_FILE}" >&2
+    exit 1
+  fi
+}
+
+require_uuid_env BOOKING_ACCOUNT_ID
+
 cd "${REPO_ROOT}"
 
 sync_repo_to_main() {

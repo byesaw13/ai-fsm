@@ -23,12 +23,14 @@ import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 type CheckStatus = "ok" | "fail";
+type ConfigStatus = "ok" | "missing";
 
 interface HealthResponse {
   status: "ok" | "degraded";
   service: "web";
   checks: {
     db: CheckStatus;
+    bookingAccount: ConfigStatus;
   };
   ts: string;
 }
@@ -45,14 +47,15 @@ async function checkDb(): Promise<CheckStatus> {
 
 export async function GET(): Promise<NextResponse<HealthResponse>> {
   const db = await checkDb();
+  const bookingAccount: ConfigStatus = process.env.BOOKING_ACCOUNT_ID ? "ok" : "missing";
 
-  const allOk = db === "ok";
+  const ready = db === "ok";
   const body: HealthResponse = {
-    status: allOk ? "ok" : "degraded",
+    status: ready ? "ok" : "degraded",
     service: "web",
-    checks: { db },
+    checks: { db, bookingAccount },
     ts: new Date().toISOString(),
   };
 
-  return NextResponse.json(body, { status: allOk ? 200 : 503 });
+  return NextResponse.json(body, { status: ready ? 200 : 503 });
 }
