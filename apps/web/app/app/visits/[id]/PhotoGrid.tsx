@@ -99,7 +99,7 @@ export function PhotoGrid({ visitId, category, initialPhotos, canUpload, canDele
               src={`/api/v1/visits/${visitId}/media/${photo.id}/image`}
               alt={photo.original_name}
               fill
-              sizes="(max-width: 768px) 33vw, 180px"
+              unoptimized
               style={{ objectFit: "cover" }}
             />
             {canDelete && (
