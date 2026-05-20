@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
-import { query, queryOne } from "@/lib/db";
+import { queryForSession, queryOneForSession } from "@/lib/db";
 import {
   canTransitionVisit,
   canAssignVisit,
@@ -120,7 +120,8 @@ export default async function VisitDetailPage({
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const visit = await queryOne<VisitRow>(
+  const visit = await queryOneForSession<VisitRow>(
+    session,
     `SELECT v.*,
             j.title AS job_title, j.job_type AS job_type, j.description AS job_description,
             j.property_id AS job_property_id, j.client_id AS job_client_id,
@@ -149,7 +150,8 @@ export default async function VisitDetailPage({
   const canDeleteMedia = session.role !== "tech";
 
   const assignableUsers = canAssign
-    ? await query<{ id: string; full_name: string; role: string; [key: string]: unknown }>(
+    ? await queryForSession<{ id: string; full_name: string; role: string; [key: string]: unknown }>(
+        session,
         `SELECT id, full_name, role FROM users WHERE account_id = $1 ORDER BY full_name ASC`,
         [session.accountId]
       )
@@ -167,7 +169,8 @@ export default async function VisitDetailPage({
 
   const [membershipVisitNumberRow, propertyVaultRows] = isMembershipVisit
     ? await Promise.all([
-        queryOne<CountRow>(
+        queryOneForSession<CountRow>(
+          session,
           `SELECT COUNT(*)::int AS membership_visit_number
            FROM visits v2
            WHERE v2.generated_from_plan_id = $1
@@ -179,7 +182,8 @@ export default async function VisitDetailPage({
           [visit.generated_from_plan_id, session.accountId, visit.scheduled_start, visit.id]
         ),
         visit.job_property_id
-          ? query<VaultCategoryRow>(
+          ? queryForSession<VaultCategoryRow>(
+              session,
               `SELECT DISTINCT category
                FROM property_vault_items
                WHERE property_id = $1 AND account_id = $2`,
@@ -209,19 +213,22 @@ export default async function VisitDetailPage({
   const [beforePhotos, afterPhotos, visitParts] =
     isRepairFlow && currentStatus !== "cancelled"
       ? await Promise.all([
-          query<PhotoMeta>(
+          queryForSession<PhotoMeta>(
+            session,
             `SELECT id, original_name, created_at FROM visit_media
              WHERE visit_id = $1 AND account_id = $2 AND category = 'before'
              ORDER BY created_at`,
             [id, session.accountId]
           ),
-          query<PhotoMeta>(
+          queryForSession<PhotoMeta>(
+            session,
             `SELECT id, original_name, created_at FROM visit_media
              WHERE visit_id = $1 AND account_id = $2 AND category = 'after'
              ORDER BY created_at`,
             [id, session.accountId]
           ),
-          query<PartRow>(
+          queryForSession<PartRow>(
+            session,
             `SELECT id, name, quantity, actual_cost_cents, customer_price_cents, receipt_media_id
              FROM visit_parts WHERE visit_id = $1 AND account_id = $2
              ORDER BY created_at`,
@@ -232,7 +239,8 @@ export default async function VisitDetailPage({
 
   const completionPacket =
     currentStatus !== "cancelled"
-      ? await queryOne<CompletionPacketRow>(
+      ? await queryOneForSession<CompletionPacketRow>(
+          session,
           `SELECT photo_urls, signature_url, signature_waiver, notes
            FROM completion_packets
            WHERE visit_id = $1 AND account_id = $2`,
@@ -373,7 +381,7 @@ export default async function VisitDetailPage({
         <div className="p7-detail-primary">
           {/* For tech on scheduled/arrived: surface the action first, above all work panels */}
           {showTransitionEarly && (
-            <Card data-testid="visit-transition-panel">
+            <Card id="visit-actions" data-testid="visit-transition-panel">
               <SectionHeader title="Actions" />
               <VisitTransitionForm
                 visitId={visit.id}
@@ -392,7 +400,7 @@ export default async function VisitDetailPage({
             </Card>
           )}
 
-          <Card>
+          <Card id="visit-timeline">
             <SectionHeader title="Visit Timeline" />
             <Timeline entries={timelineEntries} />
             {currentStatus === "scheduled" && (
@@ -448,7 +456,7 @@ export default async function VisitDetailPage({
           {/* ── Maintenance flow: full 28-item walkthrough (health_check / included_action phases) ── */}
           {!isRepairFlow && currentStatus !== "cancelled" && checklistItems.length > 0 &&
             visit.membership_visit_phase !== "reporting" && (
-            <Card data-testid="visit-checklist-panel">
+            <Card id="visit-checklist" data-testid="visit-checklist-panel">
               <SectionHeader title="Walkthrough Checklist" />
               <VisitChecklistForm
                 visitId={visit.id}
@@ -462,7 +470,7 @@ export default async function VisitDetailPage({
           {/* ── Membership reporting phase + completed membership visits: visit snapshot ── */}
           {isMembershipVisit && !isRepairFlow &&
             (visit.membership_visit_phase === "reporting" || currentStatus === "completed") && (
-            <Card data-testid="visit-snapshot-card">
+            <Card id="visit-summary" data-testid="visit-snapshot-card">
               <SectionHeader title="Visit Summary" />
               <VisitSnapshotPanel
                 visitId={visit.id}
@@ -482,7 +490,7 @@ export default async function VisitDetailPage({
           {/* ── Repair / painting / custom flow ── */}
           {isRepairFlow && currentStatus !== "cancelled" && (
             <>
-              <Card>
+              <Card id="visit-issue">
                 <SectionHeader title="Issue" />
                 <VisitIssuePanel
                   visitId={visit.id}
@@ -504,7 +512,7 @@ export default async function VisitDetailPage({
                 />
               </Card>
 
-              <Card>
+              <Card id="visit-resolution">
                 <SectionHeader title="Resolution" />
                 <VisitResolutionPanel
                   visitId={visit.id}
@@ -516,7 +524,7 @@ export default async function VisitDetailPage({
               </Card>
 
               {currentStatus !== "completed" && (
-                <Card>
+                <Card id="visit-closing-checklist">
                   <SectionHeader title="Closing Checklist" />
                   <VisitClosingChecklist
                     visitId={visit.id}
@@ -529,7 +537,7 @@ export default async function VisitDetailPage({
           )}
 
           {currentStatus === "in_progress" && (
-            <Card data-testid="completion-checklist-panel">
+            <Card id="visit-completion" data-testid="completion-checklist-panel">
               <SectionHeader title="Completion Checklist" />
               <CompletionChecklist
                 visitId={visit.id}
@@ -542,7 +550,7 @@ export default async function VisitDetailPage({
 
           {!showTransitionEarly && canTransition && currentStatus !== "completed" && currentStatus !== "cancelled" &&
             !(session.role === "tech" && currentStatus === "in_progress") && (
-            <Card data-testid="visit-transition-panel">
+            <Card id="visit-actions" data-testid="visit-transition-panel">
               <SectionHeader title={session.role === "tech" ? "Actions" : "Status Actions"} />
               <VisitTransitionForm
                 visitId={visit.id}
@@ -563,7 +571,7 @@ export default async function VisitDetailPage({
 
           {/* ── Maintenance: show notes and materials panels ── */}
           {!isRepairFlow && canNotes && (
-            <Card data-testid="visit-notes-panel">
+            <Card id="visit-notes" data-testid="visit-notes-panel">
               <SectionHeader title="Tech Notes" />
               <VisitNotesForm visitId={visit.id} initialNotes={visit.tech_notes ?? ""} />
             </Card>

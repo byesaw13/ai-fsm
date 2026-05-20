@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
-import { query } from "@/lib/db";
+import { queryForSession } from "@/lib/db";
 import {
   Card,
   EmptyState,
@@ -50,6 +50,14 @@ type RenewalRow = {
   billing_cadence: string;
   renewal_date: string;
   client_name: string;
+};
+
+type ActionQueueItem = {
+  label: string;
+  count: number;
+  href: Route;
+  detail: string;
+  tone: "danger" | "warning" | "default";
 };
 
 // ---------------------------------------------------------------------------
@@ -115,7 +123,7 @@ export default async function AppPage() {
   ] = await Promise.all([
 
     // Revenue collected this month (paid / partial invoices)
-    query<RevenueRow>(
+    queryForSession<RevenueRow>(session,
       `SELECT COALESCE(SUM(total_cents), 0)::text AS total_cents
        FROM invoices
        WHERE account_id = $1
@@ -125,7 +133,7 @@ export default async function AppPage() {
     ),
 
     // Active membership summary: count + ARR + tier breakdown
-    query<PlanSummaryRow>(
+    queryForSession<PlanSummaryRow>(session,
       `SELECT
          COUNT(*)::text AS count,
          COALESCE(SUM(annual_price_cents), 0)::text AS arr_cents,
@@ -138,7 +146,7 @@ export default async function AppPage() {
     ),
 
     // Memberships renewing within 30 days
-    query<CountRow>(
+    queryForSession<CountRow>(session,
       `SELECT COUNT(*)::text AS count FROM maintenance_plans
        WHERE account_id = $1 AND status = 'active'
          AND renewal_date IS NOT NULL
@@ -148,7 +156,7 @@ export default async function AppPage() {
     ),
 
     // Memberships with overdue renewal date
-    query<CountRow>(
+    queryForSession<CountRow>(session,
       `SELECT COUNT(*)::text AS count FROM maintenance_plans
        WHERE account_id = $1 AND status = 'active'
          AND renewal_date IS NOT NULL
@@ -157,7 +165,7 @@ export default async function AppPage() {
     ),
 
     // Active membership visits at labor cap
-    query<CountRow>(
+    queryForSession<CountRow>(session,
       `SELECT COUNT(*)::text AS count FROM visits
        WHERE account_id = $1
          AND generated_from_plan_id IS NOT NULL
@@ -167,7 +175,7 @@ export default async function AppPage() {
     ),
 
     // Membership visits pending snapshot delivery
-    query<CountRow>(
+    queryForSession<CountRow>(session,
       `SELECT COUNT(*)::text AS count FROM visits
        WHERE account_id = $1
          AND generated_from_plan_id IS NOT NULL
@@ -178,7 +186,7 @@ export default async function AppPage() {
     ),
 
     // Today's visits (schedule strip)
-    query<VisitRow>(
+    queryForSession<VisitRow>(session,
       `SELECT v.id,
               v.scheduled_start::text AS scheduled_start,
               v.status,
@@ -194,7 +202,7 @@ export default async function AppPage() {
     ),
 
     // Overdue invoices: count + outstanding total
-    query<MoneyRow>(
+    queryForSession<MoneyRow>(session,
       `SELECT COUNT(*)::text AS count,
               COALESCE(SUM(total_cents), 0)::text AS total_cents
        FROM invoices
@@ -203,7 +211,7 @@ export default async function AppPage() {
     ),
 
     // Estimates expiring within 7 days (sent or draft)
-    query<CountRow>(
+    queryForSession<CountRow>(session,
       `SELECT COUNT(*)::text AS count
        FROM estimates
        WHERE account_id = $1
@@ -214,7 +222,7 @@ export default async function AppPage() {
     ),
 
     // Sent estimates awaiting client response
-    query<CountRow>(
+    queryForSession<CountRow>(session,
       `SELECT COUNT(*)::text AS count
        FROM estimates
        WHERE account_id = $1
@@ -224,7 +232,7 @@ export default async function AppPage() {
     ),
 
     // Active jobs with no future scheduled visit
-    query<CountRow>(
+    queryForSession<CountRow>(session,
       `SELECT COUNT(*)::text AS count
        FROM jobs
        WHERE account_id = $1
@@ -239,7 +247,7 @@ export default async function AppPage() {
     ),
 
     // Jobs + visits with active sub-status (exception lanes)
-    query<ExceptionRow>(
+    queryForSession<ExceptionRow>(session,
       `SELECT 'job'   AS kind, COUNT(*)::text AS count FROM jobs   WHERE account_id = $1 AND sub_status IS NOT NULL
        UNION ALL
        SELECT 'visit' AS kind, COUNT(*)::text AS count FROM visits WHERE account_id = $1 AND sub_status IS NOT NULL`,
@@ -247,7 +255,7 @@ export default async function AppPage() {
     ),
 
     // Upcoming renewal list — overdue + within 60 days
-    query<RenewalRow>(
+    queryForSession<RenewalRow>(session,
       `SELECT mp.id, mp.name, mp.membership_tier, mp.member_priority,
               mp.annual_price_cents::text, mp.billing_cadence, mp.renewal_date::text,
               c.name AS client_name
@@ -282,6 +290,51 @@ export default async function AppPage() {
   const exceptionVisitCount = parseN(exceptionRows.find((r) => r.kind === "visit"));
 
   const alertCount = overdueInvCount + expiringCount + (capCount + snapshotCount) + (exceptionJobCount + exceptionVisitCount);
+
+  const actionQueue = ([
+    {
+      label: "Collect overdue invoices",
+      count: overdueInvCount,
+      href: "/app/invoices?status=overdue" as Route,
+      detail: `${fmt(overdueInvTotal)} outstanding`,
+      tone: "danger",
+    },
+    {
+      label: "Follow up on expiring estimates",
+      count: expiringCount,
+      href: "/app/estimates?status=sent" as Route,
+      detail: "Expiring within 7 days",
+      tone: "warning",
+    },
+    {
+      label: "Schedule active jobs",
+      count: noNextVisitCount,
+      href: "/app/jobs" as Route,
+      detail: "Active jobs without a future visit",
+      tone: "warning",
+    },
+    {
+      label: "Send membership snapshots",
+      count: snapshotCount,
+      href: "/app/visits" as Route,
+      detail: "Reporting phase, not delivered",
+      tone: "warning",
+    },
+    {
+      label: "Review labor cap visits",
+      count: capCount,
+      href: "/app/visits" as Route,
+      detail: "At or over included labor",
+      tone: "warning",
+    },
+    {
+      label: "Renew memberships",
+      count: renewingSoonCount + overdueRenewalCount,
+      href: "/app/maintenance-plans" as Route,
+      detail: overdueRenewalCount > 0 ? `${overdueRenewalCount} overdue` : "Due within 30 days",
+      tone: overdueRenewalCount > 0 ? "danger" : "default",
+    },
+  ] satisfies ActionQueueItem[]).filter((item) => item.count > 0);
 
   // -- Metrics ---------------------------------------------------------------
 
@@ -357,6 +410,46 @@ export default async function AppPage() {
 
       {/* ── KPI metrics ───────────────────────────────────────────────────── */}
       <MetricGrid metrics={metrics} />
+
+      {/* ── Action Queue ──────────────────────────────────────────────────── */}
+      <Card hover padding="lg" className="ops-wide-card" style={{ marginTop: "var(--space-6)" }}>
+        <div className="ops-section-header">
+          <h2 className="ops-section-title">Action Queue</h2>
+          <span className="ops-section-count">{actionQueue.length}</span>
+        </div>
+        {actionQueue.length === 0 ? (
+          <EmptyState title="No urgent actions" description="Today's required work is clear." />
+        ) : (
+          <div style={{ display: "grid", gap: "var(--space-2)" }}>
+            {actionQueue.map((item) => {
+              const color = item.tone === "danger" ? "var(--status-error)" : item.tone === "warning" ? "var(--status-warning)" : "var(--accent)";
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(0, 1fr) auto",
+                    gap: "var(--space-3)",
+                    alignItems: "center",
+                    padding: "var(--space-3)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    textDecoration: "none",
+                    color: "inherit",
+                  }}
+                >
+                  <span>
+                    <span style={{ display: "block", fontWeight: 700 }}>{item.label}</span>
+                    <span style={{ display: "block", color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: 2 }}>{item.detail}</span>
+                  </span>
+                  <span style={{ color, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{item.count}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </Card>
 
       {/* ── Today's Schedule ──────────────────────────────────────────────── */}
       <Card hover padding="lg" className="ops-wide-card" style={{ marginTop: "var(--space-6)" }}>

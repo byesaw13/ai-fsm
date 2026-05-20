@@ -7,10 +7,26 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MIGRATIONS_DIR="${SCRIPT_DIR}/../db/migrations"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+MIGRATIONS_DIR="${REPO_ROOT}/db/migrations"
+
+psql_cmd() {
+  if command -v psql >/dev/null 2>&1; then
+    psql "$DATABASE_URL" "$@"
+    return
+  fi
+
+  if ! command -v docker >/dev/null 2>&1; then
+    echo "psql is required (or install Docker so this script can use postgres:16 as a psql client)" >&2
+    exit 1
+  fi
+
+  docker run --rm --network host -v "${REPO_ROOT}:${REPO_ROOT}" -w "${REPO_ROOT}" postgres:16 \
+    psql "$DATABASE_URL" "$@"
+}
 
 # Ensure migration tracking table exists
-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "
+psql_cmd -v ON_ERROR_STOP=1 -c "
   CREATE TABLE IF NOT EXISTS schema_migrations (
     filename   TEXT PRIMARY KEY,
     applied_at TIMESTAMPTZ DEFAULT now()
@@ -18,7 +34,7 @@ psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "
 "
 
 # Detect transition case: existing schema with no tracking history
-MIGRATE_MODE="$(psql "$DATABASE_URL" -tAc "
+MIGRATE_MODE="$(psql_cmd -tAc "
   SELECT CASE
     WHEN (SELECT COUNT(*) FROM schema_migrations) = 0
          AND EXISTS (
@@ -40,11 +56,11 @@ for file in "${MIGRATIONS_DIR}"/*.sql; do
 
   if [[ "${MIGRATE_MODE}" == "seed" ]]; then
     echo "seeding tracking record (pre-existing migration): $filename"
-    psql "$DATABASE_URL" -c "INSERT INTO schema_migrations (filename) VALUES ('$filename') ON CONFLICT DO NOTHING"
+    psql_cmd -c "INSERT INTO schema_migrations (filename) VALUES ('$filename') ON CONFLICT DO NOTHING"
     continue
   fi
 
-  applied="$(psql "$DATABASE_URL" -tAc "SELECT COUNT(*) FROM schema_migrations WHERE filename = '$filename'" \
+  applied="$(psql_cmd -tAc "SELECT COUNT(*) FROM schema_migrations WHERE filename = '$filename'" \
     | tr -d '[:space:]')"
 
   if [[ "$applied" == "1" ]]; then
@@ -53,8 +69,8 @@ for file in "${MIGRATIONS_DIR}"/*.sql; do
   fi
 
   echo "applying migration: $filename"
-  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
-  psql "$DATABASE_URL" -c "INSERT INTO schema_migrations (filename) VALUES ('$filename')"
+  psql_cmd -v ON_ERROR_STOP=1 -f "$file"
+  psql_cmd -c "INSERT INTO schema_migrations (filename) VALUES ('$filename')"
 done
 
 echo "migrations complete"

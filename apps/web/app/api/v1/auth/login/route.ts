@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { compare } from "bcryptjs";
 import { z } from "zod";
-import { queryOne } from "@/lib/db";
+import { query } from "@/lib/db";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { roleSchema } from "@ai-fsm/domain";
 import { randomUUID } from "crypto";
@@ -77,13 +77,17 @@ export async function POST(request: NextRequest) {
 
     const { email, password } = parseResult.data;
 
-    // Look up user by email
-    const user = await queryOne<UserRow>(
-      `SELECT id, email, full_name, role, account_id, password_hash 
-       FROM users 
-       WHERE email = $1`,
+    // Look up user by email. The schema allows the same email in multiple
+    // accounts, so fail closed instead of guessing which tenant to log into.
+    const matches = await query<UserRow>(
+      `SELECT id, email, full_name, role, account_id, password_hash
+       FROM users
+       WHERE lower(email) = lower($1)
+       ORDER BY created_at ASC
+       LIMIT 2`,
       [email.toLowerCase().trim()]
     );
+    const user = matches[0];
 
     if (!user) {
       return NextResponse.json(
@@ -95,6 +99,19 @@ export async function POST(request: NextRequest) {
           },
         },
         { status: 401 }
+      );
+    }
+
+    if (matches.length > 1) {
+      return NextResponse.json(
+        {
+          error: {
+            code: "AMBIGUOUS_LOGIN",
+            message: "This email is connected to more than one account. Ask an owner to make the login email unique.",
+            traceId,
+          },
+        },
+        { status: 409 }
       );
     }
 

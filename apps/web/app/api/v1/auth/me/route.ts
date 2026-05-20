@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { queryOne } from "@/lib/db";
+import { queryOneForSession } from "@/lib/db";
 import { randomUUID } from "crypto";
 import { logger } from "@/lib/logger";
 
@@ -35,11 +35,12 @@ export async function GET() {
     }
 
     // Fetch fresh user data
-    const user = await queryOne<UserRow>(
-      `SELECT id, email, full_name, role, account_id 
-       FROM users 
-       WHERE id = $1`,
-      [session.userId]
+    const user = await queryOneForSession<UserRow>(
+      session,
+      `SELECT id, email, full_name, role, account_id
+       FROM users
+       WHERE id = $1 AND account_id = $2`,
+      [session.userId, session.accountId]
     );
 
     if (!user) {
