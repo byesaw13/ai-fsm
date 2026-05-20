@@ -93,9 +93,18 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# Port 3000 must be free for the test server
-if lsof -i:3000 -sTCP:LISTEN -t &>/dev/null 2>&1; then
-  fail "port 3000 is already in use — stop your dev server before running the full gate"
+# Port 3000 must be free for the test server. Prefer lsof, but fall back to
+# ss because lean hosts often do not install lsof.
+if command -v lsof >/dev/null 2>&1; then
+  if lsof -i:3000 -sTCP:LISTEN -t &>/dev/null 2>&1; then
+    fail "port 3000 is already in use — stop your dev server before running the full gate"
+  fi
+elif command -v ss >/dev/null 2>&1; then
+  if ss -ltn "sport = :3000" | awk 'NR > 1 { found = 1 } END { exit found ? 0 : 1 }'; then
+    fail "port 3000 is already in use — stop your dev server before running the full gate"
+  fi
+else
+  log "port preflight skipped: lsof/ss unavailable"
 fi
 
 log "starting ephemeral postgres (port ${TEST_PG_PORT})"

@@ -96,11 +96,9 @@ describe.skipIf(!RUN_INTEGRATION)("My Suite", () => { ... });
 |------|-------|--------|----------------|
 | `apps/web/lib/estimates/__tests__/estimates.integration.test.ts` | 16 | Implemented | Estimates CRUD, lifecycle transitions, RBAC, immutability |
 | `apps/web/lib/invoices/__tests__/invoices.integration.test.ts` | 12 | Implemented | Estimate→invoice conversion, invoice list/detail, transitions |
-| `apps/web/lib/auth/__tests__/auth.integration.test.ts` | 8 | **STUB** | Login flow, logout, /me endpoint, rate-limit enforcement |
+| `apps/web/lib/auth/__tests__/auth.integration.test.ts` | 8 | Implemented | Login flow, logout, /me endpoint, rate-limit enforcement |
 | `apps/web/lib/automations/__tests__/api.integration.test.ts` | 6 | Implemented | Automations API: GET list, GET events, POST run, role matrix |
 
-The auth integration file is a stub — test bodies are not yet implemented.
-Tests will be implemented as part of P5-T4 follow-on work.
 
 **How to run locally:**
 ```bash

@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth/session";
-import { queryOne, query } from "@/lib/db";
+import { queryForSession, queryOneForSession } from "@/lib/db";
 import { formatVisitTime, isVisitOverdue } from "@/lib/visits/p7";
 import {
   canCreateInvoices,
@@ -19,6 +19,7 @@ import { JobEditForm } from "./JobEditFormWrapper";
 import { JobIntakePanel } from "./JobIntakePanel";
 import { AssetLinksPanel } from "./AssetLinksPanel";
 import { JobCommandPanel } from "./JobCommandPanel";
+import { WhatNextBanner } from "./WhatNextBanner";
 import { VendorCoordinationCard } from "./VendorCoordinationCard";
 import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { isHomeboxEnabled } from "@/lib/homebox/client";
@@ -102,7 +103,8 @@ export default async function JobDetailPage({
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const job = await queryOne<JobRow>(
+  const job = await queryOneForSession<JobRow>(
+    session,
     `SELECT j.*, c.name AS client_name
      FROM jobs j
      LEFT JOIN clients c ON c.id = j.client_id
@@ -114,7 +116,8 @@ export default async function JobDetailPage({
 
   // tech: only see this job if they have an assigned visit
   if (session.role === "tech") {
-    const assigned = await queryOne(
+    const assigned = await queryOneForSession(
+      session,
       `SELECT id FROM visits WHERE job_id = $1 AND account_id = $2 AND assigned_user_id = $3 LIMIT 1`,
       [id, session.accountId, session.userId]
     );
@@ -125,7 +128,8 @@ export default async function JobDetailPage({
 
   const [visits, commercialCounts, assetLinks] = await Promise.all([
     session.role === "tech"
-      ? query<VisitRow>(
+      ? queryForSession<VisitRow>(
+          session,
           `SELECT v.*, u.full_name AS assigned_user_name
            FROM visits v
            LEFT JOIN users u ON u.id = v.assigned_user_id
@@ -133,7 +137,8 @@ export default async function JobDetailPage({
            ORDER BY v.scheduled_start ASC`,
           [id, session.accountId, session.userId]
         )
-      : query<VisitRow>(
+      : queryForSession<VisitRow>(
+          session,
           `SELECT v.*, u.full_name AS assigned_user_name
            FROM visits v
            LEFT JOIN users u ON u.id = v.assigned_user_id
@@ -143,7 +148,7 @@ export default async function JobDetailPage({
         ),
     // Count estimates and invoices + profitability snapshot + pipeline state (owner/admin only)
     session.role !== "tech"
-      ? queryOne<{
+      ? queryOneForSession<{
           estimate_count: string;
           invoice_count: string;
           parts_cost_cents: number | null;
@@ -161,6 +166,7 @@ export default async function JobDetailPage({
           booking_request_id: string | null;
           booking_status: string | null;
         }>(
+          session,
           `SELECT
              (SELECT COUNT(*) FROM estimates WHERE job_id = $1 AND account_id = $2) AS estimate_count,
              (SELECT COUNT(*) FROM invoices  WHERE job_id = $1 AND account_id = $2) AS invoice_count,
@@ -294,14 +300,31 @@ export default async function JobDetailPage({
       />
 
       {!isTech && commercialCounts && (
-        <JobCommandPanel
-          stage={pipelineStage}
-          jobId={job.id}
-          clientId={job.client_id ?? null}
-          bookingRequestId={commercialCounts.booking_request_id}
-          activeVisitId={activeVisits[0]?.id ?? null}
-          latestVisitId={latestVisit?.id ?? null}
-        />
+        <>
+          <WhatNextBanner
+            jobId={job.id}
+            clientId={job.client_id ?? null}
+            jobStatus={currentStatus}
+            estimateCount={estimateCount}
+            hasSentEstimate={commercialCounts.has_sent_estimate}
+            lastEstimateSentAt={commercialCounts.last_estimate_sent_at}
+            hasApprovedEstimate={commercialCounts.has_approved_estimate}
+            hasDepositInvoice={commercialCounts.has_deposit_invoice}
+            depositPaid={commercialCounts.deposit_paid}
+            hasActiveVisit={activeVisits.length > 0}
+            invoiceCount={invoiceCount}
+            hasUnpaidInvoice={commercialCounts.has_unpaid_invoice}
+            hasPaidInvoice={commercialCounts.has_paid_invoice}
+          />
+          <JobCommandPanel
+            stage={pipelineStage}
+            jobId={job.id}
+            clientId={job.client_id ?? null}
+            bookingRequestId={commercialCounts.booking_request_id}
+            activeVisitId={activeVisits[0]?.id ?? null}
+            latestVisitId={latestVisit?.id ?? null}
+          />
+        </>
       )}
 
       {/* Detail Hub Layout: two-column on desktop, stacked on mobile */}

@@ -5,7 +5,7 @@
 #
 # What this script does (in order):
 #   1. Validate repo and env file exist
-#   2. git pull origin main
+#   2. Sync checkout to origin/main with a backup ref for divergent local commits
 #   3. Start postgres + redis, wait for postgres healthy
 #   4. Run SQL migrations (idempotent, tracked in schema_migrations table)
 #   5. Build and start web + worker
@@ -68,7 +68,33 @@ set +a
 
 cd "${REPO_ROOT}"
 
-git pull origin main
+sync_repo_to_main() {
+  echo "syncing repo to origin/main"
+
+  git fetch origin main
+
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    echo "deploy checkout has uncommitted changes; refusing to overwrite:" >&2
+    git status --short >&2
+    echo "Commit, stash, or remove those changes before deploying." >&2
+    exit 1
+  fi
+
+  local current_head backup_branch
+  current_head="$(git rev-parse --short HEAD)"
+
+  if git merge-base --is-ancestor HEAD origin/main; then
+    git reset --hard origin/main
+    return
+  fi
+
+  backup_branch="deploy-backup/${current_head}-$(date -u +%Y%m%dT%H%M%SZ)"
+  echo "local deploy checkout has commits not on origin/main; saving ${current_head} as ${backup_branch}"
+  git branch "${backup_branch}" HEAD
+  git reset --hard origin/main
+}
+
+sync_repo_to_main
 
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" up -d postgres redis
 

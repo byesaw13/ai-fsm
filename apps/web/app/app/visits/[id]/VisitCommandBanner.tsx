@@ -1,3 +1,5 @@
+import Link from "next/link";
+import type { Route } from "next";
 import type { VisitStatus, MembershipVisitPhase } from "@ai-fsm/domain";
 
 interface VisitCommandBannerProps {
@@ -19,6 +21,8 @@ interface BannerContent {
   bg: string;
   icon: string;
   message: string;
+  actionLabel?: string;
+  actionHref?: string;
 }
 
 function computeBanner(props: VisitCommandBannerProps): BannerContent | null {
@@ -39,7 +43,9 @@ function computeBanner(props: VisitCommandBannerProps): BannerContent | null {
       color: "#1e40af",
       bg: "#dbeafe",
       icon: "◷",
-      message: "Upcoming visit — tap \"On My Way\" below when you're leaving.",
+      message: "Upcoming visit — tap \"On My Way\" when you're leaving.",
+      actionLabel: "On My Way",
+      actionHref: "#visit-timeline",
     };
   }
 
@@ -49,8 +55,10 @@ function computeBanner(props: VisitCommandBannerProps): BannerContent | null {
       bg: "#fef3c7",
       icon: "●",
       message: isRepairFlow
-        ? "You've arrived — use the Actions button below to start work."
-        : "You've arrived — use the Actions button below to begin the visit.",
+        ? "You've arrived — start the work from Actions."
+        : "You've arrived — begin the visit from Actions.",
+      actionLabel: "Open Actions",
+      actionHref: "#visit-actions",
     };
   }
 
@@ -65,6 +73,8 @@ function computeBanner(props: VisitCommandBannerProps): BannerContent | null {
           bg: "#dbeafe",
           icon: "1",
           message: "Step 1 of 4: Describe the problem and add before photos.",
+          actionLabel: "Open Issue",
+          actionHref: "#visit-issue",
         };
       }
       if (!hasResolution) {
@@ -73,6 +83,8 @@ function computeBanner(props: VisitCommandBannerProps): BannerContent | null {
           bg: "#dbeafe",
           icon: "3",
           message: "Step 3 of 4: Document your resolution — add after photos and describe what you did.",
+          actionLabel: "Open Resolution",
+          actionHref: "#visit-resolution",
         };
       }
       if (!closingAllDone) {
@@ -81,13 +93,17 @@ function computeBanner(props: VisitCommandBannerProps): BannerContent | null {
           bg: "#dbeafe",
           icon: "4",
           message: "Step 4 of 4: Complete the closing checklist, then mark the visit done.",
+          actionLabel: "Open Checklist",
+          actionHref: "#visit-closing-checklist",
         };
       }
       return {
         color: "#065f46",
         bg: "#d1fae5",
         icon: "✓",
-        message: "All documented — scroll down to mark the visit complete.",
+        message: "All documented — mark the visit complete.",
+        actionLabel: "Open Completion",
+        actionHref: "#visit-completion",
       };
     }
 
@@ -97,7 +113,9 @@ function computeBanner(props: VisitCommandBannerProps): BannerContent | null {
         color: "#065f46",
         bg: "#d1fae5",
         icon: "→",
-        message: "Checklist done — complete the visit summary below.",
+        message: "Checklist done — complete the visit summary.",
+        actionLabel: "Open Summary",
+        actionHref: "#visit-summary",
       };
     }
     if (checklistTotal > 0) {
@@ -108,6 +126,8 @@ function computeBanner(props: VisitCommandBannerProps): BannerContent | null {
           bg: "#dbeafe",
           icon: "✓",
           message: `${checklistDone} of ${checklistTotal} checklist items done — ${remaining} remaining.`,
+          actionLabel: "Open Checklist",
+          actionHref: "#visit-checklist",
         };
       }
       return {
@@ -115,13 +135,17 @@ function computeBanner(props: VisitCommandBannerProps): BannerContent | null {
         bg: "#d1fae5",
         icon: "✓",
         message: "Checklist complete — add any notes and mark the visit done.",
+        actionLabel: "Open Notes",
+        actionHref: "#visit-notes",
       };
     }
     return {
       color: "#1e40af",
       bg: "#dbeafe",
       icon: "●",
-      message: "Visit in progress — complete your work and mark done below.",
+      message: "Visit in progress — complete your work and mark done.",
+      actionLabel: "Open Completion",
+      actionHref: "#visit-completion",
     };
   }
 
@@ -142,6 +166,7 @@ export function VisitCommandBanner(props: VisitCommandBannerProps) {
         background: banner.bg,
         borderRadius: "var(--radius)",
         marginBottom: "var(--space-4)",
+        flexWrap: "wrap",
       }}
       data-testid="visit-command-banner"
     >
@@ -167,6 +192,23 @@ export function VisitCommandBanner(props: VisitCommandBannerProps) {
       >
         {banner.message}
       </span>
+      {banner.actionLabel && banner.actionHref && (
+        <Link
+          href={banner.actionHref as Route}
+          style={{
+            padding: "var(--space-1) var(--space-3)",
+            background: banner.color,
+            color: "#fff",
+            borderRadius: "var(--radius)",
+            fontSize: "var(--text-sm)",
+            fontWeight: 600,
+            textDecoration: "none",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {banner.actionLabel}
+        </Link>
+      )}
     </div>
   );
 }

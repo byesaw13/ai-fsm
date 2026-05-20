@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui";
 
@@ -94,10 +95,12 @@ export function PhotoGrid({ visitId, category, initialPhotos, canUpload, canDele
             key={photo.id}
             style={{ position: "relative", aspectRatio: "1", borderRadius: "var(--radius-sm)", overflow: "hidden" }}
           >
-            <img
+            <Image
               src={`/api/v1/visits/${visitId}/media/${photo.id}/image`}
               alt={photo.original_name}
-              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              fill
+              sizes="(max-width: 768px) 33vw, 180px"
+              style={{ objectFit: "cover" }}
             />
             {canDelete && (
               <button
