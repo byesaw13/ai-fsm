@@ -140,56 +140,65 @@ function flattenSections(sections: ReturnType<typeof getNavSections>) {
 }
 
 describe("getNavSections (role filtering)", () => {
-  it("returns a focused primary nav across 3 sections for admin role", () => {
+  it("returns 4 sections with all admin nav items for admin role", () => {
+    // Sections: Work, Customers, Money, Insights
     const sections = getNavSections("admin");
     const items = flattenSections(sections);
-    expect(sections).toHaveLength(3); // Operations, Business, Dashboards
-    expect(items).toHaveLength(12);
+    expect(sections).toHaveLength(4);
+    expect(items).toHaveLength(14);
     const hrefs = items.map((i) => i.href);
+    // Work
     expect(hrefs).toContain("/app/my-day");
     expect(hrefs).toContain("/app/schedule");
     expect(hrefs).toContain("/app/jobs");
-    expect(hrefs).toContain("/app/field");
+    expect(hrefs).toContain("/app/pipeline");
+    // Customers
     expect(hrefs).toContain("/app/clients");
+    expect(hrefs).toContain("/app/booking-requests");
+    // Money
     expect(hrefs).toContain("/app/estimates");
+    expect(hrefs).toContain("/app/invoices");
     expect(hrefs).toContain("/app/maintenance-plans");
-    expect(hrefs).toContain("/app/settings");
+    // Insights
+    expect(hrefs).toContain("/app/reports");
+    expect(hrefs).toContain("/app/operations-dashboard");
     expect(hrefs).toContain("/app/membership-dashboard");
     expect(hrefs).toContain("/app/pricing-dashboard");
-    expect(hrefs).toContain("/app/operations-dashboard");
     expect(hrefs).toContain("/app/documents-dashboard");
-    expect(hrefs).not.toContain("/app/pipeline");
-    expect(hrefs).not.toContain("/app/invoices");
+    // Settings is pinned outside nav sections — not in flattenSections result
+    expect(hrefs).not.toContain("/app/settings");
+    // Field/On Site is mobile-only — not in desktop nav sections
+    expect(hrefs).not.toContain("/app/field");
+    // Unlisted pages stay off nav
     expect(hrefs).not.toContain("/app/expenses");
-    expect(hrefs).not.toContain("/app/reports");
     expect(hrefs).not.toContain("/app/price-book");
-    expect(hrefs).not.toContain("/app/booking-requests");
     expect(hrefs).not.toContain("/app/visits");
-    expect(hrefs).not.toContain("/app/operations");
     expect(hrefs).not.toContain("/app/properties");
     expect(hrefs).not.toContain("/app/automations");
     expect(hrefs).not.toContain("/app/mileage");
     expect(hrefs).not.toContain("/app/owner-dashboard");
   });
 
-  it("returns the same focused primary nav for owner role", () => {
+  it("returns the same 14-item nav for owner role", () => {
     const sections = getNavSections("owner");
     const items = flattenSections(sections);
-    expect(items).toHaveLength(12);
+    expect(items).toHaveLength(14);
   });
 
-  it("returns only 4 items for tech role", () => {
+  it("returns only 2 items for tech role (My Day + Jobs from Work section)", () => {
+    // Tech sees only non-adminOnly items; field/settings are rendered outside sections
     const sections = getNavSections("tech");
     const items = flattenSections(sections);
-    expect(items).toHaveLength(4);
+    expect(items).toHaveLength(2);
     const hrefs = items.map((i) => i.href);
     expect(hrefs).toContain("/app/my-day");
-    expect(hrefs).toContain("/app/field");
     expect(hrefs).toContain("/app/jobs");
-    expect(hrefs).toContain("/app/settings");
+    // field is in mobile bottom nav, not desktop nav sections
+    expect(hrefs).not.toContain("/app/field");
+    // settings is pinned outside nav sections
+    expect(hrefs).not.toContain("/app/settings");
     expect(hrefs).not.toContain("/app/schedule");
     expect(hrefs).not.toContain("/app/pipeline");
-    expect(hrefs).not.toContain("/app/operations");
     expect(hrefs).not.toContain("/app/estimates");
     expect(hrefs).not.toContain("/app/invoices");
     expect(hrefs).not.toContain("/app/automations");
