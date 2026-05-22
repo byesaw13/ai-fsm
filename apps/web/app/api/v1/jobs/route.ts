@@ -14,7 +14,7 @@ const createJobBody = z.object({
   property_id: z.string().uuid().optional(),
   title: z.string().min(1).max(255),
   description: z.string().optional(),
-  job_type: z.string().optional(),
+  job_type: z.string().optional().default("custom"),
   job_category: z.enum(JOB_ACCEPTANCE_CATEGORIES).optional(),
   priority: z.number().int().min(0).optional().default(0),
 });
@@ -77,7 +77,7 @@ export const POST = withRole(
           property_id ?? null,
           title,
           description ?? null,
-          job_type ?? null,
+          job_type,
           job_category ?? null,
           priority,
           session.userId,

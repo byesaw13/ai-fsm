@@ -42,15 +42,15 @@ describe.skipIf(!RUN_INTEGRATION)("Profitability Report API integration", () => 
   beforeAll(async () => {
     const adminLogin = await fetch(`${BASE_URL}/api/v1/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "admin@test.com", password: "test1234" }),
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "it-reports-__tests__-profitability-integration-test-ts" },
+      body: JSON.stringify({ email: "admin@test.com", password: "password" }),
     });
     adminCookie = (adminLogin.headers.get("set-cookie") ?? "").split(";")[0];
 
     const techLogin = await fetch(`${BASE_URL}/api/v1/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "tech@test.com", password: "test1234" }),
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "it-reports-__tests__-profitability-integration-test-ts" },
+      body: JSON.stringify({ email: "tech@test.com", password: "password" }),
     });
     techCookie = (techLogin.headers.get("set-cookie") ?? "").split(";")[0];
   });

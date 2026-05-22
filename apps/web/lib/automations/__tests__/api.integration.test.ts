@@ -6,14 +6,23 @@ const RUN_INTEGRATION = !!process.env.TEST_DATABASE_URL && !!process.env.TEST_BA
 describe.skipIf(!RUN_INTEGRATION)("Automations API integration", () => {
   let pool: Pool;
   const BASE = process.env.TEST_BASE_URL || "http://localhost:3000";
-  const TEST_ACCOUNT_ID = "00000000-0000-0000-0000-000000000001";
-  const TEST_USER_ID = "00000000-0000-0000-0000-000000000001";
-  const ADMIN_COOKIE = "session=valid-admin-session";
-  const TECH_COOKIE = "session=valid-tech-session";
+  let adminCookie: string;
+  let techCookie: string;
+
+  async function login(email: string): Promise<string> {
+    const res = await fetch(`${BASE}/api/v1/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "it-automations-__tests__-api-integration-test-ts" },
+      body: JSON.stringify({ email, password: "password" }),
+    });
+    return (res.headers.get("set-cookie") ?? "").split(";")[0];
+  }
 
   beforeAll(async () => {
     if (!process.env.TEST_DATABASE_URL) return;
     pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
+    adminCookie = await login("admin@test.com");
+    techCookie = await login("tech@test.com");
   });
 
   afterAll(async () => {
@@ -23,7 +32,7 @@ describe.skipIf(!RUN_INTEGRATION)("Automations API integration", () => {
   describe("GET /api/v1/automations", () => {
     it("returns 200 with automations array for authenticated user", async () => {
       const res = await fetch(BASE + "/api/v1/automations", {
-        headers: { Cookie: ADMIN_COOKIE },
+        headers: { Cookie: adminCookie },
       });
       expect(res.status).toBe(200);
       const json = await res.json();
@@ -39,7 +48,7 @@ describe.skipIf(!RUN_INTEGRATION)("Automations API integration", () => {
   describe("GET /api/v1/automations/events", () => {
     it("returns 200 with events array for authenticated user", async () => {
       const res = await fetch(BASE + "/api/v1/automations/events", {
-        headers: { Cookie: ADMIN_COOKIE },
+        headers: { Cookie: adminCookie },
       });
       expect(res.status).toBe(200);
       const json = await res.json();
@@ -58,7 +67,7 @@ describe.skipIf(!RUN_INTEGRATION)("Automations API integration", () => {
       const res = await fetch(BASE + "/api/v1/automations/" + fakeId + "/run", {
         method: "POST",
         headers: {
-          Cookie: ADMIN_COOKIE,
+          Cookie: adminCookie,
           "Content-Type": "application/json",
         },
       });
@@ -70,7 +79,7 @@ describe.skipIf(!RUN_INTEGRATION)("Automations API integration", () => {
       const res = await fetch(BASE + "/api/v1/automations/" + fakeId + "/run", {
         method: "POST",
         headers: {
-          Cookie: TECH_COOKIE,
+          Cookie: techCookie,
           "Content-Type": "application/json",
         },
       });
@@ -81,7 +90,7 @@ describe.skipIf(!RUN_INTEGRATION)("Automations API integration", () => {
       const fakeId = "00000000-0000-0000-0000-000000000001";
       const res = await fetch(BASE + "/api/v1/automations/" + fakeId + "/run", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "it-automations-__tests__-api-integration-test-ts" },
       });
       expect(res.status).toBe(401);
     });

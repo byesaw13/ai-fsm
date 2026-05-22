@@ -48,16 +48,16 @@ describe.skipIf(!RUN_INTEGRATION)("Visit Checklist API integration", () => {
     // Authenticate owner
     const ownerLogin = await fetch(`${BASE_URL}/api/v1/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "owner@test.com", password: "test1234" }),
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "it-visits-__tests__-checklist-integration-test-ts" },
+      body: JSON.stringify({ email: "owner@test.com", password: "password" }),
     });
     ownerCookie = ownerLogin.headers.get("set-cookie") ?? "";
 
     // Authenticate tech
     const techLogin = await fetch(`${BASE_URL}/api/v1/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "tech@test.com", password: "test1234" }),
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "it-visits-__tests__-checklist-integration-test-ts" },
+      body: JSON.stringify({ email: "tech@test.com", password: "password" }),
     });
     techCookie = techLogin.headers.get("set-cookie") ?? "";
 
@@ -70,6 +70,7 @@ describe.skipIf(!RUN_INTEGRATION)("Visit Checklist API integration", () => {
     const jobRes = await apiRequest("POST", "/api/v1/jobs", ownerCookie, {
       client_id: clientId,
       title: "Checklist Integration Test Job",
+      job_type: "maintenance",
       status: "scheduled",
     });
     const jobId = jobRes.data.data?.id;
@@ -223,7 +224,7 @@ describe.skipIf(!RUN_INTEGRATION)("Visit Checklist API integration", () => {
       `${BASE_URL}/api/v1/visits/${testVisitId}/checklist/${itemId}`,
       {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "it-visits-__tests__-checklist-integration-test-ts" },
         body: JSON.stringify({ disposition: "ok" }),
       }
     );

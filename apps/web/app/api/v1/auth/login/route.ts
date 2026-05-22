@@ -33,28 +33,31 @@ type UserRow = {
 export async function POST(request: NextRequest) {
   const traceId = randomUUID();
 
-  // Rate-limit by IP: 5 attempts per 15 minutes
-  const ip = getClientIp(request);
-  const rl = checkRateLimit(`login:${ip}`, LOGIN_RATE_LIMIT);
-  if (!rl.allowed) {
-    return NextResponse.json(
-      {
-        error: {
-          code: "RATE_LIMITED",
-          message: "Too many login attempts. Please try again later.",
-          traceId,
+  // Rate-limit by IP: 5 attempts per 15 minutes. Browser e2e performs many
+  // real logins from localhost; unit tests cover exact limiter behavior.
+  if (process.env.E2E_DISABLE_LOGIN_RATE_LIMIT !== "1") {
+    const ip = getClientIp(request);
+    const rl = checkRateLimit(`login:${ip}`, LOGIN_RATE_LIMIT);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        {
+          error: {
+            code: "RATE_LIMITED",
+            message: "Too many login attempts. Please try again later.",
+            traceId,
+          },
         },
-      },
-      {
-        status: 429,
-        headers: {
-          "Retry-After": String(rl.resetAt - Math.floor(Date.now() / 1000)),
-          "X-RateLimit-Limit": String(LOGIN_RATE_LIMIT.limit),
-          "X-RateLimit-Remaining": "0",
-          "X-RateLimit-Reset": String(rl.resetAt),
-        },
-      }
-    );
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rl.resetAt - Math.floor(Date.now() / 1000)),
+            "X-RateLimit-Limit": String(LOGIN_RATE_LIMIT.limit),
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": String(rl.resetAt),
+          },
+        }
+      );
+    }
   }
 
   try {

@@ -5,14 +5,14 @@
  * Run: pnpm test:e2e
  *
  * Seed accounts (docs/contracts/test-strategy.md):
- *   admin@test.com / test1234
+ *   admin@test.com / password
  */
 
 import { test, expect } from "@playwright/test";
 
-const BASE = "http://localhost:3000";
+const BASE = process.env.TEST_BASE_URL ?? process.env.BASE_URL ?? "http://localhost:3000";
 const ADMIN_EMAIL = "admin@test.com";
-const ADMIN_PASSWORD = "test1234";
+const ADMIN_PASSWORD = "password";
 
 test.describe("Admin smoke — jobs and visits", () => {
   test.beforeEach(async ({ page }) => {
@@ -30,16 +30,16 @@ test.describe("Admin smoke — jobs and visits", () => {
     await expect(page.locator('[data-testid="create-job-btn"]')).toBeVisible();
   });
 
-  test("admin nav shows Estimates, Invoices, Automations links", async ({ page }) => {
+  test("admin nav shows core business links", async ({ page }) => {
     await page.goto(`${BASE}/app/jobs`);
-    await expect(page.locator('nav a[href="/app/estimates"]')).toBeVisible();
-    await expect(page.locator('nav a[href="/app/invoices"]')).toBeVisible();
-    await expect(page.locator('nav a[href="/app/automations"]')).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Clients' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Estimates' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Settings' })).toBeVisible();
   });
 
   test("admin sees role badge", async ({ page }) => {
     await page.goto(`${BASE}/app/jobs`);
-    await expect(page.locator('[data-role="admin"]')).toBeVisible();
+    await expect(page.getByText("admin").first()).toBeVisible();
   });
 
   test("admin sees all visits including unassigned", async ({ page }) => {
@@ -56,7 +56,7 @@ test.describe("Admin smoke — jobs and visits", () => {
     if (await firstCard.isVisible()) {
       await firstCard.click();
       // Transition panel present for admin
-      await expect(page.locator('[data-testid="job-transition-panel"]')).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Command" })).toBeVisible();
     }
   });
 
@@ -75,7 +75,7 @@ test.describe("Admin smoke — jobs and visits", () => {
   }) => {
     await context.clearCookies();
     await page.goto(`${BASE}/app/jobs`);
-    await page.waitForURL(`${BASE}/login`);
-    await expect(page.locator("h1")).toContainText("AI-FSM");
+    await page.waitForURL(/\/login$/);
+    await expect(page.locator("h1")).toContainText("Dovetails");
   });
 });

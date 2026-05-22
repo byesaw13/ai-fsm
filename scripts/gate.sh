@@ -15,7 +15,7 @@
 #
 # Requirements (full gate only):
 #   - Docker running (spins up ephemeral postgres + redis on high ports)
-#   - Port 3000 free (test server runs there)
+#   - A free local web port (defaults to 3000, falls forward when occupied)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -37,14 +37,42 @@ wait_tcp() {
   fail "timed out waiting for $label ($host:$port)"
 }
 
+
+port_in_use() {
+  local port="$1"
+  # Prefer ss: it is available on lean hosts and reliably sees listeners owned
+  # by containers or other users. lsof can miss those without elevated access.
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn "sport = :${port}" | awk 'NR > 1 { found = 1 } END { exit found ? 0 : 1 }'
+    return $?
+  fi
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -i:"${port}" -sTCP:LISTEN -t &>/dev/null 2>&1
+    return $?
+  fi
+  return 1
+}
+
+choose_port() {
+  local preferred="${1:-3000}"
+  local port
+  for port in $(seq "${preferred}" $((preferred + 50))); do
+    if ! port_in_use "${port}"; then
+      echo "${port}"
+      return 0
+    fi
+  done
+  fail "no free web test port found in range ${preferred}-$((preferred + 50))"
+}
+
 wait_http() {
   local url="$1" label="$2" retries="${3:-60}"
   for i in $(seq 1 "$retries"); do
-    curl -sf "$url" &>/dev/null && return 0
-    sleep 2
     if [[ -n "${SERVER_PID:-}" ]] && ! kill -0 "$SERVER_PID" 2>/dev/null; then
       fail "test server exited unexpectedly — see /tmp/ai-fsm-gate-server.log"
     fi
+    curl -sf "$url" &>/dev/null && return 0
+    sleep 2
   done
   fail "timed out waiting for $label ($url)"
 }
@@ -83,7 +111,8 @@ TEST_PASS="ai_fsm_gate_pw"
 TEST_DATABASE_URL="postgresql://${TEST_USER}:${TEST_PASS}@localhost:${TEST_PG_PORT}/${TEST_DB}"
 TEST_REDIS_URL="redis://localhost:${TEST_REDIS_PORT}/0"
 TEST_AUTH_SECRET="gate-test-auth-secret-min-32-chars!!"
-TEST_BASE_URL="http://localhost:3000"
+TEST_WEB_PORT="${TEST_WEB_PORT:-$(choose_port 3000)}"
+TEST_BASE_URL="http://localhost:${TEST_WEB_PORT}"
 SERVER_PID=""
 
 cleanup() {
@@ -93,19 +122,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# Port 3000 must be free for the test server. Prefer lsof, but fall back to
-# ss because lean hosts often do not install lsof.
-if command -v lsof >/dev/null 2>&1; then
-  if lsof -i:3000 -sTCP:LISTEN -t &>/dev/null 2>&1; then
-    fail "port 3000 is already in use — stop your dev server before running the full gate"
-  fi
-elif command -v ss >/dev/null 2>&1; then
-  if ss -ltn "sport = :3000" | awk 'NR > 1 { found = 1 } END { exit found ? 0 : 1 }'; then
-    fail "port 3000 is already in use — stop your dev server before running the full gate"
-  fi
-else
-  log "port preflight skipped: lsof/ss unavailable"
-fi
+log "using web test port ${TEST_WEB_PORT}"
 
 log "starting ephemeral postgres (port ${TEST_PG_PORT})"
 docker run -d --name "$TEST_PG_NAME" \
@@ -134,9 +151,14 @@ if [[ "${SKIP_INTEGRATION:-}" != "1" ]]; then
   DATABASE_URL="$TEST_DATABASE_URL" \
   REDIS_URL="$TEST_REDIS_URL" \
   AUTH_SECRET="$TEST_AUTH_SECRET" \
+  E2E_DISABLE_LOGIN_RATE_LIMIT=1 \
   NODE_ENV=development \
-    pnpm dev:web >/tmp/ai-fsm-gate-server.log 2>&1 &
+    pnpm --filter @ai-fsm/web exec next dev --port "${TEST_WEB_PORT}" >/tmp/ai-fsm-gate-server.log 2>&1 &
   SERVER_PID=$!
+  sleep 2
+  if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+    fail "test server exited unexpectedly — see /tmp/ai-fsm-gate-server.log"
+  fi
 
   log "waiting for test server"
   wait_http "$TEST_BASE_URL/api/health" "test server" 60
@@ -149,11 +171,13 @@ fi
 
 if [[ "${SKIP_E2E:-}" != "1" ]]; then
   log "e2e tests"
-  # Playwright reuses the already-running server on port 3000 (reuseExistingServer=true in non-CI).
-  # Pass DATABASE_URL so the webServer command (if it were to start one) uses the test DB.
+  # Playwright reuses the already-running gate server. Pass the same port and
+  # database settings in case Playwright needs to start its own server in CI.
   DATABASE_URL="$TEST_DATABASE_URL" \
   REDIS_URL="$TEST_REDIS_URL" \
   AUTH_SECRET="$TEST_AUTH_SECRET" \
+  PORT="$TEST_WEB_PORT" \
+  TEST_BASE_URL="$TEST_BASE_URL" \
     pnpm test:e2e
 fi
 

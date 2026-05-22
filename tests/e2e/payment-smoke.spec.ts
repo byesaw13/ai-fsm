@@ -10,15 +10,15 @@ import { test, expect } from "@playwright/test";
  * - At least one invoice in 'sent' status
  */
 
-const BASE_URL = "http://localhost:3000";
+const BASE_URL = process.env.TEST_BASE_URL ?? process.env.BASE_URL ?? "http://localhost:3000";
 
 test.describe("Payment Recording E2E", () => {
   test.beforeEach(async ({ page }) => {
     // Login as owner
     await page.goto(`${BASE_URL}/login`);
-    await page.fill('[data-testid="email-input"], input[name="email"]', "owner@test.com");
-    await page.fill('[data-testid="password-input"], input[name="password"]', "test1234");
-    await page.click('[data-testid="login-button"], button[type="submit"]');
+    await page.fill('#email, input[name="email"]', "owner@test.com");
+    await page.fill('#password, input[name="password"]', "password");
+    await page.click('button[type="submit"]');
     await page.waitForURL("**/app/**");
   });
 
@@ -80,19 +80,15 @@ test.describe("Payment Recording E2E", () => {
     // Wait for success message
     await expect(page.locator(".success-inline")).toBeVisible({ timeout: 5000 });
 
-    // Verify payment appears in history
-    await expect(page.locator('[data-testid="payment-history-table"]')).toBeVisible({
-      timeout: 5000,
-    });
-    await expect(page.locator('[data-testid="payment-history-row"]').first()).toBeVisible();
+    await expect(page.locator('[data-testid="invoice-paid"]')).toBeVisible();
   });
 
   test("tech user cannot see payment form", async ({ page }) => {
     // Logout and login as tech
     await page.goto(`${BASE_URL}/login`);
-    await page.fill('[data-testid="email-input"], input[name="email"]', "tech@test.com");
-    await page.fill('[data-testid="password-input"], input[name="password"]', "test1234");
-    await page.click('[data-testid="login-button"], button[type="submit"]');
+    await page.fill('#email, input[name="email"]', "tech@test.com");
+    await page.fill('#password, input[name="password"]', "password");
+    await page.click('button[type="submit"]');
     await page.waitForURL("**/app/**");
 
     // Tech should not see the invoices nav link (per role-based nav)

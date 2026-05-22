@@ -5,17 +5,17 @@
  * Run: pnpm test:e2e
  *
  * Seed accounts (docs/contracts/test-strategy.md):
- *   admin@test.com / test1234
- *   tech@test.com / test1234
+ *   admin@test.com / password
+ *   tech@test.com / password
  */
 
 import { test, expect } from "@playwright/test";
 
-const BASE = "http://localhost:3000";
+const BASE = process.env.TEST_BASE_URL ?? process.env.BASE_URL ?? "http://localhost:3000";
 const ADMIN_EMAIL = "admin@test.com";
-const ADMIN_PASSWORD = "test1234";
+const ADMIN_PASSWORD = "password";
 const TECH_EMAIL = "tech@test.com";
-const TECH_PASSWORD = "test1234";
+const TECH_PASSWORD = "password";
 
 test.describe("Automations page — admin role", () => {
   test.beforeEach(async ({ page }) => {
@@ -90,7 +90,7 @@ test.describe("Automations page — unauthenticated", () => {
   test("redirects to login when not authenticated", async ({ page, context }) => {
     await context.clearCookies();
     await page.goto(`${BASE}/app/automations`);
-    await page.waitForURL(`${BASE}/login`);
-    await expect(page.locator("h1")).toContainText("AI-FSM");
+    await page.waitForURL(/\/login$/);
+    await expect(page.locator("h1")).toContainText("Dovetails");
   });
 });
