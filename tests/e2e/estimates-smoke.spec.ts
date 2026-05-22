@@ -5,7 +5,7 @@
  * Run: pnpm test:e2e
  *
  * Seed accounts (docs/contracts/test-strategy.md):
- *   admin@test.com / test1234
+ *   admin@test.com / password
  *
  * Source evidence:
  *   Dovelite: tests/e2e/admin-flow.spec.ts (estimate form + status flow)
@@ -14,9 +14,22 @@
 
 import { test, expect } from "@playwright/test";
 
-const BASE = "http://localhost:3000";
+const BASE = process.env.TEST_BASE_URL ?? process.env.BASE_URL ?? "http://localhost:3000";
 const ADMIN_EMAIL = "admin@test.com";
-const ADMIN_PASSWORD = "test1234";
+const ADMIN_PASSWORD = "password";
+
+async function completeEstimateWizard(page: import("@playwright/test").Page, description: string, quantity: string, unitPrice: string) {
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.fill('[data-testid="line-item-desc-0"]', description);
+  await page.fill('[data-testid="line-item-qty-0"]', quantity);
+  await page.fill('[data-testid="line-item-price-0"]', unitPrice);
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: "Next" }).click();
+  await Promise.all([
+    page.waitForURL(/\/app\/estimates\/[0-9a-f-]+/),
+    page.locator('[data-testid="submit-estimate-btn"]').evaluate((button) => (button as HTMLButtonElement).click()),
+  ]);
+}
 
 test.describe("Estimates smoke — admin role", () => {
   test.beforeEach(async ({ page }) => {
@@ -68,12 +81,7 @@ test.describe("Estimates smoke — admin role", () => {
     const clientSelect = page.locator("#client_id");
     await clientSelect.selectOption({ index: 1 });
 
-    // Add a line item
-    await page.fill('[data-testid="line-item-desc-0"]', "Lawn mowing service");
-    await page.fill('[data-testid="line-item-qty-0"]', "2");
-    await page.fill('[data-testid="line-item-price-0"]', "75.00");
-
-    await page.click('[data-testid="submit-estimate-btn"]');
+    await completeEstimateWizard(page, "Lawn mowing service", "2", "200.00");
 
     // Should redirect to estimate detail
     await page.waitForURL(/\/app\/estimates\/[0-9a-f-]+/);
@@ -81,7 +89,7 @@ test.describe("Estimates smoke — admin role", () => {
       "Draft"
     );
     await expect(page.locator('[data-testid="estimate-total"]')).toContainText(
-      "$150.00"
+      "$400.00"
     );
   });
 
@@ -90,10 +98,7 @@ test.describe("Estimates smoke — admin role", () => {
     await page.goto(`${BASE}/app/estimates/new`);
     const clientSelect = page.locator("#client_id");
     await clientSelect.selectOption({ index: 1 });
-    await page.fill('[data-testid="line-item-desc-0"]', "Test service");
-    await page.fill('[data-testid="line-item-qty-0"]', "1");
-    await page.fill('[data-testid="line-item-price-0"]', "100.00");
-    await page.click('[data-testid="submit-estimate-btn"]');
+    await completeEstimateWizard(page, "Test service", "1", "200.00");
     await page.waitForURL(/\/app\/estimates\/[0-9a-f-]+/);
 
     // Verify transition panel is present
@@ -119,10 +124,7 @@ test.describe("Estimates smoke — admin role", () => {
     await page.goto(`${BASE}/app/estimates/new`);
     const clientSelect = page.locator("#client_id");
     await clientSelect.selectOption({ index: 1 });
-    await page.fill('[data-testid="line-item-desc-0"]', "Consultation");
-    await page.fill('[data-testid="line-item-qty-0"]', "3");
-    await page.fill('[data-testid="line-item-price-0"]', "50.00");
-    await page.click('[data-testid="submit-estimate-btn"]');
+    await completeEstimateWizard(page, "Consultation", "3", "100.00");
     await page.waitForURL(/\/app\/estimates\/[0-9a-f-]+/);
 
     await expect(
@@ -133,7 +135,7 @@ test.describe("Estimates smoke — admin role", () => {
     ).toHaveCount(1);
     await expect(
       page.locator('[data-testid="estimate-total"]')
-    ).toContainText("$150.00");
+    ).toContainText("$300.00");
   });
 
   test("danger zone is visible for draft estimates (owner role would delete)", async ({
@@ -143,10 +145,7 @@ test.describe("Estimates smoke — admin role", () => {
     await page.goto(`${BASE}/app/estimates/new`);
     const clientSelect = page.locator("#client_id");
     await clientSelect.selectOption({ index: 1 });
-    await page.fill('[data-testid="line-item-desc-0"]', "Deletion test");
-    await page.fill('[data-testid="line-item-qty-0"]', "1");
-    await page.fill('[data-testid="line-item-price-0"]', "10.00");
-    await page.click('[data-testid="submit-estimate-btn"]');
+    await completeEstimateWizard(page, "Deletion test", "1", "200.00");
     await page.waitForURL(/\/app\/estimates\/[0-9a-f-]+/);
 
     // Danger zone visible for draft (admin can't delete, but the UI test confirms rendering)

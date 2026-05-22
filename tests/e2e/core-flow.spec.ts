@@ -8,16 +8,29 @@
  * Run: pnpm test:e2e
  *
  * Seed accounts (docs/contracts/test-strategy.md):
- *   admin@test.com / test1234
+ *   admin@test.com / password
  *
  * Note: This test creates real data. Run against a test/dev database only.
  */
 
 import { test, expect } from "@playwright/test";
 
-const BASE = "http://localhost:3000";
+const BASE = process.env.TEST_BASE_URL ?? process.env.BASE_URL ?? "http://localhost:3000";
 const ADMIN_EMAIL = "admin@test.com";
-const ADMIN_PASSWORD = "test1234";
+const ADMIN_PASSWORD = "password";
+
+async function completeEstimateWizard(page: import("@playwright/test").Page, description: string, quantity: string, unitPrice: string) {
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.fill('[data-testid="line-item-desc-0"]', description);
+  await page.fill('[data-testid="line-item-qty-0"]', quantity);
+  await page.fill('[data-testid="line-item-price-0"]', unitPrice);
+  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: "Next" }).click();
+  await Promise.all([
+    page.waitForURL(/\/app\/estimates\/[0-9a-f-]+/),
+    page.locator('[data-testid="submit-estimate-btn"]').evaluate((button) => (button as HTMLButtonElement).click()),
+  ]);
+}
 
 test.describe("Core business flow — admin role", () => {
   test.describe.configure({ mode: "serial" }); // Tests run in order
@@ -34,8 +47,8 @@ test.describe("Core business flow — admin role", () => {
     await page.click('[type="submit"]');
 
     // Should redirect to /app (dashboard)
-    await page.waitForURL(`${BASE}/app`);
-    await expect(page.locator("h1")).toContainText("Dashboard");
+    await page.waitForURL(`${BASE}/app/jobs`);
+    await expect(page.locator("h1")).toContainText("Jobs");
   });
 
   test("2. Admin can create a new job", async ({ page }) => {
@@ -44,7 +57,7 @@ test.describe("Core business flow — admin role", () => {
     await page.fill('[id="email"]', ADMIN_EMAIL);
     await page.fill('[id="password"]', ADMIN_PASSWORD);
     await page.click('[type="submit"]');
-    await page.waitForURL(`${BASE}/app`);
+    await page.waitForURL(`${BASE}/app/jobs`);
 
     // Navigate to jobs and create new
     await page.goto(`${BASE}/app/jobs`);
@@ -61,7 +74,7 @@ test.describe("Core business flow — admin role", () => {
     await page.selectOption("#priority", "2");
 
     // Submit
-    await page.click('button[type="submit"]');
+    await page.locator('[data-testid="job-create-form"] button[type="submit"]').click();
 
     // Should redirect to job detail
     await page.waitForURL(/\/app\/jobs\/[0-9a-f-]+/);
@@ -81,7 +94,7 @@ test.describe("Core business flow — admin role", () => {
     await page.fill('[id="email"]', ADMIN_EMAIL);
     await page.fill('[id="password"]', ADMIN_PASSWORD);
     await page.click('[type="submit"]');
-    await page.waitForURL(`${BASE}/app`);
+    await page.waitForURL(`${BASE}/app/jobs`);
 
     // Go to job detail and schedule visit
     await page.goto(`${BASE}/app/jobs/${jobId}`);
@@ -91,15 +104,13 @@ test.describe("Core business flow — admin role", () => {
     // Fill schedule form
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const startStr = tomorrow.toISOString().slice(0, 16);
-    tomorrow.setHours(tomorrow.getHours() + 2);
-    const endStr = tomorrow.toISOString().slice(0, 16);
+    const dateStr = tomorrow.toISOString().slice(0, 10);
 
-    await page.fill("#scheduled_start", startStr);
-    await page.fill("#scheduled_end", endStr);
+    await page.locator('[data-testid="visit-schedule-form"] input[type="date"]').fill(dateStr);
+    await page.locator('[data-testid="visit-schedule-form"] select').first().selectOption("09:00");
 
     // Submit
-    await page.click('button[type="submit"]');
+    await page.locator('[data-testid="visit-schedule-form"] button[type="submit"]').click();
 
     // Should redirect to visit detail
     await page.waitForURL(/\/app\/visits\/[0-9a-f-]+/);
@@ -117,7 +128,7 @@ test.describe("Core business flow — admin role", () => {
     await page.fill('[id="email"]', ADMIN_EMAIL);
     await page.fill('[id="password"]', ADMIN_PASSWORD);
     await page.click('[type="submit"]');
-    await page.waitForURL(`${BASE}/app`);
+    await page.waitForURL(`${BASE}/app/jobs`);
 
     // Navigate to estimates and create new
     await page.goto(`${BASE}/app/estimates`);
@@ -130,13 +141,7 @@ test.describe("Core business flow — admin role", () => {
     test.skip(clientCount <= 1, "No clients available in database");
     await clientSelect.selectOption({ index: 1 });
 
-    // Add line item
-    await page.fill('[data-testid="line-item-desc-0"]', "E2E Test Service");
-    await page.fill('[data-testid="line-item-qty-0"]', "1");
-    await page.fill('[data-testid="line-item-price-0"]', "100.00");
-
-    // Submit
-    await page.click('[data-testid="submit-estimate-btn"]');
+    await completeEstimateWizard(page, "E2E Test Service", "1", "200.00");
 
     // Should redirect to estimate detail
     await page.waitForURL(/\/app\/estimates\/[0-9a-f-]+/);
@@ -156,7 +161,7 @@ test.describe("Core business flow — admin role", () => {
     await page.fill('[id="email"]', ADMIN_EMAIL);
     await page.fill('[id="password"]', ADMIN_PASSWORD);
     await page.click('[type="submit"]');
-    await page.waitForURL(`${BASE}/app`);
+    await page.waitForURL(`${BASE}/app/jobs`);
 
     // Navigate to estimate
     await page.goto(`${BASE}/app/estimates/${estimateId}`);
@@ -180,14 +185,14 @@ test.describe("Core business flow — admin role", () => {
     await page.fill('[id="email"]', ADMIN_EMAIL);
     await page.fill('[id="password"]', ADMIN_PASSWORD);
     await page.click('[type="submit"]');
-    await page.waitForURL(`${BASE}/app`);
+    await page.waitForURL(`${BASE}/app/jobs`);
 
     // Navigate to approved estimate
     await page.goto(`${BASE}/app/estimates/${estimateId}`);
 
     // Convert to invoice
-    await expect(page.locator('[data-testid="convert-to-invoice-btn"]')).toBeVisible();
-    await page.click('[data-testid="convert-to-invoice-btn"]');
+    await expect(page.locator('[data-testid="convert-estimate-btn"]')).toBeVisible();
+    await page.click('[data-testid="convert-estimate-btn"]');
 
     // Should redirect to invoice detail
     await page.waitForURL(/\/app\/invoices\/[0-9a-f-]+/);
@@ -196,7 +201,7 @@ test.describe("Core business flow — admin role", () => {
     expect(match).toBeTruthy();
     invoiceId = match![1];
 
-    await expect(page.locator('[data-testid="invoice-status"]')).toContainText("Draft");
+    await expect(page.locator('[data-testid="invoice-status"]')).toContainText("Sent");
   });
 
   test("7. Admin can send invoice and record payment", async ({ page }) => {
@@ -207,30 +212,29 @@ test.describe("Core business flow — admin role", () => {
     await page.fill('[id="email"]', ADMIN_EMAIL);
     await page.fill('[id="password"]', ADMIN_PASSWORD);
     await page.click('[type="submit"]');
-    await page.waitForURL(`${BASE}/app`);
+    await page.waitForURL(`${BASE}/app/jobs`);
 
     // Navigate to invoice
     await page.goto(`${BASE}/app/invoices/${invoiceId}`);
 
-    // Send invoice
-    await expect(page.locator('[data-testid="transition-btn-sent"]')).toBeVisible();
-    await page.click('[data-testid="transition-btn-sent"]');
+    // Converted invoices may already be sent; only transition draft invoices.
+    const statusText = (await page.locator('[data-testid="invoice-status"]').textContent())?.trim();
+    if (statusText === "Draft") {
+      await expect(page.locator('[data-testid="transition-btn-sent"]')).toBeVisible();
+      await page.click('[data-testid="transition-btn-sent"]');
+    }
     await expect(page.locator('[data-testid="invoice-status"]')).toContainText("Sent");
 
-    // Record payment
-    await expect(page.locator('[data-testid="record-payment-btn"]')).toBeVisible();
-    await page.click('[data-testid="record-payment-btn"]');
+    const dueText = await page.locator('[data-testid="invoice-due"]').textContent();
+    const amountDue = dueText?.replace(/[^0-9.]/g, "") || "200.00";
 
-    // Fill payment form
-    await page.fill("#amount", "100.00");
-    await page.selectOption("#method", "check");
-    await page.fill("#reference", "E2E Test Payment");
+    await page.fill('[data-testid="payment-amount-input"]', amountDue);
+    await page.selectOption('[data-testid="payment-method-select"]', "check");
+    await page.fill('[data-testid="payment-notes-input"]', "E2E Test Payment");
+    await page.click('[data-testid="record-payment-submit"]');
 
-    // Submit payment
-    await page.click('[data-testid="submit-payment-btn"]');
-
-    // Invoice status should update to Paid
     await expect(page.locator('[data-testid="invoice-status"]')).toContainText("Paid");
+    await expect(page.locator('[data-testid="invoice-paid"]')).toBeVisible();
   });
 
   test("8. Admin can verify complete flow on invoices list", async ({ page }) => {
@@ -239,7 +243,7 @@ test.describe("Core business flow — admin role", () => {
     await page.fill('[id="email"]', ADMIN_EMAIL);
     await page.fill('[id="password"]', ADMIN_PASSWORD);
     await page.click('[type="submit"]');
-    await page.waitForURL(`${BASE}/app`);
+    await page.waitForURL(`${BASE}/app/jobs`);
 
     // Check invoices list shows paid invoice
     await page.goto(`${BASE}/app/invoices`);

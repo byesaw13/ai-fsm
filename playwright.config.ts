@@ -1,5 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const port = process.env.PORT ?? "3000";
+const baseURL = process.env.TEST_BASE_URL ?? `http://localhost:${port}`;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
@@ -8,7 +11,7 @@ export default defineConfig({
   workers: 1,
   reporter: "list",
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL,
     trace: "on-first-retry",
   },
   projects: [
@@ -18,8 +21,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "pnpm dev:web",
-    url: "http://localhost:3000",
+    command: `pnpm --filter @ai-fsm/web exec next dev --port ${port}`,
+    url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },

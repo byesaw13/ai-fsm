@@ -28,7 +28,7 @@ export const POST = withRole(
   ["owner", "admin"],
   async (request: NextRequest, session: AuthSession) => {
     const automationId = validateAutomationId(
-      request.nextUrl.pathname.split("/")[5]
+      request.nextUrl.pathname.split("/")[4]
     );
 
     if (!automationId) {

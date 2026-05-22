@@ -54,8 +54,8 @@ describe.skipIf(!RUN_INTEGRATION)("Invoice conversion API integration", () => {
     // Authenticate admin
     const loginRes = await fetch(`${BASE_URL}/api/v1/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "admin@test.com", password: "test1234" }),
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "it-invoices-__tests__-invoices-integration-test-ts" },
+      body: JSON.stringify({ email: "admin@test.com", password: "password" }),
     });
     const setCookie = loginRes.headers.get("set-cookie");
     adminCookie = setCookie?.split(";")[0] ?? "";
@@ -63,8 +63,8 @@ describe.skipIf(!RUN_INTEGRATION)("Invoice conversion API integration", () => {
     // Authenticate tech
     const techLogin = await fetch(`${BASE_URL}/api/v1/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "tech@test.com", password: "test1234" }),
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "it-invoices-__tests__-invoices-integration-test-ts" },
+      body: JSON.stringify({ email: "tech@test.com", password: "password" }),
     });
     const techCookieHeader = techLogin.headers.get("set-cookie");
     techCookie = techCookieHeader?.split(";")[0] ?? "";
@@ -84,7 +84,7 @@ describe.skipIf(!RUN_INTEGRATION)("Invoice conversion API integration", () => {
             {
               description: "Integration test service",
               quantity: 1,
-              unit_price_cents: 10000,
+              unit_price_cents: 20000,
             },
           ],
         }
@@ -102,7 +102,7 @@ describe.skipIf(!RUN_INTEGRATION)("Invoice conversion API integration", () => {
             {
               description: "Approved estimate for conversion",
               quantity: 2,
-              unit_price_cents: 5000,
+              unit_price_cents: 10000,
             },
           ],
         }
@@ -264,11 +264,12 @@ describe.skipIf(!RUN_INTEGRATION)("Invoice conversion API integration", () => {
           adminCookie
         );
         expect(status).toBe(200);
-        expect(data.line_items).toBeDefined();
-        expect(Array.isArray(data.line_items)).toBe(true);
+        const lineItems = data.data?.line_items;
+        expect(lineItems).toBeDefined();
+        expect(Array.isArray(lineItems)).toBe(true);
         // Line items should have estimate_line_item_id set (traceability)
-        if (data.line_items.length > 0) {
-          expect(data.line_items[0].estimate_line_item_id).toBeTruthy();
+        if (lineItems.length > 0) {
+          expect(lineItems[0].estimate_line_item_id).toBeTruthy();
         }
       }
     });

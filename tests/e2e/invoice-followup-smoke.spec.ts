@@ -10,21 +10,21 @@ import { test, expect } from "@playwright/test";
  * - Worker running or at least one overdue invoice
  */
 
-const BASE_URL = "http://localhost:3000";
+const BASE_URL = process.env.TEST_BASE_URL ?? process.env.BASE_URL ?? "http://localhost:3000";
 
 test.describe("Invoice Follow-Up Automation E2E", () => {
   test.beforeEach(async ({ page }) => {
     // Login as owner
     await page.goto(`${BASE_URL}/login`);
     await page.fill(
-      '[data-testid="email-input"], input[name="email"]',
+      '#email, input[name="email"]',
       "owner@test.com"
     );
     await page.fill(
-      '[data-testid="password-input"], input[name="password"]',
-      "test1234"
+      '#password, input[name="password"]',
+      "password"
     );
-    await page.click('[data-testid="login-button"], button[type="submit"]');
+    await page.click('button[type="submit"]');
     await page.waitForURL("**/app/**");
   });
 
@@ -32,7 +32,7 @@ test.describe("Invoice Follow-Up Automation E2E", () => {
     page,
   }) => {
     await page.goto(`${BASE_URL}/app/automations`);
-    await expect(page.locator("h2")).toContainText("Automations");
+    await expect(page.locator("h1")).toContainText("Automations");
   });
 
   test("audit log shows invoice_followup events after worker run", async ({

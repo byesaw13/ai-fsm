@@ -147,9 +147,11 @@ export default async function InvoiceDetailPage({
               url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/invoices/${invoice.share_token}`}
               label="Copy client link"
             />
-            <StatusBadge variant={currentStatus as StatusVariant}>
-              {STATUS_LABELS[currentStatus]}
-            </StatusBadge>
+            <span data-testid="invoice-status">
+              <StatusBadge variant={currentStatus as StatusVariant}>
+                {STATUS_LABELS[currentStatus]}
+              </StatusBadge>
+            </span>
           </div>
         }
       />
@@ -179,7 +181,7 @@ export default async function InvoiceDetailPage({
             {lineItems.length === 0 ? (
               <EmptyState title="No line items" description="Line items will appear when this invoice is created from an estimate." />
             ) : (
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }} data-testid="invoice-line-items-table">
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border)" }}>
                     <th style={{ textAlign: "left", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Description</th>

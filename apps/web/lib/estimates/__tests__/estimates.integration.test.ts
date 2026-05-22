@@ -56,25 +56,31 @@ describe.skipIf(!RUN_INTEGRATION)("Estimates API integration", () => {
   }
 
   beforeAll(async () => {
-    // Login as admin, owner, and tech
-    // (Relies on seed data from db/migrations/002_seed_dev.sql)
-    const adminRes = await fetch(`${BASE_URL}/api/v1/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "admin@test.com", password: "test1234" }),
-    });
-    adminCookie = adminRes.headers.get("set-cookie") ?? "";
+    async function login(email: string, ip: string) {
+      const response = await fetch(`${BASE_URL}/api/v1/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": ip },
+        body: JSON.stringify({ email, password: "password" }),
+      });
+      const cookie = response.headers.get("set-cookie") ?? "";
+      if (!cookie) {
+        throw new Error(`Failed to login ${email}: HTTP ${response.status}`);
+      }
+      return cookie;
+    }
 
-    // TODO: Add owner and tech login when seed includes those users
-    ownerCookie = adminCookie; // placeholder
-    techCookie = adminCookie; // placeholder
+    adminCookie = await login("admin@test.com", "it-estimates-admin");
+    ownerCookie = await login("owner@test.com", "it-estimates-owner");
+    techCookie = await login("tech@test.com", "it-estimates-tech");
 
-    // Create a test client
     const clientRes = await apiRequest("POST", "/api/v1/clients", adminCookie, {
       name: "Test Client for Estimates",
       email: "testclient@example.com",
     });
-    testClientId = clientRes.data?.id ?? "";
+    testClientId = clientRes.data?.data?.id ?? "";
+    if (!testClientId) {
+      throw new Error(`Failed to create estimate test client: ${JSON.stringify(clientRes)}`);
+    }
   });
 
   afterAll(async () => {
@@ -96,7 +102,7 @@ describe.skipIf(!RUN_INTEGRATION)("Estimates API integration", () => {
             {
               description: "Service A",
               quantity: 2,
-              unit_price_cents: 5000,
+              unit_price_cents: 20000,
               sort_order: 0,
             },
           ],
@@ -197,7 +203,7 @@ describe.skipIf(!RUN_INTEGRATION)("Estimates API integration", () => {
         adminCookie,
         {
           line_items: [
-            { description: "New item", quantity: 1, unit_price_cents: 10000 },
+            { description: "New item", quantity: 1, unit_price_cents: 20000 },
           ],
         }
       );
@@ -208,7 +214,7 @@ describe.skipIf(!RUN_INTEGRATION)("Estimates API integration", () => {
         `/api/v1/estimates/${testEstimateId}`,
         adminCookie
       );
-      expect(detail.data.total_cents).toBe(10000);
+      expect(detail.data.total_cents).toBe(20000);
     });
   });
 
@@ -287,7 +293,7 @@ describe.skipIf(!RUN_INTEGRATION)("Estimates API integration", () => {
         adminCookie,
         {
           client_id: testClientId,
-          line_items: [],
+          flat_rate_cents: 0,
         }
       );
       const deleteId = created.id;

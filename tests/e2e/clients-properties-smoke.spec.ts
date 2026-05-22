@@ -1,15 +1,15 @@
 import { expect, test } from "@playwright/test";
 
-const BASE = "http://localhost:3000";
+const BASE = process.env.TEST_BASE_URL ?? process.env.BASE_URL ?? "http://localhost:3000";
 const ADMIN_EMAIL = "admin@test.com";
-const ADMIN_PASSWORD = "test1234";
+const ADMIN_PASSWORD = "password";
 
 test("admin can create client, property, and job from property context", async ({ page }) => {
   await page.goto(`${BASE}/login`);
   await page.fill("#email", ADMIN_EMAIL);
   await page.fill("#password", ADMIN_PASSWORD);
   await page.click('button[type="submit"]');
-  await page.waitForURL(`${BASE}/app`);
+  await page.waitForURL(`${BASE}/app/jobs`);
 
   const nonce = Date.now();
   const clientName = `E2E Client ${nonce}`;
@@ -41,7 +41,7 @@ test("admin can create client, property, and job from property context", async (
   await expect(page.locator("#client_id")).not.toHaveValue("");
   await expect(page.locator("#property_id")).not.toHaveValue("");
   await page.fill("#title", `E2E Property Job ${nonce}`);
-  await page.click('button[type="submit"]');
+  await page.locator('[data-testid="job-create-form"] button[type="submit"]').click();
   await page.waitForURL(/\/app\/jobs\/[0-9a-f-]+/);
   await expect(page.locator('[data-testid="job-status"]')).toContainText("Draft");
 });

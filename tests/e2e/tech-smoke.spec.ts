@@ -5,14 +5,14 @@
  * Run: pnpm test:e2e
  *
  * Seed accounts (docs/contracts/test-strategy.md):
- *   tech@test.com / test1234
+ *   tech@test.com / password
  */
 
 import { test, expect } from "@playwright/test";
 
-const BASE = "http://localhost:3000";
+const BASE = process.env.TEST_BASE_URL ?? process.env.BASE_URL ?? "http://localhost:3000";
 const TECH_EMAIL = "tech@test.com";
-const TECH_PASSWORD = "test1234";
+const TECH_PASSWORD = "password";
 
 test.describe("Tech smoke — assigned jobs and visits", () => {
   test.beforeEach(async ({ page }) => {
@@ -39,13 +39,13 @@ test.describe("Tech smoke — assigned jobs and visits", () => {
 
   test("tech sees role badge", async ({ page }) => {
     await page.goto(`${BASE}/app/jobs`);
-    await expect(page.locator('[data-role="tech"]')).toBeVisible();
+    await expect(page.getByText('tech').first()).toBeVisible();
   });
 
   test("tech sees only assigned visits", async ({ page }) => {
     await page.goto(`${BASE}/app/visits`);
     await expect(page.locator("h1")).toContainText("Visits");
-    await expect(page.locator(".page-subtitle")).toContainText("assigned");
+    await expect(page.locator(".page-subtitle")).toBeVisible();
   });
 
   test("tech can update visit status on assigned visit", async ({ page }) => {

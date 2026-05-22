@@ -51,18 +51,18 @@ describe.skipIf(!RUN_INTEGRATION)("Period Closes API integration", () => {
     const [ownerRes, adminRes, techRes] = await Promise.all([
       fetch(`${BASE_URL}/api/v1/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: "owner@test.com", password: "test1234" }),
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "it-reports-__tests__-period-closes-integration-test-ts" },
+        body: JSON.stringify({ email: "owner@test.com", password: "password" }),
       }),
       fetch(`${BASE_URL}/api/v1/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: "admin@test.com", password: "test1234" }),
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "it-reports-__tests__-period-closes-integration-test-ts" },
+        body: JSON.stringify({ email: "admin@test.com", password: "password" }),
       }),
       fetch(`${BASE_URL}/api/v1/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: "tech@test.com", password: "test1234" }),
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "it-reports-__tests__-period-closes-integration-test-ts" },
+        body: JSON.stringify({ email: "tech@test.com", password: "password" }),
       }),
     ]);
     ownerCookie = (ownerRes.headers.get("set-cookie") ?? "").split(";")[0];
