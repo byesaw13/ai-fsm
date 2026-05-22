@@ -1,8 +1,10 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { queryOne, query } from "@/lib/db";
 import { derivePortalStage, CUSTOMER_STAGE_ORDER, CUSTOMER_STAGE_LABELS, CUSTOMER_STAGE_COLORS } from "@ai-fsm/domain";
 import { SmsOptOutButton } from "./SmsOptOutButton";
+import { getPortalSession } from "@/lib/portal/session";
+import PortalLogoutButton from "./PortalLogoutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -78,16 +80,23 @@ export default async function ClientPortalPage({
 }) {
   const { clientToken } = await params;
 
-  const client = await queryOne<ClientRow>(
-    `SELECT c.id, c.name, c.email, c.account_id, c.preferred_contact, c.sms_consent,
-            a.name AS account_name
-     FROM clients c
-     JOIN accounts a ON a.id = c.account_id
-     WHERE c.portal_token = $1`,
-    [clientToken]
-  );
+  const [portalSession, client] = await Promise.all([
+    getPortalSession(),
+    queryOne<ClientRow>(
+      `SELECT c.id, c.name, c.email, c.account_id, c.preferred_contact, c.sms_consent,
+              a.name AS account_name
+       FROM clients c
+       JOIN accounts a ON a.id = c.account_id
+       WHERE c.portal_token = $1`,
+      [clientToken]
+    ),
+  ]);
 
   if (!client) notFound();
+
+  if (!portalSession || portalSession.clientId !== client.id) {
+    redirect(`/portal/login`);
+  }
 
   const [estimates, invoices, plans, maintenanceJobs, activeVisitRows, recentComms, properties] = await Promise.all([
     query<EstimateRow>(
@@ -183,11 +192,14 @@ export default async function ClientPortalPage({
     <div style={{ minHeight: "100vh", background: "#f9fafb", padding: "24px 16px" }}>
       <div style={{ maxWidth: 800, margin: "0 auto" }}>
 
-        <div style={{ marginBottom: 32 }}>
-          <div style={{ fontSize: 13, color: "#6b7280" }}>{client.account_name}</div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: "4px 0 0" }}>
-            Welcome, {(client.name as string).split(" ")[0]}
-          </h1>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 }}>
+          <div>
+            <div style={{ fontSize: 13, color: "#6b7280" }}>{client.account_name}</div>
+            <h1 style={{ fontSize: 24, fontWeight: 700, margin: "4px 0 0" }}>
+              Welcome, {(client.name as string).split(" ")[0]}
+            </h1>
+          </div>
+          <PortalLogoutButton />
         </div>
 
         {/* Stage progress bar */}
