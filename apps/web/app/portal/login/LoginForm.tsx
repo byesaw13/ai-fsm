@@ -10,6 +10,7 @@ export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
 
   if (sent) {
     return (
@@ -34,13 +35,20 @@ export default function LoginForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setSubmitError(false);
     try {
-      await fetch("/api/v1/portal/request-access", {
+      const res = await fetch("/api/v1/portal/request-access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      setSent(true);
+      if (res.ok) {
+        setSent(true);
+      } else {
+        setSubmitError(true);
+      }
+    } catch {
+      setSubmitError(true);
     } finally {
       setLoading(false);
     }
@@ -56,6 +64,12 @@ export default function LoginForm() {
       {errorParam === "invalid" && (
         <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 6, padding: "10px 14px", marginBottom: 16, color: "#991b1b", fontSize: 14 }}>
           Invalid link. Please request a new one.
+        </div>
+      )}
+
+      {submitError && (
+        <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 6, padding: "10px 14px", marginBottom: 16, color: "#991b1b", fontSize: 14 }}>
+          Something went wrong. Please try again.
         </div>
       )}
 
