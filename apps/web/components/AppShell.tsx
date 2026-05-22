@@ -14,7 +14,14 @@ import {
   IconMyDay,
   IconField,
   IconMembership,
+  IconInvoices,
+  IconPipeline,
+  IconBooking,
+  IconReports,
+  IconPriceBook,
   IconDashboard,
+  IconActivity,
+  IconFolder,
 } from "./NavIcons";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
@@ -31,80 +38,92 @@ interface NavSection {
   items: NavItem[];
 }
 
-const OPERATIONS_ITEMS: NavItem[] = [
-  { href: "/app/my-day",    label: "My Day",   Icon: IconMyDay },
-  { href: "/app/schedule",  label: "Schedule", Icon: IconSchedule, adminOnly: true },
-  { href: "/app/jobs",      label: "Jobs",     Icon: IconJobs },
-  { href: "/app/field",     label: "On Site",  Icon: IconField },
+// ---------------------------------------------------------------------------
+// Navigation definitions
+// ---------------------------------------------------------------------------
+
+const WORK_ITEMS: NavItem[] = [
+  { href: "/app/my-day",   label: "My Day",   Icon: IconMyDay },
+  { href: "/app/schedule", label: "Schedule", Icon: IconSchedule, adminOnly: true },
+  { href: "/app/jobs",     label: "Jobs",     Icon: IconJobs },
+  { href: "/app/pipeline", label: "Pipeline", Icon: IconPipeline, adminOnly: true },
 ];
 
-const BUSINESS_ITEMS: NavItem[] = [
-  { href: "/app/clients",           label: "Clients",     Icon: IconClients,    adminOnly: true },
+const CUSTOMER_ITEMS: NavItem[] = [
+  { href: "/app/clients",          label: "Clients",  Icon: IconClients,  adminOnly: true },
+  { href: "/app/booking-requests", label: "Requests", Icon: IconBooking,  adminOnly: true },
+];
+
+const MONEY_ITEMS: NavItem[] = [
   { href: "/app/estimates",         label: "Estimates",   Icon: IconEstimates,  adminOnly: true },
+  { href: "/app/invoices",          label: "Invoices",    Icon: IconInvoices,   adminOnly: true },
   { href: "/app/maintenance-plans", label: "Memberships", Icon: IconMembership, adminOnly: true },
-  { href: "/app/settings",          label: "Settings",    Icon: IconSettings },
 ];
 
-const DASHBOARD_ITEMS: NavItem[] = [
-  { href: "/app/membership-dashboard",  label: "Membership",  Icon: IconDashboard, adminOnly: true },
-  { href: "/app/pricing-dashboard",     label: "Pricing",     Icon: IconDashboard, adminOnly: true },
-  { href: "/app/operations-dashboard",  label: "Operations",  Icon: IconDashboard, adminOnly: true },
-  { href: "/app/documents-dashboard",   label: "Documents",   Icon: IconDashboard, adminOnly: true },
+const INSIGHTS_ITEMS: NavItem[] = [
+  { href: "/app/reports",              label: "Reports",    Icon: IconReports,   adminOnly: true },
+  { href: "/app/operations-dashboard", label: "Operations", Icon: IconActivity,  adminOnly: true },
+  { href: "/app/membership-dashboard", label: "Members",    Icon: IconDashboard, adminOnly: true },
+  { href: "/app/pricing-dashboard",    label: "Pricing",    Icon: IconPriceBook, adminOnly: true },
+  { href: "/app/documents-dashboard",  label: "Documents",  Icon: IconFolder,    adminOnly: true },
 ];
 
-/** Pure function — returns filtered nav sections for a given role */
+// ---------------------------------------------------------------------------
+// Pure functions
+// ---------------------------------------------------------------------------
+
+/** Returns filtered nav sections for a given role */
 export function getNavSections(role: string): NavSection[] {
-  const sections: NavSection[] = [];
+  const filter = (items: NavItem[]) =>
+    role === "tech" ? items.filter((i) => !i.adminOnly) : items;
 
-  const opsItems = role === "tech"
-    ? OPERATIONS_ITEMS.filter((item) => !item.adminOnly)
-    : OPERATIONS_ITEMS;
-  if (opsItems.length > 0) sections.push({ label: "Operations", items: opsItems });
+  const sections: NavSection[] = [
+    { label: "Work",      items: filter(WORK_ITEMS) },
+    { label: "Customers", items: filter(CUSTOMER_ITEMS) },
+    { label: "Money",     items: filter(MONEY_ITEMS) },
+    { label: "Insights",  items: filter(INSIGHTS_ITEMS) },
+  ];
 
-  const bizItems = role === "tech"
-    ? BUSINESS_ITEMS.filter((item) => !item.adminOnly)
-    : BUSINESS_ITEMS;
-  if (bizItems.length > 0) sections.push({ label: "Business", items: bizItems });
-
-  if (role !== "tech") {
-    sections.push({ label: "Dashboards", items: DASHBOARD_ITEMS });
-  }
-
-  return sections;
+  return sections.filter((s) => s.items.length > 0);
 }
 
-/** Pure function — returns flat list of nav items for mobile bottom nav */
+/** Returns flat list for the mobile bottom tab bar */
 export function getBottomNavItems(role: string): NavItem[] {
-  const myDay    = OPERATIONS_ITEMS.find((i) => i.href === "/app/my-day")!;
-  const field    = OPERATIONS_ITEMS.find((i) => i.href === "/app/field")!;
-  const jobs     = OPERATIONS_ITEMS.find((i) => i.href === "/app/jobs")!;
+  const myDay = WORK_ITEMS.find((i) => i.href === "/app/my-day")!;
+  const field: NavItem = { href: "/app/field", label: "On Site", Icon: IconField };
+  const jobs  = WORK_ITEMS.find((i) => i.href === "/app/jobs")!;
 
-  if (role === "tech") {
-    return [myDay, field, jobs];
-  }
+  if (role === "tech") return [myDay, field, jobs];
 
-  const schedule  = OPERATIONS_ITEMS.find((i) => i.href === "/app/schedule")!;
-  const clients   = BUSINESS_ITEMS.find((i) => i.href === "/app/clients")!;
-  const estimates = BUSINESS_ITEMS.find((i) => i.href === "/app/estimates")!;
+  const schedule  = WORK_ITEMS.find((i) => i.href === "/app/schedule")!;
+  const clients   = CUSTOMER_ITEMS.find((i) => i.href === "/app/clients")!;
+  const estimates = MONEY_ITEMS.find((i) => i.href === "/app/estimates")!;
   return [myDay, schedule, jobs, clients, estimates];
 }
 
-/** Pure function — returns true if href is the active nav route for pathname */
+/** Returns true if href is the active route for the current pathname */
 export function isNavActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
+// ---------------------------------------------------------------------------
+// AppShell
+// ---------------------------------------------------------------------------
+
 interface AppShellProps {
   role: string;
+  userName?: string;
   children: ReactNode;
 }
 
-export function AppShell({ role, children }: AppShellProps) {
+export function AppShell({ role, userName, children }: AppShellProps) {
   const pathname = usePathname();
   const sections = getNavSections(role);
   const bottomItems = getBottomNavItems(role);
-  const allItems = sections.flatMap((s) => s.items);
-  const activeItem = allItems.find((item) => isNavActive(pathname, item.href));
+
+  const settingsActive = isNavActive(pathname, "/app/settings");
+  const avatarLetter = userName ? userName[0].toUpperCase() : role[0].toUpperCase();
+  const displayName = userName || "Account";
 
   return (
     <ToastProvider>
@@ -119,7 +138,7 @@ export function AppShell({ role, children }: AppShellProps) {
             <span className="p7-brand-name">Dovetails</span>
           </Link>
 
-          {/* Nav sections */}
+          {/* Scrollable nav sections */}
           <nav className="p7-nav" aria-label="Primary navigation">
             {sections.map((section) => (
               <div key={section.label}>
@@ -143,16 +162,31 @@ export function AppShell({ role, children }: AppShellProps) {
                 })}
               </div>
             ))}
+
+            {/* Settings pinned to bottom of nav */}
+            <div style={{ marginTop: "auto", paddingTop: "var(--space-3)", borderTop: "1px solid var(--border)" }}>
+              <Link
+                href={"/app/settings" as Route}
+                className={`p7-nav-item ${settingsActive ? "p7-nav-active" : ""}`}
+                aria-current={settingsActive ? "page" : undefined}
+                title="Settings"
+              >
+                <span className="p7-nav-icon" aria-hidden="true">
+                  <IconSettings size={18} />
+                </span>
+                <span className="p7-nav-label">Settings</span>
+              </Link>
+            </div>
           </nav>
 
           {/* Footer — user chip + logout */}
           <div className="p7-sidebar-footer">
             <div className="p7-user-chip">
               <div className="p7-user-avatar" aria-hidden="true">
-                {activeItem ? activeItem.label[0]?.toUpperCase() : role[0]?.toUpperCase()}
+                {avatarLetter}
               </div>
               <div className="p7-user-info">
-                <span className="p7-user-name">Account</span>
+                <span className="p7-user-name">{displayName}</span>
                 <span className="p7-user-role">{role}</span>
               </div>
             </div>
@@ -191,7 +225,9 @@ export function AppShell({ role, children }: AppShellProps) {
   );
 }
 
-// ---- Logout button -------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Logout button
+// ---------------------------------------------------------------------------
 
 function LogoutButton() {
   const [pending, setPending] = useState(false);

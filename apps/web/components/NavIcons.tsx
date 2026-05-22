@@ -203,3 +203,19 @@ export function IconMembership(props: IconProps) {
     </Icon>
   );
 }
+
+export function IconActivity(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <polyline points="2 12 6 12 8 4 12 18 14 9 16 12 18 12" />
+    </Icon>
+  );
+}
+
+export function IconFolder(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M2 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6Z" />
+    </Icon>
+  );
+}
