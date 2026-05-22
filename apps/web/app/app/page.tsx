@@ -7,9 +7,6 @@ import {
   Card,
   EmptyState,
   MetricGrid,
-  PageContainer,
-  PageHeader,
-  SectionHeader,
   StatusBadge,
 } from "@/components/ui";
 import type { MetricCardData, StatusVariant } from "@/components/ui";
@@ -20,10 +17,11 @@ export const dynamic = "force-dynamic";
 // Types
 // ---------------------------------------------------------------------------
 
-type CountRow    = { count: string };
-type MoneyRow    = { count: string; total_cents: string };
-type RevenueRow  = { total_cents: string };
+type CountRow     = { count: string };
+type MoneyRow     = { count: string; total_cents: string };
+type RevenueRow   = { total_cents: string };
 type ExceptionRow = { kind: string; count: string };
+type UserRow      = { full_name: string };
 
 type VisitRow = {
   id: string;
@@ -31,6 +29,7 @@ type VisitRow = {
   status: string;
   job_title: string;
   client_name: string;
+  property_address: string | null;
 };
 
 type PlanSummaryRow = {
@@ -39,17 +38,6 @@ type PlanSummaryRow = {
   essential_count: string;
   plus_count: string;
   premier_count: string;
-};
-
-type RenewalRow = {
-  id: string;
-  name: string;
-  membership_tier: string;
-  member_priority: string;
-  annual_price_cents: string;
-  billing_cadence: string;
-  renewal_date: string;
-  client_name: string;
 };
 
 type ActionQueueItem = {
@@ -70,30 +58,16 @@ function fmt(cents: number | string): string {
 }
 
 function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
-}
-
-function fmtDate(iso: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
 }
 
 function parseN(row: CountRow | undefined | null): number {
   return parseInt(row?.count ?? "0", 10);
 }
-
-function renewalBadge(renewalDate: string): { label: string; bg: string; color: string } {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const d = new Date(renewalDate);
-  const daysOut = Math.round((d.getTime() - today.getTime()) / 86_400_000);
-  if (daysOut < 0)  return { label: "Overdue",     bg: "#fee2e2", color: "#dc2626" };
-  if (daysOut <= 30) return { label: `${daysOut}d`, bg: "#fef3c7", color: "#d97706" };
-  return               { label: `${daysOut}d`,      bg: "#dbeafe", color: "#2563eb" };
-}
-
-const TIER_LABELS: Record<string, string> = { essential: "Essential", plus: "Plus", premier: "Premier" };
-const PRIORITY_LABELS: Record<string, string> = { priority: "Priority", vip: "VIP" };
 
 // ---------------------------------------------------------------------------
 // Page
@@ -105,9 +79,23 @@ export default async function AppPage() {
   if (session.role === "tech") redirect("/app/my-day");
 
   const accountId = session.accountId;
+  const isOwner   = session.role === "owner";
+
+  const hour     = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const todayLabel = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 
   const [
+    me,
     revenueRows,
+    openARRow,
+    activeJobsRow,
+    pendingRequestsRow,
     planSummary,
     renewingSoon,
     overdueRenewals,
@@ -119,18 +107,39 @@ export default async function AppPage() {
     estimatesAwaiting,
     jobsNoNextVisit,
     exceptionRows,
-    renewalsList,
+    lastMonthRevenueRow,
   ] = await Promise.all([
+    // Current user name
+    queryForSession<UserRow>(session,
+      `SELECT full_name FROM users WHERE id = $1`,
+      [session.userId]),
 
-    // Revenue collected this month (paid / partial invoices)
+    // Revenue collected this month
     queryForSession<RevenueRow>(session,
       `SELECT COALESCE(SUM(total_cents), 0)::text AS total_cents
        FROM invoices
-       WHERE account_id = $1
-         AND status IN ('partial','paid')
+       WHERE account_id = $1 AND status IN ('partial','paid')
          AND created_at >= date_trunc('month', NOW())`,
-      [accountId]
-    ),
+      [accountId]),
+
+    // Total open AR (sent + partial + overdue invoices)
+    queryForSession<RevenueRow>(session,
+      `SELECT COALESCE(SUM(total_cents), 0)::text AS total_cents
+       FROM invoices
+       WHERE account_id = $1 AND status IN ('sent','partial','overdue')`,
+      [accountId]),
+
+    // Active jobs (scheduled or in-progress)
+    queryForSession<CountRow>(session,
+      `SELECT COUNT(*)::text AS count FROM jobs
+       WHERE account_id = $1 AND status IN ('scheduled','in_progress')`,
+      [accountId]),
+
+    // Pending booking requests
+    queryForSession<CountRow>(session,
+      `SELECT COUNT(*)::text AS count FROM booking_requests
+       WHERE account_id = $1 AND status = 'pending'`,
+      [accountId]),
 
     // Active membership summary: count + ARR + tier breakdown
     queryForSession<PlanSummaryRow>(session,
@@ -142,8 +151,7 @@ export default async function AppPage() {
          COUNT(*) FILTER (WHERE membership_tier = 'premier')::text    AS premier_count
        FROM maintenance_plans
        WHERE account_id = $1 AND status = 'active'`,
-      [accountId]
-    ),
+      [accountId]),
 
     // Memberships renewing within 30 days
     queryForSession<CountRow>(session,
@@ -152,8 +160,7 @@ export default async function AppPage() {
          AND renewal_date IS NOT NULL
          AND renewal_date > CURRENT_DATE
          AND renewal_date <= CURRENT_DATE + INTERVAL '30 days'`,
-      [accountId]
-    ),
+      [accountId]),
 
     // Memberships with overdue renewal date
     queryForSession<CountRow>(session,
@@ -161,18 +168,16 @@ export default async function AppPage() {
        WHERE account_id = $1 AND status = 'active'
          AND renewal_date IS NOT NULL
          AND renewal_date < CURRENT_DATE`,
-      [accountId]
-    ),
+      [accountId]),
 
-    // Active membership visits at labor cap
+    // Active membership visits at or over labor cap
     queryForSession<CountRow>(session,
       `SELECT COUNT(*)::text AS count FROM visits
        WHERE account_id = $1
          AND generated_from_plan_id IS NOT NULL
          AND membership_cap_status IN ('cap_reached','approval_required')
          AND status NOT IN ('completed','cancelled')`,
-      [accountId]
-    ),
+      [accountId]),
 
     // Membership visits pending snapshot delivery
     queryForSession<CountRow>(session,
@@ -182,24 +187,24 @@ export default async function AppPage() {
          AND membership_visit_phase = 'reporting'
          AND membership_snapshot_sent_at IS NULL
          AND status != 'cancelled'`,
-      [accountId]
-    ),
+      [accountId]),
 
-    // Today's visits (schedule strip)
+    // Today's visits (with property address for context)
     queryForSession<VisitRow>(session,
       `SELECT v.id,
               v.scheduled_start::text AS scheduled_start,
               v.status,
-              j.title AS job_title,
-              c.name  AS client_name
+              j.title     AS job_title,
+              c.name      AS client_name,
+              p.address   AS property_address
        FROM visits v
-       JOIN jobs j ON j.id = v.job_id
-       JOIN clients c ON c.id = j.client_id
+       JOIN jobs j     ON j.id = v.job_id
+       JOIN clients c  ON c.id = j.client_id
+       LEFT JOIN properties p ON p.id = j.property_id
        WHERE v.account_id = $1
          AND v.scheduled_start::date = CURRENT_DATE
        ORDER BY v.scheduled_start ASC`,
-      [accountId]
-    ),
+      [accountId]),
 
     // Overdue invoices: count + outstanding total
     queryForSession<MoneyRow>(session,
@@ -207,10 +212,9 @@ export default async function AppPage() {
               COALESCE(SUM(total_cents), 0)::text AS total_cents
        FROM invoices
        WHERE account_id = $1 AND status = 'overdue'`,
-      [accountId]
-    ),
+      [accountId]),
 
-    // Estimates expiring within 7 days (sent or draft)
+    // Estimates expiring within 7 days
     queryForSession<CountRow>(session,
       `SELECT COUNT(*)::text AS count
        FROM estimates
@@ -218,8 +222,7 @@ export default async function AppPage() {
          AND status IN ('draft','sent')
          AND expires_at IS NOT NULL
          AND expires_at < NOW() + INTERVAL '7 days'`,
-      [accountId]
-    ),
+      [accountId]),
 
     // Sent estimates awaiting client response
     queryForSession<CountRow>(session,
@@ -228,8 +231,7 @@ export default async function AppPage() {
        WHERE account_id = $1
          AND status = 'sent'
          AND (expires_at IS NULL OR expires_at > NOW())`,
-      [accountId]
-    ),
+      [accountId]),
 
     // Active jobs with no future scheduled visit
     queryForSession<CountRow>(session,
@@ -243,53 +245,60 @@ export default async function AppPage() {
              AND visits.status = 'scheduled'
              AND visits.scheduled_start > NOW()
          )`,
-      [accountId]
-    ),
+      [accountId]),
 
     // Jobs + visits with active sub-status (exception lanes)
     queryForSession<ExceptionRow>(session,
       `SELECT 'job'   AS kind, COUNT(*)::text AS count FROM jobs   WHERE account_id = $1 AND sub_status IS NOT NULL
        UNION ALL
        SELECT 'visit' AS kind, COUNT(*)::text AS count FROM visits WHERE account_id = $1 AND sub_status IS NOT NULL`,
-      [accountId]
-    ),
+      [accountId]),
 
-    // Upcoming renewal list — overdue + within 60 days
-    queryForSession<RenewalRow>(session,
-      `SELECT mp.id, mp.name, mp.membership_tier, mp.member_priority,
-              mp.annual_price_cents::text, mp.billing_cadence, mp.renewal_date::text,
-              c.name AS client_name
-       FROM maintenance_plans mp
-       JOIN clients c ON mp.client_id = c.id
-       WHERE mp.account_id = $1
-         AND mp.status = 'active'
-         AND mp.renewal_date IS NOT NULL
-         AND mp.renewal_date <= CURRENT_DATE + INTERVAL '60 days'
-       ORDER BY mp.renewal_date ASC
-       LIMIT 20`,
-      [accountId]
-    ),
+    // Owner only: revenue collected last calendar month (for trend)
+    isOwner
+      ? queryForSession<RevenueRow>(session,
+          `SELECT COALESCE(SUM(total_cents), 0)::text AS total_cents
+           FROM invoices
+           WHERE account_id = $1 AND status IN ('partial','paid')
+             AND created_at >= date_trunc('month', NOW() - INTERVAL '1 month')
+             AND created_at <  date_trunc('month', NOW())`,
+          [accountId])
+      : Promise.resolve([{ total_cents: "0" }] as RevenueRow[]),
   ]);
 
-  // -- Derived values --------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Derived values
+  // ---------------------------------------------------------------------------
 
-  const revenueThisMonth   = parseInt(revenueRows[0]?.total_cents ?? "0", 10);
-  const summary            = planSummary[0] ?? { count: "0", arr_cents: "0", essential_count: "0", plus_count: "0", premier_count: "0" };
-  const activeMembers      = parseInt(summary.count, 10);
-  const arrCents           = parseInt(summary.arr_cents, 10);
-  const renewingSoonCount  = parseN(renewingSoon[0]);
-  const overdueRenewalCount = parseN(overdueRenewals[0]);
-  const capCount           = parseN(capOverrunCount[0]);
-  const snapshotCount      = parseN(snapshotPendingCount[0]);
-  const overdueInvCount    = parseN(overdueInvoices[0]);
-  const overdueInvTotal    = parseInt(overdueInvoices[0]?.total_cents ?? "0", 10);
-  const expiringCount      = parseN(expiringEstimates[0]);
-  const awaitingCount      = parseN(estimatesAwaiting[0]);
-  const noNextVisitCount   = parseN(jobsNoNextVisit[0]);
-  const exceptionJobCount  = parseN(exceptionRows.find((r) => r.kind === "job"));
-  const exceptionVisitCount = parseN(exceptionRows.find((r) => r.kind === "visit"));
+  const userName             = me[0]?.full_name ?? "";
+  const firstName            = userName.split(" ")[0] || "";
+  const revenueThisMonth     = parseInt(revenueRows[0]?.total_cents ?? "0", 10);
+  const openAR               = parseInt(openARRow[0]?.total_cents ?? "0", 10);
+  const activeJobsCount      = parseN(activeJobsRow[0]);
+  const pendingRequestsCount = parseN(pendingRequestsRow[0]);
+  const summary              = planSummary[0] ?? { count: "0", arr_cents: "0", essential_count: "0", plus_count: "0", premier_count: "0" };
+  const activeMembers        = parseInt(summary.count, 10);
+  const arrCents             = parseInt(summary.arr_cents, 10);
+  const renewingSoonCount    = parseN(renewingSoon[0]);
+  const overdueRenewalCount  = parseN(overdueRenewals[0]);
+  const capCount             = parseN(capOverrunCount[0]);
+  const snapshotCount        = parseN(snapshotPendingCount[0]);
+  const overdueInvCount      = parseN(overdueInvoices[0]);
+  const overdueInvTotal      = parseInt(overdueInvoices[0]?.total_cents ?? "0", 10);
+  const expiringCount        = parseN(expiringEstimates[0]);
+  const awaitingCount        = parseN(estimatesAwaiting[0]);
+  const noNextVisitCount     = parseN(jobsNoNextVisit[0]);
+  const exceptionJobCount    = parseN(exceptionRows.find((r) => r.kind === "job"));
+  const exceptionVisitCount  = parseN(exceptionRows.find((r) => r.kind === "visit"));
+  const lastMonthRev         = parseInt(lastMonthRevenueRow[0]?.total_cents ?? "0", 10);
 
-  const alertCount = overdueInvCount + expiringCount + (capCount + snapshotCount) + (exceptionJobCount + exceptionVisitCount);
+  const revenueChangePct = lastMonthRev > 0
+    ? Math.round(((revenueThisMonth - lastMonthRev) / lastMonthRev) * 100)
+    : revenueThisMonth > 0 ? 100 : 0;
+
+  // ---------------------------------------------------------------------------
+  // Action queue — only shows items with count > 0
+  // ---------------------------------------------------------------------------
 
   const actionQueue = ([
     {
@@ -334,11 +343,20 @@ export default async function AppPage() {
       detail: overdueRenewalCount > 0 ? `${overdueRenewalCount} overdue` : "Due within 30 days",
       tone: overdueRenewalCount > 0 ? "danger" : "default",
     },
+    {
+      label: "Clear exception lanes",
+      count: exceptionJobCount + exceptionVisitCount,
+      href: "/app/jobs" as Route,
+      detail: `${exceptionJobCount} job${exceptionJobCount !== 1 ? "s" : ""} · ${exceptionVisitCount} visit${exceptionVisitCount !== 1 ? "s" : ""}`,
+      tone: "warning",
+    },
   ] satisfies ActionQueueItem[]).filter((item) => item.count > 0);
 
-  // -- Metrics ---------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Pulse metrics strip — 4 KPIs visible to all admin/owner
+  // ---------------------------------------------------------------------------
 
-  const metrics: MetricCardData[] = [
+  const pulseMetrics: MetricCardData[] = [
     {
       label: "Revenue This Month",
       value: fmt(revenueThisMonth),
@@ -347,17 +365,17 @@ export default async function AppPage() {
       variant: revenueThisMonth > 0 ? "success" : "default",
     },
     {
-      label: "Active Members",
-      value: activeMembers,
-      sub: `${summary.essential_count} Essential · ${summary.plus_count} Plus · ${summary.premier_count} Premier`,
-      href: "/app/maintenance-plans",
-      variant: "default",
+      label: "Open AR",
+      value: fmt(openAR),
+      sub: "Sent, partial & overdue",
+      href: "/app/invoices",
+      variant: openAR > 0 ? "alert" : "default",
     },
     {
-      label: "Annual Run Rate",
-      value: fmt(arrCents),
-      sub: "Active memberships",
-      href: "/app/maintenance-plans",
+      label: "Active Jobs",
+      value: activeJobsCount,
+      sub: "Scheduled or in progress",
+      href: "/app/jobs",
       variant: "default",
     },
     {
@@ -367,243 +385,316 @@ export default async function AppPage() {
       href: "/app/estimates?status=sent",
       variant: awaitingCount > 0 ? "alert" : "default",
     },
-    {
-      label: "Renewing in 30 Days",
-      value: renewingSoonCount,
-      sub: overdueRenewalCount > 0 ? `+ ${overdueRenewalCount} overdue` : "Active memberships",
-      href: "/app/maintenance-plans",
-      variant: renewingSoonCount > 0 || overdueRenewalCount > 0 ? "alert" : "default",
-    },
-    {
-      label: "Jobs Without Next Visit",
-      value: noNextVisitCount,
-      sub: "Active jobs, no visit scheduled",
-      href: "/app/jobs",
-      variant: noNextVisitCount > 0 ? "alert" : "default",
-    },
   ];
 
-  // -- Table styles (inline, reused) -----------------------------------------
+  // ---------------------------------------------------------------------------
+  // Shared inline style helpers
+  // ---------------------------------------------------------------------------
 
-  const th: React.CSSProperties = {
-    textAlign: "left",
-    padding: "var(--space-2) var(--space-3)",
+  const metaLabel: React.CSSProperties = {
+    fontSize: "var(--text-xs)",
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
     color: "var(--fg-muted)",
-    fontWeight: 500,
-    fontSize: "var(--text-sm)",
-    borderBottom: "1px solid var(--border)",
-  };
-  const td: React.CSSProperties = {
-    padding: "var(--space-2) var(--space-3)",
-    fontSize: "var(--text-sm)",
-    verticalAlign: "middle",
+    marginBottom: "var(--space-2)",
   };
 
-  // --------------------------------------------------------------------------
+  const bigNum: React.CSSProperties = {
+    fontSize: "var(--text-3xl)",
+    fontWeight: 700,
+    letterSpacing: "-0.02em",
+    color: "var(--fg)",
+    lineHeight: 1.1,
+  };
+
+  // ---------------------------------------------------------------------------
+  // Render
+  // ---------------------------------------------------------------------------
 
   return (
-    <PageContainer>
-      <PageHeader
-        title="Home"
-        subtitle="What needs your attention today"
-      />
+    <div style={{ padding: "var(--space-6) var(--space-6) var(--space-10)" }}>
 
-      {/* ── KPI metrics ───────────────────────────────────────────────────── */}
-      <MetricGrid metrics={metrics} />
-
-      {/* ── Action Queue ──────────────────────────────────────────────────── */}
-      <Card hover padding="lg" className="ops-wide-card" style={{ marginTop: "var(--space-6)" }}>
-        <div className="ops-section-header">
-          <h2 className="ops-section-title">Action Queue</h2>
-          <span className="ops-section-count">{actionQueue.length}</span>
+      {/* ── Greeting + Quick Actions ──────────────────────────────────── */}
+      <div style={{
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: "var(--space-4)",
+        flexWrap: "wrap",
+        marginBottom: "var(--space-6)",
+      }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: "var(--text-2xl)", fontWeight: 700, letterSpacing: "-0.01em" }}>
+            {greeting}{firstName ? `, ${firstName}` : ""}
+          </h1>
+          <p style={{ margin: 0, marginTop: "var(--space-1)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+            {todayLabel}
+          </p>
         </div>
-        {actionQueue.length === 0 ? (
-          <EmptyState title="No urgent actions" description="Today's required work is clear." />
-        ) : (
-          <div style={{ display: "grid", gap: "var(--space-2)" }}>
-            {actionQueue.map((item) => {
-              const color = item.tone === "danger" ? "var(--status-error)" : item.tone === "warning" ? "var(--status-warning)" : "var(--accent)";
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "minmax(0, 1fr) auto",
-                    gap: "var(--space-3)",
-                    alignItems: "center",
-                    padding: "var(--space-3)",
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    textDecoration: "none",
-                    color: "inherit",
-                  }}
-                >
-                  <span>
-                    <span style={{ display: "block", fontWeight: 700 }}>{item.label}</span>
-                    <span style={{ display: "block", color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: 2 }}>{item.detail}</span>
-                  </span>
-                  <span style={{ color, fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{item.count}</span>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </Card>
 
-      {/* ── Today's Schedule ──────────────────────────────────────────────── */}
-      <Card hover padding="lg" className="ops-wide-card" style={{ marginTop: "var(--space-6)" }}>
-        <div className="ops-section-header">
-          <h2 className="ops-section-title">Today&apos;s Schedule</h2>
-          <span className="ops-section-count">{todayVisits.length}</span>
-        </div>
-        {todayVisits.length === 0 ? (
-          <EmptyState title="No visits scheduled today" description="The schedule will appear here when visits are booked." />
-        ) : (
-          <div className="ops-visit-list">
-            {todayVisits.map((v) => (
-              <Link key={v.id} href={`/app/visits/${v.id}` as Route} className="ops-visit-row">
-                <div className="ops-visit-time">
-                  <span>{fmtTime(v.scheduled_start)}</span>
-                </div>
-                <div className="ops-visit-body">
-                  <div className="ops-visit-client">{v.client_name}</div>
-                  <div className="ops-visit-job">{v.job_title}</div>
-                </div>
-                <StatusBadge variant={v.status as StatusVariant}>{v.status.replace("_", " ")}</StatusBadge>
-              </Link>
-            ))}
-          </div>
-        )}
-        <div style={{ marginTop: "var(--space-3)", textAlign: "right" }}>
-          <Link href={"/app/schedule" as Route} style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--accent)", textDecoration: "none" }}>
-            Full schedule →
+        {/* Quick Actions */}
+        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
+          <Link href={"/app/intake/new" as Route} className="p7-btn p7-btn-primary p7-btn-sm">
+            + New Job
+          </Link>
+          <Link href={"/app/estimates/new" as Route} className="p7-btn p7-btn-secondary p7-btn-sm">
+            + Estimate
+          </Link>
+          <Link href={"/app/invoices/new" as Route} className="p7-btn p7-btn-secondary p7-btn-sm">
+            + Invoice
+          </Link>
+          <Link
+            href={"/app/booking-requests" as Route}
+            className="p7-btn p7-btn-secondary p7-btn-sm"
+            style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-2)" }}
+          >
+            Requests
+            {pendingRequestsCount > 0 && (
+              <span style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minWidth: "1.25rem",
+                height: "1.25rem",
+                borderRadius: "var(--radius-full)",
+                background: "var(--color-red-600)",
+                color: "#fff",
+                fontSize: "var(--text-xs)",
+                fontWeight: 700,
+                lineHeight: 1,
+                padding: "0 4px",
+              }}>
+                {pendingRequestsCount}
+              </span>
+            )}
           </Link>
         </div>
-      </Card>
+      </div>
 
-      {/* ── Alerts & Actions ──────────────────────────────────────────────── */}
-      {alertCount > 0 && (
-        <Card hover padding="lg" className="ops-wide-card" style={{ marginTop: "var(--space-6)" }}>
+      {/* ── Pulse Metrics (4 KPIs) ────────────────────────────────────── */}
+      <MetricGrid metrics={pulseMetrics} />
+
+      {/* ── Main 2-column: Today's Schedule + Action Queue ────────────── */}
+      <div className="home-two-col">
+
+        {/* Today's Schedule */}
+        <Card hover padding="lg">
           <div className="ops-section-header">
-            <h2 className="ops-section-title">Alerts</h2>
-            <span className="ops-section-count" style={{ background: "var(--status-error)", color: "#fff" }}>{alertCount}</span>
+            <h2 className="ops-section-title">Today&apos;s Schedule</h2>
+            <span className="ops-section-count">{todayVisits.length}</span>
           </div>
-          <div className="ops-alert-grid">
-            {overdueInvCount > 0 && (
-              <div className="ops-alert-item">
-                <div className="ops-alert-label">Overdue invoices</div>
-                <div className="ops-alert-value">{overdueInvCount}</div>
-                <div className="ops-alert-sub">{fmt(overdueInvTotal)} outstanding</div>
-                <Link href={"/app/invoices?status=overdue" as Route} className="ops-alert-link">View invoices →</Link>
+          {todayVisits.length === 0 ? (
+            <EmptyState
+              title="No visits scheduled today"
+              description="The schedule will appear here when visits are booked."
+            />
+          ) : (
+            <div className="ops-visit-list">
+              {todayVisits.map((v) => (
+                <Link key={v.id} href={`/app/visits/${v.id}` as Route} className="ops-visit-row">
+                  <div className="ops-visit-time">
+                    <span>{fmtTime(v.scheduled_start)}</span>
+                  </div>
+                  <div className="ops-visit-body">
+                    <div className="ops-visit-client">{v.client_name}</div>
+                    <div className="ops-visit-job">
+                      {v.property_address ?? v.job_title}
+                    </div>
+                  </div>
+                  <StatusBadge variant={v.status as StatusVariant}>
+                    {v.status.replace("_", " ")}
+                  </StatusBadge>
+                </Link>
+              ))}
+            </div>
+          )}
+          <div style={{ marginTop: "var(--space-4)", textAlign: "right" }}>
+            <Link
+              href={"/app/schedule" as Route}
+              style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--accent)", textDecoration: "none" }}
+            >
+              Full schedule →
+            </Link>
+          </div>
+        </Card>
+
+        {/* Action Queue */}
+        <Card hover padding="lg">
+          <div className="ops-section-header">
+            <h2 className="ops-section-title">Action Queue</h2>
+            <span className="ops-section-count">{actionQueue.length}</span>
+          </div>
+          {actionQueue.length === 0 ? (
+            <EmptyState title="All clear" description="No urgent actions right now." />
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+              {actionQueue.map((item) => {
+                const countColor =
+                  item.tone === "danger"  ? "var(--color-red-600)"   :
+                  item.tone === "warning" ? "var(--color-amber-600)" :
+                  "var(--accent)";
+                return (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "minmax(0, 1fr) auto",
+                      gap: "var(--space-3)",
+                      alignItems: "center",
+                      padding: "var(--space-3)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      textDecoration: "none",
+                      color: "inherit",
+                    }}
+                  >
+                    <span>
+                      <span style={{ display: "block", fontWeight: 600, fontSize: "var(--text-sm)" }}>
+                        {item.label}
+                      </span>
+                      <span style={{ display: "block", color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginTop: 2 }}>
+                        {item.detail}
+                      </span>
+                    </span>
+                    <span style={{ color: countColor, fontWeight: 800, fontVariantNumeric: "tabular-nums", fontSize: "var(--text-lg)" }}>
+                      {item.count}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* ── Owner: Business Health ─────────────────────────────────────── */}
+      {isOwner && (
+        <div style={{ marginTop: "var(--space-8)" }}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: "var(--space-4)",
+          }}>
+            <h2 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 700 }}>Business Health</h2>
+            <Link
+              href={"/app/reports" as Route}
+              style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--accent)", textDecoration: "none" }}
+            >
+              Full reports →
+            </Link>
+          </div>
+
+          <div className="home-owner-grid">
+
+            {/* Revenue trend */}
+            <Card padding="lg" style={{
+              background: revenueChangePct >= 0 ? "var(--color-green-50)" : "var(--color-red-50)",
+              borderColor: revenueChangePct >= 0 ? "var(--color-green-200)" : "var(--color-red-200)",
+            }}>
+              <div style={metaLabel}>Revenue This Month</div>
+              <div style={bigNum}>{fmt(revenueThisMonth)}</div>
+              <div style={{
+                marginTop: "var(--space-2)",
+                fontSize: "var(--text-sm)",
+                fontWeight: 600,
+                color: revenueChangePct >= 0 ? "var(--color-green-600)" : "var(--color-red-600)",
+              }}>
+                {revenueChangePct > 0 ? "↑" : revenueChangePct < 0 ? "↓" : "—"}{" "}
+                {revenueChangePct !== 0 ? `${Math.abs(revenueChangePct)}% vs last month` : "Same as last month"}
               </div>
-            )}
-            {expiringCount > 0 && (
-              <div className="ops-alert-item">
-                <div className="ops-alert-label">Expiring estimates</div>
-                <div className="ops-alert-value">{expiringCount}</div>
-                <div className="ops-alert-sub">Expiring within 7 days</div>
-                <Link href={"/app/estimates?status=sent" as Route} className="ops-alert-link">View estimates →</Link>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
+                Last month: {fmt(lastMonthRev)}
               </div>
-            )}
-            {capCount > 0 && (
-              <div className="ops-alert-item">
-                <div className="ops-alert-label">Labor cap overruns</div>
-                <div className="ops-alert-value">{capCount}</div>
-                <div className="ops-alert-sub">Active visits at or over cap</div>
-                <Link href={"/app/visits" as Route} className="ops-alert-link">View visits →</Link>
+            </Card>
+
+            {/* Annual Run Rate */}
+            <Card padding="lg">
+              <div style={metaLabel}>Annual Run Rate</div>
+              <div style={bigNum}>{fmt(arrCents)}</div>
+              <div style={{ marginTop: "var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                {activeMembers} active member{activeMembers !== 1 ? "s" : ""}
               </div>
-            )}
-            {snapshotCount > 0 && (
-              <div className="ops-alert-item">
-                <div className="ops-alert-label">Snapshots pending</div>
-                <div className="ops-alert-value">{snapshotCount}</div>
-                <div className="ops-alert-sub">Membership visits awaiting delivery</div>
-                <Link href={"/app/visits" as Route} className="ops-alert-link">View visits →</Link>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
+                {summary.essential_count} Essential · {summary.plus_count} Plus · {summary.premier_count} Premier
               </div>
-            )}
-            {(exceptionJobCount + exceptionVisitCount) > 0 && (
-              <div className="ops-alert-item">
-                <div className="ops-alert-label">Exception lanes</div>
-                <div className="ops-alert-value">{exceptionJobCount + exceptionVisitCount}</div>
-                <div className="ops-alert-sub">{exceptionJobCount} jobs · {exceptionVisitCount} visits</div>
-                <div className="ops-alert-links">
-                  <Link href={"/app/jobs" as Route} className="ops-alert-link">Jobs →</Link>
-                  <Link href={"/app/visits" as Route} className="ops-alert-link">Visits →</Link>
+              <Link
+                href={"/app/membership-dashboard" as Route}
+                style={{ display: "inline-block", marginTop: "var(--space-3)", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--accent)", textDecoration: "none" }}
+              >
+                Membership analytics →
+              </Link>
+            </Card>
+
+            {/* Renewal health */}
+            <Card padding="lg" style={overdueRenewalCount > 0 ? {
+              background: "var(--color-amber-50)",
+              borderColor: "var(--color-amber-200)",
+            } : {}}>
+              <div style={metaLabel}>Renewal Health</div>
+              <div style={{ ...bigNum, color: overdueRenewalCount > 0 ? "var(--color-amber-600)" : "var(--fg)" }}>
+                {overdueRenewalCount > 0
+                  ? overdueRenewalCount
+                  : renewingSoonCount > 0
+                  ? renewingSoonCount
+                  : activeMembers}
+              </div>
+              <div style={{ marginTop: "var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                {overdueRenewalCount > 0
+                  ? `overdue renewal${overdueRenewalCount !== 1 ? "s" : ""}`
+                  : renewingSoonCount > 0
+                  ? `renewing in 30 days`
+                  : "all memberships current"}
+              </div>
+              {overdueRenewalCount === 0 && renewingSoonCount > 0 && (
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
+                  {overdueRenewalCount} overdue
                 </div>
+              )}
+              {overdueRenewalCount > 0 && renewingSoonCount > 0 && (
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
+                  + {renewingSoonCount} more due within 30 days
+                </div>
+              )}
+              {(renewingSoonCount > 0 || overdueRenewalCount > 0) && (
+                <Link
+                  href={"/app/maintenance-plans" as Route}
+                  style={{ display: "inline-block", marginTop: "var(--space-3)", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--accent)", textDecoration: "none" }}
+                >
+                  View memberships →
+                </Link>
+              )}
+            </Card>
+
+          </div>
+        </div>
+      )}
+
+      {/* ── Admin: Membership Renewal Notice (non-owner) ──────────────── */}
+      {!isOwner && (renewingSoonCount > 0 || overdueRenewalCount > 0) && (
+        <Card style={{ marginTop: "var(--space-6)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: "var(--text-sm)" }}>Membership Renewals</div>
+              <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", marginTop: 2 }}>
+                {renewingSoonCount > 0 && `${renewingSoonCount} renewing in the next 30 days`}
+                {renewingSoonCount > 0 && overdueRenewalCount > 0 && " · "}
+                {overdueRenewalCount > 0 && (
+                  <span style={{ color: "var(--color-red-600)", fontWeight: 600 }}>
+                    {overdueRenewalCount} overdue
+                  </span>
+                )}
               </div>
-            )}
+            </div>
+            <Link href={"/app/maintenance-plans" as Route} className="p7-btn p7-btn-secondary p7-btn-sm">
+              View memberships →
+            </Link>
           </div>
         </Card>
       )}
 
-      {/* ── Upcoming Renewals ─────────────────────────────────────────────── */}
-      <Card style={{ marginTop: "var(--space-6)", marginBottom: "var(--space-8)" }}>
-        <SectionHeader title="Upcoming Renewals" count={renewalsList.length} />
-        <p style={{ margin: "0 0 var(--space-4)", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-          Active memberships renewing within 60 days, including overdue.
-        </p>
-        {renewalsList.length === 0 ? (
-          <EmptyState title="No renewals due in the next 60 days." />
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th style={th}>Client</th>
-                  <th style={th}>Plan</th>
-                  <th style={th}>Tier</th>
-                  <th style={th}>Renewal</th>
-                  <th style={th}>Status</th>
-                  <th style={{ ...th, textAlign: "right" }}>Annual</th>
-                </tr>
-              </thead>
-              <tbody>
-                {renewalsList.map((row) => {
-                  const badge = renewalBadge(row.renewal_date);
-                  const priorityLabel = PRIORITY_LABELS[row.member_priority];
-                  return (
-                    <tr key={row.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                      <td style={td}>{row.client_name}</td>
-                      <td style={td}>
-                        <Link href={`/app/maintenance-plans/${row.id}` as Route} style={{ color: "var(--fg-link)", textDecoration: "none" }}>
-                          {row.name}
-                        </Link>
-                        {priorityLabel && (
-                          <span style={{
-                            marginLeft: "var(--space-2)", fontSize: "var(--text-xs)", padding: "1px 6px", borderRadius: 4,
-                            background: row.member_priority === "vip" ? "#fef3c7" : "#dbeafe",
-                            color: row.member_priority === "vip" ? "#d97706" : "#2563eb",
-                          }}>
-                            {priorityLabel}
-                          </span>
-                        )}
-                      </td>
-                      <td style={td}>{TIER_LABELS[row.membership_tier] ?? row.membership_tier}</td>
-                      <td style={td}>{fmtDate(row.renewal_date)}</td>
-                      <td style={td}>
-                        <span style={{ fontSize: "var(--text-xs)", padding: "2px 8px", borderRadius: 4, background: badge.bg, color: badge.color, fontWeight: 500 }}>
-                          {badge.label}
-                        </span>
-                      </td>
-                      <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                        {fmt(row.annual_price_cents)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {renewalsList.length > 0 && (
-          <div style={{ marginTop: "var(--space-3)", textAlign: "right" }}>
-            <Link href={"/app/maintenance-plans" as Route} style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--accent)", textDecoration: "none" }}>
-              All memberships →
-            </Link>
-          </div>
-        )}
-      </Card>
-    </PageContainer>
+    </div>
   );
 }
