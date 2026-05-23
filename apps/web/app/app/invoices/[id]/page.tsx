@@ -121,7 +121,10 @@ export default async function InvoiceDetailPage({
 
   const { invoice, lineItems } = result;
   const currentStatus = invoice.status;
-  const allowedTransitions = invoiceTransitions[currentStatus];
+  // paid/partial are driven by RecordPaymentForm (payment trigger), not manual transition
+  const allowedTransitions = invoiceTransitions[currentStatus].filter(
+    (s) => s !== "paid" && s !== "partial"
+  );
   const canTransition = canCreateInvoices(session.role);
   const amountDue = invoice.total_cents - invoice.paid_cents;
   const depositPending = invoice.deposit_cents > 0 && !invoice.deposit_paid_at;

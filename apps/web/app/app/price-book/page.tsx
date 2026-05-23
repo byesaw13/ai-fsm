@@ -34,7 +34,7 @@ export default async function PriceBookPage() {
     `SELECT id, code, name, category, tier, price_min_cents, price_max_cents,
             default_price_cents, add_on_price_cents, unit_type,
             description, notes, default_labor_hours::float, requires_materials,
-            upsell_codes, is_active, created_at::text, updated_at::text
+            COALESCE(upsell_codes, '{}') AS upsell_codes, is_active, created_at::text, updated_at::text
      FROM price_book
      ORDER BY code ASC`
   );
