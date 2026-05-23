@@ -12,6 +12,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { PriceBookSelector, type PriceBookService } from "@/components/PriceBookSelector";
+import { ScopeBuilder, type ScopeBuilderResult } from "@/components/ScopeBuilder";
 import {
   formatCents,
   getStandardEstimateTerms,
@@ -249,8 +250,9 @@ export function NewEstimateForm({
   const [minimumOverrideReason, setMinimumOverrideReason] = useState("");
   const [minimumOverrideNote, setMinimumOverrideNote] = useState("");
 
-  // Price book line items
+  // Price book line items + scope intelligence
   const [priceBookItems, setPriceBookItems] = useState<{ service: PriceBookService; priceCents: number }[]>([]);
+  const [scopeResults, setScopeResults] = useState<Record<number, ScopeBuilderResult>>({});
 
   function handleAddPriceBookItem(service: PriceBookService, priceCents: number) {
     setPriceBookItems((prev) => [...prev, { service, priceCents }]);
@@ -264,8 +266,27 @@ export function NewEstimateForm({
     ]);
   }
 
+  function handleScopeChange(index: number, result: ScopeBuilderResult) {
+    setScopeResults((prev) => ({ ...prev, [index]: result }));
+    // Update the price book item's price to the scope-adjusted value
+    setPriceBookItems((prev) =>
+      prev.map((item, i) =>
+        i === index ? { ...item, priceCents: result.adjustedPriceCents } : item
+      )
+    );
+  }
+
   function removePriceBookItem(index: number) {
     setPriceBookItems((prev) => prev.filter((_, i) => i !== index));
+    setScopeResults((prev) => {
+      const next: Record<number, ScopeBuilderResult> = {};
+      Object.entries(prev).forEach(([k, v]) => {
+        const ki = Number(k);
+        if (ki < index) next[ki] = v;
+        else if (ki > index) next[ki - 1] = v;
+      });
+      return next;
+    });
   }
 
   const priceBookLineItems = useMemo(
@@ -748,6 +769,21 @@ export function NewEstimateForm({
           price_book_id: row.price_book_id,
           price_book_code: undefined as string | undefined,
         }))];
+        const scopeSnapshots = priceBookItems
+          .map((item, i) => {
+            const sr = scopeResults[i];
+            if (!sr) return null;
+            return {
+              price_book_id: item.service.id,
+              category: item.service.category,
+              components: sr.components,
+              complexity: sr.complexity,
+              computed_modifier: sr.multiplier,
+              base_price_cents: item.service.default_price_cents ?? item.priceCents,
+              adjusted_price_cents: sr.adjustedPriceCents,
+            };
+          })
+          .filter(Boolean);
         if (allItems.length === 0) {
           setError("Add at least one line item.");
           setPending(false);
@@ -774,6 +810,7 @@ export function NewEstimateForm({
           expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
           tax_rate: taxRateNum,
           line_items: allItems,
+          ...(scopeSnapshots.length > 0 ? { scope_snapshots: scopeSnapshots } : {}),
         };
       }
 
@@ -1326,44 +1363,54 @@ export function NewEstimateForm({
                         Selected Services ({priceBookItems.length})
                       </p>
                       {priceBookItems.map((item, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            padding: "var(--space-1) var(--space-2)",
-                            background: "var(--bg-subtle)",
-                            borderRadius: "var(--radius)",
-                            marginBottom: "var(--space-1)",
-                            fontSize: "var(--text-sm)",
-                          }}
-                        >
-                          <div>
-                            <span style={{ fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                              {item.service.code}
-                            </span>{" "}
-                            <span>{item.service.name}</span>
+                        <div key={i} style={{ marginBottom: "var(--space-2)" }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              padding: "var(--space-1) var(--space-2)",
+                              background: "var(--bg-subtle)",
+                              borderRadius: "var(--radius)",
+                              fontSize: "var(--text-sm)",
+                            }}
+                          >
+                            <div>
+                              <span style={{ fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                                {item.service.code}
+                              </span>{" "}
+                              <span>{item.service.name}</span>
+                              {scopeResults[i]?.multiplier !== undefined && scopeResults[i].multiplier !== 1.0 && (
+                                <span style={{ marginLeft: "var(--space-2)", fontSize: "var(--text-xs)", color: "var(--accent)", fontWeight: 600 }}>
+                                  ×{scopeResults[i].multiplier.toFixed(2)}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                              <span style={{ fontWeight: 600 }}>{formatCents(item.priceCents)}</span>
+                              <button
+                                type="button"
+                                onClick={() => removePriceBookItem(i)}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  color: "var(--color-danger)",
+                                  fontSize: "var(--text-sm)",
+                                  padding: 0,
+                                  lineHeight: 1,
+                                }}
+                                aria-label={`Remove ${item.service.name}`}
+                              >
+                                ×
+                              </button>
+                            </div>
                           </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-                            <span style={{ fontWeight: 600 }}>{formatCents(item.priceCents)}</span>
-                            <button
-                              type="button"
-                              onClick={() => removePriceBookItem(i)}
-                              style={{
-                                background: "none",
-                                border: "none",
-                                cursor: "pointer",
-                                color: "var(--color-danger)",
-                                fontSize: "var(--text-sm)",
-                                padding: 0,
-                                lineHeight: 1,
-                              }}
-                              aria-label={`Remove ${item.service.name}`}
-                            >
-                              ×
-                            </button>
-                          </div>
+                          <ScopeBuilder
+                            category={item.service.category}
+                            basePriceCents={item.service.default_price_cents ?? item.priceCents}
+                            onChange={(result) => handleScopeChange(i, result)}
+                          />
                         </div>
                       ))}
                     </div>
