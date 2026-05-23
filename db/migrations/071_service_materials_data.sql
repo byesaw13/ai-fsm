@@ -35,7 +35,7 @@ INSERT INTO service_materials (category, material_name, description, quantity_ty
   'per_coverage', 'wall_sqft', 300, 1.0, 'each', 450, 'Paint & Supplies', 4),
 
 -- Painter's tape: 1 roll per 150 LF of taping lines (trim + windows + doors)
-('painting_finishes', "Painter's tape (FrogTape or 3M)",
+('painting_finishes', 'Painter''s tape (FrogTape or 3M)',
   '1 roll covers approx 150 LF of trim and edge work. Also used for window/door masking.',
   'per_coverage', 'trim_linear_ft', 150, 1.0, 'roll', 850, 'Paint & Supplies', 5),
 
@@ -150,7 +150,7 @@ INSERT INTO service_materials (category, material_name, description, quantity_ty
   'Thread seal tape for all threaded connections. 1 roll per job covers all connections.',
   'static', NULL, NULL, 1.0, 'roll', 250, 'Plumbing', 1),
 
-('plumbing', "Plumber's putty — 14oz",
+('plumbing', 'Plumber''s putty — 14oz',
   'For faucet deck plate and drain flange sealing. 1 tub per fixture installation.',
   'static', NULL, NULL, 1.0, 'tub', 750, 'Plumbing', 2),
 
