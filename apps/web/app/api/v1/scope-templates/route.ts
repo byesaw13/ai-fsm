@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/middleware";
 import { query } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import type { ScopeTemplate, ScopeComponent, ComplexityFactor, ProfitabilityRule, ScopeComponentOption } from "@ai-fsm/domain";
+import type { ScopeTemplate, ScopeComponent, ComplexityFactor, ProfitabilityRule, ScopeComponentOption, ServiceMaterial } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +48,27 @@ interface RuleRow {
   [key: string]: unknown;
 }
 
+interface MaterialRow {
+  id: string;
+  price_book_id: string | null;
+  category: string | null;
+  material_name: string;
+  description: string | null;
+  quantity_type: ServiceMaterial["quantity_type"];
+  scope_component_key: string | null;
+  quantity_multiplier: number | null;
+  quantity_flat: number | null;
+  waste_factor: number;
+  unit: string;
+  unit_cost_cents: number;
+  store_section: string;
+  is_consumable: boolean;
+  is_optional: boolean;
+  condition_factor_key: string | null;
+  sort_order: number;
+  [key: string]: unknown;
+}
+
 // GET /api/v1/scope-templates — returns all templates with components and factors
 // Optional ?category=<category> to fetch a single template
 export const GET = withAuth(async (request: NextRequest, session) => {
@@ -75,7 +96,7 @@ export const GET = withAuth(async (request: NextRequest, session) => {
     const categories = templates.map((t) => t.category);
     const catPlaceholders = categories.map((_, i) => `$${i + 1}`).join(", ");
 
-    const [components, factors, rules] = await Promise.all([
+    const [components, factors, rules, materials] = await Promise.all([
       query<ComponentRow>(
         `SELECT id, template_id, key, label, unit, input_type, options::text, required, sort_order
          FROM scope_components
@@ -95,6 +116,18 @@ export const GET = withAuth(async (request: NextRequest, session) => {
          FROM profitability_rules
          WHERE (category IN (${catPlaceholders}) OR category = 'all')
            AND is_active = true`,
+        categories
+      ),
+      query<MaterialRow>(
+        `SELECT id, price_book_id, category, material_name, description,
+                quantity_type, scope_component_key,
+                quantity_multiplier::float, quantity_flat::float,
+                waste_factor::float, unit, unit_cost_cents,
+                store_section, is_consumable, is_optional,
+                condition_factor_key, sort_order
+         FROM service_materials
+         WHERE category IN (${catPlaceholders})
+         ORDER BY category, sort_order ASC`,
         categories
       ),
     ]);
@@ -135,14 +168,35 @@ export const GET = withAuth(async (request: NextRequest, session) => {
         })),
     }));
 
+    const assembledMaterials: ServiceMaterial[] = materials.map((m) => ({
+      id: m.id,
+      price_book_id: m.price_book_id,
+      category: m.category,
+      material_name: m.material_name,
+      description: m.description,
+      quantity_type: m.quantity_type,
+      scope_component_key: m.scope_component_key,
+      quantity_multiplier: m.quantity_multiplier,
+      quantity_flat: m.quantity_flat,
+      waste_factor: m.waste_factor,
+      unit: m.unit,
+      unit_cost_cents: m.unit_cost_cents,
+      store_section: m.store_section,
+      is_consumable: m.is_consumable,
+      is_optional: m.is_optional,
+      condition_factor_key: m.condition_factor_key,
+      sort_order: m.sort_order,
+    }));
+
     if (category) {
       return NextResponse.json({
         template: assembled[0] ?? null,
         profitability_rules: profitabilityRules,
+        materials: assembledMaterials.filter((m) => m.category === category),
       });
     }
 
-    return NextResponse.json({ templates: assembled, profitability_rules: profitabilityRules });
+    return NextResponse.json({ templates: assembled, profitability_rules: profitabilityRules, materials: assembledMaterials });
   } catch (error) {
     logger.error("[scope-templates GET]", error, { traceId: session.traceId });
     return NextResponse.json(

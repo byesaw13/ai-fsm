@@ -9,7 +9,13 @@ import type {
   ScopeComponentValues,
   ComplexityValues,
 } from "@ai-fsm/domain";
-import { computeScopeModifier, checkProfitabilityRules } from "@ai-fsm/domain";
+import {
+  computeScopeModifier,
+  checkProfitabilityRules,
+  computeMaterials,
+  groupMaterialsBySection,
+} from "@ai-fsm/domain";
+import type { ServiceMaterial, ComputedMaterial } from "@ai-fsm/domain";
 
 interface ScopeBuilderProps {
   category: string;
@@ -24,6 +30,8 @@ export interface ScopeBuilderResult {
   adderCents: number;
   adjustedPriceCents: number;
   violations: { label: string; actual: number; required: number; rule_type: string }[];
+  materials: ComputedMaterial[];
+  materialTotalCents: number;
 }
 
 function formatDollars(cents: number): string {
@@ -188,21 +196,23 @@ function ComplexityFactorRow({
 export function ScopeBuilder({ category, basePriceCents, onChange }: ScopeBuilderProps) {
   const [template, setTemplate] = useState<ScopeTemplate | null>(null);
   const [rules, setRules] = useState<ProfitabilityRule[]>([]);
+  const [materialRules, setMaterialRules] = useState<ServiceMaterial[]>([]);
   const [loading, setLoading] = useState(true);
   const [components, setComponents] = useState<ScopeComponentValues>({});
   const [complexity, setComplexity] = useState<ComplexityValues>({});
   const [expanded, setExpanded] = useState(true);
+  const [materialsExpanded, setMaterialsExpanded] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     fetch(`/api/v1/scope-templates?category=${encodeURIComponent(category)}`)
       .then((r) => r.json())
-      .then((data: { template: ScopeTemplate | null; profitability_rules: ProfitabilityRule[] }) => {
+      .then((data: { template: ScopeTemplate | null; profitability_rules: ProfitabilityRule[]; materials: ServiceMaterial[] }) => {
         if (cancelled) return;
         setTemplate(data.template);
         setRules(data.profitability_rules ?? []);
-        // Initialize component values
+        setMaterialRules(data.materials ?? []);
         if (data.template) {
           const init: ScopeComponentValues = {};
           for (const c of data.template.components) {
@@ -221,8 +231,8 @@ export function ScopeBuilder({ category, basePriceCents, onChange }: ScopeBuilde
     return () => { cancelled = true; };
   }, [category]);
 
-  const { multiplier, adderCents, adjustedPriceCents, violations } = useMemo(() => {
-    if (!template) return { multiplier: 1.0, adderCents: 0, adjustedPriceCents: basePriceCents, violations: [] };
+  const { multiplier, adderCents, adjustedPriceCents, violations, computedMaterials, materialTotalCents } = useMemo(() => {
+    if (!template) return { multiplier: 1.0, adderCents: 0, adjustedPriceCents: basePriceCents, violations: [], computedMaterials: [], materialTotalCents: 0 };
 
     const mod = computeScopeModifier(template.complexity_factors, complexity);
     const adjusted = Math.round(basePriceCents * mod.multiplier) + mod.adderCents;
@@ -235,6 +245,9 @@ export function ScopeBuilder({ category, basePriceCents, onChange }: ScopeBuilde
       sqft,
     });
 
+    const mats = computeMaterials(materialRules, components, complexity);
+    const matTotal = mats.reduce((sum, m) => sum + m.total_cost_cents, 0);
+
     return {
       multiplier: mod.multiplier,
       adderCents: mod.adderCents,
@@ -245,14 +258,16 @@ export function ScopeBuilder({ category, basePriceCents, onChange }: ScopeBuilde
         required: viol.required,
         rule_type: viol.rule.rule_type,
       })),
+      computedMaterials: mats,
+      materialTotalCents: matTotal,
     };
-  }, [template, complexity, components, basePriceCents, rules, category]);
+  }, [template, complexity, components, basePriceCents, rules, category, materialRules]);
 
   // Notify parent on changes
   useEffect(() => {
-    onChange({ components, complexity, multiplier, adderCents, adjustedPriceCents, violations });
+    onChange({ components, complexity, multiplier, adderCents, adjustedPriceCents, violations, materials: computedMaterials, materialTotalCents });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [components, complexity, multiplier, adderCents, adjustedPriceCents]);
+  }, [components, complexity, multiplier, adderCents, adjustedPriceCents, computedMaterials, materialTotalCents]);
 
   if (loading) {
     return (
@@ -448,6 +463,172 @@ export function ScopeBuilder({ category, basePriceCents, onChange }: ScopeBuilde
                     : `${formatDollars(v.actual)} (minimum ${formatDollars(v.required)})`}
                 </p>
               ))}
+            </div>
+          )}
+
+          {/* Materials Estimate */}
+          {materialRules.length > 0 && (
+            <div
+              style={{
+                marginTop: "var(--space-3)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius)",
+                overflow: "hidden",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setMaterialsExpanded((v) => !v)}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "var(--space-2) var(--space-3)",
+                  background: "var(--bg-subtle)",
+                  border: "none",
+                  borderBottom: materialsExpanded ? "1px solid var(--border)" : "none",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  gap: "var(--space-2)",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, flexShrink: 0 }}>
+                    Materials List
+                  </span>
+                  {computedMaterials.length > 0 ? (
+                    <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                      {computedMaterials.length} item{computedMaterials.length !== 1 ? "s" : ""} · est. {formatDollars(materialTotalCents)}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                      Enter measurements to auto-compute
+                    </span>
+                  )}
+                </div>
+                <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", flexShrink: 0 }}>
+                  {materialsExpanded ? "▲" : "▼"}
+                </span>
+              </button>
+
+              {materialsExpanded && (
+                <div style={{ padding: "var(--space-3)" }}>
+                  {computedMaterials.length === 0 ? (
+                    <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)", textAlign: "center", padding: "var(--space-2) 0" }}>
+                      No materials computed — enter measurements above to auto-calculate quantities.
+                    </p>
+                  ) : (
+                    <>
+                      {groupMaterialsBySection(computedMaterials).map((section) => (
+                        <div key={section.section} style={{ marginBottom: "var(--space-3)" }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              marginBottom: "var(--space-1)",
+                            }}
+                          >
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: "var(--text-xs)",
+                                fontWeight: 600,
+                                textTransform: "uppercase",
+                                letterSpacing: "0.05em",
+                                color: "var(--fg-muted)",
+                              }}
+                            >
+                              {section.section}
+                            </p>
+                            <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                              {formatDollars(section.section_total_cents)}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                            {section.items.map((item) => (
+                              <div
+                                key={item.material.id}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "var(--space-2)",
+                                  padding: "var(--space-1) var(--space-2)",
+                                  background: "var(--bg-subtle)",
+                                  borderRadius: "var(--radius)",
+                                }}
+                              >
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <span style={{ fontSize: "var(--text-sm)" }}>
+                                    {item.material.material_name}
+                                  </span>
+                                  {item.material.is_optional && (
+                                    <span
+                                      style={{
+                                        marginLeft: "var(--space-1)",
+                                        fontSize: "var(--text-xs)",
+                                        color: "var(--fg-muted)",
+                                        fontStyle: "italic",
+                                      }}
+                                    >
+                                      optional
+                                    </span>
+                                  )}
+                                </div>
+                                <span
+                                  style={{
+                                    fontSize: "var(--text-xs)",
+                                    color: "var(--fg-muted)",
+                                    flexShrink: 0,
+                                    minWidth: 64,
+                                    textAlign: "right",
+                                  }}
+                                >
+                                  {item.quantity} {item.material.unit}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: "var(--text-sm)",
+                                    fontWeight: 500,
+                                    flexShrink: 0,
+                                    minWidth: 60,
+                                    textAlign: "right",
+                                  }}
+                                >
+                                  {formatDollars(item.total_cost_cents)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+
+                      <div
+                        style={{
+                          paddingTop: "var(--space-2)",
+                          borderTop: "1px solid var(--border)",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "baseline",
+                        }}
+                      >
+                        <div>
+                          <span style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                            Materials subtotal
+                          </span>
+                          <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginLeft: "var(--space-1)" }}>
+                            + 15% handling billed to client
+                          </span>
+                        </div>
+                        <span style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--accent)" }}>
+                          {formatDollars(materialTotalCents)}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

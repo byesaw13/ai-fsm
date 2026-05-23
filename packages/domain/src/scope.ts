@@ -66,6 +66,130 @@ export interface ComplexityValues {
   [key: string]: boolean;
 }
 
+// ============================================================
+// Material rules
+// ============================================================
+
+export type MaterialQuantityType = "static" | "per_component" | "per_coverage";
+
+export interface ServiceMaterial {
+  id: string;
+  price_book_id: string | null;
+  category: string | null;
+  material_name: string;
+  description: string | null;
+  quantity_type: MaterialQuantityType;
+  scope_component_key: string | null;
+  quantity_multiplier: number | null; // per_component: multiply; per_coverage: coverage rate (sqft/gal)
+  quantity_flat: number | null;
+  waste_factor: number;              // 1.10 = 10% waste
+  unit: string;
+  unit_cost_cents: number;
+  store_section: string;
+  is_consumable: boolean;
+  is_optional: boolean;
+  condition_factor_key: string | null; // only include when this complexity factor is checked
+  sort_order: number;
+}
+
+export interface ComputedMaterial {
+  material: ServiceMaterial;
+  quantity: number;           // computed, rounded up, waste included
+  total_cost_cents: number;
+}
+
+export interface MaterialsBySection {
+  section: string;
+  items: ComputedMaterial[];
+  section_total_cents: number;
+}
+
+// Compute material quantities from scope component values and applied complexity factors
+export function computeMaterials(
+  materials: ServiceMaterial[],
+  components: ScopeComponentValues,
+  complexity: ComplexityValues
+): ComputedMaterial[] {
+  const result: ComputedMaterial[] = [];
+
+  for (const mat of materials) {
+    // Check conditional factor
+    if (mat.condition_factor_key && !complexity[mat.condition_factor_key]) continue;
+
+    let rawQty = 0;
+
+    switch (mat.quantity_type) {
+      case "static":
+        rawQty = mat.quantity_flat ?? 1;
+        break;
+
+      case "per_component": {
+        const scopeVal = mat.scope_component_key ? Number(components[mat.scope_component_key] ?? 0) : 0;
+        if (scopeVal <= 0) continue; // skip if measurement not provided
+        rawQty = scopeVal * (mat.quantity_multiplier ?? 1);
+        break;
+      }
+
+      case "per_coverage": {
+        const scopeVal = mat.scope_component_key ? Number(components[mat.scope_component_key] ?? 0) : 0;
+        if (scopeVal <= 0) continue;
+        const coverageRate = mat.quantity_multiplier ?? 1;
+        rawQty = scopeVal / coverageRate;
+        break;
+      }
+    }
+
+    // Apply waste factor and round up to whole purchasable units
+    const withWaste = rawQty * mat.waste_factor;
+    const quantity = Math.max(1, Math.ceil(withWaste * 10) / 10); // round up to 1 decimal
+
+    result.push({
+      material: mat,
+      quantity,
+      total_cost_cents: Math.round(quantity * mat.unit_cost_cents),
+    });
+  }
+
+  return result;
+}
+
+// Group computed materials by store section
+export function groupMaterialsBySection(computed: ComputedMaterial[]): MaterialsBySection[] {
+  const sectionMap = new Map<string, ComputedMaterial[]>();
+
+  for (const item of computed) {
+    const section = item.material.store_section;
+    if (!sectionMap.has(section)) sectionMap.set(section, []);
+    sectionMap.get(section)!.push(item);
+  }
+
+  const SECTION_ORDER = [
+    "Paint & Supplies",
+    "Lumber & Trim",
+    "Building Materials",
+    "Hardware & Fasteners",
+    "Plumbing",
+    "Electrical",
+    "Outdoor & Garden",
+    "Flooring & Tile",
+  ];
+
+  const sections = Array.from(sectionMap.entries()).map(([section, items]) => ({
+    section,
+    items: items.sort((a, b) => a.material.sort_order - b.material.sort_order),
+    section_total_cents: items.reduce((sum, i) => sum + i.total_cost_cents, 0),
+  }));
+
+  return sections.sort((a, b) => {
+    const ai = SECTION_ORDER.indexOf(a.section);
+    const bi = SECTION_ORDER.indexOf(b.section);
+    if (ai === -1 && bi === -1) return a.section.localeCompare(b.section);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+}
+
 // Compute the combined complexity multiplier and flat adders from applied factors
 export function computeScopeModifier(
   factors: ComplexityFactor[],
