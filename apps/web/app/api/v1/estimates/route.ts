@@ -196,6 +196,20 @@ const createEstimateSchema = z.object({
   minimum_service_override_note: z.string().nullable().optional(),
   // Engine v2: room-by-room spec — when present, computeAndPersist() runs after insert
   engine_spec: z.record(z.unknown()).optional(),
+  // Scope Intelligence: snapshot of components/complexity captured from ScopeBuilder per price-book item
+  scope_snapshots: z
+    .array(
+      z.object({
+        price_book_id: z.string().uuid().optional(),
+        category: z.string(),
+        components: z.record(z.unknown()).default({}),
+        complexity: z.record(z.boolean()).default({}),
+        computed_modifier: z.number().default(1.0),
+        base_price_cents: z.number().int().nonnegative().optional(),
+        adjusted_price_cents: z.number().int().nonnegative().optional(),
+      })
+    )
+    .optional(),
 });
 
 export const POST = withRole(["owner", "admin"], async (request, session) => {
@@ -260,6 +274,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     minimum_service_override_reason,
     minimum_service_override_note,
     engine_spec,
+    scope_snapshots,
   } = parseResult.data;
 
   const is_painting = sq_ft !== undefined && prep_level !== undefined && labor_hours_estimate !== undefined;
@@ -451,6 +466,26 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
               item.adjustment_type ?? null,
               item.sort_order ?? i,
               item.price_book_id ?? null,
+            ]
+          );
+        }
+      }
+
+      // Scope snapshots
+      if (scope_snapshots && scope_snapshots.length > 0) {
+        for (const snap of scope_snapshots) {
+          await client.query(
+            `INSERT INTO estimate_scope_snapshots
+               (estimate_id, category, components, complexity, computed_modifier, base_price_cents, adjusted_price_cents)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+              estimateId,
+              snap.category,
+              JSON.stringify(snap.components),
+              JSON.stringify(snap.complexity),
+              snap.computed_modifier,
+              snap.base_price_cents ?? null,
+              snap.adjusted_price_cents ?? null,
             ]
           );
         }

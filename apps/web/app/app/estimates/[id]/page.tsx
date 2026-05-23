@@ -262,6 +262,12 @@ export default async function EstimateDetailPage({
           <CopyPortalLinkButton
             url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/estimates/${estimate.share_token}`}
           />
+          <a
+            href={`/app/estimates/${estimate.id}/shopping-list`}
+            style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}
+          >
+            Shopping List →
+          </a>
           <Link
             href={`/app/estimates/${estimate.id}/print`}
             target="_blank"
