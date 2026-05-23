@@ -55,7 +55,7 @@ export const GET = withAuth(async (request: NextRequest, session) => {
   const category = searchParams.get("category");
 
   try {
-    const templateCondition = category ? `WHERE st.category = $1` : "";
+    const templateCondition = category ? `WHERE category = $1` : "";
     const templateParams = category ? [category] : [];
 
     const templates = await query<TemplateRow>(

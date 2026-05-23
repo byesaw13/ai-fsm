@@ -251,11 +251,14 @@ export function NewEstimateForm({
   const [minimumOverrideNote, setMinimumOverrideNote] = useState("");
 
   // Price book line items + scope intelligence
-  const [priceBookItems, setPriceBookItems] = useState<{ service: PriceBookService; priceCents: number }[]>([]);
-  const [scopeResults, setScopeResults] = useState<Record<number, ScopeBuilderResult>>({});
+  // instanceId is stable per added item — prevents key/state shift when items are removed
+  const [priceBookItems, setPriceBookItems] = useState<{ service: PriceBookService; priceCents: number; instanceId: string }[]>([]);
+  // keyed by instanceId so scope state never migrates to the wrong item
+  const [scopeResults, setScopeResults] = useState<Record<string, ScopeBuilderResult>>({});
 
   function handleAddPriceBookItem(service: PriceBookService, priceCents: number) {
-    setPriceBookItems((prev) => [...prev, { service, priceCents }]);
+    const instanceId = `${service.id}-${Date.now()}`;
+    setPriceBookItems((prev) => [...prev, { service, priceCents, instanceId }]);
 
     const unitPrice = service.default_price_cents ?? priceCents;
     const description = `${service.code} — ${service.name}${service.description ? ` — ${service.description}` : ""}`;
@@ -266,25 +269,16 @@ export function NewEstimateForm({
     ]);
   }
 
-  function handleScopeChange(index: number, result: ScopeBuilderResult) {
-    setScopeResults((prev) => ({ ...prev, [index]: result }));
-    // Update the price book item's price to the scope-adjusted value
-    setPriceBookItems((prev) =>
-      prev.map((item, i) =>
-        i === index ? { ...item, priceCents: result.adjustedPriceCents } : item
-      )
-    );
+  function handleScopeChange(instanceId: string, result: ScopeBuilderResult) {
+    // Only update scope results — never touch priceCents so the base stays stable
+    setScopeResults((prev) => ({ ...prev, [instanceId]: result }));
   }
 
-  function removePriceBookItem(index: number) {
-    setPriceBookItems((prev) => prev.filter((_, i) => i !== index));
+  function removePriceBookItem(instanceId: string) {
+    setPriceBookItems((prev) => prev.filter((item) => item.instanceId !== instanceId));
     setScopeResults((prev) => {
-      const next: Record<number, ScopeBuilderResult> = {};
-      Object.entries(prev).forEach(([k, v]) => {
-        const ki = Number(k);
-        if (ki < index) next[ki] = v;
-        else if (ki > index) next[ki - 1] = v;
-      });
+      const next = { ...prev };
+      delete next[instanceId];
       return next;
     });
   }
@@ -294,12 +288,12 @@ export function NewEstimateForm({
       priceBookItems.map((item, i) => ({
         description: `${item.service.code} — ${item.service.name}`,
         quantity: 1,
-        unit_price_cents: item.priceCents,
+        unit_price_cents: scopeResults[item.instanceId]?.adjustedPriceCents ?? item.priceCents,
         sort_order: i,
         price_book_id: item.service.id,
         price_book_code: item.service.code,
       })),
-    [priceBookItems]
+    [priceBookItems, scopeResults]
   );
 
   const filteredJobs = useMemo(
@@ -770,8 +764,8 @@ export function NewEstimateForm({
           price_book_code: undefined as string | undefined,
         }))];
         const scopeSnapshots = priceBookItems
-          .map((item, i) => {
-            const sr = scopeResults[i];
+          .map((item) => {
+            const sr = scopeResults[item.instanceId];
             if (!sr) return null;
             return {
               price_book_id: item.service.id,
@@ -1362,8 +1356,11 @@ export function NewEstimateForm({
                       <p style={{ fontSize: "var(--text-sm)", fontWeight: 600, marginBottom: "var(--space-2)" }}>
                         Selected Services ({priceBookItems.length})
                       </p>
-                      {priceBookItems.map((item, i) => (
-                        <div key={i} style={{ marginBottom: "var(--space-2)" }}>
+                      {priceBookItems.map((item) => {
+                        const sr = scopeResults[item.instanceId];
+                        const displayPrice = sr?.adjustedPriceCents ?? item.priceCents;
+                        return (
+                        <div key={item.instanceId} style={{ marginBottom: "var(--space-2)" }}>
                           <div
                             style={{
                               display: "flex",
@@ -1380,17 +1377,17 @@ export function NewEstimateForm({
                                 {item.service.code}
                               </span>{" "}
                               <span>{item.service.name}</span>
-                              {scopeResults[i]?.multiplier !== undefined && scopeResults[i].multiplier !== 1.0 && (
+                              {sr?.multiplier !== undefined && sr.multiplier !== 1.0 && (
                                 <span style={{ marginLeft: "var(--space-2)", fontSize: "var(--text-xs)", color: "var(--accent)", fontWeight: 600 }}>
-                                  ×{scopeResults[i].multiplier.toFixed(2)}
+                                  ×{sr.multiplier.toFixed(2)}
                                 </span>
                               )}
                             </div>
                             <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-                              <span style={{ fontWeight: 600 }}>{formatCents(item.priceCents)}</span>
+                              <span style={{ fontWeight: 600 }}>{formatCents(displayPrice)}</span>
                               <button
                                 type="button"
-                                onClick={() => removePriceBookItem(i)}
+                                onClick={() => removePriceBookItem(item.instanceId)}
                                 style={{
                                   background: "none",
                                   border: "none",
@@ -1409,10 +1406,11 @@ export function NewEstimateForm({
                           <ScopeBuilder
                             category={item.service.category}
                             basePriceCents={item.service.default_price_cents ?? item.priceCents}
-                            onChange={(result) => handleScopeChange(i, result)}
+                            onChange={(result) => handleScopeChange(item.instanceId, result)}
                           />
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
