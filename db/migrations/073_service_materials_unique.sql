@@ -9,5 +9,15 @@ WHERE id NOT IN (
   ORDER BY category, material_name, sort_order ASC, id ASC
 );
 
-ALTER TABLE service_materials
-  ADD CONSTRAINT uq_service_materials_category_name UNIQUE (category, material_name);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'uq_service_materials_category_name'
+      AND conrelid = 'service_materials'::regclass
+  ) THEN
+    ALTER TABLE service_materials
+      ADD CONSTRAINT uq_service_materials_category_name UNIQUE (category, material_name);
+  END IF;
+END $$;
