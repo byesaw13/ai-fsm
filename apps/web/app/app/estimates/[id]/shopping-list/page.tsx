@@ -83,66 +83,69 @@ export default async function ShoppingListPage({
 
   if (snapshotRows.length > 0) {
     const categories = [...new Set(snapshotRows.map((s) => s.category).filter(Boolean))];
-    const catPlaceholders = categories.map((_, i) => `$${i + 1}`).join(", ");
 
-    const materialRows = await query<MaterialRow>(
-      `SELECT id, price_book_id, category, material_name, description,
-              quantity_type, scope_component_key,
-              quantity_multiplier::float, quantity_flat::float,
-              waste_factor::float, unit, unit_cost_cents,
-              store_section, is_consumable, is_optional,
-              condition_factor_key, sort_order
-       FROM service_materials
-       WHERE category IN (${catPlaceholders})
-       ORDER BY category, sort_order ASC`,
-      categories
-    );
+    if (categories.length > 0) {
+      const catPlaceholders = categories.map((_, i) => `$${i + 1}`).join(", ");
 
-    const serviceMaterials: ServiceMaterial[] = materialRows.map((m) => ({
-      id: m.id,
-      price_book_id: m.price_book_id,
-      category: m.category,
-      material_name: m.material_name,
-      description: m.description,
-      quantity_type: m.quantity_type,
-      scope_component_key: m.scope_component_key,
-      quantity_multiplier: m.quantity_multiplier,
-      quantity_flat: m.quantity_flat,
-      waste_factor: m.waste_factor,
-      unit: m.unit,
-      unit_cost_cents: m.unit_cost_cents,
-      store_section: m.store_section,
-      is_consumable: m.is_consumable,
-      is_optional: m.is_optional,
-      condition_factor_key: m.condition_factor_key,
-      sort_order: m.sort_order,
-    }));
+      const materialRows = await query<MaterialRow>(
+        `SELECT id, price_book_id, category, material_name, description,
+                quantity_type, scope_component_key,
+                quantity_multiplier::float, quantity_flat::float,
+                waste_factor::float, unit, unit_cost_cents,
+                store_section, is_consumable, is_optional,
+                condition_factor_key, sort_order
+         FROM service_materials
+         WHERE category IN (${catPlaceholders})
+         ORDER BY category, sort_order ASC`,
+        categories
+      );
 
-    const allComputed = snapshotRows.flatMap((snap) => {
-      const mats = serviceMaterials.filter((m) => m.category === snap.category);
-      return computeMaterials(mats, snap.components ?? {}, snap.complexity ?? {});
-    });
+      const serviceMaterials: ServiceMaterial[] = materialRows.map((m) => ({
+        id: m.id,
+        price_book_id: m.price_book_id,
+        category: m.category,
+        material_name: m.material_name,
+        description: m.description,
+        quantity_type: m.quantity_type,
+        scope_component_key: m.scope_component_key,
+        quantity_multiplier: m.quantity_multiplier,
+        quantity_flat: m.quantity_flat,
+        waste_factor: m.waste_factor,
+        unit: m.unit,
+        unit_cost_cents: m.unit_cost_cents,
+        store_section: m.store_section,
+        is_consumable: m.is_consumable,
+        is_optional: m.is_optional,
+        condition_factor_key: m.condition_factor_key,
+        sort_order: m.sort_order,
+      }));
 
-    // Merge duplicates by material ID
-    const merged = new Map<string, { quantity: number; total_cost_cents: number; material: ServiceMaterial }>();
-    for (const item of allComputed) {
-      const existing = merged.get(item.material.id);
-      if (existing) {
-        existing.quantity += item.quantity;
-        existing.total_cost_cents += item.total_cost_cents;
-      } else {
-        merged.set(item.material.id, { ...item });
+      const allComputed = snapshotRows.flatMap((snap) => {
+        const mats = serviceMaterials.filter((m) => m.category === snap.category);
+        return computeMaterials(mats, snap.components ?? {}, snap.complexity ?? {});
+      });
+
+      // Merge duplicates by material ID
+      const merged = new Map<string, { quantity: number; total_cost_cents: number; material: ServiceMaterial }>();
+      for (const item of allComputed) {
+        const existing = merged.get(item.material.id);
+        if (existing) {
+          existing.quantity += item.quantity;
+          existing.total_cost_cents += item.total_cost_cents;
+        } else {
+          merged.set(item.material.id, { ...item });
+        }
       }
+
+      const deduplicated = Array.from(merged.values()).map((v) => ({
+        material: v.material,
+        quantity: Math.ceil(v.quantity),
+        total_cost_cents: Math.round(Math.ceil(v.quantity) * v.material.unit_cost_cents),
+      }));
+
+      sections = groupMaterialsBySection(deduplicated);
+      materialTotalCents = deduplicated.reduce((sum, i) => sum + i.total_cost_cents, 0);
     }
-
-    const deduplicated = Array.from(merged.values()).map((v) => ({
-      material: v.material,
-      quantity: Math.ceil(v.quantity * 10) / 10,
-      total_cost_cents: v.total_cost_cents,
-    }));
-
-    sections = groupMaterialsBySection(deduplicated);
-    materialTotalCents = deduplicated.reduce((sum, i) => sum + i.total_cost_cents, 0);
   }
 
   const createdDate = new Date(estimate.created_at).toLocaleDateString("en-US", {

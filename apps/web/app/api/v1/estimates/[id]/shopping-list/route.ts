@@ -72,6 +72,9 @@ export const GET = withAuth(async (request: NextRequest, session) => {
 
     // Load service materials for all categories in the snapshots
     const categories = [...new Set(snapshots.map((s) => s.category).filter(Boolean))];
+    if (categories.length === 0) {
+      return NextResponse.json({ sections: [], materialTotalCents: 0 });
+    }
     const catPlaceholders = categories.map((_, i) => `$${i + 1}`).join(", ");
 
     const materialRows = await query<MaterialRow>(
@@ -131,8 +134,8 @@ export const GET = withAuth(async (request: NextRequest, session) => {
 
     const deduplicated = Array.from(merged.values()).map((v) => ({
       material: v.material,
-      quantity: Math.ceil(v.quantity * 10) / 10,
-      total_cost_cents: v.total_cost_cents,
+      quantity: Math.ceil(v.quantity),
+      total_cost_cents: Math.round(Math.ceil(v.quantity) * v.material.unit_cost_cents),
     }));
 
     const sections = groupMaterialsBySection(deduplicated);

@@ -141,7 +141,7 @@ export function computeMaterials(
 
     // Apply waste factor and round up to whole purchasable units
     const withWaste = rawQty * mat.waste_factor;
-    const quantity = Math.max(1, Math.ceil(withWaste * 10) / 10); // round up to 1 decimal
+    const quantity = Math.max(1, Math.ceil(withWaste));
 
     result.push({
       material: mat,
