@@ -72,6 +72,8 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
   const [phone, setPhone] = useState("");
   const [preferredContact, setPreferredContact] = useState<"email" | "sms" | "phone">("email");
   const [smsConsent, setSmsConsent] = useState(false);
+  const [referralSource, setReferralSource] = useState<"online" | "friend_neighbor" | "realtor" | "repeat" | "other" | "">("");
+  const [referralName, setReferralName] = useState("");
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
@@ -106,6 +108,8 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
           access_notes: accessNotes || null,
           preferred_contact: preferredContact,
           sms_consent: preferredContact === "sms" && smsConsent,
+          referral_source: referralSource || null,
+          referral_name: referralSource === "realtor" && referralName.trim() ? referralName.trim() : null,
         }),
       });
 
@@ -386,6 +390,47 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                     {SMS_CONSENT_TEXT}
                   </span>
                 </label>
+              )}
+            </div>
+
+            {/* Referral source — optional */}
+            <div style={{ marginTop: 8 }}>
+              <p style={{ fontSize: 14, fontWeight: 600, margin: "0 0 10px" }}>How did you hear about us? <span style={{ fontWeight: 400, color: "#6b7280" }}>(optional)</span></p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                {([
+                  ["online", "Found us online"],
+                  ["friend_neighbor", "Friend or neighbor"],
+                  ["realtor", "Realtor referral"],
+                  ["repeat", "Previous client"],
+                  ["other", "Other"],
+                ] as const).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setReferralSource(referralSource === value ? "" : value)}
+                    style={{
+                      padding: "7px 14px",
+                      border: referralSource === value ? "2px solid #2563eb" : "1px solid #d1d5db",
+                      borderRadius: 20,
+                      background: referralSource === value ? "#eff6ff" : "#fff",
+                      color: referralSource === value ? "#2563eb" : "#374151",
+                      fontWeight: referralSource === value ? 600 : 400,
+                      fontSize: 13,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {referralSource === "realtor" && (
+                <input
+                  type="text"
+                  value={referralName}
+                  onChange={(e) => setReferralName(e.target.value)}
+                  placeholder="Realtor name or company"
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}
+                />
               )}
             </div>
 

@@ -31,7 +31,21 @@ const CONTACT_METHODS = [
   { value: "phone", label: "Phone" },
 ] as const;
 
+const REFERRAL_OPTIONS = [
+  { value: "online", label: "Found us online" },
+  { value: "friend_neighbor", label: "Friend or neighbor" },
+  { value: "realtor", label: "Realtor referral" },
+  { value: "repeat", label: "Previous client" },
+  { value: "other", label: "Other" },
+] as const;
+
+export const REFERRAL_LABELS: Record<string, string> = Object.fromEntries(
+  REFERRAL_OPTIONS.map((o) => [o.value, o.label])
+);
+
 type PreferredContact = (typeof CONTACT_METHODS)[number]["value"];
+
+type ReferralSource = "online" | "friend_neighbor" | "realtor" | "repeat" | "other";
 
 type IntakeFormValues = {
   name: string;
@@ -45,6 +59,8 @@ type IntakeFormValues = {
   city: string;
   sms_consent: boolean;
   preferred_contact: PreferredContact;
+  referral_source: ReferralSource | "";
+  referral_name: string;
 };
 
 type IntakeErrors = Partial<Record<keyof IntakeFormValues, string>>;
@@ -61,6 +77,8 @@ const initialValues: IntakeFormValues = {
   city: "",
   sms_consent: false,
   preferred_contact: "email",
+  referral_source: "",
+  referral_name: "",
 };
 
 export function IntakeForm() {
@@ -129,6 +147,8 @@ export function IntakeForm() {
           city: form.city.trim() || null,
           sms_consent: form.preferred_contact === "sms" && form.sms_consent,
           preferred_contact: form.preferred_contact,
+          referral_source: form.referral_source || null,
+          referral_name: form.referral_source === "realtor" && form.referral_name.trim() ? form.referral_name.trim() : null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -211,6 +231,15 @@ export function IntakeForm() {
             <Detail label="Preferred Date" value={form.preferred_date} />
             <Detail label="Preferred Time" value={form.preferred_time_slot} />
             <Detail label="Address" value={[form.address, form.city].filter(Boolean).join(", ")} />
+            {form.referral_source && (
+              <Detail
+                label="Referred By"
+                value={
+                  REFERRAL_LABELS[form.referral_source] +
+                  (form.referral_source === "realtor" && form.referral_name ? ` — ${form.referral_name}` : "")
+                }
+              />
+            )}
           </dl>
         </Card>
 
@@ -370,6 +399,49 @@ export function IntakeForm() {
           </span>
         </label>
         {errors.sms_consent ? <span className="p7-field-error" role="alert">{errors.sms_consent}</span> : null}
+      </Card>
+
+      <Card>
+        <SectionHeader title="Referral" />
+        <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+          <legend className="p7-label">How did they hear about us? <span style={{ fontWeight: 400, color: "var(--fg-muted)" }}>(optional)</span></legend>
+          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginTop: "var(--space-2)" }}>
+            {REFERRAL_OPTIONS.map((option) => (
+              <label
+                key={option.value}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "var(--space-2)",
+                  padding: "var(--space-2) var(--space-3)",
+                  border: form.referral_source === option.value ? "2px solid var(--accent)" : "1px solid var(--border)",
+                  borderRadius: "var(--radius-md)",
+                  cursor: "pointer",
+                  fontSize: "var(--text-sm)",
+                }}
+              >
+                <input
+                  type="radio"
+                  name="referral_source"
+                  value={option.value}
+                  checked={form.referral_source === option.value}
+                  onChange={() => update("referral_source", option.value)}
+                />
+                {option.label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        {form.referral_source === "realtor" && (
+          <Input
+            id="referral_name"
+            label="Realtor name or company"
+            value={form.referral_name}
+            onChange={(e) => update("referral_name", e.target.value)}
+            placeholder="e.g. Jane Smith at ABC Realty"
+            style={{ marginTop: "var(--space-3)" }}
+          />
+        )}
       </Card>
 
       <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)" }}>

@@ -25,6 +25,8 @@ export type IntakeRecordInput = {
   smsConsentSource: string;
   routingPath?: "site_visit" | "remote_estimate" | "pending";
   walkthroughScore?: number | null;
+  referralSource?: "online" | "friend_neighbor" | "realtor" | "repeat" | "other" | null;
+  referralName?: string | null;
 };
 
 export type IntakeRecordResult = {
@@ -270,6 +272,10 @@ export async function createIntakeRecords(
         name, email, phone, service_category, service_description,
         preferred_date, preferred_time_slot, address, city, state, zip, access_notes,
         preferred_contact, sms_consent, sms_consent_at, sms_consent_source,
+        routing_path, walkthrough_score, referral_source, referral_name)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+             $17, $18, CASE WHEN $18 THEN NOW() ELSE NULL END, CASE WHEN $18 THEN $19 ELSE NULL END,
+             $20, $21, $22, $23)
         routing_path, walkthrough_score)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
              $17, $18, CASE WHEN $18 THEN NOW() ELSE NULL END, CASE WHEN $18 THEN $19 ELSE NULL END,
@@ -297,6 +303,8 @@ export async function createIntakeRecords(
       input.smsConsentSource,
       routingPath,
       input.walkthroughScore ?? null,
+      input.referralSource ?? null,
+      input.referralName ?? null,
     ]
   );
   const bookingId = bookingRows[0].id;
