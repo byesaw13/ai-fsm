@@ -160,6 +160,7 @@ export default async function VisitDetailPage({
   const isRepairFlow = visit.job_type !== null && visit.job_type !== "maintenance";
   const isMembershipVisit = visit.generated_from_plan_id !== null;
   const isRealtorBaseline = visit.visit_type === "realtor_baseline";
+  const isSiteVisit = visit.visit_type === "site_visit";
   const canCreateEstimate = session.role === "owner" || session.role === "admin";
   const routingZoneWarning =
     visit.plan_routing_zone &&
@@ -425,6 +426,31 @@ export default async function VisitDetailPage({
                 propertyId={visit.job_property_id ?? null}
                 vaultCollection={membershipVaultCollection}
               />
+            </Card>
+          )}
+
+          {/* ── Site visit: create estimate prompt when completed ── */}
+          {isSiteVisit && currentStatus === "completed" && canCreateEstimate && (
+            <Card data-testid="site-visit-followup">
+              <SectionHeader title="Site Visit Complete" />
+              <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", marginBottom: "var(--space-3)" }}>
+                You&apos;ve assessed the project. Create an estimate for the client based on your findings.
+              </div>
+              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                {visit.job_client_id && (
+                  <a
+                    href={`/app/estimates/new?client_id=${visit.job_client_id}${visit.job_id ? `&job_id=${visit.job_id}` : ""}${visit.job_property_id ? `&property_id=${visit.job_property_id}` : ""}`}
+                    className="p7-btn p7-btn-primary p7-btn-sm"
+                  >
+                    Create Estimate →
+                  </a>
+                )}
+                {visit.job_id && (
+                  <a href={`/app/jobs/${visit.job_id}`} className="p7-btn p7-btn-secondary p7-btn-sm">
+                    Back to Job
+                  </a>
+                )}
+              </div>
             </Card>
           )}
 
