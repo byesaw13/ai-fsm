@@ -1,17 +1,16 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { PriceBookService } from "@/components/PriceBookSelector";
 import type { ScopeBuilderResult } from "@/components/ScopeBuilder";
 import { formatCents, getStandardEstimateTerms } from "@/lib/estimates/pricing";
 import {
-  JOB_TYPE_MATERIALS,
   ENGINE_VERSION,
   type MaterialSuggestion,
   type EstimateSpec,
 } from "@ai-fsm/domain";
-import type { DraftEstimate } from "@/lib/estimates/ai-draft";
+import { useEstimateAI } from "./useEstimateAI";
 import {
   parseCents, lineTotal, mapPrepLevel,
   EMPTY_ROW, PREP_LEVEL_LABELS, STEP_LABELS, DEFAULT_TIERS,
@@ -25,6 +24,8 @@ export {
   EMPTY_ROW, PREP_LEVEL_LABELS, STEP_LABELS, DEFAULT_TIERS,
   type LineItemRow, type OptionTier,
 } from "@/lib/estimates/form-helpers";
+
+export { type EditableSuggestion, type ParsedScope, type ScopeResult } from "./useEstimateAI";
 
 // ---------------------------------------------------------------------------
 // Types (form-specific, not shared)
@@ -45,37 +46,6 @@ export interface Property {
   id: string;
   address: string;
   client_id: string;
-}
-
-export interface EditableSuggestion {
-  code: string;
-  price_book_id: string;
-  name: string;
-  description: string | null;
-  quantity: number;
-  unit_price_cents: number;
-  reason: string;
-  accepted: boolean;
-  labor_hours_typical: number | null;
-  legal_flag: "gray" | "restricted" | null;
-}
-
-export interface ParsedScope {
-  sq_ft: number | null;
-  prep_level: number | null;
-  includes_trim: boolean;
-  includes_ceiling: boolean;
-  labor_hours_estimate: number | null;
-  material_cost_cents: number | null;
-  suggested_job_type: string;
-  confidence: number;
-  parsed_items: string[];
-  warnings: string[];
-}
-
-export interface ScopeResult {
-  parsed: ParsedScope;
-  estimate_preview: Record<string, string> | null;
 }
 
 export interface NewEstimateFormProps {
@@ -140,18 +110,7 @@ export function useEstimateForm({
   const [includesCeiling, setIncludesCeiling] = useState(false);
   const [materialCostDollars, setMaterialCostDollars] = useState("");
   const [laborHours, setLaborHours] = useState("");
-
-  const [scopeNotes, setScopeNotes] = useState("");
-  const [scopeParsing, setScopeParsing] = useState(false);
-  const [scopeResult, setScopeResult] = useState<ScopeResult | null>(null);
-  const [scopeError, setScopeError] = useState<string | null>(null);
-  const [resolvedJobType, setResolvedJobType] = useState<string>("");
   const [addedMaterials, setAddedMaterials] = useState<Set<string>>(new Set());
-
-  const [itemDescription, setItemDescription] = useState("");
-  const [itemSuggesting, setItemSuggesting] = useState(false);
-  const [itemSuggestError, setItemSuggestError] = useState<string | null>(null);
-  const [suggestions, setSuggestions] = useState<EditableSuggestion[]>([]);
 
   const [mode, setMode] = useState<"itemized" | "flat_rate" | "multi_option">("itemized");
   const [lineItems, setLineItems] = useState<LineItemRow[]>([{ ...EMPTY_ROW }]);
@@ -176,14 +135,50 @@ export function useEstimateForm({
     { service: PriceBookService; priceCents: number; instanceId: string }[]
   >([]);
   const [scopeResults, setScopeResults] = useState<Record<string, ScopeBuilderResult>>({});
-
-  const [aiDraftMode, setAiDraftMode] = useState<"idle" | "input" | "loading" | "applied">("idle");
-  const [aiDescription, setAiDescription] = useState<string>("");
-  const [aiConfidenceNotes, setAiConfidenceNotes] = useState<string>("");
-  const [aiConfidenceDismissed, setAiConfidenceDismissed] = useState<boolean>(false);
   const [pendingDraftScope, setPendingDraftScope] = useState<
     Record<string, { scopeValues: Record<string, number | string>; complexityFactors: string[] }>
   >({});
+
+  // ---------------------------------------------------------------------------
+  // AI sub-hook
+  // ---------------------------------------------------------------------------
+
+  const ai = useEstimateAI({
+    jobId,
+    pending,
+    onScopeParsed: (parsed) => {
+      if (parsed.sq_ft !== null) setSqFt(parsed.sq_ft.toString());
+      if (parsed.prep_level !== null) setPrepLevel(parsed.prep_level);
+      setIncludesTrim(parsed.includes_trim);
+      setIncludesCeiling(parsed.includes_ceiling);
+      if (parsed.labor_hours_estimate !== null) setLaborHours(parsed.labor_hours_estimate.toString());
+      if (parsed.material_cost_cents !== null) setMaterialCostDollars((parsed.material_cost_cents / 100).toFixed(2));
+      if (parsed.suggested_job_type === "custom") setServiceType("generic");
+    },
+    onAddLineItems: (rows) => {
+      setLineItems((prev) => [...prev.filter((r) => r.description.trim()), ...rows]);
+    },
+    onApplyDraft: ({ priceBookItems: draftItems, lineItems: newLineItems, scopeMap, notes: draftNotes, guardrails }) => {
+      setPriceBookItems(draftItems);
+      setScopeResults({});
+      setLineItems((prev) => {
+        const manual = prev.filter((r) => r.description.trim() && !r.price_book_id);
+        return [...newLineItems, ...manual];
+      });
+      setPendingDraftScope(scopeMap);
+      if (draftNotes) setNotes(draftNotes);
+      setTripCount(guardrails.trip_count);
+      setDifficultAccess(guardrails.difficult_access);
+      setOldHouseRisk(guardrails.old_house_risk);
+      setRequiresDryingOrCuring(guardrails.requires_drying_or_curing);
+      setCoordinationRequired(guardrails.coordination_required);
+      setFinishExpectation(guardrails.finish_expectation);
+    },
+  });
+
+  // ---------------------------------------------------------------------------
+  // Price book
+  // ---------------------------------------------------------------------------
 
   function handleAddPriceBookItem(service: PriceBookService, priceCents: number) {
     const instanceId = `${service.id}-${Date.now()}`;
@@ -209,84 +204,6 @@ export function useEstimateForm({
     });
   }
 
-  async function applyDraft() {
-    if (!aiDescription.trim()) return;
-    setAiDraftMode("loading");
-    try {
-      const res = await fetch("/api/v1/estimates/ai-draft", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: aiDescription, job_id: jobId || undefined }),
-      });
-      const { draft }: { draft: DraftEstimate | null } = await res.json();
-      if (!draft || draft.services.length === 0) {
-        setAiDraftMode("input");
-        return;
-      }
-
-      setPriceBookItems([]);
-      setScopeResults({});
-
-      const newItems: { service: PriceBookService; priceCents: number; instanceId: string }[] = [];
-      const newLineItems: LineItemRow[] = [];
-      const scopeMap: Record<string, { scopeValues: Record<string, number | string>; complexityFactors: string[] }> = {};
-
-      for (const svc of draft.services) {
-        const instanceId = `${svc.service_id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        const service: PriceBookService = {
-          id: svc.service_id,
-          code: svc.service_code,
-          name: svc.service_name,
-          category: svc.service_category,
-          tier: "core",
-          default_price_cents: svc.base_price_cents,
-          price_min_cents: svc.base_price_cents,
-          price_max_cents: null,
-          add_on_price_cents: null,
-          unit_type: null,
-          description: null,
-          notes: null,
-          default_labor_hours: null,
-          requires_materials: false,
-          upsell_codes: [],
-          is_active: true,
-        };
-        newItems.push({ service, priceCents: svc.base_price_cents, instanceId });
-        newLineItems.push({
-          description: `${svc.service_code} — ${svc.service_name}`,
-          quantity: "1",
-          unit_price: (svc.base_price_cents / 100).toFixed(2),
-          price_book_id: svc.service_id,
-        });
-        scopeMap[instanceId] = {
-          scopeValues: svc.scope_values,
-          complexityFactors: svc.complexity_factor_keys,
-        };
-      }
-
-      setPriceBookItems(newItems);
-      setLineItems((prev) => {
-        const manual = prev.filter((r) => r.description.trim() && !r.price_book_id);
-        return [...newLineItems, ...manual];
-      });
-      setPendingDraftScope(scopeMap);
-
-      if (draft.notes) setNotes(draft.notes);
-      setTripCount(draft.guardrails.trip_count);
-      setDifficultAccess(draft.guardrails.difficult_access);
-      setOldHouseRisk(draft.guardrails.old_house_risk);
-      setRequiresDryingOrCuring(draft.guardrails.requires_drying_or_curing);
-      setCoordinationRequired(draft.guardrails.coordination_required);
-      setFinishExpectation(draft.guardrails.finish_expectation);
-
-      setAiConfidenceNotes(draft.confidence_notes);
-      setAiConfidenceDismissed(false);
-      setAiDraftMode("applied");
-    } catch {
-      setAiDraftMode("input");
-    }
-  }
-
   const priceBookLineItems = useMemo(
     () =>
       priceBookItems.map((item, i) => ({
@@ -304,6 +221,10 @@ export function useEstimateForm({
     () => priceBookItems.reduce((sum, item) => sum + (scopeResults[item.instanceId]?.materialTotalCents ?? 0), 0),
     [priceBookItems, scopeResults]
   );
+
+  // ---------------------------------------------------------------------------
+  // Filtered lists + entity callbacks
+  // ---------------------------------------------------------------------------
 
   const filteredJobs = useMemo(
     () => (clientId ? jobList.filter((j) => j.client_id === clientId) : jobList),
@@ -346,60 +267,6 @@ export function useEstimateForm({
     }
   }, [filteredProperties, propertyId]);
 
-  const scopeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (!scopeNotes.trim() || scopeParsing || pending) return;
-    if (scopeDebounceRef.current) clearTimeout(scopeDebounceRef.current);
-    scopeDebounceRef.current = setTimeout(() => {
-      void handleParseScope();
-    }, 1500);
-    return () => {
-      if (scopeDebounceRef.current) clearTimeout(scopeDebounceRef.current);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scopeNotes]);
-
-  const itemDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    if (!itemDescription.trim() || itemSuggesting || pending) return;
-    if (itemDebounceRef.current) clearTimeout(itemDebounceRef.current);
-    itemDebounceRef.current = setTimeout(() => {
-      void handleSuggestItems();
-    }, 2000);
-    return () => {
-      if (itemDebounceRef.current) clearTimeout(itemDebounceRef.current);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [itemDescription]);
-
-  function handleAddSuggestion(index: number) {
-    const s = suggestions[index];
-    if (!s) return;
-    setLineItems((prev) => [
-      ...prev.filter((r) => r.description.trim()),
-      {
-        description: `${s.code} — ${s.name}`,
-        quantity: s.quantity.toString(),
-        unit_price: (s.unit_price_cents / 100).toFixed(2),
-      },
-    ]);
-    setSuggestions((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  function handleSkipSuggestion(index: number) {
-    setSuggestions((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  const bundleCategories = useMemo(() => {
-    const prefixes = new Set(suggestions.map((s) => s.code.split("-")[0]).filter(Boolean));
-    return prefixes.size;
-  }, [suggestions]);
-
-  const hasLegalFlagSuggestions = useMemo(
-    () => suggestions.some((s) => s.legal_flag !== null),
-    [suggestions]
-  );
-
   // ---------------------------------------------------------------------------
   // Pricing (delegated to useEstimatePricing)
   // ---------------------------------------------------------------------------
@@ -410,6 +277,10 @@ export function useEstimateForm({
     materialCostDollars, scopeMaterialsTotalCents,
     travelSurcharge, riskAdjustment,
   });
+
+  // ---------------------------------------------------------------------------
+  // Mode / line items / tiers
+  // ---------------------------------------------------------------------------
 
   function handleModeChange(newMode: "itemized" | "flat_rate" | "multi_option") {
     if (newMode === "flat_rate") {
@@ -491,83 +362,9 @@ export function useEstimateForm({
     ]);
   }
 
-  async function handleParseScope() {
-    setScopeParsing(true);
-    setScopeError(null);
-    setScopeResult(null);
-    try {
-      const res = await fetch("/api/v1/estimates/ai-scope", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes: scopeNotes }),
-      });
-      const json = await res.json() as ScopeResult & { error?: { message?: string } };
-      if (!res.ok) {
-        setScopeError(json.error?.message ?? "Failed to parse notes.");
-        return;
-      }
-      const { parsed } = json;
-      setScopeResult(json);
-      if (parsed.sq_ft !== null) setSqFt(parsed.sq_ft.toString());
-      if (parsed.prep_level !== null) setPrepLevel(parsed.prep_level);
-      setIncludesTrim(parsed.includes_trim);
-      setIncludesCeiling(parsed.includes_ceiling);
-      if (parsed.labor_hours_estimate !== null) setLaborHours(parsed.labor_hours_estimate.toString());
-      if (parsed.material_cost_cents !== null) setMaterialCostDollars((parsed.material_cost_cents / 100).toFixed(2));
-      if (parsed.suggested_job_type === "custom") setServiceType("generic");
-      else if (parsed.suggested_job_type && JOB_TYPE_MATERIALS[parsed.suggested_job_type]) {
-        setResolvedJobType(parsed.suggested_job_type);
-      }
-    } catch {
-      setScopeError("Network error — could not parse notes.");
-    } finally {
-      setScopeParsing(false);
-    }
-  }
-
-  async function handleSuggestItems() {
-    setItemSuggesting(true);
-    setItemSuggestError(null);
-    setSuggestions([]);
-    try {
-      const res = await fetch("/api/v1/estimates/ai-items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: itemDescription }),
-      });
-      const json = await res.json() as { suggestions?: unknown[]; error?: { message?: string } };
-      if (!res.ok) {
-        setItemSuggestError(json.error?.message ?? "Failed to get suggestions.");
-        return;
-      }
-      const raw = (json.suggestions ?? []) as Array<{
-        code: string; price_book_id: string; name: string; description: string | null;
-        quantity: number; unit_price_cents: number; reason: string;
-        labor_hours_typical: number | null; legal_flag: "gray" | "restricted" | null;
-      }>;
-      setSuggestions(raw.map((s) => ({ ...s, accepted: true })));
-    } catch {
-      setItemSuggestError("Network error — could not get suggestions.");
-    } finally {
-      setItemSuggesting(false);
-    }
-  }
-
-  function handleAcceptSuggestions() {
-    const toAdd = suggestions.filter((s) => s.accepted);
-    if (toAdd.length === 0) return;
-    setLineItems((prev) => [
-      ...prev.filter((r) => r.description.trim()),
-      ...toAdd.map((s) => ({
-        description: `${s.code} — ${s.name}`,
-        quantity: s.quantity.toString(),
-        unit_price: (s.unit_price_cents / 100).toFixed(2),
-        price_book_id: s.price_book_id,
-      })),
-    ]);
-    setSuggestions([]);
-    setItemDescription("");
-  }
+  // ---------------------------------------------------------------------------
+  // Navigation
+  // ---------------------------------------------------------------------------
 
   function advanceStep() {
     if (step === 1 && !clientId) {
@@ -588,6 +385,10 @@ export function useEstimateForm({
   const selectedClient = clientList.find((c) => c.id === clientId);
   const selectedJob = jobList.find((j) => j.id === jobId);
   const selectedProperty = propertyList.find((p) => p.id === propertyId);
+
+  // ---------------------------------------------------------------------------
+  // Submit
+  // ---------------------------------------------------------------------------
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -866,9 +667,6 @@ export function useEstimateForm({
     includesCeiling, setIncludesCeiling,
     materialCostDollars, setMaterialCostDollars,
     laborHours, setLaborHours,
-    // Scope parser
-    scopeNotes, setScopeNotes,
-    scopeParsing, scopeResult, scopeError,
     // Generic fields
     mode,
     lineItems,
@@ -889,30 +687,19 @@ export function useEstimateForm({
     priceBookItems, scopeResults,
     priceBookLineItems, scopeMaterialsTotalCents,
     pendingDraftScope,
-    // AI draft
-    aiDraftMode, setAiDraftMode,
-    aiDescription, setAiDescription,
-    aiConfidenceNotes, aiConfidenceDismissed, setAiConfidenceDismissed,
-    // Item suggester
-    itemDescription, setItemDescription,
-    itemSuggesting, itemSuggestError,
-    suggestions, setSuggestions,
-    bundleCategories, hasLegalFlagSuggestions,
     // Pricing (from useEstimatePricing)
     ...pricing,
-    // Item state
-    resolvedJobType, addedMaterials,
+    // Material tracking
+    addedMaterials,
+    // AI (from useEstimateAI)
+    ...ai,
     // Handlers
     handleAddPriceBookItem,
     handleScopeChange,
     removePriceBookItem,
-    applyDraft,
     handleClientCreated,
     handleJobCreated,
     handlePropertyCreated,
-    handleAddSuggestion,
-    handleSkipSuggestion,
-    handleAcceptSuggestions,
     handleModeChange,
     addLineItem, removeLineItem, updateLineItem,
     updateTier, addTierLineItem, removeTierLineItem, updateTierLineItem,
