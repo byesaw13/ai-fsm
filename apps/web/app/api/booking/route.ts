@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { createIntakeRecords } from "../../../lib/intake/records";
-import { priceBookCategorySchema } from "@ai-fsm/domain";
+import { priceBookCategorySchema, scoreSiteVisitProbability } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -80,6 +80,11 @@ export async function POST(request: NextRequest) {
 
   const data = parseResult.data;
 
+  const decision = scoreSiteVisitProbability({
+    service_category: data.service_category,
+    service_description: data.service_description,
+  });
+
   const pool = getPool();
   const client = await pool.connect();
 
@@ -103,12 +108,14 @@ export async function POST(request: NextRequest) {
       preferredContact: data.preferred_contact,
       smsConsent: data.sms_consent,
       smsConsentSource: "booking_form",
+      routingPath: decision.path,
+      walkthroughScore: decision.score,
     });
 
     await client.query("COMMIT");
 
     return NextResponse.json(
-      { success: true, booking_id: bookingId },
+      { success: true, booking_id: bookingId, routing_path: decision.path },
       { status: 201 }
     );
   } catch (error) {

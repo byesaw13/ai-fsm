@@ -23,6 +23,8 @@ export type IntakeRecordInput = {
   preferredContact: PreferredContact;
   smsConsent: boolean;
   smsConsentSource: string;
+  routingPath?: "site_visit" | "remote_estimate" | "pending";
+  walkthroughScore?: number | null;
 };
 
 export type IntakeRecordResult = {
@@ -30,6 +32,7 @@ export type IntakeRecordResult = {
   clientId: string;
   propertyId: string;
   jobId: string;
+  routingPath: "site_visit" | "remote_estimate" | "pending";
 };
 
 export type ExistingBookingRequestInput = {
@@ -259,14 +262,18 @@ export async function createIntakeRecords(
   );
   const jobId = jobRows[0].id;
 
+  const routingPath = input.routingPath ?? "pending";
+
   const { rows: bookingRows } = await client.query<{ id: string }>(
     `INSERT INTO booking_requests
        (account_id, client_id, property_id, job_id,
         name, email, phone, service_category, service_description,
         preferred_date, preferred_time_slot, address, city, state, zip, access_notes,
-        preferred_contact, sms_consent, sms_consent_at, sms_consent_source)
+        preferred_contact, sms_consent, sms_consent_at, sms_consent_source,
+        routing_path, walkthrough_score)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-             $17, $18, CASE WHEN $18 THEN NOW() ELSE NULL END, CASE WHEN $18 THEN $19 ELSE NULL END)
+             $17, $18, CASE WHEN $18 THEN NOW() ELSE NULL END, CASE WHEN $18 THEN $19 ELSE NULL END,
+             $20, $21)
      RETURNING id`,
     [
       input.accountId,
@@ -288,6 +295,8 @@ export async function createIntakeRecords(
       input.preferredContact,
       input.smsConsent,
       input.smsConsentSource,
+      routingPath,
+      input.walkthroughScore ?? null,
     ]
   );
   const bookingId = bookingRows[0].id;
@@ -299,6 +308,7 @@ export async function createIntakeRecords(
     clientId,
     propertyId,
     jobId,
+    routingPath,
   };
 }
 
@@ -366,5 +376,6 @@ export async function repairBookingRequestPipelineLinks(
     clientId,
     propertyId,
     jobId,
+    routingPath: "pending" as const,
   };
 }

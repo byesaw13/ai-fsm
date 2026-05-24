@@ -1,8 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import type { Route } from "next";
 import { Button, Card, Input, LinkButton, Select, SectionHeader, Textarea, useToast } from "@/components/ui";
 
 const SMS_CONSENT_TEXT =
@@ -66,13 +64,14 @@ const initialValues: IntakeFormValues = {
 };
 
 export function IntakeForm() {
-  const router = useRouter();
   const toast = useToast();
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<IntakeErrors>({});
   const [form, setForm] = useState<IntakeFormValues>(initialValues);
+  const [submittedBookingId, setSubmittedBookingId] = useState<string | null>(null);
+  const [routingPath, setRoutingPath] = useState<"site_visit" | "remote_estimate" | null>(null);
 
   const categoryLabel = useMemo(
     () => SERVICE_CATEGORIES.find((category) => category.value === form.service_category)?.label ?? form.service_category,
@@ -139,11 +138,55 @@ export function IntakeForm() {
         return;
       }
       toast.success("Booking request created");
-      router.push("/app/booking-requests" as Route);
+      setSubmittedBookingId(data.id ?? null);
+      setRoutingPath(data.routing_path ?? null);
+      setStep(3);
     } catch {
       setError("Unexpected error creating booking request");
       setPending(false);
     }
+  }
+
+  if (step === 3) {
+    const isSiteVisit = routingPath === "site_visit";
+    return (
+      <div className="p7-form-stack">
+        <Card>
+          <SectionHeader title="Intake Submitted" />
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+            <div style={{
+              padding: "var(--space-4)",
+              borderRadius: "var(--radius-md)",
+              background: isSiteVisit ? "var(--warning-bg, #fffbeb)" : "var(--success-bg, #f0fdf4)",
+              border: `1px solid ${isSiteVisit ? "var(--warning-border, #fde68a)" : "var(--success-border, #bbf7d0)"}`,
+            }}>
+              <p style={{ margin: "0 0 var(--space-2)", fontWeight: 600, fontSize: "var(--text-sm)" }}>
+                {isSiteVisit ? "Routing: Site Visit Recommended" : "Routing: Remote Estimate"}
+              </p>
+              <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                {isSiteVisit
+                  ? "Based on the description, this project should start with an on-site walkthrough to assess scope before estimating. Let the client know you'll reach out to schedule a visit."
+                  : "Based on the description, this project is straightforward enough to estimate remotely. Let the client know they'll receive an estimate within 1–2 business days."}
+              </p>
+            </div>
+            <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+              Booking request created for <strong>{form.name}</strong>.
+            </p>
+          </div>
+        </Card>
+
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)" }}>
+          <LinkButton href="/app/booking-requests" variant="secondary">
+            All Requests
+          </LinkButton>
+          {submittedBookingId ? (
+            <LinkButton href={`/app/booking-requests/${submittedBookingId}` as never}>
+              View Request →
+            </LinkButton>
+          ) : null}
+        </div>
+      </div>
+    );
   }
 
   if (step === 2) {
