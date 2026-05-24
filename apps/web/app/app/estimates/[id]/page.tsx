@@ -76,6 +76,7 @@ interface LineItemRow {
   quantity: number;
   unit_price_cents: number;
   total_cents: number;
+  line_item_type: "labor" | "materials" | "handling_fee" | "adjustment";
   sort_order: number;
   created_at: string;
 }
@@ -152,7 +153,7 @@ export default async function EstimateDetailPage({
     if (estimateResult.rowCount === 0) return null;
 
     const lineItemsResult = await client.query(
-      `SELECT id, estimate_id, option_id, description, quantity, unit_price_cents, total_cents, sort_order, created_at
+      `SELECT id, estimate_id, option_id, description, quantity, unit_price_cents, total_cents, line_item_type, sort_order, created_at
        FROM estimate_line_items
        WHERE estimate_id = $1
        ORDER BY sort_order ASC, created_at ASC`,
@@ -591,14 +592,40 @@ export default async function EstimateDetailPage({
               </tr>
             </thead>
             <tbody>
-              {lineItems.map((item: LineItemRow) => (
-                <tr key={item.id} data-testid="line-item-row">
-                  <td>{item.description}</td>
-                  <td>{item.quantity}</td>
-                  <td>{formatDollars(item.unit_price_cents)}</td>
-                  <td>{formatDollars(item.total_cents)}</td>
-                </tr>
-              ))}
+              {(() => {
+                const laborItems = lineItems.filter((li: LineItemRow) => li.line_item_type === "labor" || !li.line_item_type);
+                const materialItems = lineItems.filter((li: LineItemRow) => li.line_item_type === "materials");
+                const handlingItems = lineItems.filter((li: LineItemRow) => li.line_item_type === "handling_fee");
+                const adjustmentItems = lineItems.filter((li: LineItemRow) => li.line_item_type === "adjustment");
+                const renderRow = (item: LineItemRow, muted = false) => (
+                  <tr key={item.id} data-testid="line-item-row" style={muted ? { color: "var(--fg-muted)" } : undefined}>
+                    <td>{item.description}</td>
+                    <td>{item.quantity}</td>
+                    <td>{formatDollars(item.unit_price_cents)}</td>
+                    <td>{formatDollars(item.total_cents)}</td>
+                  </tr>
+                );
+                return (
+                  <>
+                    {laborItems.map((item: LineItemRow) => renderRow(item))}
+                    {adjustmentItems.map((item: LineItemRow) => renderRow(item))}
+                    {materialItems.length > 0 && (
+                      <tr>
+                        <td colSpan={4} style={{
+                          fontSize: "var(--text-xs)", fontWeight: 600,
+                          textTransform: "uppercase", letterSpacing: "0.05em",
+                          color: "var(--fg-muted)", paddingTop: "var(--space-3)",
+                          borderTop: "1px dashed var(--border)",
+                        }}>
+                          Materials
+                        </td>
+                      </tr>
+                    )}
+                    {materialItems.map((item: LineItemRow) => renderRow(item))}
+                    {handlingItems.map((item: LineItemRow) => renderRow(item, true))}
+                  </>
+                );
+              })()}
             </tbody>
             <tfoot>
               <tr>
