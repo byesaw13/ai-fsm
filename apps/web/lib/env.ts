@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const schema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
-  REDIS_URL: z.string().min(1, "REDIS_URL is required"),
+  REDIS_URL: z.string().optional(),
   /**
    * AUTH_SECRET must be at least 32 characters.
    * Generate with: openssl rand -hex 32
@@ -58,7 +58,6 @@ export function getEnv() {
   ) {
     cachedEnv = schema.parse({
       DATABASE_URL: "postgres://placeholder",
-      REDIS_URL: "redis://placeholder",
       AUTH_SECRET: "placeholder-secret-must-be-at-least-32-characters!!",
       NODE_ENV: "production",
     });

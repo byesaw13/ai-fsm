@@ -204,17 +204,39 @@ async function runPollIteration(client: Client): Promise<void> {
   }
 }
 
+function makeClient(): Client {
+  const c = new Client({ connectionString: databaseUrl });
+  c.on("error", (err) => logger.error("db client error", err));
+  return c;
+}
+
 async function run() {
-  const client = new Client({ connectionString: databaseUrl });
+  let client = makeClient();
   await client.connect();
 
   logger.info("worker started", { pollMs });
 
+  async function tick() {
+    try {
+      await runPollIteration(client);
+    } catch (err) {
+      logger.error("worker tick failed", err);
+      // Reconnect on connection-level errors so the interval keeps running
+      const code = (err as NodeJS.ErrnoException).code ?? "";
+      if (code === "ECONNRESET" || code === "ECONNREFUSED" || code === "EPIPE") {
+        try { await client.end(); } catch { /* ignore */ }
+        client = makeClient();
+        await client.connect();
+        logger.info("worker db reconnected");
+      }
+    }
+  }
+
   // Run immediately on start, then on interval
-  await runPollIteration(client);
+  await tick();
 
   setInterval(() => {
-    runPollIteration(client);
+    tick();
   }, pollMs);
 }
 

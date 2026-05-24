@@ -93,6 +93,16 @@ export type InvoiceStatus = z.infer<typeof invoiceStatusSchema>;
 export const automationTypeSchema = z.enum([
   "visit_reminder",
   "invoice_followup",
+  "booking_confirmed",
+  "membership_renewal_nudge",
+  "review_request",
+  "client_reactivation",
+  "recurring_inspection",
+  "property_issue_scan",
+  "stale_job_nudge",
+  "estimate_followup",
+  "seasonal_reminder_spring",
+  "seasonal_reminder_fall",
 ]);
 
 export const expenseCategorySchema = z.enum([

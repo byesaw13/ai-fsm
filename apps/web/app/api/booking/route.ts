@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { createIntakeRecords } from "../../../lib/intake/records";
+import { priceBookCategorySchema } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -10,17 +11,7 @@ const bookingSchema = z.object({
   name: z.string().min(1).max(255),
   email: z.string().email().nullable().optional(),
   phone: z.string().max(50).nullable().optional(),
-  service_category: z.enum([
-    "general_repairs",
-    "plumbing",
-    "electrical",
-    "carpentry_furniture",
-    "painting_finishes",
-    "outdoor_seasonal",
-    "mounting_installs",
-    "maintenance_small",
-    "specialty_expansion",
-  ]),
+  service_category: priceBookCategorySchema,
   service_description: z.string().min(10).max(2000),
   preferred_date: z.string().refine((val) => {
     const date = new Date(val);

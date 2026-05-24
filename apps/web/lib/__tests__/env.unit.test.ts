@@ -50,10 +50,10 @@ describe("getEnv validation", () => {
     expect(() => getEnv()).toThrow(/DATABASE_URL/);
   });
 
-  it("throws when REDIS_URL is missing", () => {
+  it("succeeds when REDIS_URL is absent (field is optional)", () => {
     Object.assign(process.env, { ...VALID_ENV });
     delete process.env.REDIS_URL;
-    expect(() => getEnv()).toThrow(/REDIS_URL/);
+    expect(() => getEnv()).not.toThrow();
   });
 
   it("returns parsed env when all values are valid", () => {

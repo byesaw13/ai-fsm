@@ -8,6 +8,18 @@ import { logger } from "../../../../../../lib/logger";
 import { checkCompletionPacket } from "../../../../../../lib/completion-guard";
 import { visitTransitions, visitStatusSchema } from "@ai-fsm/domain";
 import type { VisitStatus } from "@ai-fsm/domain";
+
+interface VisitRow {
+  id: string;
+  account_id: string;
+  job_id: string | null;
+  assigned_user_id: string | null;
+  status: VisitStatus;
+  arrived_at: string | null;
+  completed_at: string | null;
+  tech_notes: string | null;
+  updated_at: string;
+}
 import { seedConditionSnapshots } from "../../../../../../lib/visits/condition-seeding";
 import { writeWorkflowEvent } from "../../../../../../lib/workflow-events";
 
@@ -172,7 +184,7 @@ export const POST = withAuth(
       //   2. arrived   → in_progress
       // The visit is never visible in 'arrived' state outside this tx.
       // -----------------------------------------------------------------------
-      let updated: any;
+      let updated: VisitRow;
       let effectiveStatus: VisitStatus;
 
       if (targetStatus === "arrived") {
@@ -186,7 +198,7 @@ export const POST = withAuth(
         const noteClause2 = techNotes !== undefined ? `, tech_notes = $3` : "";
         const params2: unknown[] = [id, session.accountId];
         if (techNotes !== undefined) params2.push(techNotes);
-        const { rows: rows2 } = await client.query(
+        const { rows: rows2 } = await client.query<VisitRow>(
           `UPDATE visits SET status = 'in_progress', updated_at = now()${noteClause2}
            WHERE id = $1 AND account_id = $2
            RETURNING *`,
@@ -199,7 +211,7 @@ export const POST = withAuth(
         const noteClause = techNotes !== undefined ? `, tech_notes = $4` : "";
         const params: unknown[] = [targetStatus, id, session.accountId];
         if (techNotes !== undefined) params.push(techNotes);
-        const { rows } = await client.query(
+        const { rows } = await client.query<VisitRow>(
           `UPDATE visits
            SET status = $1, updated_at = now()${completedClause}${noteClause}
            WHERE id = $2 AND account_id = $3

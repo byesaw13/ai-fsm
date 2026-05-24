@@ -8,6 +8,7 @@ import { logger } from "../../../../../../lib/logger";
 import { jobTransitions, jobStatusSchema } from "@ai-fsm/domain";
 import type { JobStatus } from "@ai-fsm/domain";
 import { reviewJobIntakeGate } from "../../../../../../lib/jobs/intake-guard";
+import { generateInvoiceNumber } from "../../../../../../lib/invoices/db";
 
 export const dynamic = "force-dynamic";
 
@@ -145,12 +146,7 @@ export const POST = withRole(
             );
 
             if (existingBalance.rowCount === 0) {
-              const countResult = await client.query<{ count: string }>(
-                `SELECT COUNT(*) AS count FROM invoices WHERE account_id = $1`,
-                [session.accountId]
-              );
-              const count = parseInt(countResult.rows[0]?.count ?? "0", 10) + 1;
-              const invoiceNumber = `INV-${String(count).padStart(4, "0")}`;
+              const invoiceNumber = await generateInvoiceNumber(client, session.accountId);
 
               const balanceResult = await client.query<{ id: string }>(
                 `INSERT INTO invoices

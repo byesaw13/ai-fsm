@@ -272,3 +272,14 @@ These concepts are sometimes mentioned in discussions but have no DB table and s
 | Contract | Estimate (approved) |
 | Ticket | Job or Property Issue |
 | Lead | Booking request |
+
+---
+
+## Scaffolded Tables (Not Yet Wired)
+
+These tables exist in migrations but have no application code reading or writing them. They are retained for planned P7+ features and should not be dropped without a backlog decision.
+
+| Table | Migration | Intended Use |
+|---|---|---|
+| `price_book_modifiers` | 052 | Per-account markup/discount rules on price book items |
+| `pricing_rule_snapshots` | 061 | Point-in-time snapshots of pricing rules for audit/history |

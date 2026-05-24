@@ -169,29 +169,34 @@ export async function emitVisitReminder(
       logger.debug("visit-reminder: suppressed by governor", { visitId: visit.id });
       return false;
     }
+
+    // Write the audit log only after a notification was actually enqueued.
+    // This is the idempotency marker — writing it for no-email visits would
+    // permanently suppress the reminder even if an email is added later.
+    await client.query(
+      `INSERT INTO audit_log
+         (account_id, entity_type, entity_id, action, actor_id, old_value, new_value)
+       VALUES ($1, 'visit_reminder', $2, 'insert', $3, NULL, $4)`,
+      [
+        visit.account_id,
+        visit.id,
+        automationId,
+        JSON.stringify({
+          automation_id: automationId,
+          visit_scheduled_start: visit.scheduled_start,
+          job_id: visit.job_id,
+          job_title: visit.job_title,
+          client_name: visit.client_name,
+          assigned_user_id: visit.assigned_user_id,
+          reminder_queued_at: new Date().toISOString(),
+        }),
+      ]
+    );
+
+    return true;
   }
 
-  await client.query(
-    `INSERT INTO audit_log
-       (account_id, entity_type, entity_id, action, actor_id, old_value, new_value)
-     VALUES ($1, 'visit_reminder', $2, 'insert', $3, NULL, $4)`,
-    [
-      visit.account_id,
-      visit.id,
-      automationId,
-      JSON.stringify({
-        automation_id: automationId,
-        visit_scheduled_start: visit.scheduled_start,
-        job_id: visit.job_id,
-        job_title: visit.job_title,
-        client_name: visit.client_name,
-        assigned_user_id: visit.assigned_user_id,
-        reminder_queued_at: new Date().toISOString(),
-      }),
-    ]
-  );
-
-  return true;
+  return false;
 }
 
 /**

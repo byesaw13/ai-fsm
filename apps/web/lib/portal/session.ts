@@ -32,7 +32,7 @@ export async function setPortalSessionCookie(token: string): Promise<void> {
   const jar = await cookies();
   jar.set(PORTAL_SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.SECURE_COOKIES !== "false" && process.env.NODE_ENV === "production",
     sameSite: "lax",
     maxAge: SESSION_DAYS * 24 * 60 * 60,
     path: "/",

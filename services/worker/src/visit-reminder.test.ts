@@ -11,6 +11,12 @@ import {
 import type { AutomationRow, EligibleVisit } from "./visit-reminder.js";
 import { logger } from "./logger.js";
 
+vi.mock("./notification/enqueue.js", () => ({
+  enqueueNotification: vi.fn().mockResolvedValue("enqueued"),
+}));
+
+import { enqueueNotification } from "./notification/enqueue.js";
+
 // Mock pg Client
 function mockClient(overrides: Record<string, unknown> = {}): Client {
   return {
@@ -40,6 +46,11 @@ const VISIT: EligibleVisit = {
   client_email: null,
   property_address: null,
   tech_name: null,
+};
+
+const VISIT_WITH_EMAIL: EligibleVisit = {
+  ...VISIT,
+  client_email: "john@example.com",
 };
 
 describe("findDueReminders", () => {
@@ -121,55 +132,87 @@ describe("findEligibleVisits", () => {
 });
 
 describe("emitVisitReminder", () => {
-  it("inserts audit_log entry and returns true for new reminder", async () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(enqueueNotification).mockResolvedValue("enqueued");
+  });
+
+  it("enqueues notification, inserts audit_log, and returns true", async () => {
     const queryFn = vi.fn();
-    // First call: check existing (none found)
+    // First call: idempotency check (none found)
     queryFn.mockResolvedValueOnce({ rowCount: 0 });
-    // Second call: insert
+    // Second call: audit log insert
     queryFn.mockResolvedValueOnce({ rowCount: 1 });
     const client = { query: queryFn } as unknown as Client;
 
-    const result = await emitVisitReminder(client, VISIT, AUTOMATION.id);
+    const result = await emitVisitReminder(client, VISIT_WITH_EMAIL, AUTOMATION.id);
 
     expect(result).toBe(true);
+    expect(enqueueNotification).toHaveBeenCalledOnce();
     expect(queryFn).toHaveBeenCalledTimes(2);
-    // Check the insert call
     const insertArgs = queryFn.mock.calls[1];
     expect(insertArgs[0]).toContain("INSERT INTO audit_log");
-    expect(insertArgs[1][0]).toBe(VISIT.account_id); // account_id
-    expect(insertArgs[1][1]).toBe(VISIT.id); // entity_id = visit id
+    expect(insertArgs[1][0]).toBe(VISIT_WITH_EMAIL.account_id);
+    expect(insertArgs[1][1]).toBe(VISIT_WITH_EMAIL.id);
   });
 
-  it("returns false and skips insert if reminder already exists", async () => {
+  it("returns false without audit_log when visit has no email", async () => {
     const queryFn = vi.fn();
-    // First call: check existing (found one)
-    queryFn.mockResolvedValueOnce({ rowCount: 1 });
+    // Idempotency check returns nothing (visit not yet processed)
+    queryFn.mockResolvedValueOnce({ rowCount: 0 });
     const client = { query: queryFn } as unknown as Client;
 
     const result = await emitVisitReminder(client, VISIT, AUTOMATION.id);
 
     expect(result).toBe(false);
-    // Should only have called the check query, not the insert
+    expect(enqueueNotification).not.toHaveBeenCalled();
+    // Only the idempotency check was issued — no audit log
     expect(queryFn).toHaveBeenCalledTimes(1);
   });
 
-  it("stores automation_id and visit details in new_value", async () => {
+  it("returns false and skips insert if reminder already exists", async () => {
+    const queryFn = vi.fn();
+    // Idempotency check finds existing entry
+    queryFn.mockResolvedValueOnce({ rowCount: 1 });
+    const client = { query: queryFn } as unknown as Client;
+
+    const result = await emitVisitReminder(client, VISIT_WITH_EMAIL, AUTOMATION.id);
+
+    expect(result).toBe(false);
+    expect(enqueueNotification).not.toHaveBeenCalled();
+    expect(queryFn).toHaveBeenCalledTimes(1);
+  });
+
+  it("stores automation_id and visit details in audit_log new_value", async () => {
     const queryFn = vi.fn();
     queryFn.mockResolvedValueOnce({ rowCount: 0 });
     queryFn.mockResolvedValueOnce({ rowCount: 1 });
     const client = { query: queryFn } as unknown as Client;
 
-    await emitVisitReminder(client, VISIT, AUTOMATION.id);
+    await emitVisitReminder(client, VISIT_WITH_EMAIL, AUTOMATION.id);
 
     const insertArgs = queryFn.mock.calls[1];
     const newValue = JSON.parse(insertArgs[1][3]);
     expect(newValue.automation_id).toBe(AUTOMATION.id);
-    expect(newValue.visit_scheduled_start).toBe(VISIT.scheduled_start);
-    expect(newValue.job_id).toBe(VISIT.job_id);
-    expect(newValue.job_title).toBe(VISIT.job_title);
-    expect(newValue.client_name).toBe(VISIT.client_name);
-    expect(newValue.assigned_user_id).toBe(VISIT.assigned_user_id);
+    expect(newValue.visit_scheduled_start).toBe(VISIT_WITH_EMAIL.scheduled_start);
+    expect(newValue.job_id).toBe(VISIT_WITH_EMAIL.job_id);
+    expect(newValue.job_title).toBe(VISIT_WITH_EMAIL.job_title);
+    expect(newValue.client_name).toBe(VISIT_WITH_EMAIL.client_name);
+    expect(newValue.assigned_user_id).toBe(VISIT_WITH_EMAIL.assigned_user_id);
     expect(newValue.reminder_queued_at).toBeDefined();
+  });
+
+  it("returns false when enqueueNotification is suppressed", async () => {
+    vi.mocked(enqueueNotification).mockResolvedValueOnce("suppressed");
+    const queryFn = vi.fn();
+    queryFn.mockResolvedValueOnce({ rowCount: 0 });
+    const client = { query: queryFn } as unknown as Client;
+
+    const result = await emitVisitReminder(client, VISIT_WITH_EMAIL, AUTOMATION.id);
+
+    expect(result).toBe(false);
+    // Audit log must NOT be written when notification was suppressed
+    expect(queryFn).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -198,13 +241,13 @@ describe("processVisitReminder", () => {
 
   it("processes eligible visits and returns counts", async () => {
     const queryFn = vi.fn();
-    // findEligibleVisits
-    queryFn.mockResolvedValueOnce({ rows: [VISIT, { ...VISIT, id: "visit-2" }] });
-    // emitVisitReminder for visit-1: check (not exists)
+    // findEligibleVisits: one with email (will send), one already processed
+    queryFn.mockResolvedValueOnce({ rows: [VISIT_WITH_EMAIL, { ...VISIT_WITH_EMAIL, id: "visit-2" }] });
+    // emitVisitReminder for visit-1: idempotency check (not exists)
     queryFn.mockResolvedValueOnce({ rowCount: 0 });
-    // emitVisitReminder for visit-1: insert
+    // emitVisitReminder for visit-1: audit_log insert
     queryFn.mockResolvedValueOnce({ rowCount: 1 });
-    // emitVisitReminder for visit-2: check (already exists)
+    // emitVisitReminder for visit-2: idempotency check (already exists)
     queryFn.mockResolvedValueOnce({ rowCount: 1 });
     // markAutomationRun
     queryFn.mockResolvedValueOnce({ rowCount: 1 });
@@ -220,15 +263,15 @@ describe("processVisitReminder", () => {
 
   it("continues processing after individual visit errors", async () => {
     const queryFn = vi.fn();
-    // findEligibleVisits: 2 visits
+    // findEligibleVisits: 2 visits with email
     queryFn.mockResolvedValueOnce({
-      rows: [VISIT, { ...VISIT, id: "visit-2" }],
+      rows: [VISIT_WITH_EMAIL, { ...VISIT_WITH_EMAIL, id: "visit-2" }],
     });
-    // visit-1: check throws
+    // visit-1: idempotency check throws
     queryFn.mockRejectedValueOnce(new Error("connection lost"));
-    // visit-2: check (not exists)
+    // visit-2: idempotency check (not exists)
     queryFn.mockResolvedValueOnce({ rowCount: 0 });
-    // visit-2: insert
+    // visit-2: audit_log insert
     queryFn.mockResolvedValueOnce({ rowCount: 1 });
     // markAutomationRun
     queryFn.mockResolvedValueOnce({ rowCount: 1 });

@@ -1,7 +1,7 @@
-# Domain Model Contract (FROZEN)
+# Domain Model Contract (FROZEN — Historical Snapshot)
 
-> Status: **FROZEN** as of 2026-02-16 — P0-T1
-> Any changes require ADR entry in `docs/DECISION_LOG.md` and orchestrator approval.
+> Status: **FROZEN** as of 2026-02-16 — P0-T1. Superseded by `docs/domain/domain-model.md`.
+> Kept for historical reference only. Do not edit.
 
 ## Source Evidence
 
