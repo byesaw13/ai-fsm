@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { PriceBookService } from "@/components/PriceBookSelector";
-import type { ScopeBuilderResult } from "@/components/ScopeBuilder";
 import { formatCents, getStandardEstimateTerms } from "@/lib/estimates/pricing";
 import {
   ENGINE_VERSION,
@@ -11,6 +10,7 @@ import {
   type EstimateSpec,
 } from "@ai-fsm/domain";
 import { useEstimateAI } from "./useEstimateAI";
+import { useEstimatePriceBook } from "./useEstimatePriceBook";
 import {
   parseCents, lineTotal, mapPrepLevel,
   EMPTY_ROW, PREP_LEVEL_LABELS, STEP_LABELS, DEFAULT_TIERS,
@@ -131,13 +131,24 @@ export function useEstimateForm({
   const [minimumOverrideReason, setMinimumOverrideReason] = useState("");
   const [minimumOverrideNote, setMinimumOverrideNote] = useState("");
 
-  const [priceBookItems, setPriceBookItems] = useState<
-    { service: PriceBookService; priceCents: number; instanceId: string }[]
-  >([]);
-  const [scopeResults, setScopeResults] = useState<Record<string, ScopeBuilderResult>>({});
   const [pendingDraftScope, setPendingDraftScope] = useState<
     Record<string, { scopeValues: Record<string, number | string>; complexityFactors: string[] }>
   >({});
+
+  // ---------------------------------------------------------------------------
+  // Price book sub-hook
+  // ---------------------------------------------------------------------------
+
+  const priceBook = useEstimatePriceBook();
+  const { priceBookItems, setPriceBookItems, scopeResults, setScopeResults,
+          priceBookLineItems, scopeMaterialsTotalCents,
+          handleScopeChange, removePriceBookItem } = priceBook;
+
+  function handleAddPriceBookItem(service: PriceBookService, priceCents: number) {
+    priceBook.handleAddPriceBookItem(service, priceCents, (row) => {
+      setLineItems((prev) => [...prev.filter((r) => r.description.trim()), row]);
+    });
+  }
 
   // ---------------------------------------------------------------------------
   // AI sub-hook
@@ -175,52 +186,6 @@ export function useEstimateForm({
       setFinishExpectation(guardrails.finish_expectation);
     },
   });
-
-  // ---------------------------------------------------------------------------
-  // Price book
-  // ---------------------------------------------------------------------------
-
-  function handleAddPriceBookItem(service: PriceBookService, priceCents: number) {
-    const instanceId = `${service.id}-${Date.now()}`;
-    setPriceBookItems((prev) => [...prev, { service, priceCents, instanceId }]);
-    const unitPrice = service.default_price_cents ?? priceCents;
-    const description = `${service.code} — ${service.name}${service.description ? ` — ${service.description}` : ""}`;
-    setLineItems((prev) => [
-      ...prev.filter((r) => r.description.trim()),
-      { description, quantity: "1", unit_price: (unitPrice / 100).toFixed(2), price_book_id: service.id },
-    ]);
-  }
-
-  function handleScopeChange(instanceId: string, result: ScopeBuilderResult) {
-    setScopeResults((prev) => ({ ...prev, [instanceId]: result }));
-  }
-
-  function removePriceBookItem(instanceId: string) {
-    setPriceBookItems((prev) => prev.filter((item) => item.instanceId !== instanceId));
-    setScopeResults((prev) => {
-      const next = { ...prev };
-      delete next[instanceId];
-      return next;
-    });
-  }
-
-  const priceBookLineItems = useMemo(
-    () =>
-      priceBookItems.map((item, i) => ({
-        description: `${item.service.code} — ${item.service.name}`,
-        quantity: 1,
-        unit_price_cents: scopeResults[item.instanceId]?.adjustedPriceCents ?? item.priceCents,
-        sort_order: i,
-        price_book_id: item.service.id,
-        price_book_code: item.service.code,
-      })),
-    [priceBookItems, scopeResults]
-  );
-
-  const scopeMaterialsTotalCents = useMemo(
-    () => priceBookItems.reduce((sum, item) => sum + (scopeResults[item.instanceId]?.materialTotalCents ?? 0), 0),
-    [priceBookItems, scopeResults]
-  );
 
   // ---------------------------------------------------------------------------
   // Filtered lists + entity callbacks
