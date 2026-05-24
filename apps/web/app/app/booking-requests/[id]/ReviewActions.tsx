@@ -191,10 +191,10 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, jobId, p
                 loading={pending === "convert"}
                 disabled={!!pending}
               >
-                Schedule Visit & Convert →
+                Schedule Site Visit →
               </Button>
               <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                Creates a visit on the preferred date/time, transitions the job to Scheduled, and marks this request as Converted.
+                Schedules a site visit to assess and measure the project. Create an estimate after the visit.
               </p>
             </div>
           )}

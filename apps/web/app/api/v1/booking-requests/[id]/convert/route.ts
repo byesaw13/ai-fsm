@@ -104,10 +104,10 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     const visitEnd = new Date(visitStart);
     visitEnd.setHours(startHour + 2, 0, 0, 0);
 
-    // Create visit
+    // Create site visit — assess and measure the project before estimating
     const { rows: visitRows } = await client.query(
-      `INSERT INTO visits (account_id, job_id, scheduled_start, scheduled_end, status, tech_notes, assigned_user_id)
-       VALUES ($1, $2, $3, $4, 'scheduled', $5, $6)
+      `INSERT INTO visits (account_id, job_id, scheduled_start, scheduled_end, status, visit_type, tech_notes, assigned_user_id)
+       VALUES ($1, $2, $3, $4, 'scheduled', 'site_visit', $5, $6)
        RETURNING id`,
       [
         session.accountId,
@@ -127,31 +127,10 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       fromStatus: null,
       toStatus: "scheduled",
       changedBy: session.userId,
-      note: "Created from booking request conversion",
+      note: "Site visit created from booking request — assess scope before estimating",
     });
 
-    // Transition job to scheduled
-    const { rowCount: updatedJobCount } = await client.query(
-      `UPDATE jobs SET status = 'scheduled', updated_at = now()
-       WHERE id = $1 AND account_id = $2 AND status IN ('draft','quoted')`,
-      [br.job_id, session.accountId]
-    );
-
-    if (
-      (updatedJobCount ?? 0) > 0 &&
-      previousJobStatus !== null &&
-      previousJobStatus !== "scheduled"
-    ) {
-      await recordStatusChange(client, {
-        accountId: session.accountId,
-        entityType: "job",
-        entityId: br.job_id,
-        fromStatus: previousJobStatus,
-        toStatus: "scheduled",
-        changedBy: session.userId,
-        note: "Scheduled from booking request conversion",
-      });
-    }
+    // Job stays in draft until estimate is created and approved
 
     // Mark booking request as converted
     const { rows: updatedRows } = await client.query(

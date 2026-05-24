@@ -67,6 +67,7 @@ export const visitTransitions: Record<VisitStatus, readonly VisitStatus[]> = {
 
 export const VISIT_TYPES = [
   "standard",
+  "site_visit",
   "realtor_baseline",
   "membership_health_check",
   "punch_list",
@@ -75,6 +76,7 @@ export type VisitType = typeof VISIT_TYPES[number];
 
 export const VISIT_TYPE_LABELS: Record<VisitType, string> = {
   standard: "Standard Visit",
+  site_visit: "Site Visit",
   realtor_baseline: "Realtor Baseline Inspection",
   membership_health_check: "Membership Health Check",
   punch_list: "Punch List",
