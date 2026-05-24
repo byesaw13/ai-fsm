@@ -6,17 +6,15 @@ import { useState, type ReactNode } from "react";
 import type { Route } from "next";
 import { ToastProvider } from "./ui/Toast";
 import {
-  IconSchedule,
-  IconJobs,
-  IconClients,
   IconEstimates,
   IconSettings,
   IconMyDay,
   IconField,
   IconMembership,
-  IconInvoices,
   IconBooking,
   IconProperties,
+  IconPriceBook,
+  IconPortal,
 } from "./NavIcons";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
@@ -37,21 +35,14 @@ interface NavSection {
 // Navigation definitions
 // ---------------------------------------------------------------------------
 
-const WORK_ITEMS: NavItem[] = [
-  { href: "/app/schedule", label: "Schedule", Icon: IconSchedule, adminOnly: true },
-  { href: "/app/jobs",     label: "Jobs",     Icon: IconJobs },
-];
-
-const CUSTOMER_ITEMS: NavItem[] = [
-  { href: "/app/properties",       label: "Properties", Icon: IconProperties, adminOnly: true },
-  { href: "/app/clients",          label: "Clients",    Icon: IconClients,    adminOnly: true },
-  { href: "/app/booking-requests", label: "Intake",     Icon: IconBooking,    adminOnly: true },
-];
-
-const MONEY_ITEMS: NavItem[] = [
-  { href: "/app/estimates",         label: "Estimates",   Icon: IconEstimates,  adminOnly: true },
-  { href: "/app/invoices",          label: "Invoices",    Icon: IconInvoices,   adminOnly: true },
-  { href: "/app/maintenance-plans", label: "Memberships", Icon: IconMembership, adminOnly: true },
+const ADMIN_NAV_ITEMS: NavItem[] = [
+  { href: "/app/booking-requests",  label: "Intake",          Icon: IconBooking,    adminOnly: true },
+  { href: "/app/properties",        label: "Properties",      Icon: IconProperties, adminOnly: true },
+  { href: "/app/estimates",         label: "Estimates",       Icon: IconEstimates,  adminOnly: true },
+  { href: "/app/price-book",        label: "Price Book",      Icon: IconPriceBook,  adminOnly: true },
+  { href: "/app/maintenance-plans", label: "Memberships",     Icon: IconMembership, adminOnly: true },
+  { href: "/app/field",             label: "Technician Flow", Icon: IconField,      adminOnly: true },
+  { href: "/portal/login",           label: "Client Portal",   Icon: IconPortal,     adminOnly: true },
 ];
 
 // ---------------------------------------------------------------------------
@@ -62,14 +53,13 @@ const MONEY_ITEMS: NavItem[] = [
 export function getNavSections(role: string): NavSection[] {
   const myDayHref = role === "tech" ? "/app/my-day" : "/app";
   const myDay: NavItem = { href: myDayHref, label: "My Day", Icon: IconMyDay };
-  const filter = (items: NavItem[]) =>
-    role === "tech" ? items.filter((i) => !i.adminOnly) : items;
 
-  return [
-    { label: "Work",      items: [myDay, ...filter(WORK_ITEMS)] },
-    { label: "Customers", items: filter(CUSTOMER_ITEMS) },
-    { label: "Money",     items: filter(MONEY_ITEMS) },
-  ].filter((s) => s.items.length > 0);
+  if (role === "tech") {
+    const techFlow: NavItem = { href: "/app/field", label: "Technician Flow", Icon: IconField };
+    return [{ label: "", items: [myDay, techFlow] }];
+  }
+
+  return [{ label: "", items: [myDay, ...ADMIN_NAV_ITEMS] }];
 }
 
 /** Returns flat list for the mobile bottom tab bar */
@@ -77,14 +67,13 @@ export function getBottomNavItems(role: string): NavItem[] {
   const myDayHref = role === "tech" ? "/app/my-day" : "/app";
   const myDay: NavItem = { href: myDayHref, label: "My Day", Icon: IconMyDay };
   const field: NavItem = { href: "/app/field", label: "On Site", Icon: IconField };
-  const jobs = WORK_ITEMS.find((i) => i.href === "/app/jobs")!;
 
-  if (role === "tech") return [myDay, field, jobs];
+  if (role === "tech") return [myDay, field];
 
-  const schedule  = WORK_ITEMS.find((i) => i.href === "/app/schedule")!;
-  const clients   = CUSTOMER_ITEMS.find((i) => i.href === "/app/clients")!;
-  const estimates = MONEY_ITEMS.find((i) => i.href === "/app/estimates")!;
-  return [myDay, schedule, jobs, clients, estimates];
+  const intake    = ADMIN_NAV_ITEMS.find((i) => i.href === "/app/booking-requests")!;
+  const props     = ADMIN_NAV_ITEMS.find((i) => i.href === "/app/properties")!;
+  const estimates = ADMIN_NAV_ITEMS.find((i) => i.href === "/app/estimates")!;
+  return [myDay, intake, props, estimates];
 }
 
 /** Returns true if href is the active route for the current pathname */
@@ -129,7 +118,7 @@ export function AppShell({ role, userName, children }: AppShellProps) {
           <nav className="p7-nav" aria-label="Primary navigation">
             {sections.map((section) => (
               <div key={section.label}>
-                <div className="p7-nav-section">{section.label}</div>
+                {section.label && <div className="p7-nav-section">{section.label}</div>}
                 {section.items.map((item) => {
                   const active = isNavActive(pathname, item.href);
                   return (
