@@ -21,7 +21,7 @@ import { PaintingEstimatorSection } from "../components/PaintingEstimatorSection
 import {
   PREP_LEVEL_MULTIPLIERS,
 } from "@ai-fsm/domain";
-import { lineTotal, type LineItemRow } from "@/lib/estimates/form-helpers";
+import { parseCents, lineTotal, EMPTY_ROW, type LineItemRow } from "@/lib/estimates/form-helpers";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -83,13 +83,6 @@ interface EstimateEditFormProps {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function parseCents(dollars: string): number {
-  const n = parseFloat(dollars);
-  if (isNaN(n) || n < 0) return 0;
-  return Math.round(n * 100);
-}
-
-
 function formatDollars(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
@@ -103,8 +96,6 @@ function isoToDateString(iso: string | Date | null): string {
   const str = iso instanceof Date ? iso.toISOString() : iso;
   return str.slice(0, 10);
 }
-
-const EMPTY_ROW: LineItemRow = { description: "", quantity: "1", unit_price: "0.00" };
 
 // ---------------------------------------------------------------------------
 // Component
