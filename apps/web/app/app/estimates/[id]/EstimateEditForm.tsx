@@ -15,9 +15,13 @@ import {
   calculatePaintingEstimate,
   formatCents,
 } from "@/lib/estimates/pricing";
+import { GuardrailsSection } from "../components/GuardrailsSection";
+import { LineItemsTable } from "../components/LineItemsTable";
+import { PaintingEstimatorSection } from "../components/PaintingEstimatorSection";
 import {
   PREP_LEVEL_MULTIPLIERS,
 } from "@ai-fsm/domain";
+import { parseCents, lineTotal, EMPTY_ROW, type LineItemRow } from "@/lib/estimates/form-helpers";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -27,11 +31,6 @@ interface ClientOption { id: string; name: string; }
 interface JobOption { id: string; title: string; client_id: string; }
 interface PropertyOption { id: string; address: string; client_id: string; }
 
-interface LineItemRow {
-  description: string;
-  quantity: string;
-  unit_price: string;
-}
 
 interface InitialLineItem {
   description: string;
@@ -84,18 +83,6 @@ interface EstimateEditFormProps {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function parseCents(dollars: string): number {
-  const n = parseFloat(dollars);
-  if (isNaN(n) || n < 0) return 0;
-  return Math.round(n * 100);
-}
-
-function lineTotal(row: LineItemRow): number {
-  const qty = parseFloat(row.quantity);
-  if (isNaN(qty) || qty <= 0) return 0;
-  return Math.round(qty * parseCents(row.unit_price));
-}
-
 function formatDollars(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
@@ -109,8 +96,6 @@ function isoToDateString(iso: string | Date | null): string {
   const str = iso instanceof Date ? iso.toISOString() : iso;
   return str.slice(0, 10);
 }
-
-const EMPTY_ROW: LineItemRow = { description: "", quantity: "1", unit_price: "0.00" };
 
 // ---------------------------------------------------------------------------
 // Component
@@ -532,94 +517,20 @@ function StandardEstimateEditForm({
           />
         </div>
 
-        <div>
-          <SectionHeader title="Pricing Guardrails" as="h3" />
-          <div className="p7-form-grid p7-form-grid-2">
-            <Select
-              id="edit-trip-count"
-              label="Trip Count"
-              value={tripCount}
-              onChange={(e) => setTripCount(e.target.value as "one_trip" | "multi_trip")}
-              disabled={pending}
-              options={[
-                { value: "one_trip", label: "One Trip" },
-                { value: "multi_trip", label: "Multi-Trip" },
-              ]}
-            />
-            <Select
-              id="edit-finish-expectation"
-              label="Finish Expectation"
-              value={finishExpectation}
-              onChange={(e) => setFinishExpectation(e.target.value as "basic" | "clean" | "premium")}
-              disabled={pending}
-              options={[
-                { value: "basic", label: "Basic" },
-                { value: "clean", label: "Clean" },
-                { value: "premium", label: "Premium" },
-              ]}
-            />
-            <Input
-              id="edit-travel-surcharge"
-              label="Travel Surcharge ($)"
-              type="number"
-              min="0"
-              step="0.01"
-              value={travelSurcharge}
-              onChange={(e) => setTravelSurcharge(e.target.value)}
-              disabled={pending}
-            />
-            <Input
-              id="edit-risk-adjustment"
-              label="Risk / Return Adjustment ($)"
-              type="number"
-              min="0"
-              step="0.01"
-              value={riskAdjustment}
-              onChange={(e) => setRiskAdjustment(e.target.value)}
-              disabled={pending}
-            />
-            <Select
-              id="edit-minimum-override"
-              label="Minimum Override"
-              value={minimumOverrideReason}
-              onChange={(e) => setMinimumOverrideReason(e.target.value)}
-              disabled={pending}
-              placeholder="None"
-              options={[
-                { value: "bundled", label: "Bundled" },
-                { value: "membership_included", label: "Membership Included" },
-                { value: "promo", label: "Promotion" },
-                { value: "owner_approved", label: "Owner Approved" },
-              ]}
-            />
-            <Input
-              id="edit-minimum-override-note"
-              label="Override Note"
-              value={minimumOverrideNote}
-              onChange={(e) => setMinimumOverrideNote(e.target.value)}
-              disabled={pending}
-              placeholder="Internal reason"
-            />
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)", marginTop: "var(--space-2)" }}>
-            {[
-              ["drying", "Drying/curing required", requiresDryingOrCuring, setRequiresDryingOrCuring],
-              ["access", "Difficult access", difficultAccess, setDifficultAccess],
-              ["old-house", "Old-house risk", oldHouseRisk, setOldHouseRisk],
-              ["coordination", "Coordination required", coordinationRequired, setCoordinationRequired],
-            ].map(([key, label, checked, setter]) => (
-              <label key={key as string} style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={checked as boolean}
-                  onChange={(e) => (setter as Dispatch<SetStateAction<boolean>>)(e.target.checked)}
-                  disabled={pending}
-                />
-                <span>{label as string}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+        <GuardrailsSection
+          idPrefix="edit"
+          disabled={pending}
+          tripCount={tripCount} setTripCount={setTripCount}
+          finishExpectation={finishExpectation} setFinishExpectation={setFinishExpectation}
+          travelSurcharge={travelSurcharge} setTravelSurcharge={setTravelSurcharge}
+          riskAdjustment={riskAdjustment} setRiskAdjustment={setRiskAdjustment}
+          minimumOverrideReason={minimumOverrideReason} setMinimumOverrideReason={setMinimumOverrideReason}
+          minimumOverrideNote={minimumOverrideNote} setMinimumOverrideNote={setMinimumOverrideNote}
+          requiresDryingOrCuring={requiresDryingOrCuring} setRequiresDryingOrCuring={setRequiresDryingOrCuring}
+          difficultAccess={difficultAccess} setDifficultAccess={setDifficultAccess}
+          oldHouseRisk={oldHouseRisk} setOldHouseRisk={setOldHouseRisk}
+          coordinationRequired={coordinationRequired} setCoordinationRequired={setCoordinationRequired}
+        />
 
         {/* Service Type Toggle */}
         <div>
@@ -659,131 +570,17 @@ function StandardEstimateEditForm({
         {/* Painting Estimator */}
         {serviceType === "painting" && (
           <div style={{ marginTop: "var(--space-4)" }}>
-            <SectionHeader title="Painting Estimator" as="h3" />
-
-            <div className="p7-form-grid p7-form-grid-2">
-              <Input
-                id="edit-sq-ft"
-                label="Square Footage"
-                type="number"
-                min="1"
-                step="1"
-                value={sqFt}
-                onChange={(e) => setSqFt(e.target.value)}
-                disabled={pending}
-                placeholder="e.g. 1200"
-              />
-
-              <Input
-                id="edit-labor-hours"
-                label="Estimated Labor Hours"
-                type="number"
-                min="0.5"
-                step="0.5"
-                value={laborHours}
-                onChange={(e) => setLaborHours(e.target.value)}
-                disabled={pending}
-                placeholder="Internal only"
-                hint="Used for margin calculation"
-              />
-
-              <Input
-                id="edit-material-cost"
-                label="Material Cost ($)"
-                type="number"
-                min="0"
-                step="0.01"
-                value={materialCostDollars}
-                onChange={(e) => setMaterialCostDollars(e.target.value)}
-                disabled={pending}
-                placeholder="e.g. 350.00"
-              />
-
-              <div className="p7-field">
-                <label className="p7-label" htmlFor="edit-prep-level">Prep Level</label>
-                <select
-                  id="edit-prep-level"
-                  className="p7-select"
-                  value={prepLevel}
-                  onChange={(e) => setPrepLevel(Number(e.target.value))}
-                  disabled={pending}
-                >
-                  {Object.entries(PREP_LEVEL_MULTIPLIERS).map(([level, mult]) => (
-                    <option key={level} value={level}>
-                      Level {level} ({mult}x)
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: "var(--space-4)", marginTop: "var(--space-2)" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={includesTrim}
-                  onChange={(e) => setIncludesTrim(e.target.checked)}
-                  disabled={pending}
-                />
-                <span>Include trim (+$0.20/sq ft)</span>
-              </label>
-              <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={includesCeiling}
-                  onChange={(e) => setIncludesCeiling(e.target.checked)}
-                  disabled={pending}
-                />
-                <span>Include ceiling (+30% surface)</span>
-              </label>
-            </div>
-
-            {paintingResult && (
-              <div style={{ marginTop: "var(--space-4)" }}>
-                <Card padding="sm" style={{ background: "var(--bg-subtle)" }}>
-                  <SectionHeader title="Estimate Preview" as="h4" />
-                  <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "var(--space-1) var(--space-4)", textAlign: "right" }}>
-                    <span style={{ color: "var(--fg-muted)" }}>Labor (flat rate)</span>
-                    <span>{formatCents(paintingResult.labor_flat_rate_cents)}</span>
-
-                    {parseCents(materialCostDollars) > 0 && (
-                      <>
-                        <span style={{ color: "var(--fg-muted)" }}>Materials</span>
-                        <span>{formatCents(parseCents(materialCostDollars))}</span>
-
-                        <span style={{ color: "var(--fg-muted)" }}>Handling fee (15%)</span>
-                        <span>{formatCents(paintingResult.material_handling_cents)}</span>
-                      </>
-                    )}
-
-                    <strong>Total</strong>
-                    <strong>{formatCents(paintingResult.total_cents)}</strong>
-
-                    <span style={{ color: "var(--fg-muted)" }}>Deposit (30%)</span>
-                    <span>{formatCents(paintingResult.deposit_cents)}</span>
-
-                    <span style={{ color: "var(--fg-muted)" }}>Balance (70%)</span>
-                    <span>{formatCents(paintingResult.balance_cents)}</span>
-                  </div>
-
-                  <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
-                    <SectionHeader title="Internal Margin" as="h4" />
-                    <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "var(--space-1) var(--space-4)", textAlign: "right" }}>
-                      <span style={{ color: "var(--fg-muted)" }}>Internal labor cost ($85/hr)</span>
-                      <span>{formatCents(paintingResult.internal_labor_cost_cents)}</span>
-
-                      <span style={{ color: "var(--fg-muted)" }}>Gross margin</span>
-                      <span style={{
-                        color: paintingResult.gross_margin_pct >= 30 ? "var(--color-success)" : paintingResult.gross_margin_pct >= 15 ? "var(--color-warning)" : "var(--color-danger)",
-                        fontWeight: 600,
-                      }}>
-                        {paintingResult.gross_margin_pct}% ({formatCents(paintingResult.gross_margin_cents)})
-                      </span>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-            )}
+            <PaintingEstimatorSection
+              idPrefix="edit"
+              disabled={pending}
+              sqFt={sqFt} setSqFt={setSqFt}
+              laborHours={laborHours} setLaborHours={setLaborHours}
+              materialCostDollars={materialCostDollars} setMaterialCostDollars={setMaterialCostDollars}
+              prepLevel={prepLevel} setPrepLevel={setPrepLevel}
+              includesTrim={includesTrim} setIncludesTrim={setIncludesTrim}
+              includesCeiling={includesCeiling} setIncludesCeiling={setIncludesCeiling}
+              paintingResult={paintingResult ? { ...paintingResult, material_cents: paintingResult.material_subtotal_cents } : null}
+            />
           </div>
         )}
 
@@ -844,115 +641,15 @@ function StandardEstimateEditForm({
             </div>
           ) : (
             <>
-              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--space-2)" }}>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={addLineItem}
-                  disabled={pending}
-                  data-testid="edit-add-line-item-btn"
-                >
-                  + Add Item
-                </Button>
-              </div>
-              {lineItems.length === 0 ? (
-                <p style={{ color: "var(--fg-muted)" }}>No line items. Add at least one.</p>
-              ) : (
-                <div style={{ overflowX: "auto" }}>
-                  <table className="line-items-table" style={{ width: "100%" }}>
-                    <thead>
-                      <tr>
-                        <th>Description</th>
-                        <th style={{ width: 80 }}>Qty</th>
-                        <th style={{ width: 120 }}>Unit Price ($)</th>
-                        <th style={{ width: 100 }}>Total</th>
-                        <th style={{ width: 70 }}></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lineItems.map((row, i) => (
-                        <tr key={i}>
-                          <td>
-                            <input
-                              className="p7-input"
-                              type="text"
-                              value={row.description}
-                              onChange={(e) => updateLineItem(i, "description", e.target.value)}
-                              placeholder="Description"
-                              required
-                              disabled={pending}
-                              data-testid={`edit-line-item-desc-${i}`}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              className="p7-input"
-                              type="number"
-                              min="0.01"
-                              step="0.01"
-                              value={row.quantity}
-                              onChange={(e) => updateLineItem(i, "quantity", e.target.value)}
-                              disabled={pending}
-                              data-testid={`edit-line-item-qty-${i}`}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              className="p7-input"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={row.unit_price}
-                              onChange={(e) => updateLineItem(i, "unit_price", e.target.value)}
-                              disabled={pending}
-                              data-testid={`edit-line-item-price-${i}`}
-                            />
-                          </td>
-                          <td
-                            style={{
-                              color: "var(--fg-muted)",
-                              fontSize: "var(--text-sm)",
-                              paddingLeft: "var(--space-2)",
-                            }}
-                          >
-                            {formatDollars(lineTotal(row))}
-                          </td>
-                          <td>
-                            <div style={{ display: "flex", gap: "var(--space-1)" }}>
-                              <button
-                                type="button"
-                                className="p7-btn p7-btn-ghost p7-btn-sm"
-                                title="Duplicate row"
-                                onClick={() => duplicateLineItem(i)}
-                                disabled={pending}
-                                data-testid={`edit-duplicate-line-item-${i}`}
-                                aria-label={`Duplicate line item ${i + 1}`}
-                              >
-                                ⧉
-                              </button>
-                              {lineItems.length > 1 && (
-                                <button
-                                  type="button"
-                                  className="p7-btn p7-btn-ghost p7-btn-sm"
-                                  title="Remove row"
-                                  onClick={() => removeLineItem(i)}
-                                  disabled={pending}
-                                  data-testid={`edit-remove-line-item-${i}`}
-                                  aria-label={`Remove line item ${i + 1}`}
-                                  style={{ color: "var(--color-danger)" }}
-                                >
-                                  ×
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <LineItemsTable
+                items={lineItems}
+                disabled={pending}
+                testIdPrefix="edit"
+                onUpdate={updateLineItem}
+                onAdd={addLineItem}
+                onRemove={removeLineItem}
+                onDuplicate={duplicateLineItem}
+              />
             </>
           )}
 
