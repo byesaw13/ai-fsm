@@ -27,6 +27,8 @@ const bookingSchema = z.object({
   access_notes: z.string().max(500).nullable().optional(),
   preferred_contact: z.enum(["sms", "email", "phone"]).default("email"),
   sms_consent: z.boolean().default(false),
+  referral_source: z.enum(["online", "friend_neighbor", "realtor", "repeat", "other"]).nullable().optional(),
+  referral_name: z.string().max(255).nullable().optional(),
 }).superRefine((data, ctx) => {
   if (data.preferred_contact === "sms") {
     if (!data.phone) {
@@ -110,6 +112,8 @@ export async function POST(request: NextRequest) {
       smsConsentSource: "booking_form",
       routingPath: decision.path,
       walkthroughScore: decision.score,
+      referralSource: data.referral_source || null,
+      referralName: data.referral_name || null,
     });
 
     await client.query("COMMIT");

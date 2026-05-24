@@ -35,6 +35,14 @@ const CONTACT_LABELS: Record<string, string> = {
   phone: "Phone",
 };
 
+const REFERRAL_LABELS: Record<string, string> = {
+  online: "Found us online",
+  friend_neighbor: "Friend or neighbor",
+  realtor: "Realtor referral",
+  repeat: "Previous client",
+  other: "Other",
+};
+
 type BookingRow = {
   id: string;
   status: string;
@@ -63,6 +71,10 @@ type BookingRow = {
   visit_id: string | null;
   client_id: string | null;
   duplicate_candidate_ids: string[] | null;
+  routing_path: string | null;
+  walkthrough_score: number | null;
+  referral_source: string | null;
+  referral_name: string | null;
 };
 
 type DuplicateBookingRow = {
@@ -187,6 +199,24 @@ export default async function BookingRequestDetailPage({
             </dl>
           </Card>
 
+          {br.referral_source && (
+            <Card>
+              <SectionHeader title="Referral" />
+              <dl className="p7-detail-list">
+                <div className="p7-detail-row">
+                  <dt>Source</dt>
+                  <dd>{REFERRAL_LABELS[br.referral_source] ?? br.referral_source}</dd>
+                </div>
+                {br.referral_name && (
+                  <div className="p7-detail-row">
+                    <dt>Realtor</dt>
+                    <dd>{br.referral_name}</dd>
+                  </div>
+                )}
+              </dl>
+            </Card>
+          )}
+
           <Card>
             <SectionHeader title="Service Request" />
             <dl className="p7-detail-list">
@@ -198,6 +228,19 @@ export default async function BookingRequestDetailPage({
                 <dt>Description</dt>
                 <dd style={{ whiteSpace: "pre-wrap" }}>{br.service_description}</dd>
               </div>
+              {br.routing_path && br.routing_path !== "pending" && (
+                <div className="p7-detail-row">
+                  <dt>Routing</dt>
+                  <dd>
+                    {br.routing_path === "site_visit" ? "Site visit recommended" : "Remote estimate"}
+                    {br.walkthrough_score != null && (
+                      <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginLeft: 6 }}>
+                        (score {br.walkthrough_score})
+                      </span>
+                    )}
+                  </dd>
+                </div>
+              )}
             </dl>
           </Card>
 
