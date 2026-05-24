@@ -219,3 +219,14 @@ export function IconFolder(props: IconProps) {
     </Icon>
   );
 }
+
+export function IconPortal(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="2" y="5" width="16" height="12" rx="2" />
+      <path d="M7 5V4a3 3 0 016 0v1" />
+      <circle cx="10" cy="11" r="1.5" fill="currentColor" stroke="none" />
+      <path d="M10 12.5v2" />
+    </Icon>
+  );
+}
