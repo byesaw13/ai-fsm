@@ -109,11 +109,12 @@ describe("POST /api/v1/intake", () => {
     const res = await POST(makeRequest(VALID_BODY));
 
     expect(res.status).toBe(201);
-    await expect(res.json()).resolves.toEqual({
+    await expect(res.json()).resolves.toMatchObject({
       id: BOOKING_ID,
       clientId: CLIENT_ID,
       propertyId: PROPERTY_ID,
       jobId: JOB_ID,
+      routing_path: expect.stringMatching(/^(site_visit|remote_estimate|pending)$/),
     });
 
     const sql = mockClientQuery.mock.calls.map((call) => String(call[0])).join("\n");

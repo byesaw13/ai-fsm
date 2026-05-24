@@ -21,10 +21,16 @@ interface BookingClientProps {
 const SMS_CONSENT_TEXT =
   "By checking this box you consent to receive text messages from Dovetails Services LLC about your service requests. Message & data rates may apply. Reply STOP to opt out.";
 
-const NEXT_STEPS = [
+const NEXT_STEPS_SITE_VISIT = [
   { title: "We review your request", body: "We look at every submission within 1 business day." },
-  { title: "We reach out to confirm", body: "We'll contact you to confirm scope, timing, and pricing before anything is scheduled." },
-  { title: "We schedule your visit", body: "Once details are agreed, we book your visit and send a confirmation." },
+  { title: "We schedule a walkthrough", body: "For this type of project we like to see the space first — we'll reach out to set up a quick on-site assessment." },
+  { title: "You get a written estimate", body: "After the walkthrough we send a detailed estimate before any work begins." },
+];
+
+const NEXT_STEPS_REMOTE = [
+  { title: "We review your request", body: "We look at every submission within 1 business day." },
+  { title: "We send you an estimate", body: "Based on what you've described we can put together a quote — expect it within 1–2 business days." },
+  { title: "We schedule your visit", body: "Once you approve the estimate we'll book a time that works for you." },
 ];
 
 function BookingLogo() {
@@ -54,6 +60,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [routingPath, setRoutingPath] = useState<"site_visit" | "remote_estimate" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [serviceCategory, setServiceCategory] = useState("");
@@ -108,6 +115,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
         return;
       }
 
+      setRoutingPath(data.routing_path ?? null);
       setSubmitted(true);
     } catch {
       setError("Network error. Please check your connection and try again.");
@@ -128,7 +136,9 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
           <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 28 }}>✓</div>
           <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Request Received!</h1>
           <p style={{ color: "#6b7280", marginBottom: 24 }}>
-            Thanks, {name}! We&apos;ll review your request and be in touch within 1 business day.
+            {routingPath === "site_visit"
+              ? <>Thanks, {name}! Based on your project description, we&apos;ll reach out to schedule a quick walkthrough before sending an estimate.</>
+              : <>Thanks, {name}! We&apos;ll review your request and send you an estimate within 1–2 business days.</>}
           </p>
 
           {/* Request summary */}
@@ -142,7 +152,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
           <div style={{ textAlign: "left", marginBottom: 28 }}>
             <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>What happens next</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {NEXT_STEPS.map((step, i) => (
+              {(routingPath === "site_visit" ? NEXT_STEPS_SITE_VISIT : NEXT_STEPS_REMOTE).map((step, i) => (
                 <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                   <div style={{ minWidth: 28, height: 28, borderRadius: "50%", background: "#eff6ff", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#2563eb" }}>
                     {i + 1}
@@ -191,7 +201,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
 
         {/* How it works — collapsed blurb */}
         <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "12px 16px", marginBottom: 24, display: "flex", gap: 16, flexWrap: "wrap", justifyContent: "center" }}>
-          {NEXT_STEPS.map((step, i) => (
+          {NEXT_STEPS_REMOTE.map((step, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#1d4ed8" }}>
               <span style={{ fontWeight: 700, background: "#2563eb", color: "#fff", borderRadius: "50%", width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
               <span>{step.title}</span>

@@ -4,6 +4,7 @@ import { withRole } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { createIntakeRecords } from "../../../../lib/intake/records";
+import { scoreSiteVisitProbability } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +73,12 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
   }
 
   const data = parsed.data;
+
+  const decision = scoreSiteVisitProbability({
+    service_category: data.service_category,
+    service_description: data.service_description,
+  });
+
   const pool = getPool();
   const client = await pool.connect();
 
@@ -84,7 +91,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       [session.userId, session.accountId, session.role]
     );
 
-    const { bookingId, clientId, propertyId, jobId } = await createIntakeRecords(client, {
+    const { bookingId, clientId, propertyId, jobId, routingPath } = await createIntakeRecords(client, {
       accountId: session.accountId,
       createdByUserId: session.userId,
       name: data.name,
@@ -99,10 +106,15 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       preferredContact: data.preferred_contact,
       smsConsent: data.sms_consent,
       smsConsentSource: "staff_intake",
+      routingPath: decision.path,
+      walkthroughScore: decision.score,
     });
 
     await client.query("COMMIT");
-    return NextResponse.json({ id: bookingId, clientId, propertyId, jobId }, { status: 201 });
+    return NextResponse.json(
+      { id: bookingId, clientId, propertyId, jobId, routing_path: routingPath, walkthrough_score: decision.score },
+      { status: 201 }
+    );
   } catch (err) {
     await client.query("ROLLBACK");
     logger.error("POST /api/v1/intake error", err as Error, { traceId: session.traceId });

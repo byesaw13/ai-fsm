@@ -136,7 +136,7 @@ describe("PATCH /api/v1/booking-requests/[id]", () => {
     const res = await RepairPOST(new NextRequest(`${BASE}/repair`, { method: "POST" }));
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({
+    await expect(res.json()).resolves.toMatchObject({
       data: {
         bookingId: REQUEST_ID,
         clientId: CLIENT_ID,
