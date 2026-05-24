@@ -16,6 +16,7 @@ import { formatCents } from "@/lib/estimates/pricing";
 import { GuardrailsSection } from "../components/GuardrailsSection";
 import { LineItemsTable } from "../components/LineItemsTable";
 import { EstimateTierEditor } from "../components/EstimateTierEditor";
+import { PaintingEstimatorSection } from "../components/PaintingEstimatorSection";
 import { InlineClientForm } from "./InlineClientForm";
 import { InlineJobForm } from "./InlineJobForm";
 import { InlinePropertyForm } from "./InlinePropertyForm";
@@ -354,214 +355,80 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
         <div className="p7-form-stack">
           {/* Painting Estimator */}
           {serviceType === "painting" && (
-            <div>
-              <SectionHeader title="Painting Estimator" as="h3" />
-
-              {/* Scope parser */}
-              <div style={{ marginBottom: "var(--space-4)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
-                  <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 600 }}>
-                    Parse from description
+            <PaintingEstimatorSection
+              idPrefix="new"
+              disabled={pending}
+              sqFt={sqFt} setSqFt={setSqFt}
+              laborHours={laborHours} setLaborHours={setLaborHours}
+              materialCostDollars={materialCostDollars} setMaterialCostDollars={setMaterialCostDollars}
+              prepLevel={prepLevel} setPrepLevel={setPrepLevel}
+              includesTrim={includesTrim} setIncludesTrim={setIncludesTrim}
+              includesCeiling={includesCeiling} setIncludesCeiling={setIncludesCeiling}
+              paintingResult={paintingResult}
+              prepLevelLabels={PREP_LEVEL_LABELS}
+              scopeParserSlot={
+                <div style={{ marginBottom: "var(--space-4)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
+                    <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                      Parse from description
+                    </p>
+                    {scopeParsing && (
+                      <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontStyle: "italic" }}>
+                        Analyzing…
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                    Describe the job — fields auto-fill after you stop typing.
                   </p>
-                  {scopeParsing && (
-                    <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontStyle: "italic" }}>
-                      Analyzing…
-                    </span>
+                  <Textarea
+                    id="scope_notes"
+                    label=""
+                    value={scopeNotes}
+                    onChange={(e) => setScopeNotes(e.target.value)}
+                    placeholder="e.g. Paint 3 bedrooms, patch some holes and sand walls, include ceiling and trim, about $350 for materials"
+                    rows={3}
+                    disabled={pending || scopeParsing}
+                  />
+                  {scopeError && (
+                    <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--status-error)" }}>
+                      {scopeError}
+                    </p>
+                  )}
+                  {scopeResult && (
+                    <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-2)", borderTop: "1px solid var(--border)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-1)" }}>
+                        <span style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>Parsed</span>
+                        <span style={{
+                          padding: "2px 8px", borderRadius: 99, fontSize: "var(--text-xs)", fontWeight: 600, color: "#fff",
+                          background: scopeResult.parsed.confidence >= 70 ? "var(--status-success)" : scopeResult.parsed.confidence >= 40 ? "var(--status-warning)" : "var(--status-error)",
+                        }}>
+                          {scopeResult.parsed.confidence}% confidence
+                        </span>
+                      </div>
+                      {scopeResult.parsed.confidence < 60 && (
+                        <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--status-warning)", fontWeight: 500 }}>
+                          ⚠ Low confidence — review all fields carefully before submitting.
+                        </p>
+                      )}
+                      <ul style={{ margin: 0, padding: "0 0 0 var(--space-4)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                        {scopeResult.parsed.parsed_items.map((item, i) => (
+                          <li key={i}>{item}</li>
+                        ))}
+                      </ul>
+                      {scopeResult.parsed.warnings.map((w, i) => (
+                        <p key={i} style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--status-warning)", fontWeight: 500 }}>
+                          ⚠ {w}
+                        </p>
+                      ))}
+                      <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                        Fields applied below — review and adjust as needed.
+                      </p>
+                    </div>
                   )}
                 </div>
-                <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                  Describe the job — fields auto-fill after you stop typing.
-                </p>
-                <Textarea
-                  id="scope_notes"
-                  label=""
-                  value={scopeNotes}
-                  onChange={(e) => setScopeNotes(e.target.value)}
-                  placeholder="e.g. Paint 3 bedrooms, patch some holes and sand walls, include ceiling and trim, about $350 for materials"
-                  rows={3}
-                  disabled={pending || scopeParsing}
-                />
-
-                {scopeError && (
-                  <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--status-error)" }}>
-                    {scopeError}
-                  </p>
-                )}
-
-                {scopeResult && (
-                  <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-2)", borderTop: "1px solid var(--border)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-1)" }}>
-                      <span style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>Parsed</span>
-                      <span style={{
-                        padding: "2px 8px", borderRadius: 99, fontSize: "var(--text-xs)", fontWeight: 600, color: "#fff",
-                        background: scopeResult.parsed.confidence >= 70 ? "var(--status-success)" : scopeResult.parsed.confidence >= 40 ? "var(--status-warning)" : "var(--status-error)",
-                      }}>
-                        {scopeResult.parsed.confidence}% confidence
-                      </span>
-                    </div>
-                    {scopeResult.parsed.confidence < 60 && (
-                      <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--status-warning)", fontWeight: 500 }}>
-                        ⚠ Low confidence — review all fields carefully before submitting.
-                      </p>
-                    )}
-                    <ul style={{ margin: 0, padding: "0 0 0 var(--space-4)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                      {scopeResult.parsed.parsed_items.map((item, i) => (
-                        <li key={i}>{item}</li>
-                      ))}
-                    </ul>
-                    {scopeResult.parsed.warnings.map((w, i) => (
-                      <p key={i} style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--status-warning)", fontWeight: 500 }}>
-                        ⚠ {w}
-                      </p>
-                    ))}
-                    <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                      Fields applied below — review and adjust as needed.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="p7-form-grid p7-form-grid-2">
-                <Input
-                  id="sq_ft"
-                  label="Square Footage"
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={sqFt}
-                  onChange={(e) => setSqFt(e.target.value)}
-                  disabled={pending}
-                  placeholder="e.g. 1200"
-                />
-
-                <Input
-                  id="labor_hours"
-                  label="Estimated Labor Hours"
-                  type="number"
-                  min="0.5"
-                  step="0.5"
-                  value={laborHours}
-                  onChange={(e) => setLaborHours(e.target.value)}
-                  disabled={pending}
-                  placeholder="Optional — for your reference"
-                  hint="Engine estimates margin from square footage"
-                />
-
-                <Input
-                  id="material_cost"
-                  label="Material Cost ($)"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={materialCostDollars}
-                  onChange={(e) => setMaterialCostDollars(e.target.value)}
-                  disabled={pending}
-                  placeholder="e.g. 350.00"
-                />
-
-                <div className="p7-field">
-                  <label className="p7-label">Prep Level</label>
-                  <select
-                    id="prep_level"
-                    className="p7-select"
-                    value={prepLevel}
-                    onChange={(e) => setPrepLevel(Number(e.target.value))}
-                    disabled={pending}
-                  >
-                    {Object.entries(PREP_LEVEL_MULTIPLIERS).map(([level, mult]) => (
-                      <option key={level} value={level}>
-                        {PREP_LEVEL_LABELS[Number(level)] ?? `Level ${level} (${mult}x)`}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="p7-field-hint">
-                    Multiplier: {PREP_LEVEL_MULTIPLIERS[prepLevel]?.toFixed(2)}x base rate
-                  </span>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: "var(--space-4)", marginTop: "var(--space-2)" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={includesTrim}
-                    onChange={(e) => setIncludesTrim(e.target.checked)}
-                    disabled={pending}
-                  />
-                  <span>Include trim (+$0.20/sq ft)</span>
-                </label>
-                <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={includesCeiling}
-                    onChange={(e) => setIncludesCeiling(e.target.checked)}
-                    disabled={pending}
-                  />
-                  <span>Include ceiling (+30% surface)</span>
-                </label>
-              </div>
-
-              {/* Live Preview */}
-              {paintingResult && (
-                <div style={{ marginTop: "var(--space-4)" }}>
-                  <Card padding="sm" style={{ background: "var(--bg-subtle)" }}>
-                    <SectionHeader title="Estimate Preview" as="h4" />
-                    <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "var(--space-1) var(--space-4)", textAlign: "right" }}>
-                      <span style={{ color: "var(--fg-muted)" }}>Labor</span>
-                      <span>{formatCents(paintingResult.labor_flat_rate_cents)}</span>
-
-                      {paintingResult.material_cents > 0 && (
-                        <>
-                          <span style={{ color: "var(--fg-muted)" }}>Materials</span>
-                          <span>{formatCents(paintingResult.material_cents)}</span>
-                        </>
-                      )}
-
-                      {paintingResult.material_handling_cents > 0 && (
-                        <>
-                          <span style={{ color: "var(--fg-muted)" }}>Handling fee (15%)</span>
-                          <span>{formatCents(paintingResult.material_handling_cents)}</span>
-                        </>
-                      )}
-
-                      <strong>Total</strong>
-                      <strong>{formatCents(paintingResult.total_cents)}</strong>
-
-                      <span style={{ color: "var(--fg-muted)" }}>Deposit (30%)</span>
-                      <span>{formatCents(paintingResult.deposit_cents)}</span>
-
-                      <span style={{ color: "var(--fg-muted)" }}>Balance (70%)</span>
-                      <span>{formatCents(paintingResult.balance_cents)}</span>
-                    </div>
-
-                    <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
-                      <SectionHeader title="Internal Margin" as="h4" />
-                      <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "var(--space-1) var(--space-4)", textAlign: "right" }}>
-                        <span style={{ color: "var(--fg-muted)" }}>Estimated labor cost</span>
-                        <span>{formatCents(paintingResult.internal_labor_cost_cents)}</span>
-
-                        <span style={{ color: "var(--fg-muted)" }}>Gross margin</span>
-                        <span style={{
-                          color: paintingResult.gross_margin_pct >= 30 ? "var(--color-success)" : paintingResult.gross_margin_pct >= 15 ? "var(--color-warning)" : "var(--color-danger)",
-                          fontWeight: 600,
-                        }}>
-                          {paintingResult.gross_margin_pct}% ({formatCents(paintingResult.gross_margin_cents)})
-                        </span>
-
-                        <span style={{ color: "var(--fg-muted)" }}>Effective rate</span>
-                        <span>${(paintingResult.effective_sq_ft_rate_cents / 100).toFixed(2)}/sq ft</span>
-                      </div>
-                    </div>
-                  </Card>
-                </div>
-              )}
-
-              {!paintingResult && (
-                <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: "var(--space-2)" }}>
-                  Enter the square footage above to see the estimate preview.
-                </p>
-              )}
-            </div>
+              }
+            />
           )}
 
           {/* AI Draft panel — generic mode only */}

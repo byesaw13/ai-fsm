@@ -17,6 +17,7 @@ import {
 } from "@/lib/estimates/pricing";
 import { GuardrailsSection } from "../components/GuardrailsSection";
 import { LineItemsTable } from "../components/LineItemsTable";
+import { PaintingEstimatorSection } from "../components/PaintingEstimatorSection";
 import {
   PREP_LEVEL_MULTIPLIERS,
 } from "@ai-fsm/domain";
@@ -578,131 +579,17 @@ function StandardEstimateEditForm({
         {/* Painting Estimator */}
         {serviceType === "painting" && (
           <div style={{ marginTop: "var(--space-4)" }}>
-            <SectionHeader title="Painting Estimator" as="h3" />
-
-            <div className="p7-form-grid p7-form-grid-2">
-              <Input
-                id="edit-sq-ft"
-                label="Square Footage"
-                type="number"
-                min="1"
-                step="1"
-                value={sqFt}
-                onChange={(e) => setSqFt(e.target.value)}
-                disabled={pending}
-                placeholder="e.g. 1200"
-              />
-
-              <Input
-                id="edit-labor-hours"
-                label="Estimated Labor Hours"
-                type="number"
-                min="0.5"
-                step="0.5"
-                value={laborHours}
-                onChange={(e) => setLaborHours(e.target.value)}
-                disabled={pending}
-                placeholder="Internal only"
-                hint="Used for margin calculation"
-              />
-
-              <Input
-                id="edit-material-cost"
-                label="Material Cost ($)"
-                type="number"
-                min="0"
-                step="0.01"
-                value={materialCostDollars}
-                onChange={(e) => setMaterialCostDollars(e.target.value)}
-                disabled={pending}
-                placeholder="e.g. 350.00"
-              />
-
-              <div className="p7-field">
-                <label className="p7-label" htmlFor="edit-prep-level">Prep Level</label>
-                <select
-                  id="edit-prep-level"
-                  className="p7-select"
-                  value={prepLevel}
-                  onChange={(e) => setPrepLevel(Number(e.target.value))}
-                  disabled={pending}
-                >
-                  {Object.entries(PREP_LEVEL_MULTIPLIERS).map(([level, mult]) => (
-                    <option key={level} value={level}>
-                      Level {level} ({mult}x)
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: "var(--space-4)", marginTop: "var(--space-2)" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={includesTrim}
-                  onChange={(e) => setIncludesTrim(e.target.checked)}
-                  disabled={pending}
-                />
-                <span>Include trim (+$0.20/sq ft)</span>
-              </label>
-              <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={includesCeiling}
-                  onChange={(e) => setIncludesCeiling(e.target.checked)}
-                  disabled={pending}
-                />
-                <span>Include ceiling (+30% surface)</span>
-              </label>
-            </div>
-
-            {paintingResult && (
-              <div style={{ marginTop: "var(--space-4)" }}>
-                <Card padding="sm" style={{ background: "var(--bg-subtle)" }}>
-                  <SectionHeader title="Estimate Preview" as="h4" />
-                  <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "var(--space-1) var(--space-4)", textAlign: "right" }}>
-                    <span style={{ color: "var(--fg-muted)" }}>Labor (flat rate)</span>
-                    <span>{formatCents(paintingResult.labor_flat_rate_cents)}</span>
-
-                    {parseCents(materialCostDollars) > 0 && (
-                      <>
-                        <span style={{ color: "var(--fg-muted)" }}>Materials</span>
-                        <span>{formatCents(parseCents(materialCostDollars))}</span>
-
-                        <span style={{ color: "var(--fg-muted)" }}>Handling fee (15%)</span>
-                        <span>{formatCents(paintingResult.material_handling_cents)}</span>
-                      </>
-                    )}
-
-                    <strong>Total</strong>
-                    <strong>{formatCents(paintingResult.total_cents)}</strong>
-
-                    <span style={{ color: "var(--fg-muted)" }}>Deposit (30%)</span>
-                    <span>{formatCents(paintingResult.deposit_cents)}</span>
-
-                    <span style={{ color: "var(--fg-muted)" }}>Balance (70%)</span>
-                    <span>{formatCents(paintingResult.balance_cents)}</span>
-                  </div>
-
-                  <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
-                    <SectionHeader title="Internal Margin" as="h4" />
-                    <div style={{ display: "grid", gridTemplateColumns: "auto auto", gap: "var(--space-1) var(--space-4)", textAlign: "right" }}>
-                      <span style={{ color: "var(--fg-muted)" }}>Internal labor cost ($85/hr)</span>
-                      <span>{formatCents(paintingResult.internal_labor_cost_cents)}</span>
-
-                      <span style={{ color: "var(--fg-muted)" }}>Gross margin</span>
-                      <span style={{
-                        color: paintingResult.gross_margin_pct >= 30 ? "var(--color-success)" : paintingResult.gross_margin_pct >= 15 ? "var(--color-warning)" : "var(--color-danger)",
-                        fontWeight: 600,
-                      }}>
-                        {paintingResult.gross_margin_pct}% ({formatCents(paintingResult.gross_margin_cents)})
-                      </span>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-            )}
+            <PaintingEstimatorSection
+              idPrefix="edit"
+              disabled={pending}
+              sqFt={sqFt} setSqFt={setSqFt}
+              laborHours={laborHours} setLaborHours={setLaborHours}
+              materialCostDollars={materialCostDollars} setMaterialCostDollars={setMaterialCostDollars}
+              prepLevel={prepLevel} setPrepLevel={setPrepLevel}
+              includesTrim={includesTrim} setIncludesTrim={setIncludesTrim}
+              includesCeiling={includesCeiling} setIncludesCeiling={setIncludesCeiling}
+              paintingResult={paintingResult ? { ...paintingResult, material_cents: paintingResult.material_subtotal_cents } : null}
+            />
           </div>
         )}
 
