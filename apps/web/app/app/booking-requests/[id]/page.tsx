@@ -6,6 +6,7 @@ import { PageContainer, PageHeader, Card, SectionHeader, StatusBadge, LinkButton
 import type { StatusVariant } from "@/components/ui";
 import { ReviewActions } from "./ReviewActions";
 import { INTAKE_QUESTIONS, INTAKE_METADATA_LABELS } from "@/lib/intake/questions";
+import { scoreJobFit } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +119,13 @@ export default async function BookingRequestDetailPage({
       [session.accountId, duplicateIds]
     )
     : [];
+
+  const jobFit = scoreJobFit({
+    service_category: br.service_category,
+    referral_source: br.referral_source,
+    intake_metadata: br.intake_metadata,
+    walkthrough_score: br.walkthrough_score,
+  });
 
   const received = new Date(br.created_at).toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
@@ -337,6 +345,35 @@ export default async function BookingRequestDetailPage({
 
         {/* Right — review panel */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+          <Card>
+            <SectionHeader title="Job Fit" />
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-3)" }}>
+              <div style={{
+                width: 52, height: 52, borderRadius: "50%", flexShrink: 0,
+                background: jobFit.score >= 80 ? "#dcfce7" : jobFit.score >= 60 ? "#dbeafe" : jobFit.score >= 40 ? "#fef9c3" : "#fee2e2",
+                border: `2px solid ${jobFit.score >= 80 ? "#86efac" : jobFit.score >= 60 ? "#93c5fd" : jobFit.score >= 40 ? "#fde047" : "#fca5a5"}`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontWeight: 800, fontSize: "var(--text-sm)",
+                color: jobFit.score >= 80 ? "#166534" : jobFit.score >= 60 ? "#1e40af" : jobFit.score >= 40 ? "#854d0e" : "#991b1b",
+              }}>
+                {jobFit.score}
+              </div>
+              <div>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-sm)" }}>{jobFit.label}</p>
+                <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                  {CATEGORY_LABELS[br.service_category] ?? br.service_category}
+                </p>
+              </div>
+            </div>
+            {jobFit.reasons.length > 0 && (
+              <ul style={{ margin: 0, padding: "0 0 0 var(--space-4)", display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+                {jobFit.reasons.map((r) => (
+                  <li key={r} style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{r}</li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
           <Card>
             <SectionHeader title="Review" />
             {br.reviewed_at && (

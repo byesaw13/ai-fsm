@@ -11,6 +11,8 @@ export { checkSchedulingPreconditions } from "./scheduling-guard";
 export type { SchedulingGuardError, SchedulingGuardResult } from "./scheduling-guard";
 export { scoreSiteVisitProbability } from "./walkthrough-decision";
 export type { WalkthroughDecision, RoutingPath } from "./walkthrough-decision";
+export { scoreJobFit } from "./job-fit";
+export type { JobFitResult, JobFitInput } from "./job-fit";
 export {
   JOB_SUB_STATUSES,
   VISIT_SUB_STATUSES,
