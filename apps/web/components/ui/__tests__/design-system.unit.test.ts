@@ -156,7 +156,7 @@ describe("getNavSections (role filtering)", () => {
     expect(hrefs).toContain("/app/price-book");
     expect(hrefs).toContain("/app/maintenance-plans");
     expect(hrefs).toContain("/app/field");
-    expect(hrefs).toContain("/portal");
+    expect(hrefs).toContain("/portal/login");
     // Removed from nav (still accessible via direct URL)
     expect(hrefs).not.toContain("/app/schedule");
     expect(hrefs).not.toContain("/app/jobs");

@@ -42,7 +42,7 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
   { href: "/app/price-book",        label: "Price Book",      Icon: IconPriceBook,  adminOnly: true },
   { href: "/app/maintenance-plans", label: "Memberships",     Icon: IconMembership, adminOnly: true },
   { href: "/app/field",             label: "Technician Flow", Icon: IconField,      adminOnly: true },
-  { href: "/portal",                label: "Client Portal",   Icon: IconPortal,     adminOnly: true },
+  { href: "/portal/login",           label: "Client Portal",   Icon: IconPortal,     adminOnly: true },
 ];
 
 // ---------------------------------------------------------------------------
