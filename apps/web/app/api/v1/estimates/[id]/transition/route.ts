@@ -7,6 +7,7 @@ import { logger } from "@/lib/logger";
 import { estimateStatusSchema, estimateTransitions } from "@ai-fsm/domain";
 import type { EstimateStatus } from "@ai-fsm/domain";
 import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
+import { generateInvoiceNumber } from "@/lib/invoices/db";
 
 export const dynamic = "force-dynamic";
 
@@ -165,12 +166,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           );
 
           if (existingDeposit.rowCount === 0) {
-            const countResult = await client.query<{ count: string }>(
-              `SELECT COUNT(*) AS count FROM invoices WHERE account_id = $1`,
-              [session.accountId]
-            );
-            const count = parseInt(countResult.rows[0]?.count ?? "0", 10) + 1;
-            const invoiceNumber = `INV-${String(count).padStart(4, "0")}`;
+            const invoiceNumber = await generateInvoiceNumber(client, session.accountId);
             const depositResult = await client.query<{ id: string }>(
               `INSERT INTO invoices
                  (account_id, client_id, job_id, estimate_id, property_id,

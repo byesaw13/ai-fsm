@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import type { Route } from "next";
+import type { Role } from "@ai-fsm/domain";
 import { ToastProvider } from "./ui/Toast";
 import {
   IconEstimates,
@@ -35,14 +36,19 @@ interface NavSection {
 // Navigation definitions
 // ---------------------------------------------------------------------------
 
+// Named constants for items referenced outside the array (mobile bottom bar)
+const NAV_INTAKE:    NavItem = { href: "/app/booking-requests",  label: "Intake",          Icon: IconBooking,    adminOnly: true };
+const NAV_PROPS:     NavItem = { href: "/app/properties",        label: "Properties",      Icon: IconProperties, adminOnly: true };
+const NAV_ESTIMATES: NavItem = { href: "/app/estimates",         label: "Estimates",       Icon: IconEstimates,  adminOnly: true };
+
 const ADMIN_NAV_ITEMS: NavItem[] = [
-  { href: "/app/booking-requests",  label: "Intake",          Icon: IconBooking,    adminOnly: true },
-  { href: "/app/properties",        label: "Properties",      Icon: IconProperties, adminOnly: true },
-  { href: "/app/estimates",         label: "Estimates",       Icon: IconEstimates,  adminOnly: true },
+  NAV_INTAKE,
+  NAV_PROPS,
+  NAV_ESTIMATES,
   { href: "/app/price-book",        label: "Price Book",      Icon: IconPriceBook,  adminOnly: true },
   { href: "/app/maintenance-plans", label: "Memberships",     Icon: IconMembership, adminOnly: true },
   { href: "/app/field",             label: "Technician Flow", Icon: IconField,      adminOnly: true },
-  { href: "/portal/login",           label: "Client Portal",   Icon: IconPortal,     adminOnly: true },
+  { href: "/portal/login",          label: "Client Portal",   Icon: IconPortal,     adminOnly: true },
 ];
 
 // ---------------------------------------------------------------------------
@@ -50,7 +56,7 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
 // ---------------------------------------------------------------------------
 
 /** Returns filtered nav sections for a given role */
-export function getNavSections(role: string): NavSection[] {
+export function getNavSections(role: Role): NavSection[] {
   const myDayHref = role === "tech" ? "/app/my-day" : "/app";
   const myDay: NavItem = { href: myDayHref, label: "My Day", Icon: IconMyDay };
 
@@ -63,17 +69,14 @@ export function getNavSections(role: string): NavSection[] {
 }
 
 /** Returns flat list for the mobile bottom tab bar */
-export function getBottomNavItems(role: string): NavItem[] {
+export function getBottomNavItems(role: Role): NavItem[] {
   const myDayHref = role === "tech" ? "/app/my-day" : "/app";
   const myDay: NavItem = { href: myDayHref, label: "My Day", Icon: IconMyDay };
   const field: NavItem = { href: "/app/field", label: "On Site", Icon: IconField };
 
   if (role === "tech") return [myDay, field];
 
-  const intake    = ADMIN_NAV_ITEMS.find((i) => i.href === "/app/booking-requests")!;
-  const props     = ADMIN_NAV_ITEMS.find((i) => i.href === "/app/properties")!;
-  const estimates = ADMIN_NAV_ITEMS.find((i) => i.href === "/app/estimates")!;
-  return [myDay, intake, props, estimates];
+  return [myDay, NAV_INTAKE, NAV_PROPS, NAV_ESTIMATES];
 }
 
 /** Returns true if href is the active route for the current pathname */
@@ -87,7 +90,7 @@ export function isNavActive(pathname: string, href: string): boolean {
 // ---------------------------------------------------------------------------
 
 interface AppShellProps {
-  role: string;
+  role: Role;
   userName?: string;
   children: ReactNode;
 }
@@ -116,8 +119,8 @@ export function AppShell({ role, userName, children }: AppShellProps) {
 
           {/* Scrollable nav sections */}
           <nav className="p7-nav" aria-label="Primary navigation">
-            {sections.map((section) => (
-              <div key={section.label}>
+            {sections.map((section, sectionIdx) => (
+              <div key={sectionIdx}>
                 {section.label && <div className="p7-nav-section">{section.label}</div>}
                 {section.items.map((item) => {
                   const active = isNavActive(pathname, item.href);

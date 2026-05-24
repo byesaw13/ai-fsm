@@ -43,17 +43,19 @@ Local dev services: `docker compose -f infra/compose.dev.yml up -d postgres redi
 
 ## AI Governance
 
-This repo uses multi-agent autonomous development. Key docs (read in order):
+This repo uses multi-agent autonomous development. Current docs:
 
 1. `AGENTS.md` — Execution contract and non-negotiable rules
-2. `docs/MASTER_AUTONOMOUS_DIRECTIVE.md` — Highest priority project instruction
-3. `docs/PRODUCT_CONTRACT.md` — Acceptance criteria
-4. `docs/SYSTEM_BLUEPRINT.md` — Architecture and data rules
-5. `docs/TEAM_ORCHESTRATION.md` — AI team roles and handoff contracts
-6. `docs/EXECUTION_GRAPH.yaml` — Phased execution plan (P0–P5)
-7. `docs/WORK_ASSIGNMENT.md` — File ownership domains and active claims
+2. `docs/PRODUCT_CONTRACT.md` — Acceptance criteria
 
-Agent playbooks live in `docs/agent-playbooks/`. Role-specific prompts in `docs/prompts/`.
+Archived planning artifacts (historical reference only, superseded):
+- `docs/archive/MASTER_AUTONOMOUS_DIRECTIVE.md`
+- `docs/archive/SYSTEM_BLUEPRINT.md`
+- `docs/archive/TEAM_ORCHESTRATION.md`
+- `docs/archive/EXECUTION_GRAPH.yaml`
+- `docs/archive/WORK_ASSIGNMENT.md`
+
+Agent playbooks: `docs/archive/agent-playbooks/`. Role-specific prompts: `docs/archive/prompts/`.
 
 ## Non-Negotiable Rules
 

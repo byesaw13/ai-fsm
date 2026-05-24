@@ -44,19 +44,26 @@ export async function POST(request: NextRequest) {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      await client.query(
-        `INSERT INTO payments (account_id, invoice_id, amount_cents, method, received_at, notes)
-         VALUES ($1, $2, $3, $4, now(), $5)`,
+      const inserted = await client.query<{ id: string }>(
+        `INSERT INTO payments (account_id, invoice_id, amount_cents, method, received_at, notes, stripe_payment_intent_id)
+         VALUES ($1, $2, $3, $4, now(), $5, $6)
+         ON CONFLICT (stripe_payment_intent_id) WHERE stripe_payment_intent_id IS NOT NULL DO NOTHING
+         RETURNING id`,
         [
           invoice.account_id,
           invoice.id,
           pi.amount_received,
           pi.payment_method_types?.[0] ?? "card",
           `Stripe payment intent ${pi.id}`,
+          pi.id,
         ]
       );
       await client.query("COMMIT");
-      logger.info("Stripe payment recorded", { invoiceId, amount: pi.amount_received });
+      if (inserted.rowCount === 0) {
+        logger.info("Stripe webhook: duplicate event ignored", { paymentIntentId: pi.id });
+      } else {
+        logger.info("Stripe payment recorded", { invoiceId, amount: pi.amount_received });
+      }
     } catch (err) {
       await client.query("ROLLBACK");
       logger.error("Stripe webhook: failed to record payment", err);

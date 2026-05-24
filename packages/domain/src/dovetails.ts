@@ -13,12 +13,6 @@
 /** Internal burdened cost of labor. Never shown on customer-facing output. */
 export const LABOR_COST_CENTS_PER_HOUR = 85_00; // $85.00/hr
 
-/**
- * Customer-facing additional labor rate (solo technician, 0.25-hr increments).
- * @deprecated Use LABOR_COST_CENTS_PER_HOUR for internal margin math.
- */
-export const LABOR_RATE_CENTS_PER_HOUR = LABOR_COST_CENTS_PER_HOUR;
-
 /** Customer-facing hourly rate for T&M or add-on labor line items. */
 export const LABOR_CUSTOMER_RATE_CENTS_PER_HOUR = 115_00; // $115.00/hr
 
@@ -333,31 +327,27 @@ export const MAINTENANCE_JOB_CATEGORIES: JobAcceptanceCategory[] = ["membership"
 // ---------------------------------------------------------------------------
 
 export const PRICING_MODES = ["flat_rate", "hourly_internal"] as const;
-export type PricingMode = typeof PRICING_MODES[number];
 
 // ---------------------------------------------------------------------------
 // Line item categories
 // ---------------------------------------------------------------------------
 
 export const LINE_ITEM_TYPES = ["labor", "materials", "handling_fee", "adjustment"] as const;
-export type LineItemType = typeof LINE_ITEM_TYPES[number];
 
 // ---------------------------------------------------------------------------
 // Estimate guardrails
 // ---------------------------------------------------------------------------
 
 export const ESTIMATE_TRIP_COUNT_OPTIONS = ["one_trip", "multi_trip"] as const;
-export type EstimateTripCount = typeof ESTIMATE_TRIP_COUNT_OPTIONS[number];
 
-export const ESTIMATE_TRIP_COUNT_LABELS: Record<EstimateTripCount, string> = {
+export const ESTIMATE_TRIP_COUNT_LABELS: Record<typeof ESTIMATE_TRIP_COUNT_OPTIONS[number], string> = {
   one_trip: "One Trip",
   multi_trip: "Multi-Trip",
 };
 
 export const ESTIMATE_FINISH_EXPECTATIONS = ["basic", "clean", "premium"] as const;
-export type EstimateFinishExpectation = typeof ESTIMATE_FINISH_EXPECTATIONS[number];
 
-export const ESTIMATE_FINISH_EXPECTATION_LABELS: Record<EstimateFinishExpectation, string> = {
+export const ESTIMATE_FINISH_EXPECTATION_LABELS: Record<typeof ESTIMATE_FINISH_EXPECTATIONS[number], string> = {
   basic: "Basic",
   clean: "Clean",
   premium: "Premium",
@@ -387,9 +377,8 @@ export const ESTIMATE_ADJUSTMENT_TYPES = [
   "return_trip_charge",
   "coordination_fee",
 ] as const;
-export type EstimateAdjustmentType = typeof ESTIMATE_ADJUSTMENT_TYPES[number];
 
-export const ESTIMATE_ADJUSTMENT_TYPE_LABELS: Record<EstimateAdjustmentType, string> = {
+export const ESTIMATE_ADJUSTMENT_TYPE_LABELS: Record<typeof ESTIMATE_ADJUSTMENT_TYPES[number], string> = {
   bundle_credit: "Bundle Credit",
   member_credit: "Member Credit",
   promo: "Promotion",

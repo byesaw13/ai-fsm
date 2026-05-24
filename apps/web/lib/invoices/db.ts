@@ -1,6 +1,6 @@
 import type { PoolClient } from "pg";
-import { withDbSession } from "@/lib/db";
-import type { SessionPayload } from "@/lib/auth/session";
+import { withDbSession } from "../db";
+import type { SessionPayload } from "../auth/session";
 
 /**
  * Run fn within a PostgreSQL transaction with RLS session context set.

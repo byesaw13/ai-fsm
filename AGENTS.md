@@ -3,7 +3,7 @@
 This repository is an AI-first experiment with multi-agent autonomous delivery.
 
 ## Read This First
-Follow `docs/MASTER_AUTONOMOUS_DIRECTIVE.md` as highest-priority project instruction.
+Follow `AGENTS.md` non-negotiable rules below. Historical directive archived at `docs/archive/MASTER_AUTONOMOUS_DIRECTIVE.md`.
 
 ## Prime Directive
 AI should complete tasks end-to-end with minimal human input while preserving reliability and traceability.
