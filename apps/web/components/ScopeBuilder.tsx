@@ -21,6 +21,8 @@ interface ScopeBuilderProps {
   category: string;
   basePriceCents: number;
   onChange: (result: ScopeBuilderResult) => void;
+  initialScopeValues?: ScopeComponentValues;
+  initialComplexityFactors?: string[];
 }
 
 export interface ScopeBuilderResult {
@@ -193,7 +195,7 @@ function ComplexityFactorRow({
   );
 }
 
-export function ScopeBuilder({ category, basePriceCents, onChange }: ScopeBuilderProps) {
+export function ScopeBuilder({ category, basePriceCents, onChange, initialScopeValues, initialComplexityFactors }: ScopeBuilderProps) {
   const [template, setTemplate] = useState<ScopeTemplate | null>(null);
   const [rules, setRules] = useState<ProfitabilityRule[]>([]);
   const [materialRules, setMaterialRules] = useState<ServiceMaterial[]>([]);
@@ -218,10 +220,20 @@ export function ScopeBuilder({ category, basePriceCents, onChange }: ScopeBuilde
           for (const c of data.template.components) {
             init[c.key] = c.input_type === "boolean" ? false : null;
           }
+          if (initialScopeValues) {
+            for (const [key, val] of Object.entries(initialScopeValues)) {
+              if (key in init) init[key] = val;
+            }
+          }
           setComponents(init);
           const initC: ComplexityValues = {};
           for (const f of data.template.complexity_factors) {
             initC[f.key] = false;
+          }
+          if (initialComplexityFactors) {
+            for (const key of initialComplexityFactors) {
+              if (key in initC) initC[key] = true;
+            }
           }
           setComplexity(initC);
         }

@@ -28,6 +28,7 @@ import {
   type EstimateSpec,
   type PrepLevel,
 } from "@ai-fsm/domain";
+import type { DraftEstimate } from "@/lib/estimates/ai-draft";
 import { InlineClientForm } from "./InlineClientForm";
 import { InlineJobForm } from "./InlineJobForm";
 import { InlinePropertyForm } from "./InlinePropertyForm";
@@ -256,6 +257,15 @@ export function NewEstimateForm({
   // keyed by instanceId so scope state never migrates to the wrong item
   const [scopeResults, setScopeResults] = useState<Record<string, ScopeBuilderResult>>({});
 
+  // AI draft state
+  const [aiDraftMode, setAiDraftMode] = useState<"idle" | "input" | "loading" | "applied">("idle");
+  const [aiDescription, setAiDescription] = useState<string>("");
+  const [aiConfidenceNotes, setAiConfidenceNotes] = useState<string>("");
+  const [aiConfidenceDismissed, setAiConfidenceDismissed] = useState<boolean>(false);
+  const [pendingDraftScope, setPendingDraftScope] = useState<
+    Record<string, { scopeValues: Record<string, number | string>; complexityFactors: string[] }>
+  >({});
+
   function handleAddPriceBookItem(service: PriceBookService, priceCents: number) {
     const instanceId = `${service.id}-${Date.now()}`;
     setPriceBookItems((prev) => [...prev, { service, priceCents, instanceId }]);
@@ -283,6 +293,87 @@ export function NewEstimateForm({
     });
   }
 
+  async function applyDraft() {
+    if (!aiDescription.trim()) return;
+    setAiDraftMode("loading");
+    try {
+      const res = await fetch("/api/v1/estimates/ai-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: aiDescription, job_id: jobId || undefined }),
+      });
+      const { draft }: { draft: DraftEstimate | null } = await res.json();
+      if (!draft || draft.services.length === 0) {
+        setAiDraftMode("input");
+        return;
+      }
+
+      // Clear existing items
+      setPriceBookItems([]);
+      setScopeResults({});
+
+      // Build new items from draft services
+      const newItems: { service: PriceBookService; priceCents: number; instanceId: string }[] = [];
+      const newLineItems: LineItemRow[] = [];
+      const scopeMap: Record<string, { scopeValues: Record<string, number | string>; complexityFactors: string[] }> = {};
+
+      for (const svc of draft.services) {
+        const instanceId = `${svc.service_id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const service: PriceBookService = {
+          id: svc.service_id,
+          code: svc.service_code,
+          name: svc.service_name,
+          category: svc.service_category,
+          tier: "core",
+          default_price_cents: svc.base_price_cents,
+          price_min_cents: svc.base_price_cents,
+          price_max_cents: null,
+          add_on_price_cents: null,
+          unit_type: null,
+          description: null,
+          notes: null,
+          default_labor_hours: null,
+          requires_materials: false,
+          upsell_codes: [],
+          is_active: true,
+        };
+        newItems.push({ service, priceCents: svc.base_price_cents, instanceId });
+        newLineItems.push({
+          description: `${svc.service_code} — ${svc.service_name}`,
+          quantity: "1",
+          unit_price: (svc.base_price_cents / 100).toFixed(2),
+          price_book_id: svc.service_id,
+        });
+        scopeMap[instanceId] = {
+          scopeValues: svc.scope_values,
+          complexityFactors: svc.complexity_factor_keys,
+        };
+      }
+
+      setPriceBookItems(newItems);
+      setLineItems((prev) => {
+        const manual = prev.filter((r) => r.description.trim() && !r.price_book_id);
+        return [...newLineItems, ...manual];
+      });
+      setPendingDraftScope(scopeMap);
+
+      // Apply guardrails + notes
+      if (draft.notes) setNotes(draft.notes);
+      setTripCount(draft.guardrails.trip_count);
+      setDifficultAccess(draft.guardrails.difficult_access);
+      setOldHouseRisk(draft.guardrails.old_house_risk);
+      setRequiresDryingOrCuring(draft.guardrails.requires_drying_or_curing);
+      setCoordinationRequired(draft.guardrails.coordination_required);
+      setFinishExpectation(draft.guardrails.finish_expectation);
+
+      setAiConfidenceNotes(draft.confidence_notes);
+      setAiConfidenceDismissed(false);
+      setAiDraftMode("applied");
+    } catch {
+      setAiDraftMode("input");
+    }
+  }
+
   const priceBookLineItems = useMemo(
     () =>
       priceBookItems.map((item, i) => ({
@@ -293,6 +384,14 @@ export function NewEstimateForm({
         price_book_id: item.service.id,
         price_book_code: item.service.code,
       })),
+    [priceBookItems, scopeResults]
+  );
+
+  const scopeMaterialsTotalCents = useMemo(
+    () =>
+      priceBookItems.reduce((sum, item) => {
+        return sum + (scopeResults[item.instanceId]?.materialTotalCents ?? 0);
+      }, 0),
     [priceBookItems, scopeResults]
   );
 
@@ -447,13 +546,16 @@ export function NewEstimateForm({
   const materialLineItems = lineItems.filter((row) =>
     row.description.toLowerCase().includes("material")
   );
-  const materialSubtotalCents = materialLineItems.reduce((sum, row) => sum + lineTotal(row), 0);
+  const materialSubtotalCents =
+    materialLineItems.reduce((sum, row) => sum + lineTotal(row), 0) + scopeMaterialsTotalCents;
   const materialHandlingCents = Math.round(materialSubtotalCents * 0.15);
 
   const genericSubtotalCents =
     mode === "flat_rate"
       ? parseCents(flatRate)
-      : lineItems.reduce((sum, row) => sum + lineTotal(row), 0) + materialHandlingCents;
+      : lineItems.reduce((sum, row) => sum + lineTotal(row), 0) +
+        scopeMaterialsTotalCents +
+        materialHandlingCents;
   const guardrailAdjustmentCents = parseCents(travelSurcharge) + parseCents(riskAdjustment);
   const adjustedGenericSubtotalCents = genericSubtotalCents + guardrailAdjustmentCents;
   const genericTaxCents = Math.round((adjustedGenericSubtotalCents * taxRateNum) / 100);
@@ -755,14 +857,42 @@ export function NewEstimateForm({
         };
       } else {
         const manualItems = lineItems.filter((r) => r.description.trim() || parseCents(r.unit_price) > 0);
-        const allItems = [...priceBookLineItems, ...manualItems.map((row, i) => ({
-          description: row.description,
-          quantity: parseFloat(row.quantity) || 1,
-          unit_price_cents: parseCents(row.unit_price),
-          sort_order: priceBookLineItems.length + i,
-          price_book_id: row.price_book_id,
-          price_book_code: undefined as string | undefined,
-        }))];
+        const scopeMaterialItems = priceBookItems
+          .filter((item) => (scopeResults[item.instanceId]?.materialTotalCents ?? 0) > 0)
+          .map((item, i) => ({
+            description: `Materials — ${item.service.name}`,
+            quantity: 1,
+            unit_price_cents: scopeResults[item.instanceId].materialTotalCents,
+            line_item_type: "materials" as const,
+            visible_to_customer: true,
+            sort_order: priceBookLineItems.length + manualItems.length + i,
+          }));
+        const totalMaterialsForHandling =
+          materialLineItems.reduce((sum, row) => sum + lineTotal(row), 0) + scopeMaterialsTotalCents;
+        const handlingLineItems =
+          totalMaterialsForHandling > 0
+            ? [{
+                description: "Material handling (15%)",
+                quantity: 1,
+                unit_price_cents: Math.round(totalMaterialsForHandling * 0.15),
+                line_item_type: "handling_fee" as const,
+                visible_to_customer: true,
+                sort_order: priceBookLineItems.length + manualItems.length + scopeMaterialItems.length,
+              }]
+            : [];
+        const allItems = [
+          ...priceBookLineItems,
+          ...manualItems.map((row, i) => ({
+            description: row.description,
+            quantity: parseFloat(row.quantity) || 1,
+            unit_price_cents: parseCents(row.unit_price),
+            sort_order: priceBookLineItems.length + i,
+            price_book_id: row.price_book_id,
+            price_book_code: undefined as string | undefined,
+          })),
+          ...scopeMaterialItems,
+          ...handlingLineItems,
+        ];
         const scopeSnapshots = priceBookItems
           .map((item) => {
             const sr = scopeResults[item.instanceId];
@@ -792,8 +922,8 @@ export function NewEstimateForm({
             quantity: item.quantity,
             unit: "unit" as const,
             unitLaborCents: item.unit_price_cents,
-            ...(item.price_book_id ? { priceBookId: item.price_book_id } : {}),
-            ...(item.price_book_code ? { priceBookCode: item.price_book_code } : {}),
+            ...("price_book_id" in item && item.price_book_id ? { priceBookId: item.price_book_id } : {}),
+            ...("price_book_code" in item && item.price_book_code ? { priceBookCode: item.price_book_code } : {}),
           })),
         };
         payload = {
@@ -804,6 +934,7 @@ export function NewEstimateForm({
           expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
           tax_rate: taxRateNum,
           line_items: allItems,
+          ...(scopeMaterialsTotalCents > 0 ? { material_cost_cents: scopeMaterialsTotalCents } : {}),
           ...(scopeSnapshots.length > 0 ? { scope_snapshots: scopeSnapshots } : {}),
         };
       }
@@ -1342,6 +1473,91 @@ export function NewEstimateForm({
             </div>
           )}
 
+          {/* AI Draft panel — generic mode only */}
+          {serviceType === "generic" && aiDraftMode !== "applied" && (
+            <div style={{
+              background: "var(--bg-subtle)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius)",
+              padding: "var(--space-4)",
+              marginBottom: "var(--space-4)",
+            }}>
+              {aiDraftMode === "idle" && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)" }}>
+                  <div>
+                    <p style={{ fontWeight: 600, marginBottom: 2 }}>Draft with AI</p>
+                    <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", margin: 0 }}>
+                      Describe the job and we&apos;ll pre-fill the estimate from your price book.
+                    </p>
+                  </div>
+                  <div style={{ display: "flex", gap: "var(--space-2)", flexShrink: 0 }}>
+                    <Button type="button" variant="secondary" size="sm" onClick={() => setAiDraftMode("input")}>
+                      Draft with AI
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {(aiDraftMode === "input" || aiDraftMode === "loading") && (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)" }}>
+                    <p style={{ fontWeight: 600, margin: 0 }}>Describe the job</p>
+                    <button
+                      type="button"
+                      onClick={() => setAiDraftMode("idle")}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg-muted)", fontSize: "var(--text-sm)", padding: 0 }}
+                    >
+                      Skip →
+                    </button>
+                  </div>
+                  <Textarea
+                    id="ai-draft-description"
+                    value={aiDescription}
+                    onChange={(e) => setAiDescription(e.target.value)}
+                    placeholder="e.g. Paint the living room and hallway, replace 2 door hinges, patch small drywall hole near window"
+                    rows={3}
+                    disabled={aiDraftMode === "loading"}
+                    style={{ marginBottom: "var(--space-3)" }}
+                  />
+                  <Button
+                    type="button"
+                    onClick={applyDraft}
+                    disabled={aiDraftMode === "loading" || !aiDescription.trim()}
+                  >
+                    {aiDraftMode === "loading" ? "Drafting estimate…" : "Generate estimate"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* AI confidence notes banner */}
+          {aiDraftMode === "applied" && aiConfidenceNotes && !aiConfidenceDismissed && (
+            <div style={{
+              background: "var(--bg-subtle)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius)",
+              padding: "var(--space-3) var(--space-4)",
+              marginBottom: "var(--space-4)",
+              display: "flex",
+              gap: "var(--space-3)",
+              alignItems: "flex-start",
+            }}>
+              <span style={{ color: "var(--accent)", fontWeight: 600, flexShrink: 0 }}>ℹ</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontWeight: 600, margin: "0 0 2px" }}>AI assumptions — verify before sending</p>
+                <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", margin: 0 }}>{aiConfidenceNotes}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAiConfidenceDismissed(true)}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg-muted)", fontSize: "var(--text-lg)", padding: 0, lineHeight: 1, flexShrink: 0 }}
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
           {/* Generic Pricing */}
           {serviceType === "generic" && (
             <div>
@@ -1384,7 +1600,14 @@ export function NewEstimateForm({
                               )}
                             </div>
                             <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-                              <span style={{ fontWeight: 600 }}>{formatCents(displayPrice)}</span>
+                              <div style={{ textAlign: "right" }}>
+                                <span style={{ fontWeight: 600 }}>{formatCents(displayPrice)}</span>
+                                {sr && sr.materialTotalCents > 0 && (
+                                  <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                                    + {formatCents(sr.materialTotalCents)} materials
+                                  </div>
+                                )}
+                              </div>
                               <button
                                 type="button"
                                 onClick={() => removePriceBookItem(item.instanceId)}
@@ -1407,6 +1630,8 @@ export function NewEstimateForm({
                             category={item.service.category}
                             basePriceCents={item.service.default_price_cents ?? item.priceCents}
                             onChange={(result) => handleScopeChange(item.instanceId, result)}
+                            initialScopeValues={pendingDraftScope[item.instanceId]?.scopeValues}
+                            initialComplexityFactors={pendingDraftScope[item.instanceId]?.complexityFactors}
                           />
                         </div>
                         );
@@ -1949,8 +2174,15 @@ export function NewEstimateForm({
                     >
                       {mode === "itemized" && (
                         <>
-                          <span style={{ color: "var(--fg-muted)" }}>Subtotal</span>
-                          <span data-testid="subtotal">{formatCents(genericSubtotalCents - materialHandlingCents)}</span>
+                          <span style={{ color: "var(--fg-muted)" }}>Labor subtotal</span>
+                          <span data-testid="subtotal">{formatCents(lineItems.reduce((sum, row) => sum + lineTotal(row), 0))}</span>
+
+                          {scopeMaterialsTotalCents > 0 && (
+                            <>
+                              <span style={{ color: "var(--fg-muted)" }}>Scope materials</span>
+                              <span data-testid="scope-materials">{formatCents(scopeMaterialsTotalCents)}</span>
+                            </>
+                          )}
 
                           {materialHandlingCents > 0 && (
                             <>
