@@ -5,6 +5,7 @@ import type { AuthSession } from "@/lib/auth/middleware";
 import { queryOne, getPool } from "@/lib/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
+import { getPathId } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ const patchAutomationSchema = z.object({
 
 // PATCH /api/v1/automations/[id] — toggle enabled or update config
 export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, session: AuthSession) => {
-  const id = request.nextUrl.pathname.split("/").at(-1)!;
+  const id = getPathId(request.nextUrl.pathname);
 
   let body: unknown;
   try { body = await request.json(); } catch {

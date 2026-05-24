@@ -4,12 +4,13 @@ import type { AuthSession } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
+import { getPathId } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
 
 // DELETE /api/v1/mileage/[id] — owner only
 export const DELETE = withRole(["owner", "admin"], async (request: NextRequest, session: AuthSession) => {
-  const id = request.nextUrl.pathname.split("/").at(-1)!;
+  const id = getPathId(request.nextUrl.pathname);
 
   const pool = getPool();
   const client = await pool.connect();

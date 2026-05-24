@@ -5,6 +5,7 @@ import type { AuthSession } from "@/lib/auth/middleware";
 import { getPool, queryOne } from "@/lib/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
+import { getPathId } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ const patchUserBody = z
 
 // Any authenticated user can view/edit — permissions enforced inside handler.
 export const GET = withAuth(async (request: NextRequest, session: AuthSession) => {
-  const id = request.nextUrl.pathname.split("/").at(-1) ?? "";
+  const id = getPathId(request.nextUrl.pathname);
   const isSelf = id === session.userId;
   if (!isSelf && session.role !== "owner" && session.role !== "admin") {
     return NextResponse.json(
@@ -41,7 +42,7 @@ export const GET = withAuth(async (request: NextRequest, session: AuthSession) =
 });
 
 export const PATCH = withAuth(async (request: NextRequest, session: AuthSession) => {
-  const id = request.nextUrl.pathname.split("/").at(-1) ?? "";
+  const id = getPathId(request.nextUrl.pathname);
   const isSelf = id === session.userId;
 
   if (!isSelf && session.role !== "owner" && session.role !== "admin") {
@@ -156,7 +157,7 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
 });
 
 export const DELETE = withAuth(async (request: NextRequest, session: AuthSession) => {
-  const id = request.nextUrl.pathname.split("/").at(-1) ?? "";
+  const id = getPathId(request.nextUrl.pathname);
 
   if (session.role !== "owner") {
     return NextResponse.json(

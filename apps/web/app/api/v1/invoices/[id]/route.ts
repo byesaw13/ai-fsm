@@ -3,13 +3,14 @@ import { withAuth, withRole } from "@/lib/auth/middleware";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
+import { getPathId } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
 
 // === Get Invoice (GET /api/v1/invoices/[id]) ===
 
 export const GET = withAuth(async (request, session) => {
-  const id = request.nextUrl.pathname.split("/").at(-1)!;
+  const id = getPathId(request.nextUrl.pathname);
 
   try {
     const data = await withInvoiceContext(session, async (client) => {
@@ -80,7 +81,7 @@ export const GET = withAuth(async (request, session) => {
 // - paid/void are fully terminal
 
 export const PATCH = withRole(["owner", "admin"], async (request, session) => {
-  const id = request.nextUrl.pathname.split("/").at(-1)!;
+  const id = getPathId(request.nextUrl.pathname);
 
   let body: Record<string, unknown>;
   try {
@@ -210,7 +211,7 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
 // === Delete Invoice (DELETE /api/v1/invoices/[id]) ===
 
 export const DELETE = withRole(["owner"], async (request, session) => {
-  const id = request.nextUrl.pathname.split("/").at(-1)!;
+  const id = getPathId(request.nextUrl.pathname);
 
   try {
     await withInvoiceContext(session, async (client) => {

@@ -11,11 +11,14 @@ import {
   IconSettings,
   IconMyDay,
   IconField,
-  IconMembership,
   IconBooking,
   IconProperties,
-  IconPriceBook,
-  IconPortal,
+  IconJobs,
+  IconClients,
+  IconInvoices,
+  IconSchedule,
+  IconReports,
+  IconAutomations,
 } from "./NavIcons";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
@@ -37,18 +40,36 @@ interface NavSection {
 // ---------------------------------------------------------------------------
 
 // Named constants for items referenced outside the array (mobile bottom bar)
-const NAV_INTAKE:    NavItem = { href: "/app/booking-requests",  label: "Intake",          Icon: IconBooking,    adminOnly: true };
-const NAV_PROPS:     NavItem = { href: "/app/properties",        label: "Properties",      Icon: IconProperties, adminOnly: true };
-const NAV_ESTIMATES: NavItem = { href: "/app/estimates",         label: "Estimates",       Icon: IconEstimates,  adminOnly: true };
+const NAV_TODAY:  NavItem = { href: "/app",               label: "Today",      Icon: IconMyDay };
+const NAV_PROPS:  NavItem = { href: "/app/properties",    label: "Properties", Icon: IconProperties, adminOnly: true };
+const NAV_JOBS:   NavItem = { href: "/app/jobs",          label: "Jobs",       Icon: IconJobs,       adminOnly: true };
 
-const ADMIN_NAV_ITEMS: NavItem[] = [
-  NAV_INTAKE,
-  NAV_PROPS,
-  NAV_ESTIMATES,
-  { href: "/app/price-book",        label: "Price Book",      Icon: IconPriceBook,  adminOnly: true },
-  { href: "/app/maintenance-plans", label: "Memberships",     Icon: IconMembership, adminOnly: true },
-  { href: "/app/field",             label: "Technician Flow", Icon: IconField,      adminOnly: true },
-  { href: "/portal/login",          label: "Client Portal",   Icon: IconPortal,     adminOnly: true },
+const ADMIN_NAV_SECTIONS: NavSection[] = [
+  {
+    label: "",
+    items: [
+      NAV_TODAY,
+      NAV_PROPS,
+    ],
+  },
+  {
+    label: "Work",
+    items: [
+      { href: "/app/booking-requests", label: "Intake",     Icon: IconBooking,    adminOnly: true },
+      NAV_JOBS,
+      { href: "/app/estimates",        label: "Estimates",  Icon: IconEstimates,  adminOnly: true },
+      { href: "/app/invoices",         label: "Invoices",   Icon: IconInvoices,   adminOnly: true },
+      { href: "/app/clients",          label: "Clients",    Icon: IconClients,    adminOnly: true },
+    ],
+  },
+  {
+    label: "Manage",
+    items: [
+      { href: "/app/schedule",    label: "Schedule",    Icon: IconSchedule,    adminOnly: true },
+      { href: "/app/automations", label: "Automations", Icon: IconAutomations, adminOnly: true },
+      { href: "/app/reports",     label: "Reports",     Icon: IconReports,     adminOnly: true },
+    ],
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -57,26 +78,25 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
 
 /** Returns filtered nav sections for a given role */
 export function getNavSections(role: Role): NavSection[] {
-  const myDayHref = role === "tech" ? "/app/my-day" : "/app";
-  const myDay: NavItem = { href: myDayHref, label: "My Day", Icon: IconMyDay };
-
   if (role === "tech") {
-    const techFlow: NavItem = { href: "/app/field", label: "Technician Flow", Icon: IconField };
+    const myDay: NavItem = { href: "/app/my-day", label: "My Day", Icon: IconMyDay };
+    const techFlow: NavItem = { href: "/app/field", label: "On Site", Icon: IconField };
     return [{ label: "", items: [myDay, techFlow] }];
   }
 
-  return [{ label: "", items: [myDay, ...ADMIN_NAV_ITEMS] }];
+  return ADMIN_NAV_SECTIONS;
 }
 
 /** Returns flat list for the mobile bottom tab bar */
 export function getBottomNavItems(role: Role): NavItem[] {
-  const myDayHref = role === "tech" ? "/app/my-day" : "/app";
-  const myDay: NavItem = { href: myDayHref, label: "My Day", Icon: IconMyDay };
-  const field: NavItem = { href: "/app/field", label: "On Site", Icon: IconField };
+  if (role === "tech") {
+    const myDay: NavItem = { href: "/app/my-day", label: "My Day", Icon: IconMyDay };
+    const field: NavItem = { href: "/app/field", label: "On Site", Icon: IconField };
+    return [myDay, field];
+  }
 
-  if (role === "tech") return [myDay, field];
-
-  return [myDay, NAV_INTAKE, NAV_PROPS, NAV_ESTIMATES];
+  const settings: NavItem = { href: "/app/settings", label: "Settings", Icon: IconSettings };
+  return [NAV_TODAY, NAV_PROPS, NAV_JOBS, settings];
 }
 
 /** Returns true if href is the active route for the current pathname */
