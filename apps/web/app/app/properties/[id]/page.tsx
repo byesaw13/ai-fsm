@@ -14,6 +14,7 @@ import {
   PageHeader,
   SectionHeader,
 } from "@/components/ui";
+import { formatCents } from "@/lib/estimates/pricing";
 import { PropertyForm } from "../PropertyForm";
 import { PropertyVaultSection } from "../PropertyVaultSection";
 import { PropertyTimeline } from "./PropertyTimeline";
@@ -39,6 +40,11 @@ type PropertyRow = {
   updated_at: string;
   job_count: number | string;
   visit_count: number | string;
+  next_visit_at: string | null;
+  active_jobs: number;
+  pending_estimates: number;
+  outstanding_cents: number;
+  open_issues_count: number;
 };
 
 type ClientOption = { id: string; name: string };
@@ -60,7 +66,28 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
   const property = await queryOne<PropertyRow>(
     `SELECT p.*, c.name AS client_name,
             COUNT(DISTINCT j.id)::int AS job_count,
-            COUNT(DISTINCT v.id)::int AS visit_count
+            COUNT(DISTINCT v.id)::int AS visit_count,
+            (SELECT MIN(v2.scheduled_start)
+             FROM visits v2 JOIN jobs j2 ON j2.id = v2.job_id
+             WHERE j2.property_id = p.id AND v2.account_id = p.account_id
+               AND v2.status = 'scheduled' AND v2.scheduled_start > now()
+            ) AS next_visit_at,
+            (SELECT COUNT(*)::int FROM jobs aj
+             WHERE aj.property_id = p.id AND aj.account_id = p.account_id
+               AND aj.status IN ('scheduled', 'in_progress')
+            ) AS active_jobs,
+            (SELECT COUNT(*)::int FROM estimates pe
+             WHERE pe.property_id = p.id AND pe.account_id = p.account_id
+               AND pe.status IN ('draft', 'sent')
+            ) AS pending_estimates,
+            (SELECT COALESCE(SUM(oi.total_cents), 0)::int FROM invoices oi
+             WHERE oi.property_id = p.id AND oi.account_id = p.account_id
+               AND oi.status IN ('sent', 'partial', 'overdue')
+            ) AS outstanding_cents,
+            (SELECT COUNT(*)::int FROM property_issues pi2
+             WHERE pi2.property_id = p.id AND pi2.account_id = p.account_id
+               AND pi2.status IN ('open', 'monitoring')
+            ) AS open_issues_count
      FROM properties p
      JOIN clients c ON c.id = p.client_id AND c.account_id = p.account_id
      LEFT JOIN jobs j ON j.property_id = p.id AND j.account_id = p.account_id
@@ -209,6 +236,44 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
           { label: "Client", value: property.client_name, href: `/app/clients/${property.client_id}` },
         ]}
       />
+
+      {(property.active_jobs > 0 || property.pending_estimates > 0 || property.outstanding_cents > 0 || property.next_visit_at) && (
+        <Card style={{ marginTop: "var(--space-4)" }}>
+          <SectionHeader title="Active Work" />
+          <div style={{ display: "flex", gap: "var(--space-6)", flexWrap: "wrap", padding: "var(--space-2) 0" }}>
+            {property.next_visit_at && (
+              <div>
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginBottom: "var(--space-1)" }}>Next Visit</div>
+                <div style={{ fontWeight: 600 }}>{new Date(property.next_visit_at).toLocaleDateString()}</div>
+              </div>
+            )}
+            {property.active_jobs > 0 && (
+              <div>
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginBottom: "var(--space-1)" }}>Active Jobs</div>
+                <LinkButton href={`/app/jobs?property_id=${property.id}`} variant="ghost" size="sm" style={{ fontWeight: 600, padding: 0 }}>
+                  {property.active_jobs} job{property.active_jobs !== 1 ? "s" : ""}
+                </LinkButton>
+              </div>
+            )}
+            {property.pending_estimates > 0 && (
+              <div>
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginBottom: "var(--space-1)" }}>Pending Estimates</div>
+                <LinkButton href={`/app/estimates?property_id=${property.id}`} variant="ghost" size="sm" style={{ fontWeight: 600, padding: 0 }}>
+                  {property.pending_estimates} estimate{property.pending_estimates !== 1 ? "s" : ""}
+                </LinkButton>
+              </div>
+            )}
+            {property.outstanding_cents > 0 && (
+              <div>
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginBottom: "var(--space-1)" }}>Outstanding</div>
+                <LinkButton href={`/app/invoices?property_id=${property.id}`} variant="ghost" size="sm" style={{ fontWeight: 600, padding: 0, color: "var(--warning)" }}>
+                  {formatCents(property.outstanding_cents)}
+                </LinkButton>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
 
       <div className="p7-detail-layout" style={{ marginTop: "var(--space-4)" }}>
         <div className="p7-detail-primary">

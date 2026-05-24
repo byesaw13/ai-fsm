@@ -26,7 +26,28 @@ export const GET = withRole(["owner", "admin"], async (request: NextRequest, ses
   const row = await queryOne(
     `SELECT p.*, c.name AS client_name,
             COUNT(DISTINCT j.id)::int AS job_count,
-            COUNT(DISTINCT v.id)::int AS visit_count
+            COUNT(DISTINCT v.id)::int AS visit_count,
+            (SELECT MIN(v2.scheduled_start)
+             FROM visits v2 JOIN jobs j2 ON j2.id = v2.job_id
+             WHERE j2.property_id = p.id AND v2.account_id = p.account_id
+               AND v2.status = 'scheduled' AND v2.scheduled_start > now()
+            ) AS next_visit_at,
+            (SELECT COUNT(*)::int FROM jobs aj
+             WHERE aj.property_id = p.id AND aj.account_id = p.account_id
+               AND aj.status IN ('scheduled', 'in_progress')
+            ) AS active_jobs,
+            (SELECT COUNT(*)::int FROM estimates pe
+             WHERE pe.property_id = p.id AND pe.account_id = p.account_id
+               AND pe.status IN ('draft', 'sent')
+            ) AS pending_estimates,
+            (SELECT COALESCE(SUM(oi.total_cents), 0)::int FROM invoices oi
+             WHERE oi.property_id = p.id AND oi.account_id = p.account_id
+               AND oi.status IN ('sent', 'partial', 'overdue')
+            ) AS outstanding_cents,
+            (SELECT COUNT(*)::int FROM property_issues pi2
+             WHERE pi2.property_id = p.id AND pi2.account_id = p.account_id
+               AND pi2.status IN ('open', 'monitoring')
+            ) AS open_issues_count
      FROM properties p
      JOIN clients c ON c.id = p.client_id AND c.account_id = p.account_id
      LEFT JOIN jobs j ON j.property_id = p.id AND j.account_id = p.account_id
