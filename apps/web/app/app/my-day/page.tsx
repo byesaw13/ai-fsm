@@ -29,6 +29,7 @@ const VISIT_STATUS_LABELS: Record<VisitStatus, string> = {
 export default async function MyDayPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.role !== "tech") redirect("/app");
 
   const isAdmin = canViewAllVisits(session.role);
   const isTech = session.role === "tech";

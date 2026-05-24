@@ -15,13 +15,8 @@ import {
   IconField,
   IconMembership,
   IconInvoices,
-  IconPipeline,
   IconBooking,
-  IconReports,
-  IconPriceBook,
-  IconDashboard,
-  IconActivity,
-  IconFolder,
+  IconProperties,
 } from "./NavIcons";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
@@ -43,15 +38,14 @@ interface NavSection {
 // ---------------------------------------------------------------------------
 
 const WORK_ITEMS: NavItem[] = [
-  { href: "/app/my-day",   label: "My Day",   Icon: IconMyDay },
   { href: "/app/schedule", label: "Schedule", Icon: IconSchedule, adminOnly: true },
   { href: "/app/jobs",     label: "Jobs",     Icon: IconJobs },
-  { href: "/app/pipeline", label: "Pipeline", Icon: IconPipeline, adminOnly: true },
 ];
 
 const CUSTOMER_ITEMS: NavItem[] = [
-  { href: "/app/clients",          label: "Clients",  Icon: IconClients,  adminOnly: true },
-  { href: "/app/booking-requests", label: "Requests", Icon: IconBooking,  adminOnly: true },
+  { href: "/app/properties",       label: "Properties", Icon: IconProperties, adminOnly: true },
+  { href: "/app/clients",          label: "Clients",    Icon: IconClients,    adminOnly: true },
+  { href: "/app/booking-requests", label: "Intake",     Icon: IconBooking,    adminOnly: true },
 ];
 
 const MONEY_ITEMS: NavItem[] = [
@@ -60,38 +54,30 @@ const MONEY_ITEMS: NavItem[] = [
   { href: "/app/maintenance-plans", label: "Memberships", Icon: IconMembership, adminOnly: true },
 ];
 
-const INSIGHTS_ITEMS: NavItem[] = [
-  { href: "/app/reports",              label: "Reports",    Icon: IconReports,   adminOnly: true },
-  { href: "/app/operations-dashboard", label: "Operations", Icon: IconActivity,  adminOnly: true },
-  { href: "/app/membership-dashboard", label: "Members",    Icon: IconDashboard, adminOnly: true },
-  { href: "/app/pricing-dashboard",    label: "Pricing",    Icon: IconPriceBook, adminOnly: true },
-  { href: "/app/documents-dashboard",  label: "Documents",  Icon: IconFolder,    adminOnly: true },
-];
-
 // ---------------------------------------------------------------------------
 // Pure functions
 // ---------------------------------------------------------------------------
 
 /** Returns filtered nav sections for a given role */
 export function getNavSections(role: string): NavSection[] {
+  const myDayHref = role === "tech" ? "/app/my-day" : "/app";
+  const myDay: NavItem = { href: myDayHref, label: "My Day", Icon: IconMyDay };
   const filter = (items: NavItem[]) =>
     role === "tech" ? items.filter((i) => !i.adminOnly) : items;
 
-  const sections: NavSection[] = [
-    { label: "Work",      items: filter(WORK_ITEMS) },
+  return [
+    { label: "Work",      items: [myDay, ...filter(WORK_ITEMS)] },
     { label: "Customers", items: filter(CUSTOMER_ITEMS) },
     { label: "Money",     items: filter(MONEY_ITEMS) },
-    { label: "Insights",  items: filter(INSIGHTS_ITEMS) },
-  ];
-
-  return sections.filter((s) => s.items.length > 0);
+  ].filter((s) => s.items.length > 0);
 }
 
 /** Returns flat list for the mobile bottom tab bar */
 export function getBottomNavItems(role: string): NavItem[] {
-  const myDay = WORK_ITEMS.find((i) => i.href === "/app/my-day")!;
+  const myDayHref = role === "tech" ? "/app/my-day" : "/app";
+  const myDay: NavItem = { href: myDayHref, label: "My Day", Icon: IconMyDay };
   const field: NavItem = { href: "/app/field", label: "On Site", Icon: IconField };
-  const jobs  = WORK_ITEMS.find((i) => i.href === "/app/jobs")!;
+  const jobs = WORK_ITEMS.find((i) => i.href === "/app/jobs")!;
 
   if (role === "tech") return [myDay, field, jobs];
 
@@ -103,6 +89,7 @@ export function getBottomNavItems(role: string): NavItem[] {
 
 /** Returns true if href is the active route for the current pathname */
 export function isNavActive(pathname: string, href: string): boolean {
+  if (href === "/app") return pathname === "/app";
   return pathname === href || pathname.startsWith(href + "/");
 }
 
