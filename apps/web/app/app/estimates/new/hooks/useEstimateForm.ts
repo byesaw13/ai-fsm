@@ -7,18 +7,27 @@ import type { ScopeBuilderResult } from "@/components/ScopeBuilder";
 import { formatCents, getStandardEstimateTerms } from "@/lib/estimates/pricing";
 import {
   JOB_TYPE_MATERIALS,
-  computeEstimate,
-  CURRENT_RULES,
   ENGINE_VERSION,
   type MaterialSuggestion,
   type EstimateSpec,
-  type PrepLevel,
-  DEPOSIT_RATE,
 } from "@ai-fsm/domain";
 import type { DraftEstimate } from "@/lib/estimates/ai-draft";
+import {
+  parseCents, lineTotal, mapPrepLevel,
+  EMPTY_ROW, PREP_LEVEL_LABELS, STEP_LABELS, DEFAULT_TIERS,
+  type LineItemRow, type OptionTier,
+} from "@/lib/estimates/form-helpers";
+import { useEstimatePricing } from "./useEstimatePricing";
+
+// Re-export shared helpers + types so the component's existing imports keep working
+export {
+  parseCents, lineTotal, mapPrepLevel,
+  EMPTY_ROW, PREP_LEVEL_LABELS, STEP_LABELS, DEFAULT_TIERS,
+  type LineItemRow, type OptionTier,
+} from "@/lib/estimates/form-helpers";
 
 // ---------------------------------------------------------------------------
-// Types (exported for use by the component and sub-components)
+// Types (form-specific, not shared)
 // ---------------------------------------------------------------------------
 
 export interface Client {
@@ -36,20 +45,6 @@ export interface Property {
   id: string;
   address: string;
   client_id: string;
-}
-
-export interface LineItemRow {
-  description: string;
-  quantity: string;
-  unit_price: string;
-  price_book_id?: string;
-}
-
-export interface OptionTier {
-  label: string;
-  description: string;
-  is_recommended: boolean;
-  line_items: LineItemRow[];
 }
 
 export interface EditableSuggestion {
@@ -92,52 +87,6 @@ export interface NewEstimateFormProps {
   initialPropertyId?: string;
   initialVaultItemId?: string;
   vaultItemContext?: { name: string; category: string; location: string | null } | null;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers (exported for use in JSX)
-// ---------------------------------------------------------------------------
-
-export function parseCents(dollars: string): number {
-  const n = parseFloat(dollars);
-  if (isNaN(n) || n < 0) return 0;
-  return Math.round(n * 100);
-}
-
-export function lineTotal(row: LineItemRow): number {
-  const qty = parseFloat(row.quantity);
-  if (isNaN(qty) || qty <= 0) return 0;
-  return Math.round(qty * parseCents(row.unit_price));
-}
-
-export const EMPTY_ROW: LineItemRow = { description: "", quantity: "1", unit_price: "0.00" };
-
-export const PREP_LEVEL_LABELS: Record<number, string> = {
-  1: "1 — Light dusting",
-  2: "2 — Wipe down",
-  3: "3 — Minor touch-ups",
-  4: "4 — Small patch repairs",
-  5: "5 — Standard prep",
-  6: "6 — Moderate repair",
-  7: "7 — Heavy patching",
-  8: "8 — Extensive repair",
-  9: "9 — Major restoration",
-  10: "10 — Full restoration",
-};
-
-export const STEP_LABELS = ["Who & What", "Pricing", "Adjustments", "Review & Send"] as const;
-
-export const DEFAULT_TIERS: OptionTier[] = [
-  { label: "Good", description: "Essential services to get the job done", is_recommended: false, line_items: [{ description: "", quantity: "1", unit_price: "0.00" }] },
-  { label: "Better", description: "Recommended upgrade with better materials", is_recommended: true, line_items: [{ description: "", quantity: "1", unit_price: "0.00" }] },
-  { label: "Best", description: "Premium service with full coverage", is_recommended: false, line_items: [{ description: "", quantity: "1", unit_price: "0.00" }] },
-];
-
-export function mapPrepLevel(level: number): PrepLevel {
-  if (level <= 3) return "none";
-  if (level <= 5) return "minor";
-  if (level <= 7) return "moderate";
-  return "major";
 }
 
 // ---------------------------------------------------------------------------
@@ -451,70 +400,16 @@ export function useEstimateForm({
     [suggestions]
   );
 
-  const paintingResult = useMemo(() => {
-    if (serviceType !== "painting") return null;
-    const sq = parseFloat(sqFt);
-    if (isNaN(sq) || sq <= 0) return null;
-    const prep = mapPrepLevel(prepLevel);
-    const matCents = parseCents(materialCostDollars);
-    const surfaces = [
-      { type: "walls" as const, sqft: sq, condition: "good" as const, prep, prime: false, textureMatch: false },
-      ...(includesCeiling ? [{ type: "ceiling" as const, sqft: Math.round(sq * 0.35), condition: "good" as const, prep, prime: false, textureMatch: false }] : []),
-      ...(includesTrim ? [{ type: "trim" as const, linearFt: Math.round(sq / 8), condition: "good" as const, prep, prime: false, textureMatch: false }] : []),
-    ];
-    const spec: EstimateSpec = {
-      engineVersion: ENGINE_VERSION,
-      type: "painting",
-      paintQuality: "standard",
-      rooms: [{ id: "r1", name: "Main area", coats: 2, surfaces }],
-    };
-    if (matCents > 0) {
-      spec.lineItems = [{
-        id: "mat-user",
-        description: "Materials & supplies",
-        quantity: 1,
-        unit: "flat",
-        unitLaborCents: 0,
-        materialCents: matCents,
-      }];
-    }
-    const r = computeEstimate(spec, CURRENT_RULES);
-    return {
-      labor_flat_rate_cents: r.summary.laborCents,
-      material_cents: r.summary.materialCents,
-      material_handling_cents: r.summary.handlingCents,
-      total_cents: r.summary.totalCents,
-      deposit_cents: r.summary.depositCents,
-      balance_cents: r.summary.balanceDueCents,
-      internal_labor_cost_cents: r.internalSummary.estimatedCostCents,
-      gross_margin_pct: Math.round(r.internalSummary.grossMarginPct * 100),
-      gross_margin_cents: r.internalSummary.grossMarginCents,
-      effective_sq_ft_rate_cents: sq > 0 ? Math.round(r.summary.laborCents / sq) : 0,
-      _spec: spec,
-    };
-  }, [serviceType, sqFt, prepLevel, includesTrim, includesCeiling, materialCostDollars]);
+  // ---------------------------------------------------------------------------
+  // Pricing (delegated to useEstimatePricing)
+  // ---------------------------------------------------------------------------
 
-  const taxRateNum = parseFloat(taxRate) || 0;
-
-  const materialLineItems = lineItems.filter((row) =>
-    row.description.toLowerCase().includes("material")
-  );
-  const materialSubtotalCents =
-    materialLineItems.reduce((sum, row) => sum + lineTotal(row), 0) + scopeMaterialsTotalCents;
-  const materialHandlingCents = Math.round(materialSubtotalCents * 0.15);
-
-  const genericSubtotalCents =
-    mode === "flat_rate"
-      ? parseCents(flatRate)
-      : lineItems.reduce((sum, row) => sum + lineTotal(row), 0) +
-        scopeMaterialsTotalCents +
-        materialHandlingCents;
-  const guardrailAdjustmentCents = parseCents(travelSurcharge) + parseCents(riskAdjustment);
-  const adjustedGenericSubtotalCents = genericSubtotalCents + guardrailAdjustmentCents;
-  const genericTaxCents = Math.round((adjustedGenericSubtotalCents * taxRateNum) / 100);
-  const genericTotalCents = adjustedGenericSubtotalCents + genericTaxCents;
-  const depositCents = Math.round(genericTotalCents * 0.30);
-  const balanceDueCents = genericTotalCents - depositCents;
+  const pricing = useEstimatePricing({
+    serviceType, mode, lineItems, tiers, flatRate, taxRate,
+    sqFt, prepLevel, includesTrim, includesCeiling,
+    materialCostDollars, scopeMaterialsTotalCents,
+    travelSurcharge, riskAdjustment,
+  });
 
   function handleModeChange(newMode: "itemized" | "flat_rate" | "multi_option") {
     if (newMode === "flat_rate") {
@@ -694,21 +589,6 @@ export function useEstimateForm({
   const selectedJob = jobList.find((j) => j.id === jobId);
   const selectedProperty = propertyList.find((p) => p.id === propertyId);
 
-  function reviewTotal(): string {
-    if (serviceType === "painting" && paintingResult) {
-      return formatCents(paintingResult.total_cents);
-    }
-    if (serviceType === "generic") {
-      if (mode === "flat_rate") return formatCents(parseCents(flatRate));
-      if (mode === "multi_option") {
-        const maxTier = Math.max(...tiers.map(tierSubtotalCents));
-        return maxTier > 0 ? `up to ${formatCents(maxTier)}` : "—";
-      }
-      return formatCents(genericTotalCents);
-    }
-    return "—";
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (step !== 4) return;
@@ -719,6 +599,8 @@ export function useEstimateForm({
 
     setPending(true);
     setError(null);
+
+    const { paintingResult, taxRateNum } = pricing;
 
     try {
       let payload: Record<string, unknown>;
@@ -808,6 +690,8 @@ export function useEstimateForm({
         };
       } else {
         const manualItems = lineItems.filter((r) => r.description.trim() || parseCents(r.unit_price) > 0);
+        const { materialLineItems } = pricing;
+        const scopeMatCents = scopeMaterialsTotalCents;
         const scopeMaterialItems = priceBookItems
           .filter((item) => (scopeResults[item.instanceId]?.materialTotalCents ?? 0) > 0)
           .map((item, i) => ({
@@ -819,7 +703,7 @@ export function useEstimateForm({
             sort_order: priceBookLineItems.length + manualItems.length + i,
           }));
         const totalMaterialsForHandling =
-          materialLineItems.reduce((sum, row) => sum + lineTotal(row), 0) + scopeMaterialsTotalCents;
+          materialLineItems.reduce((sum, row) => sum + lineTotal(row), 0) + scopeMatCents;
         const handlingLineItems =
           totalMaterialsForHandling > 0
             ? [{
@@ -885,7 +769,7 @@ export function useEstimateForm({
           expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
           tax_rate: taxRateNum,
           line_items: allItems,
-          ...(scopeMaterialsTotalCents > 0 ? { material_cost_cents: scopeMaterialsTotalCents } : {}),
+          ...(scopeMatCents > 0 ? { material_cost_cents: scopeMatCents } : {}),
           ...(scopeSnapshots.length > 0 ? { scope_snapshots: scopeSnapshots } : {}),
         };
       }
@@ -974,7 +858,6 @@ export function useEstimateForm({
     expiresAt, setExpiresAt,
     notes, setNotes,
     taxRate, setTaxRate,
-    taxRateNum,
     sendImmediately, setSendImmediately,
     // Painting fields
     sqFt, setSqFt,
@@ -1015,12 +898,8 @@ export function useEstimateForm({
     itemSuggesting, itemSuggestError,
     suggestions, setSuggestions,
     bundleCategories, hasLegalFlagSuggestions,
-    // Computed totals
-    paintingResult,
-    materialLineItems, materialSubtotalCents, materialHandlingCents,
-    genericSubtotalCents, guardrailAdjustmentCents,
-    adjustedGenericSubtotalCents, genericTaxCents, genericTotalCents,
-    depositCents, balanceDueCents,
+    // Pricing (from useEstimatePricing)
+    ...pricing,
     // Item state
     resolvedJobType, addedMaterials,
     // Handlers
@@ -1040,7 +919,6 @@ export function useEstimateForm({
     tierSubtotalCents,
     handleAddMaterial,
     advanceStep, goBack,
-    reviewTotal,
     handleSubmit,
   };
 }
