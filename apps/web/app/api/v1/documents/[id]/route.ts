@@ -3,6 +3,7 @@ import { withRole } from "@/lib/auth/middleware";
 import { withDocumentContext, getDocumentLink, deleteDocumentLink } from "@/lib/paperless/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
+import { getPathId } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export const DELETE = withRole(
   ["owner", "admin"],
   async (request: NextRequest, session) => {
     const url = new URL(request.url);
-    const id = url.pathname.split("/").at(-1) ?? "";
+    const id = getPathId(url.pathname);
 
     if (!id || !/^[0-9a-f-]{36}$/.test(id)) {
       return NextResponse.json(

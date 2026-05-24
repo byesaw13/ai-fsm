@@ -5,13 +5,14 @@ import { withExpenseContext } from "@/lib/expenses/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
 import { expenseCategorySchema } from "@ai-fsm/domain";
+import { getPathId } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
 
 // === Get Expense (GET /api/v1/expenses/[id]) ===
 
 export const GET = withAuth(async (request, session) => {
-  const id = request.nextUrl.pathname.split("/").at(-1)!;
+  const id = getPathId(request.nextUrl.pathname);
 
   try {
     const data = await withExpenseContext(session, async (client) => {
@@ -77,7 +78,7 @@ const updateExpenseSchema = z.object({
 });
 
 export const PATCH = withRole(["owner", "admin"], async (request, session) => {
-  const id = request.nextUrl.pathname.split("/").at(-1)!;
+  const id = getPathId(request.nextUrl.pathname);
 
   let body: unknown;
   try {
@@ -219,7 +220,7 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
 // === Delete Expense (DELETE /api/v1/expenses/[id]) ===
 
 export const DELETE = withRole(["owner", "admin"], async (request, session) => {
-  const id = request.nextUrl.pathname.split("/").at(-1)!;
+  const id = getPathId(request.nextUrl.pathname);
 
   try {
     await withExpenseContext(session, async (client) => {

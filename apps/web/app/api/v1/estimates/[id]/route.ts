@@ -16,13 +16,14 @@ import {
   DEPOSIT_RATE,
 } from "@ai-fsm/domain";
 import { logger } from "@/lib/logger";
+import { getPathId } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
 
 // === Get Estimate (GET /api/v1/estimates/[id]) ===
 
 export const GET = withAuth(async (request, session) => {
-  const id = request.nextUrl.pathname.split("/").at(-1)!;
+  const id = getPathId(request.nextUrl.pathname);
 
   try {
     const data = await withEstimateContext(session, async (client) => {
@@ -163,7 +164,7 @@ const patchEstimateSchema = z.object({
 });
 
 export const PATCH = withRole(["owner", "admin"], async (request, session) => {
-  const id = request.nextUrl.pathname.split("/").at(-1)!;
+  const id = getPathId(request.nextUrl.pathname);
 
   let body: unknown;
   try {
@@ -649,7 +650,7 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
 // === Delete Estimate (DELETE /api/v1/estimates/[id]) ===
 
 export const DELETE = withRole(["owner"], async (request, session) => {
-  const id = request.nextUrl.pathname.split("/").at(-1)!;
+  const id = getPathId(request.nextUrl.pathname);
 
   try {
     await withEstimateContext(session, async (client) => {

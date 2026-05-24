@@ -3,6 +3,7 @@ import { withRole } from "@/lib/auth/middleware";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
+import { getPathId } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 // Note: The DB trigger only fires on INSERT. Deletion requires manual recalculation.
 
 export const DELETE = withRole(["owner"], async (request, session) => {
-  const paymentId = request.nextUrl.pathname.split("/").at(-1)!;
+  const paymentId = getPathId(request.nextUrl.pathname);
 
   try {
     await withInvoiceContext(session, async (client) => {

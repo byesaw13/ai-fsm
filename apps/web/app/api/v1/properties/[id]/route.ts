@@ -5,6 +5,7 @@ import type { AuthSession } from "@/lib/auth/middleware";
 import { getPool, queryOne } from "@/lib/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
+import { getPathId } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ const patchPropertyBody = z
   .refine((v) => Object.keys(v).length > 0, { message: "At least one field is required" });
 
 export const GET = withRole(["owner", "admin"], async (request: NextRequest, session: AuthSession) => {
-  const id = request.nextUrl.pathname.split("/").at(-1) ?? "";
+  const id = getPathId(request.nextUrl.pathname);
   const row = await queryOne(
     `SELECT p.*, c.name AS client_name,
             COUNT(DISTINCT j.id)::int AS job_count,
@@ -44,7 +45,7 @@ export const GET = withRole(["owner", "admin"], async (request: NextRequest, ses
 });
 
 export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, session: AuthSession) => {
-  const id = request.nextUrl.pathname.split("/").at(-1) ?? "";
+  const id = getPathId(request.nextUrl.pathname);
   const body = await request.json().catch(() => null);
   const parsed = patchPropertyBody.safeParse(body);
   if (!parsed.success) {

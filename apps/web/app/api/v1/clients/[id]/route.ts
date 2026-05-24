@@ -6,6 +6,7 @@ import { getPool, queryOne } from "@/lib/db";
 import { normalizeClientName } from "@/lib/crm/p7";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
+import { getPathId } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,7 @@ const patchClientBody = z
   .refine((v) => Object.keys(v).length > 0, { message: "At least one field is required" });
 
 export const GET = withRole(["owner", "admin"], async (_request: NextRequest, session: AuthSession) => {
-  const id = _request.nextUrl.pathname.split("/").at(-1) ?? "";
+  const id = getPathId(_request.nextUrl.pathname);
   const row = await queryOne(
     `SELECT c.*, 
             COUNT(DISTINCT p.id)::int AS property_count,
@@ -52,7 +53,7 @@ export const GET = withRole(["owner", "admin"], async (_request: NextRequest, se
 });
 
 export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, session: AuthSession) => {
-  const id = request.nextUrl.pathname.split("/").at(-1) ?? "";
+  const id = getPathId(request.nextUrl.pathname);
   const body = await request.json().catch(() => null);
   const parsed = patchClientBody.safeParse(body);
   if (!parsed.success) {
@@ -163,7 +164,7 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
 });
 
 export const DELETE = withRole(["owner", "admin"], async (request: NextRequest, session: AuthSession) => {
-  const id = request.nextUrl.pathname.split("/").at(-1) ?? "";
+  const id = getPathId(request.nextUrl.pathname);
 
   const pool = getPool();
   const client = await pool.connect();

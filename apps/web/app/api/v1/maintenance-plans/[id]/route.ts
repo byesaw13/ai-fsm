@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withRole } from "@/lib/auth/middleware";
 import type { AuthSession } from "@/lib/auth/middleware";
 import { queryOne, getPool } from "@/lib/db";
+import { getPathId } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ const patchBody = z.object({
 });
 
 export const GET = withRole(["owner", "admin"], async (request: NextRequest, session: AuthSession) => {
-  const id = request.nextUrl.pathname.split("/").at(-1) ?? "";
+  const id = getPathId(request.nextUrl.pathname);
   const plan = await queryOne(
     `SELECT mp.*, c.name AS client_name, p.address AS property_address
      FROM maintenance_plans mp
@@ -41,7 +42,7 @@ export const GET = withRole(["owner", "admin"], async (request: NextRequest, ses
 });
 
 export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, session: AuthSession) => {
-  const id = request.nextUrl.pathname.split("/").at(-1) ?? "";
+  const id = getPathId(request.nextUrl.pathname);
   const existing = await queryOne<{ id: string } & Record<string, unknown>>(
     `SELECT id FROM maintenance_plans WHERE id = $1 AND account_id = $2`,
     [id, session.accountId]
@@ -109,7 +110,7 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
 });
 
 export const DELETE = withRole(["owner"], async (request: NextRequest, session: AuthSession) => {
-  const id = request.nextUrl.pathname.split("/").at(-1) ?? "";
+  const id = getPathId(request.nextUrl.pathname);
   const pool = getPool();
   const result = await pool.query(
     `DELETE FROM maintenance_plans WHERE id = $1 AND account_id = $2 RETURNING id`,

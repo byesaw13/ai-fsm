@@ -5,13 +5,14 @@ import { withAssetContext, deleteAssetLink, updateAssetLinkStatus } from "@/lib/
 import { appendAuditLog } from "@/lib/db/audit";
 import { assetLinkStatusSchema } from "@ai-fsm/domain";
 import { logger } from "@/lib/logger";
+import { getPathId } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
 
 const uuidSchema = z.string().uuid();
 
 function extractId(request: NextRequest): string | null {
-  const raw = request.nextUrl.pathname.split("/").at(-1) ?? "";
+  const raw = getPathId(request.nextUrl.pathname);
   return uuidSchema.safeParse(raw).success ? raw : null;
 }
 
