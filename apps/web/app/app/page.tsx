@@ -426,10 +426,10 @@ export default async function AppPage() {
       }}>
         <div>
           <h1 style={{ margin: 0, fontSize: "var(--text-2xl)", fontWeight: 700, letterSpacing: "-0.01em" }}>
-            {greeting}{firstName ? `, ${firstName}` : ""}
+            My Day
           </h1>
           <p style={{ margin: 0, marginTop: "var(--space-1)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-            {todayLabel}
+            {greeting}{firstName ? `, ${firstName}` : ""} — {todayLabel}
           </p>
         </div>
 

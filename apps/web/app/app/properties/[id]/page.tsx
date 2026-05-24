@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
-import { canManageClients, canTransitionJob } from "@/lib/auth/permissions";
+import { canManageClients, canTransitionJob, canCreateEstimates } from "@/lib/auth/permissions";
 import { query, queryOne } from "@/lib/db";
 import { buildJobCreateHref, formatPropertyAddress } from "@/lib/crm/p7";
 import { computeVaultCompleteness, type VaultCategory } from "@ai-fsm/domain";
@@ -175,6 +175,15 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
             <LinkButton href={`/app/clients/${property.client_id}`} variant="secondary" size="sm">
               Client
             </LinkButton>
+            {canCreateEstimates(session.role) && (
+              <LinkButton
+                href={`/app/estimates/new?client_id=${property.client_id}&property_id=${property.id}`}
+                variant="secondary"
+                size="sm"
+              >
+                + Estimate
+              </LinkButton>
+            )}
             {canTransitionJob(session.role) ? (
               <LinkButton href={buildJobCreateHref(property.client_id, property.id)} variant="primary" size="sm" data-testid="create-job-from-property-btn">
                 + Job

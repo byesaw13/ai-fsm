@@ -140,31 +140,32 @@ function flattenSections(sections: ReturnType<typeof getNavSections>) {
 }
 
 describe("getNavSections (role filtering)", () => {
-  it("returns 4 sections with all admin nav items for admin role", () => {
-    // Sections: Work, Customers, Money, Insights
+  it("returns 3 sections with 9 admin nav items for admin role", () => {
+    // Sections: Work (My Day + Schedule + Jobs), Customers (Properties + Clients + Intake), Money (Estimates + Invoices + Memberships)
     const sections = getNavSections("admin");
     const items = flattenSections(sections);
-    expect(sections).toHaveLength(4);
-    expect(items).toHaveLength(14);
+    expect(sections).toHaveLength(3);
+    expect(items).toHaveLength(9);
     const hrefs = items.map((i) => i.href);
-    // Work
-    expect(hrefs).toContain("/app/my-day");
+    // Work — My Day now points to /app for non-techs
+    expect(hrefs).toContain("/app");
     expect(hrefs).toContain("/app/schedule");
     expect(hrefs).toContain("/app/jobs");
-    expect(hrefs).toContain("/app/pipeline");
-    // Customers
+    // Customers — Properties is now primary; Intake renamed (route unchanged)
+    expect(hrefs).toContain("/app/properties");
     expect(hrefs).toContain("/app/clients");
     expect(hrefs).toContain("/app/booking-requests");
     // Money
     expect(hrefs).toContain("/app/estimates");
     expect(hrefs).toContain("/app/invoices");
     expect(hrefs).toContain("/app/maintenance-plans");
-    // Insights
-    expect(hrefs).toContain("/app/reports");
-    expect(hrefs).toContain("/app/operations-dashboard");
-    expect(hrefs).toContain("/app/membership-dashboard");
-    expect(hrefs).toContain("/app/pricing-dashboard");
-    expect(hrefs).toContain("/app/documents-dashboard");
+    // Removed from nav (still accessible via direct URL)
+    expect(hrefs).not.toContain("/app/pipeline");
+    expect(hrefs).not.toContain("/app/reports");
+    expect(hrefs).not.toContain("/app/operations-dashboard");
+    expect(hrefs).not.toContain("/app/membership-dashboard");
+    expect(hrefs).not.toContain("/app/pricing-dashboard");
+    expect(hrefs).not.toContain("/app/documents-dashboard");
     // Settings is pinned outside nav sections — not in flattenSections result
     expect(hrefs).not.toContain("/app/settings");
     // Field/On Site is mobile-only — not in desktop nav sections
@@ -173,16 +174,15 @@ describe("getNavSections (role filtering)", () => {
     expect(hrefs).not.toContain("/app/expenses");
     expect(hrefs).not.toContain("/app/price-book");
     expect(hrefs).not.toContain("/app/visits");
-    expect(hrefs).not.toContain("/app/properties");
     expect(hrefs).not.toContain("/app/automations");
     expect(hrefs).not.toContain("/app/mileage");
     expect(hrefs).not.toContain("/app/owner-dashboard");
   });
 
-  it("returns the same 14-item nav for owner role", () => {
+  it("returns the same 9-item nav for owner role", () => {
     const sections = getNavSections("owner");
     const items = flattenSections(sections);
-    expect(items).toHaveLength(14);
+    expect(items).toHaveLength(9);
   });
 
   it("returns only 2 items for tech role (My Day + Jobs from Work section)", () => {
@@ -191,6 +191,7 @@ describe("getNavSections (role filtering)", () => {
     const items = flattenSections(sections);
     expect(items).toHaveLength(2);
     const hrefs = items.map((i) => i.href);
+    // Tech's My Day still points to /app/my-day
     expect(hrefs).toContain("/app/my-day");
     expect(hrefs).toContain("/app/jobs");
     // field is in mobile bottom nav, not desktop nav sections
@@ -205,27 +206,31 @@ describe("getNavSections (role filtering)", () => {
   });
 
   it("includes My Day first for all roles", () => {
-    for (const role of ["admin", "owner", "tech"]) {
-      const sections = getNavSections(role);
-      const items = flattenSections(sections);
-      expect(items[0].href).toBe("/app/my-day");
+    const sections = getNavSections("tech");
+    expect(flattenSections(sections)[0].href).toBe("/app/my-day");
+
+    // Admin/owner My Day points to /app (the owner command center)
+    for (const role of ["admin", "owner"]) {
+      const items = flattenSections(getNavSections(role));
+      expect(items[0].href).toBe("/app");
+      expect(items[0].label).toBe("My Day");
     }
   });
 });
 
 describe("getBottomNavItems (mobile)", () => {
-  it("returns 5 items for admin role", () => {
+  it("returns 5 items for admin role with My Day pointing to /app", () => {
     const items = getBottomNavItems("admin");
     expect(items).toHaveLength(5);
     const hrefs = items.map((i) => i.href);
-    expect(hrefs).toContain("/app/my-day");
+    expect(hrefs).toContain("/app");
     expect(hrefs).toContain("/app/schedule");
     expect(hrefs).toContain("/app/jobs");
     expect(hrefs).toContain("/app/clients");
     expect(hrefs).toContain("/app/estimates");
   });
 
-  it("returns 3 items for tech role", () => {
+  it("returns 3 items for tech role with My Day pointing to /app/my-day", () => {
     const items = getBottomNavItems("tech");
     expect(items).toHaveLength(3);
     const hrefs = items.map((i) => i.href);
@@ -236,6 +241,19 @@ describe("getBottomNavItems (mobile)", () => {
 });
 
 describe("isNavActive (route detection)", () => {
+  // /app is the owner command center — must be exact match only (not prefix)
+  it("returns true for /app when pathname is exactly /app", () => {
+    expect(isNavActive("/app", "/app")).toBe(true);
+  });
+
+  it("returns false for /app when pathname is /app/jobs (prevents My Day lighting up everywhere)", () => {
+    expect(isNavActive("/app/jobs", "/app")).toBe(false);
+  });
+
+  it("returns false for /app when pathname is /app/estimates/new", () => {
+    expect(isNavActive("/app/estimates/new", "/app")).toBe(false);
+  });
+
   // Dashboard — exact match only
   it("returns true for /app/operations when pathname is exactly /app/operations", () => {
     expect(isNavActive("/app/operations", "/app/operations")).toBe(true);
