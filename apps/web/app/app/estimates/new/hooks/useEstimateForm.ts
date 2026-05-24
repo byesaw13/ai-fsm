@@ -11,6 +11,7 @@ import {
 } from "@ai-fsm/domain";
 import { useEstimateAI } from "./useEstimateAI";
 import { useEstimatePriceBook } from "./useEstimatePriceBook";
+import { useEstimateTiers } from "./useEstimateTiers";
 import {
   parseCents, lineTotal, mapPrepLevel,
   EMPTY_ROW, PREP_LEVEL_LABELS, STEP_LABELS, DEFAULT_TIERS,
@@ -112,13 +113,7 @@ export function useEstimateForm({
   const [laborHours, setLaborHours] = useState("");
   const [addedMaterials, setAddedMaterials] = useState<Set<string>>(new Set());
 
-  const [mode, setMode] = useState<"itemized" | "flat_rate" | "multi_option">("itemized");
   const [lineItems, setLineItems] = useState<LineItemRow[]>([{ ...EMPTY_ROW }]);
-  const [flatRate, setFlatRate] = useState("0.00");
-
-  const [tiers, setTiers] = useState<OptionTier[]>(() =>
-    DEFAULT_TIERS.map((t) => ({ ...t, line_items: [{ ...EMPTY_ROW }] }))
-  );
 
   const [tripCount, setTripCount] = useState<"one_trip" | "multi_trip">("one_trip");
   const [requiresDryingOrCuring, setRequiresDryingOrCuring] = useState(false);
@@ -148,6 +143,24 @@ export function useEstimateForm({
     priceBook.handleAddPriceBookItem(service, priceCents, (row) => {
       setLineItems((prev) => [...prev.filter((r) => r.description.trim()), row]);
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tiers sub-hook
+  // ---------------------------------------------------------------------------
+
+  const tiersHook = useEstimateTiers(() =>
+    lineItems.reduce((sum, row) => sum + lineTotal(row), 0)
+  );
+  const { mode, flatRate, setFlatRate, tiers,
+          updateTier, addTierLineItem, removeTierLineItem, updateTierLineItem,
+          tierSubtotalCents } = tiersHook;
+
+  function handleModeChange(newMode: "itemized" | "flat_rate" | "multi_option") {
+    if (newMode === "itemized" && lineItems.length === 0) {
+      setLineItems([{ ...EMPTY_ROW }]);
+    }
+    tiersHook.handleModeChange(newMode);
   }
 
   // ---------------------------------------------------------------------------
@@ -244,20 +257,8 @@ export function useEstimateForm({
   });
 
   // ---------------------------------------------------------------------------
-  // Mode / line items / tiers
+  // Line items
   // ---------------------------------------------------------------------------
-
-  function handleModeChange(newMode: "itemized" | "flat_rate" | "multi_option") {
-    if (newMode === "flat_rate") {
-      const current = lineItems.reduce((sum, row) => sum + lineTotal(row), 0);
-      setFlatRate((current / 100).toFixed(2));
-    } else if (newMode === "itemized") {
-      if (lineItems.length === 0) setLineItems([{ ...EMPTY_ROW }]);
-    } else if (newMode === "multi_option") {
-      setTiers(DEFAULT_TIERS.map((t) => ({ ...t, line_items: [{ ...EMPTY_ROW }] })));
-    }
-    setMode(newMode);
-  }
 
   function addLineItem() {
     setLineItems((prev) => [...prev, { ...EMPTY_ROW }]);
@@ -271,49 +272,6 @@ export function useEstimateForm({
     setLineItems((prev) =>
       prev.map((row, i) => (i === index ? { ...row, [field]: value } : row))
     );
-  }
-
-  function updateTier(tierIndex: number, updates: Partial<OptionTier>) {
-    setTiers((prev) =>
-      prev.map((t, i) => (i === tierIndex ? { ...t, ...updates } : t))
-    );
-  }
-
-  function addTierLineItem(tierIndex: number) {
-    setTiers((prev) =>
-      prev.map((t, i) =>
-        i === tierIndex ? { ...t, line_items: [...t.line_items, { ...EMPTY_ROW }] } : t
-      )
-    );
-  }
-
-  function removeTierLineItem(tierIndex: number, lineIndex: number) {
-    setTiers((prev) =>
-      prev.map((t, i) =>
-        i === tierIndex
-          ? { ...t, line_items: t.line_items.filter((_, li) => li !== lineIndex) }
-          : t
-      )
-    );
-  }
-
-  function updateTierLineItem(tierIndex: number, lineIndex: number, field: keyof LineItemRow, value: string) {
-    setTiers((prev) =>
-      prev.map((t, i) =>
-        i === tierIndex
-          ? {
-              ...t,
-              line_items: t.line_items.map((row, li) =>
-                li === lineIndex ? { ...row, [field]: value } : row
-              ),
-            }
-          : t
-      )
-    );
-  }
-
-  function tierSubtotalCents(tier: OptionTier): number {
-    return tier.line_items.reduce((sum, row) => sum + lineTotal(row), 0);
   }
 
   function handleAddMaterial(mat: MaterialSuggestion) {
@@ -667,8 +625,7 @@ export function useEstimateForm({
     handlePropertyCreated,
     handleModeChange,
     addLineItem, removeLineItem, updateLineItem,
-    updateTier, addTierLineItem, removeTierLineItem, updateTierLineItem,
-    tierSubtotalCents,
+    updateTier, addTierLineItem, removeTierLineItem, updateTierLineItem, tierSubtotalCents,
     handleAddMaterial,
     advanceStep, goBack,
     handleSubmit,
