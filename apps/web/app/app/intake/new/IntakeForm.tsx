@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Button, Card, Input, LinkButton, Select, SectionHeader, Textarea, useToast } from "@/components/ui";
+import { INTAKE_QUESTIONS, INTAKE_METADATA_LABELS } from "@/lib/intake/questions";
 
 const SMS_CONSENT_TEXT =
   "By checking this box you consent to receive text messages from Dovetails Services LLC about your service requests. Message & data rates may apply. Reply STOP to opt out.";
@@ -61,6 +62,7 @@ type IntakeFormValues = {
   preferred_contact: PreferredContact;
   referral_source: ReferralSource | "";
   referral_name: string;
+  intake_metadata: Record<string, string>;
 };
 
 type IntakeErrors = Partial<Record<keyof IntakeFormValues, string>>;
@@ -79,6 +81,7 @@ const initialValues: IntakeFormValues = {
   preferred_contact: "email",
   referral_source: "",
   referral_name: "",
+  intake_metadata: {},
 };
 
 export function IntakeForm() {
@@ -149,6 +152,7 @@ export function IntakeForm() {
           preferred_contact: form.preferred_contact,
           referral_source: form.referral_source || null,
           referral_name: form.referral_source === "realtor" && form.referral_name.trim() ? form.referral_name.trim() : null,
+          intake_metadata: Object.keys(form.intake_metadata).length > 0 ? form.intake_metadata : null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -231,6 +235,12 @@ export function IntakeForm() {
             <Detail label="Preferred Date" value={form.preferred_date} />
             <Detail label="Preferred Time" value={form.preferred_time_slot} />
             <Detail label="Address" value={[form.address, form.city].filter(Boolean).join(", ")} />
+            {Object.entries(form.intake_metadata).map(([key, val]) => {
+              const q = INTAKE_QUESTIONS[form.service_category]?.find((q) => q.key === key);
+              if (!q) return null;
+              const label = INTAKE_METADATA_LABELS[key]?.[val] ?? val;
+              return <Detail key={key} label={q.label} value={label} />;
+            })}
             {form.referral_source && (
               <Detail
                 label="Referred By"
@@ -299,7 +309,7 @@ export function IntakeForm() {
             label="Service Category"
             required
             value={form.service_category}
-            onChange={(e) => update("service_category", e.target.value)}
+            onChange={(e) => { update("service_category", e.target.value); update("intake_metadata", {}); }}
             error={errors.service_category}
             options={SERVICE_CATEGORIES}
             placeholder="Select service"
@@ -316,6 +326,38 @@ export function IntakeForm() {
             containerClassName="p7-form-grid-span-2"
             rows={5}
           />
+          {/* Service-specific branching questions */}
+          {form.service_category && INTAKE_QUESTIONS[form.service_category]?.map((q) => (
+            <div key={q.key} className="p7-form-grid-span-2">
+              <p className="p7-label" style={{ marginBottom: "var(--space-2)" }}>{q.label}</p>
+              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                {q.options.map((opt) => (
+                  <label
+                    key={opt.value}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "var(--space-2)",
+                      padding: "var(--space-2) var(--space-3)",
+                      border: form.intake_metadata[q.key] === opt.value ? "2px solid var(--accent)" : "1px solid var(--border)",
+                      borderRadius: "var(--radius-md)",
+                      cursor: "pointer",
+                      fontSize: "var(--text-sm)",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name={`metadata_${q.key}`}
+                      value={opt.value}
+                      checked={form.intake_metadata[q.key] === opt.value}
+                      onChange={() => update("intake_metadata", { ...form.intake_metadata, [q.key]: opt.value })}
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
           <Input
             id="preferred_date"
             label="Preferred Date"

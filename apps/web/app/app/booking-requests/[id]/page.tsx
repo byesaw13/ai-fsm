@@ -5,6 +5,7 @@ import { query, queryOne } from "@/lib/db";
 import { PageContainer, PageHeader, Card, SectionHeader, StatusBadge, LinkButton } from "@/components/ui";
 import type { StatusVariant } from "@/components/ui";
 import { ReviewActions } from "./ReviewActions";
+import { INTAKE_QUESTIONS, INTAKE_METADATA_LABELS } from "@/lib/intake/questions";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +76,7 @@ type BookingRow = {
   walkthrough_score: number | null;
   referral_source: string | null;
   referral_name: string | null;
+  intake_metadata: Record<string, string> | null;
 };
 
 type DuplicateBookingRow = {
@@ -228,6 +230,16 @@ export default async function BookingRequestDetailPage({
                 <dt>Description</dt>
                 <dd style={{ whiteSpace: "pre-wrap" }}>{br.service_description}</dd>
               </div>
+              {br.intake_metadata && INTAKE_QUESTIONS[br.service_category]?.map((q) => {
+                const val = br.intake_metadata?.[q.key];
+                if (!val) return null;
+                return (
+                  <div key={q.key} className="p7-detail-row">
+                    <dt>{q.label}</dt>
+                    <dd>{INTAKE_METADATA_LABELS[q.key]?.[val] ?? val}</dd>
+                  </div>
+                );
+              })}
               {br.routing_path && br.routing_path !== "pending" && (
                 <div className="p7-detail-row">
                   <dt>Routing</dt>

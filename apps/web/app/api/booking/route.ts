@@ -29,6 +29,7 @@ const bookingSchema = z.object({
   sms_consent: z.boolean().default(false),
   referral_source: z.enum(["online", "friend_neighbor", "realtor", "repeat", "other"]).nullable().optional(),
   referral_name: z.string().max(255).nullable().optional(),
+  intake_metadata: z.record(z.string(), z.string()).nullable().optional(),
 }).superRefine((data, ctx) => {
   if (data.preferred_contact === "sms") {
     if (!data.phone) {
@@ -85,6 +86,7 @@ export async function POST(request: NextRequest) {
   const decision = scoreSiteVisitProbability({
     service_category: data.service_category,
     service_description: data.service_description,
+    intake_metadata: data.intake_metadata || null,
   });
 
   const pool = getPool();
@@ -114,6 +116,7 @@ export async function POST(request: NextRequest) {
       walkthroughScore: decision.score,
       referralSource: data.referral_source || null,
       referralName: data.referral_name || null,
+      intakeMetadata: data.intake_metadata || null,
     });
 
     await client.query("COMMIT");

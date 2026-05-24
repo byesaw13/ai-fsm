@@ -63,10 +63,40 @@ const SIGNALS: Signal[] = [
 const SHORT_DESCRIPTION_THRESHOLD = 60;
 const SHORT_DESCRIPTION_BOOST = 10;
 
+// Metadata signals: key/value answers from branching questions → delta adjustments
+interface MetadataSignal {
+  key: string;
+  values: string[];  // which values trigger this signal
+  delta: number;
+  reason: string;
+}
+
+const METADATA_SIGNALS: MetadataSignal[] = [
+  // Painting
+  { key: "surface",           values: ["exterior", "both"],       delta: +10, reason: "exterior painting" },
+  { key: "room_count",        values: ["4+"],                     delta: +10, reason: "large painting scope" },
+  // General repairs
+  { key: "structural_concern", values: ["structural"],            delta: +20, reason: "possible structural issue" },
+  { key: "structural_concern", values: ["unsure"],                delta: +8,  reason: "structural concern unclear" },
+  // Plumbing
+  { key: "issue_type",        values: ["leak"],                   delta: +15, reason: "active leak" },
+  { key: "issue_type",        values: ["dripping_faucet", "running_toilet", "new_install"], delta: -10, reason: "standard plumbing swap" },
+  // Electrical
+  { key: "safety_concern",    values: ["sparks_smell"],           delta: +25, reason: "electrical safety hazard" },
+  { key: "safety_concern",    values: ["tripping_breakers"],      delta: +15, reason: "recurring breaker trips" },
+  { key: "electrical_type",   values: ["panel"],                  delta: +15, reason: "panel work" },
+  { key: "electrical_type",   values: ["outlet_switch", "fixture_fan"], delta: -10, reason: "standard electrical swap" },
+  // Carpentry
+  { key: "carpentry_type",    values: ["custom_build"],           delta: +10, reason: "custom carpentry build" },
+  // Specialty
+  { key: "project_type",      values: ["addition", "major_renovation"], delta: +15, reason: "large-scope project" },
+];
+
 export function scoreSiteVisitProbability(input: {
   service_category: string;
   service_description: string;
   photo_count?: number;
+  intake_metadata?: Record<string, string> | null;
 }): WalkthroughDecision {
   const base = BASE_SCORES[input.service_category] ?? DEFAULT_BASE;
   const reasons: string[] = [];
@@ -89,6 +119,27 @@ export function scoreSiteVisitProbability(input: {
       delta += apply;
       totalReduce += Math.abs(apply);
       reasons.push(signal.reason);
+    }
+  }
+
+  // Metadata signals from branching questions
+  if (input.intake_metadata) {
+    for (const ms of METADATA_SIGNALS) {
+      const val = input.intake_metadata[ms.key];
+      if (!val || !ms.values.includes(val)) continue;
+      if (ms.delta > 0) {
+        const apply = Math.min(ms.delta, 30 - totalBoost);
+        if (apply <= 0) continue;
+        delta += apply;
+        totalBoost += apply;
+        reasons.push(ms.reason);
+      } else {
+        const apply = Math.max(ms.delta, -(30 - totalReduce));
+        if (apply >= 0) continue;
+        delta += apply;
+        totalReduce += Math.abs(apply);
+        reasons.push(ms.reason);
+      }
     }
   }
 
