@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { INTAKE_QUESTIONS } from "@/lib/intake/questions";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -74,6 +75,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
   const [smsConsent, setSmsConsent] = useState(false);
   const [referralSource, setReferralSource] = useState<"online" | "friend_neighbor" | "realtor" | "repeat" | "other" | "">("");
   const [referralName, setReferralName] = useState("");
+  const [intakeMetadata, setIntakeMetadata] = useState<Record<string, string>>({});
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
@@ -110,6 +112,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
           sms_consent: preferredContact === "sms" && smsConsent,
           referral_source: referralSource || null,
           referral_name: referralSource === "realtor" && referralName.trim() ? referralName.trim() : null,
+          intake_metadata: Object.keys(intakeMetadata).length > 0 ? intakeMetadata : null,
         }),
       });
 
@@ -244,7 +247,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                 <button
                   key={cat.id}
                   type="button"
-                  onClick={() => setServiceCategory(cat.id)}
+                  onClick={() => { setServiceCategory(cat.id); setIntakeMetadata({}); }}
                   style={{
                     padding: "12px 16px",
                     border: serviceCategory === cat.id ? "2px solid #2563eb" : "1px solid #e5e7eb",
@@ -278,6 +281,34 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                 {serviceDescription.length}/2000 characters (min 10)
               </span>
             </label>
+
+            {/* Service-specific branching questions */}
+            {serviceCategory && INTAKE_QUESTIONS[serviceCategory]?.map((q) => (
+              <div key={q.key}>
+                <p style={{ fontSize: 14, fontWeight: 600, margin: "8px 0 8px" }}>{q.label}</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {q.options.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setIntakeMetadata((prev) => ({ ...prev, [q.key]: opt.value }))}
+                      style={{
+                        padding: "7px 14px",
+                        border: intakeMetadata[q.key] === opt.value ? "2px solid #2563eb" : "1px solid #d1d5db",
+                        borderRadius: 20,
+                        background: intakeMetadata[q.key] === opt.value ? "#eff6ff" : "#fff",
+                        color: intakeMetadata[q.key] === opt.value ? "#2563eb" : "#374151",
+                        fontWeight: intakeMetadata[q.key] === opt.value ? 600 : 400,
+                        fontSize: 13,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
 
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
