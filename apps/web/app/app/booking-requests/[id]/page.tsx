@@ -5,6 +5,7 @@ import { query, queryOne } from "@/lib/db";
 import { PageContainer, PageHeader, Card, SectionHeader, StatusBadge, LinkButton } from "@/components/ui";
 import type { StatusVariant } from "@/components/ui";
 import { ReviewActions } from "./ReviewActions";
+import { IntakeSummary } from "./IntakeSummary";
 import { INTAKE_QUESTIONS, INTAKE_METADATA_LABELS } from "@/lib/intake/questions";
 import { scoreJobFit } from "@ai-fsm/domain";
 
@@ -373,6 +374,8 @@ export default async function BookingRequestDetailPage({
               </ul>
             )}
           </Card>
+
+          <IntakeSummary bookingId={br.id} />
 
           <Card>
             <SectionHeader title="Review" />
