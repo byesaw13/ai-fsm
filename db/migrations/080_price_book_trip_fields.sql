@@ -25,49 +25,51 @@ UPDATE price_book SET default_trip_count = 3, return_trip_required = true
   WHERE code IN ('1003', '1004');  -- drywall >12", texture match
 
 -- Material inclusion: customer supplies the primary item
+-- Covers cases where the customer has already purchased or chosen a specific product
 UPDATE price_book SET material_inclusion = 'customer_supplied'
   WHERE code IN (
     '1005',  -- door slab (customer provides door)
+    '2002',  -- showerhead (customer selects showerhead)
+    '2004',  -- toilet seat (customer selects seat)
     '2005',  -- toilet replacement (customer provides toilet)
     '2007',  -- garbage disposal (customer provides unit)
     '2008',  -- dishwasher hookup (customer provides appliance)
     '2009',  -- washer/dryer hookup (customer provides appliance)
+    '3001',  -- light fixture (customer selects fixture)
     '3002',  -- ceiling fan (customer provides fan)
+    '3006',  -- smart doorbell (customer provides Ring/Nest/etc)
+    '3007',  -- smart thermostat (customer provides device)
+    '3009',  -- motion sensor light (customer provides fixture)
+    '4001', '4002', '4003',  -- furniture assembly (customer owns furniture)
     '4007',  -- deck boards (customer provides decking)
     '4008',  -- fence panel (customer provides panel)
+    '6004',  -- patio furniture assembly (customer owns furniture)
     '6005',  -- shed assembly (customer provides kit)
+    '7001', '7002', '7003', '7004', '7005', '7006', '7007', '7008', '7009', '7010',  -- mounting (customer provides item to mount)
     '8002'   -- filter changes (customer provides filters)
   );
 
 -- Material inclusion: tech supplies consumables, included in price
+-- Standard parts or consumables the tech stocks — not a customer-selected item
 UPDATE price_book SET material_inclusion = 'tech_supplied_included'
   WHERE code IN (
+    '3003',  -- outlet/switch (standard devices stocked by tech)
+    '3004',  -- GFCI outlet (standard part)
+    '3005',  -- dimmer switch (standard part)
+    '3008',  -- smoke/CO detector (standard battery unit)
+    '6007',  -- house number install ("includes one set of numbers")
     '8003',  -- weatherstripping
     '8004',  -- door sweep
     '5011',  -- caulking & sealing (caulk included)
     '6008'   -- exterior caulking/weatherproofing
   );
 
--- Material inclusion: no materials needed (labor/service only)
+-- Material inclusion: no materials at all (pure labor/service)
 UPDATE price_book SET material_inclusion = 'none_needed'
   WHERE code IN (
-    '4001', '4002', '4003',  -- furniture assembly (customer has furniture)
     '6001',  -- gutter cleaning
     '6003',  -- pressure washing
-    '6004',  -- patio furniture assembly
-    '6007',  -- house number install (just labor)
-    '2002',  -- showerhead (customer provides showerhead)
-    '2004',  -- toilet seat (customer provides seat)
-    '3001',  -- light fixture (customer provides fixture)
-    '3003',  -- outlet/switch (customer provides device)
-    '3004',  -- GFCI outlet
-    '3005',  -- dimmer switch
-    '3006',  -- smart doorbell
-    '3007',  -- smart thermostat
-    '3008',  -- smoke detector
-    '3009',  -- motion sensor light
-    '7001', '7002', '7003', '7004', '7005', '7006', '7007', '7008', '7009', '7010',  -- mounting & installs
-    '8001'   -- dryer vent cleaning (no materials)
+    '8001'   -- dryer vent cleaning
   );
 
 -- Risk flags: permit risk
