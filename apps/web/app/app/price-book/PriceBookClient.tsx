@@ -24,9 +24,28 @@ interface Service {
   requires_materials: boolean;
   upsell_codes: string[];
   is_active: boolean;
+  default_trip_count: number;
+  return_trip_required: boolean;
+  material_inclusion: "none_needed" | "customer_supplied" | "tech_supplied_included" | "billed_separately";
+  risk_flags: string[];
   created_at: string;
   updated_at: string;
 }
+
+const MATERIAL_INCLUSION_LABELS: Record<string, string> = {
+  none_needed:          "None needed",
+  customer_supplied:    "Customer supplies item",
+  tech_supplied_included: "Included in price",
+  billed_separately:    "Billed separately",
+};
+
+const RISK_FLAG_LABELS: Record<string, string> = {
+  permit_risk:              "Permit may be required",
+  licensed_trade_adjacent:  "Near licensed trade boundary",
+  lead_rrp_risk:            "Lead RRP risk (pre-1978)",
+  structural_risk:          "Structural elements involved",
+  two_person_job:           "Two-person job",
+};
 
 interface Props {
   services: Service[];
@@ -286,6 +305,19 @@ export default function PriceBookClient({ services }: Props) {
                           <span>{service.requires_materials ? "Typically required" : "Not typically needed"}</span>
                           <span></span>
 
+                          <span style={{ color: "var(--fg-muted)" }}>Trips:</span>
+                          <span>
+                            {service.default_trip_count === 1 ? "Single visit" : `${service.default_trip_count} trips`}
+                            {service.return_trip_required && (
+                              <span style={{ marginLeft: 6, color: "var(--status-warning)", fontWeight: 600 }}>· Return required</span>
+                            )}
+                          </span>
+                          <span></span>
+
+                          <span style={{ color: "var(--fg-muted)" }}>Materials:</span>
+                          <span>{MATERIAL_INCLUSION_LABELS[service.material_inclusion] ?? service.material_inclusion}</span>
+                          <span></span>
+
                           {service.default_price_cents !== null && (
                             <>
                               <span style={{ color: "var(--fg-muted)" }}>Default price:</span>
@@ -310,6 +342,14 @@ export default function PriceBookClient({ services }: Props) {
                             </>
                           )}
 
+                          {service.risk_flags.length > 0 && (
+                            <>
+                              <span style={{ color: "var(--fg-muted)" }}>Risk flags:</span>
+                              <span style={{ gridColumn: "span 2" }}>
+                                {service.risk_flags.map((f) => RISK_FLAG_LABELS[f] ?? f).join(" · ")}
+                              </span>
+                            </>
+                          )}
 
                           {upsellItems.length > 0 && (
                             <>
