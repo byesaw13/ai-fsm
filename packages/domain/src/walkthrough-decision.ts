@@ -65,6 +65,7 @@ const SHORT_DESCRIPTION_BOOST = 10;
 
 // Metadata signals: key/value answers from branching questions → delta adjustments
 interface MetadataSignal {
+  categories: string[];  // only apply when service_category matches
   key: string;
   values: string[];  // which values trigger this signal
   delta: number;
@@ -73,23 +74,23 @@ interface MetadataSignal {
 
 const METADATA_SIGNALS: MetadataSignal[] = [
   // Painting
-  { key: "surface",           values: ["exterior", "both"],       delta: +10, reason: "exterior painting" },
-  { key: "room_count",        values: ["4+"],                     delta: +10, reason: "large painting scope" },
+  { categories: ["painting_finishes"], key: "surface",            values: ["exterior", "both"],       delta: +10, reason: "exterior painting" },
+  { categories: ["painting_finishes"], key: "room_count",         values: ["4+"],                     delta: +10, reason: "large painting scope" },
   // General repairs
-  { key: "structural_concern", values: ["structural"],            delta: +20, reason: "possible structural issue" },
-  { key: "structural_concern", values: ["unsure"],                delta: +8,  reason: "structural concern unclear" },
+  { categories: ["general_repairs"],   key: "structural_concern", values: ["structural"],             delta: +20, reason: "possible structural issue" },
+  { categories: ["general_repairs"],   key: "structural_concern", values: ["unsure"],                 delta: +8,  reason: "structural concern unclear" },
   // Plumbing
-  { key: "issue_type",        values: ["leak"],                   delta: +15, reason: "active leak" },
-  { key: "issue_type",        values: ["dripping_faucet", "running_toilet", "new_install"], delta: -10, reason: "standard plumbing swap" },
+  { categories: ["plumbing"],          key: "issue_type",         values: ["leak"],                   delta: +15, reason: "active leak" },
+  { categories: ["plumbing"],          key: "issue_type",         values: ["dripping_faucet", "running_toilet", "new_install"], delta: -10, reason: "standard plumbing swap" },
   // Electrical
-  { key: "safety_concern",    values: ["sparks_smell"],           delta: +25, reason: "electrical safety hazard" },
-  { key: "safety_concern",    values: ["tripping_breakers"],      delta: +15, reason: "recurring breaker trips" },
-  { key: "electrical_type",   values: ["panel"],                  delta: +15, reason: "panel work" },
-  { key: "electrical_type",   values: ["outlet_switch", "fixture_fan"], delta: -10, reason: "standard electrical swap" },
+  { categories: ["electrical"],        key: "safety_concern",     values: ["sparks_smell"],           delta: +25, reason: "electrical safety hazard" },
+  { categories: ["electrical"],        key: "safety_concern",     values: ["tripping_breakers"],      delta: +15, reason: "recurring breaker trips" },
+  { categories: ["electrical"],        key: "electrical_type",    values: ["panel"],                  delta: +15, reason: "panel work" },
+  { categories: ["electrical"],        key: "electrical_type",    values: ["outlet_switch", "fixture_fan"], delta: -10, reason: "standard electrical swap" },
   // Carpentry
-  { key: "carpentry_type",    values: ["custom_build"],           delta: +10, reason: "custom carpentry build" },
+  { categories: ["carpentry_furniture"], key: "carpentry_type",   values: ["custom_build"],           delta: +10, reason: "custom carpentry build" },
   // Specialty
-  { key: "project_type",      values: ["addition", "major_renovation"], delta: +15, reason: "large-scope project" },
+  { categories: ["specialty_expansion"], key: "project_type",     values: ["addition", "major_renovation"], delta: +15, reason: "large-scope project" },
 ];
 
 export function scoreSiteVisitProbability(input: {
@@ -122,9 +123,10 @@ export function scoreSiteVisitProbability(input: {
     }
   }
 
-  // Metadata signals from branching questions
+  // Metadata signals from branching questions — scoped to the request's category
   if (input.intake_metadata) {
     for (const ms of METADATA_SIGNALS) {
+      if (!ms.categories.includes(input.service_category)) continue;
       const val = input.intake_metadata[ms.key];
       if (!val || !ms.values.includes(val)) continue;
       if (ms.delta > 0) {
