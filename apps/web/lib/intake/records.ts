@@ -276,10 +276,6 @@ export async function createIntakeRecords(
         routing_path, walkthrough_score, referral_source, referral_name, intake_metadata)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
              $17, $18, CASE WHEN $18 THEN NOW() ELSE NULL END, CASE WHEN $18 THEN $19 ELSE NULL END,
-             $20, $21, $22, $23)
-        routing_path, walkthrough_score)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
-             $17, $18, CASE WHEN $18 THEN NOW() ELSE NULL END, CASE WHEN $18 THEN $19 ELSE NULL END,
              $20, $21, $22, $23, $24)
      RETURNING id`,
     [
