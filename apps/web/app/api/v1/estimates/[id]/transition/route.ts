@@ -8,6 +8,7 @@ import { estimateStatusSchema, estimateTransitions } from "@ai-fsm/domain";
 import type { EstimateStatus } from "@ai-fsm/domain";
 import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
 import { generateInvoiceNumber } from "@/lib/invoices/db";
+import { createActionItem, resolveActionItems } from "@/lib/action-items";
 
 export const dynamic = "force-dynamic";
 
@@ -141,6 +142,27 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         `UPDATE estimates SET status = $1, updated_at = now() WHERE id = $2`,
         [targetStatus, id]
       );
+
+      // Resolve send_estimate action item on any terminal or sent transition
+      if (["sent", "approved", "declined", "expired"].includes(targetStatus)) {
+        await resolveActionItems(client, {
+          accountId: session.accountId,
+          entityId: id,
+          actionTypes: ["send_estimate"],
+          resolvedBy: session.userId,
+        });
+      }
+
+      // Create schedule_job action item when approved
+      if (targetStatus === "approved") {
+        await createActionItem(client, {
+          accountId: session.accountId,
+          entityType: "estimate",
+          entityId: id,
+          actionType: "schedule_job",
+          title: "Schedule job for approved estimate",
+        });
+      }
 
       // Auto-create deposit invoice when estimate is approved
       if (targetStatus === "approved") {

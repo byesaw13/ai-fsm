@@ -5,6 +5,7 @@ import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { createIntakeRecords } from "../../../../lib/intake/records";
 import { bookingRequestStatusSchema } from "@ai-fsm/domain";
+import { createActionItem } from "../../../../lib/action-items";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,14 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       preferredContact: phone ? "phone" : "email",
       smsConsent: false,
       smsConsentSource: "quick_lead",
+    });
+
+    await createActionItem(client, {
+      accountId: session.accountId,
+      entityType: "booking_request",
+      entityId: bookingId,
+      actionType: "review_intake",
+      title: `Review intake from ${name}`,
     });
 
     await client.query("COMMIT");
