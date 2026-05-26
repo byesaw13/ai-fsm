@@ -76,9 +76,9 @@ export const GET = withRole(["owner", "admin"], async (request: NextRequest, ses
   }>(
     `SELECT COUNT(*)::int as trip_count,
             COALESCE(SUM(miles), 0)::numeric as total_miles
-     FROM mileage_logs
+     FROM vehicle_sessions
      WHERE account_id = $1
-       AND to_char(trip_date, 'YYYY-MM') = $2`,
+       AND to_char(session_date, 'YYYY-MM') = $2`,
     [session.accountId, targetMonth]
   );
   const mileage_trip_count = Number(mileageRows[0]?.trip_count ?? 0);
@@ -127,12 +127,13 @@ export const GET = withRole(["owner", "admin"], async (request: NextRequest, ses
        GROUP BY job_id
      ) exp ON exp.job_id = j.id
      LEFT JOIN (
-       SELECT job_id,
-              SUM(miles)::numeric as mileage_miles
-       FROM mileage_logs
-       WHERE account_id = $1 AND job_id IS NOT NULL
-         AND to_char(trip_date, 'YYYY-MM') = $2
-       GROUP BY job_id
+       SELECT a.entity_id AS job_id,
+              SUM(s.miles)::numeric as mileage_miles
+       FROM vehicle_sessions s
+       JOIN vehicle_session_activities a ON a.session_id = s.id
+       WHERE s.account_id = $1 AND a.entity_type = 'job' AND a.entity_id IS NOT NULL
+         AND to_char(s.session_date, 'YYYY-MM') = $2
+       GROUP BY a.entity_id
      ) mil ON mil.job_id = j.id
      WHERE j.account_id = $1
        AND (inv.revenue_cents IS NOT NULL OR exp.expense_cents IS NOT NULL OR mil.mileage_miles IS NOT NULL)

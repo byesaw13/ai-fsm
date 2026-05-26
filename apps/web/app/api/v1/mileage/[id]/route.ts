@@ -22,7 +22,7 @@ export const DELETE = withRole(["owner", "admin"], async (request: NextRequest, 
     );
 
     const existing = await client.query(
-      `SELECT id, miles, purpose, trip_date FROM mileage_logs WHERE id = $1 AND account_id = $2`,
+      `SELECT id, miles, session_date AS trip_date, notes FROM vehicle_sessions WHERE id = $1 AND account_id = $2`,
       [id, session.accountId]
     );
 
@@ -34,7 +34,7 @@ export const DELETE = withRole(["owner", "admin"], async (request: NextRequest, 
       );
     }
 
-    await client.query(`DELETE FROM mileage_logs WHERE id = $1 AND account_id = $2`, [id, session.accountId]);
+    await client.query(`DELETE FROM vehicle_sessions WHERE id = $1 AND account_id = $2`, [id, session.accountId]);
 
     await appendAuditLog(client, {
       account_id: session.accountId,

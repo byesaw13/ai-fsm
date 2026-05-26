@@ -22,8 +22,7 @@ export const dynamic = "force-dynamic";
 // GET /api/v1/reports/month-end-export?month=YYYY-MM&type=expenses|invoices|payments|mileage
 //
 // Returns a CSV file for the requested data type filtered to the given month.
-// Mileage gracefully returns empty CSV if the mileage_logs table does not exist
-// (pending migration from a future sprint).
+// Mileage queries vehicle_sessions (migration 083+).
 // ---------------------------------------------------------------------------
 
 const exportTypes = ["expenses", "invoices", "payments", "mileage"] as const;
@@ -148,25 +147,27 @@ async function buildCsv(
     }
 
     case "mileage": {
-      // mileage_logs table may not exist if P8-T3 migration is not applied.
-      // Return a header-only CSV rather than failing.
-      try {
-        const { rows } = await client.query(
-          `SELECT ml.trip_date, ml.purpose, ml.miles,
-                  j.title AS job_title, ml.notes
-           FROM mileage_logs ml
-           LEFT JOIN jobs j ON j.id = ml.job_id
-           WHERE ml.account_id = $1
-             AND ml.trip_date >= $2::date
-             AND ml.trip_date < ($2::date + interval '1 month')
-           ORDER BY ml.trip_date`,
-          [accountId, monthStart]
-        );
-        return formatMileageCsv(rows as unknown as MileageExportRow[]);
-      } catch {
-        // Table does not exist — return empty CSV with headers
-        return formatMileageCsv([]);
-      }
+      const { rows } = await client.query(
+        `SELECT s.session_date AS trip_date,
+                s.notes AS purpose,
+                COALESCE(s.miles, s.end_odometer - s.start_odometer) AS miles,
+                j.title AS job_title,
+                NULL AS notes
+         FROM vehicle_sessions s
+         LEFT JOIN LATERAL (
+           SELECT a.entity_id
+           FROM vehicle_session_activities a
+           WHERE a.session_id = s.id AND a.entity_type = 'job' AND a.entity_id IS NOT NULL
+           LIMIT 1
+         ) act ON true
+         LEFT JOIN jobs j ON j.id = act.entity_id
+         WHERE s.account_id = $1
+           AND s.session_date >= $2::date
+           AND s.session_date < ($2::date + interval '1 month')
+         ORDER BY s.session_date`,
+        [accountId, monthStart]
+      );
+      return formatMileageCsv(rows as unknown as MileageExportRow[]);
     }
   }
 }

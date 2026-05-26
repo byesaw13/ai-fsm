@@ -91,7 +91,10 @@ WHERE trip_type = 'personal'
   AND job_id IS NULL AND visit_id IS NULL AND estimate_id IS NULL
 ON CONFLICT DO NOTHING;
 
-DROP TABLE IF EXISTS mileage_logs;
+-- mileage_logs intentionally NOT dropped here.
+-- Migration 083 migrates data into vehicle_sessions.
+-- Routes and reports updated to query vehicle_sessions directly.
+-- mileage_logs will be removed in a future cleanup migration.
 
 -- RLS: vehicle_sessions
 ALTER TABLE vehicle_sessions ENABLE ROW LEVEL SECURITY;
