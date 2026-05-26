@@ -34,6 +34,9 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, jobId, p
   const [notes, setNotes] = useState(initialNotes ?? "");
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showConvertForm, setShowConvertForm] = useState(false);
+  const [visitDate, setVisitDate] = useState(preferredDate ?? new Date().toISOString().slice(0, 10));
+  const [visitSlot, setVisitSlot] = useState<string>(preferredTimeSlot ?? "morning");
 
   const isFinal = currentStatus === "converted" || currentStatus === "cancelled";
 
@@ -67,8 +70,8 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, jobId, p
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          preferred_date: preferredDate,
-          preferred_time_slot: preferredTimeSlot,
+          preferred_date: visitDate,
+          preferred_time_slot: visitSlot,
           review_notes: notes || null,
         }),
       });
@@ -185,17 +188,70 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, jobId, p
 
           {jobId && (currentStatus === "reviewed" || currentStatus === "pending" || currentStatus === "needs_info") && (
             <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-3)", borderTop: "1px solid var(--border)" }}>
-              <Button
-                variant="primary"
-                onClick={handleConvert}
-                loading={pending === "convert"}
-                disabled={!!pending}
-              >
-                Schedule Site Visit →
-              </Button>
-              <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                Schedules a site visit to assess and measure the project. Create an estimate after the visit.
-              </p>
+              {!showConvertForm ? (
+                <>
+                  <Button
+                    variant="primary"
+                    onClick={() => setShowConvertForm(true)}
+                    disabled={!!pending}
+                  >
+                    Schedule Site Visit →
+                  </Button>
+                  <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                    Schedules a site visit to assess and measure the project.
+                  </p>
+                </>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius)" }}>
+                  <strong style={{ fontSize: "var(--text-sm)" }}>Confirm Site Visit Date</strong>
+                  <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                    <div className="form-group" style={{ flex: "1 1 160px", margin: 0 }}>
+                      <label htmlFor="visit-date" style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Date</label>
+                      <input
+                        id="visit-date"
+                        type="date"
+                        value={visitDate}
+                        onChange={e => setVisitDate(e.target.value)}
+                        disabled={!!pending}
+                        style={{ width: "100%" }}
+                      />
+                    </div>
+                    <div className="form-group" style={{ flex: "1 1 140px", margin: 0 }}>
+                      <label htmlFor="visit-slot" style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Time</label>
+                      <select
+                        id="visit-slot"
+                        value={visitSlot}
+                        onChange={e => setVisitSlot(e.target.value)}
+                        disabled={!!pending}
+                        style={{ width: "100%" }}
+                      >
+                        <option value="morning">Morning (9am–11am)</option>
+                        <option value="afternoon">Afternoon (1pm–3pm)</option>
+                        <option value="evening">Evening (4pm–6pm)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                    <Button
+                      variant="primary"
+                      onClick={handleConvert}
+                      loading={pending === "convert"}
+                      disabled={!!pending || !visitDate}
+                      size="sm"
+                    >
+                      Confirm &amp; Schedule
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowConvertForm(false)}
+                      disabled={!!pending}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
