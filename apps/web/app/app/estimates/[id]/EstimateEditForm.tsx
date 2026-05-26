@@ -872,7 +872,17 @@ function TierEditor({
           tiers={tiers as unknown as OptionTier[]}
           taxRateNum={initialTaxRate}
           disabled={pending}
-          onUpdateTier={(ti, patch) => updateTier(ti, patch as Partial<TierDraft>)}
+          onUpdateTier={(ti, patch) => {
+            if (patch.is_recommended) {
+              // Enforce single recommended tier — clear all others
+              setTiers((prev) => prev.map((t, i) => ({
+                ...t,
+                ...(i === ti ? patch : { is_recommended: false }),
+              })));
+            } else {
+              updateTier(ti, patch as Partial<TierDraft>);
+            }
+          }}
           onUpdateTierLineItem={updateLineItem}
           onAddTierLineItem={addLineItem}
           onRemoveTierLineItem={removeLineItem}
