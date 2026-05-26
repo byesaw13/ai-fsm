@@ -15,12 +15,14 @@ import {
   calculatePaintingEstimate,
   formatCents,
 } from "@/lib/estimates/pricing";
+import { EstimateTierEditor } from "../components/EstimateTierEditor";
 import { GuardrailsSection } from "../components/GuardrailsSection";
 import { LineItemsTable } from "../components/LineItemsTable";
 import { PaintingEstimatorSection } from "../components/PaintingEstimatorSection";
 import {
   PREP_LEVEL_MULTIPLIERS,
 } from "@ai-fsm/domain";
+import type { OptionTier } from "@/lib/estimates/form-helpers";
 import { parseCents, lineTotal, EMPTY_ROW, type LineItemRow } from "@/lib/estimates/form-helpers";
 
 // ---------------------------------------------------------------------------
@@ -738,16 +740,15 @@ function StandardEstimateEditForm({
 // TierEditor — edit Good/Better/Best options on a multi_option estimate
 // ---------------------------------------------------------------------------
 
-interface TierLineItem { description: string; quantity: string; unit_price: string; }
 interface TierDraft {
   id: string;
   label: string;
   description: string;
   is_recommended: boolean;
-  line_items: TierLineItem[];
+  line_items: LineItemRow[];
 }
 
-function tierSubtotal(tier: TierDraft): number {
+function tierSubtotal(tier: OptionTier): number {
   return tier.line_items.reduce((sum, row) => {
     const qty = parseFloat(row.quantity) || 0;
     const price = parseFloat(row.unit_price) || 0;
@@ -794,7 +795,7 @@ function TierEditor({
     setTiers((prev) => prev.map((t, idx) => idx === i ? { ...t, ...patch } : t));
   }
 
-  function updateLineItem(tierIdx: number, liIdx: number, field: keyof TierLineItem, val: string) {
+  function updateLineItem(tierIdx: number, liIdx: number, field: keyof LineItemRow, val: string) {
     setTiers((prev) => prev.map((t, i) =>
       i !== tierIdx ? t : {
         ...t,
@@ -867,105 +868,26 @@ function TierEditor({
       <form onSubmit={handleSave} className="p7-form-stack">
         {error && <div className="p7-card-danger" role="alert">{error}</div>}
 
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${tiers.length}, 1fr)`, gap: "var(--space-4)" }}>
-          {tiers.map((tier, ti) => (
-            <div
-              key={tier.id}
-              style={{
-                border: tier.is_recommended ? "2px solid var(--accent, #2563eb)" : "1px solid var(--border)",
-                borderRadius: "var(--radius-md)",
-                padding: "var(--space-4)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "var(--space-3)",
-              }}
-            >
-              <Input
-                id={`tier-label-${ti}`}
-                label="Tier Name"
-                value={tier.label}
-                onChange={(e) => updateTier(ti, { label: e.target.value })}
-                disabled={pending}
-              />
-              <Input
-                id={`tier-desc-${ti}`}
-                label="Description"
-                value={tier.description}
-                onChange={(e) => updateTier(ti, { description: e.target.value })}
-                placeholder="What's included…"
-                disabled={pending}
-              />
-              <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontSize: "var(--text-sm)" }}>
-                <input
-                  type="checkbox"
-                  checked={tier.is_recommended}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setTiers((prev) => prev.map((t, i) => ({ ...t, is_recommended: i === ti ? checked : false })));
-                  }}
-                  disabled={pending}
-                />
-                Recommended
-              </label>
-
-              <div>
-                <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", fontWeight: 600 }}>Line Items</p>
-                {tier.line_items.map((li, liIdx) => (
-                  <div key={liIdx} style={{ display: "grid", gridTemplateColumns: "1fr 60px 80px 24px", gap: "var(--space-1)", marginBottom: "var(--space-1)", alignItems: "end" }}>
-                    <input
-                      type="text"
-                      value={li.description}
-                      onChange={(e) => updateLineItem(ti, liIdx, "description", e.target.value)}
-                      placeholder="Description"
-                      disabled={pending}
-                      style={{ padding: "6px 8px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "var(--text-sm)" }}
-                    />
-                    <input
-                      type="number"
-                      value={li.quantity}
-                      onChange={(e) => updateLineItem(ti, liIdx, "quantity", e.target.value)}
-                      min="0.01"
-                      step="0.01"
-                      disabled={pending}
-                      style={{ padding: "6px 8px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "var(--text-sm)" }}
-                    />
-                    <input
-                      type="number"
-                      value={li.unit_price}
-                      onChange={(e) => updateLineItem(ti, liIdx, "unit_price", e.target.value)}
-                      min="0"
-                      step="0.01"
-                      placeholder="Price"
-                      disabled={pending}
-                      style={{ padding: "6px 8px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: "var(--text-sm)" }}
-                    />
-                    {tier.line_items.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeLineItem(ti, liIdx)}
-                        disabled={pending}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}
-                      >×</button>
-                    )}
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  className="p7-btn p7-btn-ghost p7-btn-sm"
-                  onClick={() => addLineItem(ti)}
-                  disabled={pending}
-                  style={{ marginTop: "var(--space-1)" }}
-                >
-                  + Add line
-                </button>
-              </div>
-
-              <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--fg)" }}>
-                Subtotal: ${(tierSubtotal(tier) / 100).toFixed(2)}
-              </div>
-            </div>
-          ))}
-        </div>
+        <EstimateTierEditor
+          tiers={tiers as unknown as OptionTier[]}
+          taxRateNum={initialTaxRate}
+          disabled={pending}
+          onUpdateTier={(ti, patch) => {
+            if (patch.is_recommended) {
+              // Enforce single recommended tier — clear all others
+              setTiers((prev) => prev.map((t, i) => ({
+                ...t,
+                ...(i === ti ? patch : { is_recommended: false }),
+              })));
+            } else {
+              updateTier(ti, patch as Partial<TierDraft>);
+            }
+          }}
+          onUpdateTierLineItem={updateLineItem}
+          onAddTierLineItem={addLineItem}
+          onRemoveTierLineItem={removeLineItem}
+          tierSubtotalCents={tierSubtotal}
+        />
 
         <Input
           id="tier-expires"
