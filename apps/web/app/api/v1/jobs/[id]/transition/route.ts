@@ -9,6 +9,7 @@ import { jobTransitions, jobStatusSchema } from "@ai-fsm/domain";
 import type { JobStatus } from "@ai-fsm/domain";
 import { reviewJobIntakeGate } from "../../../../../../lib/jobs/intake-guard";
 import { generateInvoiceNumber } from "../../../../../../lib/invoices/db";
+import { createActionItem } from "../../../../../../lib/action-items";
 
 export const dynamic = "force-dynamic";
 
@@ -115,6 +116,17 @@ export const POST = withRole(
       );
 
       const updated = rows[0];
+
+      // Prompt to invoice when job is completed
+      if (targetStatus === "completed") {
+        await createActionItem(client, {
+          accountId: session.accountId,
+          entityType: "job",
+          entityId: id,
+          actionType: "create_invoice",
+          title: `Invoice for: ${updated.title}`,
+        });
+      }
 
       // Auto-create balance invoice when job is completed
       let balance_invoice_id: string | null = null;

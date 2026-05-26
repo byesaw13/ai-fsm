@@ -19,6 +19,7 @@ import {
   IconSchedule,
   IconReports,
   IconAutomations,
+  IconInbox,
 } from "./NavIcons";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
@@ -55,6 +56,7 @@ const ADMIN_NAV_SECTIONS: NavSection[] = [
   {
     label: "Work",
     items: [
+      { href: "/app/inbox",            label: "Inbox",      Icon: IconInbox,      adminOnly: true },
       { href: "/app/booking-requests", label: "Intake",     Icon: IconBooking,    adminOnly: true },
       NAV_JOBS,
       { href: "/app/estimates",        label: "Estimates",  Icon: IconEstimates,  adminOnly: true },

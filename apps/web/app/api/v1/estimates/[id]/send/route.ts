@@ -9,6 +9,7 @@ import { estimateEmailHtml, estimateEmailText } from "@/lib/email/templates";
 import { getEnv } from "@/lib/env";
 import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
 import { logCommunication } from "@/lib/communications-log";
+import { resolveActionItems } from "@/lib/action-items";
 
 export const dynamic = "force-dynamic";
 
@@ -174,6 +175,13 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         : "sent_at = now(), updated_at = now()";
 
       await client.query(`UPDATE estimates SET ${setClauses} WHERE id = $1`, [id]);
+
+      await resolveActionItems(client, {
+        accountId: session.accountId,
+        entityId: id,
+        actionTypes: ["send_estimate"],
+        resolvedBy: session.userId,
+      });
 
       await appendAuditLog(client, {
         account_id: session.accountId,
