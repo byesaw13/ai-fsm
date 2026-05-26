@@ -16,12 +16,27 @@ import type { TabDef } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
+const TRIP_TYPE_LABELS: Record<string, string> = {
+  job:             "Job",
+  estimate:        "Estimate",
+  walkthrough:     "Walkthrough",
+  material_pickup: "Material Pickup",
+  personal:        "Personal",
+  mixed:           "Mixed",
+};
+
 interface MileageRow {
   id: string;
   trip_date: string;
   miles: string;
-  purpose: string;
+  start_odometer: number | null;
+  end_odometer: number | null;
+  trip_type: string | null;
+  purpose: string | null;
   notes: string | null;
+  vehicle_id: string | null;
+  vehicle_nickname: string | null;
+  vehicle_plate: string | null;
   job_id: string | null;
   job_title: string | null;
   created_by_name: string | null;
@@ -48,7 +63,6 @@ function recentMonths(count = 6): TabDef[] {
   return months;
 }
 
-
 export default async function MileagePage({ searchParams }: PageProps) {
   const session = await getSession();
   if (!session) redirect("/login");
@@ -63,9 +77,14 @@ export default async function MileagePage({ searchParams }: PageProps) {
   });
 
   const logs = await query<MileageRow>(
-    `SELECT m.id, m.trip_date::text, m.miles::text, m.purpose, m.notes,
+    `SELECT m.id, m.trip_date::text,
+            COALESCE(m.miles, m.end_odometer - m.start_odometer)::text AS miles,
+            m.start_odometer, m.end_odometer,
+            m.trip_type, m.purpose, m.notes,
+            m.vehicle_id, v.nickname AS vehicle_nickname, v.plate AS vehicle_plate,
             m.job_id, j.title AS job_title, u.full_name AS created_by_name
      FROM mileage_logs m
+     LEFT JOIN vehicles v ON v.id = m.vehicle_id
      LEFT JOIN jobs j ON j.id = m.job_id
      LEFT JOIN users u ON u.id = m.created_by
      WHERE m.account_id = $1
@@ -80,8 +99,6 @@ export default async function MileagePage({ searchParams }: PageProps) {
 
   const canManage = session.role === "owner" || session.role === "admin";
 
-  const monthTabs: TabDef[] = recentMonths();
-
   return (
     <PageContainer>
       <PageHeader
@@ -89,14 +106,19 @@ export default async function MileagePage({ searchParams }: PageProps) {
         subtitle={monthLabel}
         actions={
           canManage ? (
-            <LinkButton href={"/app/mileage/new" as Route} variant="primary" size="sm">
-              + Log Trip
-            </LinkButton>
+            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+              <LinkButton href={"/app/mileage/vehicles" as Route} variant="ghost" size="sm">
+                Vehicles
+              </LinkButton>
+              <LinkButton href={"/app/mileage/new" as Route} variant="primary" size="sm">
+                + Log Trip
+              </LinkButton>
+            </div>
           ) : undefined
         }
       />
 
-      <Tabs tabs={monthTabs} activeKey={activeMonth} />
+      <Tabs tabs={recentMonths()} activeKey={activeMonth} />
 
       <MetricGrid
         metrics={[
@@ -118,8 +140,9 @@ export default async function MileagePage({ searchParams }: PageProps) {
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)" }}>
                 <th style={{ textAlign: "left", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Date</th>
-                <th style={{ textAlign: "left", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Purpose</th>
-                <th style={{ textAlign: "left", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Job</th>
+                <th style={{ textAlign: "left", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Vehicle</th>
+                <th style={{ textAlign: "left", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Trip</th>
+                <th style={{ textAlign: "left", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Odometer</th>
                 <th style={{ textAlign: "right", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Miles</th>
               </tr>
             </thead>
@@ -132,19 +155,47 @@ export default async function MileagePage({ searchParams }: PageProps) {
                     })}
                   </td>
                   <td style={{ padding: "var(--space-2) var(--space-3)" }}>
-                    <div>{log.purpose}</div>
-                    {log.notes && <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>{log.notes}</div>}
-                  </td>
-                  <td style={{ padding: "var(--space-2) var(--space-3)" }}>
-                    {log.job_id ? (
-                      <Link href={`/app/jobs/${log.job_id}` as Route} style={{ color: "var(--accent)", textDecoration: "none" }}>
-                        {log.job_title ?? log.job_id.slice(0, 8)}
-                      </Link>
+                    {log.vehicle_nickname ? (
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{log.vehicle_nickname}</div>
+                        {log.vehicle_plate && (
+                          <div style={{ fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--fg-muted)", letterSpacing: 1 }}>{log.vehicle_plate}</div>
+                        )}
+                      </div>
                     ) : (
                       <span style={{ color: "var(--fg-muted)" }}>—</span>
                     )}
                   </td>
-                  <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right", fontWeight: 600 }}>
+                  <td style={{ padding: "var(--space-2) var(--space-3)" }}>
+                    {log.trip_type && (
+                      <span style={{
+                        display: "inline-block",
+                        fontSize: "var(--text-xs)",
+                        fontWeight: 600,
+                        padding: "2px 8px",
+                        borderRadius: 99,
+                        background: "var(--accent-subtle, #eff6ff)",
+                        color: "var(--accent)",
+                        marginBottom: log.job_id || log.notes ? "var(--space-1)" : 0,
+                      }}>
+                        {TRIP_TYPE_LABELS[log.trip_type] ?? log.trip_type}
+                      </span>
+                    )}
+                    {log.job_id && (
+                      <div style={{ fontSize: "var(--text-xs)" }}>
+                        <Link href={`/app/jobs/${log.job_id}` as Route} style={{ color: "var(--accent)", textDecoration: "none" }}>
+                          {log.job_title ?? log.job_id.slice(0, 8)}
+                        </Link>
+                      </div>
+                    )}
+                    {log.notes && <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>{log.notes}</div>}
+                  </td>
+                  <td style={{ padding: "var(--space-2) var(--space-3)", fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--fg-muted)", whiteSpace: "nowrap" }}>
+                    {log.start_odometer != null && log.end_odometer != null
+                      ? `${log.start_odometer.toLocaleString()} → ${log.end_odometer.toLocaleString()}`
+                      : "—"}
+                  </td>
+                  <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right", fontWeight: 700 }}>
                     {parseFloat(log.miles).toFixed(1)}
                   </td>
                 </tr>
@@ -152,7 +203,7 @@ export default async function MileagePage({ searchParams }: PageProps) {
             </tbody>
             <tfoot>
               <tr style={{ borderTop: "2px solid var(--border)", fontWeight: 700 }}>
-                <td colSpan={3} style={{ padding: "var(--space-2) var(--space-3)" }}>Total</td>
+                <td colSpan={4} style={{ padding: "var(--space-2) var(--space-3)" }}>Total</td>
                 <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{totalMiles.toFixed(1)}</td>
               </tr>
             </tfoot>
