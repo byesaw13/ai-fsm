@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { checkSchedulingPreconditions } from "@ai-fsm/domain";
 import { withRole } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
@@ -78,19 +77,15 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       `SELECT status FROM jobs WHERE id = $1 AND account_id = $2 FOR UPDATE`,
       [br.job_id, session.accountId]
     );
-    const previousJobStatus = jobRows[0]?.status ?? null;
-    const { rows: activeVisitRows } = await client.query<{ count: string }>(
-      `SELECT COUNT(*) FROM visits WHERE job_id = $1 AND status IN ('scheduled','arrived','in_progress')`,
-      [br.job_id]
-    );
-    const guard = checkSchedulingPreconditions({
-      jobStatus: previousJobStatus,
-      activeVisitCount: parseInt(activeVisitRows[0]?.count ?? "0", 10),
-    });
-
-    if (!guard.ok) {
+    const jobStatus = jobRows[0]?.status ?? null;
+    if (!jobStatus) {
       await client.query("ROLLBACK");
-      return NextResponse.json({ error: guard.error }, { status: 422 });
+      return NextResponse.json({ error: { code: "NOT_FOUND", message: "Linked job not found", traceId: session.traceId } }, { status: 404 });
+    }
+    const terminalStatuses = ["completed", "invoiced", "cancelled"];
+    if (terminalStatuses.includes(jobStatus)) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: { code: "CONFLICT", message: `Cannot schedule a site visit — job is already ${jobStatus}`, traceId: session.traceId } }, { status: 409 });
     }
 
     // Build visit window from preferred date/time
