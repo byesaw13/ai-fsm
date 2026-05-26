@@ -13,7 +13,7 @@ function extractId(url: string) {
 
 const convertSchema = z.object({
   preferred_date: z.string().optional(),
-  preferred_time_slot: z.enum(["morning", "afternoon", "evening"]).optional().nullable(),
+  preferred_time_slot: z.enum(["morning", "afternoon", "evening", "flexible"]).optional().nullable(),
   assigned_user_id: z.string().uuid().optional().nullable(),
   review_notes: z.string().max(2000).optional().nullable(),
 });
@@ -86,6 +86,17 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     if (terminalStatuses.includes(jobStatus)) {
       await client.query("ROLLBACK");
       return NextResponse.json({ error: { code: "CONFLICT", message: `Cannot schedule a site visit — job is already ${jobStatus}`, traceId: session.traceId } }, { status: 409 });
+    }
+
+    // Block if there's already an active site visit for this job (prevents duplicates)
+    const { rows: activeSiteVisits } = await client.query<{ count: string }>(
+      `SELECT COUNT(*) AS count FROM visits
+       WHERE job_id = $1 AND visit_type = 'site_visit' AND status IN ('scheduled','arrived','in_progress')`,
+      [br.job_id]
+    );
+    if (parseInt(activeSiteVisits[0]?.count ?? "0", 10) > 0) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: { code: "CONFLICT", message: "A site visit is already scheduled for this job", traceId: session.traceId } }, { status: 409 });
     }
 
     // Build visit window from preferred date/time

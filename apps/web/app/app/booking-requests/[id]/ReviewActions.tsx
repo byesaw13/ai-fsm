@@ -228,6 +228,7 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, jobId, p
                         <option value="morning">Morning (9am–11am)</option>
                         <option value="afternoon">Afternoon (1pm–3pm)</option>
                         <option value="evening">Evening (4pm–6pm)</option>
+                        <option value="flexible">Flexible</option>
                       </select>
                     </div>
                   </div>
