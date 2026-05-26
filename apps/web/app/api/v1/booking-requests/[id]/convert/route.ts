@@ -13,7 +13,7 @@ function extractId(url: string) {
 
 const convertSchema = z.object({
   preferred_date: z.string().optional(),
-  preferred_time_slot: z.enum(["morning", "afternoon", "evening"]).optional().nullable(),
+  preferred_time_slot: z.enum(["morning", "afternoon", "evening", "flexible"]).optional().nullable(),
   assigned_user_id: z.string().uuid().optional().nullable(),
   review_notes: z.string().max(2000).optional().nullable(),
 });
