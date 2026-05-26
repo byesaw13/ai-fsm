@@ -429,6 +429,19 @@ export default async function VisitDetailPage({
             </Card>
           )}
 
+          {/* ── Site visit: assessment form link (active visits) ── */}
+          {isSiteVisit && currentStatus !== "cancelled" && currentStatus !== "completed" && (
+            <Card data-testid="site-visit-assessment-card">
+              <SectionHeader title="Site Assessment" />
+              <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", marginBottom: "var(--space-3)" }}>
+                Record room measurements, site conditions, and photos to build an accurate estimate.
+              </div>
+              <a href={`/app/visits/${visit.id}/assessment`} className="p7-btn p7-btn-primary p7-btn-sm">
+                Open Assessment Form →
+              </a>
+            </Card>
+          )}
+
           {/* ── Site visit: create estimate prompt when completed ── */}
           {isSiteVisit && currentStatus === "completed" && canCreateEstimate && (
             <Card data-testid="site-visit-followup">
@@ -437,6 +450,9 @@ export default async function VisitDetailPage({
                 You&apos;ve assessed the project. Create an estimate for the client based on your findings.
               </div>
               <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                <a href={`/app/visits/${visit.id}/assessment`} className="p7-btn p7-btn-ghost p7-btn-sm">
+                  View Assessment
+                </a>
                 {visit.job_client_id && (
                   <a
                     href={`/app/estimates/new?client_id=${visit.job_client_id}${visit.job_id ? `&job_id=${visit.job_id}` : ""}${visit.job_property_id ? `&property_id=${visit.job_property_id}` : ""}`}
