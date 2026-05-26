@@ -230,3 +230,13 @@ export function IconPortal(props: IconProps) {
     </Icon>
   );
 }
+
+export function IconInbox(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3 8l7-5 7 5" />
+      <path d="M3 8v9a2 2 0 002 2h10a2 2 0 002-2V8" />
+      <path d="M3 14h4l1.5 2h3L13 14h4" />
+    </Icon>
+  );
+}

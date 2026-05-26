@@ -159,12 +159,13 @@ describe("getNavSections (role filtering)", () => {
   it("Work section has Intake, Jobs, Estimates, Invoices, Clients for admin role", () => {
     const sections = getNavSections("admin");
     const hrefs = sections[1].items.map((i) => i.href);
+    expect(hrefs).toContain("/app/inbox");
     expect(hrefs).toContain("/app/booking-requests");
     expect(hrefs).toContain("/app/jobs");
     expect(hrefs).toContain("/app/estimates");
     expect(hrefs).toContain("/app/invoices");
     expect(hrefs).toContain("/app/clients");
-    expect(hrefs).toHaveLength(5);
+    expect(hrefs).toHaveLength(6);
   });
 
   it("Manage section has Schedule, Automations, Reports for admin role", () => {
@@ -189,7 +190,7 @@ describe("getNavSections (role filtering)", () => {
   it("returns the same 3-section nav for owner role", () => {
     const sections = getNavSections("owner");
     expect(sections).toHaveLength(3);
-    expect(flattenSections(sections)).toHaveLength(10);
+    expect(flattenSections(sections)).toHaveLength(11);
   });
 
   it("returns only 2 items for tech role (My Day + On Site)", () => {

@@ -16,36 +16,40 @@ import type { TabDef } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-const TRIP_TYPE_LABELS: Record<string, string> = {
-  job:             "Job",
-  estimate:        "Estimate",
-  walkthrough:     "Walkthrough",
-  material_pickup: "Material Pickup",
-  personal:        "Personal",
-  mixed:           "Mixed",
-};
-
-interface MileageRow {
+interface ActivityRow {
   id: string;
-  trip_date: string;
+  entity_type: string;
+  entity_id: string | null;
+  label: string | null;
+  entity_title: string | null;
+}
+
+interface SessionRow {
+  id: string;
+  session_date: string;
   miles: string;
   start_odometer: number | null;
   end_odometer: number | null;
-  trip_type: string | null;
-  purpose: string | null;
   notes: string | null;
   vehicle_id: string | null;
   vehicle_nickname: string | null;
   vehicle_plate: string | null;
-  job_id: string | null;
-  job_title: string | null;
   created_by_name: string | null;
+  activities: ActivityRow[];
   [key: string]: unknown;
 }
 
 interface PageProps {
   searchParams: Promise<{ month?: string }>;
 }
+
+const ENTITY_TYPE_LABELS: Record<string, string> = {
+  job:          "Job",
+  visit:        "Visit",
+  estimate:     "Estimate",
+  supplier_run: "Supplier",
+  other:        "Other",
+};
 
 function currentMonth() {
   return new Date().toISOString().slice(0, 7);
@@ -72,30 +76,49 @@ export default async function MileagePage({ searchParams }: PageProps) {
 
   const [year, mon] = activeMonth.split("-");
   const monthLabel = new Date(parseInt(year), parseInt(mon) - 1, 1).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "long",
+    year: "numeric", month: "long",
   });
 
-  const logs = await query<MileageRow>(
-    `SELECT m.id, m.trip_date::text,
-            COALESCE(m.miles, m.end_odometer - m.start_odometer)::text AS miles,
-            m.start_odometer, m.end_odometer,
-            m.trip_type, m.purpose, m.notes,
-            m.vehicle_id, v.nickname AS vehicle_nickname, v.plate AS vehicle_plate,
-            m.job_id, j.title AS job_title, u.full_name AS created_by_name
-     FROM mileage_logs m
-     LEFT JOIN vehicles v ON v.id = m.vehicle_id
-     LEFT JOIN jobs j ON j.id = m.job_id
-     LEFT JOIN users u ON u.id = m.created_by
-     WHERE m.account_id = $1
-       AND to_char(m.trip_date, 'YYYY-MM') = $2
-     ORDER BY m.trip_date DESC, m.created_at DESC`,
+  const sessions = await query<SessionRow>(
+    `SELECT s.id, s.session_date::text,
+            COALESCE(s.miles, s.end_odometer - s.start_odometer) AS miles,
+            s.start_odometer, s.end_odometer, s.notes,
+            s.vehicle_id, v.nickname AS vehicle_nickname, v.plate AS vehicle_plate,
+            u.full_name AS created_by_name,
+            COALESCE(
+              json_agg(
+                json_build_object(
+                  'id',           a.id,
+                  'entity_type',  a.entity_type,
+                  'entity_id',    a.entity_id,
+                  'label',        a.label,
+                  'entity_title', CASE
+                    WHEN a.entity_type = 'job'      THEN j.title
+                    WHEN a.entity_type = 'visit'    THEN vi.title
+                    WHEN a.entity_type = 'estimate' THEN est.id_short
+                    ELSE a.label
+                  END
+                ) ORDER BY a.created_at
+              ) FILTER (WHERE a.id IS NOT NULL),
+              '[]'::json
+            ) AS activities
+     FROM vehicle_sessions s
+     LEFT JOIN vehicles v   ON v.id = s.vehicle_id
+     LEFT JOIN users u      ON u.id = s.created_by
+     LEFT JOIN vehicle_session_activities a ON a.session_id = s.id
+     LEFT JOIN jobs j        ON j.id = a.entity_id AND a.entity_type = 'job'
+     LEFT JOIN visits vi     ON vi.id = a.entity_id AND a.entity_type = 'visit'
+     LEFT JOIN estimates est ON est.id = a.entity_id AND a.entity_type = 'estimate'
+     WHERE s.account_id = $1
+       AND to_char(s.session_date, 'YYYY-MM') = $2
+     GROUP BY s.id, v.nickname, v.plate, u.full_name
+     ORDER BY s.session_date DESC, s.created_at DESC`,
     [session.accountId, activeMonth]
   );
 
-  const totalMiles = logs.reduce((sum, r) => sum + parseFloat(r.miles), 0);
-  const tripCount = logs.length;
-  const avgMiles = tripCount > 0 ? totalMiles / tripCount : 0;
+  const totalMiles = sessions.reduce((sum, r) => sum + parseFloat(r.miles), 0);
+  const sessionCount = sessions.length;
+  const avgMiles = sessionCount > 0 ? totalMiles / sessionCount : 0;
 
   const canManage = session.role === "owner" || session.role === "admin";
 
@@ -111,7 +134,7 @@ export default async function MileagePage({ searchParams }: PageProps) {
                 Vehicles
               </LinkButton>
               <LinkButton href={"/app/mileage/new" as Route} variant="primary" size="sm">
-                + Log Trip
+                + Log Session
               </LinkButton>
             </div>
           ) : undefined
@@ -123,15 +146,15 @@ export default async function MileagePage({ searchParams }: PageProps) {
       <MetricGrid
         metrics={[
           { label: "Total Miles", value: totalMiles.toFixed(1) },
-          { label: "Trips", value: String(tripCount) },
-          { label: "Avg per Trip", value: avgMiles > 0 ? avgMiles.toFixed(1) : "—" },
+          { label: "Sessions", value: String(sessionCount) },
+          { label: "Avg per Session", value: avgMiles > 0 ? avgMiles.toFixed(1) : "—" },
         ]}
       />
 
-      {logs.length === 0 ? (
+      {sessions.length === 0 ? (
         <EmptyState
-          title={`No trips logged for ${monthLabel}`}
-          description={canManage ? "Use the button above to log a trip." : "No mileage recorded this month."}
+          title={`No sessions logged for ${monthLabel}`}
+          description={canManage ? "Use the button above to log a vehicle session." : "No mileage recorded this month."}
           data-testid="mileage-empty"
         />
       ) : (
@@ -141,62 +164,81 @@ export default async function MileagePage({ searchParams }: PageProps) {
               <tr style={{ borderBottom: "1px solid var(--border)" }}>
                 <th style={{ textAlign: "left", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Date</th>
                 <th style={{ textAlign: "left", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Vehicle</th>
-                <th style={{ textAlign: "left", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Trip</th>
+                <th style={{ textAlign: "left", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Activities</th>
                 <th style={{ textAlign: "left", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Odometer</th>
                 <th style={{ textAlign: "right", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Miles</th>
               </tr>
             </thead>
             <tbody>
-              {logs.map((log) => (
-                <tr key={log.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                  <td style={{ padding: "var(--space-2) var(--space-3)", whiteSpace: "nowrap" }}>
-                    {new Date(log.trip_date + "T00:00:00").toLocaleDateString(undefined, {
+              {sessions.map((s) => (
+                <tr key={s.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                  <td style={{ padding: "var(--space-2) var(--space-3)", whiteSpace: "nowrap", verticalAlign: "top" }}>
+                    {new Date(s.session_date + "T00:00:00").toLocaleDateString(undefined, {
                       weekday: "short", month: "short", day: "numeric",
                     })}
                   </td>
-                  <td style={{ padding: "var(--space-2) var(--space-3)" }}>
-                    {log.vehicle_nickname ? (
+                  <td style={{ padding: "var(--space-2) var(--space-3)", verticalAlign: "top" }}>
+                    {s.vehicle_nickname ? (
                       <div>
-                        <div style={{ fontWeight: 600 }}>{log.vehicle_nickname}</div>
-                        {log.vehicle_plate && (
-                          <div style={{ fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--fg-muted)", letterSpacing: 1 }}>{log.vehicle_plate}</div>
+                        <div style={{ fontWeight: 600 }}>{s.vehicle_nickname}</div>
+                        {s.vehicle_plate && (
+                          <div style={{ fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--fg-muted)", letterSpacing: 1 }}>{s.vehicle_plate}</div>
                         )}
                       </div>
                     ) : (
                       <span style={{ color: "var(--fg-muted)" }}>—</span>
                     )}
                   </td>
-                  <td style={{ padding: "var(--space-2) var(--space-3)" }}>
-                    {log.trip_type && (
-                      <span style={{
-                        display: "inline-block",
-                        fontSize: "var(--text-xs)",
-                        fontWeight: 600,
-                        padding: "2px 8px",
-                        borderRadius: 99,
-                        background: "var(--accent-subtle, #eff6ff)",
-                        color: "var(--accent)",
-                        marginBottom: log.job_id || log.notes ? "var(--space-1)" : 0,
-                      }}>
-                        {TRIP_TYPE_LABELS[log.trip_type] ?? log.trip_type}
+                  <td style={{ padding: "var(--space-2) var(--space-3)", verticalAlign: "top" }}>
+                    {s.activities.length === 0 ? (
+                      <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+                        {s.notes ?? "—"}
                       </span>
-                    )}
-                    {log.job_id && (
-                      <div style={{ fontSize: "var(--text-xs)" }}>
-                        <Link href={`/app/jobs/${log.job_id}` as Route} style={{ color: "var(--accent)", textDecoration: "none" }}>
-                          {log.job_title ?? log.job_id.slice(0, 8)}
-                        </Link>
+                    ) : (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-1)" }}>
+                        {s.activities.map((a) => {
+                          const entityHref = a.entity_type === "job" && a.entity_id
+                            ? `/app/jobs/${a.entity_id}`
+                            : a.entity_type === "visit" && a.entity_id
+                            ? `/app/visits/${a.entity_id}`
+                            : a.entity_type === "estimate" && a.entity_id
+                            ? `/app/estimates/${a.entity_id}`
+                            : null;
+                          const chip = (
+                            <span style={{
+                              display: "inline-block",
+                              padding: "2px 6px",
+                              borderRadius: 99,
+                              fontSize: "var(--text-xs)",
+                              fontWeight: 500,
+                              background: "var(--surface-raised)",
+                              border: "1px solid var(--border)",
+                              color: "var(--fg)",
+                              whiteSpace: "nowrap",
+                            }}>
+                              <span style={{ color: "var(--fg-muted)" }}>{ENTITY_TYPE_LABELS[a.entity_type] ?? a.entity_type}:</span>{" "}
+                              {a.entity_title ?? a.label ?? "—"}
+                            </span>
+                          );
+                          return entityHref ? (
+                            <Link key={a.id} href={entityHref as Route} style={{ textDecoration: "none" }}>{chip}</Link>
+                          ) : (
+                            <span key={a.id}>{chip}</span>
+                          );
+                        })}
                       </div>
                     )}
-                    {log.notes && <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>{log.notes}</div>}
+                    {s.notes && s.activities.length > 0 && (
+                      <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginTop: "var(--space-1)" }}>{s.notes}</div>
+                    )}
                   </td>
-                  <td style={{ padding: "var(--space-2) var(--space-3)", fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--fg-muted)", whiteSpace: "nowrap" }}>
-                    {log.start_odometer != null && log.end_odometer != null
-                      ? `${log.start_odometer.toLocaleString()} → ${log.end_odometer.toLocaleString()}`
+                  <td style={{ padding: "var(--space-2) var(--space-3)", fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--fg-muted)", whiteSpace: "nowrap", verticalAlign: "top" }}>
+                    {s.start_odometer != null && s.end_odometer != null
+                      ? `${s.start_odometer.toLocaleString()} → ${s.end_odometer.toLocaleString()}`
                       : "—"}
                   </td>
-                  <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right", fontWeight: 700 }}>
-                    {parseFloat(log.miles).toFixed(1)}
+                  <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right", fontWeight: 700, verticalAlign: "top" }}>
+                    {parseFloat(s.miles).toFixed(1)}
                   </td>
                 </tr>
               ))}
