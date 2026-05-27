@@ -22,9 +22,12 @@ CREATE TABLE IF NOT EXISTS materials_price_book (
   updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
+-- Unique on (account, name, unit) so upsert on re-save works correctly
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mpb_account_name_unit
+  ON materials_price_book (account_id, lower(name), unit);
+
 CREATE INDEX IF NOT EXISTS idx_mpb_account          ON materials_price_book (account_id);
 CREATE INDEX IF NOT EXISTS idx_mpb_account_category ON materials_price_book (account_id, category);
-CREATE INDEX IF NOT EXISTS idx_mpb_account_name     ON materials_price_book (account_id, lower(name));
 
 DO $$
 BEGIN

@@ -97,7 +97,14 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
         `INSERT INTO materials_price_book
            (account_id, name, brand, category, unit, unit_cost_cents, supplier, sku, last_purchased_at, notes, created_by)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-         ON CONFLICT DO NOTHING
+         ON CONFLICT (account_id, lower(name), unit) DO UPDATE SET
+           unit_cost_cents   = EXCLUDED.unit_cost_cents,
+           brand             = COALESCE(EXCLUDED.brand, materials_price_book.brand),
+           supplier          = COALESCE(EXCLUDED.supplier, materials_price_book.supplier),
+           sku               = COALESCE(EXCLUDED.sku, materials_price_book.sku),
+           last_purchased_at = COALESCE(EXCLUDED.last_purchased_at, materials_price_book.last_purchased_at),
+           notes             = COALESCE(EXCLUDED.notes, materials_price_book.notes),
+           updated_at        = now()
          RETURNING *`,
         [
           session.accountId,

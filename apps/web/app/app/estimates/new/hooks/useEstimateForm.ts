@@ -113,7 +113,18 @@ export function useEstimateForm({
   const [laborHours, setLaborHours] = useState("");
   const [addedMaterials, setAddedMaterials] = useState<Set<string>>(new Set());
 
-  const [lineItems, setLineItems] = useState<LineItemRow[]>([{ ...EMPTY_ROW }]);
+  const [lineItems, setLineItems] = useState<LineItemRow[]>(() => {
+    if (typeof window === "undefined") return [{ ...EMPTY_ROW }];
+    try {
+      const raw = window.sessionStorage.getItem("estimate_prefill_materials");
+      if (raw) {
+        const parsed = JSON.parse(raw) as LineItemRow[];
+        window.sessionStorage.removeItem("estimate_prefill_materials");
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch { /* ignore parse errors */ }
+    return [{ ...EMPTY_ROW }];
+  });
 
   const [tripCount, setTripCount] = useState<"one_trip" | "multi_trip">("one_trip");
   const [requiresDryingOrCuring, setRequiresDryingOrCuring] = useState(false);

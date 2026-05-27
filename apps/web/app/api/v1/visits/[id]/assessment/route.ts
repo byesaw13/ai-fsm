@@ -153,6 +153,13 @@ export const PUT = withAuth(async (request: NextRequest, session: AuthSession) =
         { status: 403 }
       );
     }
+    if (visit.visit_type !== "site_visit") {
+      await client.query("ROLLBACK");
+      return NextResponse.json(
+        { error: { code: "CONFLICT", message: "Assessments can only be attached to site visits", traceId: session.traceId } },
+        { status: 409 }
+      );
+    }
 
     const d = parsed.data;
     const { rows } = await client.query(
