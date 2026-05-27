@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
+import { QuickBookModal } from "./QuickBookModal";
 
 export interface VisitRow {
   id: string;
@@ -197,6 +198,7 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [dropError, setDropError] = useState<string | null>(null);
+  const [quickBookDate, setQuickBookDate] = useState<string | null>(null);
   const visitsRef = useRef(visits);
 
   useEffect(() => {
@@ -326,10 +328,13 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
                 <div style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: isToday ? "#fff" : "var(--fg)", marginTop: 2 }}>{dayDate.getDate()}</div>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                {dayVisits.length === 0
-                  ? <div style={{ height: 40, borderRadius: 6, border: "1px dashed var(--border)", opacity: 0.4 }} />
-                  : dayVisits.map(v => <VisitCard key={v.id} visit={v} isAdmin={isAdmin} isDragging={draggingId === v.id} onDragStart={handleDragStart} onDragEnd={handleDragEnd} />)
-                }
+                {dayVisits.map(v => <VisitCard key={v.id} visit={v} isAdmin={isAdmin} isDragging={draggingId === v.id} onDragStart={handleDragStart} onDragEnd={handleDragEnd} />)}
+                {isAdmin && (
+                  <button type="button" onClick={() => setQuickBookDate(dayStr)} style={{ height: dayVisits.length === 0 ? 40 : 28, borderRadius: 6, border: "1px dashed var(--border)", background: "none", cursor: "pointer", color: "var(--fg-muted)", fontSize: "var(--text-xs)", opacity: 0.6, transition: "opacity 0.1s" }} onMouseEnter={e => (e.currentTarget.style.opacity = "1")} onMouseLeave={e => (e.currentTarget.style.opacity = "0.6")}>
+                    + Book
+                  </button>
+                )}
+                {!isAdmin && dayVisits.length === 0 && <div style={{ height: 40, borderRadius: 6, border: "1px dashed var(--border)", opacity: 0.4 }} />}
               </div>
             </DayCell>
           );
@@ -358,8 +363,13 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
               const isToday = dayStr === todayStr;
               const dayVisits = byDate.get(dayStr) ?? [];
               return (
-                <DayCell key={ci} dateStr={dayStr} isDropTarget={dropTarget === dayStr} isDragging={draggingId !== null} style={{ minHeight: 90, border: `1px solid var(--border)`, borderRadius: 6, padding: "var(--space-1)", background: isToday ? "rgba(37,99,235,0.04)" : "#fff" }} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
-                  <div style={{ fontSize: "var(--text-xs)", fontWeight: isToday ? 700 : 500, color: isToday ? "var(--accent)" : "var(--fg)", marginBottom: 3 }}>{day.getDate()}</div>
+                <DayCell key={ci} dateStr={dayStr} isDropTarget={dropTarget === dayStr} isDragging={draggingId !== null} style={{ minHeight: 90, border: `1px solid var(--border)`, borderRadius: 6, padding: "var(--space-1)", background: isToday ? "rgba(37,99,235,0.04)" : "#fff", cursor: isAdmin ? "default" : undefined }} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 3 }}>
+                    <div style={{ fontSize: "var(--text-xs)", fontWeight: isToday ? 700 : 500, color: isToday ? "var(--accent)" : "var(--fg)" }}>{day.getDate()}</div>
+                    {isAdmin && (
+                      <button type="button" onClick={() => setQuickBookDate(dayStr)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg-muted)", fontSize: 14, lineHeight: 1, padding: "0 2px", opacity: 0.5 }} onMouseEnter={e => (e.currentTarget.style.opacity = "1")} onMouseLeave={e => (e.currentTarget.style.opacity = "0.5")} title="Quick book">+</button>
+                    )}
+                  </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                     {dayVisits.slice(0, 3).map(v => <VisitCard key={v.id} visit={v} isAdmin={isAdmin} isDragging={draggingId === v.id} compact onDragStart={handleDragStart} onDragEnd={handleDragEnd} />)}
                     {dayVisits.length > 3 && (
@@ -470,8 +480,15 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
 
       {isAdmin && view !== "year" && draggingId === null && (
         <p style={{ marginTop: "var(--space-3)", fontSize: "var(--text-xs)", color: "var(--fg-muted)", textAlign: "center" }}>
-          Drag visits to reschedule
+          Drag visits to reschedule · Click + to quick book
         </p>
+      )}
+
+      {quickBookDate && (
+        <QuickBookModal
+          initialDate={quickBookDate}
+          onClose={() => setQuickBookDate(null)}
+        />
       )}
     </div>
   );
