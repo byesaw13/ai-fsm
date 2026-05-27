@@ -258,7 +258,6 @@ export default async function VisitDetailPage({
   // Tech on scheduled/arrived gets the transition card moved to the top
   const showTransitionEarly =
     canTransition &&
-    session.role === "tech" &&
     (currentStatus === "scheduled" || currentStatus === "arrived");
 
   // pg returns timestamptz as Date objects — normalise to ISO strings throughout
