@@ -33,11 +33,13 @@ export default async function AssessmentPage({
     scheduled_start: string | Date;
     job_id: string | null;
     job_title: string | null;
+    job_client_id: string | null;
+    job_property_id: string | null;
     [key: string]: unknown;
   }>(
     session,
     `SELECT v.id, v.visit_type, v.status, v.assigned_user_id, v.scheduled_start, v.job_id,
-            j.title AS job_title
+            j.title AS job_title, j.client_id AS job_client_id, j.property_id AS job_property_id
      FROM visits v
      LEFT JOIN jobs j ON j.id = v.job_id
      WHERE v.id = $1 AND v.account_id = $2`,
@@ -86,7 +88,10 @@ export default async function AssessmentPage({
       <Card>
         <AssessmentForm
           visitId={id}
+          jobId={visit.job_id}
           jobTitle={visit.job_title}
+          clientId={visit.job_client_id}
+          propertyId={visit.job_property_id}
           initialAssessment={assessment}
           initialPhotos={photos}
           canEdit={canEdit}

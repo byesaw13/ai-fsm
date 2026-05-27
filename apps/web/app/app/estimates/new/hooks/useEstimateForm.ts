@@ -264,6 +264,10 @@ export function useEstimateForm({
     setLineItems((prev) => [...prev, { ...EMPTY_ROW }]);
   }
 
+  function addBulkLineItems(items: LineItemRow[]) {
+    setLineItems((prev) => [...prev.filter((r) => r.description.trim()), ...items]);
+  }
+
   function removeLineItem(index: number) {
     setLineItems((prev) => prev.filter((_, i) => i !== index));
   }
@@ -624,7 +628,7 @@ export function useEstimateForm({
     handleJobCreated,
     handlePropertyCreated,
     handleModeChange,
-    addLineItem, removeLineItem, updateLineItem,
+    addLineItem, addBulkLineItems, removeLineItem, updateLineItem,
     updateTier, addTierLineItem, removeTierLineItem, updateTierLineItem, tierSubtotalCents,
     handleAddMaterial,
     advanceStep, goBack,

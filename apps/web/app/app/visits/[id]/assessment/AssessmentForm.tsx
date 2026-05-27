@@ -3,6 +3,8 @@
 import { useState, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { MaterialsGenerator } from "@/app/app/estimates/components/MaterialsGenerator";
+import type { MaterialItem } from "@/app/app/estimates/components/MaterialsGenerator";
 
 export interface Room {
   id: string;
@@ -34,7 +36,10 @@ export interface Assessment {
 
 interface Props {
   visitId: string;
+  jobId: string | null;
   jobTitle: string | null;
+  clientId: string | null;
+  propertyId: string | null;
   initialAssessment: Assessment | null;
   initialPhotos: PhotoMeta[];
   canEdit: boolean;
@@ -51,7 +56,7 @@ function newRoom(): Room {
   return { id: crypto.randomUUID(), name: "", length_ft: null, width_ft: null, height_ft: null, notes: "" };
 }
 
-export function AssessmentForm({ visitId, jobTitle, initialAssessment, initialPhotos, canEdit }: Props) {
+export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId, initialAssessment, initialPhotos, canEdit }: Props) {
   const router = useRouter();
   const [rooms, setRooms] = useState<Room[]>(
     initialAssessment?.rooms?.length ? initialAssessment.rooms : [newRoom()]
@@ -68,6 +73,7 @@ export function AssessmentForm({ visitId, jobTitle, initialAssessment, initialPh
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [showMaterials, setShowMaterials] = useState(false);
 
   const totalSqft = calcTotalSqft(rooms);
 
@@ -422,6 +428,43 @@ export function AssessmentForm({ visitId, jobTitle, initialAssessment, initialPh
           <p style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", margin: 0 }}>
             No photos yet. Use the camera button to capture measurements and site conditions.
           </p>
+        )}
+      </section>
+
+      {/* Materials Generator */}
+      <section style={{ paddingTop: "var(--space-2)", borderTop: "1px solid var(--border)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: showMaterials ? "var(--space-3)" : 0 }}>
+          <h3 style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 600 }}>Materials List</h3>
+          {!showMaterials && (
+            <button
+              type="button"
+              onClick={() => setShowMaterials(true)}
+              className="p7-btn p7-btn-ghost p7-btn-sm"
+            >
+              Generate Materials →
+            </button>
+          )}
+        </div>
+        {showMaterials && (
+          <MaterialsGenerator
+            initialScope={scopeNotes}
+            rooms={rooms}
+            onAddToEstimate={(matItems: MaterialItem[]) => {
+              const params = new URLSearchParams();
+              if (clientId) params.set("client_id", clientId);
+              if (jobId) params.set("job_id", jobId);
+              if (propertyId) params.set("property_id", propertyId);
+              // Store generated materials in sessionStorage for the estimate form to pick up
+              const lineItems = matItems.map((m) => ({
+                description: `${m.name}${m.brand ? ` (${m.brand})` : ""} — ${m.quantity} ${m.unit}`,
+                quantity: "1",
+                unit_price: (m.total_cost_cents / 100).toFixed(2),
+              }));
+              sessionStorage.setItem("estimate_prefill_materials", JSON.stringify(lineItems));
+              router.push(`/app/estimates/new?${params.toString()}&from_assessment=1`);
+            }}
+            onClose={() => setShowMaterials(false)}
+          />
         )}
       </section>
 
