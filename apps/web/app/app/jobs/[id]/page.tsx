@@ -354,18 +354,14 @@ export default async function JobDetailPage({
 
           {/* Status Transitions — admin/owner only */}
           {canTransition && allowedTransitions.length > 0 && (
-            <AdvancedDetails title="Manual Status Override">
-              <Card data-testid="job-transition-panel">
-                <p style={{ marginTop: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-                  Use these only when the procedural action above does not fit the real-world state.
-                </p>
-                <JobTransitionForm
-                  jobId={job.id}
-                  allowedTransitions={allowedTransitions as JobStatus[]}
-                  statusLabels={JOB_STATUS_LABELS}
-                />
-              </Card>
-            </AdvancedDetails>
+            <Card data-testid="job-transition-panel">
+              <SectionHeader title="Close Out Job" />
+              <JobTransitionForm
+                jobId={job.id}
+                allowedTransitions={allowedTransitions as JobStatus[]}
+                statusLabels={JOB_STATUS_LABELS}
+              />
+            </Card>
           )}
 
           {/* Danger Zone — owner only, draft only */}

@@ -258,7 +258,6 @@ export default async function VisitDetailPage({
   // Tech on scheduled/arrived gets the transition card moved to the top
   const showTransitionEarly =
     canTransition &&
-    session.role === "tech" &&
     (currentStatus === "scheduled" || currentStatus === "arrived");
 
   // pg returns timestamptz as Date objects — normalise to ISO strings throughout
@@ -398,17 +397,20 @@ export default async function VisitDetailPage({
                   visit.membership_snapshot_sent_at ? toISO(visit.membership_snapshot_sent_at) : null
                 }
               />
+              {currentStatus === "scheduled" && (
+                <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-3)", borderTop: "1px solid var(--border)" }}>
+                  <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                    Optional — let the client know you&apos;re heading over:
+                  </p>
+                  <OnMyWayButton visitId={visit.id} />
+                </div>
+              )}
             </Card>
           )}
 
           <Card id="visit-timeline">
             <SectionHeader title="Visit Timeline" />
             <Timeline entries={timelineEntries} />
-            {currentStatus === "scheduled" && (
-              <div style={{ marginTop: "var(--space-4)" }}>
-                <OnMyWayButton visitId={visit.id} />
-              </div>
-            )}
           </Card>
 
           {/* ── Membership visit: phase stepper + labor cap ── */}
