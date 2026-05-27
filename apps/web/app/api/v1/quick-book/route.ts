@@ -78,10 +78,10 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       clientId = rows[0].id;
     } else {
       const { rows } = await client.query<{ id: string }>(
-        `INSERT INTO clients (account_id, name, created_by)
-         VALUES ($1, $2, $3)
+        `INSERT INTO clients (account_id, name)
+         VALUES ($1, $2)
          RETURNING id`,
-        [session.accountId, d.client_name!, session.userId]
+        [session.accountId, d.client_name!]
       );
       clientId = rows[0].id;
       await appendAuditLog(client, {
