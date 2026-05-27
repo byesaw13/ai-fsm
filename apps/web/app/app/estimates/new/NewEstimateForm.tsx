@@ -76,7 +76,7 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
     handleAddSuggestion,
     handleSkipSuggestion,
     handleModeChange,
-    addLineItem, removeLineItem, updateLineItem,
+    addLineItem, addBulkLineItems, removeLineItem, updateLineItem,
     updateTier, addTierLineItem, removeTierLineItem, updateTierLineItem,
     tierSubtotalCents,
     handleAddMaterial,
@@ -198,6 +198,7 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
           handleAddMaterial={handleAddMaterial}
           lineItems={lineItems}
           addLineItem={addLineItem}
+          addBulkLineItems={addBulkLineItems}
           removeLineItem={removeLineItem}
           updateLineItem={updateLineItem}
           scopeMaterialsTotalCents={scopeMaterialsTotalCents}

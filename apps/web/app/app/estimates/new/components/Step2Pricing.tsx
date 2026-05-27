@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Button, Card, Input, SectionHeader, Textarea } from "@/components/ui";
+import { MaterialsGenerator } from "../../components/MaterialsGenerator";
 import { PriceBookSelector } from "@/components/PriceBookSelector";
 import { ScopeBuilder } from "@/components/ScopeBuilder";
 import { getMaterialsByCategory, type MaterialSuggestion } from "@ai-fsm/domain";
@@ -84,6 +86,7 @@ interface Step2Props {
   // Line items
   lineItems: LineItemRow[];
   addLineItem: () => void;
+  addBulkLineItems: (items: LineItemRow[]) => void;
   removeLineItem: (index: number) => void;
   updateLineItem: (index: number, field: keyof LineItemRow, value: string) => void;
   // Totals
@@ -117,13 +120,14 @@ export function Step2Pricing({
   suggestions, setSuggestions, bundleCategories, hasLegalFlagSuggestions,
   handleAddSuggestion, handleSkipSuggestion,
   resolvedJobType, addedMaterials, handleAddMaterial,
-  lineItems, addLineItem, removeLineItem, updateLineItem,
+  lineItems, addLineItem, addBulkLineItems, removeLineItem, updateLineItem,
   scopeMaterialsTotalCents, materialHandlingCents,
   genericSubtotalCents, guardrailAdjustmentCents, genericTaxCents, genericTotalCents,
   depositCents, balanceDueCents,
   taxRate, setTaxRate,
   lineTotal,
 }: Step2Props) {
+  const [showMaterialsGen, setShowMaterialsGen] = useState(false);
   return (
     <div className="p7-form-stack">
       {/* Painting Estimator */}
@@ -680,6 +684,36 @@ export function Step2Pricing({
                   onAdd={addLineItem}
                   onRemove={removeLineItem}
                 />
+
+                {/* Materials Generator */}
+                {showMaterialsGen ? (
+                  <div style={{ marginTop: "var(--space-3)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
+                    <MaterialsGenerator
+                      onAddToEstimate={(matItems) => {
+                        addBulkLineItems(
+                          matItems.map((m) => ({
+                            description: `${m.name}${m.brand ? ` (${m.brand})` : ""} — ${m.quantity} ${m.unit}`,
+                            quantity: "1",
+                            unit_price: (m.total_cost_cents / 100).toFixed(2),
+                          }))
+                        );
+                        setShowMaterialsGen(false);
+                      }}
+                      onClose={() => setShowMaterialsGen(false)}
+                    />
+                  </div>
+                ) : (
+                  <div style={{ marginTop: "var(--space-2)" }}>
+                    <button
+                      type="button"
+                      onClick={() => setShowMaterialsGen(true)}
+                      disabled={pending}
+                      className="p7-btn p7-btn-ghost p7-btn-sm"
+                    >
+                      Generate Materials List →
+                    </button>
+                  </div>
+                )}
               </>
             )}
 
