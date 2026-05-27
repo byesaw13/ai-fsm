@@ -7,6 +7,14 @@ import { Button, ConfirmDialog } from "@/components/ui";
 
 const DANGER_TRANSITIONS: JobStatus[] = ["cancelled"];
 
+const ACTION_LABELS: Partial<Record<JobStatus, string>> = {
+  completed:  "Mark Job Complete",
+  invoiced:   "Mark as Invoiced",
+  cancelled:  "Cancel Job",
+  scheduled:  "Mark as Scheduled",
+  in_progress: "Mark In Progress",
+};
+
 interface Props {
   jobId: string;
   allowedTransitions: JobStatus[];
@@ -72,11 +80,11 @@ export function JobTransitionForm({ jobId, allowedTransitions, statusLabels }: P
             key={status}
             onClick={() => handleTransition(status)}
             disabled={loading}
-            variant={DANGER_TRANSITIONS.includes(status) ? "danger" : "secondary"}
+            variant={DANGER_TRANSITIONS.includes(status) ? "danger" : status === "completed" ? "primary" : "secondary"}
             size="sm"
             data-testid={`transition-btn-${status}`}
           >
-            {loading ? "Updating…" : `→ ${statusLabels[status]}`}
+            {loading ? "Updating…" : ACTION_LABELS[status] ?? `→ ${statusLabels[status]}`}
           </Button>
         ))}
       </div>

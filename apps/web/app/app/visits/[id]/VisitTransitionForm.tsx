@@ -132,14 +132,23 @@ export function VisitTransitionForm({
   }
 
   // ── Admin / owner view ─────────────────────────────────────────────────────
-  // Admins can see the timeline but should not be advancing status on behalf
-  // of a tech.  The only override available is cancelling the visit.
+  // Owners/admins often do the work themselves — give them the same progression
+  // buttons as a tech, plus the cancel option.
   if (currentStatus === "scheduled" || currentStatus === "arrived" || currentStatus === "in_progress") {
+    const action = TECH_ACTIONS[currentStatus];
     return (
-      <div data-testid="visit-transition-buttons">
-        <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-          Status updates are made by the assigned technician.
-        </p>
+      <div data-testid="visit-transition-buttons" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+        {action && (
+          <Button
+            onClick={() => transition(action.next)}
+            disabled={loading}
+            variant={action.variant}
+            style={{ width: "100%", padding: "var(--space-4)", fontSize: "var(--text-lg)" }}
+            data-testid={`visit-transition-btn-${action.next}`}
+          >
+            {loading ? "Updating…" : action.label}
+          </Button>
+        )}
         <Button
           onClick={() => transition("cancelled")}
           disabled={loading}
@@ -147,7 +156,7 @@ export function VisitTransitionForm({
           size="sm"
           data-testid="visit-transition-btn-cancelled"
         >
-          {loading ? "Cancelling…" : "Cancel Visit"}
+          Cancel Visit
         </Button>
       </div>
     );
