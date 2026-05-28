@@ -94,8 +94,8 @@ export default async function MileagePage({ searchParams }: PageProps) {
                   'label',        a.label,
                   'entity_title', CASE
                     WHEN a.entity_type = 'job'      THEN j.title
-                    WHEN a.entity_type = 'visit'    THEN vi.title
-                    WHEN a.entity_type = 'estimate' THEN est.id_short
+                    WHEN a.entity_type = 'visit'    THEN COALESCE(a.label, vj.title)
+                    WHEN a.entity_type = 'estimate' THEN COALESCE(a.label, ej.title)
                     ELSE a.label
                   END
                 ) ORDER BY a.created_at
@@ -106,9 +106,11 @@ export default async function MileagePage({ searchParams }: PageProps) {
      LEFT JOIN vehicles v   ON v.id = s.vehicle_id
      LEFT JOIN users u      ON u.id = s.created_by
      LEFT JOIN vehicle_session_activities a ON a.session_id = s.id
-     LEFT JOIN jobs j        ON j.id = a.entity_id AND a.entity_type = 'job'
-     LEFT JOIN visits vi     ON vi.id = a.entity_id AND a.entity_type = 'visit'
+     LEFT JOIN jobs j        ON j.id = a.entity_id   AND a.entity_type = 'job'
+     LEFT JOIN visits vi     ON vi.id = a.entity_id  AND a.entity_type = 'visit'
+     LEFT JOIN jobs vj       ON vj.id = vi.job_id
      LEFT JOIN estimates est ON est.id = a.entity_id AND a.entity_type = 'estimate'
+     LEFT JOIN jobs ej       ON ej.id = est.job_id
      WHERE s.account_id = $1
        AND to_char(s.session_date, 'YYYY-MM') = $2
      GROUP BY s.id, v.nickname, v.plate, u.full_name
