@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/middleware";
 import { query } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import type { ScopeTemplate, ScopeComponent, ComplexityFactor, ProfitabilityRule, ScopeComponentOption, ServiceMaterial } from "@ai-fsm/domain";
+import type { ScopeTemplate, ScopeComponent, ComplexityFactor, ProfitabilityRule, ScopeComponentOption, ServiceMaterial, ProductionRate, ProductionRateModifier } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +70,25 @@ interface MaterialRow {
   [key: string]: unknown;
 }
 
+interface ProductionRateRow {
+  id: string;
+  service_code: string;
+  scope_component_key: string;
+  base_rate: string;
+  rate_unit: string;
+  notes: string | null;
+  [key: string]: unknown;
+}
+
+interface ProductionRateModifierRow {
+  id: string;
+  service_code: string;
+  complexity_factor_key: string;
+  modifier_pct: string;
+  notes: string | null;
+  [key: string]: unknown;
+}
+
 // GET /api/v1/scope-templates — returns all templates with components and factors
 // Optional ?category=<category> to fetch a single template
 export const GET = withAuth(async (request: NextRequest, session) => {
@@ -97,7 +116,15 @@ export const GET = withAuth(async (request: NextRequest, session) => {
     const categories = templates.map((t) => t.category);
     const catPlaceholders = categories.map((_, i) => `$${i + 1}`).join(", ");
 
-    const [components, factors, rules, materials] = await Promise.all([
+    // Codes for the categories in scope — used to fetch production rates
+    const categoryCodes = await query<{ code: string }>(
+      `SELECT code FROM price_book WHERE category IN (${catPlaceholders})`,
+      categories
+    );
+    const codes = categoryCodes.map((r) => r.code);
+    const codePlaceholders = codes.length > 0 ? codes.map((_, i) => `$${i + 1}`).join(", ") : "NULL";
+
+    const [components, factors, rules, materials, productionRates, productionModifiers] = await Promise.all([
       query<ComponentRow>(
         `SELECT id, template_id, key, label, unit, input_type, options::text, required, sort_order
          FROM scope_components
@@ -131,6 +158,22 @@ export const GET = withAuth(async (request: NextRequest, session) => {
          ORDER BY category, sort_order ASC`,
         categories
       ),
+      codes.length > 0
+        ? query<ProductionRateRow>(
+            `SELECT id, service_code, scope_component_key, base_rate::float, rate_unit, notes
+             FROM production_rates
+             WHERE service_code IN (${codePlaceholders})`,
+            codes
+          )
+        : Promise.resolve([] as ProductionRateRow[]),
+      codes.length > 0
+        ? query<ProductionRateModifierRow>(
+            `SELECT id, service_code, complexity_factor_key, modifier_pct::float, notes
+             FROM production_rate_modifiers
+             WHERE service_code IN (${codePlaceholders})`,
+            codes
+          )
+        : Promise.resolve([] as ProductionRateModifierRow[]),
     ]);
 
     // Build profitability rules — dedupe by id
@@ -190,15 +233,34 @@ export const GET = withAuth(async (request: NextRequest, session) => {
       sort_order: m.sort_order,
     }));
 
+    const assembledProductionRates: ProductionRate[] = productionRates.map((r) => ({
+      id: r.id,
+      service_code: r.service_code,
+      scope_component_key: r.scope_component_key,
+      base_rate: Number(r.base_rate),
+      rate_unit: r.rate_unit as ProductionRate["rate_unit"],
+      notes: r.notes,
+    }));
+
+    const assembledProductionModifiers: ProductionRateModifier[] = productionModifiers.map((m) => ({
+      id: m.id,
+      service_code: m.service_code,
+      complexity_factor_key: m.complexity_factor_key,
+      modifier_pct: Number(m.modifier_pct),
+      notes: m.notes,
+    }));
+
     if (category) {
       return NextResponse.json({
         template: assembled[0] ?? null,
         profitability_rules: profitabilityRules,
         materials: assembledMaterials.filter((m) => m.category === category),
+        production_rates: assembledProductionRates,
+        production_rate_modifiers: assembledProductionModifiers,
       });
     }
 
-    return NextResponse.json({ templates: assembled, profitability_rules: profitabilityRules, materials: assembledMaterials });
+    return NextResponse.json({ templates: assembled, profitability_rules: profitabilityRules, materials: assembledMaterials, production_rates: assembledProductionRates, production_rate_modifiers: assembledProductionModifiers });
   } catch (error) {
     logger.error("[scope-templates GET]", error, { traceId: session.traceId });
     return NextResponse.json(

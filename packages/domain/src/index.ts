@@ -19,3 +19,5 @@ export {
   SUB_STATUS_LABELS,
 } from "./sub-statuses";
 export type { JobSubStatus, VisitSubStatus } from "./sub-statuses";
+export { computeLaborDays, formatLaborEstimate } from "./production";
+export type { ProductionRate, ProductionRateModifier, LaborEstimate } from "./production";

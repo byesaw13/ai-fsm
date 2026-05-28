@@ -15,10 +15,12 @@ import {
   computeMaterials,
   groupMaterialsBySection,
 } from "@ai-fsm/domain";
-import type { ServiceMaterial, ComputedMaterial } from "@ai-fsm/domain";
+import type { ServiceMaterial, ComputedMaterial, ProductionRate, ProductionRateModifier, LaborEstimate } from "@ai-fsm/domain";
+import { computeLaborDays, formatLaborEstimate } from "@ai-fsm/domain";
 
 interface ScopeBuilderProps {
   category: string;
+  serviceCode?: string;
   basePriceCents: number;
   onChange: (result: ScopeBuilderResult) => void;
   initialScopeValues?: ScopeComponentValues;
@@ -34,6 +36,7 @@ export interface ScopeBuilderResult {
   violations: { label: string; actual: number; required: number; rule_type: string }[];
   materials: ComputedMaterial[];
   materialTotalCents: number;
+  laborEstimate: LaborEstimate | null;
 }
 
 function formatDollars(cents: number): string {
@@ -195,10 +198,12 @@ function ComplexityFactorRow({
   );
 }
 
-export function ScopeBuilder({ category, basePriceCents, onChange, initialScopeValues, initialComplexityFactors }: ScopeBuilderProps) {
+export function ScopeBuilder({ category, serviceCode, basePriceCents, onChange, initialScopeValues, initialComplexityFactors }: ScopeBuilderProps) {
   const [template, setTemplate] = useState<ScopeTemplate | null>(null);
   const [rules, setRules] = useState<ProfitabilityRule[]>([]);
   const [materialRules, setMaterialRules] = useState<ServiceMaterial[]>([]);
+  const [productionRates, setProductionRates] = useState<ProductionRate[]>([]);
+  const [productionModifiers, setProductionModifiers] = useState<ProductionRateModifier[]>([]);
   const [loading, setLoading] = useState(true);
   const [components, setComponents] = useState<ScopeComponentValues>({});
   const [complexity, setComplexity] = useState<ComplexityValues>({});
@@ -210,11 +215,13 @@ export function ScopeBuilder({ category, basePriceCents, onChange, initialScopeV
     setLoading(true);
     fetch(`/api/v1/scope-templates?category=${encodeURIComponent(category)}`)
       .then((r) => r.json())
-      .then((data: { template: ScopeTemplate | null; profitability_rules: ProfitabilityRule[]; materials: ServiceMaterial[] }) => {
+      .then((data: { template: ScopeTemplate | null; profitability_rules: ProfitabilityRule[]; materials: ServiceMaterial[]; production_rates?: ProductionRate[]; production_rate_modifiers?: ProductionRateModifier[] }) => {
         if (cancelled) return;
         setTemplate(data.template);
         setRules(data.profitability_rules ?? []);
         setMaterialRules(data.materials ?? []);
+        setProductionRates(data.production_rates ?? []);
+        setProductionModifiers(data.production_rate_modifiers ?? []);
         if (data.template) {
           const init: ScopeComponentValues = {};
           for (const c of data.template.components) {
@@ -243,8 +250,8 @@ export function ScopeBuilder({ category, basePriceCents, onChange, initialScopeV
     return () => { cancelled = true; };
   }, [category]);
 
-  const { multiplier, adderCents, adjustedPriceCents, violations, computedMaterials, materialTotalCents } = useMemo(() => {
-    if (!template) return { multiplier: 1.0, adderCents: 0, adjustedPriceCents: basePriceCents, violations: [], computedMaterials: [], materialTotalCents: 0 };
+  const { multiplier, adderCents, adjustedPriceCents, violations, computedMaterials, materialTotalCents, laborEstimate } = useMemo(() => {
+    if (!template) return { multiplier: 1.0, adderCents: 0, adjustedPriceCents: basePriceCents, violations: [], computedMaterials: [], materialTotalCents: 0, laborEstimate: null };
 
     const mod = computeScopeModifier(template.complexity_factors, complexity);
     const adjusted = Math.round(basePriceCents * mod.multiplier) + mod.adderCents;
@@ -260,6 +267,12 @@ export function ScopeBuilder({ category, basePriceCents, onChange, initialScopeV
     const mats = computeMaterials(materialRules, components, complexity);
     const matTotal = mats.reduce((sum, m) => sum + m.total_cost_cents, 0);
 
+    const activeComplexityKeys = Object.entries(complexity).filter(([, v]) => v).map(([k]) => k);
+    const rate = serviceCode ? productionRates.find((r) => r.service_code === serviceCode) ?? null : null;
+    const labor = rate
+      ? computeLaborDays(rate, productionModifiers, components as Record<string, string | number | boolean | null>, activeComplexityKeys)
+      : null;
+
     return {
       multiplier: mod.multiplier,
       adderCents: mod.adderCents,
@@ -272,12 +285,13 @@ export function ScopeBuilder({ category, basePriceCents, onChange, initialScopeV
       })),
       computedMaterials: mats,
       materialTotalCents: matTotal,
+      laborEstimate: labor,
     };
-  }, [template, complexity, components, basePriceCents, rules, category, materialRules]);
+  }, [template, complexity, components, basePriceCents, rules, category, materialRules, productionRates, productionModifiers, serviceCode]);
 
   // Notify parent on changes
   useEffect(() => {
-    onChange({ components, complexity, multiplier, adderCents, adjustedPriceCents, violations, materials: computedMaterials, materialTotalCents });
+    onChange({ components, complexity, multiplier, adderCents, adjustedPriceCents, violations, materials: computedMaterials, materialTotalCents, laborEstimate });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [components, complexity, multiplier, adderCents, adjustedPriceCents, computedMaterials, materialTotalCents]);
 
@@ -451,6 +465,30 @@ export function ScopeBuilder({ category, basePriceCents, onChange, initialScopeV
               )}
             </div>
           </div>
+
+          {/* Labor estimate from production anchor */}
+          {laborEstimate && (
+            <div style={{
+              marginTop: "var(--space-2)",
+              padding: "var(--space-2) var(--space-3)",
+              background: "var(--bg-subtle)",
+              borderRadius: "var(--radius)",
+              border: "1px solid var(--border)",
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--space-2)",
+            }}>
+              <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--fg-muted)", flexShrink: 0 }}>
+                Labor estimate:
+              </span>
+              <span style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                {formatLaborEstimate(laborEstimate)}
+              </span>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                ({laborEstimate.quantity} {laborEstimate.rate_unit.includes("sqft") ? "sqft" : "units"} ÷ {laborEstimate.adjusted_rate.toFixed(0)} {laborEstimate.rate_unit.replace("_", " ")})
+              </span>
+            </div>
+          )}
 
           {/* Profitability Violations */}
           {violations.length > 0 && (
