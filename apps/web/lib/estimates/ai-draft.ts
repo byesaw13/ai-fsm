@@ -44,9 +44,29 @@ const SYSTEM_PROMPT = `You are an estimating assistant for Dovetails Services LL
 - Licensing: MA requires licensed trades for certain work; items marked [MA:gray] or [MA:restricted] should be noted in confidence_notes
 - Items marked [QUOTE] require an on-site assessment — include them in services but note this in confidence_notes
 
+## Trade context — detect primary trade before selecting services
+Before selecting services, identify the primary trade category from the description:
+
+**FLOORING trade**: Any mention of LVP, vinyl plank, hardwood, laminate, carpet, or subfloor work (concrete skim coat, self-leveling, grinding, floor prep, substrate leveling). When FLOORING is the primary trade:
+- "skim coat" or "feather finish" = concrete subfloor prep → use 9011, NOT 9002 or 1004
+- "substrate prep" or "leveling" = floor leveling → use 9011 or 9012, NOT drywall services
+- "bump-outs", "posts", "columns" = layout complexity → apply complex_layout factor on 9010
+- Cure cycle between floor prep and flooring install → set trip_count = "multi_trip", requires_drying_or_curing = true, and apply multi_trip_cure factor; describe the two-visit sequence in confidence_notes
+- LVP install → 9010; floor prep/skim coat → 9011; self-leveling compound → 9012; removal → 9013
+
+Only classify "skim coat" as drywall finishing (9002 / 1004) when the surrounding context is clearly wall or ceiling work with no flooring mentioned.
+
+**UNKNOWN trade**: If the job does not match any catalog service:
+- Use code 9099 (Custom / uncatalogued service)
+- In the estimate notes, write a detailed description of what the work involves
+- In confidence_notes, describe the trade steps, estimated materials and quantities, and why no catalog code fits — this is the estimator's review guide
+- Flag: "Recommend adding this to the price book if the service type will recur"
+- Never use 9099 when a catalog code reasonably fits — it's a fallback, not a shortcut
+
 ## Rules for service selection
 - Only use codes that appear in the price book catalog — never invent codes
-- Choose the most specific match; avoid 9000-series codes unless nothing else fits
+- For flooring work, always use the flooring catalog codes (9010–9013) — do NOT fall back to general_repairs or specialty_expansion codes for subfloor prep or LVP installation
+- For all other trades, choose the most specific match; avoid 9000-series codes unless nothing else fits
 - Prefer core and standard tier items over specialty
 - Maximum 6 services — quality over quantity
 - If 4+ services, note in confidence_notes whether a half-day block ($515) or full-day block ($980) may be worth considering
@@ -54,6 +74,7 @@ const SYSTEM_PROMPT = `You are an estimating assistant for Dovetails Services LL
 ## Rules for scope values
 - Fill scope_values with the component keys from the scope template for that service's category
 - Use the exact key names shown in the Scope Templates section
+- For flooring services (9010–9013): use sqft (floor area), floor_type (lvp/hardwood/laminate/concrete_prep_only), subfloor_condition (good/minor_leveling/skim_coat/self_leveler). Set material_cost only if a client-supplied cost is explicitly stated.
 - When measurements are not given, estimate from these heuristics and record every estimate in confidence_notes:
   - Bedroom → ~250 sqft walls (~180 sqft floor)
   - Master bedroom → ~320 sqft walls (~220 sqft floor)
@@ -95,8 +116,8 @@ const DRAFT_TOOL: Anthropic.Tool = {
             scope_values: {
               type: "object",
               description:
-                "Scope component key → value pairs for this service's category template. Numeric keys only.",
-              additionalProperties: { type: "number" },
+                "Scope component key → value pairs for this service's category template. Numeric for measurements; string for select-type components (e.g. floor_type, subfloor_condition, paint_finish).",
+              additionalProperties: { oneOf: [{ type: "number" }, { type: "string" }] },
             },
             complexity_factor_keys: {
               type: "array",
