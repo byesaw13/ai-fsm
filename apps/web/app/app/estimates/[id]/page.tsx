@@ -60,6 +60,7 @@ interface EstimateRow {
   minimum_service_override_reason: "bundled" | "membership_included" | "promo" | "owner_approved" | null;
   minimum_service_override_note: string | null;
   scope_assumptions: string | null;
+  condition_tier: "green" | "yellow" | "red" | null;
   pricing_review_status: "needs_review" | "passed" | "blocked";
   created_by: string;
   created_at: string;
@@ -301,6 +302,28 @@ export default async function EstimateDetailPage({
           >
             {STATUS_LABELS[currentStatus]}
           </span>
+          {estimate.condition_tier === "yellow" && (
+            <span style={{
+              display: "inline-block", padding: "2px 8px", borderRadius: 99,
+              fontSize: "var(--text-xs)", fontWeight: 600,
+              background: "color-mix(in srgb, var(--color-warning) 15%, transparent)",
+              color: "var(--color-warning)",
+              border: "1px solid color-mix(in srgb, var(--color-warning) 40%, transparent)",
+            }}>
+              Elevated Risk
+            </span>
+          )}
+          {estimate.condition_tier === "red" && (
+            <span style={{
+              display: "inline-block", padding: "2px 8px", borderRadius: 99,
+              fontSize: "var(--text-xs)", fontWeight: 600,
+              background: "color-mix(in srgb, var(--color-danger) 15%, transparent)",
+              color: "var(--color-danger)",
+              border: "1px solid color-mix(in srgb, var(--color-danger) 40%, transparent)",
+            }}>
+              Complex — Review
+            </span>
+          )}
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 import { appendAuditLog } from "@/lib/db/audit";
 import { calcTotals, lineItemTotal } from "./math";
 import { calculatePaintingEstimate } from "./pricing";
+import { computeConditionTier } from "./guardrails";
 import { DEPOSIT_RATE } from "@ai-fsm/domain";
 
 export interface LineItemInput {
@@ -71,7 +72,7 @@ export async function getEstimateById(client: PoolClient, id: string, accountId:
             e.travel_surcharge_cents, e.risk_adjustment_cents,
             e.minimum_service_override_reason, e.minimum_service_override_note,
             e.pricing_review_status, e.pricing_reviewed_at, e.pricing_reviewed_by,
-            e.scope_assumptions,
+            e.scope_assumptions, e.condition_tier,
             c.name AS client_name
      FROM estimates e
      LEFT JOIN clients c ON c.id = e.client_id
@@ -127,9 +128,16 @@ export async function updateEstimateById(
     total_cents: number;
     travel_surcharge_cents: number;
     risk_adjustment_cents: number;
+    old_house_risk: boolean;
+    difficult_access: boolean;
+    trip_count: string;
+    requires_drying_or_curing: boolean;
+    coordination_required: boolean;
   }>(
     `SELECT id, status, subtotal_cents, tax_cents, total_cents,
-            travel_surcharge_cents, risk_adjustment_cents
+            travel_surcharge_cents, risk_adjustment_cents,
+            old_house_risk, difficult_access, trip_count,
+            requires_drying_or_curing, coordination_required
      FROM estimates WHERE id = $1 AND account_id = $2`,
     [id, session.accountId]
   );
@@ -214,6 +222,20 @@ export async function updateEstimateById(
   if (patch.minimum_service_override_reason !== undefined) { setClauses.push(`minimum_service_override_reason = $${idx++}`); params.push(patch.minimum_service_override_reason); }
   if (patch.minimum_service_override_note !== undefined) { setClauses.push(`minimum_service_override_note = $${idx++}`); params.push(patch.minimum_service_override_note); }
   if (patch.scope_assumptions !== undefined) { setClauses.push(`scope_assumptions = $${idx++}`); params.push(patch.scope_assumptions); }
+
+  // Auto-recompute condition_tier when any risk flag changes
+  const tierFields = ["old_house_risk", "difficult_access", "trip_count", "requires_drying_or_curing", "coordination_required"] as const;
+  if (tierFields.some((f) => patch[f] !== undefined)) {
+    const tier = computeConditionTier({
+      old_house_risk:            patch.old_house_risk            ?? est.old_house_risk,
+      difficult_access:          patch.difficult_access          ?? est.difficult_access,
+      trip_count:                patch.trip_count                ?? est.trip_count,
+      requires_drying_or_curing: patch.requires_drying_or_curing ?? est.requires_drying_or_curing,
+      coordination_required:     patch.coordination_required     ?? est.coordination_required,
+    });
+    setClauses.push(`condition_tier = $${idx++}`);
+    params.push(tier);
+  }
 
   const has_painting_fields =
     patch.sq_ft !== undefined &&

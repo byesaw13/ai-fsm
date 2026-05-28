@@ -18,7 +18,7 @@ import {
   DEPOSIT_RATE,
 } from "@ai-fsm/domain";
 import { logger } from "@/lib/logger";
-import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
+import { reviewEstimateGuardrails, computeConditionTier } from "@/lib/estimates/guardrails";
 import { computeAndPersist } from "@/lib/estimates/compute";
 import type { EstimateSpec } from "@ai-fsm/domain";
 
@@ -326,6 +326,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
   const total_cents = subtotal_cents + tax_cents;
   const deposit_cents = Math.round(total_cents * DEPOSIT_RATE);
   const balance_cents = total_cents - deposit_cents;
+  const conditionTier = computeConditionTier({ old_house_risk, difficult_access, trip_count, requires_drying_or_curing, coordination_required });
   const pricingReview = reviewEstimateGuardrails({
     total_cents,
     trip_count,
@@ -366,10 +367,11 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             trip_count, requires_drying_or_curing, difficult_access, old_house_risk,
             coordination_required, finish_expectation, travel_surcharge_cents,
             risk_adjustment_cents, minimum_service_override_reason,
-            minimum_service_override_note, pricing_review_status, scope_assumptions)
+            minimum_service_override_note, pricing_review_status, scope_assumptions,
+            condition_tier)
           VALUES ($1, $2, $3, $4, $5, 'draft', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
                   $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27,
-                  $28, $29, $30, $31, $32, $33)
+                  $28, $29, $30, $31, $32, $33, $34)
           RETURNING id`,
         [
           session.accountId,
@@ -405,6 +407,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           minimum_service_override_note ?? null,
           pricingReview.status,
           scope_assumptions ?? null,
+          conditionTier,
         ]
       );
       const estimateId = result.rows[0].id;

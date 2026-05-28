@@ -34,6 +34,7 @@ type JobRow = {
   completed_visit_count: number;
   unpaid_invoice_count: number;
   paid_invoice_count: number;
+  estimate_condition_tier: string | null;
 };
 
 export default async function PipelinePage() {
@@ -70,7 +71,13 @@ export default async function PipelinePage() {
             (SELECT COUNT(*)::int FROM invoices iu
               WHERE iu.job_id = j.id AND iu.account_id = j.account_id AND iu.status IN ('sent','partial','overdue')) AS unpaid_invoice_count,
             (SELECT COUNT(*)::int FROM invoices ip
-              WHERE ip.job_id = j.id AND ip.account_id = j.account_id AND ip.status = 'paid') AS paid_invoice_count
+              WHERE ip.job_id = j.id AND ip.account_id = j.account_id AND ip.status = 'paid') AS paid_invoice_count,
+            (SELECT condition_tier FROM estimates e
+              WHERE e.job_id = j.id AND e.account_id = j.account_id
+                AND e.status IN ('draft','sent','approved')
+              ORDER BY CASE condition_tier WHEN 'red' THEN 1 WHEN 'yellow' THEN 2 ELSE 3 END,
+                       e.created_at DESC
+              LIMIT 1) AS estimate_condition_tier
      FROM jobs j
      LEFT JOIN clients c ON c.id = j.client_id
      LEFT JOIN LATERAL (
