@@ -29,6 +29,7 @@ import { VisitNotesForm } from "./VisitNotesForm";
 import { VisitChecklistForm } from "./VisitChecklistForm";
 import { MaterialsUsedForm } from "./MaterialsUsedForm";
 import { VisitIssuePanel } from "./VisitIssuePanel";
+import { ConditionsDifferPanel } from "./ConditionsDifferPanel";
 import { VisitResolutionPanel } from "./VisitResolutionPanel";
 import { VisitPartsPanel } from "./VisitPartsPanel";
 import { VisitClosingChecklist } from "./VisitClosingChecklist";
@@ -253,6 +254,33 @@ export default async function VisitDetailPage({
       : null;
 
   const overdue = isVisitOverdue(visit);
+
+  // For repair visits that are active, check for an approved estimate so we can surface the conditions panel
+  const approvedEstimate =
+    isRepairFlow &&
+    visit.job_id &&
+    (currentStatus === "arrived" || currentStatus === "in_progress")
+      ? await queryOneForSession<{ id: string; scope_assumptions: string | null }>(
+          session,
+          `SELECT id, scope_assumptions FROM estimates
+           WHERE job_id = $1 AND account_id = $2 AND status = 'approved'
+           ORDER BY created_at DESC LIMIT 1`,
+          [visit.job_id, session.accountId]
+        )
+      : null;
+
+  const draftChangeOrderCount = approvedEstimate
+    ? Number(
+        (
+          await queryOneForSession<{ count: string }>(
+            session,
+            `SELECT COUNT(*)::text AS count FROM change_orders
+             WHERE estimate_id = $1 AND account_id = $2 AND status = 'draft'`,
+            [approvedEstimate.id, session.accountId]
+          )
+        )?.count ?? "0"
+      )
+    : 0;
 
   const issueDescription = (visit as VisitRow & { issue_description?: string | null }).issue_description;
   const checklistDone = checklistItems.filter((i) => i.disposition === "ok").length;
@@ -548,6 +576,34 @@ export default async function VisitDetailPage({
                   canDelete={canDeleteMedia}
                 />
               </Card>
+
+              {approvedEstimate && (
+                <>
+                  {draftChangeOrderCount > 0 && (
+                    <div style={{
+                      padding: "var(--space-2) var(--space-3)",
+                      background: "color-mix(in srgb, var(--color-warning) 15%, transparent)",
+                      border: "1px solid color-mix(in srgb, var(--color-warning) 40%, transparent)",
+                      borderRadius: "var(--radius-md)",
+                      fontSize: "var(--text-sm)",
+                    }}>
+                      {draftChangeOrderCount} pending change order{draftChangeOrderCount !== 1 ? "s" : ""} —{" "}
+                      <a href={`/app/estimates/${approvedEstimate.id}#change-orders`} style={{ color: "var(--accent)" }}>
+                        Review on estimate →
+                      </a>
+                    </div>
+                  )}
+                  <Card id="visit-conditions">
+                    <SectionHeader title="Scope Conditions" />
+                    <ConditionsDifferPanel
+                      visitId={visit.id}
+                      jobId={visit.job_id!}
+                      approvedEstimateId={approvedEstimate.id}
+                      scopeAssumptions={approvedEstimate.scope_assumptions}
+                    />
+                  </Card>
+                </>
+              )}
 
               <Card>
                 <SectionHeader title="Parts" />
