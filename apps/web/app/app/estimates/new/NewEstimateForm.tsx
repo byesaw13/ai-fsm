@@ -71,6 +71,9 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
     handleScopeChange,
     removePriceBookItem,
     applyDraft,
+    pendingDraft,
+    applyPendingDraft,
+    discardPendingDraft,
     handleClientCreated,
     handleJobCreated,
     handlePropertyCreated,
@@ -171,6 +174,9 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
           aiConfidenceDismissed={aiConfidenceDismissed}
           setAiConfidenceDismissed={setAiConfidenceDismissed}
           applyDraft={applyDraft}
+          pendingDraft={pendingDraft}
+          applyPendingDraft={applyPendingDraft}
+          discardPendingDraft={discardPendingDraft}
           mode={mode} handleModeChange={handleModeChange}
           priceBookItems={priceBookItems}
           removePriceBookItem={removePriceBookItem}
