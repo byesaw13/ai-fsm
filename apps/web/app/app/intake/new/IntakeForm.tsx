@@ -176,7 +176,7 @@ export function IntakeForm() {
     return (
       <div className="p7-form-stack">
         <Card>
-          <SectionHeader title="Intake Submitted" />
+          <SectionHeader title="Request Submitted" />
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
             <div style={{
               padding: "var(--space-4)",

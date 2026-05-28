@@ -98,6 +98,7 @@ type VisitRow = Visit & {
   membership_snapshot_sent_at: string | Date | null;
   sub_status: string | null;
   visit_type: string | null;
+  property_address: string | null;
 };
 
 type CountRow = { membership_visit_number: number | string };
@@ -125,11 +126,13 @@ export default async function VisitDetailPage({
     `SELECT v.*,
             j.title AS job_title, j.job_type AS job_type, j.description AS job_description,
             j.property_id AS job_property_id, j.client_id AS job_client_id,
+            p.address AS property_address,
             mp.annual_visit_count AS plan_annual_visit_count,
             mp.routing_zone AS plan_routing_zone,
             u.full_name AS assigned_user_name
      FROM visits v
      LEFT JOIN jobs j ON j.id = v.job_id
+     LEFT JOIN properties p ON p.id = j.property_id
      LEFT JOIN maintenance_plans mp ON mp.id = v.generated_from_plan_id AND mp.account_id = v.account_id
      LEFT JOIN users u ON u.id = v.assigned_user_id
      WHERE v.id = $1 AND v.account_id = $2`,
@@ -680,6 +683,16 @@ export default async function VisitDetailPage({
                     ) : (
                       visit.job_title
                     )}
+                  </dd>
+                </div>
+              )}
+              {visit.job_property_id && (
+                <div className="p7-detail-row">
+                  <dt>Property</dt>
+                  <dd>
+                    <LinkButton href={`/app/properties/${visit.job_property_id}`} variant="ghost" size="sm">
+                      {visit.property_address ?? "View property"} →
+                    </LinkButton>
                   </dd>
                 </div>
               )}

@@ -350,7 +350,8 @@ export default async function AppPage() {
       detail: `${exceptionJobCount} job${exceptionJobCount !== 1 ? "s" : ""} · ${exceptionVisitCount} visit${exceptionVisitCount !== 1 ? "s" : ""}`,
       tone: "warning",
     },
-  ] satisfies ActionQueueItem[]).filter((item) => item.count > 0);
+  ] satisfies ActionQueueItem[]).filter((item) => item.count > 0)
+    .sort((a, b) => ({ danger: 0, warning: 1, default: 2 })[a.tone] - ({ danger: 0, warning: 1, default: 2 })[b.tone]);
 
   // ---------------------------------------------------------------------------
   // Pulse metrics strip — 4 KPIs visible to all admin/owner
@@ -426,7 +427,7 @@ export default async function AppPage() {
       }}>
         <div>
           <h1 style={{ margin: 0, fontSize: "var(--text-2xl)", fontWeight: 700, letterSpacing: "-0.01em" }}>
-            My Day
+            Today
           </h1>
           <p style={{ margin: 0, marginTop: "var(--space-1)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
             {greeting}{firstName ? `, ${firstName}` : ""} — {todayLabel}
@@ -443,6 +444,9 @@ export default async function AppPage() {
           </Link>
           <Link href={"/app/invoices/new" as Route} className="p7-btn p7-btn-secondary p7-btn-sm">
             + Invoice
+          </Link>
+          <Link href={"/app/mileage/new" as Route} className="p7-btn p7-btn-secondary p7-btn-sm">
+            + Mileage
           </Link>
           <Link
             href={"/app/booking-requests" as Route}

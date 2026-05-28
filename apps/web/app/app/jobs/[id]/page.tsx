@@ -41,6 +41,7 @@ export const dynamic = "force-dynamic";
 
 type JobRow = Job & {
   client_name: string | null;
+  property_address: string | null;
   job_category: JobAcceptanceCategory | null;
   strategy_fit: number | null;
   scope_clarity: number | null;
@@ -105,9 +106,10 @@ export default async function JobDetailPage({
 
   const job = await queryOneForSession<JobRow>(
     session,
-    `SELECT j.*, c.name AS client_name
+    `SELECT j.*, c.name AS client_name, p.address AS property_address
      FROM jobs j
      LEFT JOIN clients c ON c.id = j.client_id
+     LEFT JOIN properties p ON p.id = j.property_id
      WHERE j.id = $1 AND j.account_id = $2`,
     [id, session.accountId]
   );
@@ -419,6 +421,19 @@ export default async function JobDetailPage({
                   <div className="p7-detail-row">
                     <dt>Description</dt>
                     <dd style={{ whiteSpace: "pre-wrap" }}>{job.description}</dd>
+                  </div>
+                )}
+                {job.property_id && (
+                  <div className="p7-detail-row">
+                    <dt>Property</dt>
+                    <dd>
+                      <Link
+                        href={`/app/properties/${job.property_id}`}
+                        style={{ color: "var(--accent)", textDecoration: "none", fontSize: "var(--text-sm)", fontWeight: 600 }}
+                      >
+                        {job.property_address ?? "View property"} →
+                      </Link>
+                    </dd>
                   </div>
                 )}
               </dl>

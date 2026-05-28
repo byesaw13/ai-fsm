@@ -91,9 +91,9 @@ export default async function BookingRequestsPage({ searchParams }: PageProps) {
   return (
     <PageContainer>
       <PageHeader
-        title="Booking Requests"
+        title="Requests"
         subtitle={`${rows.length} request${rows.length !== 1 ? "s" : ""}${validStatus ? ` · ${STATUS_LABELS[validStatus]}` : ""}`}
-        actions={<LinkButton href="/app/intake/new">New Intake</LinkButton>}
+        actions={<LinkButton href="/app/intake/new">New Request</LinkButton>}
       />
 
       {/* Status filter tabs */}

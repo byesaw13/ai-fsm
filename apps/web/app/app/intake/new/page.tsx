@@ -13,7 +13,7 @@ export default async function NewIntakePage() {
   return (
     <PageContainer>
       <PageHeader
-        title="New Intake"
+        title="New Request"
         subtitle="Capture a service request while speaking with a client."
         backHref="/app/booking-requests"
       />
