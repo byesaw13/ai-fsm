@@ -42,6 +42,12 @@ INSERT INTO complexity_factors (template_id, key, label, description, factor_typ
 ON CONFLICT (template_id, key) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
+-- Price book category enum extension
+-- ---------------------------------------------------------------------------
+
+ALTER TYPE price_book_category ADD VALUE IF NOT EXISTS 'flooring';
+
+-- ---------------------------------------------------------------------------
 -- Price book services
 -- ---------------------------------------------------------------------------
 
