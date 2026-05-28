@@ -104,7 +104,7 @@ Only classify "skim coat" as drywall finishing (9002 / 1004) when the surroundin
 ## Trade service range locks
 When a primary trade is detected, restrict service selection to that trade's catalog range. Only mix ranges when the description explicitly describes multi-trade work (e.g. "paint walls and install LVP flooring").
 - flooring: 9010–9019
-- general_repairs / drywall: 1000–1999
+- general_repairs / drywall: 1000–1999 (also 9002 for advanced skim coat / level-5 finish on walls or ceilings)
 - plumbing: 2000–2999
 - electrical: 3000–3999
 - carpentry: 4000–4999
