@@ -18,6 +18,7 @@ interface JobRow {
   pipeline_stage?: string;
   pipeline_stage_label?: string;
   next_action?: string;
+  estimate_condition_tier?: string | null;
 }
 
 interface JobBoardProps {
@@ -166,9 +167,24 @@ function BoardCard({ job }: { job: JobRow }) {
             fontSize: "var(--text-sm)",
             color: "var(--fg)",
             marginBottom: "var(--space-1)",
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-1)",
           }}
         >
           {job.title}
+          {job.estimate_condition_tier === "yellow" && (
+            <span title="Elevated risk estimate" style={{
+              display: "inline-block", width: 8, height: 8, borderRadius: "50%",
+              background: "var(--color-warning)", flexShrink: 0,
+            }} />
+          )}
+          {job.estimate_condition_tier === "red" && (
+            <span title="Complex — review required" style={{
+              display: "inline-block", width: 8, height: 8, borderRadius: "50%",
+              background: "var(--color-danger)", flexShrink: 0,
+            }} />
+          )}
         </p>
         {job.client_name && (
           <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>

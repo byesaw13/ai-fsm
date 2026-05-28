@@ -118,3 +118,22 @@ export function reviewEstimateGuardrails(input: EstimateGuardrailInput): Estimat
     warnings,
   };
 }
+
+export function computeConditionTier(flags: {
+  old_house_risk: boolean;
+  difficult_access: boolean;
+  trip_count: string;
+  requires_drying_or_curing: boolean;
+  coordination_required: boolean;
+}): "green" | "yellow" | "red" {
+  if (
+    flags.old_house_risk ||
+    flags.difficult_access ||
+    flags.trip_count === "multi_trip" ||
+    flags.requires_drying_or_curing ||
+    flags.coordination_required
+  ) {
+    return "yellow";
+  }
+  return "green";
+}
