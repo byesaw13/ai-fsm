@@ -120,7 +120,20 @@ For every service, set trade_detected to the primary trade identified (e.g. "flo
 Set the top-level confidence field based on how certain the classification is:
 - "high": all services came from the catalog with specific codes (no 9099), all measurements were explicitly given in the description (not estimated from heuristics), trade is unambiguous
 - "medium": one or more measurements were estimated using heuristics (not given), or one 9099 service used, or trade detection had minor ambiguity
-- "low": multiple 9099 services, primary trade is unclear, conflicting signals, or the description lacks enough information to price confidently`;
+- "low": multiple 9099 services, primary trade is unclear, conflicting signals, or the description lacks enough information to price confidently
+
+## Production anchor guidance
+When sqft is known (given or estimated), include a labor sanity check in confidence_notes using these production benchmarks:
+
+| Service | Baseline | Key modifiers |
+|---------|----------|---------------|
+| 9010 LVP install | 175 sqft/day | complex_layout −15%, furnished_room −20%, demo_included −25% |
+| 9011 Concrete skim coat | 100 sqft/day | complex_layout −10% |
+| 9012 Self-leveling compound | 200 sqft/day | — |
+| 9013 Flooring removal | 300 sqft/day | complex_layout −15% |
+
+Example: "400 sqft LVP with complex_layout → 400 ÷ (175 × 0.85) ≈ 2.7 days. Pricing should reflect 3 field days minimum."
+Apply the same reasoning to any service where a rate is listed. Do NOT fabricate rates for services not in this table.`;
 
 const DRAFT_TOOL: Anthropic.Tool = {
   name: "draft_estimate",

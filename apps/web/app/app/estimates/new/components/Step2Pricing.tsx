@@ -380,6 +380,7 @@ export function Step2Pricing({
                         </div>
                         <ScopeBuilder
                           category={item.service.category}
+                          serviceCode={item.service.code}
                           basePriceCents={item.service.default_price_cents ?? item.priceCents}
                           onChange={(result) => handleScopeChange(item.instanceId, result)}
                           initialScopeValues={pendingDraftScope[item.instanceId]?.scopeValues}
