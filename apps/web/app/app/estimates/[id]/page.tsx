@@ -59,6 +59,7 @@ interface EstimateRow {
   risk_adjustment_cents: number;
   minimum_service_override_reason: "bundled" | "membership_included" | "promo" | "owner_approved" | null;
   minimum_service_override_note: string | null;
+  scope_assumptions: string | null;
   pricing_review_status: "needs_review" | "passed" | "blocked";
   created_by: string;
   created_at: string;
@@ -453,6 +454,15 @@ export default async function EstimateDetailPage({
           <p>
             <strong>Notes:</strong> {estimate.notes}
           </p>
+        )}
+
+        {estimate.scope_assumptions && (
+          <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px solid var(--border)" }}>
+            <p style={{ fontWeight: 600, marginBottom: "var(--space-1)", fontSize: "var(--text-sm)" }}>Service Conditions</p>
+            <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-secondary)", whiteSpace: "pre-wrap", margin: 0 }}>
+              {estimate.scope_assumptions}
+            </p>
+          </div>
         )}
 
         {/* Painting scope details */}

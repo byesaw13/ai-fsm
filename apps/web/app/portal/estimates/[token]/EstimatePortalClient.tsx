@@ -33,6 +33,7 @@ interface Estimate {
   total_cents: number;
   deposit_cents: number | null;
   notes: string | null;
+  scope_assumptions: string | null;
   expires_at: string | null;
   responded_at: string | null;
   client_approved_name: string | null;
@@ -327,6 +328,14 @@ export function EstimatePortalClient({ token, estimate, lineItems, options = [] 
           <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, marginBottom: 24 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 6 }}>NOTES</div>
             <div style={{ whiteSpace: "pre-wrap", color: "#374151" }}>{estimate.notes}</div>
+          </div>
+        )}
+
+        {/* Scope Assumptions */}
+        {estimate.scope_assumptions && (
+          <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, marginBottom: 24 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 6 }}>SERVICE CONDITIONS</div>
+            <div style={{ whiteSpace: "pre-wrap", color: "#374151", fontSize: 13 }}>{estimate.scope_assumptions}</div>
           </div>
         )}
 

@@ -76,8 +76,8 @@ export const POST = withAuth(async (request: NextRequest, session) => {
     );
 
     // Load scope templates + components + factors
-    const { rows: templateRows } = await pool.query<{ id: string; category: string; label: string; description: string | null; [key: string]: unknown }>(
-      `SELECT id, category, label, description FROM scope_templates ORDER BY label ASC`
+    const { rows: templateRows } = await pool.query<{ id: string; category: string; label: string; description: string | null; default_assumptions: string | null; [key: string]: unknown }>(
+      `SELECT id, category, label, description, default_assumptions FROM scope_templates ORDER BY label ASC`
     );
 
     let templates: ScopeTemplate[] = [];
@@ -103,6 +103,7 @@ export const POST = withAuth(async (request: NextRequest, session) => {
         category: t.category,
         label: t.label,
         description: t.description,
+        default_assumptions: t.default_assumptions,
         components: componentRows
           .filter((c) => c.template_id === t.id)
           .map((c) => ({

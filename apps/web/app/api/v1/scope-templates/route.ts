@@ -11,6 +11,7 @@ interface TemplateRow {
   category: string;
   label: string;
   description: string | null;
+  default_assumptions: string | null;
   [key: string]: unknown;
 }
 
@@ -80,7 +81,7 @@ export const GET = withAuth(async (request: NextRequest, session) => {
     const templateParams = category ? [category] : [];
 
     const templates = await query<TemplateRow>(
-      `SELECT id, category, label, description FROM scope_templates ${templateCondition} ORDER BY label ASC`,
+      `SELECT id, category, label, description, default_assumptions FROM scope_templates ${templateCondition} ORDER BY label ASC`,
       templateParams
     );
 
@@ -143,6 +144,7 @@ export const GET = withAuth(async (request: NextRequest, session) => {
       category: t.category,
       label: t.label,
       description: t.description,
+      default_assumptions: t.default_assumptions,
       components: components
         .filter((c) => c.template_id === t.id)
         .map((c) => ({

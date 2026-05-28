@@ -93,6 +93,7 @@ const patchEstimateSchema = z.object({
   risk_adjustment_cents: z.number().int().nonnegative().optional(),
   minimum_service_override_reason: estimateMinimumOverrideReasonSchema.nullable().optional(),
   minimum_service_override_note: z.string().nullable().optional(),
+  scope_assumptions: z.string().nullable().optional(),
 });
 
 export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, session) => {
