@@ -5,7 +5,11 @@ ALTER TABLE estimates
   ADD COLUMN IF NOT EXISTS condition_tier TEXT
     CHECK (condition_tier IN ('green', 'yellow', 'red'));
 
--- Backfill from existing risk flags
+-- Backfill from existing risk flags.
+-- Temporarily disable the immutability trigger so we can set the new column on
+-- already-approved/sent estimates without the trigger blocking the UPDATE.
+ALTER TABLE estimates DISABLE TRIGGER trg_estimates_immutability;
+
 UPDATE estimates
 SET condition_tier = CASE
   WHEN old_house_risk = true
@@ -17,3 +21,5 @@ SET condition_tier = CASE
   ELSE 'green'
 END
 WHERE condition_tier IS NULL;
+
+ALTER TABLE estimates ENABLE TRIGGER trg_estimates_immutability;
