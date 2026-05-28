@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { PriceBookService } from "@/components/PriceBookSelector";
 import { formatCents, getStandardEstimateTerms } from "@/lib/estimates/pricing";
@@ -137,6 +137,7 @@ export function useEstimateForm({
   const [minimumOverrideReason, setMinimumOverrideReason] = useState("");
   const [minimumOverrideNote, setMinimumOverrideNote] = useState("");
   const [scopeAssumptions, setScopeAssumptions] = useState("");
+  const assumptionsLookupInFlight = useRef(false);
 
   const [pendingDraftScope, setPendingDraftScope] = useState<
     Record<string, { scopeValues: Record<string, number | string>; complexityFactors: string[] }>
@@ -155,18 +156,19 @@ export function useEstimateForm({
     priceBook.handleAddPriceBookItem(service, priceCents, (row) => {
       setLineItems((prev) => [...prev.filter((r) => r.description.trim()), row]);
     });
-    // Auto-populate scope assumptions from template default when first item is added
-    setScopeAssumptions((prev) => {
-      if (prev.trim()) return prev;
+    // Auto-populate scope assumptions from template default when first item is added.
+    // Guard with a ref so rapid adds don't fire competing fetches.
+    if (!scopeAssumptions.trim() && !assumptionsLookupInFlight.current) {
+      assumptionsLookupInFlight.current = true;
       fetch(`/api/v1/scope-templates?category=${encodeURIComponent(service.category)}`)
         .then((r) => r.json())
         .then((data: { template?: { default_assumptions?: string | null } }) => {
           const assumptions = data?.template?.default_assumptions;
           if (assumptions) setScopeAssumptions((cur) => cur.trim() ? cur : assumptions);
         })
-        .catch(() => { /* non-critical */ });
-      return prev;
-    });
+        .catch(() => { /* non-critical */ })
+        .finally(() => { assumptionsLookupInFlight.current = false; });
+    }
   }
 
   // ---------------------------------------------------------------------------
