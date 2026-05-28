@@ -12,6 +12,7 @@ export interface DraftService {
   service_name: string;
   service_category: string;
   base_price_cents: number;
+  unit_type: string;
   scope_values: Record<string, number | string>;
   complexity_factor_keys: string[];
   trade_detected: string;
@@ -357,6 +358,7 @@ export async function draftEstimate(
           service_name: pb.name,
           service_category: pb.category,
           base_price_cents: pb.default_price_cents ?? pb.price_min_cents,
+          unit_type: pb.unit_type ?? "flat",
           scope_values: s.scope_values,
           complexity_factor_keys: s.complexity_factor_keys,
           trade_detected: s.trade_detected ?? "unknown",

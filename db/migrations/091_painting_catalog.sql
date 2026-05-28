@@ -9,11 +9,15 @@
 -- New service: full-room interior painting
 -- ---------------------------------------------------------------------------
 
+-- default_price_cents = 325 is the per-sqft rate in cents ($3.25/sqft).
+-- unit_type = 'per_sqft' tells the ScopeBuilder to compute price as rate × wall_sqft.
+-- price_min_cents = 9500 is the flat minimum ($95) for very small jobs.
 INSERT INTO price_book (code, name, category, tier, price_min_cents, price_max_cents,
-  description, notes, default_labor_hours, requires_materials, upsell_codes) VALUES
-('5012', 'Interior room painting', 'painting_finishes', 'standard', 49500, NULL,
-  'Full room interior painting — walls, optional ceiling and trim. Layout, surface prep, two finish coats. Price by sqft.',
-  'Quote by wall_sqft. Ceiling and trim are optional scope additions. Excludes wallpaper removal.',
+  default_price_cents, unit_type, description, notes, default_labor_hours, requires_materials, upsell_codes) VALUES
+('5012', 'Interior room painting', 'painting_finishes', 'standard', 9500, NULL,
+  325, 'per_sqft',
+  'Full room interior painting — walls, optional ceiling and trim. Layout, surface prep, two finish coats. Priced at $3.25/sqft of wall area.',
+  'Quote by wall_sqft. Ceiling and trim scope are additive. Excludes wallpaper removal.',
   NULL, true, ARRAY['5009','1002','5003'])
 ON CONFLICT (code) DO NOTHING;
 
