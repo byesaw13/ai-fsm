@@ -116,8 +116,8 @@ const DRAFT_TOOL: Anthropic.Tool = {
             scope_values: {
               type: "object",
               description:
-                "Scope component key → value pairs for this service's category template. Numeric keys only.",
-              additionalProperties: { type: "number" },
+                "Scope component key → value pairs for this service's category template. Numeric for measurements; string for select-type components (e.g. floor_type, subfloor_condition, paint_finish).",
+              additionalProperties: { oneOf: [{ type: "number" }, { type: "string" }] },
             },
             complexity_factor_keys: {
               type: "array",
