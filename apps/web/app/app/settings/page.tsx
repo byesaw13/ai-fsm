@@ -122,7 +122,7 @@ export default async function SettingsPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
                 {[
                   { href: "/app/schedule",              label: "Schedule",             desc: "Week / month / year calendar views" },
-                  { href: "/app/booking-requests",      label: "Booking Requests",     desc: "Intake queue and request management" },
+                  { href: "/app/booking-requests",      label: "Requests",             desc: "Intake queue and request management" },
                   { href: "/app/pipeline",              label: "Pipeline",             desc: "Jobs by stage with estimate and invoice status" },
                   { href: "/app/reports",               label: "Reports",              desc: "Revenue, pipeline, and performance" },
                   { href: "/app/operations-dashboard",  label: "Operations Dashboard", desc: "Revenue mix, schedule utilization, job quality" },

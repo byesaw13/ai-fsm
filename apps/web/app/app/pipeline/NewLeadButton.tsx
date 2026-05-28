@@ -10,7 +10,7 @@ export function NewLeadButton() {
   return (
     <>
       <Button variant="primary" onClick={() => setOpen(true)} data-testid="new-lead-btn">
-        + New Intake
+        + New Request
       </Button>
       <LeadCaptureSheet open={open} onClose={() => setOpen(false)} />
     </>

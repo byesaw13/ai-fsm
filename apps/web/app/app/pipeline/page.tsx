@@ -134,7 +134,7 @@ export default async function PipelinePage() {
             No jobs in the pipeline yet.
           </p>
           <p style={{ fontSize: "var(--text-sm)" }}>
-            Click <strong>+ New Intake</strong> to capture a new request from a text, call, or email.
+            Click <strong>+ New Request</strong> to capture a new request from a text, call, or email.
           </p>
         </div>
       ) : (
