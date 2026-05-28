@@ -6,8 +6,10 @@ ALTER TABLE estimates
     CHECK (condition_tier IN ('green', 'yellow', 'red'));
 
 -- Backfill from existing risk flags.
--- Temporarily disable the immutability trigger so we can set the new column on
--- already-approved/sent estimates without the trigger blocking the UPDATE.
+-- Wrap in an explicit transaction so that if the UPDATE or re-enable fails,
+-- the DISABLE TRIGGER is rolled back and the trigger is never left disabled.
+BEGIN;
+
 ALTER TABLE estimates DISABLE TRIGGER trg_estimates_immutability;
 
 UPDATE estimates
@@ -23,3 +25,5 @@ END
 WHERE condition_tier IS NULL;
 
 ALTER TABLE estimates ENABLE TRIGGER trg_estimates_immutability;
+
+COMMIT;
