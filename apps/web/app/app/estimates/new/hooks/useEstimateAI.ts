@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { JOB_TYPE_MATERIALS } from "@ai-fsm/domain";
 import type { PriceBookService } from "@/components/PriceBookSelector";
-import type { DraftEstimate } from "@/lib/estimates/ai-draft";
+import type { DraftEstimate, DraftConfidence } from "@/lib/estimates/ai-draft";
 import type { LineItemRow, OptionTier } from "@/lib/estimates/form-helpers";
 
 // ---------------------------------------------------------------------------
@@ -88,10 +88,11 @@ export function useEstimateAI({
   const [itemSuggestError, setItemSuggestError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<EditableSuggestion[]>([]);
 
-  const [aiDraftMode, setAiDraftMode] = useState<"idle" | "input" | "loading" | "applied">("idle");
+  const [aiDraftMode, setAiDraftMode] = useState<"idle" | "input" | "loading" | "review" | "applied">("idle");
   const [aiDescription, setAiDescription] = useState<string>("");
   const [aiConfidenceNotes, setAiConfidenceNotes] = useState<string>("");
   const [aiConfidenceDismissed, setAiConfidenceDismissed] = useState<boolean>(false);
+  const [pendingDraft, setPendingDraft] = useState<DraftEstimate | null>(null);
 
   const scopeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -213,7 +214,48 @@ export function useEstimateAI({
     setItemDescription("");
   }
 
-  async function applyDraft() {
+  function _buildApplyParams(draft: DraftEstimate): Parameters<typeof onApplyDraft>[0] {
+    const priceBookItems: DraftPriceBookItem[] = [];
+    const lineItems: LineItemRow[] = [];
+    const scopeMap: DraftScopeMap = {};
+
+    for (const svc of draft.services) {
+      const instanceId = `${svc.service_id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const service: PriceBookService = {
+        id: svc.service_id,
+        code: svc.service_code,
+        name: svc.service_name,
+        category: svc.service_category,
+        tier: "core",
+        default_price_cents: svc.base_price_cents,
+        price_min_cents: svc.base_price_cents,
+        price_max_cents: null,
+        add_on_price_cents: null,
+        unit_type: null,
+        description: null,
+        notes: null,
+        default_labor_hours: null,
+        requires_materials: false,
+        upsell_codes: [],
+        is_active: true,
+      };
+      priceBookItems.push({ service, priceCents: svc.base_price_cents, instanceId });
+      lineItems.push({
+        description: `${svc.service_code} — ${svc.service_name}`,
+        quantity: "1",
+        unit_price: (svc.base_price_cents / 100).toFixed(2),
+        price_book_id: svc.service_id,
+      });
+      scopeMap[instanceId] = {
+        scopeValues: svc.scope_values,
+        complexityFactors: svc.complexity_factor_keys,
+      };
+    }
+
+    return { priceBookItems, lineItems, scopeMap, notes: draft.notes ?? null, guardrails: draft.guardrails };
+  }
+
+  async function fetchDraft() {
     if (!aiDescription.trim()) return;
     setAiDraftMode("loading");
     try {
@@ -228,58 +270,35 @@ export function useEstimateAI({
         return;
       }
 
-      const priceBookItems: DraftPriceBookItem[] = [];
-      const lineItems: LineItemRow[] = [];
-      const scopeMap: DraftScopeMap = {};
-
-      for (const svc of draft.services) {
-        const instanceId = `${svc.service_id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        const service: PriceBookService = {
-          id: svc.service_id,
-          code: svc.service_code,
-          name: svc.service_name,
-          category: svc.service_category,
-          tier: "core",
-          default_price_cents: svc.base_price_cents,
-          price_min_cents: svc.base_price_cents,
-          price_max_cents: null,
-          add_on_price_cents: null,
-          unit_type: null,
-          description: null,
-          notes: null,
-          default_labor_hours: null,
-          requires_materials: false,
-          upsell_codes: [],
-          is_active: true,
-        };
-        priceBookItems.push({ service, priceCents: svc.base_price_cents, instanceId });
-        lineItems.push({
-          description: `${svc.service_code} — ${svc.service_name}`,
-          quantity: "1",
-          unit_price: (svc.base_price_cents / 100).toFixed(2),
-          price_book_id: svc.service_id,
-        });
-        scopeMap[instanceId] = {
-          scopeValues: svc.scope_values,
-          complexityFactors: svc.complexity_factor_keys,
-        };
-      }
-
-      onApplyDraft({
-        priceBookItems,
-        lineItems,
-        scopeMap,
-        notes: draft.notes ?? null,
-        guardrails: draft.guardrails,
-      });
-
       setAiConfidenceNotes(draft.confidence_notes);
       setAiConfidenceDismissed(false);
-      setAiDraftMode("applied");
+
+      if (draft.confidence === "high") {
+        onApplyDraft(_buildApplyParams(draft));
+        setAiDraftMode("applied");
+      } else {
+        setPendingDraft(draft);
+        setAiDraftMode("review");
+      }
     } catch {
       setAiDraftMode("input");
     }
   }
+
+  function applyPendingDraft() {
+    if (!pendingDraft) return;
+    onApplyDraft(_buildApplyParams(pendingDraft));
+    setAiDraftMode("applied");
+    setPendingDraft(null);
+  }
+
+  function discardPendingDraft() {
+    setPendingDraft(null);
+    setAiDraftMode("input");
+  }
+
+  // Keep backward-compat alias so existing callers don't break during migration
+  const applyDraft = fetchDraft;
 
   return {
     scopeNotes, setScopeNotes,
@@ -292,11 +311,15 @@ export function useEstimateAI({
     aiDraftMode, setAiDraftMode,
     aiDescription, setAiDescription,
     aiConfidenceNotes, aiConfidenceDismissed, setAiConfidenceDismissed,
+    pendingDraft,
     handleParseScope,
     handleSuggestItems,
     handleAddSuggestion,
     handleSkipSuggestion,
     handleAcceptSuggestions,
     applyDraft,
+    fetchDraft,
+    applyPendingDraft,
+    discardPendingDraft,
   };
 }

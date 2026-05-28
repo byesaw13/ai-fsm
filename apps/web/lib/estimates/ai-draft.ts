@@ -14,7 +14,11 @@ export interface DraftService {
   base_price_cents: number;
   scope_values: Record<string, number | string>;
   complexity_factor_keys: string[];
+  trade_detected: string;
+  detection_reasons: string[];
 }
+
+export type DraftConfidence = "high" | "medium" | "low";
 
 export interface DraftGuardrails {
   trip_count: "one_trip" | "multi_trip";
@@ -30,6 +34,7 @@ export interface DraftEstimate {
   notes: string;
   guardrails: DraftGuardrails;
   confidence_notes: string;
+  confidence: DraftConfidence;
 }
 
 // ---------------------------------------------------------------------------
@@ -94,7 +99,28 @@ Only classify "skim coat" as drywall finishing (9002 / 1004) when the surroundin
 - trip_count: use "multi_trip" if the job clearly requires drying/curing between visits or separate site visits
 - difficult_access: true only if the description mentions height, tight spaces, or access challenges
 - old_house_risk: true if pre-1978 construction is mentioned or implied
-- finish_expectation: use "premium" only if the client explicitly asks for high-end finish quality`;
+- finish_expectation: use "premium" only if the client explicitly asks for high-end finish quality
+
+## Trade service range locks
+When a primary trade is detected, restrict service selection to that trade's catalog range. Only mix ranges when the description explicitly describes multi-trade work (e.g. "paint walls and install LVP flooring").
+- flooring: 9010–9019
+- general_repairs / drywall: 1000–1999
+- plumbing: 2000–2999
+- electrical: 3000–3999
+- carpentry: 4000–4999
+- painting: 5000–5999
+- outdoor / hardscape: 6000–6999
+- mounting / hanging: 7000–7999
+- uncatalogued fallback: 9099
+
+## Rules for trade_detected and detection_reasons
+For every service, set trade_detected to the primary trade identified (e.g. "flooring", "painting", "carpentry"). Set detection_reasons to a short list of phrases extracted from the description that led to that classification — these are shown to the estimator as a reasoning preview. Examples: ["LVP mentioned", "concrete slab mentioned", "skim coat in flooring context"].
+
+## Rules for confidence scoring
+Set the top-level confidence field based on how certain the classification is:
+- "high": all services came from the catalog with specific codes (no 9099), all measurements were explicitly given in the description (not estimated from heuristics), trade is unambiguous
+- "medium": one or more measurements were estimated using heuristics (not given), or one 9099 service used, or trade detection had minor ambiguity
+- "low": multiple 9099 services, primary trade is unclear, conflicting signals, or the description lacks enough information to price confidently`;
 
 const DRAFT_TOOL: Anthropic.Tool = {
   name: "draft_estimate",
@@ -124,8 +150,17 @@ const DRAFT_TOOL: Anthropic.Tool = {
               items: { type: "string" },
               description: "Keys of complexity factors to pre-check for this service",
             },
+            trade_detected: {
+              type: "string",
+              description: "Primary trade identified for this service (e.g. 'flooring', 'painting', 'carpentry')",
+            },
+            detection_reasons: {
+              type: "array",
+              items: { type: "string" },
+              description: "Short phrases from the description that led to this trade classification",
+            },
           },
-          required: ["service_code", "scope_values", "complexity_factor_keys"],
+          required: ["service_code", "scope_values", "complexity_factor_keys", "trade_detected", "detection_reasons"],
           additionalProperties: false,
         },
       },
@@ -158,8 +193,13 @@ const DRAFT_TOOL: Anthropic.Tool = {
         description:
           "One paragraph summarizing every measurement estimated (not given), any legal flags, quote-trigger items, or bundle pricing notes. Shown to the estimator as a review prompt.",
       },
+      confidence: {
+        type: "string",
+        enum: ["high", "medium", "low"],
+        description: "Overall confidence tier: high = all catalog codes + all measurements given; medium = heuristic measurements or one 9099; low = multiple 9099 or ambiguous trade",
+      },
     },
-    required: ["services", "notes", "guardrails", "confidence_notes"],
+    required: ["services", "notes", "guardrails", "confidence_notes", "confidence"],
     additionalProperties: false,
   },
 };
@@ -265,12 +305,15 @@ export async function draftEstimate(
     const raw = toolUse.input as {
       services: Array<{
         service_code: string;
-        scope_values: Record<string, number>;
+        scope_values: Record<string, number | string>;
         complexity_factor_keys: string[];
+        trade_detected: string;
+        detection_reasons: string[];
       }>;
       notes: string;
       guardrails: DraftGuardrails;
       confidence_notes: string;
+      confidence: DraftConfidence;
     };
 
     // Validate and enrich services — strip hallucinated codes
@@ -284,10 +327,18 @@ export async function draftEstimate(
           service_name: pb.name,
           service_category: pb.category,
           base_price_cents: pb.default_price_cents ?? pb.price_min_cents,
-          scope_values: s.scope_values as Record<string, number | string>,
+          scope_values: s.scope_values,
           complexity_factor_keys: s.complexity_factor_keys,
+          trade_detected: s.trade_detected ?? "unknown",
+          detection_reasons: s.detection_reasons ?? [],
         };
       });
+
+    const rawConfidence = raw.confidence;
+    const confidence: DraftConfidence =
+      rawConfidence === "high" || rawConfidence === "medium" || rawConfidence === "low"
+        ? rawConfidence
+        : "medium";
 
     return {
       services,
@@ -301,6 +352,7 @@ export async function draftEstimate(
         finish_expectation: "clean",
       },
       confidence_notes: raw.confidence_notes ?? "",
+      confidence,
     };
   } catch (err) {
     console.error("[draftEstimate] Claude API error:", err);

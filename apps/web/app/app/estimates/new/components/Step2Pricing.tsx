@@ -13,6 +13,8 @@ import { LineItemsTable } from "../../components/LineItemsTable";
 import type { LineItemRow, OptionTier } from "../hooks/useEstimateForm";
 import type { PaintingEstimateResult } from "../hooks/useEstimatePricing";
 import type { EditableSuggestion, ScopeResult } from "../hooks/useEstimateAI";
+import type { DraftEstimate } from "@/lib/estimates/ai-draft";
+import { DraftReviewPanel } from "./DraftReviewPanel";
 import type { PriceBookEntry } from "../hooks/useEstimatePriceBook";
 import type { ScopeBuilderResult } from "@/components/ScopeBuilder";
 import type { PriceBookService } from "@/components/PriceBookSelector";
@@ -41,14 +43,17 @@ interface Step2Props {
   scopeError: string | null;
   scopeResult: ScopeResult | null;
   // AI Draft (generic)
-  aiDraftMode: "idle" | "input" | "loading" | "applied";
-  setAiDraftMode: (v: "idle" | "input" | "loading" | "applied") => void;
+  aiDraftMode: "idle" | "input" | "loading" | "review" | "applied";
+  setAiDraftMode: (v: "idle" | "input" | "loading" | "review" | "applied") => void;
   aiDescription: string;
   setAiDescription: (v: string) => void;
   aiConfidenceNotes: string | null;
   aiConfidenceDismissed: boolean;
   setAiConfidenceDismissed: (v: boolean) => void;
   applyDraft: () => void;
+  pendingDraft: DraftEstimate | null;
+  applyPendingDraft: () => void;
+  discardPendingDraft: () => void;
   // Generic pricing / price book
   mode: "itemized" | "flat_rate" | "multi_option";
   handleModeChange: (m: "itemized" | "flat_rate" | "multi_option") => void;
@@ -111,6 +116,7 @@ export function Step2Pricing({
   scopeParsing, scopeNotes, setScopeNotes, scopeError, scopeResult,
   aiDraftMode, setAiDraftMode, aiDescription, setAiDescription,
   aiConfidenceNotes, aiConfidenceDismissed, setAiConfidenceDismissed, applyDraft,
+  pendingDraft, applyPendingDraft, discardPendingDraft,
   mode, handleModeChange,
   priceBookItems, removePriceBookItem, scopeResults, handleScopeChange, pendingDraftScope,
   handleAddPriceBookItem,
@@ -208,8 +214,19 @@ export function Step2Pricing({
         />
       )}
 
+      {/* AI Draft review panel — shown when confidence is medium/low */}
+      {serviceType === "generic" && aiDraftMode === "review" && pendingDraft && (
+        <div style={{ marginBottom: "var(--space-4)" }}>
+          <DraftReviewPanel
+            draft={pendingDraft}
+            onApply={applyPendingDraft}
+            onRedescribe={discardPendingDraft}
+          />
+        </div>
+      )}
+
       {/* AI Draft panel — generic mode only */}
-      {serviceType === "generic" && aiDraftMode !== "applied" && (
+      {serviceType === "generic" && aiDraftMode !== "applied" && aiDraftMode !== "review" && (
         <div style={{
           background: "var(--bg-subtle)",
           border: "1px solid var(--border)",

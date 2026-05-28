@@ -119,6 +119,45 @@ export function reviewEstimateGuardrails(input: EstimateGuardrailInput): Estimat
   };
 }
 
+// ---------------------------------------------------------------------------
+// Trade-scoped material validation
+// ---------------------------------------------------------------------------
+
+const TRADE_MATERIAL_BLOCKLIST: Record<string, string[]> = {
+  flooring: ["thinset", "grout", "tile spacers", "backer board", "joint compound", "mesh tape", "drywall mud"],
+  painting: ["thinset", "grout", "tile spacers", "backer board", "self-leveling", "lvp underlayment"],
+  plumbing: ["thinset", "grout", "tile spacers", "joint compound", "mesh tape", "lvp underlayment"],
+  carpentry: ["thinset", "grout", "tile spacers", "self-leveling", "lvp underlayment"],
+  drywall: ["thinset", "grout", "tile spacers", "lvp underlayment", "self-leveling", "feather finish"],
+};
+
+export interface MaterialValidationResult {
+  allowed: string[];
+  blocked: string[];
+}
+
+export function validateMaterialsForTrade(
+  materialNames: string[],
+  tradeDetected: string
+): MaterialValidationResult {
+  const blocklist = TRADE_MATERIAL_BLOCKLIST[tradeDetected.toLowerCase()] ?? [];
+  const allowed: string[] = [];
+  const blocked: string[] = [];
+
+  for (const name of materialNames) {
+    const nameLower = name.toLowerCase();
+    const isBlocked = blocklist.some((term) => nameLower.includes(term));
+    if (isBlocked) {
+      blocked.push(name);
+      console.warn(`[validateMaterialsForTrade] Blocked cross-trade material "${name}" for trade "${tradeDetected}"`);
+    } else {
+      allowed.push(name);
+    }
+  }
+
+  return { allowed, blocked };
+}
+
 export function computeConditionTier(flags: {
   old_house_risk: boolean;
   difficult_access: boolean;
