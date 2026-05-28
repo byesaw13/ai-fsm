@@ -6,6 +6,34 @@ import type { PriceBookEntry } from "./item-suggester";
 // Types
 // ---------------------------------------------------------------------------
 
+export interface RoutingRule {
+  signal: string;  // descriptive phrase(s) that trigger this service selection
+  code: string;    // price book code to use
+}
+
+export interface DisambiguationRule {
+  trigger: string;   // ambiguous keyword
+  map_to: string;    // correct code for this trade
+  not_when: string;  // context that indicates the OTHER meaning
+  reason: string;    // explanation shown in prompt
+}
+
+export interface TradeDefinition {
+  trade_key: string;
+  display_name: string;
+  scope_template_category: string | null;
+  service_code_range_start: string;
+  service_code_range_end: string;
+  extra_code_notes: string | null;
+  detection_keywords: string[];
+  routing_rules: RoutingRule[];
+  disambiguation_rules: DisambiguationRule[];
+  scope_values_guidance: string | null;
+  complexity_guidance: string | null;
+  is_active: boolean;
+  sort_order: number;
+}
+
 export interface DraftService {
   service_code: string;
   service_id: string;
@@ -42,7 +70,58 @@ export interface DraftEstimate {
 // Prompt & tool
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `You are an estimating assistant for Dovetails Services LLC, a handyman and woodworking company serving southern New Hampshire and the Merrimack Valley in Massachusetts. Given a job description, produce a complete estimate draft using the price book catalog and scope templates provided.
+function buildTradeContextBlocks(trades: TradeDefinition[]): string {
+  const active = trades.filter((t) => t.is_active).sort((a, b) => a.sort_order - b.sort_order);
+  return active
+    .map((t) => {
+      const keywords = t.detection_keywords.join(", ");
+      const routes = t.routing_rules
+        .map((r) => `- ${r.signal} → use ${r.code}`)
+        .join("\n");
+      const disambigs = t.disambiguation_rules
+        .map(
+          (d) =>
+            `- Only map "${d.trigger}" to ${d.map_to} when NOT in: ${d.not_when}. Reason: ${d.reason}`
+        )
+        .join("\n");
+
+      const lines: string[] = [];
+      lines.push(
+        `**${t.display_name.toUpperCase()} trade**: Any mention of: ${keywords}. When this trade is detected:`
+      );
+      if (routes) lines.push(routes);
+      if (disambigs) lines.push(disambigs);
+      if (t.scope_values_guidance) lines.push(t.scope_values_guidance);
+      if (t.complexity_guidance) lines.push(t.complexity_guidance);
+      return lines.join("\n");
+    })
+    .join("\n\n");
+}
+
+function buildRangeLocks(trades: TradeDefinition[]): string {
+  const active = trades.filter((t) => t.is_active).sort((a, b) => a.sort_order - b.sort_order);
+  return active
+    .map((t) => {
+      const range = `${t.service_code_range_start}–${t.service_code_range_end}`;
+      const extra = t.extra_code_notes ? ` ${t.extra_code_notes}` : "";
+      return `- ${t.trade_key}: ${range}${extra}`;
+    })
+    .join("\n");
+}
+
+function buildScopeValueRules(trades: TradeDefinition[]): string {
+  const active = trades
+    .filter((t) => t.is_active && t.scope_values_guidance)
+    .sort((a, b) => a.sort_order - b.sort_order);
+  return active.map((t) => `- ${t.display_name}: ${t.scope_values_guidance}`).join("\n");
+}
+
+function buildSystemPrompt(trades: TradeDefinition[]): string {
+  const tradeContextBlocks = buildTradeContextBlocks(trades);
+  const rangeLocks = buildRangeLocks(trades);
+  const scopeValueRules = buildScopeValueRules(trades);
+
+  return `You are an estimating assistant for Dovetails Services LLC, a handyman and woodworking company serving southern New Hampshire and the Merrimack Valley in Massachusetts. Given a job description, produce a complete estimate draft using the price book catalog and scope templates provided.
 
 ## Business context
 - Owner-operated, solo or with a helper — no large crews
@@ -53,26 +132,7 @@ const SYSTEM_PROMPT = `You are an estimating assistant for Dovetails Services LL
 ## Trade context — detect primary trade before selecting services
 Before selecting services, identify the primary trade category from the description:
 
-**FLOORING trade**: Any mention of LVP, vinyl plank, hardwood, laminate, carpet, or subfloor work (concrete skim coat, self-leveling, grinding, floor prep, substrate leveling). When FLOORING is the primary trade:
-- "skim coat" or "feather finish" = concrete subfloor prep → use 9011, NOT 9002 or 1004
-- "substrate prep" or "leveling" = floor leveling → use 9011 or 9012, NOT drywall services
-- "bump-outs", "posts", "columns" = layout complexity → apply complex_layout factor on 9010
-- Cure cycle between floor prep and flooring install → set trip_count = "multi_trip", requires_drying_or_curing = true, and apply multi_trip_cure factor; describe the two-visit sequence in confidence_notes
-- LVP install → 9010; floor prep/skim coat → 9011; self-leveling compound → 9012; removal → 9013
-
-Only classify "skim coat" as drywall finishing (9002 / 1004) when the surrounding context is clearly wall or ceiling work with no flooring mentioned.
-
-**PAINTING trade**: Any mention of painting walls, ceilings, trim, doors, or other surfaces. When PAINTING is the primary trade:
-- Full room or multi-room wall painting → use 5012 (Interior room painting), fill wall_sqft from room heuristics if not given
-- Trim or baseboard only → use 5003
-- Single accent wall → use 5001
-- Touch-up on dried patches → use 5008 (≤6") or 5009 (>6")
-- Door painting only → use 5002 (per door)
-- Deck or fence staining → use 5005 or 5004
-- Cabinet painting → use 5006
-- For scope_values on 5012: set wall_sqft (required), ceiling_sqft (if ceiling included), trim_linear_ft (if trim included), coat_count ("two_coats" default), paint_finish ("eggshell" for walls)
-- Complexity factors: apply dark_to_light if color change from dark to light; nicotine_staining if smoke damage mentioned; occupied_home if furniture must be protected; vaulted_ceilings if mentioned; difficult_masking for crown/built-ins/chair rail
-- Multi-room jobs with heavy prep: set finish_expectation = "premium" only if client explicitly requests it
+${tradeContextBlocks}
 
 **UNKNOWN trade**: If the job does not match any catalog service:
 - Use code 9099 (Custom / uncatalogued service)
@@ -92,8 +152,7 @@ Only classify "skim coat" as drywall finishing (9002 / 1004) when the surroundin
 ## Rules for scope values
 - Fill scope_values with the component keys from the scope template for that service's category
 - Use the exact key names shown in the Scope Templates section
-- For flooring services (9010–9013): use sqft (floor area), floor_type (lvp/hardwood/laminate/concrete_prep_only), subfloor_condition (good/minor_leveling/skim_coat/self_leveler). Set material_cost only if a client-supplied cost is explicitly stated.
-- For painting_finishes services: use wall_sqft (required for 5012), ceiling_sqft (if ceiling included), trim_linear_ft (if trim included), door_count (if doors), coat_count ("two_coats" default), paint_finish ("eggshell" for walls, "semi_gloss" for trim/bath). Use room-size heuristics for wall_sqft when not given.
+${scopeValueRules}
 - When measurements are not given, estimate from these heuristics and record every estimate in confidence_notes:
   - Bedroom → ~250 sqft walls (~180 sqft floor)
   - Master bedroom → ~320 sqft walls (~220 sqft floor)
@@ -117,14 +176,7 @@ Only classify "skim coat" as drywall finishing (9002 / 1004) when the surroundin
 
 ## Trade service range locks
 When a primary trade is detected, restrict service selection to that trade's catalog range. Only mix ranges when the description explicitly describes multi-trade work (e.g. "paint walls and install LVP flooring").
-- flooring: 9010–9019
-- general_repairs: 1000–1999 (also 9002 for advanced skim coat / level-5 finish on walls or ceilings)
-- plumbing: 2000–2999
-- electrical: 3000–3999
-- carpentry_furniture: 4000–4999
-- painting_finishes: 5000–5999 (also 9003 for whole-home or large exterior painting projects)
-- outdoor_seasonal: 6000–6999
-- mounting_installs: 7000–7999
+${rangeLocks}
 - uncatalogued fallback: 9099
 
 ## Rules for trade_detected and detection_reasons
@@ -137,7 +189,7 @@ Set the top-level confidence field based on how certain the classification is:
 - "low": multiple 9099 services, primary trade is unclear, conflicting signals, or the description lacks enough information to price confidently
 
 ## Production anchor guidance
-When sqft is known (given or estimated), include a labor sanity check in confidence_notes using these production benchmarks:
+When sqft or unit counts are known (given or estimated), include a labor sanity check in confidence_notes using these production benchmarks:
 
 | Service | Baseline | Key modifiers |
 |---------|----------|---------------|
@@ -148,10 +200,18 @@ When sqft is known (given or estimated), include a labor sanity check in confide
 | 5012 Interior room painting | 200 sqft/day (wall_sqft) | dark_to_light −20%, nicotine_staining −30%, occupied_home −10%, vaulted_ceilings −15%, difficult_masking −15% |
 | 5003 Trim/baseboard painting | 120 LF/day | difficult_masking −20% |
 | 5002 Door painting | 6 doors/day | — |
+| 2001 Faucet replacement | 6 fixtures/day | difficult_access −25% |
+| 2005 Full toilet swap | 3 fixtures/day | difficult_access −20% |
+| 2007 Garbage disposal | 4 fixtures/day | difficult_access −20% |
+| 4001 Furniture assembly | 7 pieces/day | — |
+| 4004 Closet organizer | 4 units/day | custom_fit −25% |
+| 4009 Stair repair | 4 steps/day | difficult_access −20% |
 
 Example flooring: "400 sqft LVP with complex_layout → 400 ÷ (175 × 0.85) ≈ 2.7 days. Pricing should reflect 3 field days minimum."
 Example painting: "450 sqft walls (living room + hallway) with dark_to_light → 450 ÷ (200 × 0.80) ≈ 2.8 days. Budget 3 field days."
+Example plumbing: "3 faucets at 6/day → 0.5 day. Price check: 3 × $175 = $525 minimum."
 Apply the same reasoning to any service where a rate is listed. Do NOT fabricate rates for services not in this table.`;
+}
 
 const DRAFT_TOOL: Anthropic.Tool = {
   name: "draft_estimate",
@@ -293,6 +353,7 @@ export async function draftEstimate(
   description: string,
   priceBook: PriceBookEntry[],
   templates: ScopeTemplate[],
+  trades: TradeDefinition[],
   jobContext?: string
 ): Promise<DraftEstimate | null> {
   if (!process.env.ANTHROPIC_API_KEY || priceBook.length === 0) return null;
@@ -300,6 +361,7 @@ export async function draftEstimate(
   const byCode = new Map(priceBook.map((p) => [p.code, p]));
   const catalogText = buildCatalogText(priceBook);
   const templatesText = buildTemplatesText(templates);
+  const systemPrompt = buildSystemPrompt(trades);
 
   const userContent = jobContext
     ? `Job context: ${jobContext}\n\nJob description: ${description}`
@@ -314,7 +376,7 @@ export async function draftEstimate(
       system: [
         {
           type: "text",
-          text: SYSTEM_PROMPT,
+          text: systemPrompt,
           cache_control: { type: "ephemeral" },
         },
         {
