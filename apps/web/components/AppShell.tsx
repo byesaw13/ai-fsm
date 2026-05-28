@@ -11,15 +11,11 @@ import {
   IconSettings,
   IconMyDay,
   IconField,
-  IconBooking,
   IconProperties,
   IconJobs,
   IconClients,
   IconInvoices,
-  IconSchedule,
-  IconReports,
-  IconAutomations,
-  IconInbox,
+  IconMileage,
 } from "./NavIcons";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
@@ -41,35 +37,24 @@ interface NavSection {
 // ---------------------------------------------------------------------------
 
 // Named constants for items referenced outside the array (mobile bottom bar)
-const NAV_TODAY:  NavItem = { href: "/app",               label: "Today",      Icon: IconMyDay };
-const NAV_PROPS:  NavItem = { href: "/app/properties",    label: "Properties", Icon: IconProperties, adminOnly: true };
-const NAV_JOBS:   NavItem = { href: "/app/jobs",          label: "Jobs",       Icon: IconJobs,       adminOnly: true };
+const NAV_TODAY:    NavItem = { href: "/app",            label: "Today",      Icon: IconMyDay };
+const NAV_PROPS:    NavItem = { href: "/app/properties", label: "Properties", Icon: IconProperties, adminOnly: true };
+const NAV_JOBS:     NavItem = { href: "/app/jobs",       label: "Jobs",       Icon: IconJobs,       adminOnly: true };
+const NAV_INVOICES: NavItem = { href: "/app/invoices",   label: "Invoices",   Icon: IconInvoices,   adminOnly: true };
 
+// Layer 1 — Daily Driver nav only. Advanced routes (Schedule, Automations, Reports,
+// Booking Requests, Inbox) are accessible from Today or Settings — not in the sidebar.
 const ADMIN_NAV_SECTIONS: NavSection[] = [
   {
     label: "",
     items: [
       NAV_TODAY,
+      { href: "/app/clients",   label: "Clients",    Icon: IconClients,   adminOnly: true },
       NAV_PROPS,
-    ],
-  },
-  {
-    label: "Work",
-    items: [
-      { href: "/app/inbox",            label: "Inbox",      Icon: IconInbox,      adminOnly: true },
-      { href: "/app/booking-requests", label: "Intake",     Icon: IconBooking,    adminOnly: true },
+      { href: "/app/estimates", label: "Estimates",  Icon: IconEstimates, adminOnly: true },
       NAV_JOBS,
-      { href: "/app/estimates",        label: "Estimates",  Icon: IconEstimates,  adminOnly: true },
-      { href: "/app/invoices",         label: "Invoices",   Icon: IconInvoices,   adminOnly: true },
-      { href: "/app/clients",          label: "Clients",    Icon: IconClients,    adminOnly: true },
-    ],
-  },
-  {
-    label: "Manage",
-    items: [
-      { href: "/app/schedule",    label: "Schedule",    Icon: IconSchedule,    adminOnly: true },
-      { href: "/app/automations", label: "Automations", Icon: IconAutomations, adminOnly: true },
-      { href: "/app/reports",     label: "Reports",     Icon: IconReports,     adminOnly: true },
+      NAV_INVOICES,
+      { href: "/app/mileage",   label: "Mileage",    Icon: IconMileage,   adminOnly: true },
     ],
   },
 ];
@@ -98,7 +83,7 @@ export function getBottomNavItems(role: Role): NavItem[] {
   }
 
   const settings: NavItem = { href: "/app/settings", label: "Settings", Icon: IconSettings };
-  return [NAV_TODAY, NAV_PROPS, NAV_JOBS, settings];
+  return [NAV_TODAY, NAV_JOBS, NAV_INVOICES, settings];
 }
 
 /** Returns true if href is the active route for the current pathname */

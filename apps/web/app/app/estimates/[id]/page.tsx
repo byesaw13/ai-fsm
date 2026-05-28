@@ -187,6 +187,22 @@ export default async function EstimateDetailPage({
 
   const { estimate, lineItems, options } = result;
 
+  // For approved estimates with a linked job, check if any visits are scheduled
+  let jobVisitCount = 0;
+  if (estimate.status === "approved" && estimate.job_id) {
+    try {
+      const pool = getPool();
+      const vcRow = await pool.query<{ count: string }>(
+        `SELECT COUNT(*)::text AS count FROM visits
+         WHERE job_id = $1 AND account_id = $2 AND status != 'cancelled'`,
+        [estimate.job_id, session.accountId]
+      );
+      jobVisitCount = parseInt(vcRow.rows[0]?.count ?? "0", 10);
+    } catch {
+      // Non-critical — proceed without count
+    }
+  }
+
   // Fetch change orders for this estimate
   let changeOrders: unknown[] = [];
   try {
@@ -301,14 +317,37 @@ export default async function EstimateDetailPage({
           <p style={{ margin: 0, fontWeight: 600, color: "#065f46" }}>
             Estimate approved — ready to schedule work or invoice.
           </p>
-          <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-2)", flexWrap: "wrap" }}>
-            {estimate.job_id && (
+          <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-3)", flexWrap: "wrap", alignItems: "center" }}>
+            {estimate.job_id && jobVisitCount === 0 && (
+              <Link
+                href={`/app/jobs/${estimate.job_id}/visits/new`}
+                style={{
+                  padding: "var(--space-2) var(--space-4)",
+                  background: "#059669",
+                  color: "#fff",
+                  borderRadius: "var(--radius)",
+                  fontSize: "var(--text-sm)",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  whiteSpace: "nowrap",
+                }}
+                data-testid="schedule-first-visit-btn"
+              >
+                Schedule First Visit →
+              </Link>
+            )}
+            {estimate.job_id && jobVisitCount > 0 && (
               <Link
                 href={`/app/jobs/${estimate.job_id}`}
                 style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}
               >
-                Go to job / schedule visits →
+                Go to job / manage visits →
               </Link>
+            )}
+            {!estimate.job_id && (
+              <span style={{ fontSize: "var(--text-sm)", color: "#065f46", opacity: 0.8 }}>
+                No linked job — create a job first to schedule visits.
+              </span>
             )}
             <a
               href="#convert-invoice"

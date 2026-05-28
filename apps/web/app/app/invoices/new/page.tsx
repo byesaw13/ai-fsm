@@ -27,8 +27,16 @@ interface Property {
   [key: string]: unknown;
 }
 
+interface EstimateLineItem {
+  description: string;
+  quantity: number;
+  unit_price_cents: number;
+  sort_order: number;
+  [key: string]: unknown;
+}
+
 interface PageProps {
-  searchParams: Promise<{ client_id?: string; job_id?: string }>;
+  searchParams: Promise<{ client_id?: string; job_id?: string; approved_estimate_id?: string }>;
 }
 
 export default async function NewInvoicePage({ searchParams }: PageProps) {
@@ -36,7 +44,7 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
   if (!session) redirect("/login");
   if (!canCreateInvoices(session.role)) redirect("/app/invoices");
 
-  const { client_id, job_id } = await searchParams;
+  const { client_id, job_id, approved_estimate_id } = await searchParams;
 
   const [clients, jobs, properties] = await Promise.all([
     query<Client>(
@@ -53,6 +61,29 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
     ),
   ]);
 
+  // Pre-populate line items from approved estimate if requested
+  let prefillLineItems: Array<{ description: string; quantity: string; unit_price: string }> | undefined;
+  if (approved_estimate_id) {
+    const estimateItems = await query<EstimateLineItem>(
+      `SELECT eli.description, eli.quantity, eli.unit_price_cents, eli.sort_order
+       FROM estimate_line_items eli
+       JOIN estimates e ON e.id = eli.estimate_id
+       WHERE eli.estimate_id = $1
+         AND e.account_id = $2
+         AND e.status = 'approved'
+         AND eli.option_id IS NULL
+       ORDER BY eli.sort_order ASC`,
+      [approved_estimate_id, session.accountId]
+    );
+    if (estimateItems.length > 0) {
+      prefillLineItems = estimateItems.map((li) => ({
+        description: li.description,
+        quantity: String(li.quantity),
+        unit_price: (li.unit_price_cents / 100).toFixed(2),
+      }));
+    }
+  }
+
   return (
     <PageContainer>
       <PageHeader title="New Invoice" backHref="/app/invoices" backLabel="Invoices" />
@@ -63,6 +94,7 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
           properties={properties}
           initialClientId={client_id}
           initialJobId={job_id}
+          prefillLineItems={prefillLineItems}
         />
       </Card>
     </PageContainer>

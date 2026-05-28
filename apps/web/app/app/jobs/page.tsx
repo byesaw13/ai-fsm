@@ -1,3 +1,5 @@
+import Link from "next/link";
+import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { query } from "@/lib/db";
@@ -42,6 +44,20 @@ const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   cancelled: "Cancelled",
 };
 
+type JobTier = "active" | "pending" | "done";
+
+const JOB_TIER_STATUSES: Record<JobTier, JobStatus[]> = {
+  active:  ["scheduled", "in_progress"],
+  pending: ["draft", "quoted"],
+  done:    ["completed", "invoiced", "cancelled"],
+};
+
+const JOB_TIER_LABELS: Record<JobTier, string> = {
+  active:  "Active",
+  pending: "Pending",
+  done:    "Done",
+};
+
 const JOB_STATUS_ORDER: JobStatus[] = [
   "in_progress",
   "scheduled",
@@ -74,11 +90,11 @@ const JOB_FILTERS: FilterDef[] = [
 ];
 
 interface PageProps {
-  searchParams: Promise<{ q?: string; status?: string; priority?: string; view?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; priority?: string; view?: string; tier?: string }>;
 }
 
 export default async function JobsPage({ searchParams }: PageProps) {
-  const { q, status, priority, view } = await searchParams;
+  const { q, status, priority, view, tier } = await searchParams;
   const isBoardView = view === "board";
   const session = await getSession();
   if (!session) redirect("/login");
@@ -87,8 +103,12 @@ export default async function JobsPage({ searchParams }: PageProps) {
   const canCreate = canTransitionJob(session.role);
 
   const searchPattern = q ? `%${q.toLowerCase()}%` : null;
+  const activeTier = (tier && tier in JOB_TIER_STATUSES) ? tier as JobTier : null;
+  // Explicit status filter takes precedence over tier; if neither set, no status filter
   const statusFilter = status && JOB_STATUS_ORDER.includes(status as JobStatus) ? status : null;
   const priorityFilter = priority ? parseInt(priority) : null;
+  // Tier provides a multi-status filter when no explicit status is set
+  const tierStatuses = activeTier && !statusFilter ? JOB_TIER_STATUSES[activeTier] : null;
 
   let jobs: JobRow[];
   if (isAdmin) {
@@ -104,6 +124,10 @@ export default async function JobsPage({ searchParams }: PageProps) {
     if (statusFilter) {
       conditions.push(`j.status = $${idx}`);
       params.push(statusFilter);
+      idx++;
+    } else if (tierStatuses) {
+      conditions.push(`j.status = ANY($${idx}::text[])`);
+      params.push(tierStatuses);
       idx++;
     }
     if (priorityFilter !== null) {
@@ -137,6 +161,10 @@ export default async function JobsPage({ searchParams }: PageProps) {
       conditions.push(`j.status = $${idx}`);
       params.push(statusFilter);
       idx++;
+    } else if (tierStatuses) {
+      conditions.push(`j.status = ANY($${idx}::text[])`);
+      params.push(tierStatuses);
+      idx++;
     }
     if (priorityFilter !== null) {
       conditions.push(`j.priority = $${idx}`);
@@ -158,7 +186,7 @@ export default async function JobsPage({ searchParams }: PageProps) {
     );
   }
 
-  const hasFilter = !!(q || statusFilter || priorityFilter);
+  const hasFilter = !!(q || statusFilter || priorityFilter || activeTier);
   const currentValues: Record<string, string> = {};
   if (q) currentValues.q = q;
   if (status) currentValues.status = status;
@@ -223,6 +251,9 @@ export default async function JobsPage({ searchParams }: PageProps) {
           </div>
         }
       />
+
+      {/* Tier tabs — quick filter by workflow stage */}
+      <TierTabs active={activeTier} baseHref="/app/jobs" preserve={{ q, priority, view }} />
 
       <FilterBar
         filters={JOB_FILTERS}
@@ -292,6 +323,57 @@ export default async function JobsPage({ searchParams }: PageProps) {
         </div>
       )}
     </PageContainer>
+  );
+}
+
+function TierTabs({
+  active,
+  baseHref,
+  preserve = {},
+}: {
+  active: JobTier | null;
+  baseHref: string;
+  preserve?: Record<string, string | undefined>;
+}) {
+  function href(tier: JobTier | null) {
+    const params = new URLSearchParams();
+    if (tier) params.set("tier", tier);
+    Object.entries(preserve).forEach(([k, v]) => { if (v) params.set(k, v); });
+    const qs = params.toString();
+    return `${baseHref}${qs ? `?${qs}` : ""}` as Route;
+  }
+
+  const tabs: { tier: JobTier | null; label: string }[] = [
+    { tier: null,      label: "All" },
+    { tier: "active",  label: "Active" },
+    { tier: "pending", label: "Pending" },
+    { tier: "done",    label: "Done" },
+  ];
+
+  return (
+    <div style={{ display: "flex", gap: "var(--space-1)", marginBottom: "var(--space-3)", flexWrap: "wrap" }}>
+      {tabs.map(({ tier, label }) => {
+        const isActive = active === tier;
+        return (
+          <Link
+            key={label}
+            href={href(tier)}
+            style={{
+              padding: "var(--space-1) var(--space-3)",
+              borderRadius: "var(--radius-full)",
+              fontSize: "var(--text-sm)",
+              fontWeight: isActive ? 700 : 500,
+              textDecoration: "none",
+              background: isActive ? "var(--accent)" : "var(--color-surface-2, var(--bg-card))",
+              color: isActive ? "#fff" : "var(--fg-muted)",
+              border: isActive ? "1px solid var(--accent)" : "1px solid var(--border)",
+            }}
+          >
+            {label}
+          </Link>
+        );
+      })}
+    </div>
   );
 }
 

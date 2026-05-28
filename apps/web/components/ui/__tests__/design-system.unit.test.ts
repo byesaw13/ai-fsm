@@ -140,44 +140,26 @@ function flattenSections(sections: ReturnType<typeof getNavSections>) {
 }
 
 describe("getNavSections (role filtering)", () => {
-  it("returns 3 sections (primary, Work, Manage) for admin role", () => {
+  it("returns 1 section (Layer 1 daily driver) for admin role", () => {
     const sections = getNavSections("admin");
-    expect(sections).toHaveLength(3);
+    expect(sections).toHaveLength(1);
     expect(sections[0].label).toBe("");
-    expect(sections[1].label).toBe("Work");
-    expect(sections[2].label).toBe("Manage");
   });
 
-  it("primary section has Today + Properties for admin role", () => {
+  it("Layer 1 section has Today, Clients, Properties, Estimates, Jobs, Invoices, Mileage for admin role", () => {
     const sections = getNavSections("admin");
     const hrefs = sections[0].items.map((i) => i.href);
     expect(hrefs).toContain("/app");
-    expect(hrefs).toContain("/app/properties");
-    expect(hrefs).toHaveLength(2);
-  });
-
-  it("Work section has Intake, Jobs, Estimates, Invoices, Clients for admin role", () => {
-    const sections = getNavSections("admin");
-    const hrefs = sections[1].items.map((i) => i.href);
-    expect(hrefs).toContain("/app/inbox");
-    expect(hrefs).toContain("/app/booking-requests");
-    expect(hrefs).toContain("/app/jobs");
-    expect(hrefs).toContain("/app/estimates");
-    expect(hrefs).toContain("/app/invoices");
     expect(hrefs).toContain("/app/clients");
-    expect(hrefs).toHaveLength(6);
+    expect(hrefs).toContain("/app/properties");
+    expect(hrefs).toContain("/app/estimates");
+    expect(hrefs).toContain("/app/jobs");
+    expect(hrefs).toContain("/app/invoices");
+    expect(hrefs).toContain("/app/mileage");
+    expect(hrefs).toHaveLength(7);
   });
 
-  it("Manage section has Schedule, Automations, Reports for admin role", () => {
-    const sections = getNavSections("admin");
-    const hrefs = sections[2].items.map((i) => i.href);
-    expect(hrefs).toContain("/app/schedule");
-    expect(hrefs).toContain("/app/automations");
-    expect(hrefs).toContain("/app/reports");
-    expect(hrefs).toHaveLength(3);
-  });
-
-  it("settings and price-book/memberships/field/portal are not in nav sections", () => {
+  it("Layer 2+ tools (schedule, automations, reports, inbox, booking-requests) are not in main nav", () => {
     const items = flattenSections(getNavSections("admin"));
     const hrefs = items.map((i) => i.href);
     expect(hrefs).not.toContain("/app/settings");
@@ -185,12 +167,17 @@ describe("getNavSections (role filtering)", () => {
     expect(hrefs).not.toContain("/app/maintenance-plans");
     expect(hrefs).not.toContain("/app/field");
     expect(hrefs).not.toContain("/portal/login");
+    expect(hrefs).not.toContain("/app/schedule");
+    expect(hrefs).not.toContain("/app/automations");
+    expect(hrefs).not.toContain("/app/reports");
+    expect(hrefs).not.toContain("/app/inbox");
+    expect(hrefs).not.toContain("/app/booking-requests");
   });
 
-  it("returns the same 3-section nav for owner role", () => {
+  it("returns the same 1-section nav for owner role with 7 items", () => {
     const sections = getNavSections("owner");
-    expect(sections).toHaveLength(3);
-    expect(flattenSections(sections)).toHaveLength(11);
+    expect(sections).toHaveLength(1);
+    expect(flattenSections(sections)).toHaveLength(7);
   });
 
   it("returns only 2 items for tech role (My Day + On Site)", () => {
@@ -220,13 +207,13 @@ describe("getNavSections (role filtering)", () => {
 });
 
 describe("getBottomNavItems (mobile)", () => {
-  it("returns 4 items for admin role: Today, Properties, Jobs, Settings", () => {
+  it("returns 4 items for admin role: Today, Jobs, Invoices, Settings", () => {
     const items = getBottomNavItems("admin");
     expect(items).toHaveLength(4);
     const hrefs = items.map((i) => i.href);
     expect(hrefs).toContain("/app");
-    expect(hrefs).toContain("/app/properties");
     expect(hrefs).toContain("/app/jobs");
+    expect(hrefs).toContain("/app/invoices");
     expect(hrefs).toContain("/app/settings");
     expect(hrefs).not.toContain("/app/booking-requests");
     expect(hrefs).not.toContain("/app/estimates");

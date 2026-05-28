@@ -159,6 +159,7 @@ export default async function JobDetailPage({
           has_sent_estimate: boolean;
           last_estimate_sent_at: string | null;
           has_approved_estimate: boolean;
+          approved_estimate_id: string | null;
           has_deposit_invoice: boolean;
           deposit_paid: boolean;
           has_unpaid_invoice: boolean;
@@ -184,6 +185,7 @@ export default async function JobDetailPage({
              EXISTS(SELECT 1 FROM estimates WHERE job_id = $1 AND account_id = $2 AND status IN ('sent','approved')) AS has_sent_estimate,
              (SELECT sent_at FROM estimates WHERE job_id = $1 AND account_id = $2 AND status IN ('sent','approved') ORDER BY created_at DESC LIMIT 1) AS last_estimate_sent_at,
              EXISTS(SELECT 1 FROM estimates WHERE job_id = $1 AND account_id = $2 AND status = 'approved') AS has_approved_estimate,
+             (SELECT id FROM estimates WHERE job_id = $1 AND account_id = $2 AND status = 'approved' ORDER BY created_at DESC LIMIT 1) AS approved_estimate_id,
              EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND notes LIKE 'Deposit: %') AS has_deposit_invoice,
              EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND notes LIKE 'Deposit: %' AND status IN ('partial','paid')) AS deposit_paid,
              EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND status IN ('sent','partial','overdue')) AS has_unpaid_invoice,
@@ -309,6 +311,7 @@ export default async function JobDetailPage({
             hasSentEstimate={commercialCounts.has_sent_estimate}
             lastEstimateSentAt={commercialCounts.last_estimate_sent_at}
             hasApprovedEstimate={commercialCounts.has_approved_estimate}
+            approvedEstimateId={commercialCounts.approved_estimate_id}
             hasDepositInvoice={commercialCounts.has_deposit_invoice}
             depositPaid={commercialCounts.deposit_paid}
             hasActiveVisit={activeVisits.length > 0}
@@ -498,7 +501,7 @@ export default async function JobDetailPage({
                       </Link>
                     ) : canCreateInvoice && ["completed", "in_progress"].includes(currentStatus) ? (
                       <LinkButton
-                        href={`/app/invoices/new?job_id=${job.id}${job.client_id ? `&client_id=${job.client_id}` : ""}`}
+                        href={`/app/invoices/new?job_id=${job.id}${job.client_id ? `&client_id=${job.client_id}` : ""}${commercialCounts?.approved_estimate_id ? `&approved_estimate_id=${commercialCounts.approved_estimate_id}` : ""}`}
                         variant="primary"
                         size="sm"
                         data-testid="create-invoice-from-job-btn"

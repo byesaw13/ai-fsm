@@ -32,6 +32,7 @@ interface NewInvoiceFormProps {
   properties: Property[];
   initialClientId?: string;
   initialJobId?: string;
+  prefillLineItems?: LineItemRow[];
 }
 
 // ---------------------------------------------------------------------------
@@ -66,6 +67,7 @@ export function NewInvoiceForm({
   properties,
   initialClientId,
   initialJobId,
+  prefillLineItems,
 }: NewInvoiceFormProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -82,7 +84,9 @@ export function NewInvoiceForm({
   const [propertyId, setPropertyId] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
-  const [lineItems, setLineItems] = useState<LineItemRow[]>([{ ...EMPTY_ROW }]);
+  const [lineItems, setLineItems] = useState<LineItemRow[]>(
+    prefillLineItems && prefillLineItems.length > 0 ? prefillLineItems : [{ ...EMPTY_ROW }]
+  );
   const [taxRate, setTaxRate] = useState("0");
 
   const filteredJobs = useMemo(
@@ -179,6 +183,22 @@ export function NewInvoiceForm({
 
   return (
     <form onSubmit={handleSubmit} className="p7-form-stack" data-testid="new-invoice-form">
+      {prefillLineItems && prefillLineItems.length > 0 && (
+        <div
+          style={{
+            padding: "var(--space-3) var(--space-4)",
+            background: "#f0fdf4",
+            border: "1px solid #86efac",
+            borderRadius: "var(--radius)",
+            fontSize: "var(--text-sm)",
+            color: "#065f46",
+            fontWeight: 500,
+          }}
+          data-testid="prefill-notice"
+        >
+          Line items pre-filled from the approved estimate — review and adjust before submitting.
+        </div>
+      )}
       {error && (
         <Card className="p7-card-danger" padding="sm" role="alert">
           <p style={{ margin: 0 }} data-testid="form-error">{error}</p>
