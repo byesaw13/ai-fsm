@@ -12,6 +12,7 @@ export interface DraftService {
   service_name: string;
   service_category: string;
   base_price_cents: number;
+  unit_type: string;
   scope_values: Record<string, number | string>;
   complexity_factor_keys: string[];
   trade_detected: string;
@@ -61,6 +62,18 @@ Before selecting services, identify the primary trade category from the descript
 
 Only classify "skim coat" as drywall finishing (9002 / 1004) when the surrounding context is clearly wall or ceiling work with no flooring mentioned.
 
+**PAINTING trade**: Any mention of painting walls, ceilings, trim, doors, or other surfaces. When PAINTING is the primary trade:
+- Full room or multi-room wall painting → use 5012 (Interior room painting), fill wall_sqft from room heuristics if not given
+- Trim or baseboard only → use 5003
+- Single accent wall → use 5001
+- Touch-up on dried patches → use 5008 (≤6") or 5009 (>6")
+- Door painting only → use 5002 (per door)
+- Deck or fence staining → use 5005 or 5004
+- Cabinet painting → use 5006
+- For scope_values on 5012: set wall_sqft (required), ceiling_sqft (if ceiling included), trim_linear_ft (if trim included), coat_count ("two_coats" default), paint_finish ("eggshell" for walls)
+- Complexity factors: apply dark_to_light if color change from dark to light; nicotine_staining if smoke damage mentioned; occupied_home if furniture must be protected; vaulted_ceilings if mentioned; difficult_masking for crown/built-ins/chair rail
+- Multi-room jobs with heavy prep: set finish_expectation = "premium" only if client explicitly requests it
+
 **UNKNOWN trade**: If the job does not match any catalog service:
 - Use code 9099 (Custom / uncatalogued service)
 - In the estimate notes, write a detailed description of what the work involves
@@ -80,6 +93,7 @@ Only classify "skim coat" as drywall finishing (9002 / 1004) when the surroundin
 - Fill scope_values with the component keys from the scope template for that service's category
 - Use the exact key names shown in the Scope Templates section
 - For flooring services (9010–9013): use sqft (floor area), floor_type (lvp/hardwood/laminate/concrete_prep_only), subfloor_condition (good/minor_leveling/skim_coat/self_leveler). Set material_cost only if a client-supplied cost is explicitly stated.
+- For painting_finishes services: use wall_sqft (required for 5012), ceiling_sqft (if ceiling included), trim_linear_ft (if trim included), door_count (if doors), coat_count ("two_coats" default), paint_finish ("eggshell" for walls, "semi_gloss" for trim/bath). Use room-size heuristics for wall_sqft when not given.
 - When measurements are not given, estimate from these heuristics and record every estimate in confidence_notes:
   - Bedroom → ~250 sqft walls (~180 sqft floor)
   - Master bedroom → ~320 sqft walls (~220 sqft floor)
@@ -104,13 +118,13 @@ Only classify "skim coat" as drywall finishing (9002 / 1004) when the surroundin
 ## Trade service range locks
 When a primary trade is detected, restrict service selection to that trade's catalog range. Only mix ranges when the description explicitly describes multi-trade work (e.g. "paint walls and install LVP flooring").
 - flooring: 9010–9019
-- general_repairs / drywall: 1000–1999
+- general_repairs: 1000–1999 (also 9002 for advanced skim coat / level-5 finish on walls or ceilings)
 - plumbing: 2000–2999
 - electrical: 3000–3999
-- carpentry: 4000–4999
-- painting: 5000–5999
-- outdoor / hardscape: 6000–6999
-- mounting / hanging: 7000–7999
+- carpentry_furniture: 4000–4999
+- painting_finishes: 5000–5999 (also 9003 for whole-home or large exterior painting projects)
+- outdoor_seasonal: 6000–6999
+- mounting_installs: 7000–7999
 - uncatalogued fallback: 9099
 
 ## Rules for trade_detected and detection_reasons
@@ -131,8 +145,12 @@ When sqft is known (given or estimated), include a labor sanity check in confide
 | 9011 Concrete skim coat | 100 sqft/day | complex_layout −10% |
 | 9012 Self-leveling compound | 200 sqft/day | — |
 | 9013 Flooring removal | 300 sqft/day | complex_layout −15% |
+| 5012 Interior room painting | 200 sqft/day (wall_sqft) | dark_to_light −20%, nicotine_staining −30%, occupied_home −10%, vaulted_ceilings −15%, difficult_masking −15% |
+| 5003 Trim/baseboard painting | 120 LF/day | difficult_masking −20% |
+| 5002 Door painting | 6 doors/day | — |
 
-Example: "400 sqft LVP with complex_layout → 400 ÷ (175 × 0.85) ≈ 2.7 days. Pricing should reflect 3 field days minimum."
+Example flooring: "400 sqft LVP with complex_layout → 400 ÷ (175 × 0.85) ≈ 2.7 days. Pricing should reflect 3 field days minimum."
+Example painting: "450 sqft walls (living room + hallway) with dark_to_light → 450 ÷ (200 × 0.80) ≈ 2.8 days. Budget 3 field days."
 Apply the same reasoning to any service where a rate is listed. Do NOT fabricate rates for services not in this table.`;
 
 const DRAFT_TOOL: Anthropic.Tool = {
@@ -340,6 +358,7 @@ export async function draftEstimate(
           service_name: pb.name,
           service_category: pb.category,
           base_price_cents: pb.default_price_cents ?? pb.price_min_cents,
+          unit_type: pb.unit_type ?? "flat",
           scope_values: s.scope_values,
           complexity_factor_keys: s.complexity_factor_keys,
           trade_detected: s.trade_detected ?? "unknown",

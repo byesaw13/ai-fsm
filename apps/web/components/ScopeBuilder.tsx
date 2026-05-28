@@ -21,6 +21,7 @@ import { computeLaborDays, formatLaborEstimate } from "@ai-fsm/domain";
 interface ScopeBuilderProps {
   category: string;
   serviceCode?: string;
+  unitType?: string | null;
   basePriceCents: number;
   onChange: (result: ScopeBuilderResult) => void;
   initialScopeValues?: ScopeComponentValues;
@@ -198,7 +199,7 @@ function ComplexityFactorRow({
   );
 }
 
-export function ScopeBuilder({ category, serviceCode, basePriceCents, onChange, initialScopeValues, initialComplexityFactors }: ScopeBuilderProps) {
+export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, onChange, initialScopeValues, initialComplexityFactors }: ScopeBuilderProps) {
   const [template, setTemplate] = useState<ScopeTemplate | null>(null);
   const [rules, setRules] = useState<ProfitabilityRule[]>([]);
   const [materialRules, setMaterialRules] = useState<ServiceMaterial[]>([]);
@@ -250,11 +251,20 @@ export function ScopeBuilder({ category, serviceCode, basePriceCents, onChange, 
     return () => { cancelled = true; };
   }, [category]);
 
-  const { multiplier, adderCents, adjustedPriceCents, violations, computedMaterials, materialTotalCents, laborEstimate } = useMemo(() => {
-    if (!template) return { multiplier: 1.0, adderCents: 0, adjustedPriceCents: basePriceCents, violations: [], computedMaterials: [], materialTotalCents: 0, laborEstimate: null };
+  const { multiplier, adderCents, adjustedPriceCents, effectiveBasePriceCents, violations, computedMaterials, materialTotalCents, laborEstimate } = useMemo(() => {
+    if (!template) return { multiplier: 1.0, adderCents: 0, adjustedPriceCents: basePriceCents, effectiveBasePriceCents: basePriceCents, violations: [], computedMaterials: [], materialTotalCents: 0, laborEstimate: null };
 
     const mod = computeScopeModifier(template.complexity_factors, complexity);
-    const adjusted = Math.round(basePriceCents * mod.multiplier) + mod.adderCents;
+
+    // For per_sqft services, scale base price by the primary area component value
+    let effectiveBase = basePriceCents;
+    if (unitType === "per_sqft") {
+      const sqftVal = typeof components.wall_sqft === "number" ? components.wall_sqft
+                    : typeof components.sqft === "number" ? components.sqft : 0;
+      if (sqftVal > 0) effectiveBase = basePriceCents * sqftVal;
+    }
+
+    const adjusted = Math.round(effectiveBase * mod.multiplier) + mod.adderCents;
 
     const sqft = typeof components.wall_sqft === "number" ? components.wall_sqft :
                  typeof components.sqft === "number" ? components.sqft : undefined;
@@ -263,6 +273,8 @@ export function ScopeBuilder({ category, serviceCode, basePriceCents, onChange, 
       totalCents: adjusted,
       sqft,
     });
+
+
 
     const mats = computeMaterials(materialRules, components, complexity);
     const matTotal = mats.reduce((sum, m) => sum + m.total_cost_cents, 0);
@@ -277,6 +289,7 @@ export function ScopeBuilder({ category, serviceCode, basePriceCents, onChange, 
       multiplier: mod.multiplier,
       adderCents: mod.adderCents,
       adjustedPriceCents: adjusted,
+      effectiveBasePriceCents: effectiveBase,
       violations: v.map((viol) => ({
         label: viol.rule.description ?? viol.rule.rule_type,
         actual: viol.actual,
@@ -287,7 +300,7 @@ export function ScopeBuilder({ category, serviceCode, basePriceCents, onChange, 
       materialTotalCents: matTotal,
       laborEstimate: labor,
     };
-  }, [template, complexity, components, basePriceCents, rules, category, materialRules, productionRates, productionModifiers, serviceCode]);
+  }, [template, complexity, components, basePriceCents, unitType, rules, category, materialRules, productionRates, productionModifiers, serviceCode]);
 
   // Notify parent on changes
   useEffect(() => {
@@ -440,27 +453,29 @@ export function ScopeBuilder({ category, serviceCode, basePriceCents, onChange, 
           >
             <div>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                Base price
+                {unitType === "per_sqft" ? `Base price ($${(basePriceCents / 100).toFixed(2)}/sqft)` : "Base price"}
               </span>
               <span
                 style={{
                   marginLeft: "var(--space-2)",
                   fontSize: "var(--text-sm)",
-                  color: hasModifiers ? "var(--fg-muted)" : "var(--fg)",
-                  textDecoration: hasModifiers ? "line-through" : "none",
+                  color: (hasModifiers || effectiveBasePriceCents !== basePriceCents) ? "var(--fg-muted)" : "var(--fg)",
+                  textDecoration: (hasModifiers || effectiveBasePriceCents !== basePriceCents) ? "line-through" : "none",
                 }}
               >
                 {formatDollars(basePriceCents)}
               </span>
-              {hasModifiers && (
+              {(effectiveBasePriceCents !== basePriceCents || hasModifiers) && (
                 <>
                   <span style={{ margin: "0 var(--space-1)", color: "var(--fg-muted)" }}>→</span>
                   <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--accent)" }}>
                     {formatDollars(adjustedPriceCents)}
                   </span>
-                  <span style={{ marginLeft: "var(--space-2)", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                    ({formatModifier(multiplier, adderCents, basePriceCents)})
-                  </span>
+                  {hasModifiers && (
+                    <span style={{ marginLeft: "var(--space-2)", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                      ({formatModifier(multiplier, adderCents, effectiveBasePriceCents)})
+                    </span>
+                  )}
                 </>
               )}
             </div>
