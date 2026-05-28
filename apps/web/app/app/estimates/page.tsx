@@ -1,3 +1,5 @@
+import Link from "next/link";
+import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { canCreateEstimates } from "@/lib/auth/permissions";
@@ -39,6 +41,13 @@ const STATUS_LABELS: Record<EstimateStatus, string> = {
   expired: "Expired",
 };
 
+type EstimateTier = "open" | "closed";
+
+const ESTIMATE_TIER_STATUSES: Record<EstimateTier, EstimateStatus[]> = {
+  open:   ["draft", "sent"],
+  closed: ["approved", "declined", "expired"],
+};
+
 const STATUS_ORDER: EstimateStatus[] = [
   "sent",
   "draft",
@@ -63,7 +72,7 @@ const ESTIMATE_FILTERS: FilterDef[] = [
 ];
 
 interface PageProps {
-  searchParams: Promise<{ q?: string; status?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; tier?: string }>;
 }
 
 function formatDollars(cents: number): string {
@@ -71,15 +80,17 @@ function formatDollars(cents: number): string {
 }
 
 export default async function EstimatesPage({ searchParams }: PageProps) {
-  const { q, status } = await searchParams;
+  const { q, status, tier } = await searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
 
   const canCreate = canCreateEstimates(session.role);
 
   const searchPattern = q ? `%${q.toLowerCase()}%` : null;
+  const activeTier = (tier && tier in ESTIMATE_TIER_STATUSES) ? tier as EstimateTier : null;
   const statusFilter =
     status && (STATUS_ORDER as string[]).includes(status) ? status : null;
+  const tierStatuses = activeTier && !statusFilter ? ESTIMATE_TIER_STATUSES[activeTier] : null;
 
   const estimates = await withEstimateContext(session, async (client) => {
     const conditions: string[] = ["e.account_id = $1"];
@@ -96,6 +107,10 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
     if (statusFilter) {
       conditions.push(`e.status = $${idx}`);
       params.push(statusFilter);
+      idx++;
+    } else if (tierStatuses) {
+      conditions.push(`e.status = ANY($${idx}::text[])`);
+      params.push(tierStatuses);
       idx++;
     }
 
@@ -115,7 +130,7 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
     return r.rows as EstimateRow[];
   });
 
-  const hasFilter = !!(q || statusFilter);
+  const hasFilter = !!(q || statusFilter || activeTier);
   const currentValues: Record<string, string> = {};
   if (q) currentValues.q = q;
   if (status) currentValues.status = status;
@@ -194,6 +209,39 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
       {estimates.length > 0 && !hasFilter && (
         <MetricGrid metrics={metrics} />
       )}
+
+      {/* Tier tabs — quick filter: open (draft/sent) vs closed (approved/declined/expired) */}
+      <div style={{ display: "flex", gap: "var(--space-1)", marginBottom: "var(--space-3)", flexWrap: "wrap" }}>
+        {([
+          { tier: null,      label: "All" },
+          { tier: "open",    label: "Open" },
+          { tier: "closed",  label: "Closed" },
+        ] as { tier: EstimateTier | null; label: string }[]).map(({ tier: t, label }) => {
+          const isActive = activeTier === t;
+          const params = new URLSearchParams();
+          if (t) params.set("tier", t);
+          if (q) params.set("q", q);
+          const qs = params.toString();
+          return (
+            <Link
+              key={label}
+              href={`/app/estimates${qs ? `?${qs}` : ""}` as Route}
+              style={{
+                padding: "var(--space-1) var(--space-3)",
+                borderRadius: "var(--radius-full)",
+                fontSize: "var(--text-sm)",
+                fontWeight: isActive ? 700 : 500,
+                textDecoration: "none",
+                background: isActive ? "var(--accent)" : "var(--color-surface-2, var(--bg-card))",
+                color: isActive ? "#fff" : "var(--fg-muted)",
+                border: isActive ? "1px solid var(--accent)" : "1px solid var(--border)",
+              }}
+            >
+              {label}
+            </Link>
+          );
+        })}
+      </div>
 
       <FilterBar
         filters={ESTIMATE_FILTERS}

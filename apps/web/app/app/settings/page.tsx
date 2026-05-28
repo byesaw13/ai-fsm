@@ -112,6 +112,43 @@ export default async function SettingsPage() {
         )}
 
 
+        {isAdmin && (
+          <section>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Tools</h2>
+            <Card padding="default">
+              <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                Operational tools and advanced views.
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                {[
+                  { href: "/app/schedule",              label: "Schedule",             desc: "Week / month / year calendar views" },
+                  { href: "/app/booking-requests",      label: "Booking Requests",     desc: "Intake queue and request management" },
+                  { href: "/app/pipeline",              label: "Pipeline",             desc: "Jobs by stage with estimate and invoice status" },
+                  { href: "/app/reports",               label: "Reports",              desc: "Revenue, pipeline, and performance" },
+                  { href: "/app/operations-dashboard",  label: "Operations Dashboard", desc: "Revenue mix, schedule utilization, job quality" },
+                  { href: "/app/pricing-dashboard",     label: "Pricing Dashboard",    desc: "Estimate overrides, adjustments, and below-minimum fees" },
+                  { href: "/app/membership-dashboard",  label: "Membership Dashboard", desc: "Active memberships, renewals, and labor cap status" },
+                  { href: "/app/automations",           label: "Automations",          desc: "Workflow automation rules" },
+                  { href: "/app/price-book",            label: "Price Book",           desc: "Materials and labor pricing catalog" },
+                  { href: "/app/expenses",              label: "Expenses",             desc: "Job and business expense tracking" },
+                ].map(({ href, label, desc }) => (
+                  <Link
+                    key={href}
+                    href={href as unknown as Route}
+                    style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "var(--space-2) 0", borderBottom: "1px solid var(--border)", textDecoration: "none", color: "inherit" }}
+                  >
+                    <span>
+                      <span style={{ fontWeight: 600, fontSize: "var(--text-sm)" }}>{label}</span>
+                      <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>{desc}</span>
+                    </span>
+                    <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>→</span>
+                  </Link>
+                ))}
+              </div>
+            </Card>
+          </section>
+        )}
+
         <section>
           <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Your profile</h2>
           <ProfileForm

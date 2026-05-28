@@ -9,6 +9,7 @@ interface WhatNextBannerProps {
   hasSentEstimate: boolean;
   lastEstimateSentAt: string | null;
   hasApprovedEstimate: boolean;
+  approvedEstimateId: string | null;
   hasDepositInvoice: boolean;
   depositPaid: boolean;
   hasActiveVisit: boolean;
@@ -37,7 +38,7 @@ interface BannerContent {
 function computeBanner(props: WhatNextBannerProps): BannerContent | null {
   const {
     jobId, clientId, jobStatus, estimateCount, hasSentEstimate, lastEstimateSentAt,
-    hasApprovedEstimate, hasDepositInvoice, depositPaid, hasActiveVisit,
+    hasApprovedEstimate, approvedEstimateId, hasDepositInvoice, depositPaid, hasActiveVisit,
     invoiceCount, hasUnpaidInvoice, hasPaidInvoice,
   } = props;
 
@@ -67,13 +68,14 @@ function computeBanner(props: WhatNextBannerProps): BannerContent | null {
 
   // Completed, no invoice yet
   if (jobStatus === "completed" && invoiceCount === 0) {
+    const estimateParam = approvedEstimateId ? `&approved_estimate_id=${approvedEstimateId}` : "";
     return {
       color: "#1e40af",
       bg: "#dbeafe",
       icon: "→",
       message: "Work complete — send the final invoice",
       actionLabel: "Create Invoice",
-      actionHref: `/app/invoices/new?job_id=${jobId}${clientParam}`,
+      actionHref: `/app/invoices/new?job_id=${jobId}${clientParam}${estimateParam}`,
     };
   }
 
@@ -148,8 +150,8 @@ function computeBanner(props: WhatNextBannerProps): BannerContent | null {
     };
   }
 
-  // Draft with no estimates
-  if (jobStatus === "draft" && estimateCount === 0) {
+  // Draft or quoted with no estimates
+  if ((jobStatus === "draft" || jobStatus === "quoted") && estimateCount === 0) {
     return {
       color: "#1e40af",
       bg: "#dbeafe",
