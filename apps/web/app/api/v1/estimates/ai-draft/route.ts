@@ -4,6 +4,7 @@ import { withAuth } from "@/lib/auth/middleware";
 import { getPool, query } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { draftEstimate } from "@/lib/estimates/ai-draft";
+import type { TradeDefinition } from "@/lib/estimates/ai-draft";
 import type { PriceBookEntry } from "@/lib/estimates/item-suggester";
 import type { ScopeTemplate, ScopeComponent, ComplexityFactor, ScopeComponentOption } from "@ai-fsm/domain";
 
@@ -130,6 +131,17 @@ export const POST = withAuth(async (request: NextRequest, session) => {
       }));
     }
 
+    // Load trade definitions
+    const { rows: tradeRows } = await pool.query<TradeDefinition>(
+      `SELECT trade_key, display_name, scope_template_category,
+              service_code_range_start, service_code_range_end, extra_code_notes,
+              detection_keywords, routing_rules, disambiguation_rules,
+              scope_values_guidance, complexity_guidance, is_active, sort_order
+       FROM trades
+       WHERE is_active = true
+       ORDER BY sort_order ASC`
+    );
+
     // Optional job context
     let jobContext: string | undefined;
     if (job_id) {
@@ -144,7 +156,7 @@ export const POST = withAuth(async (request: NextRequest, session) => {
       }
     }
 
-    const draft = await draftEstimate(description, priceBook, templates, jobContext);
+    const draft = await draftEstimate(description, priceBook, templates, tradeRows, jobContext);
 
     return NextResponse.json({ draft });
   } catch (error) {
