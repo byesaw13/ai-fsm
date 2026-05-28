@@ -23,7 +23,7 @@ const createChangeOrderSchema = z.object({
   line_items: z.array(lineItemSchema).min(1),
 });
 
-export const POST = withRole(["owner", "admin"], async (request, session) => {
+export const POST = withRole(["owner", "admin", "tech"], async (request, session) => {
   let body: unknown;
   try {
     body = await request.json();

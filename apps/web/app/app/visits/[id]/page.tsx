@@ -600,6 +600,7 @@ export default async function VisitDetailPage({
                       jobId={visit.job_id!}
                       approvedEstimateId={approvedEstimate.id}
                       scopeAssumptions={approvedEstimate.scope_assumptions}
+                      currentTechNotes={visit.tech_notes ?? null}
                     />
                   </Card>
                 </>

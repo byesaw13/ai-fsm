@@ -8,6 +8,7 @@ interface Props {
   jobId: string;
   approvedEstimateId: string;
   scopeAssumptions: string | null;
+  currentTechNotes: string | null;
 }
 
 const CONDITION_FLAGS = [
@@ -20,7 +21,7 @@ const CONDITION_FLAGS = [
   { key: "other",                label: "Other (describe below)" },
 ] as const;
 
-export function ConditionsDifferPanel({ visitId, approvedEstimateId, scopeAssumptions }: Props) {
+export function ConditionsDifferPanel({ visitId, approvedEstimateId, scopeAssumptions, currentTechNotes }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
@@ -55,10 +56,14 @@ export function ConditionsDifferPanel({ visitId, approvedEstimateId, scopeAssump
 
     try {
       if (action === "note_only") {
+        const timestamp = new Date().toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
+        const appendedNotes = currentTechNotes?.trim()
+          ? `${currentTechNotes.trim()}\n\n[${timestamp}] ${description}`
+          : description;
         const r = await fetch(`/api/v1/visits/${visitId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tech_notes: description }),
+          body: JSON.stringify({ tech_notes: appendedNotes }),
         });
         if (!r.ok) throw new Error("Failed to save note");
       } else {
