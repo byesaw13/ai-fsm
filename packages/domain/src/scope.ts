@@ -53,6 +53,7 @@ export interface ScopeTemplate {
   category: string;
   label: string;
   description: string | null;
+  default_assumptions: string | null;
   components: ScopeComponent[];
   complexity_factors: ComplexityFactor[];
 }

@@ -195,6 +195,7 @@ const createEstimateSchema = z.object({
   risk_adjustment_cents: z.number().int().nonnegative().default(0),
   minimum_service_override_reason: estimateMinimumOverrideReasonSchema.nullable().optional(),
   minimum_service_override_note: z.string().nullable().optional(),
+  scope_assumptions: z.string().nullable().optional(),
   // Engine v2: room-by-room spec — when present, computeAndPersist() runs after insert
   engine_spec: z.record(z.unknown()).optional(),
   // Scope Intelligence: snapshot of components/complexity captured from ScopeBuilder per price-book item
@@ -274,6 +275,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     risk_adjustment_cents,
     minimum_service_override_reason,
     minimum_service_override_note,
+    scope_assumptions,
     engine_spec,
     scope_snapshots,
   } = parseResult.data;
@@ -364,10 +366,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             trip_count, requires_drying_or_curing, difficult_access, old_house_risk,
             coordination_required, finish_expectation, travel_surcharge_cents,
             risk_adjustment_cents, minimum_service_override_reason,
-            minimum_service_override_note, pricing_review_status)
+            minimum_service_override_note, pricing_review_status, scope_assumptions)
           VALUES ($1, $2, $3, $4, $5, 'draft', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
                   $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27,
-                  $28, $29, $30, $31, $32)
+                  $28, $29, $30, $31, $32, $33)
           RETURNING id`,
         [
           session.accountId,
@@ -402,6 +404,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           minimum_service_override_reason ?? null,
           minimum_service_override_note ?? null,
           pricingReview.status,
+          scope_assumptions ?? null,
         ]
       );
       const estimateId = result.rows[0].id;

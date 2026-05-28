@@ -136,6 +136,7 @@ export function useEstimateForm({
   const [riskAdjustment, setRiskAdjustment] = useState("0.00");
   const [minimumOverrideReason, setMinimumOverrideReason] = useState("");
   const [minimumOverrideNote, setMinimumOverrideNote] = useState("");
+  const [scopeAssumptions, setScopeAssumptions] = useState("");
 
   const [pendingDraftScope, setPendingDraftScope] = useState<
     Record<string, { scopeValues: Record<string, number | string>; complexityFactors: string[] }>
@@ -153,6 +154,18 @@ export function useEstimateForm({
   function handleAddPriceBookItem(service: PriceBookService, priceCents: number) {
     priceBook.handleAddPriceBookItem(service, priceCents, (row) => {
       setLineItems((prev) => [...prev.filter((r) => r.description.trim()), row]);
+    });
+    // Auto-populate scope assumptions from template default when first item is added
+    setScopeAssumptions((prev) => {
+      if (prev.trim()) return prev;
+      fetch(`/api/v1/scope-templates?category=${encodeURIComponent(service.category)}`)
+        .then((r) => r.json())
+        .then((data: { template?: { default_assumptions?: string | null } }) => {
+          const assumptions = data?.template?.default_assumptions;
+          if (assumptions) setScopeAssumptions((cur) => cur.trim() ? cur : assumptions);
+        })
+        .catch(() => { /* non-critical */ });
+      return prev;
     });
   }
 
@@ -525,6 +538,7 @@ export function useEstimateForm({
         risk_adjustment_cents: parseCents(riskAdjustment),
         minimum_service_override_reason: minimumOverrideReason || null,
         minimum_service_override_note: minimumOverrideNote.trim() || null,
+        scope_assumptions: scopeAssumptions.trim() || null,
       });
 
       if (baseEngineSpec) {
@@ -621,6 +635,7 @@ export function useEstimateForm({
     riskAdjustment, setRiskAdjustment,
     minimumOverrideReason, setMinimumOverrideReason,
     minimumOverrideNote, setMinimumOverrideNote,
+    scopeAssumptions, setScopeAssumptions,
     // Price book
     priceBookItems, scopeResults,
     priceBookLineItems, scopeMaterialsTotalCents,

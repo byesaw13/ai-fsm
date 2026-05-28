@@ -13,6 +13,7 @@ interface EstimateRow extends Record<string, unknown> {
   total_cents: number;
   deposit_cents: number | null;
   notes: string | null;
+  scope_assumptions: string | null;
   expires_at: string | null;
   responded_at: string | null;
   client_approved_name: string | null;
@@ -57,7 +58,7 @@ export default async function EstimatePortalPage({
   const estimate = await queryOne<EstimateRow>(
     `SELECT
        e.id, e.status, e.presentation_mode, e.subtotal_cents, e.tax_cents, e.total_cents,
-       e.deposit_cents, e.notes, e.expires_at, e.responded_at,
+       e.deposit_cents, e.notes, e.scope_assumptions, e.expires_at, e.responded_at,
        e.client_approved_name,
        c.name AS client_name,
        p.address AS property_address, p.city AS property_city,

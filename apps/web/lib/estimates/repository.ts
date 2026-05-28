@@ -50,6 +50,7 @@ export interface PatchEstimateInput {
   risk_adjustment_cents?: number;
   minimum_service_override_reason?: string | null;
   minimum_service_override_note?: string | null;
+  scope_assumptions?: string | null;
 }
 
 interface SessionContext {
@@ -70,6 +71,7 @@ export async function getEstimateById(client: PoolClient, id: string, accountId:
             e.travel_surcharge_cents, e.risk_adjustment_cents,
             e.minimum_service_override_reason, e.minimum_service_override_note,
             e.pricing_review_status, e.pricing_reviewed_at, e.pricing_reviewed_by,
+            e.scope_assumptions,
             c.name AS client_name
      FROM estimates e
      LEFT JOIN clients c ON c.id = e.client_id
@@ -211,6 +213,7 @@ export async function updateEstimateById(
   if (patch.risk_adjustment_cents !== undefined) { setClauses.push(`risk_adjustment_cents = $${idx++}`); params.push(patch.risk_adjustment_cents); }
   if (patch.minimum_service_override_reason !== undefined) { setClauses.push(`minimum_service_override_reason = $${idx++}`); params.push(patch.minimum_service_override_reason); }
   if (patch.minimum_service_override_note !== undefined) { setClauses.push(`minimum_service_override_note = $${idx++}`); params.push(patch.minimum_service_override_note); }
+  if (patch.scope_assumptions !== undefined) { setClauses.push(`scope_assumptions = $${idx++}`); params.push(patch.scope_assumptions); }
 
   const has_painting_fields =
     patch.sq_ft !== undefined &&

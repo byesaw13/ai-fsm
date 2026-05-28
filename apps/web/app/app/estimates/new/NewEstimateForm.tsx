@@ -50,6 +50,7 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
     riskAdjustment, setRiskAdjustment,
     minimumOverrideReason, setMinimumOverrideReason,
     minimumOverrideNote, setMinimumOverrideNote,
+    scopeAssumptions, setScopeAssumptions,
     priceBookItems, scopeResults,
     scopeMaterialsTotalCents,
     pendingDraftScope,
@@ -218,6 +219,7 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
         <Step3Adjustments
           pending={pending}
           notes={notes} setNotes={setNotes}
+          scopeAssumptions={scopeAssumptions} setScopeAssumptions={setScopeAssumptions}
           tripCount={tripCount} setTripCount={setTripCount}
           finishExpectation={finishExpectation} setFinishExpectation={setFinishExpectation}
           travelSurcharge={travelSurcharge} setTravelSurcharge={setTravelSurcharge}
