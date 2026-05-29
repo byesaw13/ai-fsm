@@ -6,7 +6,8 @@ import { logger } from "@/lib/logger";
 import { draftEstimate } from "@/lib/estimates/ai-draft";
 import type { TradeDefinition } from "@/lib/estimates/ai-draft";
 import type { PriceBookEntry } from "@/lib/estimates/item-suggester";
-import type { ScopeTemplate, ScopeComponent, ComplexityFactor, ScopeComponentOption } from "@ai-fsm/domain";
+import { computeMaterials } from "@ai-fsm/domain";
+import type { ScopeTemplate, ScopeComponent, ComplexityFactor, ScopeComponentOption, ServiceMaterial, ScopeComponentValues, ComplexityValues } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -157,6 +158,41 @@ export const POST = withAuth(async (request: NextRequest, session) => {
     }
 
     const draft = await draftEstimate(description, priceBook, templates, tradeRows, jobContext);
+
+    // Compute materials for each service using the same deterministic logic as ScopeBuilder.
+    // This makes materials visible in the review panel before the draft is applied to the form.
+    if (draft && draft.services.length > 0) {
+      const categories = [...new Set(draft.services.map((s) => s.service_category))];
+      const catPlaceholders = categories.map((_, i) => `$${i + 1}`).join(", ");
+
+      const { rows: materialRows } = await pool.query<ServiceMaterial>(
+        `SELECT id, category, material_name, description, quantity_type,
+                scope_component_key, quantity_multiplier, waste_factor, unit, unit_cost_cents,
+                store_section, sort_order, is_optional, is_active
+         FROM service_materials
+         WHERE category IN (${catPlaceholders}) AND is_active = true
+         ORDER BY sort_order ASC`,
+        categories
+      );
+
+      for (const svc of draft.services) {
+        const template = templates.find((t) => t.category === svc.service_category);
+        const categoryMaterials = materialRows.filter((m) => m.category === svc.service_category);
+        if (!categoryMaterials.length) continue;
+
+        // Build ComplexityValues from the template factors + active keys on this service
+        const complexityValues: ComplexityValues = {};
+        if (template) {
+          for (const f of template.complexity_factors) {
+            complexityValues[f.key] = svc.complexity_factor_keys.includes(f.key);
+          }
+        }
+
+        const computed = computeMaterials(categoryMaterials, svc.scope_values as ScopeComponentValues, complexityValues);
+        svc.computed_materials = computed;
+        svc.material_total_cents = computed.reduce((sum, m) => sum + m.total_cost_cents, 0);
+      }
+    }
 
     return NextResponse.json({ draft });
   } catch (error) {
