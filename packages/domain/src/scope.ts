@@ -191,21 +191,41 @@ export function groupMaterialsBySection(computed: ComputedMaterial[]): Materials
   });
 }
 
+// Weighted surplus reduction prevents runaway stacking when multiple complexity factors combine.
+// 1st factor: full surplus; 2nd: 60%; 3rd+: 30%. Hard cap at 1.75× regardless.
+const MODIFIER_SURPLUS_WEIGHTS = [1.0, 0.6, 0.3];
+const MAX_SCOPE_MULTIPLIER = 1.75;
+
 // Compute the combined complexity multiplier and flat adders from applied factors
 export function computeScopeModifier(
   factors: ComplexityFactor[],
   applied: ComplexityValues
 ): { multiplier: number; adderCents: number } {
-  let multiplier = 1.0;
   let adderCents = 0;
+  const surpluses: number[] = [];
+
   for (const factor of factors) {
     if (!applied[factor.key]) continue;
     if (factor.factor_type === "multiplier") {
-      multiplier *= factor.default_value;
+      surpluses.push(factor.default_value - 1.0);
     } else {
       adderCents += factor.default_value;
     }
   }
+
+  // Sort largest surplus first so highest-impact factor gets full weight
+  surpluses.sort((a, b) => Math.abs(b) - Math.abs(a));
+
+  let multiplier = 1.0;
+  for (let i = 0; i < surpluses.length; i++) {
+    const weight = MODIFIER_SURPLUS_WEIGHTS[Math.min(i, MODIFIER_SURPLUS_WEIGHTS.length - 1)];
+    multiplier *= 1.0 + surpluses[i] * weight;
+    if (multiplier >= MAX_SCOPE_MULTIPLIER) {
+      multiplier = MAX_SCOPE_MULTIPLIER;
+      break;
+    }
+  }
+
   return { multiplier, adderCents };
 }
 

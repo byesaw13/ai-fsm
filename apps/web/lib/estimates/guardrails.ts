@@ -7,6 +7,7 @@ import {
   type EstimateFinishExpectation,
   type EstimateMinimumOverrideReason,
   type EstimateTripCount,
+  type ComputedMaterial,
 } from "@ai-fsm/domain";
 
 export { buildClientDocumentFilename } from "@ai-fsm/domain";
@@ -132,26 +133,26 @@ const TRADE_MATERIAL_BLOCKLIST: Record<string, string[]> = {
 };
 
 export interface MaterialValidationResult {
-  allowed: string[];
-  blocked: string[];
+  allowed: ComputedMaterial[];
+  blocked: ComputedMaterial[];
 }
 
 export function validateMaterialsForTrade(
-  materialNames: string[],
+  materials: ComputedMaterial[],
   tradeDetected: string
 ): MaterialValidationResult {
   const blocklist = TRADE_MATERIAL_BLOCKLIST[tradeDetected.toLowerCase()] ?? [];
-  const allowed: string[] = [];
-  const blocked: string[] = [];
+  const allowed: ComputedMaterial[] = [];
+  const blocked: ComputedMaterial[] = [];
 
-  for (const name of materialNames) {
-    const nameLower = name.toLowerCase();
+  for (const item of materials) {
+    const nameLower = item.material.material_name.toLowerCase();
     const isBlocked = blocklist.some((term) => nameLower.includes(term));
     if (isBlocked) {
-      blocked.push(name);
-      console.warn(`[validateMaterialsForTrade] Blocked cross-trade material "${name}" for trade "${tradeDetected}"`);
+      blocked.push(item);
+      console.warn(`[validateMaterialsForTrade] Blocked cross-trade material "${item.material.material_name}" for trade "${tradeDetected}"`);
     } else {
-      allowed.push(name);
+      allowed.push(item);
     }
   }
 

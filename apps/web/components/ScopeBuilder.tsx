@@ -17,6 +17,7 @@ import {
 } from "@ai-fsm/domain";
 import type { ServiceMaterial, ComputedMaterial, ProductionRate, ProductionRateModifier, LaborEstimate } from "@ai-fsm/domain";
 import { computeLaborDays, formatLaborEstimate } from "@ai-fsm/domain";
+import { validateMaterialsForTrade } from "@/lib/estimates/guardrails";
 
 interface ScopeBuilderProps {
   category: string;
@@ -271,7 +272,8 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
     const sqft = typeof components.wall_sqft === "number" ? components.wall_sqft :
                  typeof components.sqft === "number" ? components.sqft : undefined;
 
-    const mats = computeMaterials(materialRules, components, complexity);
+    const rawMats = computeMaterials(materialRules, components, complexity);
+    const { allowed: mats } = validateMaterialsForTrade(rawMats, category);
     const matTotal = mats.reduce((sum, m) => sum + m.total_cost_cents, 0);
 
     const activeComplexityKeys = Object.entries(complexity).filter(([, v]) => v).map(([k]) => k);
