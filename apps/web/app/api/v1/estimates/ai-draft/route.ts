@@ -8,6 +8,7 @@ import type { TradeDefinition } from "@/lib/estimates/ai-draft";
 import type { PriceBookEntry } from "@/lib/estimates/item-suggester";
 import { computeMaterials } from "@ai-fsm/domain";
 import type { ScopeTemplate, ScopeComponent, ComplexityFactor, ScopeComponentOption, ServiceMaterial, ScopeComponentValues, ComplexityValues } from "@ai-fsm/domain";
+import { validateMaterialsForTrade } from "@/lib/estimates/guardrails";
 
 export const dynamic = "force-dynamic";
 
@@ -189,8 +190,13 @@ export const POST = withAuth(async (request: NextRequest, session) => {
         }
 
         const computed = computeMaterials(categoryMaterials, svc.scope_values as ScopeComponentValues, complexityValues);
-        svc.computed_materials = computed;
-        svc.material_total_cents = computed.reduce((sum, m) => sum + m.total_cost_cents, 0);
+        const trade = svc.trade_detected ?? svc.service_category ?? "";
+        const { allowed, blocked } = validateMaterialsForTrade(computed, trade);
+        if (blocked.length > 0) {
+          logger.warn("AI draft: blocked cross-trade materials", { trade, blocked: blocked.map((b) => b.material.material_name), traceId: session.traceId });
+        }
+        svc.computed_materials = allowed;
+        svc.material_total_cents = allowed.reduce((sum, m) => sum + m.total_cost_cents, 0);
       }
     }
 
