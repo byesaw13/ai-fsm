@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { ScopeTemplate, ScopeComponentValues } from "@ai-fsm/domain";
+import type { ScopeTemplate, ScopeComponentValues, ComputedMaterial } from "@ai-fsm/domain";
 import type { PriceBookEntry } from "./item-suggester";
 
 // ---------------------------------------------------------------------------
@@ -45,6 +45,9 @@ export interface DraftService {
   complexity_factor_keys: string[];
   trade_detected: string;
   detection_reasons: string[];
+  // Populated by the API route after the AI call (deterministic from service_materials table)
+  computed_materials?: ComputedMaterial[];
+  material_total_cents?: number;
 }
 
 export type DraftConfidence = "high" | "medium" | "low";
@@ -64,6 +67,8 @@ export interface DraftEstimate {
   guardrails: DraftGuardrails;
   confidence_notes: string;
   confidence: DraftConfidence;
+  schedule_notes: string;
+  proposal_summary: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -210,7 +215,23 @@ When sqft or unit counts are known (given or estimated), include a labor sanity 
 Example flooring: "400 sqft LVP with complex_layout → 400 ÷ (175 × 0.85) ≈ 2.7 days. Pricing should reflect 3 field days minimum."
 Example painting: "450 sqft walls (living room + hallway) with dark_to_light → 450 ÷ (200 × 0.80) ≈ 2.8 days. Budget 3 field days."
 Example plumbing: "3 faucets at 6/day → 0.5 day. Price check: 3 × $175 = $525 minimum."
-Apply the same reasoning to any service where a rate is listed. Do NOT fabricate rates for services not in this table.`;
+Apply the same reasoning to any service where a rate is listed. Do NOT fabricate rates for services not in this table.
+
+## Rules for schedule_notes
+Write this for the estimator, not the customer. Be specific about sequencing:
+- If multi-trip: describe each visit with Day 1 / Day 2 labels, what happens each day, and the wait period between
+- If cure time required: state the minimum cure window explicitly (e.g. "24–48h cure before next step")
+- If single-trip: estimate total field hours and note any sequencing within the visit
+- Mention any materials that need to be on-site or ordered before the visit
+
+## Rules for proposal_summary
+Write this for the customer. 2-3 sentences maximum. Rules:
+- No service codes, no technical jargon, no price breakdowns — just plain English scope
+- State WHAT we're doing, any key conditions (multi-trip, cure time), and one notable exclusion if relevant
+- Tone: professional contractor writing to a homeowner who values clear communication
+- DO NOT mention specific prices — pricing appears elsewhere in the proposal
+- Example good: "We'll patch and texture two walls in the master bedroom, sand smooth, and prime for final paint. Work requires one visit with dry time between coats — typically same-day if started early."
+- Example bad: "Service 5009: touch-up painting with 9002 specialty skim coat ×1.20 modifier, $295 base"`;
 }
 
 const DRAFT_TOOL: Anthropic.Tool = {
@@ -289,8 +310,16 @@ const DRAFT_TOOL: Anthropic.Tool = {
         enum: ["high", "medium", "low"],
         description: "Overall confidence tier: high = all catalog codes + all measurements given; medium = heuristic measurements or one 9099; low = multiple 9099 or ambiguous trade",
       },
+      schedule_notes: {
+        type: "string",
+        description: "Estimator-facing schedule summary. Describe the visit sequence, timing, and any scheduling constraints. Use Day 1 / Day 2 framing when multi-trip. Example: 'Day 1 (Friday): Concrete skim coat + bonding primer — allow 24–48h cure time. Day 2 (Monday/Tuesday): LVP installation and transitions.' For single-trip: 'Single visit, estimated X hours.'",
+      },
+      proposal_summary: {
+        type: "string",
+        description: "2-3 sentences of customer-facing proposal language describing what we're doing, why, and any key conditions or exclusions. Plain English, no service codes. Professional but conversational — like a contractor writing to a homeowner, not a database record. Example: 'We'll prepare your concrete slab with bonding primer and skim coat on Day 1, then return after a 24-hour cure to install your new LVP flooring. Client-supplied flooring tracked separately. Furniture moving and staging included.'",
+      },
     },
-    required: ["services", "notes", "guardrails", "confidence_notes", "confidence"],
+    required: ["services", "notes", "guardrails", "confidence_notes", "confidence", "schedule_notes", "proposal_summary"],
     additionalProperties: false,
   },
 };
@@ -407,6 +436,8 @@ export async function draftEstimate(
       guardrails: DraftGuardrails;
       confidence_notes: string;
       confidence: DraftConfidence;
+      schedule_notes: string;
+      proposal_summary: string;
     };
 
     // Validate and enrich services — strip hallucinated codes
@@ -447,6 +478,8 @@ export async function draftEstimate(
       },
       confidence_notes: raw.confidence_notes ?? "",
       confidence,
+      schedule_notes: raw.schedule_notes ?? "",
+      proposal_summary: raw.proposal_summary ?? "",
     };
   } catch (err) {
     console.error("[draftEstimate] Claude API error:", err);
