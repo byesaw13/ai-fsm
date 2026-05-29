@@ -132,6 +132,17 @@ const TRADE_MATERIAL_BLOCKLIST: Record<string, string[]> = {
   drywall: ["thinset", "grout", "tile spacers", "lvp underlayment", "self-leveling", "feather finish"],
 };
 
+// Maps price-book category values to the trade key used in the blocklist above.
+// Price book categories use compound names (painting_finishes, carpentry_furniture)
+// while trade keys are the base trade name.
+const CATEGORY_TO_TRADE: Record<string, string> = {
+  painting_finishes: "painting",
+  carpentry_furniture: "carpentry",
+  general_repairs: "drywall",
+  mounting_installs: "mounting",
+  outdoor_seasonal: "outdoor",
+};
+
 export interface MaterialValidationResult {
   allowed: ComputedMaterial[];
   blocked: ComputedMaterial[];
@@ -141,7 +152,9 @@ export function validateMaterialsForTrade(
   materials: ComputedMaterial[],
   tradeDetected: string
 ): MaterialValidationResult {
-  const blocklist = TRADE_MATERIAL_BLOCKLIST[tradeDetected.toLowerCase()] ?? [];
+  const raw = tradeDetected.toLowerCase();
+  const tradeKey = CATEGORY_TO_TRADE[raw] ?? raw;
+  const blocklist = TRADE_MATERIAL_BLOCKLIST[tradeKey] ?? [];
   const allowed: ComputedMaterial[] = [];
   const blocked: ComputedMaterial[] = [];
 
