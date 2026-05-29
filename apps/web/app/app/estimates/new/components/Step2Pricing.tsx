@@ -383,6 +383,7 @@ export function Step2Pricing({
                           serviceCode={item.service.code}
                           unitType={item.service.unit_type}
                           basePriceCents={item.service.default_price_cents ?? item.priceCents}
+                          priceMinCents={item.service.price_min_cents}
                           onChange={(result) => handleScopeChange(item.instanceId, result)}
                           initialScopeValues={pendingDraftScope[item.instanceId]?.scopeValues}
                           initialComplexityFactors={pendingDraftScope[item.instanceId]?.complexityFactors}

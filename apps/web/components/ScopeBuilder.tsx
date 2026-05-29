@@ -23,6 +23,7 @@ interface ScopeBuilderProps {
   serviceCode?: string;
   unitType?: string | null;
   basePriceCents: number;
+  priceMinCents?: number;
   onChange: (result: ScopeBuilderResult) => void;
   initialScopeValues?: ScopeComponentValues;
   initialComplexityFactors?: string[];
@@ -38,6 +39,8 @@ export interface ScopeBuilderResult {
   materials: ComputedMaterial[];
   materialTotalCents: number;
   laborEstimate: LaborEstimate | null;
+  isProductionBased: boolean;
+  productionDailyRateCents: number | null;
 }
 
 function formatDollars(cents: number): string {
@@ -199,7 +202,7 @@ function ComplexityFactorRow({
   );
 }
 
-export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, onChange, initialScopeValues, initialComplexityFactors }: ScopeBuilderProps) {
+export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, priceMinCents, onChange, initialScopeValues, initialComplexityFactors }: ScopeBuilderProps) {
   const [template, setTemplate] = useState<ScopeTemplate | null>(null);
   const [rules, setRules] = useState<ProfitabilityRule[]>([]);
   const [materialRules, setMaterialRules] = useState<ServiceMaterial[]>([]);
@@ -251,8 +254,9 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
     return () => { cancelled = true; };
   }, [category]);
 
-  const { multiplier, adderCents, adjustedPriceCents, effectiveBasePriceCents, violations, computedMaterials, materialTotalCents, laborEstimate } = useMemo(() => {
-    if (!template) return { multiplier: 1.0, adderCents: 0, adjustedPriceCents: basePriceCents, effectiveBasePriceCents: basePriceCents, violations: [], computedMaterials: [], materialTotalCents: 0, laborEstimate: null };
+  const { multiplier, adderCents, adjustedPriceCents, effectiveBasePriceCents, violations, computedMaterials, materialTotalCents, laborEstimate, isProductionBased, productionDailyRateCents } = useMemo(() => {
+    const empty = { multiplier: 1.0, adderCents: 0, adjustedPriceCents: basePriceCents, effectiveBasePriceCents: basePriceCents, violations: [], computedMaterials: [], materialTotalCents: 0, laborEstimate: null, isProductionBased: false, productionDailyRateCents: null };
+    if (!template) return empty;
 
     const mod = computeScopeModifier(template.complexity_factors, complexity);
 
@@ -264,17 +268,8 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
       if (sqftVal > 0) effectiveBase = basePriceCents * sqftVal;
     }
 
-    const adjusted = Math.round(effectiveBase * mod.multiplier) + mod.adderCents;
-
     const sqft = typeof components.wall_sqft === "number" ? components.wall_sqft :
                  typeof components.sqft === "number" ? components.sqft : undefined;
-
-    const v = checkProfitabilityRules(rules, category, {
-      totalCents: adjusted,
-      sqft,
-    });
-
-
 
     const mats = computeMaterials(materialRules, components, complexity);
     const matTotal = mats.reduce((sum, m) => sum + m.total_cost_cents, 0);
@@ -284,6 +279,37 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
     const labor = rate
       ? computeLaborDays(rate, productionModifiers, components as Record<string, string | number | boolean | null>, activeComplexityKeys)
       : null;
+
+    // Production-based pricing: for per_sqft services with a production rate,
+    // derive price from labor_days × daily_rate instead of sqft × rate × multipliers.
+    // daily_rate = per_sqft_rate × sqft_per_day (derived — no extra config needed).
+    // Complexity impacts are already captured in production_rate_modifiers (applied inside
+    // computeLaborDays), so we skip the scope-factor multiplier to avoid double-counting.
+    if (unitType === "per_sqft" && labor && rate && rate.rate_unit === "sqft_per_day") {
+      const dailyRateCents = basePriceCents * rate.base_rate; // e.g. 325 ¢/sqft × 200 sqft/day = 65,000 ¢/day
+      const rawProductionCents = Math.round(labor.labor_days * dailyRateCents);
+      const productionCents = Math.max(priceMinCents ?? 0, rawProductionCents);
+      // Express as a multiplier relative to effectiveBase for backward-compatible display
+      const productionMultiplier = effectiveBase > 0 ? productionCents / effectiveBase : 1.0;
+
+      const v = checkProfitabilityRules(rules, category, { totalCents: productionCents, sqft });
+      return {
+        multiplier: productionMultiplier,
+        adderCents: 0,
+        adjustedPriceCents: productionCents,
+        effectiveBasePriceCents: effectiveBase,
+        violations: v.map((viol) => ({ label: viol.rule.description ?? viol.rule.rule_type, actual: viol.actual, required: viol.required, rule_type: viol.rule.rule_type })),
+        computedMaterials: mats,
+        materialTotalCents: matTotal,
+        laborEstimate: labor,
+        isProductionBased: true,
+        productionDailyRateCents: dailyRateCents,
+      };
+    }
+
+    // Standard path: flat-rate × scope-factor multipliers
+    const adjusted = Math.round(effectiveBase * mod.multiplier) + mod.adderCents;
+    const v = checkProfitabilityRules(rules, category, { totalCents: adjusted, sqft });
 
     return {
       multiplier: mod.multiplier,
@@ -299,12 +325,14 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
       computedMaterials: mats,
       materialTotalCents: matTotal,
       laborEstimate: labor,
+      isProductionBased: false,
+      productionDailyRateCents: null,
     };
-  }, [template, complexity, components, basePriceCents, unitType, rules, category, materialRules, productionRates, productionModifiers, serviceCode]);
+  }, [template, complexity, components, basePriceCents, priceMinCents, unitType, rules, category, materialRules, productionRates, productionModifiers, serviceCode]);
 
   // Notify parent on changes
   useEffect(() => {
-    onChange({ components, complexity, multiplier, adderCents, adjustedPriceCents, violations, materials: computedMaterials, materialTotalCents, laborEstimate });
+    onChange({ components, complexity, multiplier, adderCents, adjustedPriceCents, violations, materials: computedMaterials, materialTotalCents, laborEstimate, isProductionBased, productionDailyRateCents });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [components, complexity, multiplier, adderCents, adjustedPriceCents, computedMaterials, materialTotalCents]);
 
@@ -360,7 +388,9 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
                 fontWeight: 600,
               }}
             >
-              {formatModifier(multiplier, adderCents, basePriceCents)}
+              {isProductionBased && laborEstimate
+                ? `Production: ${formatLaborEstimate(laborEstimate)} → ${formatDollars(adjustedPriceCents)}`
+                : formatModifier(multiplier, adderCents, effectiveBasePriceCents)}
             </span>
           )}
         </div>
@@ -437,52 +467,90 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
             </div>
           )}
 
-          {/* Modifier Summary */}
-          <div
-            style={{
-              marginTop: "var(--space-3)",
-              padding: "var(--space-2) var(--space-3)",
-              background: hasModifiers ? "var(--bg-subtle)" : "transparent",
-              borderRadius: "var(--radius)",
-              border: `1px solid ${hasModifiers ? "var(--accent)" : "var(--border)"}`,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: "var(--space-3)",
-            }}
-          >
-            <div>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                {unitType === "per_sqft" ? `Base price ($${(basePriceCents / 100).toFixed(2)}/sqft)` : "Base price"}
-              </span>
-              <span
-                style={{
-                  marginLeft: "var(--space-2)",
-                  fontSize: "var(--text-sm)",
-                  color: (hasModifiers || effectiveBasePriceCents !== basePriceCents) ? "var(--fg-muted)" : "var(--fg)",
-                  textDecoration: (hasModifiers || effectiveBasePriceCents !== basePriceCents) ? "line-through" : "none",
-                }}
-              >
-                {formatDollars(basePriceCents)}
-              </span>
-              {(effectiveBasePriceCents !== basePriceCents || hasModifiers) && (
-                <>
-                  <span style={{ margin: "0 var(--space-1)", color: "var(--fg-muted)" }}>→</span>
-                  <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--accent)" }}>
-                    {formatDollars(adjustedPriceCents)}
+          {/* Pricing Summary */}
+          {isProductionBased && laborEstimate && productionDailyRateCents !== null ? (
+            /* Production-based pricing breakdown */
+            <div
+              style={{
+                marginTop: "var(--space-3)",
+                padding: "var(--space-2) var(--space-3)",
+                background: "var(--bg-subtle)",
+                borderRadius: "var(--radius)",
+                border: "1px solid var(--accent)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--space-2)", marginBottom: "var(--space-1)" }}>
+                <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--accent)" }}>
+                  Production-based pricing
+                </span>
+                <span style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--accent)" }}>
+                  {formatDollars(adjustedPriceCents)}
+                </span>
+              </div>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", lineHeight: 1.6 }}>
+                <span>{laborEstimate.quantity.toFixed(0)} {laborEstimate.rate_unit.replace("_per_day", "").replace("_", " ")} ÷ {laborEstimate.adjusted_rate.toFixed(0)} {laborEstimate.rate_unit.replace("_", "/")} = {laborEstimate.labor_days} day{laborEstimate.labor_days !== 1 ? "s" : ""}</span>
+                <span style={{ margin: "0 var(--space-1)" }}>×</span>
+                <span>{formatDollars(productionDailyRateCents)}/day</span>
+                {laborEstimate.applied_modifiers.length > 0 && (
+                  <span style={{ marginLeft: "var(--space-2)", color: "var(--color-warning, #92400e)" }}>
+                    ({laborEstimate.applied_modifiers.map(m => `${m.key.replace(/_/g, " ")} ${Math.round(m.modifier_pct * 100)}%`).join(", ")})
                   </span>
-                  {hasModifiers && (
-                    <span style={{ marginLeft: "var(--space-2)", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                      ({formatModifier(multiplier, adderCents, effectiveBasePriceCents)})
-                    </span>
-                  )}
-                </>
-              )}
+                )}
+                {priceMinCents !== undefined && adjustedPriceCents === priceMinCents && (
+                  <span style={{ marginLeft: "var(--space-2)", fontStyle: "italic" }}>
+                    — minimum applied
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Standard flat-rate modifier summary */
+            <div
+              style={{
+                marginTop: "var(--space-3)",
+                padding: "var(--space-2) var(--space-3)",
+                background: hasModifiers ? "var(--bg-subtle)" : "transparent",
+                borderRadius: "var(--radius)",
+                border: `1px solid ${hasModifiers ? "var(--accent)" : "var(--border)"}`,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "var(--space-3)",
+              }}
+            >
+              <div>
+                <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                  {unitType === "per_sqft" ? `Base price ($${(basePriceCents / 100).toFixed(2)}/sqft)` : "Base price"}
+                </span>
+                <span
+                  style={{
+                    marginLeft: "var(--space-2)",
+                    fontSize: "var(--text-sm)",
+                    color: (hasModifiers || effectiveBasePriceCents !== basePriceCents) ? "var(--fg-muted)" : "var(--fg)",
+                    textDecoration: (hasModifiers || effectiveBasePriceCents !== basePriceCents) ? "line-through" : "none",
+                  }}
+                >
+                  {formatDollars(basePriceCents)}
+                </span>
+                {(effectiveBasePriceCents !== basePriceCents || hasModifiers) && (
+                  <>
+                    <span style={{ margin: "0 var(--space-1)", color: "var(--fg-muted)" }}>→</span>
+                    <span style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--accent)" }}>
+                      {formatDollars(adjustedPriceCents)}
+                    </span>
+                    {hasModifiers && (
+                      <span style={{ marginLeft: "var(--space-2)", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                        ({formatModifier(multiplier, adderCents, effectiveBasePriceCents)})
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
-          {/* Labor estimate from production anchor */}
-          {laborEstimate && (
+          {/* Labor estimate for non-production services (display only) */}
+          {!isProductionBased && laborEstimate && (
             <div style={{
               marginTop: "var(--space-2)",
               padding: "var(--space-2) var(--space-3)",
