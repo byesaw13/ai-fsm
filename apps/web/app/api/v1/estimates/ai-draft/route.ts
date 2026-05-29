@@ -169,9 +169,10 @@ export const POST = withAuth(async (request: NextRequest, session) => {
       const { rows: materialRows } = await pool.query<ServiceMaterial>(
         `SELECT id, category, material_name, description, quantity_type,
                 scope_component_key, quantity_multiplier, waste_factor, unit, unit_cost_cents,
-                store_section, sort_order, is_optional, is_active
+                store_section, sort_order, is_optional, is_consumable, condition_factor_key,
+                quantity_flat, price_book_id
          FROM service_materials
-         WHERE category IN (${catPlaceholders}) AND is_active = true
+         WHERE category IN (${catPlaceholders})
          ORDER BY sort_order ASC`,
         categories
       );
