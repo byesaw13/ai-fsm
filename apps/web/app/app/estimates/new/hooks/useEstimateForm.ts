@@ -10,7 +10,8 @@ import {
   type EstimateSpec,
 } from "@ai-fsm/domain";
 import { useEstimateAI } from "./useEstimateAI";
-import type { ShoppingList, SpecifiedMaterial } from "@ai-fsm/domain";
+import type { ShoppingList, SpecifiedMaterial, RoomSpec, ProjectOptions, PaintingProjectResult } from "@ai-fsm/domain";
+import { roomResultToLegacyFields } from "@ai-fsm/domain";
 import { useEstimatePriceBook } from "./useEstimatePriceBook";
 import { useEstimateTiers } from "./useEstimateTiers";
 import {
@@ -146,6 +147,15 @@ export function useEstimateForm({
 
   const [draftShoppingList, setDraftShoppingList] = useState<ShoppingList | null>(null);
   const [draftSpecifiedMaterials, setDraftSpecifiedMaterials] = useState<SpecifiedMaterial[]>([]);
+
+  // Room-by-room painting estimator
+  const [paintingMode, setPaintingMode] = useState<"quick" | "room_by_room">("quick");
+  const [roomSpecs, setRoomSpecs] = useState<RoomSpec[]>([]);
+  const [projectOptions, setProjectOptions] = useState<ProjectOptions>({
+    coat_count: 2,
+    occupied_home: false,
+    vaulted_ceilings: false,
+  });
 
   // ---------------------------------------------------------------------------
   // Price book sub-hook
@@ -308,6 +318,21 @@ export function useEstimateForm({
     setLineItems((prev) =>
       prev.map((row, i) => (i === index ? { ...row, [field]: value } : row))
     );
+  }
+
+  function handleRoomByRoomChange(rooms: RoomSpec[], opts: ProjectOptions, result: PaintingProjectResult) {
+    setRoomSpecs(rooms);
+    setProjectOptions(opts);
+    // Sync legacy fields so the submit path and painting estimate preview stay consistent
+    const legacy = roomResultToLegacyFields(result);
+    setSqFt(legacy.sq_ft.toString());
+    setPrepLevel(legacy.prep_level);
+    setIncludesTrim(legacy.includes_trim);
+    setIncludesCeiling(legacy.includes_ceiling);
+    setMaterialCostDollars((result.material_subtotal_cents / 100).toFixed(2));
+    // Rough labor hours estimate for internal costing
+    const estHours = (result.total_wall_sqft + result.total_ceiling_sqft) / 100 * 0.85 * opts.coat_count;
+    setLaborHours(estHours.toFixed(1));
   }
 
   function handleAddMaterial(mat: MaterialSuggestion) {
@@ -542,6 +567,7 @@ export function useEstimateForm({
         ...(initialVaultItemId ? { vault_item_id: initialVaultItemId } : {}),
         ...(draftShoppingList ? { shopping_list_json: draftShoppingList } : {}),
         ...(draftSpecifiedMaterials.length > 0 ? { specified_materials_json: draftSpecifiedMaterials } : {}),
+        ...(paintingMode === "room_by_room" && roomSpecs.length > 0 ? { room_specs: roomSpecs } : {}),
         trip_count: tripCount,
         requires_drying_or_curing: requiresDryingOrCuring,
         difficult_access: difficultAccess,
@@ -656,6 +682,9 @@ export function useEstimateForm({
     pendingDraftScope,
     draftShoppingList,
     draftSpecifiedMaterials,
+    paintingMode, setPaintingMode,
+    roomSpecs, projectOptions,
+    handleRoomByRoomChange,
     // Pricing (from useEstimatePricing)
     ...pricing,
     // Material tracking
