@@ -15,7 +15,8 @@ import type { PaintingEstimateResult } from "../hooks/useEstimatePricing";
 import type { EditableSuggestion, ScopeResult } from "../hooks/useEstimateAI";
 import type { DraftEstimate } from "@/lib/estimates/ai-draft";
 import { DraftReviewPanel } from "./DraftReviewPanel";
-import type { ShoppingList } from "@ai-fsm/domain";
+import { RoomByRoomEditor } from "./RoomByRoomEditor";
+import type { ShoppingList, RoomSpec, ProjectOptions, PaintingProjectResult } from "@ai-fsm/domain";
 import type { PriceBookEntry } from "../hooks/useEstimatePriceBook";
 import type { ScopeBuilderResult } from "@/components/ScopeBuilder";
 import type { PriceBookService } from "@/components/PriceBookSelector";
@@ -65,6 +66,12 @@ interface Step2Props {
   handleScopeChange: (instanceId: string, result: ScopeBuilderResult) => void;
   pendingDraftScope: Record<string, { scopeValues: Record<string, number | string>; complexityFactors: string[] }>;
   handleAddPriceBookItem: (service: PriceBookService, priceCents: number) => void;
+  // Room-by-room painting
+  paintingMode: "quick" | "room_by_room";
+  setPaintingMode: (m: "quick" | "room_by_room") => void;
+  roomSpecs: RoomSpec[];
+  projectOptions: ProjectOptions;
+  handleRoomByRoomChange: (rooms: RoomSpec[], options: ProjectOptions, result: PaintingProjectResult) => void;
   // Tiers / flat rate
   flatRate: string;
   setFlatRate: (v: string) => void;
@@ -122,6 +129,7 @@ export function Step2Pricing({
   mode, handleModeChange,
   priceBookItems, removePriceBookItem, scopeResults, handleScopeChange, pendingDraftScope,
   handleAddPriceBookItem,
+  paintingMode, setPaintingMode, roomSpecs, projectOptions, handleRoomByRoomChange,
   flatRate, setFlatRate,
   tiers, taxRateNum, updateTier, addTierLineItem, removeTierLineItem, updateTierLineItem, tierSubtotalCents,
   itemDescription, setItemDescription, itemSuggesting, itemSuggestError,
@@ -140,6 +148,47 @@ export function Step2Pricing({
     <div className="p7-form-stack">
       {/* Painting Estimator */}
       {serviceType === "painting" && (
+        <>
+        {/* Mode toggle */}
+        <div style={{ display: "flex", gap: "var(--space-1)", marginBottom: "var(--space-2)" }}>
+          {(["quick", "room_by_room"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setPaintingMode(m)}
+              style={{
+                fontSize: "var(--text-xs)",
+                padding: "4px 12px",
+                borderRadius: "var(--radius-sm)",
+                border: `1px solid ${paintingMode === m ? "var(--accent)" : "var(--border)"}`,
+                background: paintingMode === m ? "var(--accent)" : "var(--bg-subtle)",
+                color: paintingMode === m ? "#fff" : "var(--fg)",
+                cursor: "pointer",
+                fontWeight: paintingMode === m ? 600 : 400,
+              }}
+            >
+              {m === "quick" ? "Quick (sqft total)" : "Room by room"}
+            </button>
+          ))}
+        </div>
+
+        {paintingMode === "room_by_room" ? (
+          <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-4)" }}>
+            <p style={{ margin: "0 0 var(--space-3)", fontWeight: 600, fontSize: "var(--text-sm)" }}>
+              Room-by-room painting estimator
+            </p>
+            <RoomByRoomEditor
+              rooms={roomSpecs.length > 0 ? roomSpecs : [{
+                name: "", length_ft: 0, width_ft: 0, ceiling_height_ft: 8,
+                doors: 1, windows: 2, include_ceiling: false, include_trim: true,
+                prep_level: "minor", paint_supplied_by: "dovetails", paint_grade: "standard",
+                primer_needed: false, dark_to_light: false,
+              }]}
+              options={projectOptions}
+              onChange={handleRoomByRoomChange}
+            />
+          </div>
+        ) : (
         <PaintingEstimatorSection
           idPrefix="new"
           disabled={pending}
@@ -214,6 +263,8 @@ export function Step2Pricing({
             </div>
           }
         />
+        )}
+        </>
       )}
 
       {/* AI Draft review panel — shown when confidence is medium/low */}

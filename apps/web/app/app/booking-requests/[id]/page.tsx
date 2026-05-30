@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import type { Route } from "next";
 import { getSession } from "@/lib/auth/session";
 import { query, queryOne } from "@/lib/db";
 import { PageContainer, PageHeader, Card, SectionHeader, StatusBadge, LinkButton } from "@/components/ui";
@@ -128,6 +129,16 @@ export default async function BookingRequestDetailPage({
     walkthrough_score: br.walkthrough_score,
   });
 
+  // Load latest invite to determine next-step banner state
+  const inviteRows = await query<{ token: string; used_at: string | null; expires_at: string; created_at: string }>(
+    `SELECT token::text, used_at, expires_at, created_at
+     FROM intake_invites
+     WHERE booking_request_id = $1
+     ORDER BY created_at DESC LIMIT 1`,
+    [id]
+  );
+  const latestInvite = inviteRows[0] ?? null;
+
   const received = new Date(br.created_at).toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
   });
@@ -147,6 +158,46 @@ export default async function BookingRequestDetailPage({
           </StatusBadge>
         }
       />
+
+      {/* ── Next-step banner ────────────────────────────────────────────── */}
+      {(() => {
+        const hasEmail = !!br.email;
+        const intiteUsed = latestInvite?.used_at;
+        const inviteSent = latestInvite && !latestInvite.used_at && new Date(latestInvite.expires_at) > new Date();
+        const sentAgo = latestInvite
+          ? Math.round((Date.now() - new Date(latestInvite.created_at).getTime()) / 60000)
+          : null;
+
+        let banner: { color: string; bg: string; icon: string; message: string; href?: string; linkLabel?: string } | null = null;
+
+        if (intiteUsed) {
+          banner = { color: "#16a34a", bg: "#f0fdf4", icon: "✅", message: "Client filled out the intake form — review their answers below." };
+        } else if (inviteSent) {
+          banner = { color: "#d97706", bg: "#fffbeb", icon: "⏳", message: `Waiting on client — intake form sent ${sentAgo != null ? `${sentAgo} minutes` : ""} ago. ${!hasEmail ? "(no email on file)" : ""}` };
+        } else if (br.routing_path === "remote_estimate" && !br.job_id) {
+          banner = { color: "#0284c7", bg: "#f0f9ff", icon: "📋", message: "Remote estimate path — draft an estimate for this client.", href: `/app/estimates/new${br.client_id ? `?client_id=${br.client_id}` : ""}`, linkLabel: "New estimate →" };
+        } else if (br.routing_path === "site_visit" && !br.visit_id) {
+          banner = { color: "#7c3aed", bg: "#faf5ff", icon: "🏠", message: "Site visit recommended — schedule a visit to assess the project.", href: br.job_id ? `/app/jobs/${br.job_id}` : undefined, linkLabel: br.job_id ? "View job →" : undefined };
+        } else if (!hasEmail && br.status === "pending") {
+          banner = { color: "#d97706", bg: "#fffbeb", icon: "📧", message: "Get their email address to send the intake form." };
+        } else if (br.status === "pending" && !br.routing_path) {
+          banner = { color: "#71717a", bg: "#f9fafb", icon: "👀", message: "Review this lead and confirm the routing recommendation below." };
+        }
+
+        if (!banner) return null;
+
+        return (
+          <div style={{ background: banner.bg, border: `1px solid ${banner.color}30`, borderRadius: "var(--radius)", padding: "var(--space-3) var(--space-4)", marginBottom: "var(--space-3)", display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+            <span style={{ fontSize: 18 }}>{banner.icon}</span>
+            <p style={{ margin: 0, flex: 1, fontSize: "var(--text-sm)", color: banner.color, fontWeight: 500 }}>{banner.message}</p>
+            {banner.href && banner.linkLabel && (
+              <Link href={banner.href as Route} style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: banner.color, textDecoration: "none", whiteSpace: "nowrap" }}>
+                {banner.linkLabel}
+              </Link>
+            )}
+          </div>
+        );
+      })()}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "var(--space-4)", alignItems: "start" }}>
 
@@ -390,6 +441,7 @@ export default async function BookingRequestDetailPage({
               currentStatus={br.status}
               initialNotes={br.review_notes}
               jobId={br.job_id}
+              clientEmail={br.email}
               preferredDate={br.preferred_date}
               preferredTimeSlot={br.preferred_time_slot}
             />

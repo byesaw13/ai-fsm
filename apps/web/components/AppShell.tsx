@@ -6,6 +6,7 @@ import { useState, type ReactNode } from "react";
 import type { Route } from "next";
 import type { Role } from "@ai-fsm/domain";
 import { ToastProvider } from "./ui/Toast";
+import { QuickLeadModal } from "./QuickLeadModal";
 import {
   IconEstimates,
   IconSettings,
@@ -106,6 +107,8 @@ export function AppShell({ role, userName, children }: AppShellProps) {
   const pathname = usePathname();
   const sections = getNavSections(role);
   const bottomItems = getBottomNavItems(role);
+  const [showQuickLead, setShowQuickLead] = useState(false);
+  const isAdminOrOwner = role === "owner" || role === "admin";
 
   const settingsActive = isNavActive(pathname, "/app/settings");
   const avatarLetter = userName ? userName[0].toUpperCase() : role[0].toUpperCase();
@@ -123,6 +126,33 @@ export function AppShell({ role, userName, children }: AppShellProps) {
             </div>
             <span className="p7-brand-name">Dovetails</span>
           </Link>
+
+          {/* Quick Lead button — owner/admin only */}
+          {isAdminOrOwner && (
+            <button
+              type="button"
+              onClick={() => setShowQuickLead(true)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                width: "100%",
+                padding: "8px 12px",
+                margin: "4px 0 8px",
+                borderRadius: 6,
+                border: "1px solid var(--accent, #0f172a)",
+                background: "var(--accent, #0f172a)",
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                textAlign: "left",
+              }}
+            >
+              <span style={{ fontSize: 16 }}>⚡</span>
+              Quick Lead
+            </button>
+          )}
 
           {/* Scrollable nav sections */}
           <nav className="p7-nav" aria-label="Primary navigation">
@@ -207,6 +237,7 @@ export function AppShell({ role, userName, children }: AppShellProps) {
           </div>
         </nav>
       </div>
+      {showQuickLead && <QuickLeadModal onClose={() => setShowQuickLead(false)} />}
     </ToastProvider>
   );
 }

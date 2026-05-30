@@ -21,3 +21,20 @@ export {
 export type { JobSubStatus, VisitSubStatus } from "./sub-statuses";
 export { computeLaborDays, formatLaborEstimate } from "./production";
 export type { ProductionRate, ProductionRateModifier, LaborEstimate } from "./production";
+export {
+  computeRoomMeasurements,
+  computeRoomPainting,
+  computePaintingProject,
+  roomResultToLegacyFields,
+  isPaintingEstimateAboveFloor,
+} from "./painting";
+export type {
+  RoomPrepLevel,
+  PaintGrade,
+  PaintSupplier,
+  RoomSpec,
+  ProjectOptions,
+  RoomMeasurements,
+  RoomPaintingResult,
+  PaintingProjectResult,
+} from "./painting";

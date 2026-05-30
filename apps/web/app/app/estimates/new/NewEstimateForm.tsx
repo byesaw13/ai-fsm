@@ -68,6 +68,8 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
     depositCents, balanceDueCents,
     resolvedJobType, addedMaterials,
     handleAddPriceBookItem,
+    paintingMode, setPaintingMode,
+    roomSpecs, projectOptions, handleRoomByRoomChange,
     handleScopeChange,
     removePriceBookItem,
     applyDraft,
@@ -186,6 +188,11 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
           handleScopeChange={handleScopeChange}
           pendingDraftScope={pendingDraftScope}
           handleAddPriceBookItem={handleAddPriceBookItem}
+          paintingMode={paintingMode}
+          setPaintingMode={setPaintingMode}
+          roomSpecs={roomSpecs}
+          projectOptions={projectOptions}
+          handleRoomByRoomChange={handleRoomByRoomChange}
           flatRate={flatRate} setFlatRate={setFlatRate}
           tiers={tiers}
           taxRateNum={taxRateNum}

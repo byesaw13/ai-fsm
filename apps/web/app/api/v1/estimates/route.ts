@@ -199,6 +199,8 @@ const createEstimateSchema = z.object({
   // AI planning data
   shopping_list_json: z.record(z.unknown()).optional(),
   specified_materials_json: z.array(z.record(z.unknown())).optional(),
+  // Room-by-room painting spec
+  room_specs: z.array(z.record(z.unknown())).optional(),
   // Engine v2: room-by-room spec — when present, computeAndPersist() runs after insert
   engine_spec: z.record(z.unknown()).optional(),
   // Scope Intelligence: snapshot of components/complexity captured from ScopeBuilder per price-book item
@@ -281,6 +283,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     scope_assumptions,
     shopping_list_json,
     specified_materials_json,
+    room_specs,
     engine_spec,
     scope_snapshots,
   } = parseResult.data;
@@ -373,10 +376,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             coordination_required, finish_expectation, travel_surcharge_cents,
             risk_adjustment_cents, minimum_service_override_reason,
             minimum_service_override_note, pricing_review_status, scope_assumptions,
-            condition_tier, shopping_list_json, specified_materials_json)
+            condition_tier, shopping_list_json, specified_materials_json, room_specs)
           VALUES ($1, $2, $3, $4, $5, 'draft', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
                   $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27,
-                  $28, $29, $30, $31, $32, $33, $34, $35, $36)
+                  $28, $29, $30, $31, $32, $33, $34, $35, $36, $37)
           RETURNING id`,
         [
           session.accountId,
@@ -415,6 +418,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           conditionTier,
           shopping_list_json ? JSON.stringify(shopping_list_json) : null,
           specified_materials_json ? JSON.stringify(specified_materials_json) : null,
+          room_specs ? JSON.stringify(room_specs) : null,
         ]
       );
       const estimateId = result.rows[0].id;
