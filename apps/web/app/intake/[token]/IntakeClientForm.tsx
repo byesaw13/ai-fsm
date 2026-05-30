@@ -30,6 +30,22 @@ const TIME_SLOTS = [
   { value: "flexible",  label: "Flexible — anytime works" },
 ];
 
+const REFERRAL_SOURCES = [
+  { value: "repeat",          label: "Previous customer" },
+  { value: "realtor",         label: "Realtor referral" },
+  { value: "friend_neighbor", label: "Friend or neighbor" },
+  { value: "online",          label: "Found you online" },
+  { value: "other",           label: "Other" },
+];
+
+const OWNERSHIP_TYPES = [
+  { value: "owner",            label: "Property owner" },
+  { value: "realtor",         label: "Realtor / agent" },
+  { value: "property_manager", label: "Property manager" },
+  { value: "family_member",   label: "Family member" },
+  { value: "tenant",          label: "Tenant" },
+];
+
 type Step = "details" | "service" | "done";
 
 export function IntakeClientForm({ token, leadName, leadEmail, leadPhone }: IntakeClientFormProps) {
@@ -51,6 +67,9 @@ export function IntakeClientForm({ token, leadName, leadEmail, leadPhone }: Inta
   const [zip, setZip] = useState("");
   const [preferredDate, setPreferredDate] = useState("");
   const [timeSlot, setTimeSlot] = useState("flexible");
+  const [referralSource, setReferralSource] = useState("");
+  const [realtorName, setRealtorName] = useState("");
+  const [ownershipType, setOwnershipType] = useState("");
 
   const questions = category ? (INTAKE_QUESTIONS[category] ?? []) : [];
 
@@ -73,7 +92,13 @@ export function IntakeClientForm({ token, leadName, leadEmail, leadPhone }: Inta
           phone: phone.trim(),
           service_category: category || "general_repairs",
           service_description: description.trim(),
-          intake_metadata: intakeAnswers,
+          intake_metadata: {
+            ...intakeAnswers,
+            ...(ownershipType ? { ownership_type: ownershipType } : {}),
+            photo_count: 0,  // placeholder — upload support TBD
+          },
+          referral_source: referralSource || null,
+          referral_name: referralSource === "realtor" ? realtorName.trim() || null : null,
           address: address.trim(),
           city: city.trim(),
           zip: zip.trim(),
@@ -188,6 +213,59 @@ export function IntakeClientForm({ token, leadName, leadEmail, leadPhone }: Inta
             {description.length} / 20 characters minimum
           </span>
         </div>
+      </fieldset>
+
+      {/* ── Referral + ownership ──────────────────────────────────────── */}
+      <fieldset style={fieldsetStyle}>
+        <legend style={legendStyle}>A couple more things</legend>
+
+        <div style={fieldStyle}>
+          <label style={labelStyle}>Your relationship to this property</label>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+            {OWNERSHIP_TYPES.map((o) => (
+              <label key={o.value} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, cursor: "pointer" }}>
+                <input
+                  type="radio"
+                  name="ownership_type"
+                  value={o.value}
+                  checked={ownershipType === o.value}
+                  onChange={() => setOwnershipType(o.value)}
+                />
+                {o.label}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div style={fieldStyle}>
+          <label style={labelStyle}>How did you hear about us? <span style={{ fontWeight: 400, color: "#71717a" }}>(optional)</span></label>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+            {REFERRAL_SOURCES.map((r) => (
+              <label key={r.value} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, cursor: "pointer" }}>
+                <input
+                  type="radio"
+                  name="referral_source"
+                  value={r.value}
+                  checked={referralSource === r.value}
+                  onChange={() => setReferralSource(r.value)}
+                />
+                {r.label}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {referralSource === "realtor" && (
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Realtor name <span style={{ fontWeight: 400, color: "#71717a" }}>(optional)</span></label>
+            <input
+              style={inputStyle}
+              value={realtorName}
+              onChange={(e) => setRealtorName(e.target.value)}
+              placeholder="e.g. Jane Smith at Coldwell Banker"
+            />
+          </div>
+        )}
       </fieldset>
 
       {/* ── Property & scheduling ─────────────────────────────────────── */}

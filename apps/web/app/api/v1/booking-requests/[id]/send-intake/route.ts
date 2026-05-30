@@ -112,8 +112,8 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
         await sendEmail({
           to: email,
           subject: `Tell us about your project — Dovetails Services`,
-          html: intakeInviteEmailHtml({ leadName: br.name, intakeUrl }),
-          text: intakeInviteEmailText({ leadName: br.name, intakeUrl }),
+          html: intakeInviteEmailHtml({ leadName: br.name, intakeUrl, expiresHours: 168 }),
+          text: intakeInviteEmailText({ leadName: br.name, intakeUrl, expiresHours: 168 }),
         });
 
         await logCommunication({

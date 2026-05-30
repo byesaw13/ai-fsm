@@ -25,6 +25,7 @@ export function QuickLeadModal({ onClose }: QuickLeadModalProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [savedClientId, setSavedClientId] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,12 +47,13 @@ export function QuickLeadModal({ onClose }: QuickLeadModalProps) {
         }),
       });
 
-      const json = await res.json() as { id?: string; error?: { message?: string } };
+      const json = await res.json() as { id?: string; clientId?: string; error?: { message?: string } };
       if (!res.ok) {
         setError(json.error?.message ?? "Failed to save lead. Please try again.");
         return;
       }
       setSavedId(json.id ?? null);
+      setSavedClientId(json.clientId ?? null);
     } catch {
       setError("Network error. Please try again.");
     } finally {
@@ -81,7 +83,6 @@ export function QuickLeadModal({ onClose }: QuickLeadModalProps) {
               <button
                 type="button"
                 onClick={async () => {
-                  // Attempt to send intake form; navigate to lead page
                   await fetch(`/api/v1/booking-requests/${savedId}/send-intake`, { method: "POST" });
                   router.push(`/app/booking-requests/${savedId}`);
                   onClose();
@@ -90,6 +91,15 @@ export function QuickLeadModal({ onClose }: QuickLeadModalProps) {
               >
                 Send intake form to client
               </button>
+              {savedClientId && (
+                <button
+                  type="button"
+                  onClick={() => { router.push(`/app/estimates/new?client_id=${savedClientId}`); onClose(); }}
+                  style={secondaryBtnStyle}
+                >
+                  Create estimate now
+                </button>
+              )}
               <button type="button" onClick={onClose} style={ghostBtnStyle}>
                 Done — I&apos;ll follow up later
               </button>
