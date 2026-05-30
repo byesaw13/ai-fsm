@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui";
 import type { DraftEstimate } from "@/lib/estimates/ai-draft";
+import type { ShoppingList } from "@ai-fsm/domain";
 
 interface DraftReviewPanelProps {
   draft: DraftEstimate;
+  shoppingList?: ShoppingList | null;
   onApply: () => void;
   onRedescribe: () => void;
 }
@@ -70,8 +72,10 @@ function formatDollars(cents: number) {
   return `$${(cents / 100).toFixed(0)}`;
 }
 
-export function DraftReviewPanel({ draft, onApply, onRedescribe }: DraftReviewPanelProps) {
+export function DraftReviewPanel({ draft, shoppingList, onApply, onRedescribe }: DraftReviewPanelProps) {
   const [materialsExpanded, setMaterialsExpanded] = useState<Record<string, boolean>>({});
+  const [shoppingExpanded, setShoppingExpanded] = useState(false);
+  const [measurementsConfirmed, setMeasurementsConfirmed] = useState(false);
   const conf = CONFIDENCE_STYLES[draft.confidence];
 
   const activeFlags = GUARDRAIL_FLAGS.filter((f) => {
@@ -83,7 +87,17 @@ export function DraftReviewPanel({ draft, onApply, onRedescribe }: DraftReviewPa
   const tradeLabel = TRADE_LABELS[primaryTrade] ?? primaryTrade;
   const uniqueReasons = Array.from(new Set(draft.services.flatMap((s) => s.detection_reasons)));
 
+  const estimatedMeasurements = draft.estimated_measurements ?? [];
+  const specifiedMaterials = draft.specified_materials ?? [];
+  const needsMeasurementConfirmation = estimatedMeasurements.length > 0 && !measurementsConfirmed;
+
+  // Totals
+  const totalServiceCents = draft.services.reduce((sum, s) => sum + (s.adjusted_price_cents ?? s.base_price_cents), 0);
   const totalMaterialCents = draft.services.reduce((sum, s) => sum + (s.material_total_cents ?? 0), 0);
+  const totalSpecifiedCents = specifiedMaterials.reduce(
+    (sum, m) => sum + (m.unit_cost_cents ? m.units_to_order * m.unit_cost_cents : 0), 0
+  );
+  const grandTotalCents = totalServiceCents + totalMaterialCents;
 
   return (
     <div style={{
@@ -115,17 +129,58 @@ export function DraftReviewPanel({ draft, onApply, onRedescribe }: DraftReviewPa
             {conf.label}
           </span>
         </div>
-        <div style={{ display: "flex", gap: "var(--space-2)" }}>
-          <Button type="button" variant="primary" size="sm" onClick={onApply}>
-            Apply to estimate
-          </Button>
-          <Button type="button" variant="secondary" size="sm" onClick={onRedescribe}>
-            Re-describe
-          </Button>
-        </div>
+        {grandTotalCents > 0 && (
+          <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--fg)" }}>
+            Est. total: {formatDollars(grandTotalCents)}
+            {totalMaterialCents > 0 && (
+              <span style={{ fontWeight: 400, fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginLeft: 6 }}>
+                incl. {formatDollars(totalMaterialCents)} materials
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div style={{ padding: "var(--space-4)", display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+
+        {/* ── BLOCKING: Unconfirmed measurements ─────────────────────── */}
+        {estimatedMeasurements.length > 0 && (
+          <div style={{
+            border: measurementsConfirmed ? "1px solid #16a34a" : "1px solid #d97706",
+            borderRadius: "var(--radius-sm)",
+            background: measurementsConfirmed ? "#f0fdf4" : "#fffbeb",
+            padding: "var(--space-3)",
+          }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)" }}>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-xs)", fontWeight: 700, color: measurementsConfirmed ? "#16a34a" : "#92400e" }}>
+                  {measurementsConfirmed
+                    ? "✓ Measurements confirmed"
+                    : `⚠ ${estimatedMeasurements.length} measurement${estimatedMeasurements.length > 1 ? "s were" : " was"} estimated — confirm before applying`}
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+                  {estimatedMeasurements.map((m, i) => (
+                    <div key={i} style={{ fontSize: "var(--text-xs)", display: "flex", gap: "var(--space-2)" }}>
+                      <span style={{ fontWeight: 600, minWidth: 160 }}>{m.scope_label}:</span>
+                      <span style={{ fontWeight: 700 }}>{m.value.toLocaleString()}</span>
+                      <span style={{ color: "var(--fg-muted)", fontStyle: "italic" }}>{m.basis}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {!measurementsConfirmed && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setMeasurementsConfirmed(true)}
+                >
+                  Confirm
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── SECTION: Trade + risk flags ────────────────────────────── */}
         <div>
@@ -169,10 +224,10 @@ export function DraftReviewPanel({ draft, onApply, onRedescribe }: DraftReviewPa
             {draft.services.map((svc, i) => {
               const hasMaterials = (svc.computed_materials?.length ?? 0) > 0;
               const matExpanded = materialsExpanded[svc.service_code + i] ?? false;
+              const displayPrice = svc.adjusted_price_cents ?? svc.base_price_cents;
 
               return (
                 <Card key={i} style={{ padding: 0, overflow: "hidden" }}>
-                  {/* Service row */}
                   <div style={{
                     display: "flex",
                     justifyContent: "space-between",
@@ -206,11 +261,14 @@ export function DraftReviewPanel({ draft, onApply, onRedescribe }: DraftReviewPa
                       )}
                     </div>
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
-                        {svc.unit_type === "per_sqft"
-                          ? `$${(svc.base_price_cents / 100).toFixed(2)}/sqft`
-                          : formatDollars(svc.base_price_cents) + "+"}
+                      <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--fg)" }}>
+                        {formatDollars(displayPrice)}
                       </div>
+                      {svc.adjusted_price_cents && svc.unit_type === "per_sqft" && (
+                        <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                          ${(svc.base_price_cents / 100).toFixed(2)}/sqft
+                        </div>
+                      )}
                       {hasMaterials && svc.material_total_cents != null && svc.material_total_cents > 0 && (
                         <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
                           + {formatDollars(svc.material_total_cents)} materials
@@ -219,7 +277,6 @@ export function DraftReviewPanel({ draft, onApply, onRedescribe }: DraftReviewPa
                     </div>
                   </div>
 
-                  {/* Materials toggle */}
                   {hasMaterials && (
                     <>
                       <button
@@ -241,7 +298,7 @@ export function DraftReviewPanel({ draft, onApply, onRedescribe }: DraftReviewPa
                         }}
                       >
                         <span style={{ fontWeight: 600 }}>
-                          Materials ({svc.computed_materials!.length} items)
+                          Catalog materials ({svc.computed_materials!.length} items)
                         </span>
                         <span>{matExpanded ? "▲" : "▼"}</span>
                       </button>
@@ -276,7 +333,6 @@ export function DraftReviewPanel({ draft, onApply, onRedescribe }: DraftReviewPa
             })}
           </div>
 
-          {/* Materials total */}
           {totalMaterialCents > 0 && (
             <div style={{
               marginTop: "var(--space-2)",
@@ -287,7 +343,7 @@ export function DraftReviewPanel({ draft, onApply, onRedescribe }: DraftReviewPa
               fontSize: "var(--text-xs)",
               color: "var(--fg-muted)",
             }}>
-              <span>Est. materials total:</span>
+              <span>Est. catalog materials:</span>
               <span style={{ fontWeight: 700, fontSize: "var(--text-sm)", color: "var(--fg)" }}>
                 {formatDollars(totalMaterialCents)}
               </span>
@@ -295,6 +351,123 @@ export function DraftReviewPanel({ draft, onApply, onRedescribe }: DraftReviewPa
             </div>
           )}
         </div>
+
+        {/* ── SECTION: Specified materials (products from description) ─ */}
+        {specifiedMaterials.length > 0 && (
+          <div>
+            <SectionLabel>Materials from description</SectionLabel>
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+              {specifiedMaterials.map((mat, i) => (
+                <Card key={i} style={{ background: "#f0f9ff", borderColor: "#bae6fd" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-3)" }}>
+                    <div style={{ flex: 1 }}>
+                      <span style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>{mat.name}</span>
+                      {mat.sku && (
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginLeft: 6 }}>#{mat.sku}</span>
+                      )}
+                      <div style={{ marginTop: 4, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                        {mat.coverage_per_unit && (
+                          <span>{mat.coverage_per_unit} sqft/{mat.unit_label} · </span>
+                        )}
+                        <span>{mat.quantity_needed.toLocaleString()} sqft needed × {mat.waste_factor}x waste</span>
+                      </div>
+                      {mat.notes && (
+                        <p style={{ margin: "2px 0 0", fontSize: "var(--text-xs)", fontStyle: "italic", color: "var(--fg-muted)" }}>{mat.notes}</p>
+                      )}
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontSize: "var(--text-sm)", fontWeight: 700 }}>
+                        {mat.units_to_order} {mat.unit_label}s
+                      </div>
+                      {mat.unit_cost_cents && (
+                        <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                          {formatDollars(mat.units_to_order * mat.unit_cost_cents)} est.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              ))}
+              {totalSpecifiedCents > 0 && (
+                <div style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  alignItems: "baseline",
+                  gap: "var(--space-2)",
+                  fontSize: "var(--text-xs)",
+                  color: "var(--fg-muted)",
+                }}>
+                  <span>Est. specified materials:</span>
+                  <span style={{ fontWeight: 700, fontSize: "var(--text-sm)", color: "var(--fg)" }}>
+                    {formatDollars(totalSpecifiedCents)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── SECTION: Shopping list (full internal view) ────────────── */}
+        {shoppingList && shoppingList.sections.length > 0 && (
+          <div>
+            <SectionLabel>Shopping list (internal)</SectionLabel>
+            <Card style={{ padding: 0, overflow: "hidden" }}>
+              <button
+                type="button"
+                onClick={() => setShoppingExpanded(p => !p)}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "var(--space-2) var(--space-3)",
+                  background: "var(--bg-subtle)",
+                  border: "none",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  fontSize: "var(--text-xs)",
+                  color: "var(--fg-muted)",
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>
+                  {shoppingList.sections.length} section{shoppingList.sections.length > 1 ? "s" : ""} ·{" "}
+                  {formatDollars(shoppingList.total_catalog_cost_cents + shoppingList.total_specified_cost_cents)} est. total
+                </span>
+                <span>{shoppingExpanded ? "▲" : "▼"}</span>
+              </button>
+              {shoppingExpanded && (
+                <div style={{ padding: "var(--space-3)", display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+                  {shoppingList.sections.map((sec) => (
+                    <div key={sec.section}>
+                      <p style={{ margin: "0 0 var(--space-1)", fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        {sec.section}
+                      </p>
+                      {sec.computed_items.map((m) => (
+                        <div key={m.material.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-xs)", padding: "2px 0", gap: "var(--space-2)" }}>
+                          <span style={{ flex: 1 }}>{m.material.material_name}</span>
+                          <span style={{ color: "var(--fg-muted)", minWidth: 60, textAlign: "right" }}>{m.quantity} {m.material.unit}</span>
+                          <span style={{ fontWeight: 600, minWidth: 52, textAlign: "right" }}>{formatDollars(m.total_cost_cents)}</span>
+                        </div>
+                      ))}
+                      {sec.specified_items.map((m, i) => (
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-xs)", padding: "2px 0", gap: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
+                          <span style={{ flex: 1 }}>
+                            {m.name}
+                            <span style={{ color: "#0284c7", marginLeft: 4, fontStyle: "italic" }}>specified</span>
+                          </span>
+                          <span style={{ color: "var(--fg-muted)", minWidth: 60, textAlign: "right" }}>{m.units_to_order} {m.unit_label}</span>
+                          <span style={{ fontWeight: 600, minWidth: 52, textAlign: "right" }}>
+                            {m.unit_cost_cents ? formatDollars(m.units_to_order * m.unit_cost_cents) : "—"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
 
         {/* ── SECTION: Schedule ──────────────────────────────────────── */}
         {draft.schedule_notes && (
@@ -336,13 +509,25 @@ export function DraftReviewPanel({ draft, onApply, onRedescribe }: DraftReviewPa
         )}
 
         {/* ── Footer actions ─────────────────────────────────────────── */}
-        <div style={{ display: "flex", gap: "var(--space-2)", paddingTop: "var(--space-1)" }}>
-          <Button type="button" variant="primary" size="sm" onClick={onApply}>
+        <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", paddingTop: "var(--space-1)" }}>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={onApply}
+            disabled={needsMeasurementConfirmation}
+            title={needsMeasurementConfirmation ? "Confirm estimated measurements above before applying" : undefined}
+          >
             Apply to estimate
           </Button>
           <Button type="button" variant="secondary" size="sm" onClick={onRedescribe}>
             Re-describe
           </Button>
+          {needsMeasurementConfirmation && (
+            <span style={{ fontSize: "var(--text-xs)", color: "#92400e" }}>
+              Confirm measurements above to enable Apply
+            </span>
+          )}
         </div>
 
       </div>

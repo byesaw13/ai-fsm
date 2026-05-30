@@ -72,6 +72,7 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
     removePriceBookItem,
     applyDraft,
     pendingDraft,
+    pendingShoppingList,
     applyPendingDraft,
     discardPendingDraft,
     handleClientCreated,
@@ -175,6 +176,7 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
           setAiConfidenceDismissed={setAiConfidenceDismissed}
           applyDraft={applyDraft}
           pendingDraft={pendingDraft}
+          pendingShoppingList={pendingShoppingList}
           applyPendingDraft={applyPendingDraft}
           discardPendingDraft={discardPendingDraft}
           mode={mode} handleModeChange={handleModeChange}

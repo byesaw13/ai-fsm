@@ -154,6 +154,101 @@ export function computeMaterials(
   return result;
 }
 
+// Material explicitly named in the job description (specific product, known coverage/unit)
+export interface SpecifiedMaterial {
+  name: string;
+  sku: string | null;
+  coverage_per_unit: number | null;  // sqft or LF per box/unit
+  unit_label: string;                // "box", "gallon", "sheet", etc.
+  unit_cost_cents: number | null;    // mentioned price (null if unknown)
+  quantity_needed: number;           // raw measurement from scope (sqft, LF, etc.)
+  waste_factor: number;              // e.g. 1.10 for 10% waste
+  units_to_order: number;            // ceil(quantity_needed / coverage_per_unit * waste_factor)
+  store_section: string;
+  service_code: string;
+  notes: string | null;
+}
+
+// A unified shopping list (internal planning doc, not shown to client)
+export interface ShoppingListSection {
+  section: string;
+  computed_items: ComputedMaterial[];
+  specified_items: SpecifiedMaterial[];
+  section_total_cents: number;
+}
+
+export interface ShoppingList {
+  sections: ShoppingListSection[];
+  total_catalog_cost_cents: number;
+  total_specified_cost_cents: number;
+  generated_at: string;
+}
+
+// Build a unified shopping list from computed + specified materials
+export function buildShoppingList(
+  computedByService: Array<{ service_name: string; materials: ComputedMaterial[] }>,
+  specified: SpecifiedMaterial[]
+): ShoppingList {
+  const sectionMap = new Map<string, { computed: ComputedMaterial[]; specified: SpecifiedMaterial[] }>();
+
+  for (const { materials } of computedByService) {
+    for (const m of materials) {
+      const sec = m.material.store_section;
+      if (!sectionMap.has(sec)) sectionMap.set(sec, { computed: [], specified: [] });
+      sectionMap.get(sec)!.computed.push(m);
+    }
+  }
+
+  for (const s of specified) {
+    const sec = s.store_section;
+    if (!sectionMap.has(sec)) sectionMap.set(sec, { computed: [], specified: [] });
+    sectionMap.get(sec)!.specified.push(s);
+  }
+
+  const SECTION_ORDER = [
+    "Paint & Supplies",
+    "Flooring & Tile",
+    "Lumber & Trim",
+    "Building Materials",
+    "Hardware & Fasteners",
+    "Plumbing",
+    "Electrical",
+    "Outdoor & Garden",
+  ];
+
+  const sections: ShoppingListSection[] = Array.from(sectionMap.entries())
+    .map(([section, { computed, specified: specs }]) => ({
+      section,
+      computed_items: computed.sort((a, b) => a.material.sort_order - b.material.sort_order),
+      specified_items: specs,
+      section_total_cents:
+        computed.reduce((s, m) => s + m.total_cost_cents, 0) +
+        specs.reduce((s, m) => s + (m.unit_cost_cents ? m.units_to_order * m.unit_cost_cents : 0), 0),
+    }))
+    .sort((a, b) => {
+      const ai = SECTION_ORDER.indexOf(a.section);
+      const bi = SECTION_ORDER.indexOf(b.section);
+      if (ai === -1 && bi === -1) return a.section.localeCompare(b.section);
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+
+  return {
+    sections,
+    total_catalog_cost_cents: sections.reduce(
+      (s, sec) => s + sec.computed_items.reduce((ss, m) => ss + m.total_cost_cents, 0),
+      0
+    ),
+    total_specified_cost_cents: sections.reduce(
+      (s, sec) =>
+        s + sec.specified_items.reduce((ss, m) => ss + (m.unit_cost_cents ? m.units_to_order * m.unit_cost_cents : 0), 0),
+      0
+    ),
+    generated_at: new Date().toISOString(),
+  };
+}
+
 // Group computed materials by store section
 export function groupMaterialsBySection(computed: ComputedMaterial[]): MaterialsBySection[] {
   const sectionMap = new Map<string, ComputedMaterial[]>();

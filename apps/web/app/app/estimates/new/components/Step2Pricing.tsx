@@ -15,6 +15,7 @@ import type { PaintingEstimateResult } from "../hooks/useEstimatePricing";
 import type { EditableSuggestion, ScopeResult } from "../hooks/useEstimateAI";
 import type { DraftEstimate } from "@/lib/estimates/ai-draft";
 import { DraftReviewPanel } from "./DraftReviewPanel";
+import type { ShoppingList } from "@ai-fsm/domain";
 import type { PriceBookEntry } from "../hooks/useEstimatePriceBook";
 import type { ScopeBuilderResult } from "@/components/ScopeBuilder";
 import type { PriceBookService } from "@/components/PriceBookSelector";
@@ -52,6 +53,7 @@ interface Step2Props {
   setAiConfidenceDismissed: (v: boolean) => void;
   applyDraft: () => void;
   pendingDraft: DraftEstimate | null;
+  pendingShoppingList?: ShoppingList | null;
   applyPendingDraft: () => void;
   discardPendingDraft: () => void;
   // Generic pricing / price book
@@ -116,7 +118,7 @@ export function Step2Pricing({
   scopeParsing, scopeNotes, setScopeNotes, scopeError, scopeResult,
   aiDraftMode, setAiDraftMode, aiDescription, setAiDescription,
   aiConfidenceNotes, aiConfidenceDismissed, setAiConfidenceDismissed, applyDraft,
-  pendingDraft, applyPendingDraft, discardPendingDraft,
+  pendingDraft, pendingShoppingList, applyPendingDraft, discardPendingDraft,
   mode, handleModeChange,
   priceBookItems, removePriceBookItem, scopeResults, handleScopeChange, pendingDraftScope,
   handleAddPriceBookItem,
@@ -219,6 +221,7 @@ export function Step2Pricing({
         <div style={{ marginBottom: "var(--space-4)" }}>
           <DraftReviewPanel
             draft={pendingDraft}
+            shoppingList={pendingShoppingList}
             onApply={applyPendingDraft}
             onRedescribe={discardPendingDraft}
           />
