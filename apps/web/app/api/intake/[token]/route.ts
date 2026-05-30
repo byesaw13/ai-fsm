@@ -130,7 +130,7 @@ export async function POST(
         accountId: invite.account_id,
         entityId: invite.booking_request_id,
         actionTypes: ["review_intake"],
-        resolvedBy: "system",
+        resolvedBy: null, // client self-submission — no user actor,
       });
 
       await createActionItem(client, {

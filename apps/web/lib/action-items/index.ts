@@ -25,7 +25,7 @@ export async function resolveActionItems(
     accountId: string;
     entityId: string;
     actionTypes: string[];
-    resolvedBy: string;
+    resolvedBy: string | null;  // null for system/automated resolutions (no user actor)
   }
 ): Promise<void> {
   await client.query(

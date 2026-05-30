@@ -23,14 +23,28 @@ export default async function PublicIntakePage({
 }) {
   const { token } = await params;
 
-  const pool = getPool();
-  const { rows } = await pool.query<InviteRow>(
-    `SELECT id, account_id, booking_request_id, token::text AS token,
-            lead_name, lead_email, lead_phone, expires_at, used_at
-     FROM intake_invites
-     WHERE token = $1`,
-    [token]
-  );
+  let rows: InviteRow[] = [];
+  try {
+    const pool = getPool();
+    const result = await pool.query<InviteRow>(
+      `SELECT id, account_id, booking_request_id, token::text AS token,
+              lead_name, lead_email, lead_phone, expires_at, used_at
+       FROM intake_invites
+       WHERE token = $1`,
+      [token]
+    );
+    rows = result.rows;
+  } catch {
+    return (
+      <div style={containerStyle}>
+        <h1 style={headingStyle}>Something went wrong</h1>
+        <p style={bodyStyle}>
+          We couldn&apos;t load your intake form right now. Please try again in a moment,
+          or contact Dovetails Services directly.
+        </p>
+      </div>
+    );
+  }
 
   const invite = rows[0];
   if (!invite) return notFound();

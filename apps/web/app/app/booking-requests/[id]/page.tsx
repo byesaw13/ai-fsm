@@ -162,7 +162,7 @@ export default async function BookingRequestDetailPage({
       {/* ── Next-step banner ────────────────────────────────────────────── */}
       {(() => {
         const hasEmail = !!br.email;
-        const intiteUsed = latestInvite?.used_at;
+        const inviteUsed = latestInvite?.used_at;
         const inviteSent = latestInvite && !latestInvite.used_at && new Date(latestInvite.expires_at) > new Date();
         const sentAgo = latestInvite
           ? Math.round((Date.now() - new Date(latestInvite.created_at).getTime()) / 60000)
@@ -170,7 +170,7 @@ export default async function BookingRequestDetailPage({
 
         let banner: { color: string; bg: string; icon: string; message: string; href?: string; linkLabel?: string } | null = null;
 
-        if (intiteUsed) {
+        if (inviteUsed) {
           banner = { color: "#16a34a", bg: "#f0fdf4", icon: "✅", message: "Client filled out the intake form — review their answers below." };
         } else if (inviteSent) {
           banner = { color: "#d97706", bg: "#fffbeb", icon: "⏳", message: `Waiting on client — intake form sent ${sentAgo != null ? `${sentAgo} minutes` : ""} ago. ${!hasEmail ? "(no email on file)" : ""}` };
