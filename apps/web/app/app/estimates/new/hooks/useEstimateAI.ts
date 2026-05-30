@@ -225,15 +225,16 @@ export function useEstimateAI({
 
     for (const svc of draft.services) {
       const instanceId = `${svc.service_id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      // Use adjusted_price_cents when available (includes scope modifier + sqft multiplied in)
-      const effectivePrice = svc.adjusted_price_cents ?? svc.base_price_cents;
+      // Always pass base_price_cents to ScopeBuilder — it recomputes adjusted price
+      // from the prefilled scope values + complexity factors. Passing adjusted_price_cents
+      // would cause a second multiplication (e.g. base×sqft done twice for per_sqft services).
       const service: PriceBookService = {
         id: svc.service_id,
         code: svc.service_code,
         name: svc.service_name,
         category: svc.service_category,
         tier: "core",
-        default_price_cents: effectivePrice,
+        default_price_cents: svc.base_price_cents,
         price_min_cents: svc.base_price_cents,
         price_max_cents: null,
         add_on_price_cents: null,
@@ -245,17 +246,32 @@ export function useEstimateAI({
         upsell_codes: [],
         is_active: true,
       };
-      priceBookItems.push({ service, priceCents: effectivePrice, instanceId });
+      priceBookItems.push({ service, priceCents: svc.base_price_cents, instanceId });
+      // price_book_id tags this so handleSubmit excludes it from manualItems
+      // (priceBookLineItems handles the actual submission price via ScopeBuilder)
       lineItems.push({
         description: `${svc.service_code} — ${svc.service_name}`,
         quantity: "1",
-        unit_price: (effectivePrice / 100).toFixed(2),
+        unit_price: (svc.base_price_cents / 100).toFixed(2),
         price_book_id: svc.service_id,
       });
       scopeMap[instanceId] = {
         scopeValues: svc.scope_values,
         complexityFactors: svc.complexity_factor_keys,
       };
+    }
+
+    // Add specified materials (products named in description) as material line items.
+    // No price_book_id → goes through manualItems → included in estimate total.
+    // The customer sees the material cost; the shopping list tells us exactly what to order.
+    for (const mat of draft.specified_materials ?? []) {
+      if (!mat.unit_cost_cents) continue;
+      const totalCents = mat.units_to_order * mat.unit_cost_cents;
+      lineItems.push({
+        description: `Materials — ${mat.name} (${mat.units_to_order} ${mat.unit_label}${mat.units_to_order !== 1 ? "s" : ""})`,
+        quantity: "1",
+        unit_price: (totalCents / 100).toFixed(2),
+      });
     }
 
     return {

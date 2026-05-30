@@ -449,7 +449,11 @@ export function useEstimateForm({
           options,
         };
       } else {
-        const manualItems = lineItems.filter((r) => r.description.trim() || parseCents(r.unit_price) > 0);
+        // Exclude price_book_id items — those are already covered by priceBookLineItems via ScopeBuilder.
+        // Including them here would double-count every price-book service in the estimate total.
+        const manualItems = lineItems.filter(
+          (r) => (r.description.trim() || parseCents(r.unit_price) > 0) && !r.price_book_id
+        );
         const { materialLineItems } = pricing;
         const scopeMatCents = scopeMaterialsTotalCents;
         const scopeMaterialItems = priceBookItems
