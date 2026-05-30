@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { ScopeTemplate, ScopeComponentValues, ComputedMaterial } from "@ai-fsm/domain";
+import type { ScopeTemplate, ScopeComponentValues, ComputedMaterial, SpecifiedMaterial } from "@ai-fsm/domain";
 import type { PriceBookEntry } from "./item-suggester";
 
 // ---------------------------------------------------------------------------
@@ -45,9 +45,17 @@ export interface DraftService {
   complexity_factor_keys: string[];
   trade_detected: string;
   detection_reasons: string[];
-  // Populated by the API route after the AI call (deterministic from service_materials table)
+  // Populated by the API route after the AI call
   computed_materials?: ComputedMaterial[];
   material_total_cents?: number;
+  adjusted_price_cents?: number;   // base × sqft (if per_sqft) × scope modifier
+}
+
+export interface EstimatedMeasurement {
+  scope_key: string;    // e.g. "wall_sqft"
+  scope_label: string;  // e.g. "Wall area (living room)"
+  value: number;        // estimated value
+  basis: string;        // e.g. "standard living room heuristic (450 sqft)"
 }
 
 export type DraftConfidence = "high" | "medium" | "low";
@@ -69,6 +77,8 @@ export interface DraftEstimate {
   confidence: DraftConfidence;
   schedule_notes: string;
   proposal_summary: string;
+  estimated_measurements: EstimatedMeasurement[];  // measurements the AI guessed (not given)
+  specified_materials: SpecifiedMaterial[];          // products mentioned by name in the description
 }
 
 // ---------------------------------------------------------------------------
@@ -217,6 +227,25 @@ Example painting: "450 sqft walls (living room + hallway) with dark_to_light →
 Example plumbing: "3 faucets at 6/day → 0.5 day. Price check: 3 × $175 = $525 minimum."
 Apply the same reasoning to any service where a rate is listed. Do NOT fabricate rates for services not in this table.
 
+## Rules for specified_materials (products named in the description)
+When the description mentions a specific product by name — especially one with coverage specs (e.g. "Pergo XP 20mil, box covers 19.63 sqft, $52/box") — you MUST:
+1. Add it to specified_materials with the exact product name, coverage_per_unit, unit_label, unit_cost_cents, and units_to_order
+2. Calculate units_to_order as: ceil((quantity_needed / coverage_per_unit) × waste_factor) where waste_factor is 1.10 for flooring, 1.10 for paint, 1.15 for drywall
+3. Set quantity_needed from the relevant scope_value (e.g. floor_sqft for LVP)
+4. Set store_section to the appropriate store aisle (e.g. "Flooring & Tile", "Paint & Supplies")
+5. NEVER describe this material as "client-supplied" — Dovetails purchases the material UNLESS the description explicitly says "client is providing" or "owner-supplied"
+
+**CRITICAL RULE**: Never use the phrase "client-supplied", "customer-supplied", "owner-supplied", or "client will provide" in any output unless the description literally states the client is bringing the materials. Mentioning a specific product name or brand does NOT mean the client is supplying it.
+
+## Rules for estimated_measurements
+For every measurement that was NOT explicitly given in the description (i.e., you used a room-type heuristic), add an entry to estimated_measurements:
+- scope_key: the scope component key (e.g. "wall_sqft", "floor_sqft", "linear_feet")
+- scope_label: a plain English description including the room/area (e.g. "Wall area — living room")
+- value: the number you used
+- basis: one sentence explaining the heuristic (e.g. "Standard living room heuristic: 450 sqft walls")
+These are shown to the estimator as a required review step before they can send the estimate.
+If all measurements were given explicitly, return an empty array.
+
 ## Rules for schedule_notes
 Write this for the estimator, not the customer. Be specific about sequencing:
 - If multi-trip: describe each visit with Day 1 / Day 2 labels, what happens each day, and the wait period between
@@ -230,8 +259,10 @@ Write this for the customer. 2-3 sentences maximum. Rules:
 - State WHAT we're doing, any key conditions (multi-trip, cure time), and one notable exclusion if relevant
 - Tone: professional contractor writing to a homeowner who values clear communication
 - DO NOT mention specific prices — pricing appears elsewhere in the proposal
-- Example good: "We'll patch and texture two walls in the master bedroom, sand smooth, and prime for final paint. Work requires one visit with dry time between coats — typically same-day if started early."
-- Example bad: "Service 5009: touch-up painting with 9002 specialty skim coat ×1.20 modifier, $295 base"`;
+- DO NOT say materials are "client-supplied" unless the description explicitly says so
+- Example good: "We'll prepare your concrete slab and install new LVP flooring throughout the living room. Work is scheduled over two visits with a 24-hour cure between steps."
+- Example bad: "Service 5009: touch-up painting with 9002 specialty skim coat ×1.20 modifier, $295 base"
+- Example bad: "Client-supplied flooring will be installed." (unless the description literally said the client is providing the flooring)`;
 }
 
 const DRAFT_TOOL: Anthropic.Tool = {
@@ -316,10 +347,47 @@ const DRAFT_TOOL: Anthropic.Tool = {
       },
       proposal_summary: {
         type: "string",
-        description: "2-3 sentences of customer-facing proposal language describing what we're doing, why, and any key conditions or exclusions. Plain English, no service codes. Professional but conversational — like a contractor writing to a homeowner, not a database record. Example: 'We'll prepare your concrete slab with bonding primer and skim coat on Day 1, then return after a 24-hour cure to install your new LVP flooring. Client-supplied flooring tracked separately. Furniture moving and staging included.'",
+        description: "2-3 sentences of customer-facing proposal language describing what we're doing, why, and any key conditions or exclusions. Plain English, no service codes. Professional but conversational — like a contractor writing to a homeowner. NEVER say materials are 'client-supplied' unless the description explicitly states the client is providing them.",
+      },
+      estimated_measurements: {
+        type: "array",
+        description: "List of measurements that were NOT given in the description — only those estimated using room-type heuristics. Empty if all measurements were explicitly stated.",
+        items: {
+          type: "object",
+          properties: {
+            scope_key:   { type: "string", description: "Scope component key used (e.g. 'wall_sqft', 'floor_sqft')" },
+            scope_label: { type: "string", description: "Plain English label including the room (e.g. 'Wall area — living room')" },
+            value:       { type: "number", description: "The estimated value you used" },
+            basis:       { type: "string", description: "One sentence explaining the heuristic used" },
+          },
+          required: ["scope_key", "scope_label", "value", "basis"],
+          additionalProperties: false,
+        },
+      },
+      specified_materials: {
+        type: "array",
+        description: "Products explicitly named in the description with coverage or unit specs. Use to calculate how many boxes/units to order. Leave empty if no specific products are named.",
+        items: {
+          type: "object",
+          properties: {
+            name:              { type: "string", description: "Product name as mentioned (e.g. 'Pergo XP 20mil LVP')" },
+            sku:               { type: ["string", "null"], description: "SKU or model number if mentioned" },
+            coverage_per_unit: { type: ["number", "null"], description: "Sqft or LF covered per box/unit" },
+            unit_label:        { type: "string", description: "Unit name: 'box', 'gallon', 'sheet', 'roll', etc." },
+            unit_cost_cents:   { type: ["integer", "null"], description: "Price per unit in cents if mentioned (e.g. $52.00 → 5200)" },
+            quantity_needed:   { type: "number", description: "Raw measurement from scope (sqft, LF, etc.)" },
+            waste_factor:      { type: "number", description: "Waste factor: 1.10 for flooring/paint, 1.15 for drywall" },
+            units_to_order:    { type: "integer", description: "ceil(quantity_needed / coverage_per_unit * waste_factor)" },
+            store_section:     { type: "string", description: "Store aisle (e.g. 'Flooring & Tile', 'Paint & Supplies')" },
+            service_code:      { type: "string", description: "Price book code for the service this material belongs to" },
+            notes:             { type: ["string", "null"], description: "Any relevant notes about the product or order" },
+          },
+          required: ["name", "sku", "coverage_per_unit", "unit_label", "unit_cost_cents", "quantity_needed", "waste_factor", "units_to_order", "store_section", "service_code", "notes"],
+          additionalProperties: false,
+        },
       },
     },
-    required: ["services", "notes", "guardrails", "confidence_notes", "confidence", "schedule_notes", "proposal_summary"],
+    required: ["services", "notes", "guardrails", "confidence_notes", "confidence", "schedule_notes", "proposal_summary", "estimated_measurements", "specified_materials"],
     additionalProperties: false,
   },
 };
@@ -401,7 +469,7 @@ export async function draftEstimate(
 
     const response = await client.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 2048,
+      max_tokens: 8192,
       system: [
         {
           type: "text",
@@ -438,6 +506,13 @@ export async function draftEstimate(
       confidence: DraftConfidence;
       schedule_notes: string;
       proposal_summary: string;
+      estimated_measurements: Array<{
+        scope_key: string;
+        scope_label: string;
+        value: number;
+        basis: string;
+      }>;
+      specified_materials: SpecifiedMaterial[];
     };
 
     // Validate and enrich services — strip hallucinated codes
@@ -480,6 +555,8 @@ export async function draftEstimate(
       confidence,
       schedule_notes: raw.schedule_notes ?? "",
       proposal_summary: raw.proposal_summary ?? "",
+      estimated_measurements: Array.isArray(raw.estimated_measurements) ? raw.estimated_measurements : [],
+      specified_materials: Array.isArray(raw.specified_materials) ? raw.specified_materials : [],
     };
   } catch (err) {
     console.error("[draftEstimate] Claude API error:", err);

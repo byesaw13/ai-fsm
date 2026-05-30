@@ -10,6 +10,7 @@ import {
   type EstimateSpec,
 } from "@ai-fsm/domain";
 import { useEstimateAI } from "./useEstimateAI";
+import type { ShoppingList, SpecifiedMaterial } from "@ai-fsm/domain";
 import { useEstimatePriceBook } from "./useEstimatePriceBook";
 import { useEstimateTiers } from "./useEstimateTiers";
 import {
@@ -143,6 +144,9 @@ export function useEstimateForm({
     Record<string, { scopeValues: Record<string, number | string>; complexityFactors: string[] }>
   >({});
 
+  const [draftShoppingList, setDraftShoppingList] = useState<ShoppingList | null>(null);
+  const [draftSpecifiedMaterials, setDraftSpecifiedMaterials] = useState<SpecifiedMaterial[]>([]);
+
   // ---------------------------------------------------------------------------
   // Price book sub-hook
   // ---------------------------------------------------------------------------
@@ -208,7 +212,7 @@ export function useEstimateForm({
     onAddLineItems: (rows) => {
       setLineItems((prev) => [...prev.filter((r) => r.description.trim()), ...rows]);
     },
-    onApplyDraft: ({ priceBookItems: draftItems, lineItems: newLineItems, scopeMap, notes: draftNotes, guardrails }) => {
+    onApplyDraft: ({ priceBookItems: draftItems, lineItems: newLineItems, scopeMap, notes: draftNotes, guardrails, shoppingList, specifiedMaterials }) => {
       setPriceBookItems(draftItems);
       setScopeResults({});
       setLineItems((prev) => {
@@ -223,6 +227,8 @@ export function useEstimateForm({
       setRequiresDryingOrCuring(guardrails.requires_drying_or_curing);
       setCoordinationRequired(guardrails.coordination_required);
       setFinishExpectation(guardrails.finish_expectation);
+      setDraftShoppingList(shoppingList ?? null);
+      setDraftSpecifiedMaterials(specifiedMaterials ?? []);
     },
   });
 
@@ -443,7 +449,11 @@ export function useEstimateForm({
           options,
         };
       } else {
-        const manualItems = lineItems.filter((r) => r.description.trim() || parseCents(r.unit_price) > 0);
+        // Exclude price_book_id items — those are already covered by priceBookLineItems via ScopeBuilder.
+        // Including them here would double-count every price-book service in the estimate total.
+        const manualItems = lineItems.filter(
+          (r) => (r.description.trim() || parseCents(r.unit_price) > 0) && !r.price_book_id
+        );
         const { materialLineItems } = pricing;
         const scopeMatCents = scopeMaterialsTotalCents;
         const scopeMaterialItems = priceBookItems
@@ -530,6 +540,8 @@ export function useEstimateForm({
 
       Object.assign(payload, {
         ...(initialVaultItemId ? { vault_item_id: initialVaultItemId } : {}),
+        ...(draftShoppingList ? { shopping_list_json: draftShoppingList } : {}),
+        ...(draftSpecifiedMaterials.length > 0 ? { specified_materials_json: draftSpecifiedMaterials } : {}),
         trip_count: tripCount,
         requires_drying_or_curing: requiresDryingOrCuring,
         difficult_access: difficultAccess,
@@ -642,6 +654,8 @@ export function useEstimateForm({
     priceBookItems, scopeResults,
     priceBookLineItems, scopeMaterialsTotalCents,
     pendingDraftScope,
+    draftShoppingList,
+    draftSpecifiedMaterials,
     // Pricing (from useEstimatePricing)
     ...pricing,
     // Material tracking

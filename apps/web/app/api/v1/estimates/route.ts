@@ -196,6 +196,9 @@ const createEstimateSchema = z.object({
   minimum_service_override_reason: estimateMinimumOverrideReasonSchema.nullable().optional(),
   minimum_service_override_note: z.string().nullable().optional(),
   scope_assumptions: z.string().nullable().optional(),
+  // AI planning data
+  shopping_list_json: z.record(z.unknown()).optional(),
+  specified_materials_json: z.array(z.record(z.unknown())).optional(),
   // Engine v2: room-by-room spec — when present, computeAndPersist() runs after insert
   engine_spec: z.record(z.unknown()).optional(),
   // Scope Intelligence: snapshot of components/complexity captured from ScopeBuilder per price-book item
@@ -276,6 +279,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     minimum_service_override_reason,
     minimum_service_override_note,
     scope_assumptions,
+    shopping_list_json,
+    specified_materials_json,
     engine_spec,
     scope_snapshots,
   } = parseResult.data;
@@ -368,10 +373,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             coordination_required, finish_expectation, travel_surcharge_cents,
             risk_adjustment_cents, minimum_service_override_reason,
             minimum_service_override_note, pricing_review_status, scope_assumptions,
-            condition_tier)
+            condition_tier, shopping_list_json, specified_materials_json)
           VALUES ($1, $2, $3, $4, $5, 'draft', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
                   $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27,
-                  $28, $29, $30, $31, $32, $33, $34)
+                  $28, $29, $30, $31, $32, $33, $34, $35, $36)
           RETURNING id`,
         [
           session.accountId,
@@ -408,6 +413,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           pricingReview.status,
           scope_assumptions ?? null,
           conditionTier,
+          shopping_list_json ? JSON.stringify(shopping_list_json) : null,
+          specified_materials_json ? JSON.stringify(specified_materials_json) : null,
         ]
       );
       const estimateId = result.rows[0].id;

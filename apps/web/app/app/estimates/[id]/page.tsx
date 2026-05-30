@@ -534,6 +534,58 @@ export default async function EstimateDetailPage({
           </p>
         )}
 
+        {/* Shopping list — owner/admin only */}
+        {(session.role === "owner" || session.role === "admin") && (() => {
+          const shoppingList = (estimate as unknown as { shopping_list_json?: unknown }).shopping_list_json as {
+            sections?: Array<{
+              section: string;
+              computed_items: Array<{ material: { material_name: string; unit: string; id: string }; quantity: number; total_cost_cents: number }>;
+              specified_items: Array<{ name: string; units_to_order: number; unit_label: string; unit_cost_cents: number | null; notes: string | null }>;
+              section_total_cents: number;
+            }>;
+            total_catalog_cost_cents?: number;
+            total_specified_cost_cents?: number;
+          } | null | undefined;
+          if (!shoppingList?.sections?.length) return null;
+          const grandTotal = (shoppingList.total_catalog_cost_cents ?? 0) + (shoppingList.total_specified_cost_cents ?? 0);
+          return (
+            <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-3)", borderTop: "1px dashed var(--border)" }}>
+              <p style={{ fontWeight: 600, marginBottom: "var(--space-2)", color: "var(--fg-muted)" }}>
+                Shopping List
+                {grandTotal > 0 && (
+                  <span style={{ fontWeight: 400, marginLeft: 8, fontSize: "var(--text-sm)" }}>
+                    est. {formatDollars(grandTotal)}
+                  </span>
+                )}
+              </p>
+              {shoppingList.sections.map((sec) => (
+                <div key={sec.section} style={{ marginBottom: "var(--space-2)" }}>
+                  <p style={{ fontWeight: 600, fontSize: "var(--text-xs)", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--fg-muted)", margin: "0 0 4px" }}>
+                    {sec.section}
+                  </p>
+                  {sec.computed_items.map((m) => (
+                    <div key={m.material.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)", padding: "2px 0" }}>
+                      <span>{m.material.material_name}</span>
+                      <span style={{ color: "var(--fg-muted)" }}>
+                        {m.quantity} {m.material.unit} — {formatDollars(m.total_cost_cents)}
+                      </span>
+                    </div>
+                  ))}
+                  {sec.specified_items.map((m, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)", padding: "2px 0", fontStyle: "italic" }}>
+                      <span>{m.name} <span style={{ color: "#0284c7", fontSize: "var(--text-xs)" }}>(specified)</span></span>
+                      <span style={{ color: "var(--fg-muted)" }}>
+                        {m.units_to_order} {m.unit_label}
+                        {m.unit_cost_cents ? ` — ${formatDollars(m.units_to_order * m.unit_cost_cents)}` : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
         {(session.role === "owner" || session.role === "admin") && (
           <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
             <p style={{ fontWeight: 600, marginBottom: "var(--space-1)", color: "var(--fg-muted)" }}>Pricing Guardrails</p>

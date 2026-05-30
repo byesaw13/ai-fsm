@@ -6,11 +6,29 @@ import { logger } from "@/lib/logger";
 import { draftEstimate } from "@/lib/estimates/ai-draft";
 import type { TradeDefinition } from "@/lib/estimates/ai-draft";
 import type { PriceBookEntry } from "@/lib/estimates/item-suggester";
-import { computeMaterials } from "@ai-fsm/domain";
+import { computeMaterials, computeScopeModifier, buildShoppingList } from "@ai-fsm/domain";
 import type { ScopeTemplate, ScopeComponent, ComplexityFactor, ScopeComponentOption, ServiceMaterial, ScopeComponentValues, ComplexityValues } from "@ai-fsm/domain";
 import { validateMaterialsForTrade } from "@/lib/estimates/guardrails";
 
 export const dynamic = "force-dynamic";
+
+function findPrimarySqft(scopeValues: Record<string, number | string>): number {
+  const sqftKeys = ["wall_sqft", "floor_sqft", "ceiling_sqft", "drywall_sqft", "sqft"];
+  for (const key of sqftKeys) {
+    const val = Number(scopeValues[key]);
+    if (val > 0) return val;
+  }
+  const lfKeys = ["linear_feet", "lf", "perimeter_lf"];
+  for (const key of lfKeys) {
+    const val = Number(scopeValues[key]);
+    if (val > 0) return val;
+  }
+  for (const val of Object.values(scopeValues)) {
+    const n = Number(val);
+    if (n > 0) return n;
+  }
+  return 1;
+}
 
 const bodySchema = z.object({
   description: z.string().min(1).max(5000),
@@ -144,24 +162,55 @@ export const POST = withAuth(async (request: NextRequest, session) => {
        ORDER BY sort_order ASC`
     );
 
-    // Optional job context
+    // Enriched job context: job title/notes, property address, recent estimate history
     let jobContext: string | undefined;
     if (job_id) {
-      const { rows: jobRows } = await pool.query<{ title: string; notes: string | null }>(
-        `SELECT title, notes FROM jobs WHERE id = $1 AND account_id = $2`,
+      const { rows: jobRows } = await pool.query<{
+        title: string; notes: string | null; client_id: string; property_id: string | null;
+      }>(
+        `SELECT j.title, j.notes, j.client_id, j.property_id
+         FROM jobs j WHERE j.id = $1 AND j.account_id = $2`,
         [job_id, session.accountId]
       );
       if (jobRows[0]) {
-        jobContext = jobRows[0].notes
-          ? `${jobRows[0].title} — ${jobRows[0].notes}`
-          : jobRows[0].title;
+        const { title, notes, client_id, property_id } = jobRows[0];
+        const parts: string[] = [`Job: ${title}`];
+        if (notes) parts.push(`Notes: ${notes}`);
+
+        if (property_id) {
+          const { rows: propRows } = await pool.query<{ address: string; year_built: number | null; sqft: number | null }>(
+            `SELECT address, year_built, sqft FROM properties WHERE id = $1 AND account_id = $2`,
+            [property_id, session.accountId]
+          );
+          if (propRows[0]) {
+            parts.push(`Property: ${propRows[0].address}`);
+            if (propRows[0].year_built) parts.push(`Year built: ${propRows[0].year_built}`);
+            if (propRows[0].sqft) parts.push(`Property sqft: ${propRows[0].sqft}`);
+          }
+        }
+
+        // Recent estimate history for this client (last 3 completed)
+        const { rows: recentRows } = await pool.query<{ title: string; total_cents: number; status: string; created_at: string }>(
+          `SELECT j.title, e.total_cents, e.status, e.created_at
+           FROM estimates e JOIN jobs j ON j.id = e.job_id
+           WHERE e.account_id = $1 AND j.client_id = $2 AND e.status IN ('approved','invoiced','sent')
+           ORDER BY e.created_at DESC LIMIT 3`,
+          [session.accountId, client_id]
+        );
+        if (recentRows.length > 0) {
+          parts.push(`Prior estimates for this client: ${recentRows.map(r => `${r.title} ($${(r.total_cents/100).toFixed(0)}, ${r.status})`).join('; ')}`);
+        }
+
+        jobContext = parts.join('\n');
       }
     }
 
     const draft = await draftEstimate(description, priceBook, templates, tradeRows, jobContext);
 
-    // Compute materials for each service using the same deterministic logic as ScopeBuilder.
-    // This makes materials visible in the review panel before the draft is applied to the form.
+    // Compute materials and adjusted price for each service.
+    // adjusted_price_cents = (base × sqft if per_sqft) × scope_modifier — shown in review panel.
+    const computedByService: Array<{ service_name: string; materials: import("@ai-fsm/domain").ComputedMaterial[] }> = [];
+
     if (draft && draft.services.length > 0) {
       const categories = [...new Set(draft.services.map((s) => s.service_category))];
       const catPlaceholders = categories.map((_, i) => `$${i + 1}`).join(", ");
@@ -179,10 +228,8 @@ export const POST = withAuth(async (request: NextRequest, session) => {
 
       for (const svc of draft.services) {
         const template = templates.find((t) => t.category === svc.service_category);
-        const categoryMaterials = materialRows.filter((m) => m.category === svc.service_category);
-        if (!categoryMaterials.length) continue;
 
-        // Build ComplexityValues from the template factors + active keys on this service
+        // Build ComplexityValues
         const complexityValues: ComplexityValues = {};
         if (template) {
           for (const f of template.complexity_factors) {
@@ -190,18 +237,40 @@ export const POST = withAuth(async (request: NextRequest, session) => {
           }
         }
 
-        const computed = computeMaterials(categoryMaterials, svc.scope_values as ScopeComponentValues, complexityValues);
-        const trade = svc.trade_detected ?? svc.service_category ?? "";
-        const { allowed, blocked } = validateMaterialsForTrade(computed, trade);
-        if (blocked.length > 0) {
-          logger.warn("AI draft: blocked cross-trade materials", { trade, blocked: blocked.map((b) => b.material.material_name), traceId: session.traceId });
+        // Compute materials
+        const categoryMaterials = materialRows.filter((m) => m.category === svc.service_category);
+        if (categoryMaterials.length) {
+          const computed = computeMaterials(categoryMaterials, svc.scope_values as ScopeComponentValues, complexityValues);
+          const trade = svc.trade_detected ?? svc.service_category ?? "";
+          const { allowed, blocked } = validateMaterialsForTrade(computed, trade);
+          if (blocked.length > 0) {
+            logger.warn("AI draft: blocked cross-trade materials", { trade, blocked: blocked.map((b) => b.material.material_name), traceId: session.traceId });
+          }
+          svc.computed_materials = allowed;
+          svc.material_total_cents = allowed.reduce((sum, m) => sum + m.total_cost_cents, 0);
+          computedByService.push({ service_name: svc.service_name, materials: allowed });
         }
-        svc.computed_materials = allowed;
-        svc.material_total_cents = allowed.reduce((sum, m) => sum + m.total_cost_cents, 0);
+
+        // Compute adjusted price
+        const { multiplier, adderCents } = template
+          ? computeScopeModifier(template.complexity_factors, complexityValues)
+          : { multiplier: 1, adderCents: 0 };
+
+        if (svc.unit_type === "per_sqft") {
+          const sqft = findPrimarySqft(svc.scope_values);
+          svc.adjusted_price_cents = Math.round(svc.base_price_cents * sqft * multiplier) + adderCents;
+        } else {
+          svc.adjusted_price_cents = Math.round(svc.base_price_cents * multiplier) + adderCents;
+        }
       }
     }
 
-    return NextResponse.json({ draft });
+    // Build unified shopping list (computed catalog materials + specified products from description)
+    const shoppingList = draft
+      ? buildShoppingList(computedByService, draft.specified_materials ?? [])
+      : null;
+
+    return NextResponse.json({ draft, shopping_list: shoppingList });
   } catch (error) {
     logger.error("POST /api/v1/estimates/ai-draft error", error as Error, {
       traceId: session.traceId,

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { JOB_TYPE_MATERIALS } from "@ai-fsm/domain";
+import type { ShoppingList, SpecifiedMaterial } from "@ai-fsm/domain";
 import type { PriceBookService } from "@/components/PriceBookSelector";
 import type { DraftEstimate, DraftConfidence } from "@/lib/estimates/ai-draft";
 import type { LineItemRow, OptionTier } from "@/lib/estimates/form-helpers";
@@ -63,6 +64,8 @@ interface UseEstimateAIParams {
     scopeMap: DraftScopeMap;
     notes: string | null;
     guardrails: DraftEstimate["guardrails"];
+    shoppingList: ShoppingList | null;
+    specifiedMaterials: SpecifiedMaterial[];
   }) => void;
 }
 
@@ -93,6 +96,7 @@ export function useEstimateAI({
   const [aiConfidenceNotes, setAiConfidenceNotes] = useState<string>("");
   const [aiConfidenceDismissed, setAiConfidenceDismissed] = useState<boolean>(false);
   const [pendingDraft, setPendingDraft] = useState<DraftEstimate | null>(null);
+  const [pendingShoppingList, setPendingShoppingList] = useState<ShoppingList | null>(null);
 
   const scopeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
@@ -214,13 +218,16 @@ export function useEstimateAI({
     setItemDescription("");
   }
 
-  function _buildApplyParams(draft: DraftEstimate): Parameters<typeof onApplyDraft>[0] {
+  function _buildApplyParams(draft: DraftEstimate, shoppingList: ShoppingList | null): Parameters<typeof onApplyDraft>[0] {
     const priceBookItems: DraftPriceBookItem[] = [];
     const lineItems: LineItemRow[] = [];
     const scopeMap: DraftScopeMap = {};
 
     for (const svc of draft.services) {
       const instanceId = `${svc.service_id}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      // Always pass base_price_cents to ScopeBuilder — it recomputes adjusted price
+      // from the prefilled scope values + complexity factors. Passing adjusted_price_cents
+      // would cause a second multiplication (e.g. base×sqft done twice for per_sqft services).
       const service: PriceBookService = {
         id: svc.service_id,
         code: svc.service_code,
@@ -240,6 +247,8 @@ export function useEstimateAI({
         is_active: true,
       };
       priceBookItems.push({ service, priceCents: svc.base_price_cents, instanceId });
+      // price_book_id tags this so handleSubmit excludes it from manualItems
+      // (priceBookLineItems handles the actual submission price via ScopeBuilder)
       lineItems.push({
         description: `${svc.service_code} — ${svc.service_name}`,
         quantity: "1",
@@ -252,7 +261,28 @@ export function useEstimateAI({
       };
     }
 
-    return { priceBookItems, lineItems, scopeMap, notes: draft.notes ?? null, guardrails: draft.guardrails };
+    // Add specified materials (products named in description) as material line items.
+    // No price_book_id → goes through manualItems → included in estimate total.
+    // The customer sees the material cost; the shopping list tells us exactly what to order.
+    for (const mat of draft.specified_materials ?? []) {
+      if (!mat.unit_cost_cents) continue;
+      const totalCents = mat.units_to_order * mat.unit_cost_cents;
+      lineItems.push({
+        description: `Materials — ${mat.name} (${mat.units_to_order} ${mat.unit_label}${mat.units_to_order !== 1 ? "s" : ""})`,
+        quantity: "1",
+        unit_price: (totalCents / 100).toFixed(2),
+      });
+    }
+
+    return {
+      priceBookItems,
+      lineItems,
+      scopeMap,
+      notes: draft.notes ?? null,
+      guardrails: draft.guardrails,
+      shoppingList,
+      specifiedMaterials: draft.specified_materials ?? [],
+    };
   }
 
   async function fetchDraft() {
@@ -264,7 +294,8 @@ export function useEstimateAI({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ description: aiDescription, job_id: jobId || undefined }),
       });
-      const { draft }: { draft: DraftEstimate | null } = await res.json();
+      const json = await res.json() as { draft: DraftEstimate | null; shopping_list?: ShoppingList | null };
+      const { draft } = json;
       if (!draft || draft.services.length === 0) {
         setAiDraftMode("input");
         return;
@@ -272,9 +303,13 @@ export function useEstimateAI({
 
       setAiConfidenceNotes(draft.confidence_notes);
       setAiConfidenceDismissed(false);
+      setPendingShoppingList(json.shopping_list ?? null);
 
-      if (draft.confidence === "high") {
-        onApplyDraft(_buildApplyParams(draft));
+      // Always show review panel — high-confidence drafts go straight through only if
+      // there are NO estimated measurements requiring confirmation
+      const needsReview = draft.confidence !== "high" || (draft.estimated_measurements?.length ?? 0) > 0;
+      if (!needsReview) {
+        onApplyDraft(_buildApplyParams(draft, json.shopping_list ?? null));
         setAiDraftMode("applied");
       } else {
         setPendingDraft(draft);
@@ -287,9 +322,10 @@ export function useEstimateAI({
 
   function applyPendingDraft() {
     if (!pendingDraft) return;
-    onApplyDraft(_buildApplyParams(pendingDraft));
+    onApplyDraft(_buildApplyParams(pendingDraft, pendingShoppingList));
     setAiDraftMode("applied");
     setPendingDraft(null);
+    setPendingShoppingList(null);
   }
 
   function discardPendingDraft() {
@@ -312,6 +348,7 @@ export function useEstimateAI({
     aiDescription, setAiDescription,
     aiConfidenceNotes, aiConfidenceDismissed, setAiConfidenceDismissed,
     pendingDraft,
+    pendingShoppingList,
     handleParseScope,
     handleSuggestItems,
     handleAddSuggestion,
