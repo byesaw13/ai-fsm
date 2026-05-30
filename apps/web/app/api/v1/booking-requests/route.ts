@@ -70,6 +70,18 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       title: `Review intake from ${name}`,
     });
 
+    // Automatic 24-hour follow-up — if no action is taken on this lead by tomorrow,
+    // a "follow_up" item surfaces in the inbox as a reminder to reconnect.
+    const followUpDue = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await createActionItem(client, {
+      accountId: session.accountId,
+      entityType: "booking_request",
+      entityId: bookingId,
+      actionType: "follow_up",
+      title: `Follow up with ${name}`,
+      dueAt: followUpDue,
+    });
+
     await client.query("COMMIT");
 
     return NextResponse.json({ id: bookingId, clientId, propertyId, jobId }, { status: 201 });
