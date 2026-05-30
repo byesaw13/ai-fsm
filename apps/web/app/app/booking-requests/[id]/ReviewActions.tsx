@@ -25,16 +25,45 @@ interface Props {
   currentStatus: string;
   initialNotes: string | null;
   jobId: string | null;
+  clientEmail: string | null;
   preferredDate: string;
   preferredTimeSlot: string | null;
 }
 
-export function ReviewActions({ bookingId, currentStatus, initialNotes, jobId, preferredDate, preferredTimeSlot }: Props) {
+export function ReviewActions({ bookingId, currentStatus, initialNotes, jobId, clientEmail, preferredDate, preferredTimeSlot }: Props) {
   const router = useRouter();
   const [notes, setNotes] = useState(initialNotes ?? "");
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showConvertForm, setShowConvertForm] = useState(false);
+  const [intakeEmail, setIntakeEmail] = useState(clientEmail ?? "");
+  const [intakeSent, setIntakeSent] = useState(false);
+  const [intakeError, setIntakeError] = useState<string | null>(null);
+
+  async function handleSendIntake() {
+    setPending("intake");
+    setIntakeError(null);
+    try {
+      const body: Record<string, string> = {};
+      if (intakeEmail && !clientEmail) body.email = intakeEmail;
+      const res = await fetch(`/api/v1/booking-requests/${bookingId}/send-intake`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json() as { error?: { message?: string }; intake_url?: string };
+      if (!res.ok && res.status !== 207) {
+        setIntakeError(json.error?.message ?? "Failed to send intake form.");
+        return;
+      }
+      setIntakeSent(true);
+      router.refresh();
+    } catch {
+      setIntakeError("Network error. Try again.");
+    } finally {
+      setPending(null);
+    }
+  }
   const [visitDate, setVisitDate] = useState(preferredDate ?? new Date().toISOString().slice(0, 10));
   const [visitSlot, setVisitSlot] = useState<string>(preferredTimeSlot ?? "morning");
 
@@ -265,6 +294,46 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, jobId, p
           >
             Save Notes Only
           </Button>
+
+          {/* ── Send intake form ──────────────────────────────── */}
+          <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-3)", borderTop: "1px dashed var(--border)" }}>
+            <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--fg-muted)" }}>
+              Send intake form to client
+            </p>
+            {intakeSent ? (
+              <p style={{ fontSize: "var(--text-xs)", color: "#16a34a", margin: 0 }}>✓ Intake form sent successfully.</p>
+            ) : (
+              <>
+                {!clientEmail && (
+                  <div style={{ marginBottom: "var(--space-2)" }}>
+                    <label style={{ fontSize: "var(--text-xs)", display: "block", marginBottom: 4 }}>Client email (required)</label>
+                    <input
+                      type="email"
+                      value={intakeEmail}
+                      onChange={(e) => setIntakeEmail(e.target.value)}
+                      placeholder="client@email.com"
+                      style={{ width: "100%", padding: "6px 8px", fontSize: "var(--text-xs)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", boxSizing: "border-box" }}
+                    />
+                  </div>
+                )}
+                {clientEmail && (
+                  <p style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", margin: "0 0 var(--space-2)" }}>
+                    Will send to: {clientEmail}
+                  </p>
+                )}
+                {intakeError && <p style={{ fontSize: "var(--text-xs)", color: "#dc2626", margin: "0 0 var(--space-1)" }}>{intakeError}</p>}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleSendIntake}
+                  loading={pending === "intake"}
+                  disabled={!!pending || (!clientEmail && !intakeEmail)}
+                >
+                  Send intake form
+                </Button>
+              </>
+            )}
+          </div>
         </>
       )}
 
