@@ -8,10 +8,10 @@
 import {
   LABOR_COST_CENTS_PER_HOUR,
   PAINTING_RATE_MIN_CENTS,
-  PAINTING_RATE_STANDARD_CENTS,
+  PAINTING_RATE_LABOR_CENTS,
   PAINTING_TRIM_ADD_CENTS,
   PREP_LEVEL_MULTIPLIERS,
-  MATERIAL_HANDLING_RATE,
+  MATERIAL_HANDLING_CLIENT_RATE,
   DEPOSIT_RATE,
   BALANCE_RATE,
   STANDARD_ESTIMATE_NOTES,
@@ -72,7 +72,7 @@ export function calculatePaintingEstimate(
 
   const base_rate = use_minimum_rate
     ? PAINTING_RATE_MIN_CENTS
-    : PAINTING_RATE_STANDARD_CENTS;
+    : PAINTING_RATE_LABOR_CENTS;
 
   const prep_multiplier = PREP_LEVEL_MULTIPLIERS[Math.max(1, Math.min(10, prep_level))] ?? 1;
   const effective_rate = Math.round(base_rate * prep_multiplier);
@@ -85,7 +85,7 @@ export function calculatePaintingEstimate(
   const labor_flat_rate_cents = Math.round(effective_sq_ft * effective_rate) + trim_add_cents;
 
   const material_subtotal_cents = material_cost_cents;
-  const material_handling_cents = Math.round(material_subtotal_cents * MATERIAL_HANDLING_RATE);
+  const material_handling_cents = Math.round(material_subtotal_cents * MATERIAL_HANDLING_CLIENT_RATE);
 
   const total_cents = labor_flat_rate_cents + material_subtotal_cents + material_handling_cents;
   const deposit_cents = Math.round(total_cents * DEPOSIT_RATE);

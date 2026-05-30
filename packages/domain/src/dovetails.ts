@@ -67,14 +67,41 @@ export type EmergencyRateWindow = keyof typeof EMERGENCY_RATE_MULTIPLIERS;
 // Painting pricing (per square foot, in cents)
 // ---------------------------------------------------------------------------
 
-export const PAINTING_RATE_MIN_CENTS = 175;      // $1.75/sq ft
-export const PAINTING_RATE_STANDARD_CENTS = 205;  // $2.05/sq ft
+/**
+ * Minimum sqft rate used when the scope is uncertain or a budget floor is needed.
+ * Do not use this as the default — use PAINTING_RATE_LABOR_CENTS for estimates.
+ */
+export const PAINTING_RATE_MIN_CENTS = 175;   // $1.75/sq ft (floor rate)
+
+/**
+ * Internal labor cost basis per sqft of wall area.
+ * This is what goes into calculatePaintingEstimate() to price labor.
+ * For the customer-facing catalog price, see PAINTING_RATE_CATALOG_CENTS ($3.25).
+ */
+export const PAINTING_RATE_LABOR_CENTS = 205;  // $2.05/sq ft (labor basis)
+
+/**
+ * @deprecated Use PAINTING_RATE_LABOR_CENTS. Kept for backward compatibility.
+ */
+export const PAINTING_RATE_STANDARD_CENTS = PAINTING_RATE_LABOR_CENTS;
+
+/**
+ * All-in customer-facing rate seeded in the price book catalog (service 5012).
+ * Covers labor + overhead + margin. Do NOT use in the painting estimate engine
+ * (which uses PAINTING_RATE_LABOR_CENTS) — this is for catalog display only.
+ */
+export const PAINTING_RATE_CATALOG_CENTS = 325;  // $3.25/sq ft (customer price)
+
+/** Add-on per sqft when baseboard/trim is included. */
 export const PAINTING_TRIM_ADD_CENTS = 20;        // +$0.20/sq ft
 
 /**
- * Prep level multipliers (1–10 scale).
- * Levels 1–5 use the standard rate.
- * Levels 6–10 apply an increasing multiplier.
+ * Prep level multipliers for the painting estimator (1–10 numeric scale).
+ * Levels 1–5: standard rate. Levels 6–10: increasing multiplier for heavy prep.
+ *
+ * Note: the estimate engine (estimate-engine/rules.ts) uses a separate 4-level
+ * string system (none/minor/moderate/major) for room-by-room estimates.
+ * Both systems are intentional and serve different UX contexts.
  */
 export const PREP_LEVEL_MULTIPLIERS: Record<number, number> = {
   1: 1.00,
@@ -94,10 +121,17 @@ export const PREP_LEVEL_MULTIPLIERS: Record<number, number> = {
 // ---------------------------------------------------------------------------
 
 /**
- * Flat material handling rate used by the painting estimate engine only.
- * New code should use MATERIAL_MARKUP_TIERS for tiered markup logic.
+ * Customer-facing material handling rate shown on estimates.
+ * Applied to material subtotal before adding to the customer total.
+ * For internal cost accounting, use MATERIAL_MARKUP_TIERS instead.
  */
-export const MATERIAL_HANDLING_RATE = 0.15;
+export const MATERIAL_HANDLING_CLIENT_RATE = 0.15;
+
+/**
+ * @deprecated Use MATERIAL_HANDLING_CLIENT_RATE.
+ * Kept for backward compatibility — will be removed in a future cleanup.
+ */
+export const MATERIAL_HANDLING_RATE = MATERIAL_HANDLING_CLIENT_RATE;
 
 /**
  * Tiered material markup rates.
