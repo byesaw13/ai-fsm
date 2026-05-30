@@ -12,6 +12,7 @@ import { Step1WhoAndWhat } from "./components/Step1WhoAndWhat";
 import { Step2Pricing } from "./components/Step2Pricing";
 import { Step3Adjustments } from "./components/Step3Adjustments";
 import { Step4ReviewAndSend } from "./components/Step4ReviewAndSend";
+import { EstimateIntelSidebar } from "./components/EstimateIntelSidebar";
 
 export function NewEstimateForm(props: NewEstimateFormProps) {
   const {
@@ -90,9 +91,16 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
     advanceStep, goBack,
     reviewTotal,
     handleSubmit,
+    liveIntel,
   } = useEstimateForm(props);
 
   return (
+    <div style={{
+      display: step >= 2 ? "grid" : "block",
+      gridTemplateColumns: step >= 2 ? "1fr 280px" : undefined,
+      gap: step >= 2 ? "var(--space-6)" : undefined,
+      alignItems: "start",
+    }}>
     <form onSubmit={handleSubmit} className="p7-form-stack" data-testid="new-estimate-form">
       {/* Step indicator */}
       <div style={{ display: "flex", marginBottom: "var(--space-2)", borderRadius: "var(--radius)", overflow: "hidden", border: "1px solid var(--border)" }}>
@@ -263,6 +271,7 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
           sendImmediately={sendImmediately}
           setSendImmediately={setSendImmediately}
           reviewTotal={reviewTotal}
+          intel={liveIntel}
         />
       )}
 
@@ -291,7 +300,7 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
           <Button
             type="submit"
             variant="primary"
-            disabled={pending || !clientId || (serviceType === "painting" && !paintingResult)}
+            disabled={pending || !clientId || (serviceType === "painting" && !paintingResult) || liveIntel.guardrailReview.blockers.length > 0}
             loading={pending}
             data-testid="submit-estimate-btn"
           >
@@ -304,5 +313,9 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
         )}
       </div>
     </form>
+    {step >= 2 && (
+      <EstimateIntelSidebar intel={liveIntel} />
+    )}
+    </div>
   );
 }

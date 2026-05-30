@@ -68,6 +68,7 @@ interface EstimateRow {
   client_name: string | null;
   client_email: string | null;
   job_title: string | null;
+  shopping_list_json: unknown | null;
 }
 
 interface LineItemRow {
@@ -502,7 +503,7 @@ export default async function EstimateDetailPage({
         )}
 
         {/* Internal margin (owner/admin only) */}
-        {(session.role === "owner" || session.role === "admin") && estimate.internal_labor_cost_cents !== null && estimate.sq_ft !== null && (
+        {(session.role === "owner" || session.role === "admin") && estimate.internal_labor_cost_cents !== null && estimate.internal_labor_cost_cents > 0 && (
           <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
             <p style={{ fontWeight: 600, marginBottom: "var(--space-1)", color: "var(--fg-muted)" }}>Internal Margin</p>
             {(() => {
@@ -536,7 +537,7 @@ export default async function EstimateDetailPage({
 
         {/* Shopping list — owner/admin only */}
         {(session.role === "owner" || session.role === "admin") && (() => {
-          const shoppingList = (estimate as unknown as { shopping_list_json?: unknown }).shopping_list_json as {
+          const shoppingList = estimate.shopping_list_json as {
             sections?: Array<{
               section: string;
               computed_items: Array<{ material: { material_name: string; unit: string; id: string }; quantity: number; total_cost_cents: number }>;
@@ -546,7 +547,19 @@ export default async function EstimateDetailPage({
             total_catalog_cost_cents?: number;
             total_specified_cost_cents?: number;
           } | null | undefined;
-          if (!shoppingList?.sections?.length) return null;
+          if (!shoppingList?.sections?.length) {
+            // Fallback for old estimates created before Block 3 — link to the recomputed view
+            return (
+              <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
+                <a href={`/app/estimates/${estimate.id}/shopping-list`} style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}>
+                  View Shopping List →
+                </a>
+                <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginLeft: 8 }}>
+                  (computed from scope snapshots)
+                </span>
+              </div>
+            );
+          }
           const grandTotal = (shoppingList.total_catalog_cost_cents ?? 0) + (shoppingList.total_specified_cost_cents ?? 0);
           return (
             <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-3)", borderTop: "1px dashed var(--border)" }}>

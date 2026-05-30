@@ -1,4 +1,7 @@
-import type { PrepLevel } from "@ai-fsm/domain";
+import type { PrepLevel, ShoppingList } from "@ai-fsm/domain";
+import { buildShoppingList } from "@ai-fsm/domain";
+import type { ScopeBuilderResult } from "@/components/ScopeBuilder";
+import type { PriceBookEntry } from "@/app/app/estimates/new/hooks/useEstimatePriceBook";
 
 // ---------------------------------------------------------------------------
 // Shared types for estimate forms (new + edit) and their hooks
@@ -61,6 +64,29 @@ export const PREP_LEVEL_LABELS: Record<number, string> = {
 };
 
 export const STEP_LABELS = ["Who & What", "Pricing", "Adjustments", "Review & Send"] as const;
+
+// ---------------------------------------------------------------------------
+// Shopping list — generate for manual (non-AI) estimates
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a ShoppingList from scope builder state captured during estimate creation.
+ * Returns null when no scope materials have been computed yet.
+ * Used at submit time so ALL estimates (not just AI drafts) get a shopping_list_json.
+ */
+export function buildManualShoppingList(
+  priceBookItems: PriceBookEntry[],
+  scopeResults: Record<string, ScopeBuilderResult>
+): ShoppingList | null {
+  const computedByService = priceBookItems
+    .map((item) => ({
+      service_name: item.service.name,
+      materials: scopeResults[item.instanceId]?.materials ?? [],
+    }))
+    .filter((s) => s.materials.length > 0);
+  if (computedByService.length === 0) return null;
+  return buildShoppingList(computedByService, []);
+}
 
 export const DEFAULT_TIERS: OptionTier[] = [
   { label: "Good", description: "Essential services to get the job done", is_recommended: false, line_items: [{ description: "", quantity: "1", unit_price: "0.00" }] },

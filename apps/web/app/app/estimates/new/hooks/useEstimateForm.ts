@@ -17,9 +17,11 @@ import { useEstimateTiers } from "./useEstimateTiers";
 import {
   parseCents, lineTotal, mapPrepLevel,
   EMPTY_ROW, PREP_LEVEL_LABELS, STEP_LABELS, DEFAULT_TIERS,
+  buildManualShoppingList,
   type LineItemRow, type OptionTier,
 } from "@/lib/estimates/form-helpers";
 import { useEstimatePricing } from "./useEstimatePricing";
+import { useEstimateLiveIntel } from "./useEstimateLiveIntel";
 
 // Re-export shared helpers + types so the component's existing imports keep working
 export {
@@ -299,6 +301,27 @@ export function useEstimateForm({
   });
 
   // ---------------------------------------------------------------------------
+  // Live intelligence (unified derived state — Block 1)
+  // ---------------------------------------------------------------------------
+
+  const liveIntel = useEstimateLiveIntel({
+    serviceType, mode,
+    paintingResult: pricing.paintingResult,
+    genericTotalCents: pricing.genericTotalCents,
+    depositCents: pricing.depositCents,
+    balanceDueCents: pricing.balanceDueCents,
+    scopeMaterialsTotalCents,
+    scopeResults,
+    priceBookItems,
+    lineItems,
+    laborHours,
+    tripCount, requiresDryingOrCuring, difficultAccess, oldHouseRisk,
+    coordinationRequired, finishExpectation,
+    travelSurcharge, riskAdjustment,
+    minimumOverrideReason,
+  });
+
+  // ---------------------------------------------------------------------------
   // Line items
   // ---------------------------------------------------------------------------
 
@@ -565,7 +588,11 @@ export function useEstimateForm({
 
       Object.assign(payload, {
         ...(initialVaultItemId ? { vault_item_id: initialVaultItemId } : {}),
-        ...(draftShoppingList ? { shopping_list_json: draftShoppingList } : {}),
+        // Persist shopping list: AI draft takes priority; fall back to scope-derived list for manual estimates
+        ...((() => {
+          const sl = draftShoppingList ?? buildManualShoppingList(priceBookItems, scopeResults);
+          return sl ? { shopping_list_json: sl } : {};
+        })()),
         ...(draftSpecifiedMaterials.length > 0 ? { specified_materials_json: draftSpecifiedMaterials } : {}),
         ...(paintingMode === "room_by_room" && roomSpecs.length > 0 ? { room_specs: roomSpecs } : {}),
         trip_count: tripCount,
@@ -682,6 +709,7 @@ export function useEstimateForm({
     pendingDraftScope,
     draftShoppingList,
     draftSpecifiedMaterials,
+    liveIntel,
     paintingMode, setPaintingMode,
     roomSpecs, projectOptions,
     handleRoomByRoomChange,
