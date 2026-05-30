@@ -79,6 +79,33 @@ type CommunicationRow = {
   created_at: string;
 };
 
+type EstimateRow = {
+  id: string;
+  status: string;
+  total_cents: number;
+  created_at: string;
+  job_title: string | null;
+};
+
+type InvoiceRow = {
+  id: string;
+  status: string;
+  total_cents: number;
+  balance_cents: number;
+  due_date: string | null;
+  created_at: string;
+  job_title: string | null;
+};
+
+type MembershipRow = {
+  id: string;
+  status: string;
+  tier: string;
+  renewal_date: string | null;
+  annual_visits_included: number;
+  visits_used: number | string;
+};
+
 const CHANNEL_ICON: Record<CommunicationRow["channel"], string> = {
   sms: "SMS",
   email: "Email",
@@ -117,7 +144,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   );
   if (!client) notFound();
 
-  const [properties, recentJobs, recentVisits, finance, communications] = await Promise.all([
+  const [properties, recentJobs, recentVisits, finance, communications, estimates, invoices, membership] = await Promise.all([
     query<PropertyRow>(
       `SELECT id, name, address, city, state, zip, created_at
        FROM properties
@@ -158,6 +185,37 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
        LIMIT 20`,
       [id, session.accountId]
     ),
+    query<EstimateRow>(
+      `SELECT e.id, e.status, e.total_cents, e.created_at, j.title AS job_title
+       FROM estimates e
+       LEFT JOIN jobs j ON j.id = e.job_id
+       WHERE e.client_id = $1 AND e.account_id = $2
+       ORDER BY e.created_at DESC
+       LIMIT 10`,
+      [id, session.accountId]
+    ),
+    query<InvoiceRow>(
+      `SELECT i.id, i.status, i.total_cents, i.balance_cents, i.due_date, i.created_at, j.title AS job_title
+       FROM invoices i
+       LEFT JOIN jobs j ON j.id = i.job_id
+       WHERE i.client_id = $1 AND i.account_id = $2
+       ORDER BY i.created_at DESC
+       LIMIT 10`,
+      [id, session.accountId]
+    ),
+    queryOne<MembershipRow>(
+      `SELECT mp.id, mp.status, mp.tier, mp.renewal_date,
+              COALESCE(pt.annual_visits_included, 0) AS annual_visits_included,
+              (SELECT COUNT(*)::int FROM visits v JOIN jobs j ON j.id = v.job_id
+               WHERE j.client_id = $1 AND v.account_id = $2
+               AND v.status = 'completed'
+               AND v.scheduled_start >= date_trunc('year', now())) AS visits_used
+       FROM maintenance_plans mp
+       LEFT JOIN plan_templates pt ON pt.id = mp.template_id
+       WHERE mp.client_id = $1 AND mp.account_id = $2 AND mp.status = 'active'
+       LIMIT 1`,
+      [id, session.accountId]
+    ).catch(() => null),  // membership query is best-effort
   ]);
 
   const activityEntries: TimelineEntryData[] = recentVisits.map((v) => ({
@@ -175,6 +233,25 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const estimateTotal = Number(finance?.estimate_total_cents ?? 0);
   const invoiceTotal = Number(finance?.invoice_total_cents ?? 0);
   const paidTotal = Number(finance?.paid_total_cents ?? 0);
+
+  // Open-work items for the top-of-page attention banner
+  const openWork = [
+    ...estimates.filter((e) => e.status === "sent").map((e) => ({
+      label: `Estimate awaiting response${e.job_title ? ` — ${e.job_title}` : ""}`,
+      href: `/app/estimates/${e.id}`,
+      color: "#d97706",
+    })),
+    ...invoices.filter((e) => e.status === "overdue").map((e) => ({
+      label: `Overdue invoice${e.job_title ? ` — ${e.job_title}` : ""}: ${dollars(e.balance_cents)} due`,
+      href: `/app/invoices/${e.id}`,
+      color: "#dc2626",
+    })),
+    ...recentJobs.filter((j) => j.status === "in_progress" || j.status === "scheduled").map((j) => ({
+      label: `Active job: ${j.title}`,
+      href: `/app/jobs/${j.id}`,
+      color: "#0284c7",
+    })),
+  ];
 
   return (
     <PageContainer>
@@ -211,12 +288,41 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
       <MetricGrid
         metrics={[
-          { label: "Properties", value: Number(client.property_count) },
+          { label: "Lifetime value", value: dollars(paidTotal), sub: "paid invoices" },
           { label: "Jobs", value: Number(client.job_count) },
           { label: "Estimates", value: Number(client.estimate_count), sub: dollars(estimateTotal) },
-          { label: "Invoices", value: Number(client.invoice_count), sub: `${dollars(invoiceTotal)} total • ${dollars(paidTotal)} paid` },
+          { label: "Invoices", value: Number(client.invoice_count), sub: `${dollars(invoiceTotal)} total` },
         ]}
       />
+
+      {/* Open-work attention items */}
+      {openWork.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, margin: "var(--space-3) 0" }}>
+          {openWork.map((item, i) => (
+            <a
+              key={i}
+              href={item.href}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "10px 14px",
+                borderRadius: 6,
+                background: `${item.color}10`,
+                border: `1px solid ${item.color}40`,
+                color: item.color,
+                fontSize: 13,
+                fontWeight: 500,
+                textDecoration: "none",
+              }}
+            >
+              <span>•</span>
+              {item.label}
+              <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.7 }}>→</span>
+            </a>
+          ))}
+        </div>
+      )}
 
       <div className="p7-detail-layout" style={{ marginTop: "var(--space-4)" }}>
         <div className="p7-detail-primary">
@@ -264,6 +370,98 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               </div>
             )}
           </Card>
+
+          {/* ── Estimates ─────────────────────────────────────────────── */}
+          <Card>
+            <SectionHeader
+              title="Estimates"
+              count={estimates.length}
+              action={canCreateEstimate ? <LinkButton href={`/app/estimates/new?client_id=${client.id}`} variant="ghost" size="sm">+ Estimate</LinkButton> : undefined}
+            />
+            {estimates.length === 0 ? (
+              <EmptyState title="No estimates yet" description="Estimates created for this client will appear here." />
+            ) : (
+              <div>
+                {estimates.map((e) => (
+                  <ItemCard
+                    key={e.id}
+                    href={`/app/estimates/${e.id}`}
+                    title={e.job_title ?? "Estimate"}
+                    meta={
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <span className="p7-badge p7-badge-count">{e.status}</span>
+                        <span>{dollars(e.total_cents)}</span>
+                        <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+                          {new Date(e.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* ── Invoices ──────────────────────────────────────────────── */}
+          <Card>
+            <SectionHeader title="Invoices" count={invoices.length} />
+            {invoices.length === 0 ? (
+              <EmptyState title="No invoices yet" description="Invoices will appear here once an estimate is approved." />
+            ) : (
+              <div>
+                {invoices.map((inv) => (
+                  <ItemCard
+                    key={inv.id}
+                    href={`/app/invoices/${inv.id}`}
+                    title={inv.job_title ?? "Invoice"}
+                    meta={
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <span className={`p7-badge p7-badge-count ${inv.status === "overdue" ? "p7-badge-danger" : ""}`}>{inv.status}</span>
+                        <span>{dollars(inv.total_cents)}</span>
+                        {inv.balance_cents > 0 && (
+                          <span style={{ color: inv.status === "overdue" ? "#dc2626" : "var(--fg-muted)", fontSize: "var(--text-xs)", fontWeight: 600 }}>
+                            {dollars(inv.balance_cents)} due
+                          </span>
+                        )}
+                      </div>
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* ── Membership ────────────────────────────────────────────── */}
+          {membership && (
+            <Card>
+              <SectionHeader title="Membership" />
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
+                  <div>
+                    <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Tier</p>
+                    <p style={{ margin: 0, fontWeight: 600 }}>{membership.tier}</p>
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Status</p>
+                    <p style={{ margin: 0, fontWeight: 600 }}>{membership.status}</p>
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Visits this year</p>
+                    <p style={{ margin: 0, fontWeight: 600 }}>{Number(membership.visits_used)} / {membership.annual_visits_included}</p>
+                  </div>
+                  {membership.renewal_date && (
+                    <div>
+                      <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Renewal</p>
+                      <p style={{ margin: 0, fontWeight: 600 }}>{new Date(membership.renewal_date).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                </div>
+                <LinkButton href={`/app/maintenance-plans/${membership.id}`} variant="ghost" size="sm">
+                  View membership →
+                </LinkButton>
+              </div>
+            </Card>
+          )}
 
           <Card>
             <SectionHeader title="Communications" count={communications.length} />
