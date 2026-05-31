@@ -164,6 +164,9 @@ ${tradeContextBlocks}
 - Maximum 6 services — quality over quantity
 - If 4+ services, note in confidence_notes whether a half-day block ($515) or full-day block ($980) may be worth considering
 
+**CRITICAL — Painting trim deduplication:**
+Service 5012 (Interior room painting) already includes trim/baseboard pricing within its scope when trim_linear_ft is set. Do NOT also select service 5003 (Trim/baseboard painting) as a separate line when 5012 is present — this double-counts trim labor and materials. Only select 5003 as a standalone service when ONLY trim is being painted (not walls). If both walls and trim are included, use 5012 alone with trim_linear_ft in scope_values.
+
 ## Rules for scope values
 - Fill scope_values with the component keys from the scope template for that service's category
 - Use the exact key names shown in the Scope Templates section
@@ -182,6 +185,14 @@ ${scopeValueRules}
 ## Rules for complexity factors
 - Apply factors conservatively — only check a factor if the description clearly implies it
 - Never check more than 2 factors per service unless the description explicitly calls for it
+
+**CRITICAL — Painting complexity factor rules:**
+- dark_to_light: ONLY when the description explicitly mentions going from a dark color to a light one, or the current color is described as dark/bold
+- nicotine_staining: ONLY when smoke, cigarette, or nicotine staining is explicitly mentioned — this is the ONLY trigger for full-wall BIN/shellac primer
+- difficult_masking: ONLY when crown molding, chair rail, built-ins, or complex trim profiles are mentioned
+- texture_match: ONLY when matching existing texture on patches is explicitly required
+- Do NOT apply dark_to_light or nicotine_staining for standard repaints, minor patching, or touch-up work — these factors trigger full primer coats and significantly inflate cost
+- "Minor patching" = light prep (small nail holes, minor dings) — does NOT require primer complexity factors
 
 ## Rules for guardrails
 - trip_count: use "multi_trip" if the job clearly requires drying/curing between visits or separate site visits
@@ -226,6 +237,26 @@ Example flooring: "400 sqft LVP with complex_layout → 400 ÷ (175 × 0.85) ≈
 Example painting: "450 sqft walls (living room + hallway) with dark_to_light → 450 ÷ (200 × 0.80) ≈ 2.8 days. Budget 3 field days."
 Example plumbing: "3 faucets at 6/day → 0.5 day. Price check: 3 × $175 = $525 minimum."
 Apply the same reasoning to any service where a rate is listed. Do NOT fabricate rates for services not in this table.
+
+## Estimate sanity check (pricing ranges)
+
+After computing services, verify the total against these Dovetails benchmark ranges. Flag in confidence_notes if the estimate is MORE than 25% above the top of the range — this indicates double-counting or over-application of complexity factors.
+
+| Job type | Expected range |
+|---|---|
+| Single room, standard repaint, walls only, clean prep | $350–$600 |
+| Single room, walls + baseboard, minor prep | $450–$750 |
+| Single room, walls + ceiling + baseboard, moderate prep | $600–$950 |
+| Single room, heavy prep / dark-to-light | $800–$1,200 |
+| 2-room repaint (avg bedroom size), standard | $700–$1,100 |
+| Whole house repaint (3br/2ba), standard | $2,500–$4,500 |
+| Ceiling fan swap (standard, existing box) | $150–$250 each |
+| Faucet replacement | $175–$300 each |
+| LVP flooring install (no demo) | $3.25–$5.00/sqft |
+
+Sanity check example: "8×10 room with minor prep and baseboard = ~253 sqft walls + 33 LF trim. Expected: $450–$750. Generated total: $X. [Flag if > $937]"
+
+If the generated estimate exceeds a benchmark by >25%, include in confidence_notes: "⚠ Estimate may be inflated — review service selection and complexity factors."
 
 ## Rules for specified_materials (products named in the description)
 When the description mentions a specific product by name — especially one with coverage specs (e.g. "Pergo XP 20mil, box covers 19.63 sqft, $52/box") — you MUST:
