@@ -184,19 +184,35 @@ export interface ShoppingList {
   generated_at: string;
 }
 
-// Build a unified shopping list from computed + specified materials
+// Build a unified shopping list from computed + specified materials.
+// Deduplicates computed materials by material.id — when the same material appears
+// from multiple services (e.g. trim paint from both 5012 and 5003), quantities are
+// summed rather than listed twice.
 export function buildShoppingList(
   computedByService: Array<{ service_name: string; materials: ComputedMaterial[] }>,
   specified: SpecifiedMaterial[]
 ): ShoppingList {
-  const sectionMap = new Map<string, { computed: ComputedMaterial[]; specified: SpecifiedMaterial[] }>();
-
+  // Deduplicate by material.id — sum quantities and costs across services
+  const deduped = new Map<string, ComputedMaterial>();
   for (const { materials } of computedByService) {
     for (const m of materials) {
-      const sec = m.material.store_section;
-      if (!sectionMap.has(sec)) sectionMap.set(sec, { computed: [], specified: [] });
-      sectionMap.get(sec)!.computed.push(m);
+      const existing = deduped.get(m.material.id);
+      if (existing) {
+        // Merge: add quantities and recalculate cost
+        existing.quantity += m.quantity;
+        existing.total_cost_cents = Math.round(existing.quantity * m.material.unit_cost_cents);
+      } else {
+        deduped.set(m.material.id, { ...m });
+      }
     }
+  }
+
+  const sectionMap = new Map<string, { computed: ComputedMaterial[]; specified: SpecifiedMaterial[] }>();
+
+  for (const m of deduped.values()) {
+    const sec = m.material.store_section;
+    if (!sectionMap.has(sec)) sectionMap.set(sec, { computed: [], specified: [] });
+    sectionMap.get(sec)!.computed.push(m);
   }
 
   for (const s of specified) {
