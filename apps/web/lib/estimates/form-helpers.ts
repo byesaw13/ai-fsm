@@ -1,4 +1,4 @@
-import type { PrepLevel, ShoppingList } from "@ai-fsm/domain";
+import type { PrepLevel, ShoppingList, PaintingProjectResult } from "@ai-fsm/domain";
 import { buildShoppingList } from "@ai-fsm/domain";
 import type { ScopeBuilderResult } from "@/components/ScopeBuilder";
 import type { PriceBookEntry } from "@/app/app/estimates/new/hooks/useEstimatePriceBook";
@@ -74,6 +74,53 @@ export const STEP_LABELS = ["Who & What", "Pricing", "Adjustments", "Review & Se
  * Returns null when no scope materials have been computed yet.
  * Used at submit time so ALL estimates (not just AI drafts) get a shopping_list_json.
  */
+/**
+ * Build a ShoppingList from a PaintingProjectResult's shopping_summary.
+ * Called after room-by-room painting computation to preserve actual gallon counts.
+ * This is the authoritative source for painting shopping lists — it knows exact
+ * gallons by grade and primer gallons, which buildManualShoppingList() cannot derive.
+ */
+export function buildShoppingListFromPaintingSummary(
+  result: PaintingProjectResult
+): ShoppingList | null {
+  if (!result.shopping_summary.length) return null;
+
+  // Convert shopping_summary items into ComputedMaterial-like objects grouped by section
+  const sections: ShoppingList["sections"] = [
+    {
+      section: "Paint & Supplies",
+      computed_items: [],
+      specified_items: [],
+      section_total_cents: result.shopping_summary.reduce((s, i) => s + i.cost_cents, 0),
+    },
+  ];
+
+  // Embed summary items as specified_items (they have name, qty, unit, cost)
+  // but represent computed results from the painting engine — not user-specified products
+  sections[0].specified_items = result.shopping_summary.map((item) => ({
+    name: item.item,
+    sku: null,
+    coverage_per_unit: null,
+    unit_label: item.unit,
+    unit_cost_cents: item.qty > 0 ? Math.round(item.cost_cents / item.qty) : null,
+    quantity_needed: item.qty,
+    waste_factor: 1.1,
+    units_to_order: item.qty,
+    store_section: "Paint & Supplies",
+    service_code: "5012",
+    notes: null,
+  }));
+
+  const total = result.shopping_summary.reduce((s, i) => s + i.cost_cents, 0);
+
+  return {
+    sections,
+    total_catalog_cost_cents: 0,
+    total_specified_cost_cents: total,
+    generated_at: new Date().toISOString(),
+  };
+}
+
 export function buildManualShoppingList(
   priceBookItems: PriceBookEntry[],
   scopeResults: Record<string, ScopeBuilderResult>

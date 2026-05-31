@@ -1,8 +1,8 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { query } from "@/lib/db";
-import { computeMaterials, groupMaterialsBySection } from "@ai-fsm/domain";
-import type { ServiceMaterial, ScopeComponentValues, ComplexityValues, MaterialsBySection } from "@ai-fsm/domain";
+import { computeMaterials, groupMaterialsBySection, computePaintingProject } from "@ai-fsm/domain";
+import type { ServiceMaterial, ScopeComponentValues, ComplexityValues, MaterialsBySection, RoomSpec } from "@ai-fsm/domain";
 import { PrintButton } from "../print/PrintButton";
 
 export const dynamic = "force-dynamic";
@@ -60,7 +60,8 @@ export default async function ShoppingListPage({
 
   const [estimateRows, snapshotRows] = await Promise.all([
     query<EstimateRow>(
-      `SELECT e.id, c.name AS client_name, c.email AS client_email, e.created_at
+      `SELECT e.id, c.name AS client_name, c.email AS client_email, e.created_at,
+              e.room_specs
        FROM estimates e
        LEFT JOIN clients c ON c.id = e.client_id
        WHERE e.id = $1 AND e.account_id = $2`,
@@ -145,6 +146,53 @@ export default async function ShoppingListPage({
 
       sections = groupMaterialsBySection(deduplicated);
       materialTotalCents = deduplicated.reduce((sum, i) => sum + i.total_cost_cents, 0);
+    }
+  }
+
+  // Fallback for painting estimates that have room_specs but no scope_snapshots.
+  // Recompute materials from room dimensions using the painting domain engine.
+  if (sections.length === 0 && estimate.room_specs) {
+    const roomSpecs = estimate.room_specs as RoomSpec[];
+    if (Array.isArray(roomSpecs) && roomSpecs.length > 0) {
+      const paintResult = computePaintingProject(roomSpecs, {
+        coat_count: 2,
+        occupied_home: false,
+        vaulted_ceilings: false,
+      });
+      // Convert shopping_summary into a single "Paint & Supplies" section
+      if (paintResult.shopping_summary.length > 0) {
+        const sectionItems = paintResult.shopping_summary;
+        materialTotalCents = sectionItems.reduce((s, i) => s + i.cost_cents, 0);
+        // Use a pseudo-section for display (not MaterialsBySection format — rendered separately below)
+        // Store in sections as a synthetic entry with a sentinel
+        sections = [{
+          section: "Paint & Supplies (from room specs)",
+          items: sectionItems.map((item, idx) => ({
+            material: {
+              id: `room-${idx}`,
+              price_book_id: null,
+              category: "painting_finishes",
+              material_name: item.item,
+              description: null,
+              quantity_type: "static" as const,
+              scope_component_key: null,
+              quantity_multiplier: null,
+              quantity_flat: item.qty,
+              waste_factor: 1,
+              unit: item.unit,
+              unit_cost_cents: item.qty > 0 ? Math.round(item.cost_cents / item.qty) : 0,
+              store_section: "Paint & Supplies",
+              is_consumable: false,
+              is_optional: false,
+              condition_factor_key: null,
+              sort_order: idx,
+            },
+            quantity: item.qty,
+            total_cost_cents: item.cost_cents,
+          })),
+          section_total_cents: materialTotalCents,
+        }];
+      }
     }
   }
 

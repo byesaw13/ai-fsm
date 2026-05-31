@@ -94,6 +94,8 @@ const patchEstimateSchema = z.object({
   minimum_service_override_reason: estimateMinimumOverrideReasonSchema.nullable().optional(),
   minimum_service_override_note: z.string().nullable().optional(),
   scope_assumptions: z.string().nullable().optional(),
+  room_specs: z.array(z.record(z.unknown())).optional(),
+  shopping_list_json: z.record(z.unknown()).optional(),
 });
 
 export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, session) => {

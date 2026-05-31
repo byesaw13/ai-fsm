@@ -18,6 +18,7 @@ import {
   parseCents, lineTotal, mapPrepLevel,
   EMPTY_ROW, PREP_LEVEL_LABELS, STEP_LABELS, DEFAULT_TIERS,
   buildManualShoppingList,
+  buildShoppingListFromPaintingSummary,
   type LineItemRow, type OptionTier,
 } from "@/lib/estimates/form-helpers";
 import { useEstimatePricing } from "./useEstimatePricing";
@@ -158,6 +159,8 @@ export function useEstimateForm({
     occupied_home: false,
     vaulted_ceilings: false,
   });
+  // Shopping list derived from room-by-room computation (authoritative for painting mode)
+  const [roomShoppingList, setRoomShoppingList] = useState<ShoppingList | null>(null);
 
   // ---------------------------------------------------------------------------
   // Price book sub-hook
@@ -356,6 +359,9 @@ export function useEstimateForm({
     // Rough labor hours estimate for internal costing
     const estHours = (result.total_wall_sqft + result.total_ceiling_sqft) / 100 * 0.85 * opts.coat_count;
     setLaborHours(estHours.toFixed(1));
+    // Build shopping list from the room-by-room result (authoritative source for painting)
+    // shopping_summary has actual gallons by grade — this is the correct source, not scope builder
+    setRoomShoppingList(buildShoppingListFromPaintingSummary(result));
   }
 
   function handleAddMaterial(mat: MaterialSuggestion) {
@@ -449,11 +455,12 @@ export function useEstimateForm({
               : []),
           ],
           internal_notes: `Internal labor: ${formatCents(paintingResult.internal_labor_cost_cents)} | Gross margin: ${paintingResult.gross_margin_pct}% (${formatCents(paintingResult.gross_margin_cents)})`,
-          // Phase 5: Shopping list for painting mode
-          // Room-by-room: use existing draftShoppingList if present, else build from scope
-          // Quick mode: build from scope results if any price book items with materials exist
+          // Shopping list priority for painting mode:
+          // 1. AI draft (draftShoppingList) — user described a specific product
+          // 2. Room-by-room result (roomShoppingList) — authoritative: actual gallons by grade
+          // 3. Scope builder fallback (buildManualShoppingList) — for mixed flows
           ...((() => {
-            const sl = draftShoppingList ?? buildManualShoppingList(priceBookItems, scopeResults);
+            const sl = draftShoppingList ?? roomShoppingList ?? buildManualShoppingList(priceBookItems, scopeResults);
             return sl ? { shopping_list_json: sl } : {};
           })()),
         };
@@ -716,6 +723,7 @@ export function useEstimateForm({
     pendingDraftScope,
     draftShoppingList,
     draftSpecifiedMaterials,
+    roomShoppingList,
     liveIntel,
     paintingMode, setPaintingMode,
     roomSpecs, projectOptions,
