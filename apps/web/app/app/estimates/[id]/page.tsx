@@ -7,8 +7,8 @@ import {
 } from "@/lib/auth/permissions";
 import { withEstimateContext } from "@/lib/estimates/db";
 import { getPool } from "@/lib/db";
-import { estimateTransitions, PREP_LEVEL_MULTIPLIERS } from "@ai-fsm/domain";
-import type { EstimateStatus } from "@ai-fsm/domain";
+import { estimateTransitions, PREP_LEVEL_MULTIPLIERS, computeRoomMeasurements } from "@ai-fsm/domain";
+import type { EstimateStatus, RoomSpec } from "@ai-fsm/domain";
 import { EstimateTransitionForm } from "./EstimateTransitionForm";
 import { EstimateInternalNotesForm } from "./EstimateInternalNotesForm";
 import { EstimateConvertButton } from "./EstimateConvertButton";
@@ -69,6 +69,7 @@ interface EstimateRow {
   client_email: string | null;
   job_title: string | null;
   shopping_list_json: unknown | null;
+  room_specs: unknown | null;
 }
 
 interface LineItemRow {
@@ -502,6 +503,44 @@ export default async function EstimateDetailPage({
           </div>
         )}
 
+        {/* Room-by-room breakdown (owner/admin only) */}
+        {(session.role === "owner" || session.role === "admin") && Array.isArray(estimate.room_specs) && (estimate.room_specs as RoomSpec[]).length > 0 && (() => {
+          const rooms = estimate.room_specs as RoomSpec[];
+          return (
+            <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
+              <p style={{ fontWeight: 600, marginBottom: "var(--space-2)", color: "var(--fg-muted)" }}>Room Breakdown</p>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-xs)" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                      {["Room", "Dimensions", "Wall sqft", "Ceiling", "Trim LF", "Paint", "Grade", "Prep"].map((h) => (
+                        <th key={h} style={{ textAlign: "left", padding: "2px 8px 4px 0", color: "var(--fg-muted)", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rooms.map((room, i) => {
+                      const m = computeRoomMeasurements(room);
+                      return (
+                        <tr key={i} style={{ borderBottom: "1px solid var(--border)" }}>
+                          <td style={{ padding: "3px 8px 3px 0", fontWeight: 500 }}>{room.name || `Room ${i + 1}`}</td>
+                          <td style={{ padding: "3px 8px 3px 0", color: "var(--fg-muted)" }}>{room.length_ft}×{room.width_ft}×{room.ceiling_height_ft}ft</td>
+                          <td style={{ padding: "3px 8px 3px 0" }}>{m.wall_sqft.toFixed(0)}</td>
+                          <td style={{ padding: "3px 8px 3px 0" }}>{room.include_ceiling ? `${m.ceiling_sqft.toFixed(0)} sqft` : "—"}</td>
+                          <td style={{ padding: "3px 8px 3px 0" }}>{room.include_trim ? `${m.trim_lf.toFixed(0)} LF` : "—"}</td>
+                          <td style={{ padding: "3px 8px 3px 0" }}>{room.paint_supplied_by === "customer" ? "Client" : "Dovetails"}</td>
+                          <td style={{ padding: "3px 8px 3px 0", textTransform: "capitalize" }}>{room.paint_supplied_by === "customer" ? "—" : room.paint_grade}</td>
+                          <td style={{ padding: "3px 8px 3px 0", textTransform: "capitalize" }}>{room.prep_level}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Internal margin (owner/admin only) */}
         {(session.role === "owner" || session.role === "admin") && estimate.internal_labor_cost_cents !== null && estimate.internal_labor_cost_cents > 0 && (
           <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
@@ -846,6 +885,7 @@ export default async function EstimateDetailPage({
           initialRiskAdjustmentCents={estimate.risk_adjustment_cents}
           initialMinimumServiceOverrideReason={estimate.minimum_service_override_reason}
           initialMinimumServiceOverrideNote={estimate.minimum_service_override_note}
+          initialRoomSpecs={estimate.room_specs ? (estimate.room_specs as RoomSpec[]) : null}
         />
       )}
 

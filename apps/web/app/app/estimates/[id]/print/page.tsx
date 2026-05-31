@@ -2,8 +2,8 @@ import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { withEstimateContext } from "@/lib/estimates/db";
 import { getStandardEstimateTerms, formatCents } from "@/lib/estimates/pricing";
-import { PAYMENT_OPTIONS } from "@ai-fsm/domain";
-import type { EstimateStatus } from "@ai-fsm/domain";
+import { PAYMENT_OPTIONS, computePaintingProject } from "@ai-fsm/domain";
+import type { EstimateStatus, RoomSpec } from "@ai-fsm/domain";
 import { PrintButton } from "./PrintButton";
 import { buildClientDocumentFilename } from "@/lib/estimates/guardrails";
 
@@ -37,6 +37,8 @@ interface EstimateRow {
   property_state: string | null;
   property_zip: string | null;
   job_title: string | null;
+  shopping_list_json: unknown | null;
+  room_specs: unknown | null;
 }
 
 interface LineItemRow {
@@ -79,6 +81,7 @@ export default async function EstimatePrintPage({
          COALESCE(e.balance_cents, 0) AS balance_cents,
          e.notes, e.sent_at, e.expires_at, e.created_at,
          e.sq_ft, e.prep_level, e.includes_trim, e.includes_ceiling,
+         e.shopping_list_json, e.room_specs,
          c.name   AS client_name,
          c.email  AS client_email,
          c.phone  AS client_phone,
@@ -234,6 +237,49 @@ export default async function EstimatePrintPage({
             <p><strong>Ceiling:</strong> {estimate.includes_ceiling ? "Included" : "Not included"}</p>
           </div>
         )}
+
+        {/* Estimated Materials — from shopping_list or room_specs */}
+        {(() => {
+          // Prefer shopping_list_json (already computed at estimate creation)
+          type SLSection = { section: string; specified_items: Array<{ name: string; units_to_order: number; unit_label: string }>; computed_items: Array<{ material: { material_name: string; unit: string }; quantity: number }> };
+          const sl = estimate.shopping_list_json as { sections?: SLSection[] } | null;
+          const hasSL = sl?.sections && sl.sections.length > 0;
+
+          // Fallback: recompute from room_specs
+          let roomItems: Array<{ item: string; qty: number; unit: string }> = [];
+          if (!hasSL && estimate.room_specs) {
+            const rooms = estimate.room_specs as RoomSpec[];
+            if (Array.isArray(rooms) && rooms.length > 0) {
+              const pr = computePaintingProject(rooms, { coat_count: 2, occupied_home: false, vaulted_ceilings: false });
+              roomItems = pr.shopping_summary;
+            }
+          }
+
+          if (!hasSL && roomItems.length === 0) return null;
+
+          return (
+            <div className="section-block">
+              <h2>Estimated Materials</h2>
+              <p style={{ fontSize: "0.85em", color: "#555", marginBottom: 8 }}>
+                These are estimated quantities. Actual materials may vary based on conditions found on site.
+              </p>
+              {hasSL ? (
+                sl!.sections!.map((sec) => (
+                  <div key={sec.section} style={{ marginBottom: 8 }}>
+                    <strong style={{ fontSize: "0.9em" }}>{sec.section}</strong>
+                    {[...sec.specified_items.map(m => `${m.name} — ${m.units_to_order} ${m.unit_label}`),
+                       ...sec.computed_items.map(m => `${m.material.material_name} — ${m.quantity} ${m.material.unit}`)
+                    ].map((row, i) => <p key={i} style={{ margin: "2px 0", fontSize: "0.85em" }}>{row}</p>)}
+                  </div>
+                ))
+              ) : (
+                roomItems.map((item, i) => (
+                  <p key={i} style={{ margin: "2px 0", fontSize: "0.85em" }}>{item.item} — {item.qty} {item.unit}</p>
+                ))
+              )}
+            </div>
+          );
+        })()}
 
         <div className="section-block">
           <h2>Project Standards</h2>

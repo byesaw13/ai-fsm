@@ -52,6 +52,8 @@ export interface PatchEstimateInput {
   minimum_service_override_reason?: string | null;
   minimum_service_override_note?: string | null;
   scope_assumptions?: string | null;
+  room_specs?: Record<string, unknown>[] | null;
+  shopping_list_json?: Record<string, unknown> | null;
 }
 
 interface SessionContext {
@@ -222,6 +224,8 @@ export async function updateEstimateById(
   if (patch.minimum_service_override_reason !== undefined) { setClauses.push(`minimum_service_override_reason = $${idx++}`); params.push(patch.minimum_service_override_reason); }
   if (patch.minimum_service_override_note !== undefined) { setClauses.push(`minimum_service_override_note = $${idx++}`); params.push(patch.minimum_service_override_note); }
   if (patch.scope_assumptions !== undefined) { setClauses.push(`scope_assumptions = $${idx++}`); params.push(patch.scope_assumptions); }
+  if (patch.room_specs !== undefined) { setClauses.push(`room_specs = $${idx++}`); params.push(JSON.stringify(patch.room_specs)); }
+  if (patch.shopping_list_json !== undefined) { setClauses.push(`shopping_list_json = $${idx++}`); params.push(JSON.stringify(patch.shopping_list_json)); }
 
   // Auto-recompute condition_tier when any risk flag changes
   const tierFields = ["old_house_risk", "difficult_access", "trip_count", "requires_drying_or_curing", "coordination_required"] as const;

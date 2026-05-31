@@ -21,9 +21,13 @@ import { LineItemsTable } from "../components/LineItemsTable";
 import { PaintingEstimatorSection } from "../components/PaintingEstimatorSection";
 import {
   PREP_LEVEL_MULTIPLIERS,
+  computePaintingProject,
+  roomResultToLegacyFields,
 } from "@ai-fsm/domain";
+import type { RoomSpec, ProjectOptions, PaintingProjectResult } from "@ai-fsm/domain";
 import type { OptionTier } from "@/lib/estimates/form-helpers";
-import { parseCents, lineTotal, EMPTY_ROW, type LineItemRow } from "@/lib/estimates/form-helpers";
+import { parseCents, lineTotal, EMPTY_ROW, buildShoppingListFromPaintingSummary, type LineItemRow } from "@/lib/estimates/form-helpers";
+import { RoomByRoomEditor } from "../../estimates/new/components/RoomByRoomEditor";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -79,6 +83,8 @@ interface EstimateEditFormProps {
   initialRiskAdjustmentCents?: number;
   initialMinimumServiceOverrideReason?: "bundled" | "membership_included" | "promo" | "owner_approved" | null;
   initialMinimumServiceOverrideNote?: string | null;
+  // Room-by-room painting
+  initialRoomSpecs?: RoomSpec[] | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,6 +155,7 @@ function StandardEstimateEditForm({
   initialRiskAdjustmentCents,
   initialMinimumServiceOverrideReason,
   initialMinimumServiceOverrideNote,
+  initialRoomSpecs,
 }: EstimateEditFormProps) {
   const router = useRouter();
   const toast = useToast();
@@ -214,6 +221,26 @@ function StandardEstimateEditForm({
   const [riskAdjustment, setRiskAdjustment] = useState(centsToDisplayDollars(initialRiskAdjustmentCents ?? 0));
   const [minimumOverrideReason, setMinimumOverrideReason] = useState(initialMinimumServiceOverrideReason ?? "");
   const [minimumOverrideNote, setMinimumOverrideNote] = useState(initialMinimumServiceOverrideNote ?? "");
+
+  // Room-by-room state
+  const [paintingMode, setPaintingMode] = useState<"quick" | "room_by_room">(
+    initialRoomSpecs && initialRoomSpecs.length > 0 ? "room_by_room" : "quick"
+  );
+  const [roomSpecs, setRoomSpecs] = useState<RoomSpec[]>(initialRoomSpecs ?? []);
+  const [projectOptions, setProjectOptions] = useState<ProjectOptions>({ coat_count: 2, occupied_home: false, vaulted_ceilings: false });
+
+  function handleRoomByRoomChange(rooms: RoomSpec[], opts: ProjectOptions, result: PaintingProjectResult) {
+    setRoomSpecs(rooms);
+    setProjectOptions(opts);
+    const legacy = roomResultToLegacyFields(result);
+    setSqFt(legacy.sq_ft.toString());
+    setPrepLevel(legacy.prep_level);
+    setIncludesTrim(legacy.includes_trim);
+    setIncludesCeiling(legacy.includes_ceiling);
+    setMaterialCostDollars((result.material_subtotal_cents / 100).toFixed(2));
+    const estHours = (result.total_wall_sqft + result.total_ceiling_sqft) / 100 * 0.85 * opts.coat_count;
+    setLaborHours(estHours.toFixed(1));
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -372,6 +399,17 @@ function StandardEstimateEditForm({
           risk_adjustment_cents: parseCents(riskAdjustment),
           minimum_service_override_reason: minimumOverrideReason || null,
           minimum_service_override_note: minimumOverrideNote.trim() || null,
+          // Persist room specs when in room-by-room mode
+          ...(paintingMode === "room_by_room" && roomSpecs.length > 0 ? { room_specs: roomSpecs } : {}),
+          // Build shopping list from room result if available
+          ...((() => {
+            if (paintingMode === "room_by_room" && roomSpecs.length > 0) {
+              const result = computePaintingProject(roomSpecs, projectOptions);
+              const sl = buildShoppingListFromPaintingSummary(result);
+              return sl ? { shopping_list_json: sl } : {};
+            }
+            return {};
+          })()),
         };
       } else if (mode === "flat_rate") {
         payload = {
@@ -572,6 +610,48 @@ function StandardEstimateEditForm({
         {/* Painting Estimator */}
         {serviceType === "painting" && (
           <div style={{ marginTop: "var(--space-4)" }}>
+            {/* Mode toggle — Quick vs Room-by-room */}
+            <div style={{ display: "flex", gap: "var(--space-1)", marginBottom: "var(--space-3)" }}>
+              {(["quick", "room_by_room"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setPaintingMode(m)}
+                  style={{
+                    fontSize: "var(--text-xs)",
+                    padding: "4px 12px",
+                    borderRadius: "var(--radius-sm)",
+                    border: `1px solid ${paintingMode === m ? "var(--accent)" : "var(--border)"}`,
+                    background: paintingMode === m ? "var(--accent)" : "var(--bg-subtle)",
+                    color: paintingMode === m ? "#fff" : "var(--fg)",
+                    cursor: "pointer",
+                    fontWeight: paintingMode === m ? 600 : 400,
+                  }}
+                >
+                  {m === "quick" ? "Quick (sqft total)" : "Room by room"}
+                </button>
+              ))}
+            </div>
+
+            {paintingMode === "room_by_room" && (
+              <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+                <p style={{ margin: "0 0 var(--space-3)", fontWeight: 600, fontSize: "var(--text-sm)" }}>
+                  Room-by-room painting estimator
+                </p>
+                <RoomByRoomEditor
+                  rooms={roomSpecs.length > 0 ? roomSpecs : [{
+                    name: "", length_ft: 0, width_ft: 0, ceiling_height_ft: 8,
+                    doors: 1, windows: 2, include_ceiling: false, include_trim: true,
+                    prep_level: "minor", paint_supplied_by: "dovetails", paint_grade: "standard",
+                    primer_needed: false, dark_to_light: false,
+                  }]}
+                  options={projectOptions}
+                  onChange={handleRoomByRoomChange}
+                />
+              </div>
+            )}
+
+            {paintingMode === "quick" && (
             <PaintingEstimatorSection
               idPrefix="edit"
               disabled={pending}
@@ -583,6 +663,7 @@ function StandardEstimateEditForm({
               includesCeiling={includesCeiling} setIncludesCeiling={setIncludesCeiling}
               paintingResult={paintingResult ? { ...paintingResult, material_cents: paintingResult.material_subtotal_cents } : null}
             />
+            )}
           </div>
         )}
 
