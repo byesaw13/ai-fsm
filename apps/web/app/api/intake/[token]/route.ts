@@ -21,6 +21,7 @@ const bodySchema = z.object({
   preferred_time_slot: z.enum(["morning", "afternoon", "evening", "flexible"]).default("flexible"),
   referral_source: z.string().nullable().optional(),
   referral_name: z.string().nullable().optional(),
+  brokerage_name: z.string().nullable().optional(),
 });
 
 export async function POST(
@@ -109,6 +110,7 @@ export async function POST(
              phone = COALESCE(NULLIF($13, ''), phone),
              referral_source = COALESCE($15, referral_source),
              referral_name = COALESCE($16, referral_name),
+             brokerage_name = COALESCE($17, brokerage_name),
              updated_at = now()
          WHERE id = $14`,
         [
@@ -128,6 +130,7 @@ export async function POST(
           invite.booking_request_id,
           input.referral_source || null,
           input.referral_name || null,
+          input.brokerage_name || null,
         ]
       );
 

@@ -449,6 +449,13 @@ export function useEstimateForm({
               : []),
           ],
           internal_notes: `Internal labor: ${formatCents(paintingResult.internal_labor_cost_cents)} | Gross margin: ${paintingResult.gross_margin_pct}% (${formatCents(paintingResult.gross_margin_cents)})`,
+          // Phase 5: Shopping list for painting mode
+          // Room-by-room: use existing draftShoppingList if present, else build from scope
+          // Quick mode: build from scope results if any price book items with materials exist
+          ...((() => {
+            const sl = draftShoppingList ?? buildManualShoppingList(priceBookItems, scopeResults);
+            return sl ? { shopping_list_json: sl } : {};
+          })()),
         };
       } else if (mode === "flat_rate") {
         payload = {

@@ -4,6 +4,7 @@ import { runInvoiceFollowups } from "./invoice-followup.js";
 import { runBookingConfirmations } from "./booking-confirmed.js";
 import { runReviewRequests } from "./review-request.js";
 import { runEstimateFollowups } from "./estimate-followup.js";
+import { runLeadFollowups } from "./lead-followup.js";
 import { runRenewalNudges } from "./membership-renewal-nudge.js";
 import { runStaleJobNudges } from "./stale-job-nudge.js";
 import { runPropertyIssueScans } from "./property-issue-scan.js";
@@ -89,7 +90,18 @@ async function runPollIteration(client: Client): Promise<void> {
         });
       }
 
-      // Dispatch estimate follow-ups
+      // Dispatch lead follow-ups (stale pending booking requests)
+      const leadFollowupResults = await runLeadFollowups(client);
+      if (leadFollowupResults.length > 0) {
+        logger.info("lead-followup dispatch complete", {
+          automations: leadFollowupResults.length,
+          created: leadFollowupResults.reduce((sum, r) => sum + r.sent, 0),
+          skipped: leadFollowupResults.reduce((sum, r) => sum + r.skipped, 0),
+          errors: leadFollowupResults.reduce((sum, r) => sum + r.errors, 0),
+        });
+      }
+
+      // Dispatch estimate follow-ups (3-day + 7-day, driven by automation config)
       const estimateResults = await runEstimateFollowups(client);
       if (estimateResults.length > 0) {
         const totalSent = estimateResults.reduce((sum, r) => sum + r.sent, 0);

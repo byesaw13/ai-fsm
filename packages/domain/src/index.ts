@@ -27,6 +27,10 @@ export {
   computePaintingProject,
   roomResultToLegacyFields,
   isPaintingEstimateAboveFloor,
+  numericPrepToRoomLevel,
+  toPaintRoomSpec,
+  computePaintRoom,
+  computePaintRooms,
 } from "./painting";
 export type {
   RoomPrepLevel,
@@ -37,4 +41,7 @@ export type {
   RoomMeasurements,
   RoomPaintingResult,
   PaintingProjectResult,
+  PrepLevelNumeric,
+  PaintRoom,
+  PaintRoomOutput,
 } from "./painting";

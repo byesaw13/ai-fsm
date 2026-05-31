@@ -69,6 +69,7 @@ export function IntakeClientForm({ token, leadName, leadEmail, leadPhone }: Inta
   const [timeSlot, setTimeSlot] = useState("flexible");
   const [referralSource, setReferralSource] = useState("");
   const [realtorName, setRealtorName] = useState("");
+  const [brokerageName, setBrokerageName] = useState("");
   const [ownershipType, setOwnershipType] = useState("");
 
   const questions = category ? (INTAKE_QUESTIONS[category] ?? []) : [];
@@ -99,6 +100,7 @@ export function IntakeClientForm({ token, leadName, leadEmail, leadPhone }: Inta
           },
           referral_source: referralSource || null,
           referral_name: referralSource === "realtor" ? realtorName.trim() || null : null,
+          brokerage_name: referralSource === "realtor" ? brokerageName.trim() || null : null,
           address: address.trim(),
           city: city.trim(),
           zip: zip.trim(),
@@ -256,15 +258,26 @@ export function IntakeClientForm({ token, leadName, leadEmail, leadPhone }: Inta
         </div>
 
         {referralSource === "realtor" && (
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Realtor name <span style={{ fontWeight: 400, color: "#71717a" }}>(optional)</span></label>
-            <input
-              style={inputStyle}
-              value={realtorName}
-              onChange={(e) => setRealtorName(e.target.value)}
-              placeholder="e.g. Jane Smith at Coldwell Banker"
-            />
-          </div>
+          <>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Realtor name <span style={{ fontWeight: 400, color: "#71717a" }}>(optional)</span></label>
+              <input
+                style={inputStyle}
+                value={realtorName}
+                onChange={(e) => setRealtorName(e.target.value)}
+                placeholder="e.g. Jane Smith"
+              />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Brokerage / company <span style={{ fontWeight: 400, color: "#71717a" }}>(optional)</span></label>
+              <input
+                style={inputStyle}
+                value={brokerageName}
+                onChange={(e) => setBrokerageName(e.target.value)}
+                placeholder="e.g. Coldwell Banker, Keller Williams"
+              />
+            </div>
+          </>
         )}
       </fieldset>
 
