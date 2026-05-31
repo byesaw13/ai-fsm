@@ -333,6 +333,12 @@ export function useEstimateAI({
     setAiDraftMode("input");
   }
 
+  /** Called from useEstimateForm when an interview draft is applied on mount */
+  function applyPendingDraftFromExternal(draft: DraftEstimate, shoppingList: ShoppingList | null) {
+    onApplyDraft(_buildApplyParams(draft, shoppingList));
+    setAiDraftMode("applied");
+  }
+
   // Keep backward-compat alias so existing callers don't break during migration
   const applyDraft = fetchDraft;
 
@@ -358,5 +364,6 @@ export function useEstimateAI({
     fetchDraft,
     applyPendingDraft,
     discardPendingDraft,
+    applyPendingDraftFromExternal,
   };
 }

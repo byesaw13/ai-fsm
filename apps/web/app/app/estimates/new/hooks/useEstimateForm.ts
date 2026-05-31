@@ -63,6 +63,8 @@ export interface NewEstimateFormProps {
   initialPropertyId?: string;
   initialVaultItemId?: string;
   vaultItemContext?: { name: string; category: string; location: string | null } | null;
+  /** When set, the form auto-applies this draft on mount (from AI interview flow) */
+  initialInterviewDraft?: { draft: import("@/lib/estimates/ai-draft").DraftEstimate; shoppingList: ShoppingList | null } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,6 +80,7 @@ export function useEstimateForm({
   initialPropertyId,
   initialVaultItemId,
   vaultItemContext,
+  initialInterviewDraft,
 }: NewEstimateFormProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -246,6 +249,22 @@ export function useEstimateForm({
       setDraftSpecifiedMaterials(specifiedMaterials ?? []);
     },
   });
+
+  // ---------------------------------------------------------------------------
+  // Auto-apply interview draft on mount
+  // ---------------------------------------------------------------------------
+
+  const interviewDraftApplied = useRef(false);
+  useEffect(() => {
+    if (initialInterviewDraft && !interviewDraftApplied.current) {
+      interviewDraftApplied.current = true;
+      const { draft, shoppingList } = initialInterviewDraft;
+      // Re-use the AI hook's internal builder
+      ai.applyPendingDraftFromExternal(draft, shoppingList);
+      setStep(3); // Jump to Adjustments step after interview
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Filtered lists + entity callbacks
