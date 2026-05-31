@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { canCreateEstimates } from "@/lib/auth/permissions";
 import { query } from "@/lib/db";
-import { Card, PageContainer, PageHeader } from "@/components/ui";
-import { NewEstimateForm } from "./NewEstimateForm";
+import { PageContainer, PageHeader } from "@/components/ui";
+import { EstimateEntryShell } from "./EstimateEntryShell";
 
 export const dynamic = "force-dynamic";
 
@@ -66,18 +66,16 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
   return (
     <PageContainer>
       <PageHeader title="New Estimate" backHref="/app/estimates" backLabel="Estimates" />
-      <Card>
-        <NewEstimateForm
-          clients={clients}
-          jobs={jobs}
-          properties={properties}
-          initialClientId={client_id}
-          initialJobId={job_id}
-          initialPropertyId={property_id}
-          initialVaultItemId={vault_item_id}
-          vaultItemContext={vaultItemContext}
-        />
-      </Card>
+      <EstimateEntryShell
+        clients={clients}
+        jobs={jobs}
+        properties={properties}
+        initialClientId={client_id}
+        initialJobId={job_id}
+        initialPropertyId={property_id}
+        initialVaultItemId={vault_item_id}
+        vaultItemContext={vaultItemContext}
+      />
     </PageContainer>
   );
 }
