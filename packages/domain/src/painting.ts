@@ -12,6 +12,7 @@ import {
   MATERIAL_HANDLING_CLIENT_RATE,
   DEPOSIT_RATE,
   LABOR_COST_CENTS_PER_HOUR,
+  PREP_LEVEL_MULTIPLIERS,
 } from "./dovetails";
 
 // ---------------------------------------------------------------------------
@@ -265,6 +266,165 @@ export function computePaintingProject(
     gross_margin_cents,
     gross_margin_pct,
     shopping_summary,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// PaintRoom — canonical room model with numeric prep levels
+// ---------------------------------------------------------------------------
+// Maps to the pricing contract's 1–10 numeric prep scale (PREP_LEVEL_MULTIPLIERS).
+// Bridges to RoomSpec for computation while exposing the fields Dovetails
+// actually uses during estimating: paintWalls, paintCeiling, paintTrim, brand info.
+
+/** Prep level 1–10 matching PREP_LEVEL_MULTIPLIERS in dovetails.ts */
+export type PrepLevelNumeric = 1|2|3|4|5|6|7|8|9|10;
+
+/**
+ * Canonical room model for the Dovetails painting estimator.
+ * Uses the 1–10 numeric prep scale from the pricing contract.
+ * Convert to RoomSpec via toPaintRoomSpec() for computation.
+ */
+export interface PaintRoom {
+  id: string;
+  name: string;
+
+  lengthFt: number;
+  widthFt: number;
+  heightFt: number;
+
+  windows: number;
+  doors: number;
+
+  paintWalls: boolean;
+  paintCeiling: boolean;
+  paintTrim: boolean;
+
+  /** 1=no prep, 5=standard, 10=major resurfacing. Maps to PREP_LEVEL_MULTIPLIERS. */
+  prepLevel: PrepLevelNumeric;
+
+  primerRequired: boolean;
+
+  /** When true, Dovetails does not supply paint — labor only */
+  customerSuppliesPaint: boolean;
+
+  paintBrand?: string;    // e.g. "Sherwin-Williams"
+  paintLine?: string;     // e.g. "ProMar 200"
+  paintGrade?: PaintGrade;
+}
+
+/** Full output for a single PaintRoom — includes labor hours for scheduling */
+export interface PaintRoomOutput {
+  room: PaintRoom;
+  measurements: RoomMeasurements;
+  wallArea: number;        // sqft (after deductions)
+  ceilingArea: number;     // sqft
+  trimArea: number;        // linear feet of baseboard/trim
+  paintGallons: number;
+  primerGallons: number;
+  laborHours: number;      // estimated field hours at production rate
+  laborCost: number;       // internal cost in cents (never shown to customer)
+  materialCost: number;    // cents — paint + primer
+  roomPrice: number;       // customer-facing price in cents
+}
+
+/** Map numeric 1–10 prep level to the string system used in computation */
+export function numericPrepToRoomLevel(level: PrepLevelNumeric): RoomPrepLevel {
+  if (level <= 3) return "clean";
+  if (level <= 5) return "minor";
+  if (level <= 7) return "moderate";
+  return "major";
+}
+
+/** Convert PaintRoom → RoomSpec for use with existing computation functions */
+export function toPaintRoomSpec(room: PaintRoom): RoomSpec {
+  return {
+    name: room.name,
+    length_ft: room.lengthFt,
+    width_ft: room.widthFt,
+    ceiling_height_ft: room.heightFt,
+    doors: room.doors,
+    windows: room.windows,
+    include_ceiling: room.paintCeiling,
+    include_trim: room.paintTrim,
+    prep_level: numericPrepToRoomLevel(room.prepLevel),
+    paint_supplied_by: room.customerSuppliesPaint ? "customer" : "dovetails",
+    paint_grade: room.paintGrade ?? "standard",
+    primer_needed: room.primerRequired,
+    dark_to_light: false,   // not in PaintRoom; set directly via RoomSpec if needed
+  };
+}
+
+/** Compute a single PaintRoom and return full output including laborHours */
+export function computePaintRoom(room: PaintRoom, coatCount = 2): PaintRoomOutput {
+  const spec = toPaintRoomSpec(room);
+  const result = computeRoomPainting(spec, coatCount);
+  const measurements = result.measurements;
+
+  // Apply paintWalls=false: subtract wall labor/materials if not painting walls
+  const wallMultiplier = room.paintWalls ? 1 : 0;
+  const effectiveWallSqft = measurements.wall_sqft * wallMultiplier;
+
+  // Labor hours from production rate (0.85 hrs / 100 sqft at 2 coats, scaled by prep)
+  const prepMult = PREP_LEVEL_MULTIPLIERS[room.prepLevel] ?? 1.0;
+  const totalPaintableSqft = effectiveWallSqft + measurements.ceiling_sqft;
+  const laborHours = parseFloat(
+    ((totalPaintableSqft / 100) * LABOR_HOURS_PER_100_SQFT * coatCount * prepMult).toFixed(2)
+  );
+  const laborCost = Math.round(laborHours * LABOR_COST_CENTS_PER_HOUR);
+
+  return {
+    room,
+    measurements,
+    wallArea: measurements.wall_sqft,
+    ceilingArea: measurements.ceiling_sqft,
+    trimArea: measurements.trim_lf,
+    paintGallons: result.paint_gallons,
+    primerGallons: result.primer_gallons,
+    laborHours,
+    laborCost,
+    materialCost: result.material_cents,
+    roomPrice: room.paintWalls ? result.subtotal_cents : result.subtotal_cents - Math.round(measurements.wall_sqft * PAINTING_RATE_LABOR_CENTS * prepMult),
+  };
+}
+
+/** Compute all PaintRooms and return project-level aggregates */
+export function computePaintRooms(rooms: PaintRoom[], coatCount = 2): {
+  rooms: PaintRoomOutput[];
+  totalLaborHours: number;
+  totalLaborCost: number;
+  totalMaterialCost: number;
+  totalPaintGallons: number;
+  totalPrimerGallons: number;
+  projectPrice: number;    // sum of room prices
+  depositCents: number;
+  balanceCents: number;
+  grossMarginPct: number;
+} {
+  const outputs = rooms.map((r) => computePaintRoom(r, coatCount));
+  const totalLaborHours = outputs.reduce((s, r) => s + r.laborHours, 0);
+  const totalLaborCost = outputs.reduce((s, r) => s + r.laborCost, 0);
+  const totalMaterialCost = outputs.reduce((s, r) => s + r.materialCost, 0);
+  const totalPaintGallons = outputs.reduce((s, r) => s + r.paintGallons, 0);
+  const totalPrimerGallons = outputs.reduce((s, r) => s + r.primerGallons, 0);
+  const handlingCents = Math.round(totalMaterialCost * MATERIAL_HANDLING_CLIENT_RATE);
+  const projectPrice = outputs.reduce((s, r) => s + r.roomPrice, 0) + handlingCents;
+  const depositCents = Math.round(projectPrice * DEPOSIT_RATE);
+  const balanceCents = projectPrice - depositCents;
+  const grossMarginPct = projectPrice > 0
+    ? Math.round(((projectPrice - totalLaborCost - totalMaterialCost) / projectPrice) * 100)
+    : 0;
+
+  return {
+    rooms: outputs,
+    totalLaborHours: parseFloat(totalLaborHours.toFixed(2)),
+    totalLaborCost,
+    totalMaterialCost,
+    totalPaintGallons,
+    totalPrimerGallons,
+    projectPrice,
+    depositCents,
+    balanceCents,
+    grossMarginPct,
   };
 }
 

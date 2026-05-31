@@ -23,15 +23,26 @@ type VehicleRow = {
   plate: string | null;
   is_active: boolean;
   created_at: string;
+  current_odometer: number | null;  // derived from most recent session end_odometer
+  last_session_date: string | null;
 };
 
 export const GET = withRole(["owner", "admin", "tech"], async (_req: NextRequest, session) => {
   try {
     const rows = await query<VehicleRow>(
-      `SELECT id, nickname, make, model, year, plate, is_active, created_at::text
-       FROM vehicles
-       WHERE account_id = $1
-       ORDER BY is_active DESC, nickname ASC`,
+      `SELECT v.id, v.nickname, v.make, v.model, v.year, v.plate, v.is_active, v.created_at::text,
+              last_s.end_odometer   AS current_odometer,
+              last_s.session_date::text AS last_session_date
+       FROM vehicles v
+       LEFT JOIN LATERAL (
+         SELECT end_odometer, session_date
+         FROM vehicle_sessions
+         WHERE vehicle_id = v.id AND account_id = v.account_id AND end_odometer IS NOT NULL
+         ORDER BY session_date DESC, created_at DESC
+         LIMIT 1
+       ) last_s ON true
+       WHERE v.account_id = $1
+       ORDER BY v.is_active DESC, v.nickname ASC`,
       [session.accountId]
     );
     return NextResponse.json({ data: rows });
