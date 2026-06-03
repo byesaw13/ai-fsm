@@ -17,7 +17,6 @@ This target packages `ai-fsm` as a portable Docker Compose bundle on `garonhome.
   env/        .env only
   data/
     postgres/
-    redis/
   backups/    pg_dump files
   scripts/    optional host-local wrappers
 ```
@@ -33,14 +32,13 @@ Services:
 - `web`
 - `worker`
 - `postgres`
-- `redis`
 
 Networks:
 
 - `${COMPOSE_PROJECT_NAME}_internal` for app-private traffic
 - external `${PROXY_NETWORK}` for reverse proxy attachment
 
-The `web` service joins both networks. `postgres` and `redis` remain internal only.
+The `web` service joins both networks. `postgres` remains internal only.
 
 ## Reverse proxy plan
 
@@ -87,7 +85,6 @@ Required env values:
 - `POSTGRES_USER`
 - `POSTGRES_PASSWORD`
 - `DATABASE_URL`
-- `REDIS_URL`
 - `AUTH_SECRET`
 - `APP_BASE_URL`
 
@@ -107,7 +104,7 @@ bash scripts/deploy-garonhome.sh
 What the deploy script does:
 
 1. `git pull origin main`
-2. start `postgres` and `redis`
+2. start `postgres`
 3. wait for postgres health
 4. create `schema_migrations` tracking table if absent; apply only new migration files (already-applied files are skipped — no replay on redeploy)
 5. build `web` and `worker` from source

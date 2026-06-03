@@ -83,7 +83,6 @@ The `test` job requires these environment variables. They are set in `ci.yml`:
 | `DATABASE_URL` | CI job env | Pool connection for app code under test |
 | `TEST_DATABASE_URL` | CI job env | Direct connection for DB integration test fixtures |
 | `AUTH_SECRET` | CI job env | Required by `env.ts` validation (≥32 chars) |
-| `REDIS_URL` | CI job env | Required by `env.ts` schema; no Redis service needed in CI |
 
 The `build` job sets:
 

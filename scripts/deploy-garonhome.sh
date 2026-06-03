@@ -6,7 +6,7 @@
 # What this script does (in order):
 #   1. Validate repo and env file exist
 #   2. Sync checkout to origin/main with a backup ref for divergent local commits
-#   3. Start postgres + redis, wait for postgres healthy
+#   3. Start postgres, wait for postgres healthy
 #   4. Run SQL migrations (idempotent, tracked in schema_migrations table)
 #   5. Build and start web + worker
 #   6. Wait for web healthcheck to pass
@@ -111,7 +111,7 @@ sync_repo_to_main() {
 
 sync_repo_to_main
 
-docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" up -d postgres redis
+docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" up -d postgres
 
 while ! docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T postgres \
   sh -lc 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null 2>&1; do

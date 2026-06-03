@@ -11,7 +11,6 @@ sudo mkdir -p \
   "${DEPLOY_ROOT}/repo" \
   "${DEPLOY_ROOT}/env" \
   "${DEPLOY_ROOT}/data/postgres" \
-  "${DEPLOY_ROOT}/data/redis" \
   "${DEPLOY_ROOT}/backups" \
   "${DEPLOY_ROOT}/scripts"
 

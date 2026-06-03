@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const port = process.env.PORT ?? "3000";
 const baseURL = process.env.TEST_BASE_URL ?? `http://localhost:${port}`;
+const useExternalServer = process.env.PLAYWRIGHT_USE_EXTERNAL_SERVER === "1";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -20,10 +21,14 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  webServer: {
-    command: `pnpm --filter @ai-fsm/web exec next dev --port ${port}`,
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
+  ...(useExternalServer
+    ? {}
+    : {
+        webServer: {
+          command: `pnpm --filter @ai-fsm/web exec next dev --port ${port}`,
+          url: baseURL,
+          reuseExistingServer: !process.env.CI,
+          timeout: 120 * 1000,
+        },
+      }),
 });

@@ -52,10 +52,7 @@ export function getEnv() {
   // During Next.js build (not runtime), real env vars may not be present.
   // Return safe placeholders so `next build` succeeds in CI without secrets.
   // At runtime the full validation runs and throws if misconfigured.
-  if (
-    process.env.NEXT_PHASE === "phase-production-build" ||
-    (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL)
-  ) {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
     cachedEnv = schema.parse({
       DATABASE_URL: "postgres://placeholder",
       AUTH_SECRET: "placeholder-secret-must-be-at-least-32-characters!!",
