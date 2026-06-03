@@ -186,11 +186,16 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         initiatedBy: session.userId,
       });
 
-      const setClauses = est.status === "draft"
-        ? "status = 'sent', sent_at = now(), updated_at = now()"
-        : "sent_at = now(), updated_at = now()";
-
-      await client.query(`UPDATE estimates SET ${setClauses} WHERE id = $1`, [id]);
+      // Only the draft→sent transition writes sent_at. The estimate
+      // immutability invariant (migration 004) forbids changing sent_at once
+      // the estimate is in sent state, so a re-send must not touch it — the
+      // send is recorded via the communications + audit log.
+      if (est.status === "draft") {
+        await client.query(
+          `UPDATE estimates SET status = 'sent', sent_at = now(), updated_at = now() WHERE id = $1`,
+          [id],
+        );
+      }
 
       await resolveActionItems(client, {
         accountId: session.accountId,
