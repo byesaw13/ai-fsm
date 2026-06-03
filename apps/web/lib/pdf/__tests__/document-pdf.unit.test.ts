@@ -65,6 +65,36 @@ describe("buildInvoicePdf", () => {
 });
 
 describe("buildEstimatePdf", () => {
+  it("renders multi-option estimates from option groups (parent total is 0)", async () => {
+    const bytes = await buildEstimatePdf({
+      estimateRef: "MULTI001",
+      status: "sent",
+      clientName: "Option Client",
+      issueDate: "2026-01-01",
+      // Parent totals are intentionally zero for multi_option estimates.
+      subtotalCents: 0,
+      totalCents: 0,
+      lineItems: [],
+      options: [
+        {
+          label: "Good",
+          description: "Budget scope",
+          isRecommended: false,
+          totalCents: 250000,
+          lineItems: [{ description: "Basic paint", quantity: 1, unitPriceCents: 250000, totalCents: 250000 }],
+        },
+        {
+          label: "Better",
+          isRecommended: true,
+          totalCents: 400000,
+          lineItems: [{ description: "Premium paint + trim", quantity: 1, unitPriceCents: 400000, totalCents: 400000 }],
+        },
+      ],
+    });
+    expect(isPdf(bytes)).toBe(true);
+    expect(bytes.length).toBeGreaterThan(1000);
+  });
+
   it("produces a valid PDF with a deposit line", async () => {
     const bytes = await buildEstimatePdf({
       estimateRef: "ABCD1234",

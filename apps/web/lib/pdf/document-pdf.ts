@@ -30,6 +30,14 @@ export interface PdfLineItem {
   totalCents: number;
 }
 
+export interface EstimateOptionGroup {
+  label: string;
+  description?: string | null;
+  isRecommended: boolean;
+  totalCents: number;
+  lineItems: PdfLineItem[];
+}
+
 export interface InvoicePdfData {
   invoiceNumber: string;
   status: string;
@@ -62,6 +70,9 @@ export interface EstimatePdfData {
   depositCents?: number | null;
   notes?: string | null;
   lineItems: PdfLineItem[];
+  /** When set (multi_option estimates), render priced option sections instead
+   *  of a flat line-item table + parent total. */
+  options?: EstimateOptionGroup[];
 }
 
 function money(cents: number): string {
@@ -131,6 +142,7 @@ interface RenderInput {
   dateValue2: string | null;
   lineItems: PdfLineItem[];
   totals: { label: string; value: string; strong?: boolean }[];
+  optionGroups?: EstimateOptionGroup[];
   notes?: string | null;
   footer: string;
 }
@@ -206,6 +218,7 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
   const colUnitRight = MARGIN + CONTENT_W - 100;
   const colAmtRight = PAGE_W - MARGIN;
   const descW = colQtyRight - colDescX - 70;
+  const totalsLabelX = PAGE_W - MARGIN - 200;
 
   const drawTableHeader = () => {
     text("DESCRIPTION", colDescX, ctx.y, 8, bold, MUTED);
@@ -221,50 +234,86 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
     });
     ctx.y -= 16;
   };
-  drawTableHeader();
 
-  for (const item of input.lineItems) {
-    const lines = wrap(item.description || "—", font, 10, descW);
-    const rowH = Math.max(lines.length * 13, 14) + 6;
-    ensureSpace(ctx, rowH + 10);
-    if (ctx.y === PAGE_H - MARGIN) drawTableHeader(); // redrew header on new page
-    const rowTop = ctx.y;
-    lines.forEach((ln, i) => text(ln, colDescX, rowTop - i * 13, 10));
-    rightText(qty(item.quantity), colQtyRight, rowTop, 10);
-    rightText(money(item.unitPriceCents), colUnitRight, rowTop, 10);
-    rightText(money(item.totalCents), colAmtRight, rowTop, 10);
-    ctx.y = rowTop - rowH;
-    ctx.page.drawLine({
-      start: { x: MARGIN, y: ctx.y + 6 },
-      end: { x: PAGE_W - MARGIN, y: ctx.y + 6 },
-      thickness: 0.4,
-      color: rgb(0.92, 0.93, 0.95),
-    });
-  }
-
-  if (input.lineItems.length === 0) {
-    text("No line items recorded for this document.", colDescX, ctx.y, 10, font, MUTED);
-    ctx.y -= 18;
-  }
-
-  // --- Totals ---------------------------------------------------------------
-  ctx.y -= 10;
-  ensureSpace(ctx, input.totals.length * 16 + 30);
-  const totalsLabelX = PAGE_W - MARGIN - 200;
-  for (const t of input.totals) {
-    const f = t.strong ? bold : font;
-    const size = t.strong ? 12 : 10;
-    if (t.strong) {
+  const drawRows = (items: PdfLineItem[]) => {
+    for (const item of items) {
+      const lines = wrap(item.description || "—", font, 10, descW);
+      const rowH = Math.max(lines.length * 13, 14) + 6;
+      ensureSpace(ctx, rowH + 10);
+      if (ctx.y === PAGE_H - MARGIN) drawTableHeader(); // redrew header on new page
+      const rowTop = ctx.y;
+      lines.forEach((ln, i) => text(ln, colDescX, rowTop - i * 13, 10));
+      rightText(qty(item.quantity), colQtyRight, rowTop, 10);
+      rightText(money(item.unitPriceCents), colUnitRight, rowTop, 10);
+      rightText(money(item.totalCents), colAmtRight, rowTop, 10);
+      ctx.y = rowTop - rowH;
       ctx.page.drawLine({
-        start: { x: totalsLabelX, y: ctx.y + 12 },
-        end: { x: PAGE_W - MARGIN, y: ctx.y + 12 },
+        start: { x: MARGIN, y: ctx.y + 6 },
+        end: { x: PAGE_W - MARGIN, y: ctx.y + 6 },
+        thickness: 0.4,
+        color: rgb(0.92, 0.93, 0.95),
+      });
+    }
+    if (items.length === 0) {
+      text("No line items recorded.", colDescX, ctx.y, 10, font, MUTED);
+      ctx.y -= 18;
+    }
+  };
+
+  const drawTotals = (totals: RenderInput["totals"]) => {
+    ctx.y -= 10;
+    ensureSpace(ctx, totals.length * 16 + 30);
+    for (const t of totals) {
+      const f = t.strong ? bold : font;
+      const size = t.strong ? 12 : 10;
+      if (t.strong) {
+        ctx.page.drawLine({
+          start: { x: totalsLabelX, y: ctx.y + 12 },
+          end: { x: PAGE_W - MARGIN, y: ctx.y + 12 },
+          thickness: 0.75,
+          color: RULE,
+        });
+      }
+      text(t.label, totalsLabelX, ctx.y, size, f, t.strong ? INK : MUTED);
+      rightText(t.value, colAmtRight, ctx.y, size, f, t.strong ? ACCENT : INK);
+      ctx.y -= t.strong ? 20 : 16;
+    }
+  };
+
+  if (input.optionGroups && input.optionGroups.length > 0) {
+    // Multi-option estimate: render each option as its own priced section so
+    // the customer sees the real choices, not a flat (often $0) parent total.
+    input.optionGroups.forEach((group, gi) => {
+      ensureSpace(ctx, 70);
+      if (gi > 0) ctx.y -= 6;
+      text(`OPTION ${gi + 1}: ${group.label}`, MARGIN, ctx.y, 12, bold, ACCENT);
+      if (group.isRecommended) rightText("RECOMMENDED", colAmtRight, ctx.y, 9, bold, ACCENT);
+      ctx.y -= 16;
+      if (group.description && group.description.trim()) {
+        for (const ln of wrap(group.description.trim(), font, 9, CONTENT_W)) {
+          ensureSpace(ctx, 14);
+          text(ln, MARGIN, ctx.y, 9, font, MUTED);
+          ctx.y -= 12;
+        }
+        ctx.y -= 2;
+      }
+      drawTableHeader();
+      drawRows(group.lineItems);
+      ctx.y -= 2;
+      ctx.page.drawLine({
+        start: { x: totalsLabelX, y: ctx.y + 10 },
+        end: { x: PAGE_W - MARGIN, y: ctx.y + 10 },
         thickness: 0.75,
         color: RULE,
       });
-    }
-    text(t.label, totalsLabelX, ctx.y, size, f, t.strong ? INK : MUTED);
-    rightText(t.value, colAmtRight, ctx.y, size, f, t.strong ? ACCENT : INK);
-    ctx.y -= t.strong ? 20 : 16;
+      text(`Option ${gi + 1} total`, totalsLabelX, ctx.y, 11, bold, INK);
+      rightText(money(group.totalCents), colAmtRight, ctx.y, 11, bold, ACCENT);
+      ctx.y -= 20;
+    });
+  } else {
+    drawTableHeader();
+    drawRows(input.lineItems);
+    drawTotals(input.totals);
   }
 
   // --- Notes ----------------------------------------------------------------
@@ -327,6 +376,7 @@ export async function buildInvoicePdf(d: InvoicePdfData): Promise<Uint8Array> {
 }
 
 export async function buildEstimatePdf(d: EstimatePdfData): Promise<Uint8Array> {
+  const multiOption = !!(d.options && d.options.length > 0);
   const totals: RenderInput["totals"] = [
     { label: "Subtotal", value: money(d.subtotalCents) },
   ];
@@ -337,6 +387,7 @@ export async function buildEstimatePdf(d: EstimatePdfData): Promise<Uint8Array> 
   }
 
   return renderDocument({
+    optionGroups: multiOption ? d.options : undefined,
     docType: "ESTIMATE",
     ref: d.estimateRef,
     status: d.status,

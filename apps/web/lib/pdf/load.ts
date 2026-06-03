@@ -12,6 +12,7 @@ import {
   buildInvoicePdf,
   buildEstimatePdf,
   type PdfLineItem,
+  type EstimateOptionGroup,
 } from "./document-pdf";
 
 export interface LoadedPdf {
@@ -60,9 +61,11 @@ export async function loadInvoicePdf(
   if (!rowCount) return null;
   const inv = rows[0];
 
+  // Match the customer portal: never expose internal-only line items.
   const lineItems = await client.query(
     `SELECT description, quantity, unit_price_cents, total_cents
      FROM invoice_line_items WHERE invoice_id = $1
+       AND visible_to_customer = true
      ORDER BY sort_order ASC, created_at ASC`,
     [id],
   );
@@ -107,7 +110,7 @@ export async function loadEstimatePdf(
   id: string,
 ): Promise<LoadedPdf | null> {
   const { rows, rowCount } = await client.query(
-    `SELECT e.id, e.status, e.subtotal_cents, e.tax_cents, e.total_cents,
+    `SELECT e.id, e.status, e.presentation_mode, e.subtotal_cents, e.tax_cents, e.total_cents,
             e.deposit_cents, e.expires_at, e.notes, e.sent_at, e.created_at,
             c.id AS client_id, c.name AS client_name, c.email AS client_email,
             j.title AS job_title,
@@ -130,6 +133,38 @@ export async function loadEstimatePdf(
     [id],
   );
 
+  // Multi-option estimates store priced choices in estimate_options (the parent
+  // total is intentionally 0). Render each option as its own priced section so
+  // the customer sees the real pricing instead of a flat $0 document.
+  let options: EstimateOptionGroup[] | undefined;
+  if (est.presentation_mode === "multi_option") {
+    const optRows = await client.query(
+      `SELECT id, label, description, total_cents, is_recommended
+       FROM estimate_options WHERE estimate_id = $1
+       ORDER BY sort_order ASC, created_at ASC`,
+      [id],
+    );
+    options = await Promise.all(
+      optRows.rows.map(async (o) => {
+        const optItems = await client.query(
+          `SELECT description, quantity, unit_price_cents, total_cents
+           FROM estimate_line_items
+           WHERE estimate_id = $1 AND option_id = $2
+             AND coalesce(visible_to_customer, true) = true
+           ORDER BY sort_order ASC, created_at ASC`,
+          [id, o.id],
+        );
+        return {
+          label: String(o.label ?? "Option"),
+          description: (o.description as string | null) ?? null,
+          isRecommended: Boolean(o.is_recommended),
+          totalCents: Number(o.total_cents ?? 0),
+          lineItems: mapLineItems(optItems.rows),
+        };
+      }),
+    );
+  }
+
   const ref = id.slice(0, 8).toUpperCase();
   const bytes = await buildEstimatePdf({
     estimateRef: ref,
@@ -146,6 +181,7 @@ export async function loadEstimatePdf(
     depositCents: Number(est.deposit_cents ?? 0),
     notes: est.notes as string | null,
     lineItems: mapLineItems(lineItems.rows),
+    options,
   });
 
   const filename = buildClientDocumentFilename({
