@@ -22,11 +22,22 @@ export function getTransporter(): Transporter {
   return _transporter;
 }
 
+export interface EmailAttachment {
+  /** Filename shown to the recipient, e.g. "Invoice-123.pdf". */
+  filename: string;
+  /** Raw file bytes. */
+  content: Buffer | Uint8Array;
+  /** MIME type, e.g. "application/pdf". Defaults to application/octet-stream. */
+  contentType?: string;
+}
+
 export interface SendOptions {
   to: string;
   subject: string;
   html: string;
   text?: string;
+  /** Optional file attachments (combined size should stay well under 25MB). */
+  attachments?: EmailAttachment[];
 }
 
 export async function sendEmail(opts: SendOptions): Promise<{ ok: boolean; error?: string }> {
@@ -35,7 +46,20 @@ export async function sendEmail(opts: SendOptions): Promise<{ ok: boolean; error
   }
   try {
     const from = process.env.SMTP_FROM ?? process.env.SMTP_USER!;
-    await getTransporter().sendMail({ from, ...opts });
+    const { attachments, ...rest } = opts;
+    await getTransporter().sendMail({
+      from,
+      ...rest,
+      ...(attachments && attachments.length
+        ? {
+            attachments: attachments.map((a) => ({
+              filename: a.filename,
+              content: Buffer.isBuffer(a.content) ? a.content : Buffer.from(a.content),
+              contentType: a.contentType ?? "application/octet-stream",
+            })),
+          }
+        : {}),
+    });
     return { ok: true };
   } catch (err) {
     return { ok: false, error: (err as Error).message };

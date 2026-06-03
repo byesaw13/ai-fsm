@@ -284,6 +284,15 @@ export default async function EstimateDetailPage({
             url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/estimates/${estimate.share_token}`}
           />
           <a
+            href={`/api/v1/estimates/${estimate.id}/pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="estimate-download-pdf"
+            style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}
+          >
+            Download PDF →
+          </a>
+          <a
             href={`/app/estimates/${estimate.id}/shopping-list`}
             style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}
           >

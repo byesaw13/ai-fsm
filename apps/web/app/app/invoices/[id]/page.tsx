@@ -150,6 +150,19 @@ export default async function InvoiceDetailPage({
               url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/invoices/${invoice.share_token}`}
               label="Copy client link"
             />
+            <a
+              href={`/api/v1/invoices/${invoice.id}/pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="invoice-download-pdf"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
+                padding: "6px 12px", borderRadius: 6, border: "1px solid var(--border)",
+                color: "var(--fg)", textDecoration: "none", fontSize: "var(--text-sm)", fontWeight: 600,
+              }}
+            >
+              Download PDF
+            </a>
             <span data-testid="invoice-status">
               <StatusBadge variant={currentStatus as StatusVariant}>
                 {STATUS_LABELS[currentStatus]}
