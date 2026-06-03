@@ -27,10 +27,13 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Owner user. The password hash comes from the psql variable :owner_pw.
 -- DEFAULT: a non-bcrypt sentinel that NO password can ever match, so the
--- account is login-DISABLED. The dev loader overrides it with
---   -v owner_pw='<bcrypt-for-password>'  to make it loginable in dev.
--- For production, leave it locked and set the password via the app's reset
--- flow. This keeps a real, guessable dev password out of any prod database.
+-- account is login-DISABLED. Callers supply a real hash via
+--   -v owner_pw='<bcrypt>'  to make the account loginable.
+-- NOTE: the app has no self-service password-reset flow, so a login-disabled
+-- owner is inaccessible until recovered. Always seed production with a real
+-- password — use scripts/db-seed-dovetails.sh --prod with OWNER_PASSWORD set,
+-- which hashes it for you. This keeps a guessable dev password out of prod
+-- while still giving the production owner a working initial login.
 \if :{?owner_pw}
 \else
   \set owner_pw '!login-disabled-set-password-via-app'
