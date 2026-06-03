@@ -11,8 +11,8 @@ concurrency:
   cancel-in-progress: true
 
 # ---------------------------------------------------------------------------
-# Branch protection requires all four jobs to pass before merge to main:
-#   lint · typecheck · build · test
+# Branch protection requires all five jobs to pass before merge to main:
+#   lint · typecheck · build · test · e2e-smoke
 #
 # See docs/CI_GOVERNANCE.md for the full branch protection policy and
 # recovery procedures.
@@ -88,8 +88,6 @@ jobs:
   # Environment provided:
   #   DATABASE_URL / TEST_DATABASE_URL  — PostgreSQL 16 service fixture
   #   AUTH_SECRET                       — Required by env.ts (≥32 chars)
-  #   REDIS_URL                         — Required by env.ts (no Redis service
-  #                                       needed; rate-limit uses in-memory store)
   #
   # Intentional skips (see docs/TEST_MATRIX.md):
   #   - HTTP integration tests: skipped — require TEST_BASE_URL (running server)
@@ -117,9 +115,6 @@ jobs:
       DATABASE_URL: postgresql://test:test@localhost:5432/aifsm_test
       # Required by env.ts (≥32 chars). This is a CI-only test secret.
       AUTH_SECRET: ci-test-only-secret-not-used-in-production!!
-      # Required by env.ts schema. No Redis service runs in CI;
-      # the in-process rate limiter does not connect to Redis.
-      REDIS_URL: redis://localhost:6379/0
       # TEST_BASE_URL is intentionally NOT set.
       # HTTP integration tests (estimates, invoices, auth HTTP) require a
       # running Next.js server and will skip deterministically when absent.
@@ -148,19 +143,13 @@ jobs:
       - name: Run unit + DB-integration tests
         run: pnpm test
 
-  # ── 5. E2E (Playwright) — Optional ────────────────────────────────────────
-  # Only runs when E2E_ENABLED repository variable is set to "true".
-  # This allows repos to opt-in to E2E CI without requiring it for all PRs.
-  #
-  # To enable: Add a repository variable E2E_ENABLED=true
-  #
-  # NOT part of branch protection required checks — it's optional.
-  # See docs/TEST_MATRIX.md — Tier 4: E2E.
-  e2e:
-    name: e2e
-    needs: [build]
+  # ── 5. Required E2E Smoke (Playwright) ───────────────────────────────────
+  # Release-manifest smoke: login -> client -> job -> visit -> estimate ->
+  # invoice -> payment. This is intentionally narrow and required.
+  e2e-smoke:
+    name: e2e-smoke
+    needs: [build, test]
     runs-on: ubuntu-latest
-    if: ${{ vars.E2E_ENABLED == 'true' }}
     services:
       postgres:
         image: postgres:16
@@ -178,9 +167,9 @@ jobs:
     env:
       DATABASE_URL: postgresql://test:test@localhost:5432/aifsm_test
       AUTH_SECRET: ci-e2e-test-secret-not-used-in-production!!
-      REDIS_URL: redis://localhost:6379/0
       TEST_BASE_URL: http://localhost:3000
-      NEXT_PHASE: phase-production-build
+      PLAYWRIGHT_USE_EXTERNAL_SERVER: "1"
+      E2E_DISABLE_LOGIN_RATE_LIMIT: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -206,6 +195,8 @@ jobs:
         run: PGPASSWORD=test psql -h localhost -U test -d aifsm_test -v ON_ERROR_STOP=1 -f db/migrations/002_seed_dev.sql
 
       - name: Build production app
+        env:
+          NEXT_PHASE: phase-production-build
         run: pnpm build
 
       - name: Start production server
@@ -214,12 +205,12 @@ jobs:
       - name: Wait for server
         run: sleep 10 && curl -f http://localhost:3000/api/health
 
-      - name: Run Playwright E2E tests
-        run: pnpm exec playwright test --reporter=list
+      - name: Run required release smoke
+        run: pnpm exec playwright test tests/e2e/core-flow.spec.ts --reporter=list
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-report
+          name: playwright-smoke-report
           path: playwright-report/
           retention-days: 7

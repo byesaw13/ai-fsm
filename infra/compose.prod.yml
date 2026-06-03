@@ -13,8 +13,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null 2>&1 || exit 1"]
       interval: 20s
@@ -35,8 +33,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_started
     logging:
       driver: json-file
       options:
@@ -66,19 +62,5 @@ services:
         max-size: "50m"
         max-file: "3"
 
-  redis:
-    image: redis:7
-    container_name: ai-fsm-redis-prod
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - redis_prod:/data
-    logging:
-      driver: json-file
-      options:
-        max-size: "20m"
-        max-file: "2"
-
 volumes:
   pgdata_prod:
-  redis_prod:

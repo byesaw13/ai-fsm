@@ -10,7 +10,7 @@ Every suite has a defined tier, required environment, and documented skip behavi
 | 1 | Unit | ✅ Always | None | Never skipped |
 | 2 | DB integration | ✅ When DB available | `TEST_DATABASE_URL` | `describe.skipIf(!process.env.TEST_DATABASE_URL)` |
 | 3 | HTTP integration | ❌ Not in CI | `TEST_DATABASE_URL` + `TEST_BASE_URL` | `describe.skipIf(!RUN_INTEGRATION)` where `RUN_INTEGRATION = !!TEST_DATABASE_URL && !!TEST_BASE_URL` |
-| 4 | E2E (Playwright) | ❌ Not in CI | `TEST_BASE_URL` + running server + seeded DB | Not in `pnpm test`; run with `pnpm exec playwright test` |
+| 4 | E2E (Playwright) | ✅ Required smoke | `TEST_BASE_URL` + running server + seeded DB | `e2e-smoke` runs `tests/e2e/core-flow.spec.ts`; broader suite is on demand |
 
 ---
 
@@ -125,19 +125,19 @@ wire Tier 3 using the pattern:
 
 ## Tier 4 — E2E (Playwright)
 
-Full browser-driven tests. Not part of `pnpm test`. Run with Playwright CLI.
-Require a running dev/prod server with seeded DB.
+Full browser-driven tests. Not part of `pnpm test`. The required CI job runs the release-manifest smoke only; the broader Playwright suite remains available for local or on-demand runs. Require a running dev/prod server with seeded DB.
 
-| File | What it covers |
-|------|----------------|
-| `tests/e2e/admin-smoke.spec.ts` | Admin role: jobs, visits, estimates |
-| `tests/e2e/tech-smoke.spec.ts` | Tech role: visit list, update, complete |
-| `tests/e2e/estimates-smoke.spec.ts` | Estimate create → send → approve flow |
-| `tests/e2e/invoice-convert-smoke.spec.ts` | Approve estimate → convert → invoice |
-| `tests/e2e/payment-smoke.spec.ts` | Record payment, verify invoice status |
-| `tests/e2e/automations-smoke.spec.ts` | Automations page: admin run controls, tech read-only |
-| `tests/e2e/visit-reminder-smoke.spec.ts` | Automation: visit reminder |
-| `tests/e2e/invoice-followup-smoke.spec.ts` | Automation: invoice followup |
+| File | What it covers | CI status |
+|------|----------------|-----------|
+| `tests/e2e/core-flow.spec.ts` | Required release spine: login, client, job, visit, estimate, invoice, payment | Required in `e2e-smoke` |
+| `tests/e2e/admin-smoke.spec.ts` | Admin role: jobs, visits, estimates | On demand |
+| `tests/e2e/tech-smoke.spec.ts` | Tech role: visit list, update, complete | On demand |
+| `tests/e2e/estimates-smoke.spec.ts` | Estimate create → send → approve flow | On demand |
+| `tests/e2e/invoice-convert-smoke.spec.ts` | Approve estimate → convert → invoice | On demand |
+| `tests/e2e/payment-smoke.spec.ts` | Record payment, verify invoice status | On demand |
+| `tests/e2e/automations-smoke.spec.ts` | Automations page: admin run controls, tech read-only | On demand |
+| `tests/e2e/visit-reminder-smoke.spec.ts` | Automation: visit reminder | On demand |
+| `tests/e2e/invoice-followup-smoke.spec.ts` | Automation: invoice followup | On demand |
 
 **How to run locally:**
 ```bash
@@ -148,20 +148,11 @@ pnpm dev:web
 TEST_BASE_URL=http://localhost:3000 pnpm exec playwright test
 ```
 
-**CI integration (P6-T4):**
-E2E is now available as an optional CI job. To enable, set the repository secret `E2E_ENABLED=true`.
-The job is NOT required for branch protection — it runs only when opted in.
+**CI integration:**
+The `e2e-smoke` job is required and runs after `build` and `test`. It builds the production app, starts `next start`, sets `PLAYWRIGHT_USE_EXTERNAL_SERVER=1`, then runs:
 
-```yaml
-e2e:
-  needs: [build]
-  if: ${{ secrets.E2E_ENABLED == 'true' }}
-  env:
-    TEST_BASE_URL: http://localhost:3000
-  steps:
-    - run: pnpm build
-    - run: pnpm --filter @ai-fsm/web start &
-    - run: sleep 10 && pnpm exec playwright test
+```bash
+pnpm exec playwright test tests/e2e/core-flow.spec.ts --reporter=list
 ```
 
 ---
@@ -177,7 +168,7 @@ Skips in CI are intentional. This table documents every expected skip.
 | `invoices.integration.test.ts` | 12 | Tier 3: TEST_BASE_URL absent in CI |
 | `api.integration.test.ts` (automations) | 6 | Tier 3: TEST_BASE_URL absent in CI |
 | `payments.integration.test.ts` | 1 | Sentinel skip (confirms guard works when DB absent locally) |
-| Playwright E2E | not in test job | Tier 4: not wired to `pnpm test` |
+| Playwright full suite | not in test job | Tier 4 broad suite is on demand; required release smoke runs in `e2e-smoke` |
 
 **Expected CI output:**
 ```

@@ -19,7 +19,6 @@
   env/        .env only
   data/
     postgres/
-    redis/
   backups/    pg_dump files
 ```
 
@@ -47,7 +46,7 @@ nano /opt/business/ai-fsm/env/.env   # fill required vars
 bash scripts/deploy-garonhome.sh
 ```
 
-Required env vars: `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `DATABASE_URL`, `REDIS_URL`, `AUTH_SECRET`, `APP_BASE_URL`.
+Required env vars: `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `DATABASE_URL`, `AUTH_SECRET`, `APP_BASE_URL`.
 Generate a secret: `openssl rand -base64 32`
 
 ---
@@ -62,7 +61,7 @@ bash scripts/deploy-garonhome.sh
 The script handles the full release sequence:
 
 1. `git pull origin main`
-2. Start `postgres` and `redis` if not running
+2. Start `postgres` if not running
 3. Wait for postgres healthcheck
 4. Create `schema_migrations` tracking table if absent; apply only new migration files (already-applied files are skipped — no replay)
 5. Build `web` and `worker` from source

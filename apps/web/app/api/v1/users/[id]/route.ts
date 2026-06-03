@@ -73,15 +73,20 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     }
     if (role !== "owner" && isSelf) {
       // Check if this would remove the last owner
-      const { rows } = await (await getPool().connect()).query(
-        `SELECT COUNT(*)::int AS cnt FROM users WHERE account_id = $1 AND role = 'owner'`,
-        [session.accountId]
-      );
-      if ((rows[0]?.cnt ?? 0) <= 1) {
-        return NextResponse.json(
-          { error: { code: "FORBIDDEN", message: "Cannot remove the last owner", traceId: session.traceId } },
-          { status: 422 }
+      const client = await getPool().connect();
+      try {
+        const { rows } = await client.query(
+          `SELECT COUNT(*)::int AS cnt FROM users WHERE account_id = $1 AND role = 'owner'`,
+          [session.accountId]
         );
+        if ((rows[0]?.cnt ?? 0) <= 1) {
+          return NextResponse.json(
+            { error: { code: "FORBIDDEN", message: "Cannot remove the last owner", traceId: session.traceId } },
+            { status: 422 }
+          );
+        }
+      } finally {
+        client.release();
       }
     }
   }
