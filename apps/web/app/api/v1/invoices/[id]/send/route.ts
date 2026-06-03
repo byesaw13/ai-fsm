@@ -6,6 +6,7 @@ import { logger } from "@/lib/logger";
 import { sendEmail, appUrl, isEmailConfigured } from "@/lib/email/mailer";
 import { invoiceEmailHtml, invoiceEmailText } from "@/lib/email/templates";
 import { logCommunication } from "@/lib/communications-log";
+import { loadInvoicePdf } from "@/lib/pdf/load";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     const result = await withInvoiceContext(session, async (client) => {
       const { rows, rowCount } = await client.query(
         `SELECT i.id, i.status, i.invoice_number, i.total_cents, i.balance_cents,
-                i.deposit_cents, i.due_date, i.notes, i.sent_at,
+                i.deposit_cents, i.due_date, i.notes, i.sent_at, i.share_token,
                 c.id AS client_id, c.name AS client_name, c.email AS client_email
          FROM invoices i
          JOIN clients c ON c.id = i.client_id
@@ -30,6 +31,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         id: string; status: string; invoice_number: string;
         total_cents: number; balance_cents: number; deposit_cents: number;
         due_date: string | null; notes: string | null; sent_at: string | null;
+        share_token: string;
         client_id: string; client_name: string; client_email: string | null;
       };
 
@@ -45,10 +47,23 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         return { status: 503, message: "Email is not configured on this server" };
       }
 
-      const viewUrl = `${appUrl()}/app/invoices/${id}`;
+      // Customer-facing link points at the public portal, not the staff app.
+      const viewUrl = `${appUrl()}/portal/invoices/${inv.share_token}`;
       const dueDateStr = inv.due_date
         ? new Date(inv.due_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
         : null;
+
+      // Attach the invoice as a PDF (best-effort: a render failure must not
+      // block the notification email from going out).
+      let pdf: Awaited<ReturnType<typeof loadInvoicePdf>> = null;
+      try {
+        pdf = await loadInvoicePdf(client, session.accountId, id);
+      } catch (err) {
+        logger.warn("[invoices/send] PDF render failed; sending without attachment", {
+          invoiceId: id,
+          error: (err as Error).message,
+        });
+      }
 
       const emailResult = await sendEmail({
         to: inv.client_email,
@@ -71,6 +86,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           viewUrl,
           notes: inv.notes,
         }),
+        attachments: pdf
+          ? [{ filename: pdf.filename, content: pdf.bytes, contentType: "application/pdf" }]
+          : undefined,
       });
 
       if (!emailResult.ok) {

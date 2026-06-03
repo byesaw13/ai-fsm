@@ -10,6 +10,7 @@ import { getEnv } from "@/lib/env";
 import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
 import { logCommunication } from "@/lib/communications-log";
 import { resolveActionItems } from "@/lib/action-items";
+import { loadEstimatePdf } from "@/lib/pdf/load";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     const result = await withEstimateContext(session, async (client) => {
       const { rows, rowCount } = await client.query(
         `SELECT e.id, e.status, e.total_cents, e.deposit_cents, e.balance_cents,
-                e.expires_at, e.notes, e.sent_at,
+                e.expires_at, e.notes, e.sent_at, e.share_token,
                 e.trip_count, e.requires_drying_or_curing, e.difficult_access,
                 e.old_house_risk, e.coordination_required, e.finish_expectation,
                 e.travel_surcharge_cents, e.risk_adjustment_cents,
@@ -48,6 +49,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         id: string; status: string; total_cents: number;
         deposit_cents: number; balance_cents: number;
         expires_at: string | null; notes: string | null; sent_at: string | null;
+        share_token: string;
         trip_count: "one_trip" | "multi_trip";
         requires_drying_or_curing: boolean;
         difficult_access: boolean;
@@ -110,8 +112,19 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       // The confirmation page renders a POST form to do the actual mutation.
       const approveUrl = `${base}/estimate/respond?action=approve&token=${encodeURIComponent(approveToken)}`;
       const declineUrl = `${base}/estimate/respond?action=decline&token=${encodeURIComponent(declineToken)}`;
-      const viewUrl = `${base}/app/estimates/${id}`;
+      const viewUrl = `${base}/portal/estimates/${est.share_token}`;
       const estimateRef = id.slice(0, 8).toUpperCase();
+
+      // Attach the estimate as a PDF (best-effort — never block the email).
+      let pdf: Awaited<ReturnType<typeof loadEstimatePdf>> = null;
+      try {
+        pdf = await loadEstimatePdf(client, session.accountId, id);
+      } catch (err) {
+        logger.warn("[estimates/send] PDF render failed; sending without attachment", {
+          estimateId: id,
+          error: (err as Error).message,
+        });
+      }
 
       const expiresStr = est.expires_at
         ? new Date(est.expires_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
@@ -144,6 +157,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           declineUrl,
           viewUrl,
         }),
+        attachments: pdf
+          ? [{ filename: pdf.filename, content: pdf.bytes, contentType: "application/pdf" }]
+          : undefined,
       });
 
       if (!emailResult.ok) {
