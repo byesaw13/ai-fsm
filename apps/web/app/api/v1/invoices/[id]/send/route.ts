@@ -115,15 +115,16 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         initiatedBy: session.userId,
       });
 
-      // If draft, transition to sent; otherwise just update sent_at timestamp
-      const setClauses = inv.status === "draft"
-        ? "status = 'sent', sent_at = now(), updated_at = now()"
-        : "sent_at = now(), updated_at = now()";
-
-      await client.query(
-        `UPDATE invoices SET ${setClauses} WHERE id = $1`,
-        [id]
-      );
+      // Only the draft→sent transition writes sent_at. The invoice
+      // immutability invariant (migration 004) forbids changing sent_at once
+      // the invoice has left draft (sent/partial/overdue), so a re-send must
+      // not touch it — the send is recorded via the communications + audit log.
+      if (inv.status === "draft") {
+        await client.query(
+          `UPDATE invoices SET status = 'sent', sent_at = now(), updated_at = now() WHERE id = $1`,
+          [id]
+        );
+      }
 
       await appendAuditLog(client, {
         account_id: session.accountId,
