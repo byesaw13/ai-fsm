@@ -391,10 +391,10 @@ export default async function EstimateDetailPage({
               </span>
             )}
             <a
-              href="#convert-invoice"
+              href="#materials-plan-handoff"
               style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}
             >
-              Convert to invoice ↓
+              Project handoff ↓
             </a>
           </div>
         </div>
@@ -949,28 +949,62 @@ export default async function EstimateDetailPage({
         </div>
       )}
 
-      {/* Materials Plan handoff — owner/admin only, approved estimates */}
+      {/* Approved project handoff — owner/admin only */}
       {canTransition && currentStatus === "approved" && (
-        <div id="materials-plan-handoff" className="card action-card">
-          <h2>{hasMaterialsPlan ? "Materials Plan Ready" : "Prepare Materials Plan"}</h2>
-          <p className="muted">
-            {hasMaterialsPlan
-              ? "The scope is approved and the materials plan is ready to review or print before work starts."
-              : "Turn the approved scope into a materials plan before scheduling work or ordering supplies."}
-          </p>
-          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-            <Link
-              href={`/app/estimates/${estimate.id}/shopping-list`}
-              style={{ color: "var(--accent)", textDecoration: "none", fontSize: "var(--text-sm)", fontWeight: 600 }}
-            >
-              {hasMaterialsPlan ? "Open Materials Plan →" : "Prepare Materials Plan →"}
-            </Link>
-            <Link
-              href={`/app/estimates/${estimate.id}#materials-plan`}
-              style={{ color: "var(--fg-muted)", textDecoration: "none", fontSize: "var(--text-sm)" }}
-            >
-              View in estimate
-            </Link>
+        <div id="materials-plan-handoff" className="card action-card" data-testid="approved-project-handoff">
+          <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)", flexWrap: "wrap", marginBottom: "var(--space-3)" }}>
+            <div>
+              <h2 style={{ marginBottom: "var(--space-1)" }}>Approved Project Handoff</h2>
+              <p className="muted" style={{ margin: 0 }}>
+                Move from approved scope into purchasing, scheduling, work, and final billing.
+              </p>
+            </div>
+            <span style={{ alignSelf: "flex-start", fontSize: "var(--text-xs)", fontWeight: 700, color: "#065f46", background: "#dcfce7", border: "1px solid #86efac", borderRadius: 999, padding: "4px 10px" }}>
+              Approved
+            </span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "var(--space-3)" }}>
+            <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-3)" }}>
+              <p style={{ margin: "0 0 var(--space-1)", fontWeight: 700 }}>1. Materials</p>
+              <p className="muted" style={{ minHeight: 42 }}>
+                {hasMaterialsPlan
+                  ? "Review, print, and shop from the approved materials plan."
+                  : "Prepare the buying list from approved scope before work starts."}
+              </p>
+              <Link
+                href={`/app/estimates/${estimate.id}/shopping-list`}
+                className="p7-btn p7-btn-secondary p7-btn-sm"
+              >
+                {hasMaterialsPlan ? "Open Materials Plan →" : "Prepare Materials Plan →"}
+              </Link>
+            </div>
+            <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-3)" }}>
+              <p style={{ margin: "0 0 var(--space-1)", fontWeight: 700 }}>2. Schedule</p>
+              <p className="muted" style={{ minHeight: 42 }}>
+                {estimate.job_id
+                  ? jobVisitCount > 0
+                    ? "Visits are already on the job. Manage timing from the job thread."
+                    : "Schedule the first work visit from the approved estimate."
+                  : "Link this estimate to a job before scheduling work."}
+              </p>
+              {estimate.job_id ? (
+                <Link
+                  href={jobVisitCount > 0 ? `/app/jobs/${estimate.job_id}` : `/app/jobs/${estimate.job_id}/visits/new`}
+                  className="p7-btn p7-btn-primary p7-btn-sm"
+                >
+                  {jobVisitCount > 0 ? "Manage Job →" : "Schedule Work →"}
+                </Link>
+              ) : (
+                <span className="p7-btn p7-btn-secondary p7-btn-sm" aria-disabled="true">No linked job</span>
+              )}
+            </div>
+            <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-3)" }}>
+              <p style={{ margin: "0 0 var(--space-1)", fontWeight: 700 }}>3. Final Billing</p>
+              <p className="muted" style={{ minHeight: 42 }}>
+                Create the draft invoice from the approved estimate when the work is ready to bill.
+              </p>
+              <EstimateConvertButton estimateId={estimate.id} />
+            </div>
           </div>
         </div>
       )}
@@ -981,18 +1015,6 @@ export default async function EstimateDetailPage({
           estimateId={estimate.id}
           initialChangeOrders={changeOrders as ChangeOrder[]}
         />
-      )}
-
-      {/* Convert to Invoice — owner/admin only, approved status only */}
-      {canTransition && currentStatus === "approved" && (
-        <div id="convert-invoice" className="card action-card" data-testid="convert-panel-wrapper">
-          <h2>Convert to Invoice</h2>
-          <p className="muted">
-            Create a draft invoice from this approved estimate. Idempotent —
-            safe to click more than once.
-          </p>
-          <EstimateConvertButton estimateId={estimate.id} />
-        </div>
       )}
 
       {/* Danger Zone — owner only, draft status only */}
