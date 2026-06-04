@@ -1,5 +1,5 @@
 import type { PoolClient } from "pg";
-import { normalizePhone } from "@/lib/phone";
+import { normalizePhone } from "../phone";
 
 export const SMS_CONSENT_TEXT =
   "By checking this box you consent to receive text messages from Dovetails Services LLC about your service requests. Message & data rates may apply. Reply STOP to opt out.";
