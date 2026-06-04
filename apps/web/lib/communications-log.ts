@@ -15,11 +15,12 @@ export interface LogCommunicationOpts {
 }
 
 /**
- * Logs a communication. Returns true if a new row was inserted, false if it
- * was skipped as a duplicate (same account_id + external_id). The dedup only
- * applies when external_id is set; see migration 100.
+ * Logs a communication. Returns the new row id, or null if it was skipped as a
+ * duplicate (same account_id + external_id). The dedup only applies when
+ * external_id is set; see migration 100. Callers use the id both to detect
+ * duplicates and to back-fill linkage (e.g. job_id) afterwards.
  */
-export async function logCommunication(opts: LogCommunicationOpts): Promise<boolean> {
+export async function logCommunication(opts: LogCommunicationOpts): Promise<string | null> {
   const rows = await query<{ id: string }>(
     `INSERT INTO communications_log
        (account_id, channel, direction, outcome, client_id, booking_request_id,
@@ -41,5 +42,5 @@ export async function logCommunication(opts: LogCommunicationOpts): Promise<bool
       opts.externalId ?? null,
     ]
   );
-  return rows.length > 0;
+  return rows[0]?.id ?? null;
 }
