@@ -32,6 +32,17 @@ type VisitRow = {
   property_address: string | null;
 };
 
+type PendingRequestRow = {
+  id: string;
+  name: string;
+  service_category: string;
+  service_description: string;
+  preferred_date: string;
+  preferred_time_slot: string | null;
+  created_at: string;
+  city: string | null;
+};
+
 type PlanSummaryRow = {
   count: string;
   arr_cents: string;
@@ -62,6 +73,14 @@ function fmtTime(iso: string): string {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
+  });
+}
+
+function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 }
 
@@ -96,6 +115,7 @@ export default async function AppPage() {
     openARRow,
     activeJobsRow,
     pendingRequestsRow,
+    pendingRequestRows,
     planSummary,
     renewingSoon,
     overdueRenewals,
@@ -139,6 +159,18 @@ export default async function AppPage() {
     queryForSession<CountRow>(session,
       `SELECT COUNT(*)::text AS count FROM booking_requests
        WHERE account_id = $1 AND status = 'pending'`,
+      [accountId]),
+
+    // Oldest pending request for the home command card
+    queryForSession<PendingRequestRow>(session,
+      `SELECT id, name, service_category, service_description,
+              preferred_date::text AS preferred_date,
+              preferred_time_slot, created_at::text AS created_at,
+              city
+       FROM booking_requests
+       WHERE account_id = $1 AND status = 'pending'
+       ORDER BY created_at ASC
+       LIMIT 1`,
       [accountId]),
 
     // Active membership summary: count + ARR + tier breakdown
@@ -276,6 +308,7 @@ export default async function AppPage() {
   const openAR               = parseInt(openARRow[0]?.total_cents ?? "0", 10);
   const activeJobsCount      = parseN(activeJobsRow[0]);
   const pendingRequestsCount = parseN(pendingRequestsRow[0]);
+  const pendingRequest = pendingRequestRows[0] ?? null;
   const summary              = planSummary[0] ?? { count: "0", arr_cents: "0", essential_count: "0", plus_count: "0", premier_count: "0" };
   const activeMembers        = parseInt(summary.count, 10);
   const arrCents             = parseInt(summary.arr_cents, 10);
@@ -301,6 +334,13 @@ export default async function AppPage() {
   // ---------------------------------------------------------------------------
 
   const actionQueue = ([
+    {
+      label: "Review requests",
+      count: pendingRequestsCount,
+      href: "/app/requests" as Route,
+      detail: "Needs routing or follow-up",
+      tone: pendingRequestsCount > 0 ? "warning" : "default",
+    },
     {
       label: "Collect overdue invoices",
       count: overdueInvCount,
@@ -437,7 +477,7 @@ export default async function AppPage() {
         {/* Quick Actions */}
         <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
           <Link href={"/app/intake/new" as Route} className="p7-btn p7-btn-primary p7-btn-sm">
-            + New Job
+            + New Request
           </Link>
           <Link href={"/app/estimates/new" as Route} className="p7-btn p7-btn-secondary p7-btn-sm">
             + Estimate
@@ -449,7 +489,7 @@ export default async function AppPage() {
             + Mileage
           </Link>
           <Link
-            href={"/app/booking-requests" as Route}
+            href={"/app/requests" as Route}
             className="p7-btn p7-btn-secondary p7-btn-sm"
             style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-2)" }}
           >
@@ -478,6 +518,35 @@ export default async function AppPage() {
 
       {/* ── Pulse Metrics (4 KPIs) ────────────────────────────────────── */}
       <MetricGrid metrics={pulseMetrics} />
+
+      {pendingRequest && (
+        <Card hover padding="lg" style={{ marginTop: "var(--space-6)" }}>
+          <div className="ops-section-header">
+            <h2 className="ops-section-title">Requests</h2>
+            <span className="ops-section-count">{pendingRequestsCount}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ minWidth: 240, flex: "1 1 320px" }}>
+              <div style={{ fontWeight: 700, fontSize: "var(--text-lg)" }}>{pendingRequest.name}</div>
+              <div style={{ marginTop: "var(--space-1)", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+                {pendingRequest.service_category.replaceAll("_", " ")} · {pendingRequest.service_description}
+              </div>
+              <div style={{ marginTop: "var(--space-1)", color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+                Requested {fmtDate(pendingRequest.created_at)}{pendingRequest.city ? ` · ${pendingRequest.city}` : ""}
+                {pendingRequest.preferred_time_slot ? ` · Preferred ${pendingRequest.preferred_time_slot}` : ""}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
+              <Link href={`/app/booking-requests/${pendingRequest.id}` as Route} className="p7-btn p7-btn-primary p7-btn-sm">
+                Review Request →
+              </Link>
+              <Link href={"/app/requests" as Route} className="p7-btn p7-btn-secondary p7-btn-sm">
+                View Queue
+              </Link>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* ── Main 2-column: Today's Schedule + Action Queue ────────────── */}
       <div className="home-two-col">

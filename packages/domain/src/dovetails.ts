@@ -362,6 +362,11 @@ export const MAINTENANCE_JOB_CATEGORIES: JobAcceptanceCategory[] = ["membership"
 
 export const PRICING_MODES = ["flat_rate", "hourly_internal"] as const;
 
+export const PRICING_MODE_LABELS: Record<typeof PRICING_MODES[number], string> = {
+  flat_rate: "Fixed Bid",
+  hourly_internal: "Time and Materials",
+};
+
 // ---------------------------------------------------------------------------
 // Line item categories
 // ---------------------------------------------------------------------------

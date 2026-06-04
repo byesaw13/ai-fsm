@@ -63,6 +63,7 @@ export interface NewEstimateFormProps {
   initialPropertyId?: string;
   initialVaultItemId?: string;
   vaultItemContext?: { name: string; category: string; location: string | null } | null;
+  initialPricingMode?: "itemized" | "flat_rate" | "multi_option";
   /** When set, the form auto-applies this draft on mount (from AI interview flow) */
   initialInterviewDraft?: { draft: import("@/lib/estimates/ai-draft").DraftEstimate; shoppingList: ShoppingList | null } | null;
 }
@@ -80,6 +81,7 @@ export function useEstimateForm({
   initialPropertyId,
   initialVaultItemId,
   vaultItemContext,
+  initialPricingMode = "itemized",
   initialInterviewDraft,
 }: NewEstimateFormProps) {
   const router = useRouter();
@@ -198,7 +200,8 @@ export function useEstimateForm({
   // ---------------------------------------------------------------------------
 
   const tiersHook = useEstimateTiers(() =>
-    lineItems.reduce((sum, row) => sum + lineTotal(row), 0)
+    lineItems.reduce((sum, row) => sum + lineTotal(row), 0),
+    initialPricingMode
   );
   const { mode, flatRate, setFlatRate, tiers,
           updateTier, addTierLineItem, removeTierLineItem, updateTierLineItem,

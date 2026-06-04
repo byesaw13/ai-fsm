@@ -16,6 +16,7 @@ interface WhatNextBannerProps {
   invoiceCount: number;
   hasUnpaidInvoice: boolean;
   hasPaidInvoice: boolean;
+  latestInvoiceId: string | null;
 }
 
 // Returns the day difference from a date string to now
@@ -39,7 +40,7 @@ function computeBanner(props: WhatNextBannerProps): BannerContent | null {
   const {
     jobId, clientId, jobStatus, estimateCount, hasSentEstimate, lastEstimateSentAt,
     hasApprovedEstimate, approvedEstimateId, hasDepositInvoice, depositPaid, hasActiveVisit,
-    invoiceCount, hasUnpaidInvoice, hasPaidInvoice,
+    invoiceCount, hasUnpaidInvoice, hasPaidInvoice, latestInvoiceId,
   } = props;
 
   const days = daysSince(lastEstimateSentAt);
@@ -52,6 +53,9 @@ function computeBanner(props: WhatNextBannerProps): BannerContent | null {
       bg: "#d1fae5",
       icon: "✓",
       message: "Paid — job complete!",
+      actionLabel: latestInvoiceId ? "Open Invoice" : undefined,
+      actionHref: latestInvoiceId ? `/app/invoices/${latestInvoiceId}` : undefined,
+      secondary: { label: "View invoices →", href: `/app/invoices?job_id=${jobId}` },
     };
   }
 
@@ -62,6 +66,8 @@ function computeBanner(props: WhatNextBannerProps): BannerContent | null {
       bg: "#fef3c7",
       icon: "⟳",
       message: "Invoice sent — follow up for payment",
+      actionLabel: latestInvoiceId ? "Open Invoice" : undefined,
+      actionHref: latestInvoiceId ? `/app/invoices/${latestInvoiceId}` : undefined,
       secondary: { label: "View invoices →", href: `/app/invoices?job_id=${jobId}` },
     };
   }
@@ -109,6 +115,8 @@ function computeBanner(props: WhatNextBannerProps): BannerContent | null {
       bg: "#ede9fe",
       icon: "◈",
       message: "Waiting on deposit payment",
+      actionLabel: latestInvoiceId ? "Open Invoice" : undefined,
+      actionHref: latestInvoiceId ? `/app/invoices/${latestInvoiceId}` : undefined,
       secondary: { label: "View deposit invoice →", href: `/app/invoices?job_id=${jobId}` },
     };
   }

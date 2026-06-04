@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import type { Route } from "next";
 import { getSession } from "@/lib/auth/session";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import type { InvoiceStatus } from "@ai-fsm/domain";
@@ -10,6 +11,9 @@ import {
   EmptyState,
   StatusBadge,
   MetricGrid,
+  Card,
+  SectionHeader,
+  LinkButton,
 } from "@/components/ui";
 import type { StatusVariant, MetricCardData } from "@/components/ui";
 
@@ -114,6 +118,14 @@ export default async function InvoicesPage() {
   );
 
   const totalPaid = grouped.paid.reduce((sum, i) => sum + i.paid_cents, 0);
+  const priorityInvoice = grouped.overdue[0] ?? grouped.partial[0] ?? grouped.sent[0] ?? null;
+  const priorityLabel = priorityInvoice
+    ? priorityInvoice.status === "overdue"
+      ? "Collect overdue payment"
+      : priorityInvoice.status === "partial"
+        ? "Finish partial payment"
+        : "Follow up on sent invoice"
+    : null;
 
   const metrics: MetricCardData[] = [
     {
@@ -143,6 +155,33 @@ export default async function InvoicesPage() {
       />
 
       {invoices.length > 0 && <MetricGrid metrics={metrics} />}
+
+      {priorityInvoice && (
+        <Card style={{ marginBottom: "var(--space-4)" }} data-testid="billing-queue-card">
+          <SectionHeader title="Billing Queue" />
+          <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ minWidth: 240, flex: "1 1 320px" }}>
+              <p style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 700 }}>
+                {priorityLabel}
+              </p>
+              <p style={{ margin: "var(--space-1) 0 0", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+                {priorityInvoice.invoice_number}{priorityInvoice.client_name ? ` · ${priorityInvoice.client_name}` : ""}
+              </p>
+              <p style={{ margin: "var(--space-1) 0 0", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+                {priorityInvoice.due_date ? `Due ${new Date(priorityInvoice.due_date).toLocaleDateString()}` : "No due date set"}
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
+              <LinkButton href={(`/app/invoices/${priorityInvoice.id}`) as Route} variant="primary" size="sm">
+                Open Invoice →
+              </LinkButton>
+              <LinkButton href="/app/invoices" variant="secondary" size="sm">
+                View Queue
+              </LinkButton>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {invoices.length === 0 ? (
         <EmptyState

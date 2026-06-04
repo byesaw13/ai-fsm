@@ -9,6 +9,7 @@ import { ToastProvider } from "./ui/Toast";
 import { QuickLeadModal } from "./QuickLeadModal";
 import {
   IconEstimates,
+  IconInbox,
   IconSettings,
   IconMyDay,
   IconField,
@@ -39,17 +40,19 @@ interface NavSection {
 
 // Named constants for items referenced outside the array (mobile bottom bar)
 const NAV_TODAY:    NavItem = { href: "/app",            label: "Today",      Icon: IconMyDay };
+const NAV_REQUESTS: NavItem = { href: "/app/requests",   label: "Requests",   Icon: IconInbox };
 const NAV_PROPS:    NavItem = { href: "/app/properties", label: "Properties", Icon: IconProperties, adminOnly: true };
 const NAV_JOBS:     NavItem = { href: "/app/jobs",       label: "Jobs",       Icon: IconJobs,       adminOnly: true };
 const NAV_INVOICES: NavItem = { href: "/app/invoices",   label: "Invoices",   Icon: IconInvoices,   adminOnly: true };
 
 // Layer 1 — Daily Driver nav only. Advanced routes (Schedule, Automations, Reports,
-// Booking Requests, Inbox) are accessible from Today or Settings — not in the sidebar.
+// Booking Requests, Requests, and Workflow) are accessible from Today or Settings — not in the sidebar.
 const ADMIN_NAV_SECTIONS: NavSection[] = [
   {
     label: "",
     items: [
       NAV_TODAY,
+      NAV_REQUESTS,
       { href: "/app/clients",   label: "Clients",    Icon: IconClients,   adminOnly: true },
       NAV_PROPS,
       { href: "/app/estimates", label: "Estimates",  Icon: IconEstimates, adminOnly: true },
@@ -127,7 +130,7 @@ export function AppShell({ role, userName, children }: AppShellProps) {
             <span className="p7-brand-name">Dovetails</span>
           </Link>
 
-          {/* Quick Lead button — owner/admin only */}
+          {/* New Request button — owner/admin only */}
           {isAdminOrOwner && (
             <button
               type="button"
@@ -150,7 +153,7 @@ export function AppShell({ role, userName, children }: AppShellProps) {
               }}
             >
               <span style={{ fontSize: 16 }}>⚡</span>
-              Quick Lead
+              New Request
             </button>
           )}
 

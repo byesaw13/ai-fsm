@@ -480,7 +480,12 @@ export default async function VisitDetailPage({
             <Card data-testid="site-visit-followup">
               <SectionHeader title="Site Visit Complete" />
               <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", marginBottom: "var(--space-3)" }}>
-                You&apos;ve assessed the project. Create an estimate for the client based on your findings.
+                You&apos;ve completed the walkthrough. Use the assessment notes, photos, and parts evidence to draft the fixed-bid estimate.
+              </div>
+              <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", marginBottom: "var(--space-3)" }}>
+                <span><strong>{beforePhotos.length}</strong> before photos</span>
+                <span><strong>{afterPhotos.length}</strong> after photos</span>
+                <span><strong>{visitParts.length}</strong> parts</span>
               </div>
               <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
                 <a href={`/app/visits/${visit.id}/assessment`} className="p7-btn p7-btn-ghost p7-btn-sm">
@@ -488,7 +493,7 @@ export default async function VisitDetailPage({
                 </a>
                 {visit.job_client_id && (
                   <a
-                    href={`/app/estimates/new?client_id=${visit.job_client_id}${visit.job_id ? `&job_id=${visit.job_id}` : ""}${visit.job_property_id ? `&property_id=${visit.job_property_id}` : ""}`}
+                    href={"/app/estimates/new?client_id=" + visit.job_client_id + (visit.job_id ? "&job_id=" + visit.job_id : "") + (visit.job_property_id ? "&property_id=" + visit.job_property_id : "") + "&from_visit=" + visit.id + "&pricing_mode=flat_rate"}
                     className="p7-btn p7-btn-primary p7-btn-sm"
                   >
                     Create Estimate →
@@ -601,6 +606,9 @@ export default async function VisitDetailPage({
                       approvedEstimateId={approvedEstimate.id}
                       scopeAssumptions={approvedEstimate.scope_assumptions}
                       currentTechNotes={visit.tech_notes ?? null}
+                      beforePhotoCount={beforePhotos.length}
+                      afterPhotoCount={afterPhotos.length}
+                      partsCount={visitParts.length}
                     />
                   </Card>
                 </>

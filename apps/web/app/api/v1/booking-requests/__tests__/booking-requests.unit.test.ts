@@ -218,6 +218,30 @@ describe("PATCH /api/v1/booking-requests/[id]", () => {
     expect(json.data.review_notes).toBe("Called, left message.");
   });
 
+  it("saves pricing_mode without changing status", async () => {
+    const updated = { id: REQUEST_ID, status: "pending", pricing_mode: "hourly_internal" };
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ status: "pending" }] })
+      .mockResolvedValueOnce({ rows: [updated] })
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await PATCH(makeRequest({ pricing_mode: "hourly_internal" }));
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.pricing_mode).toBe("hourly_internal");
+
+    const updateCall = mockClientQuery.mock.calls[3];
+    expect(updateCall[0]).toContain("UPDATE booking_requests");
+    expect(updateCall[1]).toEqual([
+      REQUEST_ID,
+      mockSession.accountId,
+      "hourly_internal",
+    ]);
+  });
+
   it("returns 422 for invalid status values", async () => {
     const res = await PATCH(makeRequest({ status: "done" }));
     expect(res.status).toBe(422);

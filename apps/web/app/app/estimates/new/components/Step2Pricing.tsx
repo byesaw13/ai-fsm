@@ -454,7 +454,7 @@ export function Step2Pricing({
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-3)" }}>
               <SectionHeader
-                title={mode === "flat_rate" ? "Flat Rate" : "Line Items"}
+                title={mode === "flat_rate" ? "Fixed Bid" : "Line Items"}
                 count={mode === "itemized" ? lineItems.length : undefined}
                 as="h3"
               />
@@ -484,7 +484,7 @@ export function Step2Pricing({
                     }}
                     data-testid={`mode-${m}`}
                   >
-                    {m === "itemized" ? "Itemized" : "Flat Rate"}
+                    {m === "itemized" ? "Itemized" : "Fixed Bid"}
                   </button>
                 ))}
               </div>

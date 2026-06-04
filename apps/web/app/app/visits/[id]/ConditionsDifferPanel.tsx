@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { buildVisitChangeOrderDraft } from "@/lib/change-orders/draft";
 
 interface Props {
   visitId: string;
@@ -9,6 +10,9 @@ interface Props {
   approvedEstimateId: string;
   scopeAssumptions: string | null;
   currentTechNotes: string | null;
+  beforePhotoCount: number;
+  afterPhotoCount: number;
+  partsCount: number;
 }
 
 const CONDITION_FLAGS = [
@@ -21,7 +25,7 @@ const CONDITION_FLAGS = [
   { key: "other",                label: "Other (describe below)" },
 ] as const;
 
-export function ConditionsDifferPanel({ visitId, approvedEstimateId, scopeAssumptions, currentTechNotes }: Props) {
+export function ConditionsDifferPanel({ visitId, jobId, approvedEstimateId, scopeAssumptions, currentTechNotes, beforePhotoCount, afterPhotoCount, partsCount }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
@@ -29,7 +33,21 @@ export function ConditionsDifferPanel({ visitId, approvedEstimateId, scopeAssump
   const [action, setAction] = useState<"note_only" | "change_order">("change_order");
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const [createdChangeOrderId, setCreatedChangeOrderId] = useState<string | null>(null);
   const [error, setError] = useState("");
+
+  const draft = buildVisitChangeOrderDraft({
+    visitId,
+    jobId,
+    estimateId: approvedEstimateId,
+    conditionLabels: selected.map((k) => CONDITION_FLAGS.find((f) => f.key === k)?.label ?? k),
+    notes,
+    scopeAssumptions,
+    currentTechNotes,
+    beforePhotoCount,
+    afterPhotoCount,
+    partsCount,
+  });
 
   function toggleFlag(key: string) {
     setSelected((prev) =>
@@ -45,21 +63,14 @@ export function ConditionsDifferPanel({ visitId, approvedEstimateId, scopeAssump
     }
     setSaving(true);
     setError("");
-
-    const conditionLabels = selected.map(
-      (k) => CONDITION_FLAGS.find((f) => f.key === k)?.label ?? k
-    );
-    const description =
-      `Conditions found on arrival differing from estimate assumptions:\n` +
-      conditionLabels.map((l) => `• ${l}`).join("\n") +
-      (notes.trim() ? `\n\nNotes: ${notes.trim()}` : "");
+    const changeOrderDraft = draft;
 
     try {
       if (action === "note_only") {
         const timestamp = new Date().toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
         const appendedNotes = currentTechNotes?.trim()
-          ? `${currentTechNotes.trim()}\n\n[${timestamp}] ${description}`
-          : description;
+          ? `${currentTechNotes.trim()}\n\n[${timestamp}] ${changeOrderDraft.description}`
+          : changeOrderDraft.description;
         const r = await fetch(`/api/v1/visits/${visitId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -67,21 +78,18 @@ export function ConditionsDifferPanel({ visitId, approvedEstimateId, scopeAssump
         });
         if (!r.ok) throw new Error("Failed to save note");
       } else {
-        const title =
-          conditionLabels.length > 0
-            ? `On-site scope change: ${conditionLabels.slice(0, 2).join(", ")}${conditionLabels.length > 2 ? "…" : ""}`
-            : "On-site scope change";
         const r = await fetch("/api/v1/change-orders", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             estimate_id: approvedEstimateId,
-            title,
-            description,
+            title: changeOrderDraft.title,
+            description: changeOrderDraft.description,
+            notes: changeOrderDraft.notes,
             tax_rate: 0,
             line_items: [
               {
-                description: "Scope change — conditions found (pricing TBD)",
+                description: changeOrderDraft.lineItemDescription,
                 quantity: 1,
                 unit_price_cents: 0,
               },
@@ -89,6 +97,8 @@ export function ConditionsDifferPanel({ visitId, approvedEstimateId, scopeAssump
           }),
         });
         if (!r.ok) throw new Error("Failed to create change order");
+        const created = await r.json().catch(() => ({}));
+        setCreatedChangeOrderId(typeof created.id === "string" ? created.id : null);
       }
       setDone(true);
       router.refresh();
@@ -107,7 +117,7 @@ export function ConditionsDifferPanel({ visitId, approvedEstimateId, scopeAssump
         </p>
         {action === "change_order" && (
           <a
-            href={`/app/estimates/${approvedEstimateId}#change-orders`}
+            href={createdChangeOrderId ? `/app/estimates/${approvedEstimateId}#change-order-${createdChangeOrderId}` : `/app/estimates/${approvedEstimateId}#change-orders`}
             style={{ fontSize: "var(--text-sm)", color: "var(--accent)" }}
           >
             Review change order on estimate →
@@ -142,6 +152,16 @@ export function ConditionsDifferPanel({ visitId, approvedEstimateId, scopeAssump
               <span style={{ whiteSpace: "pre-wrap" }}>{scopeAssumptions}</span>
             </div>
           )}
+
+          <div style={{ padding: "var(--space-2) var(--space-3)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", background: "var(--bg-secondary)", fontSize: "var(--text-xs)" }}>
+            <strong style={{ display: "block", marginBottom: 4, color: "var(--fg)" }}>Change order draft preview</strong>
+            <div style={{ display: "grid", gap: 4, color: "var(--fg-muted)" }}>
+              <div><span style={{ color: "var(--fg)", fontWeight: 600 }}>Title:</span> {draft.title}</div>
+              <div><span style={{ color: "var(--fg)", fontWeight: 600 }}>Line item:</span> {draft.lineItemDescription}</div>
+              <div><span style={{ color: "var(--fg)", fontWeight: 600 }}>Source:</span> visit {visitId} · job {jobId} · estimate {approvedEstimateId}</div>
+              <div><span style={{ color: "var(--fg)", fontWeight: 600 }}>Evidence:</span> {beforePhotoCount} before photo{beforePhotoCount !== 1 ? "s" : ""}, {afterPhotoCount} after photo{afterPhotoCount !== 1 ? "s" : ""}, {partsCount} part{partsCount !== 1 ? "s" : ""}</div>
+            </div>
+          </div>
 
           <fieldset style={{ border: "none", padding: 0, margin: 0 }}>
             <legend style={{ fontWeight: 600, fontSize: "var(--text-sm)", marginBottom: "var(--space-2)" }}>

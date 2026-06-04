@@ -18,6 +18,8 @@ interface EstimateEntryShellProps {
   initialPropertyId?: string;
   initialVaultItemId?: string;
   vaultItemContext?: { name: string; category: string; location: string | null } | null;
+  initialPricingMode?: "itemized" | "flat_rate" | "multi_option";
+  initialMode?: EstimateMode;
 }
 
 export function EstimateEntryShell({
@@ -29,22 +31,17 @@ export function EstimateEntryShell({
   initialPropertyId,
   initialVaultItemId,
   vaultItemContext,
+  initialPricingMode = "itemized",
+  initialMode,
 }: EstimateEntryShellProps) {
-  const [mode, setMode] = useState<EstimateMode | null>(null);
+  const [mode, setMode] = useState<EstimateMode | null>(initialMode ?? null);
   // After interview applies draft: switch to manual form pre-populated
   const [appliedDraft, setAppliedDraft] = useState<{
     draft: DraftEstimate;
     shoppingList: ShoppingList | null;
   } | null>(null);
 
-  // If we have a pre-set context (vault item, specific job), skip launch modal
-  // and go straight to AI interview with that context
-  const hasContext = !!(initialVaultItemId || (initialJobId && initialClientId));
-
-  if (!mode) {
-    // If context provided, optionally auto-select AI mode
-    // For now, always show modal even with context
-    return (
+  if (!mode) {    return (
       <Card style={{ padding: "var(--space-6)" }}>
         <EstimateLaunchModal onSelect={setMode} />
       </Card>
@@ -81,6 +78,7 @@ export function EstimateEntryShell({
         initialPropertyId={initialPropertyId}
         initialVaultItemId={initialVaultItemId}
         vaultItemContext={vaultItemContext}
+        initialPricingMode={initialPricingMode}
         initialInterviewDraft={appliedDraft ?? undefined}
       />
     </Card>

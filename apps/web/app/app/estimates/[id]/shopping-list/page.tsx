@@ -230,7 +230,7 @@ export default async function ShoppingListPage({
             ← Back to estimate
           </a>
           <h1 style={{ fontSize: "var(--text-2xl)", fontWeight: 700, margin: "var(--space-1) 0 0" }}>
-            Shopping List
+            Materials Plan
           </h1>
           <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
             {estimate.client_name ?? "Client"} · {createdDate}
@@ -241,7 +241,7 @@ export default async function ShoppingListPage({
 
       {/* Print header */}
       <div className="print-only" style={{ marginBottom: "var(--space-4)" }}>
-        <h1 style={{ fontSize: "var(--text-2xl)", fontWeight: 700, margin: 0 }}>Materials Shopping List</h1>
+        <h1 style={{ fontSize: "var(--text-2xl)", fontWeight: 700, margin: 0 }}>Materials Plan</h1>
         <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
           {estimate.client_name ?? "Client"} · {createdDate}
         </p>
@@ -258,7 +258,7 @@ export default async function ShoppingListPage({
           }}
         >
           <p style={{ margin: 0, fontSize: "var(--text-sm)" }}>
-            No materials computed for this estimate.
+            No materials plan could be computed for this estimate.
           </p>
           <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)" }}>
             Materials are auto-calculated when scope measurements are entered during estimate creation.

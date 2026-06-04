@@ -49,7 +49,7 @@ export function QuickLeadModal({ onClose }: QuickLeadModalProps) {
 
       const json = await res.json() as { id?: string; clientId?: string; error?: { message?: string } };
       if (!res.ok) {
-        setError(json.error?.message ?? "Failed to save lead. Please try again.");
+        setError(json.error?.message ?? "Failed to save request. Please try again.");
         return;
       }
       setSavedId(json.id ?? null);
@@ -68,7 +68,7 @@ export function QuickLeadModal({ onClose }: QuickLeadModalProps) {
         <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
           <div style={{ textAlign: "center", padding: "8px 0 16px" }}>
             <p style={{ fontSize: 32, margin: "0 0 8px" }}>✅</p>
-            <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>Lead saved!</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>Request saved!</h2>
             <p style={{ fontSize: 14, color: "#52525b", margin: "0 0 20px" }}>
               {name} is in the system. What do you want to do next?
             </p>
@@ -78,7 +78,7 @@ export function QuickLeadModal({ onClose }: QuickLeadModalProps) {
                 onClick={() => { router.push(`/app/booking-requests/${savedId}`); onClose(); }}
                 style={primaryBtnStyle}
               >
-                View lead →
+                View request →
               </button>
               <button
                 type="button"
@@ -114,7 +114,7 @@ export function QuickLeadModal({ onClose }: QuickLeadModalProps) {
     <div style={overlayStyle} onClick={onClose}>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Quick Lead</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>New Request</h2>
           <button type="button" onClick={onClose} style={closeStyle}>✕</button>
         </div>
 
@@ -193,7 +193,7 @@ export function QuickLeadModal({ onClose }: QuickLeadModalProps) {
           {error && <p style={{ color: "#dc2626", fontSize: 13, margin: 0 }}>{error}</p>}
 
           <button type="submit" disabled={submitting} style={{ ...primaryBtnStyle, marginTop: 4 }}>
-            {submitting ? "Saving…" : "Save lead"}
+            {submitting ? "Saving…" : "Save Request"}
           </button>
         </form>
       </div>

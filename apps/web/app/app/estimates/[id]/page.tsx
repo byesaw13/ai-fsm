@@ -190,6 +190,12 @@ export default async function EstimateDetailPage({
   if (!result) notFound();
 
   const { estimate, lineItems, options } = result;
+  const shoppingListSummary = estimate.shopping_list_json as {
+    sections?: Array<{ section: string }>;
+    total_catalog_cost_cents?: number;
+    total_specified_cost_cents?: number;
+  } | null | undefined;
+  const hasMaterialsPlan = !!shoppingListSummary?.sections?.length;
 
   // For approved estimates with a linked job, check if any visits are scheduled
   let jobVisitCount = 0;
@@ -385,10 +391,10 @@ export default async function EstimateDetailPage({
               </span>
             )}
             <a
-              href="#convert-invoice"
+              href="#materials-plan-handoff"
               style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}
             >
-              Convert to invoice ↓
+              Project handoff ↓
             </a>
           </div>
         </div>
@@ -598,9 +604,9 @@ export default async function EstimateDetailPage({
           if (!shoppingList?.sections?.length) {
             // Fallback for old estimates created before Block 3 — link to the recomputed view
             return (
-              <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
+              <div id="materials-plan" style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
                 <a href={`/app/estimates/${estimate.id}/shopping-list`} style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}>
-                  View Shopping List →
+                  Open Materials Plan →
                 </a>
                 <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginLeft: 8 }}>
                   (computed from scope snapshots)
@@ -610,9 +616,9 @@ export default async function EstimateDetailPage({
           }
           const grandTotal = (shoppingList.total_catalog_cost_cents ?? 0) + (shoppingList.total_specified_cost_cents ?? 0);
           return (
-            <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-3)", borderTop: "1px dashed var(--border)" }}>
+            <div id="materials-plan" style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-3)", borderTop: "1px dashed var(--border)" }}>
               <p style={{ fontWeight: 600, marginBottom: "var(--space-2)", color: "var(--fg-muted)" }}>
-                Shopping List
+                Materials Plan
                 {grandTotal > 0 && (
                   <span style={{ fontWeight: 400, marginLeft: 8, fontSize: "var(--text-sm)" }}>
                     est. {formatDollars(grandTotal)}
@@ -943,24 +949,72 @@ export default async function EstimateDetailPage({
         </div>
       )}
 
+      {/* Approved project handoff — owner/admin only */}
+      {canTransition && currentStatus === "approved" && (
+        <div id="materials-plan-handoff" className="card action-card" data-testid="approved-project-handoff">
+          <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)", flexWrap: "wrap", marginBottom: "var(--space-3)" }}>
+            <div>
+              <h2 style={{ marginBottom: "var(--space-1)" }}>Approved Project Handoff</h2>
+              <p className="muted" style={{ margin: 0 }}>
+                Move from approved scope into purchasing, scheduling, work, and final billing.
+              </p>
+            </div>
+            <span style={{ alignSelf: "flex-start", fontSize: "var(--text-xs)", fontWeight: 700, color: "#065f46", background: "#dcfce7", border: "1px solid #86efac", borderRadius: 999, padding: "4px 10px" }}>
+              Approved
+            </span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "var(--space-3)" }}>
+            <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-3)" }}>
+              <p style={{ margin: "0 0 var(--space-1)", fontWeight: 700 }}>1. Materials</p>
+              <p className="muted" style={{ minHeight: 42 }}>
+                {hasMaterialsPlan
+                  ? "Review, print, and shop from the approved materials plan."
+                  : "Prepare the buying list from approved scope before work starts."}
+              </p>
+              <Link
+                href={`/app/estimates/${estimate.id}/shopping-list`}
+                className="p7-btn p7-btn-secondary p7-btn-sm"
+              >
+                {hasMaterialsPlan ? "Open Materials Plan →" : "Prepare Materials Plan →"}
+              </Link>
+            </div>
+            <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-3)" }}>
+              <p style={{ margin: "0 0 var(--space-1)", fontWeight: 700 }}>2. Schedule</p>
+              <p className="muted" style={{ minHeight: 42 }}>
+                {estimate.job_id
+                  ? jobVisitCount > 0
+                    ? "Visits are already on the job. Manage timing from the job thread."
+                    : "Schedule the first work visit from the approved estimate."
+                  : "Link this estimate to a job before scheduling work."}
+              </p>
+              {estimate.job_id ? (
+                <Link
+                  href={jobVisitCount > 0 ? `/app/jobs/${estimate.job_id}` : `/app/jobs/${estimate.job_id}/visits/new`}
+                  className="p7-btn p7-btn-primary p7-btn-sm"
+                >
+                  {jobVisitCount > 0 ? "Manage Job →" : "Schedule Work →"}
+                </Link>
+              ) : (
+                <span className="p7-btn p7-btn-secondary p7-btn-sm" aria-disabled="true">No linked job</span>
+              )}
+            </div>
+            <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-3)" }}>
+              <p style={{ margin: "0 0 var(--space-1)", fontWeight: 700 }}>3. Final Billing</p>
+              <p className="muted" style={{ minHeight: 42 }}>
+                Create the draft invoice from the approved estimate when the work is ready to bill.
+              </p>
+              <EstimateConvertButton estimateId={estimate.id} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Change Orders — owner/admin only, approved estimates */}
       {canTransition && currentStatus === "approved" && (
         <ChangeOrdersClient
           estimateId={estimate.id}
           initialChangeOrders={changeOrders as ChangeOrder[]}
         />
-      )}
-
-      {/* Convert to Invoice — owner/admin only, approved status only */}
-      {canTransition && currentStatus === "approved" && (
-        <div id="convert-invoice" className="card action-card" data-testid="convert-panel-wrapper">
-          <h2>Convert to Invoice</h2>
-          <p className="muted">
-            Create a draft invoice from this approved estimate. Idempotent —
-            safe to click more than once.
-          </p>
-          <EstimateConvertButton estimateId={estimate.id} />
-        </div>
       )}
 
       {/* Danger Zone — owner only, draft status only */}
