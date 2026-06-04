@@ -147,6 +147,98 @@ export default async function BookingRequestDetailPage({
     weekday: "long", month: "long", day: "numeric", year: "numeric",
   });
 
+  const requestNextStep = (() => {
+    if (latestInvite?.used_at) {
+      return {
+        title: "Intake complete",
+        detail: "Client filled out the intake form. Review the answers and move the request forward.",
+        primaryLabel: "Review answers →",
+        primaryHref: "#review-actions",
+        secondaryLabel: br.job_id ? "Open project →" : null,
+        secondaryHref: br.job_id ? `/app/jobs/${br.job_id}` : null,
+      };
+    }
+
+    if (latestInvite && !latestInvite.used_at && new Date(latestInvite.expires_at) > new Date()) {
+      return {
+        title: "Waiting on client",
+        detail: "The intake form has been sent. Follow up if the client hasn't completed it yet.",
+        primaryLabel: "Open review controls →",
+        primaryHref: "#review-actions",
+        secondaryLabel: null,
+        secondaryHref: null,
+      };
+    }
+
+    if (!br.pricing_mode && !["converted", "cancelled"].includes(br.status)) {
+      return {
+        title: "Choose the pricing path",
+        detail: "Set Fixed Bid for estimated project work or Time and Materials for open-ended actuals.",
+        primaryLabel: "Open review controls →",
+        primaryHref: "#review-actions",
+        secondaryLabel: null,
+        secondaryHref: null,
+      };
+    }
+
+    if (br.pricing_mode === "hourly_internal" && !br.job_id && !["converted", "cancelled"].includes(br.status)) {
+      return {
+        title: "Time and Materials path",
+        detail: "Create the job thread first so labor and materials can be tracked from actuals.",
+        primaryLabel: "Open review controls →",
+        primaryHref: "#review-actions",
+        secondaryLabel: null,
+        secondaryHref: null,
+      };
+    }
+
+    if (br.routing_path === "remote_estimate" && !br.job_id) {
+      return {
+        title: "Fixed bid path",
+        detail: "Draft the estimate for this client.",
+        primaryLabel: "Start estimate →",
+        primaryHref: `/app/estimates/new${br.client_id ? `?client_id=${br.client_id}&pricing_mode=flat_rate` : "?pricing_mode=flat_rate"}`,
+        secondaryLabel: "Open review controls →",
+        secondaryHref: "#review-actions",
+      };
+    }
+
+    if (br.routing_path === "site_visit" && !br.visit_id) {
+      return {
+        title: "Walkthrough recommended",
+        detail: "Schedule a visit to measure and assess the project.",
+        primaryLabel: br.job_id ? "Open project →" : "Open review controls →",
+        primaryHref: br.job_id ? `/app/jobs/${br.job_id}` : "#review-actions",
+        secondaryLabel: null,
+        secondaryHref: null,
+      };
+    }
+
+    if (br.visit_id) {
+      return {
+        title: "Walkthrough scheduled",
+        detail: "Open the scheduled visit and continue the project from there.",
+        primaryLabel: "Open walkthrough →",
+        primaryHref: `/app/visits/${br.visit_id}`,
+        secondaryLabel: br.job_id ? "Open project →" : null,
+        secondaryHref: br.job_id ? `/app/jobs/${br.job_id}` : null,
+      };
+    }
+
+    if (br.job_id) {
+      return {
+        title: "Request converted",
+        detail: "Open the linked project to continue scheduling, estimating, or billing.",
+        primaryLabel: "Open project →",
+        primaryHref: `/app/jobs/${br.job_id}`,
+        secondaryLabel: null,
+        secondaryHref: null,
+      };
+    }
+
+    return null;
+  })();
+
   return (
     <PageContainer>
       <PageHeader
@@ -160,49 +252,27 @@ export default async function BookingRequestDetailPage({
         }
       />
 
-      {/* ── Next-step banner ────────────────────────────────────────────── */}
-      {(() => {
-        const hasEmail = !!br.email;
-        const inviteUsed = latestInvite?.used_at;
-        const inviteSent = latestInvite && !latestInvite.used_at && new Date(latestInvite.expires_at) > new Date();
-        const sentAgo = latestInvite
-          ? Math.round((Date.now() - new Date(latestInvite.created_at).getTime()) / 60000)
-          : null;
-
-        let banner: { color: string; bg: string; icon: string; message: string; href?: string; linkLabel?: string } | null = null;
-
-        if (inviteUsed) {
-          banner = { color: "#16a34a", bg: "#f0fdf4", icon: "✅", message: "Client filled out the intake form — review their answers below." };
-        } else if (inviteSent) {
-          banner = { color: "#d97706", bg: "#fffbeb", icon: "⏳", message: `Waiting on client — intake form sent ${sentAgo != null ? `${sentAgo} minutes` : ""} ago. ${!hasEmail ? "(no email on file)" : ""}` };
-        } else if (!br.pricing_mode && !["converted", "cancelled"].includes(br.status)) {
-          banner = { color: "#71717a", bg: "#f9fafb", icon: "Review", message: "Choose the pricing path first: Fixed Bid for estimated project work or Time and Materials for actuals." };
-        } else if (br.pricing_mode === "hourly_internal" && !br.job_id && !["converted", "cancelled"].includes(br.status)) {
-          banner = { color: "#0284c7", bg: "#f0f9ff", icon: "T&M", message: "Time and Materials path — create the job thread and bill from actual labor and materials." };
-        } else if (br.routing_path === "remote_estimate" && !br.job_id) {
-          banner = { color: "#0284c7", bg: "#f0f9ff", icon: "📋", message: "Fixed-bid path — draft the estimate for this client.", href: `/app/estimates/new${br.client_id ? `?client_id=${br.client_id}&pricing_mode=flat_rate` : "?pricing_mode=flat_rate"}`, linkLabel: "Start estimate →" };
-        } else if (br.routing_path === "site_visit" && !br.visit_id) {
-          banner = { color: "#7c3aed", bg: "#faf5ff", icon: "🏠", message: "Walkthrough recommended — schedule a visit to measure and assess the project.", href: br.job_id ? `/app/jobs/${br.job_id}` : undefined, linkLabel: br.job_id ? "Open project →" : undefined };
-        } else if (!hasEmail && br.status === "pending") {
-          banner = { color: "#d97706", bg: "#fffbeb", icon: "📧", message: "Get their email address to send the intake form." };
-        } else if (br.status === "pending" && !br.routing_path) {
-          banner = { color: "#71717a", bg: "#f9fafb", icon: "👀", message: "Review this request and confirm the pricing model and routing recommendation below." };
-        }
-
-        if (!banner) return null;
-
-        return (
-          <div style={{ background: banner.bg, border: `1px solid ${banner.color}30`, borderRadius: "var(--radius)", padding: "var(--space-3) var(--space-4)", marginBottom: "var(--space-3)", display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-            <span style={{ fontSize: 18 }}>{banner.icon}</span>
-            <p style={{ margin: 0, flex: 1, fontSize: "var(--text-sm)", color: banner.color, fontWeight: 500 }}>{banner.message}</p>
-            {banner.href && banner.linkLabel && (
-              <Link href={banner.href as Route} style={{ fontSize: "var(--text-sm)", fontWeight: 600, color: banner.color, textDecoration: "none", whiteSpace: "nowrap" }}>
-                {banner.linkLabel}
-              </Link>
-            )}
+      {requestNextStep && (
+        <Card style={{ marginBottom: "var(--space-3)" }}>
+          <SectionHeader title="Next Step" />
+          <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ minWidth: 240, flex: "1 1 320px" }}>
+              <div style={{ fontWeight: 700, fontSize: "var(--text-lg)" }}>{requestNextStep.title}</div>
+              <div style={{ marginTop: "var(--space-1)", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>{requestNextStep.detail}</div>
+            </div>
+            <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
+              <LinkButton href={requestNextStep.primaryHref as Route} variant="primary" size="sm">
+                {requestNextStep.primaryLabel}
+              </LinkButton>
+              {requestNextStep.secondaryHref && requestNextStep.secondaryLabel && (
+                <LinkButton href={requestNextStep.secondaryHref as Route} variant="secondary" size="sm">
+                  {requestNextStep.secondaryLabel}
+                </LinkButton>
+              )}
+            </div>
           </div>
-        );
-      })()}
+        </Card>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "var(--space-4)", alignItems: "start" }}>
 
@@ -437,7 +507,7 @@ export default async function BookingRequestDetailPage({
 
           <IntakeSummary bookingId={br.id} />
 
-          <Card>
+          <Card id="review-actions">
             <SectionHeader title="Review" />
             {br.reviewed_at && (
               <p style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginBottom: "var(--space-3)" }}>
