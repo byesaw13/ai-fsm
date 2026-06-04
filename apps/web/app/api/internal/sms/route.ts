@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { query, queryOne } from "@/lib/db";
+import { query, queryOne, withDbSession } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { randomUUID } from "crypto";
+import { normalizePhone } from "@/lib/phone";
 import { getClientContext } from "@/lib/sms/context";
 import { classifySms, type SmsClassification } from "@/lib/sms/classify";
-import { withEstimateContext } from "@/lib/estimates/db";
-import { approveEstimateInTx } from "@/lib/estimates/approve";
 import { logCommunication } from "@/lib/communications-log";
+import { createActionItem } from "@/lib/action-items";
 
 export const dynamic = "force-dynamic";
 
 const SMS_KEY = process.env.SMS_INTERNAL_KEY;
 
-// Raw inbound SMS — classification now happens server-side.
 const bodySchema = z.object({
   phone: z.string().min(7).max(20),
   message: z.string().min(1).max(2000),
@@ -36,6 +35,47 @@ async function getOwnerContext(): Promise<{ accountId: string; userId: string }>
   _accountId = row.account_id;
   _userId = row.user_id;
   return { accountId: _accountId, userId: _userId };
+}
+
+/**
+ * Raise an Inbox action item as the owner. action_items has FORCE ROW LEVEL
+ * SECURITY, so the insert must run with RLS session context set — withDbSession
+ * sets app.current_account_id/user_id/role for the transaction.
+ */
+async function raiseActionItem(
+  session: { userId: string; accountId: string; role: "owner" },
+  entityType: "booking_request" | "estimate" | "job" | "invoice",
+  entityId: string,
+  actionType: string,
+  title: string
+): Promise<void> {
+  await withDbSession(session, (client) =>
+    createActionItem(client, { accountId: session.accountId, entityType, entityId, actionType, title })
+  );
+}
+
+async function createDraftJob(
+  accountId: string,
+  clientId: string,
+  userId: string,
+  ai: SmsClassification,
+  message: string
+): Promise<string> {
+  const [job] = await query<{ id: string }>(
+    `INSERT INTO jobs (account_id, client_id, title, description, status, job_type, created_by)
+     VALUES ($1, $2, $3, $4, 'draft', $5, $6) RETURNING id`,
+    [
+      accountId,
+      clientId,
+      ai.job_title ?? "SMS Inquiry",
+      [`Original SMS: "${message}"`, ai.description ? `\nDetails: ${ai.description}` : ""]
+        .filter(Boolean)
+        .join(""),
+      ai.job_type,
+      userId,
+    ]
+  );
+  return job.id;
 }
 
 // ── notification rendering ──────────────────────────────────────────────────
@@ -93,7 +133,8 @@ export async function POST(req: NextRequest) {
       { status: 422 }
     );
   }
-  const { phone, message, external_id } = parsed.data;
+  const { phone: rawPhone, message, external_id } = parsed.data;
+  const phone = normalizePhone(rawPhone) ?? rawPhone;
 
   let accountId: string, userId: string;
   try {
@@ -103,13 +144,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
   }
 
-  // Look up existing client first (don't create until we know it's business)
+  // Idempotency: already-seen message → no re-action, no Claude call.
+  // The unique index on (account_id, external_id) is the hard backstop.
+  if (external_id) {
+    const seen = await queryOne<{ id: string }>(
+      `SELECT id FROM communications_log WHERE account_id = $1 AND external_id = $2 LIMIT 1`,
+      [accountId, external_id]
+    );
+    if (seen) {
+      logger.info("SMS duplicate ignored", { traceId, external_id });
+      return NextResponse.json({ duplicate: true });
+    }
+  }
+
+  // Existing client (don't create until we know it's business)
   const existing = await queryOne<{ id: string; name: string }>(
     `SELECT id, name FROM clients WHERE account_id = $1 AND phone = $2 LIMIT 1`,
     [accountId, phone]
   );
 
-  // Build context (empty for unknown numbers) and classify
   const context = existing
     ? await getClientContext(accountId, existing.id)
     : { openEstimates: [], recentJobs: [], recentMessages: [] };
@@ -144,77 +197,85 @@ export async function POST(req: NextRequest) {
     isNewClient = true;
   }
 
-  // ── intent actions ─────────────────────────────────────────────────────
-  let jobId: string | null = null;
-  let estimateApprovedId: string | null = null;
-  let actionLine = "✅ Logged to client record";
+  const ownerSession = { userId, accountId, role: "owner" as const };
 
-  if (ai.message_type === "new_inquiry") {
-    const [job] = await query<{ id: string }>(
-      `INSERT INTO jobs (account_id, client_id, title, description, status, job_type, created_by)
-       VALUES ($1, $2, $3, $4, 'draft', $5, $6) RETURNING id`,
-      [
-        accountId,
-        clientId,
-        ai.job_title ?? "SMS Inquiry",
-        [`Original SMS: "${message}"`, ai.description ? `\nDetails: ${ai.description}` : ""]
-          .filter(Boolean)
-          .join(""),
-        ai.job_type,
-        userId,
-      ]
-    );
-    jobId = job.id;
-    actionLine = "✅ Draft job created";
-  } else if (ai.message_type === "approval") {
-    // Target the identified estimate, else the most recent 'sent' one
-    const targetId =
-      ai.target_estimate_id ??
-      context.openEstimates.find((e) => e.status === "sent")?.id ??
-      null;
-    if (targetId) {
-      try {
-        const result = await withEstimateContext(
-          { userId, accountId, role: "owner" },
-          (client) => approveEstimateInTx(client, { estimateId: targetId, accountId, userId, traceId })
-        );
-        if (result) {
-          estimateApprovedId = targetId;
-          jobId = result.jobId;
-          actionLine = result.depositInvoiceId
-            ? "✅ Estimate approved + deposit invoice created"
-            : "✅ Estimate approved";
-        } else {
-          actionLine = "⚠️ Approval received — estimate not in an approvable state";
-        }
-      } catch (err) {
-        logger.error("SMS auto-approve failed", err as Error, { traceId, targetId });
-        actionLine = "⚠️ Approval received — review estimate manually";
-      }
-    } else {
-      actionLine = "⚠️ Approval received — no open estimate found";
-    }
-  } else if (ai.message_type === "cancellation") {
-    jobId = context.recentJobs.find((j) => ACTIVE_JOB_STATUSES.includes(j.status))?.id ?? null;
-    actionLine = "❌ Cancellation flagged — review the job";
-  } else {
-    // follow_up / scheduling / question / other_business — link to active job if obvious
-    jobId = context.recentJobs.find((j) => ACTIVE_JOB_STATUSES.includes(j.status))?.id ?? null;
-  }
-
-  // ── always log the inbound message ─────────────────────────────────────
-  await logCommunication({
+  // Claim idempotency BEFORE any side effects: insert the inbound row now (no
+  // job linkage yet). If a concurrent delivery of the same external_id already
+  // claimed it, bail before creating jobs/action items. The job_id is back-
+  // filled after routing.
+  const commsId = await logCommunication({
     accountId,
     channel: "sms",
     direction: "inbound",
     outcome: "replied",
     clientId,
-    jobId,
+    jobId: null,
     bodyPreview: message.slice(0, 1000),
     externalId: external_id ?? null,
   });
+  if (external_id && commsId === null) {
+    logger.info("SMS duplicate ignored (claim)", { traceId, external_id });
+    return NextResponse.json({ duplicate: true });
+  }
 
-  logger.info("SMS ingested", { traceId, clientId, jobId, type: ai.message_type, estimateApprovedId });
+  const lowConfidence = ai.confidence === "low";
+  const activeJobId =
+    context.recentJobs.find((j) => ACTIVE_JOB_STATUSES.includes(j.status))?.id ?? null;
+
+  // ── intent routing (confirm-first; never auto-mutates estimates) ────────
+  let jobId: string | null = null;
+  let estimateToConfirm: string | null = null;
+  let needsReview = lowConfidence;
+  let actionLine = "✅ Logged to client record";
+
+  if (ai.message_type === "approval") {
+    const sentEstimates = context.openEstimates.filter((e) => e.status === "sent");
+    const target =
+      sentEstimates.find((e) => e.id === ai.target_estimate_id)?.id ??
+      (sentEstimates.length === 1 ? sentEstimates[0].id : null);
+    if (target) {
+      estimateToConfirm = target;
+      await raiseActionItem(
+        ownerSession, "estimate", target, "confirm_approval",
+        "Customer texted approval — confirm estimate"
+      );
+      actionLine = "✅ Approval — confirm the estimate in your Inbox";
+    } else {
+      needsReview = true;
+      actionLine = "⚠️ Approval received — no single open estimate to match";
+    }
+  } else if (ai.message_type === "new_inquiry") {
+    jobId = await createDraftJob(accountId, clientId, userId, ai, message);
+    actionLine = "✅ Draft job created";
+  } else if (ai.message_type === "cancellation") {
+    jobId = activeJobId;
+    actionLine = "❌ Cancellation flagged — review the job";
+  } else {
+    // follow_up / scheduling / question / other_business
+    jobId = activeJobId;
+  }
+
+  // Review queue: low-confidence (or unmatched approval) → Inbox action item.
+  // Action items need an entity; use the active/created job as the container.
+  if (needsReview) {
+    if (!jobId) jobId = await createDraftJob(accountId, clientId, userId, ai, message);
+    await raiseActionItem(
+      ownerSession, "job", jobId, "review_intake",
+      ai.message_type === "approval"
+        ? "Review SMS approval — couldn't match estimate"
+        : "Review SMS — low confidence"
+    );
+    if (ai.message_type !== "approval") actionLine = "🔎 Needs review (low confidence)";
+  }
+
+  // Back-fill the job linkage onto the claimed inbound row.
+  if (commsId && jobId) {
+    await query(`UPDATE communications_log SET job_id = $1 WHERE id = $2`, [jobId, commsId]);
+  }
+
+  logger.info("SMS ingested", {
+    traceId, clientId, jobId, type: ai.message_type, confidence: ai.confidence, estimateToConfirm,
+  });
 
   const notification = buildNotification(ai, { phone, clientName, isNewClient, actionLine });
 
@@ -222,9 +283,11 @@ export async function POST(req: NextRequest) {
     client_id: clientId,
     job_id: jobId,
     message_type: ai.message_type,
+    confidence: ai.confidence,
     is_new_client: isNewClient,
     client_name: clientName,
-    estimate_approved_id: estimateApprovedId,
+    estimate_to_confirm: estimateToConfirm,
+    needs_review: needsReview,
     notification,
     reply: ai.reply,
   });

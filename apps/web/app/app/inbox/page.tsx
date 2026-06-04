@@ -23,12 +23,13 @@ const ENTITY_HREFS: Record<string, string> = {
 };
 
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
-  review_intake:  { label: "Review intake",     color: "var(--status-warning, #92400e)" },
-  send_estimate:  { label: "Send estimate",     color: "var(--accent)" },
-  schedule_job:   { label: "Schedule job",      color: "var(--status-info, #1d4ed8)" },
-  create_invoice: { label: "Invoice ready",     color: "var(--status-success, #166534)" },
-  send_invoice:   { label: "Send invoice",      color: "var(--accent)" },
-  follow_up:      { label: "Follow up",         color: "var(--status-error, #991b1b)" },
+  review_intake:    { label: "Review intake",     color: "var(--status-warning, #92400e)" },
+  confirm_approval: { label: "Confirm approval",   color: "var(--status-success, #166534)" },
+  send_estimate:    { label: "Send estimate",     color: "var(--accent)" },
+  schedule_job:     { label: "Schedule job",      color: "var(--status-info, #1d4ed8)" },
+  create_invoice:   { label: "Invoice ready",     color: "var(--status-success, #166534)" },
+  send_invoice:     { label: "Send invoice",      color: "var(--accent)" },
+  follow_up:        { label: "Follow up",         color: "var(--status-error, #991b1b)" },
 };
 
 function entityHref(entityType: string, entityId: string): string {
