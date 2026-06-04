@@ -9,12 +9,34 @@ export const dynamic = "force-dynamic";
 // ── env ─────────────────────────────────────────────────────────────────────
 const SMS_KEY = process.env.SMS_INTERNAL_KEY;
 
+// ── message classification ────────────────────────────────────────────────
+// new_inquiry      → a brand new job request (also creates a draft job)
+// cancellation     → customer cancelling/declining
+// approval         → customer approving an estimate / saying yes
+// follow_up        → checking in on existing work
+// scheduling       → about timing / availability / rescheduling
+// question         → a general question about existing or potential work
+// other_business   → business-relevant but none of the above
+const MESSAGE_TYPES = [
+  "new_inquiry",
+  "cancellation",
+  "approval",
+  "follow_up",
+  "scheduling",
+  "question",
+  "other_business",
+] as const;
+
 // ── schema ───────────────────────────────────────────────────────────────────
 const bodySchema = z.object({
   phone: z.string().min(7).max(20),
   message: z.string().min(1).max(2000),
+  external_id: z.string().max(255).optional(),
   ai: z.object({
     is_business: z.boolean(),
+    // Default to new_inquiry so legacy callers (is_business:true with no type)
+    // still create a draft job, preserving the original endpoint contract.
+    message_type: z.enum(MESSAGE_TYPES).optional().default("new_inquiry"),
     customer_name: z.string().nullable().optional(),
     job_title: z.string().optional(),
     job_type: z
@@ -77,9 +99,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { phone, message, ai } = parsed.data;
+  const { phone, message, external_id, ai } = parsed.data;
 
-  // Non-business messages — acknowledge but skip
+  // Non-business messages (spam, wrong numbers) — acknowledge but skip
   if (!ai.is_business) {
     logger.info("SMS not a business inquiry — skipping", { traceId, phone });
     return NextResponse.json({ skipped: true, reason: "not_business" });
@@ -120,7 +142,7 @@ export async function POST(req: NextRequest) {
         accountId,
         ai.customer_name ?? `SMS Lead (${phone})`,
         phone,
-        `Created automatically from SMS inquiry.\n\nOriginal message: "${message}"`,
+        `Created automatically from SMS.\n\nFirst message: "${message}"`,
       ],
     );
     clientId = created.id;
@@ -129,28 +151,47 @@ export async function POST(req: NextRequest) {
     logger.info("Created new client from SMS", { traceId, clientId, phone });
   }
 
-  // Create draft job
-  const jobTitle = ai.job_title ?? "SMS Inquiry";
-  const jobDescription = [
-    `Original SMS: "${message}"`,
-    ai.description ? `\nDetails: ${ai.description}` : "",
-  ]
-    .filter(Boolean)
-    .join("");
+  // Only new inquiries spin up a draft job
+  let jobId: string | null = null;
+  if (ai.message_type === "new_inquiry") {
+    const jobTitle = ai.job_title ?? "SMS Inquiry";
+    const jobDescription = [
+      `Original SMS: "${message}"`,
+      ai.description ? `\nDetails: ${ai.description}` : "",
+    ]
+      .filter(Boolean)
+      .join("");
 
-  const [job] = await query<{ id: string }>(
-    `INSERT INTO jobs
-       (account_id, client_id, title, description, status, job_type, created_by)
-     VALUES ($1, $2, $3, $4, 'draft', $5, $6)
-     RETURNING id`,
-    [accountId, clientId, jobTitle, jobDescription, ai.job_type ?? "custom", userId],
+    const [job] = await query<{ id: string }>(
+      `INSERT INTO jobs
+         (account_id, client_id, title, description, status, job_type, created_by)
+       VALUES ($1, $2, $3, $4, 'draft', $5, $6)
+       RETURNING id`,
+      [accountId, clientId, jobTitle, jobDescription, ai.job_type ?? "custom", userId],
+    );
+    jobId = job.id;
+  }
+
+  // Always log the inbound message so the client's communication history is complete
+  await query(
+    `INSERT INTO communications_log
+       (account_id, client_id, job_id, channel, direction, outcome, body_preview, external_id)
+     VALUES ($1, $2, $3, 'sms', 'inbound', 'replied', $4, $5)`,
+    [accountId, clientId, jobId, message.slice(0, 1000), external_id ?? null],
   );
 
-  logger.info("SMS lead ingested successfully", { traceId, clientId, jobId: job.id, isNewClient });
+  logger.info("SMS ingested", {
+    traceId,
+    clientId,
+    jobId,
+    messageType: ai.message_type,
+    isNewClient,
+  });
 
   return NextResponse.json({
     client_id: clientId,
-    job_id: job.id,
+    job_id: jobId,
+    message_type: ai.message_type,
     is_new_client: isNewClient,
     client_name: clientName,
   });
