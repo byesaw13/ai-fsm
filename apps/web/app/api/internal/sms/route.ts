@@ -34,7 +34,9 @@ const bodySchema = z.object({
   external_id: z.string().max(255).optional(),
   ai: z.object({
     is_business: z.boolean(),
-    message_type: z.enum(MESSAGE_TYPES).optional().default("other_business"),
+    // Default to new_inquiry so legacy callers (is_business:true with no type)
+    // still create a draft job, preserving the original endpoint contract.
+    message_type: z.enum(MESSAGE_TYPES).optional().default("new_inquiry"),
     customer_name: z.string().nullable().optional(),
     job_title: z.string().optional(),
     job_type: z
