@@ -175,6 +175,10 @@ export default async function BookingRequestDetailPage({
           banner = { color: "#16a34a", bg: "#f0fdf4", icon: "✅", message: "Client filled out the intake form — review their answers below." };
         } else if (inviteSent) {
           banner = { color: "#d97706", bg: "#fffbeb", icon: "⏳", message: `Waiting on client — intake form sent ${sentAgo != null ? `${sentAgo} minutes` : ""} ago. ${!hasEmail ? "(no email on file)" : ""}` };
+        } else if (!br.pricing_mode && !["converted", "cancelled"].includes(br.status)) {
+          banner = { color: "#71717a", bg: "#f9fafb", icon: "Review", message: "Choose the pricing path first: Fixed Bid for estimated project work or Time and Materials for actuals." };
+        } else if (br.pricing_mode === "hourly_internal" && !br.job_id && !["converted", "cancelled"].includes(br.status)) {
+          banner = { color: "#0284c7", bg: "#f0f9ff", icon: "T&M", message: "Time and Materials path — create the job thread and bill from actual labor and materials." };
         } else if (br.routing_path === "remote_estimate" && !br.job_id) {
           banner = { color: "#0284c7", bg: "#f0f9ff", icon: "📋", message: "Fixed-bid path — draft the estimate for this client.", href: `/app/estimates/new${br.client_id ? `?client_id=${br.client_id}&pricing_mode=flat_rate` : "?pricing_mode=flat_rate"}`, linkLabel: "Start estimate →" };
         } else if (br.routing_path === "site_visit" && !br.visit_id) {
@@ -301,12 +305,10 @@ export default async function BookingRequestDetailPage({
                   </div>
                 );
               })}
-              {br.pricing_mode && (
-                <div className="p7-detail-row">
-                  <dt>Pricing</dt>
-                  <dd>{PRICING_MODE_LABELS[br.pricing_mode as keyof typeof PRICING_MODE_LABELS] ?? br.pricing_mode}</dd>
-                </div>
-              )}
+              <div className="p7-detail-row">
+                <dt>Pricing</dt>
+                <dd>{br.pricing_mode ? PRICING_MODE_LABELS[br.pricing_mode as keyof typeof PRICING_MODE_LABELS] ?? br.pricing_mode : "Needs Review"}</dd>
+              </div>
               {br.routing_path && br.routing_path !== "pending" && (
                 <div className="p7-detail-row">
                   <dt>Routing</dt>
@@ -447,7 +449,7 @@ export default async function BookingRequestDetailPage({
               bookingId={br.id}
               currentStatus={br.status}
               initialNotes={br.review_notes}
-              initialPricingMode={(br.pricing_mode as "flat_rate" | "hourly_internal" | null) ?? "flat_rate"}
+              initialPricingMode={(br.pricing_mode as "flat_rate" | "hourly_internal" | null) ?? null}
               jobId={br.job_id}
               clientEmail={br.email}
               preferredDate={br.preferred_date}

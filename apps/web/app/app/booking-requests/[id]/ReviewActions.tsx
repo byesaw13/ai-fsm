@@ -6,6 +6,7 @@ import { Button, Textarea } from "@/components/ui";
 
 type ReviewStatus = "needs_info" | "duplicate" | "reviewed" | "cancelled";
 type PricingMode = "flat_rate" | "hourly_internal";
+type PricingChoice = PricingMode | null;
 
 const ACTION_LABELS: Record<ReviewStatus, string> = {
   needs_info: "Needs Info",
@@ -35,7 +36,7 @@ interface Props {
   bookingId: string;
   currentStatus: string;
   initialNotes: string | null;
-  initialPricingMode: PricingMode;
+  initialPricingMode: PricingChoice;
   jobId: string | null;
   clientEmail: string | null;
   preferredDate: string;
@@ -45,7 +46,7 @@ interface Props {
 export function ReviewActions({ bookingId, currentStatus, initialNotes, initialPricingMode, jobId, clientEmail, preferredDate, preferredTimeSlot }: Props) {
   const router = useRouter();
   const [notes, setNotes] = useState(initialNotes ?? "");
-  const [pricingMode, setPricingMode] = useState<PricingMode>(initialPricingMode);
+  const [pricingMode, setPricingMode] = useState<PricingChoice>(initialPricingMode);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showConvertForm, setShowConvertForm] = useState(false);
@@ -221,7 +222,7 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
           <p style={{ margin: 0, fontSize: "var(--text-xs)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--fg-muted)" }}>
             Pricing model
           </p>
-          <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{PRICING_LABELS[pricingMode]}</span>
+          <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{pricingMode ? PRICING_LABELS[pricingMode] : "Needs Review"}</span>
         </div>
         <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
           {(["flat_rate", "hourly_internal"] as const).map((mode) => (
@@ -239,7 +240,7 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
           ))}
         </div>
         <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-          {PRICING_HELPER[pricingMode]}
+          {pricingMode ? PRICING_HELPER[pricingMode] : "Choose Fixed Bid for estimated project work or Time and Materials for open-ended actuals."}
         </p>
       </div>
 
@@ -262,7 +263,11 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
 
           {needsReviewAction && (
             <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-3)", borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
-              {pricingMode === "flat_rate" ? (
+              {!pricingMode ? (
+                <div style={{ padding: "var(--space-3)", background: "var(--bg-subtle)", border: "1px solid var(--border)", borderRadius: "var(--radius)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                  Choose Fixed Bid or Time and Materials above before converting this request.
+                </div>
+              ) : pricingMode === "flat_rate" ? (
                 <>
                   {!jobId ? (
                     <>
