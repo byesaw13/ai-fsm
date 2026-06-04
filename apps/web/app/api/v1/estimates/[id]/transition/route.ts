@@ -143,12 +143,17 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         [targetStatus, id]
       );
 
-      // Resolve send_estimate action item on any terminal or sent transition
+      // Resolve send_estimate action item on any terminal or sent transition.
+      // On a terminal decision, also clear any confirm_approval item raised by
+      // an SMS approval so the Inbox reminder resolves once acted on.
       if (["sent", "approved", "declined", "expired"].includes(targetStatus)) {
         await resolveActionItems(client, {
           accountId: session.accountId,
           entityId: id,
-          actionTypes: ["send_estimate"],
+          actionTypes:
+            targetStatus === "sent"
+              ? ["send_estimate"]
+              : ["send_estimate", "confirm_approval"],
           resolvedBy: session.userId,
         });
       }

@@ -14,12 +14,19 @@ export interface LogCommunicationOpts {
   externalId?: string | null;
 }
 
-export async function logCommunication(opts: LogCommunicationOpts): Promise<void> {
-  await query(
+/**
+ * Logs a communication. Returns true if a new row was inserted, false if it
+ * was skipped as a duplicate (same account_id + external_id). The dedup only
+ * applies when external_id is set; see migration 100.
+ */
+export async function logCommunication(opts: LogCommunicationOpts): Promise<boolean> {
+  const rows = await query<{ id: string }>(
     `INSERT INTO communications_log
        (account_id, channel, direction, outcome, client_id, booking_request_id,
         job_id, visit_id, body_preview, initiated_by, external_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+     ON CONFLICT (account_id, external_id) WHERE external_id IS NOT NULL DO NOTHING
+     RETURNING id`,
     [
       opts.accountId,
       opts.channel,
@@ -34,4 +41,5 @@ export async function logCommunication(opts: LogCommunicationOpts): Promise<void
       opts.externalId ?? null,
     ]
   );
+  return rows.length > 0;
 }

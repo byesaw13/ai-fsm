@@ -19,9 +19,13 @@ export const SMS_JOB_TYPES = [
 ] as const;
 export type SmsJobType = (typeof SMS_JOB_TYPES)[number];
 
+export type SmsConfidence = "high" | "medium" | "low";
+
 export interface SmsClassification {
   is_business: boolean;
   message_type: SmsMessageType;
+  /** how sure the model is about the classification; low routes to human review */
+  confidence: SmsConfidence;
   customer_name: string | null;
   job_title: string | null;
   job_type: SmsJobType;
@@ -30,6 +34,17 @@ export interface SmsClassification {
   reply: string;
   /** id of the open estimate an approval/question refers to, or null */
   target_estimate_id: string | null;
+}
+
+/** Names the model emits when it can't find a real one — treat as "no name". */
+const PLACEHOLDER_NAMES = new Set([
+  "unknown", "<unknown>", "n/a", "na", "none", "null", "customer", "sms lead",
+]);
+function cleanName(name: string | null | undefined): string | null {
+  if (!name) return null;
+  const trimmed = name.trim();
+  if (!trimmed || PLACEHOLDER_NAMES.has(trimmed.toLowerCase())) return null;
+  return trimmed;
 }
 
 let _client: Anthropic | null = null;
@@ -50,6 +65,12 @@ const CLASSIFY_TOOL: Anthropic.Tool = {
           "false ONLY for spam, scams, automated verification codes, wrong numbers, or clearly personal texts. A real person's cancellation, approval, follow-up, scheduling note, or question IS business.",
       },
       message_type: { type: "string", enum: SMS_MESSAGE_TYPES as unknown as string[] },
+      confidence: {
+        type: "string",
+        enum: ["high", "medium", "low"],
+        description:
+          "high = the type and intent are unambiguous; medium = some ambiguity; low = vague, mixed signals, or you're guessing. Use low when unsure rather than forcing a type.",
+      },
       customer_name: { type: ["string", "null"] },
       job_title: {
         type: ["string", "null"],
@@ -70,7 +91,7 @@ const CLASSIFY_TOOL: Anthropic.Tool = {
       },
     },
     required: [
-      "is_business", "message_type", "customer_name", "job_title",
+      "is_business", "message_type", "confidence", "customer_name", "job_title",
       "job_type", "description", "urgency", "reply", "target_estimate_id",
     ],
   },
@@ -78,13 +99,18 @@ const CLASSIFY_TOOL: Anthropic.Tool = {
 
 const SYSTEM_PROMPT = `You are the intake assistant for Dovetails Services LLC, a handyman and woodworking business owned by Nick Garon in New England. You read inbound SMS to the business line and classify them so the right action is taken. Be accurate and concise. Use the customer's history (provided) to write informed replies and to link approvals/questions to the correct open estimate. Always call the classify_sms tool.`;
 
-/** Rule-based fallback when ANTHROPIC_API_KEY is unset (mirrors codebase convention). */
+/**
+ * Safe fallback when the model is unavailable or errors. Marked `low` confidence
+ * and `other_business` so the endpoint routes it to human review rather than
+ * auto-creating a job or taking any action on a guess.
+ */
 function fallback(message: string): SmsClassification {
   return {
     is_business: true,
-    message_type: "new_inquiry",
+    message_type: "other_business",
+    confidence: "low",
     customer_name: null,
-    job_title: "SMS Inquiry",
+    job_title: null,
     job_type: "custom",
     description: message.slice(0, 200),
     urgency: "flexible",
@@ -136,7 +162,10 @@ export async function classifySms(params: {
       message_type: (SMS_MESSAGE_TYPES as readonly string[]).includes(raw.message_type as string)
         ? (raw.message_type as SmsMessageType)
         : "other_business",
-      customer_name: raw.customer_name ?? null,
+      confidence: (["high", "medium", "low"] as const).includes(raw.confidence as SmsConfidence)
+        ? (raw.confidence as SmsConfidence)
+        : "low",
+      customer_name: cleanName(raw.customer_name),
       job_title: raw.job_title ?? null,
       job_type: (SMS_JOB_TYPES as readonly string[]).includes(raw.job_type as string)
         ? (raw.job_type as SmsJobType)
