@@ -29,8 +29,6 @@ const bodySchema = z.object({
   }),
 });
 
-type Row = Record<string, unknown>;
-
 // ── auto-discover owner account on first call ─────────────────────────────
 let _accountId: string | null = null;
 let _userId: string | null = null;
@@ -83,7 +81,7 @@ export async function POST(req: NextRequest) {
 
   // Non-business messages — acknowledge but skip
   if (!ai.is_business) {
-    logger.info({ traceId, phone }, "SMS not a business inquiry — skipping");
+    logger.info("SMS not a business inquiry — skipping", { traceId, phone });
     return NextResponse.json({ skipped: true, reason: "not_business" });
   }
 
@@ -92,7 +90,7 @@ export async function POST(req: NextRequest) {
   try {
     ({ accountId, userId } = await getOwnerContext());
   } catch (err) {
-    logger.error({ traceId, err }, "Failed to resolve owner context");
+    logger.error("Failed to resolve owner context", err as Error, { traceId });
     return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
   }
 
@@ -112,7 +110,7 @@ export async function POST(req: NextRequest) {
     clientId = existing.id;
     clientName = existing.name;
     isNewClient = false;
-    logger.info({ traceId, clientId, phone }, "Matched existing client");
+    logger.info("Matched existing client", { traceId, clientId, phone });
   } else {
     const [created] = await query<{ id: string }>(
       `INSERT INTO clients (account_id, name, phone, notes)
@@ -128,7 +126,7 @@ export async function POST(req: NextRequest) {
     clientId = created.id;
     clientName = ai.customer_name ?? `SMS Lead (${phone})`;
     isNewClient = true;
-    logger.info({ traceId, clientId, phone }, "Created new client from SMS");
+    logger.info("Created new client from SMS", { traceId, clientId, phone });
   }
 
   // Create draft job
@@ -148,10 +146,7 @@ export async function POST(req: NextRequest) {
     [accountId, clientId, jobTitle, jobDescription, ai.job_type ?? "custom", userId],
   );
 
-  logger.info(
-    { traceId, clientId, jobId: job.id, isNewClient },
-    "SMS lead ingested successfully",
-  );
+  logger.info("SMS lead ingested successfully", { traceId, clientId, jobId: job.id, isNewClient });
 
   return NextResponse.json({
     client_id: clientId,
