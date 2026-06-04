@@ -1,68 +1,55 @@
 import Link from "next/link";
 import type { Route } from "next";
 
-export type TimelineEventType = "visit" | "estimate" | "invoice" | "vault_item" | "membership" | "photo" | "issue" | "note";
+export type ActivityEventType = "visit" | "estimate" | "invoice" | "communication";
 
-export type TimelineEvent = {
-  event_type: TimelineEventType;
+export type ActivityEvent = {
+  event_type: ActivityEventType;
   id: string;
   ts: string;
   label: string;
-  detail: string;
+  status: string | null;
   link_id: string | null;
   total_cents: number | null;
+  property_address: string | null;
 };
 
-const DOT_COLORS: Record<TimelineEventType, string> = {
-  visit:      "var(--color-primary)",
-  estimate:   "var(--color-warning)",
-  invoice:    "var(--color-success)",
-  vault_item: "#0891b2",
-  membership: "#8b5cf6",
-  photo:      "#0891b2",
-  issue:      "#dc2626",
-  note:       "#6b7280",
+const DOT_COLORS: Record<ActivityEventType, string> = {
+  visit:         "var(--color-primary, #0284c7)",
+  estimate:      "#d97706",
+  invoice:       "#16a34a",
+  communication: "#0891b2",
 };
 
-const TYPE_CHIP: Record<TimelineEventType, string> = {
-  visit:      "Visit",
-  estimate:   "Estimate",
-  invoice:    "Invoice",
-  vault_item: "Vault Item",
-  membership: "Membership",
-  photo:      "Photo",
-  issue:      "Issue",
-  note:       "Note",
+const TYPE_CHIP: Record<ActivityEventType, string> = {
+  visit:         "Visit",
+  estimate:      "Estimate",
+  invoice:       "Invoice",
+  communication: "Message",
 };
 
-export function eventHrefFor(event: TimelineEvent): string | null {
-  if (!event.link_id) return null;
+export function eventHref(event: ActivityEvent): string | null {
   switch (event.event_type) {
-    case "visit":     return `/app/visits/${event.link_id}`;
-    case "estimate":  return `/app/estimates/${event.link_id}`;
-    case "invoice":   return `/app/invoices/${event.link_id}`;
+    case "visit":     return event.link_id ? `/app/visits/${event.link_id}` : null;
+    case "estimate":  return event.link_id ? `/app/estimates/${event.link_id}` : null;
+    case "invoice":   return event.link_id ? `/app/invoices/${event.link_id}` : null;
     default:          return null;
   }
 }
 
-// Keep the old name for backward compatibility within this file
-function eventHref(event: TimelineEvent): string | null {
-  return eventHrefFor(event);
-}
-
-function formatDate(iso: string): string {
+export function formatEventDate(iso: string): string {
   return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 }
 
-function formatCents(cents: number): string {
+export function formatEventCents(cents: number): string {
   return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 0 })}`;
 }
 
-export function PropertyTimeline({ events }: { events: TimelineEvent[] }) {
+export function ClientActivityTimeline({ events }: { events: ActivityEvent[] }) {
   if (events.length === 0) {
     return (
       <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", padding: "var(--space-4) 0" }}>
-        No activity at this property yet.
+        No activity recorded for this client yet.
       </p>
     );
   }
@@ -76,7 +63,6 @@ export function PropertyTimeline({ events }: { events: TimelineEvent[] }) {
 
         return (
           <div key={`${event.event_type}-${event.id}`} style={{ display: "flex", gap: "var(--space-3)" }}>
-            {/* Dot + line */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
               <div
                 style={{
@@ -89,11 +75,10 @@ export function PropertyTimeline({ events }: { events: TimelineEvent[] }) {
                 }}
               />
               {!isLast && (
-                <div style={{ width: 2, flex: 1, background: "var(--color-border)", marginTop: 4, marginBottom: 4 }} />
+                <div style={{ width: 2, flex: 1, background: "var(--border, #e5e7eb)", marginTop: 4, marginBottom: 4 }} />
               )}
             </div>
 
-            {/* Content */}
             <div style={{ paddingBottom: isLast ? 0 : "var(--space-4)", minWidth: 0, flex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap", marginBottom: 2 }}>
                 <span
@@ -109,11 +94,16 @@ export function PropertyTimeline({ events }: { events: TimelineEvent[] }) {
                   {TYPE_CHIP[event.event_type]}
                 </span>
                 <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                  {formatDate(event.ts)}
+                  {formatEventDate(event.ts)}
                 </span>
                 {event.total_cents != null && (
                   <span style={{ fontSize: "var(--text-xs)", fontWeight: 500, color: "var(--fg-secondary)" }}>
-                    {formatCents(event.total_cents)}
+                    {formatEventCents(event.total_cents)}
+                  </span>
+                )}
+                {event.property_address && (
+                  <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                    · {event.property_address}
                   </span>
                 )}
               </div>
@@ -126,9 +116,9 @@ export function PropertyTimeline({ events }: { events: TimelineEvent[] }) {
                   event.label
                 )}
               </div>
-              {event.detail && (
+              {event.status && (
                 <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
-                  {event.detail.replaceAll("_", " ")}
+                  {event.status.replaceAll("_", " ")}
                 </div>
               )}
             </div>

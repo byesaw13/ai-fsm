@@ -12,12 +12,12 @@ import {
   IconInbox,
   IconSettings,
   IconMyDay,
-  IconField,
   IconProperties,
   IconJobs,
   IconClients,
   IconInvoices,
-  IconMileage,
+  IconReports,
+  IconVisits,
 } from "./NavIcons";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
@@ -44,9 +44,10 @@ const NAV_REQUESTS: NavItem = { href: "/app/requests",   label: "Requests",   Ic
 const NAV_PROPS:    NavItem = { href: "/app/properties", label: "Properties", Icon: IconProperties, adminOnly: true };
 const NAV_JOBS:     NavItem = { href: "/app/jobs",       label: "Jobs",       Icon: IconJobs,       adminOnly: true };
 const NAV_INVOICES: NavItem = { href: "/app/invoices",   label: "Invoices",   Icon: IconInvoices,   adminOnly: true };
+const NAV_REPORTS:  NavItem = { href: "/app/reports",    label: "Reports",    Icon: IconReports,    adminOnly: true };
+const NAV_SETTINGS: NavItem = { href: "/app/settings",   label: "Settings",   Icon: IconSettings,   adminOnly: true };
 
-// Layer 1 — Daily Driver nav only. Advanced routes (Schedule, Automations, Reports,
-// Booking Requests, Requests, and Workflow) are accessible from Today or Settings — not in the sidebar.
+// Layer 1 — Daily Driver nav only. Advanced routes are accessible from Today or Settings — not in the sidebar.
 const ADMIN_NAV_SECTIONS: NavSection[] = [
   {
     label: "",
@@ -58,7 +59,8 @@ const ADMIN_NAV_SECTIONS: NavSection[] = [
       { href: "/app/estimates", label: "Estimates",  Icon: IconEstimates, adminOnly: true },
       NAV_JOBS,
       NAV_INVOICES,
-      { href: "/app/mileage",   label: "Mileage",    Icon: IconMileage,   adminOnly: true },
+      NAV_REPORTS,
+      NAV_SETTINGS,
     ],
   },
 ];
@@ -71,8 +73,8 @@ const ADMIN_NAV_SECTIONS: NavSection[] = [
 export function getNavSections(role: Role): NavSection[] {
   if (role === "tech") {
     const myDay: NavItem = { href: "/app/my-day", label: "My Day", Icon: IconMyDay };
-    const techFlow: NavItem = { href: "/app/field", label: "On Site", Icon: IconField };
-    return [{ label: "", items: [myDay, techFlow] }];
+    const visits: NavItem = { href: "/app/visits", label: "Visits", Icon: IconVisits };
+    return [{ label: "", items: [myDay, visits] }];
   }
 
   return ADMIN_NAV_SECTIONS;
@@ -82,12 +84,11 @@ export function getNavSections(role: Role): NavSection[] {
 export function getBottomNavItems(role: Role): NavItem[] {
   if (role === "tech") {
     const myDay: NavItem = { href: "/app/my-day", label: "My Day", Icon: IconMyDay };
-    const field: NavItem = { href: "/app/field", label: "On Site", Icon: IconField };
-    return [myDay, field];
+    const visits: NavItem = { href: "/app/visits", label: "Visits", Icon: IconVisits };
+    return [myDay, visits];
   }
 
-  const settings: NavItem = { href: "/app/settings", label: "Settings", Icon: IconSettings };
-  return [NAV_TODAY, NAV_JOBS, NAV_INVOICES, settings];
+  return [NAV_TODAY, NAV_REQUESTS, NAV_JOBS, NAV_SETTINGS];
 }
 
 /** Returns true if href is the active route for the current pathname */
@@ -113,7 +114,6 @@ export function AppShell({ role, userName, children }: AppShellProps) {
   const [showQuickLead, setShowQuickLead] = useState(false);
   const isAdminOrOwner = role === "owner" || role === "admin";
 
-  const settingsActive = isNavActive(pathname, "/app/settings");
   const avatarLetter = userName ? userName[0].toUpperCase() : role[0].toUpperCase();
   const displayName = userName || "Account";
 
@@ -181,21 +181,6 @@ export function AppShell({ role, userName, children }: AppShellProps) {
                 })}
               </div>
             ))}
-
-            {/* Settings pinned to bottom of nav */}
-            <div style={{ marginTop: "auto", paddingTop: "var(--space-3)", borderTop: "1px solid var(--border)" }}>
-              <Link
-                href={"/app/settings" as Route}
-                className={`p7-nav-item ${settingsActive ? "p7-nav-active" : ""}`}
-                aria-current={settingsActive ? "page" : undefined}
-                title="Settings"
-              >
-                <span className="p7-nav-icon" aria-hidden="true">
-                  <IconSettings size={18} />
-                </span>
-                <span className="p7-nav-label">Settings</span>
-              </Link>
-            </div>
           </nav>
 
           {/* Footer — user chip + logout */}

@@ -363,27 +363,6 @@ export default async function AppPage() {
       tone: "warning",
     },
     {
-      label: "Send membership snapshots",
-      count: snapshotCount,
-      href: "/app/visits" as Route,
-      detail: "Reporting phase, not delivered",
-      tone: "warning",
-    },
-    {
-      label: "Review labor cap visits",
-      count: capCount,
-      href: "/app/visits" as Route,
-      detail: "At or over included labor",
-      tone: "warning",
-    },
-    {
-      label: "Renew memberships",
-      count: renewingSoonCount + overdueRenewalCount,
-      href: "/app/maintenance-plans" as Route,
-      detail: overdueRenewalCount > 0 ? `${overdueRenewalCount} overdue` : "Due within 30 days",
-      tone: overdueRenewalCount > 0 ? "danger" : "default",
-    },
-    {
       label: "Clear exception lanes",
       count: exceptionJobCount + exceptionVisitCount,
       href: "/app/jobs" as Route,
@@ -683,89 +662,8 @@ export default async function AppPage() {
               </div>
             </Card>
 
-            {/* Annual Run Rate */}
-            <Card padding="lg">
-              <div style={metaLabel}>Annual Run Rate</div>
-              <div style={bigNum}>{fmt(arrCents)}</div>
-              <div style={{ marginTop: "var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                {activeMembers} active member{activeMembers !== 1 ? "s" : ""}
-              </div>
-              <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
-                {summary.essential_count} Essential · {summary.plus_count} Plus · {summary.premier_count} Premier
-              </div>
-              <Link
-                href={"/app/membership-dashboard" as Route}
-                style={{ display: "inline-block", marginTop: "var(--space-3)", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--accent)", textDecoration: "none" }}
-              >
-                Membership analytics →
-              </Link>
-            </Card>
-
-            {/* Renewal health */}
-            <Card padding="lg" style={overdueRenewalCount > 0 ? {
-              background: "var(--color-amber-50)",
-              borderColor: "var(--color-amber-200)",
-            } : {}}>
-              <div style={metaLabel}>Renewal Health</div>
-              <div style={{ ...bigNum, color: overdueRenewalCount > 0 ? "var(--color-amber-600)" : "var(--fg)" }}>
-                {overdueRenewalCount > 0
-                  ? overdueRenewalCount
-                  : renewingSoonCount > 0
-                  ? renewingSoonCount
-                  : activeMembers}
-              </div>
-              <div style={{ marginTop: "var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                {overdueRenewalCount > 0
-                  ? `overdue renewal${overdueRenewalCount !== 1 ? "s" : ""}`
-                  : renewingSoonCount > 0
-                  ? `renewing in 30 days`
-                  : "all memberships current"}
-              </div>
-              {overdueRenewalCount === 0 && renewingSoonCount > 0 && (
-                <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
-                  {overdueRenewalCount} overdue
-                </div>
-              )}
-              {overdueRenewalCount > 0 && renewingSoonCount > 0 && (
-                <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
-                  + {renewingSoonCount} more due within 30 days
-                </div>
-              )}
-              {(renewingSoonCount > 0 || overdueRenewalCount > 0) && (
-                <Link
-                  href={"/app/maintenance-plans" as Route}
-                  style={{ display: "inline-block", marginTop: "var(--space-3)", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--accent)", textDecoration: "none" }}
-                >
-                  View memberships →
-                </Link>
-              )}
-            </Card>
-
           </div>
         </div>
-      )}
-
-      {/* ── Admin: Membership Renewal Notice (non-owner) ──────────────── */}
-      {!isOwner && (renewingSoonCount > 0 || overdueRenewalCount > 0) && (
-        <Card style={{ marginTop: "var(--space-6)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap" }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: "var(--text-sm)" }}>Membership Renewals</div>
-              <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", marginTop: 2 }}>
-                {renewingSoonCount > 0 && `${renewingSoonCount} renewing in the next 30 days`}
-                {renewingSoonCount > 0 && overdueRenewalCount > 0 && " · "}
-                {overdueRenewalCount > 0 && (
-                  <span style={{ color: "var(--color-red-600)", fontWeight: 600 }}>
-                    {overdueRenewalCount} overdue
-                  </span>
-                )}
-              </div>
-            </div>
-            <Link href={"/app/maintenance-plans" as Route} className="p7-btn p7-btn-secondary p7-btn-sm">
-              View memberships →
-            </Link>
-          </div>
-        </Card>
       )}
 
     </div>

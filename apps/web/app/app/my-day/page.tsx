@@ -132,9 +132,7 @@ export default async function MyDayPage() {
         subtitle={`${greeting} — ${todayVisits.length} visit${todayVisits.length !== 1 ? "s" : ""} today · ${nextTimeLabel}`}
         actions={
           isTech ? (
-            <LinkButton href="/app/field" variant="secondary" size="sm">
-              On Site →
-            </LinkButton>
+            <LinkButton href="/app/visits" variant="secondary" size="sm">Visits →</LinkButton>
           ) : undefined
         }
       />

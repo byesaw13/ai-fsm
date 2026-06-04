@@ -79,23 +79,6 @@ export default async function SettingsPage() {
 
         {isAdmin && (
           <section>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Membership Pricing</h2>
-            <Card padding="default">
-              <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                Manage published prices for each membership tier. Published prices pre-fill when creating new maintenance plans.
-              </p>
-              <Link
-                href={"/app/settings/membership-pricing" as unknown as Route}
-                style={{ fontSize: "var(--text-sm)", color: "var(--accent)", fontWeight: "var(--font-medium)" }}
-              >
-                Manage Membership Pricing &rarr;
-              </Link>
-            </Card>
-          </section>
-        )}
-
-        {isAdmin && (
-          <section>
             <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>System Health</h2>
             <Card padding="default">
               <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
@@ -124,7 +107,7 @@ export default async function SettingsPage() {
                   { href: "/app/schedule",              label: "Schedule",             desc: "Week / month / year calendar views" },
                   { href: "/app/booking-requests",      label: "Requests",             desc: "Intake queue and request management" },
                   { href: "/app/workflow",              label: "Workflow",             desc: "Requests and jobs by stage with estimate and invoice status" },
-                  { href: "/app/reports",               label: "Reports",              desc: "Revenue, pipeline, and performance" },
+                  { href: "/app/reports",               label: "Reports",              desc: "Revenue, operations, and performance" },
                   { href: "/app/operations-dashboard",  label: "Operations Dashboard", desc: "Revenue mix, schedule utilization, job quality" },
                   { href: "/app/pricing-dashboard",     label: "Pricing Dashboard",    desc: "Estimate overrides, adjustments, and below-minimum fees" },
                   { href: "/app/membership-dashboard",  label: "Membership Dashboard", desc: "Active memberships, renewals, and labor cap status" },

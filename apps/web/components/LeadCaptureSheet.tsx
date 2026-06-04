@@ -70,7 +70,7 @@ export function LeadCaptureSheet({ open, onClose, onCreated }: LeadCaptureSheetP
         createdId ? (
           <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
             <a
-              href={`/app/booking-requests`}
+              href="/app/requests"
               style={{
                 fontSize: "var(--text-sm)",
                 color: "var(--accent)",

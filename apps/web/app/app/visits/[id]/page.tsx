@@ -38,7 +38,15 @@ import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { MembershipVisitPanel } from "./MembershipVisitPanel";
 import { VisitSnapshotPanel } from "./VisitSnapshotPanel";
 import { VisitCommandBanner } from "./VisitCommandBanner";
+import { VisitPropertyContext } from "./VisitPropertyContext";
+import type { PropertyIssueContextRow, PropertyNoteContextRow, LastServiceRow } from "./VisitPropertyContext";
+import { VisitRecommendationPanel } from "./VisitRecommendationPanel";
 import { OnMyWayButton } from "./OnMyWayButton";
+import {
+  shouldShowPropertyContext,
+  shouldShowFollowUp,
+  shouldShowCompletionRecord,
+} from "./visit-execution-helpers";
 import {
   Card,
   EmptyState,
@@ -172,9 +180,18 @@ export default async function VisitDetailPage({
       ? ROUTING_ZONE_WARNINGS[visit.plan_routing_zone]
       : null;
 
-  const [membershipVisitNumberRow, propertyVaultRows] = isMembershipVisit
-    ? await Promise.all([
-        queryOneForSession<CountRow>(
+  // Property context is loaded for all active (non-cancelled) visits that have a property.
+  const needsPropertyContext = !!visit.job_property_id && currentStatus !== "cancelled";
+
+  const [
+    membershipVisitNumberRow,
+    propertyVaultRows,
+    propertyContextIssues,
+    propertyContextNotes,
+    lastServiceVisit,
+  ] = await Promise.all([
+    isMembershipVisit
+      ? queryOneForSession<CountRow>(
           session,
           `SELECT COUNT(*)::int AS membership_visit_number
            FROM visits v2
@@ -185,18 +202,63 @@ export default async function VisitDetailPage({
                OR (v2.scheduled_start = $3 AND v2.id <= $4)
              )`,
           [visit.generated_from_plan_id, session.accountId, visit.scheduled_start, visit.id]
-        ),
-        visit.job_property_id
-          ? queryForSession<VaultCategoryRow>(
-              session,
-              `SELECT DISTINCT category
-               FROM property_vault_items
-               WHERE property_id = $1 AND account_id = $2`,
-              [visit.job_property_id, session.accountId]
-            )
-          : Promise.resolve([] as VaultCategoryRow[]),
-      ])
-    : [null, [] as VaultCategoryRow[]];
+        )
+      : Promise.resolve(null),
+
+    isMembershipVisit && visit.job_property_id
+      ? queryForSession<VaultCategoryRow>(
+          session,
+          `SELECT DISTINCT category
+           FROM property_vault_items
+           WHERE property_id = $1 AND account_id = $2`,
+          [visit.job_property_id, session.accountId]
+        )
+      : Promise.resolve([] as VaultCategoryRow[]),
+
+    // Open property issues — shown as context before/during visit
+    needsPropertyContext
+      ? queryForSession<PropertyIssueContextRow>(
+          session,
+          `SELECT id, title, severity, area, occurrence_count
+           FROM property_issues
+           WHERE property_id = $1 AND account_id = $2
+             AND status IN ('open','monitoring')
+           ORDER BY CASE severity
+             WHEN 'critical' THEN 1 WHEN 'major' THEN 2 WHEN 'moderate' THEN 3 ELSE 4
+           END
+           LIMIT 5`,
+          [visit.job_property_id!, session.accountId]
+        )
+      : Promise.resolve([] as PropertyIssueContextRow[]),
+
+    // Pinned property notes — surface warnings/alerts for the tech
+    needsPropertyContext
+      ? queryForSession<PropertyNoteContextRow>(
+          session,
+          `SELECT id, body, source, created_at::text AS created_at
+           FROM property_notes
+           WHERE property_id = $1 AND account_id = $2 AND pinned = true
+           ORDER BY created_at DESC
+           LIMIT 3`,
+          [visit.job_property_id!, session.accountId]
+        )
+      : Promise.resolve([] as PropertyNoteContextRow[]),
+
+    // Last completed visit at this property (excluding current visit)
+    needsPropertyContext
+      ? queryOneForSession<LastServiceRow>(
+          session,
+          `SELECT v2.id, j2.title AS job_title, v2.completed_at::text AS completed_at
+           FROM visits v2
+           JOIN jobs j2 ON j2.id = v2.job_id
+           WHERE j2.property_id = $1 AND v2.account_id = $2
+             AND v2.status = 'completed' AND v2.id != $3
+           ORDER BY v2.completed_at DESC
+           LIMIT 1`,
+          [visit.job_property_id!, session.accountId, id]
+        )
+      : Promise.resolve(null),
+  ]);
 
   const membershipVaultCollection: VaultCollectionStep | null = isMembershipVisit
     ? getVaultCollectionStep({
@@ -444,6 +506,17 @@ export default async function VisitDetailPage({
             <Timeline entries={timelineEntries} />
           </Card>
 
+          {/* ── Property context — shown for active visits with a property ── */}
+          {shouldShowPropertyContext(currentStatus) && visit.job_property_id && (
+            <VisitPropertyContext
+              propertyId={visit.job_property_id}
+              propertyAddress={visit.property_address}
+              issues={propertyContextIssues}
+              pinnedNotes={propertyContextNotes}
+              lastService={lastServiceVisit}
+            />
+          )}
+
           {/* ── Membership visit: phase stepper + labor cap ── */}
           {isMembershipVisit && !isRepairFlow && currentStatus !== "cancelled" && (
             <Card data-testid="membership-visit-phase-card">
@@ -497,31 +570,6 @@ export default async function VisitDetailPage({
                     className="p7-btn p7-btn-primary p7-btn-sm"
                   >
                     Create Estimate →
-                  </a>
-                )}
-                {visit.job_id && (
-                  <a href={`/app/jobs/${visit.job_id}`} className="p7-btn p7-btn-secondary p7-btn-sm">
-                    Back to Job
-                  </a>
-                )}
-              </div>
-            </Card>
-          )}
-
-          {/* ── Realtor baseline: membership follow-up prompt when completed ── */}
-          {isRealtorBaseline && currentStatus === "completed" && canCreateEstimate && (
-            <Card data-testid="realtor-baseline-followup">
-              <SectionHeader title="Baseline Complete" />
-              <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", marginBottom: "var(--space-3)" }}>
-                The realtor baseline inspection is done. Offer the client a maintenance membership to build on this visit.
-              </div>
-              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-                {visit.job_client_id && (
-                  <a
-                    href={`/app/maintenance-plans/new?client_id=${visit.job_client_id}${visit.job_property_id ? `&property_id=${visit.job_property_id}` : ""}`}
-                    className="p7-btn p7-btn-primary p7-btn-sm"
-                  >
-                    Offer Membership
                   </a>
                 )}
                 {visit.job_id && (
@@ -696,6 +744,56 @@ export default async function VisitDetailPage({
                 visitId={visit.id}
                 initialValue={(visit as Visit & { materials_used?: string | null }).materials_used ?? null}
                 canUpdate={canNotes}
+              />
+            </Card>
+          )}
+
+          {/* ── Completion Record — summary of what was captured ── */}
+          {shouldShowCompletionRecord(currentStatus) && completionPacket && (
+            <Card data-testid="visit-completion-record">
+              <SectionHeader title="Visit Record" />
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", fontSize: "var(--text-sm)" }}>
+                {completionPacket.photo_urls.length > 0 && (
+                  <div style={{ color: "var(--fg-secondary)" }}>
+                    {completionPacket.photo_urls.length} completion photo{completionPacket.photo_urls.length !== 1 ? "s" : ""} captured
+                  </div>
+                )}
+                {completionPacket.signature_url && (
+                  <div style={{ color: "#16a34a", fontWeight: 500 }}>Client signature on file</div>
+                )}
+                {completionPacket.signature_waiver && !completionPacket.signature_url && (
+                  <div style={{ color: "var(--fg-muted)" }}>Signature waived</div>
+                )}
+                {completionPacket.notes && (
+                  <div style={{
+                    padding: "var(--space-2) var(--space-3)",
+                    background: "var(--bg-subtle)",
+                    borderRadius: "var(--radius-sm)",
+                    border: "1px solid var(--border)",
+                    whiteSpace: "pre-wrap",
+                    fontSize: "var(--text-sm)",
+                  }}>
+                    {completionPacket.notes}
+                  </div>
+                )}
+                {!completionPacket.photo_urls.length && !completionPacket.signature_url && !completionPacket.signature_waiver && !completionPacket.notes && (
+                  <div style={{ color: "var(--fg-muted)" }}>No completion notes or photos recorded.</div>
+                )}
+              </div>
+            </Card>
+          )}
+
+          {/* ── Follow-Up — post-completion recommendations ── */}
+          {shouldShowFollowUp(currentStatus) && visit.job_property_id && (
+            <Card data-testid="visit-follow-up">
+              <SectionHeader title="Follow-Up" />
+              <VisitRecommendationPanel
+                propertyId={visit.job_property_id}
+                visitId={visit.id}
+                jobId={visit.job_id ?? null}
+                clientId={visit.job_client_id ?? null}
+                propertyAddress={visit.property_address}
+                canCreateEstimate={canCreateEstimate}
               />
             </Card>
           )}
