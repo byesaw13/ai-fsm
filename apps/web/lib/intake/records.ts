@@ -1,4 +1,5 @@
 import type { PoolClient } from "pg";
+import { normalizePhone } from "@/lib/phone";
 
 export const SMS_CONSENT_TEXT =
   "By checking this box you consent to receive text messages from Dovetails Services LLC about your service requests. Message & data rates may apply. Reply STOP to opt out.";
@@ -108,6 +109,8 @@ async function findOrCreateClient(
   input: IntakeRecordInput
 ): Promise<string> {
   let clientId: string | null = null;
+  // Normalize to E.164 so the same person always maps to one record.
+  const normalizedPhone = normalizePhone(input.phone) ?? input.phone ?? null;
 
   if (input.email) {
     const { rows } = await client.query<{ id: string }>(
@@ -117,10 +120,10 @@ async function findOrCreateClient(
     clientId = rows[0]?.id ?? null;
   }
 
-  if (!clientId && input.phone) {
+  if (!clientId && normalizedPhone) {
     const { rows } = await client.query<{ id: string }>(
       `SELECT id FROM clients WHERE account_id = $1 AND phone = $2`,
-      [input.accountId, input.phone]
+      [input.accountId, normalizedPhone]
     );
     clientId = rows[0]?.id ?? null;
   }
@@ -137,7 +140,7 @@ async function findOrCreateClient(
         input.accountId,
         input.name,
         input.email || null,
-        input.phone || null,
+        normalizedPhone || null,
         input.preferredContact,
         input.smsConsent,
         input.smsConsent ? input.smsConsentSource : null,
