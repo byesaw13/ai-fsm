@@ -601,6 +601,9 @@ export default async function VisitDetailPage({
                       approvedEstimateId={approvedEstimate.id}
                       scopeAssumptions={approvedEstimate.scope_assumptions}
                       currentTechNotes={visit.tech_notes ?? null}
+                      beforePhotoCount={beforePhotos.length}
+                      afterPhotoCount={afterPhotos.length}
+                      partsCount={visitParts.length}
                     />
                   </Card>
                 </>

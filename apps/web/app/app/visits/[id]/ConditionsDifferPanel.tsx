@@ -10,6 +10,9 @@ interface Props {
   approvedEstimateId: string;
   scopeAssumptions: string | null;
   currentTechNotes: string | null;
+  beforePhotoCount: number;
+  afterPhotoCount: number;
+  partsCount: number;
 }
 
 const CONDITION_FLAGS = [
@@ -22,7 +25,7 @@ const CONDITION_FLAGS = [
   { key: "other",                label: "Other (describe below)" },
 ] as const;
 
-export function ConditionsDifferPanel({ visitId, jobId, approvedEstimateId, scopeAssumptions, currentTechNotes }: Props) {
+export function ConditionsDifferPanel({ visitId, jobId, approvedEstimateId, scopeAssumptions, currentTechNotes, beforePhotoCount, afterPhotoCount, partsCount }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
@@ -30,6 +33,7 @@ export function ConditionsDifferPanel({ visitId, jobId, approvedEstimateId, scop
   const [action, setAction] = useState<"note_only" | "change_order">("change_order");
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const [createdChangeOrderId, setCreatedChangeOrderId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const draft = buildVisitChangeOrderDraft({
@@ -40,6 +44,9 @@ export function ConditionsDifferPanel({ visitId, jobId, approvedEstimateId, scop
     notes,
     scopeAssumptions,
     currentTechNotes,
+    beforePhotoCount,
+    afterPhotoCount,
+    partsCount,
   });
 
   function toggleFlag(key: string) {
@@ -90,6 +97,8 @@ export function ConditionsDifferPanel({ visitId, jobId, approvedEstimateId, scop
           }),
         });
         if (!r.ok) throw new Error("Failed to create change order");
+        const created = await r.json().catch(() => ({}));
+        setCreatedChangeOrderId(typeof created.id === "string" ? created.id : null);
       }
       setDone(true);
       router.refresh();
@@ -108,7 +117,7 @@ export function ConditionsDifferPanel({ visitId, jobId, approvedEstimateId, scop
         </p>
         {action === "change_order" && (
           <a
-            href={`/app/estimates/${approvedEstimateId}#change-orders`}
+            href={createdChangeOrderId ? `/app/estimates/${approvedEstimateId}#change-order-${createdChangeOrderId}` : `/app/estimates/${approvedEstimateId}#change-orders`}
             style={{ fontSize: "var(--text-sm)", color: "var(--accent)" }}
           >
             Review change order on estimate →
@@ -150,6 +159,7 @@ export function ConditionsDifferPanel({ visitId, jobId, approvedEstimateId, scop
               <div><span style={{ color: "var(--fg)", fontWeight: 600 }}>Title:</span> {draft.title}</div>
               <div><span style={{ color: "var(--fg)", fontWeight: 600 }}>Line item:</span> {draft.lineItemDescription}</div>
               <div><span style={{ color: "var(--fg)", fontWeight: 600 }}>Source:</span> visit {visitId} · job {jobId} · estimate {approvedEstimateId}</div>
+              <div><span style={{ color: "var(--fg)", fontWeight: 600 }}>Evidence:</span> {beforePhotoCount} before photo{beforePhotoCount !== 1 ? "s" : ""}, {afterPhotoCount} after photo{afterPhotoCount !== 1 ? "s" : ""}, {partsCount} part{partsCount !== 1 ? "s" : ""}</div>
             </div>
           </div>
 

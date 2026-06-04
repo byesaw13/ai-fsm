@@ -6,6 +6,9 @@ export interface VisitChangeOrderDraftInput {
   notes: string;
   scopeAssumptions: string | null;
   currentTechNotes: string | null;
+  beforePhotoCount?: number;
+  afterPhotoCount?: number;
+  partsCount?: number;
 }
 
 export interface VisitChangeOrderDraft {
@@ -27,6 +30,9 @@ export function buildVisitChangeOrderDraft(input: VisitChangeOrderDraftInput): V
   const noteSummary = input.notes.trim();
   const techNotes = input.currentTechNotes?.trim();
   const scopeAssumptions = input.scopeAssumptions?.trim();
+  const beforePhotoCount = input.beforePhotoCount ?? 0;
+  const afterPhotoCount = input.afterPhotoCount ?? 0;
+  const partsCount = input.partsCount ?? 0;
 
   const title = input.conditionLabels.length > 0
     ? `On-site scope change: ${conditionSummary}`
@@ -57,6 +63,12 @@ export function buildVisitChangeOrderDraft(input: VisitChangeOrderDraftInput): V
     contextLines.push(`- Technician notes: ${techNotes}`);
   }
 
+  if (beforePhotoCount > 0 || afterPhotoCount > 0 || partsCount > 0) {
+    contextLines.push(
+      `- Evidence captured: ${beforePhotoCount} before photo${beforePhotoCount === 1 ? "" : "s"}, ${afterPhotoCount} after photo${afterPhotoCount === 1 ? "" : "s"}, ${partsCount} part${partsCount === 1 ? "" : "s"}`
+    );
+  }
+
   const description = [...descriptionLines, ...contextLines].join("\n");
 
   const notesBlock = [
@@ -64,6 +76,7 @@ export function buildVisitChangeOrderDraft(input: VisitChangeOrderDraftInput): V
     `Source job: ${input.jobId}`,
     `Approved estimate: ${input.estimateId}`,
     `Suggested line item: ${conditionSummary}`,
+    `Evidence: ${beforePhotoCount} before photo${beforePhotoCount === 1 ? "" : "s"}, ${afterPhotoCount} after photo${afterPhotoCount === 1 ? "" : "s"}, ${partsCount} part${partsCount === 1 ? "" : "s"}`,
   ].join("\n");
 
   const lineItemDescription = input.conditionLabels.length > 0

@@ -11,6 +11,9 @@ describe("buildVisitChangeOrderDraft", () => {
       notes: "Closet door trim is also damaged.",
       scopeAssumptions: "No hidden wall damage was expected.",
       currentTechNotes: "Client asked about vanity replacement.",
+      beforePhotoCount: 2,
+      afterPhotoCount: 1,
+      partsCount: 3,
     });
 
     expect(draft.title).toBe("On-site scope change: Hidden damage behind walls or fixtures, Previous poor workmanship found");
@@ -22,5 +25,7 @@ describe("buildVisitChangeOrderDraft", () => {
     expect(draft.notes).toContain("Source visit: visit-123");
     expect(draft.notes).toContain("Source job: job-456");
     expect(draft.notes).toContain("Approved estimate: est-789");
+    expect(draft.description).toContain("Evidence captured: 2 before photos, 1 after photo, 3 parts");
+    expect(draft.notes).toContain("Evidence: 2 before photos, 1 after photo, 3 parts");
   });
 });

@@ -315,6 +315,7 @@ export function ChangeOrdersClient({ estimateId, initialChangeOrders }: ChangeOr
         <div style={{ marginTop: "var(--space-3)" }}>
           {changeOrders.map((co) => (
             <div
+              id={`change-order-${co.id}`}
               key={co.id}
               style={{
                 padding: "var(--space-3)",
