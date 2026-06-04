@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { query, queryOne, getPool } from "@/lib/db";
+import { query, queryOne, withDbSession } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { randomUUID } from "crypto";
 import { normalizePhone } from "@/lib/phone";
@@ -37,20 +37,21 @@ async function getOwnerContext(): Promise<{ accountId: string; userId: string }>
   return { accountId: _accountId, userId: _userId };
 }
 
-/** Raise an Inbox action item from outside a request session (short-lived conn). */
+/**
+ * Raise an Inbox action item as the owner. action_items has FORCE ROW LEVEL
+ * SECURITY, so the insert must run with RLS session context set — withDbSession
+ * sets app.current_account_id/user_id/role for the transaction.
+ */
 async function raiseActionItem(
-  accountId: string,
+  session: { userId: string; accountId: string; role: "owner" },
   entityType: "booking_request" | "estimate" | "job" | "invoice",
   entityId: string,
   actionType: string,
   title: string
 ): Promise<void> {
-  const client = await getPool().connect();
-  try {
-    await createActionItem(client, { accountId, entityType, entityId, actionType, title });
-  } finally {
-    client.release();
-  }
+  await withDbSession(session, (client) =>
+    createActionItem(client, { accountId: session.accountId, entityType, entityId, actionType, title })
+  );
 }
 
 async function createDraftJob(
@@ -196,6 +197,27 @@ export async function POST(req: NextRequest) {
     isNewClient = true;
   }
 
+  const ownerSession = { userId, accountId, role: "owner" as const };
+
+  // Claim idempotency BEFORE any side effects: insert the inbound row now (no
+  // job linkage yet). If a concurrent delivery of the same external_id already
+  // claimed it, bail before creating jobs/action items. The job_id is back-
+  // filled after routing.
+  const commsId = await logCommunication({
+    accountId,
+    channel: "sms",
+    direction: "inbound",
+    outcome: "replied",
+    clientId,
+    jobId: null,
+    bodyPreview: message.slice(0, 1000),
+    externalId: external_id ?? null,
+  });
+  if (external_id && commsId === null) {
+    logger.info("SMS duplicate ignored (claim)", { traceId, external_id });
+    return NextResponse.json({ duplicate: true });
+  }
+
   const lowConfidence = ai.confidence === "low";
   const activeJobId =
     context.recentJobs.find((j) => ACTIVE_JOB_STATUSES.includes(j.status))?.id ?? null;
@@ -214,7 +236,7 @@ export async function POST(req: NextRequest) {
     if (target) {
       estimateToConfirm = target;
       await raiseActionItem(
-        accountId, "estimate", target, "confirm_approval",
+        ownerSession, "estimate", target, "confirm_approval",
         "Customer texted approval — confirm estimate"
       );
       actionLine = "✅ Approval — confirm the estimate in your Inbox";
@@ -238,7 +260,7 @@ export async function POST(req: NextRequest) {
   if (needsReview) {
     if (!jobId) jobId = await createDraftJob(accountId, clientId, userId, ai, message);
     await raiseActionItem(
-      accountId, "job", jobId, "review_intake",
+      ownerSession, "job", jobId, "review_intake",
       ai.message_type === "approval"
         ? "Review SMS approval — couldn't match estimate"
         : "Review SMS — low confidence"
@@ -246,17 +268,10 @@ export async function POST(req: NextRequest) {
     if (ai.message_type !== "approval") actionLine = "🔎 Needs review (low confidence)";
   }
 
-  // Always log the inbound message (idempotent on external_id)
-  await logCommunication({
-    accountId,
-    channel: "sms",
-    direction: "inbound",
-    outcome: "replied",
-    clientId,
-    jobId,
-    bodyPreview: message.slice(0, 1000),
-    externalId: external_id ?? null,
-  });
+  // Back-fill the job linkage onto the claimed inbound row.
+  if (commsId && jobId) {
+    await query(`UPDATE communications_log SET job_id = $1 WHERE id = $2`, [jobId, commsId]);
+  }
 
   logger.info("SMS ingested", {
     traceId, clientId, jobId, type: ai.message_type, confidence: ai.confidence, estimateToConfirm,

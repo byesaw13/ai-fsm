@@ -1,5 +1,5 @@
 import type { PoolClient } from "pg";
-import { normalizePhone } from "@/lib/phone";
+import { normalizePhone } from "../phone";
 
 export const SMS_CONSENT_TEXT =
   "By checking this box you consent to receive text messages from Dovetails Services LLC about your service requests. Message & data rates may apply. Reply STOP to opt out.";
@@ -332,7 +332,7 @@ export async function repairBookingRequestPipelineLinks(
     email: input.email || null,
     phone: input.phone || null,
     serviceCategory: input.serviceCategory,
-    serviceDescription: input.serviceDescription || "Intake request created before project linking was enabled.",
+    serviceDescription: input.serviceDescription || "Intake request created before pipeline linking was enabled.",
     preferredDate: input.preferredDate,
     preferredTimeSlot: input.preferredTimeSlot || null,
     address: input.address,
