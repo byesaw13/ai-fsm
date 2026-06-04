@@ -277,10 +277,10 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
                         loading={pending === "repair"}
                         disabled={!!pending}
                       >
-                        Create Project →
+                        Create Job →
                       </Button>
                       <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                        Creates the project thread so you can book the walkthrough next.
+                        Creates the job thread so you can book the walkthrough next.
                       </p>
                     </>
                   ) : !showConvertForm ? (

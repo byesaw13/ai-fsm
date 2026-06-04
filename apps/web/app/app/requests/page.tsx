@@ -103,7 +103,7 @@ function getNextAction(row: RequestRow): { label: string; href: Route; detail: s
   }
 
   if (!row.job_id) {
-    return { label: "Create Project", href: `/app/booking-requests/${row.id}` as Route, detail: "Create project thread" };
+    return { label: "Create Job", href: `/app/booking-requests/${row.id}` as Route, detail: "Create job thread" };
   }
 
   if (!row.visit_id) {

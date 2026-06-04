@@ -154,7 +154,7 @@ export default async function BookingRequestDetailPage({
         detail: "Client filled out the intake form. Review the answers and move the request forward.",
         primaryLabel: "Review answers →",
         primaryHref: "#review-actions",
-        secondaryLabel: br.job_id ? "Open project →" : null,
+        secondaryLabel: br.job_id ? "Open Job →" : null,
         secondaryHref: br.job_id ? `/app/jobs/${br.job_id}` : null,
       };
     }
@@ -206,8 +206,8 @@ export default async function BookingRequestDetailPage({
     if (br.routing_path === "site_visit" && !br.visit_id) {
       return {
         title: "Walkthrough recommended",
-        detail: "Schedule a visit to measure and assess the project.",
-        primaryLabel: br.job_id ? "Open project →" : "Open review controls →",
+        detail: "Schedule a visit to measure and assess the job.",
+        primaryLabel: br.job_id ? "Open Job →" : "Open review controls →",
         primaryHref: br.job_id ? `/app/jobs/${br.job_id}` : "#review-actions",
         secondaryLabel: null,
         secondaryHref: null,
@@ -217,10 +217,10 @@ export default async function BookingRequestDetailPage({
     if (br.visit_id) {
       return {
         title: "Walkthrough scheduled",
-        detail: "Open the scheduled visit and continue the project from there.",
+        detail: "Open the scheduled visit and continue the job from there.",
         primaryLabel: "Open walkthrough →",
         primaryHref: `/app/visits/${br.visit_id}`,
-        secondaryLabel: br.job_id ? "Open project →" : null,
+        secondaryLabel: br.job_id ? "Open Job →" : null,
         secondaryHref: br.job_id ? `/app/jobs/${br.job_id}` : null,
       };
     }
@@ -228,8 +228,8 @@ export default async function BookingRequestDetailPage({
     if (br.job_id) {
       return {
         title: "Request converted",
-        detail: "Open the linked project to continue scheduling, estimating, or billing.",
-        primaryLabel: "Open project →",
+        detail: "Open the linked job to continue scheduling, estimating, or billing.",
+        primaryLabel: "Open Job →",
         primaryHref: `/app/jobs/${br.job_id}`,
         secondaryLabel: null,
         secondaryHref: null,
