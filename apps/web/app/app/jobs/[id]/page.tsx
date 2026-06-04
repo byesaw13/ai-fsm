@@ -159,6 +159,7 @@ export default async function JobDetailPage({
           estimated_labor_cost_cents: number | null;
           estimated_total_cents: number | null;
           invoice_total_cents: number | null;
+          latest_invoice_id: string | null;
           has_sent_estimate: boolean;
           last_estimate_sent_at: string | null;
           has_approved_estimate: boolean;
@@ -192,6 +193,9 @@ export default async function JobDetailPage({
              (SELECT total_cents FROM invoices
               WHERE job_id = $1 AND account_id = $2 AND status != 'void'
               ORDER BY created_at DESC LIMIT 1) AS invoice_total_cents,
+             (SELECT id FROM invoices
+              WHERE job_id = $1 AND account_id = $2 AND status != 'void'
+              ORDER BY created_at DESC LIMIT 1) AS latest_invoice_id,
              EXISTS(SELECT 1 FROM estimates WHERE job_id = $1 AND account_id = $2 AND status IN ('sent','approved')) AS has_sent_estimate,
              (SELECT sent_at FROM estimates WHERE job_id = $1 AND account_id = $2 AND status IN ('sent','approved') ORDER BY created_at DESC LIMIT 1) AS last_estimate_sent_at,
              EXISTS(SELECT 1 FROM estimates WHERE job_id = $1 AND account_id = $2 AND status = 'approved') AS has_approved_estimate,
@@ -332,6 +336,7 @@ export default async function JobDetailPage({
             invoiceCount={invoiceCount}
             hasUnpaidInvoice={commercialCounts.has_unpaid_invoice}
             hasPaidInvoice={commercialCounts.has_paid_invoice}
+            latestInvoiceId={commercialCounts.latest_invoice_id}
           />
           <JobCommandPanel
             stage={pipelineStage}
@@ -342,6 +347,7 @@ export default async function JobDetailPage({
             activeVisitId={activeVisits[0]?.id ?? null}
             latestVisitId={latestVisit?.id ?? null}
             approvedEstimateId={commercialCounts.approved_estimate_id}
+            latestInvoiceId={commercialCounts.latest_invoice_id}
           />
         </>
       )}

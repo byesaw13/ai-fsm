@@ -24,6 +24,7 @@ type Props = {
   activeVisitId: string | null;
   latestVisitId: string | null;
   approvedEstimateId: string | null;
+  latestInvoiceId: string | null;
 };
 
 const FIXED_BID_STAGE_COPY: Record<PipelineStage, string> = {
@@ -88,7 +89,9 @@ function actionForStage(props: Props): CommandAction | null {
         href: `/app/invoices/new?job_id=${props.jobId}${clientParam}`,
       };
     case "invoiced":
-      return { label: "View Invoices", href: `/app/invoices?job_id=${props.jobId}` };
+      return props.latestInvoiceId
+        ? { label: "Open Invoice", href: `/app/invoices/${props.latestInvoiceId}` }
+        : { label: "View Invoices", href: `/app/invoices?job_id=${props.jobId}` };
     case "archived":
       return { label: "View Invoices", href: `/app/invoices?job_id=${props.jobId}`, variant: "secondary" };
   }
