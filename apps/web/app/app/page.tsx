@@ -302,6 +302,13 @@ export default async function AppPage() {
 
   const actionQueue = ([
     {
+      label: "Review requests",
+      count: pendingRequestsCount,
+      href: "/app/requests" as Route,
+      detail: "Needs routing or follow-up",
+      tone: pendingRequestsCount > 0 ? "warning" : "default",
+    },
+    {
       label: "Collect overdue invoices",
       count: overdueInvCount,
       href: "/app/invoices?status=overdue" as Route,
@@ -437,7 +444,7 @@ export default async function AppPage() {
         {/* Quick Actions */}
         <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
           <Link href={"/app/intake/new" as Route} className="p7-btn p7-btn-primary p7-btn-sm">
-            + New Job
+            + New Request
           </Link>
           <Link href={"/app/estimates/new" as Route} className="p7-btn p7-btn-secondary p7-btn-sm">
             + Estimate
@@ -449,7 +456,7 @@ export default async function AppPage() {
             + Mileage
           </Link>
           <Link
-            href={"/app/booking-requests" as Route}
+            href={"/app/requests" as Route}
             className="p7-btn p7-btn-secondary p7-btn-sm"
             style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-2)" }}
           >

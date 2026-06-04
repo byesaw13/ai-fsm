@@ -20,6 +20,7 @@ export {
 } from "./sub-statuses";
 export type { JobSubStatus, VisitSubStatus } from "./sub-statuses";
 export { computeLaborDays, formatLaborEstimate } from "./production";
+export * from "./vocabulary";
 export type {
   InterviewRoom,
   InterviewFixture,

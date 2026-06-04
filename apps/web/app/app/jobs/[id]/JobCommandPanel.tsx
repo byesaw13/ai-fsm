@@ -13,20 +13,23 @@ type CommandAction = {
   variant?: "primary" | "secondary";
 };
 
+type PricingMode = "flat_rate" | "hourly_internal" | null;
+
 type Props = {
   stage: PipelineStage;
   jobId: string;
   clientId: string | null;
   bookingRequestId: string | null;
+  pricingMode?: PricingMode;
   activeVisitId: string | null;
   latestVisitId: string | null;
 };
 
-const STAGE_COPY: Record<PipelineStage, string> = {
-  new_lead:        "Review the intake before estimating or scheduling.",
+const FIXED_BID_STAGE_COPY: Record<PipelineStage, string> = {
+  new_lead:        "Review the request before estimating or scheduling.",
   estimate_needed: "This job needs an estimate before the customer can approve work.",
   estimate_sent:   "The estimate is out. Follow up or review the customer's response.",
-  approved_ready:  "Customer approval is in. Schedule the work.",
+  approved_ready:  "Customer approval is in. Book the walkthrough or schedule the work.",
   scheduled:       "Work is scheduled. Open the visit to prepare or update field status.",
   in_progress:     "Work is active. Keep the visit current and complete it from field mode.",
   waiting:         "Job is blocked. Resolve the blocker before the visit can continue.",
@@ -35,29 +38,49 @@ const STAGE_COPY: Record<PipelineStage, string> = {
   archived:        "This job is closed or cancelled.",
 };
 
+const TM_STAGE_COPY: Record<PipelineStage, string> = {
+  new_lead:        "Review the request, then open the time-and-materials project.",
+  estimate_needed: "This job is set to time and materials. Skip the estimate and open the project.",
+  estimate_sent:   "Time and materials does not need an estimate. Open the job and start tracking work.",
+  approved_ready:  "The request is approved. Open the project and schedule work as needed.",
+  scheduled:       "Work is scheduled. Open the visit to prepare or update field status.",
+  in_progress:     "Work is active. Keep the visit current and capture time and materials.",
+  waiting:         "Job is blocked. Resolve the blocker before the visit can continue.",
+  completed:       "Work is complete. Create the invoice from actual time and materials.",
+  invoiced:        "Invoice is out. Track payment and follow up.",
+  archived:        "This job is closed or cancelled.",
+};
+
 function actionForStage(props: Props): CommandAction | null {
   const clientParam = props.clientId ? `&client_id=${props.clientId}` : "";
+  const isTm = props.pricingMode === "hourly_internal";
 
   switch (props.stage) {
     case "new_lead":
       return props.bookingRequestId
-        ? { label: "Review Intake", href: `/app/booking-requests/${props.bookingRequestId}` }
-        : { label: "Open Job", href: `/app/jobs/${props.jobId}` };
+        ? { label: "Review Request", href: `/app/booking-requests/${props.bookingRequestId}` }
+        : { label: isTm ? "Open T&M Job" : "Open Project", href: `/app/jobs/${props.jobId}` };
     case "estimate_needed":
-      return {
-        label: "Create Estimate",
-        href: `/app/estimates/new?job_id=${props.jobId}${clientParam}`,
-      };
+      return isTm
+        ? { label: "Open T&M Job", href: `/app/jobs/${props.jobId}` }
+        : {
+            label: "Create Estimate",
+            href: `/app/estimates/new?job_id=${props.jobId}${clientParam}&pricing_mode=flat_rate`,
+          };
     case "estimate_sent":
-      return { label: "View Estimates", href: `/app/estimates?job_id=${props.jobId}` };
+      return isTm
+        ? { label: "Open T&M Job", href: `/app/jobs/${props.jobId}` }
+        : { label: "View Estimates", href: `/app/estimates?job_id=${props.jobId}` };
     case "approved_ready":
-      return { label: "Schedule Visit", href: `/app/jobs/${props.jobId}/visits/new` };
+      return isTm
+        ? { label: "Open T&M Job", href: `/app/jobs/${props.jobId}` }
+        : { label: "Book Walkthrough", href: `/app/jobs/${props.jobId}/visits/new` };
     case "scheduled":
     case "in_progress":
     case "waiting":
       return props.activeVisitId || props.latestVisitId
-        ? { label: "Open Visit", href: `/app/visits/${props.activeVisitId ?? props.latestVisitId}` }
-        : { label: "Schedule Visit", href: `/app/jobs/${props.jobId}/visits/new` };
+        ? { label: isTm ? "Open T&M Visit" : "Open Visit", href: `/app/visits/${props.activeVisitId ?? props.latestVisitId}` }
+        : { label: isTm ? "Open T&M Job" : "Book Walkthrough", href: `/app/jobs/${props.jobId}/visits/new` };
     case "completed":
       return {
         label: "Create Invoice",
@@ -73,10 +96,14 @@ function actionForStage(props: Props): CommandAction | null {
 export function JobCommandPanel(props: Props) {
   const action = actionForStage(props);
   const currentIndex = PIPELINE_STAGE_ORDER.indexOf(props.stage);
+  const stageCopy = props.pricingMode === "hourly_internal" ? TM_STAGE_COPY : FIXED_BID_STAGE_COPY;
 
   return (
     <Card data-testid="job-command-panel" style={{ marginBottom: "var(--space-4)" }}>
       <SectionHeader title="Command" />
+      <p style={{ margin: 0, marginTop: "calc(var(--space-1) * -1)", color: "var(--fg-muted)", fontSize: "var(--text-xs)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+        {props.pricingMode === "hourly_internal" ? "Time and materials" : "Fixed bid"}
+      </p>
       <div style={{ display: "grid", gap: "var(--space-3)" }}>
         <div>
           <p
@@ -90,7 +117,7 @@ export function JobCommandPanel(props: Props) {
             {PIPELINE_STAGE_LABELS[props.stage]}
           </p>
           <p style={{ margin: "var(--space-1) 0 0", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-            {STAGE_COPY[props.stage]}
+            {stageCopy[props.stage]}
           </p>
         </div>
 
@@ -107,7 +134,7 @@ export function JobCommandPanel(props: Props) {
         )}
 
         <div
-          aria-label="Pipeline progress"
+          aria-label="Workflow progress"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(88px, 1fr))",
@@ -120,7 +147,7 @@ export function JobCommandPanel(props: Props) {
             return (
               <Link
                 key={stage}
-                href="/app/pipeline"
+                href={"/app/workflow" as Route}
                 style={{
                   minHeight: 34,
                   padding: "6px 8px",

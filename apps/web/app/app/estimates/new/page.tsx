@@ -28,7 +28,7 @@ interface Property {
 }
 
 interface PageProps {
-  searchParams: Promise<{ client_id?: string; job_id?: string; property_id?: string; vault_item_id?: string }>;
+  searchParams: Promise<{ client_id?: string; job_id?: string; property_id?: string; vault_item_id?: string; pricing_mode?: "itemized" | "flat_rate" | "multi_option" }>;
 }
 
 export default async function NewEstimatePage({ searchParams }: PageProps) {
@@ -36,7 +36,7 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
   if (!session) redirect("/login");
   if (!canCreateEstimates(session.role)) redirect("/app/estimates");
 
-  const { client_id, job_id, property_id, vault_item_id } = await searchParams;
+  const { client_id, job_id, property_id, vault_item_id, pricing_mode } = await searchParams;
 
   const [clients, jobs, properties] = await Promise.all([
     query<Client>(
@@ -75,6 +75,7 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
         initialPropertyId={property_id}
         initialVaultItemId={vault_item_id}
         vaultItemContext={vaultItemContext}
+        initialPricingMode={pricing_mode ?? "itemized"}
       />
     </PageContainer>
   );

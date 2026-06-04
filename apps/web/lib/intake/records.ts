@@ -329,7 +329,7 @@ export async function repairBookingRequestPipelineLinks(
     email: input.email || null,
     phone: input.phone || null,
     serviceCategory: input.serviceCategory,
-    serviceDescription: input.serviceDescription || "Intake request created before pipeline linking was enabled.",
+    serviceDescription: input.serviceDescription || "Intake request created before project linking was enabled.",
     preferredDate: input.preferredDate,
     preferredTimeSlot: input.preferredTimeSlot || null,
     address: input.address,

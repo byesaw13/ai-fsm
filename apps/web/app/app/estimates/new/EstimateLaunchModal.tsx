@@ -31,7 +31,7 @@ const OPTIONS: Array<{
   {
     mode: "convert",
     label: "Convert Booking Request",
-    description: "Start from an existing lead or intake form.",
+    description: "Start from an existing request or intake form.",
   },
 ];
 

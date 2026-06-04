@@ -5,11 +5,11 @@
 export type CustomerStage = "intake" | "estimate" | "accepted" | "scheduled" | "completed";
 
 export const CUSTOMER_STAGE_LABELS: Record<CustomerStage, string> = {
-  intake:    "Intake",
+  intake:    "Request",
   estimate:  "Estimate",
-  accepted:  "Accepted",
-  scheduled: "Scheduled",
-  completed: "Completed",
+  accepted:  "Approved",
+  scheduled:       "Scheduled",
+  completed: "Closeout",
 };
 
 export const CUSTOMER_STAGE_ORDER: CustomerStage[] = [
@@ -114,29 +114,29 @@ export const PIPELINE_STAGE_ORDER = [
 export type PipelineStage = typeof PIPELINE_STAGE_ORDER[number];
 
 export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
-  new_lead:        "New Intake",
-  estimate_needed: "Estimate Needed",
+  new_lead:        "Request",
+  estimate_needed: "Needs Estimate",
   estimate_sent:   "Estimate Sent",
-  approved_ready:  "Approved / Ready",
+  approved_ready:  "Ready to Schedule",
   scheduled:       "Scheduled",
-  in_progress:     "In Progress",
-  waiting:         "Waiting",
-  completed:       "Completed",
-  invoiced:        "Invoiced / Paid",
-  archived:        "Archived",
+  in_progress:     "Working",
+  waiting:         "On Hold",
+  completed: "Closeout",
+  invoiced:  "Invoiced",
+  archived:   "Closed",
 };
 
 export const PIPELINE_STAGE_ACTIONS: Record<PipelineStage, string> = {
-  new_lead:        "Review intake",
+  new_lead:        "Review request",
   estimate_needed: "Create estimate",
   estimate_sent:   "Follow up",
-  approved_ready:  "Schedule visit",
-  scheduled:       "Prepare visit",
-  in_progress:     "Complete work",
+  approved_ready:  "Book walkthrough",
+  scheduled:       "Prepare work",
+  in_progress:     "Do the work",
   waiting:         "Resolve blocker",
-  completed:       "Send invoice",
+  completed: "Close out project",
   invoiced:        "Collect payment",
-  archived:        "Closed",
+  archived:   "Closed",
 };
 
 export type PipelineStageFacts = {

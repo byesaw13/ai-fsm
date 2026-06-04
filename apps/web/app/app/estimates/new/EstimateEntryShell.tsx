@@ -18,6 +18,7 @@ interface EstimateEntryShellProps {
   initialPropertyId?: string;
   initialVaultItemId?: string;
   vaultItemContext?: { name: string; category: string; location: string | null } | null;
+  initialPricingMode?: "itemized" | "flat_rate" | "multi_option";
 }
 
 export function EstimateEntryShell({
@@ -29,6 +30,7 @@ export function EstimateEntryShell({
   initialPropertyId,
   initialVaultItemId,
   vaultItemContext,
+  initialPricingMode = "itemized",
 }: EstimateEntryShellProps) {
   const [mode, setMode] = useState<EstimateMode | null>(null);
   // After interview applies draft: switch to manual form pre-populated
@@ -81,6 +83,7 @@ export function EstimateEntryShell({
         initialPropertyId={initialPropertyId}
         initialVaultItemId={initialVaultItemId}
         vaultItemContext={vaultItemContext}
+        initialPricingMode={initialPricingMode}
         initialInterviewDraft={appliedDraft ?? undefined}
       />
     </Card>

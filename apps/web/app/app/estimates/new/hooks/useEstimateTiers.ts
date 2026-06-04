@@ -6,8 +6,8 @@ import {
   type LineItemRow, type OptionTier,
 } from "@/lib/estimates/form-helpers";
 
-export function useEstimateTiers(getLineItemsSubtotal: () => number) {
-  const [mode, setMode] = useState<"itemized" | "flat_rate" | "multi_option">("itemized");
+export function useEstimateTiers(getLineItemsSubtotal: () => number, initialMode: "itemized" | "flat_rate" | "multi_option" = "itemized") {
+  const [mode, setMode] = useState<"itemized" | "flat_rate" | "multi_option">(initialMode);
   const [flatRate, setFlatRate] = useState("0.00");
   const [tiers, setTiers] = useState<OptionTier[]>(() =>
     DEFAULT_TIERS.map((t) => ({ ...t, line_items: [{ ...EMPTY_ROW }] }))

@@ -125,7 +125,7 @@ export default async function PipelinePage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Pipeline"
+        title="Workflow"
         subtitle={`${totalActive} active job${totalActive !== 1 ? "s" : ""}`}
         actions={<NewLeadButton />}
       />
@@ -138,10 +138,10 @@ export default async function PipelinePage() {
           }}
         >
           <p style={{ marginBottom: "var(--space-2)", fontWeight: "var(--font-semibold)" }}>
-            No jobs in the pipeline yet.
+            No requests or jobs yet.
           </p>
           <p style={{ fontSize: "var(--text-sm)" }}>
-            Click <strong>+ New Request</strong> to capture a new request from a text, call, or email.
+            Click <strong>+ New Request</strong> to capture a request from text, call, or email.
           </p>
         </div>
       ) : (

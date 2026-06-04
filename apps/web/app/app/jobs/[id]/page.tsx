@@ -153,6 +153,7 @@ export default async function JobDetailPage({
       ? queryOneForSession<{
           estimate_count: string;
           invoice_count: string;
+          change_order_count: string;
           parts_cost_cents: number | null;
           travel_miles: number | null;
           estimated_labor_cost_cents: number | null;
@@ -168,11 +169,18 @@ export default async function JobDetailPage({
           has_paid_invoice: boolean;
           booking_request_id: string | null;
           booking_status: string | null;
+          booking_pricing_mode: string | null;
         }>(
           session,
           `SELECT
              (SELECT COUNT(*) FROM estimates WHERE job_id = $1 AND account_id = $2) AS estimate_count,
              (SELECT COUNT(*) FROM invoices  WHERE job_id = $1 AND account_id = $2) AS invoice_count,
+             (SELECT COUNT(*) FROM change_orders co
+              WHERE co.estimate_id = (
+                SELECT id FROM estimates
+                WHERE job_id = $1 AND account_id = $2 AND status = 'approved'
+                ORDER BY created_at DESC LIMIT 1
+              )) AS change_order_count,
              j.actual_cost_cents AS parts_cost_cents,
              j.travel_miles,
              (SELECT internal_labor_cost_cents FROM estimates
@@ -197,7 +205,10 @@ export default async function JobDetailPage({
               ORDER BY created_at DESC LIMIT 1) AS booking_request_id,
              (SELECT status FROM booking_requests
               WHERE job_id = $1 AND account_id = $2
-              ORDER BY created_at DESC LIMIT 1) AS booking_status
+              ORDER BY created_at DESC LIMIT 1) AS booking_status,
+             (SELECT pricing_mode FROM booking_requests
+              WHERE job_id = $1 AND account_id = $2
+              ORDER BY created_at DESC LIMIT 1) AS booking_pricing_mode
            FROM jobs j WHERE j.id = $1 AND j.account_id = $2`,
           [id, session.accountId]
         )
@@ -217,6 +228,7 @@ export default async function JobDetailPage({
 
   const estimateCount = commercialCounts ? parseInt(commercialCounts.estimate_count) : 0;
   const invoiceCount = commercialCounts ? parseInt(commercialCounts.invoice_count) : 0;
+  const changeOrderCount = commercialCounts ? parseInt(commercialCounts.change_order_count) : 0;
   const activeVisits = visits.filter((v) => !["completed", "cancelled"].includes(v.status));
   const latestVisit = visits[0] ?? null;
   const pipelineStage = derivePipelineStage({
@@ -326,6 +338,7 @@ export default async function JobDetailPage({
             jobId={job.id}
             clientId={job.client_id ?? null}
             bookingRequestId={commercialCounts.booking_request_id}
+            pricingMode={commercialCounts.booking_pricing_mode as "flat_rate" | "hourly_internal" | null}
             activeVisitId={activeVisits[0]?.id ?? null}
             latestVisitId={latestVisit?.id ?? null}
           />
@@ -473,19 +486,86 @@ export default async function JobDetailPage({
               canEdit={canTransition}
             />
 
+            {commercialCounts?.approved_estimate_id && (
+              <Card>
+                <SectionHeader
+                  title="Materials & Change Orders"
+                  action={
+                    <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                      <LinkButton
+                        href={`/app/estimates/${commercialCounts.approved_estimate_id}/shopping-list`}
+                        variant="secondary"
+                        size="sm"
+                      >
+                        Materials Plan
+                      </LinkButton>
+                      <LinkButton
+                        href={`/app/estimates/${commercialCounts.approved_estimate_id}#change-orders`}
+                        variant="secondary"
+                        size="sm"
+                      >
+                        Change Orders
+                      </LinkButton>
+                    </div>
+                  }
+                />
+                <dl className="p7-detail-list">
+                  <div className="p7-detail-row">
+                    <dt>Materials</dt>
+                    <dd>
+                      <Link
+                        href={`/app/estimates/${commercialCounts.approved_estimate_id}/shopping-list`}
+                        style={{ color: "var(--accent)", textDecoration: "none", fontSize: "var(--text-sm)" }}
+                      >
+                        Open approved materials plan →
+                      </Link>
+                    </dd>
+                  </div>
+                  <div className="p7-detail-row">
+                    <dt>Change orders</dt>
+                    <dd>
+                      {changeOrderCount > 0 ? (
+                        <Link
+                          href={`/app/estimates/${commercialCounts.approved_estimate_id}#change-orders`}
+                          style={{ color: "var(--accent)", textDecoration: "none", fontSize: "var(--text-sm)" }}
+                        >
+                          {changeOrderCount} change order{changeOrderCount !== 1 ? "s" : ""} →
+                        </Link>
+                      ) : (
+                        <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+                          No change orders yet
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </Card>
+            )}
+
             {/* Commercial links */}
             <Card>
               <SectionHeader
                 title="Commercial"
                 action={
-                  <LinkButton
-                    href={`/app/estimates/new?job_id=${job.id}&client_id=${job.client_id ?? ""}`}
-                    variant="secondary"
-                    size="sm"
-                    data-testid="new-estimate-btn"
-                  >
-                    + New Estimate
-                  </LinkButton>
+                  commercialCounts?.booking_pricing_mode === "hourly_internal" ? (
+                    <LinkButton
+                      href={`/app/invoices/new?job_id=${job.id}${job.client_id ? `&client_id=${job.client_id}` : ""}`}
+                      variant="secondary"
+                      size="sm"
+                      data-testid="new-invoice-btn"
+                    >
+                      + Invoice Draft
+                    </LinkButton>
+                  ) : (
+                    <LinkButton
+                      href={`/app/estimates/new?job_id=${job.id}&client_id=${job.client_id ?? ""}&pricing_mode=flat_rate`}
+                      variant="secondary"
+                      size="sm"
+                      data-testid="new-estimate-btn"
+                    >
+                      + New Estimate
+                    </LinkButton>
+                  )
                 }
               />
               <dl className="p7-detail-list">

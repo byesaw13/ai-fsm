@@ -8,7 +8,7 @@ import type { StatusVariant } from "@/components/ui";
 import { ReviewActions } from "./ReviewActions";
 import { IntakeSummary } from "./IntakeSummary";
 import { INTAKE_QUESTIONS, INTAKE_METADATA_LABELS } from "@/lib/intake/questions";
-import { scoreJobFit } from "@ai-fsm/domain";
+import { PRICING_MODE_LABELS, scoreJobFit } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +76,7 @@ type BookingRow = {
   client_id: string | null;
   duplicate_candidate_ids: string[] | null;
   routing_path: string | null;
+  pricing_mode: string | null;
   walkthrough_score: number | null;
   referral_source: string | null;
   referral_name: string | null;
@@ -149,7 +150,7 @@ export default async function BookingRequestDetailPage({
   return (
     <PageContainer>
       <PageHeader
-        title={`Booking — ${br.name}`}
+        title={`Request — ${br.name}`}
         subtitle={received}
         backHref="/app/booking-requests"
         actions={
@@ -175,13 +176,13 @@ export default async function BookingRequestDetailPage({
         } else if (inviteSent) {
           banner = { color: "#d97706", bg: "#fffbeb", icon: "⏳", message: `Waiting on client — intake form sent ${sentAgo != null ? `${sentAgo} minutes` : ""} ago. ${!hasEmail ? "(no email on file)" : ""}` };
         } else if (br.routing_path === "remote_estimate" && !br.job_id) {
-          banner = { color: "#0284c7", bg: "#f0f9ff", icon: "📋", message: "Remote estimate path — draft an estimate for this client.", href: `/app/estimates/new${br.client_id ? `?client_id=${br.client_id}` : ""}`, linkLabel: "New estimate →" };
+          banner = { color: "#0284c7", bg: "#f0f9ff", icon: "📋", message: "Fixed-bid path — draft the estimate for this client.", href: `/app/estimates/new${br.client_id ? `?client_id=${br.client_id}&pricing_mode=flat_rate` : "?pricing_mode=flat_rate"}`, linkLabel: "Start estimate →" };
         } else if (br.routing_path === "site_visit" && !br.visit_id) {
-          banner = { color: "#7c3aed", bg: "#faf5ff", icon: "🏠", message: "Site visit recommended — schedule a visit to assess the project.", href: br.job_id ? `/app/jobs/${br.job_id}` : undefined, linkLabel: br.job_id ? "View job →" : undefined };
+          banner = { color: "#7c3aed", bg: "#faf5ff", icon: "🏠", message: "Walkthrough recommended — schedule a visit to measure and assess the project.", href: br.job_id ? `/app/jobs/${br.job_id}` : undefined, linkLabel: br.job_id ? "Open project →" : undefined };
         } else if (!hasEmail && br.status === "pending") {
           banner = { color: "#d97706", bg: "#fffbeb", icon: "📧", message: "Get their email address to send the intake form." };
         } else if (br.status === "pending" && !br.routing_path) {
-          banner = { color: "#71717a", bg: "#f9fafb", icon: "👀", message: "Review this lead and confirm the routing recommendation below." };
+          banner = { color: "#71717a", bg: "#f9fafb", icon: "👀", message: "Review this request and confirm the pricing model and routing recommendation below." };
         }
 
         if (!banner) return null;
@@ -300,6 +301,12 @@ export default async function BookingRequestDetailPage({
                   </div>
                 );
               })}
+              {br.pricing_mode && (
+                <div className="p7-detail-row">
+                  <dt>Pricing</dt>
+                  <dd>{PRICING_MODE_LABELS[br.pricing_mode as keyof typeof PRICING_MODE_LABELS] ?? br.pricing_mode}</dd>
+                </div>
+              )}
               {br.routing_path && br.routing_path !== "pending" && (
                 <div className="p7-detail-row">
                   <dt>Routing</dt>
@@ -440,6 +447,7 @@ export default async function BookingRequestDetailPage({
               bookingId={br.id}
               currentStatus={br.status}
               initialNotes={br.review_notes}
+              initialPricingMode={(br.pricing_mode as "flat_rate" | "hourly_internal" | null) ?? "flat_rate"}
               jobId={br.job_id}
               clientEmail={br.email}
               preferredDate={br.preferred_date}

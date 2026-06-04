@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { derivePipelineStage, getPipelineNextAction } from "@ai-fsm/domain";
 
 describe("derivePipelineStage", () => {
-  it("routes unreviewed booking requests to New Lead", () => {
+  it("routes unreviewed booking requests to Request", () => {
     expect(derivePipelineStage({
       jobStatus: "draft",
       hasBookingRequest: true,
@@ -10,7 +10,7 @@ describe("derivePipelineStage", () => {
     })).toBe("new_lead");
   });
 
-  it("routes booking requests under review to New Lead", () => {
+  it("routes booking requests under review to Request", () => {
     expect(derivePipelineStage({
       jobStatus: "draft",
       hasBookingRequest: true,
@@ -82,7 +82,7 @@ describe("derivePipelineStage", () => {
     })).toBe("in_progress");
   });
 
-  it("routes completed work without an invoice to Completed", () => {
+  it("routes completed work without an invoice to Closeout", () => {
     expect(derivePipelineStage({
       jobStatus: "completed",
       completedVisitCount: 1,
@@ -129,8 +129,8 @@ describe("derivePipelineStage", () => {
 
 describe("getPipelineNextAction", () => {
   it("returns action labels for each stage", () => {
-    expect(getPipelineNextAction("new_lead")).toBe("Review intake");
-    expect(getPipelineNextAction("completed")).toBe("Send invoice");
+    expect(getPipelineNextAction("new_lead")).toBe("Review request");
+    expect(getPipelineNextAction("completed")).toBe("Close out project");
     expect(getPipelineNextAction("invoiced")).toBe("Collect payment");
     expect(getPipelineNextAction("archived")).toBe("Closed");
   });

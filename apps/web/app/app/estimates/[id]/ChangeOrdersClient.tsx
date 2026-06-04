@@ -163,7 +163,7 @@ export function ChangeOrdersClient({ estimateId, initialChangeOrders }: ChangeOr
   const subtotal = lineItems.reduce((sum, item) => sum + item.quantity * item.unit_price_cents, 0);
 
   return (
-    <div className="card action-card" data-testid="change-orders-panel">
+    <div id="change-orders" className="card action-card" data-testid="change-orders-panel">
       <h2 style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         Change Orders
         {!showForm && !editingId && (

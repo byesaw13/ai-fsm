@@ -46,15 +46,15 @@ export function LeadCaptureSheet({ open, onClose, onCreated }: LeadCaptureSheetP
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        toastError(data?.error?.message ?? "Failed to save lead");
+        toastError(data?.error?.message ?? "Failed to save request");
         return;
       }
       const data = await res.json();
       setCreatedId(data.id);
-      success(`Lead captured for ${name.trim()}`);
+      success(`Request captured for ${name.trim()}`);
       onCreated?.(data.id);
     } catch {
-      toastError("Network error — lead not saved");
+      toastError("Network error — request not saved");
     } finally {
       setSubmitting(false);
     }
@@ -64,7 +64,7 @@ export function LeadCaptureSheet({ open, onClose, onCreated }: LeadCaptureSheetP
     <Modal
       open={open}
       onClose={handleClose}
-      title="New Lead"
+      title="New Request"
       data-testid="lead-capture-sheet"
       footer={
         createdId ? (
@@ -77,7 +77,7 @@ export function LeadCaptureSheet({ open, onClose, onCreated }: LeadCaptureSheetP
                 textDecoration: "none",
               }}
             >
-              View in booking queue →
+              View requests →
             </a>
             <Button variant="primary" onClick={() => { reset(); }}>
               Add another
@@ -94,7 +94,7 @@ export function LeadCaptureSheet({ open, onClose, onCreated }: LeadCaptureSheetP
               form="lead-capture-form"
               disabled={submitting || !name.trim()}
             >
-              {submitting ? "Saving…" : "Save Lead"}
+              {submitting ? "Saving…" : "Save Request"}
             </Button>
           </div>
         )
@@ -104,10 +104,10 @@ export function LeadCaptureSheet({ open, onClose, onCreated }: LeadCaptureSheetP
         <div style={{ textAlign: "center", padding: "var(--space-4) 0" }}>
           <div style={{ fontSize: 32, marginBottom: "var(--space-2)" }}>✓</div>
           <p style={{ fontWeight: "var(--font-semibold)", marginBottom: "var(--space-1)" }}>
-            Lead saved for {name}
+            Request saved for {name}
           </p>
           <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-            It will appear in the pipeline as a pending booking request.
+            It will appear in Requests as a pending intake record.
           </p>
         </div>
       ) : (

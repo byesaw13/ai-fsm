@@ -190,6 +190,12 @@ export default async function EstimateDetailPage({
   if (!result) notFound();
 
   const { estimate, lineItems, options } = result;
+  const shoppingListSummary = estimate.shopping_list_json as {
+    sections?: Array<{ section: string }>;
+    total_catalog_cost_cents?: number;
+    total_specified_cost_cents?: number;
+  } | null | undefined;
+  const hasMaterialsPlan = !!shoppingListSummary?.sections?.length;
 
   // For approved estimates with a linked job, check if any visits are scheduled
   let jobVisitCount = 0;
@@ -598,9 +604,9 @@ export default async function EstimateDetailPage({
           if (!shoppingList?.sections?.length) {
             // Fallback for old estimates created before Block 3 — link to the recomputed view
             return (
-              <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
+              <div id="materials-plan" style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
                 <a href={`/app/estimates/${estimate.id}/shopping-list`} style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}>
-                  View Shopping List →
+                  Open Materials Plan →
                 </a>
                 <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginLeft: 8 }}>
                   (computed from scope snapshots)
@@ -610,9 +616,9 @@ export default async function EstimateDetailPage({
           }
           const grandTotal = (shoppingList.total_catalog_cost_cents ?? 0) + (shoppingList.total_specified_cost_cents ?? 0);
           return (
-            <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-3)", borderTop: "1px dashed var(--border)" }}>
+            <div id="materials-plan" style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-3)", borderTop: "1px dashed var(--border)" }}>
               <p style={{ fontWeight: 600, marginBottom: "var(--space-2)", color: "var(--fg-muted)" }}>
-                Shopping List
+                Materials Plan
                 {grandTotal > 0 && (
                   <span style={{ fontWeight: 400, marginLeft: 8, fontSize: "var(--text-sm)" }}>
                     est. {formatDollars(grandTotal)}
@@ -940,6 +946,32 @@ export default async function EstimateDetailPage({
             estimateId={estimate.id}
             initialNotes={estimate.internal_notes}
           />
+        </div>
+      )}
+
+      {/* Materials Plan handoff — owner/admin only, approved estimates */}
+      {canTransition && currentStatus === "approved" && (
+        <div id="materials-plan-handoff" className="card action-card">
+          <h2>{hasMaterialsPlan ? "Materials Plan Ready" : "Prepare Materials Plan"}</h2>
+          <p className="muted">
+            {hasMaterialsPlan
+              ? "The scope is approved and the materials plan is ready to review or print before work starts."
+              : "Turn the approved scope into a materials plan before scheduling work or ordering supplies."}
+          </p>
+          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+            <Link
+              href={`/app/estimates/${estimate.id}/shopping-list`}
+              style={{ color: "var(--accent)", textDecoration: "none", fontSize: "var(--text-sm)", fontWeight: 600 }}
+            >
+              {hasMaterialsPlan ? "Open Materials Plan →" : "Prepare Materials Plan →"}
+            </Link>
+            <Link
+              href={`/app/estimates/${estimate.id}#materials-plan`}
+              style={{ color: "var(--fg-muted)", textDecoration: "none", fontSize: "var(--text-sm)" }}
+            >
+              View in estimate
+            </Link>
+          </div>
         </div>
       )}
 
