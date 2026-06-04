@@ -328,6 +328,7 @@ export default async function JobDetailPage({
             bookingRequestId={commercialCounts.booking_request_id}
             activeVisitId={activeVisits[0]?.id ?? null}
             latestVisitId={latestVisit?.id ?? null}
+            approvedEstimateId={commercialCounts.approved_estimate_id}
           />
         </>
       )}
