@@ -161,9 +161,8 @@ export function JobCommandPanel(props: Props) {
             const isCurrent = stage === props.stage;
             const isPast = index < currentIndex;
             return (
-              <Link
+              <div
                 key={stage}
-                href={"/app/workflow" as Route}
                 style={{
                   minHeight: 34,
                   padding: "6px 8px",
@@ -177,13 +176,12 @@ export function JobCommandPanel(props: Props) {
                   color: isCurrent ? "var(--accent)" : "var(--fg-muted)",
                   fontSize: "var(--text-xs)",
                   fontWeight: isCurrent ? 700 : 500,
-                  textDecoration: "none",
                   display: "flex",
                   alignItems: "center",
                 }}
               >
                 {PIPELINE_STAGE_LABELS[stage]}
-              </Link>
+              </div>
             );
           })}
         </div>

@@ -12,11 +12,14 @@ import {
   PageContainer,
   PageHeader,
   SectionHeader,
-  Timeline,
 } from "@/components/ui";
 import { ClientForm } from "../ClientForm";
-import type { TimelineEntryData } from "@/components/ui";
+import { ClientActivityTimeline } from "./ClientActivityTimeline";
+import type { ActivityEvent } from "./ClientActivityTimeline";
+import { activeJobStatusColor, dollars } from "./client360-helpers";
 import { CopyPortalLinkButton } from "@/components/CopyPortalLinkButton";
+import { VAULT_CATEGORY_LABELS } from "@ai-fsm/domain";
+import type { VaultCategory } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -48,35 +51,25 @@ type PropertyRow = {
   state: string | null;
   zip: string | null;
   created_at: string;
+  open_job_count: number | string;
+  last_service_date: string | null;
 };
 
-type JobRow = {
+type ActiveJobRow = {
   id: string;
   title: string;
   status: string;
-  created_at: string;
-};
-
-type VisitRow = {
-  id: string;
-  status: string;
-  scheduled_start: string;
-  job_title: string;
+  property_id: string | null;
+  property_address: string | null;
+  next_visit_id: string | null;
+  next_visit_start: string | null;
+  next_visit_status: string | null;
 };
 
 type FinancialSummary = {
   estimate_total_cents: string;
   invoice_total_cents: string;
   paid_total_cents: string;
-};
-
-type CommunicationRow = {
-  id: string;
-  channel: "sms" | "email" | "phone";
-  direction: "outbound" | "inbound";
-  outcome: string;
-  body_preview: string | null;
-  created_at: string;
 };
 
 type EstimateRow = {
@@ -97,29 +90,15 @@ type InvoiceRow = {
   job_title: string | null;
 };
 
-type MembershipRow = {
+type VaultItemRow = {
   id: string;
-  status: string;
-  tier: string;
-  renewal_date: string | null;
-  annual_visits_included: number;
-  visits_used: number | string;
+  name: string;
+  category: VaultCategory;
+  property_id: string;
+  property_address: string;
+  created_at: string;
+  photo_count: number | string;
 };
-
-const CHANNEL_ICON: Record<CommunicationRow["channel"], string> = {
-  sms: "SMS",
-  email: "Email",
-  phone: "Phone",
-};
-
-const DIRECTION_ARROW: Record<CommunicationRow["direction"], string> = {
-  outbound: "->",
-  inbound: "<-",
-};
-
-function dollars(cents: number): string {
-  return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(cents / 100);
-}
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -144,30 +123,82 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   );
   if (!client) notFound();
 
-  const [properties, recentJobs, recentVisits, finance, communications, estimates, invoices, membership] = await Promise.all([
+  const [properties, activeJobs, activityEvents, finance, estimates, invoices, vaultItems] = await Promise.all([
     query<PropertyRow>(
-      `SELECT id, name, address, city, state, zip, created_at
-       FROM properties
-       WHERE client_id = $1 AND account_id = $2
-       ORDER BY created_at DESC
+      `SELECT p.id, p.name, p.address, p.city, p.state, p.zip, p.created_at,
+              (SELECT COUNT(*) FROM jobs j
+               WHERE j.property_id = p.id AND j.account_id = p.account_id
+                 AND j.status NOT IN ('cancelled','completed','invoiced')) AS open_job_count,
+              (SELECT MAX(v.completed_at) FROM visits v
+               JOIN jobs j ON j.id = v.job_id
+               WHERE j.property_id = p.id AND v.account_id = p.account_id
+                 AND v.status = 'completed') AS last_service_date
+       FROM properties p
+       WHERE p.client_id = $1 AND p.account_id = $2
+       ORDER BY p.created_at DESC
        LIMIT 10`,
       [id, session.accountId]
     ),
-    query<JobRow>(
-      `SELECT id, title, status, created_at
-       FROM jobs
-       WHERE client_id = $1 AND account_id = $2
-       ORDER BY created_at DESC
-       LIMIT 10`,
+    query<ActiveJobRow>(
+      `SELECT j.id, j.title, j.status,
+              j.property_id,
+              p.address AS property_address,
+              v.id AS next_visit_id,
+              v.scheduled_start AS next_visit_start,
+              v.status AS next_visit_status
+       FROM jobs j
+       LEFT JOIN properties p ON p.id = j.property_id
+       LEFT JOIN LATERAL (
+         SELECT id, scheduled_start, status
+         FROM visits
+         WHERE job_id = j.id AND status NOT IN ('completed','cancelled')
+         ORDER BY scheduled_start ASC NULLS LAST
+         LIMIT 1
+       ) v ON true
+       WHERE j.client_id = $1 AND j.account_id = $2
+         AND j.status NOT IN ('completed','invoiced','cancelled')
+       ORDER BY CASE j.status
+         WHEN 'in_progress' THEN 1
+         WHEN 'scheduled'   THEN 2
+         WHEN 'quoted'      THEN 3
+         WHEN 'draft'       THEN 4
+         ELSE 5
+       END, j.created_at DESC`,
       [id, session.accountId]
     ),
-    query<VisitRow>(
-      `SELECT v.id, v.status, v.scheduled_start, j.title AS job_title
-       FROM visits v
-       JOIN jobs j ON j.id = v.job_id
-       WHERE j.client_id = $1 AND v.account_id = $2
-       ORDER BY v.scheduled_start DESC
-       LIMIT 10`,
+    query<ActivityEvent>(
+      `SELECT event_type, id, ts, label, status, link_id, total_cents, property_address FROM (
+         SELECT 'visit'::text AS event_type, v.id,
+                COALESCE(v.completed_at, v.scheduled_start) AS ts,
+                COALESCE(j.title, 'Visit') AS label,
+                v.status, v.id AS link_id, NULL::int AS total_cents,
+                p.address AS property_address
+         FROM visits v
+         JOIN jobs j ON j.id = v.job_id
+         LEFT JOIN properties p ON p.id = j.property_id
+         WHERE j.client_id = $1 AND v.account_id = $2
+         UNION ALL
+         SELECT 'estimate'::text, e.id, COALESCE(e.sent_at, e.created_at),
+                COALESCE(j.title, 'Estimate'), e.status, e.id, e.total_cents,
+                p.address AS property_address
+         FROM estimates e
+         LEFT JOIN jobs j ON j.id = e.job_id
+         LEFT JOIN properties p ON p.id = COALESCE(e.property_id, j.property_id)
+         WHERE e.client_id = $1 AND e.account_id = $2 AND e.status != 'draft'
+         UNION ALL
+         SELECT 'invoice'::text, i.id, COALESCE(i.sent_at, i.created_at),
+                COALESCE(j.title, 'Invoice'), i.status, i.id, i.total_cents,
+                p.address AS property_address
+         FROM invoices i
+         LEFT JOIN jobs j ON j.id = i.job_id
+         LEFT JOIN properties p ON p.id = COALESCE(i.property_id, j.property_id)
+         WHERE i.client_id = $1 AND i.account_id = $2 AND i.status != 'draft'
+         UNION ALL
+         SELECT 'communication'::text, cl.id, cl.created_at,
+                cl.channel || ' ' || cl.direction, cl.outcome, NULL, NULL,
+                NULL::text AS property_address
+         FROM communications_log cl WHERE cl.client_id = $1 AND cl.account_id = $2
+       ) t ORDER BY ts DESC LIMIT 50`,
       [id, session.accountId]
     ),
     queryOne<FinancialSummary>(
@@ -175,14 +206,6 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
          COALESCE((SELECT SUM(total_cents) FROM estimates WHERE client_id = $1 AND account_id = $2), 0)::text AS estimate_total_cents,
          COALESCE((SELECT SUM(total_cents) FROM invoices WHERE client_id = $1 AND account_id = $2), 0)::text AS invoice_total_cents,
          COALESCE((SELECT SUM(paid_cents) FROM invoices WHERE client_id = $1 AND account_id = $2), 0)::text AS paid_total_cents`,
-      [id, session.accountId]
-    ),
-    query<CommunicationRow>(
-      `SELECT id, channel, direction, outcome, body_preview, created_at
-       FROM communications_log
-       WHERE client_id = $1 AND account_id = $2
-       ORDER BY created_at DESC
-       LIMIT 20`,
       [id, session.accountId]
     ),
     query<EstimateRow>(
@@ -203,30 +226,21 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
        LIMIT 10`,
       [id, session.accountId]
     ),
-    queryOne<MembershipRow>(
-      `SELECT mp.id, mp.status, mp.tier, mp.renewal_date,
-              COALESCE(pt.annual_visits_included, 0) AS annual_visits_included,
-              (SELECT COUNT(*)::int FROM visits v JOIN jobs j ON j.id = v.job_id
-               WHERE j.client_id = $1 AND v.account_id = $2
-               AND v.status = 'completed'
-               AND v.scheduled_start >= date_trunc('year', now())) AS visits_used
-       FROM maintenance_plans mp
-       LEFT JOIN plan_templates pt ON pt.id = mp.template_id
-       WHERE mp.client_id = $1 AND mp.account_id = $2 AND mp.status = 'active'
-       LIMIT 1`,
+    query<VaultItemRow>(
+      `SELECT pvi.id, pvi.name, pvi.category,
+              p.id AS property_id, p.address AS property_address,
+              pvi.created_at,
+              COUNT(pvim.id)::int AS photo_count
+       FROM property_vault_items pvi
+       JOIN properties p ON p.id = pvi.property_id
+       LEFT JOIN property_vault_item_media pvim ON pvim.vault_item_id = pvi.id
+       WHERE p.client_id = $1 AND pvi.account_id = $2
+       GROUP BY pvi.id, pvi.name, pvi.category, p.id, p.address, pvi.created_at
+       ORDER BY pvi.created_at DESC
+       LIMIT 20`,
       [id, session.accountId]
-    ).catch(() => null),  // membership query is best-effort
+    ),
   ]);
-
-  const activityEntries: TimelineEntryData[] = recentVisits.map((v) => ({
-    id: v.id,
-    timestamp: v.scheduled_start,
-    title: v.job_title,
-    subtitle: `Visit ${v.status.replaceAll("_", " ")}`,
-    status: v.status,
-    href: `/app/visits/${v.id}`,
-    isCompleted: v.status === "completed" || v.status === "cancelled",
-  }));
 
   const canCreateJobs = canTransitionJob(session.role);
   const canCreateEstimate = canCreateEstimates(session.role);
@@ -234,7 +248,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const invoiceTotal = Number(finance?.invoice_total_cents ?? 0);
   const paidTotal = Number(finance?.paid_total_cents ?? 0);
 
-  // Open-work items for the top-of-page attention banner
+  // Attention banner: estimates awaiting response + overdue invoices only.
+  // Active jobs are surfaced in the Active Work section below.
   const openWork = [
     ...estimates.filter((e) => e.status === "sent").map((e) => ({
       label: `Estimate awaiting response${e.job_title ? ` — ${e.job_title}` : ""}`,
@@ -245,11 +260,6 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       label: `Overdue invoice${e.job_title ? ` — ${e.job_title}` : ""}: ${dollars(e.balance_cents)} due`,
       href: `/app/invoices/${e.id}`,
       color: "#dc2626",
-    })),
-    ...recentJobs.filter((j) => j.status === "in_progress" || j.status === "scheduled").map((j) => ({
-      label: `Active job: ${j.title}`,
-      href: `/app/jobs/${j.id}`,
-      color: "#0284c7",
     })),
   ];
 
@@ -268,9 +278,6 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             />
             <LinkButton href={`/app/properties/new?client_id=${client.id}`} variant="secondary" size="sm" data-testid="add-property-btn">
               + Property
-            </LinkButton>
-            <LinkButton href={`/app/maintenance-plans/new?client_id=${client.id}`} variant="secondary" size="sm">
-              + Plan
             </LinkButton>
             {canCreateEstimate ? (
               <LinkButton href={`/app/estimates/new?client_id=${client.id}`} variant="secondary" size="sm" data-testid="create-estimate-from-client-btn">
@@ -326,6 +333,55 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
       <div className="p7-detail-layout" style={{ marginTop: "var(--space-4)" }}>
         <div className="p7-detail-primary">
+          {/* ── Active Work ───────────────────────────────────────────── */}
+          {activeJobs.length > 0 && (
+            <Card>
+              <SectionHeader title="Active Work" count={activeJobs.length} />
+              <div>
+                {activeJobs.map((job) => {
+                  const color = activeJobStatusColor(job.status);
+                  const nextVisitLabel = job.next_visit_start
+                    ? `Next visit ${new Date(job.next_visit_start).toLocaleDateString([], { month: "short", day: "numeric" })}`
+                    : "No visit scheduled";
+                  return (
+                    <ItemCard
+                      key={job.id}
+                      href={`/app/jobs/${job.id}`}
+                      title={job.title}
+                      titleBadge={
+                        <span
+                          style={{
+                            fontSize: "var(--text-xs)",
+                            fontWeight: 600,
+                            color,
+                            background: `${color}18`,
+                            padding: "1px 7px",
+                            borderRadius: 99,
+                          }}
+                        >
+                          {job.status.replaceAll("_", " ")}
+                        </span>
+                      }
+                      meta={
+                        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                          <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                            {nextVisitLabel}
+                          </span>
+                          {job.property_address && (
+                            <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                              · {job.property_address}
+                            </span>
+                          )}
+                        </div>
+                      }
+                    />
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
+          {/* ── Properties ────────────────────────────────────────────── */}
           <Card>
             <SectionHeader
               title="Properties"
@@ -336,39 +392,42 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               <EmptyState title="No properties yet" description="Create a property to track service locations for this client." />
             ) : (
               <div>
-                {properties.map((p) => (
-                  <ItemCard
-                    key={p.id}
-                    href={`/app/properties/${p.id}`}
-                    title={p.name?.trim() || p.address}
-                    meta={<div>{formatPropertyAddress(p)}</div>}
-                  />
-                ))}
+                {properties.map((p) => {
+                  const openCount = Number(p.open_job_count ?? 0);
+                  const lastService = p.last_service_date
+                    ? new Date(p.last_service_date).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" })
+                    : null;
+                  return (
+                    <ItemCard
+                      key={p.id}
+                      href={`/app/properties/${p.id}`}
+                      title={p.name?.trim() || p.address}
+                      meta={
+                        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                          <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                            {formatPropertyAddress(p)}
+                          </span>
+                          {openCount > 0 && (
+                            <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "#0284c7" }}>
+                              {openCount} open job{openCount !== 1 ? "s" : ""}
+                            </span>
+                          )}
+                          <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                            {lastService ? `Last serviced ${lastService}` : "Never serviced"}
+                          </span>
+                        </div>
+                      }
+                    />
+                  );
+                })}
               </div>
             )}
           </Card>
 
+          {/* ── Unified Activity Timeline ─────────────────────────────── */}
           <Card>
-            <SectionHeader title="Recent Activity" />
-            <Timeline entries={activityEntries} emptyMessage="No visits yet for this client." />
-          </Card>
-
-          <Card>
-            <SectionHeader title="Recent Jobs" count={recentJobs.length} />
-            {recentJobs.length === 0 ? (
-              <EmptyState title="No jobs yet" description="Jobs created for this client will appear here." />
-            ) : (
-              <div>
-                {recentJobs.map((job) => (
-                  <ItemCard
-                    key={job.id}
-                    href={`/app/jobs/${job.id}`}
-                    title={job.title}
-                    meta={<div>Status: {job.status.replaceAll("_", " ")}</div>}
-                  />
-                ))}
-              </div>
-            )}
+            <SectionHeader title="Activity" count={activityEvents.length} />
+            <ClientActivityTimeline events={activityEvents} />
           </Card>
 
           {/* ── Estimates ─────────────────────────────────────────────── */}
@@ -431,76 +490,37 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             )}
           </Card>
 
-          {/* ── Membership ────────────────────────────────────────────── */}
-          {membership && (
+          {/* ── Documents & Photos ────────────────────────────────────── */}
+          {vaultItems.length > 0 && (
             <Card>
-              <SectionHeader title="Membership" />
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
-                  <div>
-                    <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Tier</p>
-                    <p style={{ margin: 0, fontWeight: 600 }}>{membership.tier}</p>
-                  </div>
-                  <div>
-                    <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Status</p>
-                    <p style={{ margin: 0, fontWeight: 600 }}>{membership.status}</p>
-                  </div>
-                  <div>
-                    <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Visits this year</p>
-                    <p style={{ margin: 0, fontWeight: 600 }}>{Number(membership.visits_used)} / {membership.annual_visits_included}</p>
-                  </div>
-                  {membership.renewal_date && (
-                    <div>
-                      <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Renewal</p>
-                      <p style={{ margin: 0, fontWeight: 600 }}>{new Date(membership.renewal_date).toLocaleDateString()}</p>
-                    </div>
-                  )}
-                </div>
-                <LinkButton href={`/app/maintenance-plans/${membership.id}`} variant="ghost" size="sm">
-                  View membership →
-                </LinkButton>
+              <SectionHeader title="Documents & Photos" count={vaultItems.length} />
+              <div>
+                {vaultItems.map((item) => (
+                  <ItemCard
+                    key={item.id}
+                    href={`/app/properties/${item.property_id}`}
+                    title={item.name}
+                    meta={
+                      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                        <span className="p7-badge p7-badge-count">
+                          {VAULT_CATEGORY_LABELS[item.category] ?? item.category}
+                        </span>
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                          {item.property_address}
+                        </span>
+                        {Number(item.photo_count) > 0 && (
+                          <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                            {item.photo_count} photo{Number(item.photo_count) !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </div>
+                    }
+                  />
+                ))}
               </div>
             </Card>
           )}
 
-          <Card>
-            <SectionHeader title="Communications" count={communications.length} />
-            {communications.length === 0 ? (
-              <EmptyState title="No communications yet" description="Emails, texts, and phone attempts will appear here." />
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                {communications.map((log) => {
-                  const preview = log.body_preview && log.body_preview.length > 80
-                    ? `${log.body_preview.slice(0, 77)}...`
-                    : log.body_preview;
-                  return (
-                    <div
-                      key={log.id}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "90px 32px 96px 120px 1fr",
-                        gap: "var(--space-2)",
-                        alignItems: "center",
-                        padding: "var(--space-2) 0",
-                        borderBottom: "1px solid var(--border)",
-                        fontSize: "var(--text-sm)",
-                      }}
-                    >
-                      <span>{CHANNEL_ICON[log.channel]}</span>
-                      <span style={{ color: "var(--fg-muted)" }}>{DIRECTION_ARROW[log.direction]}</span>
-                      <span className="p7-badge p7-badge-count">{log.outcome.replaceAll("_", " ")}</span>
-                      <span style={{ color: "var(--fg-muted)" }}>
-                        {new Date(log.created_at).toLocaleDateString()}
-                      </span>
-                      <span style={{ color: preview ? "var(--fg)" : "var(--fg-muted)" }}>
-                        {preview || "No preview"}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
         </div>
 
         <div className="p7-detail-sidebar">

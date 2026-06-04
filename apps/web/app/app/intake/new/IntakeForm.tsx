@@ -200,7 +200,7 @@ export function IntakeForm() {
         </Card>
 
         <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)" }}>
-          <LinkButton href="/app/booking-requests" variant="secondary">
+          <LinkButton href="/app/requests" variant="secondary">
             All Requests
           </LinkButton>
           {submittedBookingId ? (
@@ -487,7 +487,7 @@ export function IntakeForm() {
       </Card>
 
       <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)" }}>
-        <LinkButton href="/app/booking-requests" variant="secondary">
+        <LinkButton href="/app/requests" variant="secondary">
           Cancel
         </LinkButton>
         <Button type="submit">

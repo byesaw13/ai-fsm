@@ -8,7 +8,9 @@ import { logger } from "../../../../../../lib/logger";
 export const dynamic = "force-dynamic";
 
 const completionPacketBody = z.object({
-  photo_urls: z.array(z.string().url()).default([]),
+  // Accept any non-empty string — photo_urls may be absolute URLs (external)
+  // or relative /api/v1/.../image paths for media uploaded during the visit.
+  photo_urls: z.array(z.string().min(1)).default([]),
   signature_url: z.string().url().nullable().optional(),
   signature_waiver: z.boolean().default(false),
   notes: z.string().max(2000).nullable().optional(),

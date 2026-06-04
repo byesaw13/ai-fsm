@@ -302,7 +302,7 @@ export default async function OperationsDashboardPage() {
       label: "Realtor Baselines",
       value: rbRow.total_baselines,
       sub: `${rbRow.converted} converted · ${rbRow.pending_conversion} unconverted`,
-      href: "/app/membership-dashboard#baselines",
+      href: "#realtor-baselines",
       variant: "default",
     },
   ];
