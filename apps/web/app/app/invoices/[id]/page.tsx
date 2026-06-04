@@ -1,5 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
+import type { Route } from "next";
 import { getSession } from "@/lib/auth/session";
 import { canCreateInvoices, canRecordPayments } from "@/lib/auth/permissions";
 import { withInvoiceContext } from "@/lib/invoices/db";
@@ -129,6 +130,7 @@ export default async function InvoiceDetailPage({
   const amountDue = invoice.total_cents - invoice.paid_cents;
   const depositPending = invoice.deposit_cents > 0 && !invoice.deposit_paid_at;
   const canMarkDeposit = canTransition && !["paid", "void"].includes(currentStatus);
+  const canRecordPaymentAction = canRecordPayments(session.role) && ["sent", "partial", "overdue"].includes(currentStatus) && amountDue > 0;
   const documentFilename = buildClientDocumentFilename({
     date: invoice.sent_at ?? invoice.created_at,
     clientName: invoice.client_name,
@@ -234,7 +236,7 @@ export default async function InvoiceDetailPage({
 
           {/* Payment History */}
           {currentStatus !== "draft" && (
-            <Card data-testid="payment-history-panel">
+            <Card data-testid="payment-history-panel" id="payment-history-panel">
               <SectionHeader title="Payment History" />
               <PaymentHistory
                 invoiceId={invoice.id}
@@ -247,6 +249,64 @@ export default async function InvoiceDetailPage({
 
         {/* RIGHT: Summary + Actions */}
         <div className="p7-detail-sidebar">
+          {(currentStatus !== "draft" && currentStatus !== "void") && (
+            <Card className="p7-card-accent" data-testid="invoice-closeout-card">
+              <SectionHeader title="Invoice Closeout" />
+              <dl className="p7-detail-list">
+                <div className="p7-detail-row">
+                  <dt>Status</dt>
+                  <dd>
+                    <StatusBadge variant={currentStatus as StatusVariant}>
+                      {STATUS_LABELS[currentStatus]}
+                    </StatusBadge>
+                  </dd>
+                </div>
+                <div className="p7-detail-row">
+                  <dt>Remaining</dt>
+                  <dd data-testid="invoice-closeout-remaining">{formatDollars(amountDue)}</dd>
+                </div>
+                {invoice.deposit_cents > 0 && (
+                  <div className="p7-detail-row">
+                    <dt>Deposit</dt>
+                    <dd>
+                      {formatDollars(invoice.deposit_cents)}
+                      {invoice.deposit_paid_at ? (
+                        <span style={{ marginLeft: "var(--space-2)", color: "var(--color-success, green)", fontSize: "var(--text-xs)" }}>
+                          received
+                        </span>
+                      ) : (
+                        <span style={{ marginLeft: "var(--space-2)", color: "var(--color-warning, orange)", fontSize: "var(--text-xs)" }}>
+                          pending
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+              <p style={{ margin: "var(--space-3) 0 0", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                {currentStatus === "paid"
+                  ? "This invoice is closed out. Use the payment history if you need to audit the receipt trail."
+                  : amountDue > 0
+                    ? "Record the payment, then keep the payment history in one place while the balance clears."
+                    : "The balance is clear. Keep the record for audit and closeout."}
+              </p>
+              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginTop: "var(--space-3)" }}>
+                {canRecordPaymentAction && (
+                  <a href="#record-payment-panel" className="p7-btn p7-btn-primary p7-btn-sm">
+                    Record Payment ↓
+                  </a>
+                )}
+                <a href="#payment-history-panel" className="p7-btn p7-btn-secondary p7-btn-sm">
+                  Payment History ↓
+                </a>
+                {invoice.estimate_id && (
+                  <Link href={("/app/estimates/" + invoice.estimate_id) as Route} className="p7-btn p7-btn-secondary p7-btn-sm">
+                    View Estimate
+                  </Link>
+                )}
+              </div>
+            </Card>
+          )}
           {/* Summary */}
           <Card>
             <SectionHeader title="Summary" />
@@ -367,7 +427,7 @@ export default async function InvoiceDetailPage({
           {canRecordPayments(session.role) &&
             ["sent", "partial", "overdue"].includes(currentStatus) &&
             amountDue > 0 && (
-              <Card className="p7-card-accent" data-testid="record-payment-panel">
+              <Card className="p7-card-accent" data-testid="record-payment-panel" id="record-payment-panel">
                 <SectionHeader title="Record Payment" />
                 <RecordPaymentForm
                   invoiceId={invoice.id}
@@ -378,7 +438,7 @@ export default async function InvoiceDetailPage({
 
           {/* Send to Client — owner/admin only, non-terminal invoices */}
           {canTransition && !["paid", "void"].includes(currentStatus) && (
-            <Card>
+            <Card data-testid="send-invoice-card">
               <SectionHeader title="Send to Client" />
               <SendInvoiceButton
                 invoiceId={invoice.id}

@@ -173,7 +173,7 @@ export default async function RequestsPage({ searchParams }: PageProps) {
 
       <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginBottom: "var(--space-4)" }}>
         <Link
-          href="/app/requests"
+          href={"/app/requests" as Route}
           style={{
             padding: "4px 12px",
             borderRadius: "var(--radius-full)",
