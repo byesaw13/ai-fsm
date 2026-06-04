@@ -23,13 +23,14 @@ type Props = {
   pricingMode?: PricingMode;
   activeVisitId: string | null;
   latestVisitId: string | null;
+  approvedEstimateId: string | null;
 };
 
 const FIXED_BID_STAGE_COPY: Record<PipelineStage, string> = {
   new_lead:        "Review the request before estimating or scheduling.",
   estimate_needed: "This job needs an estimate before the customer can approve work.",
   estimate_sent:   "The estimate is out. Follow up or review the customer's response.",
-  approved_ready:  "Customer approval is in. Book the walkthrough or schedule the work.",
+  approved_ready:  "Customer approval is in. Open the approved estimate, materials plan, or schedule the work.",
   scheduled:       "Work is scheduled. Open the visit to prepare or update field status.",
   in_progress:     "Work is active. Keep the visit current and complete it from field mode.",
   waiting:         "Job is blocked. Resolve the blocker before the visit can continue.",
@@ -97,6 +98,7 @@ export function JobCommandPanel(props: Props) {
   const action = actionForStage(props);
   const currentIndex = PIPELINE_STAGE_ORDER.indexOf(props.stage);
   const stageCopy = props.pricingMode === "hourly_internal" ? TM_STAGE_COPY : FIXED_BID_STAGE_COPY;
+  const approvedEstimateId = props.approvedEstimateId;
 
   return (
     <Card data-testid="job-command-panel" style={{ marginBottom: "var(--space-4)" }}>
@@ -122,7 +124,7 @@ export function JobCommandPanel(props: Props) {
         </div>
 
         {action && (
-          <div>
+          <div style={{ display: "grid", gap: "var(--space-2)" }}>
             <LinkButton
               href={action.href as Route}
               variant={action.variant ?? "primary"}
@@ -130,6 +132,17 @@ export function JobCommandPanel(props: Props) {
             >
               {action.label} →
             </LinkButton>
+            {props.stage === "approved_ready" && approvedEstimateId && (
+              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                <Link href={`/app/estimates/${approvedEstimateId}`} style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}>Open approved estimate →</Link>
+                <Link href={`/app/estimates/${approvedEstimateId}/shopping-list`} style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}>Materials plan →</Link>
+              </div>
+            )}
+            {props.stage === "completed" && approvedEstimateId && (
+              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                <Link href={`/app/estimates/${approvedEstimateId}`} style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}>Open approved estimate →</Link>
+              </div>
+            )}
           </div>
         )}
 

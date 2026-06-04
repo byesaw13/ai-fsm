@@ -7,8 +7,8 @@ import { logger } from "@/lib/logger";
 import { estimateStatusSchema, estimateTransitions } from "@ai-fsm/domain";
 import type { EstimateStatus } from "@ai-fsm/domain";
 import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
-import { generateInvoiceNumber } from "@/lib/invoices/db";
-import { createActionItem, resolveActionItems } from "@/lib/action-items";
+import { resolveActionItems } from "@/lib/action-items";
+import { createApprovalArtifacts } from "@/lib/estimates/approve";
 
 export const dynamic = "force-dynamic";
 
@@ -153,68 +153,14 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         });
       }
 
-      // Create schedule_job action item when approved
+      // Create schedule_job action item + auto-create deposit invoice when approved
       if (targetStatus === "approved") {
-        await createActionItem(client, {
+        const { depositInvoiceId } = await createApprovalArtifacts(client, {
+          estimateId: id,
           accountId: session.accountId,
-          entityType: "estimate",
-          entityId: id,
-          actionType: "schedule_job",
-          title: "Schedule job for approved estimate",
+          userId: session.userId,
         });
-      }
-
-      // Auto-create deposit invoice when estimate is approved
-      if (targetStatus === "approved") {
-        const estData = await client.query<{
-          client_id: string;
-          job_id: string | null;
-          property_id: string | null;
-          deposit_cents: number;
-          notes: string | null;
-        }>(
-          `SELECT client_id, job_id, property_id, deposit_cents, notes
-           FROM estimates WHERE id = $1`,
-          [id]
-        );
-        const est = estData.rows[0];
-
-        if (est && est.deposit_cents > 0) {
-          const existingDeposit = await client.query<{ id: string }>(
-            `SELECT id FROM invoices
-             WHERE estimate_id = $1 AND account_id = $2 AND notes LIKE 'Deposit: %'
-             LIMIT 1`,
-            [id, session.accountId]
-          );
-
-          if (existingDeposit.rowCount === 0) {
-            const invoiceNumber = await generateInvoiceNumber(client, session.accountId);
-            const depositResult = await client.query<{ id: string }>(
-              `INSERT INTO invoices
-                 (account_id, client_id, job_id, estimate_id, property_id,
-                  status, invoice_number,
-                  subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
-                  notes, created_by)
-               VALUES ($1, $2, $3, $4, $5,
-                       'sent', $6,
-                       $7, 0, $7, 0, $7,
-                       $8, $9)
-               RETURNING id`,
-              [
-                session.accountId,
-                est.client_id,
-                est.job_id,
-                id,
-                est.property_id,
-                invoiceNumber,
-                est.deposit_cents,
-                `Deposit: ${est.notes ?? "Estimate approved"}`,
-                session.userId,
-              ]
-            );
-            createdDepositInvoiceId = depositResult.rows[0].id;
-          }
-        }
+        createdDepositInvoiceId = depositInvoiceId;
       }
 
       // Audit log

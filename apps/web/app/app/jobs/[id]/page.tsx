@@ -341,6 +341,7 @@ export default async function JobDetailPage({
             pricingMode={commercialCounts.booking_pricing_mode as "flat_rate" | "hourly_internal" | null}
             activeVisitId={activeVisits[0]?.id ?? null}
             latestVisitId={latestVisit?.id ?? null}
+            approvedEstimateId={commercialCounts.approved_estimate_id}
           />
         </>
       )}
