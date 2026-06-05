@@ -48,8 +48,8 @@ const OPTIONS: Array<{
   },
   {
     mode: "ai",
-    label: "AI Guided Estimate",
-    description: "Describe the project — the assistant asks what it needs, then drafts the estimate.",
+    label: "AI Estimate",
+    description: "Describe the job in your own words. The assistant prices it and builds the line items.",
   },
 ];
 
