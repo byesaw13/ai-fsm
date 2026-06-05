@@ -6,6 +6,7 @@ import { query } from "@/lib/db";
 import { Card, EmptyState, LinkButton, PageContainer, PageHeader, StatusBadge } from "@/components/ui";
 import type { StatusVariant } from "@/components/ui";
 import { PRICING_MODE_LABELS } from "@ai-fsm/domain";
+import { getRequestGuidance } from "../booking-requests/request-guidance";
 
 export const dynamic = "force-dynamic";
 
@@ -47,10 +48,12 @@ type RequestRow = {
   address: string;
   city: string | null;
   created_at: string;
+  client_id: string | null;
   job_id: string | null;
   visit_id: string | null;
   pricing_mode: PricingMode | null;
   routing_path: string | null;
+  walkthrough_score: number | null;
   referral_source: string | null;
   referral_name: string | null;
 };
@@ -68,49 +71,52 @@ function pricingPathLabel(mode: PricingMode | null): string {
   return PRICING_MODE_LABELS[mode] ?? mode;
 }
 
-function getNextAction(row: RequestRow): { label: string; href: Route; detail: string } {
-  if (row.status === "cancelled") {
-    return { label: "Review Archive", href: `/app/booking-requests/${row.id}` as Route, detail: "Cancelled request" };
+function getAction(row: RequestRow): { label: string; href: string; detail: string } {
+  const guidance = getRequestGuidance({
+    status: row.status,
+    pricing_mode: row.pricing_mode,
+    routing_path: row.routing_path as "site_visit" | "remote_estimate" | "pending" | null,
+    job_id: row.job_id,
+    visit_id: row.visit_id,
+    walkthrough_score: row.walkthrough_score,
+    service_category: row.service_category,
+  });
+
+  if (guidance.followUpKind && guidance.followUpHref) {
+    return {
+      label: guidance.followUpKind === "view_visit" ? "Open Walkthrough" : "Open Job",
+      href: guidance.followUpHref,
+      detail: guidance.recommendedDetail,
+    };
   }
 
-  if (row.status === "duplicate") {
-    return { label: "Review Duplicate", href: `/app/booking-requests/${row.id}` as Route, detail: "Confirm duplicate handling" };
+  switch (guidance.primaryActionKind) {
+    case "create_estimate":
+      return {
+        label: "Create Estimate",
+        href: row.client_id ? `/app/estimates/new?client_id=${row.client_id}&pricing_mode=flat_rate` : "/app/estimates/new",
+        detail: guidance.recommendedDetail,
+      };
+    case "create_job":
+      return {
+        label: "Open Request",
+        href: `/app/booking-requests/${row.id}`,
+        detail: guidance.recommendedDetail,
+      };
+    case "schedule_walkthrough":
+      return {
+        label: "Schedule Walkthrough",
+        href: `/app/booking-requests/${row.id}`,
+        detail: guidance.recommendedDetail,
+      };
+    case "close_request":
+    default:
+      return {
+        label: "Close Request",
+        href: `/app/booking-requests/${row.id}`,
+        detail: guidance.recommendedDetail,
+      };
   }
-
-  if (row.status === "converted") {
-    if (row.visit_id) {
-      return { label: "Open Walkthrough", href: `/app/visits/${row.visit_id}` as Route, detail: "Walkthrough is scheduled" };
-    }
-    if (row.job_id) {
-      return { label: "Open Job", href: `/app/jobs/${row.job_id}` as Route, detail: "Job is active" };
-    }
-    return { label: "Review Request", href: `/app/booking-requests/${row.id}` as Route, detail: "Converted, missing linked work" };
-  }
-
-  if (row.status === "needs_info" || (!row.email && !row.phone)) {
-    return { label: row.phone ? "Call Client" : "Get Contact Info", href: `/app/booking-requests/${row.id}` as Route, detail: "Need info before routing" };
-  }
-
-  if (!row.pricing_mode) {
-    return { label: "Choose Path", href: `/app/booking-requests/${row.id}` as Route, detail: "Pick Fixed Bid or Time and Materials" };
-  }
-
-  if (row.pricing_mode === "hourly_internal") {
-    if (row.job_id) {
-      return { label: "Open T&M Job", href: `/app/jobs/${row.job_id}` as Route, detail: "Track actual labor and materials" };
-    }
-    return { label: "Convert to T&M Job", href: `/app/booking-requests/${row.id}` as Route, detail: "Create job thread for actuals" };
-  }
-
-  if (!row.job_id) {
-    return { label: "Create Job", href: `/app/booking-requests/${row.id}` as Route, detail: "Create job thread" };
-  }
-
-  if (!row.visit_id) {
-    return { label: "Book Walkthrough", href: `/app/booking-requests/${row.id}` as Route, detail: "Schedule measurements and assessment" };
-  }
-
-  return { label: "Open Walkthrough", href: `/app/visits/${row.visit_id}` as Route, detail: "Gather field evidence" };
 }
 
 export default async function RequestsPage({ searchParams }: PageProps) {
@@ -133,7 +139,8 @@ export default async function RequestsPage({ searchParams }: PageProps) {
             br.service_category, br.service_description,
             br.preferred_date, br.preferred_time_slot,
             br.address, br.city, br.created_at,
-            br.job_id, br.visit_id, br.pricing_mode, br.routing_path,
+            br.client_id, br.job_id, br.visit_id, br.pricing_mode, br.routing_path,
+            br.walkthrough_score,
             br.referral_source, br.referral_name
      FROM booking_requests br
      WHERE ${conditions.join(" AND ")}
@@ -167,7 +174,7 @@ export default async function RequestsPage({ searchParams }: PageProps) {
     <PageContainer>
       <PageHeader
         title="Requests"
-        subtitle="One front door for new work, walkthroughs, and T&M decisions."
+        subtitle="One front door for new work, walkthroughs, and estimate decisions."
         actions={<LinkButton href="/app/intake/new">New Request</LinkButton>}
       />
 
@@ -213,7 +220,7 @@ export default async function RequestsPage({ searchParams }: PageProps) {
       ) : (
         <div style={{ display: "grid", gap: "var(--space-3)" }}>
           {rows.map((row) => {
-            const nextAction = getNextAction(row);
+            const action = getAction(row);
             const contact = row.email ?? row.phone ?? "No contact saved";
             const source = row.referral_source === "realtor" && row.referral_name
               ? `Realtor: ${row.referral_name}`
@@ -244,7 +251,7 @@ export default async function RequestsPage({ searchParams }: PageProps) {
 
                   <div>
                     <p style={{ margin: "0 0 4px", fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                      Path
+                      Request Type
                     </p>
                     <p style={{ margin: "0 0 var(--space-1)", fontWeight: 700 }}>{pricingPathLabel(row.pricing_mode)}</p>
                     <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
@@ -254,13 +261,13 @@ export default async function RequestsPage({ searchParams }: PageProps) {
 
                   <div>
                     <p style={{ margin: "0 0 4px", fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                      Next Action
+                      Next Step
                     </p>
-                    <LinkButton href={nextAction.href} size="sm" variant="primary">
-                      {nextAction.label}
+                    <LinkButton href={action.href} size="sm" variant="primary">
+                      {action.label}
                     </LinkButton>
                     <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                      {nextAction.detail}
+                      {action.detail}
                     </p>
                   </div>
                 </div>
