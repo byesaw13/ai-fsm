@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 import { computeEstimate, CURRENT_RULES, ENGINE_VERSION, type EstimateSpec } from "@ai-fsm/domain";
 import { formatCents } from "@/lib/estimates/pricing";
+import { calculateDepositPolicy } from "@/lib/estimates/deposit-policy";
+import type { DepositDueTrigger, DepositType } from "@/lib/estimates/deposit-policy";
 import { parseCents, lineTotal, mapPrepLevel, type LineItemRow, type OptionTier } from "@/lib/estimates/form-helpers";
 
 // ---------------------------------------------------------------------------
@@ -54,6 +56,11 @@ interface UseEstimatePricingInput {
   scopeMaterialsTotalCents: number;
   travelSurcharge: string;
   riskAdjustment: string;
+  depositRequired: boolean;
+  depositType: DepositType;
+  depositPercentage: string;
+  depositFixedDollars: string;
+  depositDueTrigger: DepositDueTrigger;
 }
 
 // ---------------------------------------------------------------------------
@@ -64,6 +71,7 @@ export function useEstimatePricing({
   serviceType, mode, lineItems, tiers, flatRate, taxRate,
   sqFt, prepLevel, includesTrim, includesCeiling, materialCostDollars,
   scopeMaterialsTotalCents, travelSurcharge, riskAdjustment,
+  depositRequired, depositType, depositPercentage, depositFixedDollars, depositDueTrigger: _depositDueTrigger,
 }: UseEstimatePricingInput): PricingResult {
   const paintingResult = useMemo<PaintingEstimateResult | null>(() => {
     if (serviceType !== "painting") return null;
@@ -127,8 +135,25 @@ export function useEstimatePricing({
   const adjustedGenericSubtotalCents = genericSubtotalCents + guardrailAdjustmentCents;
   const genericTaxCents = Math.round((adjustedGenericSubtotalCents * taxRateNum) / 100);
   const genericTotalCents = adjustedGenericSubtotalCents + genericTaxCents;
-  const depositCents = Math.round(genericTotalCents * 0.30);
-  const balanceDueCents = genericTotalCents - depositCents;
+  const genericDepositPolicy = calculateDepositPolicy({
+    deposit_required: depositRequired,
+    deposit_type: depositType,
+    deposit_percentage: parseFloat(depositPercentage) || 0,
+    deposit_fixed_cents: parseCents(depositFixedDollars),
+    material_total_cents: materialSubtotalCents,
+    total_cents: genericTotalCents,
+  });
+  const depositCents = serviceType === "painting" && paintingResult
+    ? calculateDepositPolicy({
+        deposit_required: depositRequired,
+        deposit_type: depositType,
+        deposit_percentage: parseFloat(depositPercentage) || 0,
+        deposit_fixed_cents: parseCents(depositFixedDollars),
+        material_total_cents: paintingResult.material_cents,
+        total_cents: paintingResult.total_cents,
+      }).deposit_cents
+    : genericDepositPolicy.deposit_cents;
+  const balanceDueCents = (serviceType === "painting" && paintingResult ? paintingResult.total_cents : genericTotalCents) - depositCents;
 
   function reviewTotal(): string {
     if (serviceType === "painting" && paintingResult) {

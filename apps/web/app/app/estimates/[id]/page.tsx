@@ -535,12 +535,12 @@ export default async function EstimateDetailPage({
         </p>
         {estimate.deposit_cents > 0 && (
           <p>
-            <strong>Deposit (30%):</strong> {formatDollars(estimate.deposit_cents)}
+            <strong>Deposit due:</strong> {formatDollars(estimate.deposit_cents)}
           </p>
         )}
         {estimate.balance_cents > 0 && (
           <p>
-            <strong>Balance (70%):</strong> {formatDollars(estimate.balance_cents)}
+            <strong>Balance due:</strong> {formatDollars(estimate.balance_cents)}
           </p>
         )}
         {estimate.sent_at && (

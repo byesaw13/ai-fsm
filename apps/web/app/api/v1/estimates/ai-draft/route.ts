@@ -30,6 +30,57 @@ function findPrimarySqft(scopeValues: Record<string, number | string>): number {
   return 1;
 }
 
+const UNIT_COUNT_KEYS = [
+  "fixture_count",
+  "device_count",
+  "piece_count",
+  "mount_count",
+  "repair_count",
+  "door_count",
+  "window_count",
+  "unit_count",
+  "item_count",
+  "quantity",
+  "count",
+];
+
+const NON_UNIT_COUNT_KEYS = new Set(["coat_count"]);
+
+function findUnitCount(scopeValues: Record<string, number | string>): number {
+  for (const key of UNIT_COUNT_KEYS) {
+    const val = Number(scopeValues[key]);
+    if (Number.isFinite(val) && val > 0) return Math.max(1, Math.floor(val));
+  }
+
+  for (const [key, value] of Object.entries(scopeValues)) {
+    if (!key.endsWith("_count") || NON_UNIT_COUNT_KEYS.has(key)) continue;
+    const val = Number(value);
+    if (Number.isFinite(val) && val > 0) return Math.max(1, Math.floor(val));
+  }
+
+  return 1;
+}
+
+function priceWithUnitCount(
+  basePriceCents: number,
+  addOnPriceCents: number | null | undefined,
+  unitType: string | null | undefined,
+  scopeValues: Record<string, number | string>,
+): number {
+  const count = findUnitCount(scopeValues);
+  if (count <= 1) return basePriceCents;
+
+  if (addOnPriceCents != null) {
+    return basePriceCents + (count - 1) * addOnPriceCents;
+  }
+
+  if (unitType === "per_unit" || unitType === "per_room") {
+    return basePriceCents * count;
+  }
+
+  return basePriceCents;
+}
+
 const bodySchema = z.object({
   description: z.string().min(1).max(5000),
   job_id: z.string().uuid().optional(),
@@ -260,7 +311,13 @@ export const POST = withAuth(async (request: NextRequest, session) => {
           const sqft = findPrimarySqft(svc.scope_values);
           svc.adjusted_price_cents = Math.round(svc.base_price_cents * sqft * multiplier) + adderCents;
         } else {
-          svc.adjusted_price_cents = Math.round(svc.base_price_cents * multiplier) + adderCents;
+          const unitAdjustedBase = priceWithUnitCount(
+            svc.base_price_cents,
+            svc.add_on_price_cents,
+            svc.unit_type,
+            svc.scope_values,
+          );
+          svc.adjusted_price_cents = Math.round(unitAdjustedBase * multiplier) + adderCents;
         }
       }
     }

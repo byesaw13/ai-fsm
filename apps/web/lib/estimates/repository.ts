@@ -2,8 +2,8 @@ import type { PoolClient } from "pg";
 import { appendAuditLog } from "@/lib/db/audit";
 import { calcTotals, lineItemTotal } from "./math";
 import { calculatePaintingEstimate } from "./pricing";
+import { calculateDepositPolicy, estimateMaterialsDepositBasis } from "./deposit-policy";
 import { computeConditionTier } from "./guardrails";
-import { DEPOSIT_RATE } from "@ai-fsm/domain";
 
 export interface LineItemInput {
   description: string;
@@ -31,6 +31,14 @@ export interface PatchEstimateInput {
   internal_notes?: string | null;
   expires_at?: string | null;
   tax_rate?: number;
+  deposit_required?: boolean;
+  deposit_type?: "none" | "materials" | "percentage" | "fixed";
+  deposit_percentage?: number | null;
+  deposit_fixed_cents?: number | null;
+  deposit_due_trigger?: "on_acceptance" | "before_scheduling" | "before_material_order" | "custom";
+  terms_scope_accepted?: boolean;
+  terms_payment_accepted?: boolean;
+  terms_change_order_accepted?: boolean;
   line_items?: LineItemInput[];
   flat_rate_cents?: number;
   presentation_mode?: "standard" | "multi_option";
@@ -69,6 +77,9 @@ export async function getEstimateById(client: PoolClient, id: string, accountId:
             e.client_id, e.job_id, e.property_id,
             e.created_by, e.created_at, e.updated_at,
             e.presentation_mode,
+            e.deposit_required, e.deposit_type, e.deposit_percentage, e.deposit_fixed_cents,
+            e.deposit_due_trigger, e.terms_scope_accepted, e.terms_payment_accepted,
+            e.terms_change_order_accepted,
             e.trip_count, e.requires_drying_or_curing, e.difficult_access,
             e.old_house_risk, e.coordination_required, e.finish_expectation,
             e.travel_surcharge_cents, e.risk_adjustment_cents,
@@ -135,11 +146,18 @@ export async function updateEstimateById(
     trip_count: string;
     requires_drying_or_curing: boolean;
     coordination_required: boolean;
+    internal_material_cost_cents: number | null;
+    deposit_required: boolean;
+    deposit_type: "none" | "materials" | "percentage" | "fixed";
+    deposit_percentage: number | null;
+    deposit_fixed_cents: number | null;
   }>(
     `SELECT id, status, subtotal_cents, tax_cents, total_cents,
             travel_surcharge_cents, risk_adjustment_cents,
             old_house_risk, difficult_access, trip_count,
-            requires_drying_or_curing, coordination_required
+            requires_drying_or_curing, coordination_required,
+            internal_material_cost_cents,
+            deposit_required, deposit_type, deposit_percentage, deposit_fixed_cents
      FROM estimates WHERE id = $1 AND account_id = $2`,
     [id, session.accountId]
   );
@@ -167,6 +185,8 @@ export async function updateEstimateById(
       "old_house_risk", "coordination_required", "finish_expectation",
       "travel_surcharge_cents", "risk_adjustment_cents",
       "minimum_service_override_reason", "minimum_service_override_note",
+      "deposit_required", "deposit_type", "deposit_percentage", "deposit_fixed_cents",
+      "deposit_due_trigger", "terms_scope_accepted", "terms_payment_accepted", "terms_change_order_accepted",
     ] as const;
     for (const key of disallowedKeys) {
       if (patch[key] !== undefined) {
@@ -226,6 +246,14 @@ export async function updateEstimateById(
   if (patch.scope_assumptions !== undefined) { setClauses.push(`scope_assumptions = $${idx++}`); params.push(patch.scope_assumptions); }
   if (patch.room_specs !== undefined) { setClauses.push(`room_specs = $${idx++}`); params.push(JSON.stringify(patch.room_specs)); }
   if (patch.shopping_list_json !== undefined) { setClauses.push(`shopping_list_json = $${idx++}`); params.push(JSON.stringify(patch.shopping_list_json)); }
+  if (patch.deposit_required !== undefined) { setClauses.push(`deposit_required = $${idx++}`); params.push(patch.deposit_required); }
+  if (patch.deposit_type !== undefined) { setClauses.push(`deposit_type = $${idx++}`); params.push(patch.deposit_type); }
+  if (patch.deposit_percentage !== undefined) { setClauses.push(`deposit_percentage = $${idx++}`); params.push(patch.deposit_percentage); }
+  if (patch.deposit_fixed_cents !== undefined) { setClauses.push(`deposit_fixed_cents = $${idx++}`); params.push(patch.deposit_fixed_cents); }
+  if (patch.deposit_due_trigger !== undefined) { setClauses.push(`deposit_due_trigger = $${idx++}`); params.push(patch.deposit_due_trigger); }
+  if (patch.terms_scope_accepted !== undefined) { setClauses.push(`terms_scope_accepted = $${idx++}`); params.push(patch.terms_scope_accepted); }
+  if (patch.terms_payment_accepted !== undefined) { setClauses.push(`terms_payment_accepted = $${idx++}`); params.push(patch.terms_payment_accepted); }
+  if (patch.terms_change_order_accepted !== undefined) { setClauses.push(`terms_change_order_accepted = $${idx++}`); params.push(patch.terms_change_order_accepted); }
 
   // Auto-recompute condition_tier when any risk flag changes
   const tierFields = ["old_house_risk", "difficult_access", "trip_count", "requires_drying_or_curing", "coordination_required"] as const;
@@ -249,8 +277,13 @@ export async function updateEstimateById(
   const has_guardrail_amounts =
     patch.travel_surcharge_cents !== undefined ||
     patch.risk_adjustment_cents !== undefined;
+  const has_deposit_policy_fields =
+    patch.deposit_required !== undefined ||
+    patch.deposit_type !== undefined ||
+    patch.deposit_percentage !== undefined ||
+    patch.deposit_fixed_cents !== undefined;
 
-  if (patch.line_items !== undefined || patch.flat_rate_cents !== undefined || has_painting_fields || has_guardrail_amounts) {
+  if (patch.line_items !== undefined || patch.flat_rate_cents !== undefined || has_painting_fields || has_guardrail_amounts || has_deposit_policy_fields) {
     let subtotal_cents: number;
     let itemsToInsert = patch.line_items ?? [];
     let new_internal_labor: number | null = null;
@@ -289,8 +322,26 @@ export async function updateEstimateById(
     const taxRate = patch.tax_rate ?? 0;
     const tax_cents = Math.round((subtotal_cents * taxRate) / 100);
     const total_cents = subtotal_cents + tax_cents;
-    const deposit_cents = Math.round(total_cents * DEPOSIT_RATE);
-    const balance_cents = total_cents - deposit_cents;
+    let currentMaterialBasis = new_internal_material ?? 0;
+    if (itemsToInsert.length === 0 && currentMaterialBasis === 0) {
+      const materialRows = await client.query<{ total: string }>(
+        `SELECT COALESCE(SUM(total_cents), 0)::text AS total
+         FROM estimate_line_items
+         WHERE estimate_id = $1 AND visible_to_customer = true AND line_item_type = 'materials'`,
+        [id]
+      );
+      currentMaterialBasis = Number(materialRows.rows[0]?.total ?? 0);
+    }
+    const depositPolicy = calculateDepositPolicy({
+      deposit_required: patch.deposit_required ?? est.deposit_required ?? false,
+      deposit_type: patch.deposit_type ?? est.deposit_type ?? "none",
+      deposit_percentage: patch.deposit_percentage ?? est.deposit_percentage ?? null,
+      deposit_fixed_cents: patch.deposit_fixed_cents ?? est.deposit_fixed_cents ?? null,
+      material_total_cents: estimateMaterialsDepositBasis(itemsToInsert, currentMaterialBasis),
+      total_cents,
+    });
+    const deposit_cents = depositPolicy.deposit_cents;
+    const balance_cents = depositPolicy.balance_cents;
 
     setClauses.push(`subtotal_cents = $${idx++}`); params.push(subtotal_cents);
     setClauses.push(`tax_cents = $${idx++}`); params.push(tax_cents);
@@ -369,8 +420,16 @@ export async function updateEstimateById(
         const tax = Math.round((sub * taxRate) / 100);
         return sub + tax;
       }));
-      const deposit_cents = Math.round(maxOptionTotal * DEPOSIT_RATE);
-      const balance_cents = maxOptionTotal - deposit_cents;
+      const depositPolicy = calculateDepositPolicy({
+        deposit_required: est.deposit_required ?? false,
+        deposit_type: est.deposit_type ?? "none",
+        deposit_percentage: est.deposit_percentage ?? null,
+        deposit_fixed_cents: est.deposit_fixed_cents ?? null,
+        material_total_cents: 0,
+        total_cents: maxOptionTotal,
+      });
+      const deposit_cents = depositPolicy.deposit_cents;
+      const balance_cents = depositPolicy.balance_cents;
       const firstSub = calcTotals(patch.options[0].line_items).subtotal_cents;
       setClauses.push(`subtotal_cents = $${idx++}`); params.push(firstSub);
       setClauses.push(`tax_cents = $${idx++}`); params.push(Math.round((firstSub * taxRate) / 100));

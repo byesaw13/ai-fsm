@@ -323,7 +323,7 @@ export default async function InvoiceDetailPage({
               </div>
               {invoice.deposit_cents > 0 && (
                 <div className="p7-detail-row">
-                  <dt>Deposit (30%)</dt>
+                  <dt>Deposit due</dt>
                   <dd>
                     <span data-testid="invoice-deposit">{formatDollars(invoice.deposit_cents)}</span>
                     {invoice.deposit_paid_at ? (

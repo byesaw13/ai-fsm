@@ -98,8 +98,8 @@ Used by `estimate-engine/rules.ts` for room-by-room estimates.
 
 | Constant | Value | Purpose |
 |---|---|---|
-| `DEPOSIT_RATE` | 30% | Deposit due before scheduling. |
-| `BALANCE_RATE` | 70% | Balance due upon completion. |
+| Explicit deposit policy | No default | Deposits are selected per estimate: none, materials-only, percentage, or fixed. |
+| Balance due | Derived | Project total minus any explicit deposit due or credited. |
 | `PAYMENT_OPTIONS` | Check / Venmo / Square | Shown on all estimates and invoices. |
 
 ---
@@ -136,8 +136,13 @@ Used by `estimate-engine/rules.ts` for room-by-room estimates.
 
 ## Rules
 
-1. **Never hard-code a dollar value in app code.** Always import from `@ai-fsm/domain`.
+1. **Never hard-code a dollar value in app code.** Always import active pricing constants from `@ai-fsm/domain`. Deposit policy is explicit per estimate and must not default from a pricing constant.
 2. **Never show `LABOR_COST_CENTS_PER_HOUR` to a customer.** It is internal only.
 3. **Never use `PAINTING_RATE_CATALOG_CENTS` in `calculatePaintingEstimate()`.** It would price labor ~60% too high.
 4. **When adding a new rate**, update this file AND `dovetails.ts` in the same commit.
 5. **Before changing any value**, check `apps/web/lib/estimates/pricing.ts` and `estimate-engine/rules.ts` — both must stay in sync.
+
+
+## Deposit Policy Update
+
+The system must not assume a deposit. Legacy constants `DEPOSIT_RATE` and `BALANCE_RATE` are retained only for backward compatibility and must not be used to calculate new estimate deposits. New estimate deposits are explicit payment policy, separate from job pricing.

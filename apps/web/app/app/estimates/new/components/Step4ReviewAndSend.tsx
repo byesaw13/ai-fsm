@@ -124,10 +124,14 @@ export function Step4ReviewAndSend({
             <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "var(--space-1) var(--space-4)", fontSize: "var(--text-sm)" }}>
               <span>Project Total</span>
               <span style={{ fontWeight: 800, fontSize: "var(--text-lg)", textAlign: "right" }}>{fmt$(totalCents)}</span>
-              <span style={{ color: "var(--fg-muted)" }}>Deposit (30%)</span>
-              <span style={{ textAlign: "right" }}>{fmt$(depositCents)}</span>
-              <span style={{ color: "var(--fg-muted)" }}>Balance Due (70%)</span>
-              <span style={{ textAlign: "right" }}>{fmt$(balanceDueCents)}</span>
+              {depositCents > 0 && (
+                <>
+                  <span style={{ color: "var(--fg-muted)" }}>Deposit due</span>
+                  <span style={{ textAlign: "right" }}>{fmt$(depositCents)}</span>
+                  <span style={{ color: "var(--fg-muted)" }}>Balance due</span>
+                  <span style={{ textAlign: "right" }}>{fmt$(balanceDueCents)}</span>
+                </>
+              )}
             </div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "var(--space-1) var(--space-4)", fontSize: "var(--text-sm)" }}>

@@ -164,11 +164,14 @@ export function PaintingEstimatorSection({
               <strong>Total</strong>
               <strong>{formatCents(paintingResult.total_cents)}</strong>
 
-              <span style={{ color: "var(--fg-muted)" }}>Deposit (30%)</span>
-              <span>{formatCents(paintingResult.deposit_cents)}</span>
-
-              <span style={{ color: "var(--fg-muted)" }}>Balance (70%)</span>
-              <span>{formatCents(paintingResult.balance_cents)}</span>
+              {paintingResult.deposit_cents > 0 && (
+                <>
+                  <span style={{ color: "var(--fg-muted)" }}>Deposit due</span>
+                  <span>{formatCents(paintingResult.deposit_cents)}</span>
+                  <span style={{ color: "var(--fg-muted)" }}>Balance due</span>
+                  <span>{formatCents(paintingResult.balance_cents)}</span>
+                </>
+              )}
             </div>
 
             <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>

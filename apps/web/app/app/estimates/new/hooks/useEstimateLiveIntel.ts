@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import {
   LABOR_COST_CENTS_PER_HOUR,
-  DEPOSIT_RATE,
   groupMaterialsBySection,
 } from "@ai-fsm/domain";
 import type { MaterialsBySection } from "@ai-fsm/domain";
@@ -94,8 +93,8 @@ export function useEstimateLiveIntel(input: UseEstimateLiveIntelInput): Estimate
 
     if (serviceType === "painting" && paintingResult) {
       totalCents = paintingResult.total_cents;
-      deposit = paintingResult.deposit_cents;
-      balance = paintingResult.balance_cents;
+      deposit = depositCents;
+      balance = balanceDueCents;
     } else {
       totalCents = genericTotalCents;
       deposit = depositCents;

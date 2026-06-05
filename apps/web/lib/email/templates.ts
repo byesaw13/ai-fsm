@@ -92,8 +92,8 @@ export function estimateEmailHtml(d: EstimateEmailData): string {
     <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
       <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Estimate #:</td><td style="padding:4px 0;font-weight:600;font-size:13px;">${d.estimateRef}</td></tr>
       <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Total:</td><td style="padding:4px 0;font-weight:700;font-size:15px;color:#0f172a;">${dollars(d.totalCents)}</td></tr>
-      ${d.depositCents > 0 ? `<tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Deposit (30%):</td><td style="padding:4px 0;font-size:13px;">${dollars(d.depositCents)}</td></tr>` : ""}
-      ${d.depositCents > 0 ? `<tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Balance on completion:</td><td style="padding:4px 0;font-size:13px;">${dollars(d.balanceCents)}</td></tr>` : ""}
+      ${d.depositCents > 0 ? `<tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Deposit due:</td><td style="padding:4px 0;font-size:13px;">${dollars(d.depositCents)}</td></tr>` : ""}
+      ${d.depositCents > 0 ? `<tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Balance due:</td><td style="padding:4px 0;font-size:13px;">${dollars(d.balanceCents)}</td></tr>` : ""}
       ${expiresRow}
     </table>
     ${d.notes ? `<p style="margin:0 0 24px;padding:12px;background:#f4f4f5;border-radius:6px;font-size:13px;color:#52525b;">${d.notes}</p>` : ""}
@@ -108,7 +108,7 @@ export function estimateEmailHtml(d: EstimateEmailData): string {
 }
 
 export function estimateEmailText(d: EstimateEmailData): string {
-  return `Estimate ${d.estimateRef}\n\nHi ${d.clientName},\n\nTotal: ${dollars(d.totalCents)}${d.depositCents > 0 ? `\nDeposit (30%): ${dollars(d.depositCents)}\nBalance: ${dollars(d.balanceCents)}` : ""}${d.expiresStr ? `\nExpires: ${d.expiresStr}` : ""}\n${d.notes ? `\nNotes: ${d.notes}\n` : ""}\nApprove: ${d.approveUrl}\nDecline: ${d.declineUrl}\n\n${BRAND}`;
+  return `Estimate ${d.estimateRef}\n\nHi ${d.clientName},\n\nTotal: ${dollars(d.totalCents)}${d.depositCents > 0 ? `\nDeposit due: ${dollars(d.depositCents)}\nBalance: ${dollars(d.balanceCents)}` : ""}${d.expiresStr ? `\nExpires: ${d.expiresStr}` : ""}\n${d.notes ? `\nNotes: ${d.notes}\n` : ""}\nApprove: ${d.approveUrl}\nDecline: ${d.declineUrl}\n\n${BRAND}`;
 }
 
 // ── Visit reminder ─────────────────────────────────────────────────────────

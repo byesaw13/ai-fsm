@@ -355,7 +355,7 @@ export default async function EstimatePrintPage({
                 {estimate.deposit_cents > 0 && (
                   <>
                     <tr className="deposit-row">
-                      <td colSpan={3}>Deposit Required (30%)</td>
+                      <td colSpan={3}>Deposit due</td>
                       <td className="amt">{formatCents(estimate.deposit_cents)}</td>
                     </tr>
                     <tr className="deposit-row">
@@ -382,7 +382,7 @@ export default async function EstimatePrintPage({
                 {estimate.deposit_cents > 0 && (
                   <>
                     <tr className="deposit-row">
-                      <td>Deposit Required (30%)</td>
+                      <td>Deposit due</td>
                       <td className="amt">{formatCents(estimate.deposit_cents)}</td>
                     </tr>
                     <tr className="deposit-row">

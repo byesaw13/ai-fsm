@@ -73,14 +73,14 @@ describe("computeEstimate — painting", () => {
     expect(r.lineItems.some((l) => l.category === "handling")).toBe(true);
   });
 
-  it("deposit is exactly 30% of total", () => {
+  it("does not apply a deposit by default", () => {
     const spec: EstimateSpec = {
       engineVersion: ENGINE_VERSION, type: "painting",
       rooms: [wallsRoom(400)], paintQuality: "standard",
     };
     const r = computeEstimate(spec, CURRENT_RULES);
-    expect(r.summary.depositCents).toBe(Math.round(r.summary.totalCents * 0.30));
-    expect(r.summary.balanceDueCents).toBe(r.summary.totalCents - r.summary.depositCents);
+    expect(r.summary.depositCents).toBe(0);
+    expect(r.summary.balanceDueCents).toBe(r.summary.totalCents);
   });
 
   it("adds ceiling surface correctly", () => {

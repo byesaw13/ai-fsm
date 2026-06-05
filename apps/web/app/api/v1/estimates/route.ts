@@ -15,11 +15,11 @@ import {
   estimateMinimumOverrideReasonSchema,
   estimateStatusSchema,
   estimateTripCountSchema,
-  DEPOSIT_RATE,
 } from "@ai-fsm/domain";
 import { logger } from "@/lib/logger";
 import { reviewEstimateGuardrails, computeConditionTier } from "@/lib/estimates/guardrails";
 import { computeAndPersist } from "@/lib/estimates/compute";
+import { calculateDepositPolicy, estimateMaterialsDepositBasis } from "@/lib/estimates/deposit-policy";
 import type { EstimateSpec } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
@@ -171,6 +171,14 @@ const createEstimateSchema = z.object({
   internal_notes: z.string().nullable().optional(),
   expires_at: z.string().datetime().nullable().optional(),
   tax_rate: z.number().min(0).max(100).default(0),
+  deposit_required: z.boolean().default(false),
+  deposit_type: z.enum(["none", "materials", "percentage", "fixed"]).default("none"),
+  deposit_percentage: z.number().min(0).max(100).nullable().optional(),
+  deposit_fixed_cents: z.number().int().nonnegative().nullable().optional(),
+  deposit_due_trigger: z.enum(["on_acceptance", "before_scheduling", "before_material_order", "custom"]).default("before_scheduling"),
+  terms_scope_accepted: z.boolean().default(false),
+  terms_payment_accepted: z.boolean().default(false),
+  terms_change_order_accepted: z.boolean().default(false),
   line_items: z.array(lineItemInputSchema).default([]),
   // Flat-rate mode: set this instead of line_items to store a single price with no breakdown
   flat_rate_cents: z.number().int().nonnegative().optional(),
@@ -260,6 +268,14 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     internal_notes,
     expires_at,
     tax_rate,
+    deposit_required,
+    deposit_type,
+    deposit_percentage,
+    deposit_fixed_cents,
+    deposit_due_trigger,
+    terms_scope_accepted,
+    terms_payment_accepted,
+    terms_change_order_accepted,
     line_items,
     flat_rate_cents,
     presentation_mode,
@@ -332,8 +348,19 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
   subtotal_cents += travel_surcharge_cents + risk_adjustment_cents;
   const tax_cents = Math.round((subtotal_cents * tax_rate) / 100);
   const total_cents = subtotal_cents + tax_cents;
-  const deposit_cents = Math.round(total_cents * DEPOSIT_RATE);
-  const balance_cents = total_cents - deposit_cents;
+  const materialBasisCents = is_painting
+    ? material_cost_cents ?? 0
+    : estimateMaterialsDepositBasis(line_items, material_cost_cents ?? 0);
+  const depositPolicy = calculateDepositPolicy({
+    deposit_required,
+    deposit_type,
+    deposit_percentage,
+    deposit_fixed_cents,
+    material_total_cents: materialBasisCents,
+    total_cents,
+  });
+  const deposit_cents = depositPolicy.deposit_cents;
+  const balance_cents = depositPolicy.balance_cents;
   const conditionTier = computeConditionTier({ old_house_risk, difficult_access, trip_count, requires_drying_or_curing, coordination_required });
   const pricingReview = reviewEstimateGuardrails({
     total_cents,
@@ -369,6 +396,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         `INSERT INTO estimates
            (account_id, client_id, job_id, property_id, vault_item_id, status, presentation_mode,
             subtotal_cents, tax_cents, total_cents, deposit_cents, balance_cents,
+            deposit_required, deposit_type, deposit_percentage, deposit_fixed_cents, deposit_due_trigger,
+            terms_scope_accepted, terms_payment_accepted, terms_change_order_accepted,
             notes, internal_notes, expires_at, created_by,
             sq_ft, prep_level, includes_trim, includes_ceiling,
             internal_labor_cost_cents, internal_material_cost_cents,
@@ -377,9 +406,11 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             risk_adjustment_cents, minimum_service_override_reason,
             minimum_service_override_note, pricing_review_status, scope_assumptions,
             condition_tier, shopping_list_json, specified_materials_json, room_specs)
-          VALUES ($1, $2, $3, $4, $5, 'draft', $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-                  $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27,
-                  $28, $29, $30, $31, $32, $33, $34, $35, $36, $37)
+          VALUES ($1, $2, $3, $4, $5, 'draft', $6, $7, $8, $9, $10, $11,
+                  $12, $13, $14, $15, $16, $17, $18, $19,
+                  $20, $21, $22, $23, $24, $25, $26, $27,
+                  $28, $29, $30, $31, $32, $33, $34, $35,
+                  $36, $37, $38, $39, $40, $41, $42, $43, $44, $45)
           RETURNING id`,
         [
           session.accountId,
@@ -393,6 +424,14 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           total_cents,
           deposit_cents,
           balance_cents,
+          depositPolicy.deposit_required,
+          depositPolicy.deposit_type,
+          depositPolicy.deposit_type === "percentage" ? deposit_percentage ?? null : null,
+          depositPolicy.deposit_type === "fixed" ? deposit_fixed_cents ?? null : null,
+          deposit_due_trigger,
+          terms_scope_accepted,
+          terms_payment_accepted,
+          terms_change_order_accepted,
           notes ?? null,
           internal_notes ?? null,
           expires_at ?? null,
