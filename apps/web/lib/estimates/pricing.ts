@@ -12,7 +12,6 @@ import {
   PAINTING_TRIM_ADD_CENTS,
   PREP_LEVEL_MULTIPLIERS,
   MATERIAL_HANDLING_CLIENT_RATE,
-  DEPOSIT_RATE,
   BALANCE_RATE,
   STANDARD_ESTIMATE_NOTES,
   STANDARD_PAYMENT_TERMS,
@@ -88,8 +87,8 @@ export function calculatePaintingEstimate(
   const material_handling_cents = Math.round(material_subtotal_cents * MATERIAL_HANDLING_CLIENT_RATE);
 
   const total_cents = labor_flat_rate_cents + material_subtotal_cents + material_handling_cents;
-  const deposit_cents = Math.round(total_cents * DEPOSIT_RATE);
-  const balance_cents = total_cents - deposit_cents;
+  const deposit_cents = 0;
+  const balance_cents = total_cents;
 
   const internal_labor_cost_cents = Math.round(labor_hours_estimate * LABOR_COST_CENTS_PER_HOUR);
   const gross_margin_cents = labor_flat_rate_cents - internal_labor_cost_cents;
@@ -147,8 +146,8 @@ export function calculateEstimateTotals(items: LineItemInput[]): EstimateTotals 
 
   const subtotal_cents = labor_cents + materials_cents + handling_cents + adjustment_cents;
   const total_cents = subtotal_cents;
-  const deposit_cents = Math.round(total_cents * DEPOSIT_RATE);
-  const balance_cents = total_cents - deposit_cents;
+  const deposit_cents = 0;
+  const balance_cents = total_cents;
 
   return {
     subtotal_cents,

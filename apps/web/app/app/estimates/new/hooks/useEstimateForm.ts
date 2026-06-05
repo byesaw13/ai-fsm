@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { PriceBookService } from "@/components/PriceBookSelector";
 import { formatCents, getStandardEstimateTerms } from "@/lib/estimates/pricing";
+import type { DepositDueTrigger, DepositType } from "@/lib/estimates/deposit-policy";
 import {
   ENGINE_VERSION,
   type MaterialSuggestion,
@@ -121,6 +122,14 @@ export function useEstimateForm({
   );
   const [taxRate, setTaxRate] = useState("0");
   const [sendImmediately, setSendImmediately] = useState(false);
+  const [depositRequired, setDepositRequired] = useState(false);
+  const [depositType, setDepositType] = useState<DepositType>("none");
+  const [depositPercentage, setDepositPercentage] = useState("30");
+  const [depositFixedDollars, setDepositFixedDollars] = useState("0.00");
+  const [depositDueTrigger, setDepositDueTrigger] = useState<DepositDueTrigger>("before_scheduling");
+  const [termsScopeAccepted, setTermsScopeAccepted] = useState(false);
+  const [termsPaymentAccepted, setTermsPaymentAccepted] = useState(false);
+  const [termsChangeOrderAccepted, setTermsChangeOrderAccepted] = useState(false);
 
   const [sqFt, setSqFt] = useState("");
   const [prepLevel, setPrepLevel] = useState(5);
@@ -330,6 +339,7 @@ export function useEstimateForm({
     sqFt, prepLevel, includesTrim, includesCeiling,
     materialCostDollars, scopeMaterialsTotalCents,
     travelSurcharge, riskAdjustment,
+    depositRequired, depositType, depositPercentage, depositFixedDollars, depositDueTrigger,
   });
 
   // ---------------------------------------------------------------------------
@@ -649,6 +659,14 @@ export function useEstimateForm({
         minimum_service_override_reason: minimumOverrideReason || null,
         minimum_service_override_note: minimumOverrideNote.trim() || null,
         scope_assumptions: scopeAssumptions.trim() || null,
+        deposit_required: depositRequired,
+        deposit_type: depositRequired ? depositType : "none",
+        deposit_percentage: depositRequired && depositType === "percentage" ? parseFloat(depositPercentage) || 0 : null,
+        deposit_fixed_cents: depositRequired && depositType === "fixed" ? parseCents(depositFixedDollars) : null,
+        deposit_due_trigger: depositDueTrigger,
+        terms_scope_accepted: termsScopeAccepted,
+        terms_payment_accepted: termsPaymentAccepted,
+        terms_change_order_accepted: termsChangeOrderAccepted,
       });
 
       if (baseEngineSpec) {
@@ -722,6 +740,14 @@ export function useEstimateForm({
     notes, setNotes,
     taxRate, setTaxRate,
     sendImmediately, setSendImmediately,
+    depositRequired, setDepositRequired,
+    depositType, setDepositType,
+    depositPercentage, setDepositPercentage,
+    depositFixedDollars, setDepositFixedDollars,
+    depositDueTrigger, setDepositDueTrigger,
+    termsScopeAccepted, setTermsScopeAccepted,
+    termsPaymentAccepted, setTermsPaymentAccepted,
+    termsChangeOrderAccepted, setTermsChangeOrderAccepted,
     // Painting fields
     sqFt, setSqFt,
     prepLevel, setPrepLevel,

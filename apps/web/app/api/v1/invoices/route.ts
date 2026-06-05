@@ -4,7 +4,7 @@ import { withAuth, withRole } from "@/lib/auth/middleware";
 import { withInvoiceContext, generateInvoiceNumber } from "@/lib/invoices/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
-import { invoiceStatusSchema, DEPOSIT_RATE } from "@ai-fsm/domain";
+import { invoiceStatusSchema } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -163,7 +163,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
   );
   const tax_cents = Math.round((subtotal_cents * tax_rate) / 100);
   const total_cents = subtotal_cents + tax_cents;
-  const deposit_cents = Math.round(total_cents * DEPOSIT_RATE);
+  const deposit_cents = 0;
 
   try {
     const invoice = await withInvoiceContext(session, async (client) => {

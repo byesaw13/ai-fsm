@@ -5,7 +5,7 @@ import { generateInvoiceNumber } from "@/lib/invoices/db";
 /**
  * Side effects that accompany an estimate being approved:
  *  - create the `schedule_job` action item
- *  - auto-create the deposit invoice (once) when deposit_cents > 0
+ *  - auto-create the deposit invoice (once) only when deposit_required is true and deposit_cents > 0
  *
  * The deposit invoice is created as a DRAFT (invoice_kind='deposit') so the
  * owner reviews and sends it deliberately — it is never silently put into a
@@ -38,16 +38,17 @@ export async function createApprovalArtifacts(
     job_id: string | null;
     property_id: string | null;
     deposit_cents: number;
+    deposit_required: boolean;
     notes: string | null;
   }>(
-    `SELECT client_id, job_id, property_id, deposit_cents, notes
+    `SELECT client_id, job_id, property_id, deposit_cents, deposit_required, notes
      FROM estimates WHERE id = $1`,
     [estimateId]
   );
   const est = estData.rows[0];
 
   let depositInvoiceId: string | null = null;
-  if (est && est.deposit_cents > 0) {
+  if (est && est.deposit_required && est.deposit_cents > 0) {
     const existingDeposit = await client.query<{ id: string }>(
       `SELECT id FROM invoices
        WHERE estimate_id = $1 AND account_id = $2 AND invoice_kind = 'deposit'

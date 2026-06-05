@@ -383,7 +383,7 @@ export async function buildEstimatePdf(d: EstimatePdfData): Promise<Uint8Array> 
   if (d.taxCents && d.taxCents > 0) totals.push({ label: "Tax", value: money(d.taxCents) });
   totals.push({ label: "Total", value: money(d.totalCents), strong: true });
   if (d.depositCents && d.depositCents > 0) {
-    totals.push({ label: "Deposit to Schedule", value: money(d.depositCents) });
+    totals.push({ label: "Deposit due", value: money(d.depositCents) });
   }
 
   return renderDocument({

@@ -10,7 +10,6 @@ import {
   PAINTING_RATE_MIN_CENTS,
   PAINTING_TRIM_ADD_CENTS,
   MATERIAL_HANDLING_CLIENT_RATE,
-  DEPOSIT_RATE,
   LABOR_COST_CENTS_PER_HOUR,
   PREP_LEVEL_MULTIPLIERS,
 } from "./dovetails";
@@ -208,8 +207,8 @@ export function computePaintingProject(
   const material_handling_cents = Math.round(material_subtotal_cents * MATERIAL_HANDLING_CLIENT_RATE);
 
   const total_cents = labor_cents + material_subtotal_cents + material_handling_cents;
-  const deposit_cents = Math.round(total_cents * DEPOSIT_RATE);
-  const balance_cents = total_cents - deposit_cents;
+  const deposit_cents = 0;
+  const balance_cents = total_cents;
 
   // Internal cost estimate (labor hours from production rate)
   const total_paintable_sqft = total_wall_sqft + total_ceiling_sqft;
@@ -408,8 +407,8 @@ export function computePaintRooms(rooms: PaintRoom[], coatCount = 2): {
   const totalPrimerGallons = outputs.reduce((s, r) => s + r.primerGallons, 0);
   const handlingCents = Math.round(totalMaterialCost * MATERIAL_HANDLING_CLIENT_RATE);
   const projectPrice = outputs.reduce((s, r) => s + r.roomPrice, 0) + handlingCents;
-  const depositCents = Math.round(projectPrice * DEPOSIT_RATE);
-  const balanceCents = projectPrice - depositCents;
+  const depositCents = 0;
+  const balanceCents = projectPrice;
   const grossMarginPct = projectPrice > 0
     ? Math.round(((projectPrice - totalLaborCost - totalMaterialCost) / projectPrice) * 100)
     : 0;

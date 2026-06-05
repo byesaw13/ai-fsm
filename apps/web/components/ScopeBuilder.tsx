@@ -25,6 +25,7 @@ interface ScopeBuilderProps {
   unitType?: string | null;
   basePriceCents: number;
   priceMinCents?: number;
+  addOnPriceCents?: number | null;
   onChange: (result: ScopeBuilderResult) => void;
   initialScopeValues?: ScopeComponentValues;
   initialComplexityFactors?: string[];
@@ -55,6 +56,52 @@ function formatModifier(multiplier: number, adderCents: number, baseCents: numbe
   if (parts.length === 0) return "No modifiers applied";
   const adjusted = Math.round(baseCents * multiplier) + adderCents;
   return `${parts.join(" ")} → ${formatDollars(adjusted)}`;
+}
+
+const UNIT_COUNT_KEYS = [
+  "fixture_count",
+  "device_count",
+  "piece_count",
+  "mount_count",
+  "repair_count",
+  "door_count",
+  "window_count",
+  "unit_count",
+  "item_count",
+  "quantity",
+  "count",
+];
+
+const NON_UNIT_COUNT_KEYS = new Set(["coat_count"]);
+
+function findUnitCount(values: ScopeComponentValues): number {
+  for (const key of UNIT_COUNT_KEYS) {
+    const val = Number(values[key]);
+    if (Number.isFinite(val) && val > 0) return Math.max(1, Math.floor(val));
+  }
+
+  for (const [key, value] of Object.entries(values)) {
+    if (!key.endsWith("_count") || NON_UNIT_COUNT_KEYS.has(key)) continue;
+    const val = Number(value);
+    if (Number.isFinite(val) && val > 0) return Math.max(1, Math.floor(val));
+  }
+
+  return 1;
+}
+
+function priceWithUnitCount(
+  basePriceCents: number,
+  addOnPriceCents: number | null | undefined,
+  unitType: string | null | undefined,
+  values: ScopeComponentValues,
+): number {
+  const count = findUnitCount(values);
+  if (count <= 1) return basePriceCents;
+
+  if (addOnPriceCents != null) return basePriceCents + (count - 1) * addOnPriceCents;
+  if (unitType === "per_unit" || unitType === "per_room") return basePriceCents * count;
+
+  return basePriceCents;
 }
 
 function ScopeComponentInput({
@@ -203,7 +250,7 @@ function ComplexityFactorRow({
   );
 }
 
-export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, priceMinCents, onChange, initialScopeValues, initialComplexityFactors }: ScopeBuilderProps) {
+export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, priceMinCents, addOnPriceCents, onChange, initialScopeValues, initialComplexityFactors }: ScopeBuilderProps) {
   const [template, setTemplate] = useState<ScopeTemplate | null>(null);
   const [rules, setRules] = useState<ProfitabilityRule[]>([]);
   const [materialRules, setMaterialRules] = useState<ServiceMaterial[]>([]);
@@ -262,7 +309,7 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
     const mod = computeScopeModifier(template.complexity_factors, complexity);
 
     // For per_sqft services, scale base price by the primary area component value
-    let effectiveBase = basePriceCents;
+    let effectiveBase = priceWithUnitCount(basePriceCents, addOnPriceCents, unitType, components);
     if (unitType === "per_sqft") {
       const sqftVal = typeof components.wall_sqft === "number" ? components.wall_sqft
                     : typeof components.sqft === "number" ? components.sqft : 0;
@@ -330,7 +377,7 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
       isProductionBased: false,
       productionDailyRateCents: null,
     };
-  }, [template, complexity, components, basePriceCents, priceMinCents, unitType, rules, category, materialRules, productionRates, productionModifiers, serviceCode]);
+  }, [template, complexity, components, basePriceCents, priceMinCents, addOnPriceCents, unitType, rules, category, materialRules, productionRates, productionModifiers, serviceCode]);
 
   // Notify parent on changes
   useEffect(() => {

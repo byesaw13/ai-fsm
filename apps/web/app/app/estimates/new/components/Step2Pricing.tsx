@@ -438,6 +438,7 @@ export function Step2Pricing({
                           unitType={item.service.unit_type}
                           basePriceCents={item.service.default_price_cents ?? item.priceCents}
                           priceMinCents={item.service.price_min_cents}
+                          addOnPriceCents={item.service.add_on_price_cents}
                           onChange={(result) => handleScopeChange(item.instanceId, result)}
                           initialScopeValues={pendingDraftScope[item.instanceId]?.scopeValues}
                           initialComplexityFactors={pendingDraftScope[item.instanceId]?.complexityFactors}
@@ -840,11 +841,14 @@ export function Step2Pricing({
                         </>
                       )}
 
-                      <span style={{ color: "var(--fg-muted)" }}>Deposit (30%)</span>
-                      <span data-testid="deposit">{formatCents(depositCents)}</span>
-
-                      <span style={{ fontWeight: "var(--font-semibold)" }}>Balance due</span>
-                      <span data-testid="balance-due" style={{ fontWeight: "var(--font-semibold)" }}>{formatCents(balanceDueCents)}</span>
+                      {depositCents > 0 && (
+                        <>
+                          <span style={{ color: "var(--fg-muted)" }}>Deposit due</span>
+                          <span data-testid="deposit">{formatCents(depositCents)}</span>
+                          <span style={{ fontWeight: "var(--font-semibold)" }}>Balance due</span>
+                          <span data-testid="balance-due" style={{ fontWeight: "var(--font-semibold)" }}>{formatCents(balanceDueCents)}</span>
+                        </>
+                      )}
                     </>
                   )}
 

@@ -29,6 +29,14 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
     taxRate, setTaxRate,
     taxRateNum,
     sendImmediately, setSendImmediately,
+    depositRequired, setDepositRequired,
+    depositType, setDepositType,
+    depositPercentage, setDepositPercentage,
+    depositFixedDollars, setDepositFixedDollars,
+    depositDueTrigger, setDepositDueTrigger,
+    termsScopeAccepted, setTermsScopeAccepted,
+    termsPaymentAccepted, setTermsPaymentAccepted,
+    termsChangeOrderAccepted, setTermsChangeOrderAccepted,
     sqFt, setSqFt,
     prepLevel, setPrepLevel,
     includesTrim, setIncludesTrim,
@@ -253,6 +261,14 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
           difficultAccess={difficultAccess} setDifficultAccess={setDifficultAccess}
           oldHouseRisk={oldHouseRisk} setOldHouseRisk={setOldHouseRisk}
           coordinationRequired={coordinationRequired} setCoordinationRequired={setCoordinationRequired}
+          depositRequired={depositRequired} setDepositRequired={setDepositRequired}
+          depositType={depositType} setDepositType={setDepositType}
+          depositPercentage={depositPercentage} setDepositPercentage={setDepositPercentage}
+          depositFixedDollars={depositFixedDollars} setDepositFixedDollars={setDepositFixedDollars}
+          depositDueTrigger={depositDueTrigger} setDepositDueTrigger={setDepositDueTrigger}
+          termsScopeAccepted={termsScopeAccepted} setTermsScopeAccepted={setTermsScopeAccepted}
+          termsPaymentAccepted={termsPaymentAccepted} setTermsPaymentAccepted={setTermsPaymentAccepted}
+          termsChangeOrderAccepted={termsChangeOrderAccepted} setTermsChangeOrderAccepted={setTermsChangeOrderAccepted}
         />
       )}
 

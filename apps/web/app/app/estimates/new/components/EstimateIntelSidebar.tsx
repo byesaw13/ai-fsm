@@ -94,10 +94,12 @@ export function EstimateIntelSidebar({ intel }: EstimateIntelSidebarProps) {
         <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-2xl, 1.5rem)", fontWeight: 800, color: "var(--fg)", lineHeight: 1 }}>
           {fmt$(totalCents)}
         </p>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-          <span>Deposit (30%): <strong style={{ color: "var(--fg)" }}>{fmt$(depositCents)}</strong></span>
-          <span>Balance: <strong style={{ color: "var(--fg)" }}>{fmt$(balanceDueCents)}</strong></span>
-        </div>
+        {depositCents > 0 && (
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+            <span>Deposit due: <strong style={{ color: "var(--fg)" }}>{fmt$(depositCents)}</strong></span>
+            <span>Balance: <strong style={{ color: "var(--fg)" }}>{fmt$(balanceDueCents)}</strong></span>
+          </div>
+        )}
       </div>
 
       {/* ── Margin & profit ───────────────────────────────────────────────── */}

@@ -8,6 +8,7 @@
 import { computeEstimate, CURRENT_RULES, ENGINE_VERSION } from "@ai-fsm/domain";
 import type { EstimateSpec, EstimateResult } from "@ai-fsm/domain";
 import { query } from "@/lib/db";
+import { calculateDepositPolicy } from "@/lib/estimates/deposit-policy";
 
 export interface ComputeAndPersistArgs {
   estimateId: string;
@@ -27,6 +28,27 @@ export async function computeAndPersist(args: ComputeAndPersistArgs): Promise<Co
   const { estimateId, accountId, spec } = args;
 
   const result = computeEstimate(spec, CURRENT_RULES);
+
+  const policyRows = await query<{
+    deposit_required: boolean;
+    deposit_type: "none" | "materials" | "percentage" | "fixed";
+    deposit_percentage: number | null;
+    deposit_fixed_cents: number | null;
+  }>(
+    `SELECT deposit_required, deposit_type, deposit_percentage, deposit_fixed_cents
+     FROM estimates WHERE id =  AND account_id = `,
+    [estimateId, accountId]
+  );
+  const policy = policyRows[0];
+  const materialTotalCents = result.summary.materialCents + result.summary.handlingCents;
+  const depositPolicy = calculateDepositPolicy({
+    deposit_required: policy?.deposit_required ?? false,
+    deposit_type: policy?.deposit_type ?? "none",
+    deposit_percentage: policy?.deposit_percentage ?? null,
+    deposit_fixed_cents: policy?.deposit_fixed_cents ?? null,
+    material_total_cents: materialTotalCents,
+    total_cents: result.summary.totalCents,
+  });
 
   await query(
     `UPDATE estimates SET
@@ -50,8 +72,8 @@ export async function computeAndPersist(args: ComputeAndPersistArgs): Promise<Co
       JSON.stringify(result),
       result.summary.subtotalCents,
       result.summary.totalCents,
-      result.summary.depositCents,
-      result.summary.balanceDueCents,
+      depositPolicy.deposit_cents,
+      depositPolicy.balance_cents,
       result.internalSummary.estimatedCostCents,
       Math.round(result.internalSummary.grossMarginPct * 100 * 10) / 10,
       estimateId,

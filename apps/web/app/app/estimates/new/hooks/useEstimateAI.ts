@@ -237,7 +237,7 @@ export function useEstimateAI({
         default_price_cents: svc.base_price_cents,
         price_min_cents: svc.base_price_cents,
         price_max_cents: null,
-        add_on_price_cents: null,
+        add_on_price_cents: svc.add_on_price_cents ?? null,
         unit_type: svc.unit_type ?? "flat",
         description: null,
         notes: null,

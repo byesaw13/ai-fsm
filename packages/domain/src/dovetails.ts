@@ -155,10 +155,10 @@ export function calculateMaterialMarkup(materialCostCents: number): number {
 // Deposits & payment terms
 // ---------------------------------------------------------------------------
 
-/** Deposit required before scheduling: 30% of total estimate. */
+/**  Deposits are explicit estimate policy; do not use as a default. */
 export const DEPOSIT_RATE = 0.30;
 
-/** Balance due upon completion: 70% of total estimate. */
+/**  Balances are total minus explicit deposit policy. */
 export const BALANCE_RATE = 0.70;
 
 // ---------------------------------------------------------------------------
@@ -184,8 +184,8 @@ Any work outside the defined scope will be quoted separately.
 `.trim();
 
 export const STANDARD_PAYMENT_TERMS = `
-A 30% deposit is required to schedule your project.
-Remaining balance is due upon completion of work.
+Deposits are required only when explicitly listed on the estimate.
+Any remaining balance is due according to the accepted estimate terms.
 `.trim();
 
 export const STANDARD_DISCLAIMER = `

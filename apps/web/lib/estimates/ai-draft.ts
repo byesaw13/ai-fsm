@@ -41,6 +41,7 @@ export interface DraftService {
   service_category: string;
   base_price_cents: number;
   unit_type: string;
+  add_on_price_cents: number | null;
   scope_values: Record<string, number | string>;
   complexity_factor_keys: string[];
   trade_detected: string;
@@ -163,6 +164,9 @@ ${tradeContextBlocks}
 - Prefer core and standard tier items over specialty
 - Maximum 6 services — quality over quantity
 - If 4+ services, note in confidence_notes whether a half-day block ($515) or full-day block ($980) may be worth considering
+
+**CRITICAL — Unit count and add-on pricing:**
+When one catalog service covers the first unit and lists an add-on price for additional units, return ONE service with the total count in the correct scope value rather than duplicating the service. Examples: 2 ceiling fans → service 3002 with fixture_count: 2; 3 light fixtures → service 3001 with fixture_count: 3. The pricing engine will calculate first unit at base price plus discounted add-ons.
 
 **CRITICAL — Painting trim deduplication:**
 Service 5012 (Interior room painting) already includes trim/baseboard pricing within its scope when trim_linear_ft is set. Do NOT also select service 5003 (Trim/baseboard painting) as a separate line when 5012 is present — this double-counts trim labor and materials. Only select 5003 as a standalone service when ONLY trim is being painted (not walls). If both walls and trim are included, use 5012 alone with trim_linear_ft in scope_values.
@@ -441,10 +445,11 @@ function buildCatalogText(items: PriceBookEntry[]): string {
       const scope = item.scope_description ? ` | scope: ${item.scope_description}` : "";
       const excl = item.excluded_items ? ` | excl: ${item.excluded_items}` : "";
       const mats = item.requires_materials ? " | needs materials" : "";
+      const addOn = item.add_on_price_cents ? " | add-on $" + (item.add_on_price_cents / 100).toFixed(0) : "";
       const legalMa = item.legal_status_ma !== "legal" ? ` | [MA:${item.legal_status_ma}]` : "";
       const qt = item.quote_trigger ? " | [QUOTE]" : "";
       const desc = item.description ? ` — ${item.description}` : "";
-      return `${item.code} | ${item.category} | ${item.name}${desc} | ${priceRange}${hours}${scope}${excl}${mats}${legalMa}${qt}`;
+      return `${item.code} | ${item.category} | ${item.name}${desc} | ${priceRange}${hours}${addOn}${scope}${excl}${mats}${legalMa}${qt}`;
     })
     .join("\n");
 }
@@ -558,6 +563,7 @@ export async function draftEstimate(
           service_category: pb.category,
           base_price_cents: pb.default_price_cents ?? pb.price_min_cents,
           unit_type: pb.unit_type ?? "flat",
+          add_on_price_cents: pb.add_on_price_cents,
           scope_values: s.scope_values,
           complexity_factor_keys: s.complexity_factor_keys,
           trade_detected: s.trade_detected ?? "unknown",

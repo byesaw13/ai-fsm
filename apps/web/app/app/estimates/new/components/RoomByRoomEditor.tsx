@@ -434,7 +434,7 @@ export function RoomByRoomEditor({ rooms, options, onChange }: RoomByRoomEditorP
               { label: "Labor", value: formatDollars(result.labor_cents) },
               ...(result.material_subtotal_cents > 0 ? [{ label: "Materials", value: formatDollars(result.material_subtotal_cents) }] : []),
               { label: "Est. total", value: formatDollars(result.total_cents) },
-              { label: "Deposit (30%)", value: formatDollars(result.deposit_cents) },
+              ...(result.deposit_cents > 0 ? [{ label: "Deposit due", value: formatDollars(result.deposit_cents) }] : []),
             ].map(({ label, value }) => (
               <div key={label}>
                 <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{label}</p>
