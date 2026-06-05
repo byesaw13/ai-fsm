@@ -59,11 +59,11 @@ export function EstimateInterviewFlow({
   const threadRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Open with the AI's first message
+  // Open with the AI's first message — framed as an internal tool, not customer intake
   useEffect(() => {
     const openingMessage: InterviewMessage = {
       role: "assistant",
-      content: "Tell me about the work that needs to be done.",
+      content: "Describe the job and I'll draft the estimate. Include the scope, measurements if you have them, and who's supplying materials.",
     };
     setMessages([openingMessage]);
     inputRef.current?.focus();
@@ -240,7 +240,7 @@ export function EstimateInterviewFlow({
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-3)" }}>
         <div>
-          <h3 style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)" }}>AI Estimate Interview</h3>
+          <h3 style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)" }}>Estimating Assistant</h3>
           {extractedFacts && (
             <p style={{ margin: "2px 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
               {extractedFacts.job_types.join(", ")}
@@ -291,20 +291,28 @@ export function EstimateInterviewFlow({
             key={i}
             style={{
               display: "flex",
-              justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
+              gap: "var(--space-2)",
+              alignItems: "flex-start",
             }}
           >
+            <span style={{
+              fontSize: "var(--text-xs)",
+              fontWeight: 700,
+              color: msg.role === "user" ? "var(--accent)" : "var(--fg-muted)",
+              minWidth: 28,
+              paddingTop: 2,
+              flexShrink: 0,
+            }}>
+              {msg.role === "user" ? "You" : "AI"}
+            </span>
             <div
               style={{
-                maxWidth: "78%",
-                padding: "var(--space-2) var(--space-3)",
-                borderRadius: msg.role === "user" ? "12px 12px 4px 12px" : "12px 12px 12px 4px",
-                background: msg.role === "user" ? "var(--accent)" : "var(--bg-surface)",
-                color: msg.role === "user" ? "#fff" : "var(--fg)",
-                border: msg.role === "assistant" ? "1px solid var(--border)" : "none",
+                flex: 1,
+                padding: "var(--space-1) 0",
                 fontSize: "var(--text-sm)",
                 lineHeight: 1.5,
                 whiteSpace: "pre-wrap",
+                color: "var(--fg)",
               }}
             >
               {msg.content}
@@ -313,17 +321,11 @@ export function EstimateInterviewFlow({
         ))}
 
         {isWaiting && (
-          <div style={{ display: "flex", justifyContent: "flex-start" }}>
-            <div style={{
-              padding: "var(--space-2) var(--space-3)",
-              borderRadius: "12px 12px 12px 4px",
-              background: "var(--bg-surface)",
-              border: "1px solid var(--border)",
-              color: "var(--fg-muted)",
-              fontSize: "var(--text-sm)",
-            }}>
-              <span style={{ animation: "pulse 1.5s ease-in-out infinite" }}>thinking…</span>
-            </div>
+          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-start" }}>
+            <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--fg-muted)", minWidth: 28, paddingTop: 2 }}>AI</span>
+            <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", animation: "pulse 1.5s ease-in-out infinite" }}>
+              working…
+            </span>
           </div>
         )}
       </div>
@@ -369,7 +371,7 @@ export function EstimateInterviewFlow({
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type your answer… (Enter to send, Shift+Enter for new line)"
+          placeholder="Describe the job… (Enter to send, Shift+Enter for new line)"
           disabled={isWaiting || phase !== "chatting"}
           rows={2}
           style={{
