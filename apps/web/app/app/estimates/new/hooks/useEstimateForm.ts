@@ -66,6 +66,8 @@ export interface NewEstimateFormProps {
   initialPricingMode?: "itemized" | "flat_rate" | "multi_option";
   /** When set, the form auto-applies this draft on mount (from AI interview flow) */
   initialInterviewDraft?: { draft: import("@/lib/estimates/ai-draft").DraftEstimate; shoppingList: ShoppingList | null } | null;
+  /** Seed text for the notes/scope field (e.g. walkthrough findings). Initial value only — never overwrites edits. */
+  initialNotes?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,8 +83,9 @@ export function useEstimateForm({
   initialPropertyId,
   initialVaultItemId,
   vaultItemContext,
-  initialPricingMode = "itemized",
+  initialPricingMode = "flat_rate",
   initialInterviewDraft,
+  initialNotes,
 }: NewEstimateFormProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -108,7 +111,11 @@ export function useEstimateForm({
   );
   const [expiresAt, setExpiresAt] = useState("");
   const [notes, setNotes] = useState(
-    vaultItemContext
+    // Initial value only (runs once on mount) so later user edits are never overwritten.
+    // Walkthrough prefill takes precedence, then vault-item context, then empty.
+    initialNotes?.trim()
+      ? initialNotes
+      : vaultItemContext
       ? `Service for ${vaultItemContext.name}${vaultItemContext.location ? ` (${vaultItemContext.location})` : ""} — ${vaultItemContext.category}.`
       : ""
   );

@@ -7,11 +7,13 @@ import {
 } from "@/lib/auth/permissions";
 import { withEstimateContext } from "@/lib/estimates/db";
 import { getPool } from "@/lib/db";
-import { estimateTransitions, PREP_LEVEL_MULTIPLIERS, computeRoomMeasurements } from "@ai-fsm/domain";
+import { PREP_LEVEL_MULTIPLIERS, computeRoomMeasurements } from "@ai-fsm/domain";
 import type { EstimateStatus, RoomSpec } from "@ai-fsm/domain";
+import { manualEstimateTransitions } from "@/lib/estimates/transitions";
 import { EstimateTransitionForm } from "./EstimateTransitionForm";
 import { EstimateInternalNotesForm } from "./EstimateInternalNotesForm";
 import { EstimateConvertButton } from "./EstimateConvertButton";
+import { CreateJobFromEstimateButton } from "./CreateJobFromEstimateButton";
 import { DeleteEstimateButton } from "./DeleteEstimateButton";
 import { EstimateEditForm } from "./EstimateEditForm";
 import { EstimateReviewPanel } from "./EstimateReviewPanel";
@@ -213,6 +215,33 @@ export default async function EstimateDetailPage({
     }
   }
 
+  // Deposit + final invoice status for the approved-estimate billing summary.
+  type EstimateInvoiceRow = {
+    id: string;
+    invoice_kind: string;
+    invoice_number: string;
+    status: string;
+    total_cents: number;
+    balance_cents: number;
+  };
+  let depositInvoice: EstimateInvoiceRow | null = null;
+  let finalInvoice: EstimateInvoiceRow | null = null;
+  if (estimate.status === "approved") {
+    try {
+      const pool = getPool();
+      const invRows = await pool.query<EstimateInvoiceRow>(
+        `SELECT id, invoice_kind, invoice_number, status, total_cents, balance_cents
+         FROM invoices
+         WHERE estimate_id = $1 AND account_id = $2 AND invoice_kind IN ('deposit','final')`,
+        [id, session.accountId]
+      );
+      depositInvoice = invRows.rows.find((r) => r.invoice_kind === "deposit") ?? null;
+      finalInvoice = invRows.rows.find((r) => r.invoice_kind === "final") ?? null;
+    } catch {
+      // Non-critical — proceed without billing summary
+    }
+  }
+
   // Fetch change orders for this estimate
   let changeOrders: unknown[] = [];
   try {
@@ -258,7 +287,8 @@ export default async function EstimateDetailPage({
   }
 
   const currentStatus = estimate.status;
-  const allowedTransitions = estimateTransitions[currentStatus];
+  // Manual transitions exclude `sent` — sending is the only path to sent status.
+  const allowedTransitions = manualEstimateTransitions(currentStatus);
   const canTransition = canCreateEstimates(session.role);
   const canDelete = canDeleteRecords(session.role);
   const canEditInternalNotes =
@@ -386,9 +416,7 @@ export default async function EstimateDetailPage({
               </Link>
             )}
             {!estimate.job_id && (
-              <span style={{ fontSize: "var(--text-sm)", color: "#065f46", opacity: 0.8 }}>
-                No linked job — create a job first to schedule visits.
-              </span>
+              <CreateJobFromEstimateButton estimateId={estimate.id} />
             )}
             <a
               href="#materials-plan-handoff"
@@ -397,6 +425,49 @@ export default async function EstimateDetailPage({
               Project handoff ↓
             </a>
           </div>
+
+          {/* Billing summary — makes deposit vs final handling explicit */}
+          {(depositInvoice || finalInvoice) && (
+            <div
+              style={{
+                marginTop: "var(--space-3)",
+                paddingTop: "var(--space-3)",
+                borderTop: "1px solid #bbf7d0",
+                display: "flex",
+                gap: "var(--space-4)",
+                flexWrap: "wrap",
+                fontSize: "var(--text-sm)",
+              }}
+              data-testid="estimate-billing-summary"
+            >
+              {depositInvoice && (
+                <Link
+                  href={`/app/invoices/${depositInvoice.id}`}
+                  style={{ color: "#065f46", textDecoration: "none" }}
+                  data-testid="deposit-invoice-link"
+                >
+                  <strong>Deposit invoice</strong> {depositInvoice.invoice_number} ·{" "}
+                  {formatDollars(depositInvoice.total_cents)} · {depositInvoice.status} →
+                </Link>
+              )}
+              {finalInvoice ? (
+                <Link
+                  href={`/app/invoices/${finalInvoice.id}`}
+                  style={{ color: "#065f46", textDecoration: "none" }}
+                  data-testid="final-invoice-link"
+                >
+                  <strong>Final invoice</strong> {finalInvoice.invoice_number} · balance{" "}
+                  {formatDollars(finalInvoice.balance_cents)} · {finalInvoice.status} →
+                </Link>
+              ) : (
+                <span style={{ color: "#065f46", opacity: 0.8 }}>
+                  {depositInvoice
+                    ? "Final invoice not yet created — it will credit the deposit above."
+                    : "No invoice yet — create the final invoice when work is ready to bill."}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -995,7 +1066,7 @@ export default async function EstimateDetailPage({
                   {jobVisitCount > 0 ? "Manage Job →" : "Schedule Work →"}
                 </Link>
               ) : (
-                <span className="p7-btn p7-btn-secondary p7-btn-sm" aria-disabled="true">No linked job</span>
+                <CreateJobFromEstimateButton estimateId={estimate.id} />
               )}
             </div>
             <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-3)" }}>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Card } from "@/components/ui";
-import { EstimateLaunchModal, type EstimateMode } from "./EstimateLaunchModal";
+import { EstimateLaunchModal, resolveEntryPricingMode, type EstimateMode } from "./EstimateLaunchModal";
 import { EstimateInterviewFlow } from "./EstimateInterviewFlow";
 import { NewEstimateForm } from "./NewEstimateForm";
 import type { DraftEstimate } from "@/lib/estimates/ai-draft";
@@ -20,6 +20,7 @@ interface EstimateEntryShellProps {
   vaultItemContext?: { name: string; category: string; location: string | null } | null;
   initialPricingMode?: "itemized" | "flat_rate" | "multi_option";
   initialMode?: EstimateMode;
+  initialNotes?: string;
 }
 
 export function EstimateEntryShell({
@@ -31,17 +32,19 @@ export function EstimateEntryShell({
   initialPropertyId,
   initialVaultItemId,
   vaultItemContext,
-  initialPricingMode = "itemized",
+  initialPricingMode,
   initialMode,
+  initialNotes,
 }: EstimateEntryShellProps) {
   const [mode, setMode] = useState<EstimateMode | null>(initialMode ?? null);
-  // After interview applies draft: switch to manual form pre-populated
+  // After interview applies draft: switch to the manual form pre-populated.
   const [appliedDraft, setAppliedDraft] = useState<{
     draft: DraftEstimate;
     shoppingList: ShoppingList | null;
   } | null>(null);
 
-  if (!mode) {    return (
+  if (!mode) {
+    return (
       <Card style={{ padding: "var(--space-6)" }}>
         <EstimateLaunchModal onSelect={setMode} />
       </Card>
@@ -56,17 +59,21 @@ export function EstimateEntryShell({
           clientId={initialClientId}
           onApplyDraft={({ draft, shoppingList }) => {
             setAppliedDraft({ draft, shoppingList });
-            setMode("manual");
+            // AI drafts produce line items → continue in itemized form.
+            setMode("detailed");
           }}
-          onSwitchToManual={() => setMode("manual")}
+          onSwitchToManual={() => setMode("detailed")}
         />
       </Card>
     );
   }
 
-  // Manual / post-interview: render existing form
-  // When coming from interview, the form will pick up the draft from
-  // a sessionStorage pre-fill mechanism (handled by onApplyDraft above)
+  // Resolve the form's pricing mode from the entry mode (Quick → flat-rate,
+  // Detailed/AI → itemized). An explicit URL/preset pricing mode still wins.
+  const resolvedPricingMode = resolveEntryPricingMode(mode, initialPricingMode);
+
+  // Manual / post-interview form. When coming from the interview, the form picks
+  // up the applied draft (sessionStorage + initialInterviewDraft).
   return (
     <Card>
       <NewEstimateForm
@@ -78,8 +85,9 @@ export function EstimateEntryShell({
         initialPropertyId={initialPropertyId}
         initialVaultItemId={initialVaultItemId}
         vaultItemContext={vaultItemContext}
-        initialPricingMode={initialPricingMode}
+        initialPricingMode={resolvedPricingMode}
         initialInterviewDraft={appliedDraft ?? undefined}
+        initialNotes={initialNotes}
       />
     </Card>
   );
