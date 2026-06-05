@@ -23,6 +23,7 @@ vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn() } }));
 import { POST as QuickLeadPOST } from "../route";
 import { PATCH } from "../[id]/route";
 import { POST as RepairPOST } from "../[id]/repair/route";
+import { POST as ConvertPOST } from "../[id]/convert/route";
 
 const REQUEST_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const CLIENT_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
@@ -282,5 +283,43 @@ describe("PATCH /api/v1/booking-requests/[id]", () => {
     expect(res.status).toBe(404);
     const json = await res.json();
     expect(json.error.code).toBe("NOT_FOUND");
+  });
+});
+
+describe("POST /api/v1/booking-requests/[id]/convert", () => {
+  it("rejects duplicate conversion when the request is already converted", async () => {
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // set_config
+      .mockResolvedValueOnce({ rows: [{ status: "converted" }] }) // SELECT booking request FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+    const res = await ConvertPOST(new NextRequest(`${BASE}/convert`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ preferred_date: "2099-05-12" }),
+    }));
+
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error.code).toBe("CONFLICT");
+  });
+
+  it("rejects duplicate conversion when a visit is already linked", async () => {
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // set_config
+      .mockResolvedValueOnce({ rows: [{ status: "reviewed", job_id: JOB_ID, visit_id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee" }] }) // SELECT booking request FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+    const res = await ConvertPOST(new NextRequest(`${BASE}/convert`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ preferred_date: "2099-05-12" }),
+    }));
+
+    expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error.code).toBe("CONFLICT");
   });
 });
