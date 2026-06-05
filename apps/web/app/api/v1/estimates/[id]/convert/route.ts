@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { withRole } from "@/lib/auth/middleware";
 import { appendAuditLog } from "@/lib/db/audit";
 import { withInvoiceContext, generateInvoiceNumber } from "@/lib/invoices/db";
+import { reconcileFinalInvoice } from "@/lib/invoices/billing";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -69,25 +70,45 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         );
       }
 
-      // 3. Idempotency guard: check if an invoice already exists for this estimate
-      const existingInvoice = await client.query<{
+      // 3. Idempotency guard: only a prior FINAL invoice counts as "already
+      //    converted". A deposit invoice (created on approval) must NOT short
+      //    circuit this — otherwise Convert would return the deposit invoice
+      //    and the real final invoice would never be created.
+      const existingFinal = await client.query<{
         id: string;
         status: string;
       }>(
         `SELECT id, status FROM invoices
-         WHERE estimate_id = $1 AND account_id = $2
+         WHERE estimate_id = $1 AND account_id = $2 AND invoice_kind = 'final'
          LIMIT 1`,
         [id, session.accountId]
       );
 
-      if (existingInvoice.rowCount !== null && existingInvoice.rowCount > 0) {
-        // Already converted — return existing invoice (idempotent)
+      if (existingFinal.rowCount !== null && existingFinal.rowCount > 0) {
+        // Already converted — return existing final invoice (idempotent)
         return {
-          invoice_id: existingInvoice.rows[0].id,
-          invoice_status: existingInvoice.rows[0].status,
+          invoice_id: existingFinal.rows[0].id,
+          invoice_status: existingFinal.rows[0].status,
           created: false,
         };
       }
+
+      // 3b. Reconcile against any deposit invoices already billed so the final
+      //     invoice credits the deposit and the two never double-bill.
+      const depositInvoices = await client.query<{
+        invoice_number: string;
+        total_cents: number;
+        status: string;
+      }>(
+        `SELECT invoice_number, total_cents, status FROM invoices
+         WHERE estimate_id = $1 AND account_id = $2 AND invoice_kind = 'deposit'`,
+        [id, session.accountId]
+      );
+
+      const reconciliation = reconcileFinalInvoice({
+        invoiceTotalCents: estimate.total_cents,
+        depositInvoices: depositInvoices.rows,
+      });
 
       // 4. Fetch estimate line items for copying
       const lineItemsResult = await client.query(
@@ -112,15 +133,21 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         session.accountId
       );
 
-      // 6. Create invoice as immutable snapshot of approved estimate
+      // 6. Create the FINAL invoice as an immutable snapshot of the approved
+      //    estimate. It carries the full project total; deposit_cents holds the
+      //    deposit already billed so the generated balance_cents excludes it.
+      const finalNotes = reconciliation.reconciliationNote
+        ? `${estimate.notes ? `${estimate.notes}\n\n` : ""}${reconciliation.reconciliationNote}`
+        : estimate.notes;
+
       const invoiceResult = await client.query<{ id: string }>(
         `INSERT INTO invoices
            (account_id, client_id, job_id, estimate_id, property_id,
-            status, invoice_number,
+            status, invoice_kind, invoice_number,
             subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
             notes, created_by)
          VALUES ($1, $2, $3, $4, $5,
-                 'draft', $6,
+                 'draft', 'final', $6,
                  $7, $8, $9, 0, $10,
                  $11, $12)
          RETURNING id`,
@@ -134,8 +161,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           estimate.subtotal_cents,
           estimate.tax_cents,
           estimate.total_cents,
-          estimate.deposit_cents,
-          estimate.notes,
+          reconciliation.depositCreditCents,
+          finalNotes,
           session.userId,
         ]
       );
@@ -171,7 +198,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           source: "estimate_conversion",
           estimate_id: id,
           invoice_number: invoiceNumber,
+          invoice_kind: "final",
           total_cents: estimate.total_cents,
+          deposit_credit_cents: reconciliation.depositCreditCents,
+          balance_due_cents: reconciliation.balanceDueCents,
           line_item_count: lineItems.length,
         },
       });
@@ -180,6 +210,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         invoice_id: invoiceId,
         invoice_number: invoiceNumber,
         invoice_status: "draft",
+        deposit_credit_cents: reconciliation.depositCreditCents,
+        balance_due_cents: reconciliation.balanceDueCents,
         created: true,
       };
     });

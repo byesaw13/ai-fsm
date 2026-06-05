@@ -7,6 +7,13 @@ import { generateInvoiceNumber } from "@/lib/invoices/db";
  *  - create the `schedule_job` action item
  *  - auto-create the deposit invoice (once) when deposit_cents > 0
  *
+ * The deposit invoice is created as a DRAFT (invoice_kind='deposit') so the
+ * owner reviews and sends it deliberately — it is never silently put into a
+ * billable `sent` state. The final invoice (invoice_kind='final', created by
+ * the estimate→invoice Convert path) credits this deposit so the two invoices
+ * sum to exactly the estimate total. See lib/invoices/billing.ts and
+ * migration 104_invoice_kind.sql.
+ *
  * Extracted from the estimate transition route so both the owner-facing
  * transition endpoint and the non-session SMS auto-approve path share one
  * canonical implementation. Caller must run this inside a transaction with
@@ -43,22 +50,25 @@ export async function createApprovalArtifacts(
   if (est && est.deposit_cents > 0) {
     const existingDeposit = await client.query<{ id: string }>(
       `SELECT id FROM invoices
-       WHERE estimate_id = $1 AND account_id = $2 AND notes LIKE 'Deposit: %'
+       WHERE estimate_id = $1 AND account_id = $2 AND invoice_kind = 'deposit'
        LIMIT 1`,
       [estimateId, accountId]
     );
 
     if (existingDeposit.rowCount === 0) {
       const invoiceNumber = await generateInvoiceNumber(client, accountId);
+      // Deposit invoice: created as a reviewable DRAFT, not silently `sent`.
+      // deposit_cents = 0 on the deposit invoice itself (its own total IS the
+      // deposit); the credit is applied to the FINAL invoice instead.
       const depositResult = await client.query<{ id: string }>(
         `INSERT INTO invoices
            (account_id, client_id, job_id, estimate_id, property_id,
-            status, invoice_number,
+            status, invoice_kind, invoice_number,
             subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
             notes, created_by)
          VALUES ($1, $2, $3, $4, $5,
-                 'sent', $6,
-                 $7, 0, $7, 0, $7,
+                 'draft', 'deposit', $6,
+                 $7, 0, $7, 0, 0,
                  $8, $9)
          RETURNING id`,
         [

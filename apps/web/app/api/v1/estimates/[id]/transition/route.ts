@@ -6,7 +6,6 @@ import { withEstimateContext } from "@/lib/estimates/db";
 import { logger } from "@/lib/logger";
 import { estimateStatusSchema, estimateTransitions } from "@ai-fsm/domain";
 import type { EstimateStatus } from "@ai-fsm/domain";
-import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
 import { resolveActionItems } from "@/lib/action-items";
 import { createApprovalArtifacts } from "@/lib/estimates/approve";
 
@@ -64,6 +63,25 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
   }
 
   const { status: targetStatus } = parseResult.data;
+
+  // `sent` may never be reached through the manual transition endpoint. The
+  // only path to `sent` is the Send action, which actually delivers the
+  // estimate to the client and flips the status atomically. This prevents an
+  // estimate being marked "sent" without ever being delivered.
+  if (targetStatus === "sent") {
+    return NextResponse.json(
+      {
+        error: {
+          code: "USE_SEND_ACTION",
+          message:
+            "An estimate becomes 'sent' only by delivering it. Use the Send to Client action.",
+          traceId: session.traceId,
+        },
+      },
+      { status: 409 }
+    );
+  }
+
   let createdDepositInvoiceId: string | null = null;
 
   try {
@@ -113,29 +131,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         );
       }
 
-      if (targetStatus === "sent") {
-        const pricingReview = reviewEstimateGuardrails({
-          ...existing.rows[0],
-          margin_pct: null,
-          has_ma_regulated_items: false,
-          line_item_count: existing.rows[0].line_item_count,
-        });
-        await client.query(
-          `UPDATE estimates
-           SET pricing_review_status = $1,
-               pricing_reviewed_at = now(),
-               pricing_reviewed_by = $2,
-               updated_at = now()
-           WHERE id = $3`,
-          [pricingReview.status, session.userId, id]
-        );
-        if (pricingReview.blockers.length > 0) {
-          throw Object.assign(
-            new Error(pricingReview.blockers.map((b) => b.message).join(" ")),
-            { code: "PRICING_REVIEW_BLOCKED" }
-          );
-        }
-      }
+      // Note: the `sent` target is rejected before the transaction (see the
+      // USE_SEND_ACTION guard above). The Send action performs its own pricing
+      // review and the draft→sent flip, so no sent handling is needed here.
 
       // Execute the transition; DB triggers enforce at storage layer too
       await client.query(
@@ -143,17 +141,14 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         [targetStatus, id]
       );
 
-      // Resolve send_estimate action item on any terminal or sent transition.
-      // On a terminal decision, also clear any confirm_approval item raised by
-      // an SMS approval so the Inbox reminder resolves once acted on.
-      if (["sent", "approved", "declined", "expired"].includes(targetStatus)) {
+      // Resolve action items on a terminal decision. Also clear any
+      // confirm_approval item raised by an SMS approval so the Inbox reminder
+      // resolves once acted on. (`sent` is handled by the Send action, not here.)
+      if (["approved", "declined", "expired"].includes(targetStatus)) {
         await resolveActionItems(client, {
           accountId: session.accountId,
           entityId: id,
-          actionTypes:
-            targetStatus === "sent"
-              ? ["send_estimate"]
-              : ["send_estimate", "confirm_approval"],
+          actionTypes: ["send_estimate", "confirm_approval"],
           resolvedBy: session.userId,
         });
       }

@@ -4,6 +4,7 @@ import { canCreateEstimates } from "@/lib/auth/permissions";
 import { query, queryOne } from "@/lib/db";
 import { Card, PageContainer, PageHeader } from "@/components/ui";
 import { EstimateEntryShell } from "./EstimateEntryShell";
+import { buildWalkthroughScopeNotes } from "@/lib/estimates/walkthrough-prefill";
 
 export const dynamic = "force-dynamic";
 
@@ -105,6 +106,27 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
     );
   }
 
+  // Build the scope-notes prefill from the walkthrough evidence so the estimate
+  // form opens with the tech's findings already captured (not re-typed).
+  let walkthroughPrefill = "";
+  if (walkthroughContext) {
+    const partRows = await query<{ name: string; quantity: number | string }>(
+      `SELECT name, quantity FROM visit_parts
+       WHERE visit_id = $1 AND account_id = $2
+       ORDER BY created_at ASC`,
+      [walkthroughContext.id, session.accountId]
+    );
+    walkthroughPrefill = buildWalkthroughScopeNotes({
+      visitDate: typeof walkthroughContext.scheduled_start === "string"
+        ? walkthroughContext.scheduled_start
+        : null,
+      techNotes: walkthroughContext.tech_notes,
+      parts: partRows.map((p) => ({ name: p.name, quantity: Number(p.quantity) })),
+      assessmentPhotoCount: walkthroughContext.assessment_photo_count,
+      beforePhotoCount: walkthroughContext.before_photo_count,
+    });
+  }
+
   return (
     <PageContainer>
       <PageHeader title="New Estimate" backHref="/app/estimates" backLabel="Estimates" />
@@ -144,8 +166,9 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
         initialPropertyId={property_id}
         initialVaultItemId={vault_item_id}
         vaultItemContext={vaultItemContext}
-        initialPricingMode={pricing_mode ?? "itemized"}
-        initialMode={walkthroughContext ? "manual" : undefined}
+        initialPricingMode={pricing_mode}
+        initialMode={walkthroughContext ? "quick" : undefined}
+        initialNotes={walkthroughPrefill || undefined}
       />
     </PageContainer>
   );

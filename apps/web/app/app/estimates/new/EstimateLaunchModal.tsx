@@ -1,6 +1,29 @@
 "use client";
 
-export type EstimateMode = "ai" | "manual" | "duplicate" | "convert";
+// Estimate entry modes. The two dead paths from the old modal — "duplicate"
+// (never pre-filled) and "convert booking request" (never pre-filled) — were
+// removed because they only opened a blank manual form. See
+// docs/generated/ESTIMATE_SYSTEM_DEEP_AUDIT.md.
+//
+//   quick    → manual form defaulting to flat-rate (the most common Dovetails estimate)
+//   detailed → manual form defaulting to itemized line items + price book
+//   ai       → conversational AI draft, then the manual form pre-populated
+export type EstimateMode = "quick" | "detailed" | "ai";
+
+type PricingMode = "itemized" | "flat_rate" | "multi_option";
+
+/**
+ * Resolve the form's pricing mode from the chosen entry mode.
+ * An explicit override (e.g. a ?pricing_mode= URL param) always wins; otherwise
+ * Quick → flat-rate (the common default) and Detailed/AI → itemized.
+ */
+export function resolveEntryPricingMode(
+  mode: EstimateMode,
+  override?: PricingMode
+): PricingMode {
+  if (override) return override;
+  return mode === "quick" ? "flat_rate" : "itemized";
+}
 
 interface EstimateLaunchModalProps {
   onSelect: (mode: EstimateMode) => void;
@@ -13,25 +36,20 @@ const OPTIONS: Array<{
   badge?: string;
 }> = [
   {
-    mode: "ai",
-    label: "AI Guided Estimate",
-    description: "Describe the project — the AI asks what it needs, then generates a complete draft.",
+    mode: "quick",
+    label: "Quick Estimate",
+    description: "One flat price for the job. Fastest path — best for most handyman work.",
     badge: "Recommended",
   },
   {
-    mode: "manual",
-    label: "Manual Estimate Builder",
-    description: "Use the step-by-step form to build the estimate yourself.",
+    mode: "detailed",
+    label: "Detailed Estimate",
+    description: "Itemized line items with the price book. Use for larger or multi-task projects.",
   },
   {
-    mode: "duplicate",
-    label: "Duplicate Existing Estimate",
-    description: "Copy a previous estimate as a starting point.",
-  },
-  {
-    mode: "convert",
-    label: "Convert Booking Request",
-    description: "Start from an existing request or intake form.",
+    mode: "ai",
+    label: "AI Guided Estimate",
+    description: "Describe the project — the assistant asks what it needs, then drafts the estimate.",
   },
 ];
 
@@ -58,13 +76,14 @@ export function EstimateLaunchModal({ onSelect }: EstimateLaunchModalProps) {
           key={opt.mode}
           type="button"
           onClick={() => onSelect(opt.mode)}
+          data-testid={`estimate-mode-${opt.mode}`}
           style={{
             display: "flex",
             alignItems: "flex-start",
             gap: "var(--space-3)",
             padding: "var(--space-4)",
             background: "var(--bg-surface)",
-            border: opt.mode === "ai" ? "2px solid var(--accent)" : "1px solid var(--border)",
+            border: opt.mode === "quick" ? "2px solid var(--accent)" : "1px solid var(--border)",
             borderRadius: "var(--radius)",
             cursor: "pointer",
             textAlign: "left",
