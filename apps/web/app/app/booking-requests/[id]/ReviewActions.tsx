@@ -34,13 +34,14 @@ interface Props {
   jobId: string | null;
   clientEmail: string | null;
   clientId: string | null;
+  propertyId: string | null;
   visitId: string | null;
   routingPath: string | null;
   preferredDate: string;
   preferredTimeSlot: string | null;
 }
 
-export function ReviewActions({ bookingId, currentStatus, initialNotes, initialPricingMode, jobId, clientEmail, clientId, visitId, routingPath, preferredDate, preferredTimeSlot }: Props) {
+export function ReviewActions({ bookingId, currentStatus, initialNotes, initialPricingMode, jobId, clientEmail, clientId, propertyId, visitId, routingPath, preferredDate, preferredTimeSlot }: Props) {
   const router = useRouter();
   const [notes, setNotes] = useState(initialNotes ?? "");
   const [pricingMode, setPricingMode] = useState<PricingChoice>(initialPricingMode);
@@ -212,6 +213,7 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
       case "create_estimate": {
         const params = new URLSearchParams({ pricing_mode: "flat_rate" });
         if (clientId) params.set("client_id", clientId);
+        if (propertyId) params.set("property_id", propertyId);
         params.set("booking_request_id", bookingId);
         return <LinkButton href={`/app/estimates/new?${params.toString()}`} variant="primary" size="sm">Create Estimate →</LinkButton>;
       }

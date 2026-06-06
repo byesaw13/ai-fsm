@@ -45,6 +45,10 @@ interface BookingRequestRow extends Record<string, unknown> {
   id: string;
   service_description: string;
   service_category: string;
+  property_id: string | null;
+  routing_path: string | null;
+  referral_source: string | null;
+  review_notes: string | null;
 }
 
 interface PageProps {
@@ -95,7 +99,8 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
   let bookingRequestContext: BookingRequestRow | null = null;
   if (booking_request_id) {
     const rows = await query<BookingRequestRow>(
-      `SELECT id, service_description, service_category
+      `SELECT id, service_description, service_category,
+              property_id, routing_path, referral_source, review_notes
        FROM booking_requests
        WHERE id = $1 AND account_id = $2`,
       [booking_request_id, session.accountId]
@@ -126,10 +131,17 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
   }
 
   // Build the scope-notes prefill. Walkthrough evidence takes priority;
-  // fall back to the booking request service description.
+  // fall back to a richer booking request summary.
   let walkthroughPrefill = "";
   if (bookingRequestContext && !walkthroughContext) {
-    walkthroughPrefill = bookingRequestContext.service_description.trim();
+    const parts: string[] = [bookingRequestContext.service_description.trim()];
+    if (bookingRequestContext.review_notes?.trim()) {
+      parts.push(`Review notes: ${bookingRequestContext.review_notes.trim()}`);
+    }
+    if (bookingRequestContext.routing_path && bookingRequestContext.routing_path !== "pending") {
+      parts.push(`Routing: ${bookingRequestContext.routing_path === "site_visit" ? "Site visit recommended" : "Remote estimate"}`);
+    }
+    walkthroughPrefill = parts.join("\n\n");
   }
   if (walkthroughContext) {
     const partRows = await query<{ name: string; quantity: number | string }>(
@@ -185,7 +197,7 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
         properties={properties}
         initialClientId={client_id}
         initialJobId={job_id}
-        initialPropertyId={property_id}
+        initialPropertyId={property_id ?? bookingRequestContext?.property_id ?? undefined}
         initialVaultItemId={vault_item_id}
         vaultItemContext={vaultItemContext}
         initialPricingMode={pricing_mode}
