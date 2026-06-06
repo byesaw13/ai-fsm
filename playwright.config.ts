@@ -3,9 +3,11 @@ import { defineConfig, devices } from "@playwright/test";
 const port = process.env.PORT ?? "3000";
 const baseURL = process.env.TEST_BASE_URL ?? `http://localhost:${port}`;
 const useExternalServer = process.env.PLAYWRIGHT_USE_EXTERNAL_SERVER === "1";
+const outputDir = process.env.PLAYWRIGHT_OUTPUT_DIR ?? "test-results";
 
 export default defineConfig({
   testDir: "./tests/e2e",
+  outputDir,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

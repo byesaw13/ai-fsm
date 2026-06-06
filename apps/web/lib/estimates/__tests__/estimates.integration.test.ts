@@ -20,6 +20,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { Client } from "pg";
 
 // HTTP integration: requires both a running DB and a running web server.
 const RUN_INTEGRATION =
@@ -53,6 +54,16 @@ describe.skipIf(!RUN_INTEGRATION)("Estimates API integration", () => {
     });
     const data = await res.json().catch(() => ({}));
     return { status: res.status, data };
+  }
+
+  async function dbExec(sql: string, params: unknown[] = []) {
+    const client = new Client({ connectionString: process.env.TEST_DATABASE_URL });
+    await client.connect();
+    try {
+      await client.query(sql, params);
+    } finally {
+      await client.end();
+    }
   }
 
   beforeAll(async () => {
@@ -219,18 +230,19 @@ describe.skipIf(!RUN_INTEGRATION)("Estimates API integration", () => {
   });
 
   describe("POST /api/v1/estimates/[id]/transition", () => {
-    it("transitions draft → sent", async () => {
+    it("rejects manual draft → sent", async () => {
       const { status, data } = await apiRequest(
         "POST",
         `/api/v1/estimates/${testEstimateId}/transition`,
         adminCookie,
         { status: "sent" }
       );
-      expect(status).toBe(200);
-      expect(data.status).toBe("sent");
+      expect(status).toBe(409);
+      expect(data.error.code).toBe("USE_SEND_ACTION");
     });
 
     it("rejects invalid transition (sent → draft is not allowed)", async () => {
+      await dbExec("UPDATE estimates SET status = 'sent', sent_at = now(), updated_at = now() WHERE id = $1", [testEstimateId]);
       const { status, data } = await apiRequest(
         "POST",
         `/api/v1/estimates/${testEstimateId}/transition`,

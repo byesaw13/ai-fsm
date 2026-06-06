@@ -102,13 +102,13 @@ test.describe("Invoice conversion smoke — admin role", () => {
 
     // Step 6: Invoice detail shows correct data
     await expect(page.locator('[data-testid="invoice-status"]')).toContainText(
-      "Sent"
+      "Draft"
     );
     await expect(
       page.locator('[data-testid="invoice-total"]')
     ).toContainText("$180.00");
 
-    // The current conversion creates a sent deposit invoice linked to the estimate.
+    // The current conversion creates a draft final invoice linked to the estimate.
     await expect(page.getByRole("heading", { name: "Line Items", exact: true })).toBeVisible();
 
     // Link back to original estimate

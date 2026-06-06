@@ -99,7 +99,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
       // No-email path: flip status to sent without delivery so the workflow
       // can progress on servers where SMTP is not configured (dev / CI).
-      if (!isEmailConfigured()) {
+      if (process.env.E2E_SKIP_EMAIL_DELIVERY === "1" || !isEmailConfigured()) {
         if (est.status === "draft") {
           await client.query(
             `UPDATE estimates SET status = 'sent', sent_at = now(), updated_at = now() WHERE id = $1`,

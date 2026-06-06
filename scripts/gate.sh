@@ -152,6 +152,7 @@ if [[ "${SKIP_INTEGRATION:-}" != "1" ]]; then
   REDIS_URL="$TEST_REDIS_URL" \
   AUTH_SECRET="$TEST_AUTH_SECRET" \
   E2E_DISABLE_LOGIN_RATE_LIMIT=1 \
+  E2E_SKIP_EMAIL_DELIVERY=1 \
   NODE_ENV=development \
     pnpm --filter @ai-fsm/web exec next dev --port "${TEST_WEB_PORT}" >/tmp/ai-fsm-gate-server.log 2>&1 &
   SERVER_PID=$!
@@ -176,6 +177,7 @@ if [[ "${SKIP_E2E:-}" != "1" ]]; then
   DATABASE_URL="$TEST_DATABASE_URL" \
   REDIS_URL="$TEST_REDIS_URL" \
   AUTH_SECRET="$TEST_AUTH_SECRET" \
+  E2E_SKIP_EMAIL_DELIVERY=1 \
   PORT="$TEST_WEB_PORT" \
   TEST_BASE_URL="$TEST_BASE_URL" \
     pnpm test:e2e

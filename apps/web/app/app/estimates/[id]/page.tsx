@@ -260,7 +260,7 @@ export default async function EstimateDetailPage({
       declined_at: string | null;
       created_at: string;
     }>(
-      `SELECT id, title, description, status, subtotal_cents, tax_cents, total_cents, notes,
+      `SELECT co.id, co.title, co.description, co.status, co.subtotal_cents, co.tax_cents, co.total_cents, co.notes,
               u2.full_name as approved_by_name,
               co.approved_at, co.declined_at, co.created_at
        FROM change_orders co
