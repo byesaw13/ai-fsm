@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import type { Route } from "next";
 import type { Role } from "@ai-fsm/domain";
@@ -19,6 +19,8 @@ import {
   IconReports,
   IconVisits,
 } from "./NavIcons";
+
+export type WorkspaceMode = "mobile" | "desktop" | "auto";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
 
@@ -81,11 +83,16 @@ export function getNavSections(role: Role): NavSection[] {
 }
 
 /** Returns flat list for the mobile bottom tab bar */
-export function getBottomNavItems(role: Role): NavItem[] {
+export function getBottomNavItems(role: Role, workspaceMode: WorkspaceMode = "auto"): NavItem[] {
   if (role === "tech") {
     const myDay: NavItem = { href: "/app/my-day", label: "My Day", Icon: IconMyDay };
     const visits: NavItem = { href: "/app/visits", label: "Visits", Icon: IconVisits };
     return [myDay, visits];
+  }
+
+  if (workspaceMode === "mobile") {
+    // Field-first: visits, jobs, invoices, inbox — not CRM admin links
+    return [NAV_TODAY, NAV_JOBS, NAV_INVOICES, { href: "/app/inbox", label: "Inbox", Icon: IconInbox }];
   }
 
   return [NAV_TODAY, NAV_REQUESTS, NAV_JOBS, NAV_SETTINGS];
@@ -104,15 +111,33 @@ export function isNavActive(pathname: string, href: string): boolean {
 interface AppShellProps {
   role: Role;
   userName?: string;
+  workspaceMode?: WorkspaceMode;
   children: ReactNode;
 }
 
-export function AppShell({ role, userName, children }: AppShellProps) {
+export function AppShell({ role, userName, workspaceMode = "auto", children }: AppShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const sections = getNavSections(role);
-  const bottomItems = getBottomNavItems(role);
+  const bottomItems = getBottomNavItems(role, workspaceMode);
   const [showQuickLead, setShowQuickLead] = useState(false);
+  const [switchingMode, setSwitchingMode] = useState(false);
   const isAdminOrOwner = role === "owner" || role === "admin";
+
+  async function handleWorkspaceSwitch(mode: WorkspaceMode) {
+    if (mode === workspaceMode || switchingMode) return;
+    setSwitchingMode(true);
+    try {
+      await fetch("/api/v1/workspace-mode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode }),
+      });
+      router.refresh();
+    } finally {
+      setSwitchingMode(false);
+    }
+  }
 
   const avatarLetter = userName ? userName[0].toUpperCase() : role[0].toUpperCase();
   const displayName = userName || "Account";
@@ -183,18 +208,39 @@ export function AppShell({ role, userName, children }: AppShellProps) {
             ))}
           </nav>
 
-          {/* Footer — user chip + logout */}
+          {/* Footer — workspace switcher + user chip + logout */}
           <div className="p7-sidebar-footer">
-            <div className="p7-user-chip">
-              <div className="p7-user-avatar" aria-hidden="true">
-                {avatarLetter}
+            {isAdminOrOwner && (
+              <div className="p7-workspace-switcher" aria-label="Workspace mode">
+                <span className="p7-workspace-label">Workspace</span>
+                <div className="p7-workspace-options">
+                  {(["mobile", "desktop", "auto"] as WorkspaceMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => handleWorkspaceSwitch(mode)}
+                      disabled={switchingMode}
+                      aria-pressed={workspaceMode === mode}
+                      className={`p7-workspace-btn ${workspaceMode === mode ? "p7-workspace-btn-active" : ""}`}
+                    >
+                      {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="p7-user-info">
-                <span className="p7-user-name">{displayName}</span>
-                <span className="p7-user-role">{role}</span>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+              <div className="p7-user-chip">
+                <div className="p7-user-avatar" aria-hidden="true">
+                  {avatarLetter}
+                </div>
+                <div className="p7-user-info">
+                  <span className="p7-user-name">{displayName}</span>
+                  <span className="p7-user-role">{role}</span>
+                </div>
               </div>
+              <LogoutButton />
             </div>
-            <LogoutButton />
           </div>
         </aside>
 

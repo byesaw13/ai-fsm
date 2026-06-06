@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { getSession } from "@/lib/auth/session";
 import { queryForSession } from "@/lib/db";
 import {
@@ -97,6 +98,10 @@ export default async function AppPage() {
   if (!session) redirect("/login");
   if (session.role === "tech") redirect("/app/my-day");
 
+  const cookieStore = await cookies();
+  const rawMode = cookieStore.get("workspace_mode")?.value;
+  const isMobileWorkspace = rawMode === "mobile";
+
   const accountId = session.accountId;
   const isOwner   = session.role === "owner";
 
@@ -135,20 +140,24 @@ export default async function AppPage() {
       `SELECT full_name FROM users WHERE id = $1`,
       [session.userId]),
 
-    // Revenue collected this month
-    queryForSession<RevenueRow>(session,
-      `SELECT COALESCE(SUM(total_cents), 0)::text AS total_cents
-       FROM invoices
-       WHERE account_id = $1 AND status IN ('partial','paid')
-         AND created_at >= date_trunc('month', NOW())`,
-      [accountId]),
+    // Revenue collected this month (skipped in mobile workspace — not needed in field)
+    isMobileWorkspace
+      ? Promise.resolve([{ total_cents: "0" }] as RevenueRow[])
+      : queryForSession<RevenueRow>(session,
+          `SELECT COALESCE(SUM(total_cents), 0)::text AS total_cents
+           FROM invoices
+           WHERE account_id = $1 AND status IN ('partial','paid')
+             AND created_at >= date_trunc('month', NOW())`,
+          [accountId]),
 
-    // Total open AR (sent + partial + overdue invoices)
-    queryForSession<RevenueRow>(session,
-      `SELECT COALESCE(SUM(total_cents), 0)::text AS total_cents
-       FROM invoices
-       WHERE account_id = $1 AND status IN ('sent','partial','overdue')`,
-      [accountId]),
+    // Total open AR (skipped in mobile workspace)
+    isMobileWorkspace
+      ? Promise.resolve([{ total_cents: "0" }] as RevenueRow[])
+      : queryForSession<RevenueRow>(session,
+          `SELECT COALESCE(SUM(total_cents), 0)::text AS total_cents
+           FROM invoices
+           WHERE account_id = $1 AND status IN ('sent','partial','overdue')`,
+          [accountId]),
 
     // Active jobs (scheduled or in-progress)
     queryForSession<CountRow>(session,
@@ -296,8 +305,8 @@ export default async function AppPage() {
        SELECT 'visit' AS kind, COUNT(*)::text AS count FROM visits WHERE account_id = $1 AND sub_status IS NOT NULL`,
       [accountId]),
 
-    // Owner only: revenue collected last calendar month (for trend)
-    isOwner
+    // Owner only: revenue collected last calendar month (for trend) — skipped in mobile workspace
+    isOwner && !isMobileWorkspace
       ? queryForSession<RevenueRow>(session,
           `SELECT COALESCE(SUM(total_cents), 0)::text AS total_cents
            FROM invoices
@@ -513,8 +522,8 @@ export default async function AppPage() {
         </div>
       </div>
 
-      {/* ── Pulse Metrics (4 KPIs) ────────────────────────────────────── */}
-      <MetricGrid metrics={pulseMetrics} />
+      {/* ── Pulse Metrics (4 KPIs) — hidden in Mobile Workspace ─────── */}
+      {!isMobileWorkspace && <MetricGrid metrics={pulseMetrics} />}
 
       {pendingRequest && (
         <Card hover padding="lg" style={{ marginTop: "var(--space-6)" }}>
@@ -639,8 +648,8 @@ export default async function AppPage() {
         </Card>
       </div>
 
-      {/* ── Owner: Business Health ─────────────────────────────────────── */}
-      {isOwner && (
+      {/* ── Owner: Business Health — hidden in Mobile Workspace ──────── */}
+      {isOwner && !isMobileWorkspace && (
         <div style={{ marginTop: "var(--space-8)" }}>
           <div style={{
             display: "flex",
