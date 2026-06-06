@@ -169,8 +169,8 @@ test.describe("Required release smoke — admin core flow", () => {
     await page.goto(`${BASE}/app/invoices/${invoiceId}`);
     const statusText = (await page.locator('[data-testid="invoice-status"]').textContent())?.trim();
     if (statusText === "Draft") {
-      await expect(page.locator('[data-testid="transition-btn-sent"]')).toBeVisible();
-      await page.click('[data-testid="transition-btn-sent"]');
+      await expect(page.locator('[data-testid="invoice-transition-btn-sent"]')).toBeVisible();
+      await page.click('[data-testid="invoice-transition-btn-sent"]');
     }
     await expect(page.locator('[data-testid="invoice-status"]')).toContainText("Sent");
 
