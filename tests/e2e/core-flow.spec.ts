@@ -119,7 +119,7 @@ test.describe("Required release smoke — admin core flow", () => {
     await page.goto(`${BASE}/app/estimates`);
     await page.click('[data-testid="create-estimate-btn"]');
     await page.waitForURL(`/app/estimates/new`);
-    await page.getByRole("button", { name: /Manual Estimate Builder/ }).click();
+    await page.click('[data-testid="estimate-mode-detailed"]');
 
     await page.locator("#client_id").selectOption({ label: clientName });
     await completeEstimateWizard(page);
