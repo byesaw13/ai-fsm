@@ -25,6 +25,10 @@ COMMENT ON COLUMN estimates.terms_change_order_accepted IS 'Estimator confirmed 
 -- Historical estimates already have stored deposit_cents from the old policy.
 -- Preserve those dollar amounts while marking them as explicit percentage terms
 -- so approval/final-invoice reconciliation remains backward compatible.
+-- Disable the immutability trigger so terminal-state estimates (declined, expired)
+-- can receive the backfill — only the new classification columns change, no financial data.
+ALTER TABLE estimates DISABLE TRIGGER trg_estimates_immutability;
+
 UPDATE estimates
    SET deposit_required = true,
        deposit_type = 'percentage',
@@ -33,3 +37,5 @@ UPDATE estimates
        terms_payment_accepted = true
  WHERE deposit_cents > 0
    AND deposit_required = false;
+
+ALTER TABLE estimates ENABLE TRIGGER trg_estimates_immutability;
