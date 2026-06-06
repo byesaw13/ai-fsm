@@ -124,7 +124,12 @@ const TARGET_COUNT = 6;
 // Page
 // ---------------------------------------------------------------------------
 
+// MEMBERSHIPS PAUSED — redirects until feature is re-enabled.
 export default async function MembershipDashboardPage() {
+  redirect("/app/settings");
+}
+
+async function _MembershipDashboardPage_Paused() {
   const session = await getSession();
   if (!session) redirect("/login");
   if (session.role === "tech") redirect("/app/my-day");

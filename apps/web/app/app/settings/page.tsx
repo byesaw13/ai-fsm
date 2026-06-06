@@ -130,7 +130,8 @@ export default async function SettingsPage() {
                   { href: "/app/reports",               label: "Reports",              desc: "Revenue, operations, and performance" },
                   { href: "/app/operations-dashboard",  label: "Operations Dashboard", desc: "Revenue mix, schedule utilization, job quality" },
                   { href: "/app/pricing-dashboard",     label: "Pricing Dashboard",    desc: "Estimate overrides, adjustments, and below-minimum fees" },
-                  { href: "/app/membership-dashboard",  label: "Membership Dashboard", desc: "Active memberships, renewals, and labor cap status" },
+                  // Memberships paused — link hidden until feature is re-enabled
+                  // { href: "/app/membership-dashboard",  label: "Membership Dashboard", desc: "Active memberships, renewals, and labor cap status" },
                   { href: "/app/automations",           label: "Automations",          desc: "Workflow automation rules" },
                   { href: "/app/price-book",            label: "Price Book",           desc: "Materials and labor pricing catalog" },
                   { href: "/app/expenses",              label: "Expenses",             desc: "Job and business expense tracking" },

@@ -183,53 +183,20 @@ export default async function AppPage() {
        LIMIT 1`,
       [accountId]),
 
-    // Active membership summary: count + ARR + tier breakdown
-    queryForSession<PlanSummaryRow>(session,
-      `SELECT
-         COUNT(*)::text AS count,
-         COALESCE(SUM(annual_price_cents), 0)::text AS arr_cents,
-         COUNT(*) FILTER (WHERE membership_tier = 'essential')::text AS essential_count,
-         COUNT(*) FILTER (WHERE membership_tier = 'plus')::text       AS plus_count,
-         COUNT(*) FILTER (WHERE membership_tier = 'premier')::text    AS premier_count
-       FROM maintenance_plans
-       WHERE account_id = $1 AND status = 'active'`,
-      [accountId]),
+    // Active membership summary — memberships paused, skip query
+    Promise.resolve([{ count: "0", arr_cents: "0", essential_count: "0", plus_count: "0", premier_count: "0" }] as PlanSummaryRow[]),
 
-    // Memberships renewing within 30 days
-    queryForSession<CountRow>(session,
-      `SELECT COUNT(*)::text AS count FROM maintenance_plans
-       WHERE account_id = $1 AND status = 'active'
-         AND renewal_date IS NOT NULL
-         AND renewal_date > CURRENT_DATE
-         AND renewal_date <= CURRENT_DATE + INTERVAL '30 days'`,
-      [accountId]),
+    // Memberships renewing within 30 days — paused
+    Promise.resolve([{ count: "0" }] as CountRow[]),
 
-    // Memberships with overdue renewal date
-    queryForSession<CountRow>(session,
-      `SELECT COUNT(*)::text AS count FROM maintenance_plans
-       WHERE account_id = $1 AND status = 'active'
-         AND renewal_date IS NOT NULL
-         AND renewal_date < CURRENT_DATE`,
-      [accountId]),
+    // Memberships with overdue renewal date — paused
+    Promise.resolve([{ count: "0" }] as CountRow[]),
 
-    // Active membership visits at or over labor cap
-    queryForSession<CountRow>(session,
-      `SELECT COUNT(*)::text AS count FROM visits
-       WHERE account_id = $1
-         AND generated_from_plan_id IS NOT NULL
-         AND membership_cap_status IN ('cap_reached','approval_required')
-         AND status NOT IN ('completed','cancelled')`,
-      [accountId]),
+    // Active membership visits at or over labor cap — paused
+    Promise.resolve([{ count: "0" }] as CountRow[]),
 
-    // Membership visits pending snapshot delivery
-    queryForSession<CountRow>(session,
-      `SELECT COUNT(*)::text AS count FROM visits
-       WHERE account_id = $1
-         AND generated_from_plan_id IS NOT NULL
-         AND membership_visit_phase = 'reporting'
-         AND membership_snapshot_sent_at IS NULL
-         AND status != 'cancelled'`,
-      [accountId]),
+    // Membership visits pending snapshot delivery — paused
+    Promise.resolve([{ count: "0" }] as CountRow[]),
 
     // Today's visits (with property address for context)
     queryForSession<VisitRow>(session,

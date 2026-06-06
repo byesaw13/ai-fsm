@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
 import { getSession } from "@/lib/auth/session";
@@ -38,7 +39,14 @@ interface MaintenancePlanRow {
   [key: string]: unknown;
 }
 
-export default async function MaintenancePlansPage({
+// MEMBERSHIPS PAUSED — redirects to settings until feature is re-enabled.
+// All original code below is preserved and can be restored by removing the
+// exported function override above.
+export default async function MaintenancePlansPage() {
+  redirect("/app/settings");
+}
+
+async function _MaintenancePlansPage_Paused({
   searchParams,
 }: {
   searchParams: Promise<{ status?: string }>;
