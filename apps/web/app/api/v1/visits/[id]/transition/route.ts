@@ -8,6 +8,7 @@ import { logger } from "../../../../../../lib/logger";
 import { checkCompletionPacket } from "../../../../../../lib/completion-guard";
 import { visitTransitions, visitStatusSchema } from "@ai-fsm/domain";
 import type { VisitStatus } from "@ai-fsm/domain";
+import { generateInvoiceNumber } from "../../../../../../lib/invoices/db";
 
 interface VisitRow {
   id: string;
@@ -372,6 +373,144 @@ export const POST = withAuth(
         const propertyId = jobProp.rows[0]?.property_id;
         if (propertyId) {
           await seedConditionSnapshots(client, id, propertyId, session.accountId);
+        }
+      }
+
+      // Auto-create invoice draft on visit completion so Nick can review and send
+      // without starting from scratch. Skipped if the job already has an invoice.
+      if (effectiveStatus === "completed" && updated.job_id) {
+        try {
+          const existingInvoice = await client.query<{ id: string }>(
+            `SELECT id FROM invoices
+             WHERE job_id = $1 AND account_id = $2 AND status NOT IN ('cancelled')
+             LIMIT 1`,
+            [updated.job_id, session.accountId]
+          );
+
+          if (existingInvoice.rowCount === 0) {
+            // Fetch job + estimate for line items
+            const jobRow = await client.query<{
+              client_id: string;
+              property_id: string | null;
+              estimate_id: string | null;
+            }>(
+              `SELECT j.client_id, j.property_id,
+                      (SELECT id FROM estimates WHERE job_id = j.id AND account_id = j.account_id
+                       AND status = 'approved' ORDER BY created_at DESC LIMIT 1) AS estimate_id
+               FROM jobs j
+               WHERE j.id = $1 AND j.account_id = $2`,
+              [updated.job_id, session.accountId]
+            );
+            const job = jobRow.rows[0];
+
+            if (job) {
+              // Gather line items: estimate items first, then visit materials as extras
+              const lineItems: Array<{ description: string; quantity: number; unit_price_cents: number; sort_order: number }> = [];
+
+              if (job.estimate_id) {
+                const estimateItems = await client.query<{
+                  description: string;
+                  quantity: string;
+                  unit_price_cents: number;
+                  sort_order: number;
+                }>(
+                  `SELECT description, quantity, unit_price_cents, sort_order
+                   FROM estimate_line_items
+                   WHERE estimate_id = $1 AND visible_to_customer = true
+                   ORDER BY sort_order`,
+                  [job.estimate_id]
+                );
+                for (const item of estimateItems.rows) {
+                  lineItems.push({
+                    description: item.description,
+                    quantity: parseFloat(item.quantity),
+                    unit_price_cents: item.unit_price_cents,
+                    sort_order: item.sort_order,
+                  });
+                }
+              }
+
+              // Add billable visit parts (materials/parts logged during the visit)
+              // only when no estimate line items already cover the scope.
+              if (lineItems.length === 0) {
+                const visitParts = await client.query<{
+                  name: string;
+                  quantity: string;
+                  customer_price_cents: number;
+                }>(
+                  `SELECT name, quantity, customer_price_cents
+                   FROM visit_parts
+                   WHERE visit_id = $1 AND account_id = $2 AND customer_price_cents > 0
+                   ORDER BY created_at`,
+                  [id, session.accountId]
+                );
+                for (let i = 0; i < visitParts.rows.length; i++) {
+                  const p = visitParts.rows[i];
+                  lineItems.push({
+                    description: p.name,
+                    quantity: parseFloat(p.quantity),
+                    unit_price_cents: p.customer_price_cents,
+                    sort_order: i,
+                  });
+                }
+              }
+
+              if (lineItems.length > 0) {
+                const subtotal = lineItems.reduce((s, li) => s + Math.round(li.quantity * li.unit_price_cents), 0);
+                const invoiceNumber = await generateInvoiceNumber(client, session.accountId);
+
+                const invoiceRes = await client.query<{ id: string }>(
+                  `INSERT INTO invoices
+                     (account_id, client_id, job_id, property_id,
+                      status, invoice_number,
+                      subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
+                      created_by)
+                   VALUES ($1, $2, $3, $4, 'draft', $5, $6, 0, $6, 0, 0, $7)
+                   RETURNING id`,
+                  [
+                    session.accountId,
+                    job.client_id,
+                    updated.job_id,
+                    job.property_id,
+                    invoiceNumber,
+                    subtotal,
+                    session.userId,
+                  ]
+                );
+                const invoiceId = invoiceRes.rows[0].id;
+
+                for (let i = 0; i < lineItems.length; i++) {
+                  const li = lineItems[i];
+                  await client.query(
+                    `INSERT INTO invoice_line_items
+                       (invoice_id, description, quantity, unit_price_cents, total_cents, sort_order)
+                     VALUES ($1, $2, $3, $4, $5, $6)`,
+                    [
+                      invoiceId,
+                      li.description,
+                      li.quantity,
+                      li.unit_price_cents,
+                      Math.round(li.quantity * li.unit_price_cents),
+                      i,
+                    ]
+                  );
+                }
+
+                await appendAuditLog(client, {
+                  account_id: session.accountId,
+                  entity_type: "invoice",
+                  entity_id: invoiceId,
+                  action: "insert",
+                  actor_id: session.userId,
+                  trace_id: session.traceId,
+                  new_value: { source: "visit_completion", visit_id: id, job_id: updated.job_id, total_cents: subtotal },
+                });
+              }
+            }
+          }
+        } catch (invoiceErr) {
+          // Non-fatal — don't fail the visit completion if invoice draft creation fails.
+          logger.error("visit completion: auto-create invoice draft failed (non-fatal)", invoiceErr, { traceId: session.traceId });
         }
       }
 

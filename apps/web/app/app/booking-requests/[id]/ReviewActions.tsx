@@ -209,10 +209,12 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
 
   const primaryAction = (() => {
     switch (guidance.primaryActionKind) {
-      case "create_estimate":
-        return clientId
-          ? <LinkButton href={`/app/estimates/new?client_id=${clientId}&pricing_mode=flat_rate`} variant="primary" size="sm">Create Estimate →</LinkButton>
-          : <LinkButton href="/app/estimates/new" variant="primary" size="sm">Create Estimate →</LinkButton>;
+      case "create_estimate": {
+        const params = new URLSearchParams({ pricing_mode: "flat_rate" });
+        if (clientId) params.set("client_id", clientId);
+        params.set("booking_request_id", bookingId);
+        return <LinkButton href={`/app/estimates/new?${params.toString()}`} variant="primary" size="sm">Create Estimate →</LinkButton>;
+      }
       case "create_job":
         return <Button variant="primary" onClick={handleRepair} loading={pending === "repair"} disabled={!!pending} size="sm">Create Job →</Button>;
       case "schedule_walkthrough":

@@ -41,6 +41,12 @@ interface WalkthroughContext extends Record<string, unknown> {
   part_count: number;
 }
 
+interface BookingRequestRow extends Record<string, unknown> {
+  id: string;
+  service_description: string;
+  service_category: string;
+}
+
 interface PageProps {
   searchParams: Promise<{
     client_id?: string;
@@ -49,6 +55,7 @@ interface PageProps {
     vault_item_id?: string;
     from_visit?: string;
     pricing_mode?: "itemized" | "flat_rate" | "multi_option";
+    booking_request_id?: string;
   }>;
 }
 
@@ -57,7 +64,7 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
   if (!session) redirect("/login");
   if (!canCreateEstimates(session.role)) redirect("/app/estimates");
 
-  const { client_id, job_id, property_id, vault_item_id, from_visit, pricing_mode } = await searchParams;
+  const { client_id, job_id, property_id, vault_item_id, from_visit, pricing_mode, booking_request_id } = await searchParams;
 
   const [clients, jobs, properties] = await Promise.all([
     query<Client>(
@@ -84,6 +91,18 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
     vaultItemContext = rows[0] ?? null;
   }
 
+  // Fetch the source booking request (if any) to pre-populate the notes field.
+  let bookingRequestContext: BookingRequestRow | null = null;
+  if (booking_request_id) {
+    const rows = await query<BookingRequestRow>(
+      `SELECT id, service_description, service_category
+       FROM booking_requests
+       WHERE id = $1 AND account_id = $2`,
+      [booking_request_id, session.accountId]
+    );
+    bookingRequestContext = rows[0] ?? null;
+  }
+
   let walkthroughContext: WalkthroughContext | null = null;
   if (from_visit) {
     walkthroughContext = await queryOne<WalkthroughContext>(
@@ -106,9 +125,12 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
     );
   }
 
-  // Build the scope-notes prefill from the walkthrough evidence so the estimate
-  // form opens with the tech's findings already captured (not re-typed).
+  // Build the scope-notes prefill. Walkthrough evidence takes priority;
+  // fall back to the booking request service description.
   let walkthroughPrefill = "";
+  if (bookingRequestContext && !walkthroughContext) {
+    walkthroughPrefill = bookingRequestContext.service_description.trim();
+  }
   if (walkthroughContext) {
     const partRows = await query<{ name: string; quantity: number | string }>(
       `SELECT name, quantity FROM visit_parts
@@ -169,6 +191,7 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
         initialPricingMode={pricing_mode}
         initialMode={walkthroughContext ? "quick" : undefined}
         initialNotes={walkthroughPrefill || undefined}
+        bookingRequestId={bookingRequestContext?.id}
       />
     </PageContainer>
   );
