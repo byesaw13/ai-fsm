@@ -123,6 +123,7 @@ export default async function AppPage() {
     snapshotPendingCount,
     todayVisits,
     overdueInvoices,
+    draftInvoices,
     expiringEstimates,
     estimatesAwaiting,
     jobsNoNextVisit,
@@ -246,6 +247,15 @@ export default async function AppPage() {
        WHERE account_id = $1 AND status = 'overdue'`,
       [accountId]),
 
+    // Draft final invoices awaiting review (excludes deposit invoices)
+    queryForSession<CountRow>(session,
+      `SELECT COUNT(*)::text AS count
+       FROM invoices
+       WHERE account_id = $1
+         AND status = 'draft'
+         AND invoice_kind IN ('final', 'standard')`,
+      [accountId]),
+
     // Estimates expiring within 7 days
     queryForSession<CountRow>(session,
       `SELECT COUNT(*)::text AS count
@@ -318,6 +328,7 @@ export default async function AppPage() {
   const snapshotCount        = parseN(snapshotPendingCount[0]);
   const overdueInvCount      = parseN(overdueInvoices[0]);
   const overdueInvTotal      = parseInt(overdueInvoices[0]?.total_cents ?? "0", 10);
+  const draftInvoiceCount    = parseN(draftInvoices[0]);
   const expiringCount        = parseN(expiringEstimates[0]);
   const awaitingCount        = parseN(estimatesAwaiting[0]);
   const noNextVisitCount     = parseN(jobsNoNextVisit[0]);
@@ -347,6 +358,13 @@ export default async function AppPage() {
       href: "/app/invoices?status=overdue" as Route,
       detail: `${fmt(overdueInvTotal)} outstanding`,
       tone: "danger",
+    },
+    {
+      label: "Review draft invoices",
+      count: draftInvoiceCount,
+      href: "/app/invoices?status=draft" as Route,
+      detail: "Completed work waiting for invoice review",
+      tone: draftInvoiceCount > 0 ? "warning" : "default",
     },
     {
       label: "Follow up on expiring estimates",
