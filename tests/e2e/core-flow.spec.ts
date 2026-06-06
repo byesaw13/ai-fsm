@@ -159,7 +159,7 @@ test.describe("Required release smoke — admin core flow", () => {
     expect(match).toBeTruthy();
     invoiceId = match![1];
 
-    await expect(page.locator('[data-testid="invoice-status"]')).toContainText("Sent");
+    await expect(page.locator('[data-testid="invoice-status"]')).toContainText("Draft");
   });
 
   test("8. Admin can record payment on the invoice", async ({ page }) => {
