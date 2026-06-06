@@ -376,38 +376,61 @@ export const POST = withAuth(
         }
       }
 
-      // Auto-create invoice draft on visit completion so Nick can review and send
-      // without starting from scratch. Skipped if the job already has an invoice.
+      // Auto-create a draft final invoice on visit completion so Nick can review
+      // and send without starting from scratch.
+      //
+      // Guarded by:
+      //   - No existing final/standard invoice for the job (deposit invoices don't block)
+      //   - Standard-mode estimate only — multi_option estimates can't auto-invoice
+      //     because we don't know which option the customer chose
+      //   - At least one line item must exist (estimate items or visit parts)
+      //
+      // Uses a savepoint so a PG error inside this block cannot abort the outer
+      // visit-completion transaction.
       if (effectiveStatus === "completed" && updated.job_id) {
+        await client.query("SAVEPOINT before_auto_invoice");
         try {
-          const existingInvoice = await client.query<{ id: string }>(
+          // Only block on final/standard invoices — deposit invoices are separate billing events.
+          const existingFinal = await client.query<{ id: string }>(
             `SELECT id FROM invoices
-             WHERE job_id = $1 AND account_id = $2 AND status NOT IN ('cancelled')
+             WHERE job_id = $1 AND account_id = $2
+               AND invoice_kind IN ('final', 'standard')
+               AND status NOT IN ('cancelled')
              LIMIT 1`,
             [updated.job_id, session.accountId]
           );
 
-          if (existingInvoice.rowCount === 0) {
-            // Fetch job + estimate for line items
+          if (existingFinal.rowCount === 0) {
+            // Fetch job + approved estimate (prefer the one directly linked to this job)
             const jobRow = await client.query<{
               client_id: string;
               property_id: string | null;
               estimate_id: string | null;
+              presentation_mode: string | null;
+              deposit_cents: number | null;
             }>(
               `SELECT j.client_id, j.property_id,
-                      (SELECT id FROM estimates WHERE job_id = j.id AND account_id = j.account_id
-                       AND status = 'approved' ORDER BY created_at DESC LIMIT 1) AS estimate_id
+                      e.id AS estimate_id,
+                      e.presentation_mode,
+                      e.deposit_cents
                FROM jobs j
-               WHERE j.id = $1 AND j.account_id = $2`,
+               LEFT JOIN estimates e ON e.job_id = j.id
+                 AND e.account_id = j.account_id
+                 AND e.status = 'approved'
+               WHERE j.id = $1 AND j.account_id = $2
+               ORDER BY e.created_at DESC
+               LIMIT 1`,
               [updated.job_id, session.accountId]
             );
             const job = jobRow.rows[0];
 
             if (job) {
-              // Gather line items: estimate items first, then visit materials as extras
               const lineItems: Array<{ description: string; quantity: number; unit_price_cents: number; sort_order: number }> = [];
 
-              if (job.estimate_id) {
+              // Pull estimate line items only for standard-mode estimates.
+              // Multi-option estimates have items split across competing options;
+              // we can't know which was accepted, so fall through to visit_parts.
+              if (job.estimate_id && job.presentation_mode !== "multi_option") {
                 const estimateItems = await client.query<{
                   description: string;
                   quantity: string;
@@ -416,7 +439,9 @@ export const POST = withAuth(
                 }>(
                   `SELECT description, quantity, unit_price_cents, sort_order
                    FROM estimate_line_items
-                   WHERE estimate_id = $1 AND visible_to_customer = true
+                   WHERE estimate_id = $1
+                     AND option_id IS NULL
+                     AND visible_to_customer = true
                    ORDER BY sort_order`,
                   [job.estimate_id]
                 );
@@ -430,8 +455,7 @@ export const POST = withAuth(
                 }
               }
 
-              // Add billable visit parts (materials/parts logged during the visit)
-              // only when no estimate line items already cover the scope.
+              // Fall back to billable visit parts when no estimate items are available.
               if (lineItems.length === 0) {
                 const visitParts = await client.query<{
                   name: string;
@@ -457,23 +481,28 @@ export const POST = withAuth(
 
               if (lineItems.length > 0) {
                 const subtotal = lineItems.reduce((s, li) => s + Math.round(li.quantity * li.unit_price_cents), 0);
+                // Carry forward the deposit amount so the final invoice correctly
+                // shows the balance owed rather than the full project total.
+                const depositCents = job.deposit_cents ?? 0;
                 const invoiceNumber = await generateInvoiceNumber(client, session.accountId);
 
                 const invoiceRes = await client.query<{ id: string }>(
                   `INSERT INTO invoices
-                     (account_id, client_id, job_id, property_id,
-                      status, invoice_number,
+                     (account_id, client_id, job_id, property_id, estimate_id,
+                      status, invoice_kind, invoice_number,
                       subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
                       created_by)
-                   VALUES ($1, $2, $3, $4, 'draft', $5, $6, 0, $6, 0, 0, $7)
+                   VALUES ($1, $2, $3, $4, $5, 'draft', 'final', $6, $7, 0, $7, 0, $8, $9)
                    RETURNING id`,
                   [
                     session.accountId,
                     job.client_id,
                     updated.job_id,
                     job.property_id,
+                    job.estimate_id ?? null,
                     invoiceNumber,
                     subtotal,
+                    depositCents,
                     session.userId,
                   ]
                 );
@@ -503,13 +532,23 @@ export const POST = withAuth(
                   action: "insert",
                   actor_id: session.userId,
                   trace_id: session.traceId,
-                  new_value: { source: "visit_completion", visit_id: id, job_id: updated.job_id, total_cents: subtotal },
+                  new_value: {
+                    source: "visit_completion",
+                    visit_id: id,
+                    job_id: updated.job_id,
+                    estimate_id: job.estimate_id,
+                    total_cents: subtotal,
+                    deposit_cents: depositCents,
+                  },
                 });
               }
             }
           }
+          await client.query("RELEASE SAVEPOINT before_auto_invoice");
         } catch (invoiceErr) {
-          // Non-fatal — don't fail the visit completion if invoice draft creation fails.
+          // Roll back only the invoice work; visit completion is preserved.
+          await client.query("ROLLBACK TO SAVEPOINT before_auto_invoice");
+          await client.query("RELEASE SAVEPOINT before_auto_invoice");
           logger.error("visit completion: auto-create invoice draft failed (non-fatal)", invoiceErr, { traceId: session.traceId });
         }
       }

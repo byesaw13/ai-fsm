@@ -135,7 +135,11 @@ export async function POST(
 
     // Auto-create the linked job on approval so Nick sees it immediately
     // without needing to click "Create Linked Job" manually.
+    // Use a savepoint so a PG error inside createJobFromEstimate cannot abort
+    // the outer approval transaction — the catch here would otherwise run
+    // after the transaction is already in the error state, causing COMMIT to fail.
     if (action === "approve") {
+      await dbClient.query("SAVEPOINT before_auto_job");
       try {
         const ownerId = await getAccountOwnerUserId(dbClient, estimate.account_id);
         if (ownerId) {
@@ -146,9 +150,11 @@ export async function POST(
             createdBy: ownerId,
           });
         }
+        await dbClient.query("RELEASE SAVEPOINT before_auto_job");
       } catch (jobErr) {
-        // Don't fail the approval if job creation fails — the estimate is already approved.
-        // Nick can still click "Create Linked Job" manually.
+        // Roll back only the job-creation work; approval continues.
+        await dbClient.query("ROLLBACK TO SAVEPOINT before_auto_job");
+        await dbClient.query("RELEASE SAVEPOINT before_auto_job");
         logger.error("portal approval: auto-create job failed (non-fatal)", jobErr);
       }
     }
