@@ -211,6 +211,8 @@ const createEstimateSchema = z.object({
   room_specs: z.array(z.record(z.unknown())).optional(),
   // Engine v2: room-by-room spec — when present, computeAndPersist() runs after insert
   engine_spec: z.record(z.unknown()).optional(),
+  // Intake request that originated this estimate (for chain traceability)
+  booking_request_id: z.string().uuid().nullable().optional(),
   // Scope Intelligence: snapshot of components/complexity captured from ScopeBuilder per price-book item
   scope_snapshots: z
     .array(
@@ -302,6 +304,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     room_specs,
     engine_spec,
     scope_snapshots,
+    booking_request_id,
   } = parseResult.data;
 
   const is_painting = sq_ft !== undefined && prep_level !== undefined && labor_hours_estimate !== undefined;
@@ -405,12 +408,13 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             coordination_required, finish_expectation, travel_surcharge_cents,
             risk_adjustment_cents, minimum_service_override_reason,
             minimum_service_override_note, pricing_review_status, scope_assumptions,
-            condition_tier, shopping_list_json, specified_materials_json, room_specs)
+            condition_tier, shopping_list_json, specified_materials_json, room_specs,
+            booking_request_id)
           VALUES ($1, $2, $3, $4, $5, 'draft', $6, $7, $8, $9, $10, $11,
                   $12, $13, $14, $15, $16, $17, $18, $19,
                   $20, $21, $22, $23, $24, $25, $26, $27,
                   $28, $29, $30, $31, $32, $33, $34, $35,
-                  $36, $37, $38, $39, $40, $41, $42, $43, $44, $45)
+                  $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46)
           RETURNING id`,
         [
           session.accountId,
@@ -458,6 +462,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           shopping_list_json ? JSON.stringify(shopping_list_json) : null,
           specified_materials_json ? JSON.stringify(specified_materials_json) : null,
           room_specs ? JSON.stringify(room_specs) : null,
+          booking_request_id ?? null,
         ]
       );
       const estimateId = result.rows[0].id;

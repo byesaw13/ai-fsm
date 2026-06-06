@@ -3,7 +3,7 @@ import { withRole } from "@/lib/auth/middleware";
 import { appendAuditLog } from "@/lib/db/audit";
 import { withEstimateContext } from "@/lib/estimates/db";
 import { resolveActionItems } from "@/lib/action-items";
-import { deriveJobTitle, deriveJobDescription } from "@/lib/estimates/job-from-estimate";
+import { createJobFromEstimate } from "@/lib/estimates/create-job-db";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -28,102 +28,35 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
   try {
     const result = await withEstimateContext(session, async (client) => {
-      // Lock the estimate row to serialize concurrent create-job requests.
-      const estRes = await client.query<{
-        id: string;
-        status: string;
-        client_id: string;
-        property_id: string | null;
-        job_id: string | null;
-        notes: string | null;
-        total_cents: number;
-        job_type: string | null;
-        client_name: string | null;
-        property_address: string | null;
-      }>(
-        `SELECT e.id, e.status, e.client_id, e.property_id, e.job_id, e.notes, e.total_cents,
-                j.job_type AS job_type,
-                c.name AS client_name,
-                p.address AS property_address
-         FROM estimates e
-         LEFT JOIN jobs j ON j.id = e.job_id
-         LEFT JOIN clients c ON c.id = e.client_id
-         LEFT JOIN properties p ON p.id = e.property_id
-         WHERE e.id = $1 AND e.account_id = $2
-         FOR UPDATE OF e`,
-        [id, session.accountId]
-      );
-
-      if (estRes.rowCount === 0) {
-        throw Object.assign(new Error("Estimate not found"), { code: "NOT_FOUND" });
-      }
-      const est = estRes.rows[0];
-
-      if (est.status !== "approved") {
-        throw Object.assign(
-          new Error(`Only approved estimates can spawn a job (current status: ${est.status})`),
-          { code: "INVALID_TRANSITION" }
-        );
-      }
-
-      // Idempotency: already linked → return the existing job, create nothing.
-      if (est.job_id) {
-        return { job_id: est.job_id, created: false };
-      }
-
-      const title = deriveJobTitle({
-        notes: est.notes,
-        property_address: est.property_address,
-        client_name: est.client_name,
-        total_cents: est.total_cents,
-      });
-      const description = deriveJobDescription({
-        notes: est.notes,
-        property_address: est.property_address,
-        client_name: est.client_name,
-        total_cents: est.total_cents,
-      });
-
-      // A job born from an approved estimate is past the quoting stage.
-      const jobRes = await client.query<{ id: string }>(
-        `INSERT INTO jobs
-           (account_id, client_id, property_id, title, description, status, job_type, created_by)
-         VALUES ($1, $2, $3, $4, $5, 'quoted', 'custom', $6)
-         RETURNING id`,
-        [
-          session.accountId,
-          est.client_id,
-          est.property_id,
-          title,
-          description,
-          session.userId,
-        ]
-      );
-      const jobId = jobRes.rows[0].id;
-
-      // Link the estimate to the new job (one-time NULL→value link; allowed by
-      // the narrowed terminal-immutability rule).
-      await client.query(`UPDATE estimates SET job_id = $1 WHERE id = $2`, [jobId, id]);
-
-      // Resolve the schedule_job action item raised on approval.
-      await resolveActionItems(client, {
+      const { jobId, created } = await createJobFromEstimate({
+        client,
+        estimateId: id,
         accountId: session.accountId,
-        entityId: id,
-        actionTypes: ["schedule_job"],
-        resolvedBy: session.userId,
+        createdBy: session.userId,
+        traceId: session.traceId,
       });
 
-      await appendAuditLog(client, {
-        account_id: session.accountId,
-        entity_type: "job",
-        entity_id: jobId,
-        action: "insert",
-        actor_id: session.userId,
-        trace_id: session.traceId,
-        new_value: { source: "estimate_create_job", estimate_id: id, title },
-      });
+      if (created) {
+        // Resolve the schedule_job action item raised on approval.
+        await resolveActionItems(client, {
+          accountId: session.accountId,
+          entityId: id,
+          actionTypes: ["schedule_job"],
+          resolvedBy: session.userId,
+        });
 
-      return { job_id: jobId, created: true };
+        await appendAuditLog(client, {
+          account_id: session.accountId,
+          entity_type: "job",
+          entity_id: jobId,
+          action: "insert",
+          actor_id: session.userId,
+          trace_id: session.traceId,
+          new_value: { source: "estimate_create_job", estimate_id: id },
+        });
+      }
+
+      return { job_id: jobId, created };
     });
 
     return NextResponse.json(result, { status: result.created ? 201 : 200 });

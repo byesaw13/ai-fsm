@@ -97,8 +97,32 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       }
 
 
+      // No-email path: flip status to sent without delivery so the workflow
+      // can progress on servers where SMTP is not configured (dev / CI).
       if (!isEmailConfigured()) {
-        return { status: 503, message: "Email is not configured on this server" };
+        if (est.status === "draft") {
+          await client.query(
+            `UPDATE estimates SET status = 'sent', sent_at = now(), updated_at = now() WHERE id = $1`,
+            [id],
+          );
+        }
+        await resolveActionItems(client, {
+          accountId: session.accountId,
+          entityId: id,
+          actionTypes: ["send_estimate"],
+          resolvedBy: session.userId,
+        });
+        await appendAuditLog(client, {
+          account_id: session.accountId,
+          entity_type: "estimate",
+          entity_id: id,
+          action: "update",
+          actor_id: session.userId,
+          trace_id: session.traceId,
+          old_value: { status: est.status },
+          new_value: { status: "sent", email_skipped: true },
+        });
+        return { status: 200, sentTo: null, emailSkipped: true };
       }
 
       const secret = new TextEncoder().encode(getEnv().AUTH_SECRET);

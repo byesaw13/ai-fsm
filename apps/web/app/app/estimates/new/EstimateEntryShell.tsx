@@ -21,6 +21,7 @@ interface EstimateEntryShellProps {
   initialPricingMode?: "itemized" | "flat_rate" | "multi_option";
   initialMode?: EstimateMode;
   initialNotes?: string;
+  bookingRequestId?: string;
 }
 
 export function EstimateEntryShell({
@@ -35,6 +36,7 @@ export function EstimateEntryShell({
   initialPricingMode,
   initialMode,
   initialNotes,
+  bookingRequestId,
 }: EstimateEntryShellProps) {
   const [mode, setMode] = useState<EstimateMode | null>(initialMode ?? null);
   // After interview applies draft: switch to the manual form pre-populated.
@@ -88,6 +90,7 @@ export function EstimateEntryShell({
         initialPricingMode={resolvedPricingMode}
         initialInterviewDraft={appliedDraft ?? undefined}
         initialNotes={initialNotes}
+        bookingRequestId={bookingRequestId}
       />
     </Card>
   );

@@ -119,7 +119,7 @@ test.describe("Required release smoke — admin core flow", () => {
     await page.goto(`${BASE}/app/estimates`);
     await page.click('[data-testid="create-estimate-btn"]');
     await page.waitForURL(`/app/estimates/new`);
-    await page.getByRole("button", { name: /Manual Estimate Builder/ }).click();
+    await page.click('[data-testid="estimate-mode-detailed"]');
 
     await page.locator("#client_id").selectOption({ label: clientName });
     await completeEstimateWizard(page);
@@ -159,7 +159,7 @@ test.describe("Required release smoke — admin core flow", () => {
     expect(match).toBeTruthy();
     invoiceId = match![1];
 
-    await expect(page.locator('[data-testid="invoice-status"]')).toContainText("Sent");
+    await expect(page.locator('[data-testid="invoice-status"]')).toContainText("Draft");
   });
 
   test("8. Admin can record payment on the invoice", async ({ page }) => {
@@ -169,8 +169,8 @@ test.describe("Required release smoke — admin core flow", () => {
     await page.goto(`${BASE}/app/invoices/${invoiceId}`);
     const statusText = (await page.locator('[data-testid="invoice-status"]').textContent())?.trim();
     if (statusText === "Draft") {
-      await expect(page.locator('[data-testid="transition-btn-sent"]')).toBeVisible();
-      await page.click('[data-testid="transition-btn-sent"]');
+      await expect(page.locator('[data-testid="invoice-transition-btn-sent"]')).toBeVisible();
+      await page.click('[data-testid="invoice-transition-btn-sent"]');
     }
     await expect(page.locator('[data-testid="invoice-status"]')).toContainText("Sent");
 

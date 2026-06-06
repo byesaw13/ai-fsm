@@ -69,6 +69,8 @@ export interface NewEstimateFormProps {
   initialInterviewDraft?: { draft: import("@/lib/estimates/ai-draft").DraftEstimate; shoppingList: ShoppingList | null } | null;
   /** Seed text for the notes/scope field (e.g. walkthrough findings). Initial value only — never overwrites edits. */
   initialNotes?: string;
+  /** Booking request that originated this estimate — stored for chain traceability. */
+  bookingRequestId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -87,6 +89,7 @@ export function useEstimateForm({
   initialPricingMode = "flat_rate",
   initialInterviewDraft,
   initialNotes,
+  bookingRequestId,
 }: NewEstimateFormProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -641,6 +644,7 @@ export function useEstimateForm({
 
       Object.assign(payload, {
         ...(initialVaultItemId ? { vault_item_id: initialVaultItemId } : {}),
+        ...(bookingRequestId ? { booking_request_id: bookingRequestId } : {}),
         // Persist shopping list: AI draft takes priority; fall back to scope-derived list for manual estimates
         ...((() => {
           const sl = draftShoppingList ?? buildManualShoppingList(priceBookItems, scopeResults);
