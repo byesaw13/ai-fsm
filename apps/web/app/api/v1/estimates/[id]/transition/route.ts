@@ -8,6 +8,7 @@ import { estimateStatusSchema, estimateTransitions } from "@ai-fsm/domain";
 import type { EstimateStatus } from "@ai-fsm/domain";
 import { resolveActionItems } from "@/lib/action-items";
 import { createApprovalArtifacts } from "@/lib/estimates/approve";
+import { createJobFromEstimate } from "@/lib/estimates/create-job-db";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +84,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
   }
 
   let createdDepositInvoiceId: string | null = null;
+  let createdJobId: string | null = null;
 
   try {
     await withEstimateContext(session, async (client) => {
@@ -153,7 +155,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         });
       }
 
-      // Create schedule_job action item + auto-create deposit invoice when approved
+      // On approval: create deposit invoice + action item, then auto-link a job.
+      // createJobFromEstimate is idempotent (returns existing job if already linked).
       if (targetStatus === "approved") {
         const { depositInvoiceId } = await createApprovalArtifacts(client, {
           estimateId: id,
@@ -161,6 +164,25 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           userId: session.userId,
         });
         createdDepositInvoiceId = depositInvoiceId;
+
+        // Auto-create the job so it's immediately visible in the job board.
+        // Wrapped in a savepoint so a job-creation failure never rolls back
+        // the estimate approval itself.
+        await client.query("SAVEPOINT before_auto_job");
+        try {
+          const { jobId } = await createJobFromEstimate({
+            client,
+            estimateId: id,
+            accountId: session.accountId,
+            createdBy: session.userId,
+          });
+          createdJobId = jobId;
+          await client.query("RELEASE SAVEPOINT before_auto_job");
+        } catch (jobErr) {
+          await client.query("ROLLBACK TO SAVEPOINT before_auto_job");
+          await client.query("RELEASE SAVEPOINT before_auto_job");
+          logger.error("estimate transition: auto-create job failed (non-fatal)", jobErr, { traceId: session.traceId });
+        }
       }
 
       // Audit log
@@ -172,13 +194,16 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         actor_id: session.userId,
         trace_id: session.traceId,
         old_value: { status: currentStatus },
-        new_value: { status: targetStatus, deposit_invoice_id: createdDepositInvoiceId },
+        new_value: { status: targetStatus, deposit_invoice_id: createdDepositInvoiceId, job_id: createdJobId },
       });
     });
 
     const response: Record<string, unknown> = { status: targetStatus };
     if (createdDepositInvoiceId) {
       response.deposit_invoice_id = createdDepositInvoiceId;
+    }
+    if (createdJobId) {
+      response.job_id = createdJobId;
     }
     return NextResponse.json(response);
   } catch (error) {

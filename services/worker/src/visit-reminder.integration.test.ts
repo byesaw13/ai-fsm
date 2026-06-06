@@ -156,7 +156,7 @@ describe.skipIf(!shouldRun)("Visit Reminder Integration Tests", () => {
       scheduled_start: new Date(Date.now() + 12 * 3600000).toISOString(),
       job_title: "Reminder Test Job",
       client_name: "Reminder Test Client",
-      client_email: null,
+      client_email: "reminder-test@example.com",
       property_address: null,
       tech_name: null,
     };
@@ -190,7 +190,7 @@ describe.skipIf(!shouldRun)("Visit Reminder Integration Tests", () => {
       scheduled_start: new Date(Date.now() + 12 * 3600000).toISOString(),
       job_title: "Reminder Test Job",
       client_name: "Reminder Test Client",
-      client_email: null,
+      client_email: "reminder-test@example.com",
       property_address: null,
       tech_name: null,
     };

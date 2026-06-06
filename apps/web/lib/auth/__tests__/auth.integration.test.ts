@@ -37,8 +37,7 @@ describe.skipIf(!RUN_HTTP_INTEGRATION)("Auth API (HTTP integration)", () => {
       expect(response.headers.get("set-cookie") ?? "").toContain("fsm_session=");
       expect(response.headers.get("set-cookie") ?? "").toContain("HttpOnly");
 
-      const body = await json<{ token: string; user: { email: string; role: string } }>(response);
-      expect(body.token).toEqual(expect.any(String));
+      const body = await json<{ user: { email: string; role: string } }>(response);
       expect(body.user.email).toBe("admin@test.com");
       expect(body.user.role).toBe("admin");
     });

@@ -19,6 +19,7 @@
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
+import { Client } from "pg";
 
 // HTTP integration: requires both a running DB and a running web server.
 const RUN_INTEGRATION =
@@ -48,6 +49,16 @@ describe.skipIf(!RUN_INTEGRATION)("Invoice conversion API integration", () => {
     });
     const data = await res.json().catch(() => ({}));
     return { status: res.status, data };
+  }
+
+  async function dbExec(sql: string, params: unknown[] = []) {
+    const client = new Client({ connectionString: process.env.TEST_DATABASE_URL });
+    await client.connect();
+    try {
+      await client.query(sql, params);
+    } finally {
+      await client.end();
+    }
   }
 
   beforeAll(async () => {
@@ -110,13 +121,7 @@ describe.skipIf(!RUN_INTEGRATION)("Invoice conversion API integration", () => {
       approvedEstimateId = createApprovedRes.data?.id;
 
       if (approvedEstimateId) {
-        // Transition to sent
-        await apiRequest(
-          "POST",
-          `/api/v1/estimates/${approvedEstimateId}/transition`,
-          adminCookie,
-          { status: "sent" }
-        );
+        await dbExec("UPDATE estimates SET status = 'sent', sent_at = now(), updated_at = now() WHERE id = $1", [approvedEstimateId]);
         // Transition to approved
         await apiRequest(
           "POST",

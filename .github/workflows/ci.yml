@@ -170,6 +170,7 @@ jobs:
       TEST_BASE_URL: http://localhost:3000
       PLAYWRIGHT_USE_EXTERNAL_SERVER: "1"
       E2E_DISABLE_LOGIN_RATE_LIMIT: "1"
+      E2E_SKIP_EMAIL_DELIVERY: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

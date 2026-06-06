@@ -36,7 +36,7 @@ export async function computeAndPersist(args: ComputeAndPersistArgs): Promise<Co
     deposit_fixed_cents: number | null;
   }>(
     `SELECT deposit_required, deposit_type, deposit_percentage, deposit_fixed_cents
-     FROM estimates WHERE id =  AND account_id = `,
+     FROM estimates WHERE id = $1 AND account_id = $2`,
     [estimateId, accountId]
   );
   const policy = policyRows[0];

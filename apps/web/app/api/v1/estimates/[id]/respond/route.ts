@@ -4,6 +4,8 @@ import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { getEnv } from "@/lib/env";
 import { writeWorkflowEvent } from "@/lib/workflow-events";
+import { createJobFromEstimate, getAccountOwnerUserId } from "@/lib/estimates/create-job-db";
+import { createApprovalArtifacts } from "@/lib/estimates/approve";
 
 export const dynamic = "force-dynamic";
 
@@ -63,24 +65,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const client = await getPool().connect();
   try {
+    await client.query("BEGIN");
+
     const newStatus = action === "approve" ? "approved" : "declined";
 
     // Atomic first-writer-wins: only transitions from draft/sent.
     // If status is already approved/declined/expired, RETURNING returns nothing
     // and we treat it as idempotent success.
-    const { rows } = await client.query<{ id: string; account_id: string; old_status: string }>(
+    const { rows } = await client.query<{ id: string; account_id: string }>(
       `UPDATE estimates
        SET status = $1, updated_at = now()
        WHERE id = $2 AND status IN ('draft', 'sent')
-       RETURNING id, account_id, status AS old_status`,
+       RETURNING id, account_id`,
       [newStatus, id]
     );
 
     if (rows.length > 0) {
       const { account_id } = rows[0];
       const eventType = action === "approve" ? "estimate.approved" : "estimate.declined";
-      // Fire-and-forget audit log and workflow event (non-critical, don't block redirect)
-      Promise.all([
+
+      // Audit log + workflow event (non-critical)
+      await Promise.all([
         client.query(
           `INSERT INTO audit_log
              (account_id, entity_type, entity_id, action, actor_id, old_value, new_value)
@@ -98,11 +103,51 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           entityType: "estimate",
           entityId: id,
         }),
-      ]).catch((err) => logger.error("estimate respond: post-update writes failed", err, { estimateId: id }));
+      ]).catch((err) => logger.error("estimate respond: audit/event writes failed", err, { estimateId: id }));
+
+      // On approval: auto-create job + deposit invoice, matching portal and
+      // admin paths. Uses savepoints so artifact failures never block the
+      // customer's approval confirmation.
+      if (action === "approve") {
+        const ownerId = await getAccountOwnerUserId(client, account_id);
+        if (ownerId) {
+          // Set RLS session context so INSERT policies on jobs/invoices pass.
+          await client.query(
+            `SELECT set_config('app.current_user_id', $1, true),
+                    set_config('app.current_account_id', $2, true),
+                    set_config('app.current_role', 'owner', true)`,
+            [ownerId, account_id]
+          );
+
+          // Auto-create job (non-fatal)
+          await client.query("SAVEPOINT before_auto_job");
+          try {
+            await createJobFromEstimate({ client, estimateId: id, accountId: account_id, createdBy: ownerId });
+            await client.query("RELEASE SAVEPOINT before_auto_job");
+          } catch (jobErr) {
+            await client.query("ROLLBACK TO SAVEPOINT before_auto_job");
+            await client.query("RELEASE SAVEPOINT before_auto_job");
+            logger.error("email approve: auto-create job failed (non-fatal)", jobErr, { estimateId: id });
+          }
+
+          // Create deposit invoice + action item (non-fatal)
+          await client.query("SAVEPOINT before_artifacts");
+          try {
+            await createApprovalArtifacts(client, { estimateId: id, accountId: account_id, userId: ownerId });
+            await client.query("RELEASE SAVEPOINT before_artifacts");
+          } catch (artifactErr) {
+            await client.query("ROLLBACK TO SAVEPOINT before_artifacts");
+            await client.query("RELEASE SAVEPOINT before_artifacts");
+            logger.error("email approve: auto-create artifacts failed (non-fatal)", artifactErr, { estimateId: id });
+          }
+        }
+      }
     }
 
+    await client.query("COMMIT");
     return NextResponse.redirect(thanksUrl(action));
   } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
     logger.error("POST /api/v1/estimates/[id]/respond error", error, { estimateId: id, action });
     return NextResponse.redirect(errorUrl);
   } finally {

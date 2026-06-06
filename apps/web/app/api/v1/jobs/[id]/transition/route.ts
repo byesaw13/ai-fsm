@@ -8,9 +8,8 @@ import { logger } from "../../../../../../lib/logger";
 import { jobTransitions, jobStatusSchema } from "@ai-fsm/domain";
 import type { JobStatus } from "@ai-fsm/domain";
 import { reviewJobIntakeGate } from "../../../../../../lib/jobs/intake-guard";
-import { generateInvoiceNumber } from "../../../../../../lib/invoices/db";
-import { reconcileFinalInvoice } from "../../../../../../lib/invoices/billing";
 import { createActionItem } from "../../../../../../lib/action-items";
+import { createDraftFinalInvoiceForJob } from "../../../../../../lib/invoices/final-invoice";
 
 export const dynamic = "force-dynamic";
 
@@ -129,87 +128,18 @@ export const POST = withRole(
         });
       }
 
-      // Auto-create a draft final invoice when job is completed, using the same
-      // deposit-credit reconciliation as the explicit estimate Convert action.
+      // Auto-create a draft final invoice when job is completed using the shared
+      // createDraftFinalInvoiceForJob helper (same logic as visit completion).
       let final_invoice_id: string | null = null;
       if (targetStatus === "completed") {
-        const approvedEstimate = await client.query<{
-          id: string;
-          client_id: string;
-          property_id: string | null;
-          subtotal_cents: number;
-          tax_cents: number;
-          total_cents: number;
-          notes: string | null;
-        }>(
-          `SELECT id, client_id, property_id, subtotal_cents, tax_cents, total_cents, notes
-           FROM estimates
-           WHERE job_id = $1 AND account_id = $2 AND status = 'approved'
-           ORDER BY created_at DESC
-           LIMIT 1`,
-          [id, session.accountId]
-        );
-
-        if (approvedEstimate.rowCount !== null && approvedEstimate.rowCount > 0) {
-          const est = approvedEstimate.rows[0];
-
-          if (est.total_cents > 0) {
-            const existingFinal = await client.query<{ id: string }>(
-              `SELECT id FROM invoices
-               WHERE estimate_id = $1 AND account_id = $2 AND invoice_kind = 'final'
-               LIMIT 1`,
-              [est.id, session.accountId]
-            );
-
-            if (existingFinal.rowCount === 0) {
-              const depositInvoices = await client.query<{
-                invoice_number: string;
-                total_cents: number;
-                status: string;
-              }>(
-                `SELECT invoice_number, total_cents, status FROM invoices
-                 WHERE estimate_id = $1 AND account_id = $2 AND invoice_kind = 'deposit'`,
-                [est.id, session.accountId]
-              );
-              const reconciliation = reconcileFinalInvoice({
-                invoiceTotalCents: est.total_cents,
-                depositInvoices: depositInvoices.rows,
-              });
-              const invoiceNumber = await generateInvoiceNumber(client, session.accountId);
-              const finalNotes = reconciliation.reconciliationNote
-                ? `${est.notes ? `${est.notes}\n\n` : ""}${reconciliation.reconciliationNote}`
-                : est.notes;
-
-              const finalResult = await client.query<{ id: string }>(
-                `INSERT INTO invoices
-                   (account_id, client_id, job_id, estimate_id, property_id,
-                    status, invoice_kind, invoice_number,
-                    subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
-                    notes, created_by)
-                 VALUES ($1, $2, $3, $4, $5,
-                         'draft', 'final', $6,
-                         $7, $8, $9, 0, $10,
-                         $11, $12)
-                 RETURNING id`,
-                [
-                  session.accountId,
-                  est.client_id,
-                  id,
-                  est.id,
-                  est.property_id,
-                  invoiceNumber,
-                  est.subtotal_cents,
-                  est.tax_cents,
-                  est.total_cents,
-                  reconciliation.depositCreditCents,
-                  finalNotes,
-                  session.userId,
-                ]
-              );
-              final_invoice_id = finalResult.rows[0].id;
-            }
-          }
-        }
+        const result = await createDraftFinalInvoiceForJob({
+          client,
+          jobId: id,
+          accountId: session.accountId,
+          userId: session.userId,
+          traceId: session.traceId,
+        });
+        final_invoice_id = result?.invoiceId ?? null;
       }
 
       await appendAuditLog(client, {

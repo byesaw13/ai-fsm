@@ -75,6 +75,7 @@ type BookingRow = {
   job_status: string | null;
   visit_id: string | null;
   client_id: string | null;
+  property_id: string | null;
   duplicate_candidate_ids: string[] | null;
   routing_path: string | null;
   pricing_mode: string | null;
@@ -445,6 +446,7 @@ export default async function BookingRequestDetailPage({
               jobId={br.job_id}
               clientEmail={br.email}
               clientId={br.client_id}
+              propertyId={br.property_id}
               visitId={br.visit_id}
               routingPath={br.routing_path}
               preferredDate={br.preferred_date}

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { queryOne, query, getPool } from "@/lib/db";
 import { createJobFromEstimate, getAccountOwnerUserId } from "@/lib/estimates/create-job-db";
+import { createApprovalArtifacts } from "@/lib/estimates/approve";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -133,29 +134,51 @@ export async function POST(
       [newStatus, name ?? null, signature_svg ?? null, estimate.id]
     );
 
-    // Auto-create the linked job on approval so Nick sees it immediately
-    // without needing to click "Create Linked Job" manually.
-    // Use a savepoint so a PG error inside createJobFromEstimate cannot abort
-    // the outer approval transaction — the catch here would otherwise run
-    // after the transaction is already in the error state, causing COMMIT to fail.
+    // On approval: set RLS context then create job + deposit invoice artifacts,
+    // matching the behavior of the admin transition and email respond paths.
+    // Each artifact step uses its own savepoint so one failure never rolls
+    // back the customer's approval or the other artifacts.
     if (action === "approve") {
-      await dbClient.query("SAVEPOINT before_auto_job");
-      try {
-        const ownerId = await getAccountOwnerUserId(dbClient, estimate.account_id);
-        if (ownerId) {
+      const ownerId = await getAccountOwnerUserId(dbClient, estimate.account_id);
+      if (ownerId) {
+        // Set RLS session context so INSERT policies on jobs/invoices pass.
+        await dbClient.query(
+          `SELECT set_config('app.current_user_id', $1, true),
+                  set_config('app.current_account_id', $2, true),
+                  set_config('app.current_role', 'owner', true)`,
+          [ownerId, estimate.account_id]
+        );
+
+        // Auto-create job (non-fatal)
+        await dbClient.query("SAVEPOINT before_auto_job");
+        try {
           await createJobFromEstimate({
             client: dbClient,
             estimateId: estimate.id,
             accountId: estimate.account_id,
             createdBy: ownerId,
           });
+          await dbClient.query("RELEASE SAVEPOINT before_auto_job");
+        } catch (jobErr) {
+          await dbClient.query("ROLLBACK TO SAVEPOINT before_auto_job");
+          await dbClient.query("RELEASE SAVEPOINT before_auto_job");
+          logger.error("portal approval: auto-create job failed (non-fatal)", jobErr);
         }
-        await dbClient.query("RELEASE SAVEPOINT before_auto_job");
-      } catch (jobErr) {
-        // Roll back only the job-creation work; approval continues.
-        await dbClient.query("ROLLBACK TO SAVEPOINT before_auto_job");
-        await dbClient.query("RELEASE SAVEPOINT before_auto_job");
-        logger.error("portal approval: auto-create job failed (non-fatal)", jobErr);
+
+        // Create deposit invoice + action item (non-fatal)
+        await dbClient.query("SAVEPOINT before_artifacts");
+        try {
+          await createApprovalArtifacts(dbClient, {
+            estimateId: estimate.id,
+            accountId: estimate.account_id,
+            userId: ownerId,
+          });
+          await dbClient.query("RELEASE SAVEPOINT before_artifacts");
+        } catch (artifactErr) {
+          await dbClient.query("ROLLBACK TO SAVEPOINT before_artifacts");
+          await dbClient.query("RELEASE SAVEPOINT before_artifacts");
+          logger.error("portal approval: auto-create artifacts failed (non-fatal)", artifactErr);
+        }
       }
     }
 
