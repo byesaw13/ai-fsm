@@ -79,7 +79,9 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
   const [clientSearch, setClientSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [sendImmediately, setSendImmediately] = useState(false);
+  // Once the estimate is created we keep its id so a retry (e.g. after a send
+  // failure) reuses it instead of creating a duplicate.
+  const [createdId, setCreatedId] = useState<string | null>(null);
 
   const selectedClient = clients.find((c) => c.id === selectedClientId) ?? null;
 
@@ -111,7 +113,9 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
     setStep(3);
   }
 
-  async function handleSubmit() {
+  // The `send` choice is passed in directly (not read from state) so a single
+  // click reflects the right action without waiting for a re-render.
+  async function handleSubmit(send: boolean) {
     if (!selectedService || !selectedClientId) return;
     const flat_rate_cents = parseDollars(priceInput);
     if (flat_rate_cents <= 0) {
@@ -121,29 +125,43 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
     setError("");
     setSubmitting(true);
     try {
-      const res = await fetch("/api/v1/estimates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          client_id: selectedClientId,
-          flat_rate_cents,
-          notes: [selectedService.name, notes.trim()].filter(Boolean).join("\n\n") || null,
-          presentation_mode: "standard",
-        }),
-      });
-      if (!res.ok) {
-        const d = await res.json();
-        setError(d.error?.message ?? "Failed to create estimate");
-        return;
-      }
-      const { id } = await res.json() as { id: string };
-
-      if (sendImmediately) {
-        await fetch(`/api/v1/estimates/${id}/transition`, {
+      // Create once; reuse the id on retry to avoid duplicate estimates.
+      let id = createdId;
+      if (!id) {
+        const res = await fetch("/api/v1/estimates", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "sent" }),
+          body: JSON.stringify({
+            client_id: selectedClientId,
+            flat_rate_cents,
+            notes: [selectedService.name, notes.trim()].filter(Boolean).join("\n\n") || null,
+            presentation_mode: "standard",
+          }),
         });
+        if (!res.ok) {
+          const d = await res.json();
+          setError(d.error?.message ?? "Failed to create estimate");
+          return;
+        }
+        id = (await res.json() as { id: string }).id;
+        setCreatedId(id);
+      }
+
+      // Deliver through the dedicated send action (the transition endpoint
+      // rejects `sent` with USE_SEND_ACTION). The estimate already exists as a
+      // draft, so on a send failure we surface the reason and let the user
+      // retry or fall back to "Save as Draft" without creating a duplicate.
+      if (send) {
+        const sendRes = await fetch(`/api/v1/estimates/${id}/send`, { method: "POST" });
+        if (!sendRes.ok) {
+          const d = await sendRes.json().catch(() => ({}));
+          setError(
+            d.error?.message
+              ? `Saved as draft, but couldn't send: ${d.error.message}`
+              : "Saved as draft, but sending failed. Open the estimate to send it."
+          );
+          return;
+        }
       }
 
       router.push(`/app/estimates/${id}`);
@@ -427,7 +445,7 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
         <button
           type="button"
-          onClick={() => { setSendImmediately(false); handleSubmit(); }}
+          onClick={() => handleSubmit(false)}
           disabled={submitting}
           style={{
             padding: "var(--space-4)", borderRadius: "var(--radius-md)", border: "none",
@@ -436,11 +454,11 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
             opacity: submitting ? 0.7 : 1,
           }}
         >
-          {submitting ? "Creating…" : "Save as Draft"}
+          {submitting ? "Working…" : createdId ? "Open Draft" : "Save as Draft"}
         </button>
         <button
           type="button"
-          onClick={() => { setSendImmediately(true); handleSubmit(); }}
+          onClick={() => handleSubmit(true)}
           disabled={submitting}
           style={{
             padding: "var(--space-4)", borderRadius: "var(--radius-md)",
@@ -449,7 +467,7 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
             cursor: submitting ? "wait" : "pointer", opacity: submitting ? 0.7 : 1,
           }}
         >
-          {submitting ? "Sending…" : "Send to Client →"}
+          {submitting ? "Working…" : "Send to Client →"}
         </button>
       </div>
     </div>
