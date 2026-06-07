@@ -1563,3 +1563,37 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Mobile Workspace field-work list items */
+.mobile-work-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  min-height: 64px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: inherit;
+  text-decoration: none;
+}
+.mobile-work-item-primary { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+.mobile-work-item strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
+  line-height: 1.25;
+}
+.mobile-work-item small {
+  display: block;
+  margin-top: 3px;
+  color: var(--fg-muted);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+.mobile-work-item b {
+  color: var(--accent);
+  font-size: var(--text-base);
+  font-variant-numeric: tabular-nums;
+}

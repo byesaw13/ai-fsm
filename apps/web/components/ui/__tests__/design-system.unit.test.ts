@@ -221,6 +221,17 @@ describe("getBottomNavItems (mobile)", () => {
     expect(hrefs).not.toContain("/app/estimates");
   });
 
+  it("returns field-first destinations when Mobile Workspace is forced", () => {
+    const items = getBottomNavItems("admin", "mobile");
+    expect(items).toHaveLength(4);
+    expect(items.map((i) => i.href)).toEqual([
+      "/app",
+      "/app/action-queue",
+      "/app/jobs",
+      "/app/settings",
+    ]);
+  });
+
   it("returns 2 items for tech role with My Day and Visits", () => {
     const items = getBottomNavItems("tech");
     expect(items).toHaveLength(2);

@@ -662,7 +662,7 @@ export default async function VisitDetailPage({
                 </>
               )}
 
-              <Card>
+              <Card id="visit-parts">
                 <SectionHeader title="Parts" />
                 <VisitPartsPanel
                   visitId={visit.id}
@@ -738,7 +738,7 @@ export default async function VisitDetailPage({
           )}
 
           {!isRepairFlow && currentStatus !== "cancelled" && (
-            <Card data-testid="materials-used-panel">
+            <Card id="visit-materials" data-testid="materials-used-panel">
               <SectionHeader title="Materials Used" />
               <MaterialsUsedForm
                 visitId={visit.id}
