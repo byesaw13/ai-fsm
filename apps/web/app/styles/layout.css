@@ -404,6 +404,11 @@
   height: calc(60px + env(safe-area-inset-bottom, 0px));
 }
 
+/* Floating action button — mobile only, hidden by default */
+.p7-fab-wrap {
+  display: none;
+}
+
 .p7-bottom-nav-inner {
   display: flex;
   height: 60px;
@@ -579,6 +584,8 @@
   }
 
   .p7-bottom-nav { display: block; }
+
+  .p7-fab-wrap { display: block; }
 
   .p7-page-container {
     padding: var(--space-4) var(--space-4) var(--space-12);

@@ -195,13 +195,22 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
         subtitle={`${estimates.length} ${hasFilter ? "matching" : "total"}`}
         actions={
           canCreate ? (
-            <LinkButton
-              href="/app/estimates/new"
-              variant="primary"
-              data-testid="create-estimate-btn"
-            >
-              + New Estimate
-            </LinkButton>
+            <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+              <LinkButton
+                href="/app/estimates/quick"
+                variant="secondary"
+                data-testid="quick-estimate-btn"
+              >
+                ⚡ Quick Estimate
+              </LinkButton>
+              <LinkButton
+                href="/app/estimates/new"
+                variant="primary"
+                data-testid="create-estimate-btn"
+              >
+                + New Estimate
+              </LinkButton>
+            </div>
           ) : undefined
         }
       />

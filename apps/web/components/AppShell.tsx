@@ -7,6 +7,7 @@ import type { Route } from "next";
 import type { Role } from "@ai-fsm/domain";
 import { ToastProvider } from "./ui/Toast";
 import { QuickLeadModal } from "./QuickLeadModal";
+import { FloatingActionButton } from "./FloatingActionButton";
 import {
   IconEstimates,
   IconInbox,
@@ -272,6 +273,7 @@ export function AppShell({ role, userName, workspaceMode = "auto", children }: A
         </nav>
       </div>
       {showQuickLead && <QuickLeadModal onClose={() => setShowQuickLead(false)} />}
+      {isAdminOrOwner && <FloatingActionButton />}
     </ToastProvider>
   );
 }
