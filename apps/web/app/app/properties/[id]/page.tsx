@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth/session";
 import { canManageClients, canTransitionJob, canCreateEstimates } from "@/lib/auth/permissions";
 import { query, queryOne } from "@/lib/db";
@@ -9,7 +10,6 @@ import {
   EmptyState,
   ItemCard,
   LinkButton,
-  MetricGrid,
   PageContainer,
   PageHeader,
   SectionHeader,
@@ -120,6 +120,19 @@ type VisitMediaRow = {
   visit_date: string;
   photo_count: number;
 };
+
+
+function Disclosure({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
+  return (
+    <details style={{ border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", padding: "var(--space-3)" }}>
+      <summary style={{ cursor: "pointer", fontWeight: 800, display: "flex", justifyContent: "space-between", gap: "var(--space-3)" }}>
+        <span>{title}</span>
+        {typeof count === "number" ? <span className="ops-section-count">{count}</span> : null}
+      </summary>
+      <div style={{ marginTop: "var(--space-3)" }}>{children}</div>
+    </details>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Page
@@ -357,7 +370,6 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
 
   // Derived values
   const vaultCompleteness = computeVaultCompleteness(vaultItems);
-  const outstandingCents = openInvoices.reduce((s, i) => s + i.balance_cents, 0);
   const activeWorkCount = activeJobs.length + openEstimates.length + openInvoices.length;
   const hasDocumentsOrMedia = documents.length > 0 || visitMedia.length > 0;
   const pinnedNotes = propertyNotes.filter((n) => n.pinned);
@@ -399,34 +411,16 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
         }
       />
 
-      <MetricGrid
-        metrics={[
-          { label: "Jobs", value: Number(property.job_count) },
-          { label: "Completed visits", value: Number(property.completed_visit_count) },
-          {
-            label: "Outstanding",
-            value: outstandingCents > 0 ? formatPropertyCents(outstandingCents) : "$0",
-            variant: outstandingCents > 0 ? "alert" : "default",
-          },
-          {
-            label: "Client",
-            value: property.client_name,
-            href: `/app/clients/${property.client_id}`,
-          },
-        ]}
-      />
-
       <div className="p7-detail-layout" style={{ marginTop: "var(--space-4)" }}>
         <div className="p7-detail-primary">
 
           {/* ── Active Work ──────────────────────────────────────────────── */}
-          {activeWorkCount > 0 && (
-            <Card>
-              <SectionHeader title="Active Work" count={activeWorkCount} />
+          <Card>
+              <SectionHeader title="Operations" count={activeWorkCount} />
 
               {activeJobs.length > 0 && (
                 <div style={{ marginBottom: openEstimates.length > 0 || openInvoices.length > 0 ? "var(--space-3)" : 0 }}>
-                  {activeJobs.map((job) => {
+                  {activeJobs.slice(0, 2).map((job) => {
                     const color = propertyActiveJobStatusColor(job.status);
                     const nextLabel = job.next_visit_start
                       ? `Next visit ${new Date(job.next_visit_start).toLocaleDateString([], { month: "short", day: "numeric" })}`
@@ -457,7 +451,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                   <div style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--fg-muted)", padding: "var(--space-1) 0", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                     Estimates
                   </div>
-                  {openEstimates.map((e) => (
+                  {openEstimates.slice(0, 1).map((e) => (
                     <ItemCard
                       key={e.id}
                       href={`/app/estimates/${e.id}`}
@@ -478,7 +472,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                   <div style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--fg-muted)", padding: "var(--space-1) 0", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                     Outstanding Invoices
                   </div>
-                  {openInvoices.map((inv) => (
+                  {openInvoices.slice(0, 2).map((inv) => (
                     <ItemCard
                       key={inv.id}
                       href={`/app/invoices/${inv.id}`}
@@ -496,22 +490,23 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                   ))}
                 </>
               )}
+              {activeWorkCount === 0 && (
+                <EmptyState title="No active operations" description="Open jobs, upcoming visits, open estimates, and outstanding invoices appear here." />
+              )}
             </Card>
-          )}
 
           {/* ── Service History ──────────────────────────────────────────── */}
           {serviceHistory.length > 0 && (
             <Card>
-              <SectionHeader title="Service History" count={serviceHistory.length} />
-              <PropertyServiceHistory rows={serviceHistory} />
+              <SectionHeader title="Recent History" count={Math.min(serviceHistory.length, 3)} />
+              <PropertyServiceHistory rows={serviceHistory.slice(0, 3)} />
             </Card>
           )}
 
-          {/* ── Property Timeline ────────────────────────────────────────── */}
-          <Card>
-            <SectionHeader title="Property Timeline" count={timelineEvents.length} />
+          {/* ── Full History ─────────────────────────────────────────────── */}
+          <Disclosure title="Full History" count={timelineEvents.length}>
             <PropertyTimeline events={timelineEvents} />
-          </Card>
+          </Disclosure>
 
           {/* ── Property Health ──────────────────────────────────────────── */}
           {hasHealth && (
@@ -598,8 +593,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
 
           {/* ── Documents & Media ────────────────────────────────────────── */}
           {hasDocumentsOrMedia && (
-            <Card>
-              <SectionHeader title="Documents & Media" count={documents.length + visitMedia.length} />
+            <Disclosure title="Documents & Media" count={documents.length + visitMedia.length}>
 
               {documents.length > 0 && (
                 <div style={{ marginBottom: visitMedia.length > 0 ? "var(--space-4)" : 0 }}>
@@ -653,15 +647,11 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                   ))}
                 </div>
               )}
-            </Card>
+            </Disclosure>
           )}
 
           {/* ── Digital Home Vault ───────────────────────────────────────── */}
-          <Card data-testid="property-vault-card">
-            <SectionHeader
-              title="Digital Home Vault"
-              count={vaultItems.length}
-            />
+          <Disclosure title="Vault" count={vaultItems.length}>
             <div style={{ marginBottom: "var(--space-2)" }}>
               <span style={{ fontSize: "var(--text-xs)", color: vaultCompleteness.percent === 100 ? "#16a34a" : "var(--fg-muted)" }}>
                 {vaultCompleteness.percent === 100
@@ -675,7 +665,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
               initialItems={vaultItems}
               canEdit={canManageClients(session.role)}
             />
-          </Card>
+          </Disclosure>
 
         </div>
 
