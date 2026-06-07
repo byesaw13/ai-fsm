@@ -6,6 +6,7 @@ export * from "./dovetails";
 export * from "./estimate-engine";
 export * from "./job-materials";
 export * from "./stages";
+export * from "./operational-visibility";
 export * from "./scope";
 export { checkSchedulingPreconditions } from "./scheduling-guard";
 export type { SchedulingGuardError, SchedulingGuardResult } from "./scheduling-guard";
