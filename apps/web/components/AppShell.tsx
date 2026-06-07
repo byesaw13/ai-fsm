@@ -92,8 +92,16 @@ export function getBottomNavItems(role: Role, workspaceMode: WorkspaceMode = "au
   }
 
   if (workspaceMode === "mobile") {
-    // Field-first: visits, jobs, invoices, inbox — not CRM admin links
-    return [NAV_TODAY, NAV_JOBS, NAV_INVOICES, { href: "/app/inbox", label: "Inbox", Icon: IconInbox }];
+    // Field-first: visits, jobs, invoices, inbox. Settings is kept so the
+    // workspace switcher stays reachable when the sidebar is hidden (the
+    // forced-mobile shell hides the sidebar even on desktop screens).
+    return [
+      NAV_TODAY,
+      NAV_JOBS,
+      NAV_INVOICES,
+      { href: "/app/inbox", label: "Inbox", Icon: IconInbox },
+      NAV_SETTINGS,
+    ];
   }
 
   return [NAV_TODAY, NAV_REQUESTS, NAV_JOBS, NAV_SETTINGS];
@@ -145,7 +153,7 @@ export function AppShell({ role, userName, workspaceMode = "auto", children }: A
 
   return (
     <ToastProvider>
-      <div className="p7-layout">
+      <div className={`p7-layout p7-mode-${workspaceMode}`}>
         {/* ---- Desktop/Tablet Sidebar ---- */}
         <aside className="p7-sidebar" aria-label="Main navigation">
           {/* Brand */}

@@ -506,6 +506,50 @@
 }
 
 /* ==========================================================================
+   WORKSPACE MODE OVERRIDES
+
+   These force a specific layout shell regardless of viewport width, so the
+   Mobile/Desktop/Auto switch is visibly meaningful on any screen:
+     - p7-mode-mobile  : always the mobile shell (bottom nav + FAB, no sidebar)
+     - p7-mode-desktop : always the desktop shell (sidebar, no bottom nav)
+     - p7-mode-auto    : no override — the media queries below decide.
+   Compound selectors (specificity 0,2,0) beat the plain media-query rules
+   (0,1,0), so these win without !important.
+   ========================================================================== */
+
+/* ---- Forced MOBILE shell (e.g. previewing mobile on a desktop screen) ---- */
+.p7-mode-mobile .p7-sidebar { display: none; }
+.p7-mode-mobile .p7-main {
+  margin-left: 0;
+  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+}
+.p7-mode-mobile .p7-bottom-nav { display: block; }
+.p7-mode-mobile .p7-fab-wrap { display: block; }
+.p7-mode-mobile .p7-detail-layout { grid-template-columns: 1fr; }
+.p7-mode-mobile .p7-detail-sidebar { position: static; }
+.p7-mode-mobile .p7-page-container { padding: var(--space-4) var(--space-4) var(--space-12); }
+
+/* ---- Forced DESKTOP shell (e.g. a tablet user who wants full power) ---- */
+.p7-mode-desktop .p7-sidebar {
+  display: flex;
+  width: var(--sidebar-width);
+}
+.p7-mode-desktop .p7-main {
+  margin-left: var(--sidebar-width);
+  padding-bottom: 0;
+}
+.p7-mode-desktop .p7-bottom-nav { display: none; }
+.p7-mode-desktop .p7-fab-wrap { display: none; }
+/* Restore full sidebar labels even if the tablet media query collapsed them */
+.p7-mode-desktop .p7-brand-name,
+.p7-mode-desktop .p7-nav-label,
+.p7-mode-desktop .p7-nav-section,
+.p7-mode-desktop .p7-user-name,
+.p7-mode-desktop .p7-user-role,
+.p7-mode-desktop .p7-logout-btn,
+.p7-mode-desktop .p7-workspace-switcher { display: revert; }
+
+/* ==========================================================================
    RESPONSIVE BREAKPOINTS
    ========================================================================== */
 
