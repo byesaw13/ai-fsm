@@ -5,13 +5,13 @@ import { runBookingConfirmations } from "./booking-confirmed.js";
 import { runReviewRequests } from "./review-request.js";
 import { runEstimateFollowups } from "./estimate-followup.js";
 import { runLeadFollowups } from "./lead-followup.js";
-import { runRenewalNudges } from "./membership-renewal-nudge.js";
+// import { runRenewalNudges } from "./membership-renewal-nudge.js";
 import { runStaleJobNudges } from "./stale-job-nudge.js";
 import { runPropertyIssueScans } from "./property-issue-scan.js";
 import { runClientReactivations } from "./client-reactivation.js";
 import { runSeasonalReminders } from "./seasonal-reminder.js";
 import { runRecurringInspections } from "./recurring-inspection.js";
-import { processMaintenanceScheduling } from "./maintenance-scheduling.js";
+// import { processMaintenanceScheduling } from "./maintenance-scheduling.js";
 import { expireEstimates } from "./expire-estimates.js";
 import { processWorkflowEvents } from "./workflow-events.js";
 import { dispatchNotificationQueue } from "./notification/dispatch.js";
@@ -113,6 +113,7 @@ async function runPollIteration(client: Client): Promise<void> {
         });
       }
 
+      /* Memberships paused/archived:
       // Dispatch membership renewal nudges
       const renewalResults = await runRenewalNudges(client);
       if (renewalResults.length > 0) {
@@ -124,6 +125,7 @@ async function runPollIteration(client: Client): Promise<void> {
           errors: renewalResults.reduce((sum, r) => sum + r.errors, 0),
         });
       }
+      */
 
       // Dispatch stale job nudges (internal alerts)
       const staleResults = await runStaleJobNudges(client);
@@ -200,6 +202,7 @@ async function runPollIteration(client: Client): Promise<void> {
       logger.info("expire-estimates complete", { expired: expireResult.expired });
     }
 
+    /* Memberships paused/archived:
     // Process maintenance plans independently (not automation-based)
     const maintenanceResults = await processMaintenanceScheduling(client);
     if (maintenanceResults.length > 0) {
@@ -211,6 +214,7 @@ async function runPollIteration(client: Client): Promise<void> {
         errors: totalErrors,
       });
     }
+    */
   } catch (error) {
     logger.error("worker poll failed", error);
   }
