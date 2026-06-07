@@ -16,7 +16,12 @@ interface PricingRow extends Record<string, unknown> {
   notes: string | null;
 }
 
+// MEMBERSHIPS PAUSED — redirects until feature is re-enabled.
 export default async function MembershipPricingPage() {
+  redirect("/app/settings");
+}
+
+async function _MembershipPricingPage_Paused() {
   const session = await getSession();
   if (!session) redirect("/login");
   if (session.role !== "owner" && session.role !== "admin") redirect("/app/settings");
