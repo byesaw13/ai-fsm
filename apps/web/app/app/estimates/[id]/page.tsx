@@ -1,4 +1,5 @@
 import { redirect, notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import {
@@ -145,6 +146,9 @@ export default async function EstimateDetailPage({
   const { id } = await params;
   const session = await getSession();
   if (!session) redirect("/login");
+
+  const cookieStore = await cookies();
+  const isMobileWorkspace = cookieStore.get("workspace_mode")?.value === "mobile";
 
   const result = await withEstimateContext(session, async (client) => {
     const estimateResult = await client.query(
@@ -627,8 +631,8 @@ export default async function EstimateDetailPage({
           );
         })()}
 
-        {/* Internal margin (owner/admin only) */}
-        {(session.role === "owner" || session.role === "admin") && estimate.internal_labor_cost_cents !== null && estimate.internal_labor_cost_cents > 0 && (
+        {/* Internal margin — hidden in mobile workspace */}
+        {!isMobileWorkspace && (session.role === "owner" || session.role === "admin") && estimate.internal_labor_cost_cents !== null && estimate.internal_labor_cost_cents > 0 && (
           <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
             <p style={{ fontWeight: 600, marginBottom: "var(--space-1)", color: "var(--fg-muted)" }}>Internal Margin</p>
             {(() => {
@@ -807,6 +811,50 @@ export default async function EstimateDetailPage({
             ))}
           </div>
         </div>
+      ) : isMobileWorkspace ? (
+      /* Mobile Workspace: card-based line items instead of table */
+      <div className="card">
+        <h2>Line Items</h2>
+        {lineItems.length === 0 && estimate.subtotal_cents === 0 ? (
+          <p className="muted" data-testid="line-items-empty">No line items.</p>
+        ) : lineItems.length === 0 ? (
+          <div style={{ padding: "var(--space-3)", borderRadius: "var(--radius)", background: "var(--bg)", border: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
+            <span style={{ fontWeight: 600 }}>Flat rate</span>
+            <span style={{ fontWeight: 700 }}>{formatDollars(estimate.subtotal_cents)}</span>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            {lineItems.map((item) => (
+              <div key={item.id} data-testid="line-item-row" style={{ padding: "var(--space-3)", borderRadius: "var(--radius)", background: "var(--bg)", border: "1px solid var(--border)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-2)" }}>
+                  <span style={{ fontWeight: 500, fontSize: "var(--text-sm)", flex: 1 }}>{item.description}</span>
+                  <span style={{ fontWeight: 700, fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>{formatDollars(item.total_cents)}</span>
+                </div>
+                {String(item.quantity) !== "1" && (
+                  <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
+                    {item.quantity} × {formatDollars(item.unit_price_cents)}
+                  </div>
+                )}
+              </div>
+            ))}
+            <div style={{ padding: "var(--space-3)", borderRadius: "var(--radius)", background: "var(--bg-card)", border: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "var(--space-1)", marginTop: "var(--space-1)" }}>
+              {estimate.tax_cents > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                  <span>Tax</span><span>{formatDollars(estimate.tax_cents)}</span>
+                </div>
+              )}
+              <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: "var(--text-base)" }}>
+                <span>Total</span><span data-testid="estimate-total-footer">{formatDollars(estimate.total_cents)}</span>
+              </div>
+              {estimate.deposit_cents > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                  <span>Deposit</span><span>{formatDollars(estimate.deposit_cents)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
       ) : (
       <div className="card">
         <h2>Line Items</h2>
@@ -975,8 +1023,8 @@ export default async function EstimateDetailPage({
         />
       )}
 
-      {/* Review — owner/admin only, active estimates */}
-      {canTransition && !["declined", "expired"].includes(currentStatus) && (
+      {/* Review panel — hidden in mobile workspace */}
+      {!isMobileWorkspace && canTransition && !["declined", "expired"].includes(currentStatus) && (
         <EstimateReviewPanel estimateId={estimate.id} />
       )}
 
@@ -1081,7 +1129,8 @@ export default async function EstimateDetailPage({
       )}
 
       {/* Change Orders — owner/admin only, approved estimates */}
-      {canTransition && currentStatus === "approved" && (
+      {/* Change orders — hidden in mobile workspace */}
+      {!isMobileWorkspace && canTransition && currentStatus === "approved" && (
         <ChangeOrdersClient
           estimateId={estimate.id}
           initialChangeOrders={changeOrders as ChangeOrder[]}

@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { getSession } from "@/lib/auth/session";
 import { canCreateEstimates, canManageClients, canTransitionJob } from "@/lib/auth/permissions";
 import { query, queryOne } from "@/lib/db";
@@ -105,6 +106,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const session = await getSession();
   if (!session) redirect("/login");
   if (!canManageClients(session.role)) redirect("/app");
+
+  const cookieStore = await cookies();
+  const isMobileWorkspace = cookieStore.get("workspace_mode")?.value === "mobile";
 
   const client = await queryOne<ClientRow>(
     `SELECT c.*,
@@ -293,14 +297,65 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         }
       />
 
-      <MetricGrid
-        metrics={[
-          { label: "Lifetime value", value: dollars(paidTotal), sub: "paid invoices" },
-          { label: "Jobs", value: Number(client.job_count) },
-          { label: "Estimates", value: Number(client.estimate_count), sub: dollars(estimateTotal) },
-          { label: "Invoices", value: Number(client.invoice_count), sub: `${dollars(invoiceTotal)} total` },
-        ]}
-      />
+      {/* Mobile Workspace: quick-contact chips */}
+      {isMobileWorkspace && (client.phone || client.email) && (
+        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginBottom: "var(--space-4)" }}>
+          {client.phone && (
+            <a
+              href={`tel:${client.phone}`}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: "var(--space-1)",
+                padding: "var(--space-2) var(--space-4)", borderRadius: "var(--radius-full)",
+                background: "var(--color-green-50, #f0fdf4)", border: "1px solid var(--color-green-200, #bbf7d0)",
+                color: "var(--color-green-700, #15803d)", fontWeight: 600, fontSize: "var(--text-sm)",
+                textDecoration: "none",
+              }}
+            >
+              📞 Call
+            </a>
+          )}
+          {client.phone && (
+            <a
+              href={`sms:${client.phone}`}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: "var(--space-1)",
+                padding: "var(--space-2) var(--space-4)", borderRadius: "var(--radius-full)",
+                background: "var(--color-blue-50, #eff6ff)", border: "1px solid var(--color-blue-200, #bfdbfe)",
+                color: "var(--color-blue-700, #1d4ed8)", fontWeight: 600, fontSize: "var(--text-sm)",
+                textDecoration: "none",
+              }}
+            >
+              💬 Text
+            </a>
+          )}
+          {client.email && (
+            <a
+              href={`mailto:${client.email}`}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: "var(--space-1)",
+                padding: "var(--space-2) var(--space-4)", borderRadius: "var(--radius-full)",
+                background: "var(--color-slate-50, #f8fafc)", border: "1px solid var(--border)",
+                color: "var(--fg)", fontWeight: 600, fontSize: "var(--text-sm)",
+                textDecoration: "none",
+              }}
+            >
+              ✉️ Email
+            </a>
+          )}
+        </div>
+      )}
+
+      {/* KPI strip — hidden in mobile workspace */}
+      {!isMobileWorkspace && (
+        <MetricGrid
+          metrics={[
+            { label: "Lifetime value", value: dollars(paidTotal), sub: "paid invoices" },
+            { label: "Jobs", value: Number(client.job_count) },
+            { label: "Estimates", value: Number(client.estimate_count), sub: dollars(estimateTotal) },
+            { label: "Invoices", value: Number(client.invoice_count), sub: `${dollars(invoiceTotal)} total` },
+          ]}
+        />
+      )}
 
       {/* Open-work attention items */}
       {openWork.length > 0 && (
@@ -424,14 +479,16 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             )}
           </Card>
 
-          {/* ── Unified Activity Timeline ─────────────────────────────── */}
-          <Card>
-            <SectionHeader title="Activity" count={activityEvents.length} />
-            <ClientActivityTimeline events={activityEvents} />
-          </Card>
+          {/* ── Unified Activity Timeline — hidden in mobile workspace ── */}
+          {!isMobileWorkspace && (
+            <Card>
+              <SectionHeader title="Activity" count={activityEvents.length} />
+              <ClientActivityTimeline events={activityEvents} />
+            </Card>
+          )}
 
-          {/* ── Estimates ─────────────────────────────────────────────── */}
-          <Card>
+          {/* ── Estimates — hidden in mobile workspace ────────────────── */}
+          {!isMobileWorkspace && <Card>
             <SectionHeader
               title="Estimates"
               count={estimates.length}
@@ -459,10 +516,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 ))}
               </div>
             )}
-          </Card>
+          </Card>}
 
-          {/* ── Invoices ──────────────────────────────────────────────── */}
-          <Card>
+          {/* ── Invoices — hidden in mobile workspace ─────────────────── */}
+          {!isMobileWorkspace && <Card>
             <SectionHeader title="Invoices" count={invoices.length} />
             {invoices.length === 0 ? (
               <EmptyState title="No invoices yet" description="Invoices will appear here once an estimate is approved." />
@@ -488,10 +545,10 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 ))}
               </div>
             )}
-          </Card>
+          </Card>}
 
-          {/* ── Documents & Photos ────────────────────────────────────── */}
-          {vaultItems.length > 0 && (
+          {/* ── Documents & Photos — hidden in mobile workspace ────────── */}
+          {!isMobileWorkspace && vaultItems.length > 0 && (
             <Card>
               <SectionHeader title="Documents & Photos" count={vaultItems.length} />
               <div>

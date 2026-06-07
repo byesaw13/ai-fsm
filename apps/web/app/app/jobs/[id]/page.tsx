@@ -1,4 +1,5 @@
 import { redirect, notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth/session";
@@ -41,6 +42,7 @@ export const dynamic = "force-dynamic";
 
 type JobRow = Job & {
   client_name: string | null;
+  client_phone: string | null;
   property_address: string | null;
   job_category: JobAcceptanceCategory | null;
   strategy_fit: number | null;
@@ -104,9 +106,12 @@ export default async function JobDetailPage({
   const session = await getSession();
   if (!session) redirect("/login");
 
+  const cookieStore = await cookies();
+  const isMobileWorkspace = cookieStore.get("workspace_mode")?.value === "mobile";
+
   const job = await queryOneForSession<JobRow>(
     session,
-    `SELECT j.*, c.name AS client_name, p.address AS property_address
+    `SELECT j.*, c.name AS client_name, c.phone AS client_phone, p.address AS property_address
      FROM jobs j
      LEFT JOIN clients c ON c.id = j.client_id
      LEFT JOIN properties p ON p.id = j.property_id
@@ -319,6 +324,56 @@ export default async function JobDetailPage({
         }
       />
 
+      {/* Mobile Workspace: quick-contact chips — Call, Text, Map */}
+      {isMobileWorkspace && (job.client_phone || job.property_address) && (
+        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginBottom: "var(--space-4)" }}>
+          {job.client_phone && (
+            <a
+              href={`tel:${job.client_phone}`}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: "var(--space-1)",
+                padding: "var(--space-2) var(--space-4)", borderRadius: "var(--radius-full)",
+                background: "var(--color-green-50, #f0fdf4)", border: "1px solid var(--color-green-200, #bbf7d0)",
+                color: "var(--color-green-700, #15803d)", fontWeight: 600, fontSize: "var(--text-sm)",
+                textDecoration: "none",
+              }}
+            >
+              📞 Call
+            </a>
+          )}
+          {job.client_phone && (
+            <a
+              href={`sms:${job.client_phone}`}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: "var(--space-1)",
+                padding: "var(--space-2) var(--space-4)", borderRadius: "var(--radius-full)",
+                background: "var(--color-blue-50, #eff6ff)", border: "1px solid var(--color-blue-200, #bfdbfe)",
+                color: "var(--color-blue-700, #1d4ed8)", fontWeight: 600, fontSize: "var(--text-sm)",
+                textDecoration: "none",
+              }}
+            >
+              💬 Text
+            </a>
+          )}
+          {job.property_address && (
+            <a
+              href={`https://maps.apple.com/?q=${encodeURIComponent(job.property_address)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: "var(--space-1)",
+                padding: "var(--space-2) var(--space-4)", borderRadius: "var(--radius-full)",
+                background: "var(--color-slate-50, #f8fafc)", border: "1px solid var(--border)",
+                color: "var(--fg)", fontWeight: 600, fontSize: "var(--text-sm)",
+                textDecoration: "none",
+              }}
+            >
+              📍 Map
+            </a>
+          )}
+        </div>
+      )}
+
       {!isTech && commercialCounts && (
         <>
           <WhatNextBanner
@@ -485,13 +540,15 @@ export default async function JobDetailPage({
               </Card>
             </AdvancedDetails>
 
-            {/* Vendor coordination */}
-            <VendorCoordinationCard
-              jobId={job.id}
-              vendorCoordination={job.vendor_coordination}
-              conciergeFeeCents={job.concierge_fee_cents}
-              canEdit={canTransition}
-            />
+            {/* Vendor coordination — hidden in mobile workspace */}
+            {!isMobileWorkspace && (
+              <VendorCoordinationCard
+                jobId={job.id}
+                vendorCoordination={job.vendor_coordination}
+                conciergeFeeCents={job.concierge_fee_cents}
+                canEdit={canTransition}
+              />
+            )}
 
             {commercialCounts?.approved_estimate_id && (
               <Card>
@@ -618,8 +675,8 @@ export default async function JobDetailPage({
               </dl>
             </Card>
 
-            {/* Profitability (owner/admin only) */}
-            {!isTech && (revenueCents !== null || costCents !== null) && (
+            {/* Profitability — hidden in mobile workspace */}
+            {!isTech && !isMobileWorkspace && (revenueCents !== null || costCents !== null) && (
               <Card data-testid="profitability-card">
                 <SectionHeader title="Profitability" />
                 <dl className="p7-detail-list">
@@ -678,16 +735,18 @@ export default async function JobDetailPage({
             )}
 
 
-            {/* Asset links (Homebox) */}
-            <AdvancedDetails title="Home Assets">
-              <AssetLinksPanel
-                entityType="job"
-                entityId={job.id}
-                initialLinks={assetLinks}
-                homeboxEnabled={homeboxEnabled}
-                canLink={!isTech}
-              />
-            </AdvancedDetails>
+            {/* Asset links (Homebox) — hidden in mobile workspace */}
+            {!isMobileWorkspace && (
+              <AdvancedDetails title="Home Assets">
+                <AssetLinksPanel
+                  entityType="job"
+                  entityId={job.id}
+                  initialLinks={assetLinks}
+                  homeboxEnabled={homeboxEnabled}
+                  canLink={!isTech}
+                />
+              </AdvancedDetails>
+            )}
           </div>
         )}
 
