@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import type { Route } from "next";
 import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth/session";
 import { queryForSession, queryOneForSession } from "@/lib/db";
@@ -94,6 +95,34 @@ function AdvancedDetails({ title, children }: { title: string; children: ReactNo
         {children}
       </div>
     </details>
+  );
+}
+
+function MobileJobAction({ href, label, detail, primary = false }: { href: Route; label: string; detail?: string; primary?: boolean }) {
+  return (
+    <Link
+      href={href}
+      className={`mobile-work-item ${primary ? "mobile-work-item-primary" : ""}`}
+      style={{ minHeight: 72 }}
+    >
+      <span>
+        <strong>{label}</strong>
+        {detail && <small>{detail}</small>}
+      </span>
+      <b>Open</b>
+    </Link>
+  );
+}
+
+function MobileJobExternalAction({ href, label, detail }: { href: string; label: string; detail?: string }) {
+  return (
+    <a href={href} className="mobile-work-item" style={{ minHeight: 72 }} target={href.startsWith("http") ? "_blank" : undefined} rel={href.startsWith("http") ? "noopener noreferrer" : undefined}>
+      <span>
+        <strong>{label}</strong>
+        {detail && <small>{detail}</small>}
+      </span>
+      <b>Go</b>
+    </a>
   );
 }
 
@@ -302,6 +331,76 @@ export default async function JobDetailPage({
       + Schedule Visit
     </LinkButton>
   ) : undefined;
+
+  if (isMobileWorkspace) {
+    const currentVisit = activeVisits.find((v) => v.status === "in_progress" || v.status === "arrived") ?? activeVisits[0] ?? visits[0] ?? null;
+    const visitHref = currentVisit ? (`/app/visits/${currentVisit.id}` as Route) : null;
+    const mapHref = job.property_address ? `https://maps.apple.com/?q=${encodeURIComponent(job.property_address)}` : null;
+
+    return (
+      <div style={{ padding: "var(--space-4) var(--space-4) var(--space-12)", display: "flex", flexDirection: "column", gap: "var(--space-5)", maxWidth: 760 }}>
+        <header style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+          <Link href="/app/jobs" style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", textDecoration: "none", fontWeight: 700 }}>
+            Jobs
+          </Link>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)", alignItems: "flex-start" }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: "var(--text-2xl)", fontWeight: 800 }}>{job.title}</h1>
+              <p style={{ margin: "var(--space-1) 0 0", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+                {job.client_name ?? "Current job"}{job.property_address ? ` / ${job.property_address}` : ""}
+              </p>
+            </div>
+            <StatusBadge variant={currentStatus as StatusVariant}>{JOB_STATUS_LABELS[currentStatus]}</StatusBadge>
+          </div>
+        </header>
+
+        <section style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "var(--space-2)" }}>
+          {job.client_phone ? <MobileJobExternalAction href={`tel:${job.client_phone}`} label="Call" /> : null}
+          {job.client_phone ? <MobileJobExternalAction href={`sms:${job.client_phone}`} label="Text" /> : null}
+          {mapHref ? <MobileJobExternalAction href={mapHref} label="Map" /> : null}
+        </section>
+
+        <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+          <h2 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 800 }}>Current Job</h2>
+          <div style={{ padding: "var(--space-4)", border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", fontSize: "var(--text-sm)", whiteSpace: "pre-wrap", color: job.description ? "var(--fg)" : "var(--fg-muted)" }}>
+            {job.description || "No scope notes have been added yet."}
+          </div>
+        </section>
+
+        <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+          {visitHref ? (
+            <>
+              <MobileJobAction href={visitHref} label="Scope" detail="Open the active visit scope and checklist" primary />
+              <MobileJobAction href={`${visitHref}#visit-issue` as Route} label="Photos" detail="Capture before, assessment, and completion photos" />
+              <MobileJobAction href={`${visitHref}#visit-parts` as Route} label="Materials" detail="Record parts and materials used" />
+              <MobileJobAction href={`${visitHref}#visit-resolution` as Route} label="Notes" detail="Document the work performed" />
+              <MobileJobAction href={`${visitHref}#visit-completion` as Route} label="Complete Visit" detail="Finish photos, signature, and closeout" primary />
+            </>
+          ) : (
+            <div style={{ padding: "var(--space-4)", border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+              No visit is scheduled for this job yet.
+            </div>
+          )}
+          {canAddVisit && !visitHref ? (
+            <Link href={`/app/jobs/${job.id}/visits/new` as Route} className="p7-btn p7-btn-primary p7-btn-sm" style={{ justifyContent: "center" }}>
+              Schedule Visit
+            </Link>
+          ) : null}
+        </section>
+
+        <AdvancedDetails title="Secondary Details">
+          <dl className="p7-detail-list">
+            {job.client_name && <div className="p7-detail-row"><dt>Client</dt><dd>{job.client_name}</dd></div>}
+            {job.property_address && <div className="p7-detail-row"><dt>Property</dt><dd>{job.property_address}</dd></div>}
+            <div className="p7-detail-row"><dt>Status</dt><dd>{JOB_STATUS_LABELS[currentStatus]}</dd></div>
+            <div className="p7-detail-row"><dt>Visits</dt><dd>{visits.length}</dd></div>
+            {!isTech && <div className="p7-detail-row"><dt>Estimates</dt><dd>{estimateCount}</dd></div>}
+            {!isTech && <div className="p7-detail-row"><dt>Invoices</dt><dd>{invoiceCount}</dd></div>}
+          </dl>
+        </AdvancedDetails>
+      </div>
+    );
+  }
 
   return (
     <PageContainer>

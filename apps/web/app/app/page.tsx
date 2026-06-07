@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
@@ -60,6 +61,24 @@ type ActionQueueItem = {
   tone: "danger" | "warning" | "default";
 };
 
+type MobileInvoiceRow = {
+  id: string;
+  invoice_number: string;
+  total_cents: string;
+  status: string;
+  client_name: string | null;
+  job_title: string | null;
+};
+
+type MobileEstimateRow = {
+  id: string;
+  total_cents: string;
+  status: string;
+  expires_at: string | null;
+  client_name: string | null;
+  job_title: string | null;
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -87,6 +106,149 @@ function fmtDate(iso: string): string {
 
 function parseN(row: CountRow | undefined | null): number {
   return parseInt(row?.count ?? "0", 10);
+}
+
+function MobileSection({
+  title,
+  count,
+  children,
+}: {
+  title: string;
+  count: number;
+  children: ReactNode;
+}) {
+  return (
+    <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <h2 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 800 }}>{title}</h2>
+        <span className="ops-section-count">{count}</span>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function MobileEmpty({ children }: { children: ReactNode }) {
+  return (
+    <div style={{
+      padding: "var(--space-4)",
+      border: "1px solid var(--border)",
+      borderRadius: 8,
+      background: "var(--bg-card)",
+      color: "var(--fg-muted)",
+      fontSize: "var(--text-sm)",
+    }}>
+      {children}
+    </div>
+  );
+}
+
+function MobileToday({
+  firstName,
+  todayLabel,
+  actionQueue,
+  todayVisits,
+  draftInvoices,
+  depositInvoices,
+  estimateFollowUps,
+}: {
+  firstName: string;
+  todayLabel: string;
+  actionQueue: ActionQueueItem[];
+  todayVisits: VisitRow[];
+  draftInvoices: MobileInvoiceRow[];
+  depositInvoices: MobileInvoiceRow[];
+  estimateFollowUps: MobileEstimateRow[];
+}) {
+  return (
+    <div style={{ padding: "var(--space-4) var(--space-4) var(--space-12)", display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
+      <header style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+        <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)", fontWeight: 700 }}>{todayLabel}</p>
+        <h1 style={{ margin: 0, fontSize: "var(--text-2xl)", fontWeight: 800 }}>Today{firstName ? `, ${firstName}` : ""}</h1>
+      </header>
+
+      <MobileSection title="Action Queue" count={actionQueue.length}>
+        {actionQueue.length === 0 ? (
+          <MobileEmpty>No field actions need attention right now.</MobileEmpty>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            {actionQueue.slice(0, 5).map((item) => (
+              <Link key={item.label} href={item.href} className="mobile-work-item">
+                <span>
+                  <strong>{item.label}</strong>
+                  <small>{item.detail}</small>
+                </span>
+                <b>{item.count}</b>
+              </Link>
+            ))}
+            <Link href="/app/action-queue" className="p7-btn p7-btn-secondary p7-btn-sm" style={{ justifyContent: "center" }}>
+              Open Queue
+            </Link>
+          </div>
+        )}
+      </MobileSection>
+
+      <MobileSection title="Today's Visits" count={todayVisits.length}>
+        {todayVisits.length === 0 ? (
+          <MobileEmpty>No visits scheduled today.</MobileEmpty>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            {todayVisits.map((v) => (
+              <Link key={v.id} href={`/app/visits/${v.id}` as Route} className="mobile-work-item mobile-work-item-primary">
+                <span>
+                  <strong>{fmtTime(v.scheduled_start)} · {v.client_name}</strong>
+                  <small>{v.property_address ?? v.job_title}</small>
+                </span>
+                <StatusBadge variant={v.status as StatusVariant}>{v.status.replace("_", " ")}</StatusBadge>
+              </Link>
+            ))}
+          </div>
+        )}
+      </MobileSection>
+
+      <MobileSection title="Draft Invoices" count={draftInvoices.length}>
+        {draftInvoices.length === 0 ? <MobileEmpty>No draft invoices waiting.</MobileEmpty> : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            {draftInvoices.map((invoice) => (
+              <Link key={invoice.id} href={`/app/invoices/${invoice.id}` as Route} className="mobile-work-item">
+                <span><strong>{invoice.invoice_number}</strong><small>{invoice.client_name ?? invoice.job_title ?? "Draft invoice"}</small></span>
+                <b>{fmt(invoice.total_cents)}</b>
+              </Link>
+            ))}
+          </div>
+        )}
+      </MobileSection>
+
+      <MobileSection title="Deposits Needed" count={depositInvoices.length}>
+        {depositInvoices.length === 0 ? <MobileEmpty>No deposits need collection.</MobileEmpty> : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            {depositInvoices.map((invoice) => (
+              <Link key={invoice.id} href={`/app/invoices/${invoice.id}` as Route} className="mobile-work-item">
+                <span><strong>{invoice.invoice_number}</strong><small>{invoice.client_name ?? invoice.job_title ?? "Deposit invoice"}</small></span>
+                <b>{fmt(invoice.total_cents)}</b>
+              </Link>
+            ))}
+          </div>
+        )}
+      </MobileSection>
+
+      <MobileSection title="Estimate Follow-Ups" count={estimateFollowUps.length}>
+        {estimateFollowUps.length === 0 ? <MobileEmpty>No estimates need follow-up.</MobileEmpty> : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            {estimateFollowUps.map((estimate) => (
+              <Link key={estimate.id} href={`/app/estimates/${estimate.id}` as Route} className="mobile-work-item">
+                <span>
+                  <strong>{estimate.client_name ?? estimate.job_title ?? "Estimate"}</strong>
+                  <small>{estimate.expires_at ? `Expires ${fmtDate(estimate.expires_at)}` : "Awaiting client response"}</small>
+                </span>
+                <b>{fmt(estimate.total_cents)}</b>
+              </Link>
+            ))}
+          </div>
+        )}
+      </MobileSection>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -311,6 +473,75 @@ export default async function AppPage() {
   const exceptionJobCount    = parseN(exceptionRows.find((r) => r.kind === "job"));
   const exceptionVisitCount  = parseN(exceptionRows.find((r) => r.kind === "visit"));
   const lastMonthRev         = parseInt(lastMonthRevenueRow[0]?.total_cents ?? "0", 10);
+  const [
+    depositInvoiceRows,
+    materialOrderRows,
+    mobileDraftInvoices,
+    mobileDepositInvoices,
+    mobileEstimateFollowUps,
+  ] = isMobileWorkspace
+    ? await Promise.all([
+        queryForSession<CountRow>(session,
+          `SELECT COUNT(*)::text AS count
+           FROM invoices
+           WHERE account_id = $1
+             AND invoice_kind = 'deposit'
+             AND status IN ('draft','sent','partial','overdue')`,
+          [accountId]),
+        queryForSession<CountRow>(session,
+          `SELECT COUNT(DISTINCT e.id)::text AS count
+           FROM estimates e
+           JOIN jobs j ON j.id = e.job_id AND j.account_id = e.account_id
+           WHERE e.account_id = $1
+             AND e.status = 'approved'
+             AND j.status IN ('scheduled','in_progress')`,
+          [accountId]),
+        queryForSession<MobileInvoiceRow>(session,
+          `SELECT i.id, i.invoice_number, i.total_cents::text AS total_cents,
+                  i.status, c.name AS client_name, j.title AS job_title
+           FROM invoices i
+           JOIN clients c ON c.id = i.client_id
+           LEFT JOIN jobs j ON j.id = i.job_id
+           WHERE i.account_id = $1
+             AND i.status = 'draft'
+             AND i.invoice_kind IN ('final', 'standard')
+           ORDER BY i.created_at ASC
+           LIMIT 5`,
+          [accountId]),
+        queryForSession<MobileInvoiceRow>(session,
+          `SELECT i.id, i.invoice_number, i.total_cents::text AS total_cents,
+                  i.status, c.name AS client_name, j.title AS job_title
+           FROM invoices i
+           JOIN clients c ON c.id = i.client_id
+           LEFT JOIN jobs j ON j.id = i.job_id
+           WHERE i.account_id = $1
+             AND i.invoice_kind = 'deposit'
+             AND i.status IN ('draft','sent','partial','overdue')
+           ORDER BY i.created_at ASC
+           LIMIT 5`,
+          [accountId]),
+        queryForSession<MobileEstimateRow>(session,
+          `SELECT e.id, e.total_cents::text AS total_cents, e.status,
+                  e.expires_at::text AS expires_at, c.name AS client_name, j.title AS job_title
+           FROM estimates e
+           JOIN clients c ON c.id = e.client_id
+           LEFT JOIN jobs j ON j.id = e.job_id
+           WHERE e.account_id = $1
+             AND e.status = 'sent'
+           ORDER BY e.expires_at ASC NULLS LAST, e.sent_at ASC NULLS LAST, e.created_at ASC
+           LIMIT 5`,
+          [accountId]),
+      ])
+    : [
+        [{ count: "0" }] as CountRow[],
+        [{ count: "0" }] as CountRow[],
+        [] as MobileInvoiceRow[],
+        [] as MobileInvoiceRow[],
+        [] as MobileEstimateRow[],
+      ];
+
+  const depositNeededCount = parseN(depositInvoiceRows[0]);
+  const materialOrderCount = parseN(materialOrderRows[0]);
 
   const revenueChangePct = lastMonthRev > 0
     ? Math.round(((revenueThisMonth - lastMonthRev) / lastMonthRev) * 100)
@@ -319,6 +550,45 @@ export default async function AppPage() {
   // ---------------------------------------------------------------------------
   // Action queue — only shows items with count > 0
   // ---------------------------------------------------------------------------
+
+  const mobileActionQueue = ([
+    {
+      label: "Review Draft Invoices",
+      count: draftInvoiceCount,
+      href: "/app/invoices?status=draft" as Route,
+      detail: "Completed work waiting for invoice review",
+      tone: draftInvoiceCount > 0 ? "warning" : "default",
+    },
+    {
+      label: "Schedule Approved Jobs",
+      count: noNextVisitCount,
+      href: "/app/jobs" as Route,
+      detail: "Approved or active jobs without a next visit",
+      tone: "warning",
+    },
+    {
+      label: "Follow Up Estimates",
+      count: expiringCount + awaitingCount,
+      href: "/app/estimates?status=sent" as Route,
+      detail: expiringCount > 0 ? "Some expire within 7 days" : "Sent estimates awaiting response",
+      tone: "warning",
+    },
+    {
+      label: "Collect Deposits",
+      count: depositNeededCount,
+      href: "/app/invoices?kind=deposit" as Route,
+      detail: "Deposit invoices not fully collected",
+      tone: depositNeededCount > 0 ? "danger" : "default",
+    },
+    {
+      label: "Order Materials",
+      count: materialOrderCount,
+      href: "/app/estimates?status=approved" as Route,
+      detail: "Approved jobs with materials to stage",
+      tone: "warning",
+    },
+  ] satisfies ActionQueueItem[]).filter((item) => item.count > 0)
+    .sort((a, b) => ({ danger: 0, warning: 1, default: 2 })[a.tone] - ({ danger: 0, warning: 1, default: 2 })[b.tone]);
 
   const actionQueue = ([
     {
@@ -365,6 +635,20 @@ export default async function AppPage() {
     },
   ] satisfies ActionQueueItem[]).filter((item) => item.count > 0)
     .sort((a, b) => ({ danger: 0, warning: 1, default: 2 })[a.tone] - ({ danger: 0, warning: 1, default: 2 })[b.tone]);
+
+  if (isMobileWorkspace) {
+    return (
+      <MobileToday
+        firstName={firstName}
+        todayLabel={todayLabel}
+        actionQueue={mobileActionQueue}
+        todayVisits={todayVisits}
+        draftInvoices={mobileDraftInvoices}
+        depositInvoices={mobileDepositInvoices}
+        estimateFollowUps={mobileEstimateFollowUps}
+      />
+    );
+  }
 
   // ---------------------------------------------------------------------------
   // Pulse metrics strip — 4 KPIs visible to all admin/owner

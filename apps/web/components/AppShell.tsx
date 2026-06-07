@@ -19,6 +19,7 @@ import {
   IconInvoices,
   IconReports,
   IconVisits,
+  IconQueue,
 } from "./NavIcons";
 
 export type WorkspaceMode = "mobile" | "desktop" | "auto";
@@ -42,8 +43,9 @@ interface NavSection {
 // ---------------------------------------------------------------------------
 
 // Named constants for items referenced outside the array (mobile bottom bar)
-const NAV_TODAY:    NavItem = { href: "/app",            label: "Today",      Icon: IconMyDay };
-const NAV_REQUESTS: NavItem = { href: "/app/requests",   label: "Requests",   Icon: IconInbox };
+const NAV_TODAY:    NavItem = { href: "/app",              label: "Today",    Icon: IconMyDay };
+const NAV_QUEUE:    NavItem = { href: "/app/action-queue", label: "Queue",    Icon: IconQueue };
+const NAV_REQUESTS: NavItem = { href: "/app/requests",     label: "Requests", Icon: IconInbox };
 const NAV_PROPS:    NavItem = { href: "/app/properties", label: "Properties", Icon: IconProperties, adminOnly: true };
 const NAV_JOBS:     NavItem = { href: "/app/jobs",       label: "Jobs",       Icon: IconJobs,       adminOnly: true };
 const NAV_INVOICES: NavItem = { href: "/app/invoices",   label: "Invoices",   Icon: IconInvoices,   adminOnly: true };
@@ -92,14 +94,12 @@ export function getBottomNavItems(role: Role, workspaceMode: WorkspaceMode = "au
   }
 
   if (workspaceMode === "mobile") {
-    // Field-first: visits, jobs, invoices, inbox. Settings is kept so the
-    // workspace switcher stays reachable when the sidebar is hidden (the
-    // forced-mobile shell hides the sidebar even on desktop screens).
+    // Field-first: today, execution queue, jobs, settings. Settings is kept so
+    // the workspace switcher stays reachable when the sidebar is hidden.
     return [
       NAV_TODAY,
+      NAV_QUEUE,
       NAV_JOBS,
-      NAV_INVOICES,
-      { href: "/app/inbox", label: "Inbox", Icon: IconInbox },
       NAV_SETTINGS,
     ];
   }

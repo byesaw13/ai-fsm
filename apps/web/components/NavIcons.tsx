@@ -158,6 +158,15 @@ export function IconMyDay(props: IconProps) {
   );
 }
 
+export function IconQueue(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5 5h10M5 10h10M5 15h6" />
+      <path d="m2.5 5 1 1 2-2M2.5 10l1 1 2-2M2.5 15l1 1 2-2" />
+    </Icon>
+  );
+}
+
 export function IconMileage(props: IconProps) {
   return (
     <Icon {...props}>
