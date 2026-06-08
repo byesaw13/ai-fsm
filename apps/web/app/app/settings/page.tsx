@@ -125,11 +125,8 @@ export default async function SettingsPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
                 {[
                   { href: "/app/schedule",              label: "Schedule",             desc: "Week / month / year calendar views" },
-                  { href: "/app/booking-requests",      label: "Requests",             desc: "Intake queue and request management" },
-                  { href: "/app/workflow",              label: "Workflow",             desc: "Requests and jobs by stage with estimate and invoice status" },
-                  { href: "/app/reports",               label: "Reports",              desc: "Revenue, operations, and performance" },
-                  { href: "/app/operations-dashboard",  label: "Operations Dashboard", desc: "Revenue mix, schedule utilization, job quality" },
-                  { href: "/app/pricing-dashboard",     label: "Pricing Dashboard",    desc: "Estimate overrides, adjustments, and below-minimum fees" },
+                  { href: "/app/requests",              label: "Requests",             desc: "Intake queue and request management" },
+                  { href: "/app/reports",               label: "Reports",              desc: "Revenue, pricing health, schedule utilization, and performance" },
                   // Memberships paused — link hidden until feature is re-enabled
                   // { href: "/app/membership-dashboard",  label: "Membership Dashboard", desc: "Active memberships, renewals, and labor cap status" },
                   { href: "/app/automations",           label: "Automations",          desc: "Workflow automation rules" },
