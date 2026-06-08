@@ -14,6 +14,7 @@ import {
   SectionHeader,
 } from "@/components/ui";
 import type { FilterDef } from "@/components/ui";
+import { MINIMUM_SERVICE_FEE_CENTS } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -89,6 +90,41 @@ type EstimateConversionRow = {
   pct_of_total: string;
 };
 
+// Salvaged from the retired Operations Dashboard
+type ScheduleUtilRow = {
+  scheduled_count: number;
+  completed_count: number;
+  cancelled_count: number;
+  avg_per_week: string;
+};
+
+type LowValueRow = {
+  below_minimum: number;
+  total_estimated_jobs: number;
+};
+
+// Salvaged from the retired Pricing Dashboard
+type PricingSummaryRow = {
+  total: number;
+  below_minimum: number;
+  with_override: number;
+  price_book_line_items: number;
+  total_line_items: number;
+};
+
+type OverrideReasonRow = {
+  reason: string;
+  count: number;
+};
+
+type BelowMinimumEstimateRow = {
+  id: string;
+  total_cents: number;
+  minimum_service_override_reason: string | null;
+  client_name: string | null;
+  job_title: string | null;
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -116,6 +152,17 @@ function categoryLabel(cat: string): string {
     other: "Other",
   };
   return labels[cat] ?? cat;
+}
+
+const OVERRIDE_REASON_LABELS: Record<string, string> = {
+  bundled:        "Bundled job",
+  promo:          "Promotional",
+  owner_approved: "Owner approved",
+};
+
+function pctOf(num: number, den: number): string {
+  if (den === 0) return "0%";
+  return `${Math.round((num / den) * 100)}%`;
 }
 
 function statusLabel(s: string): string {
@@ -343,6 +390,81 @@ export default async function ReportsPage({ searchParams }: PageProps) {
          ELSE 6
        END`,
     [session.accountId, targetMonth]
+  );
+
+  // === Schedule utilization (salvaged from Operations Dashboard, month-scoped) ===
+  const scheduleUtilRows = await query<ScheduleUtilRow>(
+    `SELECT
+       COUNT(*) FILTER (WHERE status = 'scheduled')::int AS scheduled_count,
+       COUNT(*) FILTER (WHERE status = 'completed')::int AS completed_count,
+       COUNT(*) FILTER (WHERE status = 'cancelled')::int AS cancelled_count,
+       ROUND(COUNT(*)::numeric / 4.0, 1)::text AS avg_per_week
+     FROM visits
+     WHERE account_id = $1
+       AND to_char(scheduled_start, 'YYYY-MM') = $2`,
+    [session.accountId, targetMonth]
+  );
+  const scheduleUtil = scheduleUtilRows[0] ?? {
+    scheduled_count: 0, completed_count: 0, cancelled_count: 0, avg_per_week: "0",
+  };
+
+  // === Low-value job ratio (salvaged from Operations Dashboard, current snapshot) ===
+  const lowValueRows = await query<LowValueRow>(
+    `SELECT
+       COUNT(*) FILTER (
+         WHERE e.total_cents < $2
+           AND e.minimum_service_override_reason IS NULL
+       )::int AS below_minimum,
+       COUNT(DISTINCT j.id)::int AS total_estimated_jobs
+     FROM jobs j
+     JOIN estimates e ON e.job_id = j.id AND e.status IN ('approved','sent')
+     WHERE j.account_id = $1
+       AND j.status IN ('scheduled','in_progress','completed')`,
+    [session.accountId, MINIMUM_SERVICE_FEE_CENTS]
+  );
+  const lowValue = lowValueRows[0] ?? { below_minimum: 0, total_estimated_jobs: 0 };
+
+  // === Pricing health (salvaged from Pricing Dashboard) ===
+  const pricingSummaryRows = await query<PricingSummaryRow>(
+    `SELECT
+       COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE total_cents < $2)::int AS below_minimum,
+       COUNT(*) FILTER (WHERE total_cents < $2 AND minimum_service_override_reason IS NOT NULL)::int AS with_override,
+       (SELECT COUNT(*)::int FROM estimate_line_items eli
+          JOIN estimates e2 ON e2.id = eli.estimate_id
+          WHERE e2.account_id = $1 AND eli.price_book_id IS NOT NULL) AS price_book_line_items,
+       (SELECT COUNT(*)::int FROM estimate_line_items eli
+          JOIN estimates e2 ON e2.id = eli.estimate_id
+          WHERE e2.account_id = $1) AS total_line_items
+     FROM estimates
+     WHERE account_id = $1`,
+    [session.accountId, MINIMUM_SERVICE_FEE_CENTS]
+  );
+  const pricingSummary = pricingSummaryRows[0] ?? {
+    total: 0, below_minimum: 0, with_override: 0, price_book_line_items: 0, total_line_items: 0,
+  };
+
+  const overrideReasonRows = await query<OverrideReasonRow>(
+    `SELECT minimum_service_override_reason AS reason, COUNT(*)::int AS count
+     FROM estimates
+     WHERE account_id = $1
+       AND minimum_service_override_reason IS NOT NULL
+     GROUP BY minimum_service_override_reason
+     ORDER BY count DESC`,
+    [session.accountId]
+  );
+
+  const belowMinimumEstimates = await query<BelowMinimumEstimateRow>(
+    `SELECT e.id, e.total_cents, e.minimum_service_override_reason,
+            c.name AS client_name, j.title AS job_title
+     FROM estimates e
+     LEFT JOIN clients c ON c.id = e.client_id
+     LEFT JOIN jobs j ON j.id = e.job_id
+     WHERE e.account_id = $1
+       AND e.total_cents < $2
+     ORDER BY e.created_at DESC
+     LIMIT 25`,
+    [session.accountId, MINIMUM_SERVICE_FEE_CENTS]
   );
 
   const currentValues: Record<string, string> = {};
@@ -709,6 +831,116 @@ export default async function ReportsPage({ searchParams }: PageProps) {
 
         </>
       )}
+
+      {/* === Schedule Utilization (salvaged from Operations Dashboard) === */}
+      <Card style={{ marginTop: "var(--space-6)" }}>
+        <SectionHeader title="Schedule Utilization" />
+        <p style={{ padding: "0 var(--space-3) var(--space-2)", color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+          Visits scheduled in {monthLabel}.
+        </p>
+        <div style={{ padding: "var(--space-3)", display: "flex", gap: "var(--space-6)", flexWrap: "wrap", fontSize: "var(--text-sm)" }}>
+          <div>
+            <div style={{ color: "var(--fg-muted)" }}>Scheduled</div>
+            <div style={{ fontWeight: 700, fontSize: "var(--text-lg)" }}>{scheduleUtil.scheduled_count}</div>
+          </div>
+          <div>
+            <div style={{ color: "var(--fg-muted)" }}>Completed</div>
+            <div style={{ fontWeight: 700, fontSize: "var(--text-lg)", color: "var(--status-success)" }}>{scheduleUtil.completed_count}</div>
+          </div>
+          <div>
+            <div style={{ color: "var(--fg-muted)" }}>Cancelled</div>
+            <div style={{ fontWeight: 700, fontSize: "var(--text-lg)", color: scheduleUtil.cancelled_count > 0 ? "var(--status-error)" : "inherit" }}>{scheduleUtil.cancelled_count}</div>
+          </div>
+          <div>
+            <div style={{ color: "var(--fg-muted)" }}>Avg / week</div>
+            <div style={{ fontWeight: 700, fontSize: "var(--text-lg)" }}>{scheduleUtil.avg_per_week}</div>
+          </div>
+        </div>
+      </Card>
+
+      {/* === Pricing Health (salvaged from Pricing Dashboard) === */}
+      <Card style={{ marginTop: "var(--space-4)" }}>
+        <SectionHeader title="Pricing Health" />
+        <p style={{ padding: "0 var(--space-3) var(--space-2)", color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+          Estimate pricing guardrails (all dates). Minimum service fee: {formatCents(MINIMUM_SERVICE_FEE_CENTS)}.
+        </p>
+        <div style={{ padding: "var(--space-3)", display: "flex", gap: "var(--space-6)", flexWrap: "wrap", fontSize: "var(--text-sm)" }}>
+          <div>
+            <div style={{ color: "var(--fg-muted)" }}>Total estimates</div>
+            <div style={{ fontWeight: 700, fontSize: "var(--text-lg)" }}>{pricingSummary.total}</div>
+          </div>
+          <div>
+            <div style={{ color: "var(--fg-muted)" }}>Below minimum</div>
+            <div style={{ fontWeight: 700, fontSize: "var(--text-lg)", color: pricingSummary.below_minimum > 0 ? "var(--status-warning)" : "inherit" }}>
+              {pricingSummary.below_minimum} <span style={{ fontSize: "var(--text-xs)", fontWeight: 400, color: "var(--fg-muted)" }}>({pctOf(pricingSummary.below_minimum, pricingSummary.total)})</span>
+            </div>
+          </div>
+          <div>
+            <div style={{ color: "var(--fg-muted)" }}>Below-min w/ override</div>
+            <div style={{ fontWeight: 700, fontSize: "var(--text-lg)" }}>{pricingSummary.with_override} <span style={{ fontSize: "var(--text-xs)", fontWeight: 400, color: "var(--fg-muted)" }}>of {pricingSummary.below_minimum}</span></div>
+          </div>
+          <div>
+            <div style={{ color: "var(--fg-muted)" }}>Low-value job ratio</div>
+            <div style={{ fontWeight: 700, fontSize: "var(--text-lg)", color: lowValue.below_minimum > 0 ? "var(--status-warning)" : "inherit" }}>
+              {pctOf(lowValue.below_minimum, lowValue.total_estimated_jobs)} <span style={{ fontSize: "var(--text-xs)", fontWeight: 400, color: "var(--fg-muted)" }}>({lowValue.below_minimum}/{lowValue.total_estimated_jobs} jobs)</span>
+            </div>
+          </div>
+          <div>
+            <div style={{ color: "var(--fg-muted)" }}>Price book adoption</div>
+            <div style={{ fontWeight: 700, fontSize: "var(--text-lg)" }}>{pctOf(pricingSummary.price_book_line_items, pricingSummary.total_line_items)}</div>
+          </div>
+        </div>
+
+        {overrideReasonRows.length > 0 && (
+          <div style={{ padding: "0 var(--space-3) var(--space-3)" }}>
+            <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--fg-muted)", marginBottom: "var(--space-2)" }}>
+              Minimum override reasons
+            </div>
+            <dl className="p7-detail-list">
+              {overrideReasonRows.map((row) => (
+                <div key={row.reason} className="p7-detail-row">
+                  <dt>{OVERRIDE_REASON_LABELS[row.reason] ?? row.reason}</dt>
+                  <dd>{row.count}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        )}
+
+        {belowMinimumEstimates.length > 0 && (
+          <div style={{ padding: "0 var(--space-3) var(--space-3)", overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                  {["Client / Job", "Total", "Override reason"].map((h) => (
+                    <th key={h} style={{ textAlign: "left", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)", fontSize: "var(--text-xs)" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {belowMinimumEstimates.map((row) => (
+                  <tr key={row.id} style={{ borderBottom: "1px solid var(--border)" }}>
+                    <td style={{ padding: "var(--space-2) var(--space-3)" }}>
+                      <Link href={`/app/estimates/${row.id}` as Route} style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}>
+                        {row.client_name ?? "—"}
+                      </Link>
+                      {row.job_title && (
+                        <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{row.job_title}</div>
+                      )}
+                    </td>
+                    <td style={{ padding: "var(--space-2) var(--space-3)", color: "var(--status-warning)", fontWeight: 600 }}>{formatCents(row.total_cents)}</td>
+                    <td style={{ padding: "var(--space-2) var(--space-3)" }}>
+                      {row.minimum_service_override_reason
+                        ? OVERRIDE_REASON_LABELS[row.minimum_service_override_reason] ?? row.minimum_service_override_reason
+                        : <span style={{ color: "var(--status-error)", fontWeight: 600 }}>None</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
       {/* Estimate Margins — not month-scoped; shows whenever cost-tracked estimates exist */}
       {estimateMarginRows.length > 0 && (
