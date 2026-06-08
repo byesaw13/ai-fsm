@@ -204,7 +204,7 @@ export function IntakeForm() {
             All Requests
           </LinkButton>
           {submittedBookingId ? (
-            <LinkButton href={`/app/booking-requests/${submittedBookingId}` as never}>
+            <LinkButton href={`/app/requests/${submittedBookingId}` as never}>
               View Request →
             </LinkButton>
           ) : null}

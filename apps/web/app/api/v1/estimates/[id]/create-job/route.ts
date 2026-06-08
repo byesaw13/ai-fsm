@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { withRole } from "@/lib/auth/middleware";
 import { appendAuditLog } from "@/lib/db/audit";
 import { withEstimateContext } from "@/lib/estimates/db";
-import { resolveActionItems } from "@/lib/action-items";
 import { createJobFromEstimate } from "@/lib/estimates/create-job-db";
 import { logger } from "@/lib/logger";
 
@@ -37,14 +36,6 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       });
 
       if (created) {
-        // Resolve the schedule_job action item raised on approval.
-        await resolveActionItems(client, {
-          accountId: session.accountId,
-          entityId: id,
-          actionTypes: ["schedule_job"],
-          resolvedBy: session.userId,
-        });
-
         await appendAuditLog(client, {
           account_id: session.accountId,
           entity_type: "job",

@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { query, queryOne, withDbSession } from "@/lib/db";
+import { query, queryOne } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { randomUUID } from "crypto";
 import { normalizePhone } from "@/lib/phone";
 import { getClientContext } from "@/lib/sms/context";
 import { classifySms, type SmsClassification } from "@/lib/sms/classify";
 import { logCommunication } from "@/lib/communications-log";
-import { createActionItem } from "@/lib/action-items";
 
 export const dynamic = "force-dynamic";
 
@@ -35,23 +34,6 @@ async function getOwnerContext(): Promise<{ accountId: string; userId: string }>
   _accountId = row.account_id;
   _userId = row.user_id;
   return { accountId: _accountId, userId: _userId };
-}
-
-/**
- * Raise an Inbox action item as the owner. action_items has FORCE ROW LEVEL
- * SECURITY, so the insert must run with RLS session context set — withDbSession
- * sets app.current_account_id/user_id/role for the transaction.
- */
-async function raiseActionItem(
-  session: { userId: string; accountId: string; role: "owner" },
-  entityType: "booking_request" | "estimate" | "job" | "invoice",
-  entityId: string,
-  actionType: string,
-  title: string
-): Promise<void> {
-  await withDbSession(session, (client) =>
-    createActionItem(client, { accountId: session.accountId, entityType, entityId, actionType, title })
-  );
 }
 
 async function createDraftJob(
@@ -197,8 +179,6 @@ export async function POST(req: NextRequest) {
     isNewClient = true;
   }
 
-  const ownerSession = { userId, accountId, role: "owner" as const };
-
   // Claim idempotency BEFORE any side effects: insert the inbound row now (no
   // job linkage yet). If a concurrent delivery of the same external_id already
   // claimed it, bail before creating jobs/action items. The job_id is back-
@@ -235,11 +215,7 @@ export async function POST(req: NextRequest) {
       (sentEstimates.length === 1 ? sentEstimates[0].id : null);
     if (target) {
       estimateToConfirm = target;
-      await raiseActionItem(
-        ownerSession, "estimate", target, "confirm_approval",
-        "Customer texted approval — confirm estimate"
-      );
-      actionLine = "✅ Approval — confirm the estimate in your Inbox";
+      actionLine = "✅ Approval — confirm the estimate";
     } else {
       needsReview = true;
       actionLine = "⚠️ Approval received — no single open estimate to match";
@@ -255,16 +231,10 @@ export async function POST(req: NextRequest) {
     jobId = activeJobId;
   }
 
-  // Review queue: low-confidence (or unmatched approval) → Inbox action item.
-  // Action items need an entity; use the active/created job as the container.
+  // Review queue: low-confidence (or unmatched approval) messages still get
+  // attached to a job so the thread is captured, then flagged in the reply line.
   if (needsReview) {
     if (!jobId) jobId = await createDraftJob(accountId, clientId, userId, ai, message);
-    await raiseActionItem(
-      ownerSession, "job", jobId, "review_intake",
-      ai.message_type === "approval"
-        ? "Review SMS approval — couldn't match estimate"
-        : "Review SMS — low confidence"
-    );
     if (ai.message_type !== "approval") actionLine = "🔎 Needs review (low confidence)";
   }
 

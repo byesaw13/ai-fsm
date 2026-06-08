@@ -3,7 +3,6 @@ import { z } from "zod";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { scoreSiteVisitProbability } from "@ai-fsm/domain";
-import { createActionItem, resolveActionItems } from "@/lib/action-items";
 
 export const dynamic = "force-dynamic";
 
@@ -133,22 +132,6 @@ export async function POST(
           input.brokerage_name || null,
         ]
       );
-
-      // Resolve any pending review_intake action items and create a new one to signal completion
-      await resolveActionItems(client, {
-        accountId: invite.account_id,
-        entityId: invite.booking_request_id,
-        actionTypes: ["review_intake"],
-        resolvedBy: null, // client self-submission — no user actor,
-      });
-
-      await createActionItem(client, {
-        accountId: invite.account_id,
-        entityType: "booking_request",
-        entityId: invite.booking_request_id,
-        actionType: "review_intake",
-        title: `Review completed intake from ${input.name}`,
-      });
     }
 
     await client.query("COMMIT");

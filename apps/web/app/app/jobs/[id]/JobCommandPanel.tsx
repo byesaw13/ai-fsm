@@ -60,7 +60,7 @@ function actionForStage(props: Props): CommandAction | null {
   switch (props.stage) {
     case "new_lead":
       return props.bookingRequestId
-        ? { label: "Review Request", href: `/app/booking-requests/${props.bookingRequestId}` }
+        ? { label: "Review Request", href: `/app/requests/${props.bookingRequestId}` }
         : { label: isTm ? "Open T&M Job" : "Open Project", href: `/app/jobs/${props.jobId}` };
     case "estimate_needed":
       return isTm
