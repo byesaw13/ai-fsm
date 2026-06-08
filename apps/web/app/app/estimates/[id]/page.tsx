@@ -2,19 +2,11 @@ import { redirect, notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
-import {
-  canCreateEstimates,
-  canDeleteRecords,
-} from "@/lib/auth/permissions";
-import { withEstimateContext } from "@/lib/estimates/db";
-import { getPool } from "@/lib/db";
-import { PREP_LEVEL_MULTIPLIERS, computeRoomMeasurements } from "@ai-fsm/domain";
+import { canCreateEstimates, canDeleteRecords } from "@/lib/auth/permissions";
 import type { EstimateStatus, RoomSpec } from "@ai-fsm/domain";
 import { manualEstimateTransitions } from "@/lib/estimates/transitions";
 import { EstimateTransitionForm } from "./EstimateTransitionForm";
 import { EstimateInternalNotesForm } from "./EstimateInternalNotesForm";
-import { EstimateConvertButton } from "./EstimateConvertButton";
-import { CreateJobFromEstimateButton } from "./CreateJobFromEstimateButton";
 import { DeleteEstimateButton } from "./DeleteEstimateButton";
 import { EstimateEditForm } from "./EstimateEditForm";
 import { EstimateReviewPanel } from "./EstimateReviewPanel";
@@ -23,120 +15,15 @@ import { StatusStepper } from "@/components/ui";
 import { isEmailConfigured } from "@/lib/email/mailer";
 import { CopyPortalLinkButton } from "@/components/CopyPortalLinkButton";
 import { buildClientDocumentFilename } from "@/lib/estimates/guardrails";
-
 import { ChangeOrdersClient } from "./ChangeOrdersClient";
+import { loadEstimateDetail } from "./detail-data";
+import { STATUS_LABELS } from "./format";
+import { EstimateBanners } from "./sections/EstimateBanners";
+import { EstimateSummaryCard } from "./sections/EstimateSummaryCard";
+import { EstimateLineItems } from "./sections/EstimateLineItems";
+import { ApprovedHandoff } from "./sections/ApprovedHandoff";
 
 export const dynamic = "force-dynamic";
-
-interface EstimateRow {
-  id: string;
-  account_id: string;
-  client_id: string;
-  job_id: string | null;
-  property_id: string | null;
-  status: EstimateStatus;
-  presentation_mode: "standard" | "multi_option";
-  subtotal_cents: number;
-  tax_cents: number;
-  total_cents: number;
-  deposit_cents: number;
-  balance_cents: number;
-  notes: string | null;
-  internal_notes: string | null;
-  sent_at: string | null;
-  expires_at: string | null;
-  share_token: string;
-  sq_ft: number | null;
-  prep_level: number | null;
-  includes_trim: boolean;
-  includes_ceiling: boolean;
-  internal_labor_cost_cents: number | null;
-  internal_material_cost_cents: number | null;
-  trip_count: "one_trip" | "multi_trip";
-  requires_drying_or_curing: boolean;
-  difficult_access: boolean;
-  old_house_risk: boolean;
-  coordination_required: boolean;
-  finish_expectation: "basic" | "clean" | "premium";
-  travel_surcharge_cents: number;
-  risk_adjustment_cents: number;
-  minimum_service_override_reason: "bundled" | "membership_included" | "promo" | "owner_approved" | null;
-  minimum_service_override_note: string | null;
-  scope_assumptions: string | null;
-  condition_tier: "green" | "yellow" | "red" | null;
-  pricing_review_status: "needs_review" | "passed" | "blocked";
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  client_name: string | null;
-  client_email: string | null;
-  job_title: string | null;
-  shopping_list_json: unknown | null;
-  room_specs: unknown | null;
-}
-
-interface LineItemRow {
-  id: string;
-  estimate_id: string;
-  option_id: string | null;
-  description: string;
-  quantity: number;
-  unit_price_cents: number;
-  total_cents: number;
-  line_item_type: "labor" | "materials" | "handling_fee" | "adjustment";
-  sort_order: number;
-  created_at: string;
-}
-
-interface OptionRow {
-  id: string;
-  estimate_id: string;
-  label: string;
-  description: string | null;
-  sort_order: number;
-  subtotal_cents: number;
-  tax_cents: number;
-  total_cents: number;
-  is_recommended: boolean;
-  created_at: string;
-}
-
-interface ChangeOrderLineItem {
-  id: string;
-  description: string;
-  quantity: number;
-  unit_price_cents: number;
-  total_cents: number;
-  sort_order: number;
-}
-
-interface ChangeOrder {
-  id: string;
-  title: string;
-  description: string | null;
-  status: string;
-  subtotal_cents: number;
-  tax_cents: number;
-  total_cents: number;
-  notes: string | null;
-  approved_by_name: string | null;
-  approved_at: string | null;
-  declined_at: string | null;
-  created_at: string;
-  line_items: ChangeOrderLineItem[];
-}
-
-const STATUS_LABELS: Record<EstimateStatus, string> = {
-  draft: "Draft",
-  sent: "Sent",
-  approved: "Approved",
-  declined: "Declined",
-  expired: "Expired",
-};
-
-function formatDollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 export default async function EstimateDetailPage({
   params,
@@ -150,153 +37,20 @@ export default async function EstimateDetailPage({
   const cookieStore = await cookies();
   const isMobileWorkspace = cookieStore.get("workspace_mode")?.value === "mobile";
 
-  const result = await withEstimateContext(session, async (client) => {
-    const estimateResult = await client.query(
-      `SELECT e.*, c.name AS client_name, c.email AS client_email, j.title AS job_title
-       FROM estimates e
-       LEFT JOIN clients c ON c.id = e.client_id
-       LEFT JOIN jobs j ON j.id = e.job_id
-       WHERE e.id = $1 AND e.account_id = $2`,
-      [id, session.accountId]
-    );
+  const detail = await loadEstimateDetail(session, id);
+  if (!detail) notFound();
 
-    if (estimateResult.rowCount === 0) return null;
+  const { estimate, lineItems, options, jobVisitCount, depositInvoice, finalInvoice, changeOrders } = detail;
 
-    const lineItemsResult = await client.query(
-      `SELECT id, estimate_id, option_id, description, quantity, unit_price_cents, total_cents, line_item_type, sort_order, created_at
-       FROM estimate_line_items
-       WHERE estimate_id = $1
-       ORDER BY sort_order ASC, created_at ASC`,
-      [id]
-    );
-
-    const optionsResult = await client.query(
-      `SELECT id, estimate_id, label, description, sort_order, subtotal_cents, tax_cents, total_cents, is_recommended, created_at
-       FROM estimate_options
-       WHERE estimate_id = $1
-       ORDER BY sort_order ASC, created_at ASC`,
-      [id]
-    );
-
-    const allLineItems = lineItemsResult.rows as LineItemRow[];
-    const options = optionsResult.rows as OptionRow[];
-
-    const optionsWithItems = options.map((opt) => ({
-      ...opt,
-      line_items: allLineItems.filter((li) => li.option_id === opt.id),
-    }));
-
-    return {
-      estimate: estimateResult.rows[0] as EstimateRow,
-      lineItems: allLineItems.filter((li) => !li.option_id),
-      options: optionsWithItems,
-    };
-  });
-
-  if (!result) notFound();
-
-  const { estimate, lineItems, options } = result;
-  const shoppingListSummary = estimate.shopping_list_json as {
-    sections?: Array<{ section: string }>;
-    total_catalog_cost_cents?: number;
-    total_specified_cost_cents?: number;
-  } | null | undefined;
+  const shoppingListSummary = estimate.shopping_list_json as { sections?: Array<{ section: string }> } | null | undefined;
   const hasMaterialsPlan = !!shoppingListSummary?.sections?.length;
-
-  // For approved estimates with a linked job, check if any visits are scheduled
-  let jobVisitCount = 0;
-  if (estimate.status === "approved" && estimate.job_id) {
-    try {
-      const pool = getPool();
-      const vcRow = await pool.query<{ count: string }>(
-        `SELECT COUNT(*)::text AS count FROM visits
-         WHERE job_id = $1 AND account_id = $2 AND status != 'cancelled'`,
-        [estimate.job_id, session.accountId]
-      );
-      jobVisitCount = parseInt(vcRow.rows[0]?.count ?? "0", 10);
-    } catch {
-      // Non-critical — proceed without count
-    }
-  }
-
-  // Deposit + final invoice status for the approved-estimate billing summary.
-  type EstimateInvoiceRow = {
-    id: string;
-    invoice_kind: string;
-    invoice_number: string;
-    status: string;
-    total_cents: number;
-    balance_cents: number;
-  };
-  let depositInvoice: EstimateInvoiceRow | null = null;
-  let finalInvoice: EstimateInvoiceRow | null = null;
-  if (estimate.status === "approved") {
-    try {
-      const pool = getPool();
-      const invRows = await pool.query<EstimateInvoiceRow>(
-        `SELECT id, invoice_kind, invoice_number, status, total_cents, balance_cents
-         FROM invoices
-         WHERE estimate_id = $1 AND account_id = $2 AND invoice_kind IN ('deposit','final')`,
-        [id, session.accountId]
-      );
-      depositInvoice = invRows.rows.find((r) => r.invoice_kind === "deposit") ?? null;
-      finalInvoice = invRows.rows.find((r) => r.invoice_kind === "final") ?? null;
-    } catch {
-      // Non-critical — proceed without billing summary
-    }
-  }
-
-  // Fetch change orders for this estimate
-  let changeOrders: unknown[] = [];
-  try {
-    const pool = getPool();
-    const coRows = await pool.query<{
-      id: string;
-      title: string;
-      description: string | null;
-      status: string;
-      subtotal_cents: number;
-      tax_cents: number;
-      total_cents: number;
-      notes: string | null;
-      approved_by_name: string | null;
-      approved_at: string | null;
-      declined_at: string | null;
-      created_at: string;
-    }>(
-      `SELECT co.id, co.title, co.description, co.status, co.subtotal_cents, co.tax_cents, co.total_cents, co.notes,
-              u2.full_name as approved_by_name,
-              co.approved_at, co.declined_at, co.created_at
-       FROM change_orders co
-       LEFT JOIN users u2 ON u2.id = co.approved_by
-       WHERE co.estimate_id = $1 AND co.account_id = $2
-       ORDER BY co.created_at DESC`,
-      [id, session.accountId]
-    );
-    changeOrders = coRows.rows;
-
-    // Fetch line items for each change order
-    for (const co of changeOrders) {
-      const items = await pool.query(
-        `SELECT id, description, quantity, unit_price_cents, total_cents, sort_order
-         FROM change_order_line_items
-         WHERE change_order_id = $1
-         ORDER BY sort_order ASC`,
-        [(co as { id: string }).id]
-      );
-      (co as Record<string, unknown>).line_items = items.rows;
-    }
-  } catch {
-    // Change orders table may not exist yet
-  }
 
   const currentStatus = estimate.status;
   // Manual transitions exclude `sent` — sending is the only path to sent status.
   const allowedTransitions = manualEstimateTransitions(currentStatus);
   const canTransition = canCreateEstimates(session.role);
   const canDelete = canDeleteRecords(session.role);
-  const canEditInternalNotes =
-    canCreateEstimates(session.role) && currentStatus === "sent";
+  const canEditInternalNotes = canCreateEstimates(session.role) && currentStatus === "sent";
   const documentFilename = buildClientDocumentFilename({
     date: estimate.sent_at ?? estimate.created_at,
     clientName: estimate.client_name,
@@ -309,20 +63,12 @@ export default async function EstimateDetailPage({
     <div className="page-container">
       <div className="page-header">
         <div>
-          <Link href="/app/estimates" className="back-link">
-            ← Estimates
-          </Link>
-          <h1 className="page-title">
-            Estimate — {estimate.client_name ?? "Unknown client"}
-          </h1>
-          {estimate.job_title && (
-            <p className="page-subtitle">Job: {estimate.job_title}</p>
-          )}
+          <Link href="/app/estimates" className="back-link">← Estimates</Link>
+          <h1 className="page-title">Estimate — {estimate.client_name ?? "Unknown client"}</h1>
+          {estimate.job_title && <p className="page-subtitle">Job: {estimate.job_title}</p>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-          <CopyPortalLinkButton
-            url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/estimates/${estimate.share_token}`}
-          />
+          <CopyPortalLinkButton url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/estimates/${estimate.share_token}`} />
           <a
             href={`/api/v1/estimates/${estimate.id}/pdf`}
             target="_blank"
@@ -332,10 +78,7 @@ export default async function EstimateDetailPage({
           >
             Download PDF →
           </a>
-          <a
-            href={`/app/estimates/${estimate.id}/shopping-list`}
-            style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}
-          >
+          <a href={`/app/estimates/${estimate.id}/shopping-list`} style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}>
             Shopping List →
           </a>
           <Link
@@ -347,10 +90,7 @@ export default async function EstimateDetailPage({
           >
             Print / PDF →
           </Link>
-          <span
-            className={`status-pill status-${estimate.status}`}
-            data-testid="estimate-status"
-          >
+          <span className={`status-pill status-${estimate.status}`} data-testid="estimate-status">
             {STATUS_LABELS[currentStatus]}
           </span>
           {estimate.condition_tier === "yellow" && (
@@ -378,140 +118,13 @@ export default async function EstimateDetailPage({
         </div>
       </div>
 
-      {/* Approved next-steps banner */}
-      {currentStatus === "approved" && canTransition && (
-        <div
-          className="card"
-          style={{
-            marginBottom: "var(--space-4)",
-            borderLeft: "4px solid #059669",
-            background: "#f0fdf4",
-          }}
-          data-testid="approved-banner"
-        >
-          <p style={{ margin: 0, fontWeight: 600, color: "#065f46" }}>
-            Estimate approved — ready to schedule work or invoice.
-          </p>
-          <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-3)", flexWrap: "wrap", alignItems: "center" }}>
-            {estimate.job_id && jobVisitCount === 0 && (
-              <Link
-                href={`/app/jobs/${estimate.job_id}/visits/new`}
-                style={{
-                  padding: "var(--space-2) var(--space-4)",
-                  background: "#059669",
-                  color: "#fff",
-                  borderRadius: "var(--radius)",
-                  fontSize: "var(--text-sm)",
-                  fontWeight: 600,
-                  textDecoration: "none",
-                  whiteSpace: "nowrap",
-                }}
-                data-testid="schedule-first-visit-btn"
-              >
-                Schedule First Visit →
-              </Link>
-            )}
-            {estimate.job_id && jobVisitCount > 0 && (
-              <Link
-                href={`/app/jobs/${estimate.job_id}`}
-                style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}
-              >
-                Go to job / manage visits →
-              </Link>
-            )}
-            {!estimate.job_id && (
-              <CreateJobFromEstimateButton estimateId={estimate.id} />
-            )}
-            <a
-              href="#materials-plan-handoff"
-              style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}
-            >
-              Project handoff ↓
-            </a>
-          </div>
-
-          {/* Billing summary — makes deposit vs final handling explicit */}
-          {(depositInvoice || finalInvoice) && (
-            <div
-              style={{
-                marginTop: "var(--space-3)",
-                paddingTop: "var(--space-3)",
-                borderTop: "1px solid #bbf7d0",
-                display: "flex",
-                gap: "var(--space-4)",
-                flexWrap: "wrap",
-                fontSize: "var(--text-sm)",
-              }}
-              data-testid="estimate-billing-summary"
-            >
-              {depositInvoice && (
-                <Link
-                  href={`/app/invoices/${depositInvoice.id}`}
-                  style={{ color: "#065f46", textDecoration: "none" }}
-                  data-testid="deposit-invoice-link"
-                >
-                  <strong>Deposit invoice</strong> {depositInvoice.invoice_number} ·{" "}
-                  {formatDollars(depositInvoice.total_cents)} · {depositInvoice.status} →
-                </Link>
-              )}
-              {finalInvoice ? (
-                <Link
-                  href={`/app/invoices/${finalInvoice.id}`}
-                  style={{ color: "#065f46", textDecoration: "none" }}
-                  data-testid="final-invoice-link"
-                >
-                  <strong>Final invoice</strong> {finalInvoice.invoice_number} · balance{" "}
-                  {formatDollars(finalInvoice.balance_cents)} · {finalInvoice.status} →
-                </Link>
-              ) : (
-                <span style={{ color: "#065f46", opacity: 0.8 }}>
-                  {depositInvoice
-                    ? "Final invoice not yet created — it will credit the deposit above."
-                    : "No invoice yet — create the final invoice when work is ready to bill."}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Expired recovery banner */}
-      {currentStatus === "expired" && (
-        <div
-          className="card"
-          style={{
-            marginBottom: "var(--space-4)",
-            borderLeft: "4px solid #d97706",
-            background: "#fffbeb",
-          }}
-          data-testid="expired-banner"
-        >
-          <p style={{ margin: 0, fontWeight: 600, color: "#92400e" }}>
-            This estimate expired
-            {estimate.expires_at
-              ? ` on ${new Date(estimate.expires_at).toLocaleDateString()}`
-              : ""}
-            .
-          </p>
-          <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)", color: "#78350f" }}>
-            To re-engage this client, go to the job and create a new estimate.
-          </p>
-          {estimate.job_id && (
-            <Link
-              href={`/app/jobs/${estimate.job_id}`}
-              style={{
-                display: "inline-block",
-                marginTop: "var(--space-2)",
-                fontSize: "var(--text-sm)",
-                color: "var(--accent)",
-                textDecoration: "none",
-              }}
-            >
-              Go to job →
-            </Link>
-          )}
-        </div>
-      )}
+      <EstimateBanners
+        estimate={estimate}
+        canTransition={canTransition}
+        jobVisitCount={jobVisitCount}
+        depositInvoice={depositInvoice}
+        finalInvoice={finalInvoice}
+      />
 
       {/* Status Stepper — main path only */}
       {(["draft", "sent", "approved"] as EstimateStatus[]).includes(currentStatus) && (
@@ -528,448 +141,19 @@ export default async function EstimateDetailPage({
         </div>
       )}
 
-      {/* Summary */}
-      <div className="card detail-card">
-        <h2>Summary</h2>
-        <p>
-          <strong>Total:</strong>{" "}
-          <span data-testid="estimate-total">
-            {formatDollars(estimate.total_cents)}
-          </span>
-        </p>
-        {estimate.deposit_cents > 0 && (
-          <p>
-            <strong>Deposit due:</strong> {formatDollars(estimate.deposit_cents)}
-          </p>
-        )}
-        {estimate.balance_cents > 0 && (
-          <p>
-            <strong>Balance due:</strong> {formatDollars(estimate.balance_cents)}
-          </p>
-        )}
-        {estimate.sent_at && (
-          <p>
-            <strong>Sent:</strong>{" "}
-            {new Date(estimate.sent_at).toLocaleDateString()}
-          </p>
-        )}
-        {estimate.expires_at && (
-          <p>
-            <strong>Expires:</strong>{" "}
-            {new Date(estimate.expires_at).toLocaleDateString()}
-          </p>
-        )}
-        {(session.role === "owner" || session.role === "admin") && (
-          <p>
-            <strong>Document Filename:</strong>{" "}
-            <code>{documentFilename}</code>
-          </p>
-        )}
-        {estimate.notes && (
-          <p>
-            <strong>Notes:</strong> {estimate.notes}
-          </p>
-        )}
+      <EstimateSummaryCard
+        estimate={estimate}
+        role={session.role}
+        isMobileWorkspace={isMobileWorkspace}
+        documentFilename={documentFilename}
+      />
 
-        {estimate.scope_assumptions && (
-          <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px solid var(--border)" }}>
-            <p style={{ fontWeight: 600, marginBottom: "var(--space-1)", fontSize: "var(--text-sm)" }}>Service Conditions</p>
-            <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-secondary)", whiteSpace: "pre-wrap", margin: 0 }}>
-              {estimate.scope_assumptions}
-            </p>
-          </div>
-        )}
-
-        {/* Painting scope details */}
-        {estimate.sq_ft !== null && (
-          <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px solid var(--border)" }}>
-            <p style={{ fontWeight: 600, marginBottom: "var(--space-1)" }}>Painting Scope</p>
-            <p><strong>Square footage:</strong> {Number(estimate.sq_ft).toLocaleString()} sq ft</p>
-            {estimate.prep_level !== null && (
-              <p><strong>Prep level:</strong> {estimate.prep_level} ({PREP_LEVEL_MULTIPLIERS[estimate.prep_level]?.toFixed(2)}x multiplier)</p>
-            )}
-            <p><strong>Trim:</strong> {estimate.includes_trim ? "Included" : "Not included"}</p>
-            <p><strong>Ceiling:</strong> {estimate.includes_ceiling ? "Included (+30% surface)" : "Not included"}</p>
-          </div>
-        )}
-
-        {/* Room-by-room breakdown (owner/admin only) */}
-        {(session.role === "owner" || session.role === "admin") && Array.isArray(estimate.room_specs) && (estimate.room_specs as RoomSpec[]).length > 0 && (() => {
-          const rooms = estimate.room_specs as RoomSpec[];
-          return (
-            <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
-              <p style={{ fontWeight: 600, marginBottom: "var(--space-2)", color: "var(--fg-muted)" }}>Room Breakdown</p>
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-xs)" }}>
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                      {["Room", "Dimensions", "Wall sqft", "Ceiling", "Trim LF", "Paint", "Grade", "Prep"].map((h) => (
-                        <th key={h} style={{ textAlign: "left", padding: "2px 8px 4px 0", color: "var(--fg-muted)", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rooms.map((room, i) => {
-                      const m = computeRoomMeasurements(room);
-                      return (
-                        <tr key={i} style={{ borderBottom: "1px solid var(--border)" }}>
-                          <td style={{ padding: "3px 8px 3px 0", fontWeight: 500 }}>{room.name || `Room ${i + 1}`}</td>
-                          <td style={{ padding: "3px 8px 3px 0", color: "var(--fg-muted)" }}>{room.length_ft}×{room.width_ft}×{room.ceiling_height_ft}ft</td>
-                          <td style={{ padding: "3px 8px 3px 0" }}>{m.wall_sqft.toFixed(0)}</td>
-                          <td style={{ padding: "3px 8px 3px 0" }}>{room.include_ceiling ? `${m.ceiling_sqft.toFixed(0)} sqft` : "—"}</td>
-                          <td style={{ padding: "3px 8px 3px 0" }}>{room.include_trim ? `${m.trim_lf.toFixed(0)} LF` : "—"}</td>
-                          <td style={{ padding: "3px 8px 3px 0" }}>{room.paint_supplied_by === "customer" ? "Client" : "Dovetails"}</td>
-                          <td style={{ padding: "3px 8px 3px 0", textTransform: "capitalize" }}>{room.paint_supplied_by === "customer" ? "—" : room.paint_grade}</td>
-                          <td style={{ padding: "3px 8px 3px 0", textTransform: "capitalize" }}>{room.prep_level}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Internal margin — hidden in mobile workspace */}
-        {!isMobileWorkspace && (session.role === "owner" || session.role === "admin") && estimate.internal_labor_cost_cents !== null && estimate.internal_labor_cost_cents > 0 && (
-          <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
-            <p style={{ fontWeight: 600, marginBottom: "var(--space-1)", color: "var(--fg-muted)" }}>Internal Margin</p>
-            {(() => {
-              // Recompute gross margin from stored data
-              const laborRevenue = estimate.subtotal_cents - (estimate.internal_material_cost_cents ?? 0) - Math.round((estimate.internal_material_cost_cents ?? 0) * 0.15);
-              const internalCost = estimate.internal_labor_cost_cents;
-              const marginCents = laborRevenue - internalCost;
-              const marginPct = laborRevenue > 0 ? Math.round((marginCents / laborRevenue) * 100 * 10) / 10 : 0;
-              const marginColor = marginPct >= 30 ? "var(--color-success)" : marginPct >= 15 ? "var(--color-warning)" : "var(--color-danger)";
-              return (
-                <>
-                  <p><strong>Internal labor cost:</strong> {formatDollars(estimate.internal_labor_cost_cents)}</p>
-                  <p><strong>Labor revenue:</strong> {formatDollars(laborRevenue)}</p>
-                  <p>
-                    <strong>Gross margin:</strong>{" "}
-                    <span style={{ color: marginColor, fontWeight: 700 }}>
-                      {marginPct}% ({formatDollars(marginCents)})
-                    </span>
-                  </p>
-                </>
-              );
-            })()}
-          </div>
-        )}
-
-        {estimate.internal_notes && session.role !== "tech" && (
-          <p>
-            <strong>Internal Notes:</strong> {estimate.internal_notes}
-          </p>
-        )}
-
-        {/* Shopping list — owner/admin only */}
-        {(session.role === "owner" || session.role === "admin") && (() => {
-          const shoppingList = estimate.shopping_list_json as {
-            sections?: Array<{
-              section: string;
-              computed_items: Array<{ material: { material_name: string; unit: string; id: string }; quantity: number; total_cost_cents: number }>;
-              specified_items: Array<{ name: string; units_to_order: number; unit_label: string; unit_cost_cents: number | null; notes: string | null }>;
-              section_total_cents: number;
-            }>;
-            total_catalog_cost_cents?: number;
-            total_specified_cost_cents?: number;
-          } | null | undefined;
-          if (!shoppingList?.sections?.length) {
-            // Fallback for old estimates created before Block 3 — link to the recomputed view
-            return (
-              <div id="materials-plan" style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
-                <a href={`/app/estimates/${estimate.id}/shopping-list`} style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}>
-                  Open Materials Plan →
-                </a>
-                <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginLeft: 8 }}>
-                  (computed from scope snapshots)
-                </span>
-              </div>
-            );
-          }
-          const grandTotal = (shoppingList.total_catalog_cost_cents ?? 0) + (shoppingList.total_specified_cost_cents ?? 0);
-          return (
-            <div id="materials-plan" style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-3)", borderTop: "1px dashed var(--border)" }}>
-              <p style={{ fontWeight: 600, marginBottom: "var(--space-2)", color: "var(--fg-muted)" }}>
-                Materials Plan
-                {grandTotal > 0 && (
-                  <span style={{ fontWeight: 400, marginLeft: 8, fontSize: "var(--text-sm)" }}>
-                    est. {formatDollars(grandTotal)}
-                  </span>
-                )}
-              </p>
-              {shoppingList.sections.map((sec) => (
-                <div key={sec.section} style={{ marginBottom: "var(--space-2)" }}>
-                  <p style={{ fontWeight: 600, fontSize: "var(--text-xs)", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--fg-muted)", margin: "0 0 4px" }}>
-                    {sec.section}
-                  </p>
-                  {sec.computed_items.map((m) => (
-                    <div key={m.material.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)", padding: "2px 0" }}>
-                      <span>{m.material.material_name}</span>
-                      <span style={{ color: "var(--fg-muted)" }}>
-                        {m.quantity} {m.material.unit} — {formatDollars(m.total_cost_cents)}
-                      </span>
-                    </div>
-                  ))}
-                  {sec.specified_items.map((m, i) => (
-                    <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)", padding: "2px 0", fontStyle: "italic" }}>
-                      <span>{m.name} <span style={{ color: "#0284c7", fontSize: "var(--text-xs)" }}>(specified)</span></span>
-                      <span style={{ color: "var(--fg-muted)" }}>
-                        {m.units_to_order} {m.unit_label}
-                        {m.unit_cost_cents ? ` — ${formatDollars(m.units_to_order * m.unit_cost_cents)}` : ""}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          );
-        })()}
-
-        {(session.role === "owner" || session.role === "admin") && (
-          <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
-            <p style={{ fontWeight: 600, marginBottom: "var(--space-1)", color: "var(--fg-muted)" }}>Pricing Guardrails</p>
-            <p><strong>Review:</strong> {estimate.pricing_review_status.replace(/_/g, " ")}</p>
-            <p><strong>Trips:</strong> {estimate.trip_count === "multi_trip" ? "Multi-trip" : "One trip"}</p>
-            <p><strong>Finish:</strong> {estimate.finish_expectation}</p>
-            {(estimate.travel_surcharge_cents > 0 || estimate.risk_adjustment_cents > 0) && (
-              <p>
-                <strong>Adjustments:</strong>{" "}
-                {formatDollars(estimate.travel_surcharge_cents + estimate.risk_adjustment_cents)}
-              </p>
-            )}
-            {estimate.minimum_service_override_reason && (
-              <p><strong>Minimum override:</strong> {estimate.minimum_service_override_reason.replace(/_/g, " ")}</p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Line Items (or flat rate summary) */}
-      {estimate.presentation_mode === "multi_option" && options.length > 0 ? (
-        <div>
-          <div className="card">
-            <h2>Options</h2>
-            <p className="muted">Compare options and choose the one that best fits your needs.</p>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${options.length}, 1fr)`, gap: "var(--space-4)" }}>
-            {options.map((option) => (
-              <div
-                key={option.id}
-                className="card"
-                style={{
-                  border: option.is_recommended ? "2px solid var(--accent)" : "1px solid var(--border)",
-                  position: "relative",
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-              >
-                {option.is_recommended && (
-                  <div style={{
-                    position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)",
-                    background: "var(--accent)", color: "#fff", padding: "2px 12px", borderRadius: 99,
-                    fontSize: "var(--text-xs)", fontWeight: 600, whiteSpace: "nowrap", zIndex: 1,
-                  }}>
-                    Recommended
-                  </div>
-                )}
-                <div style={{ marginBottom: "var(--space-3)" }}>
-                  <h2 style={{ margin: "0 0 var(--space-1)" }}>{option.label}</h2>
-                  {option.description && (
-                    <p className="muted" style={{ margin: 0, fontSize: "var(--text-sm)" }}>{option.description}</p>
-                  )}
-                </div>
-
-                <table className="line-items-table" style={{ flex: 1 }}>
-                  <tbody>
-                    {option.line_items.map((item) => (
-                      <tr key={item.id}>
-                        <td>{item.description}</td>
-                        <td>{item.quantity}</td>
-                        <td>{formatDollars(item.unit_price_cents)}</td>
-                        <td>{formatDollars(item.total_cents)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-                <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-2)", marginTop: "var(--space-3)" }}>
-                  {option.tax_cents > 0 && (
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                      <span>Tax</span>
-                      <span>{formatDollars(option.tax_cents)}</span>
-                    </div>
-                  )}
-                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: "var(--space-1)" }}>
-                    <strong>Total</strong>
-                    <strong>{formatDollars(option.total_cents)}</strong>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : isMobileWorkspace ? (
-      /* Mobile Workspace: card-based line items instead of table */
-      <div className="card">
-        <h2>Line Items</h2>
-        {lineItems.length === 0 && estimate.subtotal_cents === 0 ? (
-          <p className="muted" data-testid="line-items-empty">No line items.</p>
-        ) : lineItems.length === 0 ? (
-          <div style={{ padding: "var(--space-3)", borderRadius: "var(--radius)", background: "var(--bg)", border: "1px solid var(--border)", display: "flex", justifyContent: "space-between" }}>
-            <span style={{ fontWeight: 600 }}>Flat rate</span>
-            <span style={{ fontWeight: 700 }}>{formatDollars(estimate.subtotal_cents)}</span>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-            {lineItems.map((item) => (
-              <div key={item.id} data-testid="line-item-row" style={{ padding: "var(--space-3)", borderRadius: "var(--radius)", background: "var(--bg)", border: "1px solid var(--border)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-2)" }}>
-                  <span style={{ fontWeight: 500, fontSize: "var(--text-sm)", flex: 1 }}>{item.description}</span>
-                  <span style={{ fontWeight: 700, fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>{formatDollars(item.total_cents)}</span>
-                </div>
-                {String(item.quantity) !== "1" && (
-                  <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
-                    {item.quantity} × {formatDollars(item.unit_price_cents)}
-                  </div>
-                )}
-              </div>
-            ))}
-            <div style={{ padding: "var(--space-3)", borderRadius: "var(--radius)", background: "var(--bg-card)", border: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "var(--space-1)", marginTop: "var(--space-1)" }}>
-              {estimate.tax_cents > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                  <span>Tax</span><span>{formatDollars(estimate.tax_cents)}</span>
-                </div>
-              )}
-              <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: "var(--text-base)" }}>
-                <span>Total</span><span data-testid="estimate-total-footer">{formatDollars(estimate.total_cents)}</span>
-              </div>
-              {estimate.deposit_cents > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                  <span>Deposit</span><span>{formatDollars(estimate.deposit_cents)}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-      ) : (
-      <div className="card">
-        <h2>Line Items</h2>
-        {lineItems.length === 0 && estimate.subtotal_cents === 0 ? (
-          <p className="muted" data-testid="line-items-empty">
-            No line items.
-          </p>
-        ) : lineItems.length === 0 ? (
-          /* Flat-rate estimate — no breakdown rows */
-          <table className="line-items-table" data-testid="line-items-table">
-            <tbody>
-              <tr data-testid="line-item-row">
-                <td>Flat rate</td>
-                <td colSpan={2}></td>
-                <td>{formatDollars(estimate.subtotal_cents)}</td>
-              </tr>
-            </tbody>
-            <tfoot>
-              {estimate.tax_cents > 0 && (
-                <tr>
-                  <td colSpan={2}></td>
-                  <td className="subtotal-label">Tax</td>
-                  <td>{formatDollars(estimate.tax_cents)}</td>
-                </tr>
-              )}
-              <tr>
-                <td colSpan={2}></td>
-                <td className="subtotal-label"><strong>Total</strong></td>
-                <td>
-                  <strong data-testid="estimate-total-footer">
-                    {formatDollars(estimate.total_cents)}
-                  </strong>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        ) : (
-          <table className="line-items-table" data-testid="line-items-table">
-            <thead>
-              <tr>
-                <th>Description</th>
-                <th style={{ width: 80 }}>Qty</th>
-                <th style={{ width: 120 }}>Unit Price</th>
-                <th style={{ width: 100 }}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(() => {
-                const laborItems = lineItems.filter((li: LineItemRow) => li.line_item_type === "labor" || !li.line_item_type);
-                const materialItems = lineItems.filter((li: LineItemRow) => li.line_item_type === "materials");
-                const handlingItems = lineItems.filter((li: LineItemRow) => li.line_item_type === "handling_fee");
-                const adjustmentItems = lineItems.filter((li: LineItemRow) => li.line_item_type === "adjustment");
-                const renderRow = (item: LineItemRow, muted = false) => (
-                  <tr key={item.id} data-testid="line-item-row" style={muted ? { color: "var(--fg-muted)" } : undefined}>
-                    <td>{item.description}</td>
-                    <td>{item.quantity}</td>
-                    <td>{formatDollars(item.unit_price_cents)}</td>
-                    <td>{formatDollars(item.total_cents)}</td>
-                  </tr>
-                );
-                return (
-                  <>
-                    {laborItems.map((item: LineItemRow) => renderRow(item))}
-                    {adjustmentItems.map((item: LineItemRow) => renderRow(item))}
-                    {materialItems.length > 0 && (
-                      <tr>
-                        <td colSpan={4} style={{
-                          fontSize: "var(--text-xs)", fontWeight: 600,
-                          textTransform: "uppercase", letterSpacing: "0.05em",
-                          color: "var(--fg-muted)", paddingTop: "var(--space-3)",
-                          borderTop: "1px dashed var(--border)",
-                        }}>
-                          Materials
-                        </td>
-                      </tr>
-                    )}
-                    {materialItems.map((item: LineItemRow) => renderRow(item))}
-                    {handlingItems.map((item: LineItemRow) => renderRow(item, true))}
-                  </>
-                );
-              })()}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colSpan={2}></td>
-                <td className="subtotal-label">
-                  <strong>Subtotal</strong>
-                </td>
-                <td data-testid="estimate-subtotal">
-                  {formatDollars(estimate.subtotal_cents)}
-                </td>
-              </tr>
-              {estimate.tax_cents > 0 && (
-                <tr>
-                  <td colSpan={2}></td>
-                  <td className="subtotal-label">Tax</td>
-                  <td>{formatDollars(estimate.tax_cents)}</td>
-                </tr>
-              )}
-              <tr>
-                <td colSpan={2}></td>
-                <td className="subtotal-label">
-                  <strong>Total</strong>
-                </td>
-                <td>
-                  <strong data-testid="estimate-total-footer">
-                    {formatDollars(estimate.total_cents)}
-                  </strong>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        )}
-      </div>
-      )}
+      <EstimateLineItems
+        estimate={estimate}
+        lineItems={lineItems}
+        options={options}
+        isMobileWorkspace={isMobileWorkspace}
+      />
 
       {/* Edit form — owner/admin only, draft only */}
       {canTransition && currentStatus === "draft" && (
@@ -983,19 +167,19 @@ export default async function EstimateDetailPage({
           initialExpiresAt={estimate.expires_at}
           initialSubtotalCents={estimate.subtotal_cents}
           initialTaxCents={estimate.tax_cents}
-          initialLineItems={lineItems.map(item => ({
+          initialLineItems={lineItems.map((item) => ({
             description: item.description,
             quantity: item.quantity,
             unit_price_cents: item.unit_price_cents,
             sort_order: item.sort_order,
           }))}
-          initialOptions={options.map(opt => ({
+          initialOptions={options.map((opt) => ({
             id: opt.id,
             label: opt.label,
             description: opt.description ?? "",
             is_recommended: opt.is_recommended,
             sort_order: opt.sort_order,
-            line_items: opt.line_items.map(li => ({
+            line_items: opt.line_items.map((li) => ({
               description: li.description,
               quantity: li.quantity,
               unit_price_cents: li.unit_price_cents,
@@ -1028,7 +212,6 @@ export default async function EstimateDetailPage({
         <EstimateReviewPanel estimateId={estimate.id} />
       )}
 
-
       {/* Send to Client — owner/admin only, non-terminal estimates */}
       {canTransition && !["approved", "declined", "expired"].includes(currentStatus) && (
         <div className="card action-card">
@@ -1044,10 +227,7 @@ export default async function EstimateDetailPage({
 
       {/* Status Transitions — owner/admin only */}
       {canTransition && allowedTransitions.length > 0 && (
-        <div
-          className="card action-card"
-          data-testid="estimate-transition-panel"
-        >
+        <div className="card action-card" data-testid="estimate-transition-panel">
           <h2>Transition Status</h2>
           <EstimateTransitionForm
             estimateId={estimate.id}
@@ -1061,90 +241,25 @@ export default async function EstimateDetailPage({
       {canEditInternalNotes && (
         <div className="card" data-testid="internal-notes-panel">
           <h2>Internal Notes</h2>
-          <EstimateInternalNotesForm
-            estimateId={estimate.id}
-            initialNotes={estimate.internal_notes}
-          />
+          <EstimateInternalNotesForm estimateId={estimate.id} initialNotes={estimate.internal_notes} />
         </div>
       )}
 
       {/* Approved project handoff — owner/admin only */}
       {canTransition && currentStatus === "approved" && (
-        <div id="materials-plan-handoff" className="card action-card" data-testid="approved-project-handoff">
-          <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)", flexWrap: "wrap", marginBottom: "var(--space-3)" }}>
-            <div>
-              <h2 style={{ marginBottom: "var(--space-1)" }}>Approved Project Handoff</h2>
-              <p className="muted" style={{ margin: 0 }}>
-                Move from approved scope into purchasing, scheduling, work, and final billing.
-              </p>
-            </div>
-            <span style={{ alignSelf: "flex-start", fontSize: "var(--text-xs)", fontWeight: 700, color: "#065f46", background: "#dcfce7", border: "1px solid #86efac", borderRadius: 999, padding: "4px 10px" }}>
-              Approved
-            </span>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "var(--space-3)" }}>
-            <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-3)" }}>
-              <p style={{ margin: "0 0 var(--space-1)", fontWeight: 700 }}>1. Materials</p>
-              <p className="muted" style={{ minHeight: 42 }}>
-                {hasMaterialsPlan
-                  ? "Review, print, and shop from the approved materials plan."
-                  : "Prepare the buying list from approved scope before work starts."}
-              </p>
-              <Link
-                href={`/app/estimates/${estimate.id}/shopping-list`}
-                className="p7-btn p7-btn-secondary p7-btn-sm"
-              >
-                {hasMaterialsPlan ? "Open Materials Plan →" : "Prepare Materials Plan →"}
-              </Link>
-            </div>
-            <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-3)" }}>
-              <p style={{ margin: "0 0 var(--space-1)", fontWeight: 700 }}>2. Schedule</p>
-              <p className="muted" style={{ minHeight: 42 }}>
-                {estimate.job_id
-                  ? jobVisitCount > 0
-                    ? "Visits are already on the job. Manage timing from the job thread."
-                    : "Schedule the first work visit from the approved estimate."
-                  : "Link this estimate to a job before scheduling work."}
-              </p>
-              {estimate.job_id ? (
-                <Link
-                  href={jobVisitCount > 0 ? `/app/jobs/${estimate.job_id}` : `/app/jobs/${estimate.job_id}/visits/new`}
-                  className="p7-btn p7-btn-primary p7-btn-sm"
-                >
-                  {jobVisitCount > 0 ? "Manage Job →" : "Schedule Work →"}
-                </Link>
-              ) : (
-                <CreateJobFromEstimateButton estimateId={estimate.id} />
-              )}
-            </div>
-            <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-3)" }}>
-              <p style={{ margin: "0 0 var(--space-1)", fontWeight: 700 }}>3. Final Billing</p>
-              <p className="muted" style={{ minHeight: 42 }}>
-                Create the draft invoice from the approved estimate when the work is ready to bill.
-              </p>
-              <EstimateConvertButton estimateId={estimate.id} />
-            </div>
-          </div>
-        </div>
+        <ApprovedHandoff estimate={estimate} jobVisitCount={jobVisitCount} hasMaterialsPlan={hasMaterialsPlan} />
       )}
 
-      {/* Change Orders — owner/admin only, approved estimates */}
-      {/* Change orders — hidden in mobile workspace */}
+      {/* Change orders — owner/admin only, approved estimates, hidden in mobile workspace */}
       {!isMobileWorkspace && canTransition && currentStatus === "approved" && (
-        <ChangeOrdersClient
-          estimateId={estimate.id}
-          initialChangeOrders={changeOrders as ChangeOrder[]}
-        />
+        <ChangeOrdersClient estimateId={estimate.id} initialChangeOrders={changeOrders} />
       )}
 
       {/* Danger Zone — owner only, draft status only */}
       {canDelete && currentStatus === "draft" && (
         <div className="card danger-card" data-testid="danger-zone">
           <h2>Danger Zone</h2>
-          <p className="muted">
-            Delete this estimate permanently. Only available for draft
-            estimates.
-          </p>
+          <p className="muted">Delete this estimate permanently. Only available for draft estimates.</p>
           <DeleteEstimateButton estimateId={estimate.id} />
         </div>
       )}
