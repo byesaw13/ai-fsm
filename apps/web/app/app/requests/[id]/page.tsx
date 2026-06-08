@@ -211,7 +211,7 @@ export default async function BookingRequestDetailPage({
                   {duplicateRows.map((duplicate) => (
                     <Link
                       key={duplicate.id}
-                      href={`/app/booking-requests/${duplicate.id}`}
+                      href={`/app/requests/${duplicate.id}`}
                       style={{ color: "inherit", fontWeight: 600 }}
                     >
                       {duplicate.name} · {new Date(duplicate.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} · {STATUS_LABELS[duplicate.status] ?? duplicate.status}

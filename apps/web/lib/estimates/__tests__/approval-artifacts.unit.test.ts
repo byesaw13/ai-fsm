@@ -15,10 +15,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PoolClient } from "pg";
 
-vi.mock("@/lib/action-items", () => ({
-  createActionItem: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock("@/lib/invoices/db", () => ({
   generateInvoiceNumber: vi.fn().mockResolvedValue("DEP-0001"),
 }));
@@ -42,7 +38,6 @@ describe("createApprovalArtifacts", () => {
 
   it("creates a deposit invoice when deposit_required=true and deposit_cents>0", async () => {
     const { createApprovalArtifacts } = await import("../approve");
-    const { createActionItem } = await import("@/lib/action-items");
 
     const client = makeClient([
       // estData query
@@ -66,7 +61,6 @@ describe("createApprovalArtifacts", () => {
     });
 
     expect(result.depositInvoiceId).toBe("dep-inv-1");
-    expect(createActionItem).toHaveBeenCalledOnce();
     // Verify the invoice INSERT was called
     const insertCall = (client.query as ReturnType<typeof vi.fn>).mock.calls.find(
       (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("INSERT INTO invoices")

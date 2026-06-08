@@ -6,7 +6,7 @@ import { query } from "@/lib/db";
 import { Card, EmptyState, LinkButton, PageContainer, PageHeader, StatusBadge } from "@/components/ui";
 import type { StatusVariant } from "@/components/ui";
 import { PRICING_MODE_LABELS } from "@ai-fsm/domain";
-import { getRequestGuidance } from "../booking-requests/request-guidance";
+import { getRequestGuidance } from "./request-guidance";
 
 export const dynamic = "force-dynamic";
 
@@ -100,20 +100,20 @@ function getAction(row: RequestRow): { label: string; href: string; detail: stri
     case "create_job":
       return {
         label: "Open Request",
-        href: `/app/booking-requests/${row.id}`,
+        href: `/app/requests/${row.id}`,
         detail: guidance.recommendedDetail,
       };
     case "schedule_walkthrough":
       return {
         label: "Schedule Walkthrough",
-        href: `/app/booking-requests/${row.id}`,
+        href: `/app/requests/${row.id}`,
         detail: guidance.recommendedDetail,
       };
     case "close_request":
     default:
       return {
         label: "Close Request",
-        href: `/app/booking-requests/${row.id}`,
+        href: `/app/requests/${row.id}`,
         detail: guidance.recommendedDetail,
       };
   }
@@ -233,7 +233,7 @@ export default async function RequestsPage({ searchParams }: PageProps) {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "var(--space-4)", alignItems: "start" }}>
                   <div>
                     <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flexWrap: "wrap", marginBottom: "var(--space-1)" }}>
-                      <Link href={`/app/booking-requests/${row.id}` as Route} style={{ color: "var(--accent)", fontWeight: 700, textDecoration: "none" }}>
+                      <Link href={`/app/requests/${row.id}` as Route} style={{ color: "var(--accent)", fontWeight: 700, textDecoration: "none" }}>
                         {row.name}
                       </Link>
                       <StatusBadge variant={row.status as StatusVariant}>{STATUS_LABELS[row.status] ?? row.status}</StatusBadge>
