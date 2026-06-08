@@ -8,7 +8,6 @@ import { logger } from "../../../../../../lib/logger";
 import { jobTransitions, jobStatusSchema } from "@ai-fsm/domain";
 import type { JobStatus } from "@ai-fsm/domain";
 import { reviewJobIntakeGate } from "../../../../../../lib/jobs/intake-guard";
-import { createActionItem } from "../../../../../../lib/action-items";
 import { createDraftFinalInvoiceForJob } from "../../../../../../lib/invoices/final-invoice";
 
 export const dynamic = "force-dynamic";
@@ -116,17 +115,6 @@ export const POST = withRole(
       );
 
       const updated = rows[0];
-
-      // Prompt to invoice when job is completed
-      if (targetStatus === "completed") {
-        await createActionItem(client, {
-          accountId: session.accountId,
-          entityType: "job",
-          entityId: id,
-          actionType: "create_invoice",
-          title: `Invoice for: ${updated.title}`,
-        });
-      }
 
       // Auto-create a draft final invoice when job is completed using the shared
       // createDraftFinalInvoiceForJob helper (same logic as visit completion).

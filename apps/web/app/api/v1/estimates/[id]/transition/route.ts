@@ -6,7 +6,6 @@ import { withEstimateContext } from "@/lib/estimates/db";
 import { logger } from "@/lib/logger";
 import { estimateStatusSchema, estimateTransitions } from "@ai-fsm/domain";
 import type { EstimateStatus } from "@ai-fsm/domain";
-import { resolveActionItems } from "@/lib/action-items";
 import { createApprovalArtifacts } from "@/lib/estimates/approve";
 import { createJobFromEstimate } from "@/lib/estimates/create-job-db";
 
@@ -143,19 +142,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         [targetStatus, id]
       );
 
-      // Resolve action items on a terminal decision. Also clear any
-      // confirm_approval item raised by an SMS approval so the Inbox reminder
-      // resolves once acted on. (`sent` is handled by the Send action, not here.)
-      if (["approved", "declined", "expired"].includes(targetStatus)) {
-        await resolveActionItems(client, {
-          accountId: session.accountId,
-          entityId: id,
-          actionTypes: ["send_estimate", "confirm_approval"],
-          resolvedBy: session.userId,
-        });
-      }
-
-      // On approval: create deposit invoice + action item, then auto-link a job.
+      // On approval: create deposit invoice, then auto-link a job.
       // createJobFromEstimate is idempotent (returns existing job if already linked).
       if (targetStatus === "approved") {
         const { depositInvoiceId } = await createApprovalArtifacts(client, {

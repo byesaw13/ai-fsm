@@ -5,7 +5,6 @@ import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { createIntakeRecords } from "../../../../lib/intake/records";
 import { bookingRequestStatusSchema } from "@ai-fsm/domain";
-import { createActionItem } from "../../../../lib/action-items";
 
 export const dynamic = "force-dynamic";
 
@@ -62,25 +61,8 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       smsConsentSource: "quick_lead",
     });
 
-    await createActionItem(client, {
-      accountId: session.accountId,
-      entityType: "booking_request",
-      entityId: bookingId,
-      actionType: "review_intake",
-      title: `Review intake from ${name}`,
-    });
-
-    // Automatic 24-hour follow-up — if no action is taken on this lead by tomorrow,
-    // a "follow_up" item surfaces in the inbox as a reminder to reconnect.
-    const followUpDue = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    await createActionItem(client, {
-      accountId: session.accountId,
-      entityType: "booking_request",
-      entityId: bookingId,
-      actionType: "follow_up",
-      title: `Follow up with ${name}`,
-      dueAt: followUpDue,
-    });
+    // Stale-lead follow-up is raised by the lead-followup worker once a pending
+    // request crosses its inactivity threshold — no action item is created here.
 
     await client.query("COMMIT");
 

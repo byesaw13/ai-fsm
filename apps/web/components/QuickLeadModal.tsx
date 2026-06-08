@@ -75,7 +75,7 @@ export function QuickLeadModal({ onClose }: QuickLeadModalProps) {
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <button
                 type="button"
-                onClick={() => { router.push(`/app/booking-requests/${savedId}`); onClose(); }}
+                onClick={() => { router.push(`/app/requests/${savedId}`); onClose(); }}
                 style={primaryBtnStyle}
               >
                 View request →
@@ -84,7 +84,7 @@ export function QuickLeadModal({ onClose }: QuickLeadModalProps) {
                 type="button"
                 onClick={async () => {
                   await fetch(`/api/v1/booking-requests/${savedId}/send-intake`, { method: "POST" });
-                  router.push(`/app/booking-requests/${savedId}`);
+                  router.push(`/app/requests/${savedId}`);
                   onClose();
                 }}
                 style={secondaryBtnStyle}

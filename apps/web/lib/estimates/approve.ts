@@ -1,10 +1,8 @@
 import type { PoolClient } from "pg";
-import { createActionItem } from "@/lib/action-items";
 import { generateInvoiceNumber } from "@/lib/invoices/db";
 
 /**
  * Side effects that accompany an estimate being approved:
- *  - create the `schedule_job` action item
  *  - auto-create the deposit invoice (once) only when deposit_required is true and deposit_cents > 0
  *
  * The deposit invoice is created as a DRAFT (invoice_kind='deposit') so the
@@ -24,14 +22,6 @@ export async function createApprovalArtifacts(
   params: { estimateId: string; accountId: string; userId: string }
 ): Promise<{ depositInvoiceId: string | null }> {
   const { estimateId, accountId, userId } = params;
-
-  await createActionItem(client, {
-    accountId,
-    entityType: "estimate",
-    entityId: estimateId,
-    actionType: "schedule_job",
-    title: "Schedule job for approved estimate",
-  });
 
   const estData = await client.query<{
     client_id: string;
