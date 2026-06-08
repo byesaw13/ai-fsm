@@ -3,9 +3,6 @@ import { estimateEmailHtml, estimateEmailText } from "@/lib/email/templates";
 import { calculateDepositPolicy, depositDueTriggerLabel, estimateMaterialsDepositBasis } from "../deposit-policy";
 import { createApprovalArtifacts } from "../approve";
 
-vi.mock("@/lib/action-items", () => ({
-  createActionItem: vi.fn(async () => null),
-}));
 vi.mock("@/lib/invoices/db", () => ({
   generateInvoiceNumber: vi.fn(async () => "INV-TEST"),
 }));

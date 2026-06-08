@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import { Modal, Button } from "@/components/ui";
 import { useToast } from "@/components/ui/Toast";
 
@@ -69,8 +71,8 @@ export function LeadCaptureSheet({ open, onClose, onCreated }: LeadCaptureSheetP
       footer={
         createdId ? (
           <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
-            <a
-              href="/app/requests"
+            <Link
+              href={"/app/requests" as Route}
               style={{
                 fontSize: "var(--text-sm)",
                 color: "var(--accent)",
@@ -78,7 +80,7 @@ export function LeadCaptureSheet({ open, onClose, onCreated }: LeadCaptureSheetP
               }}
             >
               View requests →
-            </a>
+            </Link>
             <Button variant="primary" onClick={() => { reset(); }}>
               Add another
             </Button>

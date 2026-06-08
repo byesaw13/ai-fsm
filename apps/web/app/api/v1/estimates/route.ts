@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth, withRole } from "@/lib/auth/middleware";
 import { appendAuditLog } from "@/lib/db/audit";
-import { createActionItem } from "@/lib/action-items";
 import {
   withEstimateContext,
   calcTotals,
@@ -393,7 +392,6 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       if (clientRow.rowCount === 0) {
         throw Object.assign(new Error("Client not found"), { code: "NOT_FOUND" });
       }
-      const clientName = clientRow.rows[0].name;
 
       const result = await client.query<{ id: string }>(
         `INSERT INTO estimates
@@ -563,14 +561,6 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         actor_id: session.userId,
         trace_id: session.traceId,
         new_value: { client_id, status: "draft", total_cents, presentation_mode },
-      });
-
-      await createActionItem(client, {
-        accountId: session.accountId,
-        entityType: "estimate",
-        entityId: estimateId,
-        actionType: "send_estimate",
-        title: `Send estimate to ${clientName}`,
       });
 
       return estimateId;

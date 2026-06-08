@@ -9,7 +9,6 @@ import { estimateEmailHtml, estimateEmailText } from "@/lib/email/templates";
 import { getEnv } from "@/lib/env";
 import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
 import { logCommunication } from "@/lib/communications-log";
-import { resolveActionItems } from "@/lib/action-items";
 import { loadEstimatePdf } from "@/lib/pdf/load";
 
 export const dynamic = "force-dynamic";
@@ -106,12 +105,6 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             [id],
           );
         }
-        await resolveActionItems(client, {
-          accountId: session.accountId,
-          entityId: id,
-          actionTypes: ["send_estimate"],
-          resolvedBy: session.userId,
-        });
         await appendAuditLog(client, {
           account_id: session.accountId,
           entity_type: "estimate",
@@ -220,13 +213,6 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           [id],
         );
       }
-
-      await resolveActionItems(client, {
-        accountId: session.accountId,
-        entityId: id,
-        actionTypes: ["send_estimate"],
-        resolvedBy: session.userId,
-      });
 
       await appendAuditLog(client, {
         account_id: session.accountId,
