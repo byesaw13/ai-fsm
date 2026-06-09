@@ -263,28 +263,54 @@ export default async function AppPage() {
         title="Today"
         subtitle={todayLabel}
         actions={
-          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-            <LinkButton href="/app/action-queue" variant="secondary" size="sm">Action Queue</LinkButton>
-            <LinkButton href="/app/intake/new" variant="primary" size="sm">+ Request</LinkButton>
-          </div>
+          <LinkButton href="/app/intake/new" variant="primary" size="sm">+ New Request</LinkButton>
         }
       />
 
-      <div style={{ display: "grid", gap: "var(--space-4)", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
-        <TodaySection title="Action Queue" count={actionQueue.length} href="/app/action-queue">
-          {actionQueue.length === 0 ? <EmptyToday label="No active queue items" /> : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-              {actionQueue.slice(0, 5).map((item) => (
-                <Link key={item.label} href={item.href} className="mobile-work-item">
-                  <span><strong>{item.label}</strong><small>{item.detail}</small></span>
-                  <b>{item.count}</b>
+      {/* Hero: the single prioritized "do this next" list */}
+      <Card>
+        <SectionHeader title="What needs you" count={actionQueue.length} />
+        {actionQueue.length === 0 ? (
+          <EmptyState
+            title="You're all caught up"
+            description="Nothing needs action right now. New work shows up here as estimates, jobs, and invoices move."
+          />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            {actionQueue.map((item) => {
+              const accent = item.tone === "danger" ? "var(--color-danger)" : item.tone === "warning" ? "var(--color-warning)" : "var(--accent)";
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)",
+                    padding: "var(--space-3)", borderRadius: "var(--radius)",
+                    border: "1px solid var(--border)", borderLeft: `4px solid ${accent}`,
+                    textDecoration: "none", color: "inherit", background: "var(--bg-card)",
+                  }}
+                >
+                  <span style={{ display: "flex", flexDirection: "column" }}>
+                    <strong style={{ fontSize: "var(--text-base)" }}>{item.label}</strong>
+                    <small style={{ color: "var(--fg-muted)" }}>{item.detail}</small>
+                  </span>
+                  <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", whiteSpace: "nowrap" }}>
+                    <b style={{ fontSize: "var(--text-lg)", color: accent }}>{item.count}</b>
+                    <span style={{ color: "var(--fg-muted)" }}>→</span>
+                  </span>
                 </Link>
-              ))}
-            </div>
-          )}
-        </TodaySection>
+              );
+            })}
+          </div>
+        )}
+      </Card>
 
-        <TodaySection title="Today's Jobs" count={todayJobs.length} href="/app/jobs">
+      {/* Secondary: what's on the calendar today (context, not actions) */}
+      <h2 style={{ fontSize: "var(--text-sm)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--fg-muted)", margin: "var(--space-6) 0 var(--space-3)" }}>
+        On today
+      </h2>
+      <div style={{ display: "grid", gap: "var(--space-4)", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
+        <TodaySection title="Jobs" count={todayJobs.length} href="/app/jobs">
           {todayJobs.length === 0 ? <EmptyToday label="No active jobs today" /> : (
             <div>
               {todayJobs.map((job) => (
@@ -300,7 +326,7 @@ export default async function AppPage() {
           )}
         </TodaySection>
 
-        <TodaySection title="Today's Estimates" count={todayEstimates.length} href="/app/estimates">
+        <TodaySection title="Estimates" count={todayEstimates.length} href="/app/estimates">
           {todayEstimates.length === 0 ? <EmptyToday label="No active estimates today" /> : (
             <div>
               {todayEstimates.map((estimate) => (
@@ -316,7 +342,7 @@ export default async function AppPage() {
           )}
         </TodaySection>
 
-        <TodaySection title="Today's Follow-Ups" count={todayFollowUps.length} href="/app/estimates?status=sent">
+        <TodaySection title="Follow-Ups" count={todayFollowUps.length} href="/app/estimates?status=sent">
           {todayFollowUps.length === 0 ? <EmptyToday label="No follow-ups due today" /> : (
             <div>
               {todayFollowUps.map((estimate) => (
@@ -331,7 +357,7 @@ export default async function AppPage() {
           )}
         </TodaySection>
 
-        <TodaySection title="Today's Invoices" count={todayInvoices.length} href="/app/invoices">
+        <TodaySection title="Invoices" count={todayInvoices.length} href="/app/invoices">
           {todayInvoices.length === 0 ? <EmptyToday label="No active invoices today" /> : (
             <div>
               {todayInvoices.map((invoice) => (
