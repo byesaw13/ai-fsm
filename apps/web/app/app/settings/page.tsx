@@ -117,21 +117,23 @@ export default async function SettingsPage() {
 
         {isAdmin && (
           <section>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Tools</h2>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Tools &amp; setup</h2>
             <Card padding="default">
               <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                Operational tools and advanced views.
+                Every workspace tool in one place — and your full menu on a phone, where the sidebar is hidden.
               </p>
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
                 {[
+                  // Day-to-day surfaces — also in the desktop sidebar, kept here so
+                  // they stay reachable on mobile (sidebar is hidden below 768px).
                   { href: "/app/schedule",              label: "Schedule",             desc: "Week / month / year calendar views" },
                   { href: "/app/requests",              label: "Requests",             desc: "Intake queue and request management" },
                   { href: "/app/reports",               label: "Reports",              desc: "Revenue, pricing health, schedule utilization, and performance" },
                   // Memberships paused — link hidden until feature is re-enabled
                   // { href: "/app/membership-dashboard",  label: "Membership Dashboard", desc: "Active memberships, renewals, and labor cap status" },
-                  { href: "/app/automations",           label: "Automations",          desc: "Workflow automation rules" },
                   { href: "/app/price-book",            label: "Price Book",           desc: "Materials and labor pricing catalog" },
                   { href: "/app/expenses",              label: "Expenses",             desc: "Job and business expense tracking" },
+                  { href: "/app/automations",           label: "Automations",          desc: "Workflow automation rules" },
                 ].map(({ href, label, desc }) => (
                   <Link
                     key={href}

@@ -20,6 +20,7 @@ import {
   IconReports,
   IconVisits,
   IconQueue,
+  IconSchedule,
 } from "./NavIcons";
 
 export type WorkspaceMode = "mobile" | "desktop" | "auto";
@@ -63,6 +64,7 @@ const ADMIN_NAV_SECTIONS: NavSection[] = [
       NAV_PROPS,
       { href: "/app/estimates", label: "Estimates",  Icon: IconEstimates, adminOnly: true },
       NAV_JOBS,
+      { href: "/app/schedule",  label: "Schedule",   Icon: IconSchedule,  adminOnly: true },
       NAV_INVOICES,
       NAV_REPORTS,
       NAV_SETTINGS,
