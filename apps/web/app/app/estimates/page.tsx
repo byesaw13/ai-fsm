@@ -11,8 +11,8 @@ import {
   FilterBar,
   ItemCard,
   StatusSection,
-  EmptyState,
   StatusBadge,
+  EmptyState,
   LinkButton,
   MetricGrid,
 } from "@/components/ui";
@@ -281,7 +281,7 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
       ) : hasFilter ? (
         <div>
           {estimates.map((est) => (
-            <EstimateItemCard key={est.id} est={est} />
+            <EstimateItemCard key={est.id} est={est} showStatus />
           ))}
         </div>
       ) : (
@@ -303,7 +303,7 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
   );
 }
 
-function EstimateItemCard({ est }: { est: EstimateRow }) {
+function EstimateItemCard({ est, showStatus = false }: { est: EstimateRow; showStatus?: boolean }) {
   const now = Date.now();
   const isExpired =
     est.expires_at && new Date(est.expires_at).getTime() < now;
@@ -354,9 +354,11 @@ function EstimateItemCard({ est }: { est: EstimateRow }) {
       meta={meta}
       overdue={!!(isExpired && est.status === "sent")}
       actions={
-        <StatusBadge variant={est.status as StatusVariant}>
-          {STATUS_LABELS[est.status]}
-        </StatusBadge>
+        showStatus ? (
+          <StatusBadge variant={est.status as StatusVariant}>
+            {STATUS_LABELS[est.status]}
+          </StatusBadge>
+        ) : undefined
       }
       data-testid="estimate-card"
     />

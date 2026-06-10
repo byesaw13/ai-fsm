@@ -192,6 +192,10 @@ test.describe("Required release smoke — admin core flow", () => {
 
     const paidInvoice = page.locator(`a[href="/app/invoices/${invoiceId}"]`);
     await expect(paidInvoice).toBeVisible();
-    await expect(paidInvoice).toContainText("Paid");
+    // Status reads from the group header now — per-card status badges were
+    // removed as redundant (cards are grouped under their status section).
+    await expect(
+      page.locator(".p7-status-section-header span", { hasText: /^Paid$/ })
+    ).toBeVisible();
   });
 });

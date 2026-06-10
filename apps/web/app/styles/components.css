@@ -59,8 +59,8 @@
 .p7-badge-priority-medium { background: var(--priority-medium-bg); color: var(--priority-medium-fg); }
 .p7-badge-priority-low    { background: var(--priority-low-bg);    color: var(--priority-low-fg); }
 
-/* Role variants — updated to indigo accent */
-.p7-badge-role-owner { background: var(--color-indigo-100); color: var(--color-indigo-700); }
+/* Role variants — accent family */
+.p7-badge-role-owner { background: var(--color-forest-100); color: var(--color-forest-900); }
 .p7-badge-role-admin { background: var(--color-blue-100);   color: var(--color-blue-600); }
 .p7-badge-role-tech  { background: var(--color-amber-100);  color: var(--color-amber-600); }
 

@@ -6,26 +6,36 @@
 :root {
   /* -------------------------------------------------------------------------
      Color — Primitives
-     Refined palette: professional indigo accent with warm neutrals.
-     Inspired by ServiceTitan's clarity + Housecall Pro's approachability.
+     "Forest & Cedar" identity: deep forest-green accent with warm stone
+     neutrals. Built for Dovetails — a trade brand, not a generic SaaS.
      ---------------------------------------------------------------------- */
-  --color-indigo-700: #4338ca;
-  --color-indigo-600: #4f46e5;
-  --color-indigo-500: #6366f1;
-  --color-indigo-100: #e0e7ff;
-  --color-indigo-50:  #eef2ff;
+  --color-forest-900: #14532d;
+  --color-forest-800: #166534;
+  --color-forest-700: #15803d;
+  --color-forest-100: #dcfce7;
+  --color-forest-50:  #e9f6ee;
 
-  --color-slate-950: #020617;
-  --color-slate-900: #0f172a;
-  --color-slate-800: #1e293b;
-  --color-slate-700: #334155;
-  --color-slate-600: #475569;
-  --color-slate-500: #64748b;
-  --color-slate-400: #94a3b8;
-  --color-slate-300: #cbd5e1;
-  --color-slate-200: #e2e8f0;
-  --color-slate-100: #f1f5f9;
-  --color-slate-50:  #f8fafc;
+  /* Legacy indigo primitives — remapped to the forest ramp so any straggling
+     consumer picks up the new identity. Do not use in new code. */
+  --color-indigo-700: var(--color-forest-900);
+  --color-indigo-600: var(--color-forest-800);
+  --color-indigo-500: var(--color-forest-700);
+  --color-indigo-100: var(--color-forest-100);
+  --color-indigo-50:  var(--color-forest-50);
+
+  /* Neutral ramp — values are warm STONE (the name is kept for compatibility
+     with existing consumers; treat "slate" as "neutral"). */
+  --color-slate-950: #0c0a09;
+  --color-slate-900: #1c1917;
+  --color-slate-800: #292524;
+  --color-slate-700: #44403c;
+  --color-slate-600: #57534e;
+  --color-slate-500: #78716c;
+  --color-slate-400: #a8a29e;
+  --color-slate-300: #d6d3d1;
+  --color-slate-200: #e7e5e4;
+  --color-slate-100: #f5f5f4;
+  --color-slate-50:  #fafaf9;
 
   --color-white:     #ffffff;
 
@@ -64,11 +74,11 @@
   --border:        var(--color-slate-200);
   --border-strong: var(--color-slate-300);
   --border-subtle: var(--color-slate-100);
-  --accent:        var(--color-indigo-600);
-  --accent-hover:  var(--color-indigo-500);
-  --accent-subtle: var(--color-indigo-50);
+  --accent:        var(--color-forest-800);
+  --accent-hover:  var(--color-forest-700);
+  --accent-subtle: var(--color-forest-50);
   --accent-fg:     var(--color-white);
-  --ring:          var(--color-indigo-500);
+  --ring:          var(--color-forest-700);
 
   /* -------------------------------------------------------------------------
      Status Semantic — used by Badge and status-pill components
@@ -93,8 +103,10 @@
   --status-void-fg:        var(--color-slate-500);
   --status-in_progress-bg: var(--color-blue-100);
   --status-in_progress-fg: var(--color-blue-600);
-  --status-scheduled-bg:   var(--color-indigo-100);
-  --status-scheduled-fg:   var(--color-indigo-600);
+  /* Scheduled stays blue so it can never be misread as approved/paid green
+     now that the accent itself is green. */
+  --status-scheduled-bg:   var(--color-blue-100);
+  --status-scheduled-fg:   var(--color-blue-600);
   --status-completed-bg:   var(--color-green-100);
   --status-completed-fg:   var(--color-green-600);
   --status-cancelled-bg:   var(--color-slate-100);
@@ -103,8 +115,8 @@
   --status-arrived-fg:     var(--color-blue-600);
   --status-quoted-bg:      var(--color-blue-100);
   --status-quoted-fg:      var(--color-blue-600);
-  --status-invoiced-bg:    var(--color-indigo-100);
-  --status-invoiced-fg:    var(--color-indigo-600);
+  --status-invoiced-bg:    var(--color-violet-100);
+  --status-invoiced-fg:    var(--color-violet-600);
 
   /* -------------------------------------------------------------------------
      Priority Semantic
