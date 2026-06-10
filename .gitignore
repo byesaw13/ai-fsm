@@ -21,3 +21,8 @@ playwright-report/
 docs/*.pdf
 docs/deep-research-report.md
 docs/research
+
+# Local data tooling — personal purchase exports + one-off import scripts
+# (not app features; keep business data and ad-hoc scripts out of the repo)
+docs/Purchase_History_*.csv
+scripts/import-expenses.js
