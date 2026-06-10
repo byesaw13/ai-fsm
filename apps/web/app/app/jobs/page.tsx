@@ -433,9 +433,6 @@ function JobItemCard({ job }: { job: JobRow }) {
       meta={meta}
       actions={
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
-          <StatusBadge variant={job.status as StatusVariant}>
-            {JOB_STATUS_LABELS[job.status as JobStatus]}
-          </StatusBadge>
           {job.sub_status && (
             <StatusBadge variant="overdue">
               {SUB_STATUS_LABELS[job.sub_status] ?? job.sub_status}

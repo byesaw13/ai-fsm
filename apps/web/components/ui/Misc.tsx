@@ -113,7 +113,7 @@ interface AvatarProps {
 }
 
 const AVATAR_COLORS = [
-  "var(--color-indigo-500)",
+  "var(--color-forest-700)",
   "var(--color-blue-500)",
   "var(--color-green-500)",
   "var(--color-amber-500)",

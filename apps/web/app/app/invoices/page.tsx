@@ -9,13 +9,12 @@ import {
   ItemCard,
   StatusSection,
   EmptyState,
-  StatusBadge,
   MetricGrid,
   Card,
   SectionHeader,
   LinkButton,
 } from "@/components/ui";
-import type { StatusVariant, MetricCardData } from "@/components/ui";
+import type { MetricCardData } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -216,9 +215,6 @@ export default async function InvoicesPage() {
                             — {inv.client_name}
                           </span>
                         )}
-                        <StatusBadge variant={inv.status as StatusVariant}>
-                          {STATUS_LABELS[inv.status]}
-                        </StatusBadge>
                       </div>
                     }
                     meta={

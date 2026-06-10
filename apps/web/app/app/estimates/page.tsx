@@ -12,11 +12,10 @@ import {
   ItemCard,
   StatusSection,
   EmptyState,
-  StatusBadge,
   LinkButton,
   MetricGrid,
 } from "@/components/ui";
-import type { FilterDef, StatusVariant, MetricCardData } from "@/components/ui";
+import type { FilterDef, MetricCardData } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -353,11 +352,6 @@ function EstimateItemCard({ est }: { est: EstimateRow }) {
       title={est.client_name ?? "Unknown client"}
       meta={meta}
       overdue={!!(isExpired && est.status === "sent")}
-      actions={
-        <StatusBadge variant={est.status as StatusVariant}>
-          {STATUS_LABELS[est.status]}
-        </StatusBadge>
-      }
       data-testid="estimate-card"
     />
   );
