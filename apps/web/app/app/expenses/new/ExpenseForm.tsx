@@ -13,16 +13,20 @@ interface Props {
   clients: { id: string; name: string }[];
   defaultJobId?: string;
   defaultClientId?: string;
+  mode?: "standard" | "run";
 }
 
-export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId }: Props) {
+type OpenSessionResponse = { data: { id: string } | null };
+
+export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode = "standard" }: Props) {
   const router = useRouter();
+  const isMaterialRun = mode === "run";
 
   const todayLocal = new Date();
   const defaultDate = `${todayLocal.getFullYear()}-${String(todayLocal.getMonth() + 1).padStart(2, "0")}-${String(todayLocal.getDate()).padStart(2, "0")}`;
 
   const [vendorName, setVendorName] = useState("");
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState(isMaterialRun ? "materials" : "");
   const [amountStr, setAmountStr] = useState("");
   const [expenseDate, setExpenseDate] = useState(defaultDate);
   const [jobId, setJobId] = useState(defaultJobId ?? "");
@@ -35,9 +39,11 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId }: Pr
   // Receipt scanning
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [selectedReceiptFile, setSelectedReceiptFile] = useState<File | null>(null);
   const receiptInputRef = useRef<HTMLInputElement>(null);
 
   async function handleScanReceipt(file: File) {
+    setSelectedReceiptFile(file);
     setScanning(true);
     setScanError(null);
     try {
@@ -46,17 +52,17 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId }: Pr
       const res = await fetch("/api/v1/expenses/scan-receipt", { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) {
-        setScanError(data.error?.message ?? "Scan failed — try a clearer photo");
+        setScanError(data.error?.message ?? "Scan failed — enter the receipt details manually. The photo will still be saved.");
         return;
       }
       const { vendor_name, amount_cents, expense_date, category: cat, notes: n } = data.data;
       if (vendor_name) setVendorName(vendor_name);
       if (amount_cents) setAmountStr((amount_cents / 100).toFixed(2));
       if (expense_date) setExpenseDate(expense_date);
-      if (cat) setCategory(cat);
+      if (cat && !isMaterialRun) setCategory(cat);
       if (n) setNotes(n);
     } catch {
-      setScanError("Network error — try again");
+      setScanError("Network error — enter the receipt details manually. The photo will still be saved.");
     } finally {
       setScanning(false);
       if (receiptInputRef.current) receiptInputRef.current.value = "";
@@ -106,7 +112,41 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId }: Pr
         return;
       }
 
-      router.push(`/app/expenses/${data.id}` as Route);
+      const expenseId = data.id;
+      if (expenseId && selectedReceiptFile) {
+        const upload = new FormData();
+        upload.append("file", selectedReceiptFile);
+        const receiptRes = await fetch(`/api/v1/expenses/${expenseId}/receipt`, {
+          method: "POST",
+          body: upload,
+        });
+        if (!receiptRes.ok) {
+          setError("Expense saved, but the receipt photo could not be uploaded. Open the expense and try again.");
+          setPending(false);
+          return;
+        }
+      }
+
+      if (isMaterialRun) {
+        const openRes = await fetch("/api/v1/sessions/open");
+        const openJson = (await openRes.json().catch(() => ({ data: null }))) as OpenSessionResponse;
+        if (openRes.ok && openJson.data?.id) {
+          await fetch(`/api/v1/sessions/${openJson.data.id}/activities`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              entity_type: "supplier_run",
+              entity_id: null,
+              label: vendorName.trim() || "Material Run",
+            }),
+          }).catch(() => null);
+        }
+        router.push("/app" as Route);
+        router.refresh();
+        return;
+      }
+
+      router.push(`/app/expenses/${expenseId}` as Route);
     } catch {
       setError("Network error — please try again.");
       setPending(false);
@@ -120,7 +160,7 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId }: Pr
     label: EXPENSE_CATEGORY_LABELS[c],
   }));
   const jobOptions = [
-    { value: "", label: "No job" },
+    { value: "", label: isMaterialRun ? "No job — general stock" : "No job" },
     ...jobs.map((j) => ({ value: j.id, label: j.title })),
   ];
   const clientOptions = [
@@ -140,10 +180,10 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId }: Pr
         }}
       >
         <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", fontWeight: 600 }}>
-          Scan a Receipt
+          {isMaterialRun ? "Material Run Receipt" : "Scan a Receipt"}
         </p>
         <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-          Take a photo or upload a receipt image to auto-fill the form below.
+          Take a photo or upload a receipt image to auto-fill the form below. The photo is saved after the expense is created.
         </p>
         <input
           ref={receiptInputRef}
@@ -167,6 +207,11 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId }: Pr
         {scanError && (
           <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--color-error, red)" }} role="alert">
             {scanError}
+          </p>
+        )}
+        {selectedReceiptFile && (
+          <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+            Photo ready: {selectedReceiptFile.name}
           </p>
         )}
         {scanning && (
@@ -234,10 +279,10 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId }: Pr
         hint={`Expenses outside ${currentMonth} will not appear in this month's summary.`}
       />
 
-      {jobs.length > 0 && (
+      {(jobs.length > 0 || isMaterialRun) && (
         <Select
           id="job_id"
-          label="Link to Job (optional)"
+          label={isMaterialRun ? "Job" : "Link to Job (optional)"}
           value={jobId}
           onChange={(e) => setJobId(e.target.value)}
           options={jobOptions}
@@ -268,13 +313,13 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId }: Pr
 
       <div className="p7-form-actions">
         <Button type="submit" variant="primary" loading={pending} disabled={pending}>
-          Save Expense
+          {isMaterialRun ? "Save Material Run" : "Save Expense"}
         </Button>
         <Button
           type="button"
           variant="ghost"
           disabled={pending}
-          onClick={() => router.push("/app/expenses" as Route)}
+          onClick={() => router.push((isMaterialRun ? "/app" : "/app/expenses") as Route)}
         >
           Cancel
         </Button>

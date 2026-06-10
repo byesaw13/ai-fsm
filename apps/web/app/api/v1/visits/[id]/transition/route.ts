@@ -103,19 +103,28 @@ export const POST = withAuth(
         );
       }
 
-      // Precondition: a visit must have an assigned technician before it can be started.
+      // Precondition: techs need assignment. Owner/admin field work may start an
+      // unassigned visit; in that case assign it to the actor before transition.
       if (targetStatus === "arrived" && !visit.assigned_user_id) {
-        await client.query("ROLLBACK");
-        return NextResponse.json(
-          {
-            error: {
-              code: "PRECONDITION_FAILED",
-              message: "Visit must have an assigned technician before it can be started",
-              traceId: session.traceId,
+        if (session.role === "owner" || session.role === "admin") {
+          visit.assigned_user_id = session.userId;
+          await client.query(
+            `UPDATE visits SET assigned_user_id = $1, updated_at = now() WHERE id = $2 AND account_id = $3`,
+            [session.userId, id, session.accountId]
+          );
+        } else {
+          await client.query("ROLLBACK");
+          return NextResponse.json(
+            {
+              error: {
+                code: "PRECONDITION_FAILED",
+                message: "Visit must have an assigned technician before it can be started",
+                traceId: session.traceId,
+              },
             },
-          },
-          { status: 422 }
-        );
+            { status: 422 }
+          );
+        }
       }
 
       // Precondition: membership visits must reach the Reporting phase before completion.

@@ -441,19 +441,25 @@ describe("POST /api/v1/visits/[id]/transition", () => {
     expect(json.error.code).toBe("INVALID_TRANSITION");
   });
 
-  it("scheduled → arrived without assigned_user_id → 422 PRECONDITION_FAILED", async () => {
+  it("owner scheduled → arrived without assigned_user_id assigns actor and starts visit", async () => {
+    const updatedInProgress = { ...SAMPLE_VISIT, status: "in_progress", assigned_user_id: USER_ID, arrived_at: NOW };
     mockClientQuery
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ ...SAMPLE_VISIT, status: "scheduled", assigned_user_id: null }] })
-      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+      .mockResolvedValueOnce({ rows: [] }) // owner assignment
+      .mockResolvedValueOnce({ rows: [] }) // scheduled → arrived
+      .mockResolvedValueOnce({ rows: [updatedInProgress] }); // arrived → in_progress
 
     const res = await visitTransition(
       makeRequest("POST", `${VISITS_BASE}/${VISIT_ID}/transition`, { status: "arrived" })
     );
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json.error.code).toBe("PRECONDITION_FAILED");
+    expect(json.data.status).toBe("in_progress");
+    expect(mockClientQuery.mock.calls.some((call) =>
+      String(call[0]).includes("SET assigned_user_id = $1")
+    )).toBe(true);
   });
 
   it("membership completion without a sent summary → 422 PRECONDITION_FAILED", async () => {
