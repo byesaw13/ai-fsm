@@ -303,7 +303,7 @@ export default async function JobsPage({ searchParams }: PageProps) {
         // Flat list when filtered
         <div>
           {jobs.map((job) => (
-            <JobItemCard key={job.id} job={job} />
+            <JobItemCard key={job.id} job={job} showStatus />
           ))}
         </div>
       ) : (
@@ -377,7 +377,7 @@ function TierTabs({
   );
 }
 
-function JobItemCard({ job }: { job: JobRow }) {
+function JobItemCard({ job, showStatus = false }: { job: JobRow; showStatus?: boolean }) {
   const pv: PriorityVariant | null = priorityNumToVariant(job.priority);
   const pl: string = priorityLabel(job.priority);
 
@@ -433,6 +433,11 @@ function JobItemCard({ job }: { job: JobRow }) {
       meta={meta}
       actions={
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+          {showStatus && (
+            <StatusBadge variant={job.status as StatusVariant}>
+              {JOB_STATUS_LABELS[job.status as JobStatus]}
+            </StatusBadge>
+          )}
           {job.sub_status && (
             <StatusBadge variant="overdue">
               {SUB_STATUS_LABELS[job.sub_status] ?? job.sub_status}
