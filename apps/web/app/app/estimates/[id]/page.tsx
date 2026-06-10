@@ -67,29 +67,21 @@ export default async function EstimateDetailPage({
           <h1 className="page-title">Estimate — {estimate.client_name ?? "Unknown client"}</h1>
           {estimate.job_title && <p className="page-subtitle">Job: {estimate.job_title}</p>}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
           <CopyPortalLinkButton url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/estimates/${estimate.share_token}`} />
+          {/* One canonical PDF action; the /print view duplicated this artifact. */}
           <a
             href={`/api/v1/estimates/${estimate.id}/pdf`}
             target="_blank"
             rel="noopener noreferrer"
             data-testid="estimate-download-pdf"
-            style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}
+            style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none", whiteSpace: "nowrap" }}
           >
             Download PDF →
           </a>
-          <a href={`/app/estimates/${estimate.id}/shopping-list`} style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}>
+          <a href={`/app/estimates/${estimate.id}/shopping-list`} style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none", whiteSpace: "nowrap" }}>
             Shopping List →
           </a>
-          <Link
-            href={`/app/estimates/${estimate.id}/print`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}
-            data-testid="estimate-print-link"
-          >
-            Print / PDF →
-          </Link>
           <span className={`status-pill status-${estimate.status}`} data-testid="estimate-status">
             {STATUS_LABELS[currentStatus]}
           </span>

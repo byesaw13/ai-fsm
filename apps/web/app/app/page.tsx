@@ -295,8 +295,12 @@ export default async function AppPage() {
                     <small style={{ color: "var(--fg-muted)" }}>{item.detail}</small>
                   </span>
                   <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", whiteSpace: "nowrap" }}>
-                    <b style={{ fontSize: "var(--text-lg)", color: accent }}>{item.count}</b>
-                    <span style={{ color: "var(--fg-muted)" }}>→</span>
+                    <b style={{
+                      minWidth: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      padding: "0 8px", borderRadius: 99, fontSize: "var(--text-sm)",
+                      background: `color-mix(in srgb, ${accent} 14%, transparent)`, color: accent,
+                    }}>{item.count}</b>
+                    <span aria-hidden="true" style={{ color: accent, fontSize: "var(--text-lg)", lineHeight: 1 }}>›</span>
                   </span>
                 </Link>
               );

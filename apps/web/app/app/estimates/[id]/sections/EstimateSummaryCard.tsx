@@ -21,24 +21,29 @@ export function EstimateSummaryCard({ estimate, role, isMobileWorkspace, documen
   return (
     <div className="card detail-card">
       <h2>Summary</h2>
-      <p>
-        <strong>Total:</strong>{" "}
-        <span data-testid="estimate-total">{formatDollars(estimate.total_cents)}</span>
-      </p>
-      {estimate.deposit_cents > 0 && (
-        <p><strong>Deposit due:</strong> {formatDollars(estimate.deposit_cents)}</p>
-      )}
-      {estimate.balance_cents > 0 && (
-        <p><strong>Balance due:</strong> {formatDollars(estimate.balance_cents)}</p>
-      )}
-      {estimate.sent_at && (
-        <p><strong>Sent:</strong> {new Date(estimate.sent_at).toLocaleDateString()}</p>
-      )}
-      {estimate.expires_at && (
-        <p><strong>Expires:</strong> {new Date(estimate.expires_at).toLocaleDateString()}</p>
-      )}
-      {isOwnerAdmin && (
-        <p><strong>Document Filename:</strong> <code>{documentFilename}</code></p>
+
+      {/* Money anchor: the total leads, deposit/balance read as chips beside it */}
+      <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-3)", flexWrap: "wrap", margin: "var(--space-2) 0 var(--space-1)" }}>
+        <span data-testid="estimate-total" style={{ fontSize: "var(--text-3xl, 1.875rem)", fontWeight: 800, letterSpacing: "-0.02em" }}>
+          {formatDollars(estimate.total_cents)}
+        </span>
+        {estimate.deposit_cents > 0 && (
+          <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, padding: "3px 10px", borderRadius: 99, background: "color-mix(in srgb, var(--accent) 10%, transparent)", color: "var(--accent)", whiteSpace: "nowrap" }}>
+            Deposit {formatDollars(estimate.deposit_cents)}
+          </span>
+        )}
+        {estimate.balance_cents > 0 && (
+          <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, padding: "3px 10px", borderRadius: 99, background: "var(--bg)", border: "1px solid var(--border)", color: "var(--fg-secondary)", whiteSpace: "nowrap" }}>
+            Balance {formatDollars(estimate.balance_cents)}
+          </span>
+        )}
+      </div>
+      {(estimate.sent_at || estimate.expires_at) && (
+        <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+          {estimate.sent_at && <>Sent {new Date(estimate.sent_at).toLocaleDateString()}</>}
+          {estimate.sent_at && estimate.expires_at && " · "}
+          {estimate.expires_at && <>Expires {new Date(estimate.expires_at).toLocaleDateString()}</>}
+        </p>
       )}
       {estimate.notes && (
         <p><strong>Notes:</strong> {estimate.notes}</p>
@@ -198,22 +203,28 @@ export function EstimateSummaryCard({ estimate, role, isMobileWorkspace, documen
         );
       })()}
 
+      {/* Internal details — collapsed by default so client-facing info leads */}
       {isOwnerAdmin && (
-        <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
-          <p style={{ fontWeight: 600, marginBottom: "var(--space-1)", color: "var(--fg-muted)" }}>Pricing Guardrails</p>
-          <p><strong>Review:</strong> {estimate.pricing_review_status.replace(/_/g, " ")}</p>
-          <p><strong>Trips:</strong> {estimate.trip_count === "multi_trip" ? "Multi-trip" : "One trip"}</p>
-          <p><strong>Finish:</strong> {estimate.finish_expectation}</p>
-          {(estimate.travel_surcharge_cents > 0 || estimate.risk_adjustment_cents > 0) && (
-            <p>
-              <strong>Adjustments:</strong>{" "}
-              {formatDollars(estimate.travel_surcharge_cents + estimate.risk_adjustment_cents)}
-            </p>
-          )}
-          {estimate.minimum_service_override_reason && (
-            <p><strong>Minimum override:</strong> {estimate.minimum_service_override_reason.replace(/_/g, " ")}</p>
-          )}
-        </div>
+        <details style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
+          <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+            Internal details — pricing guardrails &amp; document
+          </summary>
+          <div style={{ marginTop: "var(--space-2)" }}>
+            <p><strong>Review:</strong> {estimate.pricing_review_status.replace(/_/g, " ")}</p>
+            <p><strong>Trips:</strong> {estimate.trip_count === "multi_trip" ? "Multi-trip" : "One trip"}</p>
+            <p><strong>Finish:</strong> {estimate.finish_expectation}</p>
+            {(estimate.travel_surcharge_cents > 0 || estimate.risk_adjustment_cents > 0) && (
+              <p>
+                <strong>Adjustments:</strong>{" "}
+                {formatDollars(estimate.travel_surcharge_cents + estimate.risk_adjustment_cents)}
+              </p>
+            )}
+            {estimate.minimum_service_override_reason && (
+              <p><strong>Minimum override:</strong> {estimate.minimum_service_override_reason.replace(/_/g, " ")}</p>
+            )}
+            <p style={{ overflowWrap: "anywhere" }}><strong>Document filename:</strong> <code style={{ fontSize: "var(--text-xs)" }}>{documentFilename}</code></p>
+          </div>
+        </details>
       )}
     </div>
   );
