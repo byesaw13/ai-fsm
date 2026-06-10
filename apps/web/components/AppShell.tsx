@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useState, type ReactNode } from "react";
 import type { Route } from "next";
 import type { Role } from "@ai-fsm/domain";
 import { ToastProvider } from "./ui/Toast";
@@ -19,11 +19,8 @@ import {
   IconInvoices,
   IconReports,
   IconVisits,
-  IconQueue,
   IconSchedule,
 } from "./NavIcons";
-
-export type WorkspaceMode = "mobile" | "desktop" | "auto";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
 
@@ -40,12 +37,12 @@ interface NavSection {
 }
 
 // ---------------------------------------------------------------------------
-// Navigation definitions
+// Navigation definitions — ONE model. The sidebar (≥768px) and the More sheet
+// (<768px) render the same list; the bottom bar is a shortcut subset of it.
 // ---------------------------------------------------------------------------
 
 // Named constants for items referenced outside the array (mobile bottom bar)
 const NAV_TODAY:    NavItem = { href: "/app",              label: "Today",    Icon: IconMyDay };
-const NAV_QUEUE:    NavItem = { href: "/app/action-queue", label: "Queue",    Icon: IconQueue };
 const NAV_REQUESTS: NavItem = { href: "/app/requests",     label: "Requests", Icon: IconInbox };
 const NAV_PROPS:    NavItem = { href: "/app/properties", label: "Properties", Icon: IconProperties, adminOnly: true };
 const NAV_JOBS:     NavItem = { href: "/app/jobs",       label: "Jobs",       Icon: IconJobs,       adminOnly: true };
@@ -87,26 +84,20 @@ export function getNavSections(role: Role): NavSection[] {
   return ADMIN_NAV_SECTIONS;
 }
 
-/** Returns flat list for the mobile bottom tab bar */
-export function getBottomNavItems(role: Role, workspaceMode: WorkspaceMode = "auto"): NavItem[] {
+/**
+ * Returns the link items for the mobile bottom tab bar. For owner/admin this
+ * is a 3-item shortcut subset — the bar's 4th slot is the More button (added
+ * by AppShell), which opens the full nav so every destination stays reachable
+ * on a phone.
+ */
+export function getBottomNavItems(role: Role): NavItem[] {
   if (role === "tech") {
     const myDay: NavItem = { href: "/app/my-day", label: "My Day", Icon: IconMyDay };
     const visits: NavItem = { href: "/app/visits", label: "Visits", Icon: IconVisits };
     return [myDay, visits];
   }
 
-  if (workspaceMode === "mobile") {
-    // Field-first: today, execution queue, jobs, settings. Settings is kept so
-    // the workspace switcher stays reachable when the sidebar is hidden.
-    return [
-      NAV_TODAY,
-      NAV_QUEUE,
-      NAV_JOBS,
-      NAV_SETTINGS,
-    ];
-  }
-
-  return [NAV_TODAY, NAV_REQUESTS, NAV_JOBS, NAV_SETTINGS];
+  return [NAV_TODAY, NAV_REQUESTS, NAV_JOBS];
 }
 
 /** Returns true if href is the active route for the current pathname */
@@ -122,40 +113,28 @@ export function isNavActive(pathname: string, href: string): boolean {
 interface AppShellProps {
   role: Role;
   userName?: string;
-  workspaceMode?: WorkspaceMode;
   children: ReactNode;
 }
 
-export function AppShell({ role, userName, workspaceMode = "auto", children }: AppShellProps) {
+export function AppShell({ role, userName, children }: AppShellProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const sections = getNavSections(role);
-  const bottomItems = getBottomNavItems(role, workspaceMode);
+  const bottomItems = getBottomNavItems(role);
   const [showQuickLead, setShowQuickLead] = useState(false);
-  const [switchingMode, setSwitchingMode] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   const isAdminOrOwner = role === "owner" || role === "admin";
 
-  async function handleWorkspaceSwitch(mode: WorkspaceMode) {
-    if (mode === workspaceMode || switchingMode) return;
-    setSwitchingMode(true);
-    try {
-      await fetch("/api/v1/workspace-mode", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode }),
-      });
-      router.refresh();
-    } finally {
-      setSwitchingMode(false);
-    }
-  }
+  // Close the More sheet whenever navigation happens.
+  useEffect(() => {
+    setShowMore(false);
+  }, [pathname]);
 
   const avatarLetter = userName ? userName[0].toUpperCase() : role[0].toUpperCase();
   const displayName = userName || "Account";
 
   return (
     <ToastProvider>
-      <div className={`p7-layout p7-mode-${workspaceMode}`}>
+      <div className="p7-layout">
         {/* ---- Desktop/Tablet Sidebar ---- */}
         <aside className="p7-sidebar" aria-label="Main navigation">
           {/* Brand */}
@@ -219,27 +198,8 @@ export function AppShell({ role, userName, workspaceMode = "auto", children }: A
             ))}
           </nav>
 
-          {/* Footer — workspace switcher + user chip + logout */}
+          {/* Footer — user chip + logout */}
           <div className="p7-sidebar-footer">
-            {isAdminOrOwner && (
-              <div className="p7-workspace-switcher" aria-label="Workspace mode">
-                <span className="p7-workspace-label">Workspace</span>
-                <div className="p7-workspace-options">
-                  {(["mobile", "desktop", "auto"] as WorkspaceMode[]).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => handleWorkspaceSwitch(mode)}
-                      disabled={switchingMode}
-                      aria-pressed={workspaceMode === mode}
-                      className={`p7-workspace-btn ${workspaceMode === mode ? "p7-workspace-btn-active" : ""}`}
-                    >
-                      {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
             <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
               <div className="p7-user-chip">
                 <div className="p7-user-avatar" aria-hidden="true">
@@ -269,7 +229,7 @@ export function AppShell({ role, userName, workspaceMode = "auto", children }: A
                 <Link
                   key={item.href}
                   href={item.href as Route}
-                  className={`p7-bottom-nav-item ${active ? "p7-nav-active" : ""}`}
+                  className={`p7-bottom-nav-item ${active && !showMore ? "p7-nav-active" : ""}`}
                   aria-current={active ? "page" : undefined}
                 >
                   <span className="p7-bottom-nav-icon" aria-hidden="true">
@@ -279,8 +239,68 @@ export function AppShell({ role, userName, workspaceMode = "auto", children }: A
                 </Link>
               );
             })}
+            {isAdminOrOwner && (
+              <button
+                type="button"
+                className={`p7-bottom-nav-item p7-more-btn ${showMore ? "p7-nav-active" : ""}`}
+                aria-expanded={showMore}
+                aria-controls="p7-more-sheet"
+                onClick={() => setShowMore((v) => !v)}
+              >
+                <span className="p7-bottom-nav-icon" aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="5" cy="12" r="1.8" fill="currentColor" />
+                    <circle cx="12" cy="12" r="1.8" fill="currentColor" />
+                    <circle cx="19" cy="12" r="1.8" fill="currentColor" />
+                  </svg>
+                </span>
+                <span>More</span>
+              </button>
+            )}
           </div>
         </nav>
+
+        {/* ---- Mobile "More" sheet — the complete nav on a phone ---- */}
+        {showMore && (
+          <>
+            <div
+              className="p7-more-overlay"
+              aria-hidden="true"
+              onClick={() => setShowMore(false)}
+            />
+            <div id="p7-more-sheet" className="p7-more-sheet" role="dialog" aria-label="All destinations">
+              <div className="p7-more-grid">
+                {sections.flatMap((s) => s.items).map((item) => {
+                  const active = isNavActive(pathname, item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href as Route}
+                      className={`p7-more-item ${active ? "p7-nav-active" : ""}`}
+                      aria-current={active ? "page" : undefined}
+                      onClick={() => setShowMore(false)}
+                    >
+                      <span className="p7-nav-icon" aria-hidden="true">
+                        <item.Icon size={20} />
+                      </span>
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+              <div className="p7-more-footer">
+                <div className="p7-user-chip">
+                  <div className="p7-user-avatar" aria-hidden="true">{avatarLetter}</div>
+                  <div className="p7-user-info">
+                    <span className="p7-user-name">{displayName}</span>
+                    <span className="p7-user-role">{role}</span>
+                  </div>
+                </div>
+                <LogoutButton />
+              </div>
+            </div>
+          </>
+        )}
       </div>
       {showQuickLead && <QuickLeadModal onClose={() => setShowQuickLead(false)} />}
       {isAdminOrOwner && <FloatingActionButton />}

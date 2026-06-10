@@ -209,27 +209,17 @@ describe("getNavSections (role filtering)", () => {
 });
 
 describe("getBottomNavItems (mobile)", () => {
-  it("returns 4 items for admin role: Today, Requests, Jobs, Settings", () => {
+  it("returns 3 link items for admin role (Today, Requests, Jobs) — the 4th slot is the More button", () => {
     const items = getBottomNavItems("admin");
-    expect(items).toHaveLength(4);
-    const hrefs = items.map((i) => i.href);
-    expect(hrefs).toContain("/app");
-    expect(hrefs).toContain("/app/jobs");
-    expect(hrefs).toContain("/app/requests");
-    expect(hrefs).toContain("/app/settings");
-    expect(hrefs).not.toContain("/app/booking-requests");
-    expect(hrefs).not.toContain("/app/estimates");
-  });
-
-  it("returns field-first destinations when Mobile Workspace is forced", () => {
-    const items = getBottomNavItems("admin", "mobile");
-    expect(items).toHaveLength(4);
+    expect(items).toHaveLength(3);
     expect(items.map((i) => i.href)).toEqual([
       "/app",
-      "/app/action-queue",
+      "/app/requests",
       "/app/jobs",
-      "/app/settings",
     ]);
+    const hrefs = items.map((i) => i.href);
+    expect(hrefs).not.toContain("/app/booking-requests");
+    expect(hrefs).not.toContain("/app/estimates");
   });
 
   it("returns 2 items for tech role with My Day and Visits", () => {

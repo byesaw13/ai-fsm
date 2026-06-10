@@ -165,59 +165,6 @@
   background: var(--color-slate-50);
 }
 
-/* Workspace mode switcher (in sidebar footer) */
-.p7-workspace-switcher {
-  padding: var(--space-2) 0 var(--space-1);
-  border-bottom: 1px solid var(--border);
-  margin-bottom: var(--space-1);
-}
-
-.p7-workspace-label {
-  display: block;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--fg-muted);
-  margin-bottom: var(--space-2);
-}
-
-.p7-workspace-options {
-  display: flex;
-  gap: var(--space-1);
-}
-
-.p7-workspace-btn {
-  flex: 1;
-  padding: 3px 4px;
-  font-size: 11px;
-  font-weight: 500;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--fg-muted);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  white-space: nowrap;
-}
-
-.p7-workspace-btn:hover {
-  background: var(--bg);
-  color: var(--fg);
-}
-
-.p7-workspace-btn-active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  font-weight: 600;
-}
-
-.p7-workspace-btn-active:hover {
-  background: var(--accent);
-  color: #fff;
-}
-
 .p7-user-chip {
   display: flex;
   align-items: center;
@@ -506,50 +453,92 @@
 }
 
 /* ==========================================================================
-   WORKSPACE MODE OVERRIDES
+   RESPONSIVE VISIBILITY UTILITIES
 
-   These force a specific layout shell regardless of viewport width, so the
-   Mobile/Desktop/Auto switch is visibly meaningful on any screen:
-     - p7-mode-mobile  : always the mobile shell (bottom nav + FAB, no sidebar)
-     - p7-mode-desktop : always the desktop shell (sidebar, no bottom nav)
-     - p7-mode-auto    : no override — the media queries below decide.
-   Compound selectors (specificity 0,2,0) beat the plain media-query rules
-   (0,1,0), so these win without !important.
+   The layout is purely viewport-driven (no workspace-mode override classes).
+   Server components that need a phone-specific rendering emit both variants
+   and toggle them with these utilities.
    ========================================================================== */
 
-/* ---- Forced MOBILE shell (e.g. previewing mobile on a desktop screen) ---- */
-.p7-mode-mobile .p7-sidebar { display: none; }
-.p7-mode-mobile .p7-main {
-  margin-left: 0;
-  /* Clear the bottom nav (60px) plus the floating action button that sits
-     above it, so the FAB never covers the last card on the page. */
-  padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
-}
-.p7-mode-mobile .p7-bottom-nav { display: block; }
-.p7-mode-mobile .p7-fab-wrap { display: block; }
-.p7-mode-mobile .p7-detail-layout { grid-template-columns: 1fr; }
-.p7-mode-mobile .p7-detail-sidebar { position: static; }
-.p7-mode-mobile .p7-page-container { padding: var(--space-4) var(--space-4) var(--space-12); }
+.p7-only-mobile { display: none; }
+.p7-only-desktop { display: block; }
 
-/* ---- Forced DESKTOP shell (e.g. a tablet user who wants full power) ---- */
-.p7-mode-desktop .p7-sidebar {
+@media (max-width: 767px) {
+  .p7-only-mobile { display: block; }
+  .p7-only-desktop { display: none; }
+}
+
+/* ==========================================================================
+   MOBILE "MORE" SHEET — the complete nav on a phone
+   ========================================================================== */
+
+.p7-more-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  /* Above the FAB stack (z 399-402) so the sheet isn't covered by it. */
+  z-index: 450;
+}
+
+.p7-more-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+  background: var(--bg-card, #fff);
+  border-top: 1px solid var(--border);
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 30px rgba(15, 23, 42, 0.18);
+  padding: var(--space-4);
+  z-index: 460;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.p7-more-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-2);
+}
+
+.p7-more-item {
   display: flex;
-  width: var(--sidebar-width);
+  align-items: center;
+  gap: var(--space-2);
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  font-weight: 600;
 }
-.p7-mode-desktop .p7-main {
-  margin-left: var(--sidebar-width);
-  padding-bottom: 0;
+
+.p7-more-item:hover { text-decoration: none; background: var(--bg); }
+
+.p7-more-item.p7-nav-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
-.p7-mode-desktop .p7-bottom-nav { display: none; }
-.p7-mode-desktop .p7-fab-wrap { display: none; }
-/* Restore full sidebar labels even if the tablet media query collapsed them */
-.p7-mode-desktop .p7-brand-name,
-.p7-mode-desktop .p7-nav-label,
-.p7-mode-desktop .p7-nav-section,
-.p7-mode-desktop .p7-user-name,
-.p7-mode-desktop .p7-user-role,
-.p7-mode-desktop .p7-logout-btn,
-.p7-mode-desktop .p7-workspace-switcher { display: revert; }
+
+.p7-more-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+/* The More button is a <button>; match the link tab styling. */
+.p7-more-btn {
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+}
 
 /* ==========================================================================
    RESPONSIVE BREAKPOINTS
@@ -573,8 +562,7 @@
   .p7-nav-section,
   .p7-user-name,
   .p7-user-role,
-  .p7-logout-btn,
-  .p7-workspace-switcher {
+  .p7-logout-btn {
     display: none;
   }
 

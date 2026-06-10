@@ -6,7 +6,6 @@ import type { EstimateRow } from "../detail-data";
 interface Props {
   estimate: EstimateRow;
   role: Role;
-  isMobileWorkspace: boolean;
   documentFilename: string;
 }
 
@@ -15,7 +14,7 @@ interface Props {
  * scope, room-by-room breakdown, internal margin, internal notes, materials
  * plan, and pricing guardrails. Owner/admin-only blocks are gated by role.
  */
-export function EstimateSummaryCard({ estimate, role, isMobileWorkspace, documentFilename }: Props) {
+export function EstimateSummaryCard({ estimate, role, documentFilename }: Props) {
   const isOwnerAdmin = role === "owner" || role === "admin";
 
   return (
@@ -109,8 +108,8 @@ export function EstimateSummaryCard({ estimate, role, isMobileWorkspace, documen
         );
       })()}
 
-      {/* Internal margin — hidden in mobile workspace */}
-      {!isMobileWorkspace && isOwnerAdmin && estimate.internal_labor_cost_cents !== null && estimate.internal_labor_cost_cents > 0 && (
+      {/* Internal margin — owner/admin only */}
+      {isOwnerAdmin && estimate.internal_labor_cost_cents !== null && estimate.internal_labor_cost_cents > 0 && (
         <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
           <p style={{ fontWeight: 600, marginBottom: "var(--space-1)", color: "var(--fg-muted)" }}>Internal Margin</p>
           {(() => {

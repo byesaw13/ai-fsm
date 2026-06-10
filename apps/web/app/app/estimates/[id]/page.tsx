@@ -1,5 +1,4 @@
 import { redirect, notFound } from "next/navigation";
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { canCreateEstimates, canDeleteRecords } from "@/lib/auth/permissions";
@@ -33,9 +32,6 @@ export default async function EstimateDetailPage({
   const { id } = await params;
   const session = await getSession();
   if (!session) redirect("/login");
-
-  const cookieStore = await cookies();
-  const isMobileWorkspace = cookieStore.get("workspace_mode")?.value === "mobile";
 
   const detail = await loadEstimateDetail(session, id);
   if (!detail) notFound();
@@ -136,7 +132,6 @@ export default async function EstimateDetailPage({
       <EstimateSummaryCard
         estimate={estimate}
         role={session.role}
-        isMobileWorkspace={isMobileWorkspace}
         documentFilename={documentFilename}
       />
 
@@ -144,7 +139,6 @@ export default async function EstimateDetailPage({
         estimate={estimate}
         lineItems={lineItems}
         options={options}
-        isMobileWorkspace={isMobileWorkspace}
       />
 
       {/* Edit form — owner/admin only, draft only */}
@@ -199,8 +193,8 @@ export default async function EstimateDetailPage({
         />
       )}
 
-      {/* Review panel — hidden in mobile workspace */}
-      {!isMobileWorkspace && canTransition && !["declined", "expired"].includes(currentStatus) && (
+      {/* Review panel */}
+      {canTransition && !["declined", "expired"].includes(currentStatus) && (
         <EstimateReviewPanel estimateId={estimate.id} />
       )}
 
@@ -242,8 +236,8 @@ export default async function EstimateDetailPage({
         <ApprovedHandoff estimate={estimate} jobVisitCount={jobVisitCount} hasMaterialsPlan={hasMaterialsPlan} />
       )}
 
-      {/* Change orders — owner/admin only, approved estimates, hidden in mobile workspace */}
-      {!isMobileWorkspace && canTransition && currentStatus === "approved" && (
+      {/* Change orders — owner/admin only, approved estimates */}
+      {canTransition && currentStatus === "approved" && (
         <ChangeOrdersClient estimateId={estimate.id} initialChangeOrders={changeOrders} />
       )}
 
