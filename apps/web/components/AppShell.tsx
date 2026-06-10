@@ -312,8 +312,9 @@ function LogoutButton() {
       disabled={pending}
       className="p7-logout-btn"
       aria-label="Sign out"
+      title="Sign out"
     >
-      {pending ? "…" : "Out"}
+      {pending ? "…" : "Sign out"}
     </button>
   );
 }

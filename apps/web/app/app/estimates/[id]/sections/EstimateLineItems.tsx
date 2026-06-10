@@ -1,6 +1,11 @@
 import { formatDollars } from "../format";
 import type { EstimateRow, LineItemRow, OptionWithItems } from "../detail-data";
 
+/** Postgres numerics arrive as "1.00" — render whole quantities without decimals. */
+function fmtQty(q: number | string): string {
+  return Number(q).toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+
 interface Props {
   estimate: EstimateRow;
   lineItems: LineItemRow[];
@@ -51,7 +56,7 @@ export function EstimateLineItems({ estimate, lineItems, options, isMobileWorksp
                   {option.line_items.map((item) => (
                     <tr key={item.id}>
                       <td>{item.description}</td>
-                      <td>{item.quantity}</td>
+                      <td>{fmtQty(item.quantity)}</td>
                       <td>{formatDollars(item.unit_price_cents)}</td>
                       <td>{formatDollars(item.total_cents)}</td>
                     </tr>
@@ -97,9 +102,9 @@ export function EstimateLineItems({ estimate, lineItems, options, isMobileWorksp
                   <span style={{ fontWeight: 500, fontSize: "var(--text-sm)", flex: 1 }}>{item.description}</span>
                   <span style={{ fontWeight: 700, fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>{formatDollars(item.total_cents)}</span>
                 </div>
-                {String(item.quantity) !== "1" && (
+                {Number(item.quantity) !== 1 && (
                   <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
-                    {item.quantity} × {formatDollars(item.unit_price_cents)}
+                    {fmtQty(item.quantity)} × {formatDollars(item.unit_price_cents)}
                   </div>
                 )}
               </div>
@@ -174,7 +179,7 @@ export function EstimateLineItems({ estimate, lineItems, options, isMobileWorksp
               const renderRow = (item: LineItemRow, muted = false) => (
                 <tr key={item.id} data-testid="line-item-row" style={muted ? { color: "var(--fg-muted)" } : undefined}>
                   <td>{item.description}</td>
-                  <td>{item.quantity}</td>
+                  <td>{fmtQty(item.quantity)}</td>
                   <td>{formatDollars(item.unit_price_cents)}</td>
                   <td>{formatDollars(item.total_cents)}</td>
                 </tr>

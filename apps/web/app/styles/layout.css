@@ -521,7 +521,9 @@
 .p7-mode-mobile .p7-sidebar { display: none; }
 .p7-mode-mobile .p7-main {
   margin-left: 0;
-  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+  /* Clear the bottom nav (60px) plus the floating action button that sits
+     above it, so the FAB never covers the last card on the page. */
+  padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
 }
 .p7-mode-mobile .p7-bottom-nav { display: block; }
 .p7-mode-mobile .p7-fab-wrap { display: block; }
@@ -624,7 +626,8 @@
 
   .p7-main {
     margin-left: 0;
-    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+    /* Clear the bottom nav plus the floating action button above it. */
+    padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
   }
 
   .p7-bottom-nav { display: block; }
@@ -659,10 +662,10 @@
     width: 100%;
   }
 
-  /* Section headers wrap on mobile */
+  /* Section headers stay on one row on mobile (title + count left, action
+     right); wrap is only a fallback for unusually long titles. */
   .p7-section-header {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-wrap: wrap;
     gap: var(--space-2);
   }
 }
