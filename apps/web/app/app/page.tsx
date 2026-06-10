@@ -1,84 +1,17 @@
-import Link from "next/link";
 import type { Route } from "next";
-import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { queryForSession } from "@/lib/db";
-import { Card, EmptyState, ItemCard, LinkButton, PageContainer, PageHeader, SectionHeader, StatusBadge } from "@/components/ui";
-import type { StatusVariant } from "@/components/ui";
+import { LinkButton, PageContainer, PageHeader } from "@/components/ui";
+import { DailyCommandCenter } from "./DailyCommandCenter";
+import type { CommandVisit, CountAction, EndWarnings, MaterialJob, OpenSession, VehicleOption } from "./DailyCommandCenter";
 
 export const dynamic = "force-dynamic";
 
 type CountRow = { count: string };
 
-type TodayJobRow = {
-  id: string;
-  title: string;
-  status: string;
-  client_name: string | null;
-  property_address: string | null;
-  visit_id: string | null;
-  scheduled_start: string | null;
-  visit_status: string | null;
-};
-
-type TodayEstimateRow = {
-  id: string;
-  status: string;
-  total_cents: string;
-  client_name: string | null;
-  job_title: string | null;
-  activity_at: string;
-};
-
-type TodayInvoiceRow = {
-  id: string;
-  invoice_number: string;
-  status: string;
-  total_cents: string;
-  balance_cents: string;
-  client_name: string | null;
-  job_title: string | null;
-  activity_at: string;
-};
-
-type ActionQueueItem = {
-  label: string;
-  count: number;
-  href: Route;
-  detail: string;
-  tone: "danger" | "warning" | "default";
-};
-
 function parseN(row: CountRow | undefined | null): number {
   return parseInt(row?.count ?? "0", 10);
-}
-
-function fmt(cents: number | string): string {
-  const n = Number(cents);
-  return `$${(n / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-}
-
-function fmtTime(iso: string | null): string {
-  if (!iso) return "Today";
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
-}
-
-function TodaySection({ title, count, href, children }: { title: string; count: number; href?: Route; children: ReactNode }) {
-  return (
-    <Card>
-      <SectionHeader
-        title={title}
-        count={count}
-        action={href ? <LinkButton href={href} variant="ghost" size="sm">View all</LinkButton> : undefined}
-      />
-      {children}
-    </Card>
-  );
-}
-
-function EmptyToday({ label }: { label: string }) {
-  return <EmptyState title={label} description="Only active work for today appears here." />;
 }
 
 export default async function AppPage() {
@@ -96,23 +29,27 @@ export default async function AppPage() {
 
   const [
     todayJobs,
-    todayEstimates,
-    todayFollowUps,
-    todayInvoices,
+    tomorrowJobs,
+    openSessionRows,
+    vehicles,
     draftInvoiceCountRows,
     scheduleApprovedCountRows,
     estimateFollowUpCountRows,
     depositCountRows,
     materialCountRows,
+    materialJobs,
+    missingReceiptRows,
+    inProgressRows,
   ] = await Promise.all([
-    queryForSession<TodayJobRow>(session,
+    queryForSession<CommandVisit>(session,
       `SELECT DISTINCT ON (j.id)
               j.id, j.title, j.status,
               c.name AS client_name,
               p.address AS property_address,
               v.id AS visit_id,
               v.scheduled_start::text AS scheduled_start,
-              v.status AS visit_status
+              v.status AS visit_status,
+              v.sub_status
        FROM jobs j
        LEFT JOIN clients c ON c.id = j.client_id
        LEFT JOIN properties p ON p.id = j.property_id
@@ -122,54 +59,55 @@ export default async function AppPage() {
          AND v.status IN ('scheduled','arrived','in_progress')
          AND v.scheduled_start::date = CURRENT_DATE
        ORDER BY j.id, v.scheduled_start ASC
-       LIMIT 5`,
+       LIMIT 10`,
       [accountId]),
 
-    queryForSession<TodayEstimateRow>(session,
-      `SELECT e.id, e.status, e.total_cents::text AS total_cents,
-              c.name AS client_name, j.title AS job_title,
-              COALESCE(e.sent_at, e.created_at)::text AS activity_at
-       FROM estimates e
-       JOIN clients c ON c.id = e.client_id
-       LEFT JOIN jobs j ON j.id = e.job_id
-       WHERE e.account_id = $1
-         AND e.status IN ('draft','sent','approved')
-         AND COALESCE(e.sent_at, e.created_at)::date = CURRENT_DATE
-       ORDER BY COALESCE(e.sent_at, e.created_at) DESC
-       LIMIT 5`,
+    queryForSession<CommandVisit>(session,
+      `SELECT DISTINCT ON (j.id)
+              j.id, j.title, j.status,
+              c.name AS client_name,
+              p.address AS property_address,
+              v.id AS visit_id,
+              v.scheduled_start::text AS scheduled_start,
+              v.status AS visit_status,
+              v.sub_status
+       FROM jobs j
+       LEFT JOIN clients c ON c.id = j.client_id
+       LEFT JOIN properties p ON p.id = j.property_id
+       LEFT JOIN visits v ON v.job_id = j.id AND v.account_id = j.account_id
+       WHERE j.account_id = $1
+         AND v.status IN ('scheduled','arrived','in_progress')
+         AND v.scheduled_start::date = CURRENT_DATE + interval '1 day'
+       ORDER BY j.id, v.scheduled_start ASC
+       LIMIT 3`,
       [accountId]),
 
-    queryForSession<TodayEstimateRow>(session,
-      `SELECT e.id, e.status, e.total_cents::text AS total_cents,
-              c.name AS client_name, j.title AS job_title,
-              COALESCE(e.expires_at, e.sent_at, e.created_at)::text AS activity_at
-       FROM estimates e
-       JOIN clients c ON c.id = e.client_id
-       LEFT JOIN jobs j ON j.id = e.job_id
-       WHERE e.account_id = $1
-         AND e.status = 'sent'
-         AND (
-           e.expires_at::date = CURRENT_DATE
-           OR e.sent_at::date = CURRENT_DATE
-         )
-       ORDER BY COALESCE(e.expires_at, e.sent_at, e.created_at) ASC
-       LIMIT 5`,
+    queryForSession<OpenSession>(session,
+      `SELECT s.id, s.session_date::text, s.vehicle_id, v.nickname AS vehicle_nickname,
+              v.plate AS vehicle_plate, s.start_odometer
+       FROM vehicle_sessions s
+       LEFT JOIN vehicles v ON v.id = s.vehicle_id
+       WHERE s.account_id = $1
+         AND s.session_date = CURRENT_DATE
+         AND s.end_odometer IS NULL
+         AND s.miles IS NULL
+       ORDER BY s.created_at DESC
+       LIMIT 1`,
       [accountId]),
 
-    queryForSession<TodayInvoiceRow>(session,
-      `SELECT i.id, i.invoice_number, i.status,
-              i.total_cents::text AS total_cents,
-              i.balance_cents::text AS balance_cents,
-              c.name AS client_name, j.title AS job_title,
-              COALESCE(i.due_date, i.sent_at, i.created_at)::text AS activity_at
-       FROM invoices i
-       JOIN clients c ON c.id = i.client_id
-       LEFT JOIN jobs j ON j.id = i.job_id
-       WHERE i.account_id = $1
-         AND i.status IN ('draft','sent','partial','overdue')
-         AND COALESCE(i.due_date, i.sent_at, i.created_at)::date = CURRENT_DATE
-       ORDER BY COALESCE(i.due_date, i.sent_at, i.created_at) ASC
-       LIMIT 5`,
+    queryForSession<VehicleOption>(session,
+      `SELECT v.id, v.nickname, v.plate,
+              last_s.end_odometer AS current_odometer
+       FROM vehicles v
+       LEFT JOIN LATERAL (
+         SELECT end_odometer, session_date
+         FROM vehicle_sessions
+         WHERE vehicle_id = v.id AND account_id = v.account_id AND end_odometer IS NOT NULL
+         ORDER BY session_date DESC, created_at DESC
+         LIMIT 1
+       ) last_s ON true
+       WHERE v.account_id = $1 AND v.is_active = true
+       ORDER BY v.nickname ASC`,
       [accountId]),
 
     queryForSession<CountRow>(session,
@@ -215,12 +153,44 @@ export default async function AppPage() {
          AND e.status = 'approved'
          AND j.status IN ('scheduled','in_progress')`,
       [accountId]),
+
+    queryForSession<MaterialJob>(session,
+      `SELECT e.id, j.id AS job_id, j.title, c.name AS client_name
+       FROM estimates e
+       JOIN jobs j ON j.id = e.job_id AND j.account_id = e.account_id
+       LEFT JOIN clients c ON c.id = j.client_id
+       WHERE e.account_id = $1
+         AND e.status = 'approved'
+         AND j.status IN ('scheduled','in_progress')
+       ORDER BY e.updated_at DESC
+       LIMIT 5`,
+      [accountId]),
+
+    queryForSession<CountRow>(session,
+      `SELECT COUNT(*)::text AS count
+       FROM expenses
+       WHERE account_id = $1
+         AND expense_date = CURRENT_DATE
+         AND receipt_url IS NULL`,
+      [accountId]),
+
+    queryForSession<CountRow>(session,
+      `SELECT COUNT(*)::text AS count
+       FROM visits
+       WHERE account_id = $1
+         AND scheduled_start::date = CURRENT_DATE
+         AND status IN ('arrived','in_progress')`,
+      [accountId]),
   ]);
+
+  const draftInvoices = parseN(draftInvoiceCountRows[0]);
+  const deposits = parseN(depositCountRows[0]);
+  const materialCount = parseN(materialCountRows[0]);
 
   const actionQueue = ([
     {
       label: "Review Draft Invoices",
-      count: parseN(draftInvoiceCountRows[0]),
+      count: draftInvoices,
       href: "/app/invoices?status=draft" as Route,
       detail: "Draft invoices awaiting review",
       tone: "warning",
@@ -241,142 +211,47 @@ export default async function AppPage() {
     },
     {
       label: "Collect Deposits",
-      count: parseN(depositCountRows[0]),
+      count: deposits,
       href: "/app/invoices?kind=deposit" as Route,
       detail: "Deposit invoices not fully collected",
       tone: "danger",
     },
     {
       label: "Order Materials",
-      count: parseN(materialCountRows[0]),
+      count: materialCount,
       href: "/app/estimates?status=approved" as Route,
       detail: "Approved jobs with materials to stage",
       tone: "warning",
     },
-  ] satisfies ActionQueueItem[])
+  ] satisfies CountAction[])
     .filter((item) => item.count > 0)
     .sort((a, b) => ({ danger: 0, warning: 1, default: 2 })[a.tone] - ({ danger: 0, warning: 1, default: 2 })[b.tone]);
+
+  const warnings: EndWarnings = {
+    missingReceiptPhotos: parseN(missingReceiptRows[0]),
+    jobsInProgress: parseN(inProgressRows[0]),
+    draftInvoices,
+    deposits,
+  };
 
   return (
     <PageContainer>
       <PageHeader
-        title="Today"
+        title="Daily Command Center"
         subtitle={todayLabel}
-        actions={
-          <LinkButton href="/app/intake/new" variant="primary" size="sm">+ New Request</LinkButton>
-        }
+        actions={<LinkButton href="/app/intake/new" variant="primary" size="sm">+ New Request</LinkButton>}
       />
-
-      {/* Hero: the single prioritized "do this next" list */}
-      <Card>
-        <SectionHeader title="What needs you" count={actionQueue.length} />
-        {actionQueue.length === 0 ? (
-          <EmptyState
-            title="You're all caught up"
-            description="Nothing needs action right now. New work shows up here as estimates, jobs, and invoices move."
-          />
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-            {actionQueue.map((item) => {
-              const accent = item.tone === "danger" ? "var(--color-danger)" : item.tone === "warning" ? "var(--color-warning)" : "var(--accent)";
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)",
-                    padding: "var(--space-3)", borderRadius: "var(--radius)",
-                    border: "1px solid var(--border)", borderLeft: `4px solid ${accent}`,
-                    textDecoration: "none", color: "inherit", background: "var(--bg-card)",
-                  }}
-                >
-                  <span style={{ display: "flex", flexDirection: "column" }}>
-                    <strong style={{ fontSize: "var(--text-base)" }}>{item.label}</strong>
-                    <small style={{ color: "var(--fg-muted)" }}>{item.detail}</small>
-                  </span>
-                  <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", whiteSpace: "nowrap" }}>
-                    <b style={{
-                      minWidth: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center",
-                      padding: "0 8px", borderRadius: 99, fontSize: "var(--text-sm)",
-                      background: `color-mix(in srgb, ${accent} 14%, transparent)`, color: accent,
-                    }}>{item.count}</b>
-                    <span aria-hidden="true" style={{ color: accent, fontSize: "var(--text-lg)", lineHeight: 1 }}>›</span>
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </Card>
-
-      {/* Secondary: what's on the calendar today (context, not actions) */}
-      <h2 style={{ fontSize: "var(--text-sm)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--fg-muted)", margin: "var(--space-6) 0 var(--space-3)" }}>
-        On today
-      </h2>
-      <div style={{ display: "grid", gap: "var(--space-4)", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}>
-        <TodaySection title="Jobs" count={todayJobs.length} href="/app/jobs">
-          {todayJobs.length === 0 ? <EmptyToday label="No active jobs today" /> : (
-            <div>
-              {todayJobs.map((job) => (
-                <ItemCard
-                  key={job.id}
-                  href={(job.visit_id ? `/app/visits/${job.visit_id}` : `/app/jobs/${job.id}`) as Route}
-                  title={job.title}
-                  titleBadge={<StatusBadge variant={job.status as StatusVariant}>{job.status.replaceAll("_", " ")}</StatusBadge>}
-                  meta={<span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{fmtTime(job.scheduled_start)} · {job.client_name ?? "Client"}{job.property_address ? ` · ${job.property_address}` : ""}</span>}
-                />
-              ))}
-            </div>
-          )}
-        </TodaySection>
-
-        <TodaySection title="Estimates" count={todayEstimates.length} href="/app/estimates">
-          {todayEstimates.length === 0 ? <EmptyToday label="No active estimates today" /> : (
-            <div>
-              {todayEstimates.map((estimate) => (
-                <ItemCard
-                  key={estimate.id}
-                  href={`/app/estimates/${estimate.id}` as Route}
-                  title={estimate.client_name ?? estimate.job_title ?? "Estimate"}
-                  titleBadge={<StatusBadge variant={estimate.status as StatusVariant}>{estimate.status}</StatusBadge>}
-                  meta={<span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{estimate.job_title ?? "Estimate"} · {fmt(estimate.total_cents)}</span>}
-                />
-              ))}
-            </div>
-          )}
-        </TodaySection>
-
-        <TodaySection title="Follow-Ups" count={todayFollowUps.length} href="/app/estimates?status=sent">
-          {todayFollowUps.length === 0 ? <EmptyToday label="No follow-ups due today" /> : (
-            <div>
-              {todayFollowUps.map((estimate) => (
-                <ItemCard
-                  key={estimate.id}
-                  href={`/app/estimates/${estimate.id}` as Route}
-                  title={estimate.client_name ?? estimate.job_title ?? "Estimate follow-up"}
-                  meta={<span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{estimate.job_title ?? "Sent estimate"} · {fmt(estimate.total_cents)}</span>}
-                />
-              ))}
-            </div>
-          )}
-        </TodaySection>
-
-        <TodaySection title="Invoices" count={todayInvoices.length} href="/app/invoices">
-          {todayInvoices.length === 0 ? <EmptyToday label="No active invoices today" /> : (
-            <div>
-              {todayInvoices.map((invoice) => (
-                <ItemCard
-                  key={invoice.id}
-                  href={`/app/invoices/${invoice.id}` as Route}
-                  title={invoice.invoice_number}
-                  titleBadge={<StatusBadge variant={invoice.status as StatusVariant}>{invoice.status}</StatusBadge>}
-                  meta={<span style={{ fontSize: "var(--text-xs)", color: invoice.status === "overdue" ? "#dc2626" : "var(--fg-muted)" }}>{invoice.client_name ?? invoice.job_title ?? "Invoice"} · {fmt(invoice.balance_cents)} due</span>}
-                />
-              ))}
-            </div>
-          )}
-        </TodaySection>
-      </div>
+      <DailyCommandCenter
+        todayLabel={todayLabel}
+        openSession={openSessionRows[0] ?? null}
+        vehicles={vehicles}
+        actionQueue={actionQueue}
+        todayJobs={todayJobs}
+        materialCount={materialCount}
+        materialJobs={materialJobs}
+        warnings={warnings}
+        tomorrowJobs={tomorrowJobs}
+      />
     </PageContainer>
   );
 }

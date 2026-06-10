@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { redirect, notFound } from "next/navigation";
 import type { Route } from "next";
 import { getSession } from "@/lib/auth/session";
@@ -97,6 +98,26 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
         <div className="p7-detail-primary">
           <Card>
             <SectionHeader title="Expense Details" />
+            {expense.receipt_url && (
+              <div style={{ marginBottom: "var(--space-4)" }}>
+                <Image
+                  src={`/api/v1/expenses/${expense.id}/receipt`}
+                  alt="Receipt photo"
+                  width={720}
+                  height={480}
+                  unoptimized
+                  style={{
+                    width: "100%",
+                    height: "auto",
+                    maxHeight: 360,
+                    objectFit: "contain",
+                    borderRadius: "var(--radius)",
+                    border: "1px solid var(--border)",
+                    background: "var(--bg-subtle)",
+                  }}
+                />
+              </div>
+            )}
             <dl className="p7-detail-list">
               <div className="p7-detail-row">
                 <dt>Amount</dt>
