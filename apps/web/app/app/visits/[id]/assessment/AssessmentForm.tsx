@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui";
 import { MaterialsGenerator } from "@/app/app/estimates/components/MaterialsGenerator";
 import type { MaterialItem } from "@/app/app/estimates/components/MaterialsGenerator";
 
@@ -58,6 +59,7 @@ function newRoom(): Room {
 
 export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId, initialAssessment, initialPhotos, canEdit }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const [rooms, setRooms] = useState<Room[]>(
     initialAssessment?.rooms?.length ? initialAssessment.rooms : [newRoom()]
   );
@@ -73,6 +75,7 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [showMaterials, setShowMaterials] = useState(false);
 
@@ -146,7 +149,7 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
     setUploading(true);
-    setError(null);
+    setUploadError(null);
     const failures: string[] = [];
     let lastErrorMessage: string | null = null;
     try {
@@ -170,12 +173,17 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
           lastErrorMessage = "Upload failed";
         }
       }
+      const uploaded = files.length - failures.length;
+      if (uploaded > 0) {
+        toast.success(uploaded === 1 ? "Photo uploaded" : `${uploaded} photos uploaded`);
+      }
       if (failures.length > 0) {
-        setError(
+        const message =
           files.length === 1
             ? lastErrorMessage ?? "Upload failed"
-            : `${failures.length} of ${files.length} photos failed to upload (${failures.join(", ")})`
-        );
+            : `${failures.length} of ${files.length} photos failed to upload (${failures.join(", ")})`;
+        setUploadError(message);
+        toast.error(message);
       }
     } finally {
       setUploading(false);
@@ -402,6 +410,11 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
             </label>
           )}
         </div>
+        {uploadError && (
+          <div className="p7-card-danger" role="alert" style={{ marginBottom: "var(--space-2)" }}>
+            {uploadError}
+          </div>
+        )}
         {photos.length > 0 ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: "var(--space-2)" }}>
             {photos.map((photo) => (
