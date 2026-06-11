@@ -1,6 +1,8 @@
 # Domain Model: Dovetails FSM
 
-This is the canonical source of truth for all core entity relationships and hierarchical dependencies.
+This is a compact AI reference derived from docs/canonical/DOMAIN_MODEL.md. If this file conflicts with docs/canonical, docs/canonical wins.
+
+This AI summary is a quick reference for common entity relationships. It is not authoritative.
 
 ## 1. Entity Hierarchy & Cardinality
 ```text
