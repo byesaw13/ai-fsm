@@ -217,6 +217,14 @@ async function runPollIteration(client: Client): Promise<void> {
     */
   } catch (error) {
     logger.error("worker poll failed", error);
+    const msg = (error as Error)?.message ?? "";
+    if (
+      msg.includes("connection error") ||
+      msg.includes("not queryable") ||
+      msg.includes("Connection terminated")
+    ) {
+      throw error;
+    }
   }
 }
 
@@ -238,8 +246,16 @@ async function run() {
     } catch (err) {
       logger.error("worker tick failed", err);
       // Reconnect on connection-level errors so the interval keeps running
+      const msg = (err as Error)?.message ?? "";
       const code = (err as NodeJS.ErrnoException).code ?? "";
-      if (code === "ECONNRESET" || code === "ECONNREFUSED" || code === "EPIPE") {
+      if (
+        code === "ECONNRESET" ||
+        code === "ECONNREFUSED" ||
+        code === "EPIPE" ||
+        msg.includes("connection error") ||
+        msg.includes("not queryable") ||
+        msg.includes("Connection terminated")
+      ) {
         try { await client.end(); } catch { /* ignore */ }
         client = makeClient();
         await client.connect();
