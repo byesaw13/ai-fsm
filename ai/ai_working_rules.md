@@ -1,19 +1,30 @@
 # AI Working Rules: Dovetails FSM
 
+> [!IMPORTANT]
+> **Product direction is defined only by the canonical documentation set under `docs/canonical/` (as specified in [AGENTS.md](file:///home/nick/ai-fsm-deploy-clean/AGENTS.md))**. The `/ai` memory files serve as developer guidelines, constraints, and operational checklists for AI tools, and must never override canonical product definitions.
+
 This is the entry point for all AI coding agents (Claude, ChatGPT, Antigravity) working in this repository. Read this file before checking other code.
 
 ## 1. Initial Reading Order & Pre-flight Checklist
 Before proposing or writing any code, you must read the following files in this order:
-1. **[ai_working_rules.md](file:///home/nick/ai-fsm-deploy-clean/ai/ai_working_rules.md)** (this file)
-2. **[project_context.md](file:///home/nick/ai-fsm-deploy-clean/ai/project_context.md)**
-3. **[domain_model.md](file:///home/nick/ai-fsm-deploy-clean/ai/domain_model.md)**
-4. **[glossary.md](file:///home/nick/ai-fsm-deploy-clean/ai/glossary.md)**
-5. **[business_rules.md](file:///home/nick/ai-fsm-deploy-clean/ai/business_rules.md)**
-6. **[decisions.md](file:///home/nick/ai-fsm-deploy-clean/ai/decisions.md)**
-7. **[current_sprint.md](file:///home/nick/ai-fsm-deploy-clean/ai/current_sprint.md)**
+1. **[AGENTS.md](file:///home/nick/ai-fsm-deploy-clean/AGENTS.md)**
+2. **Canonical product specifications**:
+   - [PRODUCT_VISION.md](file:///home/nick/ai-fsm-deploy-clean/docs/canonical/PRODUCT_VISION.md)
+   - [DOMAIN_MODEL.md](file:///home/nick/ai-fsm-deploy-clean/docs/canonical/DOMAIN_MODEL.md)
+   - [WORKFLOW.md](file:///home/nick/ai-fsm-deploy-clean/docs/canonical/WORKFLOW.md)
+   - [ARCHITECTURE.md](file:///home/nick/ai-fsm-deploy-clean/docs/canonical/ARCHITECTURE.md)
+   - [ROADMAP.md](file:///home/nick/ai-fsm-deploy-clean/docs/canonical/ROADMAP.md)
+3. **AI memory & working rules**:
+   - [ai_working_rules.md](file:///home/nick/ai-fsm-deploy-clean/ai/ai_working_rules.md) (this file)
+   - [project_context.md](file:///home/nick/ai-fsm-deploy-clean/ai/project_context.md)
+   - [domain_model.md](file:///home/nick/ai-fsm-deploy-clean/ai/domain_model.md)
+   - [glossary.md](file:///home/nick/ai-fsm-deploy-clean/ai/glossary.md)
+   - [business_rules.md](file:///home/nick/ai-fsm-deploy-clean/ai/business_rules.md)
+   - [decisions.md](file:///home/nick/ai-fsm-deploy-clean/ai/decisions.md)
+   - [current_sprint.md](file:///home/nick/ai-fsm-deploy-clean/ai/current_sprint.md)
 
 ### Before Writing Code Checklist:
-1. **Read all AI memory files** listed above.
+1. **Read all AI memory files** and canonical docs listed above.
 2. **Search the existing codebase** for similar features or imports.
 3. **Reuse existing patterns** (routing setup, SQL helpers, CSS styling, components).
 4. **Only then propose changes** to code or schema.

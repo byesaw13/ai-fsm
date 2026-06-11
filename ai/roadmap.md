@@ -9,21 +9,21 @@ Client -> Property -> Estimate -> Job -> Visit -> Invoice -> Property History
 ## 2. Active Development Phases
 
 ### Phase 1: Documentation & Governance Canonicalization
-- **Status**: Completed / Maintained.
+- **Status**: In progress
 - **Deliverables**:
   - Define authoritative canonical model in `docs/canonical/`.
   - Establish static `/ai` memory directory for agents.
   - Purge redundant/outdated planning and strategy stubs.
 
 ### Phase 2: Property-Centered Workflow
-- **Status**: In Progress / Active.
+- **Status**: Next
 - **Deliverables**:
   - Expose Property timeline across all entities (Client, Job, Visit, Invoice).
   - Materialize completed visit evidence directly on the Property record.
   - Auto-promote field observations (e.g. technician notes) to Property timeline.
 
 ### Phase 3: Estimate & Execution Clarity
-- **Status**: Next.
+- **Status**: Next
 - **Deliverables**:
   - Estimate versioning and revision history.
   - Room-by-room Estimate templates.
@@ -32,7 +32,7 @@ Client -> Property -> Estimate -> Job -> Visit -> Invoice -> Property History
   - Field technician photo uploads.
 
 ### Phase 4: Billing & Timeline Closure
-- **Status**: Planned.
+- **Status**: Planned
 - **Deliverables**:
   - Auto-generate Invoices directly from completed Visits.
   - Integrate Payment transaction history with the Property timeline.

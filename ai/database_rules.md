@@ -13,15 +13,16 @@ Every new table created in PostgreSQL must comply with the following structural 
 - **Request Traceability**: State-changing event tables, audit logs, and transaction tables must include a nullable `trace_id UUID` column to correlate database writes to HTTP request flows.
 
 ## 2. Row-Level Security (RLS)
-- **RLS Enforced**: Row-Level Security must be enabled on **every** table.
-- **RLS Policies**: Standard tenant isolation policy must be declared for all SELECT, INSERT, UPDATE, and DELETE actions:
+- **RLS Enforced**: Row-Level Security must be enabled and forced on **every** table.
+- **RLS Policies**: Standard tenant isolation policies should be declared to utilize the existing `app_account_id()` security helper:
   ```sql
   ALTER TABLE <table_name> ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE <table_name> FORCE ROW LEVEL SECURITY;
   
-  CREATE POLICY tenant_isolation ON <table_name>
-    FOR ALL
-    TO authenticated
-    USING (account_id = current_setting('app.current_account_id', true)::uuid);
+  CREATE POLICY <table_name>_select ON <table_name> FOR SELECT USING (account_id = app_account_id());
+  CREATE POLICY <table_name>_insert ON <table_name> FOR INSERT WITH CHECK (account_id = app_account_id() AND is_owner_or_admin());
+  CREATE POLICY <table_name>_update ON <table_name> FOR UPDATE USING (account_id = app_account_id() AND is_owner_or_admin());
+  CREATE POLICY <table_name>_delete ON <table_name> FOR DELETE USING (account_id = app_account_id() AND is_owner_or_admin());
   ```
 
 ## 3. Migration Integrity
