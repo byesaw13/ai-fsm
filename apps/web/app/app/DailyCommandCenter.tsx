@@ -137,23 +137,46 @@ function StartDayCard({ initialSession, vehicles }: { initialSession: OpenSessio
     );
   }
 
+  // Not started yet — dominate the screen so this is the one obvious next action.
+  // The rest of the day's sections render below the fold until the day begins.
   return (
-    <Card style={{ border: "2px solid var(--accent)", boxShadow: "var(--shadow-md, 0 6px 20px rgba(15, 23, 42, 0.12))" }}>
-      <SectionHeader title="Start Day" />
-      <div style={{ display: "grid", gap: "var(--space-3)", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", alignItems: "end" }}>
+    <Card
+      style={{
+        border: "2px solid var(--accent)",
+        boxShadow: "var(--shadow-md, 0 6px 20px rgba(15, 23, 42, 0.12))",
+        minHeight: "58vh",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        textAlign: "center",
+        gap: "var(--space-5)",
+      }}
+    >
+      <div>
+        <h2 style={{ fontSize: "var(--text-3xl, 1.875rem)", fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>
+          Start your day
+        </h2>
+        <p style={{ color: "var(--fg-muted)", margin: "var(--space-2) 0 0", maxWidth: 440 }}>
+          Log your vehicle and starting mileage to begin. Today&apos;s jobs, follow-ups, and end-of-day checks appear once you&apos;re rolling.
+        </p>
+      </div>
+      <div style={{ display: "grid", gap: "var(--space-3)", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", alignItems: "end", width: "100%", maxWidth: 520, textAlign: "left" }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: "var(--text-sm)", fontWeight: 600 }}>
           Vehicle
-          <select value={vehicleId} onChange={(e) => { const next = vehicles.find((v) => v.id === e.target.value); setVehicleId(e.target.value); setStartOdometer(String(next?.current_odometer ?? "")); }} style={{ minHeight: 40, border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "0 var(--space-3)", background: "var(--bg-card)" }}>
+          <select value={vehicleId} onChange={(e) => { const next = vehicles.find((v) => v.id === e.target.value); setVehicleId(e.target.value); setStartOdometer(String(next?.current_odometer ?? "")); }} style={{ minHeight: 44, border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "0 var(--space-3)", background: "var(--bg-card)" }}>
             <option value="">No vehicle</option>
             {vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.nickname}{vehicle.plate ? ` (${vehicle.plate})` : ""}</option>)}
           </select>
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: "var(--text-sm)", fontWeight: 600 }}>
           Start odometer
-          <input value={startOdometer} onChange={(e) => setStartOdometer(e.target.value)} inputMode="numeric" style={{ minHeight: 40, border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "0 var(--space-3)", background: "var(--bg-card)" }} />
+          <input value={startOdometer} onChange={(e) => setStartOdometer(e.target.value)} inputMode="numeric" style={{ minHeight: 44, border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "0 var(--space-3)", background: "var(--bg-card)" }} />
         </label>
-        <button type="button" onClick={startDay} disabled={pending} className="p7-btn p7-btn-primary" style={{ minHeight: 42 }}>{pending ? "Starting..." : "Start Day"}</button>
       </div>
+      <button type="button" onClick={startDay} disabled={pending} className="p7-btn p7-btn-primary" style={{ minHeight: 52, fontSize: "var(--text-base)", fontWeight: 700, padding: "0 var(--space-10)", width: "100%", maxWidth: 520 }}>
+        {pending ? "Starting…" : "Start Day"}
+      </button>
     </Card>
   );
 }
