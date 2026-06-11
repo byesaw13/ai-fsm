@@ -18,6 +18,7 @@ import { TechnicianSection } from "./sections/TechnicianSection";
 import { OperationsSection } from "./sections/OperationsSection";
 import { PricingHealthSection } from "./sections/PricingHealthSection";
 import { EstimateMarginsSection } from "./sections/EstimateMarginsSection";
+import { TimeSection } from "./sections/TimeSection";
 
 export const dynamic = "force-dynamic";
 
@@ -95,6 +96,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
       )}
 
       {/* Always-on sections — render regardless of monthly financial activity */}
+      <TimeSection rows={data.timeByCategory} monthLabel={monthLabel} />
       <OperationsSection scheduleUtil={data.scheduleUtil} monthLabel={monthLabel} />
       <PricingHealthSection
         pricingSummary={data.pricingSummary}

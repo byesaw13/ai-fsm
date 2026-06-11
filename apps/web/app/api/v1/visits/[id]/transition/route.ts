@@ -242,6 +242,25 @@ export const POST = withAuth(
            )`,
           [session.accountId, id, updated.job_id ?? null, updated.assigned_user_id ?? session.userId]
         );
+
+        // Activity ledger hard trigger: arriving on site IS doing job work.
+        // Close whatever was active, start job_work linked to this visit.
+        await client.query(
+          `UPDATE activity_entries SET ended_at = now()
+           WHERE account_id = $1 AND ended_at IS NULL AND voided_at IS NULL
+             AND NOT (activity_type = 'job_work' AND entity_type = 'visit' AND entity_id = $2)`,
+          [session.accountId, id]
+        );
+        await client.query(
+          `INSERT INTO activity_entries
+             (account_id, user_id, session_date, activity_type, category, entity_type, entity_id, source)
+           SELECT $1, $2, CURRENT_DATE, 'job_work', 'revenue', 'visit', $3, 'auto_visit'
+           WHERE NOT EXISTS (
+             SELECT 1 FROM activity_entries
+             WHERE account_id = $1 AND ended_at IS NULL AND voided_at IS NULL
+           )`,
+          [session.accountId, session.userId, id]
+        );
       }
 
       if (effectiveStatus === "completed" || effectiveStatus === "cancelled") {
@@ -254,6 +273,14 @@ export const POST = withAuth(
              AND visit_id = $2
              AND ended_at IS NULL`,
           [session.accountId, id, techNotes ?? null]
+        );
+
+        // Activity ledger: closing out the visit ends its job_work segment.
+        await client.query(
+          `UPDATE activity_entries SET ended_at = now()
+           WHERE account_id = $1 AND ended_at IS NULL AND voided_at IS NULL
+             AND entity_type = 'visit' AND entity_id = $2`,
+          [session.accountId, id]
         );
       }
 

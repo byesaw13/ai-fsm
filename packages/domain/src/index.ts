@@ -54,3 +54,4 @@ export type {
   PaintRoom,
   PaintRoomOutput,
 } from "./painting";
+export * from "./activities";

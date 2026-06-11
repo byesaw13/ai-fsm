@@ -5,6 +5,7 @@ import { queryForSession } from "@/lib/db";
 import { LinkButton, PageContainer, PageHeader } from "@/components/ui";
 import { DailyCommandCenter } from "./DailyCommandCenter";
 import type { CommandVisit, CountAction, EndWarnings, MaterialJob, OpenSession, VehicleOption } from "./DailyCommandCenter";
+import type { ActivityEntryDto } from "./ActivityTracker";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,7 @@ export default async function AppPage() {
     materialJobs,
     missingReceiptRows,
     inProgressRows,
+    activityEntries,
   ] = await Promise.all([
     queryForSession<CommandVisit>(session,
       `SELECT DISTINCT ON (j.id)
@@ -181,6 +183,16 @@ export default async function AppPage() {
          AND scheduled_start::date = CURRENT_DATE
          AND status IN ('arrived','in_progress')`,
       [accountId]),
+
+    queryForSession<ActivityEntryDto>(session,
+      `SELECT id, activity_type, category, started_at::text, ended_at::text,
+              entity_type, entity_id, note
+       FROM activity_entries
+       WHERE account_id = $1
+         AND (session_date = CURRENT_DATE OR ended_at IS NULL)
+         AND voided_at IS NULL
+       ORDER BY started_at ASC`,
+      [accountId]),
   ]);
 
   const draftInvoices = parseN(draftInvoiceCountRows[0]);
@@ -251,6 +263,7 @@ export default async function AppPage() {
         materialJobs={materialJobs}
         warnings={warnings}
         tomorrowJobs={tomorrowJobs}
+        activityEntries={activityEntries}
       />
     </PageContainer>
   );

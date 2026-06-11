@@ -103,6 +103,12 @@ export type BelowMinimumEstimateRow = {
   job_title: string | null;
 };
 
+// Activity ledger — where the owner's time went (month-scoped)
+export type TimeByCategoryRow = {
+  category: string;
+  minutes: number;
+};
+
 // ---------------------------------------------------------------------------
 // Aggregate shape returned to the page
 // ---------------------------------------------------------------------------
@@ -120,6 +126,7 @@ export interface ReportData {
   pricingSummary: PricingSummaryRow;
   overrideReasonRows: OverrideReasonRow[];
   belowMinimumEstimates: BelowMinimumEstimateRow[];
+  timeByCategory: TimeByCategoryRow[];
 
   // Derived aggregates
   revenueTotalCents: number;
@@ -401,6 +408,19 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
     [accountId, MINIMUM_SERVICE_FEE_CENTS]
   );
 
+  // === Where the owner's time went (activity ledger, month-scoped) ===
+  const timeByCategory = await query<TimeByCategoryRow>(
+    `SELECT category,
+            ROUND(SUM(EXTRACT(EPOCH FROM (COALESCE(ended_at, now()) - started_at)) / 60))::int AS minutes
+     FROM activity_entries
+     WHERE account_id = $1
+       AND voided_at IS NULL
+       AND to_char(session_date, 'YYYY-MM') = $2
+     GROUP BY category
+     ORDER BY minutes DESC`,
+    [accountId, targetMonth]
+  );
+
   // === Derived aggregates ===
   const netCents = revenuePaidCents - expensesTotalCents;
   const hasAnyData = revenueTotalCents > 0 || expensesTotalCents > 0 || mileageTripCount > 0;
@@ -421,6 +441,7 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
     pricingSummary,
     overrideReasonRows,
     belowMinimumEstimates,
+    timeByCategory,
     revenueTotalCents,
     revenuePaidCents,
     revenueOutstandingCents,
