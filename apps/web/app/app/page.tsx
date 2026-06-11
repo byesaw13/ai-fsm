@@ -188,7 +188,9 @@ export default async function AppPage() {
       `SELECT id, activity_type, category, started_at::text, ended_at::text,
               entity_type, entity_id, note
        FROM activity_entries
-       WHERE account_id = $1 AND session_date = CURRENT_DATE AND voided_at IS NULL
+       WHERE account_id = $1
+         AND (session_date = CURRENT_DATE OR ended_at IS NULL)
+         AND voided_at IS NULL
        ORDER BY started_at ASC`,
       [accountId]),
   ]);
