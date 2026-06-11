@@ -22,6 +22,32 @@ describe("formatExpenseDate", () => {
     const result = formatExpenseDate("2026-03-01");
     expect(result).toBe("Mar 1, 2026");
   });
+
+  it("handles JS Date objects correctly", () => {
+    const d = new Date(2025, 10, 4); // Nov 4, 2025 local time
+    expect(formatExpenseDate(d)).toBe("Nov 4, 2025");
+  });
+
+  it("handles stringified JS Date objects with timezones", () => {
+    // This is the output format of String(new Date(...))
+    const dateStr = "Tue Nov 04 2025 00:00:00 GMT-0500";
+    expect(formatExpenseDate(dateStr)).toBe("Nov 4, 2025");
+  });
+
+  it("handles ISO date strings", () => {
+    expect(formatExpenseDate("2025-11-04T00:00:00.000Z")).toBe("Nov 4, 2025");
+  });
+
+  it("handles null, undefined, and empty string", () => {
+    expect(formatExpenseDate(null)).toBe("");
+    expect(formatExpenseDate(undefined)).toBe("");
+    expect(formatExpenseDate("")).toBe("");
+  });
+
+  it("handles invalid inputs gracefully", () => {
+    expect(formatExpenseDate("not-a-date")).toBe("Invalid Date");
+    expect(formatExpenseDate(new Date(NaN))).toBe("Invalid Date");
+  });
 });
 
 describe("formatMonthLabel", () => {

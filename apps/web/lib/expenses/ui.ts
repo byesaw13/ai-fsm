@@ -10,19 +10,43 @@ export function isValidMonthKey(monthKey: string): boolean {
   return Number.isInteger(year) && month >= 1 && month <= 12;
 }
 
-/**
- * Format a YYYY-MM-DD expense date to a short readable label.
- * e.g. "2026-03-15" → "Mar 15, 2026"
- */
-export function formatExpenseDate(dateStr: string): string {
-  // Parse as local date to avoid UTC-shift issues (date-only strings are midnight UTC)
-  const [year, month, day] = dateStr.split("-").map(Number);
-  const d = new Date(year, month - 1, day);
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+export function formatExpenseDate(dateInput: string | Date | null | undefined): string {
+  if (!dateInput) return "";
+
+  const formatParts = (year: number, month: number, day: number) => {
+    const d = new Date(year, month - 1, day);
+    return d.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  // If it's a Date object
+  if (dateInput instanceof Date) {
+    if (isNaN(dateInput.getTime())) {
+      return "Invalid Date";
+    }
+    return formatParts(dateInput.getFullYear(), dateInput.getMonth() + 1, dateInput.getDate());
+  }
+
+  const dateStr = String(dateInput).trim();
+
+  // Pattern 1: YYYY-MM-DD (possibly with timezone/time, e.g. YYYY-MM-DDT00:00:00...)
+  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+    const [year, month, day] = dateStr.slice(0, 10).split("-").map(Number);
+    if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+      return formatParts(year, month, day);
+    }
+  }
+
+  // Pattern 2: Any other parsable date string (e.g. JS toString() output: "Tue Nov 04 2025 00:00:00 GMT-0500")
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    return formatParts(d.getFullYear(), d.getMonth() + 1, d.getDate());
+  }
+
+  return "Invalid Date";
 }
 
 /**
