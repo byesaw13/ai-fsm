@@ -10,19 +10,33 @@ Client -> Property -> Estimate -> Job -> Visit -> Invoice -> Property History
 
 ### Phase 1: Documentation & Governance Canonicalization
 - **Status**: Completed / Maintained.
-- **Goals**: Create single authoritative definitions of domain, architecture, and database logic. Purge stale/deprecated workspace files.
+- **Deliverables**:
+  - Define authoritative canonical model in `docs/canonical/`.
+  - Establish static `/ai` memory directory for agents.
+  - Purge redundant/outdated planning and strategy stubs.
 
 ### Phase 2: Property-Centered Workflow
 - **Status**: In Progress / Active.
-- **Goals**: Make property timeline history accessible across client, job, visit, estimate, and invoice views. Ensure completion records, technician logs, and photos materialize directly on the property record.
+- **Deliverables**:
+  - Expose Property timeline across all entities (Client, Job, Visit, Invoice).
+  - Materialize completed visit evidence directly on the Property record.
+  - Auto-promote field observations (e.g. technician notes) to Property timeline.
 
 ### Phase 3: Estimate & Execution Clarity
 - **Status**: Next.
-- **Goals**: Keep estimate guardrails enforceable. Make the handoff from approved estimate to job readiness explicit. Focus visit execution interface on notes, materials, media, and completion packets.
+- **Deliverables**:
+  - Estimate versioning and revision history.
+  - Room-by-room Estimate templates.
+  - Sequential, account-scoped Job numbering.
+  - Visit checklist completion packets.
+  - Field technician photo uploads.
 
 ### Phase 4: Billing & Timeline Closure
 - **Status**: Planned.
-- **Goals**: Link invoice creation directly to completed visit records. Make payment history visible on the property timeline.
+- **Deliverables**:
+  - Auto-generate Invoices directly from completed Visits.
+  - Integrate Payment transaction history with the Property timeline.
+  - Simplify dashboard to show only derived operational views.
 
 ---
 

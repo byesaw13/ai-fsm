@@ -1,25 +1,30 @@
-# Current Sprint: Dovetails FSM
+# Current Strategic Focus: Dovetails FSM
 
-## Sprint Goals & Deliverables
+This document details the active strategic objectives for developers and AI agents. Operational bugs and hotfixes belong in the changelog (`docs/changelog.md`), not here.
 
-### TASK-001: Background Worker Resilience
-- **Objective**: Fix the background worker container getting trapped in an infinite error loop when PostgreSQL restarts.
-- **Scope**:
-  - Propagate connection errors out of `runPollIteration()` in `services/worker/src/index.ts`.
-  - Update `tick()` catch block to recognize PG-client connection-level error messages (`"connection error"`, `"not queryable"`, and `"Connection terminated"`) and cleanly reconnect.
-- **Status**: **Completed & Hotfixed**.
+## Active Strategic Focus Areas
 
-### TASK-002: Recurring Inspection SQL Typecast Fix
-- **Objective**: Fix the SQL error `operator does not exist: numeric >= text` that crashed the worker's recurring inspection loop.
-- **Scope**:
-  - Update `services/worker/src/recurring-inspection.ts` to convert the `HAVING` clause to a standard `AND` condition inside the `WHERE` block.
-  - Explicitly typecast parameter `$2` as `text` for string interval concatenations and `int` for numeric day comparisons.
-- **Status**: **Completed & Hotfixed**.
+### 1. Property-Centered Workflow
+- **Goal**: Establish the property timeline as the central hub of truth.
+- **Priority**: High.
+- **Focus**: Integrating observation feeds, equipment records, and technician notes directly onto the Property view.
 
-### TASK-003: Ephemeral Test Container Cleanup
-- **Objective**: Identify and prune orphaned test containers (`ai-fsm-gate-pg-*` and `ai-fsm-gate-redis-*`) left on the server.
-- **Status**: **Completed**.
+### 2. Chronological Job Numbering
+- **Goal**: Implement clean, sequential, and account-scoped job numbers (e.g. Job #1001).
+- **Priority**: Medium.
+- **Focus**: Generating deterministic job IDs upon estimate approval, keeping them visible in technicians' schedules and invoices.
 
-### TASK-004: AI Memory Directory Initialization
-- **Objective**: Create the `/ai/` directory in the monorepo root to house distilled, static files representing context, architecture, rules, pricing, roadmap, sprint state, and decision logs to optimize AI agent session performance.
-- **Status**: **Completed**.
+### 3. AI Estimate Generation
+- **Goal**: Standardize the estimate builder interface using structured price book options.
+- **Priority**: Medium.
+- **Focus**: Supporting room-based scope configurations and ensuring estimate-level pricing guardrails are strictly checked before sending.
+
+### 4. Property Timeline View
+- **Goal**: Optimize the performance and presentation of property history.
+- **Priority**: Low.
+- **Focus**: Creating derived read-model timeline aggregations that summarize client interactions, previous repairs, and equipment servicing.
+
+### 5. Invoice Workflow
+- **Goal**: Ensure seamless transition from visit completion to invoice collection.
+- **Priority**: Low.
+- **Focus**: Mapping visit line items (labor plus materials) automatically to invoice draft records.
