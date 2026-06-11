@@ -1,38 +1,19 @@
-# Decision Log: Dovetails FSM
+# Decision Reminders: Dovetails FSM
 
-This is the living record of frozen architectural and technical decisions. AI agents should NOT propose changes to or refactor code that violates these decisions.
+This is a compact AI reference derived from docs/DECISION_LOG.md and docs/canonical/ARCHITECTURE.md. If this file conflicts with docs/canonical, docs/canonical wins. If this file conflicts with docs/DECISION_LOG.md for formal ADR history, docs/DECISION_LOG.md wins.
 
-## Locked Technical Decisions (ADRs)
+Use this as locked decision reminders only. It is not the formal decision log.
 
-### ADR-001: System Shape
-- **Decision**: TypeScript monorepo with Next.js web app (`apps/web`), raw PostgreSQL, Redis, and a background Node worker (`services/worker`).
+## Locked Decision Reminders
 
-### ADR-002: Domain Model & Currency
-- **Decision**: Properties are the core entities. All monetary figures are stored as integers in **cents** (e.g. `$115.00` is `11500`). Use `users.role` for permissions, not a complex memberships junction table.
-
-### ADR-003: API Design
-- **Decision**: Version all routes under `/api/v1/`. Errors use the structure `{ error: { code, message, details?, traceId } }`. Use explicit transition endpoints (e.g., `POST /transition`) rather than PATCH for lifecycle changes.
-
-### ADR-004: Test Stack
-- **Decision**: Vitest for fast unit/integration testing, Playwright for E2E testing, and a dedicated database test suite for Row-Level Security (RLS) policies.
-
-### ADR-005: Auth & Sessions
-- **Decision**: Custom JWT sessions using the `jose` library stored in HTTP-only cookies. Password hashing uses `bcryptjs` (10 rounds for performance).
-
-### ADR-006: Rendering Engine
-- **Decision**: All Next.js pages or API routes reading cookies must define `export const dynamic = "force-dynamic"` to bypass Next.js 15 static analysis compile hangs.
-
-### ADR-007: Traceability
-- **Decision**: Extract trace ID once per request from incoming headers and store in DB audit logs under `trace_id` UUID columns to correlate request execution.
-
-### ADR-008: Security Hardening
-- **Decision**: Login rate-limiting (5 requests/15 minutes per IP), mandatory HTTP security headers in middleware, and a minimum password length of 8 characters.
-
-### ADR-010: UI Confirmation
-- **Decision**: Administrative destructive operations (e.g., deletions) use standard browser-native `window.confirm` to keep JS bundles lightweight.
-
-### ADR-011: UI Notifications
-- **Decision**: Success alerts auto-dismiss using `useEffect` timers (3 seconds for general events, 5 seconds for financial/payment confirmations).
-
-### ADR-013: Production Target
-- **Decision**: The single, authoritative production deployment target is `garonhome.local` (running at `/opt/business/ai-fsm` on x86 Debian). Raspberry Pi targets are legacy/deprecated.
+- System shape: TypeScript monorepo with Next.js web app (`apps/web`), raw PostgreSQL, Redis, and a background Node worker (`services/worker`).
+- Domain and money: properties are core entities; monetary figures are stored as integer cents.
+- API design: version routes under `/api/v1/`; structured errors use `{ error: { code, message, details?, traceId } }`; lifecycle changes use explicit transition endpoints.
+- Test stack: Vitest for unit/integration tests; Playwright for E2E tests; database tests cover RLS policies.
+- Auth and sessions: custom JWT sessions use `jose` in HTTP-only cookies; password hashing uses `bcryptjs`.
+- Rendering: pages or API routes reading cookies use `export const dynamic = "force-dynamic"`.
+- Traceability: extract trace ID once per request and carry it through audit/log writes.
+- Security: keep login rate limiting, HTTP security headers, and minimum password length.
+- UI confirmation: destructive admin operations use browser-native `window.confirm`.
+- UI notifications: success alerts auto-dismiss using existing timer patterns.
+- Production target: `garonhome.local` under `/opt/business/ai-fsm` is the active production deployment target.
