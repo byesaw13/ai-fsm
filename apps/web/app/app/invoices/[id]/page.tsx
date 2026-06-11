@@ -12,6 +12,7 @@ import { PaymentHistory } from "./PaymentHistory";
 import { InvoiceEditForm } from "./InvoiceEditForm";
 import { MarkDepositReceivedButton } from "./MarkDepositReceivedButton";
 import { SendInvoiceButton } from "./SendInvoiceButton";
+import { InvoiceLineItemsEditor } from "./InvoiceLineItemsEditor";
 import {
   PageContainer,
   PageHeader,
@@ -65,6 +66,7 @@ interface LineItemRow {
   quantity: number;
   unit_price_cents: number;
   total_cents: number;
+  line_item_type: "labor" | "materials" | "handling_fee" | "adjustment";
   sort_order: number;
   created_at: string;
 }
@@ -105,7 +107,7 @@ export default async function InvoiceDetailPage({
 
     const lineItemsResult = await client.query(
       `SELECT id, invoice_id, estimate_line_item_id,
-              description, quantity, unit_price_cents, total_cents, sort_order, created_at
+              description, quantity::float8 AS quantity, unit_price_cents, total_cents, line_item_type, sort_order, created_at
        FROM invoice_line_items
        WHERE invoice_id = $1
        ORDER BY sort_order ASC, created_at ASC`,
@@ -124,13 +126,14 @@ export default async function InvoiceDetailPage({
   const currentStatus = invoice.status;
   // paid/partial are driven by RecordPaymentForm (payment trigger), not manual transition
   const allowedTransitions = invoiceTransitions[currentStatus].filter(
-    (s) => s !== "paid" && s !== "partial"
+    (s) => s !== "paid" && s !== "partial" && (s !== "draft" || invoice.paid_cents === 0)
   );
   const canTransition = canCreateInvoices(session.role);
   const amountDue = invoice.total_cents - invoice.paid_cents;
   const depositPending = invoice.deposit_cents > 0 && !invoice.deposit_paid_at;
   const canMarkDeposit = canTransition && !["paid", "void"].includes(currentStatus);
   const canRecordPaymentAction = canRecordPayments(session.role) && ["sent", "partial", "overdue"].includes(currentStatus) && amountDue > 0;
+  const canEditLineItems = canTransition && currentStatus === "draft";
   const documentFilename = buildClientDocumentFilename({
     date: invoice.sent_at ?? invoice.created_at,
     clientName: invoice.client_name,
@@ -196,7 +199,13 @@ export default async function InvoiceDetailPage({
         <div className="p7-detail-primary">
           <Card>
             <SectionHeader title="Line Items" />
-            {lineItems.length === 0 ? (
+            {canEditLineItems ? (
+              <InvoiceLineItemsEditor
+                invoiceId={invoice.id}
+                jobId={invoice.job_id}
+                lineItems={lineItems}
+              />
+            ) : lineItems.length === 0 ? (
               <EmptyState title="No line items" description="Line items will appear when this invoice is created from an estimate." />
             ) : (
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }} data-testid="invoice-line-items-table">
@@ -437,7 +446,7 @@ export default async function InvoiceDetailPage({
             )}
 
           {/* Send to Client — owner/admin only, non-terminal invoices */}
-          {canTransition && !["paid", "void"].includes(currentStatus) && (
+          {canTransition && currentStatus === "draft" && (
             <Card data-testid="send-invoice-card">
               <SectionHeader title="Send to Client" />
               <SendInvoiceButton

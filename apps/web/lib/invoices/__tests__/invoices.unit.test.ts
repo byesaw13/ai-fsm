@@ -36,6 +36,10 @@ describe("invoiceTransitions", () => {
     expect(invoiceTransitions["draft"]).toContain("void");
   });
 
+  it("sent → draft is allowed for unpaid reopen", () => {
+    expect(invoiceTransitions["sent"]).toContain("draft");
+  });
+
   it("sent → partial is allowed", () => {
     expect(invoiceTransitions["sent"]).toContain("partial");
   });
@@ -52,6 +56,10 @@ describe("invoiceTransitions", () => {
     expect(invoiceTransitions["sent"]).toContain("void");
   });
 
+  it("partial → draft is allowed by transition map; payment guard is enforced by API/DB", () => {
+    expect(invoiceTransitions["partial"]).toContain("draft");
+  });
+
   it("partial → paid is allowed", () => {
     expect(invoiceTransitions["partial"]).toContain("paid");
   });
@@ -62,6 +70,10 @@ describe("invoiceTransitions", () => {
 
   it("partial → void is allowed", () => {
     expect(invoiceTransitions["partial"]).toContain("void");
+  });
+
+  it("overdue → draft is allowed for unpaid reopen", () => {
+    expect(invoiceTransitions["overdue"]).toContain("draft");
   });
 
   it("overdue → void is allowed", () => {

@@ -25,6 +25,11 @@ import type { PoolClient } from "pg";
 import { generateInvoiceNumber } from "@/lib/invoices/db";
 import { reconcileFinalInvoice } from "@/lib/invoices/billing";
 import { appendAuditLog } from "@/lib/db/audit";
+import {
+  createInvoiceLineItem,
+  roundedQuarterHoursFromMinutes,
+} from "@/lib/invoices/line-items";
+import { LABOR_CUSTOMER_RATE_CENTS_PER_HOUR } from "@ai-fsm/domain";
 
 interface CreateFinalInvoiceParams {
   client: PoolClient;
@@ -109,8 +114,10 @@ export async function createDraftFinalInvoiceForJob(
     description: string;
     quantity: number;
     unit_price_cents: number;
+    line_item_type: "labor" | "materials" | "handling_fee" | "adjustment";
     sort_order: number;
   }> = [];
+  let shouldUseEstimateTotals = false;
 
   if (job.estimate_id && job.presentation_mode !== "multi_option") {
     // Standard estimate: pull customer-visible items at the root level
@@ -119,9 +126,10 @@ export async function createDraftFinalInvoiceForJob(
       description: string;
       quantity: string;
       unit_price_cents: number;
+      line_item_type: "labor" | "materials" | "handling_fee" | "adjustment";
       sort_order: number;
     }>(
-      `SELECT description, quantity, unit_price_cents, sort_order
+      `SELECT description, quantity, unit_price_cents, line_item_type, sort_order
        FROM estimate_line_items
        WHERE estimate_id = $1
          AND option_id IS NULL
@@ -134,13 +142,41 @@ export async function createDraftFinalInvoiceForJob(
         description: row.description,
         quantity: parseFloat(row.quantity),
         unit_price_cents: row.unit_price_cents,
+        line_item_type: row.line_item_type,
         sort_order: row.sort_order,
+      });
+    }
+    shouldUseEstimateTotals = lineItems.length > 0;
+  }
+
+  // Fallback: tracked labor plus billable visit parts for T&M jobs with no
+  // estimate line items. Labor is sourced from completed visit timers, not parts.
+  if (lineItems.length === 0) {
+    const trackedTime = await client.query<{ tracked_minutes: string }>(
+      `SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (ended_at - started_at)) / 60), 0)::numeric AS tracked_minutes
+       FROM visit_time_logs
+       WHERE account_id = $1
+         AND job_id = $2
+         AND started_at IS NOT NULL
+         AND ended_at IS NOT NULL`,
+      [accountId, jobId]
+    );
+    const billableHours = roundedQuarterHoursFromMinutes(
+      Number(trackedTime.rows[0]?.tracked_minutes ?? 0)
+    );
+    if (billableHours > 0) {
+      lineItems.push({
+        description: "Labor",
+        quantity: billableHours,
+        unit_price_cents: LABOR_CUSTOMER_RATE_CENTS_PER_HOUR,
+        line_item_type: "labor",
+        sort_order: 0,
       });
     }
   }
 
   // Fallback: billable visit parts (only when no estimate items available)
-  if (lineItems.length === 0 && visitId) {
+  if (visitId && (job.estimate_id == null || !shouldUseEstimateTotals)) {
     const parts = await client.query<{
       name: string;
       quantity: string;
@@ -152,13 +188,15 @@ export async function createDraftFinalInvoiceForJob(
        ORDER BY created_at`,
       [visitId, accountId]
     );
+    const partSortStart = lineItems.length;
     for (let i = 0; i < parts.rows.length; i++) {
       const p = parts.rows[i];
       lineItems.push({
         description: p.name,
         quantity: parseFloat(p.quantity),
         unit_price_cents: p.customer_price_cents,
-        sort_order: i,
+        line_item_type: "materials",
+        sort_order: partSortStart + i,
       });
     }
   }
@@ -169,11 +207,17 @@ export async function createDraftFinalInvoiceForJob(
   // ── Totals ───────────────────────────────────────────────────────────────
   // Prefer estimate subtotal/tax when available (more accurate for painting
   // and complex jobs). Fall back to summing line items.
-  const subtotal =
-    job.subtotal_cents ??
-    lineItems.reduce((s, li) => s + Math.round(li.quantity * li.unit_price_cents), 0);
-  const taxCents = job.tax_cents ?? 0;
-  const totalCents = job.total_cents ?? subtotal + taxCents;
+  const calculatedSubtotal = lineItems.reduce(
+    (s, li) => s + Math.round(li.quantity * li.unit_price_cents),
+    0
+  );
+  const subtotal = shouldUseEstimateTotals && job.subtotal_cents != null
+    ? job.subtotal_cents
+    : calculatedSubtotal;
+  const taxCents = shouldUseEstimateTotals ? job.tax_cents ?? 0 : 0;
+  const totalCents = shouldUseEstimateTotals && job.total_cents != null
+    ? job.total_cents
+    : subtotal + taxCents;
 
   // ── Deposit reconciliation ───────────────────────────────────────────────
   // Use reconcileFinalInvoice so voided deposit invoices are excluded and the
@@ -238,19 +282,13 @@ export async function createDraftFinalInvoiceForJob(
   // ── Line items ───────────────────────────────────────────────────────────
   for (let i = 0; i < lineItems.length; i++) {
     const li = lineItems[i];
-    await client.query(
-      `INSERT INTO invoice_line_items
-         (invoice_id, description, quantity, unit_price_cents, total_cents, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [
-        invoiceId,
-        li.description,
-        li.quantity,
-        li.unit_price_cents,
-        Math.round(li.quantity * li.unit_price_cents),
-        i,
-      ]
-    );
+    await createInvoiceLineItem(client, invoiceId, {
+      description: li.description,
+      quantity: li.quantity,
+      unit_price_cents: li.unit_price_cents,
+      line_item_type: li.line_item_type,
+      sort_order: i,
+    });
   }
 
   // ── Audit log ────────────────────────────────────────────────────────────

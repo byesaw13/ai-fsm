@@ -7,6 +7,7 @@ import { logger } from "@/lib/logger";
 import { invoiceStatusSchema, invoiceTransitions } from "@ai-fsm/domain";
 import type { InvoiceStatus } from "@ai-fsm/domain";
 import { writeWorkflowEvent } from "@/lib/workflow-events";
+import { recordStatusChange } from "@/lib/status-history";
 
 export const dynamic = "force-dynamic";
 
@@ -67,8 +68,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       const existing = await client.query<{
         id: string;
         status: InvoiceStatus;
+        paid_cents: number;
+        sent_at: string | null;
       }>(
-        `SELECT id, status FROM invoices WHERE id = $1 AND account_id = $2`,
+        `SELECT id, status, paid_cents, sent_at FROM invoices WHERE id = $1 AND account_id = $2`,
         [id, session.accountId]
       );
 
@@ -78,7 +81,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         });
       }
 
-      const currentStatus = existing.rows[0].status;
+      const invoice = existing.rows[0];
+      const currentStatus = invoice.status;
 
       // App-layer guard
       const allowed = invoiceTransitions[currentStatus];
@@ -91,10 +95,23 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         );
       }
 
-      await client.query(
-        `UPDATE invoices SET status = $1, updated_at = now() WHERE id = $2`,
-        [targetStatus, id]
-      );
+      if (targetStatus === "draft" && invoice.paid_cents > 0) {
+        throw Object.assign(new Error("Only unpaid invoices may be reopened to draft"), {
+          code: "INVALID_TRANSITION",
+        });
+      }
+
+      if (targetStatus === "draft") {
+        await client.query(
+          `UPDATE invoices SET status = 'draft', sent_at = NULL, updated_at = now() WHERE id = $1`,
+          [id]
+        );
+      } else {
+        await client.query(
+          `UPDATE invoices SET status = $1, updated_at = now() WHERE id = $2`,
+          [targetStatus, id]
+        );
+      }
 
       await appendAuditLog(client, {
         account_id: session.accountId,
@@ -103,8 +120,18 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         action: "update",
         actor_id: session.userId,
         trace_id: session.traceId,
-        old_value: { status: currentStatus },
-        new_value: { status: targetStatus },
+        old_value: { status: currentStatus, sent_at: invoice.sent_at },
+        new_value: { status: targetStatus, sent_at: targetStatus === "draft" ? null : invoice.sent_at },
+      });
+
+      await recordStatusChange(client, {
+        accountId: session.accountId,
+        entityType: "invoice",
+        entityId: id,
+        fromStatus: currentStatus,
+        toStatus: targetStatus,
+        changedBy: session.userId,
+        note: targetStatus === "draft" ? "Reopened unpaid invoice for correction" : null,
       });
 
       if (targetStatus === "void") {
