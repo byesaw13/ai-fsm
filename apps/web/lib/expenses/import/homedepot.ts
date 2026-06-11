@@ -21,8 +21,9 @@ export interface ImportLineItem {
   sku: string | null;
   name: string;
   category: MaterialCategory;
-  unit_cost_cents: number; // net unit price; may be negative for returns
+  unit_cost_cents: number; // net unit price (what was paid); may be negative for returns
   quantity: number;
+  discounted: boolean;     // a program/other discount applied → don't let this overwrite an item's regular estimate price
 }
 
 export interface ImportTransaction {
@@ -166,6 +167,8 @@ export function parseHomeDepotCsv(text: string): ParseResult {
     qty: colIndex(header, "Quantity"),
     net: colIndex(header, "Net Unit Price"),
     dept: colIndex(header, "Department Name"),
+    progDisc: colIndex(header, "Program Discount Amount"),
+    otherDisc: colIndex(header, "Other Discount Amount"),
   };
 
   const byTxn = new Map<string, ImportTransaction>();
@@ -203,12 +206,16 @@ export function parseHomeDepotCsv(text: string): ParseResult {
 
     txn.amount_cents += Math.round(netUnit * qty);
     if (desc) {
+      const discounted =
+        (ix.progDisc >= 0 && parseMoneyCents(r[ix.progDisc]) > 0) ||
+        (ix.otherDisc >= 0 && parseMoneyCents(r[ix.otherDisc]) > 0);
       txn.line_items.push({
         sku: ix.sku >= 0 ? ((r[ix.sku] ?? "").trim() || null) : null,
         name: desc,
         category: materialCategoryFor(dept, desc),
         unit_cost_cents: netUnit,
         quantity: qty,
+        discounted,
       });
     }
   }

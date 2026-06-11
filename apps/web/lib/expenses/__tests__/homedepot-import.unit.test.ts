@@ -94,4 +94,18 @@ describe("parseHomeDepotCsv", () => {
   it("throws on a non-Home-Depot CSV", () => {
     expect(() => parseHomeDepotCsv("foo,bar\n1,2")).toThrow(/Home Depot/);
   });
+
+  it("flags line items as discounted when a program/other discount applied", () => {
+    const csv = `Export Date,x
+
+Date,Transaction ID,Job Name,SKU Number,SKU Description,Quantity,Department Name,Program Discount Amount,Other Discount Amount,Net Unit Price
+2026-06-01,800,LASKY,111,Regular Paint,1,PAINT,$0.00,$0.00,$40.00
+2026-06-01,800,LASKY,222,Sale Paint,1,PAINT,$5.00,$0.00,$35.00
+2026-06-01,800,LASKY,333,Other Disc Item,1,HARDWARE,$0.00,$2.00,$10.00`;
+    const { transactions } = parseHomeDepotCsv(csv);
+    const items = transactions[0].line_items;
+    expect(items.find((i) => i.sku === "111")!.discounted).toBe(false);
+    expect(items.find((i) => i.sku === "222")!.discounted).toBe(true);
+    expect(items.find((i) => i.sku === "333")!.discounted).toBe(true);
+  });
 });
