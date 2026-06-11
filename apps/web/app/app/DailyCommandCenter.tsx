@@ -5,6 +5,7 @@ import type { Route } from "next";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, EmptyState, LinkButton, SectionHeader, StatusBadge, useToast } from "@/components/ui";
+import { NowBar, DayTimeSummary, type ActivityEntryDto } from "./ActivityTracker";
 import type { StatusVariant } from "@/components/ui";
 
 export type CountAction = {
@@ -288,7 +289,7 @@ function Materials({ count, jobs }: { count: number; jobs: MaterialJob[] }) {
   );
 }
 
-function EndDay({ session, warnings, tomorrow }: { session: OpenSession | null; warnings: EndWarnings; tomorrow: CommandVisit[] }) {
+function EndDay({ session, warnings, tomorrow, activityEntries }: { session: OpenSession | null; warnings: EndWarnings; tomorrow: CommandVisit[]; activityEntries: ActivityEntryDto[] }) {
   const router = useRouter();
   const toast = useToast();
   const [endOdometer, setEndOdometer] = useState("");
@@ -327,6 +328,7 @@ function EndDay({ session, warnings, tomorrow }: { session: OpenSession | null; 
   return (
     <Card>
       <SectionHeader title="End Day" count={activeWarnings.length} />
+      <DayTimeSummary entries={activityEntries} />
       {activeWarnings.length === 0 ? <EmptyState title="No loose ends" description="Close mileage when the day is done, then preview tomorrow." /> : (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", marginBottom: "var(--space-4)" }}>
           {activeWarnings.map((warning) => <div key={warning} style={{ color: "#b91c1c", fontWeight: 700 }}>🔴 {warning}</div>)}
@@ -361,6 +363,7 @@ export function DailyCommandCenter({
   materialJobs,
   warnings,
   tomorrowJobs,
+  activityEntries,
 }: {
   todayLabel: string;
   openSession: OpenSession | null;
@@ -371,14 +374,17 @@ export function DailyCommandCenter({
   materialJobs: MaterialJob[];
   warnings: EndWarnings;
   tomorrowJobs: CommandVisit[];
+  activityEntries: ActivityEntryDto[];
 }) {
+  const activeEntry = activityEntries.find((e) => e.ended_at === null) ?? null;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       <StartDayCard initialSession={openSession} vehicles={vehicles} />
+      <NowBar active={activeEntry} />
       <ActionQueue items={actionQueue} />
       <JobsToday jobs={todayJobs} />
       <Materials count={materialCount} jobs={materialJobs} />
-      <EndDay session={openSession} warnings={warnings} tomorrow={tomorrowJobs} />
+      <EndDay session={openSession} warnings={warnings} tomorrow={tomorrowJobs} activityEntries={activityEntries} />
       <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>{todayLabel}</p>
     </div>
   );

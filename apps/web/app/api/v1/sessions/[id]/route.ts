@@ -90,6 +90,13 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       );
     }
 
+    // End Day closes the books: any still-running activity entry ends now.
+    await client.query(
+      `UPDATE activity_entries SET ended_at = now()
+       WHERE account_id = $1 AND ended_at IS NULL AND voided_at IS NULL`,
+      [session.accountId]
+    );
+
     const notes = parsed.data.notes === undefined ? row.notes : parsed.data.notes;
     const { rows } = await client.query(
       `UPDATE vehicle_sessions
