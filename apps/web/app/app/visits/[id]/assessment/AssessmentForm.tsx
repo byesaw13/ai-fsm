@@ -69,6 +69,7 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
   const [leadPaintRisk, setLeadPaintRisk] = useState(initialAssessment?.lead_paint_risk ?? false);
   const [photos, setPhotos] = useState<PhotoMeta[]>(initialPhotos);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -142,24 +143,43 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
   }
 
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
     setUploading(true);
+    setError(null);
+    const failures: string[] = [];
+    let lastErrorMessage: string | null = null;
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("category", "assessment");
-      const res = await fetch(`/api/v1/visits/${visitId}/media`, { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error?.message ?? "Upload failed");
-      } else {
-        setPhotos((prev) => [...prev, data.data]);
+      for (let i = 0; i < files.length; i++) {
+        setUploadProgress(files.length > 1 ? `${i + 1} of ${files.length}` : null);
+        const file = files[i];
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("category", "assessment");
+          const res = await fetch(`/api/v1/visits/${visitId}/media`, { method: "POST", body: formData });
+          const data = await res.json();
+          if (!res.ok) {
+            failures.push(file.name);
+            lastErrorMessage = data.error?.message ?? "Upload failed";
+          } else {
+            setPhotos((prev) => [...prev, data.data]);
+          }
+        } catch {
+          failures.push(file.name);
+          lastErrorMessage = "Upload failed";
+        }
       }
-    } catch {
-      setError("Upload failed");
+      if (failures.length > 0) {
+        setError(
+          files.length === 1
+            ? lastErrorMessage ?? "Upload failed"
+            : `${failures.length} of ${files.length} photos failed to upload (${failures.join(", ")})`
+        );
+      }
     } finally {
       setUploading(false);
+      setUploadProgress(null);
       if (e.target) e.target.value = "";
     }
   }
@@ -370,11 +390,11 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
                 borderRadius: "var(--radius)",
               }}
             >
-              {uploading ? "Uploading…" : "+ Add Photo"}
+              {uploading ? `Uploading${uploadProgress ? ` ${uploadProgress}` : ""}…` : "+ Add Photos"}
               <input
                 type="file"
                 accept="image/*"
-                capture="environment"
+                multiple
                 onChange={handlePhotoUpload}
                 disabled={uploading}
                 style={{ display: "none" }}
