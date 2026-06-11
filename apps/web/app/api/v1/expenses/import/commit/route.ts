@@ -23,6 +23,7 @@ const lineItemSchema = z.object({
   category: z.enum(MATERIAL_CATEGORIES).default("other"),
   unit_cost_cents: z.number().int(),
   quantity: z.number().default(1),
+  discounted: z.boolean().default(false),
 });
 
 const txnSchema = z.object({
@@ -81,18 +82,49 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
         if (update_prices) {
           for (const li of t.line_items) {
             if (li.unit_cost_cents <= 0) continue; // skip returns / $0 lines in the price book
-            await client.query(
-              `INSERT INTO materials_price_book
-                 (account_id, name, category, unit, unit_cost_cents, supplier, sku, last_purchased_at, created_by)
-               VALUES ($1, $2, $3, 'each', $4, $5, $6, $7::date, $8)
-               ON CONFLICT (account_id, lower(name), unit) DO UPDATE SET
-                 unit_cost_cents   = EXCLUDED.unit_cost_cents,
-                 supplier          = COALESCE(EXCLUDED.supplier, materials_price_book.supplier),
-                 sku               = COALESCE(EXCLUDED.sku, materials_price_book.sku),
-                 last_purchased_at = GREATEST(materials_price_book.last_purchased_at, EXCLUDED.last_purchased_at),
-                 updated_at        = now()`,
-              [session.accountId, li.name, li.category, li.unit_cost_cents, t.vendor, li.sku ?? null, t.date, session.userId]
+            const sku = li.sku ?? null;
+
+            // SKU-first match (exact item), falling back to name+unit.
+            const found = await client.query<{ id: string; last_purchased_at: string | null }>(
+              `SELECT id, last_purchased_at::text
+               FROM materials_price_book
+               WHERE account_id = $1
+                 AND ( ($2::text IS NOT NULL AND sku = $2) OR (lower(name) = lower($3) AND unit = 'each') )
+               ORDER BY ($2::text IS NOT NULL AND sku = $2) DESC
+               LIMIT 1`,
+              [session.accountId, sku, li.name]
             );
+            const existing = found.rows[0];
+
+            if (existing) {
+              // Latest purchase wins, but a discounted (sale) purchase never
+              // overwrites the established regular price — only bump the date/sku.
+              const newer = !existing.last_purchased_at || t.date >= existing.last_purchased_at;
+              const setPrice = newer && !li.discounted;
+              await client.query(
+                `UPDATE materials_price_book SET
+                   unit_cost_cents   = CASE WHEN $5::boolean THEN $2 ELSE unit_cost_cents END,
+                   category          = CASE WHEN $5::boolean THEN $6 ELSE category END,
+                   sku               = COALESCE(sku, $3),
+                   supplier          = COALESCE(supplier, $7),
+                   last_purchased_at = GREATEST(last_purchased_at, $4::date),
+                   updated_at        = now()
+                 WHERE id = $1`,
+                [existing.id, li.unit_cost_cents, sku, t.date, setPrice, li.category, t.vendor]
+              );
+            } else {
+              // New item: store what we have (even if it was on sale — it's all we know).
+              await client.query(
+                `INSERT INTO materials_price_book
+                   (account_id, name, category, unit, unit_cost_cents, supplier, sku, last_purchased_at, created_by)
+                 VALUES ($1, $2, $3, 'each', $4, $5, $6, $7::date, $8)
+                 ON CONFLICT (account_id, lower(name), unit) DO UPDATE SET
+                   last_purchased_at = GREATEST(materials_price_book.last_purchased_at, EXCLUDED.last_purchased_at),
+                   sku               = COALESCE(materials_price_book.sku, EXCLUDED.sku),
+                   updated_at        = now()`,
+                [session.accountId, li.name, li.category, li.unit_cost_cents, t.vendor, sku, t.date, session.userId]
+              );
+            }
             materials++;
           }
         }
