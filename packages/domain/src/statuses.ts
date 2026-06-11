@@ -142,9 +142,9 @@ export type InvoiceStatus = z.infer<typeof invoiceStatusSchema>;
 
 export const invoiceTransitions: Record<InvoiceStatus, readonly InvoiceStatus[]> = {
   draft: ["sent", "void"],
-  sent: ["partial", "paid", "overdue", "void"],
-  partial: ["paid", "overdue", "void"],
-  overdue: ["partial", "paid", "void"],
+  sent: ["draft", "partial", "paid", "overdue", "void"],
+  partial: ["draft", "paid", "overdue", "void"],
+  overdue: ["draft", "partial", "paid", "void"],
   paid: [],
   void: [],
 };

@@ -33,7 +33,7 @@ export const GET = withAuth(async (request, session) => {
 
       const lineItemsResult = await client.query(
         `SELECT id, invoice_id, estimate_line_item_id,
-                description, quantity, unit_price_cents, total_cents, sort_order, created_at
+                description, quantity::float8 AS quantity, unit_price_cents, total_cents, line_item_type, sort_order, created_at
          FROM invoice_line_items
          WHERE invoice_id = $1
          ORDER BY sort_order ASC, created_at ASC`,
