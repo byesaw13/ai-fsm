@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"];
-const VALID_CATEGORIES = ["before", "after", "receipt"] as const;
+const VALID_CATEGORIES = ["before", "after", "receipt", "assessment"] as const;
 type MediaCategory = typeof VALID_CATEGORIES[number];
 
 async function getVisit(visitId: string, session: AuthSession) {
@@ -116,7 +116,7 @@ export const POST = withAuth(
     }
     if (!category || !VALID_CATEGORIES.includes(category as MediaCategory)) {
       return NextResponse.json(
-        { error: { code: "VALIDATION_ERROR", message: "category must be before, after, or receipt", traceId: session.traceId } },
+        { error: { code: "VALIDATION_ERROR", message: "category must be before, after, receipt, or assessment", traceId: session.traceId } },
         { status: 422 }
       );
     }
