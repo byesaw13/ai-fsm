@@ -26,36 +26,59 @@ export function PhotoGrid({ visitId, category, initialPhotos, canUpload, canDele
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [photos, setPhotos] = useState<PhotoMeta[]>(initialPhotos);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
 
     setUploading(true);
+    const failures: string[] = [];
+    let lastErrorMessage: string | null = null;
+    let next = photos;
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("category", category);
+      for (let i = 0; i < files.length; i++) {
+        setUploadProgress(files.length > 1 ? `${i + 1} of ${files.length}` : null);
+        const file = files[i];
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("category", category);
 
-      const res = await fetch(`/api/v1/visits/${visitId}/media`, {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error?.message ?? "Upload failed");
-      } else {
-        const newPhoto: PhotoMeta = data.data;
-        const next = [...photos, newPhoto];
-        setPhotos(next);
-        onCountChange?.(next.length);
-        router.refresh();
-        toast.success("Photo uploaded");
+          const res = await fetch(`/api/v1/visits/${visitId}/media`, {
+            method: "POST",
+            body: formData,
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            failures.push(file.name);
+            lastErrorMessage = data.error?.message ?? "Upload failed";
+          } else {
+            const newPhoto: PhotoMeta = data.data;
+            next = [...next, newPhoto];
+            setPhotos(next);
+            onCountChange?.(next.length);
+          }
+        } catch {
+          failures.push(file.name);
+          lastErrorMessage = "Upload failed";
+        }
       }
-    } catch {
-      toast.error("Upload failed");
+      const uploaded = files.length - failures.length;
+      if (uploaded > 0) {
+        router.refresh();
+        toast.success(uploaded === 1 ? "Photo uploaded" : `${uploaded} photos uploaded`);
+      }
+      if (failures.length > 0) {
+        toast.error(
+          files.length === 1
+            ? lastErrorMessage ?? "Upload failed"
+            : `${failures.length} of ${files.length} photos failed to upload (${failures.join(", ")})`
+        );
+      }
     } finally {
       setUploading(false);
+      setUploadProgress(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
@@ -134,6 +157,7 @@ export function PhotoGrid({ visitId, category, initialPhotos, canUpload, canDele
             ref={fileInputRef}
             type="file"
             accept="image/*"
+            multiple
             style={{ display: "none" }}
             onChange={handleFileChange}
           />
@@ -144,7 +168,7 @@ export function PhotoGrid({ visitId, category, initialPhotos, canUpload, canDele
             className="p7-btn p7-btn-secondary p7-btn-sm"
             style={{ marginTop: photos.length > 0 ? "var(--space-1)" : 0 }}
           >
-            {uploading ? "Uploading…" : "+ Add Photo"}
+            {uploading ? `Uploading${uploadProgress ? ` ${uploadProgress}` : ""}…` : "+ Add Photos"}
           </button>
         </>
       )}
