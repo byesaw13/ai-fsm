@@ -1,6 +1,8 @@
 # Glossary of Terms: Dovetails FSM
 
-This glossary defines the authoritative business vocabulary of Dovetails FSM. Developers and AI coding agents must use these exact terms and avoid synonyms in code comments, database schema definitions, variable names, and UI labels.
+This is a compact AI reference derived from docs/canonical/DOMAIN_MODEL.md and docs/canonical/WORKFLOW.md. If this file conflicts with docs/canonical, docs/canonical wins.
+
+Use these terms as quick vocabulary reminders, not as an authoritative glossary.
 
 - **Client**: The person, household, or organization paying for services.
 - **Property**: The physical residential home or commercial service location. (The central asset of the system).
