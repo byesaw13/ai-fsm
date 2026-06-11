@@ -1,6 +1,9 @@
-# Domain Model: Dovetails FSM
+# Domain Model Summary
 
-This is the canonical source of truth for all core entity relationships and hierarchical dependencies.
+> [!IMPORTANT]
+> **Authoritative Source**: [docs/canonical/DOMAIN_MODEL.md](file:///home/nick/ai-fsm-deploy-clean/docs/canonical/DOMAIN_MODEL.md). If conflicts exist, the canonical document always wins.
+
+This is a distilled summary of the entity relationships for AI tools.
 
 ## 1. Entity Hierarchy & Cardinality
 ```text
@@ -17,19 +20,9 @@ Lead (Booking Request)
                           └── Payments (0..*)
 ```
 
-## 2. Structural Relationships
-
-### Client & Property
-- A **Client** can own or reside at **one or more Properties** (e.g. primary residence and rental properties).
-- A **Property** has a **single active Client** association at any given time.
-
-### Property & Work Records
-- All **Estimates**, **Jobs**, and **Invoices** are linked directly to a **Property** record, ensuring property history remains continuous even if property ownership changes.
-
-### Job & Visit Execution
-- A **Job** represents a contractual agreement and can compile **one or many Visits** (execution events).
-- A **Visit** belongs to exactly **one Job** and maps technician schedule times and completed checklist logs.
-
-### Billing & Payments
-- A **Job** can yield **one or more Invoices** (e.g. deposit invoice, progress billing, and final invoice).
-- An **Invoice** records the billing line items and compiles **zero or more Payments** (transactions).
+## 2. Core Reminders & Constraints
+- **Property is the Core Asset**: All estimates, jobs, invoices, notes, and photos are linked directly to the property. History stays with the physical home.
+- **Client owns identity**: Contact details, communication preferences, and portal access. Client does NOT own timeline history or billing balances.
+- **Jobs own work execution**: Represents the contract that binds estimates, visits, invoices, and expenses together.
+- **Visits own scheduling**: Owns scheduled times, assignments, site logs, checklists, and completion packets. Does NOT own pricing/invoicing.
+- **Invoices own billing**: Records total amounts, line items, and transaction payments.

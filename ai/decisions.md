@@ -1,38 +1,16 @@
-# Decision Log: Dovetails FSM
+# Locked Decision Summary
 
-This is the living record of frozen architectural and technical decisions. AI agents should NOT propose changes to or refactor code that violates these decisions.
+> [!IMPORTANT]
+> **Authoritative Source**: [docs/DECISION_LOG.md](file:///home/nick/ai-fsm-deploy-clean/docs/DECISION_LOG.md). If conflicts exist, the canonical log always wins.
 
-## Locked Technical Decisions (ADRs)
+This is a distilled summary of the locked architectural decisions for AI tools. Do NOT propose changes that violate these points.
 
-### ADR-001: System Shape
-- **Decision**: TypeScript monorepo with Next.js web app (`apps/web`), raw PostgreSQL, Redis, and a background Node worker (`services/worker`).
+## Critical Technical Reminders
 
-### ADR-002: Domain Model & Currency
-- **Decision**: Properties are the core entities. All monetary figures are stored as integers in **cents** (e.g. `$115.00` is `11500`). Use `users.role` for permissions, not a complex memberships junction table.
-
-### ADR-003: API Design
-- **Decision**: Version all routes under `/api/v1/`. Errors use the structure `{ error: { code, message, details?, traceId } }`. Use explicit transition endpoints (e.g., `POST /transition`) rather than PATCH for lifecycle changes.
-
-### ADR-004: Test Stack
-- **Decision**: Vitest for fast unit/integration testing, Playwright for E2E testing, and a dedicated database test suite for Row-Level Security (RLS) policies.
-
-### ADR-005: Auth & Sessions
-- **Decision**: Custom JWT sessions using the `jose` library stored in HTTP-only cookies. Password hashing uses `bcryptjs` (10 rounds for performance).
-
-### ADR-006: Rendering Engine
-- **Decision**: All Next.js pages or API routes reading cookies must define `export const dynamic = "force-dynamic"` to bypass Next.js 15 static analysis compile hangs.
-
-### ADR-007: Traceability
-- **Decision**: Extract trace ID once per request from incoming headers and store in DB audit logs under `trace_id` UUID columns to correlate request execution.
-
-### ADR-008: Security Hardening
-- **Decision**: Login rate-limiting (5 requests/15 minutes per IP), mandatory HTTP security headers in middleware, and a minimum password length of 8 characters.
-
-### ADR-010: UI Confirmation
-- **Decision**: Administrative destructive operations (e.g., deletions) use standard browser-native `window.confirm` to keep JS bundles lightweight.
-
-### ADR-011: UI Notifications
-- **Decision**: Success alerts auto-dismiss using `useEffect` timers (3 seconds for general events, 5 seconds for financial/payment confirmations).
-
-### ADR-013: Production Target
-- **Decision**: The single, authoritative production deployment target is `garonhome.local` (running at `/opt/business/ai-fsm` on x86 Debian). Raspberry Pi targets are legacy/deprecated.
+- **No ORM**: Monorepo uses raw SQL migrations and `pg` client/pool.
+- **Raw SQL Database**: All persistence logic and Row-Level Security (RLS) use native PostgreSQL features.
+- **Property-Centric Model**: Properties are the core entities. Clients own contact info, properties own timeline history, jobs own execution, visits own scheduling, and invoices own billing.
+- **Money in Cents**: All monetary amounts are stored as integers in **cents** (e.g., `$115.00` is `11500`).
+- **Edge rendering**: Any Next.js pages or routes reading cookies must define `export const dynamic = "force-dynamic"` to bypass Next.js 15 static analysis compile hangs.
+- **Session Auth**: Custom JWT cookies via `jose` library, password hashing via `bcryptjs` (10 rounds).
+- **Simple UI elements**: Destructive actions use native browser `window.confirm` to keep JS bundles lightweight.
