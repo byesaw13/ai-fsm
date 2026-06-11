@@ -2,14 +2,21 @@
 
 This is the entry point for all AI coding agents (Claude, ChatGPT, Antigravity) working in this repository. Read this file before checking other code.
 
-## 1. Initial Reading Order
+## 1. Initial Reading Order & Pre-flight Checklist
 Before proposing or writing any code, you must read the following files in this order:
 1. **[ai_working_rules.md](file:///home/nick/ai-fsm-deploy-clean/ai/ai_working_rules.md)** (this file)
 2. **[project_context.md](file:///home/nick/ai-fsm-deploy-clean/ai/project_context.md)**
 3. **[domain_model.md](file:///home/nick/ai-fsm-deploy-clean/ai/domain_model.md)**
-4. **[business_rules.md](file:///home/nick/ai-fsm-deploy-clean/ai/business_rules.md)**
-5. **[decisions.md](file:///home/nick/ai-fsm-deploy-clean/ai/decisions.md)**
-6. **[current_sprint.md](file:///home/nick/ai-fsm-deploy-clean/ai/current_sprint.md)**
+4. **[glossary.md](file:///home/nick/ai-fsm-deploy-clean/ai/glossary.md)**
+5. **[business_rules.md](file:///home/nick/ai-fsm-deploy-clean/ai/business_rules.md)**
+6. **[decisions.md](file:///home/nick/ai-fsm-deploy-clean/ai/decisions.md)**
+7. **[current_sprint.md](file:///home/nick/ai-fsm-deploy-clean/ai/current_sprint.md)**
+
+### Before Writing Code Checklist:
+1. **Read all AI memory files** listed above.
+2. **Search the existing codebase** for similar features or imports.
+3. **Reuse existing patterns** (routing setup, SQL helpers, CSS styling, components).
+4. **Only then propose changes** to code or schema.
 
 ## 2. Hard Architectural Constraints
 - **Never Introduce an ORM**: Do not install Prisma, Drizzle, TypeORM, or other ORMs. All DB operations use raw SQL queries via the `pg` client/pool.
