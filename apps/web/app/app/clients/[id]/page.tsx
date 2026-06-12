@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth/session";
+import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { canCreateEstimates, canManageClients, canTransitionJob } from "@/lib/auth/permissions";
 import { query, queryOne } from "@/lib/db";
 import { buildJobCreateHref, formatClientContact, formatPropertyAddress } from "@/lib/crm/p7";
@@ -375,6 +376,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               }}
             />
           </Disclosure>
+
+          <LinkedDocuments session={session} entityType="client" entityId={client.id} />
         </div>
       </div>
     </PageContainer>

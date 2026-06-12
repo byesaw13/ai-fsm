@@ -16,6 +16,7 @@ import { CopyPortalLinkButton } from "@/components/CopyPortalLinkButton";
 import { buildClientDocumentFilename } from "@/lib/estimates/guardrails";
 import { ChangeOrdersClient } from "./ChangeOrdersClient";
 import { loadEstimateDetail } from "./detail-data";
+import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { STATUS_LABELS } from "./format";
 import { EstimateBanners } from "./sections/EstimateBanners";
 import { EstimateSummaryCard } from "./sections/EstimateSummaryCard";
@@ -240,6 +241,9 @@ export default async function EstimateDetailPage({
       {canTransition && currentStatus === "approved" && (
         <ChangeOrdersClient estimateId={estimate.id} initialChangeOrders={changeOrders} />
       )}
+
+      {/* Linked Paperless documents (contracts, signed approvals, reference docs) */}
+      <LinkedDocuments session={session} entityType="estimate" entityId={estimate.id} />
 
       {/* Danger Zone — owner only, draft status only */}
       {canDelete && currentStatus === "draft" && (
