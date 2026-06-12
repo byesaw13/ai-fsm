@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import { withRole } from "@/lib/auth/middleware";
 import { withExpenseContext } from "@/lib/expenses/db";
 import { logger } from "@/lib/logger";
+import { syncReceiptToPaperless } from "@/lib/paperless/receipt-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,11 @@ const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"
 type ExpenseReceiptRow = {
   id: string;
   receipt_url: string | null;
+};
+
+type ExpenseReceiptSyncRow = ExpenseReceiptRow & {
+  vendor_name: string | null;
+  expense_date: string | Date | null;
 };
 
 function expenseIdFromPath(request: NextRequest): string | undefined {
@@ -133,15 +139,17 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
   const filePath = path.join(uploadDir, `${randomUUID()}.${safeExtension(file)}`);
 
   try {
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
     const expense = await withExpenseContext(session, async (client) => {
-      const found = await client.query<ExpenseReceiptRow>(
-        `SELECT id, receipt_url FROM expenses WHERE id = $1 AND account_id = $2`,
+      const found = await client.query<ExpenseReceiptSyncRow>(
+        `SELECT id, receipt_url, vendor_name, expense_date
+         FROM expenses WHERE id = $1 AND account_id = $2`,
         [id, session.accountId]
       );
       if (!found.rows[0]) return null;
 
       fs.mkdirSync(uploadDir, { recursive: true });
-      fs.writeFileSync(filePath, Buffer.from(await file.arrayBuffer()));
+      fs.writeFileSync(filePath, fileBuffer);
 
       const updated = await client.query<ExpenseReceiptRow>(
         `UPDATE expenses
@@ -150,7 +158,8 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
          RETURNING id, receipt_url`,
         [filePath, id, session.accountId]
       );
-      return updated.rows[0] ?? null;
+      if (!updated.rows[0]) return null;
+      return { ...found.rows[0], ...updated.rows[0] };
     });
 
     if (!expense) {
@@ -160,6 +169,24 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
         { status: 404 }
       );
     }
+
+    // Mirror the receipt into Paperless after the response is sent.
+    const expenseDate =
+      expense.expense_date instanceof Date
+        ? expense.expense_date.toISOString().slice(0, 10)
+        : expense.expense_date?.slice(0, 10) ?? null;
+    after(() =>
+      syncReceiptToPaperless({
+        session,
+        expenseId: expense.id,
+        vendorName: expense.vendor_name,
+        expenseDate,
+        data: fileBuffer,
+        filename: file.name || path.basename(filePath),
+        mimeType: file.type,
+        traceId: session.traceId,
+      })
+    );
 
     return NextResponse.json({ data: { id: expense.id, receipt_url: expense.receipt_url } }, { status: 201 });
   } catch (error) {

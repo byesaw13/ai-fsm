@@ -62,6 +62,7 @@ export interface PaperlessSearchResult {
 // ---------------------------------------------------------------------------
 
 const TIMEOUT_MS = 5000;
+const UPLOAD_TIMEOUT_MS = 30_000;
 
 async function paperlessFetch(
   config: PaperlessConfig,
@@ -140,6 +141,100 @@ export async function searchPaperlessDocuments(
   } catch {
     return { count: 0, results: [] };
   }
+}
+
+/**
+ * Upload a document to Paperless for consumption (OCR + indexing).
+ * Returns the consume task UUID, or null if Paperless is not configured,
+ * unavailable, or rejected the upload. Consumption is asynchronous — use
+ * waitForPaperlessDocument to resolve the task into a document ID.
+ */
+export async function uploadPaperlessDocument(opts: {
+  data: Buffer | Uint8Array;
+  filename: string;
+  mimeType: string;
+  title?: string;
+}): Promise<string | null> {
+  const config = getPaperlessConfig();
+  if (!config) return null;
+
+  const form = new FormData();
+  form.append(
+    "document",
+    new Blob([opts.data as BlobPart], { type: opts.mimeType }),
+    opts.filename
+  );
+  if (opts.title) form.append("title", opts.title);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+  try {
+    const response = await fetch(`${config.url}/api/documents/post_document/`, {
+      method: "POST",
+      headers: { Authorization: `Token ${config.token}` },
+      body: form,
+      signal: controller.signal,
+    });
+    if (!response.ok) return null;
+    // Paperless returns the task UUID as a JSON-encoded string.
+    const taskId = (await response.json()) as unknown;
+    return typeof taskId === "string" && taskId.length > 0 ? taskId : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+interface PaperlessTask {
+  task_id: string;
+  status: "PENDING" | "STARTED" | "SUCCESS" | "FAILURE";
+  related_document: string | null;
+  result: string | null;
+}
+
+/**
+ * Fetch the status of a Paperless consume task.
+ * Returns null if Paperless is unreachable or the task is unknown.
+ */
+export async function getPaperlessTask(taskId: string): Promise<PaperlessTask | null> {
+  const config = getPaperlessConfig();
+  if (!config) return null;
+
+  try {
+    const response = await paperlessFetch(config, "/tasks/", { task_id: taskId });
+    if (!response.ok) return null;
+    const tasks = (await response.json()) as PaperlessTask[];
+    return Array.isArray(tasks) && tasks.length > 0 ? tasks[0] : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Poll a consume task until it reaches a terminal state and return the
+ * resulting document ID. Returns null on failure, timeout, or if Paperless
+ * becomes unreachable. Intended for background (after-response) use only —
+ * never call this on the critical path of a request.
+ */
+export async function waitForPaperlessDocument(
+  taskId: string,
+  opts: { timeoutMs?: number; intervalMs?: number } = {}
+): Promise<number | null> {
+  const timeoutMs = opts.timeoutMs ?? 120_000;
+  const intervalMs = opts.intervalMs ?? 3_000;
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const task = await getPaperlessTask(taskId);
+    if (task?.status === "SUCCESS") {
+      const docId = task.related_document ? parseInt(task.related_document, 10) : NaN;
+      return Number.isFinite(docId) ? docId : null;
+    }
+    if (task?.status === "FAILURE") return null;
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  return null;
 }
 
 /**
