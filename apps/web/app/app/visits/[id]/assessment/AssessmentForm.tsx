@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { buildAssessmentJobDescription } from "@ai-fsm/domain";
 import { useToast } from "@/components/ui";
 import { MaterialsGenerator } from "@/app/app/estimates/components/MaterialsGenerator";
 import type { MaterialItem } from "@/app/app/estimates/components/MaterialsGenerator";
@@ -202,6 +203,24 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
   }
 
   const disabled = !canEdit || saving || completing;
+
+  // Seed the materials generator with the full assessment, not just scope
+  // notes. The generator's scope textarea stays editable as the preview.
+  const generatedJobDescription = useMemo(
+    () =>
+      buildAssessmentJobDescription({
+        rooms,
+        scope_notes: scopeNotes,
+        access_notes: accessNotes,
+        has_pets: hasPets,
+        difficult_access: difficultAccess,
+        asbestos_risk: asbestosRisk,
+        lead_paint_risk: leadPaintRisk,
+        total_sqft: totalSqft > 0 ? totalSqft : null,
+        photo_count: photos.length,
+      }),
+    [rooms, scopeNotes, accessNotes, hasPets, difficultAccess, asbestosRisk, leadPaintRisk, totalSqft, photos.length]
+  );
 
   return (
     <div className="p7-form-stack" style={{ maxWidth: 680 }}>
@@ -480,7 +499,7 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
         </div>
         {showMaterials && (
           <MaterialsGenerator
-            initialScope={scopeNotes}
+            initialScope={generatedJobDescription}
             rooms={rooms}
             onAddToEstimate={(matItems: MaterialItem[]) => {
               const params = new URLSearchParams();

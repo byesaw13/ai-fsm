@@ -8,6 +8,7 @@ export * from "./job-materials";
 export * from "./stages";
 export * from "./operational-visibility";
 export * from "./scope";
+export * from "./assessment-summary";
 export { checkSchedulingPreconditions } from "./scheduling-guard";
 export type { SchedulingGuardError, SchedulingGuardResult } from "./scheduling-guard";
 export { scoreSiteVisitProbability } from "./walkthrough-decision";
