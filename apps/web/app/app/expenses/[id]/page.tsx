@@ -3,9 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import type { Route } from "next";
 import { getSession } from "@/lib/auth/session";
 import { withExpenseContext } from "@/lib/expenses/db";
-import { withDocumentContext, listDocumentLinks } from "@/lib/paperless/db";
-import { canManageExpenses, canLinkDocuments } from "@/lib/auth/permissions";
-import { isPaperlessEnabled } from "@/lib/paperless/client";
+import { canManageExpenses } from "@/lib/auth/permissions";
 import { formatCentsToDollars } from "@/lib/expenses/math";
 import { categoryLabel, formatExpenseDate } from "@/lib/expenses/ui";
 import type { ExpenseCategory } from "@ai-fsm/domain";
@@ -18,7 +16,7 @@ import {
   SectionHeader,
 } from "@/components/ui";
 import { ExpenseEditForm } from "./ExpenseEditForm";
-import { DocumentPanel } from "./DocumentPanel";
+import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 
 export const dynamic = "force-dynamic";
 
@@ -32,8 +30,6 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
   if (!session) redirect("/login");
 
   const canManage = canManageExpenses(session.role);
-  const canLink = canLinkDocuments(session.role);
-  const paperlessEnabled = isPaperlessEnabled();
 
   const expense = await withExpenseContext(session, async (client) => {
     const result = await client.query(
@@ -58,11 +54,6 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
       : String(expense.expense_date);
 
   const cat = expense.category as ExpenseCategory;
-
-  // Fetch linked documents server-side for initial render
-  const initialLinks = await withDocumentContext(session, (client) =>
-    listDocumentLinks(client, session.accountId, "expense", id)
-  );
 
   // Fetch jobs and clients for the edit form
   const { jobs, clients } = canManage
@@ -206,13 +197,7 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
           )}
 
           {/* Document panel — visible to all roles */}
-          <DocumentPanel
-            entityType="expense"
-            entityId={id}
-            initialLinks={initialLinks}
-            paperlessEnabled={paperlessEnabled}
-            canLink={canLink}
-          />
+          <LinkedDocuments session={session} entityType="expense" entityId={id} />
         </div>
       </div>
     </PageContainer>

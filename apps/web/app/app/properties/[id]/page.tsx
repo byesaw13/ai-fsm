@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth/session";
+import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { canManageClients, canTransitionJob, canCreateEstimates } from "@/lib/auth/permissions";
 import { query, queryOne } from "@/lib/db";
 import { buildJobCreateHref, formatPropertyAddress } from "@/lib/crm/p7";
@@ -711,6 +712,8 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
               }}
             />
           </Card>
+
+          <LinkedDocuments session={session} entityType="property" entityId={property.id} />
         </div>
       </div>
     </PageContainer>

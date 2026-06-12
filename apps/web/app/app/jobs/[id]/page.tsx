@@ -19,6 +19,7 @@ import { DeleteJobButton } from "./DeleteJobButton";
 import { JobEditForm } from "./JobEditFormWrapper";
 import { JobIntakePanel } from "./JobIntakePanel";
 import { AssetLinksPanel } from "./AssetLinksPanel";
+import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { JobCommandPanel } from "./JobCommandPanel";
 import { WhatNextBanner } from "./WhatNextBanner";
 import { VendorCoordinationCard } from "./VendorCoordinationCard";
@@ -395,6 +396,8 @@ export default async function JobDetailPage({
             {!isTech && <div className="p7-detail-row"><dt>Invoices</dt><dd>{invoiceCount}</dd></div>}
           </dl>
         </AdvancedDetails>
+
+        <LinkedDocuments session={session} entityType="job" entityId={job.id} />
       </div>
   );
 
@@ -792,6 +795,8 @@ export default async function JobDetailPage({
                 />
               </AdvancedDetails>
             )}
+
+            <LinkedDocuments session={session} entityType="job" entityId={job.id} />
           </div>
         )}
 

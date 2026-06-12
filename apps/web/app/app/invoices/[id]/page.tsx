@@ -2,6 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
 import { getSession } from "@/lib/auth/session";
+import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { canCreateInvoices, canRecordPayments } from "@/lib/auth/permissions";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import { buildClientDocumentFilename, invoiceTransitions } from "@ai-fsm/domain";
@@ -469,6 +470,8 @@ export default async function InvoiceDetailPage({
               />
             </Card>
           )}
+
+          <LinkedDocuments session={session} entityType="invoice" entityId={invoice.id} />
         </div>
       </div>
     </PageContainer>
