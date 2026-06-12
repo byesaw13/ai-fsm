@@ -336,6 +336,120 @@ describe("createDocumentLinkSchema", () => {
 });
 
 // ---------------------------------------------------------------------------
+// uploadPaperlessDocument / getPaperlessTask / waitForPaperlessDocument
+// ---------------------------------------------------------------------------
+
+import {
+  uploadPaperlessDocument,
+  getPaperlessTask,
+  waitForPaperlessDocument,
+} from "../client";
+
+describe("uploadPaperlessDocument", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const uploadOpts = {
+    data: Buffer.from("img"),
+    filename: "receipt.jpg",
+    mimeType: "image/jpeg",
+    title: "Home Depot receipt 2026-06-12",
+  };
+
+  it("returns null when Paperless is not configured", async () => {
+    withoutPaperless();
+    expect(await uploadPaperlessDocument(uploadOpts)).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("posts multipart form and returns the task UUID", async () => {
+    withPaperless();
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new Response(JSON.stringify("task-uuid-1"), { status: 200 })
+    );
+
+    const taskId = await uploadPaperlessDocument(uploadOpts);
+
+    expect(taskId).toBe("task-uuid-1");
+    const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toBe("http://paperless.local:8000/api/documents/post_document/");
+    expect(init.method).toBe("POST");
+    expect(init.headers.Authorization).toBe("Token testtoken");
+    expect(init.body).toBeInstanceOf(FormData);
+    expect(init.body.get("title")).toBe("Home Depot receipt 2026-06-12");
+  });
+
+  it("returns null on a rejected upload", async () => {
+    withPaperless();
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new Response("bad", { status: 400 })
+    );
+    expect(await uploadPaperlessDocument(uploadOpts)).toBeNull();
+  });
+
+  it("returns null on network failure", async () => {
+    withPaperless();
+    (fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("refused"));
+    expect(await uploadPaperlessDocument(uploadOpts)).toBeNull();
+  });
+});
+
+describe("getPaperlessTask / waitForPaperlessDocument", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function taskResponse(status: string, relatedDocument: string | null) {
+    return new Response(
+      JSON.stringify([
+        { task_id: "t1", status, related_document: relatedDocument, result: null },
+      ]),
+      { status: 200 }
+    );
+  }
+
+  it("returns the first matching task", async () => {
+    withPaperless();
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(taskResponse("SUCCESS", "42"));
+
+    const task = await getPaperlessTask("t1");
+    expect(task?.status).toBe("SUCCESS");
+    expect(task?.related_document).toBe("42");
+  });
+
+  it("resolves the document id once the task succeeds", async () => {
+    withPaperless();
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(taskResponse("STARTED", null))
+      .mockResolvedValueOnce(taskResponse("SUCCESS", "42"));
+
+    const docId = await waitForPaperlessDocument("t1", { timeoutMs: 2000, intervalMs: 10 });
+    expect(docId).toBe(42);
+  });
+
+  it("returns null when the task fails", async () => {
+    withPaperless();
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(taskResponse("FAILURE", null));
+
+    expect(await waitForPaperlessDocument("t1", { timeoutMs: 2000, intervalMs: 10 })).toBeNull();
+  });
+
+  it("returns null on timeout while the task is pending", async () => {
+    withPaperless();
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(taskResponse("PENDING", null));
+
+    expect(await waitForPaperlessDocument("t1", { timeoutMs: 50, intervalMs: 10 })).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Permission: canLinkDocuments
 // ---------------------------------------------------------------------------
 
