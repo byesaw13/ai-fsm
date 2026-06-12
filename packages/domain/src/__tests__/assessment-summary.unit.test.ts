@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildAssessmentJobDescription,
   composeJobDescription,
+  MAX_JOB_DESCRIPTION_LENGTH,
 } from "../assessment-summary";
 
 describe("buildAssessmentJobDescription", () => {
@@ -102,6 +103,34 @@ describe("composeJobDescription", () => {
 
   it("returns just the manual description when the assessment is empty", () => {
     expect(composeJobDescription("Fix the fence.", {})).toBe("Fix the fence.");
+  });
+
+  it("caps output at the materials API scope limit", () => {
+    // Max-length scope notes plus extra sections must not exceed the cap.
+    const longNotes = "x".repeat(MAX_JOB_DESCRIPTION_LENGTH);
+    const out = buildAssessmentJobDescription({
+      scope_notes: longNotes,
+      rooms: [{ name: "Office", length_ft: 10, width_ft: 12 }],
+      has_pets: true,
+    });
+    expect(out.length).toBeLessThanOrEqual(MAX_JOB_DESCRIPTION_LENGTH);
+    expect(out.startsWith("xxx")).toBe(true);
+
+    const shortCap = buildAssessmentJobDescription(
+      {
+        scope_notes: "Repaint bedroom.",
+        rooms: [{ name: "Bedroom", length_ft: 10, width_ft: 12 }],
+        has_pets: true,
+      },
+      { maxLength: 40 }
+    );
+    // Drops whole trailing sections rather than cutting mid-sentence.
+    expect(shortCap).toBe("Repaint bedroom.");
+
+    const composed = composeJobDescription(longNotes, {
+      rooms: [{ name: "Office", length_ft: 10, width_ft: 12 }],
+    });
+    expect(composed.length).toBeLessThanOrEqual(MAX_JOB_DESCRIPTION_LENGTH);
   });
 
   it("does not duplicate when one side already contains the other", () => {

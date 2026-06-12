@@ -45,8 +45,34 @@ export interface AssessmentSummaryInput {
   customer_supplied_materials?: string | null;
 }
 
+/**
+ * Matches the `scope` limit enforced by /api/v1/estimates/ai-materials.
+ * Generated descriptions must stay under this or generation 422s.
+ */
+export const MAX_JOB_DESCRIPTION_LENGTH = 5000;
+
+export interface JobDescriptionOptions {
+  maxLength?: number;
+}
+
 function clean(value: string | null | undefined): string {
   return (value ?? "").trim();
+}
+
+/** Join sections, dropping trailing ones that would exceed maxLength. */
+function joinSectionsWithinLimit(sections: string[], maxLength: number): string {
+  let out = "";
+  for (const section of sections) {
+    const candidate = out ? `${out}\n\n${section}` : section;
+    if (candidate.length > maxLength) break;
+    out = candidate;
+  }
+  // A single oversized leading section (e.g. max-length scope notes) still
+  // has to fit, so hard-truncate as a last resort.
+  if (!out && sections.length > 0) {
+    out = sections[0].slice(0, maxLength);
+  }
+  return out;
 }
 
 function formatDimension(value: number): string {
@@ -77,7 +103,11 @@ function describeRoom(room: AssessmentSummaryRoom): string | null {
  * Build a normalized job description from site assessment data.
  * Returns "" when the assessment has no usable content.
  */
-export function buildAssessmentJobDescription(input: AssessmentSummaryInput): string {
+export function buildAssessmentJobDescription(
+  input: AssessmentSummaryInput,
+  options: JobDescriptionOptions = {}
+): string {
+  const maxLength = options.maxLength ?? MAX_JOB_DESCRIPTION_LENGTH;
   const sections: string[] = [];
 
   const scopeNotes = clean(input.scope_notes);
@@ -128,7 +158,7 @@ export function buildAssessmentJobDescription(input: AssessmentSummaryInput): st
     );
   }
 
-  return sections.join("\n\n");
+  return joinSectionsWithinLimit(sections, maxLength);
 }
 
 /**
@@ -138,14 +168,16 @@ export function buildAssessmentJobDescription(input: AssessmentSummaryInput): st
  */
 export function composeJobDescription(
   manualDescription: string | null | undefined,
-  assessment: AssessmentSummaryInput
+  assessment: AssessmentSummaryInput,
+  options: JobDescriptionOptions = {}
 ): string {
-  const manual = clean(manualDescription);
-  const generated = buildAssessmentJobDescription(assessment);
+  const maxLength = options.maxLength ?? MAX_JOB_DESCRIPTION_LENGTH;
+  const manual = clean(manualDescription).slice(0, maxLength);
+  const generated = buildAssessmentJobDescription(assessment, { maxLength });
 
   if (!manual) return generated;
   if (!generated) return manual;
   if (generated.includes(manual)) return generated;
   if (manual.includes(generated)) return manual;
-  return `${manual}\n\n${generated}`;
+  return joinSectionsWithinLimit([manual, ...generated.split("\n\n")], maxLength);
 }
