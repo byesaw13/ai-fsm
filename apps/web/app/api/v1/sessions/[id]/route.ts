@@ -11,6 +11,9 @@ export const dynamic = "force-dynamic";
 const closeSessionSchema = z.object({
   end_odometer: z.number().int().min(1),
   notes: z.string().max(2000).nullable().optional(),
+  // End Day closes the books (ends running activity entries). Closing a single
+  // mileage session mid-day (e.g. parking a vehicle) leaves the day running.
+  end_day: z.boolean().optional(),
 });
 
 function sessionIdFromPath(request: NextRequest): string | undefined {
@@ -91,11 +94,14 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     }
 
     // End Day closes the books: any still-running activity entry ends now.
-    await client.query(
-      `UPDATE activity_entries SET ended_at = now()
-       WHERE account_id = $1 AND ended_at IS NULL AND voided_at IS NULL`,
-      [session.accountId]
-    );
+    // Switching/parking a vehicle (end_day omitted) must NOT end the work day.
+    if (parsed.data.end_day) {
+      await client.query(
+        `UPDATE activity_entries SET ended_at = now()
+         WHERE account_id = $1 AND ended_at IS NULL AND voided_at IS NULL`,
+        [session.accountId]
+      );
+    }
 
     const notes = parsed.data.notes === undefined ? row.notes : parsed.data.notes;
     const { rows } = await client.query(
@@ -103,6 +109,7 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
        SET end_odometer = $1,
            miles = $1 - start_odometer,
            notes = $4,
+           ended_at = now(),
            updated_at = now()
        WHERE id = $2 AND account_id = $3
        RETURNING id, session_date::text, start_odometer, end_odometer, miles::text, notes`,

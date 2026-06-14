@@ -86,14 +86,14 @@ export default async function AppPage() {
 
     queryForSession<OpenSession>(session,
       `SELECT s.id, s.session_date::text, s.vehicle_id, v.nickname AS vehicle_nickname,
-              v.plate AS vehicle_plate, s.start_odometer
+              v.plate AS vehicle_plate, s.start_odometer, s.started_at::text AS started_at
        FROM vehicle_sessions s
        LEFT JOIN vehicles v ON v.id = s.vehicle_id
        WHERE s.account_id = $1
          AND s.session_date = CURRENT_DATE
          AND s.end_odometer IS NULL
          AND s.miles IS NULL
-       ORDER BY s.created_at DESC
+       ORDER BY s.started_at DESC
        LIMIT 1`,
       [accountId]),
 

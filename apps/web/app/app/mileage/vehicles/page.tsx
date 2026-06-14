@@ -13,6 +13,8 @@ interface Vehicle {
   year: number | null;
   plate: string | null;
   is_active: boolean;
+  current_odometer: number | null;
+  total_miles: string | null;
 }
 
 const EMPTY_FORM = { nickname: "", make: "", model: "", year: "", plate: "" };
@@ -231,6 +233,10 @@ export default function VehiclesPage() {
                         {[v.year, v.make, v.model].filter(Boolean).join(" ")}
                       </div>
                     )}
+                    <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: "var(--space-1)" }}>
+                      Last known odometer: <strong>{v.current_odometer != null ? Number(v.current_odometer).toLocaleString() : "—"}</strong>
+                      {" · "}Lifetime miles: <strong>{v.total_miles != null ? Math.round(Number(v.total_miles)).toLocaleString() : "0"}</strong>
+                    </div>
                   </div>
                   <div style={{ display: "flex", gap: "var(--space-2)", flexShrink: 0 }}>
                     <button className="p7-btn p7-btn-ghost" style={{ fontSize: "var(--text-xs)" }} onClick={() => startEdit(v)}>Edit</button>
