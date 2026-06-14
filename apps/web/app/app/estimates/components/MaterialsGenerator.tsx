@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const JOB_TYPES = [
   { value: "deck_build", label: "Deck Build (new)" },
@@ -75,6 +75,9 @@ export function MaterialsGenerator({
   onClose,
 }: Props) {
   const [scope, setScope] = useState(initialScope);
+  // Tracks whether the user has hand-edited the scope field. Once they have,
+  // we stop overwriting their text when a fresh initialScope arrives.
+  const [scopeDirty, setScopeDirty] = useState(false);
   const [jobType, setJobType] = useState(initialJobType);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +85,13 @@ export function MaterialsGenerator({
   const [editedItems, setEditedItems] = useState<MaterialItem[]>([]);
   const [savingPrices, setSavingPrices] = useState(false);
   const [saveToBook, setSaveToBook] = useState(true);
+
+  // Resync scope when a fresh initialScope arrives (e.g. the assessment is
+  // edited while the generator is open) — but only while the user has not
+  // manually edited the field, so we never wipe their typing.
+  useEffect(() => {
+    if (!scopeDirty) setScope(initialScope);
+  }, [initialScope, scopeDirty]);
 
   async function generate() {
     if (!scope.trim() || !jobType) return;
@@ -196,7 +206,10 @@ export function MaterialsGenerator({
               id="mat-scope"
               rows={4}
               value={scope}
-              onChange={(e) => setScope(e.target.value)}
+              onChange={(e) => {
+                setScope(e.target.value);
+                setScopeDirty(true);
+              }}
               placeholder="e.g. Build a 10x10 freestanding ground-level deck with pressure treated lumber, diagonal decking pattern, 3 steps, no railing..."
               style={{ width: "100%", fontFamily: "inherit", fontSize: "var(--text-sm)" }}
             />

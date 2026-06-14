@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { buildAssessmentJobDescription } from "@ai-fsm/domain";
 import { useToast } from "@/components/ui";
+import { writeAssessmentContext } from "@/lib/estimates/assessment-context";
 import { MaterialsGenerator } from "@/app/app/estimates/components/MaterialsGenerator";
 import type { MaterialItem } from "@/app/app/estimates/components/MaterialsGenerator";
 
@@ -513,6 +514,14 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
                 unit_price: (m.total_cost_cents / 100).toFixed(2),
               }));
               sessionStorage.setItem("estimate_prefill_materials", JSON.stringify(lineItems));
+              // Carry the assessment context so the estimate-page materials
+              // generator keeps the generated description + room measurements.
+              writeAssessmentContext({
+                generatedJobDescription,
+                rooms,
+                visitId,
+                assessmentId: initialAssessment?.id ?? null,
+              });
               router.push(`/app/estimates/new?${params.toString()}&from_assessment=1`);
             }}
             onClose={() => setShowMaterials(false)}

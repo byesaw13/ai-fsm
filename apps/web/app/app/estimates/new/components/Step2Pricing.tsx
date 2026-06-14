@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button, Card, Input, SectionHeader, Textarea } from "@/components/ui";
 import { MaterialsGenerator } from "../../components/MaterialsGenerator";
+import { readAssessmentContext } from "@/lib/estimates/assessment-context";
 import { PriceBookSelector } from "@/components/PriceBookSelector";
 import { ScopeBuilder } from "@/components/ScopeBuilder";
 import { getMaterialsByCategory, type MaterialSuggestion } from "@ai-fsm/domain";
@@ -144,6 +145,9 @@ export function Step2Pricing({
   lineTotal,
 }: Step2Props) {
   const [showMaterialsGen, setShowMaterialsGen] = useState(false);
+  // Assessment hand-off (generated description + rooms) when the user came
+  // from a site assessment. Read once; absent for estimates started directly.
+  const [assessmentContext] = useState(() => readAssessmentContext());
   return (
     <div className="p7-form-stack">
       {/* Painting Estimator */}
@@ -764,6 +768,8 @@ export function Step2Pricing({
                 {showMaterialsGen ? (
                   <div style={{ marginTop: "var(--space-3)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
                     <MaterialsGenerator
+                      initialScope={assessmentContext?.generatedJobDescription ?? ""}
+                      rooms={assessmentContext?.rooms ?? []}
                       onAddToEstimate={(matItems) => {
                         addBulkLineItems(
                           matItems.map((m) => ({
