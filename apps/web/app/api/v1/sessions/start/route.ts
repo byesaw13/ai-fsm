@@ -4,6 +4,11 @@ import { withAuth } from "@/lib/auth/middleware";
 import type { AuthSession } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { appendAuditLog } from "@/lib/db/audit";
+import {
+  findOpenSessionForVehicle,
+  lastKnownOdometer,
+  validateStartOdometer,
+} from "@/lib/mileage/sessions";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +18,10 @@ const startSessionSchema = z.object({
   start_odometer: z.number().int().min(0),
   session_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   notes: z.string().max(2000).nullable().optional(),
+  // Explicit correction flow: allows a start below the vehicle's last known
+  // odometer when the owner is knowingly fixing an earlier reading.
+  correction: z.boolean().optional(),
+  correction_reason: z.string().max(500).nullable().optional(),
 });
 
 function todayKey(): string {
@@ -38,6 +47,7 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
 
   const d = parsed.data;
   const sessionDate = d.session_date ?? todayKey();
+  const isCorrection = d.correction === true && !!d.correction_reason;
   const pool = getPool();
   const client = await pool.connect();
 
@@ -47,31 +57,6 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
       `SELECT set_config('app.current_user_id', $1, true), set_config('app.current_account_id', $2, true), set_config('app.current_role', $3, true)`,
       [session.userId, session.accountId, session.role]
     );
-
-    const existing = await client.query<{ id: string }>(
-      `SELECT id
-       FROM vehicle_sessions
-       WHERE account_id = $1
-         AND session_date = $2::date
-         AND end_odometer IS NULL
-         AND miles IS NULL
-       LIMIT 1`,
-      [session.accountId, sessionDate]
-    );
-
-    if (existing.rows[0]) {
-      await client.query("ROLLBACK");
-      return NextResponse.json(
-        {
-          error: {
-            code: "OPEN_SESSION_EXISTS",
-            message: "A day is already started for this date",
-            traceId: session.traceId,
-          },
-        },
-        { status: 409 }
-      );
-    }
 
     if (d.vehicle_id) {
       const vehicle = await client.query<{ id: string }>(
@@ -85,6 +70,46 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
           { status: 404 }
         );
       }
+
+      // Requirement 4: an open/incomplete prior session for THIS vehicle must be
+      // closed first. Surface its end-odometer prompt (defaulted to the proposed
+      // start) so the UI can collect the missing reading.
+      const openPrior = await findOpenSessionForVehicle(client, session.accountId, d.vehicle_id);
+      if (openPrior) {
+        await client.query("ROLLBACK");
+        return NextResponse.json(
+          {
+            error: {
+              code: "INCOMPLETE_PRIOR_SESSION",
+              message: "This vehicle has an open mileage session. Enter its end odometer before starting a new one.",
+              open_session_id: openPrior.id,
+              open_session_start_odometer: openPrior.start_odometer,
+              suggested_end_odometer: d.start_odometer,
+              traceId: session.traceId,
+            },
+          },
+          { status: 409 }
+        );
+      }
+
+      // Requirement 3: start cannot move the vehicle's odometer backward unless
+      // this is an explicit correction.
+      const lastKnown = await lastKnownOdometer(client, session.accountId, d.vehicle_id);
+      const check = validateStartOdometer(lastKnown, d.start_odometer, { correction: isCorrection });
+      if (!check.ok) {
+        await client.query("ROLLBACK");
+        return NextResponse.json(
+          {
+            error: {
+              code: "ODOMETER_TOO_LOW",
+              message: `Start odometer (${d.start_odometer.toLocaleString()}) is below this vehicle's last known reading (${check.lastKnown.toLocaleString()}).`,
+              last_known_odometer: check.lastKnown,
+              traceId: session.traceId,
+            },
+          },
+          { status: 422 }
+        );
+      }
     }
 
     const { rows } = await client.query<{
@@ -94,8 +119,8 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
       start_odometer: number;
     }>(
       `INSERT INTO vehicle_sessions
-         (account_id, vehicle_id, session_date, start_odometer, end_odometer, miles, notes, created_by)
-       VALUES ($1, $2, $3::date, $4, NULL, NULL, $5, $6)
+         (account_id, vehicle_id, session_date, start_odometer, end_odometer, miles, notes, correction_reason, started_at, created_by)
+       VALUES ($1, $2, $3::date, $4, NULL, NULL, $5, $6, now(), $7)
        RETURNING id, session_date::text, vehicle_id, start_odometer`,
       [
         session.accountId,
@@ -103,6 +128,7 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
         sessionDate,
         d.start_odometer,
         d.notes ?? null,
+        isCorrection ? d.correction_reason : null,
         session.userId,
       ]
     );
@@ -114,7 +140,13 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
       action: "insert",
       actor_id: session.userId,
       trace_id: session.traceId,
-      new_value: { session_date: sessionDate, start_odometer: d.start_odometer, status: "open" },
+      new_value: {
+        session_date: sessionDate,
+        vehicle_id: d.vehicle_id ?? null,
+        start_odometer: d.start_odometer,
+        status: "open",
+        ...(isCorrection ? { correction_reason: d.correction_reason } : {}),
+      },
     });
 
     await client.query("COMMIT");
@@ -123,7 +155,7 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
     await client.query("ROLLBACK");
     logger.error("POST /api/v1/sessions/start error", error, { traceId: session.traceId });
     return NextResponse.json(
-      { error: { code: "INTERNAL_ERROR", message: "Failed to start day", traceId: session.traceId } },
+      { error: { code: "INTERNAL_ERROR", message: "Failed to start mileage session", traceId: session.traceId } },
       { status: 500 }
     );
   } finally {
