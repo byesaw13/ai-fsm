@@ -26,6 +26,25 @@ ALTER TABLE vehicle_sessions ALTER COLUMN started_at SET NOT NULL;
 -- Drop the day-level lock that forced one vehicle per day.
 DROP INDEX IF EXISTS idx_vehicle_sessions_one_open_per_day;
 
+-- Reconcile pre-existing duplicate OPEN sessions per vehicle. The old day-based
+-- model never prevented a vehicle from being left open across multiple days, so
+-- a vehicle can already have >1 open session — which would break the per-vehicle
+-- unique index below. An abandoned open session recorded NO odometer movement
+-- (both miles and end_odometer are NULL, so it contributes 0 to every rollup);
+-- keep the most recently started open session per vehicle and remove the
+-- superseded duplicates. This is mileage-neutral.
+WITH ranked AS (
+  SELECT id,
+         row_number() OVER (
+           PARTITION BY account_id, vehicle_id
+           ORDER BY started_at DESC NULLS LAST, created_at DESC
+         ) AS rn
+  FROM vehicle_sessions
+  WHERE end_odometer IS NULL AND miles IS NULL AND vehicle_id IS NOT NULL
+)
+DELETE FROM vehicle_sessions
+WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
+
 -- Allow at most one OPEN (no end odometer, no miles) session per vehicle.
 -- NULL vehicle_id rows are exempt (SQL treats NULLs as distinct), which is an
 -- acceptable edge for unassigned sessions.
