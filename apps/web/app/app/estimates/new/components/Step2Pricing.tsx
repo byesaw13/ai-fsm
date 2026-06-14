@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button, Card, Input, SectionHeader, Textarea } from "@/components/ui";
 import { MaterialsGenerator } from "../../components/MaterialsGenerator";
-import { readAssessmentContext } from "@/lib/estimates/assessment-context";
+import type { AssessmentContext } from "@/lib/estimates/assessment-context";
 import { PriceBookSelector } from "@/components/PriceBookSelector";
 import { ScopeBuilder } from "@/components/ScopeBuilder";
 import { getMaterialsByCategory, type MaterialSuggestion } from "@ai-fsm/domain";
@@ -116,6 +116,7 @@ interface Step2Props {
   taxRate: string;
   setTaxRate: (v: string) => void;
   lineTotal: (row: LineItemRow) => number;
+  assessmentContext: AssessmentContext | null;
 }
 
 export function Step2Pricing({
@@ -143,11 +144,9 @@ export function Step2Pricing({
   depositCents, balanceDueCents,
   taxRate, setTaxRate,
   lineTotal,
+  assessmentContext,
 }: Step2Props) {
   const [showMaterialsGen, setShowMaterialsGen] = useState(false);
-  // Assessment hand-off (generated description + rooms) when the user came
-  // from a site assessment. Read once; absent for estimates started directly.
-  const [assessmentContext] = useState(() => readAssessmentContext());
   return (
     <div className="p7-form-stack">
       {/* Painting Estimator */}
