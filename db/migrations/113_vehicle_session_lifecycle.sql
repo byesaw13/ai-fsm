@@ -29,10 +29,46 @@ DROP INDEX IF EXISTS idx_vehicle_sessions_one_open_per_day;
 -- Reconcile pre-existing duplicate OPEN sessions per vehicle. The old day-based
 -- model never prevented a vehicle from being left open across multiple days, so
 -- a vehicle can already have >1 open session — which would break the per-vehicle
--- unique index below. An abandoned open session recorded NO odometer movement
--- (both miles and end_odometer are NULL, so it contributes 0 to every rollup);
--- keep the most recently started open session per vehicle and remove the
--- superseded duplicates. This is mileage-neutral.
+-- unique index below.
+--
+-- We CLOSE (not delete) the superseded duplicates so their attached
+-- vehicle_session_activities (job/visit/estimate links, which cascade on delete)
+-- are preserved. A superseded open never had an end odometer recorded, so we
+-- close it at its own start (zero recorded movement) and note why. The newest
+-- open session per vehicle stays open.
+--
+-- Closing at end = start needs the odometer checks to allow a zero-length
+-- session; relax them from strict `>` to `>=`. The API still enforces strict
+-- `>` for user-created sessions, so zero-mile rows only ever come from this
+-- backfill.
+ALTER TABLE vehicle_sessions
+  DROP CONSTRAINT IF EXISTS vehicle_sessions_value_check,
+  DROP CONSTRAINT IF EXISTS vehicle_sessions_odometer_order;
+
+ALTER TABLE vehicle_sessions
+  ADD CONSTRAINT vehicle_sessions_value_check CHECK (
+    (
+      end_odometer IS NULL
+      AND miles IS NULL
+      AND start_odometer IS NOT NULL
+    )
+    OR (
+      end_odometer IS NOT NULL
+      AND start_odometer IS NOT NULL
+      AND end_odometer >= start_odometer
+    )
+    OR (
+      miles IS NOT NULL
+      AND miles >= 0
+      AND (start_odometer IS NULL OR end_odometer IS NULL)
+    )
+  ),
+  ADD CONSTRAINT vehicle_sessions_odometer_order CHECK (
+    end_odometer IS NULL
+    OR start_odometer IS NULL
+    OR end_odometer >= start_odometer
+  );
+
 WITH ranked AS (
   SELECT id,
          row_number() OVER (
@@ -42,8 +78,18 @@ WITH ranked AS (
   FROM vehicle_sessions
   WHERE end_odometer IS NULL AND miles IS NULL AND vehicle_id IS NOT NULL
 )
-DELETE FROM vehicle_sessions
-WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
+UPDATE vehicle_sessions s
+   SET end_odometer = s.start_odometer,
+       miles = 0,
+       ended_at = COALESCE(s.ended_at, now()),
+       correction_reason = COALESCE(
+         s.correction_reason,
+         'Auto-closed by migration 113: superseded duplicate open session'
+       ),
+       updated_at = now()
+  FROM ranked
+ WHERE ranked.id = s.id
+   AND ranked.rn > 1;
 
 -- Allow at most one OPEN (no end odometer, no miles) session per vehicle.
 -- NULL vehicle_id rows are exempt (SQL treats NULLs as distinct), which is an
@@ -57,6 +103,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_vehicle_sessions_one_open_per_vehicle
 -- CREATE UNIQUE INDEX IF NOT EXISTS idx_vehicle_sessions_one_open_per_day
 --   ON vehicle_sessions (account_id, session_date)
 --   WHERE end_odometer IS NULL AND miles IS NULL;
+-- -- Re-tightening the odometer checks to strict `>` first requires removing any
+-- -- zero-mile sessions this migration created (end_odometer = start_odometer).
 -- ALTER TABLE vehicle_sessions ALTER COLUMN started_at DROP NOT NULL;
 -- ALTER TABLE vehicle_sessions ALTER COLUMN started_at DROP DEFAULT;
 -- ALTER TABLE vehicle_sessions
