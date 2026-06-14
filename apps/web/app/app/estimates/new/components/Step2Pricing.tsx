@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button, Card, Input, SectionHeader, Textarea } from "@/components/ui";
 import { MaterialsGenerator } from "../../components/MaterialsGenerator";
+import type { AssessmentContext } from "@/lib/estimates/assessment-context";
 import { PriceBookSelector } from "@/components/PriceBookSelector";
 import { ScopeBuilder } from "@/components/ScopeBuilder";
 import { getMaterialsByCategory, type MaterialSuggestion } from "@ai-fsm/domain";
@@ -115,6 +116,7 @@ interface Step2Props {
   taxRate: string;
   setTaxRate: (v: string) => void;
   lineTotal: (row: LineItemRow) => number;
+  assessmentContext: AssessmentContext | null;
 }
 
 export function Step2Pricing({
@@ -142,6 +144,7 @@ export function Step2Pricing({
   depositCents, balanceDueCents,
   taxRate, setTaxRate,
   lineTotal,
+  assessmentContext,
 }: Step2Props) {
   const [showMaterialsGen, setShowMaterialsGen] = useState(false);
   return (
@@ -764,6 +767,8 @@ export function Step2Pricing({
                 {showMaterialsGen ? (
                   <div style={{ marginTop: "var(--space-3)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
                     <MaterialsGenerator
+                      initialScope={assessmentContext?.generatedJobDescription ?? ""}
+                      rooms={assessmentContext?.rooms ?? []}
                       onAddToEstimate={(matItems) => {
                         addBulkLineItems(
                           matItems.map((m) => ({

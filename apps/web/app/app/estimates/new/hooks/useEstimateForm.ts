@@ -11,6 +11,11 @@ import {
   type EstimateSpec,
 } from "@ai-fsm/domain";
 import { useEstimateAI } from "./useEstimateAI";
+import {
+  readAssessmentContext,
+  clearAssessmentContext,
+  type AssessmentContext,
+} from "@/lib/estimates/assessment-context";
 import type { ShoppingList, SpecifiedMaterial, RoomSpec, ProjectOptions, PaintingProjectResult } from "@ai-fsm/domain";
 import { roomResultToLegacyFields } from "@ai-fsm/domain";
 import { useEstimatePriceBook } from "./useEstimatePriceBook";
@@ -153,6 +158,15 @@ export function useEstimateForm({
       }
     } catch { /* ignore parse errors */ }
     return [{ ...EMPTY_ROW }];
+  });
+
+  // Assessment hand-off (generated description + rooms). Read-and-clear once
+  // at form level — same lifecycle as estimate_prefill_materials above — so it
+  // survives step remounts but never leaks into a later estimate in this tab.
+  const [assessmentContext] = useState<AssessmentContext | null>(() => {
+    const ctx = readAssessmentContext();
+    clearAssessmentContext();
+    return ctx;
   });
 
   const [tripCount, setTripCount] = useState<"one_trip" | "multi_trip">("one_trip");
@@ -730,6 +744,7 @@ export function useEstimateForm({
   return {
     // UI state
     pending, error, step, setStep,
+    assessmentContext,
     inlineForm, setInlineForm,
     // Entity lists
     clientList, jobList, propertyList,
