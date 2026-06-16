@@ -11,6 +11,7 @@
 #   5. Build and start web + worker
 #   6. Wait for web healthcheck to pass
 #   7. Print service status + health endpoint response
+#   8. Report the PWA install origin (tailscale serve), best-effort
 #
 # Pre-flight checks (run once before first deploy):
 #   docker network inspect business_proxy >/dev/null
@@ -190,3 +191,29 @@ done
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" ps
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T web \
   wget -qO- http://localhost:3000/api/health
+
+# -----------------------------------------------------------------------------
+# PWA install origin (best-effort): the app is only installable over a secure
+# origin. Report whether `tailscale serve` is exposing it over HTTPS for
+# phone/field use, and how to enable it if not. Never fails the deploy.
+# See docs/working/pwa-https-deployment.md.
+# -----------------------------------------------------------------------------
+TAILSCALE_SERVE_PORT="${TAILSCALE_SERVE_PORT:-3000}"
+check_tailscale_serve() {
+  echo
+  if ! command -v tailscale >/dev/null 2>&1; then
+    echo "PWA install: tailscale not installed — install needs an HTTPS origin (docs/working/pwa-https-deployment.md)"
+    return 0
+  fi
+  local serve_status url
+  serve_status="$(tailscale serve status 2>/dev/null || true)"
+  if printf '%s' "${serve_status}" | grep -q ":${TAILSCALE_SERVE_PORT}\b"; then
+    url="$(printf '%s' "${serve_status}" | grep -oE 'https://[^ ]+' | head -1 || true)"
+    echo "PWA install: tailscale serve active → install at ${url:-https://<your-tailnet-host>}"
+  else
+    echo "PWA install: tailscale serve not exposing :${TAILSCALE_SERVE_PORT} — for phone/field install run:"
+    echo "    sudo tailscale serve --bg ${TAILSCALE_SERVE_PORT}"
+    echo "  then set APP_URL/APP_BASE_URL to the https URL and redeploy (docs/working/pwa-https-deployment.md)"
+  fi
+}
+check_tailscale_serve
