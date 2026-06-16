@@ -39,6 +39,7 @@ Complete requested tasks end-to-end while preserving reliability, traceability, 
 5. Business logic changes must include tests or an explicit documented test gap.
 6. Production runs on garonhome.local using `infra/compose.garonhome.yml`.
 7. Do not use archived or generated planning documents as product instructions.
+8. Do not start new work unless it maps to an existing `docs/backlog/` task, or a new task is added to `docs/backlog/` first.
 
 ## Decision Policy
 
