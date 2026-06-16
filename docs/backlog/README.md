@@ -8,6 +8,19 @@ This backlog was created as an initial pass from recent planning discussions.
 The tasks here did **not** previously exist as a tracked list — this is the
 first time they are written down in one place.
 
+## Working rule
+
+**No new work may be started unless it maps to an existing task here, or a new
+task is added to this backlog first.** If nothing fits, add a `Proposed` task
+(correct epic, the standard headings below) before writing code. Adding the task
+can be the first step of the same effort, but the task must exist before the
+work.
+
+A task closes when its acceptance criteria are met — it then moves to `done/`.
+Do not keep a task open because new ideas surfaced during the build; new ideas
+become new tasks, which earn their place only after the shipped feature proves
+its value in use.
+
 ## How this relates to the canonical docs
 
 - **`docs/canonical/ROADMAP.md` remains the product-direction source of truth.**
@@ -39,7 +52,7 @@ Next available ID: **TASK-019**.
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
 | TASK-003 | Wrong Vehicle Correction | 001 | Done |
-| TASK-004 | Daily Operations Log | 001 | In Progress |
+| TASK-004 | Daily Operations Log | 001 | Done |
 | TASK-005 | Activity Tracking | 001 | Done |
 | TASK-006 | Assessment → Materials Generator Context | 002 | Done |
 | TASK-007 | Assessment → Estimate Context | 002 | In Progress |
