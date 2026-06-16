@@ -75,6 +75,114 @@ Priority: ranked above TASK-017 (Lead Source / Referral ROI). Bad activity data
 corrupts mileage, profitability, job costing, utilization, and reporting, whereas
 Referral ROI only affects business analytics.
 
+# TASK-021: Quick Activity Switching
+
+Status:
+Proposed
+
+Problem:
+Switching activities mid-day costs too many taps, so in practice the owner
+doesn't switch — travel stays running through job work, a tool run never gets
+recorded, and the day's ledger drifts. The best correction is preventing bad
+data in the first place. If a switch is slower than the work it interrupts, it
+won't happen.
+
+Business Value:
+- More accurate activity data at the source (fewer corrections needed later).
+- Less friction in the field → higher logging compliance.
+- Better mileage, job costing, and utilization because the timeline reflects
+  reality as it happens.
+
+Scope:
+- Surface the top ~4 activities as one-tap chips on the Daily Command Center.
+- One-tap switching (no modal, no extra confirmation).
+- Prioritize recently/most-used activities so the common switch is always front
+  and center.
+- Reuse the existing `/api/v1/activities/switch` endpoint (atomic close-and-open
+  already implemented).
+
+Out of Scope:
+- The full activity picker (the existing bottom sheet stays for the long tail).
+- Timeline correction (TASK-019) — this is prevention, that is repair.
+
+Acceptance Criteria:
+- [ ] Top 4 activities shown as chips.
+- [ ] One-tap switching with no modal.
+- [ ] Last-used activities prioritized.
+- [ ] Switch completes (perceived) under 500ms.
+
+Notes:
+Highest-priority Proposed task in this epic — it attacks the root cause that
+TASK-019 only cleans up after. Originated from the Daily Command Center UX
+review. Builds on TASK-005 (`activity_entries`) and the existing `NowBar` /
+switch flow in `apps/web/app/app/ActivityTracker.tsx`. Embodies the Mobile First
+Field Rule (see backlog README).
+
+# TASK-022: Smart Start Day
+
+Status:
+Proposed
+
+Problem:
+Starting the day re-asks for information the system already knows — which
+vehicle, its last odometer, the last session. That is typing the owner shouldn't
+have to do at 7am.
+
+Business Value:
+- Removes morning friction; the day starts in one tap.
+- Fewer odometer entry errors because the last reading is pre-filled.
+
+Scope:
+- Offer a one-tap "Start Day in <vehicle> · <last mileage>" action using the
+  known last vehicle, last odometer, and last session.
+- Fall back to the existing flow when there is no prior context (first use, new
+  vehicle).
+
+Out of Scope:
+- Multi-vehicle selection UI changes beyond the one-tap default.
+- End-of-day flow (TASK-023).
+
+Acceptance Criteria:
+- [ ] Start Day presents a one-tap action prefilled with the last vehicle and
+      last odometer.
+- [ ] Confirming starts a session without further input.
+- [ ] A clear path remains to choose a different vehicle / correct the odometer.
+
+Notes:
+Most of the data already exists (vehicle, last mileage, last session via
+`apps/web/lib/mileage/sessions.ts` and the Current Vehicle panel) — this is
+primarily a UX assembly task. Originated from the Daily Command Center UX review.
+Embodies the Mobile First Field Rule (see backlog README).
+
+# TASK-023: End of Day Checklist Wizard
+
+Status:
+Proposed
+
+Problem:
+Closing the day is a scatter of separate actions (close mileage, resolve
+warnings, review tomorrow). A guided wizard could walk the owner through it.
+
+Business Value:
+- A single, guided close-out reduces forgotten steps and loose ends.
+
+Scope:
+- A step-through wizard that sequences the existing End Day actions.
+
+Out of Scope:
+- New end-of-day data or rules — composition of existing actions only.
+
+Acceptance Criteria:
+- [ ] A guided flow steps through the existing close-out actions.
+- [ ] Each step reflects current state (mileage open, warnings, tomorrow).
+
+Notes:
+**Intentionally parked.** Do not build yet. The underlying pieces — Daily
+Operations Log (TASK-004), Activity Tracking (TASK-005), and Timeline Correction
+(TASK-019) — should stabilize in production first, or the wizard will be
+redesigned repeatedly. Revisit only after those have been evaluated in real use.
+Originated from the Daily Command Center UX review.
+
 ## Completed
 
 - [TASK-001: Vehicle Mileage Sessions](done/TASK-001-vehicle-mileage-sessions.md) — Done

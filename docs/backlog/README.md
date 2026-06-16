@@ -21,6 +21,23 @@ Do not keep a task open because new ideas surfaced during the build; new ideas
 become new tasks, which earn their place only after the shipped feature proves
 its value in use.
 
+## Design principles
+
+These cross-cutting rules guide how tasks here are scoped and built. They are
+working guidance, not yet canonical product direction — promote to
+`docs/canonical/` if they prove durable.
+
+### Mobile First Field Rule
+
+> Any action performed more than ~5 times per day should be executable in one
+> tap whenever possible.
+
+Dovetails is run from a phone in the field. Reduce typing, reduce modal dialogs,
+reduce navigation; increase one-tap actions. When this rule and "software
+purity" disagree, field reality wins. TASK-021 (Quick Activity Switching),
+TASK-022 (Smart Start Day), and the prevention-over-correction framing of
+TASK-019 all derive directly from this principle.
+
 ## How this relates to the canonical docs
 
 - **`docs/canonical/ROADMAP.md` remains the product-direction source of truth.**
@@ -46,7 +63,7 @@ tasks in `done/`.
 
 ## Task index
 
-Next available ID: **TASK-021**.
+Next available ID: **TASK-024**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -70,6 +87,9 @@ Next available ID: **TASK-021**.
 | TASK-018 | Assessment Summary Engine | 002 | In Progress |
 | TASK-019 | Activity Timeline Correction | 001 | Proposed |
 | TASK-020 | PWA Installability | 005 | In Progress |
+| TASK-021 | Quick Activity Switching | 001 | Proposed |
+| TASK-022 | Smart Start Day | 001 | Proposed |
+| TASK-023 | End of Day Checklist Wizard | 001 | Proposed |
 
 ## Status legend
 
