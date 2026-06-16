@@ -592,6 +592,11 @@ function EndDay({ session, warnings, tomorrow, activityEntries, dayMileage }: { 
       <SectionHeader title="End Day" count={activeWarnings.length} />
       <DayMileagePanel data={dayMileage} />
       <DayTimeSummary entries={activityEntries} />
+      <div style={{ marginBottom: "var(--space-4)" }}>
+        <Link href={"/app/timeline" as Route} style={{ color: "var(--accent)", fontSize: "var(--text-sm)", fontWeight: 600, textDecoration: "none" }}>
+          Edit timeline →
+        </Link>
+      </div>
       {activeWarnings.length === 0 ? <EmptyState title="No loose ends" description="Close mileage when the day is done, then preview tomorrow." /> : (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", marginBottom: "var(--space-4)" }}>
           {activeWarnings.map((warning) => <div key={warning} style={{ color: "#b91c1c", fontWeight: 700 }}>🔴 {warning}</div>)}
