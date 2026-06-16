@@ -110,3 +110,65 @@ export function completedSessionMiles(s: SessionMiles): number | null {
 export function dailyMileageTotal(sessions: SessionMiles[]): number {
   return sessions.reduce((sum, s) => sum + (completedSessionMiles(s) ?? 0), 0);
 }
+
+export type VehicleSessionRow = SessionMiles & {
+  vehicle_id: string | null;
+  vehicle_nickname: string | null;
+  vehicle_plate: string | null;
+};
+
+export type DayMileageSummary = {
+  totalMiles: number;
+  completedSessions: number;
+  openSessions: number;
+  perVehicle: {
+    vehicle_id: string | null;
+    nickname: string | null;
+    plate: string | null;
+    miles: number;
+    sessions: number;
+  }[];
+};
+
+/**
+ * Roll a day's vehicle sessions into a Daily Operations Log mileage summary:
+ * total miles across all vehicles, how many sessions are completed vs still
+ * open, and a per-vehicle breakdown. Open sessions add no miles but are counted
+ * so the day can warn about unclosed mileage. Per-vehicle rows are ordered by
+ * miles descending. Vehicle-less sessions group under a null vehicle.
+ */
+export function summarizeDayMileage(rows: VehicleSessionRow[]): DayMileageSummary {
+  const byVehicle = new Map<string, DayMileageSummary["perVehicle"][number]>();
+  let completedSessions = 0;
+  let openSessions = 0;
+
+  for (const row of rows) {
+    const miles = completedSessionMiles(row);
+    if (miles == null) {
+      openSessions += 1;
+      continue;
+    }
+    completedSessions += 1;
+    const key = row.vehicle_id ?? "__none__";
+    const entry = byVehicle.get(key);
+    if (entry) {
+      entry.miles += miles;
+      entry.sessions += 1;
+    } else {
+      byVehicle.set(key, {
+        vehicle_id: row.vehicle_id,
+        nickname: row.vehicle_nickname,
+        plate: row.vehicle_plate,
+        miles,
+        sessions: 1,
+      });
+    }
+  }
+
+  return {
+    totalMiles: dailyMileageTotal(rows),
+    completedSessions,
+    openSessions,
+    perVehicle: [...byVehicle.values()].sort((a, b) => b.miles - a.miles),
+  };
+}
