@@ -65,6 +65,10 @@ the HTTPS origin itself is a deployment task, not a code change. From an
 app-config standpoint the criteria are satisfiable now; the final Lighthouse
 "installable" green requires the secure origin to be in place.
 
+Deployment runbook for the HTTPS path (real subdomain + DNS-01 cert via NPM,
+split-horizon resolution via AdGuard, env + verification steps):
+`docs/working/pwa-https-deployment.md`.
+
 ## Completed
 
 _None yet._
