@@ -7,7 +7,9 @@ import {
   findOpenSessionForVehicle,
   isSuspiciousMiles,
   lastKnownOdometer,
+  summarizeDayMileage,
   validateStartOdometer,
+  type VehicleSessionRow,
 } from "../sessions";
 
 function mockClient(rows: unknown[]): PoolClient {
@@ -50,6 +52,47 @@ describe("completedSessionMiles / dailyMileageTotal — daily total across vehic
     expect(completedSessionMiles(sessions[0])).toBe(40);
     expect(completedSessionMiles(sessions[2])).toBeNull();
     expect(dailyMileageTotal(sessions)).toBe(65);
+  });
+});
+
+describe("summarizeDayMileage — Daily Operations Log rollup", () => {
+  function row(over: Partial<VehicleSessionRow>): VehicleSessionRow {
+    return {
+      vehicle_id: null,
+      vehicle_nickname: null,
+      vehicle_plate: null,
+      miles: null,
+      start_odometer: null,
+      end_odometer: null,
+      ...over,
+    };
+  }
+
+  it("totals completed miles across vehicles and breaks down per vehicle", () => {
+    const rows = [
+      row({ vehicle_id: "ram", vehicle_nickname: "Ram 1500", vehicle_plate: "ABC", start_odometer: 100, end_odometer: 140 }), // 40
+      row({ vehicle_id: "path", vehicle_nickname: "Pathfinder", vehicle_plate: "XYZ", miles: 25 }),                              // 25
+      row({ vehicle_id: "ram", vehicle_nickname: "Ram 1500", vehicle_plate: "ABC", start_odometer: 140, end_odometer: 150 }),   // 10
+      row({ vehicle_id: "ram", vehicle_nickname: "Ram 1500", vehicle_plate: "ABC", start_odometer: 150, end_odometer: null }),  // open
+    ];
+    const summary = summarizeDayMileage(rows);
+    expect(summary.totalMiles).toBe(75);
+    expect(summary.completedSessions).toBe(3);
+    expect(summary.openSessions).toBe(1);
+    // ordered by miles desc: Ram (50) before Pathfinder (25)
+    expect(summary.perVehicle.map((v) => [v.nickname, v.miles, v.sessions])).toEqual([
+      ["Ram 1500", 50, 2],
+      ["Pathfinder", 25, 1],
+    ]);
+  });
+
+  it("handles an empty day", () => {
+    expect(summarizeDayMileage([])).toEqual({
+      totalMiles: 0,
+      completedSessions: 0,
+      openSessions: 0,
+      perVehicle: [],
+    });
   });
 });
 

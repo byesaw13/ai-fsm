@@ -6,6 +6,7 @@ import { LinkButton, PageContainer, PageHeader } from "@/components/ui";
 import { DailyCommandCenter } from "./DailyCommandCenter";
 import type { CommandVisit, CountAction, EndWarnings, MaterialJob, OpenSession, VehicleOption } from "./DailyCommandCenter";
 import type { ActivityEntryDto } from "./ActivityTracker";
+import { summarizeDayMileage, type VehicleSessionRow } from "@/lib/mileage/sessions";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,7 @@ export default async function AppPage() {
     missingReceiptRows,
     inProgressRows,
     activityEntries,
+    todaySessionRows,
   ] = await Promise.all([
     queryForSession<CommandVisit>(session,
       `SELECT DISTINCT ON (j.id)
@@ -193,7 +195,22 @@ export default async function AppPage() {
          AND voided_at IS NULL
        ORDER BY started_at ASC`,
       [accountId]),
+
+    queryForSession<VehicleSessionRow>(session,
+      `SELECT s.vehicle_id,
+              v.nickname AS vehicle_nickname,
+              v.plate    AS vehicle_plate,
+              s.start_odometer,
+              s.end_odometer,
+              s.miles::float8 AS miles
+       FROM vehicle_sessions s
+       LEFT JOIN vehicles v ON v.id = s.vehicle_id
+       WHERE s.account_id = $1 AND s.session_date = CURRENT_DATE
+       ORDER BY s.started_at ASC`,
+      [accountId]),
   ]);
+
+  const dayMileage = summarizeDayMileage(todaySessionRows);
 
   const draftInvoices = parseN(draftInvoiceCountRows[0]);
   const deposits = parseN(depositCountRows[0]);
@@ -264,6 +281,7 @@ export default async function AppPage() {
         warnings={warnings}
         tomorrowJobs={tomorrowJobs}
         activityEntries={activityEntries}
+        dayMileage={dayMileage}
       />
     </PageContainer>
   );

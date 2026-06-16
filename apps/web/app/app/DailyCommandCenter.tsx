@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Button, Card, EmptyState, LinkButton, Modal, SectionHeader, StatusBadge, useToast } from "@/components/ui";
 import { NowBar, DayTimeSummary, type ActivityEntryDto } from "./ActivityTracker";
 import type { StatusVariant } from "@/components/ui";
+import type { DayMileageSummary } from "@/lib/mileage/sessions";
 
 export type CountAction = {
   label: string;
@@ -527,7 +528,30 @@ function Materials({ count, jobs }: { count: number; jobs: MaterialJob[] }) {
   );
 }
 
-function EndDay({ session, warnings, tomorrow, activityEntries }: { session: OpenSession | null; warnings: EndWarnings; tomorrow: CommandVisit[]; activityEntries: ActivityEntryDto[] }) {
+function DayMileagePanel({ data }: { data: DayMileageSummary }) {
+  if (data.completedSessions === 0 && data.openSessions === 0) return null;
+  const plural = (n: number) => (n === 1 ? "" : "s");
+  return (
+    <div style={{ marginBottom: "var(--space-4)" }}>
+      <SectionHeader title="Today's mileage" as="h3" />
+      <div style={{ fontSize: "var(--text-sm)" }}>
+        <strong>{data.totalMiles.toLocaleString()} mi</strong> across {data.completedSessions} completed session{plural(data.completedSessions)}
+        {data.openSessions > 0 ? ` · ${data.openSessions} still open` : ""}
+      </div>
+      {data.perVehicle.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: "var(--space-2)" }}>
+          {data.perVehicle.map((v) => (
+            <div key={v.vehicle_id ?? "none"} style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+              {v.nickname ?? "No vehicle"}{v.plate ? ` (${v.plate})` : ""} — {v.miles.toLocaleString()} mi · {v.sessions} session{plural(v.sessions)}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EndDay({ session, warnings, tomorrow, activityEntries, dayMileage }: { session: OpenSession | null; warnings: EndWarnings; tomorrow: CommandVisit[]; activityEntries: ActivityEntryDto[]; dayMileage: DayMileageSummary }) {
   const router = useRouter();
   const toast = useToast();
   const [endOdometer, setEndOdometer] = useState("");
@@ -566,6 +590,7 @@ function EndDay({ session, warnings, tomorrow, activityEntries }: { session: Ope
   return (
     <Card>
       <SectionHeader title="End Day" count={activeWarnings.length} />
+      <DayMileagePanel data={dayMileage} />
       <DayTimeSummary entries={activityEntries} />
       {activeWarnings.length === 0 ? <EmptyState title="No loose ends" description="Close mileage when the day is done, then preview tomorrow." /> : (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", marginBottom: "var(--space-4)" }}>
@@ -602,6 +627,7 @@ export function DailyCommandCenter({
   warnings,
   tomorrowJobs,
   activityEntries,
+  dayMileage,
 }: {
   todayLabel: string;
   openSession: OpenSession | null;
@@ -613,6 +639,7 @@ export function DailyCommandCenter({
   warnings: EndWarnings;
   tomorrowJobs: CommandVisit[];
   activityEntries: ActivityEntryDto[];
+  dayMileage: DayMileageSummary;
 }) {
   const activeEntry = activityEntries.find((e) => e.ended_at === null) ?? null;
   return (
@@ -622,7 +649,7 @@ export function DailyCommandCenter({
       <ActionQueue items={actionQueue} />
       <JobsToday jobs={todayJobs} />
       <Materials count={materialCount} jobs={materialJobs} />
-      <EndDay session={openSession} warnings={warnings} tomorrow={tomorrowJobs} activityEntries={activityEntries} />
+      <EndDay session={openSession} warnings={warnings} tomorrow={tomorrowJobs} activityEntries={activityEntries} dayMileage={dayMileage} />
       <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>{todayLabel}</p>
     </div>
   );
