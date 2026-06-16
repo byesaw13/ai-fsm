@@ -101,7 +101,9 @@ export default async function AppPage() {
 
     queryForSession<VehicleOption>(session,
       `SELECT v.id, v.nickname, v.plate,
-              last_s.end_odometer AS current_odometer
+              last_s.end_odometer AS current_odometer,
+              (SELECT max(started_at) FROM vehicle_sessions
+                 WHERE vehicle_id = v.id AND account_id = v.account_id)::text AS last_used_at
        FROM vehicles v
        LEFT JOIN LATERAL (
          SELECT end_odometer, session_date

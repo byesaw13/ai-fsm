@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Button, Card, EmptyState, LinkButton, Modal, SectionHeader, StatusBadge, useToast } from "@/components/ui";
 import { NowBar, DayTimeSummary, type ActivityEntryDto } from "./ActivityTracker";
 import { pickQuickActivities } from "@/lib/activities/quick-switch";
+import { pickStartVehicle, canSmartStart } from "@/lib/mileage/start-day";
 import type { StatusVariant } from "@/components/ui";
 import type { DayMileageSummary } from "@/lib/mileage/sessions";
 
@@ -35,6 +36,7 @@ export type VehicleOption = {
   nickname: string;
   plate: string | null;
   current_odometer: number | null;
+  last_used_at?: string | null;
 };
 
 export type OpenSession = {
@@ -133,10 +135,12 @@ function CurrentVehiclePanel({ initialSession, vehicles }: { initialSession: Ope
   const toast = useToast();
   const [openSession, setOpenSession] = useState(initialSession);
 
-  // Start form
-  const [vehicleId, setVehicleId] = useState(vehicles[0]?.id ?? "");
+  // Start form — default to the most recently used vehicle (Smart Start Day).
+  const smartVehicle = useMemo(() => pickStartVehicle(vehicles), [vehicles]);
+  const [vehicleId, setVehicleId] = useState(smartVehicle?.id ?? "");
   const selectedVehicle = vehicles.find((v) => v.id === vehicleId);
   const [startOdometer, setStartOdometer] = useState(String(selectedVehicle?.current_odometer ?? ""));
+  const [showStartForm, setShowStartForm] = useState(false);
 
   // Switch / correct forms
   const [mode, setMode] = useState<null | "switch" | "correct">(null);
@@ -206,6 +210,16 @@ function CurrentVehiclePanel({ initialSession, vehicles }: { initialSession: Ope
       confirmLabel: "Yes, use this vehicle",
       run: (reason) => postStart(vehicleId || null, odo, reason),
     });
+  }
+
+  // One-tap Smart Start: the last vehicle at its last-known odometer. No
+  // confirm/reason needed because the odometer equals the last reading (no
+  // warning); postStart still handles an unclosed prior session.
+  async function smartStart() {
+    if (!canSmartStart(smartVehicle) || pending) return;
+    setPending(true);
+    await postStart(smartVehicle.id, smartVehicle.current_odometer, null);
+    setPending(false);
   }
 
   function beginSwitch() {
@@ -365,26 +379,50 @@ function CurrentVehiclePanel({ initialSession, vehicles }: { initialSession: Ope
           <div>
             <h2 style={{ fontSize: "var(--text-3xl, 1.875rem)", fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>Start your day</h2>
             <p style={{ color: "var(--fg-muted)", margin: "var(--space-2) 0 0", maxWidth: 440 }}>
-              Pick your vehicle and starting mileage. You can switch vehicles any time without ending the day.
+              {canSmartStart(smartVehicle) && !showStartForm
+                ? "One tap to start in your last vehicle. You can switch vehicles any time without ending the day."
+                : "Pick your vehicle and starting mileage. You can switch vehicles any time without ending the day."}
             </p>
           </div>
-          <div style={{ display: "grid", gap: "var(--space-3)", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", alignItems: "end", width: "100%", maxWidth: 520, textAlign: "left" }}>
-            <label style={labelStyle}>
-              Vehicle
-              <select value={vehicleId} onChange={(e) => { const next = vehicles.find((v) => v.id === e.target.value); setVehicleId(e.target.value); setStartOdometer(String(next?.current_odometer ?? "")); }} style={{ ...fieldStyle, minHeight: 44 }}>
-                <option value="">No vehicle</option>
-                {vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.nickname}{vehicle.plate ? ` (${vehicle.plate})` : ""}</option>)}
-              </select>
-              {selectedVehicle ? <small style={{ color: "var(--fg-muted)" }}>{selectedVehicle.plate ? `${selectedVehicle.plate} · ` : ""}last known {fmtOdo(selectedVehicle.current_odometer)}</small> : null}
-            </label>
-            <label style={labelStyle}>
-              Start odometer
-              <input value={startOdometer} onChange={(e) => setStartOdometer(e.target.value)} inputMode="numeric" style={fieldStyle} />
-            </label>
-          </div>
-          <button type="button" onClick={beginStart} className="p7-btn p7-btn-primary" style={{ minHeight: 52, fontSize: "var(--text-base)", fontWeight: 700, padding: "0 var(--space-10)", width: "100%", maxWidth: 520 }}>
-            Start Day
-          </button>
+
+          {/* Smart Start Day: one-tap start in the last vehicle at its last odometer. */}
+          {canSmartStart(smartVehicle) && !showStartForm ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", width: "100%", maxWidth: 520, alignItems: "center" }}>
+              <button
+                type="button"
+                onClick={smartStart}
+                disabled={pending}
+                className="p7-btn p7-btn-primary"
+                data-testid="smart-start-day-btn"
+                style={{ minHeight: 56, fontSize: "var(--text-lg, 1.125rem)", fontWeight: 800, padding: "0 var(--space-8)", width: "100%" }}
+              >
+                {pending ? "Starting…" : `Start Day in ${smartVehicle.nickname} · ${fmtOdo(smartVehicle.current_odometer)} mi`}
+              </button>
+              <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" onClick={() => setShowStartForm(true)} disabled={pending}>
+                Different vehicle or mileage?
+              </button>
+            </div>
+          ) : (
+            <>
+              <div style={{ display: "grid", gap: "var(--space-3)", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", alignItems: "end", width: "100%", maxWidth: 520, textAlign: "left" }}>
+                <label style={labelStyle}>
+                  Vehicle
+                  <select value={vehicleId} onChange={(e) => { const next = vehicles.find((v) => v.id === e.target.value); setVehicleId(e.target.value); setStartOdometer(String(next?.current_odometer ?? "")); }} style={{ ...fieldStyle, minHeight: 44 }}>
+                    <option value="">No vehicle</option>
+                    {vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.nickname}{vehicle.plate ? ` (${vehicle.plate})` : ""}</option>)}
+                  </select>
+                  {selectedVehicle ? <small style={{ color: "var(--fg-muted)" }}>{selectedVehicle.plate ? `${selectedVehicle.plate} · ` : ""}last known {fmtOdo(selectedVehicle.current_odometer)}</small> : null}
+                </label>
+                <label style={labelStyle}>
+                  Start odometer
+                  <input value={startOdometer} onChange={(e) => setStartOdometer(e.target.value)} inputMode="numeric" style={fieldStyle} />
+                </label>
+              </div>
+              <button type="button" onClick={beginStart} className="p7-btn p7-btn-primary" style={{ minHeight: 52, fontSize: "var(--text-base)", fontWeight: 700, padding: "0 var(--space-10)", width: "100%", maxWidth: 520 }}>
+                Start Day
+              </button>
+            </>
+          )}
         </Card>
       )}
 
