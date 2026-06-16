@@ -6,42 +6,6 @@ trustworthy enough to feed tax mileage, vehicle cost, and job profitability.
 
 ## Active tasks
 
-# TASK-022: Smart Start Day
-
-Status:
-Proposed
-
-Problem:
-Starting the day re-asks for information the system already knows — which
-vehicle, its last odometer, the last session. That is typing the owner shouldn't
-have to do at 7am.
-
-Business Value:
-- Removes morning friction; the day starts in one tap.
-- Fewer odometer entry errors because the last reading is pre-filled.
-
-Scope:
-- Offer a one-tap "Start Day in <vehicle> · <last mileage>" action using the
-  known last vehicle, last odometer, and last session.
-- Fall back to the existing flow when there is no prior context (first use, new
-  vehicle).
-
-Out of Scope:
-- Multi-vehicle selection UI changes beyond the one-tap default.
-- End-of-day flow (TASK-023).
-
-Acceptance Criteria:
-- [ ] Start Day presents a one-tap action prefilled with the last vehicle and
-      last odometer.
-- [ ] Confirming starts a session without further input.
-- [ ] A clear path remains to choose a different vehicle / correct the odometer.
-
-Notes:
-Most of the data already exists (vehicle, last mileage, last session via
-`apps/web/lib/mileage/sessions.ts` and the Current Vehicle panel) — this is
-primarily a UX assembly task. Originated from the Daily Command Center UX review.
-Embodies the Mobile First Field Rule (see backlog README).
-
 # TASK-023: End of Day Checklist Wizard
 
 Status:
@@ -80,3 +44,4 @@ Originated from the Daily Command Center UX review.
 - [TASK-005: Activity Tracking](done/TASK-005-activity-tracking.md) — Done
 - [TASK-019: Activity Timeline Correction](done/TASK-019-activity-timeline-correction.md) — Done
 - [TASK-021: Quick Activity Switching](done/TASK-021-quick-activity-switching.md) — Done
+- [TASK-022: Smart Start Day](done/TASK-022-smart-start-day.md) — Done
