@@ -18,6 +18,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 RUN corepack enable
 COPY --from=build /app/apps/web/.next /app/apps/web/.next
+COPY --from=build /app/apps/web/public /app/apps/web/public
 COPY --from=build /app/apps/web/package.json /app/apps/web/package.json
 COPY --from=build /app/apps/web/node_modules /app/apps/web/node_modules
 COPY --from=build /app/node_modules /app/node_modules

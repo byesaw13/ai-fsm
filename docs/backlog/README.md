@@ -38,6 +38,7 @@ its value in use.
 - `EPIC-002-estimating-and-assessments.md`
 - `EPIC-003-property-intelligence.md`
 - `EPIC-004-billing-and-profitability.md`
+- `EPIC-005-platform-and-delivery.md`
 - `done/` — completed tasks, moved out of the active epics.
 
 Each epic file lists its **active** tasks in full and links to its **completed**
@@ -45,7 +46,7 @@ tasks in `done/`.
 
 ## Task index
 
-Next available ID: **TASK-020**.
+Next available ID: **TASK-021**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -68,6 +69,7 @@ Next available ID: **TASK-020**.
 | TASK-017 | Lead Source / Referral ROI | 004 | In Progress |
 | TASK-018 | Assessment Summary Engine | 002 | In Progress |
 | TASK-019 | Activity Timeline Correction | 001 | Proposed |
+| TASK-020 | PWA Installability | 005 | In Progress |
 
 ## Status legend
 
