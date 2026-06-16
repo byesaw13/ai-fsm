@@ -24,6 +24,8 @@ Product direction:
 
 Archived, generated, and working documents may provide evidence, implementation notes, or historical context. They do not override canonical docs.
 
+Active implementation backlog: docs/backlog/README.md
+
 ## Prime Directive
 
 Complete requested tasks end-to-end while preserving reliability, traceability, and canonical product scope.
