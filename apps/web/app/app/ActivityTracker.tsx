@@ -30,21 +30,55 @@ function elapsedLabel(startedAt: string, nowMs: number): string {
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}` : `0:${String(m).padStart(2, "0")}`;
 }
 
-export function NowBar({ active }: { active: ActivityEntryDto | null }) {
+export function NowBar({
+  active,
+  quickTypes = [],
+}: {
+  active: ActivityEntryDto | null;
+  quickTypes?: ActivityType[];
+}) {
   const router = useRouter();
   const toast = useToast();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
-  // Tick the elapsed label once a minute while something is active.
+  // Optimistic switch: reflect the tapped activity immediately (perceived
+  // <500ms) instead of waiting on the network round-trip + refresh. Cleared
+  // once the server-provided `active` catches up (or on error).
+  const [optimistic, setOptimistic] = useState<{ type: ActivityType; startedAt: string } | null>(null);
+
+  // Drop the optimistic override once the refreshed server state matches it.
   useEffect(() => {
-    if (!active) return;
+    if (optimistic && active?.activity_type === optimistic.type) setOptimistic(null);
+  }, [active, optimistic]);
+
+  // Tick the elapsed label once a minute while something is active.
+  const hasActive = !!active || !!optimistic;
+  useEffect(() => {
+    if (!hasActive) return;
     const t = setInterval(() => setNowMs(Date.now()), 60_000);
     return () => clearInterval(t);
-  }, [active]);
+  }, [hasActive]);
+
+  const displayType: ActivityType | null = optimistic?.type ?? (active?.activity_type as ActivityType ?? null);
+  const displayStartedAt = optimistic?.startedAt ?? active?.started_at ?? null;
+  const displayNote = optimistic ? null : active?.note ?? null;
 
   async function switchTo(type: ActivityType) {
+    // Skip only on a TRUE no-op: same type AND the current entry is unlinked.
+    // Chips never carry an entity link, so tapping the same type while the
+    // active entry IS linked (e.g. job_work auto-started by a visit) is a real
+    // transition to unlinked work — let it through to the (idempotent) API.
+    const isNoOp = optimistic ? optimistic.type === type : active?.activity_type === type && active?.entity_id == null;
+    if (isNoOp) {
+      setSheetOpen(false);
+      return;
+    }
+    const startedAt = new Date().toISOString();
+    setOptimistic({ type, startedAt }); // instant feedback
+    setNowMs(Date.now());
+    setSheetOpen(false);
     setPending(true);
     const res = await fetch("/api/v1/activities/switch", {
       method: "POST",
@@ -52,8 +86,8 @@ export function NowBar({ active }: { active: ActivityEntryDto | null }) {
       body: JSON.stringify({ activity_type: type }),
     });
     setPending(false);
-    setSheetOpen(false);
     if (!res.ok) {
+      setOptimistic(null); // revert
       const json = await res.json().catch(() => ({}));
       toast.error(json.error?.message ?? "Could not switch activity");
       return;
@@ -63,6 +97,7 @@ export function NowBar({ active }: { active: ActivityEntryDto | null }) {
   }
 
   async function stop() {
+    setOptimistic(null);
     setPending(true);
     const res = await fetch("/api/v1/activities/stop", { method: "POST" });
     setPending(false);
@@ -74,44 +109,76 @@ export function NowBar({ active }: { active: ActivityEntryDto | null }) {
     router.refresh();
   }
 
-  const meta = active ? ACTIVITY_TYPE_META[active.activity_type as ActivityType] : null;
+  const meta = displayType ? ACTIVITY_TYPE_META[displayType] : null;
 
   return (
     <>
       <div
         style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)",
+          display: "flex", flexDirection: "column", gap: "var(--space-2)",
           padding: "var(--space-3) var(--space-4)", borderRadius: "var(--radius)",
           border: "1px solid var(--border)",
-          borderLeft: `4px solid ${active ? "var(--accent)" : "var(--border-strong)"}`,
+          borderLeft: `4px solid ${hasActive ? "var(--accent)" : "var(--border-strong)"}`,
           background: "var(--bg-card)",
         }}
         data-testid="now-bar"
       >
-        {active && meta ? (
-          <span style={{ display: "flex", alignItems: "baseline", gap: "var(--space-2)", minWidth: 0 }}>
-            <strong style={{ whiteSpace: "nowrap" }}>{meta.emoji} {meta.label}</strong>
-            {active.note && (
-              <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {active.note}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)" }}>
+          {meta && displayStartedAt ? (
+            <span style={{ display: "flex", alignItems: "baseline", gap: "var(--space-2)", minWidth: 0 }}>
+              <strong style={{ whiteSpace: "nowrap" }}>{meta.emoji} {meta.label}</strong>
+              {displayNote && (
+                <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {displayNote}
+                </span>
+              )}
+              <span style={{ color: "var(--accent)", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                {elapsedLabel(displayStartedAt, nowMs)}
               </span>
-            )}
-            <span style={{ color: "var(--accent)", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-              {elapsedLabel(active.started_at, nowMs)}
             </span>
-          </span>
-        ) : (
-          <span style={{ color: "var(--fg-muted)" }}>Not tracking — what are you doing?</span>
+          ) : (
+            <span style={{ color: "var(--fg-muted)" }}>Not tracking — what are you doing?</span>
+          )}
+          <button
+            type="button"
+            className="p7-btn p7-btn-ghost p7-btn-sm"
+            disabled={pending}
+            onClick={() => setSheetOpen(true)}
+            data-testid="switch-activity-btn"
+          >
+            More…
+          </button>
+        </div>
+
+        {/* One-tap quick switch chips — top activities, no modal (TASK-021). */}
+        {quickTypes.length > 0 && (
+          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }} data-testid="quick-switch-chips">
+            {quickTypes.map((t) => {
+              const m = ACTIVITY_TYPE_META[t];
+              const isCurrent = displayType === t;
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  disabled={pending && !isCurrent}
+                  onClick={() => switchTo(t)}
+                  aria-pressed={isCurrent}
+                  data-testid={`quick-${t}`}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    padding: "8px 12px", borderRadius: "999px",
+                    border: `1px solid ${isCurrent ? "var(--accent)" : "var(--border)"}`,
+                    background: isCurrent ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "var(--bg-card)",
+                    color: isCurrent ? "var(--accent)" : "var(--fg)",
+                    fontWeight: 600, fontSize: "var(--text-sm)", cursor: "pointer", whiteSpace: "nowrap",
+                  }}
+                >
+                  <span aria-hidden="true">{m.emoji}</span>{m.label}
+                </button>
+              );
+            })}
+          </div>
         )}
-        <button
-          type="button"
-          className="p7-btn p7-btn-primary p7-btn-sm"
-          disabled={pending}
-          onClick={() => setSheetOpen(true)}
-          data-testid="switch-activity-btn"
-        >
-          {active ? "Switch" : "Start"}
-        </button>
       </div>
 
       {sheetOpen && (

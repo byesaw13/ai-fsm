@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, EmptyState, LinkButton, Modal, SectionHeader, StatusBadge, useToast } from "@/components/ui";
 import { NowBar, DayTimeSummary, type ActivityEntryDto } from "./ActivityTracker";
+import { pickQuickActivities } from "@/lib/activities/quick-switch";
 import type { StatusVariant } from "@/components/ui";
 import type { DayMileageSummary } from "@/lib/mileage/sessions";
 
@@ -647,10 +648,11 @@ export function DailyCommandCenter({
   dayMileage: DayMileageSummary;
 }) {
   const activeEntry = activityEntries.find((e) => e.ended_at === null) ?? null;
+  const quickTypes = pickQuickActivities(activityEntries);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
       <CurrentVehiclePanel initialSession={openSession} vehicles={vehicles} />
-      <NowBar active={activeEntry} />
+      <NowBar active={activeEntry} quickTypes={quickTypes} />
       <ActionQueue items={actionQueue} />
       <JobsToday jobs={todayJobs} />
       <Materials count={materialCount} jobs={materialJobs} />
