@@ -30,6 +30,31 @@ first time they are written down in one place.
 Each epic file lists its **active** tasks in full and links to its **completed**
 tasks in `done/`.
 
+## Task index
+
+Next available ID: **TASK-019**.
+
+| ID | Title | Epic | Status |
+| --- | --- | --- | --- |
+| TASK-001 | Vehicle Mileage Sessions | 001 | Done |
+| TASK-002 | Vehicle Session Recovery | 001 | Done |
+| TASK-003 | Wrong Vehicle Correction | 001 | Done |
+| TASK-004 | Daily Operations Log | 001 | In Progress |
+| TASK-005 | Activity Tracking | 001 | Done |
+| TASK-006 | Assessment → Materials Generator Context | 002 | Done |
+| TASK-007 | Assessment → Estimate Context | 002 | In Progress |
+| TASK-008 | Room-Based Estimate Templates | 002 | Proposed |
+| TASK-009 | Estimate Versioning | 002 | Proposed |
+| TASK-010 | Property Timeline | 003 | Done |
+| TASK-011 | Property Opportunities | 003 | Proposed |
+| TASK-012 | Property Health Records | 003 | Proposed |
+| TASK-013 | Maintenance Plan Fit Scoring | 003 | Proposed |
+| TASK-014 | Invoice Generation from Visits | 004 | Done |
+| TASK-015 | Payment Tracking | 004 | Done |
+| TASK-016 | Job Profitability | 004 | Done |
+| TASK-017 | Lead Source / Referral ROI | 004 | In Progress |
+| TASK-018 | Assessment Summary Engine | 002 | In Progress |
+
 ## Status legend
 
 | Status | Meaning |
@@ -45,6 +70,10 @@ tasks in `done/`.
 When a task is finished, set its status to `Done` and move its file into
 `docs/backlog/done/`. Leave a one-line link to it under the epic's
 "Completed" section so the epic still reads as a coherent history.
+
+**Task IDs are permanent and must never be reused, even after moving tasks to
+done.** A retired or deleted task keeps its number; new work always takes the
+next unused `TASK-XXX`.
 
 ## Task format
 
