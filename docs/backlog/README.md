@@ -45,7 +45,7 @@ tasks in `done/`.
 
 ## Task index
 
-Next available ID: **TASK-019**.
+Next available ID: **TASK-020**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -67,6 +67,7 @@ Next available ID: **TASK-019**.
 | TASK-016 | Job Profitability | 004 | Done |
 | TASK-017 | Lead Source / Referral ROI | 004 | In Progress |
 | TASK-018 | Assessment Summary Engine | 002 | In Progress |
+| TASK-019 | Activity Timeline Correction | 001 | Proposed |
 
 ## Status legend
 
