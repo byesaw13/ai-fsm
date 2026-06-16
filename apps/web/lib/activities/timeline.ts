@@ -31,11 +31,16 @@ export interface SplitSegment {
   ended_at: string;          // ISO
 }
 
-/** A proposed change to one neighbour so the timeline stays consistent. */
+/**
+ * A proposed change to one neighbour so the timeline stays consistent: either
+ * clamp its bounds, or — when the change fully engulfs it — drop it (`delete`),
+ * since no non-zero duration would avoid the overlap.
+ */
 export interface RebalanceAdjustment {
   id: string;
   started_at?: string;       // ISO
   ended_at?: string;         // ISO
+  delete?: boolean;
 }
 
 const ms = (iso: string): number => new Date(iso).getTime();
@@ -118,9 +123,10 @@ export function proposeRebalance(
       // Neighbour starts inside the change and runs past it → push start forward.
       adjustments.push({ id: e.id, started_at: change.ended_at });
     } else {
-      // Neighbour is fully engulfed by the change; clamp it to a zero-width
-      // seam at the change start so the caller can drop or review it.
-      adjustments.push({ id: e.id, started_at: change.started_at, ended_at: change.started_at });
+      // Neighbour is fully engulfed by the change; no valid non-zero duration
+      // avoids the overlap, so propose dropping it (clamping to a zero-width
+      // seam would violate the ended_at > started_at constraint).
+      adjustments.push({ id: e.id, delete: true });
     }
   }
   return adjustments;

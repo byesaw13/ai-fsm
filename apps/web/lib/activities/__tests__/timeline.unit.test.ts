@@ -57,6 +57,17 @@ describe("proposeRebalance", () => {
     expect(adj).toContainEqual({ id: "b", started_at: T(14) });
   });
 
+  it("proposes dropping a neighbour fully engulfed by the change", () => {
+    // A change spanning 6:00–16:00 fully covers travel(7–12); it can't be
+    // clamped to a valid duration, so it must be dropped.
+    const adj = proposeRebalance(entries, { started_at: T(6), ended_at: T(16) });
+    const dropped = adj.find((x) => x.id === "a");
+    // Dropped, with no (zero-width) bounds that would violate the duration check.
+    expect(dropped).toEqual({ id: "a", delete: true });
+    expect(dropped?.started_at).toBeUndefined();
+    expect(dropped?.ended_at).toBeUndefined();
+  });
+
   it("returns nothing when the change does not overlap anyone", () => {
     expect(proposeRebalance(entries, { started_at: T(12), ended_at: T(13) })).toEqual([]);
   });

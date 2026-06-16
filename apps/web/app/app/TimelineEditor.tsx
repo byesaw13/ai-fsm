@@ -98,12 +98,20 @@ export function TimelineEditor({ date, entries }: { date: string; entries: Activ
   );
   const timelineEntries = useMemo(() => sorted.map(toTimelineEntry), [sorted]);
 
-  // Offer to clamp neighbours when a change overlaps them. Confirm via window.
-  function maybeRebalance(change: { id?: string; started_at: string; ended_at: string }): RebalanceAdjustment[] {
+  // Offer to clamp/drop neighbours when a change overlaps them. Declining the
+  // offer aborts the save — committing the change without rebalancing would
+  // leave overlapping rows that inflate tracked time.
+  function resolveRebalance(change: { id?: string; started_at: string; ended_at: string }):
+    | { proceed: true; rebalance: RebalanceAdjustment[] }
+    | { proceed: false } {
     const proposed = proposeRebalance(timelineEntries, change);
-    if (proposed.length === 0) return [];
-    const ok = window.confirm(`Adjust ${proposed.length} surrounding ${proposed.length === 1 ? "activity" : "activities"} so the timeline stays consistent?`);
-    return ok ? proposed : [];
+    if (proposed.length === 0) return { proceed: true, rebalance: [] };
+    const drops = proposed.filter((p) => p.delete).length;
+    const detail = drops > 0 ? ` (${drops} fully-covered ${drops === 1 ? "entry" : "entries"} will be removed)` : "";
+    const ok = window.confirm(
+      `This overlaps ${proposed.length} surrounding ${proposed.length === 1 ? "activity" : "activities"}. Adjust ${proposed.length === 1 ? "it" : "them"} so the timeline stays consistent?${detail}`
+    );
+    return ok ? { proceed: true, rebalance: proposed } : { proceed: false };
   }
 
   async function send(url: string, method: string, body: unknown, okMsg: string): Promise<boolean> {
@@ -131,11 +139,12 @@ export function TimelineEditor({ date, entries }: { date: string; entries: Activ
       toast.error("End must be after start");
       return;
     }
-    const rebalance = maybeRebalance({ id, started_at, ended_at });
+    const resolved = resolveRebalance({ id, started_at, ended_at });
+    if (!resolved.proceed) return;
     const ok = await send(`/api/v1/activities/${id}`, "PATCH", {
       activity_type: draft.activity_type, started_at, ended_at,
       note: draft.note || null, reason: draft.reason || null,
-      rebalance,
+      rebalance: resolved.rebalance,
     }, "Activity updated");
     if (ok) setEditId(null);
   }
@@ -154,7 +163,8 @@ export function TimelineEditor({ date, entries }: { date: string; entries: Activ
     }
     const ok = await send(`/api/v1/activities/${row.id}/split`, "POST", {
       segments: [
-        { activity_type: row.activity_type, ended_at: cut },
+        // First segment is the original block up to the cut — keep its link/note.
+        { activity_type: row.activity_type, ended_at: cut, entity_type: row.entity_type, entity_id: row.entity_id, note: row.note },
         { activity_type: secondType, ended_at: row.ended_at },
       ],
     }, "Activity split");
@@ -168,11 +178,12 @@ export function TimelineEditor({ date, entries }: { date: string; entries: Activ
       toast.error("End must be after start");
       return;
     }
-    const rebalance = maybeRebalance({ started_at, ended_at });
+    const resolved = resolveRebalance({ started_at, ended_at });
+    if (!resolved.proceed) return;
     const ok = await send("/api/v1/activities/insert", "POST", {
       activity_type: draft.activity_type, started_at, ended_at,
       note: draft.note || null, reason: draft.reason || null,
-      rebalance,
+      rebalance: resolved.rebalance,
     }, "Activity added");
     if (ok) setInserting(false);
   }

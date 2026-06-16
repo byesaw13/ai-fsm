@@ -6,6 +6,7 @@ import { getPool } from "@/lib/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
 import { ACTIVITY_TYPES, ACTIVITY_ENTITY_TYPES, activityCategoryFor } from "@ai-fsm/domain";
+import { applyRebalance } from "@/lib/activities/rebalance";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ const rebalanceSchema = z.array(
     id: z.string().uuid(),
     started_at: z.string().datetime().optional(),
     ended_at: z.string().datetime().optional(),
+    delete: z.boolean().optional(),
   })
 ).optional();
 
@@ -130,16 +132,11 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     );
 
     // Apply optional neighbour rebalancing in the same transaction.
-    for (const adj of d.rebalance ?? []) {
-      if (adj.id === id) continue;
-      await client.query(
-        `UPDATE activity_entries
-         SET started_at = COALESCE($1::timestamptz, started_at),
-             ended_at   = COALESCE($2::timestamptz, ended_at)
-         WHERE id = $3 AND account_id = $4 AND ended_at IS NOT NULL AND voided_at IS NULL`,
-        [adj.started_at ?? null, adj.ended_at ?? null, adj.id, session.accountId]
-      );
-    }
+    await applyRebalance(
+      client,
+      { accountId: session.accountId, userId: session.userId, traceId: session.traceId, skipId: id },
+      d.rebalance,
+    );
 
     await appendAuditLog(client, {
       account_id: session.accountId,

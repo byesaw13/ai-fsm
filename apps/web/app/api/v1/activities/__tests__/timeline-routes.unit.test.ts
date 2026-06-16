@@ -96,6 +96,28 @@ describe("PATCH /api/v1/activities/[id]", () => {
     expect(res.status).toBe(400);
   });
 
+  it("drops an engulfed neighbour via rebalance and audits the delete", async () => {
+    mockClientQuery.mockImplementation((sql: string) => {
+      if (sql.includes("FOR UPDATE")) return Promise.resolve({ rows: [EXISTING] });
+      if (sql.startsWith("UPDATE activity_entries")) return Promise.resolve({ rows: [EXISTING] });
+      if (sql.startsWith("DELETE FROM activity_entries")) {
+        return Promise.resolve({ rows: [{ ...EXISTING, id: "22222222-2222-2222-2222-222222222222", activity_type: "admin" }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+    const res = await editActivity(req("/api/v1/activities/" + EXISTING.id, "PATCH", {
+      started_at: "2026-06-11T10:00:00.000Z",
+      ended_at: "2026-06-11T18:00:00.000Z",
+      rebalance: [{ id: "22222222-2222-2222-2222-222222222222", delete: true }],
+    }));
+    expect(res.status).toBe(200);
+    // One audit for the edit, one for the rebalance-dropped neighbour.
+    expect(mockAppendAuditLog).toHaveBeenCalledTimes(2);
+    const actions = mockAppendAuditLog.mock.calls.map((c) => c[1].action);
+    expect(actions).toContain("update");
+    expect(actions).toContain("delete");
+  });
+
   it("404s when the entry does not exist", async () => {
     mockClientQuery.mockResolvedValue({ rows: [] });
     const res = await editActivity(req("/api/v1/activities/" + EXISTING.id, "PATCH", { note: "x" }));
