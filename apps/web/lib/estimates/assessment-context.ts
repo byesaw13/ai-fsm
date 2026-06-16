@@ -101,3 +101,26 @@ export function clearAssessmentContext(): void {
     /* ignore */
   }
 }
+
+/**
+ * Consume the assessment hand-off for an estimate-form mount.
+ *
+ * The context is ALWAYS cleared from storage so it can never linger and leak
+ * into a later, unrelated estimate — but it is only *returned* (and thus used
+ * to prefill) when the estimate was actually opened from an assessment
+ * (`from_assessment=1`). Opening a fresh estimate any other way drops any stale
+ * context on the floor instead of inheriting it.
+ *
+ * Dependencies are injectable so the policy can be unit-tested without a DOM.
+ */
+export function consumeAssessmentContext(
+  fromAssessment: boolean,
+  deps: { read: () => AssessmentContext | null; clear: () => void } = {
+    read: readAssessmentContext,
+    clear: clearAssessmentContext,
+  },
+): AssessmentContext | null {
+  const ctx = deps.read();
+  deps.clear();
+  return fromAssessment ? ctx : null;
+}

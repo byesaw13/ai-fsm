@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { PriceBookService } from "@/components/PriceBookSelector";
 import { formatCents, getStandardEstimateTerms } from "@/lib/estimates/pricing";
 import type { DepositDueTrigger, DepositType } from "@/lib/estimates/deposit-policy";
@@ -12,8 +12,7 @@ import {
 } from "@ai-fsm/domain";
 import { useEstimateAI } from "./useEstimateAI";
 import {
-  readAssessmentContext,
-  clearAssessmentContext,
+  consumeAssessmentContext,
   type AssessmentContext,
 } from "@/lib/estimates/assessment-context";
 import type { ShoppingList, SpecifiedMaterial, RoomSpec, ProjectOptions, PaintingProjectResult } from "@ai-fsm/domain";
@@ -97,6 +96,7 @@ export function useEstimateForm({
   bookingRequestId,
 }: NewEstimateFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(1);
@@ -160,14 +160,14 @@ export function useEstimateForm({
     return [{ ...EMPTY_ROW }];
   });
 
-  // Assessment hand-off (generated description + rooms). Read-and-clear once
-  // at form level — same lifecycle as estimate_prefill_materials above — so it
-  // survives step remounts but never leaks into a later estimate in this tab.
-  const [assessmentContext] = useState<AssessmentContext | null>(() => {
-    const ctx = readAssessmentContext();
-    clearAssessmentContext();
-    return ctx;
-  });
+  // Assessment hand-off (generated description + rooms). Consume once at form
+  // level: storage is always cleared so it can't survive into a later estimate,
+  // but the context is only applied when this estimate was opened from an
+  // assessment (from_assessment=1) — a plain new-estimate never inherits stale
+  // context left behind by an abandoned hand-off.
+  const [assessmentContext] = useState<AssessmentContext | null>(() =>
+    consumeAssessmentContext(searchParams.get("from_assessment") === "1")
+  );
 
   const [tripCount, setTripCount] = useState<"one_trip" | "multi_trip">("one_trip");
   const [requiresDryingOrCuring, setRequiresDryingOrCuring] = useState(false);
