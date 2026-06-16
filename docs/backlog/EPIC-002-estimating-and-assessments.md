@@ -87,6 +87,49 @@ Acceptance Criteria:
 Notes:
 No implementation found in repo.
 
+# TASK-018: Assessment Summary Engine
+
+Status:
+In Progress
+
+Problem:
+Assessment data is now used by the materials generator, but the broader flow
+still needs one reusable assessment summary/context object that can support
+materials, estimates, work orders, and invoices without retyping scope.
+
+Business Value:
+Reduces duplicate entry, keeps estimate/material/work-order context consistent,
+and makes site assessments more valuable.
+
+Scope:
+- Define one normalized assessment summary/context shape.
+- Ensure the materials generator, estimate creation, work order generation, and
+  future invoice summaries can consume the same context.
+- Reuse existing assessment-context helpers where possible.
+- Preserve manual user edits without overwriting them.
+- Document the handoff from assessment to downstream workflows.
+
+Out of Scope:
+- Rewriting the AI materials prompt.
+- Creating new database tables unless clearly necessary.
+- Business Ledger implementation.
+- Opportunity tracking implementation.
+
+Acceptance Criteria:
+- [ ] A single assessment summary/context shape is documented.
+- [ ] Existing assessment-to-materials context is represented in that shape.
+- [ ] Estimate creation can consume the same context.
+- [ ] Manual scope edits are preserved.
+- [ ] Context handoff behavior is documented for future work-order and invoice flows.
+- [ ] Tests or manual verification notes cover assessment → materials and
+      assessment → estimate flows.
+
+Notes:
+This task exists because assessment context is becoming a shared subsystem, not
+just a materials-generator patch. Builds on `apps/web/lib/estimates/assessment-context.ts`
+(see TASK-006, TASK-007). Closely related to TASK-007; TASK-018 owns the shared
+context *shape*, while TASK-007 covers the estimate-entry consumption.
+
 ## Completed
 
 - [TASK-006: Assessment → Materials Generator Context](done/TASK-006-assessment-to-materials-generator-context.md) — Done
