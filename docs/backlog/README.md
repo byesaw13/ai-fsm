@@ -87,7 +87,7 @@ Next available ID: **TASK-024**.
 | TASK-018 | Assessment Summary Engine | 002 | In Progress |
 | TASK-019 | Activity Timeline Correction | 001 | Proposed |
 | TASK-020 | PWA Installability | 005 | In Progress |
-| TASK-021 | Quick Activity Switching | 001 | Proposed |
+| TASK-021 | Quick Activity Switching | 001 | Done |
 | TASK-022 | Smart Start Day | 001 | Proposed |
 | TASK-023 | End of Day Checklist Wizard | 001 | Proposed |
 
