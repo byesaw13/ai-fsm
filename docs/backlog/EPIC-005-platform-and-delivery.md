@@ -65,9 +65,11 @@ the HTTPS origin itself is a deployment task, not a code change. From an
 app-config standpoint the criteria are satisfiable now; the final Lighthouse
 "installable" green requires the secure origin to be in place.
 
-Deployment runbook for the HTTPS path (real subdomain + DNS-01 cert via NPM,
-split-horizon resolution via AdGuard, env + verification steps):
-`docs/working/pwa-https-deployment.md`.
+Deployment runbook for the HTTPS path: `docs/working/pwa-https-deployment.md`.
+Two routes — **Tailscale Serve** (recommended for phone/field use: trusted
+`*.ts.net` cert, reachable on cellular over the tailnet, no public exposure) and
+a **real subdomain + DNS-01 via NPM with AdGuard split-horizon** (LAN-only).
+Split-horizon DNS does not work in the field, so Tailscale is the field answer.
 
 ## Completed
 
