@@ -66,8 +66,12 @@ export function NowBar({
   const displayNote = optimistic ? null : active?.note ?? null;
 
   async function switchTo(type: ActivityType) {
-    // Already doing this activity → nothing to switch (server is idempotent too).
-    if (displayType === type) {
+    // Skip only on a TRUE no-op: same type AND the current entry is unlinked.
+    // Chips never carry an entity link, so tapping the same type while the
+    // active entry IS linked (e.g. job_work auto-started by a visit) is a real
+    // transition to unlinked work — let it through to the (idempotent) API.
+    const isNoOp = optimistic ? optimistic.type === type : active?.activity_type === type && active?.entity_id == null;
+    if (isNoOp) {
       setSheetOpen(false);
       return;
     }
