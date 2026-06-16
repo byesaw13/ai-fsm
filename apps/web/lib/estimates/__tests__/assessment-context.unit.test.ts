@@ -11,6 +11,8 @@ import {
   writeAssessmentContext,
   readAssessmentContext,
   clearAssessmentContext,
+  consumeAssessmentContext,
+  type AssessmentContext,
 } from "../assessment-context";
 
 function makeSessionStorage() {
@@ -125,6 +127,53 @@ describe("write / read assessment context (browser env)", () => {
     writeAssessmentContext({ generatedJobDescription: "x", rooms: [] });
     clearAssessmentContext();
     expect(readAssessmentContext()).toBeNull();
+  });
+});
+
+describe("consumeAssessmentContext (hand-off gating)", () => {
+  const ctx: AssessmentContext = {
+    generatedJobDescription: "Repaint kitchen",
+    rooms: [{ id: "1", name: "Kitchen", length_ft: 10, width_ft: 12, height_ft: 8, notes: "" }],
+    visitId: "visit-1",
+    assessmentId: "assess-1",
+  };
+
+  it("returns the context and clears storage when opened from an assessment", () => {
+    const clear = vi.fn();
+    const out = consumeAssessmentContext(true, { read: () => ctx, clear });
+    expect(out).toEqual(ctx);
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it("drops stale context (returns null) but still clears when NOT from an assessment", () => {
+    const clear = vi.fn();
+    // Storage held leftover context from an abandoned hand-off; a plain new
+    // estimate must not inherit it.
+    const out = consumeAssessmentContext(false, { read: () => ctx, clear });
+    expect(out).toBeNull();
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it("always clears even when there was nothing stored", () => {
+    const clear = vi.fn();
+    const out = consumeAssessmentContext(true, { read: () => null, clear });
+    expect(out).toBeNull();
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it("integrates with the real read/clear via sessionStorage", () => {
+    const storage = makeSessionStorage();
+    vi.stubGlobal("window", {} as unknown);
+    vi.stubGlobal("sessionStorage", storage);
+    try {
+      writeAssessmentContext(ctx);
+      const out = consumeAssessmentContext(true);
+      expect(out?.generatedJobDescription).toBe("Repaint kitchen");
+      // Consumed: a second read finds nothing.
+      expect(readAssessmentContext()).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

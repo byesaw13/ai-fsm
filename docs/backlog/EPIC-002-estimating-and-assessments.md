@@ -5,37 +5,6 @@ re-keying, and keeping estimate structure consistent across jobs.
 
 ## Active tasks
 
-# TASK-007: Assessment → Estimate Context
-
-Status:
-In Progress
-
-Problem:
-Assessment findings (conditions, scope, measurements) should flow into the
-estimate so the estimator is not re-entering what was already captured on site.
-
-Business Value:
-Less double-entry, fewer transcription errors, and estimates that reflect the
-actual site condition.
-
-Scope:
-- Carry assessment context into estimate entry and prefill where it is reliable.
-- Consume-and-clear context so stale assessment data is not reused on a later
-  estimate.
-
-Out of Scope:
-- Full room-by-room template system (TASK-008).
-- Estimate versioning (TASK-009).
-
-Acceptance Criteria:
-- [ ] Assessment context populates the estimate draft.
-- [ ] Context is cleared after use so it cannot leak into an unrelated estimate.
-
-Notes:
-Shared logic in `apps/web/lib/estimates/assessment-context.ts` and
-walkthrough prefill already exist; consume-and-clear has landed. Remaining work
-is coverage and edge cases.
-
 # TASK-008: Room-Based Estimate Templates
 
 Status:
@@ -133,3 +102,4 @@ context *shape*, while TASK-007 covers the estimate-entry consumption.
 ## Completed
 
 - [TASK-006: Assessment → Materials Generator Context](done/TASK-006-assessment-to-materials-generator-context.md) — Done
+- [TASK-007: Assessment → Estimate Context](done/TASK-007-assessment-to-estimate-context.md) — Done

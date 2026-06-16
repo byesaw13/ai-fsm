@@ -55,7 +55,7 @@ Next available ID: **TASK-020**.
 | TASK-004 | Daily Operations Log | 001 | Done |
 | TASK-005 | Activity Tracking | 001 | Done |
 | TASK-006 | Assessment → Materials Generator Context | 002 | Done |
-| TASK-007 | Assessment → Estimate Context | 002 | In Progress |
+| TASK-007 | Assessment → Estimate Context | 002 | Done |
 | TASK-008 | Room-Based Estimate Templates | 002 | Proposed |
 | TASK-009 | Estimate Versioning | 002 | Proposed |
 | TASK-010 | Property Timeline | 003 | Done |
