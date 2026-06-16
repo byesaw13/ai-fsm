@@ -8,6 +8,14 @@ This backlog was created as an initial pass from recent planning discussions.
 The tasks here did **not** previously exist as a tracked list — this is the
 first time they are written down in one place.
 
+## Working rule
+
+**No new work may be started unless it maps to an existing task here, or a new
+task is added to this backlog first.** If nothing fits, add a `Proposed` task
+(correct epic, the standard headings below) before writing code. Adding the task
+can be the first step of the same effort, but the task must exist before the
+work.
+
 ## How this relates to the canonical docs
 
 - **`docs/canonical/ROADMAP.md` remains the product-direction source of truth.**
