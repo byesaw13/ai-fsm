@@ -33,62 +33,7 @@ Browser ──► Nginx Proxy Manager (homelab, :80/:443) ──► ai-fsm-web:3
 So the proxy path is already correct. We only need a real hostname + cert + the
 app's base-URL env pointed at it.
 
-## Choosing a path: where will the phone be?
-
-| Path | Works at home (LAN) | Works in the field (cellular) | Setup |
-| --- | --- | --- | --- |
-| **Tailscale Serve** (below) | ✅ | ✅ (over the tailnet) | Easiest; auto cert |
-| **Real subdomain + split-horizon** | ✅ | ❌ (name resolves only via home DNS) | Real domain + DNS-01 |
-
-> For genuine **field use**, split-horizon DNS is **not enough** — `fsm.<domain>`
-> resolves only through the home AdGuard rewrite, so it dies on cellular. Use
-> **Tailscale Serve**, which reaches the home box over the tailnet from anywhere.
-> The subdomain path below is the right choice when install only needs to happen
-> on the home LAN.
-
-## Recommended for field use: Tailscale Serve
-
-You already run Tailscale. `tailscale serve` puts the app behind HTTPS on the
-node's MagicDNS name (`<host>.<tailnet>.ts.net`) with an **auto-provisioned,
-universally-trusted cert** — no domain DNS, no NPM cert config, and **no public
-exposure** (tailnet-only; this is `serve`, not `funnel`). Any device on the
-tailnet — including your phone on cellular — can install it.
-
-### Steps
-
-1. **Tailnet prep (one-time).** In the Tailscale admin console enable **MagicDNS**
-   and **HTTPS certificates** (DNS → "Enable HTTPS"). Install Tailscale on the
-   garonhome box and the phone; sign both into the same tailnet.
-
-2. **Expose the app to the host loopback.** This is the
-   `127.0.0.1:3000:3000` mapping now on the `web` service in
-   `compose.garonhome.yml` (loopback only — no LAN exposure). Redeploy `web` so
-   the port is live: `bash scripts/deploy-garonhome.sh`.
-
-3. **Serve it over the tailnet** (on the garonhome box):
-   ```bash
-   sudo tailscale serve --bg 3000          # serves 127.0.0.1:3000 at https://<host>.<tailnet>.ts.net
-   tailscale serve status                   # confirm the https mapping
-   ```
-
-4. **Point the app's base URL at the tailnet name** in production env (so links,
-   cookies, and absolute URLs match — install itself works regardless because
-   the manifest uses relative URLs). `SECURE_COOKIES` is already `true` in the
-   compose, which is correct for HTTPS:
-   ```
-   APP_BASE_URL=https://<host>.<tailnet>.ts.net
-   APP_URL=https://<host>.<tailnet>.ts.net
-   ```
-   (Set both — see the naming note below.) Redeploy `web`.
-
-5. **Install on the phone.** With Tailscale connected, open
-   `https://<host>.<tailnet>.ts.net` in Chrome → menu → **Install app**. It
-   launches standalone and works from anywhere the phone has the tailnet up.
-
-> Trade-off: the phone must have Tailscale running to reach the app in the field.
-> That is also a security win — the app is never publicly exposed.
-
-## Alternative: real subdomain + DNS-01, split-horizon resolution (LAN-only)
+## Recommended approach: real subdomain + DNS-01, split-horizon resolution
 
 Use a subdomain of a domain you own, e.g. `fsm.dovetails.app` (substitute your
 real domain). The homelab box is **not** publicly reachable, and we want to keep
