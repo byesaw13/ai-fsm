@@ -44,6 +44,10 @@ export default async function AppPage() {
     inProgressRows,
     activityEntries,
     todaySessionRows,
+    yesterdayMilesRows,
+    outstandingInvoicesCentsRows,
+    pendingDepositsCentsRows,
+    paidThisMonthCentsRows,
   ] = await Promise.all([
     queryForSession<CommandVisit>(session,
       `SELECT DISTINCT ON (j.id)
@@ -210,6 +214,30 @@ export default async function AppPage() {
        WHERE s.account_id = $1 AND s.session_date = CURRENT_DATE
        ORDER BY s.started_at ASC`,
       [accountId]),
+
+    queryForSession<CountRow>(session,
+      `SELECT COALESCE(SUM(miles), 0)::text AS count
+       FROM vehicle_sessions
+       WHERE account_id = $1 AND session_date = CURRENT_DATE - interval '1 day'`,
+      [accountId]),
+
+    queryForSession<CountRow>(session,
+      `SELECT COALESCE(SUM(total_cents - paid_cents), 0)::text AS count
+       FROM invoices
+       WHERE account_id = $1 AND status IN ('sent', 'partial', 'overdue')`,
+      [accountId]),
+
+    queryForSession<CountRow>(session,
+      `SELECT COALESCE(SUM(total_cents - paid_cents), 0)::text AS count
+       FROM invoices
+       WHERE account_id = $1 AND invoice_kind = 'deposit' AND status IN ('draft', 'sent', 'partial', 'overdue')`,
+      [accountId]),
+
+    queryForSession<CountRow>(session,
+      `SELECT COALESCE(SUM(amount_cents), 0)::text AS count
+       FROM payments
+       WHERE account_id = $1 AND received_at >= DATE_TRUNC('month', CURRENT_DATE)`,
+      [accountId]),
   ]);
 
   const dayMileage = summarizeDayMileage(todaySessionRows);
@@ -217,6 +245,11 @@ export default async function AppPage() {
   const draftInvoices = parseN(draftInvoiceCountRows[0]);
   const deposits = parseN(depositCountRows[0]);
   const materialCount = parseN(materialCountRows[0]);
+
+  const yesterdayMiles = parseN(yesterdayMilesRows[0]);
+  const outstandingInvoicesCents = parseN(outstandingInvoicesCentsRows[0]);
+  const pendingDepositsCents = parseN(pendingDepositsCentsRows[0]);
+  const paidThisMonthCents = parseN(paidThisMonthCentsRows[0]);
 
   const actionQueue = ([
     {
@@ -284,6 +317,10 @@ export default async function AppPage() {
         tomorrowJobs={tomorrowJobs}
         activityEntries={activityEntries}
         dayMileage={dayMileage}
+        yesterdayMiles={yesterdayMiles}
+        outstandingInvoicesCents={outstandingInvoicesCents}
+        pendingDepositsCents={pendingDepositsCents}
+        paidThisMonthCents={paidThisMonthCents}
       />
     </PageContainer>
   );
