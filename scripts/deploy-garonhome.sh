@@ -202,7 +202,9 @@ docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T web \
 report_pwa_origin() {
   echo
   local origin
-  origin="$(grep -E '^APP_URL=' "${ENV_FILE}" 2>/dev/null | head -1 | cut -d= -f2-)"
+  # `|| true` so a missing APP_URL (grep no-match → non-zero) does not trip
+  # `set -euo pipefail` and abort the deploy; we want to fall through to the hint.
+  origin="$(grep -E '^APP_URL=' "${ENV_FILE}" 2>/dev/null | head -1 | cut -d= -f2- || true)"
   if [[ -n "${origin}" && "${origin}" == https://* ]]; then
     echo "PWA install: secure origin ${origin} — open it in Chrome → menu → Install app"
   else
