@@ -88,9 +88,19 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     }
 
     if (d.action === "dismiss") {
+      if (seg.status === "dismissed") {
+        await client.query("ROLLBACK");
+        return NextResponse.json({ data: { id, status: "dismissed", already: true } });
+      }
+      // Don't dismiss a segment another tab already promoted — that would orphan
+      // its ledger row. Make the user undo the entry from the timeline instead.
+      if (seg.status === "confirmed") {
+        await client.query("ROLLBACK");
+        return err("CONFLICT", "Segment is already logged; remove the entry from the timeline instead.", 409, session.traceId);
+      }
       await client.query(
         `UPDATE location_segments SET status = 'dismissed', updated_at = now()
-         WHERE id = $1 AND account_id = $2`,
+         WHERE id = $1 AND account_id = $2 AND status = 'provisional'`,
         [id, session.accountId],
       );
       await client.query("COMMIT");
@@ -104,11 +114,35 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
         data: { id, status: "confirmed", activity_entry_id: seg.activity_entry_id, already: true },
       });
     }
+    // Only a provisional segment can be promoted (e.g. not a dismissed one).
+    if (seg.status !== "provisional") {
+      await client.query("ROLLBACK");
+      return err("CONFLICT", `Segment is ${seg.status}; cannot confirm.`, 409, session.traceId);
+    }
     // A segment must have ended before it can become a ledger fact, so it never
     // collides with the live "one active entry" invariant.
     if (seg.ended_at === null) {
       await client.query("ROLLBACK");
       return err("CONFLICT", "Segment is still in progress; label it once it ends.", 409, session.traceId);
+    }
+
+    // Refuse to create overlapping ledger time (double-counting). The owner
+    // resolves the conflict in the timeline editor or dismisses the segment.
+    const { rows: overlap } = await client.query<{ id: string }>(
+      `SELECT id FROM activity_entries
+       WHERE account_id = $1 AND voided_at IS NULL
+         AND started_at < $3 AND COALESCE(ended_at, 'infinity'::timestamptz) > $2
+       LIMIT 1`,
+      [session.accountId, seg.started_at, seg.ended_at],
+    );
+    if (overlap.length > 0) {
+      await client.query("ROLLBACK");
+      return err(
+        "CONFLICT",
+        "This time range overlaps activity already logged. Adjust it in the timeline or dismiss the segment.",
+        409,
+        session.traceId,
+      );
     }
 
     const category = activityCategoryFor(d.activity_type);
