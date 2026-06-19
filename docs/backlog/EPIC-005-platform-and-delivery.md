@@ -66,10 +66,12 @@ app-config standpoint the criteria are satisfiable now; the final Lighthouse
 "installable" green requires the secure origin to be in place.
 
 Deployment runbook for the HTTPS path: `docs/working/pwa-https-deployment.md`.
-Two routes — **Tailscale Serve** (recommended for phone/field use: trusted
-`*.ts.net` cert, reachable on cellular over the tailnet, no public exposure) and
-a **real subdomain + DNS-01 via NPM with AdGuard split-horizon** (LAN-only).
-Split-horizon DNS does not work in the field, so Tailscale is the field answer.
+Chosen route — **Cloudflare Tunnel** to a real subdomain (`app.<domain>`): a
+trusted public cert, reachable on cellular for staff and clients with no VPN
+client, no inbound host ports, home IP hidden. This serves field staff (who
+install the PWA) and clients (who use the portal in a browser) from one origin.
+Tailscale was evaluated and rejected: it requires the VPN on every device, so it
+cannot serve clients, and `tailscale serve` collided with NPM on host 443.
 
 ## Completed
 
