@@ -48,6 +48,7 @@ export default async function AppPage() {
     outstandingInvoicesCentsRows,
     pendingDepositsCentsRows,
     paidThisMonthCentsRows,
+    pendingSegmentRows,
   ] = await Promise.all([
     queryForSession<CommandVisit>(session,
       `SELECT DISTINCT ON (j.id)
@@ -238,6 +239,16 @@ export default async function AppPage() {
        FROM payments
        WHERE account_id = $1 AND received_at >= DATE_TRUNC('month', CURRENT_DATE)`,
       [accountId]),
+
+    // TASK-024: ended, still-unlabelled location segments waiting to be logged.
+    queryForSession<CountRow>(session,
+      `SELECT COUNT(*)::text AS count
+       FROM location_segments
+       WHERE account_id = $1
+         AND segment_date = CURRENT_DATE
+         AND status = 'provisional'
+         AND ended_at IS NOT NULL`,
+      [accountId]),
   ]);
 
   const dayMileage = summarizeDayMileage(todaySessionRows);
@@ -245,6 +256,7 @@ export default async function AppPage() {
   const draftInvoices = parseN(draftInvoiceCountRows[0]);
   const deposits = parseN(depositCountRows[0]);
   const materialCount = parseN(materialCountRows[0]);
+  const pendingSegments = parseN(pendingSegmentRows[0]);
 
   const yesterdayMiles = parseN(yesterdayMilesRows[0]);
   const outstandingInvoicesCents = parseN(outstandingInvoicesCentsRows[0]);
@@ -287,6 +299,13 @@ export default async function AppPage() {
       detail: "Approved jobs with materials to stage",
       tone: "warning",
     },
+    {
+      label: "Label Captured Locations",
+      count: pendingSegments,
+      href: "/app/timeline" as Route,
+      detail: "Auto-recorded stops & drives to log to your day",
+      tone: "default",
+    },
   ] satisfies CountAction[])
     .filter((item) => item.count > 0)
     .sort((a, b) => ({ danger: 0, warning: 1, default: 2 })[a.tone] - ({ danger: 0, warning: 1, default: 2 })[b.tone]);
@@ -303,7 +322,12 @@ export default async function AppPage() {
       <PageHeader
         title="Daily Command Center"
         subtitle={todayLabel}
-        actions={<LinkButton href="/app/intake/new" variant="primary" size="sm">+ New Request</LinkButton>}
+        actions={
+          <>
+            <LinkButton href="/app/timeline" variant="secondary" size="sm">Timeline</LinkButton>
+            <LinkButton href="/app/intake/new" variant="primary" size="sm">+ New Request</LinkButton>
+          </>
+        }
       />
       <DailyCommandCenter
         todayLabel={todayLabel}
