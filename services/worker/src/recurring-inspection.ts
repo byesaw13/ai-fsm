@@ -59,18 +59,18 @@ export async function findPlansNeedingInspection(
          WHERE al.entity_type = 'recurring_inspection'
            AND al.entity_id = mp.id
            AND al.account_id = mp.account_id
-           AND al.created_at > now() - ($2 || ' days')::interval
+           AND al.created_at > now() - ($2::text || ' days')::interval
        )
-     HAVING EXTRACT(DAY FROM (now() - COALESCE(
-       (SELECT MAX(v2.completed_at)
-        FROM visits v2
-        JOIN jobs j2 ON j2.id = v2.job_id
-        WHERE j2.client_id = c.id
-          AND j2.account_id = mp.account_id
-          AND v2.status = 'completed'
-          AND v2.generated_from_plan_id = mp.id),
-       mp.created_at
-     ))) >= $2
+       AND EXTRACT(DAY FROM (now() - COALESCE(
+         (SELECT MAX(v2.completed_at)
+          FROM visits v2
+          JOIN jobs j2 ON j2.id = v2.job_id
+          WHERE j2.client_id = c.id
+            AND j2.account_id = mp.account_id
+            AND v2.status = 'completed'
+            AND v2.generated_from_plan_id = mp.id),
+         mp.created_at
+       ))) >= $2::int
      ORDER BY days_since_last_inspection DESC
      LIMIT 50`,
     [automation.account_id, inspectionIntervalDays]
