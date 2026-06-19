@@ -95,10 +95,33 @@ Activity suggestion: drives → `travel`; stops at a recognized supply-house zon
 `material_run`; everything else → none (the owner assigns it, e.g. `job_work` at
 a customer address). Zone→activity rules live in `packages/domain/src/location.ts`.
 
-## HA-side setup (later slice)
+## HA-side setup (slice 3)
 
-To be documented with the HA automation: enable the Companion app's background
-location + detected-activity + reverse-geocoded-location sensors; define zones
-for home + frequent supply houses; publish zone enter/leave + activity changes to
-the bridge. Zones are optional — background GPS + detected-activity already
-captures arbitrary customer stops; zones just make recurring places self-label.
+The HA wiring is a direct `rest_command` → FSM ingest (no n8n hop needed; the
+endpoint is idempotent). Canonical config: **`ha-location-capture.yaml`** in this
+folder. On the garonhome box it is installed across the HA include files
+(`rest_commands.yaml`, `automations.yaml`) + `secrets.yaml`, and routes over the
+LAN via NPM (`http://fsm.garonhome.local`).
+
+Entities used (Nick's Samsung S25 Ultra):
+- `device_tracker.nick_s_s25` — zone presence (zone enter/leave).
+- `sensor.nick_s_s25_ultra_detected_activity` — `in_vehicle` / `still` transitions.
+- `sensor.nick_s_s25_ultra_geocoded_location` — reverse-geocoded stop address.
+
+Two automations are installed: **zone transition** (enter/leave) and **detected
+activity change** (filtered to `in_vehicle`/`still`). A geocode-update automation
+is provided commented-out for optional address enrichment.
+
+One-time phone setup (Android Companion app): enable the **Background location**,
+**Detected activity**, and **Geocoded location** sensors and grant "Always"
+location permission. Add an HA **zone** for each regular supply house (Home
+already exists). Zones are optional — the activity-change feed captures arbitrary
+customer stops too; zones just make recurring places self-label.
+
+After editing the HA YAML, reload via Developer Tools → YAML → "REST Commands"
+and "Automations" (no full restart needed).
+
+> **Live requirement:** the `/api/internal/location` route ships in the FSM app
+> build, so the app must be deployed from `main` (slices 1–2) for the endpoint to
+> exist. The shared secret is `LOCATION_INTERNAL_KEY` in the FSM env, mirrored as
+> `fsm_location_internal_key` in HA `secrets.yaml`.

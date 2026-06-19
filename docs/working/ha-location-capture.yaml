@@ -1,0 +1,114 @@
+# Home Assistant ↔ FSM location capture (TASK-024, slice 3)
+# =============================================================================
+# Reference copy of the HA config that feeds location transitions into the FSM
+# ingest endpoint. On the garonhome box this lives split across the HA include
+# files (rest_commands.yaml + automations.yaml) and secrets.yaml; this file is
+# the canonical, reviewable artifact.
+#
+# Install (garonhome HA — ~/docker/homeassistant/):
+#   1. secrets.yaml:  fsm_location_internal_key: "<same value as FSM env LOCATION_INTERNAL_KEY>"
+#   2. rest_commands.yaml:  add the `fsm_location_event` block below.
+#   3. automations.yaml:    add the two automations below.
+#   4. Reload: Developer Tools → YAML → "REST Commands" and "Automations"
+#      (no full restart needed).
+#
+# Phone (Android Companion app on the S25 — one-time):
+#   Settings → Companion app → Manage sensors → enable:
+#     • Background location   • Detected activity   • Geocoded location
+#   App settings → enable "Always" location permission + background.
+#   Zones (HA → Settings → Areas & Zones): "Home" exists; add a zone for each
+#   regular supply house. Unknown/customer stops still capture via the
+#   activity-change feed below — zones just make recurring places self-label.
+# =============================================================================
+
+# --- rest_commands.yaml -------------------------------------------------------
+rest_command:
+  fsm_location_event:
+    url: "http://fsm.garonhome.local/api/internal/location"
+    method: post
+    content_type: "application/json"
+    headers:
+      x-api-key: !secret fsm_location_internal_key
+    # occurred_at must be UTC with a 'Z' suffix — the ingest route validates a
+    # strict UTC datetime and rejects a local offset (e.g. -04:00).
+    payload: >-
+      {"kind": "{{ kind }}", "occurred_at": "{{ utcnow().strftime('%Y-%m-%dT%H:%M:%SZ') }}", "external_id": "{{ external_id }}"
+      {% if zone is defined and zone %}, "zone": {{ zone | tojson }}{% endif %}
+      {% if latitude is defined and latitude not in [none, '', 'unknown', 'unavailable'] %}, "latitude": {{ latitude }}{% endif %}
+      {% if longitude is defined and longitude not in [none, '', 'unknown', 'unavailable'] %}, "longitude": {{ longitude }}{% endif %}
+      {% if address is defined and address and address not in ['unknown', 'unavailable'] %}, "geocoded_address": {{ address | tojson }}{% endif %}
+      {% if activity is defined and activity %}, "detected_activity": {{ activity | tojson }}{% endif %}}
+
+# --- automations.yaml (list entries) ------------------------------------------
+automation:
+  - id: fsm_location_zone_transition
+    alias: FSM - location zone transition
+    description: Post zone enter/leave for Nick's phone to the FSM location ingest.
+    triggers:
+      - trigger: state
+        entity_id: device_tracker.nick_s_s25
+    conditions:
+      # Ignore non-real transitions and unknown/unavailable tracker states
+      # (HA restart, integration reload, connectivity loss) so we never post a
+      # bogus zone event.
+      - condition: template
+        value_template: >-
+          {{ trigger.from_state.state != trigger.to_state.state
+             and trigger.to_state.state not in ['unknown', 'unavailable']
+             and trigger.from_state.state not in ['unknown', 'unavailable'] }}
+    actions:
+      - action: rest_command.fsm_location_event
+        data:
+          kind: "{{ 'zone_leave' if trigger.to_state.state in ['not_home','away'] else 'zone_enter' }}"
+          zone: "{{ trigger.from_state.state if trigger.to_state.state in ['not_home','away'] else trigger.to_state.state }}"
+          latitude: "{{ trigger.to_state.attributes.latitude | default('') }}"
+          longitude: "{{ trigger.to_state.attributes.longitude | default('') }}"
+          external_id: "ha-zone-{{ trigger.to_state.last_changed.timestamp() | int }}"
+    mode: queued
+    max: 10
+
+  - id: fsm_location_activity_change
+    alias: FSM - detected activity change
+    description: Post driving/stopped transitions to the FSM location ingest.
+    triggers:
+      - trigger: state
+        entity_id: sensor.nick_s_s25_ultra_detected_activity
+        to:
+          - in_vehicle
+          - still
+    conditions:
+      - condition: template
+        value_template: "{{ trigger.from_state.state != trigger.to_state.state }}"
+    actions:
+      - action: rest_command.fsm_location_event
+        data:
+          kind: activity_change
+          activity: "{{ trigger.to_state.state }}"
+          address: "{{ states('sensor.nick_s_s25_ultra_geocoded_location') }}"
+          latitude: "{{ state_attr('device_tracker.nick_s_s25','latitude') | default('') }}"
+          longitude: "{{ state_attr('device_tracker.nick_s_s25','longitude') | default('') }}"
+          external_id: "ha-act-{{ trigger.to_state.last_changed.timestamp() | int }}"
+    mode: queued
+    max: 10
+
+  # Optional (not installed by default — adds address enrichment but more
+  # traffic): refresh the open stop's address as the geocode updates while still.
+  # - id: fsm_location_geocode_update
+  #   alias: FSM - geocode update
+  #   triggers:
+  #     - trigger: state
+  #       entity_id: sensor.nick_s_s25_ultra_geocoded_location
+  #   conditions:
+  #     - condition: state
+  #       entity_id: sensor.nick_s_s25_ultra_detected_activity
+  #       state: still
+  #   actions:
+  #     - action: rest_command.fsm_location_event
+  #       data:
+  #         kind: location_update
+  #         address: "{{ trigger.to_state.state }}"
+  #         latitude: "{{ state_attr('device_tracker.nick_s_s25','latitude') | default('') }}"
+  #         longitude: "{{ state_attr('device_tracker.nick_s_s25','longitude') | default('') }}"
+  #         external_id: "ha-geo-{{ trigger.to_state.last_changed.timestamp() | int }}"
+  #   mode: queued
+  #   max: 5
