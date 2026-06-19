@@ -63,7 +63,7 @@ tasks in `done/`.
 
 ## Task index
 
-Next available ID: **TASK-025**.
+Next available ID: **TASK-026**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -86,11 +86,12 @@ Next available ID: **TASK-025**.
 | TASK-017 | Lead Source / Referral ROI | 004 | In Progress |
 | TASK-018 | Assessment Summary Engine | 002 | In Progress |
 | TASK-019 | Activity Timeline Correction | 001 | Done |
-| TASK-020 | PWA Installability | 005 | In Progress |
+| TASK-020 | PWA Installability | 005 | Done |
 | TASK-021 | Quick Activity Switching | 001 | Done |
 | TASK-022 | Smart Start Day | 001 | Done |
 | TASK-023 | End of Day Checklist Wizard | 001 | Proposed |
-| TASK-024 | Passive Location-Based Activity Capture | 001 | Proposed |
+| TASK-024 | Passive Location-Based Activity Capture | 001 | Done |
+| TASK-025 | Bluetooth-Triggered Vehicle-Aware Auto-Mileage | 001 | Proposed |
 
 ## Status legend
 
