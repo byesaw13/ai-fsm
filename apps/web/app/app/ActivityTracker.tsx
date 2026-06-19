@@ -115,47 +115,100 @@ export function NowBar({
     <>
       <div
         style={{
-          display: "flex", flexDirection: "column", gap: "var(--space-2)",
-          padding: "var(--space-3) var(--space-4)", borderRadius: "var(--radius)",
-          border: "1px solid var(--border)",
-          borderLeft: `4px solid ${hasActive ? "var(--accent)" : "var(--border-strong)"}`,
-          background: "var(--bg-card)",
+          display: "flex", flexDirection: "column", gap: "var(--space-3)",
+          padding: "var(--space-4)", borderRadius: "var(--radius-lg)",
+          border: `1px solid ${hasActive ? "var(--accent)" : "var(--border)"}`,
+          background: hasActive ? "var(--accent)" : "var(--bg-card)",
+          color: hasActive ? "#fff" : "var(--fg)",
+          boxShadow: hasActive ? "var(--shadow-md)" : "var(--shadow-xs)",
+          transition: "all var(--transition-base)"
         }}
         data-testid="now-bar"
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)" }}>
-          {meta && displayStartedAt ? (
-            <span style={{ display: "flex", alignItems: "baseline", gap: "var(--space-2)", minWidth: 0 }}>
-              <strong style={{ whiteSpace: "nowrap" }}>{meta.emoji} {meta.label}</strong>
-              {displayNote && (
-                <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {displayNote}
+        {hasActive && meta && displayStartedAt ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            <span style={{ fontSize: "var(--text-xs)", textTransform: "uppercase", letterSpacing: "0.06em", color: "rgba(255, 255, 255, 0.7)", fontWeight: 700 }}>
+              Currently Tracking
+            </span>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", minWidth: 0 }}>
+                <span style={{ fontSize: "var(--text-xl)" }} aria-hidden="true">{meta.emoji}</span>
+                <span style={{ fontWeight: 800, fontSize: "var(--text-lg)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {meta.label}
                 </span>
-              )}
-              <span style={{ color: "var(--accent)", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                {displayNote && (
+                  <span style={{ color: "rgba(255, 255, 255, 0.8)", fontSize: "var(--text-sm)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    · {displayNote}
+                  </span>
+                )}
+              </div>
+              <span style={{ fontSize: "var(--text-2xl)", fontWeight: 800, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em" }}>
                 {elapsedLabel(displayStartedAt, nowMs)}
               </span>
-            </span>
-          ) : (
-            <span style={{ color: "var(--fg-muted)" }}>Not tracking — what are you doing?</span>
-          )}
-          <button
-            type="button"
-            className="p7-btn p7-btn-ghost p7-btn-sm"
-            disabled={pending}
-            onClick={() => setSheetOpen(true)}
-            data-testid="switch-activity-btn"
-          >
-            More…
-          </button>
-        </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-1)" }}>
+              <button
+                type="button"
+                className="p7-btn p7-btn-sm"
+                style={{ background: "#fff", color: "var(--accent)", border: "1px solid #fff" }}
+                disabled={pending}
+                onClick={stop}
+              >
+                Stop Tracking
+              </button>
+              <button
+                type="button"
+                className="p7-btn p7-btn-sm"
+                style={{ background: "rgba(255, 255, 255, 0.2)", color: "#fff", border: "1px solid transparent" }}
+                disabled={pending}
+                onClick={() => setSheetOpen(true)}
+                data-testid="switch-activity-btn"
+              >
+                More…
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-3)" }}>
+            <span style={{ color: "var(--fg-muted)", fontWeight: 500 }}>Not tracking — what are you doing?</span>
+            <button
+              type="button"
+              className="p7-btn p7-btn-primary p7-btn-sm"
+              disabled={pending}
+              onClick={() => setSheetOpen(true)}
+              data-testid="switch-activity-btn"
+            >
+              Start Tracking
+            </button>
+          </div>
+        )}
 
         {/* One-tap quick switch chips — top activities, no modal (TASK-021). */}
         {quickTypes.length > 0 && (
-          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }} data-testid="quick-switch-chips">
+          <div style={{ display: "flex", gap: "var(--space-2)", overflowX: "auto", paddingBottom: 2, margin: "0 -4px" }} className="chips-scroll" data-testid="quick-switch-chips">
             {quickTypes.map((t) => {
               const m = ACTIVITY_TYPE_META[t];
               const isCurrent = displayType === t;
+              
+              // Dark green theme friendly styling if tracker is active
+              const chipStyle: React.CSSProperties = hasActive ? {
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "6px 14px", borderRadius: "999px",
+                border: isCurrent ? "1px solid #fff" : "1px solid rgba(255, 255, 255, 0.3)",
+                background: isCurrent ? "#fff" : "rgba(255, 255, 255, 0.1)",
+                color: isCurrent ? "var(--accent)" : "#fff",
+                fontWeight: "600", fontSize: "var(--text-xs)", cursor: "pointer", whiteSpace: "nowrap",
+                transition: "all var(--transition-base)",
+              } : {
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "6px 14px", borderRadius: "999px",
+                border: `1px solid ${isCurrent ? "var(--accent)" : "var(--border)"}`,
+                background: isCurrent ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "var(--bg-card)",
+                color: isCurrent ? "var(--accent)" : "var(--fg)",
+                fontWeight: "600", fontSize: "var(--text-xs)", cursor: "pointer", whiteSpace: "nowrap",
+                transition: "all var(--transition-base)",
+              };
+
               return (
                 <button
                   key={t}
@@ -164,14 +217,7 @@ export function NowBar({
                   onClick={() => switchTo(t)}
                   aria-pressed={isCurrent}
                   data-testid={`quick-${t}`}
-                  style={{
-                    display: "inline-flex", alignItems: "center", gap: 6,
-                    padding: "8px 12px", borderRadius: "999px",
-                    border: `1px solid ${isCurrent ? "var(--accent)" : "var(--border)"}`,
-                    background: isCurrent ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "var(--bg-card)",
-                    color: isCurrent ? "var(--accent)" : "var(--fg)",
-                    fontWeight: 600, fontSize: "var(--text-sm)", cursor: "pointer", whiteSpace: "nowrap",
-                  }}
+                  style={chipStyle}
                 >
                   <span aria-hidden="true">{m.emoji}</span>{m.label}
                 </button>

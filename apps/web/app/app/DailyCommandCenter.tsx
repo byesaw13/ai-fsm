@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, EmptyState, LinkButton, Modal, SectionHeader, StatusBadge, useToast } from "@/components/ui";
 import { NowBar, DayTimeSummary, type ActivityEntryDto } from "./ActivityTracker";
-import { pickQuickActivities } from "@/lib/activities/quick-switch";
-import { pickStartVehicle, canSmartStart } from "@/lib/mileage/start-day";
 import type { StatusVariant } from "@/components/ui";
 import type { DayMileageSummary } from "@/lib/mileage/sessions";
+import { ACTIVITY_TYPE_META, type ActivityType } from "@ai-fsm/domain";
 
 export type CountAction = {
   label: string;
@@ -36,7 +35,6 @@ export type VehicleOption = {
   nickname: string;
   plate: string | null;
   current_odometer: number | null;
-  last_used_at?: string | null;
 };
 
 export type OpenSession = {
@@ -65,9 +63,15 @@ export type EndWarnings = {
   deposits: number;
 };
 
+type TabState = "start_day" | "work_day" | "end_day";
+
 function fmtTime(iso: string | null): string {
   if (!iso) return "Today";
   return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+}
+
+function fmtOdo(n: number | null | undefined): string {
+  return n == null ? "—" : n.toLocaleString();
 }
 
 function accentForTone(tone: CountAction["tone"]): string {
@@ -76,42 +80,10 @@ function accentForTone(tone: CountAction["tone"]): string {
   return "var(--accent)";
 }
 
-function ActionQueue({ items }: { items: CountAction[] }) {
-  return (
-    <Card>
-      <SectionHeader title="What needs you" count={items.length} />
-      {items.length === 0 ? (
-        <EmptyState title="Nothing is waiting" description="Follow-ups, deposits, and invoices show up here when they need action." />
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          {items.map((item) => {
-            const accent = accentForTone(item.tone);
-            return (
-              <Link key={item.label} href={item.href} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)", padding: "var(--space-3)", borderRadius: "var(--radius)", border: "1px solid var(--border)", borderLeft: `4px solid ${accent}`, textDecoration: "none", color: "inherit", background: "var(--bg-card)" }}>
-                <span style={{ display: "flex", flexDirection: "column" }}>
-                  <strong>{item.label}</strong>
-                  <small style={{ color: "var(--fg-muted)" }}>{item.detail}</small>
-                </span>
-                <b style={{ minWidth: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 8px", borderRadius: 99, background: `color-mix(in srgb, ${accent} 14%, transparent)`, color: accent }}>{item.count}</b>
-              </Link>
-            );
-          })}
-        </div>
-      )}
-    </Card>
-  );
-}
-
-function fmtOdo(n: number | null | undefined): string {
-  return n == null ? "—" : n.toLocaleString();
-}
-
-const fieldStyle: React.CSSProperties = { minHeight: 44, border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "0 var(--space-3)", background: "var(--bg-card)" };
 const labelStyle: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 6, fontSize: "var(--text-sm)", fontWeight: 600 };
+const fieldStyle: React.CSSProperties = { minHeight: 40, border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "0 var(--space-3)", background: "var(--bg-card)" };
 
-// A pending vehicle selection awaiting explicit confirmation. Every path that
-// commits a vehicle (start / switch / correct) routes through this so an
-// accidental pick can never silently log miles against the wrong truck.
+// A pending vehicle selection awaiting explicit confirmation.
 type VehicleConfirm = {
   title: string;
   vehicle: VehicleOption | null;
@@ -122,42 +94,93 @@ type VehicleConfirm = {
   run: (reason: string | null) => Promise<void>;
 };
 
-// A vehicle has an open session from a prior day — we must capture its end
-// odometer before the requested action can proceed (requirement 4).
+// A vehicle has an open session from a prior day — we must capture its end odometer first
 type PriorPrompt = {
   openSessionId: string;
   suggestedEnd: number;
   retry: () => Promise<void>;
 };
 
-function CurrentVehiclePanel({ initialSession, vehicles }: { initialSession: OpenSession | null; vehicles: VehicleOption[] }) {
+export function DailyCommandCenter({
+  todayLabel,
+  openSession,
+  vehicles,
+  actionQueue,
+  todayJobs,
+  materialCount,
+  materialJobs,
+  warnings,
+  tomorrowJobs,
+  activityEntries,
+  dayMileage,
+  yesterdayMiles = 0,
+  outstandingInvoicesCents = 0,
+  pendingDepositsCents = 0,
+  paidThisMonthCents = 0,
+}: {
+  todayLabel: string;
+  openSession: OpenSession | null;
+  vehicles: VehicleOption[];
+  actionQueue: CountAction[];
+  todayJobs: CommandVisit[];
+  materialCount: number;
+  materialJobs: MaterialJob[];
+  warnings: EndWarnings;
+  tomorrowJobs: CommandVisit[];
+  activityEntries: ActivityEntryDto[];
+  dayMileage: DayMileageSummary;
+  yesterdayMiles?: number;
+  outstandingInvoicesCents?: number;
+  pendingDepositsCents?: number;
+  paidThisMonthCents?: number;
+}) {
   const router = useRouter();
   const toast = useToast();
-  const [openSession, setOpenSession] = useState(initialSession);
 
-  // Start form — default to the most recently used vehicle (Smart Start Day).
-  const smartVehicle = useMemo(() => pickStartVehicle(vehicles), [vehicles]);
-  const [vehicleId, setVehicleId] = useState(smartVehicle?.id ?? "");
+  const [activeTab, setActiveTab] = useState<TabState>(openSession ? "work_day" : "start_day");
+
+  // Keep state synced with open session
+  useEffect(() => {
+    if (!openSession) {
+      setActiveTab("start_day");
+    } else if (activeTab === "start_day") {
+      setActiveTab("work_day");
+    }
+  }, [openSession]);
+
+  // Start Day form state
+  const [vehicleId, setVehicleId] = useState(vehicles[0]?.id ?? "");
   const selectedVehicle = vehicles.find((v) => v.id === vehicleId);
   const [startOdometer, setStartOdometer] = useState(String(selectedVehicle?.current_odometer ?? ""));
-  const [showStartForm, setShowStartForm] = useState(false);
+  const [showStartDetails, setShowStartDetails] = useState(false);
 
-  // Switch / correct forms
-  const [mode, setMode] = useState<null | "switch" | "correct">(null);
+  // Sync odometer input when vehicle selection changes
+  useEffect(() => {
+    if (selectedVehicle) {
+      setStartOdometer(String(selectedVehicle.current_odometer ?? ""));
+    }
+  }, [vehicleId, vehicles]);
+
+  // Switch / Correct inline state
+  const [vehicleMode, setVehicleMode] = useState<null | "switch" | "correct">(null);
   const [switchVehicleId, setSwitchVehicleId] = useState("");
   const [switchEnd, setSwitchEnd] = useState("");
   const [switchStart, setSwitchStart] = useState("");
   const [correctVehicleId, setCorrectVehicleId] = useState("");
   const [correctReason, setCorrectReason] = useState("");
 
-  // Shared modals
+  // Modals & triggers
   const [confirm, setConfirm] = useState<VehicleConfirm | null>(null);
   const [confirmReason, setConfirmReason] = useState("");
   const [prior, setPrior] = useState<PriorPrompt | null>(null);
   const [priorEnd, setPriorEnd] = useState("");
   const [pending, setPending] = useState(false);
 
+  // End of Day Odometer Input state
+  const [endOdometer, setEndOdometer] = useState("");
+
   const activeVehicle = openSession ? vehicles.find((v) => v.id === openSession.vehicle_id) ?? null : null;
+  const activeEntry = activityEntries.find((e) => e.ended_at === null) ?? null;
 
   function vehicleLines(v: VehicleOption | null, start: number): string[] {
     return [
@@ -189,8 +212,6 @@ function CurrentVehiclePanel({ initialSession, vehicles }: { initialSession: Ope
       return;
     }
     if (!res.ok) { toast.error(json.error?.message ?? "Could not start session"); return; }
-    const v = vehicles.find((x) => x.id === vId) ?? null;
-    setOpenSession({ ...json.data, vehicle_nickname: v?.nickname ?? null, vehicle_plate: v?.plate ?? null });
     toast.success("Mileage session started");
     router.refresh();
   }
@@ -210,16 +231,6 @@ function CurrentVehiclePanel({ initialSession, vehicles }: { initialSession: Ope
       confirmLabel: "Yes, use this vehicle",
       run: (reason) => postStart(vehicleId || null, odo, reason),
     });
-  }
-
-  // One-tap Smart Start: the last vehicle at its last-known odometer. No
-  // confirm/reason needed because the odometer equals the last reading (no
-  // warning); postStart still handles an unclosed prior session.
-  async function smartStart() {
-    if (!canSmartStart(smartVehicle) || pending) return;
-    setPending(true);
-    await postStart(smartVehicle.id, smartVehicle.current_odometer, null);
-    setPending(false);
   }
 
   function beginSwitch() {
@@ -247,8 +258,7 @@ function CurrentVehiclePanel({ initialSession, vehicles }: { initialSession: Ope
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) { toast.error(json.error?.message ?? "Could not switch vehicle"); return; }
-        setOpenSession({ ...json.data, vehicle_nickname: newVehicle.nickname, vehicle_plate: newVehicle.plate });
-        setMode(null);
+        setVehicleMode(null);
         toast.success(`Switched to ${newVehicle.nickname}`);
         router.refresh();
       },
@@ -275,8 +285,7 @@ function CurrentVehiclePanel({ initialSession, vehicles }: { initialSession: Ope
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) { toast.error(json.error?.message ?? "Could not change vehicle"); return; }
-        setOpenSession({ ...openSession, vehicle_id: correctVehicleId, vehicle_nickname: newVehicle.nickname, vehicle_plate: newVehicle.plate });
-        setMode(null);
+        setVehicleMode(null);
         toast.success(`Session reassigned to ${newVehicle.nickname}`);
         router.refresh();
       },
@@ -315,117 +324,558 @@ function CurrentVehiclePanel({ initialSession, vehicles }: { initialSession: Ope
     router.refresh();
   }
 
+  async function closeSession() {
+    if (!openSession) return;
+    const odometer = Number(endOdometer);
+    if (!Number.isInteger(odometer) || odometer <= openSession.start_odometer) {
+      toast.error(`Ending odometer must be greater than start (${fmtOdo(openSession.start_odometer)})`);
+      return;
+    }
+    setPending(true);
+    const res = await fetch(`/api/v1/sessions/${openSession.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ end_odometer: odometer, end_day: true }),
+    });
+    setPending(false);
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      toast.error(json.error?.message ?? "Could not close session");
+      return;
+    }
+    toast.success("Day closed and mileage finalized");
+    router.refresh();
+  }
+
+  // Jobs Today transition helpers
+  const [updatingVisitId, setUpdatingVisitId] = useState<string | null>(null);
+  const [guardedVisit, setGuardedVisit] = useState<string | null>(null);
+
+  async function transitionVisit(visitId: string, status: "arrived" | "completed") {
+    setUpdatingVisitId(visitId);
+    setGuardedVisit(null);
+    const res = await fetch(`/api/v1/visits/${visitId}/transition`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setUpdatingVisitId(null);
+    if (!res.ok) {
+      if (status === "completed" && ["MISSING_PHOTO", "MISSING_SIGNATURE"].includes(json.error?.code)) {
+        setGuardedVisit(visitId);
+        return;
+      }
+      toast.error(json.error?.message ?? "Could not update visit");
+      return;
+    }
+    toast.success(status === "completed" ? "Visit completed" : "Arrived on site");
+    router.refresh();
+  }
+
+  async function markNeedsFollowUp(visitId: string) {
+    setUpdatingVisitId(visitId);
+    const res = await fetch(`/api/v1/visits/${visitId}/sub-status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sub_status: "reschedule_requested" }),
+    });
+    setUpdatingVisitId(null);
+    if (!res.ok) {
+      toast.error("Could not mark visit for follow-up");
+      return;
+    }
+    toast.success("Visit marked for reschedule");
+    router.refresh();
+  }
+
+  // Stop current active activity tracking
+  async function stopTracking() {
+    setPending(true);
+    const res = await fetch("/api/v1/activities/stop", { method: "POST" });
+    setPending(false);
+    if (!res.ok) {
+      toast.error("Could not stop activity");
+      return;
+    }
+    toast.success("Activity tracking stopped");
+    router.refresh();
+  }
+
+  // Derived state calculations
+  const totalWarnings = warnings.missingReceiptPhotos + warnings.jobsInProgress + warnings.draftInvoices + warnings.deposits;
+  const isEndDayReady = !openSession || (Number(endOdometer) > (openSession?.start_odometer ?? 0));
+
   return (
     <>
-      {openSession ? (
-        <Card padding="sm" style={{ borderLeft: "4px solid var(--color-success)", background: "var(--bg-subtle)" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
-            <span>
-              <strong>Current vehicle: {openSession.vehicle_nickname ?? "No vehicle"}</strong>
-              {openSession.vehicle_plate ? <small style={{ color: "var(--fg-muted)", marginLeft: 6 }}>({openSession.vehicle_plate})</small> : null}
-              <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: 2 }}>
-                Started at {fmtOdo(openSession.start_odometer)}
-                {activeVehicle?.current_odometer != null ? ` · last known ${fmtOdo(activeVehicle.current_odometer)}` : ""}
-              </div>
-            </span>
-            <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-              <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" onClick={() => { setMode(mode === "switch" ? null : "switch"); setSwitchVehicleId(""); setSwitchEnd(""); setSwitchStart(""); }}>Switch vehicle</button>
-              <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" onClick={() => { setMode(mode === "correct" ? null : "correct"); setCorrectVehicleId(""); setCorrectReason(""); }}>Change vehicle for this session</button>
-            </div>
-          </div>
+      <style>{`
+        .dc-container {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: var(--space-4);
+        }
+        @media (min-width: 1024px) {
+          .dc-container {
+            grid-template-columns: 2.2fr 1fr;
+          }
+        }
+        .quick-actions-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: var(--space-2);
+        }
+        .workflow-stepper {
+          display: flex;
+          gap: var(--space-3);
+          align-items: center;
+          width: 100%;
+          overflow-x: auto;
+          padding-bottom: var(--space-2);
+          border-bottom: 1px solid var(--border);
+          margin-bottom: var(--space-4);
+        }
+        .chips-scroll {
+          display: flex;
+          gap: var(--space-2);
+          overflow-x: auto;
+          padding-bottom: 4px;
+          -webkit-overflow-scrolling: touch;
+        }
+      `}</style>
 
-          {mode === "switch" && (
-            <div style={{ display: "grid", gap: "var(--space-3)", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", alignItems: "end", marginTop: "var(--space-3)" }}>
-              <label style={labelStyle}>
-                End odometer ({activeVehicle?.nickname ?? "current"})
-                <input value={switchEnd} onChange={(e) => setSwitchEnd(e.target.value)} inputMode="numeric" style={fieldStyle} />
-              </label>
-              <label style={labelStyle}>
-                Switch to
-                <select value={switchVehicleId} onChange={(e) => { const v = vehicles.find((x) => x.id === e.target.value); setSwitchVehicleId(e.target.value); setSwitchStart(String(v?.current_odometer ?? "")); }} style={fieldStyle}>
-                  <option value="">Select vehicle</option>
-                  {vehicles.filter((v) => v.id !== openSession.vehicle_id).map((v) => <option key={v.id} value={v.id}>{v.nickname}{v.plate ? ` (${v.plate})` : ""}</option>)}
-                </select>
-              </label>
-              <label style={labelStyle}>
-                New start odometer
-                <input value={switchStart} onChange={(e) => setSwitchStart(e.target.value)} inputMode="numeric" style={fieldStyle} />
-              </label>
-              <button type="button" className="p7-btn p7-btn-primary p7-btn-sm" onClick={beginSwitch}>Review switch</button>
-            </div>
-          )}
+      {/* Modern Horizontal Stepper */}
+      <div className="workflow-stepper">
+        {[
+          { key: "start_day", label: "Start Day", desc: openSession ? (activeVehicle?.nickname ?? "Vehicle active") : "Pre-flight & Vehicle", icon: "🏁" },
+          { key: "work_day", label: "Work Day", desc: openSession ? `${todayJobs.length} jobs scheduled` : "Track time & jobs", icon: "🛠️" },
+          { key: "end_day", label: "End Day", desc: `${totalWarnings} tasks remaining`, icon: "🏁" },
+        ].map((step, i) => {
+          const isCurrent = activeTab === step.key;
+          const isCompleted = step.key === "start_day" && openSession;
+          const isDisabled = !openSession && step.key !== "start_day";
 
-          {mode === "correct" && (
-            <div style={{ display: "grid", gap: "var(--space-3)", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", alignItems: "end", marginTop: "var(--space-3)" }}>
-              <label style={labelStyle}>
-                Correct vehicle
-                <select value={correctVehicleId} onChange={(e) => setCorrectVehicleId(e.target.value)} style={fieldStyle}>
-                  <option value="">Select vehicle</option>
-                  {vehicles.filter((v) => v.id !== openSession.vehicle_id).map((v) => <option key={v.id} value={v.id}>{v.nickname}{v.plate ? ` (${v.plate})` : ""}</option>)}
-                </select>
-              </label>
-              <label style={labelStyle}>
-                Reason (optional)
-                <input value={correctReason} onChange={(e) => setCorrectReason(e.target.value)} placeholder="Wrong vehicle selected" style={fieldStyle} />
-              </label>
-              <button type="button" className="p7-btn p7-btn-primary p7-btn-sm" onClick={beginCorrect}>Review change</button>
-            </div>
-          )}
-        </Card>
-      ) : (
-        <Card
-          style={{ border: "2px solid var(--accent)", boxShadow: "var(--shadow-md, 0 6px 20px rgba(15, 23, 42, 0.12))", minHeight: "48vh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center", gap: "var(--space-5)" }}
-        >
-          <div>
-            <h2 style={{ fontSize: "var(--text-3xl, 1.875rem)", fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>Start your day</h2>
-            <p style={{ color: "var(--fg-muted)", margin: "var(--space-2) 0 0", maxWidth: 440 }}>
-              {canSmartStart(smartVehicle) && !showStartForm
-                ? "One tap to start in your last vehicle. You can switch vehicles any time without ending the day."
-                : "Pick your vehicle and starting mileage. You can switch vehicles any time without ending the day."}
-            </p>
-          </div>
-
-          {/* Smart Start Day: one-tap start in the last vehicle at its last odometer. */}
-          {canSmartStart(smartVehicle) && !showStartForm ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", width: "100%", maxWidth: 520, alignItems: "center" }}>
-              <button
-                type="button"
-                onClick={smartStart}
-                disabled={pending}
-                className="p7-btn p7-btn-primary"
-                data-testid="smart-start-day-btn"
-                style={{ minHeight: 56, fontSize: "var(--text-lg, 1.125rem)", fontWeight: 800, padding: "0 var(--space-8)", width: "100%" }}
+          return (
+            <div
+              key={step.key}
+              onClick={() => { if (!isDisabled) setActiveTab(step.key as TabState); }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "var(--space-3)",
+                cursor: isDisabled ? "not-allowed" : "pointer",
+                opacity: isDisabled ? 0.45 : 1,
+                padding: "var(--space-2) var(--space-3)",
+                borderRadius: "var(--radius-md)",
+                background: isCurrent ? "var(--accent-subtle)" : "transparent",
+                border: isCurrent ? "1px solid var(--accent)" : "1px solid transparent",
+                flex: 1,
+                minWidth: 160,
+                transition: "all var(--transition-base)"
+              }}
+            >
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  background: isCompleted ? "var(--color-green-500)" : isCurrent ? "var(--accent)" : "var(--color-slate-200)",
+                  color: isCompleted || isCurrent ? "#fff" : "var(--fg-muted)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontWeight: "bold",
+                  fontSize: 14
+                }}
               >
-                {pending ? "Starting…" : `Start Day in ${smartVehicle.nickname} · ${fmtOdo(smartVehicle.current_odometer)} mi`}
-              </button>
-              <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" onClick={() => setShowStartForm(true)} disabled={pending}>
-                Different vehicle or mileage?
-              </button>
-            </div>
-          ) : (
-            <>
-              <div style={{ display: "grid", gap: "var(--space-3)", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", alignItems: "end", width: "100%", maxWidth: 520, textAlign: "left" }}>
-                <label style={labelStyle}>
-                  Vehicle
-                  <select value={vehicleId} onChange={(e) => { const next = vehicles.find((v) => v.id === e.target.value); setVehicleId(e.target.value); setStartOdometer(String(next?.current_odometer ?? "")); }} style={{ ...fieldStyle, minHeight: 44 }}>
-                    <option value="">No vehicle</option>
-                    {vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.nickname}{vehicle.plate ? ` (${vehicle.plate})` : ""}</option>)}
-                  </select>
-                  {selectedVehicle ? <small style={{ color: "var(--fg-muted)" }}>{selectedVehicle.plate ? `${selectedVehicle.plate} · ` : ""}last known {fmtOdo(selectedVehicle.current_odometer)}</small> : null}
-                </label>
-                <label style={labelStyle}>
-                  Start odometer
-                  <input value={startOdometer} onChange={(e) => setStartOdometer(e.target.value)} inputMode="numeric" style={fieldStyle} />
-                </label>
+                {isCompleted ? "✓" : i + 1}
               </div>
-              <button type="button" onClick={beginStart} className="p7-btn p7-btn-primary" style={{ minHeight: 52, fontSize: "var(--text-base)", fontWeight: 700, padding: "0 var(--space-10)", width: "100%", maxWidth: 520 }}>
-                Start Day
-              </button>
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <span style={{ fontWeight: 700, fontSize: "var(--text-sm)", color: isCurrent ? "var(--accent)" : "var(--fg)" }}>{step.label}</span>
+                <span style={{ fontSize: 10, color: "var(--fg-muted)" }}>{step.desc}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="dc-container">
+        
+        {/* ---- LEFT COLUMN: MAIN WORKSPACE ---- */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+          
+          {/* STATE 1: Before Day Starts */}
+          {activeTab === "start_day" && (
+            <>
+              {!openSession ? (
+                <Card style={{ border: "2px solid var(--accent)", boxShadow: "var(--shadow-md)", padding: "var(--space-5)" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+                    <div>
+                      <div style={{ fontSize: "var(--text-xs)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--accent)", fontWeight: 700, marginBottom: 4 }}>
+                        Dovetails Handyman System
+                      </div>
+                      <h2 style={{ fontSize: "var(--text-2xl)", fontWeight: 800, margin: 0 }}>Start Your Workday</h2>
+                      <p style={{ color: "var(--fg-muted)", margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)" }}>
+                        Welcome back, Nick! Log starting odometer to unlock day tracking.
+                      </p>
+                    </div>
+
+                    {!showStartDetails ? (
+                      <div style={{ padding: "var(--space-3)", background: "var(--color-slate-50)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <strong>{selectedVehicle?.nickname ?? "No vehicle"}</strong>
+                          <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                            Last Odometer: {fmtOdo(selectedVehicle?.current_odometer)} mi {selectedVehicle?.plate ? `· ${selectedVehicle.plate}` : ""}
+                          </div>
+                        </div>
+                        <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" onClick={() => setShowStartDetails(true)}>
+                          ✏️ Change
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: "grid", gap: "var(--space-3)", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", padding: "var(--space-3)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)" }}>
+                        <label style={labelStyle}>
+                          Select Vehicle
+                          <select value={vehicleId} onChange={(e) => setVehicleId(e.target.value)} style={fieldStyle}>
+                            <option value="">No vehicle</option>
+                            {vehicles.map((v) => <option key={v.id} value={v.id}>{v.nickname}</option>)}
+                          </select>
+                        </label>
+                        <label style={labelStyle}>
+                          Starting Odometer (mi)
+                          <input value={startOdometer} onChange={(e) => setStartOdometer(e.target.value)} inputMode="numeric" style={fieldStyle} />
+                        </label>
+                        <div style={{ gridColumn: "1 / -1", textAlign: "right" }}>
+                          <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" onClick={() => setShowStartDetails(false)}>
+                            Hide Settings
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={beginStart}
+                      className="p7-btn p7-btn-primary"
+                      style={{ minHeight: 48, fontSize: "var(--text-base)", fontWeight: 700 }}
+                    >
+                      Start Day in {selectedVehicle?.nickname ?? "Default Vehicle"} ({fmtOdo(Number(startOdometer) || selectedVehicle?.current_odometer)} mi)
+                    </button>
+                  </div>
+                </Card>
+              ) : (
+                <Card style={{ padding: "var(--space-4)", background: "var(--accent-subtle)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <h3 style={{ margin: 0, fontWeight: 700, color: "var(--accent)" }}>✓ Odometer & Day Started</h3>
+                      <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                        Logged {activeVehicle?.nickname} at {fmtOdo(openSession.start_odometer)} mi.
+                      </span>
+                    </div>
+                    <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" onClick={() => setActiveTab("work_day")}>
+                      Go to Work Day
+                    </button>
+                  </div>
+                </Card>
+              )}
+
+              {/* Today's Schedule Card */}
+              <JobsToday jobs={todayJobs} />
             </>
           )}
-        </Card>
-      )}
 
+          {/* STATE 2: Active Day */}
+          {activeTab === "work_day" && (
+            <>
+              {/* NowBar & Quick Switching */}
+              <NowBar
+                active={activeEntry}
+                quickTypes={["travel", "job_work", "material_run", "admin", "personal"]}
+              />
+
+              {/* Active Vehicle Ribbon */}
+              {openSession && (
+                <Card padding="sm" style={{ background: "var(--bg-subtle)", borderLeft: "4px solid var(--color-success)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
+                    <span>
+                      <strong>Driving: {openSession.vehicle_nickname ?? "No vehicle"}</strong>
+                      <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginLeft: 8 }}>
+                        (Plate: {openSession.vehicle_plate ?? "—"}) · Started: {fmtOdo(openSession.start_odometer)} mi
+                      </span>
+                    </span>
+                    <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                      <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" onClick={() => { setVehicleMode(vehicleMode === "switch" ? null : "switch"); setSwitchVehicleId(""); setSwitchEnd(""); setSwitchStart(""); }}>
+                        Switch Vehicle
+                      </button>
+                      <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" onClick={() => { setVehicleMode(vehicleMode === "correct" ? null : "correct"); setCorrectVehicleId(""); setCorrectReason(""); }}>
+                        Correct
+                      </button>
+                    </div>
+                  </div>
+
+                  {vehicleMode === "switch" && (
+                    <div style={{ display: "grid", gap: "var(--space-3)", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", alignItems: "end", marginTop: "var(--space-3)", borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)" }}>
+                      <label style={labelStyle}>
+                        End odometer ({activeVehicle?.nickname})
+                        <input value={switchEnd} onChange={(e) => setSwitchEnd(e.target.value)} inputMode="numeric" style={fieldStyle} />
+                      </label>
+                      <label style={labelStyle}>
+                        Switch to
+                        <select value={switchVehicleId} onChange={(e) => { const v = vehicles.find((x) => x.id === e.target.value); setSwitchVehicleId(e.target.value); setSwitchStart(String(v?.current_odometer ?? "")); }} style={fieldStyle}>
+                          <option value="">Select vehicle</option>
+                          {vehicles.filter((v) => v.id !== openSession.vehicle_id).map((v) => <option key={v.id} value={v.id}>{v.nickname}</option>)}
+                        </select>
+                      </label>
+                      <label style={labelStyle}>
+                        New start odometer
+                        <input value={switchStart} onChange={(e) => setSwitchStart(e.target.value)} inputMode="numeric" style={fieldStyle} />
+                      </label>
+                      <button type="button" className="p7-btn p7-btn-primary p7-btn-sm" onClick={beginSwitch}>Review</button>
+                    </div>
+                  )}
+
+                  {vehicleMode === "correct" && (
+                    <div style={{ display: "grid", gap: "var(--space-3)", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", alignItems: "end", marginTop: "var(--space-3)", borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)" }}>
+                      <label style={labelStyle}>
+                        Correct vehicle
+                        <select value={correctVehicleId} onChange={(e) => setCorrectVehicleId(e.target.value)} style={fieldStyle}>
+                          <option value="">Select vehicle</option>
+                          {vehicles.filter((v) => v.id !== openSession.vehicle_id).map((v) => <option key={v.id} value={v.id}>{v.nickname}</option>)}
+                        </select>
+                      </label>
+                      <label style={labelStyle}>
+                        Reason (optional)
+                        <input value={correctReason} onChange={(e) => setCorrectReason(e.target.value)} placeholder="Wrong truck selected" style={fieldStyle} />
+                      </label>
+                      <button type="button" className="p7-btn p7-btn-primary p7-btn-sm" onClick={beginCorrect}>Review</button>
+                    </div>
+                  )}
+                </Card>
+              )}
+
+              {/* Today's Schedule Card */}
+              <JobsToday jobs={todayJobs} />
+
+              {/* Action Queue Alerts */}
+              <ActionQueue items={actionQueue} />
+
+              {/* Materials Card */}
+              <Materials count={materialCount} jobs={materialJobs} />
+            </>
+          )}
+
+          {/* STATE 3: End of Day */}
+          {activeTab === "end_day" && (
+            <>
+              {/* Checklist Hero Card */}
+              <Card style={{ padding: "var(--space-4)" }}>
+                <SectionHeader title="End of Day Checklist" count={warnings.missingReceiptPhotos + (activeEntry ? 1 : 0) + (openSession ? 1 : 0)} />
+                <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", margin: "-4px 0 var(--space-4)" }}>
+                  Resolve blockers below to complete your checkout and close the day.
+                </p>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", marginBottom: "var(--space-5)" }}>
+                  
+                  {/* Item 1: Mileage Session */}
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)", padding: "var(--space-3)", background: "var(--color-slate-50)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+                    <div style={{ fontSize: 20 }}>{openSession ? "🔴" : "🟢"}</div>
+                    <div style={{ flex: 1 }}>
+                      <strong>Vehicle Session</strong>
+                      <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                        {openSession ? (
+                          <>
+                            Active session open on <strong>{openSession.vehicle_nickname}</strong> (started at {fmtOdo(openSession.start_odometer)} mi).
+                            <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "end", marginTop: "var(--space-2)", flexWrap: "wrap" }}>
+                              <label style={{ ...labelStyle, fontWeight: 500, fontSize: 12 }}>
+                                Ending Odometer
+                                <input value={endOdometer} onChange={(e) => setEndOdometer(e.target.value)} inputMode="numeric" placeholder="Odo reading" style={{ ...fieldStyle, minHeight: 34, width: 120 }} />
+                              </label>
+                              <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" style={{ minHeight: 34 }} onClick={closeSession} disabled={pending || !endOdometer}>
+                                Close Mileage
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          "All mileage sessions closed successfully."
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Item 2: Unclosed Activity */}
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)", padding: "var(--space-3)", background: "var(--color-slate-50)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+                    <div style={{ fontSize: 20 }}>{activeEntry ? "🔴" : "🟢"}</div>
+                    <div style={{ flex: 1 }}>
+                      <strong>Active Time Tracking</strong>
+                      <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                        {activeEntry ? (
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                            <span>Active tracker running: <strong>{ACTIVITY_TYPE_META[activeEntry.activity_type as ActivityType]?.emoji} {ACTIVITY_TYPE_META[activeEntry.activity_type as ActivityType]?.label}</strong>.</span>
+                            <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" onClick={stopTracking}>Stop Tracking</button>
+                          </div>
+                        ) : (
+                          "All activity trackers stopped."
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Item 3: Missing Receipt Photos */}
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)", padding: "var(--space-3)", background: "var(--color-slate-50)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+                    <div style={{ fontSize: 20 }}>{warnings.missingReceiptPhotos > 0 ? "🔴" : "🟢"}</div>
+                    <div style={{ flex: 1 }}>
+                      <strong>Receipt Photos</strong>
+                      <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-2)" }}>
+                        <span>
+                          {warnings.missingReceiptPhotos > 0 
+                            ? `${warnings.missingReceiptPhotos} receipt expense records are missing attached photos.` 
+                            : "All of today's receipts have photos attached."}
+                        </span>
+                        {warnings.missingReceiptPhotos > 0 && (
+                          <Link href={"/app/expenses" as Route} className="p7-btn p7-btn-secondary p7-btn-sm">Attach Photos</Link>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Item 4: In-Progress Jobs */}
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)", padding: "var(--space-3)", background: "var(--color-slate-50)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+                    <div style={{ fontSize: 20 }}>{warnings.jobsInProgress > 0 ? "🟡" : "🟢"}</div>
+                    <div style={{ flex: 1 }}>
+                      <strong>Unclosed Jobs</strong>
+                      <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                        {warnings.jobsInProgress > 0 
+                          ? `${warnings.jobsInProgress} job(s) are still active or in progress.` 
+                          : "All of today's scheduled jobs are completed."}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                  <button
+                    type="button"
+                    className="p7-btn p7-btn-primary"
+                    style={{ minHeight: 48, fontWeight: 700, width: "100%" }}
+                    disabled={openSession !== null || pending}
+                    onClick={() => {
+                      toast.success("Workday completed. See you tomorrow!");
+                      router.push("/app" as Route);
+                    }}
+                  >
+                    Complete & Close Day
+                  </button>
+                  {openSession && (
+                    <span style={{ fontSize: 11, color: "var(--color-red-600)", textAlign: "center", display: "block" }}>
+                      ⚠️ You must close your mileage session before you can finalize and close your day.
+                    </span>
+                  )}
+                </div>
+              </Card>
+
+              {/* Tomorrow's Schedule */}
+              <Card>
+                <SectionHeader title="Tomorrow's Plan" count={tomorrowJobs.length} />
+                {tomorrowJobs.length === 0 ? (
+                  <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", margin: 0 }}>No visits scheduled tomorrow.</p>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                    {tomorrowJobs.map((job) => (
+                      <Link key={job.id} href={(job.visit_id ? `/app/visits/${job.visit_id}` : `/app/jobs/${job.id}`) as Route} style={{ display: "flex", justifyContent: "space-between", padding: "var(--space-2)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", textDecoration: "none", color: "inherit", background: "var(--bg-card)" }}>
+                        <span><strong>{fmtTime(job.scheduled_start)}</strong> · {job.title}</span>
+                        <small style={{ color: "var(--fg-muted)" }}>{job.client_name}</small>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            </>
+          )}
+
+        </div>
+
+        {/* ---- RIGHT COLUMN: SIDEBAR DESKTOP ONLY ---- */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+          
+          {/* Financial Snapshot Card */}
+          <Card style={{ padding: "var(--space-4)" }}>
+            <SectionHeader title="Financial Snapshot" />
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", marginTop: "var(--space-3)" }}>
+              <div>
+                <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", textTransform: "uppercase", fontWeight: 600 }}>Outstanding Invoices</span>
+                <div style={{ fontSize: "var(--text-xl)", fontWeight: 800, color: "var(--color-red-600)" }}>
+                  ${(outstandingInvoicesCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", textTransform: "uppercase", fontWeight: 600 }}>Deposits Pending</span>
+                <div style={{ fontSize: "var(--text-xl)", fontWeight: 800, color: "var(--color-amber-600)" }}>
+                  ${(pendingDepositsCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", textTransform: "uppercase", fontWeight: 600 }}>Collected This Month</span>
+                <div style={{ fontSize: "var(--text-xl)", fontWeight: 800, color: "var(--color-green-600)" }}>
+                  ${(paidThisMonthCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+            </div>
+            <div style={{ marginTop: "var(--space-4)", borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)" }}>
+              <Link href={"/app/reports" as Route} style={{ color: "var(--accent)", fontSize: "var(--text-xs)", fontWeight: 600, textDecoration: "none" }}>
+                View Full Reports →
+              </Link>
+            </div>
+          </Card>
+
+          {/* Quick Actions Card */}
+          <Card style={{ padding: "var(--space-4)" }}>
+            <SectionHeader title="Quick Actions" />
+            <div className="quick-actions-grid" style={{ marginTop: "var(--space-3)" }}>
+              {[
+                { label: "New Estimate", href: "/app/estimates", icon: "📝" },
+                { label: "New Job", href: "/app/jobs", icon: "🛠️" },
+                { label: "Log Mileage", href: "/app/mileage", icon: "🚗" },
+                { label: "Add Expense", href: "/app/expenses/new", icon: "🛒" },
+                { label: "Upload Receipt", href: "/app/expenses/new", icon: "🧾" },
+                { label: "New Request", href: "/app/intake/new", icon: "⚡" },
+              ].map((act) => (
+                <Link
+                  key={act.label}
+                  href={act.href as Route}
+                  style={{
+                    display: "flex", flexDirection: "column", gap: 4, alignItems: "center", justifyContent: "center",
+                    padding: "var(--space-2)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
+                    textDecoration: "none", color: "inherit", background: "var(--bg-card)", textAlign: "center",
+                    minHeight: 74, fontSize: 11, fontWeight: 600, boxShadow: "var(--shadow-xs)"
+                  }}
+                  className="p7-card-hover"
+                >
+                  <span style={{ fontSize: 18 }}>{act.icon}</span>
+                  <span>{act.label}</span>
+                </Link>
+              ))}
+            </div>
+          </Card>
+
+          {/* Statistics at a Glance */}
+          <Card style={{ padding: "var(--space-4)" }}>
+            <SectionHeader title="Today's Stats" />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginTop: "var(--space-3)" }}>
+              <div style={{ background: "var(--color-slate-50)", padding: "var(--space-3)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+                <span style={{ fontSize: 10, color: "var(--fg-muted)", textTransform: "uppercase" }}>Miles Today</span>
+                <div style={{ fontSize: "var(--text-lg)", fontWeight: 800 }}>{dayMileage.totalMiles} mi</div>
+              </div>
+              <div style={{ background: "var(--color-slate-50)", padding: "var(--space-3)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+                <span style={{ fontSize: 10, color: "var(--fg-muted)", textTransform: "uppercase" }}>Yesterday</span>
+                <div style={{ fontSize: "var(--text-lg)", fontWeight: 800 }}>{yesterdayMiles} mi</div>
+              </div>
+            </div>
+          </Card>
+
+        </div>
+
+      </div>
+
+      {/* --- CONFIRM VEHICLE MODAL --- */}
       <Modal open={!!confirm} onClose={() => setConfirm(null)} title={confirm?.title ?? "Confirm vehicle"} data-testid="vehicle-confirm">
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {confirm?.lines.map((line, i) => line === "" ? <div key={i} style={{ height: 4 }} /> : <div key={i}>{line}</div>)}
@@ -443,6 +893,7 @@ function CurrentVehiclePanel({ initialSession, vehicles }: { initialSession: Ope
         </div>
       </Modal>
 
+      {/* --- RESOLVE PRIOR SESSION MODAL --- */}
       <Modal open={!!prior} onClose={() => setPrior(null)} title="Close the open session first" data-testid="prior-session-prompt">
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
           <p style={{ margin: 0 }}>This vehicle still has an open mileage session. Enter its end odometer to close it before starting a new one.</p>
@@ -457,6 +908,32 @@ function CurrentVehiclePanel({ initialSession, vehicles }: { initialSession: Ope
         </div>
       </Modal>
     </>
+  );
+}
+
+function ActionQueue({ items }: { items: CountAction[] }) {
+  return (
+    <Card>
+      <SectionHeader title="What needs you" count={items.length} />
+      {items.length === 0 ? (
+        <EmptyState title="Nothing is waiting" description="Follow-ups, deposits, and invoices show up here when they need action." />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+          {items.map((item) => {
+            const accent = accentForTone(item.tone);
+            return (
+              <Link key={item.label} href={item.href} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)", padding: "var(--space-3)", borderRadius: "var(--radius)", border: "1px solid var(--border)", borderLeft: `4px solid ${accent}`, textDecoration: "none", color: "inherit", background: "var(--bg-card)" }}>
+                <span style={{ display: "flex", flexDirection: "column" }}>
+                  <strong>{item.label}</strong>
+                  <small style={{ color: "var(--fg-muted)" }}>{item.detail}</small>
+                </span>
+                <b style={{ minWidth: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 8px", borderRadius: 99, background: `color-mix(in srgb, ${accent} 14%, transparent)`, color: accent }}>{item.count}</b>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -500,7 +977,7 @@ function JobsToday({ jobs }: { jobs: CommandVisit[] }) {
       toast.error("Could not mark visit for follow-up");
       return;
     }
-    toast.success("Visit marked for follow-up");
+    toast.success("Visit marked for reschedule");
     router.refresh();
   }
 
@@ -564,138 +1041,5 @@ function Materials({ count, jobs }: { count: number; jobs: MaterialJob[] }) {
         </div>
       )}
     </Card>
-  );
-}
-
-function DayMileagePanel({ data }: { data: DayMileageSummary }) {
-  if (data.completedSessions === 0 && data.openSessions === 0) return null;
-  const plural = (n: number) => (n === 1 ? "" : "s");
-  return (
-    <div style={{ marginBottom: "var(--space-4)" }}>
-      <SectionHeader title="Today's mileage" as="h3" />
-      <div style={{ fontSize: "var(--text-sm)" }}>
-        <strong>{data.totalMiles.toLocaleString()} mi</strong> across {data.completedSessions} completed session{plural(data.completedSessions)}
-        {data.openSessions > 0 ? ` · ${data.openSessions} still open` : ""}
-      </div>
-      {data.perVehicle.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: "var(--space-2)" }}>
-          {data.perVehicle.map((v) => (
-            <div key={v.vehicle_id ?? "none"} style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-              {v.nickname ?? "No vehicle"}{v.plate ? ` (${v.plate})` : ""} — {v.miles.toLocaleString()} mi · {v.sessions} session{plural(v.sessions)}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function EndDay({ session, warnings, tomorrow, activityEntries, dayMileage }: { session: OpenSession | null; warnings: EndWarnings; tomorrow: CommandVisit[]; activityEntries: ActivityEntryDto[]; dayMileage: DayMileageSummary }) {
-  const router = useRouter();
-  const toast = useToast();
-  const [endOdometer, setEndOdometer] = useState("");
-  const [pending, setPending] = useState(false);
-  const activeWarnings = useMemo(() => [
-    session ? "mileage session still open" : null,
-    warnings.missingReceiptPhotos > 0 ? `${warnings.missingReceiptPhotos} receipt${warnings.missingReceiptPhotos === 1 ? "" : "s"} missing photos` : null,
-    warnings.jobsInProgress > 0 ? `${warnings.jobsInProgress} job${warnings.jobsInProgress === 1 ? "" : "s"} still in progress` : null,
-    warnings.draftInvoices > 0 ? `${warnings.draftInvoices} draft invoice${warnings.draftInvoices === 1 ? "" : "s"} needing action` : null,
-    warnings.deposits > 0 ? `${warnings.deposits} deposit${warnings.deposits === 1 ? "" : "s"} needing action` : null,
-  ].filter(Boolean) as string[], [session, warnings]);
-
-  async function closeSession() {
-    if (!session) return;
-    const odometer = Number(endOdometer);
-    if (!Number.isInteger(odometer) || odometer <= session.start_odometer) {
-      toast.error("End odometer must be greater than start");
-      return;
-    }
-    setPending(true);
-    const res = await fetch(`/api/v1/sessions/${session.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ end_odometer: odometer, end_day: true }),
-    });
-    setPending(false);
-    if (!res.ok) {
-      const json = await res.json().catch(() => ({}));
-      toast.error(json.error?.message ?? "Could not close session");
-      return;
-    }
-    toast.success("Day closed");
-    router.refresh();
-  }
-
-  return (
-    <Card>
-      <SectionHeader title="End Day" count={activeWarnings.length} />
-      <DayMileagePanel data={dayMileage} />
-      <DayTimeSummary entries={activityEntries} />
-      <div style={{ marginBottom: "var(--space-4)" }}>
-        <Link href={"/app/timeline" as Route} style={{ color: "var(--accent)", fontSize: "var(--text-sm)", fontWeight: 600, textDecoration: "none" }}>
-          Edit timeline →
-        </Link>
-      </div>
-      {activeWarnings.length === 0 ? <EmptyState title="No loose ends" description="Close mileage when the day is done, then preview tomorrow." /> : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", marginBottom: "var(--space-4)" }}>
-          {activeWarnings.map((warning) => <div key={warning} style={{ color: "#b91c1c", fontWeight: 700 }}>🔴 {warning}</div>)}
-        </div>
-      )}
-      {session && (
-        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "end", marginBottom: "var(--space-4)" }}>
-          <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: "var(--text-sm)", fontWeight: 600 }}>
-            End odometer
-            <input value={endOdometer} onChange={(e) => setEndOdometer(e.target.value)} inputMode="numeric" style={{ minHeight: 38, border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "0 var(--space-3)", background: "var(--bg-card)" }} />
-          </label>
-          <button type="button" className="p7-btn p7-btn-primary p7-btn-sm" disabled={pending} onClick={closeSession}>{pending ? "Closing..." : "Close mileage"}</button>
-        </div>
-      )}
-      <SectionHeader title="Tomorrow" count={tomorrow.length} as="h3" />
-      {tomorrow.length === 0 ? <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", margin: 0 }}>No visits scheduled tomorrow.</p> : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          {tomorrow.slice(0, 3).map((job) => <Link key={job.id} href={(job.visit_id ? `/app/visits/${job.visit_id}` : `/app/jobs/${job.id}`) as Route} style={{ color: "inherit", textDecoration: "none", fontSize: "var(--text-sm)" }}>{fmtTime(job.scheduled_start)} · {job.title}</Link>)}
-        </div>
-      )}
-    </Card>
-  );
-}
-
-export function DailyCommandCenter({
-  todayLabel,
-  openSession,
-  vehicles,
-  actionQueue,
-  todayJobs,
-  materialCount,
-  materialJobs,
-  warnings,
-  tomorrowJobs,
-  activityEntries,
-  dayMileage,
-}: {
-  todayLabel: string;
-  openSession: OpenSession | null;
-  vehicles: VehicleOption[];
-  actionQueue: CountAction[];
-  todayJobs: CommandVisit[];
-  materialCount: number;
-  materialJobs: MaterialJob[];
-  warnings: EndWarnings;
-  tomorrowJobs: CommandVisit[];
-  activityEntries: ActivityEntryDto[];
-  dayMileage: DayMileageSummary;
-}) {
-  const activeEntry = activityEntries.find((e) => e.ended_at === null) ?? null;
-  const quickTypes = pickQuickActivities(activityEntries);
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
-      <CurrentVehiclePanel initialSession={openSession} vehicles={vehicles} />
-      <NowBar active={activeEntry} quickTypes={quickTypes} />
-      <ActionQueue items={actionQueue} />
-      <JobsToday jobs={todayJobs} />
-      <Materials count={materialCount} jobs={materialJobs} />
-      <EndDay session={openSession} warnings={warnings} tomorrow={tomorrowJobs} activityEntries={activityEntries} dayMileage={dayMileage} />
-      <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>{todayLabel}</p>
-    </div>
   );
 }

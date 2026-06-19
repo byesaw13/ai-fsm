@@ -6,34 +6,36 @@ trustworthy enough to feed tax mileage, vehicle cost, and job profitability.
 
 ## Active tasks
 
-# TASK-023: End of Day Checklist Wizard
+# TASK-023: Daily Command Center UX Modernization
 
 Status:
-Proposed
+Completed
 
-Problem:
-Closing the day is a scatter of separate actions (close mileage, resolve
-warnings, review tomorrow). A guided wizard could walk the owner through it.
-
-Business Value:
-- A single, guided close-out reduces forgotten steps and loose ends.
+Goal:
+Redesign the Daily Command Center so it feels like the supplied mockups: clean, mobile-first, visually polished, fast to use, and organized around the technician's real workday.
 
 Scope:
-- A step-through wizard that sequences the existing End Day actions.
+- State-driven dashboard UI (Before Day Starts, Active Day, End of Day).
+- Mobile-first responsive layout matching mockup aesthetics.
+- Quick activity chips for single-tap switching on the NowBar.
+- Inline checklist wizard for End of Day closing.
 
 Out of Scope:
-- New end-of-day data or rules — composition of existing actions only.
+- Business Ledger.
+- New database tables.
+- Core business logic changes.
 
 Acceptance Criteria:
-- [ ] A guided flow steps through the existing close-out actions.
-- [ ] Each step reflects current state (mileage open, warnings, tomorrow).
-
-Notes:
-**Intentionally parked.** Do not build yet. The underlying pieces — Daily
-Operations Log (TASK-004), Activity Tracking (TASK-005), and Timeline Correction
-(TASK-019) — should stabilize in production first, or the wizard will be
-redesigned repeatedly. Revisit only after those have been evaluated in real use.
-Originated from the Daily Command Center UX review.
+- [x] Dashboard has a clear state-driven layout.
+- [x] Start Day is visually dominant before the day starts.
+- [x] Active NowBar is visually dominant during the workday.
+- [x] Quick activity chips support one-tap switching.
+- [x] End Day checklist is visually dominant when closing the day.
+- [x] Mobile layout resembles the clarity and polish of the supplied mockups.
+- [x] Desktop layout uses sidebar + clean card grid.
+- [x] Existing mileage/session/activity functionality still works.
+- [x] No new untracked feature work is introduced.
+- [x] pnpm gate:fast passes.
 
 ## Completed
 
