@@ -65,9 +65,13 @@ the HTTPS origin itself is a deployment task, not a code change. From an
 app-config standpoint the criteria are satisfiable now; the final Lighthouse
 "installable" green requires the secure origin to be in place.
 
-Deployment runbook for the HTTPS path (real subdomain + DNS-01 cert via NPM,
-split-horizon resolution via AdGuard, env + verification steps):
-`docs/working/pwa-https-deployment.md`.
+Deployment runbook for the HTTPS path: `docs/working/pwa-https-deployment.md`.
+Chosen route — **Cloudflare Tunnel** to a real subdomain (`app.<domain>`): a
+trusted public cert, reachable on cellular for staff and clients with no VPN
+client, no inbound host ports, home IP hidden. This serves field staff (who
+install the PWA) and clients (who use the portal in a browser) from one origin.
+Tailscale was evaluated and rejected: it requires the VPN on every device, so it
+cannot serve clients, and `tailscale serve` collided with NPM on host 443.
 
 ## Completed
 

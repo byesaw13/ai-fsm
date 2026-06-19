@@ -11,7 +11,7 @@
 #   5. Build and start web + worker
 #   6. Wait for web healthcheck to pass
 #   7. Print service status + health endpoint response
-#   8. Report the PWA install origin (tailscale serve), best-effort
+#   8. Report the PWA install origin (Cloudflare Tunnel), best-effort
 #
 # Pre-flight checks (run once before first deploy):
 #   docker network inspect business_proxy >/dev/null
@@ -194,26 +194,23 @@ docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T web \
 
 # -----------------------------------------------------------------------------
 # PWA install origin (best-effort): the app is only installable over a secure
-# origin. Report whether `tailscale serve` is exposing it over HTTPS for
-# phone/field use, and how to enable it if not. Never fails the deploy.
+# origin. The secure origin is provided by a Cloudflare Tunnel routing to the
+# `ai-fsm-web` alias — independent of this deploy. Report the configured public
+# origin so the operator can confirm the install URL. Never fails the deploy.
 # See docs/working/pwa-https-deployment.md.
 # -----------------------------------------------------------------------------
-TAILSCALE_SERVE_PORT="${TAILSCALE_SERVE_PORT:-3000}"
-check_tailscale_serve() {
+report_pwa_origin() {
   echo
-  if ! command -v tailscale >/dev/null 2>&1; then
-    echo "PWA install: tailscale not installed — install needs an HTTPS origin (docs/working/pwa-https-deployment.md)"
-    return 0
-  fi
-  local serve_status url
-  serve_status="$(tailscale serve status 2>/dev/null || true)"
-  if printf '%s' "${serve_status}" | grep -q ":${TAILSCALE_SERVE_PORT}\b"; then
-    url="$(printf '%s' "${serve_status}" | grep -oE 'https://[^ ]+' | head -1 || true)"
-    echo "PWA install: tailscale serve active → install at ${url:-https://<your-tailnet-host>}"
+  local origin
+  # `|| true` so a missing APP_URL (grep no-match → non-zero) does not trip
+  # `set -euo pipefail` and abort the deploy; we want to fall through to the hint.
+  origin="$(grep -E '^APP_URL=' "${ENV_FILE}" 2>/dev/null | head -1 | cut -d= -f2- || true)"
+  if [[ -n "${origin}" && "${origin}" == https://* ]]; then
+    echo "PWA install: secure origin ${origin} — open it in Chrome → menu → Install app"
   else
-    echo "PWA install: tailscale serve not exposing :${TAILSCALE_SERVE_PORT} — for phone/field install run:"
-    echo "    sudo tailscale serve --bg ${TAILSCALE_SERVE_PORT}"
-    echo "  then set APP_URL/APP_BASE_URL to the https URL and redeploy (docs/working/pwa-https-deployment.md)"
+    echo "PWA install: no https APP_URL configured — set APP_URL/APP_BASE_URL to the"
+    echo "  Cloudflare Tunnel hostname and ensure the tunnel routes to ai-fsm-web:3000"
+    echo "  (docs/working/pwa-https-deployment.md). Install needs a secure HTTPS origin."
   fi
 }
-check_tailscale_serve
+report_pwa_origin

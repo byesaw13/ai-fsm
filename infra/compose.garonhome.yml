@@ -53,12 +53,10 @@ services:
       dockerfile: apps/web/Dockerfile
     image: ai-fsm-web:${APP_TAG:-latest}
     restart: unless-stopped
-    # Loopback-only host port so `tailscale serve 3000` can expose the PWA over
-    # HTTPS on the tailnet for field/phone use (see
-    # docs/working/pwa-https-deployment.md). Bound to 127.0.0.1 — NOT exposed to
-    # the LAN; NPM still routes via the business_proxy `ai-fsm-web` alias.
-    ports:
-      - "127.0.0.1:${TAILSCALE_SERVE_PORT:-3000}:3000"
+    # No host port mapping. The PWA's secure origin is provided by a Cloudflare
+    # Tunnel (cloudflared) that routes to this service over the business_proxy
+    # network via the `ai-fsm-web` alias — no inbound host ports are exposed.
+    # See docs/working/pwa-https-deployment.md.
     env_file:
       - ${FSM_ENV_FILE:-/opt/business/ai-fsm/env/.env}
     environment:
