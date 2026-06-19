@@ -29,8 +29,10 @@ rest_command:
     content_type: "application/json"
     headers:
       x-api-key: !secret fsm_location_internal_key
+    # occurred_at must be UTC with a 'Z' suffix — the ingest route validates a
+    # strict UTC datetime and rejects a local offset (e.g. -04:00).
     payload: >-
-      {"kind": "{{ kind }}", "occurred_at": "{{ now().isoformat() }}", "external_id": "{{ external_id }}"
+      {"kind": "{{ kind }}", "occurred_at": "{{ utcnow().strftime('%Y-%m-%dT%H:%M:%SZ') }}", "external_id": "{{ external_id }}"
       {% if zone is defined and zone %}, "zone": {{ zone | tojson }}{% endif %}
       {% if latitude is defined and latitude not in [none, '', 'unknown', 'unavailable'] %}, "latitude": {{ latitude }}{% endif %}
       {% if longitude is defined and longitude not in [none, '', 'unknown', 'unavailable'] %}, "longitude": {{ longitude }}{% endif %}
@@ -46,8 +48,14 @@ automation:
       - trigger: state
         entity_id: device_tracker.nick_s_s25
     conditions:
+      # Ignore non-real transitions and unknown/unavailable tracker states
+      # (HA restart, integration reload, connectivity loss) so we never post a
+      # bogus zone event.
       - condition: template
-        value_template: "{{ trigger.from_state.state != trigger.to_state.state }}"
+        value_template: >-
+          {{ trigger.from_state.state != trigger.to_state.state
+             and trigger.to_state.state not in ['unknown', 'unavailable']
+             and trigger.from_state.state not in ['unknown', 'unavailable'] }}
     actions:
       - action: rest_command.fsm_location_event
         data:
