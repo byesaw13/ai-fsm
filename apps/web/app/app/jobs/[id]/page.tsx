@@ -333,7 +333,9 @@ export default async function JobDetailPage({
   // viewport width (p7-only-* utilities), replacing the workspace-mode cookie.
   const currentVisit = activeVisits.find((v) => v.status === "in_progress" || v.status === "arrived") ?? activeVisits[0] ?? visits[0] ?? null;
   const visitHref = currentVisit ? (`/app/visits/${currentVisit.id}` as Route) : null;
-  const mapHref = job.property_address ? `https://maps.apple.com/?q=${encodeURIComponent(job.property_address)}` : null;
+  // Universal maps link: opens the native maps app on both iOS and Android
+  // (and the browser as fallback). maps.apple.com only deep-links cleanly on iOS.
+  const mapHref = job.property_address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.property_address)}` : null;
 
   const mobileView = (
       <div style={{ padding: "var(--space-4) var(--space-4) var(--space-12)", display: "flex", flexDirection: "column", gap: "var(--space-5)", maxWidth: 760 }}>
