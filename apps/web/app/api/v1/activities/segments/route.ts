@@ -21,19 +21,24 @@ type SegmentRow = {
 };
 
 /**
- * GET /api/v1/activities/segments — today's stop/drive segments (oldest first),
- * plus the currently-open one. Dismissed segments are hidden.
+ * GET /api/v1/activities/segments — a day's stop/drive segments (oldest first),
+ * plus the currently-open one. Dismissed segments are hidden. The day defaults
+ * to today; pass ?date=YYYY-MM-DD to match the timeline's day picker.
  */
-export const GET = withAuth(async (_request: NextRequest, session) => {
+export const GET = withAuth(async (request: NextRequest, session) => {
   try {
+    const dateParam = request.nextUrl.searchParams.get("date");
+    const day = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : null;
     const rows = await queryForSession<SegmentRow>(
       session,
       `SELECT id, kind, started_at::text, ended_at::text, place_label, zone,
               latitude, longitude, suggested_activity_type, status, activity_entry_id
        FROM location_segments
-       WHERE account_id = $1 AND segment_date = CURRENT_DATE AND status <> 'dismissed'
+       WHERE account_id = $1
+         AND segment_date = COALESCE($2::date, CURRENT_DATE)
+         AND status <> 'dismissed'
        ORDER BY started_at ASC`,
-      [session.accountId],
+      [session.accountId, day],
     );
     const open = rows.find((r) => r.ended_at === null) ?? null;
     return NextResponse.json({ data: { segments: rows, open } });

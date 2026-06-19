@@ -58,8 +58,25 @@ HA Companion app (zones + background GPS + detected-activity)
 
 ## Reading segments
 
-`GET /api/v1/activities/segments` (authenticated owner session) → today's
-stop/drive segments oldest-first plus the open one. Dismissed segments hidden.
+`GET /api/v1/activities/segments[?date=YYYY-MM-DD]` (authenticated owner session)
+→ that day's stop/drive segments oldest-first plus the open one (defaults to
+today). Dismissed segments hidden.
+
+## Labelling segments → the ledger (slice 2)
+
+`PATCH /api/v1/activities/segments/{id}`:
+
+- `{ "action": "confirm", "activity_type": "material_run", "entity_type"?, "entity_id"?, "note"? }`
+  → inserts an `activity_entries` row (`source = 'backfill'`) spanning the
+  segment's start/end, links it back (`status = 'confirmed'`,
+  `activity_entry_id`). Idempotent; rejects a still-open segment with 409 so it
+  never collides with the live "one active entry" invariant.
+- `{ "action": "dismiss" }` → hides the segment; nothing reaches the ledger.
+
+UI: the **Captured locations** panel on `/app/timeline` (and its day picker)
+lists provisional segments with a one-tap activity assignment + Confirm/Dismiss,
+and shows confirmed ones as logged. Provisional segments never affect
+profitability until confirmed.
 
 ## Segmentation rules (reducer)
 
