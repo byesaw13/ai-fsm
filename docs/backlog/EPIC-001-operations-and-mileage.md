@@ -6,6 +6,45 @@ trustworthy enough to feed tax mileage, vehicle cost, and job profitability.
 
 ## Active tasks
 
+# TASK-026: Day Map (stops + drive routes)
+
+Status:
+In Progress
+
+Problem:
+The captured day is a list. Stops and drives carry GPS, but the owner can't see
+*where* they were — which makes labeling slower and gives no visual check on the
+auto-mileage.
+
+Approach:
+A map on the activity timeline (`/app/timeline`) that plots the day:
+- **stops as pins**, **drives as routes** drawn from the `location_events` GPS
+  breadcrumb (denser thanks to the drive-GPS-point automation).
+- Provisional vs confirmed are color-coded; popups show the place / trip miles.
+- Tiles: **Leaflet + OpenStreetMap** — free, no API key (aligns with the cost /
+  complexity policy). Loaded client-side only (`ssr: false`).
+
+Scope:
+- `GET /api/v1/activities/segments/geometry[?date=]` — stop pins + drive routes
+  for a day.
+- `DayMap` (imperative Leaflet client component) + `DayMapPanel` (dynamic, ssr
+  off) mounted on the timeline above the Captured Locations panel.
+- `leaflet` + `@types/leaflet` dependency.
+
+Out of Scope:
+- Geocoding client/property addresses onto the map (separate, needs geocoding).
+- Live "where am I now" tracking; offline tiles.
+
+Acceptance Criteria:
+- [ ] The timeline shows a map of the selected day's stops + drive routes.
+- [ ] Provisional/confirmed are visually distinguishable; popups identify each.
+- [ ] Empty days show a clear "nothing mapped yet" state.
+- [ ] No API key / external billing (OSM tiles).
+
+Notes:
+- Route quality tracks the breadcrumb density (sparse on older drives, real on
+  new ones via the periodic-GPS automation). Builds on TASK-024/025.
+
 # TASK-025: Bluetooth-triggered, vehicle-aware auto-mileage
 
 Status:

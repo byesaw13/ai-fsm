@@ -120,6 +120,7 @@ export function LocationSegmentsPanel({ day }: { day?: string }) {
       toast.success(successMsg);
       await load();
       router.refresh(); // refresh the activity_entries timeline above
+      window.dispatchEvent(new CustomEvent("fsm:segments-changed")); // refresh the day map (TASK-026)
     } finally {
       setPending(null);
     }
