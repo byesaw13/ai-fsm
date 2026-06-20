@@ -22,6 +22,7 @@ type VehicleRow = {
   year: number | null;
   plate: string | null;
   is_active: boolean;
+  is_default: boolean;
   created_at: string;
   current_odometer: number | null;  // derived from most recent session end_odometer
   last_session_date: string | null;
@@ -31,7 +32,7 @@ type VehicleRow = {
 export const GET = withRole(["owner", "admin", "tech"], async (_req: NextRequest, session) => {
   try {
     const rows = await query<VehicleRow>(
-      `SELECT v.id, v.nickname, v.make, v.model, v.year, v.plate, v.is_active, v.created_at::text,
+      `SELECT v.id, v.nickname, v.make, v.model, v.year, v.plate, v.is_active, v.is_default, v.created_at::text,
               last_s.end_odometer   AS current_odometer,
               last_s.session_date::text AS last_session_date,
               roll.total_miles::text AS total_miles

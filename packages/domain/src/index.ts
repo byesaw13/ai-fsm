@@ -57,3 +57,4 @@ export type {
 } from "./painting";
 export * from "./activities";
 export * from "./location";
+export * from "./geo";

@@ -18,6 +18,10 @@ type SegmentRow = {
   suggested_activity_type: string | null;
   status: string;
   activity_entry_id: string | null;
+  distance_meters: number | null;
+  vehicle_id: string | null;
+  vehicle_session_id: string | null;
+  estimated_miles: number | null;
 };
 
 /**
@@ -32,7 +36,9 @@ export const GET = withAuth(async (request: NextRequest, session) => {
     const rows = await queryForSession<SegmentRow>(
       session,
       `SELECT id, kind, started_at::text, ended_at::text, place_label, zone,
-              latitude, longitude, suggested_activity_type, status, activity_entry_id
+              latitude, longitude, suggested_activity_type, status, activity_entry_id,
+              distance_meters, vehicle_id, vehicle_session_id,
+              ROUND((distance_meters / 1609.344)::numeric, 1)::float8 AS estimated_miles
        FROM location_segments
        WHERE account_id = $1
          AND segment_date = COALESCE($2::date, CURRENT_DATE)

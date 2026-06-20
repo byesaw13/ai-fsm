@@ -20,7 +20,14 @@ type Segment = {
   suggested_activity_type: string | null;
   status: string;
   activity_entry_id: string | null;
+  // TASK-025: drive → mileage.
+  distance_meters: number | null;
+  estimated_miles: number | null;
+  vehicle_id: string | null;
+  vehicle_session_id: string | null;
 };
+
+type Vehicle = { id: string; nickname: string; is_active: boolean; is_default: boolean };
 
 const ACTIVITY_OPTIONS = ACTIVITY_TYPES.map((t) => ({
   value: t,
@@ -45,21 +52,45 @@ export function LocationSegmentsPanel({ day }: { day?: string }) {
   const router = useRouter();
   const toast = useToast();
   const [segments, setSegments] = useState<Segment[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [choice, setChoice] = useState<Record<string, ActivityType>>({});
+  const [vehicleChoice, setVehicleChoice] = useState<Record<string, string>>({});
+  const [milesChoice, setMilesChoice] = useState<Record<string, string>>({});
   const [pending, setPending] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const qs = day ? `?date=${day}` : "";
-      const res = await fetch(`/api/v1/activities/segments${qs}`);
-      const json = await res.json();
-      const list: Segment[] = json?.data?.segments ?? [];
+      const [segRes, vehRes] = await Promise.all([
+        fetch(`/api/v1/activities/segments${qs}`),
+        fetch(`/api/v1/vehicles`),
+      ]);
+      const segJson = await segRes.json();
+      const list: Segment[] = segJson?.data?.segments ?? [];
+      const vehJson = await vehRes.json().catch(() => ({}));
+      const vehList: Vehicle[] = (vehJson?.data ?? []).filter((v: Vehicle) => v.is_active);
+      const defaultVehicle = vehList.find((v) => v.is_default)?.id ?? vehList[0]?.id ?? "";
       setSegments(list);
+      setVehicles(vehList);
       setChoice((prev) => {
         const next = { ...prev };
         for (const s of list) if (!next[s.id]) next[s.id] = defaultActivity(s);
+        return next;
+      });
+      setVehicleChoice((prev) => {
+        const next = { ...prev };
+        for (const s of list) if (s.kind === "drive" && !next[s.id]) next[s.id] = s.vehicle_id ?? defaultVehicle;
+        return next;
+      });
+      setMilesChoice((prev) => {
+        const next = { ...prev };
+        for (const s of list) {
+          if (s.kind === "drive" && next[s.id] === undefined) {
+            next[s.id] = s.estimated_miles != null ? String(s.estimated_miles) : "";
+          }
+        }
         return next;
       });
     } catch {
@@ -143,22 +174,64 @@ export function LocationSegmentsPanel({ day }: { day?: string }) {
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
-                  <Select
-                    id={`seg-activity-${seg.id}`}
-                    options={ACTIVITY_OPTIONS}
-                    value={choice[seg.id] ?? defaultActivity(seg)}
-                    onChange={(e) => setChoice((c) => ({ ...c, [seg.id]: e.target.value as ActivityType }))}
-                    disabled={isOpen || pending === seg.id}
-                  />
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    loading={pending === seg.id}
-                    disabled={isOpen}
-                    onClick={() => patch(seg.id, { action: "confirm", activity_type: choice[seg.id] ?? defaultActivity(seg) }, "Logged to your day")}
-                  >
-                    Confirm
-                  </Button>
+                  {seg.kind === "drive" ? (
+                    <>
+                      <Select
+                        id={`seg-vehicle-${seg.id}`}
+                        options={vehicles.map((v) => ({ value: v.id, label: v.nickname }))}
+                        value={vehicleChoice[seg.id] ?? ""}
+                        onChange={(e) => setVehicleChoice((c) => ({ ...c, [seg.id]: e.target.value }))}
+                        disabled={isOpen || pending === seg.id || vehicles.length === 0}
+                      />
+                      <input
+                        className="p7-input"
+                        type="number"
+                        inputMode="decimal"
+                        step="0.1"
+                        min="0"
+                        placeholder="miles"
+                        aria-label="Trip miles"
+                        style={{ width: "5.5rem" }}
+                        value={milesChoice[seg.id] ?? ""}
+                        onChange={(e) => setMilesChoice((c) => ({ ...c, [seg.id]: e.target.value }))}
+                        disabled={isOpen || pending === seg.id}
+                      />
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        loading={pending === seg.id}
+                        disabled={isOpen || !vehicleChoice[seg.id] || !(Number(milesChoice[seg.id]) > 0)}
+                        onClick={() =>
+                          patch(
+                            seg.id,
+                            { action: "log_trip", vehicle_id: vehicleChoice[seg.id], miles: Number(milesChoice[seg.id]) },
+                            "Trip logged to mileage",
+                          )
+                        }
+                      >
+                        Log trip
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Select
+                        id={`seg-activity-${seg.id}`}
+                        options={ACTIVITY_OPTIONS}
+                        value={choice[seg.id] ?? defaultActivity(seg)}
+                        onChange={(e) => setChoice((c) => ({ ...c, [seg.id]: e.target.value as ActivityType }))}
+                        disabled={isOpen || pending === seg.id}
+                      />
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        loading={pending === seg.id}
+                        disabled={isOpen}
+                        onClick={() => patch(seg.id, { action: "confirm", activity_type: choice[seg.id] ?? defaultActivity(seg) }, "Logged to your day")}
+                      >
+                        Confirm
+                      </Button>
+                    </>
+                  )}
                   <Button
                     size="sm"
                     variant="ghost"
@@ -168,9 +241,16 @@ export function LocationSegmentsPanel({ day }: { day?: string }) {
                     Dismiss
                   </Button>
                 </div>
+                {seg.kind === "drive" && !isOpen ? (
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", margin: 0 }}>
+                    {seg.estimated_miles != null
+                      ? `~${seg.estimated_miles} mi estimated from GPS — adjust if needed.`
+                      : "Enter the miles for this trip."}
+                  </p>
+                ) : null}
                 {isOpen ? (
                   <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", margin: 0 }}>
-                    Label this once it ends.
+                    {seg.kind === "drive" ? "Log this once the trip ends." : "Label this once it ends."}
                   </p>
                 ) : null}
               </div>

@@ -78,6 +78,32 @@ lists provisional segments with a one-tap activity assignment + Confirm/Dismiss,
 and shows confirmed ones as logged. Provisional segments never affect
 profitability until confirmed.
 
+## Drive → mileage (TASK-025 slice 1)
+
+A **drive** segment can be logged as a mileage session instead of an activity:
+
+`PATCH /api/v1/activities/segments/{id}` with
+`{ "action": "log_trip", "vehicle_id": "...", "miles": 12.4, "note"? }` →
+inserts a `vehicle_sessions` row (miles-only; no odometer needed), links it back
+(`vehicle_session_id`, `status = 'confirmed'`), and attributes the drive to that
+vehicle. Idempotent; rejects non-drive / still-open segments.
+
+Distance is estimated from GPS: when a drive closes, the ingest stores a
+straight-line `distance_meters` (great-circle from the drive's start point to
+where it ended), surfaced as `estimated_miles`. It's an **estimate the owner
+confirms/edits** before it writes. In the panel, drive rows show a **vehicle
+picker** (defaults to the vehicle flagged `is_default`) + the **editable miles**
+(pre-filled from the estimate) + **Log trip**.
+
+Migration 115 adds `location_segments.{distance_meters, vehicle_id,
+vehicle_session_id}` and `vehicles.{bluetooth_id, is_default}`. Geo helpers:
+`packages/domain/src/geo.ts`.
+
+Slice 2 (next): Bluetooth-triggered, vehicle-aware capture — connecting the phone
+to a known vehicle's stereo (RAM "Uconnect" / GMC "IntelliLink") auto-opens a
+vehicle-tagged drive and pre-selects the vehicle; periodic GPS during drives
+sharpens the distance estimate.
+
 ## Segmentation rules (reducer)
 
 Pure, unit-tested in `apps/web/lib/location/segments.test.ts`. At most one open
