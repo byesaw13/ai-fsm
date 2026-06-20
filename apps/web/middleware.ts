@@ -33,7 +33,8 @@ export function middleware(request: NextRequest) {
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data:",
+      // OpenStreetMap tiles for the day map (TASK-026) — external tile images.
+      "img-src 'self' data: https://*.tile.openstreetmap.org",
       "font-src 'self'",
       "connect-src 'self'",
       "frame-ancestors 'none'",
