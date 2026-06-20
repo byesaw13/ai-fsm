@@ -99,10 +99,25 @@ Migration 115 adds `location_segments.{distance_meters, vehicle_id,
 vehicle_session_id}` and `vehicles.{bluetooth_id, is_default}`. Geo helpers:
 `packages/domain/src/geo.ts`.
 
-Slice 2 (next): Bluetooth-triggered, vehicle-aware capture — connecting the phone
-to a known vehicle's stereo (RAM "Uconnect" / GMC "IntelliLink") auto-opens a
-vehicle-tagged drive and pre-selects the vehicle; periodic GPS during drives
-sharpens the distance estimate.
+## Bluetooth-triggered, vehicle-aware capture (TASK-025 slice 2)
+
+The phone's `bluetooth_connection` sensor identifies which vehicle it's in. New
+ingest event kinds `vehicle_connect` / `vehicle_disconnect` carry
+`vehicle_bluetooth` (the car-stereo MAC); the ingest resolves it against
+`vehicles.bluetooth_id` and **opens a vehicle-tagged drive** on connect, closes
+it on disconnect. So a logged trip auto-attributes to the right truck — the
+timeline pre-selects it.
+
+- Map each vehicle's Bluetooth + default in **Vehicles** (`/app/mileage/vehicles`):
+  RAM `00:22:A0:A6:49:0D`, GMC Acadia `30:C3:D9:19:1E:C3`; mark the RAM default.
+  Match is tolerant of a stored `"MAC (Name)"` string. The Pathfinder has no BT —
+  its drives fall back to the default vehicle, owner-reassignable.
+- Distance now **accumulates** great-circle legs over the GPS points captured
+  during the drive (a periodic-GPS automation posts points while `in_vehicle`),
+  instead of a single straight line. Still owner-confirmed.
+- HA: `rest_command` gains `vehicle_bluetooth`; four automations
+  (RAM/GMC × connect/disconnect) watch `connected_paired_devices`, plus a
+  drive-GPS-point automation. See `ha-location-capture.yaml`.
 
 ## Segmentation rules (reducer)
 

@@ -7,12 +7,14 @@ import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const patchSchema = z.object({
-  nickname:  z.string().min(1).max(80).optional(),
-  make:      z.string().max(80).nullable().optional(),
-  model:     z.string().max(80).nullable().optional(),
-  year:      z.number().int().min(1900).max(2100).nullable().optional(),
-  plate:     z.string().max(20).nullable().optional(),
-  is_active: z.boolean().optional(),
+  nickname:     z.string().min(1).max(80).optional(),
+  make:         z.string().max(80).nullable().optional(),
+  model:        z.string().max(80).nullable().optional(),
+  year:         z.number().int().min(1900).max(2100).nullable().optional(),
+  plate:        z.string().max(20).nullable().optional(),
+  is_active:    z.boolean().optional(),
+  bluetooth_id: z.string().max(120).nullable().optional(),  // car-stereo BT identity (TASK-025)
+  is_default:   z.boolean().optional(),
 });
 
 type VehicleRow = {
@@ -23,6 +25,8 @@ type VehicleRow = {
   year: number | null;
   plate: string | null;
   is_active: boolean;
+  is_default: boolean;
+  bluetooth_id: string | null;
   created_at: string;
 };
 
@@ -44,17 +48,28 @@ export const PATCH = withRole(["owner", "admin"], async (req: NextRequest, sessi
   if (d.model     !== undefined) { fields.push(`model = $${idx++}`);     params.push(d.model); }
   if (d.year      !== undefined) { fields.push(`year = $${idx++}`);      params.push(d.year); }
   if (d.plate     !== undefined) { fields.push(`plate = $${idx++}`);     params.push(d.plate); }
-  if (d.is_active !== undefined) { fields.push(`is_active = $${idx++}`); params.push(d.is_active); }
+  if (d.is_active    !== undefined) { fields.push(`is_active = $${idx++}`);    params.push(d.is_active); }
+  if (d.bluetooth_id !== undefined) { fields.push(`bluetooth_id = $${idx++}`); params.push(d.bluetooth_id); }
+  if (d.is_default   !== undefined) { fields.push(`is_default = $${idx++}`);   params.push(d.is_default); }
 
   if (fields.length === 0) return NextResponse.json({ error: { message: "No fields to update" } }, { status: 400 });
 
   params.push(pathId, session.accountId);
 
   try {
+    // Only one default per account (a partial unique index enforces it): clear
+    // the others first so flipping a new default doesn't collide.
+    if (d.is_default === true) {
+      await queryOne(
+        `UPDATE vehicles SET is_default = false
+         WHERE account_id = $1 AND id <> $2 AND is_default = true`,
+        [session.accountId, pathId],
+      );
+    }
     const row = await queryOne<VehicleRow>(
       `UPDATE vehicles SET ${fields.join(", ")}
        WHERE id = $${idx} AND account_id = $${idx + 1}
-       RETURNING id, nickname, make, model, year, plate, is_active, created_at::text`,
+       RETURNING id, nickname, make, model, year, plate, is_active, is_default, bluetooth_id, created_at::text`,
       params
     );
     if (!row) return NextResponse.json({ error: { message: "Not found" } }, { status: 404 });

@@ -13,11 +13,13 @@ interface Vehicle {
   year: number | null;
   plate: string | null;
   is_active: boolean;
+  is_default: boolean;
+  bluetooth_id: string | null;
   current_odometer: number | null;
   total_miles: string | null;
 }
 
-const EMPTY_FORM = { nickname: "", make: "", model: "", year: "", plate: "" };
+const EMPTY_FORM = { nickname: "", make: "", model: "", year: "", plate: "", bluetooth_id: "", is_default: false };
 
 export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -80,6 +82,8 @@ export default function VehiclesPage() {
       model:    v.model ?? "",
       year:     v.year ? String(v.year) : "",
       plate:    v.plate ?? "",
+      bluetooth_id: v.bluetooth_id ?? "",
+      is_default: v.is_default,
     });
     setEditError("");
   }
@@ -99,6 +103,8 @@ export default function VehiclesPage() {
         model:    editForm.model.trim() || null,
         year:     editForm.year ? parseInt(editForm.year, 10) : null,
         plate:    editForm.plate.trim() || null,
+        bluetooth_id: editForm.bluetooth_id.trim() || null,
+        is_default: editForm.is_default,
       }),
     });
     const data = await res.json();
@@ -208,6 +214,15 @@ export default function VehiclesPage() {
                         <input className="p7-input" style={inputStyle} type="number" min="1900" max="2100" value={editForm.year} onChange={e => setEditForm(f => ({ ...f, year: e.target.value }))} disabled={editPending} />
                       </div>
                     </div>
+                    <div>
+                      <label className="p7-label">Bluetooth ID (car stereo MAC)</label>
+                      <input className="p7-input" style={inputStyle} value={editForm.bluetooth_id} onChange={e => setEditForm(f => ({ ...f, bluetooth_id: e.target.value }))} placeholder="e.g. 00:22:A0:A6:49:0D (Uconnect)" disabled={editPending} />
+                      <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>Auto-tags trips to this vehicle when your phone connects to its stereo.</span>
+                    </div>
+                    <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontSize: "var(--text-sm)" }}>
+                      <input type="checkbox" checked={editForm.is_default} onChange={e => setEditForm(f => ({ ...f, is_default: e.target.checked }))} disabled={editPending} />
+                      Default vehicle (pre-selected when logging a trip)
+                    </label>
                     <div className="p7-form-actions">
                       <button type="submit" className="p7-btn p7-btn-primary" disabled={editPending}>{editPending ? "Saving…" : "Save"}</button>
                       <button type="button" className="p7-btn p7-btn-ghost" onClick={() => setEditId(null)}>Cancel</button>
@@ -226,6 +241,12 @@ export default function VehiclesPage() {
                       )}
                       {!v.is_active && (
                         <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", padding: "2px 6px", background: "var(--surface-raised)", borderRadius: "var(--radius-sm)" }}>Inactive</span>
+                      )}
+                      {v.is_default && (
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--accent)", padding: "2px 6px", background: "var(--surface-raised)", borderRadius: "var(--radius-sm)" }}>Default</span>
+                      )}
+                      {v.bluetooth_id && (
+                        <span title={v.bluetooth_id} style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", padding: "2px 6px", background: "var(--surface-raised)", borderRadius: "var(--radius-sm)" }}>🔵 BT linked</span>
                       )}
                     </div>
                     {(v.make || v.model || v.year) && (

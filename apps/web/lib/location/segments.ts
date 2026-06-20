@@ -35,6 +35,7 @@ export interface OpenSegment {
   placeLabel: string | null;
   latitude: number | null;
   longitude: number | null;
+  vehicleId: string | null;
 }
 
 /** A normalized incoming event (already validated by the route). */
@@ -46,6 +47,9 @@ export interface IncomingLocationEvent {
   longitude?: number | null;
   geocodedAddress?: string | null;
   detectedActivity?: DetectedActivity | null;
+  // TASK-025: the vehicle resolved from a vehicle_connect's Bluetooth id (the
+  // route resolves the id → vehicle before calling the reducer).
+  vehicleId?: string | null;
 }
 
 /** Fields for opening a new segment. */
@@ -57,6 +61,7 @@ export interface OpenSegmentSpec {
   latitude: number | null;
   longitude: number | null;
   suggestedActivityType: ActivityType | null;
+  vehicleId: string | null;
 }
 
 /** Patch applied to the currently-open segment. */
@@ -65,6 +70,7 @@ export interface UpdateOpenSpec {
   zone?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  vehicleId?: string | null;
 }
 
 /**
@@ -89,6 +95,7 @@ function openStop(ev: IncomingLocationEvent, placeLabel: string | null): OpenSeg
     latitude: ev.latitude ?? null,
     longitude: ev.longitude ?? null,
     suggestedActivityType: suggestActivityForSegment({ kind: "stop", zone }),
+    vehicleId: null,
   };
 }
 
@@ -101,6 +108,7 @@ function openDrive(ev: IncomingLocationEvent): OpenSegmentSpec {
     latitude: ev.latitude ?? null,
     longitude: ev.longitude ?? null,
     suggestedActivityType: suggestActivityForSegment({ kind: "drive" }),
+    vehicleId: ev.vehicleId ?? null,
   };
 }
 
@@ -128,6 +136,26 @@ export function reduceLocationEvent(
         ...(open ? { closeOpen: { endedAt: ev.occurredAt } } : {}),
         open: openDrive(ev),
       };
+    }
+
+    case "vehicle_connect": {
+      // Ignition on in a known vehicle — the strongest "driving" signal, and it
+      // tells us which vehicle. If already driving, just tag/retag the vehicle.
+      if (open?.kind === "drive") {
+        return open.vehicleId === (ev.vehicleId ?? null)
+          ? NO_OP
+          : { updateOpen: { vehicleId: ev.vehicleId ?? null } };
+      }
+      return {
+        ...(open ? { closeOpen: { endedAt: ev.occurredAt } } : {}),
+        open: openDrive(ev),
+      };
+    }
+
+    case "vehicle_disconnect": {
+      // Ignition off — end the drive. Next stop opens on the next arrival event.
+      if (open?.kind === "drive") return { closeOpen: { endedAt: ev.occurredAt } };
+      return NO_OP;
     }
 
     case "activity_change": {
