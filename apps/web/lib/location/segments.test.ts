@@ -18,7 +18,7 @@ describe("reduceLocationEvent — zone_enter", () => {
   it("opens a stop with no prior open segment", () => {
     const out = reduceLocationEvent(null, ev({ kind: "zone_enter", zone: "home" }));
     expect(out.closeOpen).toBeUndefined();
-    expect(out.open).toMatchObject({ kind: "stop", startedAt: T2, zone: "home", placeLabel: "home" });
+    expect(out.open).toMatchObject({ kind: "stop", startedAt: T2, zone: "home", placeLabel: "Home" });
   });
 
   it("closes an open drive then opens a stop", () => {
@@ -29,7 +29,21 @@ describe("reduceLocationEvent — zone_enter", () => {
 
   it("suggests material_run for a supply-house zone", () => {
     const out = reduceLocationEvent(null, ev({ kind: "zone_enter", zone: "Ferguson Plumbing Supply" }));
-    expect(out.open?.suggestedActivityType).toBe("material_run");
+    expect(out.open).toMatchObject({ placeLabel: "Ferguson", suggestedActivityType: "material_run" });
+  });
+
+  it("labels known places from geocoded addresses", () => {
+    const transfer = reduceLocationEvent(
+      null,
+      ev({ kind: "activity_change", detectedActivity: "still", geocodedAddress: "Town Transfer Station" }),
+    );
+    expect(transfer.open).toMatchObject({ kind: "stop", placeLabel: "Transfer station" });
+
+    const homeDepot = reduceLocationEvent(
+      null,
+      ev({ kind: "activity_change", detectedActivity: "still", geocodedAddress: "Home Depot, Main Street" }),
+    );
+    expect(homeDepot.open).toMatchObject({ kind: "stop", placeLabel: "Home Depot", suggestedActivityType: "material_run" });
   });
 
   it("does not suggest an activity for an unknown (customer) zone", () => {
@@ -103,9 +117,20 @@ describe("reduceLocationEvent — location_update", () => {
     expect(out.updateOpen).toEqual({ placeLabel: "14 Oak St", latitude: 42.1, longitude: -71.2 });
   });
 
-  it("does not overwrite an existing label", () => {
-    const out = reduceLocationEvent(stop({ placeLabel: "home" }), ev({ kind: "location_update", geocodedAddress: "elsewhere" }));
-    expect(out).toEqual({});
+  it("does not overwrite an existing zone label", () => {
+    const out = reduceLocationEvent(
+      stop({ zone: "home", placeLabel: "Home" }),
+      ev({ kind: "location_update", geocodedAddress: "elsewhere", latitude: 42.1, longitude: -71.2 }),
+    );
+    expect(out.updateOpen).toEqual({ latitude: 42.1, longitude: -71.2 });
+  });
+
+  it("refreshes an unknown stop label and coordinates as geocoding settles", () => {
+    const out = reduceLocationEvent(
+      stop({ placeLabel: "Old Road", latitude: 42, longitude: -71 }),
+      ev({ kind: "location_update", geocodedAddress: "Town Transfer Station", latitude: 42.1, longitude: -71.2 }),
+    );
+    expect(out.updateOpen).toEqual({ placeLabel: "Transfer station", latitude: 42.1, longitude: -71.2 });
   });
 
   it("is a no-op during a drive", () => {
@@ -138,9 +163,84 @@ describe("reduceLocationEvent — vehicle Bluetooth", () => {
     expect(out.open).toBeUndefined();
   });
 
+  it("vehicle_disconnect opens a stop when the disconnect event has a location", () => {
+    const out = reduceLocationEvent(
+      drive({ vehicleId: "veh-ram" }),
+      ev({
+        kind: "vehicle_disconnect",
+        geocodedAddress: "Transfer Station",
+        latitude: 42.1,
+        longitude: -71.2,
+      }),
+    );
+    expect(out.closeOpen).toEqual({ endedAt: T2 });
+    expect(out.open).toMatchObject({
+      kind: "stop",
+      placeLabel: "Transfer station",
+      latitude: 42.1,
+      longitude: -71.2,
+      suggestedActivityType: null,
+    });
+  });
+
   it("vehicle_disconnect with no open drive is a no-op", () => {
     expect(reduceLocationEvent(stop(), ev({ kind: "vehicle_disconnect" }))).toEqual({});
     expect(reduceLocationEvent(null, ev({ kind: "vehicle_disconnect" }))).toEqual({});
+  });
+});
+
+describe("reduceLocationEvent — arrival after vehicle disconnect", () => {
+  it("opens a stop from a location update when no segment is open", () => {
+    const out = reduceLocationEvent(
+      null,
+      ev({
+        kind: "location_update",
+        geocodedAddress: "Main Street Hardware",
+        latitude: 42.2,
+        longitude: -71.3,
+      }),
+    );
+    expect(out.open).toMatchObject({
+      kind: "stop",
+      placeLabel: "Hardware store",
+      latitude: 42.2,
+      longitude: -71.3,
+      suggestedActivityType: "material_run",
+    });
+  });
+
+  it("store stop → drive → store stop works with vehicle signals and location updates", () => {
+    let out = reduceLocationEvent(
+      drive({ vehicleId: "veh-ram" }),
+      ev({
+        kind: "vehicle_disconnect",
+        geocodedAddress: "First Store",
+        latitude: 42.1,
+        longitude: -71.2,
+        occurredAt: "2026-06-20T14:00:00Z",
+      }),
+    );
+    expect(out.closeOpen).toEqual({ endedAt: "2026-06-20T14:00:00Z" });
+    expect(out.open).toMatchObject({ kind: "stop", placeLabel: "First Store" });
+
+    out = reduceLocationEvent(
+      stop({ placeLabel: "First Store", latitude: 42.1, longitude: -71.2 }),
+      ev({ kind: "vehicle_connect", vehicleId: "veh-ram", occurredAt: "2026-06-20T14:30:00Z" }),
+    );
+    expect(out.closeOpen).toEqual({ endedAt: "2026-06-20T14:30:00Z" });
+    expect(out.open).toMatchObject({ kind: "drive", suggestedActivityType: "travel" });
+
+    out = reduceLocationEvent(
+      null,
+      ev({
+        kind: "location_update",
+        geocodedAddress: "Second Store",
+        latitude: 42.3,
+        longitude: -71.4,
+        occurredAt: "2026-06-20T14:45:00Z",
+      }),
+    );
+    expect(out.open).toMatchObject({ kind: "stop", placeLabel: "Second Store" });
   });
 });
 

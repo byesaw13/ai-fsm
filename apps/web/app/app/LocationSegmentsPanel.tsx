@@ -20,6 +20,8 @@ type Segment = {
   suggested_activity_type: string | null;
   status: string;
   activity_entry_id: string | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 const ACTIVITY_OPTIONS = ACTIVITY_TYPES.map((t) => ({
@@ -39,6 +41,18 @@ function defaultActivity(seg: Segment): ActivityType {
   const s = seg.suggested_activity_type;
   if (s && (ACTIVITY_TYPES as readonly string[]).includes(s)) return s as ActivityType;
   return seg.kind === "drive" ? "travel" : "job_work";
+}
+
+function confidenceLabel(seg: Segment): "high" | "medium" | "low" {
+  if (seg.kind === "drive") return "high";
+  const score =
+    (seg.zone ? 2 : 0) +
+    (seg.place_label ? 1 : 0) +
+    (seg.latitude != null && seg.longitude != null ? 1 : 0) +
+    (seg.ended_at ? 1 : 0);
+  if (score >= 4) return "high";
+  if (score >= 2) return "medium";
+  return "low";
 }
 
 export function LocationSegmentsPanel({ day }: { day?: string }) {
@@ -141,6 +155,7 @@ export function LocationSegmentsPanel({ day }: { day?: string }) {
                     {durationLabel(seg.started_at, seg.ended_at)}
                   </span>
                   {isOpen ? <Badge>In progress</Badge> : null}
+                  <Badge>{confidenceLabel(seg)} confidence</Badge>
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>

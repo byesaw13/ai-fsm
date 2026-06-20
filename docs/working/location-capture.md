@@ -130,11 +130,17 @@ segment at a time:
   - `in_vehicle` → ensure a **drive** is open.
   - `still` → close an open drive, open a **stop** here (address fills in via `location_update`).
   - other → no transition.
+- `vehicle_disconnect` → close the open drive and, when HA includes location
+  data, open the parked stop immediately.
 - `location_update` → enrich an open stop that is missing its address/coords.
+  If no segment is open because a drive just closed, open a stop from the
+  location update.
 
 Activity suggestion: drives → `travel`; stops at a recognized supply-house zone →
 `material_run`; everything else → none (the owner assigns it, e.g. `job_work` at
 a customer address). Zone→activity rules live in `packages/domain/src/location.ts`.
+The reducer also normalizes common address/zone text into readable labels such
+as Home Depot, Ferguson, Transfer station, Hardware store, Gas stop, and Home.
 
 ## HA-side setup (slice 3)
 
@@ -148,10 +154,13 @@ Entities used (Nick's Samsung S25 Ultra):
 - `device_tracker.nick_s_s25` — zone presence (zone enter/leave).
 - `sensor.nick_s_s25_ultra_detected_activity` — `in_vehicle` / `still` transitions.
 - `sensor.nick_s_s25_ultra_geocoded_location` — reverse-geocoded stop address.
+- `sensor.nick_s_s25_ultra_bluetooth_connection` — vehicle connect/disconnect.
 
-Two automations are installed: **zone transition** (enter/leave) and **detected
-activity change** (filtered to `in_vehicle`/`still`). A geocode-update automation
-is provided commented-out for optional address enrichment.
+Installed automations cover **zone transition** (enter/leave), **detected
+activity change** (filtered to `in_vehicle`/`still`), vehicle Bluetooth
+connect/disconnect, drive GPS points, and still-only geocode enrichment. Vehicle
+disconnect posts the current address and then sends a delayed `location_update`
+45 seconds later so the stop label can settle after parking.
 
 One-time phone setup (Android Companion app): enable the **Background location**,
 **Detected activity**, and **Geocoded location** sensors and grant "Always"
