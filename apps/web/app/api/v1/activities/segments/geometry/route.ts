@@ -38,15 +38,24 @@ export const GET = withAuth(async (request: NextRequest, session) => {
       [session.accountId, day],
     );
 
-    const pts = await queryForSession<EventPt>(
-      session,
-      `SELECT occurred_at::text, latitude, longitude
-       FROM location_events
-       WHERE account_id = $1 AND latitude IS NOT NULL AND longitude IS NOT NULL
-         AND occurred_at::date = COALESCE($2::date, CURRENT_DATE)
-       ORDER BY occurred_at ASC`,
-      [session.accountId, day],
-    );
+    // Load the breadcrumb across the actual span of the day's segments (by time,
+    // not by date) so a drive that crosses midnight still gets its later points.
+    let pts: EventPt[] = [];
+    if (segs.length > 0) {
+      const starts = segs.map((s) => s.started_at);
+      const ends = segs.map((s) => s.ended_at ?? new Date().toISOString());
+      const minStart = starts.reduce((a, b) => (a < b ? a : b));
+      const maxEnd = ends.reduce((a, b) => (a > b ? a : b));
+      pts = await queryForSession<EventPt>(
+        session,
+        `SELECT occurred_at::text, latitude, longitude
+         FROM location_events
+         WHERE account_id = $1 AND latitude IS NOT NULL AND longitude IS NOT NULL
+           AND occurred_at >= $2::timestamptz AND occurred_at <= $3::timestamptz
+         ORDER BY occurred_at ASC`,
+        [session.accountId, minStart, maxEnd],
+      );
+    }
 
     const stops = segs
       .filter((s) => s.kind === "stop" && s.latitude != null && s.longitude != null)
