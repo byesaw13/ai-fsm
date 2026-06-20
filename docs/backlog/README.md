@@ -63,7 +63,7 @@ tasks in `done/`.
 
 ## Task index
 
-Next available ID: **TASK-026**.
+Next available ID: **TASK-027**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -91,7 +91,8 @@ Next available ID: **TASK-026**.
 | TASK-022 | Smart Start Day | 001 | Done |
 | TASK-023 | End of Day Checklist Wizard | 001 | Proposed |
 | TASK-024 | Passive Location-Based Activity Capture | 001 | In Progress |
-| TASK-025 | Bluetooth-Triggered Vehicle-Aware Auto-Mileage | 001 | Proposed |
+| TASK-025 | Bluetooth-Triggered Vehicle-Aware Auto-Mileage | 001 | In Progress |
+| TASK-026 | Day Map (stops + drive routes) | 001 | In Progress |
 
 ## Status legend
 
