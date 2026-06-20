@@ -347,6 +347,27 @@ export function DailyCommandCenter({
     router.refresh();
   }
 
+  // Discard a stuck/erroneous open session (e.g. a wrong start odometer that
+  // can't be closed because the end must exceed it). Deletes the session, so the
+  // vehicle's last-known odometer reverts to the prior good reading.
+  async function discardSession() {
+    if (!openSession) return;
+    if (!window.confirm(
+      `Discard the open session on ${openSession.vehicle_nickname} (started at ${fmtOdo(openSession.start_odometer)} mi)? ` +
+      `No mileage is recorded and the vehicle's last reading reverts to the previous session.`,
+    )) return;
+    setPending(true);
+    const res = await fetch(`/api/v1/mileage/${openSession.id}`, { method: "DELETE" });
+    setPending(false);
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      toast.error(json.error?.message ?? "Could not discard session");
+      return;
+    }
+    toast.success("Open session discarded");
+    router.refresh();
+  }
+
   // Jobs Today transition helpers
   const [updatingVisitId, setUpdatingVisitId] = useState<string | null>(null);
   const [guardedVisit, setGuardedVisit] = useState<string | null>(null);
@@ -692,7 +713,13 @@ export function DailyCommandCenter({
                               <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" style={{ minHeight: 34 }} onClick={closeSession} disabled={pending || !endOdometer}>
                                 Close Mileage
                               </button>
+                              <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" style={{ minHeight: 34 }} onClick={discardSession} disabled={pending}>
+                                Discard session
+                              </button>
                             </div>
+                            <span style={{ display: "block", color: "var(--fg-muted)", fontSize: 11, marginTop: "var(--space-1)" }}>
+                              Wrong start odometer? Use Discard to clear it without recording mileage.
+                            </span>
                           </>
                         ) : (
                           "All mileage sessions closed successfully."
