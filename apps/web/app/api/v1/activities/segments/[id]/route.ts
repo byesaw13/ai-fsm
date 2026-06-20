@@ -36,8 +36,17 @@ const confirmSchema = z
   });
 
 const dismissSchema = z.object({ action: z.literal("dismiss") });
+
+// log_trip: promote a DRIVE segment into a vehicle mileage session (TASK-025).
+const logTripSchema = z.object({
+  action: z.literal("log_trip"),
+  vehicle_id: z.string().uuid(),
+  miles: z.number().positive().max(100000),
+  note: z.string().max(500).nullish(),
+});
+
 // union (not discriminatedUnion) because confirmSchema carries a .refine().
-const bodySchema = z.union([confirmSchema, dismissSchema]);
+const bodySchema = z.union([confirmSchema, dismissSchema, logTripSchema]);
 
 type SegRow = {
   id: string;
@@ -48,6 +57,7 @@ type SegRow = {
   place_label: string | null;
   status: string;
   activity_entry_id: string | null;
+  vehicle_session_id: string | null;
 };
 
 export const PATCH = withAuth(async (request: NextRequest, session: AuthSession) => {
@@ -75,7 +85,7 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
 
     const { rows } = await client.query<SegRow>(
       `SELECT id, kind, segment_date::text, started_at::text, ended_at::text,
-              place_label, status, activity_entry_id
+              place_label, status, activity_entry_id, vehicle_session_id
        FROM location_segments
        WHERE id = $1 AND account_id = $2
        FOR UPDATE`,
@@ -85,6 +95,63 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     if (!seg) {
       await client.query("ROLLBACK");
       return err("NOT_FOUND", "Segment not found", 404, session.traceId);
+    }
+
+    if (d.action === "log_trip") {
+      // Promote a drive into a mileage session. Owner supplies the vehicle and
+      // the (GPS-pre-filled, editable) miles — nothing is written without that.
+      if (seg.kind !== "drive") {
+        await client.query("ROLLBACK");
+        return err("CONFLICT", "Only a drive can be logged as mileage.", 409, session.traceId);
+      }
+      if (seg.ended_at === null) {
+        await client.query("ROLLBACK");
+        return err("CONFLICT", "Drive is still in progress; log it once it ends.", 409, session.traceId);
+      }
+      if (seg.vehicle_session_id) {
+        await client.query("ROLLBACK");
+        return NextResponse.json({
+          data: { id, status: "confirmed", vehicle_session_id: seg.vehicle_session_id, already: true },
+        });
+      }
+      // Only a provisional drive can be logged (not a dismissed or otherwise
+      // already-resolved one) — mirrors the confirm/dismiss guards.
+      if (seg.status !== "provisional") {
+        await client.query("ROLLBACK");
+        return err("CONFLICT", `Drive is ${seg.status}; cannot log mileage.`, 409, session.traceId);
+      }
+      // The vehicle must belong to this account (RLS also guards the FK).
+      const veh = await client.query<{ id: string }>(
+        `SELECT id FROM vehicles WHERE id = $1 AND account_id = $2`,
+        [d.vehicle_id, session.accountId],
+      );
+      if (veh.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return err("VALIDATION_ERROR", "Unknown vehicle", 400, session.traceId);
+      }
+      const { rows: sess } = await client.query<{ id: string }>(
+        `INSERT INTO vehicle_sessions
+           (account_id, vehicle_id, session_date, miles, notes, created_by)
+         VALUES ($1, $2, $3::date, $4, $5, $6)
+         RETURNING id`,
+        [
+          session.accountId,
+          d.vehicle_id,
+          seg.segment_date,
+          d.miles,
+          d.note ?? `Auto-captured drive ${seg.started_at.slice(11, 16)}–${(seg.ended_at ?? "").slice(11, 16)}`,
+          session.userId,
+        ],
+      );
+      const sessionId = sess[0].id;
+      await client.query(
+        `UPDATE location_segments
+         SET status = 'confirmed', vehicle_id = $1, vehicle_session_id = $2, updated_at = now()
+         WHERE id = $3 AND account_id = $4`,
+        [d.vehicle_id, sessionId, id, session.accountId],
+      );
+      await client.query("COMMIT");
+      return NextResponse.json({ data: { id, status: "confirmed", vehicle_session_id: sessionId } });
     }
 
     if (d.action === "dismiss") {

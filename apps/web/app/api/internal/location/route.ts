@@ -3,7 +3,7 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { getPool, queryOne } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { DETECTED_ACTIVITIES, LOCATION_EVENT_KINDS } from "@ai-fsm/domain";
+import { DETECTED_ACTIVITIES, LOCATION_EVENT_KINDS, haversineMeters } from "@ai-fsm/domain";
 import { reduceLocationEvent, type OpenSegment } from "@/lib/location/segments";
 
 export const dynamic = "force-dynamic";
@@ -171,10 +171,25 @@ export async function POST(req: NextRequest) {
 
     // 3. Apply. Close BEFORE open so the one-open invariant always holds.
     if (mut.closeOpen && open) {
+      // For a closing drive, estimate distance (great-circle from the drive's
+      // start point to where it ended). A rough straight-line estimate the owner
+      // confirms/edits; refined once periodic GPS is added (TASK-025 slice 2).
+      let distanceMeters: number | null = null;
+      if (
+        open.kind === "drive" &&
+        open.latitude != null && open.longitude != null &&
+        data.latitude != null && data.longitude != null
+      ) {
+        distanceMeters = haversineMeters(
+          { latitude: open.latitude, longitude: open.longitude },
+          { latitude: data.latitude, longitude: data.longitude },
+        );
+      }
       await client.query(
-        `UPDATE location_segments SET ended_at = $1, updated_at = now()
+        `UPDATE location_segments
+         SET ended_at = $1, distance_meters = COALESCE($4, distance_meters), updated_at = now()
          WHERE id = $2 AND account_id = $3 AND ended_at IS NULL`,
-        [mut.closeOpen.endedAt, open.id, accountId],
+        [mut.closeOpen.endedAt, open.id, accountId, distanceMeters],
       );
     }
     if (mut.updateOpen && open) {
