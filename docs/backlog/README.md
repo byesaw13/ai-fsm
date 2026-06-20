@@ -63,7 +63,7 @@ tasks in `done/`.
 
 ## Task index
 
-Next available ID: **TASK-027**.
+Next available ID: **TASK-028**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -93,6 +93,7 @@ Next available ID: **TASK-027**.
 | TASK-024 | Passive Location-Based Activity Capture | 001 | In Progress |
 | TASK-025 | Bluetooth-Triggered Vehicle-Aware Auto-Mileage | 001 | In Progress |
 | TASK-026 | Day Map (stops + drive routes) | 001 | In Progress |
+| TASK-027 | Hybrid Tracking (manual mileage, auto time) | 001 | In Progress |
 
 ## Status legend
 
