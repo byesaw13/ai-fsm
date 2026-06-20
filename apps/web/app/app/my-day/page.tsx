@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { query, queryForSession } from "@/lib/db";
 import { isSameCalendarDay, isVisitOverdue, formatOverdueLabel } from "@/lib/visits/p7";
-import { canViewAllVisits } from "@/lib/auth/permissions";
 import { MyDayView } from "./MyDayView";
 import { WorkdayPanel } from "../WorkdayPanel";
 import type { OpenSession, VehicleOption } from "../WorkdayPanel";
@@ -36,52 +35,30 @@ export default async function MyDayPage() {
   // EPIC-006: My Day is the field surface for technicians AND owner-as-technician.
   // (Owners reach it from the nav; their default landing is still the dashboard.)
 
-  const isAdmin = canViewAllVisits(session.role);
   const isTech = session.role === "tech";
   const accountId = session.accountId;
 
-  let visits: VisitRow[];
-  if (isAdmin) {
-    visits = await query<VisitRow>(
-      `SELECT
-          v.*,
-          j.title AS job_title,
-          j.job_type AS job_type,
-          j.description AS job_description,
-          u.full_name AS assigned_user_name,
-          c.name AS client_name,
-          p.address AS property_address
-       FROM visits v
-       LEFT JOIN jobs j ON j.id = v.job_id
-       LEFT JOIN users u ON u.id = v.assigned_user_id
-       LEFT JOIN clients c ON c.id = j.client_id
-       LEFT JOIN properties p ON p.id = j.property_id
-       WHERE v.account_id = $1
-       ORDER BY v.scheduled_start ASC
-       LIMIT 200`,
-      [session.accountId]
-    );
-  } else {
-    visits = await query<VisitRow>(
-      `SELECT
-          v.*,
-          j.title AS job_title,
-          j.job_type AS job_type,
-          j.description AS job_description,
-          u.full_name AS assigned_user_name,
-          c.name AS client_name,
-          p.address AS property_address
-       FROM visits v
-       LEFT JOIN jobs j ON j.id = v.job_id
-       LEFT JOIN users u ON u.id = v.assigned_user_id
-       LEFT JOIN clients c ON c.id = j.client_id
-       LEFT JOIN properties p ON p.id = j.property_id
-       WHERE v.account_id = $1 AND v.assigned_user_id = $2
-       ORDER BY v.scheduled_start ASC
-       LIMIT 200`,
-      [session.accountId, session.userId]
-    );
-  }
+  // My Day is "do the work" — always the viewer's OWN assigned visits, for every
+  // role (including owner-as-technician). EPIC-006: never the all-techs list here.
+  const visits = await query<VisitRow>(
+    `SELECT
+        v.*,
+        j.title AS job_title,
+        j.job_type AS job_type,
+        j.description AS job_description,
+        u.full_name AS assigned_user_name,
+        c.name AS client_name,
+        p.address AS property_address
+     FROM visits v
+     LEFT JOIN jobs j ON j.id = v.job_id
+     LEFT JOIN users u ON u.id = v.assigned_user_id
+     LEFT JOIN clients c ON c.id = j.client_id
+     LEFT JOIN properties p ON p.id = j.property_id
+     WHERE v.account_id = $1 AND v.assigned_user_id = $2
+     ORDER BY v.scheduled_start ASC
+     LIMIT 200`,
+    [session.accountId, session.userId]
+  );
 
   // Field workday data (EPIC-006 TASK-029) — Start/End Day, vehicle, activity,
   // mileage. Duplicated from the owner dashboard's queries so /app stays untouched.
@@ -209,12 +186,8 @@ export default async function MyDayPage() {
 
       {todayVisits.length === 0 && upcomingVisits.length === 0 ? (
         <EmptyState
-          title={isAdmin ? "No visits scheduled" : "No visits assigned"}
-          description={
-            isAdmin
-              ? "Schedule visits from job detail pages."
-              : "Visits will appear here when you're assigned."
-          }
+          title="No visits assigned"
+          description="Visits assigned to you appear here. Your workday actions are above."
         />
       ) : (
         <MyDayView
