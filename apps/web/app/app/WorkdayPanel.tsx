@@ -101,16 +101,26 @@ type PriorPrompt = {
   retry: () => Promise<void>;
 };
 
+const EMPTY_WARNINGS: EndWarnings = {
+  missingReceiptPhotos: 0,
+  jobsInProgress: 0,
+  draftInvoices: 0,
+  deposits: 0,
+};
+
 export function WorkdayPanel({
   todayLabel,
   openSession,
   vehicles,
-  actionQueue,
-  todayJobs,
-  materialCount,
-  materialJobs,
-  warnings,
-  tomorrowJobs,
+  // surface: "owner" shows the full command center (business widgets included);
+  // "my_day" renders the field workday only (EPIC-006 — My Day reuses this).
+  surface = "owner",
+  actionQueue = [],
+  todayJobs = [],
+  materialCount = 0,
+  materialJobs = [],
+  warnings = EMPTY_WARNINGS,
+  tomorrowJobs = [],
   activityEntries,
   dayMileage,
   yesterdayMiles = 0,
@@ -121,12 +131,13 @@ export function WorkdayPanel({
   todayLabel: string;
   openSession: OpenSession | null;
   vehicles: VehicleOption[];
-  actionQueue: CountAction[];
-  todayJobs: CommandVisit[];
-  materialCount: number;
-  materialJobs: MaterialJob[];
-  warnings: EndWarnings;
-  tomorrowJobs: CommandVisit[];
+  surface?: "owner" | "my_day";
+  actionQueue?: CountAction[];
+  todayJobs?: CommandVisit[];
+  materialCount?: number;
+  materialJobs?: MaterialJob[];
+  warnings?: EndWarnings;
+  tomorrowJobs?: CommandVisit[];
   activityEntries: ActivityEntryDto[];
   dayMileage: DayMileageSummary;
   yesterdayMiles?: number;
@@ -134,6 +145,9 @@ export function WorkdayPanel({
   pendingDepositsCents?: number;
   paidThisMonthCents?: number;
 }) {
+  // Owner-only widgets (business action queue, revenue, tomorrow). Hidden on the
+  // technician My Day surface, which is field-execution only.
+  const showOwnerExtras = surface !== "my_day";
   const router = useRouter();
   const toast = useToast();
 
@@ -673,14 +687,15 @@ export function WorkdayPanel({
                 </Card>
               )}
 
-              {/* Today's Schedule Card */}
-              <JobsToday jobs={todayJobs} />
-
-              {/* Action Queue Alerts */}
-              <ActionQueue items={actionQueue} />
-
-              {/* Materials Card */}
-              <Materials count={materialCount} jobs={materialJobs} />
+              {/* Owner-only: today's schedule, action queue, materials. On My Day
+                  the assigned visits come from the My Day visit list instead. */}
+              {showOwnerExtras && (
+                <>
+                  <JobsToday jobs={todayJobs} />
+                  <ActionQueue items={actionQueue} />
+                  <Materials count={materialCount} jobs={materialJobs} />
+                </>
+              )}
             </>
           )}
 
@@ -799,22 +814,24 @@ export function WorkdayPanel({
                 </div>
               </Card>
 
-              {/* Tomorrow's Schedule */}
-              <Card>
-                <SectionHeader title="Tomorrow's Plan" count={tomorrowJobs.length} />
-                {tomorrowJobs.length === 0 ? (
-                  <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", margin: 0 }}>No visits scheduled tomorrow.</p>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                    {tomorrowJobs.map((job) => (
-                      <Link key={job.id} href={(job.visit_id ? `/app/visits/${job.visit_id}` : `/app/jobs/${job.id}`) as Route} style={{ display: "flex", justifyContent: "space-between", padding: "var(--space-2)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", textDecoration: "none", color: "inherit", background: "var(--bg-card)" }}>
-                        <span><strong>{fmtTime(job.scheduled_start)}</strong> · {job.title}</span>
-                        <small style={{ color: "var(--fg-muted)" }}>{job.client_name}</small>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </Card>
+              {/* Tomorrow's Schedule (owner planning view) */}
+              {showOwnerExtras && (
+                <Card>
+                  <SectionHeader title="Tomorrow's Plan" count={tomorrowJobs.length} />
+                  {tomorrowJobs.length === 0 ? (
+                    <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", margin: 0 }}>No visits scheduled tomorrow.</p>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                      {tomorrowJobs.map((job) => (
+                        <Link key={job.id} href={(job.visit_id ? `/app/visits/${job.visit_id}` : `/app/jobs/${job.id}`) as Route} style={{ display: "flex", justifyContent: "space-between", padding: "var(--space-2)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", textDecoration: "none", color: "inherit", background: "var(--bg-card)" }}>
+                          <span><strong>{fmtTime(job.scheduled_start)}</strong> · {job.title}</span>
+                          <small style={{ color: "var(--fg-muted)" }}>{job.client_name}</small>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              )}
             </>
           )}
 
@@ -823,7 +840,8 @@ export function WorkdayPanel({
         {/* ---- RIGHT COLUMN: SIDEBAR DESKTOP ONLY ---- */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
           
-          {/* Financial Snapshot Card */}
+          {/* Financial Snapshot + Quick Actions — owner-only business sidebar */}
+          {showOwnerExtras && (<>
           <Card style={{ padding: "var(--space-4)" }}>
             <SectionHeader title="Financial Snapshot" />
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", marginTop: "var(--space-3)" }}>
@@ -882,6 +900,7 @@ export function WorkdayPanel({
               ))}
             </div>
           </Card>
+          </>)}
 
           {/* Statistics at a Glance */}
           <Card style={{ padding: "var(--space-4)" }}>

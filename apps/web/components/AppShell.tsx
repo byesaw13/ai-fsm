@@ -56,6 +56,8 @@ const ADMIN_NAV_SECTIONS: NavSection[] = [
     label: "",
     items: [
       NAV_TODAY,
+      // EPIC-006: owner/admin can switch to the field "My Day" surface.
+      { href: "/app/my-day", label: "My Day", Icon: IconMyDay },
       NAV_REQUESTS,
       { href: "/app/clients",   label: "Clients",    Icon: IconClients,   adminOnly: true },
       NAV_PROPS,
