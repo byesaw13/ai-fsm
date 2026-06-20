@@ -1,9 +1,13 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
-import { query } from "@/lib/db";
+import { query, queryForSession } from "@/lib/db";
 import { isSameCalendarDay, isVisitOverdue, formatOverdueLabel } from "@/lib/visits/p7";
 import { canViewAllVisits } from "@/lib/auth/permissions";
 import { MyDayView } from "./MyDayView";
+import { WorkdayPanel } from "../WorkdayPanel";
+import type { OpenSession, VehicleOption } from "../WorkdayPanel";
+import type { ActivityEntryDto } from "../ActivityTracker";
+import { summarizeDayMileage, type VehicleSessionRow } from "@/lib/mileage/sessions";
 import { PageContainer, PageHeader, EmptyState, LinkButton } from "@/components/ui";
 import type { Visit, VisitStatus } from "@ai-fsm/domain";
 
@@ -29,10 +33,12 @@ const VISIT_STATUS_LABELS: Record<VisitStatus, string> = {
 export default async function MyDayPage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.role !== "tech") redirect("/app");
+  // EPIC-006: My Day is the field surface for technicians AND owner-as-technician.
+  // (Owners reach it from the nav; their default landing is still the dashboard.)
 
   const isAdmin = canViewAllVisits(session.role);
   const isTech = session.role === "tech";
+  const accountId = session.accountId;
 
   let visits: VisitRow[];
   if (isAdmin) {
@@ -76,6 +82,57 @@ export default async function MyDayPage() {
       [session.accountId, session.userId]
     );
   }
+
+  // Field workday data (EPIC-006 TASK-029) — Start/End Day, vehicle, activity,
+  // mileage. Duplicated from the owner dashboard's queries so /app stays untouched.
+  const [openSessionRows, fieldVehicles, fieldActivity, todaySessionRows, yesterdayMilesRows] = await Promise.all([
+    queryForSession<OpenSession>(session,
+      `SELECT s.id, s.session_date::text, s.vehicle_id, v.nickname AS vehicle_nickname,
+              v.plate AS vehicle_plate, s.start_odometer, s.started_at::text AS started_at
+       FROM vehicle_sessions s LEFT JOIN vehicles v ON v.id = s.vehicle_id
+       WHERE s.account_id = $1 AND s.session_date = CURRENT_DATE
+         AND s.end_odometer IS NULL AND s.miles IS NULL
+       ORDER BY s.started_at DESC LIMIT 1`,
+      [accountId]),
+    queryForSession<VehicleOption>(session,
+      `SELECT v.id, v.nickname, v.plate,
+              last_s.end_odometer AS current_odometer,
+              (SELECT max(started_at) FROM vehicle_sessions
+                 WHERE vehicle_id = v.id AND account_id = v.account_id)::text AS last_used_at
+       FROM vehicles v
+       LEFT JOIN LATERAL (
+         SELECT end_odometer, session_date FROM vehicle_sessions
+         WHERE vehicle_id = v.id AND account_id = v.account_id AND end_odometer IS NOT NULL
+         ORDER BY session_date DESC, created_at DESC LIMIT 1
+       ) last_s ON true
+       WHERE v.account_id = $1 AND v.is_active = true
+       ORDER BY v.nickname ASC`,
+      [accountId]),
+    queryForSession<ActivityEntryDto>(session,
+      `SELECT id, activity_type, category, started_at::text, ended_at::text,
+              entity_type, entity_id, note
+       FROM activity_entries
+       WHERE account_id = $1 AND (session_date = CURRENT_DATE OR ended_at IS NULL) AND voided_at IS NULL
+       ORDER BY started_at ASC`,
+      [accountId]),
+    queryForSession<VehicleSessionRow>(session,
+      `SELECT s.vehicle_id, v.nickname AS vehicle_nickname, v.plate AS vehicle_plate,
+              s.start_odometer, s.end_odometer, s.miles::float8 AS miles
+       FROM vehicle_sessions s LEFT JOIN vehicles v ON v.id = s.vehicle_id
+       WHERE s.account_id = $1 AND s.session_date = CURRENT_DATE
+       ORDER BY s.started_at ASC`,
+      [accountId]),
+    queryForSession<{ count: string }>(session,
+      `SELECT COALESCE(SUM(miles), 0)::text AS count
+       FROM vehicle_sessions
+       WHERE account_id = $1 AND session_date = CURRENT_DATE - interval '1 day'`,
+      [accountId]),
+  ]);
+  const dayMileage = summarizeDayMileage(todaySessionRows);
+  const yesterdayMiles = parseInt(yesterdayMilesRows[0]?.count ?? "0", 10);
+  const todayLabel = new Date().toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric", year: "numeric",
+  });
 
   const now = new Date();
   const todayVisits = visits.filter((v) => isSameCalendarDay(v.scheduled_start));
@@ -136,6 +193,19 @@ export default async function MyDayPage() {
           ) : undefined
         }
       />
+
+      {/* Field workday: Start/End Day, vehicle, activity, mileage (EPIC-006) */}
+      <div style={{ marginBottom: "var(--space-6)" }}>
+        <WorkdayPanel
+          surface="my_day"
+          todayLabel={todayLabel}
+          openSession={openSessionRows[0] ?? null}
+          vehicles={fieldVehicles}
+          activityEntries={fieldActivity}
+          dayMileage={dayMileage}
+          yesterdayMiles={yesterdayMiles}
+        />
+      </div>
 
       {todayVisits.length === 0 && upcomingVisits.length === 0 ? (
         <EmptyState
