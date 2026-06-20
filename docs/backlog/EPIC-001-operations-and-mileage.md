@@ -41,6 +41,15 @@ Acceptance Criteria:
 - [ ] Start Day mileage and auto activities no longer double-count the same time
       when the owner stops manually tapping activities.
 
+Test gap (documented):
+This pass is a UI-wiring change — the segments panel now invokes the existing,
+already-exercised `confirm` action for drives (same path stops use) instead of
+`log_trip`. No new business logic: the segmentation reducer is unit-tested
+(`segments.test.ts`) and the `confirm` endpoint/overlap guard are unchanged and
+covered by integration/e2e. The web app has no React-component test harness
+(`@testing-library/react` is not a dependency), so a focused panel unit test is
+not added here; standing up RTL is out of scope for this fix.
+
 # TASK-026: Day Map (stops + drive routes)
 
 Status:
