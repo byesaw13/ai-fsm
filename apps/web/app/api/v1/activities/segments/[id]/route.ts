@@ -114,6 +114,12 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
           data: { id, status: "confirmed", vehicle_session_id: seg.vehicle_session_id, already: true },
         });
       }
+      // Only a provisional drive can be logged (not a dismissed or otherwise
+      // already-resolved one) — mirrors the confirm/dismiss guards.
+      if (seg.status !== "provisional") {
+        await client.query("ROLLBACK");
+        return err("CONFLICT", `Drive is ${seg.status}; cannot log mileage.`, 409, session.traceId);
+      }
       // The vehicle must belong to this account (RLS also guards the FK).
       const veh = await client.query<{ id: string }>(
         `SELECT id FROM vehicles WHERE id = $1 AND account_id = $2`,
