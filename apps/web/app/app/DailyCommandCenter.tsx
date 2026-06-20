@@ -357,7 +357,7 @@ export function DailyCommandCenter({
       `No mileage is recorded and the vehicle's last reading reverts to the previous session.`,
     )) return;
     setPending(true);
-    const res = await fetch(`/api/v1/mileage/${openSession.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/v1/sessions/${openSession.id}`, { method: "DELETE" });
     setPending(false);
     if (!res.ok) {
       const json = await res.json().catch(() => ({}));
