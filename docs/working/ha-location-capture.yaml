@@ -37,7 +37,8 @@ rest_command:
       {% if latitude is defined and latitude not in [none, '', 'unknown', 'unavailable'] %}, "latitude": {{ latitude }}{% endif %}
       {% if longitude is defined and longitude not in [none, '', 'unknown', 'unavailable'] %}, "longitude": {{ longitude }}{% endif %}
       {% if address is defined and address and address not in ['unknown', 'unavailable'] %}, "geocoded_address": {{ address | tojson }}{% endif %}
-      {% if activity is defined and activity %}, "detected_activity": {{ activity | tojson }}{% endif %}}
+      {% if activity is defined and activity %}, "detected_activity": {{ activity | tojson }}{% endif %}
+      {% if vehicle_bluetooth is defined and vehicle_bluetooth %}, "vehicle_bluetooth": {{ vehicle_bluetooth | tojson }}{% endif %}}
 
 # --- automations.yaml (list entries) ------------------------------------------
 automation:
@@ -90,6 +91,121 @@ automation:
           external_id: "ha-act-{{ trigger.to_state.last_changed.timestamp() | int }}"
     mode: queued
     max: 10
+
+  # --- Vehicle Bluetooth (TASK-025 slice 2) ----------------------------------
+  # The bluetooth_connection sensor's `connected_paired_devices` is a list of
+  # "MAC (Name)" strings. When a known vehicle's MAC appears → vehicle_connect
+  # (engine on, this vehicle); when it disappears → vehicle_disconnect. One
+  # automation per vehicle per edge keeps the templates trivial and reliable.
+  # The FSM ingest resolves the vehicle from the MAC (vehicles.bluetooth_id).
+
+  - id: fsm_vehicle_connect_ram
+    alias: FSM - RAM connected
+    triggers:
+      - trigger: state
+        entity_id: sensor.nick_s_s25_ultra_bluetooth_connection
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ ('00:22:A0:A6:49:0D' in (trigger.to_state.attributes.connected_paired_devices | default([]) | join(', ')))
+             and not ('00:22:A0:A6:49:0D' in (trigger.from_state.attributes.connected_paired_devices | default([]) | join(', '))) }}
+    actions:
+      - action: rest_command.fsm_location_event
+        data:
+          kind: vehicle_connect
+          vehicle_bluetooth: "00:22:A0:A6:49:0D"
+          latitude: "{{ state_attr('device_tracker.nick_s_s25','latitude') | default('') }}"
+          longitude: "{{ state_attr('device_tracker.nick_s_s25','longitude') | default('') }}"
+          external_id: "ha-vcon-ram-{{ now().timestamp() | int }}"
+    mode: queued
+    max: 10
+
+  - id: fsm_vehicle_disconnect_ram
+    alias: FSM - RAM disconnected
+    triggers:
+      - trigger: state
+        entity_id: sensor.nick_s_s25_ultra_bluetooth_connection
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ ('00:22:A0:A6:49:0D' in (trigger.from_state.attributes.connected_paired_devices | default([]) | join(', ')))
+             and not ('00:22:A0:A6:49:0D' in (trigger.to_state.attributes.connected_paired_devices | default([]) | join(', '))) }}
+    actions:
+      - action: rest_command.fsm_location_event
+        data:
+          kind: vehicle_disconnect
+          vehicle_bluetooth: "00:22:A0:A6:49:0D"
+          latitude: "{{ state_attr('device_tracker.nick_s_s25','latitude') | default('') }}"
+          longitude: "{{ state_attr('device_tracker.nick_s_s25','longitude') | default('') }}"
+          external_id: "ha-vdis-ram-{{ now().timestamp() | int }}"
+    mode: queued
+    max: 10
+
+  - id: fsm_vehicle_connect_gmc
+    alias: FSM - GMC connected
+    triggers:
+      - trigger: state
+        entity_id: sensor.nick_s_s25_ultra_bluetooth_connection
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ ('30:C3:D9:19:1E:C3' in (trigger.to_state.attributes.connected_paired_devices | default([]) | join(', ')))
+             and not ('30:C3:D9:19:1E:C3' in (trigger.from_state.attributes.connected_paired_devices | default([]) | join(', '))) }}
+    actions:
+      - action: rest_command.fsm_location_event
+        data:
+          kind: vehicle_connect
+          vehicle_bluetooth: "30:C3:D9:19:1E:C3"
+          latitude: "{{ state_attr('device_tracker.nick_s_s25','latitude') | default('') }}"
+          longitude: "{{ state_attr('device_tracker.nick_s_s25','longitude') | default('') }}"
+          external_id: "ha-vcon-gmc-{{ now().timestamp() | int }}"
+    mode: queued
+    max: 10
+
+  - id: fsm_vehicle_disconnect_gmc
+    alias: FSM - GMC disconnected
+    triggers:
+      - trigger: state
+        entity_id: sensor.nick_s_s25_ultra_bluetooth_connection
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ ('30:C3:D9:19:1E:C3' in (trigger.from_state.attributes.connected_paired_devices | default([]) | join(', ')))
+             and not ('30:C3:D9:19:1E:C3' in (trigger.to_state.attributes.connected_paired_devices | default([]) | join(', '))) }}
+    actions:
+      - action: rest_command.fsm_location_event
+        data:
+          kind: vehicle_disconnect
+          vehicle_bluetooth: "30:C3:D9:19:1E:C3"
+          latitude: "{{ state_attr('device_tracker.nick_s_s25','latitude') | default('') }}"
+          longitude: "{{ state_attr('device_tracker.nick_s_s25','longitude') | default('') }}"
+          external_id: "ha-vdis-gmc-{{ now().timestamp() | int }}"
+    mode: queued
+    max: 10
+
+  # Periodic GPS during a drive (TASK-025 slice 2): post the phone's location
+  # whenever the geocoded location changes AND the phone is in a vehicle. This
+  # feeds intermediate points so the trip distance accumulates instead of being
+  # a single straight line. Enable the "High accuracy mode" / a sensor-update
+  # interval on the Companion app while in_vehicle for denser points.
+  - id: fsm_location_drive_point
+    alias: FSM - drive GPS point
+    triggers:
+      - trigger: state
+        entity_id: sensor.nick_s_s25_ultra_geocoded_location
+    conditions:
+      - condition: state
+        entity_id: sensor.nick_s_s25_ultra_detected_activity
+        state: in_vehicle
+    actions:
+      - action: rest_command.fsm_location_event
+        data:
+          kind: location_update
+          latitude: "{{ state_attr('device_tracker.nick_s_s25','latitude') | default('') }}"
+          longitude: "{{ state_attr('device_tracker.nick_s_s25','longitude') | default('') }}"
+          external_id: "ha-pt-{{ now().timestamp() | int }}"
+    mode: queued
+    max: 20
 
   # Optional (not installed by default — adds address enrichment but more
   # traffic): refresh the open stop's address as the geocode updates while still.

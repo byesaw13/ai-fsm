@@ -15,6 +15,9 @@ export const LOCATION_EVENT_KINDS = [
   "zone_leave",
   "location_update",
   "activity_change",
+  // TASK-025: phone connected/disconnected a known vehicle's Bluetooth.
+  "vehicle_connect",
+  "vehicle_disconnect",
 ] as const;
 export type LocationEventKind = (typeof LOCATION_EVENT_KINDS)[number];
 

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { getPool, queryOne } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { DETECTED_ACTIVITIES, LOCATION_EVENT_KINDS, haversineMeters } from "@ai-fsm/domain";
+import { DETECTED_ACTIVITIES, LOCATION_EVENT_KINDS, haversineMeters, pathDistanceMeters } from "@ai-fsm/domain";
 import { reduceLocationEvent, type OpenSegment } from "@/lib/location/segments";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +22,8 @@ const bodySchema = z.object({
   geocoded_address: z.string().max(500).nullish(),
   detected_activity: z.enum(DETECTED_ACTIVITIES).nullish(),
   external_id: z.string().max(255).optional(),
+  // TASK-025: car-stereo BT id (MAC) on vehicle_connect → resolves the vehicle.
+  vehicle_bluetooth: z.string().max(120).nullish(),
 });
 
 // ── owner account discovery (cached; single-owner model, mirrors SMS ingest) ──
@@ -49,6 +51,7 @@ type SegmentRow = {
   longitude: number | null;
   suggested_activity_type: string | null;
   status: string;
+  vehicle_id: string | null;
 };
 
 // POST /api/internal/location — record one HA location event, update segments.
@@ -133,10 +136,24 @@ export async function POST(req: NextRequest) {
       ],
     );
 
+    // Resolve which vehicle a vehicle_connect refers to (match the BT id/MAC
+    // against vehicles.bluetooth_id; tolerant of a stored "MAC (Name)" string).
+    let resolvedVehicleId: string | null = null;
+    if (data.kind === "vehicle_connect" && data.vehicle_bluetooth) {
+      const { rows: veh } = await client.query<{ id: string }>(
+        `SELECT id FROM vehicles
+         WHERE account_id = $1 AND bluetooth_id IS NOT NULL
+           AND (bluetooth_id = $2 OR bluetooth_id ILIKE '%' || $2 || '%')
+         LIMIT 1`,
+        [accountId, data.vehicle_bluetooth],
+      );
+      resolvedVehicleId = veh[0]?.id ?? null;
+    }
+
     // 2. Currently-open segment (locked) → reducer.
     const { rows: openRows } = await client.query<SegmentRow>(
       `SELECT id, kind, started_at::text, ended_at::text, zone, place_label,
-              latitude, longitude, suggested_activity_type, status
+              latitude, longitude, suggested_activity_type, status, vehicle_id
        FROM location_segments
        WHERE account_id = $1 AND ended_at IS NULL
        ORDER BY started_at DESC LIMIT 1
@@ -153,6 +170,7 @@ export async function POST(req: NextRequest) {
           placeLabel: openRow.place_label,
           latitude: openRow.latitude,
           longitude: openRow.longitude,
+          vehicleId: openRow.vehicle_id,
         }
       : null;
     segmentId = open?.id ?? null;
@@ -165,25 +183,34 @@ export async function POST(req: NextRequest) {
       longitude: data.longitude ?? null,
       geocodedAddress: data.geocoded_address ?? null,
       detectedActivity: data.detected_activity ?? null,
+      vehicleId: resolvedVehicleId,
     });
     mutOpenKind = mut.open?.kind ?? null;
     mutClosed = Boolean(mut.closeOpen);
 
     // 3. Apply. Close BEFORE open so the one-open invariant always holds.
     if (mut.closeOpen && open) {
-      // For a closing drive, estimate distance (great-circle from the drive's
-      // start point to where it ended). A rough straight-line estimate the owner
-      // confirms/edits; refined once periodic GPS is added (TASK-025 slice 2).
+      // For a closing drive, estimate distance by accumulating great-circle
+      // legs over the GPS points captured during the drive (periodic location
+      // updates make this realistic; with only endpoints it's a straight line).
+      // An estimate the owner confirms/edits before it becomes mileage.
       let distanceMeters: number | null = null;
-      if (
-        open.kind === "drive" &&
-        open.latitude != null && open.longitude != null &&
-        data.latitude != null && data.longitude != null
-      ) {
-        distanceMeters = haversineMeters(
-          { latitude: open.latitude, longitude: open.longitude },
-          { latitude: data.latitude, longitude: data.longitude },
+      if (open.kind === "drive") {
+        const { rows: pts } = await client.query<{ latitude: number; longitude: number }>(
+          `SELECT latitude, longitude FROM location_events
+           WHERE account_id = $1 AND latitude IS NOT NULL AND longitude IS NOT NULL
+             AND occurred_at >= $2::timestamptz AND occurred_at <= $3::timestamptz
+           ORDER BY occurred_at ASC`,
+          [accountId, open.startedAt, mut.closeOpen.endedAt],
         );
+        if (pts.length >= 2) {
+          distanceMeters = pathDistanceMeters(pts.map((p) => ({ latitude: p.latitude, longitude: p.longitude })));
+        } else if (open.latitude != null && open.longitude != null && data.latitude != null && data.longitude != null) {
+          distanceMeters = haversineMeters(
+            { latitude: open.latitude, longitude: open.longitude },
+            { latitude: data.latitude, longitude: data.longitude },
+          );
+        }
       }
       await client.query(
         `UPDATE location_segments
@@ -200,9 +227,10 @@ export async function POST(req: NextRequest) {
            zone        = COALESCE($2, zone),
            latitude    = COALESCE($3, latitude),
            longitude   = COALESCE($4, longitude),
+           vehicle_id  = COALESCE($5, vehicle_id),
            updated_at  = now()
-         WHERE id = $5 AND account_id = $6 AND ended_at IS NULL`,
-        [u.placeLabel ?? null, u.zone ?? null, u.latitude ?? null, u.longitude ?? null, open.id, accountId],
+         WHERE id = $6 AND account_id = $7 AND ended_at IS NULL`,
+        [u.placeLabel ?? null, u.zone ?? null, u.latitude ?? null, u.longitude ?? null, u.vehicleId ?? null, open.id, accountId],
       );
     }
     if (mut.open) {
@@ -212,10 +240,10 @@ export async function POST(req: NextRequest) {
       const { rows: ins } = await client.query<{ id: string }>(
         `INSERT INTO location_segments
            (account_id, segment_date, kind, started_at, zone, place_label,
-            latitude, longitude, suggested_activity_type)
-         VALUES ($1, ($2::timestamptz)::date, $3, $2, $4, $5, $6, $7, $8)
+            latitude, longitude, suggested_activity_type, vehicle_id)
+         VALUES ($1, ($2::timestamptz)::date, $3, $2, $4, $5, $6, $7, $8, $9)
          RETURNING id`,
-        [accountId, o.startedAt, o.kind, o.zone, o.placeLabel, o.latitude, o.longitude, o.suggestedActivityType],
+        [accountId, o.startedAt, o.kind, o.zone, o.placeLabel, o.latitude, o.longitude, o.suggestedActivityType, o.vehicleId],
       );
       segmentId = ins[0]?.id ?? segmentId;
     }
