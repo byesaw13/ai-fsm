@@ -135,9 +135,21 @@ automation:
         data:
           kind: vehicle_disconnect
           vehicle_bluetooth: "00:22:A0:A6:49:0D"
+          address: "{{ states('sensor.nick_s_s25_ultra_geocoded_location') }}"
           latitude: "{{ state_attr('device_tracker.nick_s_s25','latitude') | default('') }}"
           longitude: "{{ state_attr('device_tracker.nick_s_s25','longitude') | default('') }}"
           external_id: "ha-vdis-ram-{{ now().timestamp() | int }}"
+      # Phone geocoding often settles shortly after parking. Send a second
+      # enrichment point so the stop label is based on the parked location, not
+      # the last in-drive address.
+      - delay: "00:00:45"
+      - action: rest_command.fsm_location_event
+        data:
+          kind: location_update
+          address: "{{ states('sensor.nick_s_s25_ultra_geocoded_location') }}"
+          latitude: "{{ state_attr('device_tracker.nick_s_s25','latitude') | default('') }}"
+          longitude: "{{ state_attr('device_tracker.nick_s_s25','longitude') | default('') }}"
+          external_id: "ha-vdis-ram-settle-{{ now().timestamp() | int }}"
     mode: queued
     max: 10
 
@@ -177,9 +189,21 @@ automation:
         data:
           kind: vehicle_disconnect
           vehicle_bluetooth: "30:C3:D9:19:1E:C3"
+          address: "{{ states('sensor.nick_s_s25_ultra_geocoded_location') }}"
           latitude: "{{ state_attr('device_tracker.nick_s_s25','latitude') | default('') }}"
           longitude: "{{ state_attr('device_tracker.nick_s_s25','longitude') | default('') }}"
           external_id: "ha-vdis-gmc-{{ now().timestamp() | int }}"
+      # Phone geocoding often settles shortly after parking. Send a second
+      # enrichment point so the stop label is based on the parked location, not
+      # the last in-drive address.
+      - delay: "00:00:45"
+      - action: rest_command.fsm_location_event
+        data:
+          kind: location_update
+          address: "{{ states('sensor.nick_s_s25_ultra_geocoded_location') }}"
+          latitude: "{{ state_attr('device_tracker.nick_s_s25','latitude') | default('') }}"
+          longitude: "{{ state_attr('device_tracker.nick_s_s25','longitude') | default('') }}"
+          external_id: "ha-vdis-gmc-settle-{{ now().timestamp() | int }}"
     mode: queued
     max: 10
 
@@ -207,24 +231,29 @@ automation:
     mode: queued
     max: 20
 
-  # Optional (not installed by default — adds address enrichment but more
-  # traffic): refresh the open stop's address as the geocode updates while still.
-  # - id: fsm_location_geocode_update
-  #   alias: FSM - geocode update
-  #   triggers:
-  #     - trigger: state
-  #       entity_id: sensor.nick_s_s25_ultra_geocoded_location
-  #   conditions:
-  #     - condition: state
-  #       entity_id: sensor.nick_s_s25_ultra_detected_activity
-  #       state: still
-  #   actions:
-  #     - action: rest_command.fsm_location_event
-  #       data:
-  #         kind: location_update
-  #         address: "{{ trigger.to_state.state }}"
-  #         latitude: "{{ state_attr('device_tracker.nick_s_s25','latitude') | default('') }}"
-  #         longitude: "{{ state_attr('device_tracker.nick_s_s25','longitude') | default('') }}"
-  #         external_id: "ha-geo-{{ trigger.to_state.last_changed.timestamp() | int }}"
-  #   mode: queued
-  #   max: 5
+  # Refresh the open stop's address as the geocode updates while still. This is
+  # intentionally gated to `still` so it enriches parked stops without flooding
+  # the FSM endpoint during normal driving.
+  - id: fsm_location_geocode_update
+    alias: FSM - geocode update
+    triggers:
+      - trigger: state
+        entity_id: sensor.nick_s_s25_ultra_geocoded_location
+    conditions:
+      - condition: state
+        entity_id: sensor.nick_s_s25_ultra_detected_activity
+        state: still
+      - condition: template
+        value_template: >-
+          {{ trigger.to_state.state not in ['unknown', 'unavailable', '']
+             and trigger.from_state.state != trigger.to_state.state }}
+    actions:
+      - action: rest_command.fsm_location_event
+        data:
+          kind: location_update
+          address: "{{ trigger.to_state.state }}"
+          latitude: "{{ state_attr('device_tracker.nick_s_s25','latitude') | default('') }}"
+          longitude: "{{ state_attr('device_tracker.nick_s_s25','longitude') | default('') }}"
+          external_id: "ha-geo-{{ trigger.to_state.last_changed.timestamp() | int }}"
+    mode: queued
+    max: 5

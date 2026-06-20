@@ -85,16 +85,54 @@ export interface SegmentMutations {
 
 const NO_OP: SegmentMutations = {};
 
+type KnownPlaceRule = {
+  label: string;
+  match: RegExp;
+};
+
+const KNOWN_PLACE_RULES: KnownPlaceRule[] = [
+  { label: "Transfer station", match: /\b(transfer\s+station|dump|recycling\s+center|landfill)\b/i },
+  { label: "Home Depot", match: /\bhome\s+depot\b/i },
+  { label: "Lowe's", match: /\blowe'?s\b/i },
+  { label: "Ace Hardware", match: /\bace\s+hardware\b/i },
+  { label: "Ferguson", match: /\bferguson\b/i },
+  { label: "Hardware store", match: /\bhardware\b/i },
+  { label: "Supply house", match: /\b(supply|warehouse|grainger|menards)\b/i },
+  { label: "Gas stop", match: /\b(gas|fuel|shell|mobil|sunoco|citgo|cumberland\s+farms)\b/i },
+  { label: "Home", match: /^home$/i },
+];
+
+function knownPlaceLabel(input: string | null | undefined): string | null {
+  if (!input) return null;
+  for (const rule of KNOWN_PLACE_RULES) {
+    if (rule.match.test(input)) return rule.label;
+  }
+  return null;
+}
+
+function stopLabel(ev: IncomingLocationEvent): string | null {
+  const raw = ev.zone ?? ev.geocodedAddress ?? null;
+  return knownPlaceLabel(raw) ?? raw;
+}
+
+function shouldRefreshStopLabel(open: OpenSegment, nextLabel: string | null): boolean {
+  if (!nextLabel) return false;
+  if (!open.placeLabel) return true;
+  if (open.zone) return false;
+  return open.placeLabel !== nextLabel;
+}
+
 function openStop(ev: IncomingLocationEvent, placeLabel: string | null): OpenSegmentSpec {
   const zone = ev.zone ?? null;
+  const label = knownPlaceLabel(placeLabel) ?? placeLabel;
   return {
     kind: "stop",
     startedAt: ev.occurredAt,
     zone,
-    placeLabel,
+    placeLabel: label,
     latitude: ev.latitude ?? null,
     longitude: ev.longitude ?? null,
-    suggestedActivityType: suggestActivityForSegment({ kind: "stop", zone }),
+    suggestedActivityType: suggestActivityForSegment({ kind: "stop", zone: zone ?? label }),
     vehicleId: null,
   };
 }
@@ -112,6 +150,14 @@ function openDrive(ev: IncomingLocationEvent): OpenSegmentSpec {
   };
 }
 
+function hasStopLocation(ev: IncomingLocationEvent): boolean {
+  return Boolean(
+    ev.zone ||
+      ev.geocodedAddress ||
+      (ev.latitude != null && ev.longitude != null),
+  );
+}
+
 export function reduceLocationEvent(
   open: OpenSegment | null,
   ev: IncomingLocationEvent,
@@ -122,10 +168,9 @@ export function reduceLocationEvent(
       if (open?.kind === "stop" && open.zone && ev.zone && open.zone === ev.zone) {
         return NO_OP;
       }
-      const label = ev.zone ?? ev.geocodedAddress ?? null;
       return {
         ...(open ? { closeOpen: { endedAt: ev.occurredAt } } : {}),
-        open: openStop(ev, label),
+        open: openStop(ev, stopLabel(ev)),
       };
     }
 
@@ -153,8 +198,14 @@ export function reduceLocationEvent(
     }
 
     case "vehicle_disconnect": {
-      // Ignition off — end the drive. Next stop opens on the next arrival event.
-      if (open?.kind === "drive") return { closeOpen: { endedAt: ev.occurredAt } };
+      // Ignition off — end the drive. If the event includes a usable location,
+      // open the stop immediately; otherwise the next location_update will.
+      if (open?.kind === "drive") {
+        return {
+          closeOpen: { endedAt: ev.occurredAt },
+          ...(hasStopLocation(ev) ? { open: openStop(ev, stopLabel(ev)) } : {}),
+        };
+      }
       return NO_OP;
     }
 
@@ -170,10 +221,9 @@ export function reduceLocationEvent(
       if (act === "still") {
         // Stopped moving → a stop here (address fills in via location_update).
         if (open?.kind === "stop") return NO_OP; // already stopped
-        const label = ev.zone ?? ev.geocodedAddress ?? null;
         return {
           ...(open ? { closeOpen: { endedAt: ev.occurredAt } } : {}),
-          open: openStop(ev, label),
+          open: openStop(ev, stopLabel(ev)),
         };
       }
       // walking / running / cycling / unknown → no transition in v1.
@@ -181,15 +231,23 @@ export function reduceLocationEvent(
     }
 
     case "location_update": {
-      // Enrich an open stop that is still missing a label/coords.
-      if (!open || open.kind !== "stop") return NO_OP;
+      // Enrich an open stop that is still missing a label/coords. If a drive was
+      // just closed by vehicle_disconnect, this may be the first arrival signal,
+      // so open a stop instead of dropping the update on the floor.
+      if (!open) {
+        return hasStopLocation(ev)
+          ? { open: openStop(ev, stopLabel(ev)) }
+          : NO_OP;
+      }
+      if (open.kind !== "stop") return NO_OP;
       const patch: UpdateOpenSpec = {};
-      if (!open.placeLabel && (ev.zone || ev.geocodedAddress)) {
-        patch.placeLabel = ev.zone ?? ev.geocodedAddress ?? null;
+      const nextLabel = stopLabel(ev);
+      if (shouldRefreshStopLabel(open, nextLabel)) {
+        patch.placeLabel = nextLabel;
       }
       if (!open.zone && ev.zone) patch.zone = ev.zone;
-      if (open.latitude == null && ev.latitude != null) patch.latitude = ev.latitude;
-      if (open.longitude == null && ev.longitude != null) patch.longitude = ev.longitude;
+      if ((open.latitude == null || !open.zone) && ev.latitude != null) patch.latitude = ev.latitude;
+      if ((open.longitude == null || !open.zone) && ev.longitude != null) patch.longitude = ev.longitude;
       return Object.keys(patch).length > 0 ? { updateOpen: patch } : NO_OP;
     }
 
