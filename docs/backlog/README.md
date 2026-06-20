@@ -56,6 +56,7 @@ TASK-019 all derive directly from this principle.
 - `EPIC-003-property-intelligence.md`
 - `EPIC-004-billing-and-profitability.md`
 - `EPIC-005-platform-and-delivery.md`
+- `EPIC-006-role-based-workspaces.md`
 - `done/` — completed tasks, moved out of the active epics.
 
 Each epic file lists its **active** tasks in full and links to its **completed**
@@ -63,7 +64,7 @@ tasks in `done/`.
 
 ## Task index
 
-Next available ID: **TASK-028**.
+Next available ID: **TASK-033**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -94,6 +95,11 @@ Next available ID: **TASK-028**.
 | TASK-025 | Bluetooth-Triggered Vehicle-Aware Auto-Mileage | 001 | In Progress |
 | TASK-026 | Day Map (stops + drive routes) | 001 | In Progress |
 | TASK-027 | Hybrid Tracking (manual mileage, auto time) | 001 | In Progress |
+| TASK-028 | Phase 0 — Extract WorkdayPanel | 006 | Proposed |
+| TASK-029 | Phase 1 — My Day becomes the field home | 006 | Proposed |
+| TASK-030 | Phase 2 — Slim the Owner Dashboard | 006 | Proposed |
+| TASK-031 | Phase 3 — Role routing & hardening | 006 | Proposed |
+| TASK-032 | Phase 4 — Owner widgets & polish | 006 | Proposed |
 
 ## Status legend
 
