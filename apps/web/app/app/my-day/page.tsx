@@ -167,7 +167,10 @@ export default async function MyDayPage() {
         actions={
           isTech ? (
             <LinkButton href="/app/visits" variant="secondary" size="sm">Visits →</LinkButton>
-          ) : undefined
+          ) : (
+            // EPIC-006: owner/admin can switch back to the business dashboard.
+            <LinkButton href="/app" variant="secondary" size="sm">← Dashboard</LinkButton>
+          )
         }
       />
 
