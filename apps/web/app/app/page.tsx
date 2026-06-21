@@ -3,10 +3,8 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { queryForSession } from "@/lib/db";
 import { LinkButton, PageContainer, PageHeader } from "@/components/ui";
-import { DailyCommandCenter } from "./DailyCommandCenter";
-import type { CommandVisit, CountAction, EndWarnings, MaterialJob, OpenSession, VehicleOption } from "./DailyCommandCenter";
-import type { ActivityEntryDto } from "./ActivityTracker";
-import { summarizeDayMileage, type VehicleSessionRow } from "@/lib/mileage/sessions";
+import { OwnerDashboard } from "./OwnerDashboard";
+import type { CommandVisit, CountAction, MaterialJob } from "./WorkdayPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -32,19 +30,12 @@ export default async function AppPage() {
   const [
     todayJobs,
     tomorrowJobs,
-    openSessionRows,
-    vehicles,
     draftInvoiceCountRows,
     scheduleApprovedCountRows,
     estimateFollowUpCountRows,
     depositCountRows,
     materialCountRows,
     materialJobs,
-    missingReceiptRows,
-    inProgressRows,
-    activityEntries,
-    todaySessionRows,
-    yesterdayMilesRows,
     outstandingInvoicesCentsRows,
     pendingDepositsCentsRows,
     paidThisMonthCentsRows,
@@ -89,36 +80,6 @@ export default async function AppPage() {
          AND v.scheduled_start::date = CURRENT_DATE + interval '1 day'
        ORDER BY j.id, v.scheduled_start ASC
        LIMIT 3`,
-      [accountId]),
-
-    queryForSession<OpenSession>(session,
-      `SELECT s.id, s.session_date::text, s.vehicle_id, v.nickname AS vehicle_nickname,
-              v.plate AS vehicle_plate, s.start_odometer, s.started_at::text AS started_at
-       FROM vehicle_sessions s
-       LEFT JOIN vehicles v ON v.id = s.vehicle_id
-       WHERE s.account_id = $1
-         AND s.session_date = CURRENT_DATE
-         AND s.end_odometer IS NULL
-         AND s.miles IS NULL
-       ORDER BY s.started_at DESC
-       LIMIT 1`,
-      [accountId]),
-
-    queryForSession<VehicleOption>(session,
-      `SELECT v.id, v.nickname, v.plate,
-              last_s.end_odometer AS current_odometer,
-              (SELECT max(started_at) FROM vehicle_sessions
-                 WHERE vehicle_id = v.id AND account_id = v.account_id)::text AS last_used_at
-       FROM vehicles v
-       LEFT JOIN LATERAL (
-         SELECT end_odometer, session_date
-         FROM vehicle_sessions
-         WHERE vehicle_id = v.id AND account_id = v.account_id AND end_odometer IS NOT NULL
-         ORDER BY session_date DESC, created_at DESC
-         LIMIT 1
-       ) last_s ON true
-       WHERE v.account_id = $1 AND v.is_active = true
-       ORDER BY v.nickname ASC`,
       [accountId]),
 
     queryForSession<CountRow>(session,
@@ -178,51 +139,6 @@ export default async function AppPage() {
       [accountId]),
 
     queryForSession<CountRow>(session,
-      `SELECT COUNT(*)::text AS count
-       FROM expenses
-       WHERE account_id = $1
-         AND expense_date = CURRENT_DATE
-         AND receipt_url IS NULL`,
-      [accountId]),
-
-    queryForSession<CountRow>(session,
-      `SELECT COUNT(*)::text AS count
-       FROM visits
-       WHERE account_id = $1
-         AND scheduled_start::date = CURRENT_DATE
-         AND status IN ('arrived','in_progress')`,
-      [accountId]),
-
-    queryForSession<ActivityEntryDto>(session,
-      `SELECT id, activity_type, category, started_at::text, ended_at::text,
-              entity_type, entity_id, note
-       FROM activity_entries
-       WHERE account_id = $1
-         AND (session_date = CURRENT_DATE OR ended_at IS NULL)
-         AND voided_at IS NULL
-       ORDER BY started_at ASC`,
-      [accountId]),
-
-    queryForSession<VehicleSessionRow>(session,
-      `SELECT s.vehicle_id,
-              v.nickname AS vehicle_nickname,
-              v.plate    AS vehicle_plate,
-              s.start_odometer,
-              s.end_odometer,
-              s.miles::float8 AS miles
-       FROM vehicle_sessions s
-       LEFT JOIN vehicles v ON v.id = s.vehicle_id
-       WHERE s.account_id = $1 AND s.session_date = CURRENT_DATE
-       ORDER BY s.started_at ASC`,
-      [accountId]),
-
-    queryForSession<CountRow>(session,
-      `SELECT COALESCE(SUM(miles), 0)::text AS count
-       FROM vehicle_sessions
-       WHERE account_id = $1 AND session_date = CURRENT_DATE - interval '1 day'`,
-      [accountId]),
-
-    queryForSession<CountRow>(session,
       `SELECT COALESCE(SUM(total_cents - paid_cents), 0)::text AS count
        FROM invoices
        WHERE account_id = $1 AND status IN ('sent', 'partial', 'overdue')`,
@@ -251,14 +167,11 @@ export default async function AppPage() {
       [accountId]),
   ]);
 
-  const dayMileage = summarizeDayMileage(todaySessionRows);
-
   const draftInvoices = parseN(draftInvoiceCountRows[0]);
   const deposits = parseN(depositCountRows[0]);
   const materialCount = parseN(materialCountRows[0]);
   const pendingSegments = parseN(pendingSegmentRows[0]);
 
-  const yesterdayMiles = parseN(yesterdayMilesRows[0]);
   const outstandingInvoicesCents = parseN(outstandingInvoicesCentsRows[0]);
   const pendingDepositsCents = parseN(pendingDepositsCentsRows[0]);
   const paidThisMonthCents = parseN(paidThisMonthCentsRows[0]);
@@ -310,38 +223,24 @@ export default async function AppPage() {
     .filter((item) => item.count > 0)
     .sort((a, b) => ({ danger: 0, warning: 1, default: 2 })[a.tone] - ({ danger: 0, warning: 1, default: 2 })[b.tone]);
 
-  const warnings: EndWarnings = {
-    missingReceiptPhotos: parseN(missingReceiptRows[0]),
-    jobsInProgress: parseN(inProgressRows[0]),
-    draftInvoices,
-    deposits,
-  };
-
   return (
     <PageContainer>
       <PageHeader
-        title="Daily Command Center"
+        title="Dashboard"
         subtitle={todayLabel}
         actions={
           <>
-            <LinkButton href="/app/timeline" variant="secondary" size="sm">Timeline</LinkButton>
+            <LinkButton href="/app/my-day" variant="secondary" size="sm">My Day</LinkButton>
             <LinkButton href="/app/intake/new" variant="primary" size="sm">+ New Request</LinkButton>
           </>
         }
       />
-      <DailyCommandCenter
-        todayLabel={todayLabel}
-        openSession={openSessionRows[0] ?? null}
-        vehicles={vehicles}
+      <OwnerDashboard
         actionQueue={actionQueue}
         todayJobs={todayJobs}
         materialCount={materialCount}
         materialJobs={materialJobs}
-        warnings={warnings}
         tomorrowJobs={tomorrowJobs}
-        activityEntries={activityEntries}
-        dayMileage={dayMileage}
-        yesterdayMiles={yesterdayMiles}
         outstandingInvoicesCents={outstandingInvoicesCents}
         pendingDepositsCents={pendingDepositsCents}
         paidThisMonthCents={paidThisMonthCents}

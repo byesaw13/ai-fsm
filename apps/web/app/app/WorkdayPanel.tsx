@@ -957,7 +957,7 @@ export function WorkdayPanel({
   );
 }
 
-function ActionQueue({ items }: { items: CountAction[] }) {
+export function ActionQueue({ items }: { items: CountAction[] }) {
   return (
     <Card>
       <SectionHeader title="What needs you" count={items.length} />
@@ -983,7 +983,7 @@ function ActionQueue({ items }: { items: CountAction[] }) {
   );
 }
 
-function JobsToday({ jobs }: { jobs: CommandVisit[] }) {
+export function JobsToday({ jobs }: { jobs: CommandVisit[] }) {
   const router = useRouter();
   const toast = useToast();
   const [pending, setPending] = useState<string | null>(null);
@@ -1069,7 +1069,7 @@ function JobsToday({ jobs }: { jobs: CommandVisit[] }) {
   );
 }
 
-function Materials({ count, jobs }: { count: number; jobs: MaterialJob[] }) {
+export function Materials({ count, jobs }: { count: number; jobs: MaterialJob[] }) {
   return (
     <Card>
       <SectionHeader title="Materials" count={count} action={<LinkButton href="/app/expenses/new?mode=run" variant="primary" size="sm">Material Run</LinkButton>} />
