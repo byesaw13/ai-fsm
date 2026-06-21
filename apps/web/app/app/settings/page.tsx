@@ -28,6 +28,7 @@ interface UserRow extends Record<string, unknown> {
 export default async function SettingsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.role === "tech") redirect("/app/my-day"); // EPIC-006: techs have no settings access
 
   const isAdmin = session.role === "owner" || session.role === "admin";
 
