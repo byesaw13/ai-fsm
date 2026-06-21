@@ -51,7 +51,7 @@ export function OwnerDashboard({
       >
         {/* Left: operations */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
-          <JobsToday jobs={todayJobs} />
+          <JobsToday jobs={todayJobs} readOnly />
           <Materials count={materialCount} jobs={materialJobs} />
 
           <Card>

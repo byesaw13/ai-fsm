@@ -983,7 +983,7 @@ export function ActionQueue({ items }: { items: CountAction[] }) {
   );
 }
 
-export function JobsToday({ jobs }: { jobs: CommandVisit[] }) {
+export function JobsToday({ jobs, readOnly = false }: { jobs: CommandVisit[]; readOnly?: boolean }) {
   const router = useRouter();
   const toast = useToast();
   const [pending, setPending] = useState<string | null>(null);
@@ -1045,13 +1045,13 @@ export function JobsToday({ jobs }: { jobs: CommandVisit[] }) {
                   </div>
                   <StatusBadge variant={(job.visit_status ?? job.status) as StatusVariant}>{(job.visit_status ?? job.status).replaceAll("_", " ")}</StatusBadge>
                 </div>
-                {(canArrive || canComplete) && (
+                {!readOnly && (canArrive || canComplete) && (
                   <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-3)", flexWrap: "wrap" }}>
                     {canArrive && <button type="button" className="p7-btn p7-btn-primary p7-btn-sm" disabled={pending === visitId} onClick={() => transition(visitId, "arrived")}>{pending === visitId ? "Updating..." : "Arrive"}</button>}
                     {canComplete && <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" disabled={pending === visitId} onClick={() => transition(visitId, "completed")}>{pending === visitId ? "Updating..." : "Complete"}</button>}
                   </div>
                 )}
-                {visitId && guardedVisit === visitId && (
+                {!readOnly && visitId && guardedVisit === visitId && (
                   <div style={{ marginTop: "var(--space-3)", padding: "var(--space-3)", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-warning)", background: "#fffbeb", color: "#92400e" }}>
                     <strong>Need a photo/signature before closing.</strong>
                     <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginTop: "var(--space-2)" }}>
