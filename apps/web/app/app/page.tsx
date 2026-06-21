@@ -40,6 +40,8 @@ export default async function AppPage() {
     pendingDepositsCentsRows,
     paidThisMonthCentsRows,
     pendingSegmentRows,
+    agingRows,
+    techProductivityRows,
   ] = await Promise.all([
     queryForSession<CommandVisit>(session,
       `SELECT DISTINCT ON (j.id)
@@ -165,6 +167,29 @@ export default async function AppPage() {
          AND status = 'provisional'
          AND ended_at IS NOT NULL`,
       [accountId]),
+
+    // EPIC-006 Phase 4: invoice aging — unpaid balance bucketed by age.
+    queryForSession<{ current_cents: string; d30_cents: string; d60_cents: string; d90_cents: string }>(session,
+      `SELECT
+         COALESCE(SUM(total_cents - paid_cents) FILTER (WHERE due_date IS NULL OR due_date >= CURRENT_DATE), 0)::text AS current_cents,
+         COALESCE(SUM(total_cents - paid_cents) FILTER (WHERE due_date < CURRENT_DATE AND due_date >= CURRENT_DATE - interval '30 days'), 0)::text AS d30_cents,
+         COALESCE(SUM(total_cents - paid_cents) FILTER (WHERE due_date < CURRENT_DATE - interval '30 days' AND due_date >= CURRENT_DATE - interval '60 days'), 0)::text AS d60_cents,
+         COALESCE(SUM(total_cents - paid_cents) FILTER (WHERE due_date < CURRENT_DATE - interval '60 days'), 0)::text AS d90_cents
+       FROM invoices
+       WHERE account_id = $1 AND status IN ('sent','partial','overdue')`,
+      [accountId]),
+
+    // EPIC-006 Phase 4: technician productivity — visits completed this month per tech.
+    queryForSession<{ name: string; completed: string }>(session,
+      `SELECT COALESCE(u.full_name, 'Unassigned') AS name, COUNT(*)::text AS completed
+       FROM visits v
+       LEFT JOIN users u ON u.id = v.assigned_user_id
+       WHERE v.account_id = $1 AND v.status = 'completed'
+         AND v.completed_at >= DATE_TRUNC('month', CURRENT_DATE)
+       GROUP BY u.full_name
+       ORDER BY COUNT(*) DESC
+       LIMIT 6`,
+      [accountId]),
   ]);
 
   const draftInvoices = parseN(draftInvoiceCountRows[0]);
@@ -175,6 +200,15 @@ export default async function AppPage() {
   const outstandingInvoicesCents = parseN(outstandingInvoicesCentsRows[0]);
   const pendingDepositsCents = parseN(pendingDepositsCentsRows[0]);
   const paidThisMonthCents = parseN(paidThisMonthCentsRows[0]);
+
+  const aging = agingRows[0];
+  const invoiceAging = {
+    current: parseInt(aging?.current_cents ?? "0", 10),
+    d30: parseInt(aging?.d30_cents ?? "0", 10),
+    d60: parseInt(aging?.d60_cents ?? "0", 10),
+    d90: parseInt(aging?.d90_cents ?? "0", 10),
+  };
+  const techProductivity = techProductivityRows.map((r) => ({ name: r.name, completed: parseInt(r.completed, 10) }));
 
   const actionQueue = ([
     {
@@ -244,6 +278,8 @@ export default async function AppPage() {
         outstandingInvoicesCents={outstandingInvoicesCents}
         pendingDepositsCents={pendingDepositsCents}
         paidThisMonthCents={paidThisMonthCents}
+        invoiceAging={invoiceAging}
+        techProductivity={techProductivity}
       />
     </PageContainer>
   );
