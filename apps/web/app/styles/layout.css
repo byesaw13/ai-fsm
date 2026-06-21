@@ -489,10 +489,14 @@
   .owner-dashboard-grid .owner-dash-money    { order: 1; }
   .owner-dashboard-grid .owner-dash-jobs     { order: 2; }
   .owner-dashboard-grid .owner-dash-materials{ order: 3; }
-  .owner-dashboard-grid .owner-dash-actions  { order: 4; }
-  .owner-dashboard-grid .owner-dash-aging    { order: 5; }
-  .owner-dashboard-grid .owner-dash-tomorrow { order: 6; }
-  .owner-dashboard-grid .owner-dash-completed{ order: 7; }
+  .owner-dashboard-grid .owner-dash-aging    { order: 4; }
+  .owner-dashboard-grid .owner-dash-tomorrow { order: 5; }
+  .owner-dashboard-grid .owner-dash-completed{ order: 6; }
+
+  /* Quick Actions is redundant on a phone: every create tile lives in the
+     floating "+" (FAB) and every nav tile in the bottom-nav More sheet. Hide
+     it here to cut scroll; desktop keeps it (no FAB, free space). */
+  .owner-dashboard-grid .owner-dash-actions { display: none !important; }
 }
 
 /* ==========================================================================
