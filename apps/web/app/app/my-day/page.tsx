@@ -1,3 +1,5 @@
+import Link from "next/link";
+import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { query, queryForSession } from "@/lib/db";
@@ -33,9 +35,11 @@ export default async function MyDayPage() {
   const session = await getSession();
   if (!session) redirect("/login");
   // EPIC-006: My Day is the field surface for technicians AND owner-as-technician.
-  // (Owners reach it from the nav; their default landing is still the dashboard.)
+  // Phase 5: pure admins don't do field work — keep them in the Office.
+  if (session.role === "admin") redirect("/app");
 
   const isTech = session.role === "tech";
+  const isOwner = session.role === "owner";
   const accountId = session.accountId;
 
   // My Day is "do the work" — always the viewer's OWN assigned visits, for every
@@ -107,6 +111,26 @@ export default async function MyDayPage() {
   ]);
   const dayMileage = summarizeDayMileage(todaySessionRows);
   const yesterdayMiles = parseInt(yesterdayMilesRows[0]?.count ?? "0", 10);
+
+  // EPIC-006 Phase 5: a light "business peek" so the owner-in-the-field is never
+  // fully blind to the office. One glance + a tap back to the dashboard.
+  let ownerPeek: { outstandingCents: number; draftInvoices: number } | null = null;
+  if (isOwner) {
+    const [outRows, draftRows] = await Promise.all([
+      queryForSession<{ cents: string }>(session,
+        `SELECT COALESCE(SUM(total_cents - paid_cents), 0)::text AS cents
+         FROM invoices WHERE account_id = $1 AND status IN ('sent','partial','overdue')`,
+        [accountId]),
+      queryForSession<{ count: string }>(session,
+        `SELECT COUNT(*)::text AS count FROM invoices
+         WHERE account_id = $1 AND status = 'draft' AND invoice_kind IN ('final','standard')`,
+        [accountId]),
+    ]);
+    ownerPeek = {
+      outstandingCents: parseInt(outRows[0]?.cents ?? "0", 10),
+      draftInvoices: parseInt(draftRows[0]?.count ?? "0", 10),
+    };
+  }
   const todayLabel = new Date().toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
   });
@@ -173,6 +197,33 @@ export default async function MyDayPage() {
           )
         }
       />
+
+      {/* EPIC-006 Phase 5: owner-only business peek — a glance at the office. */}
+      {ownerPeek && (
+        <Link
+          href={"/app" as Route}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)",
+            marginBottom: "var(--space-4)", padding: "var(--space-2) var(--space-3)",
+            border: "1px solid var(--border)", borderRadius: "var(--radius-md)",
+            background: "var(--bg-card)", textDecoration: "none", color: "inherit",
+          }}
+        >
+          <div style={{ display: "flex", gap: "var(--space-5)", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "var(--text-sm)" }}>
+              <strong style={{ color: "var(--color-red-600)" }}>
+                ${(ownerPeek.outstandingCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              </strong>
+              <span style={{ color: "var(--fg-muted)" }}> outstanding</span>
+            </span>
+            <span style={{ fontSize: "var(--text-sm)" }}>
+              <strong>{ownerPeek.draftInvoices}</strong>
+              <span style={{ color: "var(--fg-muted)" }}> draft invoice{ownerPeek.draftInvoices !== 1 ? "s" : ""} to review</span>
+            </span>
+          </div>
+          <span style={{ color: "var(--accent)", fontSize: "var(--text-xs)", fontWeight: 700, whiteSpace: "nowrap" }}>Office →</span>
+        </Link>
+      )}
 
       {/* Field workday: Start/End Day, vehicle, activity, mileage (EPIC-006) */}
       <div style={{ marginBottom: "var(--space-6)" }}>
