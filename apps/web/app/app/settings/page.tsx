@@ -28,7 +28,9 @@ interface UserRow extends Record<string, unknown> {
 export default async function SettingsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.role === "tech") redirect("/app/my-day"); // EPIC-006: techs have no settings access
+  // EPIC-006 Phase 5: techs reach Settings for their profile + sign out. The
+  // admin-only sections below (Company, Team, Tools, System Health) stay gated
+  // by `isAdmin`, so a tech sees only "Your profile".
 
   const isAdmin = session.role === "owner" || session.role === "admin";
 
