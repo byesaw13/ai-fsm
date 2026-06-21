@@ -155,7 +155,8 @@ export default async function AppPage() {
     queryForSession<CountRow>(session,
       `SELECT COALESCE(SUM(amount_cents), 0)::text AS count
        FROM payments
-       WHERE account_id = $1 AND received_at >= DATE_TRUNC('month', CURRENT_DATE)`,
+       WHERE account_id = $1 AND status = 'paid'
+         AND received_at >= DATE_TRUNC('month', CURRENT_DATE)`,
       [accountId]),
 
     // TASK-024: ended, still-unlabelled location segments waiting to be logged.

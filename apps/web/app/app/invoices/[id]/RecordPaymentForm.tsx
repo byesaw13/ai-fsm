@@ -109,10 +109,19 @@ export function RecordPaymentForm({ invoiceId, remainingCents }: Props) {
             type="number"
             step="0.01"
             min="0.01"
-            max={(remainingCents / 100).toFixed(2)}
+            // Refunds aren't bounded by the remaining balance, so don't cap them.
+            max={
+              paymentType === "refund"
+                ? undefined
+                : (remainingCents / 100).toFixed(2)
+            }
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder={`Max: $${(remainingCents / 100).toFixed(2)}`}
+            placeholder={
+              paymentType === "refund"
+                ? "Refund amount"
+                : `Max: $${(remainingCents / 100).toFixed(2)}`
+            }
             required
             data-testid="payment-amount-input"
           />

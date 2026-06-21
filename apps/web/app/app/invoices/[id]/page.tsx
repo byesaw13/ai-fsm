@@ -433,12 +433,18 @@ export default async function InvoiceDetailPage({
             />
           )}
 
-          {/* Record Payment — owner/admin only, on payable invoices */}
+          {/* Record Payment — owner/admin only. Shown on payable invoices, and
+              on paid invoices so refunds/adjustments stay reachable. */}
           {canRecordPayments(session.role) &&
-            ["sent", "partial", "overdue"].includes(currentStatus) &&
-            amountDue > 0 && (
+            ((["sent", "partial", "overdue"].includes(currentStatus) && amountDue > 0) ||
+              currentStatus === "paid") && (
               <Card className="p7-card-accent" data-testid="record-payment-panel" id="record-payment-panel">
-                <SectionHeader title="Record Payment" />
+                <SectionHeader title={currentStatus === "paid" ? "Record Refund / Adjustment" : "Record Payment"} />
+                {currentStatus === "paid" && (
+                  <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                    This invoice is paid. Use the <strong>Refund</strong> type to log money returned to the client.
+                  </p>
+                )}
                 <RecordPaymentForm
                   invoiceId={invoice.id}
                   remainingCents={amountDue}
