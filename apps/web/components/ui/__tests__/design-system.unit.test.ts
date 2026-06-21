@@ -146,11 +146,11 @@ describe("getNavSections (role filtering)", () => {
     expect(sections[0].label).toBe("");
   });
 
-  it("Owner/admin nav has Today, My Day, Requests, Clients, Properties, Estimates, Jobs, Schedule, Invoices, Reports, Settings", () => {
-    const sections = getNavSections("admin");
+  it("Owner nav has Today, My Day, Requests, Clients, Properties, Estimates, Jobs, Schedule, Invoices, Reports, Settings", () => {
+    const sections = getNavSections("owner");
     const hrefs = sections[0].items.map((i) => i.href);
     expect(hrefs).toContain("/app");
-    expect(hrefs).toContain("/app/my-day"); // EPIC-006: owner/admin can switch to My Day
+    expect(hrefs).toContain("/app/my-day"); // EPIC-006 P5: only the owner switches to My Day
     expect(hrefs).toContain("/app/requests");
     expect(hrefs).toContain("/app/clients");
     expect(hrefs).toContain("/app/properties");
@@ -162,6 +162,15 @@ describe("getNavSections (role filtering)", () => {
     expect(hrefs).toContain("/app/settings");
     expect(hrefs).not.toContain("/app/mileage");
     expect(hrefs).toHaveLength(11);
+  });
+
+  it("Admin nav drops My Day (pure admins don't do field work) — 10 items", () => {
+    const sections = getNavSections("admin");
+    const hrefs = sections[0].items.map((i) => i.href);
+    expect(hrefs).not.toContain("/app/my-day"); // EPIC-006 P5
+    expect(hrefs).toContain("/app");
+    expect(hrefs).toContain("/app/settings");
+    expect(hrefs).toHaveLength(10);
   });
 
   it("Layer 2+ tools are not in main nav", () => {
