@@ -51,8 +51,9 @@ export async function POST(request: NextRequest) {
     account_id: string;
     enabled: boolean;
     secrets: Buffer | null;
+    webhook_url: string | null;
   }>(
-    `SELECT account_id, enabled, secrets
+    `SELECT account_id, enabled, secrets, config->>'webhookUrl' AS webhook_url
      FROM integration_settings
      WHERE provider = 'square' AND config->>'locationId' = $1`,
     [locationId]
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
     logger.error("Square webhook: no account for location", { locationId });
     return NextResponse.json({ received: true });
   }
-  const { account_id, secrets } = settingsRow.rows[0];
+  const { account_id, secrets, webhook_url } = settingsRow.rows[0];
   const decrypted: SquareSecrets = secrets
     ? decryptJson<SquareSecrets>(secrets)
     : { accessToken: null, webhookSignatureKey: null };
@@ -71,9 +72,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Webhook not configured" }, { status: 400 });
   }
 
-  // Verify against the registered notification URL (override via env if the
-  // public URL differs from the request URL, e.g. behind a tunnel).
-  const notificationUrl = process.env.SQUARE_WEBHOOK_URL ?? request.url;
+  // Verify against the registered notification URL. Prefer the value saved in
+  // the Square settings panel; fall back to an env override, then request.url.
+  const notificationUrl =
+    webhook_url || process.env.SQUARE_WEBHOOK_URL || request.url;
   const valid = await verifySquareWebhook({
     body,
     signature,

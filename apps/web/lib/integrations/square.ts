@@ -13,6 +13,9 @@ export type SquareEnvironmentName = "sandbox" | "production";
 export interface SquarePublicConfig {
   locationId: string | null;
   applicationId: string | null;
+  // Public endpoint Square is configured to call. Used as the notification URL
+  // for webhook signature verification (must match the dashboard exactly).
+  webhookUrl: string | null;
 }
 
 // Secret material stored encrypted in integration_settings.secrets (bytea).
@@ -66,7 +69,7 @@ export async function loadSquareSettings(
   return {
     enabled: row.enabled,
     environment: row.environment,
-    config: row.config ?? { locationId: null, applicationId: null },
+    config: row.config ?? { locationId: null, applicationId: null, webhookUrl: null },
     secrets,
     status: row.status,
     statusDetail: row.status_detail,
@@ -85,6 +88,7 @@ function toSettings(row: SquareSettingsRow): SquareSettings {
     environment: row.environment,
     locationId: row.config.locationId,
     applicationId: row.config.applicationId,
+    webhookUrl: row.config.webhookUrl,
     accessToken: row.secrets.accessToken,
     webhookSignatureKey: row.secrets.webhookSignatureKey,
   };

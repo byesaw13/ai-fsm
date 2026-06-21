@@ -9,6 +9,7 @@ export interface SquareStatus {
   environment: "sandbox" | "production";
   locationId: string | null;
   applicationId: string | null;
+  webhookUrl: string | null;
   hasAccessToken: boolean;
   hasWebhookSignatureKey: boolean;
   status: "disconnected" | "connected" | "error";
@@ -35,6 +36,7 @@ export function SquarePanel({ initial }: Props) {
   const [applicationId, setApplicationId] = useState(
     initial.applicationId ?? ""
   );
+  const [webhookUrl, setWebhookUrl] = useState(initial.webhookUrl ?? "");
   const [accessToken, setAccessToken] = useState("");
   const [webhookSignatureKey, setWebhookSignatureKey] = useState("");
   const [hasAccessToken, setHasAccessToken] = useState(initial.hasAccessToken);
@@ -58,6 +60,7 @@ export function SquarePanel({ initial }: Props) {
           environment,
           locationId: locationId.trim() || null,
           applicationId: applicationId.trim() || null,
+          webhookUrl: webhookUrl.trim(),
           // only send secrets when the user typed a new value
           accessToken: accessToken.trim() || undefined,
           webhookSignatureKey: webhookSignatureKey.trim() || undefined,
@@ -187,6 +190,22 @@ export function SquarePanel({ initial }: Props) {
           maxLength={128}
           placeholder="e.g. sandbox-sq0idb-…"
         />
+      </div>
+
+      <div className="form-group">
+        <label htmlFor="square-webhook-url">Webhook URL</label>
+        <input
+          id="square-webhook-url"
+          type="url"
+          value={webhookUrl}
+          onChange={(e) => setWebhookUrl(e.target.value)}
+          maxLength={512}
+          placeholder="https://your-host/api/webhooks/square"
+        />
+        <p style={{ margin: "4px 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+          Must exactly match the notification URL registered in Square — used to
+          verify webhook signatures. Set this when running behind a tunnel/proxy.
+        </p>
       </div>
 
       <div className="form-group">

@@ -27,6 +27,7 @@ export const GET = withRole(["owner"], async (_request, session) => {
           environment: "sandbox" as const,
           locationId: null,
           applicationId: null,
+          webhookUrl: null,
           hasAccessToken: false,
           hasWebhookSignatureKey: false,
           status: "disconnected" as const,
@@ -41,6 +42,7 @@ export const GET = withRole(["owner"], async (_request, session) => {
         environment: row.environment,
         locationId: row.config.locationId,
         applicationId: row.config.applicationId,
+        webhookUrl: row.config.webhookUrl,
         hasAccessToken: !!row.secrets.accessToken,
         hasWebhookSignatureKey: !!row.secrets.webhookSignatureKey,
         status: row.status,
@@ -74,6 +76,7 @@ const putSchema = z.object({
   environment: z.enum(["sandbox", "production"]),
   locationId: z.string().trim().max(64).nullable().optional(),
   applicationId: z.string().trim().max(128).nullable().optional(),
+  webhookUrl: z.string().trim().url().max(512).nullable().optional().or(z.literal("")),
   // Secrets: only persisted when a non-empty value is supplied. Omit/empty to
   // keep the existing secret. Never echoed back by GET.
   accessToken: z.string().trim().max(512).optional(),
@@ -141,10 +144,17 @@ export const PUT = withRole(["owner"], async (request, session) => {
       if (input.webhookSignatureKey)
         secrets.webhookSignatureKey = input.webhookSignatureKey;
 
+      // webhookUrl: "" clears it, undefined keeps the existing value.
+      const webhookUrl =
+        input.webhookUrl === ""
+          ? null
+          : (input.webhookUrl ?? existing?.config.webhookUrl ?? null);
+
       const config = {
         locationId: input.locationId ?? existing?.config.locationId ?? null,
         applicationId:
           input.applicationId ?? existing?.config.applicationId ?? null,
+        webhookUrl,
       };
 
       const encrypted = encryptSquareSecrets(secrets);

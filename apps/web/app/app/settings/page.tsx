@@ -69,6 +69,7 @@ export default async function SettingsPage() {
       environment: row?.environment ?? "sandbox",
       locationId: row?.config.locationId ?? null,
       applicationId: row?.config.applicationId ?? null,
+      webhookUrl: row?.config.webhookUrl ?? null,
       hasAccessToken: !!row?.secrets.accessToken,
       hasWebhookSignatureKey: !!row?.secrets.webhookSignatureKey,
       status: row?.status ?? "disconnected",
