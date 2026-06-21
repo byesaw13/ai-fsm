@@ -9,11 +9,21 @@ interface Props {
 }
 
 const PAYMENT_METHODS = [
+  { value: "square", label: "Square" },
+  { value: "venmo", label: "Venmo" },
   { value: "cash", label: "Cash" },
   { value: "check", label: "Check" },
-  { value: "card", label: "Card" },
-  { value: "transfer", label: "Transfer" },
+  { value: "zelle", label: "Zelle" },
+  { value: "ach", label: "ACH" },
   { value: "other", label: "Other" },
+] as const;
+
+const PAYMENT_TYPES = [
+  { value: "deposit", label: "Deposit" },
+  { value: "progress", label: "Progress" },
+  { value: "final", label: "Final" },
+  { value: "refund", label: "Refund" },
+  { value: "adjustment", label: "Adjustment" },
 ] as const;
 
 export function RecordPaymentForm({ invoiceId, remainingCents }: Props) {
@@ -23,6 +33,7 @@ export function RecordPaymentForm({ invoiceId, remainingCents }: Props) {
   const [success, setSuccess] = useState("");
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("cash");
+  const [paymentType, setPaymentType] = useState("progress");
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
@@ -45,7 +56,8 @@ export function RecordPaymentForm({ invoiceId, remainingCents }: Props) {
       return;
     }
 
-    if (amountCents > remainingCents) {
+    // Refunds are ledger-only and may exceed the remaining balance.
+    if (paymentType !== "refund" && amountCents > remainingCents) {
       setError(
         `Amount exceeds remaining balance of $${(remainingCents / 100).toFixed(2)}`
       );
@@ -60,6 +72,7 @@ export function RecordPaymentForm({ invoiceId, remainingCents }: Props) {
         body: JSON.stringify({
           amount_cents: amountCents,
           method,
+          payment_type: paymentType,
           notes: notes.trim() || null,
         }),
       });
@@ -96,13 +109,39 @@ export function RecordPaymentForm({ invoiceId, remainingCents }: Props) {
             type="number"
             step="0.01"
             min="0.01"
-            max={(remainingCents / 100).toFixed(2)}
+            // Refunds aren't bounded by the remaining balance, so don't cap them.
+            max={
+              paymentType === "refund"
+                ? undefined
+                : (remainingCents / 100).toFixed(2)
+            }
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder={`Max: $${(remainingCents / 100).toFixed(2)}`}
+            placeholder={
+              paymentType === "refund"
+                ? "Refund amount"
+                : `Max: $${(remainingCents / 100).toFixed(2)}`
+            }
             required
             data-testid="payment-amount-input"
           />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="payment-type">Type</label>
+          <select
+            id="payment-type"
+            value={paymentType}
+            onChange={(e) => setPaymentType(e.target.value)}
+            className="payment-select"
+            data-testid="payment-type-select"
+          >
+            {PAYMENT_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="form-group">

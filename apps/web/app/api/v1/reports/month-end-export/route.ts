@@ -134,7 +134,7 @@ async function buildCsv(
 
     case "payments": {
       const { rows } = await client.query(
-        `SELECT i.invoice_number, p.amount_cents, p.method, p.received_at, p.notes
+        `SELECT i.invoice_number, p.amount_cents, p.method, p.payment_type, p.status, p.received_at, p.notes
          FROM payments p
          JOIN invoices i ON i.id = p.invoice_id
          WHERE p.account_id = $1

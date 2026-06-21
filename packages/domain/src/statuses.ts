@@ -152,13 +152,64 @@ export const invoiceTransitions: Record<InvoiceStatus, readonly InvoiceStatus[]>
 // === Payment ===
 
 export const paymentMethodSchema = z.enum([
+  "square",
+  "venmo",
   "cash",
   "check",
+  "zelle",
+  "ach",
+  // legacy values retained for back-compat with existing payment rows
   "card",
   "transfer",
   "other",
 ]);
 export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
+
+export const paymentMethodLabels: Record<PaymentMethod, string> = {
+  square: "Square",
+  venmo: "Venmo",
+  cash: "Cash",
+  check: "Check",
+  zelle: "Zelle",
+  ach: "ACH",
+  card: "Card",
+  transfer: "Transfer",
+  other: "Other",
+};
+
+export const paymentTypeSchema = z.enum([
+  "deposit",
+  "progress",
+  "final",
+  "refund",
+  "adjustment",
+]);
+export type PaymentType = z.infer<typeof paymentTypeSchema>;
+
+export const paymentTypeLabels: Record<PaymentType, string> = {
+  deposit: "Deposit",
+  progress: "Progress",
+  final: "Final",
+  refund: "Refund",
+  adjustment: "Adjustment",
+};
+
+export const paymentStatusSchema = z.enum([
+  "pending",
+  "paid",
+  "failed",
+  "refunded",
+  "cancelled",
+]);
+export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
+
+export const paymentStatusLabels: Record<PaymentStatus, string> = {
+  pending: "Pending",
+  paid: "Paid",
+  failed: "Failed",
+  refunded: "Refunded",
+  cancelled: "Cancelled",
+};
 
 // === Automation ===
 

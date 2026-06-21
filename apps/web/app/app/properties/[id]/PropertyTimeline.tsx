@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 
-export type TimelineEventType = "visit" | "estimate" | "invoice" | "vault_item" | "membership" | "photo" | "issue" | "note";
+export type TimelineEventType = "visit" | "estimate" | "invoice" | "payment" | "vault_item" | "membership" | "photo" | "issue" | "note";
 
 export type TimelineEvent = {
   event_type: TimelineEventType;
@@ -17,6 +17,7 @@ const DOT_COLORS: Record<TimelineEventType, string> = {
   visit:      "var(--color-primary)",
   estimate:   "var(--color-warning)",
   invoice:    "var(--color-success)",
+  payment:    "#16a34a",
   vault_item: "#0891b2",
   membership: "#8b5cf6",
   photo:      "#0891b2",
@@ -28,6 +29,7 @@ const TYPE_CHIP: Record<TimelineEventType, string> = {
   visit:      "Visit",
   estimate:   "Estimate",
   invoice:    "Invoice",
+  payment:    "Payment",
   vault_item: "Vault Item",
   membership: "Membership",
   photo:      "Photo",
@@ -41,6 +43,7 @@ export function eventHrefFor(event: TimelineEvent): string | null {
     case "visit":     return `/app/visits/${event.link_id}`;
     case "estimate":  return `/app/estimates/${event.link_id}`;
     case "invoice":   return `/app/invoices/${event.link_id}`;
+    case "payment":   return `/app/invoices/${event.link_id}`;
     default:          return null;
   }
 }

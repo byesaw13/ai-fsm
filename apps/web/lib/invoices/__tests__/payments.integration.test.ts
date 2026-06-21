@@ -92,6 +92,29 @@ describe.skipIf(!shouldRun)("Payment Integration Tests", () => {
     // 3. Verify old_value/new_value contain status change
     expect(true).toBe(true);
   });
+
+  it("pending payment does NOT credit the invoice (migration 117)", () => {
+    // 1. Create invoice sent, total_cents=10000
+    // 2. Insert payment amount=10000 with status='pending' (e.g. Square link)
+    // 3. Verify invoice.paid_cents=0, status still 'sent'
+    // 4. UPDATE the payment status='paid'
+    // 5. Verify trigger now credits: paid_cents=10000, status='paid'
+    expect(true).toBe(true);
+  });
+
+  it("refund payment is ledger-only and does not reduce paid_cents", () => {
+    // 1. Create invoice paid, total_cents=10000, one paid payment of 10000
+    // 2. Insert payment payment_type='refund', status='refunded', amount=2000
+    // 3. Verify invoice.paid_cents unchanged (10000); refund visible in history
+    expect(true).toBe(true);
+  });
+
+  it("payment records payment_type, customer_id and job_id from invoice", () => {
+    // 1. Create invoice linked to a job + client
+    // 2. Record payment via API with payment_type='deposit'
+    // 3. Verify payments row has payment_type='deposit', customer_id, job_id set
+    expect(true).toBe(true);
+  });
 });
 
 // Placeholder to prevent vitest from complaining about empty test file

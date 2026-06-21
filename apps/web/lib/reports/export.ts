@@ -77,6 +77,8 @@ export interface PaymentExportRow {
   invoice_number: unknown;
   amount_cents: unknown;
   method: unknown;
+  payment_type?: unknown;
+  status?: unknown;
   received_at: unknown;
   notes?: unknown;
 }
@@ -133,11 +135,15 @@ export function formatInvoicesCsv(rows: InvoiceExportRow[]): string {
 }
 
 export function formatPaymentsCsv(rows: PaymentExportRow[]): string {
-  const headers = ["Invoice #", "Amount", "Method", "Received Date", "Notes"];
+  const headers = ["Invoice #", "Amount", "Method", "Type", "Status", "Received Date", "Notes"];
   const mapped: Record<string, unknown>[] = rows.map((r) => ({
     "Invoice #": r.invoice_number ?? "",
     Amount: formatCentsForCsv(r.amount_cents),
     Method: r.method ?? "",
+    // Type/Status make refunds and pending links distinguishable from received
+    // cash so a reader never sums a refund as income.
+    Type: r.payment_type ?? "",
+    Status: r.status ?? "",
     "Received Date": formatDateForCsv(r.received_at),
     Notes: r.notes ?? "",
   }));

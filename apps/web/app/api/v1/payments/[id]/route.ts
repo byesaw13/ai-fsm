@@ -69,10 +69,12 @@ export const DELETE = withRole(["owner"], async (request, session) => {
       // Delete the payment
       await client.query(`DELETE FROM payments WHERE id = $1`, [paymentId]);
 
-      // Recalculate paid_cents from remaining payments
+      // Recalculate paid_cents from remaining COMPLETED payments only —
+      // pending links and refund rows must not count toward the paid total
+      // (mirrors sync_invoice_on_payment, migration 117).
       const sumResult = await client.query<{ total_paid: string }>(
         `SELECT COALESCE(SUM(amount_cents), 0) AS total_paid
-         FROM payments WHERE invoice_id = $1`,
+         FROM payments WHERE invoice_id = $1 AND status = 'paid'`,
         [payment.invoice_id]
       );
 
