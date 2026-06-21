@@ -83,6 +83,7 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
   const { q, status, tier } = await searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.role === "tech") redirect("/app/my-day"); // EPIC-006: techs have no estimate access
 
   const canCreate = canCreateEstimates(session.role);
 
