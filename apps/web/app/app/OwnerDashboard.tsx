@@ -57,11 +57,11 @@ export function OwnerDashboard({
         className="owner-dashboard-grid"
       >
         {/* Left: operations */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
-          <JobsToday jobs={todayJobs} readOnly />
-          <Materials count={materialCount} jobs={materialJobs} />
+        <div className="owner-dash-col" style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+          <div className="owner-dash-jobs"><JobsToday jobs={todayJobs} readOnly /></div>
+          <div className="owner-dash-materials"><Materials count={materialCount} jobs={materialJobs} /></div>
 
-          <Card>
+          <Card className="owner-dash-tomorrow">
             <SectionHeader title="Tomorrow's Plan" count={tomorrowJobs.length} />
             {tomorrowJobs.length === 0 ? (
               <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", margin: 0 }}>No visits scheduled tomorrow.</p>
@@ -83,8 +83,8 @@ export function OwnerDashboard({
         </div>
 
         {/* Right: money + quick links */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
-          <Card style={{ padding: "var(--space-4)" }}>
+        <div className="owner-dash-col" style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
+          <Card className="owner-dash-money" style={{ padding: "var(--space-4)" }}>
             <SectionHeader title="Financial Snapshot" />
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", marginTop: "var(--space-3)" }}>
               <div>
@@ -108,7 +108,7 @@ export function OwnerDashboard({
           </Card>
 
           {invoiceAging ? (
-            <Card style={{ padding: "var(--space-4)" }}>
+            <Card className="owner-dash-aging" style={{ padding: "var(--space-4)" }}>
               <SectionHeader title="Invoice Aging" />
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
                 {[
@@ -126,7 +126,7 @@ export function OwnerDashboard({
             </Card>
           ) : null}
 
-          <Card style={{ padding: "var(--space-4)" }}>
+          <Card className="owner-dash-completed" style={{ padding: "var(--space-4)" }}>
             <SectionHeader title="Completed This Month" />
             {techProductivity.length === 0 ? (
               <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", margin: "var(--space-2) 0 0" }}>No visits completed yet this month.</p>
@@ -142,7 +142,7 @@ export function OwnerDashboard({
             )}
           </Card>
 
-          <Card style={{ padding: "var(--space-4)" }}>
+          <Card className="owner-dash-actions" style={{ padding: "var(--space-4)" }}>
             <SectionHeader title="Quick Actions" />
             <div className="quick-actions-grid" style={{ marginTop: "var(--space-3)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-2)" }}>
               {[

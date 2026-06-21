@@ -469,6 +469,33 @@
 }
 
 /* ==========================================================================
+   OWNER DASHBOARD GRID — two columns on desktop, single stack on a phone.
+   Without the mobile rule the 2fr/1fr grid squeezes the money column into a
+   ~110px sliver and labels collide ("Current$0.00"). On phones we stack and
+   surface the financial column first so the owner's key glance is up top.
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .owner-dashboard-grid {
+    grid-template-columns: 1fr !important;
+    gap: var(--space-4) !important;
+  }
+  /* The two wrapper columns dissolve so every card is a direct grid item,
+     letting us order individual cards on mobile. !important overrides the
+     wrappers' inline display:flex. */
+  .owner-dashboard-grid > .owner-dash-col {
+    display: contents !important;
+  }
+  .owner-dashboard-grid .owner-dash-money    { order: 1; }
+  .owner-dashboard-grid .owner-dash-jobs     { order: 2; }
+  .owner-dashboard-grid .owner-dash-materials{ order: 3; }
+  .owner-dashboard-grid .owner-dash-actions  { order: 4; }
+  .owner-dashboard-grid .owner-dash-aging    { order: 5; }
+  .owner-dashboard-grid .owner-dash-tomorrow { order: 6; }
+  .owner-dashboard-grid .owner-dash-completed{ order: 7; }
+}
+
+/* ==========================================================================
    MOBILE "MORE" SHEET — the complete nav on a phone
    ========================================================================== */
 
