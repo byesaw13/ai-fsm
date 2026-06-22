@@ -6,6 +6,10 @@ import { query, queryOne } from "@/lib/db";
 import { CompanyForm } from "./CompanyForm";
 import { TeamPanel, type TeamMember } from "./TeamPanel";
 import { ProfileForm } from "./ProfileForm";
+import { SquarePanel, type SquareStatus } from "./SquarePanel";
+import { withDbSession } from "@/lib/db";
+import { loadSquareSettings } from "@/lib/integrations/square";
+import { isEncryptionConfigured } from "@/lib/crypto";
 import { Card, PageContainer, PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -52,6 +56,29 @@ export default async function SettingsPage() {
 
   if (!me) redirect("/login");
 
+  // Square payment integration is owner-only (secrets). Load current status.
+  const isOwner = session.role === "owner";
+  let square: SquareStatus | null = null;
+  if (isOwner) {
+    const row = await withDbSession(session, (client) =>
+      loadSquareSettings(client, session.accountId)
+    );
+    square = {
+      configured: !!row,
+      enabled: row?.enabled ?? false,
+      environment: row?.environment ?? "sandbox",
+      locationId: row?.config.locationId ?? null,
+      applicationId: row?.config.applicationId ?? null,
+      webhookUrl: row?.config.webhookUrl ?? null,
+      hasAccessToken: !!row?.secrets.accessToken,
+      hasWebhookSignatureKey: !!row?.secrets.webhookSignatureKey,
+      status: row?.status ?? "disconnected",
+      statusDetail: row?.statusDetail ?? null,
+      lastCheckedAt: row?.lastCheckedAt ?? null,
+      encryptionConfigured: isEncryptionConfigured(),
+    };
+  }
+
   return (
     <PageContainer>
       <PageHeader title="Settings" />
@@ -97,6 +124,20 @@ export default async function SettingsPage() {
           </section>
         )}
 
+
+        {isOwner && square && (
+          <section>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Payments — Square</h2>
+            <Card padding="default">
+              <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                Connect Square to create hosted card-payment links for invoices.
+                Manual payment recording (Venmo, cash, check, Zelle, ACH) works
+                whether or not Square is enabled.
+              </p>
+              <SquarePanel initial={square} />
+            </Card>
+          </section>
+        )}
 
         {isAdmin && (
           <section>
