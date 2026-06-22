@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
-import { queryOne, query } from "@/lib/db";
+import { queryOne, query, getPool } from "@/lib/db";
+import { loadSquareSettings } from "@/lib/integrations/square";
 import { InvoicePortalClient } from "./InvoicePortalClient";
 
 export const dynamic = "force-dynamic";
 
 interface InvoiceRow extends Record<string, unknown> {
   id: string;
+  account_id: string;
   status: string;
   invoice_number: string;
   subtotal_cents: number;
@@ -43,7 +45,7 @@ export default async function InvoicePortalPage({
 
   const invoice = await queryOne<InvoiceRow>(
     `SELECT
-       i.id, i.status, i.invoice_number, i.subtotal_cents, i.tax_cents,
+       i.id, i.account_id, i.status, i.invoice_number, i.subtotal_cents, i.tax_cents,
        i.total_cents, i.paid_cents, i.deposit_cents, i.notes, i.due_date,
        i.paid_at,
        c.name AS client_name,
@@ -68,14 +70,25 @@ export default async function InvoicePortalPage({
     [invoice.id]
   );
 
-  const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? "";
+  // Online card payment is offered only when the account has Square configured.
+  let onlinePaymentAvailable = false;
+  const client = await getPool().connect();
+  try {
+    const square = await loadSquareSettings(client, invoice.account_id);
+    onlinePaymentAvailable =
+      !!square?.enabled &&
+      !!square.secrets.accessToken &&
+      !!square.config.locationId;
+  } finally {
+    client.release();
+  }
 
   return (
     <InvoicePortalClient
       token={token}
       invoice={invoice}
       lineItems={lineItems}
-      stripePublishableKey={publishableKey}
+      onlinePaymentAvailable={onlinePaymentAvailable}
     />
   );
 }

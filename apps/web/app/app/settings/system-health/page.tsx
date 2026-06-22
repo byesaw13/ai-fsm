@@ -95,23 +95,21 @@ function aiHealth(): HealthItem {
   };
 }
 
-function stripeHealth(): HealthItem {
-  const secret = hasEnv("STRIPE_SECRET_KEY");
-  const publishable = hasEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY");
-  const webhook = hasEnv("STRIPE_WEBHOOK_SECRET");
-  const count = [secret, publishable, webhook].filter(Boolean).length;
-  const complete = secret && publishable && webhook;
+function squareHealth(): HealthItem {
+  // Square credentials live per-account in the database (Settings → Payments);
+  // the only env requirement is the key that encrypts those secrets at rest.
+  const encryption = hasEnv("APP_ENCRYPTION_KEY");
   return {
-    name: "Stripe Payments",
-    status: complete ? "ok" : count > 0 ? "partial" : "optional",
-    label: complete ? "Configured" : count > 0 ? "Partial" : "Optional",
-    detail: complete
-      ? "Secret key, publishable key, and webhook secret are set."
-      : `Stripe fields set: ${count}/3.`,
-    impact: complete
-      ? "Online invoice payment integration can operate."
-      : "Manual payment tracking still works; online payment collection is incomplete.",
-    href: "/app/invoices",
+    name: "Square Payments",
+    status: encryption ? "ok" : "optional",
+    label: encryption ? "Ready" : "Optional",
+    detail: encryption
+      ? "APP_ENCRYPTION_KEY is set — Square credentials can be stored in Settings → Payments."
+      : "APP_ENCRYPTION_KEY is not set; Square credentials can't be saved until it is.",
+    impact: encryption
+      ? "Online card payment via Square can operate once credentials are entered."
+      : "Manual payment tracking still works; online card collection is unavailable.",
+    href: "/app/settings",
   };
 }
 
@@ -199,7 +197,7 @@ export default async function SystemHealthPage() {
     bookingHealth(),
     emailHealth(),
     aiHealth(),
-    stripeHealth(),
+    squareHealth(),
     appUrlHealth(),
   ];
 

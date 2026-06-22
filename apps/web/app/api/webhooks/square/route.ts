@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 // === POST /api/webhooks/square ===
 // Handles payment.created / payment.updated. Square delivers events at-least-
 // once, so processing is idempotent via the unique index on
-// (external_provider, external_payment_id). Mirrors the Stripe webhook: the app
-// DB role bypasses RLS, so no session context is set.
+// (external_provider, external_payment_id). The app DB role bypasses RLS, so no
+// session context is set on this unauthenticated endpoint.
 
 interface SquarePaymentObject {
   id?: string;
@@ -147,15 +147,17 @@ export async function POST(request: NextRequest) {
         amountCents = upd.rows[0].amount_cents;
       } else {
         amountCents = payment.amount_money?.amount ?? 0;
-        const inv = await client.query<{ account_id: string; client_id: string; job_id: string | null }>(
-          `SELECT account_id, client_id, job_id FROM invoices WHERE id = $1`,
+        const inv = await client.query<{ account_id: string; client_id: string; job_id: string | null; created_by: string }>(
+          `SELECT account_id, client_id, job_id, created_by FROM invoices WHERE id = $1`,
           [invoiceId]
         );
+        // payments.created_by is NOT NULL; system-recorded Square payments are
+        // attributed to whoever created the invoice.
         const ins = await client.query<{ id: string }>(
           `INSERT INTO payments
              (account_id, invoice_id, job_id, customer_id, amount_cents, method,
-              payment_type, status, external_provider, external_payment_id, paid_at)
-           VALUES ($1, $2, $3, $4, $5, 'square', 'progress', 'paid', 'square', $6, now())
+              payment_type, status, external_provider, external_payment_id, paid_at, created_by)
+           VALUES ($1, $2, $3, $4, $5, 'square', 'progress', 'paid', 'square', $6, now(), $7)
            ON CONFLICT (external_provider, external_payment_id)
              WHERE external_provider IS NOT NULL AND external_payment_id IS NOT NULL
              DO NOTHING
@@ -167,6 +169,7 @@ export async function POST(request: NextRequest) {
             inv.rows[0].client_id,
             amountCents,
             payment.id,
+            inv.rows[0].created_by,
           ]
         );
         if (ins.rowCount === 0) {
