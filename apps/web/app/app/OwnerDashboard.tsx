@@ -3,6 +3,7 @@ import type { Route } from "next";
 import { Card, SectionHeader } from "@/components/ui";
 import { ActionQueue, JobsToday, Materials } from "./WorkdayPanel";
 import type { CommandVisit, CountAction, MaterialJob } from "./WorkdayPanel";
+import { OWNER_QUICK_ACTIONS } from "@/lib/navigation/quick-actions";
 
 // EPIC-006 TASK-030: the Owner Dashboard — "run the business." Business widgets
 // only (revenue, action queue, today's jobs, materials, tomorrow, quick links).
@@ -145,14 +146,7 @@ export function OwnerDashboard({
           <Card className="owner-dash-actions" style={{ padding: "var(--space-4)" }}>
             <SectionHeader title="Quick Actions" />
             <div className="quick-actions-grid" style={{ marginTop: "var(--space-3)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-2)" }}>
-              {[
-                { label: "New Estimate", href: "/app/estimates", icon: "📝" },
-                { label: "New Job", href: "/app/jobs", icon: "🛠️" },
-                { label: "Schedule", href: "/app/schedule", icon: "📅" },
-                { label: "Invoices", href: "/app/invoices", icon: "🧾" },
-                { label: "Clients", href: "/app/clients", icon: "👥" },
-                { label: "New Request", href: "/app/intake/new", icon: "⚡" },
-              ].map((act) => (
+              {OWNER_QUICK_ACTIONS.map((act) => (
                 <Link
                   key={act.label}
                   href={act.href as Route}
