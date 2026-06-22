@@ -15,8 +15,6 @@
   "dependencies": {
     "@ai-fsm/domain": "workspace:*",
     "@anthropic-ai/sdk": "^0.92.0",
-    "@stripe/react-stripe-js": "^6.3.0",
-    "@stripe/stripe-js": "^9.3.1",
     "bcryptjs": "^3.0.3",
     "jose": "^6.1.3",
     "leaflet": "^1.9.4",
@@ -27,7 +25,6 @@
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "square": "^44.2.0",
-    "stripe": "^22.1.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {

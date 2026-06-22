@@ -106,6 +106,15 @@ Acceptance Criteria:
 - [ ] A completed Square payment marks the invoice partially/fully paid.
 - [ ] Square can be disabled without breaking manual recording.
 
+Notes:
+Square is the chosen card processor. The pre-existing Stripe integration (portal
+PaymentElement flow, `/api/webhooks/stripe`, `lib/stripe.ts`, stripe-cli
+forwarder, Stripe env vars) was **archived/removed** in favour of Square; the
+client portal "Pay online" button now redirects to a Square-hosted checkout
+link. The `invoices.stripe_payment_intent_id` column is left in place as inert
+historical data. Stripe can be reintroduced later via the `lib/integrations`
+provider abstraction if needed.
+
 ## Completed
 
 - [TASK-014: Invoice Generation from Visits](done/TASK-014-invoice-generation-from-visits.md) — Done
