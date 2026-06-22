@@ -64,7 +64,7 @@ tasks in `done/`.
 
 ## Task index
 
-Next available ID: **TASK-033**.
+Next available ID: **TASK-036**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -100,6 +100,9 @@ Next available ID: **TASK-033**.
 | TASK-030 | Phase 2 — Slim the Owner Dashboard | 006 | Proposed |
 | TASK-031 | Phase 3 — Role routing & hardening | 006 | Proposed |
 | TASK-032 | Phase 4 — Owner widgets & polish | 006 | Proposed |
+| TASK-033 | Read-Only Business MCP Server | 005 | In Progress |
+| TASK-034 | MCP Non-Superuser RLS Verification | 005 | Proposed |
+| TASK-035 | MCP Write Tools v1 (operations writes) | 001 | Proposed |
 
 ## Status legend
 
