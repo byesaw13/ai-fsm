@@ -6,6 +6,11 @@
  * here as a persistent entry point — the dashboard's "Label Captured Locations"
  * action is count-gated and disappears when there is nothing pending, so without
  * a Quick Action the timeline would be unreachable from the UI.
+ *
+ * The Activity Timeline edits the account-wide time ledger (entries keyed by
+ * account, not by user), so it is **owner/admin-only**: it belongs in
+ * OWNER_QUICK_ACTIONS but not in FIELD_QUICK_ACTIONS, which the technician My Day
+ * surface also renders. The /app/timeline route enforces this too.
  */
 
 export interface QuickAction {
@@ -33,12 +38,14 @@ export const OWNER_QUICK_ACTIONS: QuickAction[] = [
   { label: "New Request", href: "/app/intake/new", icon: "⚡" },
 ];
 
-/** Field My Day (`/app/my-day`) quick actions. */
+/**
+ * Field My Day (`/app/my-day`) quick actions. Rendered for technicians as well
+ * as owners, so it intentionally omits the owner/admin-only Activity Timeline.
+ */
 export const FIELD_QUICK_ACTIONS: QuickAction[] = [
   { label: "New Estimate", href: "/app/estimates", icon: "📝" },
   { label: "New Job", href: "/app/jobs", icon: "🛠️" },
   { label: "Log Mileage", href: "/app/mileage", icon: "🚗" },
-  ACTIVITY_TIMELINE_ACTION,
   { label: "Add Expense", href: "/app/expenses/new", icon: "🛒" },
   { label: "Upload Receipt", href: "/app/expenses/new", icon: "🧾" },
   { label: "New Request", href: "/app/intake/new", icon: "⚡" },

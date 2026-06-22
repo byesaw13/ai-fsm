@@ -6,13 +6,16 @@ import {
 } from "../quick-actions";
 
 describe("quick actions", () => {
-  it("the Activity Timeline (auto time tracker) is reachable from both surfaces", () => {
+  it("exposes the Activity Timeline to owner/admin but not the field/tech surface", () => {
     // Regression guard: the dashboard's count-gated "Label Captured Locations"
     // action disappears when nothing is pending, so the timeline must always be
-    // reachable via a persistent Quick Action.
+    // reachable via a persistent owner Quick Action.
     expect(OWNER_QUICK_ACTIONS).toContainEqual(ACTIVITY_TIMELINE_ACTION);
-    expect(FIELD_QUICK_ACTIONS).toContainEqual(ACTIVITY_TIMELINE_ACTION);
     expect(ACTIVITY_TIMELINE_ACTION.href).toBe("/app/timeline");
+    // It edits the account-wide ledger, so it must NOT appear on the field/tech
+    // My Day surface. The /app/timeline route enforces the same guard.
+    expect(FIELD_QUICK_ACTIONS).not.toContainEqual(ACTIVITY_TIMELINE_ACTION);
+    expect(FIELD_QUICK_ACTIONS.some((a) => a.href === "/app/timeline")).toBe(false);
   });
 
   it("every quick action has a well-formed internal href, label, and icon", () => {
