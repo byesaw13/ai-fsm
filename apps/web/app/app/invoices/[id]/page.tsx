@@ -207,19 +207,27 @@ export default async function InvoiceDetailPage({
         </Card>
       )}
 
+      {/* Line Items editor — full width while editing a draft, so rows aren't
+          crammed into the narrow detail column (which causes overflow). */}
+      {canEditLineItems && (
+        <Card style={{ marginBottom: "var(--space-4)" }}>
+          <SectionHeader title="Line Items" />
+          <InvoiceLineItemsEditor
+            invoiceId={invoice.id}
+            jobId={invoice.job_id}
+            lineItems={lineItems}
+          />
+        </Card>
+      )}
+
       {/* Detail layout */}
       <div className="p7-detail-layout">
-        {/* LEFT: Line items + Payment history */}
+        {/* LEFT: Line items (read-only) + Payment history */}
         <div className="p7-detail-primary">
+          {!canEditLineItems && (
           <Card>
             <SectionHeader title="Line Items" />
-            {canEditLineItems ? (
-              <InvoiceLineItemsEditor
-                invoiceId={invoice.id}
-                jobId={invoice.job_id}
-                lineItems={lineItems}
-              />
-            ) : lineItems.length === 0 ? (
+            {lineItems.length === 0 ? (
               <EmptyState title="No line items" description="Line items will appear when this invoice is created from an estimate." />
             ) : (
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }} data-testid="invoice-line-items-table">
@@ -256,6 +264,7 @@ export default async function InvoiceDetailPage({
               </table>
             )}
           </Card>
+          )}
 
           {/* Payment History */}
           {currentStatus !== "draft" && (

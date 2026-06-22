@@ -123,54 +123,56 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
         <form
           key={item.id}
           action={(formData) => updateLineItem(item, formData)}
-          style={{ display: "grid", gridTemplateColumns: "1.2fr 130px 110px 140px 96px", gap: "var(--space-2)", alignItems: "end" }}
+          className="invoice-li-row"
           data-testid="invoice-line-item-edit-row"
         >
-          <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+          <label className="invoice-li-field invoice-li-field--desc">
             Description
-            <input name="description" defaultValue={item.description} disabled={pending} required className="input" />
+            <input name="description" defaultValue={item.description} disabled={pending} required className="p7-input" />
           </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+          <label className="invoice-li-field invoice-li-field--type">
             Type
-            <select name="line_item_type" defaultValue={item.line_item_type} disabled={pending} className="input">
+            <select name="line_item_type" defaultValue={item.line_item_type} disabled={pending} className="p7-select">
               {TYPES.map((type) => <option key={type} value={type}>{TYPE_LABELS[type]}</option>)}
             </select>
           </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+          <label className="invoice-li-field invoice-li-field--qty">
             Qty
-            <input name="quantity" type="number" min="0.01" step="0.01" defaultValue={item.quantity} disabled={pending} required className="input" />
+            <input name="quantity" type="number" min="0.01" step="0.01" defaultValue={item.quantity} disabled={pending} required className="p7-input" />
           </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+          <label className="invoice-li-field invoice-li-field--price">
             Unit price
-            <input name="unit_price" type="number" min="0" step="0.01" defaultValue={centsToDollars(item.unit_price_cents)} disabled={pending} required className="input" />
+            <input name="unit_price" type="number" min="0" step="0.01" defaultValue={centsToDollars(item.unit_price_cents)} disabled={pending} required className="p7-input" />
           </label>
-          <div style={{ display: "flex", gap: "var(--space-1)" }}>
+          <div className="invoice-li-actions">
             <button type="submit" disabled={pending} className="btn btn-secondary">Save</button>
             <button type="button" onClick={() => deleteLineItem(item)} disabled={pending} className="btn btn-secondary" aria-label={`Delete ${item.description}`}>Delete</button>
           </div>
         </form>
       ))}
 
-      <form onSubmit={addLineItem} style={{ display: "grid", gridTemplateColumns: "1.2fr 130px 110px 140px 76px", gap: "var(--space-2)", alignItems: "end", paddingTop: "var(--space-2)", borderTop: "1px solid var(--border)" }} data-testid="invoice-line-item-add-form">
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+      <form onSubmit={addLineItem} className="invoice-li-row" style={{ paddingTop: "var(--space-2)", borderTop: "1px solid var(--border)" }} data-testid="invoice-line-item-add-form">
+        <label className="invoice-li-field invoice-li-field--desc">
           Description
-          <input value={draft.description} onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))} disabled={pending} required className="input" />
+          <input value={draft.description} onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))} disabled={pending} required className="p7-input" />
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+        <label className="invoice-li-field invoice-li-field--type">
           Type
-          <select value={draft.line_item_type} onChange={(e) => setDraft((d) => ({ ...d, line_item_type: e.target.value as LineItemType }))} disabled={pending} className="input">
+          <select value={draft.line_item_type} onChange={(e) => setDraft((d) => ({ ...d, line_item_type: e.target.value as LineItemType }))} disabled={pending} className="p7-select">
             {TYPES.map((type) => <option key={type} value={type}>{TYPE_LABELS[type]}</option>)}
           </select>
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+        <label className="invoice-li-field invoice-li-field--qty">
           Qty
-          <input type="number" min="0.01" step="0.01" value={draft.quantity} onChange={(e) => setDraft((d) => ({ ...d, quantity: e.target.value }))} disabled={pending} required className="input" />
+          <input type="number" min="0.01" step="0.01" value={draft.quantity} onChange={(e) => setDraft((d) => ({ ...d, quantity: e.target.value }))} disabled={pending} required className="p7-input" />
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+        <label className="invoice-li-field invoice-li-field--price">
           Unit price
-          <input type="number" min="0" step="0.01" value={draft.unit_price} onChange={(e) => setDraft((d) => ({ ...d, unit_price: e.target.value }))} disabled={pending} required className="input" />
+          <input type="number" min="0" step="0.01" value={draft.unit_price} onChange={(e) => setDraft((d) => ({ ...d, unit_price: e.target.value }))} disabled={pending} required className="p7-input" />
         </label>
-        <button type="submit" disabled={pending} className="btn btn-primary">Add</button>
+        <div className="invoice-li-actions">
+          <button type="submit" disabled={pending} className="btn btn-primary">Add</button>
+        </div>
       </form>
     </div>
   );
