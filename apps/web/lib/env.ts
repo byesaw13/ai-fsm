@@ -34,9 +34,12 @@ const schema = z.object({
   HOMEBOX_URL: z.string().url().optional(),
   HOMEBOX_USER: z.string().optional(),
   HOMEBOX_PASSWORD: z.string().optional(),
-  STRIPE_SECRET_KEY: z.string().optional(),
-  STRIPE_WEBHOOK_SECRET: z.string().optional(),
-  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
+  // Secrets at rest (Square access token / webhook signing key). Required to
+  // store payment-provider credentials in Settings → Payments.
+  APP_ENCRYPTION_KEY: z.string().optional(),
+  // Optional fallback for the Square webhook notification URL (normally set in
+  // Settings → Payments). Card payments use Square; Stripe has been archived.
+  SQUARE_WEBHOOK_URL: z.string().url().optional(),
   /**
    * Account used by the public booking page when unauthenticated customers
    * submit intake requests.

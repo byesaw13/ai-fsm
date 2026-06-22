@@ -112,7 +112,7 @@ export default async function SettingsPage() {
             <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>System Health</h2>
             <Card padding="default">
               <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                Check booking, email, AI, Stripe, portal-link, and database configuration.
+                Check booking, email, AI, Square, portal-link, and database configuration.
               </p>
               <Link
                 href={"/app/settings/system-health" as unknown as Route}
