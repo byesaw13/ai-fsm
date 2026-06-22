@@ -115,6 +115,14 @@ link. The `invoices.stripe_payment_intent_id` column is left in place as inert
 historical data. Stripe can be reintroduced later via the `lib/integrations`
 provider abstraction if needed.
 
+Follow-ups landed: the webhook now also handles Square-initiated refunds
+(`refund.created`/`refund.updated` → ledger-only `refunded` rows); unit tests
+cover the provider module, settings route (secrets never leak), webhook
+(payment completion, idempotency, refunds), and payment-link route; setup
+runbook at `docs/working/square-payments-runbook.md`. The acceptance boxes
+remain unchecked pending live sandbox/production verification with real Square
+credentials.
+
 ## Completed
 
 - [TASK-014: Invoice Generation from Visits](done/TASK-014-invoice-generation-from-visits.md) — Done
