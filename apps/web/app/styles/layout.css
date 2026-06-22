@@ -404,12 +404,57 @@
   gap: var(--space-4);
 }
 
+/* When the primary column has no content (e.g. editing a draft invoice where
+   the line-items editor is rendered full-width above), drop the empty column
+   and let the sidebar use the full width instead of floating to one side. */
+.p7-detail-primary:empty {
+  display: none;
+}
+
+.p7-detail-layout:has(> .p7-detail-primary:empty) {
+  grid-template-columns: 1fr;
+}
+
 .p7-detail-sidebar {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   position: sticky;
   top: var(--space-8);
+}
+
+/* -------------------------------------------------------------------------
+   Line-items editor row (invoice/estimate draft editing)
+   Flex-wrap so fields reflow to fit the available width instead of
+   overflowing under the detail sidebar. Container-width aware via wrapping,
+   so it stays usable whether full-width or in a narrow column.
+   ---------------------------------------------------------------------- */
+.invoice-li-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: end;
+}
+
+.invoice-li-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+}
+
+.invoice-li-field--desc { flex: 4 1 200px; }
+.invoice-li-field--type { flex: 2 1 130px; }
+.invoice-li-field--qty { flex: 1 1 80px; }
+.invoice-li-field--price { flex: 1 1 110px; }
+
+.invoice-li-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--space-2);
+  align-items: end;
 }
 
 /* -------------------------------------------------------------------------
