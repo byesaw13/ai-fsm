@@ -267,6 +267,59 @@ Acceptance Criteria:
 - [x] No new untracked feature work is introduced.
 - [x] pnpm gate:fast passes.
 
+# TASK-035: MCP Write Tools v1 (low-risk operations writes)
+
+Status:
+Proposed
+
+Problem:
+The MCP server (TASK-033) is read-only. Once it proves useful in daily use, the
+highest-value next step is a small set of **low-risk** write tools that support
+the Daily Operations Log vision — capturing notes, time, and mileage from an AI
+client without opening the app.
+
+Business Value:
+- Lets the owner log the day's work conversationally from the field.
+- Directly feeds the time ledger and daily operations log that already exist.
+- Keeps writes small and reversible so the safety model can be proven on
+  low-stakes actions before anything financial.
+
+Scope:
+First write tools, each layered on the existing service layer:
+- `create_job_note`
+- `log_activity_entry`
+- `log_mileage`
+- `start_day`
+- `end_day`
+
+Cross-cutting requirements for every write tool:
+- Explicit confirmation flag on the tool input (no silent writes).
+- Audit log entry written for each mutation.
+- Workflow event emitted where the action has downstream automations.
+- Account scoped (and owner/admin gated) exactly as the read tools are.
+- Idempotency protection where appropriate (e.g. `start_day` must not create a
+  second open day; `log_mileage` should dedupe a repeated submission).
+- Writes go through the web app's service layer, not new parallel SQL.
+
+Out of Scope:
+- Invoice creation, payment recording, job status editing.
+- Any Square / payment-provider action.
+- Any Home Assistant action.
+- Bulk or destructive operations.
+
+Acceptance Criteria:
+- [ ] The five tools above create the correct records, account-scoped.
+- [ ] Each write requires an explicit confirmation flag.
+- [ ] Each write produces an audit log entry (and workflow event where relevant).
+- [ ] Idempotency is enforced where it matters (start/end day, mileage).
+- [ ] Unit + integration tests cover happy path, scoping, and idempotency.
+
+Notes:
+Originally framed as `EPIC: MCP-WRITE-V1`; recorded here as a single task under
+Operations because all five tools are operations-centric. Split into multiple
+tasks if the build proves large. Do **not** start until TASK-033 has been in
+real daily use and TASK-034 (non-superuser RLS verification) is considered.
+
 ## Completed
 
 - [TASK-001: Vehicle Mileage Sessions](done/TASK-001-vehicle-mileage-sessions.md) — Done
