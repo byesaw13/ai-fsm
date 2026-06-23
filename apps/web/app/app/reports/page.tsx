@@ -12,8 +12,9 @@ import {
 } from "@/components/ui";
 import type { FilterDef } from "@/components/ui";
 import { formatCents } from "./format";
-import { loadReportData } from "./queries";
+import { loadReportData, loadInvoiceAging } from "./queries";
 import { FinancialSection } from "./sections/FinancialSection";
+import { InvoiceAgingSection } from "./sections/InvoiceAgingSection";
 import { TechnicianSection } from "./sections/TechnicianSection";
 import { OperationsSection } from "./sections/OperationsSection";
 import { PricingHealthSection } from "./sections/PricingHealthSection";
@@ -40,6 +41,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   const targetMonth = month && /^\d{4}-\d{2}$/.test(month) ? month : today;
 
   const data = await loadReportData(session.accountId, targetMonth);
+  const invoiceAging = await loadInvoiceAging(session.accountId);
 
   const currentValues: Record<string, string> = {};
   if (month) currentValues.month = month;
@@ -56,9 +58,14 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         title="Profitability"
         subtitle={monthLabel}
         actions={
-          <Link href={"/app/reports/close" as Route} style={{ color: "var(--accent)", fontSize: "var(--text-sm)" }}>
-            Month-End Close →
-          </Link>
+          <>
+            <Link href={"/app/timeline" as Route} style={{ color: "var(--accent)", fontSize: "var(--text-sm)" }}>
+              Activity Timeline →
+            </Link>
+            <Link href={"/app/reports/close" as Route} style={{ color: "var(--accent)", fontSize: "var(--text-sm)" }}>
+              Month-End Close →
+            </Link>
+          </>
         }
       />
 
@@ -89,13 +96,15 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           />
         </div>
       ) : (
-        <>
-          <FinancialSection data={data} monthLabel={monthLabel} />
-          <TechnicianSection rows={data.techPerformance} monthLabel={monthLabel} />
-        </>
+        <FinancialSection data={data} monthLabel={monthLabel} />
       )}
 
-      {/* Always-on sections — render regardless of monthly financial activity */}
+      {/* Always-on sections — render regardless of monthly financial activity.
+          TechnicianSection stays out of the hasAnyData gate so completed-visit
+          metrics still show in months with visits but no invoices/expenses
+          (it returns null when there are no techs). */}
+      <TechnicianSection rows={data.techPerformance} monthLabel={monthLabel} />
+      <InvoiceAgingSection aging={invoiceAging} />
       <TimeSection rows={data.timeByCategory} monthLabel={monthLabel} />
       <OperationsSection scheduleUtil={data.scheduleUtil} monthLabel={monthLabel} />
       <PricingHealthSection

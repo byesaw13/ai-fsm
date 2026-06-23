@@ -19,7 +19,9 @@ async function login(page: Page) {
   await page.fill('[id="email"]', ADMIN_EMAIL);
   await page.fill('[id="password"]', ADMIN_PASSWORD);
   await page.click('[type="submit"]');
-  await page.waitForURL(`${BASE}/app/jobs`);
+  // Post-login lands everyone on My Day; a pure admin (this seed account) is
+  // bounced to the Overview dashboard at /app. Wait for that landing.
+  await page.waitForURL(`${BASE}/app`);
 }
 
 async function completeEstimateWizard(page: Page) {
@@ -44,9 +46,9 @@ test.describe("Required release smoke — admin core flow", () => {
   let estimateId: string;
   let invoiceId: string;
 
-  test("1. Admin login redirects to jobs workspace", async ({ page }) => {
+  test("1. Admin login lands on the Overview dashboard", async ({ page }) => {
     await login(page);
-    await expect(page.locator("h1")).toContainText("Jobs");
+    await expect(page.locator("h1")).toContainText("Dashboard");
   });
 
   test("2. Admin can create a launch client", async ({ page }) => {

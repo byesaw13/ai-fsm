@@ -17,9 +17,6 @@ function dollars(cents: number): string {
   return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 }
 
-type InvoiceAging = { current: number; d30: number; d60: number; d90: number };
-type TechProductivity = { name: string; completed: number };
-
 export function OwnerDashboard({
   actionQueue,
   todayJobs,
@@ -29,8 +26,6 @@ export function OwnerDashboard({
   outstandingInvoicesCents = 0,
   pendingDepositsCents = 0,
   paidThisMonthCents = 0,
-  invoiceAging,
-  techProductivity = [],
 }: {
   actionQueue: CountAction[];
   todayJobs: CommandVisit[];
@@ -40,8 +35,6 @@ export function OwnerDashboard({
   outstandingInvoicesCents?: number;
   pendingDepositsCents?: number;
   paidThisMonthCents?: number;
-  invoiceAging?: InvoiceAging;
-  techProductivity?: TechProductivity[];
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
@@ -106,41 +99,6 @@ export function OwnerDashboard({
                 View Full Reports →
               </Link>
             </div>
-          </Card>
-
-          {invoiceAging ? (
-            <Card className="owner-dash-aging" style={{ padding: "var(--space-4)" }}>
-              <SectionHeader title="Invoice Aging" />
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
-                {[
-                  { label: "Current", v: invoiceAging.current, color: "var(--fg-default)" },
-                  { label: "1–30 days", v: invoiceAging.d30, color: "var(--color-amber-600)" },
-                  { label: "31–60 days", v: invoiceAging.d60, color: "var(--color-amber-600)" },
-                  { label: "60+ days", v: invoiceAging.d90, color: "var(--color-red-600)" },
-                ].map((b) => (
-                  <div key={b.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                    <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>{b.label}</span>
-                    <span style={{ fontWeight: 700, color: b.color }}>{dollars(b.v)}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          ) : null}
-
-          <Card className="owner-dash-completed" style={{ padding: "var(--space-4)" }}>
-            <SectionHeader title="Completed This Month" />
-            {techProductivity.length === 0 ? (
-              <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", margin: "var(--space-2) 0 0" }}>No visits completed yet this month.</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
-                {techProductivity.map((t) => (
-                  <div key={t.name} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                    <span style={{ fontSize: "var(--text-sm)" }}>{t.name}</span>
-                    <span style={{ fontWeight: 700 }}>{t.completed} visit{t.completed !== 1 ? "s" : ""}</span>
-                  </div>
-                ))}
-              </div>
-            )}
           </Card>
 
           <Card className="owner-dash-actions" style={{ padding: "var(--space-4)" }}>
