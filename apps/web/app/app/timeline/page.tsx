@@ -4,6 +4,7 @@ import { queryForSession } from "@/lib/db";
 import { PageContainer, PageHeader } from "@/components/ui";
 import { TimelineEditor } from "../TimelineEditor";
 import { LocationSegmentsPanel } from "../LocationSegmentsPanel";
+import { VisitCandidatesPanel } from "../VisitCandidatesPanel";
 import { DayMapPanel } from "../DayMapPanel";
 import { LocationDebugPanel } from "../LocationDebugPanel";
 import type { ActivityEntryDto } from "../ActivityTracker";
@@ -55,6 +56,9 @@ export default async function TimelinePage({
     <PageContainer>
       <PageHeader title="Activity Timeline" subtitle={label} />
       <TimelineEditor date={day} entries={entries} />
+      <div style={{ marginTop: "var(--space-6)" }}>
+        <VisitCandidatesPanel day={day} />
+      </div>
       <div style={{ marginTop: "var(--space-6)" }}>
         <DayMapPanel day={day} />
       </div>
