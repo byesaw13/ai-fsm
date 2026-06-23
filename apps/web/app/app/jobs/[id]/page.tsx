@@ -347,7 +347,7 @@ export default async function JobDetailPage({
             <div>
               <h1 style={{ margin: 0, fontSize: "var(--text-2xl)", fontWeight: 800 }}>{job.title}</h1>
               <p style={{ margin: "var(--space-1) 0 0", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-                {job.client_name ?? "Current job"}{job.property_address ? ` / ${job.property_address}` : ""}
+                {job.job_number ? `${job.job_number} · ` : ""}{job.client_name ?? "Current job"}{job.property_address ? ` / ${job.property_address}` : ""}
               </p>
             </div>
             <StatusBadge variant={currentStatus as StatusVariant}>{JOB_STATUS_LABELS[currentStatus]}</StatusBadge>
@@ -407,7 +407,7 @@ export default async function JobDetailPage({
     <PageContainer>
       <PageHeader
         title={job.title}
-        subtitle={job.client_name ?? undefined}
+        subtitle={[job.job_number, job.client_name].filter(Boolean).join(" · ") || undefined}
         backHref="/app/jobs"
         backLabel="Jobs"
         actions={

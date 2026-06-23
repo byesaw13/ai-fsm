@@ -217,7 +217,7 @@ CI or mutate state. A future task could add optional PR-comment output.
 # TASK-039: Human-readable numbering for jobs and estimates
 
 Status:
-Proposed
+In Progress
 
 Problem:
 Invoices have human-readable per-account numbers (`invoices.invoice_number`,

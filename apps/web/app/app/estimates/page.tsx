@@ -29,6 +29,7 @@ interface EstimateRow {
   sent_at: string | null;
   expires_at: string | null;
   created_at: string;
+  estimate_number: string | null;
   client_name: string | null;
   job_title: string | null;
 }
@@ -117,7 +118,7 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
 
     const r = await client.query(
       `SELECT e.id, e.status, e.subtotal_cents, e.tax_cents, e.total_cents,
-              e.sent_at, e.expires_at, e.created_at,
+              e.sent_at, e.expires_at, e.created_at, e.estimate_number,
               c.name AS client_name,
               j.title AS job_title
        FROM estimates e
@@ -351,7 +352,7 @@ function EstimateItemCard({ est, showStatus = false }: { est: EstimateRow; showS
   return (
     <ItemCard
       href={`/app/estimates/${est.id}`}
-      title={est.client_name ?? "Unknown client"}
+      title={`${est.estimate_number ? `${est.estimate_number} · ` : ""}${est.client_name ?? "Unknown client"}`}
       meta={meta}
       overdue={!!(isExpired && est.status === "sent")}
       actions={
