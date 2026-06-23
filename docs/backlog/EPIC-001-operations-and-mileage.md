@@ -9,7 +9,7 @@ trustworthy enough to feed tax mileage, vehicle cost, and job profitability.
 # TASK-040: False-drive detection
 
 Status:
-In Progress
+Done
 
 Problem:
 Passive location capture (TASK-024) produces false drives — parked Bluetooth
