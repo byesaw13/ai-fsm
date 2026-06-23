@@ -143,7 +143,7 @@ Acceptance:
 # TASK-038: Surface consolidation — one daily home, fewer overlapping dashboards
 
 Status:
-In Progress
+Done
 
 Problem:
 Five operational surfaces — Today (`/app`), My Day, Schedule, Visits, Timeline —
@@ -165,8 +165,10 @@ Scope:
   the visit triage, reusing one shared `buildVisitTriage` + `VisitTriage` across
   the Visits page and Schedule. Also fixed a latent `filter(isVisitOverdue)` bug
   that left the Overdue bucket and metric silently empty (fixed on My Day too).
-- Step 3 (proposed): relocate the Overview KPI widgets and the Activity Timeline
-  under Reports; remove the Timeline quick-action and drop it from daily nav.
+- Step 3 (done — PR #365): relocated the Invoice Aging KPI to a Reports section
+  and dropped the duplicate "Completed This Month" card (Reports' TechnicianSection
+  covers it); added an "Activity Timeline →" link in the Reports header and removed
+  the Timeline quick-action. Kept the Financial Snapshot money-glance on the home.
 
 Out of Scope:
 - The tech field experience — techs keep their own Visits screen and nav.
@@ -175,8 +177,8 @@ Acceptance Criteria:
 - [x] Owner/tech land on My Day; pure admins stay on the Overview dashboard.
 - [x] Schedule exposes the visit triage via an admin-only List view.
 - [x] The Overdue triage/metric actually populates (bug fixed + unit-tested).
-- [ ] Overview KPIs and the Activity Timeline live under Reports.
-- [ ] Timeline is removed from quick-actions and the daily navigation.
+- [x] Overview KPIs and the Activity Timeline live under Reports.
+- [x] Timeline is removed from quick-actions and the daily navigation.
 
 Notes:
 Refines the owner-dashboard-centric assumption in TASK-030/031/032: the owner's
