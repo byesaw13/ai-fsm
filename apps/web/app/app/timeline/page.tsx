@@ -5,6 +5,7 @@ import { PageContainer, PageHeader } from "@/components/ui";
 import { TimelineEditor } from "../TimelineEditor";
 import { LocationSegmentsPanel } from "../LocationSegmentsPanel";
 import { VisitCandidatesPanel } from "../VisitCandidatesPanel";
+import { ManualSiteVisitButton } from "../ManualSiteVisitButton";
 import { DayMapPanel } from "../DayMapPanel";
 import { LocationDebugPanel } from "../LocationDebugPanel";
 import type { ActivityEntryDto } from "../ActivityTracker";
@@ -54,7 +55,11 @@ export default async function TimelinePage({
 
   return (
     <PageContainer>
-      <PageHeader title="Activity Timeline" subtitle={label} />
+      <PageHeader
+        title="Activity Timeline"
+        subtitle={label}
+        actions={<ManualSiteVisitButton />}
+      />
       <TimelineEditor date={day} entries={entries} />
       <div style={{ marginTop: "var(--space-6)" }}>
         <VisitCandidatesPanel day={day} />
