@@ -41,13 +41,17 @@ ALTER TABLE estimates ENABLE TRIGGER USER;
 
 -- Auto-assign on insert (any code path) when not supplied. Sequence = count of
 -- the account's rows in that year + 1; the unique index is the safety net.
+-- Allocate from the highest existing suffix for the account+year, not a row
+-- count: drafts are hard-deleted, so count(*)+1 could reuse a live number and
+-- collide with the unique index. max(suffix)+1 is monotonic.
 CREATE OR REPLACE FUNCTION assign_job_number() RETURNS trigger AS $$
 DECLARE yr TEXT; seq INT;
 BEGIN
   IF NEW.job_number IS NULL THEN
     yr := to_char(COALESCE(NEW.created_at, now()), 'YYYY');
-    SELECT count(*) + 1 INTO seq FROM jobs
-      WHERE account_id = NEW.account_id AND to_char(created_at, 'YYYY') = yr;
+    SELECT COALESCE(MAX(split_part(job_number, '-', 3)::int), 0) + 1 INTO seq
+      FROM jobs
+      WHERE account_id = NEW.account_id AND job_number LIKE 'J-' || yr || '-%';
     NEW.job_number := 'J-' || yr || '-' || lpad(seq::text, 4, '0');
   END IF;
   RETURN NEW;
@@ -58,8 +62,9 @@ DECLARE yr TEXT; seq INT;
 BEGIN
   IF NEW.estimate_number IS NULL THEN
     yr := to_char(COALESCE(NEW.created_at, now()), 'YYYY');
-    SELECT count(*) + 1 INTO seq FROM estimates
-      WHERE account_id = NEW.account_id AND to_char(created_at, 'YYYY') = yr;
+    SELECT COALESCE(MAX(split_part(estimate_number, '-', 3)::int), 0) + 1 INTO seq
+      FROM estimates
+      WHERE account_id = NEW.account_id AND estimate_number LIKE 'EST-' || yr || '-%';
     NEW.estimate_number := 'EST-' || yr || '-' || lpad(seq::text, 4, '0');
   END IF;
   RETURN NEW;
