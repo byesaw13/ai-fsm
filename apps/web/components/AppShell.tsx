@@ -43,7 +43,9 @@ interface NavSection {
 // ---------------------------------------------------------------------------
 
 // Named constants for items referenced outside the array (mobile bottom bar)
-const NAV_TODAY:    NavItem = { href: "/app",              label: "Today",    Icon: IconMyDay };
+// The office overview/dashboard. Labelled "Overview" (not "Today") so it reads
+// as the numbers screen and doesn't compete with the My Day field surface.
+const NAV_TODAY:    NavItem = { href: "/app",              label: "Overview", Icon: IconMyDay };
 // EPIC-006 Phase 5: the field surface. Owners can switch into it; pure admins
 // (who don't do field work) and the all-techs list never see it here.
 const NAV_MY_DAY:   NavItem = { href: "/app/my-day",       label: "My Day",   Icon: IconMyDay };
@@ -95,7 +97,20 @@ export function getNavSections(role: Role): NavSection[] {
     }));
   }
 
-  return ADMIN_NAV_SECTIONS;
+  // Owner = the all-rounder. Leads with My Day (their daily home); the Overview
+  // dashboard is demoted next to Reports, since the owner rarely starts the day
+  // in the numbers. Same items as admin plus My Day, just reordered.
+  const base = ADMIN_NAV_SECTIONS[0].items.filter(
+    (i) => i.href !== NAV_MY_DAY.href && i.href !== NAV_TODAY.href,
+  );
+  const reportsIdx = base.findIndex((i) => i.href === NAV_REPORTS.href);
+  const ownerItems = [
+    NAV_MY_DAY,
+    ...base.slice(0, reportsIdx),
+    NAV_TODAY,
+    ...base.slice(reportsIdx),
+  ];
+  return [{ label: "", items: ownerItems }];
 }
 
 /**
@@ -109,6 +124,11 @@ export function getBottomNavItems(role: Role): NavItem[] {
     const myDay: NavItem = { href: "/app/my-day", label: "My Day", Icon: IconMyDay };
     const visits: NavItem = { href: "/app/visits", label: "Visits", Icon: IconVisits };
     return [myDay, visits];
+  }
+
+  // Owner leads with My Day; pure admins keep the Overview dashboard up front.
+  if (role === "owner") {
+    return [NAV_MY_DAY, NAV_REQUESTS, NAV_JOBS];
   }
 
   return [NAV_TODAY, NAV_REQUESTS, NAV_JOBS];
@@ -137,6 +157,9 @@ export function AppShell({ role, userName, children }: AppShellProps) {
   const [showQuickLead, setShowQuickLead] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const isAdminOrOwner = role === "owner" || role === "admin";
+  // Logo goes to each role's home: My Day for field roles, the office dashboard
+  // for pure admins (who get bounced there from My Day anyway).
+  const homeHref = role === "admin" ? "/app" : "/app/my-day";
 
   // Close the More sheet whenever navigation happens.
   useEffect(() => {
@@ -152,7 +175,7 @@ export function AppShell({ role, userName, children }: AppShellProps) {
         {/* ---- Desktop/Tablet Sidebar ---- */}
         <aside className="p7-sidebar" aria-label="Main navigation">
           {/* Brand */}
-          <Link href={"/app" as Route} className="p7-sidebar-brand">
+          <Link href={homeHref as Route} className="p7-sidebar-brand">
             <div className="p7-brand-logo" aria-hidden="true">
               <span className="p7-brand-logo-text">DV</span>
             </div>
