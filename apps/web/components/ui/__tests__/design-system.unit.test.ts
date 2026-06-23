@@ -206,15 +206,23 @@ describe("getNavSections (role filtering)", () => {
     expect(hrefs).not.toContain("/app/automations");
   });
 
-  it("includes Today first for admin/owner, My Day first for tech", () => {
-    const techItems = flattenSections(getNavSections("tech"));
-    expect(techItems[0].href).toBe("/app/my-day");
-
-    for (const role of ["admin", "owner"] as const) {
-      const sections = getNavSections(role);
-      expect(sections[0].items[0].href).toBe("/app");
-      expect(sections[0].items[0].label).toBe("Today");
+  it("leads with My Day for owner/tech, Overview for pure admin", () => {
+    for (const role of ["tech", "owner"] as const) {
+      const items = flattenSections(getNavSections(role));
+      expect(items[0].href).toBe("/app/my-day");
     }
+
+    const adminFirst = getNavSections("admin")[0].items[0];
+    expect(adminFirst.href).toBe("/app");
+    expect(adminFirst.label).toBe("Overview");
+  });
+
+  it("owner keeps the Overview dashboard reachable, demoted before Reports", () => {
+    const items = flattenSections(getNavSections("owner"));
+    const overviewIdx = items.findIndex((i) => i.href === "/app");
+    const reportsIdx = items.findIndex((i) => i.href === "/app/reports");
+    expect(overviewIdx).toBeGreaterThan(0); // not the landing item
+    expect(overviewIdx).toBe(reportsIdx - 1); // sits just before Reports
   });
 });
 
@@ -240,6 +248,15 @@ describe("getBottomNavItems (mobile)", () => {
     expect(hrefs).toContain("/app/visits");
     expect(hrefs).not.toContain("/app/field");
     expect(hrefs).not.toContain("/app/jobs");
+  });
+
+  it("returns 3 link items for owner role leading with My Day", () => {
+    const items = getBottomNavItems("owner");
+    expect(items.map((i) => i.href)).toEqual([
+      "/app/my-day",
+      "/app/requests",
+      "/app/jobs",
+    ]);
   });
 });
 

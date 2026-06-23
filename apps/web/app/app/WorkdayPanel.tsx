@@ -9,6 +9,7 @@ import { NowBar, DayTimeSummary, type ActivityEntryDto } from "./ActivityTracker
 import type { StatusVariant } from "@/components/ui";
 import type { DayMileageSummary } from "@/lib/mileage/sessions";
 import { ACTIVITY_TYPE_META, type ActivityType } from "@ai-fsm/domain";
+import { FIELD_QUICK_ACTIONS } from "@/lib/navigation/quick-actions";
 
 export type CountAction = {
   label: string;
@@ -875,14 +876,7 @@ export function WorkdayPanel({
           <Card style={{ padding: "var(--space-4)" }}>
             <SectionHeader title="Quick Actions" />
             <div className="quick-actions-grid" style={{ marginTop: "var(--space-3)" }}>
-              {[
-                { label: "New Estimate", href: "/app/estimates", icon: "📝" },
-                { label: "New Job", href: "/app/jobs", icon: "🛠️" },
-                { label: "Log Mileage", href: "/app/mileage", icon: "🚗" },
-                { label: "Add Expense", href: "/app/expenses/new", icon: "🛒" },
-                { label: "Upload Receipt", href: "/app/expenses/new", icon: "🧾" },
-                { label: "New Request", href: "/app/intake/new", icon: "⚡" },
-              ].map((act) => (
+              {FIELD_QUICK_ACTIONS.map((act) => (
                 <Link
                   key={act.label}
                   href={act.href as Route}
