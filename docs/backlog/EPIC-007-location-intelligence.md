@@ -189,7 +189,7 @@ Acceptance Criteria:
 # TASK-046: Workday & privacy controls
 
 Status:
-Proposed
+In Progress
 
 Problem:
 Passive tracking needs guardrails.

@@ -87,6 +87,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
   }
 
+  // Privacy gating (TASK-046): only capture when tracking is enabled, not
+  // paused, and an active Start-Day workday session exists for the event's date.
+  // Otherwise drop the event entirely — nothing is stored off-workday.
+  const gate = await queryOne<{ enabled: boolean; paused: boolean; active_session: boolean }>(
+    `SELECT a.location_tracking_enabled AS enabled,
+            (a.location_paused_until IS NOT NULL AND a.location_paused_until > now()) AS paused,
+            EXISTS (
+              SELECT 1 FROM vehicle_sessions vs
+              WHERE vs.account_id = a.id
+                AND vs.session_date = ($2::timestamptz)::date
+                AND vs.ended_at IS NULL
+            ) AS active_session
+     FROM accounts a WHERE a.id = $1`,
+    [accountId, occurredAt],
+  );
+  const ignored = !gate?.enabled ? "tracking_disabled"
+    : gate.paused ? "paused"
+    : !gate.active_session ? "no_active_workday"
+    : null;
+  if (ignored) {
+    logger.info("location event dropped by privacy gate", { traceId, reason: ignored });
+    return NextResponse.json({ ok: true, ignored });
+  }
+
   // Idempotency: HA may retry the same event.
   if (data.external_id) {
     const seen = await queryOne<{ id: string }>(

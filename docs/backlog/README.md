@@ -113,7 +113,7 @@ Next available ID: **TASK-047**.
 | TASK-043 | visit_candidates table + creation from stops | 007 | Proposed |
 | TASK-044 | Visit review card + classification → ledger | 007 | Proposed |
 | TASK-045 | "I'm at customer site" manual override | 007 | In Progress |
-| TASK-046 | Workday & privacy controls | 007 | Proposed |
+| TASK-046 | Workday & privacy controls | 007 | In Progress |
 
 ## Status legend
 
