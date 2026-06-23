@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { AssessmentRoom } from "@ai-fsm/domain";
 
 const JOB_TYPES = [
   { value: "deck_build", label: "Deck Build (new)" },
@@ -46,14 +47,8 @@ export interface MaterialItem {
   price_book_id: string | null;
 }
 
-export interface RoomMeasurement {
-  id: string;
-  name: string;
-  length_ft: number | null;
-  width_ft: number | null;
-  height_ft: number | null;
-  notes?: string;
-}
+// One canonical room shape across assessment-derived flows (TASK-018).
+export type RoomMeasurement = AssessmentRoom;
 
 interface Props {
   initialScope?: string;

@@ -6,27 +6,23 @@
  * via sessionStorage so the estimate-page materials generator keeps full
  * assessment context instead of asking for a manual description again.
  *
- * This is a transient UI hand-off only — no persistence, no new tables.
+ * This is a transient UI hand-off only — no persistence, no new tables. The
+ * shapes are a thin projection of the canonical `AssessmentSummary`
+ * (packages/domain) — not a competing definition (TASK-018).
  */
+
+import type { AssessmentRoom, AssessmentSummary } from "@ai-fsm/domain";
 
 export const ASSESSMENT_CONTEXT_KEY = "dovetails.assessmentContext";
 
-/** Room shape MaterialsGenerator expects (RoomMeasurement). */
-export interface AssessmentContextRoom {
-  id: string;
-  name: string;
-  length_ft: number | null;
-  width_ft: number | null;
-  height_ft: number | null;
-  notes: string;
-}
+/** The canonical persisted room; the materials generator expects this shape. */
+export type AssessmentContextRoom = AssessmentRoom;
 
-export interface AssessmentContext {
-  generatedJobDescription: string;
-  rooms: AssessmentContextRoom[];
-  visitId?: string | null;
-  assessmentId?: string | null;
-}
+/** The subset of the canonical summary the sessionStorage hand-off carries. */
+export type AssessmentContext = Pick<
+  AssessmentSummary,
+  "generatedJobDescription" | "rooms" | "visitId" | "assessmentId"
+>;
 
 function toNullableNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
