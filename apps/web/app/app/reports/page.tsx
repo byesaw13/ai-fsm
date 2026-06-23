@@ -96,13 +96,14 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           />
         </div>
       ) : (
-        <>
-          <FinancialSection data={data} monthLabel={monthLabel} />
-          <TechnicianSection rows={data.techPerformance} monthLabel={monthLabel} />
-        </>
+        <FinancialSection data={data} monthLabel={monthLabel} />
       )}
 
-      {/* Always-on sections — render regardless of monthly financial activity */}
+      {/* Always-on sections — render regardless of monthly financial activity.
+          TechnicianSection stays out of the hasAnyData gate so completed-visit
+          metrics still show in months with visits but no invoices/expenses
+          (it returns null when there are no techs). */}
+      <TechnicianSection rows={data.techPerformance} monthLabel={monthLabel} />
       <InvoiceAgingSection aging={invoiceAging} />
       <TimeSection rows={data.timeByCategory} monthLabel={monthLabel} />
       <OperationsSection scheduleUtil={data.scheduleUtil} monthLabel={monthLabel} />
