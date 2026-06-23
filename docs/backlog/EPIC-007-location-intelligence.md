@@ -22,9 +22,9 @@ already live:
 - **Review + "only confirmed counts":** the captured-segments panel already does
   provisional → owner-confirm → ledger.
 - **Ledger:** `activity_entries` already supports `entity_type` / `entity_id` /
-  `source` / `category` — confirmed visits write here (source
-  `auto_detected_location`), linked to customer/job/property. **No new
-  `business_ledger_entry` table.**
+  `source` / `category` — confirmed visits write here (source `auto_visit`, one of
+  the allowed values), linked to job/visit/client. **No new `business_ledger_entry`
+  table.**
 - **Supplier zones:** `suggestActivityForZone` already tags supply houses.
 
 What this epic **adds** (the missing layer): geocoded customer-property
@@ -116,13 +116,19 @@ Business Value:
 The detected-visit backlog the owner reviews.
 
 Scope:
-- New `visit_candidates` table: property_id, matched_customer_id,
-  confidence_score, arrival_time, departure_time, duration_minutes,
+- New `visit_candidates` table, account-scoped like every other table:
+  `account_id` (NOT NULL FK + RLS policies keyed off `app_account_id()`),
+  `location_segment_id`, property_id, matched_customer_id, confidence_score,
+  arrival_time, departure_time, duration_minutes,
   status (pending/confirmed/ignored), classification, linked_job_id,
   linked_estimate_id, source.
 - When a `stop` segment closes (existing pipeline) and matches a property above a
   confidence floor, create a **pending** `visit_candidate`. Reuse the stop's
   arrival/departure/duration; never auto-confirm.
+- Stop-noise guard: TASK-040 only filters false *drives* ("stops are never
+  classified"), so candidate creation must not assume stops are clean — gate on
+  the confidence floor plus a minimum dwell so brief stationary/GPS blips near a
+  property don't mint candidates.
 
 Out of Scope:
 - Classification UI (TASK-044), manual creation (TASK-045).
@@ -148,10 +154,14 @@ Scope:
   customer/property, time range, duration, confidence; classify buttons
   (Job Work / Warranty / Estimate Visit / Walkthrough / Material Drop / Realtor /
   Ignore).
-- On confirm: write an `activity_entries` row (source `auto_detected_location`,
-  entity link to customer/job/property, category/activity from classification);
-  set candidate `confirmed`. Optionally auto-fill a matched scheduled visit's
-  `arrived_at`. Map classifications to existing `activity_type`s (add any missing).
+- On confirm: write an `activity_entries` row using values the table actually
+  accepts — `source = 'auto_visit'` (the allowed set is manual / auto_visit /
+  auto_material_run / auto_estimate / backfill) and an `entity_type` from the
+  allowed set (`job` / `visit` / `client` — there is no `property` entity type, so
+  link to the strongest of job→visit→client), category/activity from the
+  classification; set candidate `confirmed`. Optionally auto-fill a matched
+  scheduled visit's `arrived_at`. Classifications map to existing `activity_type`s
+  (no new ones needed).
 
 Out of Scope:
 - Job/estimate creation from a visit (link only, for now).
