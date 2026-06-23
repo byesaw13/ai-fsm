@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth, type AuthSession } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
+import { canViewReports } from "@/lib/auth/permissions";
 import { logger } from "@/lib/logger";
 import {
   VISIT_CLASSIFICATIONS,
@@ -44,6 +45,10 @@ type CandidateRow = {
 };
 
 export const PATCH = withAuth(async (request: NextRequest, session: AuthSession) => {
+  // Owner/admin only — these are account-wide records (matches the list GET).
+  if (!canViewReports(session.role)) {
+    return err("FORBIDDEN", "Not permitted", 403, session.traceId);
+  }
   const id = idFromPath(request);
   if (!id) return err("NOT_FOUND", "Candidate not found", 404, session.traceId);
 

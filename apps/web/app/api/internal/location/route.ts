@@ -341,7 +341,7 @@ async function detectVisitCandidate(
        SELECT v.id AS visit_id, v.job_id
        FROM visits v JOIN jobs j ON j.id = v.job_id
        WHERE j.property_id = p.id AND v.status IN ('scheduled','arrived')
-         AND v.scheduled_start::date = CURRENT_DATE
+         AND v.scheduled_start::date = ($2::timestamptz)::date
        ORDER BY v.scheduled_start ASC LIMIT 1
      ) tv ON true
      LEFT JOIN LATERAL (
@@ -351,7 +351,7 @@ async function detectVisitCandidate(
      ) oj ON true
      WHERE p.account_id = $1
        AND (p.latitude IS NOT NULL OR tv.visit_id IS NOT NULL OR oj.id IS NOT NULL)`,
-    [accountId],
+    [accountId, stop.startedAt],
   );
   if (rows.length === 0) return;
 
