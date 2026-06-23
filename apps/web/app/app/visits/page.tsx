@@ -37,22 +37,32 @@ export default async function VisitsPage() {
   // their own assigned visits.
   const visits: TriageVisitRow[] = isAdmin
     ? await getTriageVisits(session.accountId)
-    : await query<TriageVisitRow>(
-        `SELECT
-            v.*,
-            j.title AS job_title,
-            u.full_name AS assigned_user_name,
-            c.name AS client_name,
-            p.address AS property_address
-         FROM visits v
-         LEFT JOIN jobs j ON j.id = v.job_id
-         LEFT JOIN users u ON u.id = v.assigned_user_id
-         LEFT JOIN clients c ON c.id = j.client_id
-         LEFT JOIN properties p ON p.id = j.property_id
-         WHERE v.account_id = $1 AND v.assigned_user_id = $2
-         ORDER BY v.scheduled_start ASC
-         LIMIT 200`,
-        [session.accountId, session.userId]
+    : // Relevance-order before the 200-row cap so a tech's current/open visits
+      // aren't crowded out by old completed ones; re-sort ascending for display.
+      // (Mirrors getTriageVisits — see lib/visits/queries.ts.)
+      (
+        await query<TriageVisitRow>(
+          `SELECT
+              v.*,
+              j.title AS job_title,
+              u.full_name AS assigned_user_name,
+              c.name AS client_name,
+              p.address AS property_address
+           FROM visits v
+           LEFT JOIN jobs j ON j.id = v.job_id
+           LEFT JOIN users u ON u.id = v.assigned_user_id
+           LEFT JOIN clients c ON c.id = j.client_id
+           LEFT JOIN properties p ON p.id = j.property_id
+           WHERE v.account_id = $1 AND v.assigned_user_id = $2
+           ORDER BY
+             CASE WHEN v.status IN ('completed','cancelled') THEN 1 ELSE 0 END,
+             CASE WHEN v.status IN ('completed','cancelled') THEN NULL ELSE v.scheduled_start END ASC NULLS LAST,
+             v.scheduled_start DESC
+           LIMIT 200`,
+          [session.accountId, session.userId]
+        )
+      ).sort(
+        (a, b) => new Date(a.scheduled_start).getTime() - new Date(b.scheduled_start).getTime()
       );
 
   const now = new Date();
