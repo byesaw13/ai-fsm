@@ -166,7 +166,9 @@ export default async function MyDayPage() {
   const pendingToday = todayVisits.filter(
     (v) => v.status !== "completed" && v.status !== "cancelled"
   );
-  const overdueVisits = todayVisits.filter(isVisitOverdue);
+  // Wrap the callback — passing isVisitOverdue directly makes Array.filter hand
+  // it the element index as its `nowMs` arg, which silently emptied this list.
+  const overdueVisits = todayVisits.filter((v) => isVisitOverdue(v));
 
   const nowISO = now.toISOString();
   const nowHour = now.getHours();
