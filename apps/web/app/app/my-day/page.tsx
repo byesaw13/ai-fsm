@@ -6,6 +6,7 @@ import { query, queryForSession } from "@/lib/db";
 import { isSameCalendarDay, isVisitOverdue, formatOverdueLabel } from "@/lib/visits/p7";
 import { MyDayView } from "./MyDayView";
 import { ManualSiteVisitButton } from "../ManualSiteVisitButton";
+import { LocationCaptureControl } from "../LocationCaptureControl";
 import { WorkdayPanel } from "../WorkdayPanel";
 import type { OpenSession, VehicleOption } from "../WorkdayPanel";
 import type { ActivityEntryDto } from "../ActivityTracker";
@@ -116,7 +117,17 @@ export default async function MyDayPage() {
   // EPIC-006 Phase 5: a light "business peek" so the owner-in-the-field is never
   // fully blind to the office. One glance + a tap back to the dashboard.
   let ownerPeek: { outstandingCents: number; draftInvoices: number } | null = null;
+  let locationSettings: { enabled: boolean; pausedUntil: string | null } | null = null;
   if (isOwner) {
+    const settingsRows = await queryForSession<{ enabled: boolean; paused_until: string | null }>(
+      session,
+      `SELECT location_tracking_enabled AS enabled, location_paused_until::text AS paused_until
+       FROM accounts WHERE id = $1`,
+      [accountId],
+    );
+    locationSettings = settingsRows[0]
+      ? { enabled: settingsRows[0].enabled, pausedUntil: settingsRows[0].paused_until }
+      : null;
     const [outRows, draftRows] = await Promise.all([
       queryForSession<{ cents: string }>(session,
         `SELECT COALESCE(SUM(total_cents - paid_cents), 0)::text AS cents
@@ -204,6 +215,17 @@ export default async function MyDayPage() {
           )
         }
       />
+
+      {/* EPIC-007 TASK-046: owner control for passive location capture. */}
+      {locationSettings && (
+        <div style={{ marginBottom: "var(--space-4)" }}>
+          <LocationCaptureControl
+            enabled={locationSettings.enabled}
+            pausedUntil={locationSettings.pausedUntil}
+            hasActiveWorkday={openSessionRows.length > 0}
+          />
+        </div>
+      )}
 
       {/* EPIC-006 Phase 5: owner-only business peek — a glance at the office. */}
       {ownerPeek && (
