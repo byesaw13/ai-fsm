@@ -64,7 +64,7 @@ tasks in `done/`.
 
 ## Task index
 
-Next available ID: **TASK-041**.
+Next available ID: **TASK-047**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -107,6 +107,12 @@ Next available ID: **TASK-041**.
 | TASK-038 | Surface consolidation (one daily home) | 006 | Done |
 | TASK-039 | Job & estimate numbering | 005 | Proposed |
 | TASK-040 | False-drive detection | 001 | In Progress |
+| TASK-041 | Customer-property geofences | 007 | Proposed |
+| TASK-042 | Property matching engine + confidence | 007 | Proposed |
+| TASK-043 | visit_candidates table + creation from stops | 007 | Proposed |
+| TASK-044 | Visit review card + classification → ledger | 007 | Proposed |
+| TASK-045 | "I'm at customer site" manual override | 007 | Proposed |
+| TASK-046 | Workday & privacy controls | 007 | Proposed |
 
 ## Status legend
 
