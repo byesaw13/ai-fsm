@@ -61,7 +61,7 @@ export default async function EstimateDetailPage({
       <div className="page-header">
         <div>
           <Link href="/app/estimates" className="back-link">← Estimates</Link>
-          <h1 className="page-title">Estimate — {estimate.client_name ?? "Unknown client"}</h1>
+          <h1 className="page-title">{estimate.estimate_number ? `${estimate.estimate_number} — ` : "Estimate — "}{estimate.client_name ?? "Unknown client"}</h1>
           {estimate.job_title && <p className="page-subtitle">Job: {estimate.job_title}</p>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>

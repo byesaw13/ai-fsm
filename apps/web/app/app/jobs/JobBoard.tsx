@@ -8,6 +8,7 @@ import { deriveCustomerStage, CUSTOMER_STAGE_LABELS, CUSTOMER_STAGE_COLORS, SUB_
 interface JobRow {
   id: string;
   title: string;
+  job_number?: string | null;
   status: string;
   priority: number;
   client_name: string | null;
@@ -172,6 +173,11 @@ function BoardCard({ job }: { job: JobRow }) {
             gap: "var(--space-1)",
           }}
         >
+          {job.job_number && (
+            <span style={{ color: "var(--fg-muted)", fontWeight: 400, fontSize: "var(--text-xs)" }}>
+              {job.job_number}
+            </span>
+          )}
           {job.title}
           {job.estimate_condition_tier === "yellow" && (
             <span title="Elevated risk estimate" style={{
