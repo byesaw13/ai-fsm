@@ -64,7 +64,7 @@ tasks in `done/`.
 
 ## Task index
 
-Next available ID: **TASK-037**.
+Next available ID: **TASK-040**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -104,6 +104,8 @@ Next available ID: **TASK-037**.
 | TASK-034 | MCP Non-Superuser RLS Verification | 005 | Proposed |
 | TASK-035 | MCP Write Tools v1 (operations writes) | 001 | Proposed |
 | TASK-036 | PR Gatekeeper MCP Server | 005 | In Progress |
+| TASK-038 | Surface consolidation (one daily home) | 006 | Done |
+| TASK-039 | Job & estimate numbering | 005 | Proposed |
 
 ## Status legend
 

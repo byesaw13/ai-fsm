@@ -214,6 +214,44 @@ Notes:
 Read-only, "report don't act" by design — it advises a human, it does not gate
 CI or mutate state. A future task could add optional PR-comment output.
 
+# TASK-039: Human-readable numbering for jobs and estimates
+
+Status:
+Proposed
+
+Problem:
+Invoices have human-readable per-account numbers (`invoices.invoice_number`,
+unique per account), but jobs and estimates do not. There is no stable
+`J-2026-####` / `EST-2026-####` identifier to reference a job or estimate in
+conversation, on paper, or across records.
+
+Business Value:
+Every service record can be referenced by a short, human number — the way a
+handyman business actually talks about work — and documents/links stay legible.
+
+Scope:
+- Add per-account sequential numbers for jobs and estimates, mirroring the
+  existing `invoice_number` pattern (additive migration + unique index per
+  account, one-time backfill of existing rows).
+- Surface the number on job and estimate detail/list pages and on any generated
+  documents.
+
+Out of Scope:
+- Configurable formats/prefixes (fixed `J-YYYY-####` / `EST-YYYY-####` to start).
+- Re-numbering beyond the one-time backfill.
+
+Acceptance Criteria:
+- [ ] New jobs receive a unique per-account job number.
+- [ ] New estimates receive a unique per-account estimate number.
+- [ ] Numbers are shown on the respective detail and list views.
+- [ ] Migration is additive and reversible; existing rows are backfilled.
+
+Notes:
+Invoice numbering is the reference implementation (`invoices.invoice_number`,
+unique index per account). Identified as a genuine gap in the June 2026 recovery
+fact-check (`docs/generated/RECOVERY_AUDIT_FACT_CHECK_2026-06.md`), which also
+corrected the earlier assumption that invoice numbering was missing — it exists.
+
 ## Completed
 
 _None yet._

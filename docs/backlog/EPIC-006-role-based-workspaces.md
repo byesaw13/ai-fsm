@@ -140,6 +140,52 @@ Acceptance:
 - [ ] Owner dashboard has the management widgets.
 - [ ] Mobile bottom bar matches role.
 
+# TASK-038: Surface consolidation — one daily home, fewer overlapping dashboards
+
+Status:
+Done
+
+Problem:
+Five operational surfaces — Today (`/app`), My Day, Schedule, Visits, Timeline —
+read as redundant dashboards. Owner/admin couldn't tell which to open, and there
+was no single screen to watch a visit move through its statuses while testing the
+core workflow. The owner/admin visit triage (Overdue / Needs-assignment / status
+groups) lived only at `/app/visits`, which is not in their nav.
+
+Business Value:
+The owner runs the day from one clear home, with the other surfaces demoted to
+distinct, discoverable roles — directly reducing the "is this built or lost?"
+confusion.
+
+Scope:
+- Step 1 (done — PR #362): My Day is the role-aware landing; the `/app` dashboard
+  is relabelled "Overview" and demoted next to Reports but kept reachable. Pure
+  admins still land on the Overview dashboard.
+- Step 2 (done — PR #363): Schedule gains an admin-only "List" view that surfaces
+  the visit triage, reusing one shared `buildVisitTriage` + `VisitTriage` across
+  the Visits page and Schedule. Also fixed a latent `filter(isVisitOverdue)` bug
+  that left the Overdue bucket and metric silently empty (fixed on My Day too).
+- Step 3 (done — PR #365): relocated the Invoice Aging KPI to a Reports section
+  and dropped the duplicate "Completed This Month" card (Reports' TechnicianSection
+  covers it); added an "Activity Timeline →" link in the Reports header and removed
+  the Timeline quick-action. Kept the Financial Snapshot money-glance on the home.
+
+Out of Scope:
+- The tech field experience — techs keep their own Visits screen and nav.
+
+Acceptance Criteria:
+- [x] Owner/tech land on My Day; pure admins stay on the Overview dashboard.
+- [x] Schedule exposes the visit triage via an admin-only List view.
+- [x] The Overdue triage/metric actually populates (bug fixed + unit-tested).
+- [x] Overview KPIs and the Activity Timeline live under Reports.
+- [x] Timeline is removed from quick-actions and the daily navigation.
+
+Notes:
+Refines the owner-dashboard-centric assumption in TASK-030/031/032: the owner's
+daily home is now My Day, not `/app`. Evidence basis for the broader cleanup is
+the June 2026 recovery fact-check
+(`docs/generated/RECOVERY_AUDIT_FACT_CHECK_2026-06.md`).
+
 ## Completed
 
 _None yet._
