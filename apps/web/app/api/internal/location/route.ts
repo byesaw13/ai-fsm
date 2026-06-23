@@ -3,7 +3,8 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { getPool, queryOne } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { DETECTED_ACTIVITIES, LOCATION_EVENT_KINDS, classifyDrive, haversineMeters, pathDistanceMeters } from "@ai-fsm/domain";
+import { DETECTED_ACTIVITIES, LOCATION_EVENT_KINDS, classifyDrive, haversineMeters, pathDistanceMeters, rankVisitCandidates, VISIT_CONFIDENCE_FLOOR } from "@ai-fsm/domain";
+import type { PoolClient } from "pg";
 import { reduceLocationEvent, type OpenSegment } from "@/lib/location/segments";
 
 export const dynamic = "force-dynamic";
@@ -235,6 +236,13 @@ export async function POST(req: NextRequest) {
          WHERE id = $2 AND account_id = $3 AND ended_at IS NULL`,
         [mut.closeOpen.endedAt, open.id, accountId, distanceMeters, isLikelyNoise, dismissAsNoise],
       );
+
+      // EPIC-007 slice 1: a closed stop may be a customer visit. Score it against
+      // the account's properties (schedule + open-job signals now, distance once
+      // coords are learned) and persist the top match as a pending candidate.
+      if (open.kind === "stop") {
+        await detectVisitCandidate(client, accountId, open, mut.closeOpen.endedAt);
+      }
     }
     if (mut.updateOpen && open) {
       const u = mut.updateOpen;
@@ -286,4 +294,95 @@ export async function POST(req: NextRequest) {
     opened: mutOpenKind,
     closed: mutClosed,
   });
+}
+
+interface ClosedStop {
+  id: string;
+  startedAt: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+interface CandidateRow {
+  property_id: string;
+  client_id: string;
+  latitude: number | null;
+  longitude: number | null;
+  today_visit_id: string | null;
+  today_job_id: string | null;
+  open_job_id: string | null;
+  recent_client: boolean;
+  job_count: string;
+}
+
+/**
+ * Score a closed stop against the account's properties and persist the top
+ * match (>= confidence floor) as a pending visit_candidate. Runs in the same
+ * transaction as the segment close. Schedule/open-job signals work without
+ * coordinates; distance is added once a property has learned coords.
+ */
+async function detectVisitCandidate(
+  client: PoolClient,
+  accountId: string,
+  stop: ClosedStop,
+  endedAt: string,
+): Promise<void> {
+  const durationMinutes = (new Date(endedAt).getTime() - new Date(stop.startedAt).getTime()) / 60000;
+
+  const { rows } = await client.query<CandidateRow>(
+    `SELECT p.id AS property_id, p.client_id, p.latitude, p.longitude,
+            tv.visit_id AS today_visit_id, tv.job_id AS today_job_id,
+            oj.id AS open_job_id,
+            EXISTS (SELECT 1 FROM jobs j WHERE j.client_id = p.client_id
+                      AND j.created_at >= now() - interval '30 days') AS recent_client,
+            (SELECT count(*) FROM jobs j WHERE j.client_id = p.client_id) AS job_count
+     FROM properties p
+     LEFT JOIN LATERAL (
+       SELECT v.id AS visit_id, v.job_id
+       FROM visits v JOIN jobs j ON j.id = v.job_id
+       WHERE j.property_id = p.id AND v.status IN ('scheduled','arrived')
+         AND v.scheduled_start::date = CURRENT_DATE
+       ORDER BY v.scheduled_start ASC LIMIT 1
+     ) tv ON true
+     LEFT JOIN LATERAL (
+       SELECT j.id FROM jobs j
+       WHERE j.property_id = p.id AND j.status IN ('scheduled','in_progress')
+       ORDER BY j.scheduled_start ASC NULLS LAST LIMIT 1
+     ) oj ON true
+     WHERE p.account_id = $1
+       AND (p.latitude IS NOT NULL OR tv.visit_id IS NOT NULL OR oj.id IS NOT NULL)`,
+    [accountId],
+  );
+  if (rows.length === 0) return;
+
+  const ranked = rankVisitCandidates({
+    stop: { latitude: stop.latitude, longitude: stop.longitude, durationMinutes },
+    candidates: rows.map((r) => ({
+      propertyId: r.property_id,
+      clientId: r.client_id,
+      latitude: r.latitude,
+      longitude: r.longitude,
+      scheduledToday: r.today_visit_id != null,
+      openJob: r.open_job_id != null,
+      jobId: r.today_job_id ?? r.open_job_id ?? null,
+      visitId: r.today_visit_id ?? null,
+      recentClient: r.recent_client,
+      repeatClient: Number(r.job_count) > 1,
+    })),
+  });
+
+  const top = ranked[0];
+  if (!top || top.score < VISIT_CONFIDENCE_FLOOR) return;
+
+  await client.query(
+    `INSERT INTO visit_candidates
+       (account_id, location_segment_id, property_id, matched_client_id, job_id, visit_id,
+        distance_meters, confidence_score, arrival_time, departure_time, duration_minutes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     ON CONFLICT (location_segment_id) DO NOTHING`,
+    [
+      accountId, stop.id, top.propertyId, top.clientId, top.jobId, top.visitId,
+      top.distanceMeters, top.score, stop.startedAt, endedAt, Math.round(durationMinutes),
+    ],
+  );
 }

@@ -58,3 +58,4 @@ export type {
 export * from "./activities";
 export * from "./location";
 export * from "./geo";
+export * from "./visit-matching";
