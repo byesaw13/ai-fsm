@@ -2,8 +2,11 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { query } from "@/lib/db";
 import { PageContainer, PageHeader } from "@/components/ui";
+import { getTriageVisits } from "@/lib/visits/queries";
 import { ScheduleCalendar } from "./ScheduleCalendar";
 import type { VisitRow, ViewMode } from "./ScheduleCalendar";
+import { ScheduleViewToggle } from "./ScheduleViewToggle";
+import { VisitTriage } from "../visits/VisitTriage";
 
 export const dynamic = "force-dynamic";
 
@@ -56,8 +59,32 @@ export default async function SchedulePage({ searchParams }: PageProps) {
   const session = await getSession();
   if (!session) redirect("/login");
 
+  const isAdmin = session.role === "owner" || session.role === "admin";
+
   const params = await searchParams;
-  const view = (["week", "month", "year"].includes(params.view ?? "") ? params.view : "week") as ViewMode;
+  const allowed = isAdmin ? ["week", "month", "year", "list"] : ["week", "month", "year"];
+  const view = (allowed.includes(params.view ?? "") ? params.view : "week") as ViewMode;
+
+  // List (triage) view — owner/admin only. Loads every visit for the account
+  // rather than the calendar's date range.
+  if (view === "list") {
+    const visits = await getTriageVisits(session.accountId);
+    return (
+      <PageContainer>
+        <PageHeader title="Schedule" />
+        <div style={{ marginBottom: "var(--space-4)" }}>
+          <ScheduleViewToggle
+            current="list"
+            isAdmin={isAdmin}
+            weekUrl="/app/schedule?view=week"
+            monthUrl="/app/schedule?view=month"
+            yearUrl="/app/schedule?view=year"
+          />
+        </div>
+        <VisitTriage visits={visits} />
+      </PageContainer>
+    );
+  }
 
   let rangeStart: Date, rangeEnd: Date;
   if (view === "week") {
@@ -73,8 +100,6 @@ export default async function SchedulePage({ searchParams }: PageProps) {
     rangeStart = new Date(y, 0, 1);
     rangeEnd = new Date(y + 1, 0, 1);
   }
-
-  const isAdmin = session.role === "owner" || session.role === "admin";
 
   const visits = isAdmin
     ? await query<VisitRow>(
