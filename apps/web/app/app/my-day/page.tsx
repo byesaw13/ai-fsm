@@ -5,6 +5,7 @@ import { getSession } from "@/lib/auth/session";
 import { query, queryForSession } from "@/lib/db";
 import { isSameCalendarDay, isVisitOverdue, formatOverdueLabel } from "@/lib/visits/p7";
 import { MyDayView } from "./MyDayView";
+import { ManualSiteVisitButton } from "../ManualSiteVisitButton";
 import { WorkdayPanel } from "../WorkdayPanel";
 import type { OpenSession, VehicleOption } from "../WorkdayPanel";
 import type { ActivityEntryDto } from "../ActivityTracker";
@@ -195,7 +196,11 @@ export default async function MyDayPage() {
             <LinkButton href="/app/visits" variant="secondary" size="sm">Visits →</LinkButton>
           ) : (
             // EPIC-006: owner/admin can switch back to the business dashboard.
-            <LinkButton href="/app" variant="secondary" size="sm">← Dashboard</LinkButton>
+            // EPIC-007 TASK-045: record a visit by hand when GPS missed.
+            <span style={{ display: "inline-flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+              <ManualSiteVisitButton />
+              <LinkButton href="/app" variant="secondary" size="sm">← Dashboard</LinkButton>
+            </span>
           )
         }
       />

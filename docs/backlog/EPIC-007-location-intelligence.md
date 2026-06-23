@@ -174,7 +174,7 @@ Acceptance Criteria:
 # TASK-045: "I'm at customer site" manual override
 
 Status:
-Proposed
+In Progress
 
 Problem:
 GPS can be wrong or the address new; the owner needs to attach a visit by hand.

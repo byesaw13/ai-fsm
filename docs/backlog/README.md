@@ -57,6 +57,7 @@ TASK-019 all derive directly from this principle.
 - `EPIC-004-billing-and-profitability.md`
 - `EPIC-005-platform-and-delivery.md`
 - `EPIC-006-role-based-workspaces.md`
+- `EPIC-007-location-intelligence.md`
 - `done/` — completed tasks, moved out of the active epics.
 
 Each epic file lists its **active** tasks in full and links to its **completed**
@@ -111,7 +112,7 @@ Next available ID: **TASK-047**.
 | TASK-042 | Property matching engine + confidence | 007 | Proposed |
 | TASK-043 | visit_candidates table + creation from stops | 007 | Proposed |
 | TASK-044 | Visit review card + classification → ledger | 007 | Proposed |
-| TASK-045 | "I'm at customer site" manual override | 007 | Proposed |
+| TASK-045 | "I'm at customer site" manual override | 007 | In Progress |
 | TASK-046 | Workday & privacy controls | 007 | Proposed |
 
 ## Status legend
