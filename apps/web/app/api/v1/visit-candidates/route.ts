@@ -132,6 +132,25 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
     const departure = new Date();
     const arrival = new Date(departure.getTime() - d.duration_minutes * 60_000);
 
+    // Refuse to double-count time already in the ledger (same guard the
+    // segment/candidate confirm paths use).
+    const { rows: overlap } = await client.query<{ id: string }>(
+      `SELECT id FROM activity_entries
+       WHERE account_id = $1 AND voided_at IS NULL
+         AND started_at < $3 AND COALESCE(ended_at, 'infinity'::timestamptz) > $2
+       LIMIT 1`,
+      [session.accountId, arrival.toISOString(), departure.toISOString()],
+    );
+    if (overlap.length > 0) {
+      await client.query("ROLLBACK");
+      return err(
+        "CONFLICT",
+        "This time overlaps activity already logged. Adjust the duration or resolve it in the timeline.",
+        409,
+        session.traceId,
+      );
+    }
+
     const { rows: ins } = await client.query<{ id: string }>(
       `INSERT INTO activity_entries
          (account_id, user_id, session_date, activity_type, category,
