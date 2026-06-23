@@ -49,7 +49,7 @@ manual override (045), privacy controls (046).
 # TASK-041: Customer-property geofences
 
 Status:
-Proposed
+Done
 
 Problem:
 `properties` has only `address` — no coordinates — so the system can match the
@@ -78,7 +78,7 @@ Acceptance Criteria:
 # TASK-042: Customer-property matching engine + confidence scoring
 
 Status:
-Proposed
+Done
 
 Problem:
 A closed stop has lat/long but no notion of *whose* property it is or how sure we
@@ -106,7 +106,7 @@ Acceptance Criteria:
 # TASK-043: visit_candidates table + creation from stops
 
 Status:
-Proposed
+Done
 
 Problem:
 Detected visits need to be stored as reviewable items, separate from scheduled
@@ -140,7 +140,7 @@ Acceptance Criteria:
 # TASK-044: Review card + classification → ledger
 
 Status:
-Proposed
+Done
 
 Problem:
 Pending candidates need owner review and a way to become real records.
@@ -174,7 +174,7 @@ Acceptance Criteria:
 # TASK-045: "I'm at customer site" manual override
 
 Status:
-In Progress
+Done
 
 Problem:
 GPS can be wrong or the address new; the owner needs to attach a visit by hand.
@@ -200,10 +200,18 @@ Scope:
   confirmed ledger entries kept permanently.
 
 Acceptance Criteria:
-- [ ] Tracking can be paused and is bounded to the workday.
+- [x] Tracking can be paused and is bounded to the workday. (slice 1, PR #373)
 - [ ] Home/private locations don't surface in reports; raw GPS ages out on
-      schedule while confirmed entries persist.
+      schedule while confirmed entries persist. (deferred)
+
+Notes:
+Slice 1 shipped (PR #373): master enable/disable + pause + Start-Day workday
+gating on the ingest (drops events unless enabled, not paused, and a workday
+session is open); `accounts.location_retention_days` reserved. Remaining:
+home/private-location filtering in reports and the GPS retention pruning job.
 
 ## Completed
 
-_None yet._
+TASK-041..045 shipped — see git history (PRs #368/#372). TASK-046 in progress
+(slice 1 above). Task bodies are kept inline here for now rather than moved to
+`done/`.

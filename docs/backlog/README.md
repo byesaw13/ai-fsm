@@ -106,13 +106,13 @@ Next available ID: **TASK-047**.
 | TASK-035 | MCP Write Tools v1 (operations writes) | 001 | Proposed |
 | TASK-036 | PR Gatekeeper MCP Server | 005 | In Progress |
 | TASK-038 | Surface consolidation (one daily home) | 006 | Done |
-| TASK-039 | Job & estimate numbering | 005 | In Progress |
-| TASK-040 | False-drive detection | 001 | In Progress |
-| TASK-041 | Customer-property geofences | 007 | Proposed |
-| TASK-042 | Property matching engine + confidence | 007 | Proposed |
-| TASK-043 | visit_candidates table + creation from stops | 007 | Proposed |
-| TASK-044 | Visit review card + classification → ledger | 007 | Proposed |
-| TASK-045 | "I'm at customer site" manual override | 007 | In Progress |
+| TASK-039 | Job & estimate numbering | 005 | Done |
+| TASK-040 | False-drive detection | 001 | Done |
+| TASK-041 | Customer-property geofences | 007 | Done |
+| TASK-042 | Property matching engine + confidence | 007 | Done |
+| TASK-043 | visit_candidates table + creation from stops | 007 | Done |
+| TASK-044 | Visit review card + classification → ledger | 007 | Done |
+| TASK-045 | "I'm at customer site" manual override | 007 | Done |
 | TASK-046 | Workday & privacy controls | 007 | In Progress |
 
 ## Status legend
