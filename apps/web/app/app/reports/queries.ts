@@ -455,3 +455,40 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
     totalJobs: jobProfitRows.length,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Invoice aging — relocated from the Overview dashboard (TASK-038 step 3).
+// Account-wide unpaid balance bucketed by how overdue it is (not month-scoped).
+// ---------------------------------------------------------------------------
+
+export type InvoiceAgingData = {
+  current: number;
+  d30: number;
+  d60: number;
+  d90: number;
+};
+
+export async function loadInvoiceAging(accountId: string): Promise<InvoiceAgingData> {
+  const rows = await query<{
+    current_cents: string;
+    d30_cents: string;
+    d60_cents: string;
+    d90_cents: string;
+  }>(
+    `SELECT
+       COALESCE(SUM(total_cents - paid_cents) FILTER (WHERE due_date IS NULL OR due_date >= CURRENT_DATE), 0)::text AS current_cents,
+       COALESCE(SUM(total_cents - paid_cents) FILTER (WHERE due_date < CURRENT_DATE AND due_date >= CURRENT_DATE - interval '30 days'), 0)::text AS d30_cents,
+       COALESCE(SUM(total_cents - paid_cents) FILTER (WHERE due_date < CURRENT_DATE - interval '30 days' AND due_date >= CURRENT_DATE - interval '60 days'), 0)::text AS d60_cents,
+       COALESCE(SUM(total_cents - paid_cents) FILTER (WHERE due_date < CURRENT_DATE - interval '60 days'), 0)::text AS d90_cents
+     FROM invoices
+     WHERE account_id = $1 AND status IN ('sent','partial','overdue')`,
+    [accountId]
+  );
+  const r = rows[0];
+  return {
+    current: parseInt(r?.current_cents ?? "0", 10),
+    d30: parseInt(r?.d30_cents ?? "0", 10),
+    d60: parseInt(r?.d60_cents ?? "0", 10),
+    d90: parseInt(r?.d90_cents ?? "0", 10),
+  };
+}
