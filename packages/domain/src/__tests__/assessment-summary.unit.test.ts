@@ -1,9 +1,61 @@
 import { describe, it, expect } from "vitest";
 import {
+  buildAssessmentSummary,
   buildAssessmentJobDescription,
   composeJobDescription,
   MAX_JOB_DESCRIPTION_LENGTH,
 } from "../assessment-summary";
+
+describe("buildAssessmentSummary", () => {
+  it("normalizes fields and fills the generated description", () => {
+    const summary = buildAssessmentSummary({
+      visitId: "v1",
+      assessmentId: "a1",
+      rooms: [
+        { id: "r1", name: "Living Room", length_ft: 12, width_ft: 10, height_ft: 8, notes: "south wall water stain" },
+      ],
+      scopeNotes: "Repaint two rooms",
+      accessNotes: "lockbox",
+      hasPets: true,
+      totalSqft: 240,
+    });
+    expect(summary.visitId).toBe("v1");
+    expect(summary.assessmentId).toBe("a1");
+    expect(summary.rooms).toHaveLength(1);
+    expect(summary.rooms[0]).toEqual({ id: "r1", name: "Living Room", length_ft: 12, width_ft: 10, height_ft: 8, notes: "south wall water stain" });
+    expect(summary.hasPets).toBe(true);
+    expect(summary.difficultAccess).toBe(false);
+    expect(summary.totalSqft).toBe(240);
+    // generated description reflects the same data
+    expect(summary.generatedJobDescription).toContain("Repaint two rooms");
+    expect(summary.generatedJobDescription).toContain("Living Room");
+    expect(summary.generatedJobDescription).toContain("pets on site");
+  });
+
+  it("defaults missing fields and produces an empty description for an empty assessment", () => {
+    const summary = buildAssessmentSummary({});
+    expect(summary).toMatchObject({
+      visitId: null,
+      assessmentId: null,
+      rooms: [],
+      scopeNotes: null,
+      accessNotes: null,
+      hasPets: false,
+      difficultAccess: false,
+      asbestosRisk: false,
+      leadPaintRisk: false,
+      totalSqft: null,
+      generatedJobDescription: "",
+    });
+  });
+
+  it("coerces nullish room dimensions/notes to the canonical shape", () => {
+    const summary = buildAssessmentSummary({
+      rooms: [{ id: "r1", name: "Hall", length_ft: null, width_ft: null, height_ft: null, notes: "" }],
+    });
+    expect(summary.rooms[0]).toEqual({ id: "r1", name: "Hall", length_ft: null, width_ft: null, height_ft: null, notes: "" });
+  });
+});
 
 describe("buildAssessmentJobDescription", () => {
   it("composes a full description from a multi-room assessment", () => {

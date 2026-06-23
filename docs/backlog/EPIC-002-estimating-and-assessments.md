@@ -99,6 +99,16 @@ just a materials-generator patch. Builds on `apps/web/lib/estimates/assessment-c
 (see TASK-006, TASK-007). Closely related to TASK-007; TASK-018 owns the shared
 context *shape*, while TASK-007 covers the estimate-entry consumption.
 
+Consolidation slice shipped: canonical `AssessmentSummary` + `AssessmentRoom` +
+`buildAssessmentSummary` in `packages/domain/src/assessment-summary.ts`; a
+server-side `loadAssessmentSummary` / `mapRowToAssessmentSummary`
+(`apps/web/lib/estimates/assessment-summary-loader.ts`) derives it from
+`site_visit_assessments`; the web `AssessmentContext` is now a thin `Pick<>` of
+the canonical summary and `RoomMeasurement` aliases `AssessmentRoom` (no
+duplicate shapes). Owner edits preserved (unchanged `scopeDirty`). Remaining
+(In Progress): wire the loader as the estimate's primary source (off
+sessionStorage) and add work-order/invoice consumption.
+
 ## Completed
 
 - [TASK-006: Assessment → Materials Generator Context](done/TASK-006-assessment-to-materials-generator-context.md) — Done

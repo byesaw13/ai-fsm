@@ -7,12 +7,31 @@
  * order generator, and invoice scope summaries.
  */
 
+/**
+ * Loose room shape accepted by the description builder — dimensions and notes
+ * are optional. The canonical persisted `AssessmentRoom` (below) is assignable
+ * to this, so callers can pass either.
+ */
 export interface AssessmentSummaryRoom {
   name: string;
   length_ft?: number | null;
   width_ft?: number | null;
   height_ft?: number | null;
   notes?: string | null;
+}
+
+/**
+ * The canonical persisted room — what `site_visit_assessments.rooms` stores and
+ * what the materials generator and the estimate hand-off carry. One room shape
+ * for every assessment-derived flow.
+ */
+export interface AssessmentRoom {
+  id: string;
+  name: string;
+  length_ft: number | null;
+  width_ft: number | null;
+  height_ft: number | null;
+  notes: string;
 }
 
 export type AssessmentTradeKey = "painting" | "drywall" | "trim" | "flooring";
@@ -159,6 +178,95 @@ export function buildAssessmentJobDescription(
   }
 
   return joinSectionsWithinLimit(sections, maxLength);
+}
+
+/**
+ * The canonical assessment summary — the single contract every assessment-
+ * derived flow consumes (materials, estimates, and later work orders/invoices).
+ * Derivable from a persisted `site_visit_assessments` row; `generatedJobDescription`
+ * is produced from the same data via `buildAssessmentJobDescription`.
+ */
+export interface AssessmentSummary {
+  visitId: string | null;
+  assessmentId: string | null;
+  rooms: AssessmentRoom[];
+  scopeNotes: string | null;
+  accessNotes: string | null;
+  hasPets: boolean;
+  difficultAccess: boolean;
+  asbestosRisk: boolean;
+  leadPaintRisk: boolean;
+  totalSqft: number | null;
+  generatedJobDescription: string;
+}
+
+export interface AssessmentSummaryBuildInput {
+  visitId?: string | null;
+  assessmentId?: string | null;
+  rooms?: AssessmentRoom[] | null;
+  scopeNotes?: string | null;
+  accessNotes?: string | null;
+  hasPets?: boolean;
+  difficultAccess?: boolean;
+  asbestosRisk?: boolean;
+  leadPaintRisk?: boolean;
+  totalSqft?: number | null;
+  photoCount?: number;
+}
+
+/**
+ * Normalize raw assessment fields into the canonical `AssessmentSummary`,
+ * filling `generatedJobDescription` from the same data. Pure — the single place
+ * a summary is constructed, whether from persistence or the live form.
+ */
+export function buildAssessmentSummary(
+  input: AssessmentSummaryBuildInput,
+  options: JobDescriptionOptions = {}
+): AssessmentSummary {
+  const rooms = (input.rooms ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    length_ft: r.length_ft ?? null,
+    width_ft: r.width_ft ?? null,
+    height_ft: r.height_ft ?? null,
+    notes: r.notes ?? "",
+  }));
+  const scopeNotes = input.scopeNotes ?? null;
+  const accessNotes = input.accessNotes ?? null;
+  const totalSqft = input.totalSqft ?? null;
+  const hasPets = input.hasPets ?? false;
+  const difficultAccess = input.difficultAccess ?? false;
+  const asbestosRisk = input.asbestosRisk ?? false;
+  const leadPaintRisk = input.leadPaintRisk ?? false;
+
+  const generatedJobDescription = buildAssessmentJobDescription(
+    {
+      rooms,
+      scope_notes: scopeNotes,
+      access_notes: accessNotes,
+      has_pets: hasPets,
+      difficult_access: difficultAccess,
+      asbestos_risk: asbestosRisk,
+      lead_paint_risk: leadPaintRisk,
+      total_sqft: totalSqft,
+      photo_count: input.photoCount,
+    },
+    options
+  );
+
+  return {
+    visitId: input.visitId ?? null,
+    assessmentId: input.assessmentId ?? null,
+    rooms,
+    scopeNotes,
+    accessNotes,
+    hasPets,
+    difficultAccess,
+    asbestosRisk,
+    leadPaintRisk,
+    totalSqft,
+    generatedJobDescription,
+  };
 }
 
 /**
