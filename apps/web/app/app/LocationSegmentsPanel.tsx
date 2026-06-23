@@ -22,6 +22,7 @@ type Segment = {
   activity_entry_id: string | null;
   latitude: number | null;
   longitude: number | null;
+  is_likely_noise?: boolean;
 };
 
 const ACTIVITY_OPTIONS = ACTIVITY_TYPES.map((t) => ({
@@ -130,6 +131,7 @@ export function LocationSegmentsPanel({ day }: { day?: string }) {
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           {provisional.map((seg) => {
             const isOpen = seg.ended_at === null;
+            const flagged = !!seg.is_likely_noise;
             return (
               <div
                 key={seg.id}
@@ -155,6 +157,7 @@ export function LocationSegmentsPanel({ day }: { day?: string }) {
                     {durationLabel(seg.started_at, seg.ended_at)}
                   </span>
                   {isOpen ? <Badge>In progress</Badge> : null}
+                  {flagged ? <Badge className="p7-badge-status-overdue">Likely noise</Badge> : null}
                   <Badge>{confidenceLabel(seg)} confidence</Badge>
                 </div>
 
@@ -168,9 +171,11 @@ export function LocationSegmentsPanel({ day }: { day?: string }) {
                     onChange={(e) => setChoice((c) => ({ ...c, [seg.id]: e.target.value as ActivityType }))}
                     disabled={isOpen || pending === seg.id}
                   />
+                  {/* Flagged drives lead with Dismiss (one-tap clear); Confirm
+                      stays available as an override. */}
                   <Button
                     size="sm"
-                    variant="primary"
+                    variant={flagged ? "ghost" : "primary"}
                     loading={pending === seg.id}
                     disabled={isOpen}
                     onClick={() => patch(seg.id, { action: "confirm", activity_type: choice[seg.id] ?? defaultActivity(seg) }, "Logged to your day")}
@@ -179,7 +184,7 @@ export function LocationSegmentsPanel({ day }: { day?: string }) {
                   </Button>
                   <Button
                     size="sm"
-                    variant="ghost"
+                    variant={flagged ? "primary" : "ghost"}
                     disabled={pending === seg.id}
                     onClick={() => patch(seg.id, { action: "dismiss" }, "Dismissed")}
                   >
@@ -189,6 +194,10 @@ export function LocationSegmentsPanel({ day }: { day?: string }) {
                 {isOpen ? (
                   <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", margin: 0 }}>
                     {seg.kind === "drive" ? "Confirm this once the drive ends." : "Label this once it ends."}
+                  </p>
+                ) : flagged ? (
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", margin: 0 }}>
+                    Looks like you didn’t really go anywhere — probably safe to dismiss.
                   </p>
                 ) : null}
               </div>

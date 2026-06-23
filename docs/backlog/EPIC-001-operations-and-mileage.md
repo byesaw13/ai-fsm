@@ -6,6 +6,43 @@ trustworthy enough to feed tax mileage, vehicle cost, and job profitability.
 
 ## Active tasks
 
+# TASK-040: False-drive detection
+
+Status:
+In Progress
+
+Problem:
+Passive location capture (TASK-024) produces false drives — parked Bluetooth
+connect/disconnect cycles, GPS drift, and sub-minute teleport blips — that pile
+up as unlabeled provisional segments the owner has to dismiss by hand.
+
+Business Value:
+The owner only ever sees real trips to label; noise is cleared automatically and
+borderline cases are one tap.
+
+Scope:
+- A pure `classifyDrive` (packages/domain) that grades a closed drive by average
+  speed: noise (<1 km/h, or under 60s), suspect (1–3 km/h), ok (≥3 km/h).
+- Apply at capture: auto-dismiss noise, flag suspect (`location_segments.is_likely_noise`).
+- One-time backfill of existing provisional drives (migration 120).
+- Surface a "Likely noise" badge in the captured-segments panel with Dismiss as
+  the primary action; Confirm stays available as an override.
+
+Out of Scope:
+- Auto-mileage from drives (still parked — see TASK-027).
+- Re-classifying already confirmed/dismissed segments.
+
+Acceptance Criteria:
+- [ ] Sub-walking-pace / sub-minute drives are auto-dismissed at capture.
+- [ ] Borderline drives are flagged and dismissable in one tap; real trips are
+      untouched.
+- [ ] Existing provisional drives are backfilled by the migration.
+- [ ] `classifyDrive` is unit-tested against the real-data examples.
+
+Notes:
+Refines TASK-024 (location capture) and TASK-027 (hybrid tracking). Thresholds
+live in `classifyDrive`; migration 120's backfill mirrors them.
+
 # TASK-027: Hybrid tracking — manual mileage, auto time
 
 Status:

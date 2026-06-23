@@ -22,6 +22,7 @@ type SegmentRow = {
   vehicle_id: string | null;
   vehicle_session_id: string | null;
   estimated_miles: number | null;
+  is_likely_noise: boolean;
 };
 
 /**
@@ -37,7 +38,7 @@ export const GET = withAuth(async (request: NextRequest, session) => {
       session,
       `SELECT id, kind, started_at::text, ended_at::text, place_label, zone,
               latitude, longitude, suggested_activity_type, status, activity_entry_id,
-              distance_meters, vehicle_id, vehicle_session_id,
+              distance_meters, vehicle_id, vehicle_session_id, is_likely_noise,
               ROUND((distance_meters / 1609.344)::numeric, 1)::float8 AS estimated_miles
        FROM location_segments
        WHERE account_id = $1
