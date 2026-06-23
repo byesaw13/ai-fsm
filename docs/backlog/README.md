@@ -64,7 +64,7 @@ tasks in `done/`.
 
 ## Task index
 
-Next available ID: **TASK-040**.
+Next available ID: **TASK-041**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -106,6 +106,7 @@ Next available ID: **TASK-040**.
 | TASK-036 | PR Gatekeeper MCP Server | 005 | In Progress |
 | TASK-038 | Surface consolidation (one daily home) | 006 | Done |
 | TASK-039 | Job & estimate numbering | 005 | Proposed |
+| TASK-040 | False-drive detection | 001 | In Progress |
 
 ## Status legend
 

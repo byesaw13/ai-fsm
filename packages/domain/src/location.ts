@@ -80,3 +80,39 @@ export function suggestActivityForSegment(input: {
   if (input.kind === "drive") return "travel";
   return suggestActivityForZone(input.zone);
 }
+
+// ---------------------------------------------------------------------------
+// False-drive detection
+// ---------------------------------------------------------------------------
+
+/**
+ * How a captured drive looks once it closes:
+ * - "noise"   → the vehicle never really went anywhere (parked Bluetooth cycle,
+ *               GPS drift, or a sub-minute/teleport blip). Auto-dismissed.
+ * - "suspect" → borderline, below walking pace (1–3 km/h). Kept but flagged so
+ *               the owner can clear it in one tap.
+ * - "ok"      → a real trip (or distance unknown, so we can't judge — keep it).
+ */
+export type DriveClassification = "ok" | "suspect" | "noise";
+
+const NOISE_MAX_KMH = 1; // at/under this, the vehicle didn't really move
+const SUSPECT_MAX_KMH = 3; // below walking pace — borderline
+const MIN_DRIVE_SECONDS = 60; // shorter than this is a blip/teleport, not a trip
+
+/**
+ * Classify a closed drive by its average speed. Pure — the single source of
+ * truth shared by the capture route and the backfill migration.
+ */
+export function classifyDrive(input: {
+  distanceMeters: number | null;
+  durationSeconds: number;
+}): DriveClassification {
+  const { distanceMeters, durationSeconds } = input;
+  if (durationSeconds < MIN_DRIVE_SECONDS) return "noise";
+  // Distance unknown (too few GPS points) → can't judge; keep the drive.
+  if (distanceMeters == null) return "ok";
+  const avgKmh = distanceMeters / 1000 / (durationSeconds / 3600);
+  if (avgKmh < NOISE_MAX_KMH) return "noise";
+  if (avgKmh < SUSPECT_MAX_KMH) return "suspect";
+  return "ok";
+}

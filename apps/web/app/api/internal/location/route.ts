@@ -3,7 +3,7 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { getPool, queryOne } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { DETECTED_ACTIVITIES, LOCATION_EVENT_KINDS, haversineMeters, pathDistanceMeters } from "@ai-fsm/domain";
+import { DETECTED_ACTIVITIES, LOCATION_EVENT_KINDS, classifyDrive, haversineMeters, pathDistanceMeters } from "@ai-fsm/domain";
 import { reduceLocationEvent, type OpenSegment } from "@/lib/location/segments";
 
 export const dynamic = "force-dynamic";
@@ -212,11 +212,28 @@ export async function POST(req: NextRequest) {
           );
         }
       }
+      // Classify a closing drive by average speed: auto-dismiss the obvious
+      // noise (parked Bluetooth cycle, GPS drift, sub-minute blip) and flag the
+      // borderline so the owner can clear it in one tap. Shared rule:
+      // classifyDrive (packages/domain). Stops are never classified.
+      let isLikelyNoise = false;
+      let dismissAsNoise = false;
+      if (open.kind === "drive") {
+        const durationSeconds =
+          (new Date(mut.closeOpen.endedAt).getTime() - new Date(open.startedAt).getTime()) / 1000;
+        const cls = classifyDrive({ distanceMeters, durationSeconds });
+        isLikelyNoise = cls !== "ok";
+        dismissAsNoise = cls === "noise";
+      }
       await client.query(
         `UPDATE location_segments
-         SET ended_at = $1, distance_meters = COALESCE($4, distance_meters), updated_at = now()
+         SET ended_at = $1,
+             distance_meters = COALESCE($4, distance_meters),
+             is_likely_noise = $5,
+             status = CASE WHEN $6 THEN 'dismissed' ELSE status END,
+             updated_at = now()
          WHERE id = $2 AND account_id = $3 AND ended_at IS NULL`,
-        [mut.closeOpen.endedAt, open.id, accountId, distanceMeters],
+        [mut.closeOpen.endedAt, open.id, accountId, distanceMeters, isLikelyNoise, dismissAsNoise],
       );
     }
     if (mut.updateOpen && open) {
