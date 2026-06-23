@@ -30,8 +30,10 @@ export default function LoginPage() {
         return;
       }
 
-      // Full page navigation so the session cookie is included in the next request
-      window.location.href = "/app/jobs";
+      // Full page navigation so the session cookie is included in the next request.
+      // Everyone lands on My Day (the daily home); pure admins are bounced to the
+      // office dashboard by the redirect in app/app/my-day/page.tsx.
+      window.location.href = "/app/my-day";
     } catch {
       setError("An unexpected error occurred");
       setLoading(false);
