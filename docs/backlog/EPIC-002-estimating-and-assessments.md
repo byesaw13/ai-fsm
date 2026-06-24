@@ -128,9 +128,19 @@ confirms/edits, or adds manually), plus a status-grouped list and a "Work Orders
 item. Entry point: a "Create Work Order →" button on the assessment page. Owner edits
 preserved.
 
+Slice 4 shipped: completed work orders feed the Property Timeline. Migration
+`db/migrations/126_property_timeline_work_orders.sql` adds a `work_order` arm to
+`property_timeline_v` (status='completed', `occurred_at=completed_at`, `total_cents`,
+`link_id` → work order, `detail` = materials-used summary, metadata carries
+`materials` + `materials_count`); the property page renders it via a "Work Order"
+event type (`apps/web/app/app/properties/[id]/PropertyTimeline.tsx`) linking to
+`/app/work-orders/<id>`, and the timeline API allows the `work_order` filter. So a
+completed work order now shows on the property: what was done, when, materials used,
+and total.
+
 Remaining (In Progress): make persistence the *primary* estimate source (not just
-a fallback); Slice 4 — completed work orders feed the Property Timeline (UNION view);
-warranty tracking, opportunities, and invoice generation from a work order.
+a fallback); warranty tracking, opportunities, and invoice generation from a work
+order.
 
 ## Completed
 
