@@ -12,7 +12,7 @@ import {
 } from "@ai-fsm/domain";
 import { useEstimateAI } from "./useEstimateAI";
 import {
-  consumeAssessmentContext,
+  resolveAssessmentContext,
   type AssessmentContext,
 } from "@/lib/estimates/assessment-context";
 import type { ShoppingList, SpecifiedMaterial, RoomSpec, ProjectOptions, PaintingProjectResult } from "@ai-fsm/domain";
@@ -75,6 +75,9 @@ export interface NewEstimateFormProps {
   initialNotes?: string;
   /** Booking request that originated this estimate — stored for chain traceability. */
   bookingRequestId?: string;
+  /** Server-loaded assessment summary, used to recover context when the
+   * sessionStorage hand-off is missing (refresh / deep-link). TASK-018 slice 2. */
+  serverAssessmentContext?: AssessmentContext | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -94,6 +97,7 @@ export function useEstimateForm({
   initialInterviewDraft,
   initialNotes,
   bookingRequestId,
+  serverAssessmentContext = null,
 }: NewEstimateFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -166,7 +170,10 @@ export function useEstimateForm({
   // assessment (from_assessment=1) — a plain new-estimate never inherits stale
   // context left behind by an abandoned hand-off.
   const [assessmentContext] = useState<AssessmentContext | null>(() =>
-    consumeAssessmentContext(searchParams.get("from_assessment") === "1")
+    resolveAssessmentContext(
+      searchParams.get("from_assessment") === "1",
+      serverAssessmentContext
+    )
   );
 
   const [tripCount, setTripCount] = useState<"one_trip" | "multi_trip">("one_trip");

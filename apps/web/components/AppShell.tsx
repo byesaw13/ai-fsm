@@ -68,6 +68,7 @@ const ADMIN_NAV_SECTIONS: NavSection[] = [
       NAV_PROPS,
       { href: "/app/estimates", label: "Estimates",  Icon: IconEstimates, adminOnly: true },
       NAV_JOBS,
+      { href: "/app/work-orders", label: "Work Orders", Icon: IconJobs, adminOnly: true },
       { href: "/app/schedule",  label: "Schedule",   Icon: IconSchedule,  adminOnly: true },
       NAV_INVOICES,
       NAV_REPORTS,

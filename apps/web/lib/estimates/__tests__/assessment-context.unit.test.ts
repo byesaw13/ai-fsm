@@ -12,8 +12,58 @@ import {
   readAssessmentContext,
   clearAssessmentContext,
   consumeAssessmentContext,
+  resolveAssessmentContext,
+  preserveScope,
   type AssessmentContext,
 } from "../assessment-context";
+
+const ctx = (desc: string): AssessmentContext => ({
+  generatedJobDescription: desc,
+  rooms: [],
+  visitId: "v1",
+  assessmentId: "a1",
+});
+
+describe("resolveAssessmentContext (persisted recovery — TASK-018 slice 2)", () => {
+  it("uses the sessionStorage context when present (server fallback ignored)", () => {
+    const read = vi.fn(() => ctx("from-storage"));
+    const clear = vi.fn();
+    const out = resolveAssessmentContext(true, ctx("from-server"), { read, clear });
+    expect(out?.generatedJobDescription).toBe("from-storage");
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it("recovers from the server context when sessionStorage is missing (refresh/deep-link)", () => {
+    const read = vi.fn(() => null);
+    const clear = vi.fn();
+    const out = resolveAssessmentContext(true, ctx("from-server"), { read, clear });
+    expect(out?.generatedJobDescription).toBe("from-server");
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it("returns null and still clears when not opened from an assessment", () => {
+    const read = vi.fn(() => ctx("from-storage"));
+    const clear = vi.fn();
+    const out = resolveAssessmentContext(false, ctx("from-server"), { read, clear });
+    expect(out).toBeNull();
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it("returns null when neither source has context", () => {
+    expect(
+      resolveAssessmentContext(true, null, { read: () => null, clear: () => {} })
+    ).toBeNull();
+  });
+});
+
+describe("preserveScope (manual-edit preservation)", () => {
+  it("keeps the owner's typed text once the field is dirty", () => {
+    expect(preserveScope("owner edit", "fresh default", true)).toBe("owner edit");
+  });
+  it("adopts the incoming default while the field is untouched", () => {
+    expect(preserveScope("", "fresh default", false)).toBe("fresh default");
+  });
+});
 
 function makeSessionStorage() {
   const store = new Map<string, string>();

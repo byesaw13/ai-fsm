@@ -120,3 +120,35 @@ export function consumeAssessmentContext(
   deps.clear();
   return fromAssessment ? ctx : null;
 }
+
+/**
+ * Resolve the assessment context for an estimate-form mount, recovering from the
+ * persisted summary when the sessionStorage hand-off is missing (TASK-018 slice
+ * 2). sessionStorage wins when present (it reflects the live form); otherwise we
+ * fall back to the server-loaded summary so a refresh / deep-link / navigation
+ * still recovers the assessment. Storage is always cleared, like consume.
+ *
+ * Only applies when the estimate was opened from an assessment (`fromAssessment`).
+ */
+export function resolveAssessmentContext(
+  fromAssessment: boolean,
+  serverContext: AssessmentContext | null,
+  deps: { read: () => AssessmentContext | null; clear: () => void } = {
+    read: readAssessmentContext,
+    clear: clearAssessmentContext,
+  },
+): AssessmentContext | null {
+  const stored = deps.read();
+  deps.clear();
+  if (!fromAssessment) return null;
+  return stored ?? serverContext ?? null;
+}
+
+/**
+ * Decide the next scope value when a fresh default arrives: keep the owner's
+ * typed text once they've edited the field, otherwise adopt the incoming
+ * default. The single rule that protects manual edits across re-renders.
+ */
+export function preserveScope(typed: string, incoming: string, dirty: boolean): string {
+  return dirty ? typed : incoming;
+}
