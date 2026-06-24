@@ -115,8 +115,22 @@ manual-edit guard a tested pure rule. A pure `buildWorkOrderDraft`
 (`packages/domain/src/work-order.ts`) maps a summary → work-order draft but is
 NOT wired into any UI. Owner edits preserved.
 
+Slice 3 shipped: a real, persisted `work_orders` entity (+ `work_order_materials`
+child) created from a site assessment. `buildWorkOrderDraft(summary)` →
+`{ title, scope, siteNotes, safetyNotes, roomBreakdown, materials }`
+(`packages/domain/src/work-order.ts`); migration `db/migrations/125_work_orders.sql`
+(account RLS, status lifecycle draft→scheduled→in_progress→completed→cancelled,
+`property_id` + `completed_at` + materials child kept for the Slice 4 timeline UNION);
+API `apps/web/app/api/v1/work-orders/` (GET/POST + `[id]` GET/PATCH); a Work Order
+Create/Edit screen (`apps/web/app/app/work-orders/`) where the owner edits everything,
+materials are a happy medium (AI-suggested via the estimate materials generator, owner
+confirms/edits, or adds manually), plus a status-grouped list and a "Work Orders" nav
+item. Entry point: a "Create Work Order →" button on the assessment page. Owner edits
+preserved.
+
 Remaining (In Progress): make persistence the *primary* estimate source (not just
-a fallback) and build real work-order / invoice consumption.
+a fallback); Slice 4 — completed work orders feed the Property Timeline (UNION view);
+warranty tracking, opportunities, and invoice generation from a work order.
 
 ## Completed
 

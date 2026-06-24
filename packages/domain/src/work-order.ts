@@ -1,57 +1,110 @@
 /**
- * Work-order draft mapping (TASK-018 slice 2).
+ * Work-order draft mapping (TASK-018).
  *
- * A pure map from the canonical AssessmentSummary into a work-order draft shape.
- * This exists so a future work-order UI has a ready contract to consume — it is
- * NOT wired into any UI yet (out of scope for this slice).
+ * Pure maps from the canonical AssessmentSummary (and AI material suggestions)
+ * into the editable work-order draft the Create-from-Assessment screen seeds.
  */
 
 import type { AssessmentRoom, AssessmentSummary } from "./assessment-summary";
 
-export interface WorkOrderTask {
-  /** Room/area this task is for, or null when it isn't room-specific. */
-  room: string | null;
+function formatRoomDimensions(room: AssessmentRoom): string | null {
+  if (room.length_ft && room.width_ft) {
+    let dims = `${room.length_ft} x ${room.width_ft} ft`;
+    if (room.height_ft) dims += `, ${room.height_ft} ft ceiling`;
+    return dims;
+  }
+  if (room.height_ft) return `${room.height_ft} ft ceiling`;
+  return null;
+}
+
+export interface WorkOrderRoomLine {
+  name: string;
+  /** Human-readable dimensions, or null when not measured. */
+  dimensions: string | null;
   description: string;
+}
+
+export interface WorkOrderMaterialDraft {
+  description: string;
+  quantity: number;
+  unitCents: number;
+  totalCents: number;
+  /** True when this row was AI-suggested (vs owner-entered) and awaits confirm. */
+  suggested: boolean;
 }
 
 export interface WorkOrderDraft {
   title: string;
-  scopeDescription: string;
-  rooms: AssessmentRoom[];
-  tasks: WorkOrderTask[];
-  /** Site conditions surfaced from the assessment (pets, access, risks). */
-  siteConditions: string[];
-  /** Traceability back to the originating assessment. */
+  scope: string;
+  /** Access / logistics notes (access notes, pets, difficult access). */
+  siteNotes: string;
+  /** Hazard notes (asbestos, lead paint). */
+  safetyNotes: string;
+  roomBreakdown: WorkOrderRoomLine[];
+  materials: WorkOrderMaterialDraft[];
+  /** Traceability back to the originating assessment (for the property timeline). */
   sourceVisitId: string | null;
   sourceAssessmentId: string | null;
 }
 
-/** Build a work-order draft from a canonical assessment summary. Pure. */
+/**
+ * Build an editable work-order draft from a canonical assessment summary. Pure.
+ * Materials start empty — the screen seeds suggestions on demand and the owner
+ * confirms/edits them.
+ */
 export function buildWorkOrderDraft(summary: AssessmentSummary): WorkOrderDraft {
-  const rooms = summary.rooms;
-  const tasks: WorkOrderTask[] = rooms.map((r) => ({
-    room: r.name || null,
+  const roomBreakdown: WorkOrderRoomLine[] = summary.rooms.map((r) => ({
+    name: r.name || "Area",
+    dimensions: formatRoomDimensions(r),
     description: (r.notes && r.notes.trim()) || `Work in ${r.name || "area"}`,
   }));
 
-  const siteConditions: string[] = [];
-  if (summary.hasPets) siteConditions.push("pets on site");
-  if (summary.difficultAccess) siteConditions.push("difficult access");
-  if (summary.asbestosRisk) siteConditions.push("asbestos risk");
-  if (summary.leadPaintRisk) siteConditions.push("lead paint risk");
+  const siteParts: string[] = [];
+  if (summary.accessNotes && summary.accessNotes.trim()) siteParts.push(summary.accessNotes.trim());
+  if (summary.hasPets) siteParts.push("Pets on site.");
+  if (summary.difficultAccess) siteParts.push("Difficult access.");
 
-  const roomCount = rooms.length;
+  const safetyParts: string[] = [];
+  if (summary.asbestosRisk) safetyParts.push("Asbestos risk — confirm before disturbing surfaces.");
+  if (summary.leadPaintRisk) safetyParts.push("Lead paint risk — follow RRP precautions.");
+
+  const roomCount = roomBreakdown.length;
   const title = roomCount > 0
     ? `Work order — ${roomCount} ${roomCount === 1 ? "area" : "areas"}`
     : "Work order";
 
   return {
     title,
-    scopeDescription: summary.generatedJobDescription,
-    rooms,
-    tasks,
-    siteConditions,
+    scope: summary.generatedJobDescription,
+    siteNotes: siteParts.join(" "),
+    safetyNotes: safetyParts.join(" "),
+    roomBreakdown,
+    materials: [],
     sourceVisitId: summary.visitId,
     sourceAssessmentId: summary.assessmentId,
   };
+}
+
+/** A material item from the AI materials generator (subset we map from). */
+export interface SuggestedMaterialItem {
+  name: string;
+  brand?: string | null;
+  quantity: number;
+  unit?: string;
+  unit_cost_cents: number;
+  total_cost_cents: number;
+}
+
+/**
+ * Map AI material suggestions into draft material rows the owner confirms/edits.
+ * Pure — keeps the "suggested" provenance so the UI can mark them for review.
+ */
+export function materialItemsToDraft(items: SuggestedMaterialItem[]): WorkOrderMaterialDraft[] {
+  return items.map((m) => ({
+    description: `${m.name}${m.brand ? ` (${m.brand})` : ""}${m.unit ? ` — ${m.quantity} ${m.unit}` : ""}`.trim(),
+    quantity: m.quantity > 0 ? m.quantity : 1,
+    unitCents: Math.max(0, Math.round(m.unit_cost_cents)),
+    totalCents: Math.max(0, Math.round(m.total_cost_cents)),
+    suggested: true,
+  }));
 }

@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { buildAssessmentJobDescription } from "@ai-fsm/domain";
 import { useToast } from "@/components/ui";
 import { writeAssessmentContext } from "@/lib/estimates/assessment-context";
@@ -549,6 +550,20 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
             className="p7-btn p7-btn-primary p7-btn-sm"
           >
             {completing ? "Completing…" : "Mark Assessment Complete"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const params = new URLSearchParams();
+              if (clientId) params.set("client_id", clientId);
+              if (jobId) params.set("job_id", jobId);
+              if (propertyId) params.set("property_id", propertyId);
+              params.set("visit_id", visitId);
+              router.push(`/app/work-orders/new?${params.toString()}` as Route);
+            }}
+            className="p7-btn p7-btn-ghost p7-btn-sm"
+          >
+            Create Work Order →
           </button>
           <a href={`/app/visits/${visitId}`} className="p7-btn p7-btn-ghost p7-btn-sm">
             Back to Visit

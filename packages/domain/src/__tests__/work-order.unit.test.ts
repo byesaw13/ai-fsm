@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { buildWorkOrderDraft, buildAssessmentSummary } from "../index";
+import { buildWorkOrderDraft, materialItemsToDraft, buildAssessmentSummary } from "../index";
 
 describe("buildWorkOrderDraft", () => {
-  it("maps a summary into a work-order draft with tasks + conditions + traceability", () => {
+  it("maps a summary into an editable draft (scope, site/safety, rooms, traceability)", () => {
     const summary = buildAssessmentSummary({
       visitId: "v1",
       assessmentId: "a1",
@@ -11,19 +11,22 @@ describe("buildWorkOrderDraft", () => {
         { id: "r2", name: "Hall", length_ft: null, width_ft: null, height_ft: null, notes: "" },
       ],
       scopeNotes: "Two-room refresh",
+      accessNotes: "side door, lockbox 1234",
       hasPets: true,
       asbestosRisk: true,
     });
     const draft = buildWorkOrderDraft(summary);
 
     expect(draft.title).toBe("Work order — 2 areas");
-    expect(draft.scopeDescription).toBe(summary.generatedJobDescription);
-    expect(draft.rooms).toHaveLength(2);
-    expect(draft.tasks).toEqual([
-      { room: "Kitchen", description: "replace backsplash" },
-      { room: "Hall", description: "Work in Hall" }, // falls back when no notes
+    expect(draft.scope).toBe(summary.generatedJobDescription);
+    expect(draft.roomBreakdown).toEqual([
+      { name: "Kitchen", dimensions: "12 x 10 ft, 8 ft ceiling", description: "replace backsplash" },
+      { name: "Hall", dimensions: null, description: "Work in Hall" },
     ]);
-    expect(draft.siteConditions).toEqual(["pets on site", "asbestos risk"]);
+    expect(draft.siteNotes).toContain("side door, lockbox 1234");
+    expect(draft.siteNotes).toContain("Pets on site.");
+    expect(draft.safetyNotes).toContain("Asbestos risk");
+    expect(draft.materials).toEqual([]); // seeded on demand, not auto
     expect(draft.sourceVisitId).toBe("v1");
     expect(draft.sourceAssessmentId).toBe("a1");
   });
@@ -31,8 +34,21 @@ describe("buildWorkOrderDraft", () => {
   it("handles an empty assessment", () => {
     const draft = buildWorkOrderDraft(buildAssessmentSummary({}));
     expect(draft.title).toBe("Work order");
-    expect(draft.tasks).toEqual([]);
-    expect(draft.siteConditions).toEqual([]);
+    expect(draft.roomBreakdown).toEqual([]);
+    expect(draft.siteNotes).toBe("");
+    expect(draft.safetyNotes).toBe("");
     expect(draft.sourceVisitId).toBeNull();
+  });
+});
+
+describe("materialItemsToDraft", () => {
+  it("maps AI material suggestions into confirmable draft rows", () => {
+    const rows = materialItemsToDraft([
+      { name: "Drywall sheet", brand: "USG", quantity: 6, unit: "sheets", unit_cost_cents: 1200, total_cost_cents: 7200 },
+      { name: "Joint compound", quantity: 2, unit_cost_cents: 1500, total_cost_cents: 3000 },
+    ]);
+    expect(rows[0]).toEqual({ description: "Drywall sheet (USG) — 6 sheets", quantity: 6, unitCents: 1200, totalCents: 7200, suggested: true });
+    expect(rows[1].description).toBe("Joint compound");
+    expect(rows[1].suggested).toBe(true);
   });
 });
