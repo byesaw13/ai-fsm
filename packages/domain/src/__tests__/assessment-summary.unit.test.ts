@@ -45,8 +45,29 @@ describe("buildAssessmentSummary", () => {
       asbestosRisk: false,
       leadPaintRisk: false,
       totalSqft: null,
+      workItems: [],
+      prepNotes: null,
+      tradeNotes: {},
+      customerSuppliedMaterials: null,
       generatedJobDescription: "",
     });
+  });
+
+  it("carries work items, prep, trade notes, and customer-supplied materials", () => {
+    const summary = buildAssessmentSummary({
+      scopeNotes: "Kitchen refresh",
+      workItems: ["  patch 3 drywall holes  ", "", "paint ceiling"],
+      prepNotes: "Mask cabinets",
+      tradeNotes: { painting: "two coats, eggshell" },
+      customerSuppliedMaterials: "customer supplies paint",
+    });
+    expect(summary.workItems).toEqual(["patch 3 drywall holes", "paint ceiling"]);
+    expect(summary.prepNotes).toBe("Mask cabinets");
+    expect(summary.tradeNotes.painting).toBe("two coats, eggshell");
+    expect(summary.customerSuppliedMaterials).toBe("customer supplies paint");
+    // The same fields flow into the generated description.
+    expect(summary.generatedJobDescription).toContain("patch 3 drywall holes");
+    expect(summary.generatedJobDescription).toContain("customer supplies paint");
   });
 
   it("coerces nullish room dimensions/notes to the canonical shape", () => {

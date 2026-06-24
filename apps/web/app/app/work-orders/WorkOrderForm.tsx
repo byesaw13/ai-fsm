@@ -82,7 +82,12 @@ export function WorkOrderForm(props: WorkOrderFormProps) {
       const res = await fetch(`/api/v1/estimates/ai-materials`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope: scope.trim() || title, job_type: "general" }),
+        body: JSON.stringify({
+          scope: scope.trim() || title,
+          job_type: "general",
+          ...(props.sourceVisitId ? { visit_id: props.sourceVisitId } : {}),
+          ...(props.sourceAssessmentId ? { assessment_id: props.sourceAssessmentId } : {}),
+        }),
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));

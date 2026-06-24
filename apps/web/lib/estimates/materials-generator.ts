@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { ASSESSMENT_TRADE_LABELS, type AssessmentSummary, type AssessmentTradeKey } from "@ai-fsm/domain";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,6 +43,12 @@ export interface MaterialsResult {
   items: MaterialItem[];
   summary_notes: string;
   total_cost_cents: number;
+  /** Judgement calls the estimator made (item counts inferred, design assumed, …). */
+  assumptions: string[];
+  /** Measurements the assessment is missing that would sharpen the estimate. */
+  missing_measurements: string[];
+  /** Materials the customer is supplying — deliberately left off the purchase list. */
+  excluded_customer_supplied_items: string[];
 }
 
 export interface GenerateMaterialsInput {
@@ -51,6 +58,12 @@ export interface GenerateMaterialsInput {
   saved_materials?: SavedMaterial[];
   // account-level pricing preferences
   material_markup_pct?: number;
+  /**
+   * Canonical site assessment, when this estimate is assessment-driven. When
+   * present it is the source of truth: room notes, prep notes, site conditions,
+   * and customer-supplied materials all feed the materials list (TASK-018).
+   */
+  assessmentSummary?: AssessmentSummary;
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +105,15 @@ const SYSTEM_PROMPT = `You are a materials estimator for Dovetails Services LLC,
 - 80lb concrete bag: ~$7–8. 60lb: ~$5.50–6.
 - Standard drywall 4x8 sheet: ~$15–18. Moisture resistant: ~$22–25.
 - Joist hangers (single): ~$1.50–2 each. Post bases (4x4): ~$12–15 each.
-- Generate a maximum of 25 line items — consolidate where sensible`;
+- Generate a maximum of 25 line items — consolidate where sensible
+
+## Working from a site assessment
+When a "Site assessment" section is provided, treat it as the source of truth — it is what the tradesperson observed on site. Build the materials list from the assessment, not from a generic reading of the job type:
+- Convert assessment observations into concrete material needs. Room notes describe real work — turn them into consumables (e.g. "patch 3 drywall holes" → spackle, sanding sponge, primer; "replace 3 can lights" → LED retrofit trims, wire nuts).
+- Honor site conditions: lead paint risk → containment/encapsulation supplies; difficult access → note it; pets on site → no exclusions unless materials are affected.
+- Do NOT include customer-supplied materials as Dovetails purchase items. If the scope, customer-supplied list, or a room note says the customer is providing something (e.g. "customer supplies paint"), leave it off the purchase list and record it in excluded_customer_supplied_items.
+- Flag missing measurements instead of guessing silently. If a quantity depends on a measurement the assessment didn't capture (no dimensions for a room you must paint, unknown linear feet of trim), still give a best-effort line marked "estimated", and add a plain-language note to missing_measurements describing what to measure.
+- Keep calculated and estimated quantities separate via the confidence field, and list the judgement calls you made in assumptions.`;
 
 const MATERIALS_TOOL: Anthropic.Tool = {
   name: "generate_materials_list",
@@ -129,6 +150,21 @@ const MATERIALS_TOOL: Anthropic.Tool = {
         type: "string",
         description: "1–3 sentence summary: total material scope, any items that need measurement confirmation, any items that should be bought after on-site verification",
       },
+      assumptions: {
+        type: "array",
+        items: { type: "string" },
+        description: "Judgement calls made when the assessment was incomplete (item counts inferred, design choices assumed). Empty array if none.",
+      },
+      missing_measurements: {
+        type: "array",
+        items: { type: "string" },
+        description: "Measurements the assessment did not capture that would sharpen the estimate, in plain language (e.g. 'ceiling height for the living room'). Empty array if none.",
+      },
+      excluded_customer_supplied_items: {
+        type: "array",
+        items: { type: "string" },
+        description: "Materials the customer is supplying themselves, deliberately left off the purchase list. Empty array if none.",
+      },
     },
   },
 };
@@ -137,7 +173,7 @@ const MATERIALS_TOOL: Anthropic.Tool = {
 // Matcher: link generated items to saved price book entries
 // ---------------------------------------------------------------------------
 
-function matchToSaved(
+export function matchToSaved(
   item: { name: string; category: string; unit: string },
   saved: SavedMaterial[]
 ): SavedMaterial | null {
@@ -156,6 +192,87 @@ function matchToSaved(
 }
 
 // ---------------------------------------------------------------------------
+// User message builder (pure — unit tested)
+// ---------------------------------------------------------------------------
+
+function roomContextLines(rooms: RoomMeasurement[] | undefined): string | null {
+  if (!rooms || rooms.length === 0) return null;
+  const lines = rooms
+    .filter((r) => r.name || r.length_ft)
+    .map((r) => {
+      const dims =
+        r.length_ft && r.width_ft
+          ? `${r.length_ft}ft × ${r.width_ft}ft${r.height_ft ? ` × ${r.height_ft}ft ceiling` : ""} = ${(r.length_ft * r.width_ft).toFixed(0)} sqft floor`
+          : "(dimensions not recorded)";
+      return `- ${r.name || "Area"}: ${dims}${r.notes ? ` — ${r.notes}` : ""}`;
+    });
+  return lines.length > 0 ? lines.join("\n") : null;
+}
+
+/**
+ * Build the user message for the materials generator. When an assessment
+ * summary is present it becomes the primary, source-of-truth context block;
+ * otherwise the message falls back to the plain scope + room measurements.
+ * Pure so it can be unit-tested without calling Claude.
+ */
+export function buildMaterialsUserMessage(input: GenerateMaterialsInput): string {
+  const a = input.assessmentSummary;
+  const roomContext = roomContextLines(input.rooms);
+  const markupLine = input.material_markup_pct
+    ? `\nNote: owner applies ${input.material_markup_pct}% markup to material costs.`
+    : "";
+
+  if (!a) {
+    return [
+      `Job type: ${input.job_type}`,
+      `Scope: ${input.scope}`,
+      roomContext ? `\nRoom measurements:\n${roomContext}` : "",
+      markupLine,
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  // Assessment-driven: lead with the assessment as the source of truth.
+  const conditions: string[] = [];
+  if (a.hasPets) conditions.push("pets on site");
+  if (a.difficultAccess) conditions.push("difficult access");
+  if (a.asbestosRisk) conditions.push("asbestos risk");
+  if (a.leadPaintRisk) conditions.push("lead paint risk");
+
+  const tradeLines = (Object.keys(ASSESSMENT_TRADE_LABELS) as AssessmentTradeKey[])
+    .map((t) => {
+      const note = (a.tradeNotes?.[t] ?? "").trim();
+      return note ? `- ${ASSESSMENT_TRADE_LABELS[t]}: ${note}` : null;
+    })
+    .filter(Boolean) as string[];
+
+  const sections: string[] = [
+    `Job type: ${input.job_type}`,
+    `## Site assessment (source of truth)`,
+    (a.scopeNotes ?? "").trim() || input.scope,
+  ];
+
+  if (a.workItems.length > 0) {
+    sections.push(`Work items:\n${a.workItems.map((w) => `- ${w}`).join("\n")}`);
+  }
+  if (roomContext) sections.push(`Rooms / areas:\n${roomContext}`);
+  if (a.totalSqft && a.totalSqft > 0) sections.push(`Total area: ${Math.round(a.totalSqft)} sqft`);
+  if ((a.prepNotes ?? "").trim()) sections.push(`Prep requirements: ${a.prepNotes!.trim()}`);
+  if (tradeLines.length > 0) sections.push(`Trade notes:\n${tradeLines.join("\n")}`);
+  if (conditions.length > 0) sections.push(`Site conditions: ${conditions.join("; ")}`);
+  if ((a.accessNotes ?? "").trim()) sections.push(`Access: ${a.accessNotes!.trim()}`);
+  if ((a.customerSuppliedMaterials ?? "").trim()) {
+    sections.push(
+      `Customer-supplied materials (DO NOT include as purchase items — list in excluded_customer_supplied_items): ${a.customerSuppliedMaterials!.trim()}`
+    );
+  }
+  if (markupLine) sections.push(markupLine.trim());
+
+  return sections.filter(Boolean).join("\n\n");
+}
+
+// ---------------------------------------------------------------------------
 // Generator
 // ---------------------------------------------------------------------------
 
@@ -164,31 +281,7 @@ export async function generateMaterials(
 ): Promise<MaterialsResult> {
   const client = new Anthropic();
 
-  // Build room context string
-  const roomContext =
-    input.rooms && input.rooms.length > 0
-      ? input.rooms
-          .filter((r) => r.name || r.length_ft)
-          .map((r) => {
-            const dims =
-              r.length_ft && r.width_ft
-                ? `${r.length_ft}ft × ${r.width_ft}ft${r.height_ft ? ` × ${r.height_ft}ft ceiling` : ""} = ${(r.length_ft * r.width_ft).toFixed(0)} sqft floor`
-                : "(dimensions not recorded)";
-            return `- ${r.name || "Area"}: ${dims}${r.notes ? ` — ${r.notes}` : ""}`;
-          })
-          .join("\n")
-      : null;
-
-  const userMessage = [
-    `Job type: ${input.job_type}`,
-    `Scope: ${input.scope}`,
-    roomContext ? `\nRoom measurements:\n${roomContext}` : "",
-    input.material_markup_pct
-      ? `\nNote: owner applies ${input.material_markup_pct}% markup to material costs.`
-      : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const userMessage = buildMaterialsUserMessage(input);
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
@@ -224,7 +317,13 @@ export async function generateMaterials(
       notes: string;
     }>;
     summary_notes: string;
+    assumptions?: string[];
+    missing_measurements?: string[];
+    excluded_customer_supplied_items?: string[];
   };
+
+  const cleanList = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((s): s is string => typeof s === "string" && s.trim() !== "") : [];
 
   const saved = input.saved_materials ?? [];
 
@@ -255,5 +354,8 @@ export async function generateMaterials(
     items,
     summary_notes: raw.summary_notes,
     total_cost_cents,
+    assumptions: cleanList(raw.assumptions),
+    missing_measurements: cleanList(raw.missing_measurements),
+    excluded_customer_supplied_items: cleanList(raw.excluded_customer_supplied_items),
   };
 }

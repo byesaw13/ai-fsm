@@ -64,6 +64,13 @@ export function mapRowToAssessmentSummary(row: SiteVisitAssessmentRow): Assessme
   });
 }
 
+const ASSESSMENT_SELECT = `SELECT a.id, a.visit_id, a.rooms, a.scope_notes, a.access_notes,
+            a.has_pets, a.difficult_access, a.asbestos_risk, a.lead_paint_risk,
+            a.total_sqft,
+            (SELECT COUNT(*) FROM visit_media m
+              WHERE m.visit_id = a.visit_id AND m.category = 'assessment') AS photo_count
+     FROM site_visit_assessments a`;
+
 /** Load the canonical assessment summary for a visit, or null if none exists. */
 export async function loadAssessmentSummary(
   session: SessionPayload,
@@ -71,14 +78,21 @@ export async function loadAssessmentSummary(
 ): Promise<AssessmentSummary | null> {
   const rows = await queryForSession<SiteVisitAssessmentRow>(
     session,
-    `SELECT a.id, a.visit_id, a.rooms, a.scope_notes, a.access_notes,
-            a.has_pets, a.difficult_access, a.asbestos_risk, a.lead_paint_risk,
-            a.total_sqft,
-            (SELECT COUNT(*) FROM visit_media m
-              WHERE m.visit_id = a.visit_id AND m.category = 'assessment') AS photo_count
-     FROM site_visit_assessments a
-     WHERE a.visit_id = $1 AND a.account_id = $2`,
+    `${ASSESSMENT_SELECT} WHERE a.visit_id = $1 AND a.account_id = $2`,
     [visitId, session.accountId]
+  );
+  return rows[0] ? mapRowToAssessmentSummary(rows[0]) : null;
+}
+
+/** Load the canonical assessment summary by assessment id, or null if none exists. */
+export async function loadAssessmentSummaryById(
+  session: SessionPayload,
+  assessmentId: string
+): Promise<AssessmentSummary | null> {
+  const rows = await queryForSession<SiteVisitAssessmentRow>(
+    session,
+    `${ASSESSMENT_SELECT} WHERE a.id = $1 AND a.account_id = $2`,
+    [assessmentId, session.accountId]
   );
   return rows[0] ? mapRowToAssessmentSummary(rows[0]) : null;
 }

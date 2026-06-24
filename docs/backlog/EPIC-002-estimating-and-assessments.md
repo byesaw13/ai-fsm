@@ -138,9 +138,29 @@ event type (`apps/web/app/app/properties/[id]/PropertyTimeline.tsx`) linking to
 completed work order now shows on the property: what was done, when, materials used,
 and total.
 
+Assessment-powered materials generator shipped: the materials generator now
+consumes the canonical `AssessmentSummary` as its primary context.
+`/api/v1/estimates/ai-materials` accepts `assessment_id` / `visit_id` (loads the
+summary server-side via `loadAssessmentSummary` / `loadAssessmentSummaryById`) or a
+client `assessment_summary` fallback; `scope`/`job_type` are optional and derived
+from the summary when absent. The canonical `AssessmentSummary` gained
+`workItems` / `prepNotes` / `tradeNotes` / `customerSuppliedMaterials` (no new
+tables — populated when capture exists). The prompt now uses the assessment as the
+source of truth: converts room/prep notes into consumables, excludes
+customer-supplied materials from the purchase list, and flags missing measurements
+instead of guessing. `MaterialsResult` gained `assumptions`,
+`missing_measurements`, and `excluded_customer_supplied_items`. Price-book matching
+preserved; the non-assessment scope/rooms flow still works; generation stays
+side-effect-free so owner-edited materials are never overwritten. Both callers
+(estimate `MaterialsGenerator`, work-order `WorkOrderForm`) pass the source
+`visit_id`/`assessment_id`.
+
 Remaining (In Progress): make persistence the *primary* estimate source (not just
-a fallback); warranty tracking, opportunities, and invoice generation from a work
-order.
+a fallback); capture `work_items` / `prep_notes` / `trade_notes` /
+`customer_supplied_materials` on the assessment form (the summary contract and
+generator already consume them); surface the new `assumptions` /
+`missing_measurements` / `excluded_customer_supplied_items` in the materials UI;
+warranty tracking, opportunities, and invoice generation from a work order.
 
 ## Completed
 

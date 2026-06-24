@@ -197,6 +197,14 @@ export interface AssessmentSummary {
   asbestosRisk: boolean;
   leadPaintRisk: boolean;
   totalSqft: number | null;
+  /** Structured scope work items, when the assessment captures them. */
+  workItems: string[];
+  /** Prep requirements (masking, furniture moving, surface prep, …). */
+  prepNotes: string | null;
+  /** Trade-specific notes keyed by trade. */
+  tradeNotes: Partial<Record<AssessmentTradeKey, string>>;
+  /** Materials the customer is supplying themselves (excluded from purchase lists). */
+  customerSuppliedMaterials: string | null;
   generatedJobDescription: string;
 }
 
@@ -212,6 +220,10 @@ export interface AssessmentSummaryBuildInput {
   leadPaintRisk?: boolean;
   totalSqft?: number | null;
   photoCount?: number;
+  workItems?: string[] | null;
+  prepNotes?: string | null;
+  tradeNotes?: Partial<Record<AssessmentTradeKey, string>> | null;
+  customerSuppliedMaterials?: string | null;
 }
 
 /**
@@ -238,6 +250,10 @@ export function buildAssessmentSummary(
   const difficultAccess = input.difficultAccess ?? false;
   const asbestosRisk = input.asbestosRisk ?? false;
   const leadPaintRisk = input.leadPaintRisk ?? false;
+  const workItems = (input.workItems ?? []).map((w) => w.trim()).filter(Boolean);
+  const prepNotes = input.prepNotes ?? null;
+  const tradeNotes = input.tradeNotes ?? {};
+  const customerSuppliedMaterials = input.customerSuppliedMaterials ?? null;
 
   const generatedJobDescription = buildAssessmentJobDescription(
     {
@@ -250,6 +266,10 @@ export function buildAssessmentSummary(
       lead_paint_risk: leadPaintRisk,
       total_sqft: totalSqft,
       photo_count: input.photoCount,
+      work_items: workItems,
+      prep_notes: prepNotes,
+      trade_notes: tradeNotes,
+      customer_supplied_materials: customerSuppliedMaterials,
     },
     options
   );
@@ -265,6 +285,10 @@ export function buildAssessmentSummary(
     asbestosRisk,
     leadPaintRisk,
     totalSqft,
+    workItems,
+    prepNotes,
+    tradeNotes,
+    customerSuppliedMaterials,
     generatedJobDescription,
   };
 }
