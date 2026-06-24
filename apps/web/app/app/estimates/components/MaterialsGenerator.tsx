@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { AssessmentRoom } from "@ai-fsm/domain";
 import { preserveScope } from "@/lib/estimates/assessment-context";
+import { MaterialsMetadata } from "./MaterialsMetadata";
 
 const JOB_TYPES = [
   { value: "deck_build", label: "Deck Build (new)" },
@@ -82,7 +83,14 @@ export function MaterialsGenerator({
   const [jobType, setJobType] = useState(initialJobType);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ items: MaterialItem[]; summary_notes: string; total_cost_cents: number } | null>(null);
+  const [result, setResult] = useState<{
+    items: MaterialItem[];
+    summary_notes: string;
+    total_cost_cents: number;
+    assumptions?: string[];
+    missing_measurements?: string[];
+    excluded_customer_supplied_items?: string[];
+  } | null>(null);
   const [editedItems, setEditedItems] = useState<MaterialItem[]>([]);
   const [savingPrices, setSavingPrices] = useState(false);
   const [saveToBook, setSaveToBook] = useState(true);
@@ -254,6 +262,8 @@ export function MaterialsGenerator({
               {result.summary_notes}
             </div>
           )}
+
+          <MaterialsMetadata metadata={result} />
 
           {Object.entries(grouped).map(([cat, group]) => (
             <div key={cat}>
