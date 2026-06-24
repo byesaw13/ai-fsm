@@ -301,15 +301,17 @@ export async function generateMaterials(
     messages: [{ role: "user", content: userMessage }],
   });
 
+  // A max_tokens stop means generation was cut off — even when the tool call
+  // already emitted a valid `items` array, the response is truncated (e.g.
+  // mid summary_notes or the metadata arrays). Reject it before trusting any
+  // part of the payload rather than returning a partial materials list.
+  if (response.stop_reason === "max_tokens") {
+    throw new Error("Materials list was truncated (hit the token limit) — try a narrower scope");
+  }
+
   const toolUse = response.content.find((b) => b.type === "tool_use");
   if (!toolUse || toolUse.type !== "tool_use") {
-    // A max_tokens stop here means the tool call was cut off before it
-    // completed — report it precisely instead of a generic failure.
-    throw new Error(
-      response.stop_reason === "max_tokens"
-        ? "Materials list was truncated (hit the token limit) — try a narrower scope"
-        : "Claude did not return a materials list"
-    );
+    throw new Error("Claude did not return a materials list");
   }
 
   const raw = toolUse.input as {
@@ -334,14 +336,10 @@ export async function generateMaterials(
   const cleanList = (v: unknown): string[] =>
     Array.isArray(v) ? v.filter((s): s is string => typeof s === "string" && s.trim() !== "") : [];
 
-  // A truncated tool call (max_tokens) can leave `items` missing or malformed;
-  // fail clearly rather than throwing a TypeError on `.map`.
+  // Defensive: a non-truncated response should always carry an items array
+  // (max_tokens is already handled above), but never throw a TypeError on `.map`.
   if (!Array.isArray(raw.items)) {
-    throw new Error(
-      response.stop_reason === "max_tokens"
-        ? "Materials list was truncated (hit the token limit) — try a narrower scope"
-        : "Claude returned an unexpected materials payload"
-    );
+    throw new Error("Claude returned an unexpected materials payload");
   }
 
   const saved = input.saved_materials ?? [];
