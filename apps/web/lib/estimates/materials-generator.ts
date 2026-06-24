@@ -285,7 +285,10 @@ export async function generateMaterials(
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 2048,
+    // The tool allows up to 25 items plus the assumptions / missing_measurements
+    // / excluded arrays; 2048 truncated the tool call mid-JSON on richer,
+    // assessment-driven lists, which surfaced as a 500. 4096 leaves headroom.
+    max_tokens: 4096,
     system: [
       {
         type: "text",
@@ -300,7 +303,13 @@ export async function generateMaterials(
 
   const toolUse = response.content.find((b) => b.type === "tool_use");
   if (!toolUse || toolUse.type !== "tool_use") {
-    throw new Error("Claude did not return a materials list");
+    // A max_tokens stop here means the tool call was cut off before it
+    // completed — report it precisely instead of a generic failure.
+    throw new Error(
+      response.stop_reason === "max_tokens"
+        ? "Materials list was truncated (hit the token limit) — try a narrower scope"
+        : "Claude did not return a materials list"
+    );
   }
 
   const raw = toolUse.input as {
@@ -324,6 +333,16 @@ export async function generateMaterials(
 
   const cleanList = (v: unknown): string[] =>
     Array.isArray(v) ? v.filter((s): s is string => typeof s === "string" && s.trim() !== "") : [];
+
+  // A truncated tool call (max_tokens) can leave `items` missing or malformed;
+  // fail clearly rather than throwing a TypeError on `.map`.
+  if (!Array.isArray(raw.items)) {
+    throw new Error(
+      response.stop_reason === "max_tokens"
+        ? "Materials list was truncated (hit the token limit) — try a narrower scope"
+        : "Claude returned an unexpected materials payload"
+    );
+  }
 
   const saved = input.saved_materials ?? [];
 
