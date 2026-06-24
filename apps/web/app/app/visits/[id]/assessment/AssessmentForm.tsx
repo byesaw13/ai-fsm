@@ -507,6 +507,9 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
               if (clientId) params.set("client_id", clientId);
               if (jobId) params.set("job_id", jobId);
               if (propertyId) params.set("property_id", propertyId);
+              // Carry the source visit so the estimate page can recover the
+              // assessment summary from persistence if sessionStorage is gone.
+              params.set("visit_id", visitId);
               // Store generated materials in sessionStorage for the estimate form to pick up
               const lineItems = matItems.map((m) => ({
                 description: `${m.name}${m.brand ? ` (${m.brand})` : ""} — ${m.quantity} ${m.unit}`,
