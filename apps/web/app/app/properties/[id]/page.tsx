@@ -267,7 +267,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
     ),
 
     // Unified property timeline — sourced from property_timeline_v (single source of truth).
-    // Covers: visit, estimate, invoice, vault_item, photo, issue, note, membership.
+    // Covers: visit, estimate, invoice, payment, work_order, vault_item, photo, issue, note, membership.
     query<TimelineEvent>(
       `SELECT event_type,
               entity_id::text          AS id,

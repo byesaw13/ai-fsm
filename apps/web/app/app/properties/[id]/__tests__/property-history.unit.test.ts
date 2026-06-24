@@ -217,13 +217,15 @@ describe("eventHrefFor", () => {
 // ---------------------------------------------------------------------------
 
 describe("Timeline event types — property_timeline_v coverage", () => {
-  // These are the eight event types emitted by property_timeline_v after migration 103.
+  // These are the event types emitted by property_timeline_v.
   // The PropertyTimeline component must handle all of them (DOT_COLORS + TYPE_CHIP).
   // If a new event type is added to the view, it must be added here and handled in the component.
   const VIEW_EVENT_TYPES = [
     "visit",
     "estimate",
     "invoice",
+    "payment",     // added to view in migration 118
+    "work_order",  // completed work orders — added to view in migration 126 (TASK-018 slice 4)
     "vault_item",
     "photo",       // vault item photos — was in view, now surfaced on property page
     "issue",       // property issues — was in view, now surfaced on property page
@@ -231,8 +233,8 @@ describe("Timeline event types — property_timeline_v coverage", () => {
     "membership",  // added to view in Consolidation phase (migration 103)
   ];
 
-  it("all eight event types from property_timeline_v are accounted for", () => {
-    expect(VIEW_EVENT_TYPES).toHaveLength(8);
+  it("all ten event types from property_timeline_v are accounted for", () => {
+    expect(VIEW_EVENT_TYPES).toHaveLength(10);
   });
 
   it("photo events are now surfaced (was missing from inline UNION)", () => {
@@ -247,9 +249,13 @@ describe("Timeline event types — property_timeline_v coverage", () => {
     expect(VIEW_EVENT_TYPES).toContain("membership");
   });
 
+  it("work_order events are surfaced (migration 126 — completed work orders)", () => {
+    expect(VIEW_EVENT_TYPES).toContain("work_order");
+  });
+
   it("PropertyTimeline component DOT_COLORS covers all view event types", () => {
     // Regression guard: if this fails, add the new type to PropertyTimeline.tsx
-    const COMPONENT_TYPES = ["visit", "estimate", "invoice", "vault_item", "membership", "photo", "issue", "note"];
+    const COMPONENT_TYPES = ["visit", "estimate", "invoice", "payment", "work_order", "vault_item", "membership", "photo", "issue", "note"];
     for (const t of VIEW_EVENT_TYPES) {
       expect(COMPONENT_TYPES).toContain(t);
     }

@@ -10,7 +10,7 @@ function propertyId(request: NextRequest) {
 }
 
 const ALLOWED_EVENT_TYPES = new Set([
-  "visit", "estimate", "invoice", "payment", "vault_item", "photo", "issue", "note",
+  "visit", "estimate", "invoice", "payment", "work_order", "vault_item", "photo", "issue", "note",
 ]);
 
 export const GET = withAuth(async (request: NextRequest, session: AuthSession) => {
