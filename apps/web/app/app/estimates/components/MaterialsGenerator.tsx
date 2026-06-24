@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { AssessmentRoom } from "@ai-fsm/domain";
+import { preserveScope } from "@/lib/estimates/assessment-context";
 
 const JOB_TYPES = [
   { value: "deck_build", label: "Deck Build (new)" },
@@ -83,9 +84,9 @@ export function MaterialsGenerator({
 
   // Resync scope when a fresh initialScope arrives (e.g. the assessment is
   // edited while the generator is open) — but only while the user has not
-  // manually edited the field, so we never wipe their typing.
+  // manually edited the field, so we never wipe their typing (preserveScope).
   useEffect(() => {
-    if (!scopeDirty) setScope(initialScope);
+    setScope((current) => preserveScope(current, initialScope, scopeDirty));
   }, [initialScope, scopeDirty]);
 
   async function generate() {

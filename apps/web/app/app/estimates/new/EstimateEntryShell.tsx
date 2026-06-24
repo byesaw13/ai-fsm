@@ -7,6 +7,7 @@ import { EstimateInterviewFlow } from "./EstimateInterviewFlow";
 import { NewEstimateForm } from "./NewEstimateForm";
 import type { DraftEstimate } from "@/lib/estimates/ai-draft";
 import type { ShoppingList } from "@ai-fsm/domain";
+import type { AssessmentContext } from "@/lib/estimates/assessment-context";
 
 interface EstimateEntryShellProps {
   // Props passed down to NewEstimateForm
@@ -22,6 +23,7 @@ interface EstimateEntryShellProps {
   initialMode?: EstimateMode;
   initialNotes?: string;
   bookingRequestId?: string;
+  serverAssessmentContext?: AssessmentContext | null;
 }
 
 export function EstimateEntryShell({
@@ -37,6 +39,7 @@ export function EstimateEntryShell({
   initialMode,
   initialNotes,
   bookingRequestId,
+  serverAssessmentContext,
 }: EstimateEntryShellProps) {
   const [mode, setMode] = useState<EstimateMode | null>(initialMode ?? null);
   // After interview applies draft: switch to the manual form pre-populated.
@@ -91,6 +94,7 @@ export function EstimateEntryShell({
         initialInterviewDraft={appliedDraft ?? undefined}
         initialNotes={initialNotes}
         bookingRequestId={bookingRequestId}
+        serverAssessmentContext={serverAssessmentContext}
       />
     </Card>
   );
