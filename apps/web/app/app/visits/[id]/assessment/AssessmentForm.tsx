@@ -503,6 +503,8 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
           <MaterialsGenerator
             initialScope={generatedJobDescription}
             rooms={rooms}
+            visitId={visitId}
+            assessmentId={initialAssessment?.id ?? null}
             onAddToEstimate={(matItems: MaterialItem[]) => {
               const params = new URLSearchParams();
               if (clientId) params.set("client_id", clientId);

@@ -55,6 +55,9 @@ interface Props {
   initialScope?: string;
   initialJobType?: string;
   rooms?: RoomMeasurement[];
+  /** Source assessment, so generation can pull the canonical summary server-side. */
+  visitId?: string | null;
+  assessmentId?: string | null;
   onAddToEstimate: (items: MaterialItem[]) => void;
   onClose: () => void;
 }
@@ -67,6 +70,8 @@ export function MaterialsGenerator({
   initialScope = "",
   initialJobType = "",
   rooms = [],
+  visitId = null,
+  assessmentId = null,
   onAddToEstimate,
   onClose,
 }: Props) {
@@ -98,7 +103,13 @@ export function MaterialsGenerator({
       const res = await fetch("/api/v1/estimates/ai-materials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope, job_type: jobType, rooms }),
+        body: JSON.stringify({
+          scope,
+          job_type: jobType,
+          rooms,
+          ...(visitId ? { visit_id: visitId } : {}),
+          ...(assessmentId ? { assessment_id: assessmentId } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
