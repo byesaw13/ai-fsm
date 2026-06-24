@@ -5,6 +5,7 @@ import { query, queryOne } from "@/lib/db";
 import { Card, PageContainer, PageHeader } from "@/components/ui";
 import { EstimateEntryShell } from "./EstimateEntryShell";
 import { buildWalkthroughScopeNotes } from "@/lib/estimates/walkthrough-prefill";
+import { loadAssessmentSummary } from "@/lib/estimates/assessment-summary-loader";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,8 @@ interface PageProps {
     from_visit?: string;
     pricing_mode?: "itemized" | "flat_rate" | "multi_option";
     booking_request_id?: string;
+    from_assessment?: string;
+    visit_id?: string;
   }>;
 }
 
@@ -68,7 +71,15 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
   if (!session) redirect("/login");
   if (!canCreateEstimates(session.role)) redirect("/app/estimates");
 
-  const { client_id, job_id, property_id, vault_item_id, from_visit, pricing_mode, booking_request_id } = await searchParams;
+  const { client_id, job_id, property_id, vault_item_id, from_visit, pricing_mode, booking_request_id, from_assessment, visit_id } = await searchParams;
+
+  // TASK-018 slice 2: when opened from an assessment, recover the canonical
+  // summary from persistence so a refresh / deep-link (no sessionStorage) still
+  // carries the assessment context into estimate/materials.
+  const serverAssessmentContext =
+    from_assessment === "1" && visit_id
+      ? await loadAssessmentSummary(session, visit_id)
+      : null;
 
   const [clients, jobs, properties] = await Promise.all([
     query<Client>(
@@ -204,6 +215,7 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
         initialMode={walkthroughContext ? "quick" : undefined}
         initialNotes={walkthroughPrefill || undefined}
         bookingRequestId={bookingRequestContext?.id}
+        serverAssessmentContext={serverAssessmentContext}
       />
     </PageContainer>
   );
