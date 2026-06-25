@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { buildAssessmentSummary } from "@ai-fsm/domain";
 import {
   buildMaterialsUserMessage,
+  generateMaterials,
   matchToSaved,
+  MaterialsGenerationError,
   type SavedMaterial,
 } from "../materials-generator";
 
@@ -91,5 +93,30 @@ describe("matchToSaved — price book matching", () => {
 
   it("does not match when the unit differs", () => {
     expect(matchToSaved({ name: "2x4x8 SPF Stud", category: "lumber", unit: "each" }, saved)).toBeNull();
+  });
+});
+
+describe("generateMaterials — configuration guard", () => {
+  it("throws a legible AI_NOT_CONFIGURED error when ANTHROPIC_API_KEY is missing", async () => {
+    const prev = process.env.ANTHROPIC_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
+    try {
+      await expect(
+        generateMaterials({ scope: "replace a vanity", job_type: "plumbing" })
+      ).rejects.toMatchObject({
+        name: "MaterialsGenerationError",
+        code: "AI_NOT_CONFIGURED",
+        status: 503,
+      });
+    } finally {
+      if (prev !== undefined) process.env.ANTHROPIC_API_KEY = prev;
+    }
+  });
+
+  it("exports MaterialsGenerationError carrying code + status", () => {
+    const e = new MaterialsGenerationError("nope", "RESULT_TRUNCATED", 422);
+    expect(e).toBeInstanceOf(Error);
+    expect(e.code).toBe("RESULT_TRUNCATED");
+    expect(e.status).toBe(422);
   });
 });
