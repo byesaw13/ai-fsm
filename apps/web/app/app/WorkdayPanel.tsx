@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Button, Card, EmptyState, LinkButton, Modal, SectionHeader, StatusBadge, useToast } from "@/components/ui";
 import { NowBar, DayTimeSummary, type ActivityEntryDto } from "./ActivityTracker";
 import { BusinessDayBar } from "./BusinessDayBar";
+import { ClockBar } from "./ClockBar";
 import type { StatusVariant } from "@/components/ui";
 import type { DayMileageSummary } from "@/lib/mileage/sessions";
 import { ACTIVITY_TYPE_META, type ActivityType } from "@ai-fsm/domain";
@@ -484,6 +485,13 @@ export function WorkdayPanel({
         }
       `}</style>
 
+      {/* "Today" header — the independent lifecycles, always visible:
+          Payroll (Clock In/Out) and the Business Day (Open / Close / Reopen).
+          These are how the day actually starts and ends; the stepper below is
+          the working flow within it. */}
+      <ClockBar />
+      <BusinessDayBar />
+
       {/* Modern Horizontal Stepper */}
       <div className="workflow-stepper">
         {[
@@ -710,10 +718,8 @@ export function WorkdayPanel({
           {/* STATE 3: End of Day */}
           {activeTab === "end_day" && (
             <>
-              {/* The Business Day lifecycle — independent of mileage/activity. */}
-              <BusinessDayBar />
-
-              {/* Checklist Hero Card */}
+              {/* Checklist Hero Card (the Business Day control lives in the
+                  always-visible "Today" header above the stepper). */}
               <Card style={{ padding: "var(--space-4)" }}>
                 <SectionHeader title="Review & Close Day" count={warnings.missingReceiptPhotos + (activeEntry ? 1 : 0) + (openSession ? 1 : 0)} />
                 <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", margin: "-4px 0 var(--space-4)" }}>

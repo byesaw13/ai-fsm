@@ -36,15 +36,27 @@ export function BusinessDayBar() {
   async function load() {
     try {
       const res = await fetch("/api/v1/business-day/current");
+      // A non-2xx must NOT be read as "not opened yet" — surface it and keep the
+      // last known state rather than inviting a redundant Open Day.
+      if (!res.ok) {
+        setError("Couldn't load today — tap retry.");
+        return;
+      }
       const json = await res.json().catch(() => ({}));
       setDay((json.data ?? null) as Day);
+      setError(null);
     } catch {
-      setError("Couldn't load today's day.");
+      setError("Couldn't load today — tap retry.");
     }
   }
 
+  // Load on mount and on the shared Today-header signal (e.g. Clock In opens the
+  // day server-side, so this bar must refresh even though its own buttons weren't used).
   useEffect(() => {
     void load();
+    const onRefresh = () => void load();
+    window.addEventListener("ops:refresh", onRefresh);
+    return () => window.removeEventListener("ops:refresh", onRefresh);
   }, []);
 
   async function openDay() {
@@ -53,7 +65,7 @@ export function BusinessDayBar() {
     try {
       const res = await fetch("/api/v1/business-day/current", { method: "POST" });
       if (!res.ok) throw new Error();
-      await load();
+      window.dispatchEvent(new Event("ops:refresh"));
     } catch {
       setError("Couldn't open the day.");
     } finally {
@@ -77,7 +89,7 @@ export function BusinessDayBar() {
       }
       setReopening(false);
       setReason("");
-      await load();
+      window.dispatchEvent(new Event("ops:refresh"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't update the day.");
     } finally {
@@ -98,7 +110,17 @@ export function BusinessDayBar() {
   };
 
   if (day === undefined) {
-    return <div style={{ ...wrap, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>Loading today…</div>;
+    return (
+      <div style={{ ...wrap, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+        {error ? (
+          <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" onClick={() => void load()} disabled={busy}>
+            {error} ↻
+          </button>
+        ) : (
+          "Loading today…"
+        )}
+      </div>
+    );
   }
 
   return (
