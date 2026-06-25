@@ -315,10 +315,12 @@ export async function generateMaterials(
   try {
     response = await client.messages.create({
       model: "claude-sonnet-4-6",
-      // The tool allows up to 25 items plus the assumptions / missing_measurements
-      // / excluded arrays; 2048 truncated the tool call mid-JSON on richer,
-      // assessment-driven lists, which surfaced as a 500. 4096 leaves headroom.
-      max_tokens: 4096,
+      // Output headroom for a full 25-item list plus the assumptions /
+      // missing_measurements / excluded arrays. History: 2048 then 4096 both
+      // truncated mid-JSON on richer, whole-house assessments (a real whole-house
+      // job needs ~4700 output tokens), surfacing as a 500 / "truncated" reject.
+      // 8192 clears that with margin; Sonnet supports far more if needed.
+      max_tokens: 8192,
       system: [
         {
           type: "text",
