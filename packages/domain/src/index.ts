@@ -58,6 +58,7 @@ export type {
 } from "./painting";
 export * from "./activities";
 export * from "./business-day";
+export * from "./payroll";
 export * from "./location";
 export * from "./geo";
 export * from "./visit-matching";
