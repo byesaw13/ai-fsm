@@ -58,6 +58,7 @@ TASK-019 all derive directly from this principle.
 - `EPIC-005-platform-and-delivery.md`
 - `EPIC-006-role-based-workspaces.md`
 - `EPIC-007-location-intelligence.md`
+- `EPIC-008-production-intelligence.md` — deliberate stub (PI-002, PI-006 only).
 - `done/` — completed tasks, moved out of the active epics.
 
 Each epic file lists its **active** tasks in full and links to its **completed**
@@ -65,7 +66,7 @@ tasks in `done/`.
 
 ## Task index
 
-Next available ID: **TASK-047**.
+Next available ID: **TASK-049**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -114,6 +115,8 @@ Next available ID: **TASK-047**.
 | TASK-044 | Visit review card + classification → ledger | 007 | Done |
 | TASK-045 | "I'm at customer site" manual override | 007 | Done |
 | TASK-046 | Workday & privacy controls | 007 | In Progress |
+| TASK-047 | Work Item Library (PI-002) | 008 | Proposed |
+| TASK-048 | Confidence Engine (PI-006) | 008 | Proposed |
 
 ## Status legend
 
@@ -173,3 +176,31 @@ signal a commitment to build:
   or task yet; strategic note only.
 - **Opportunity Tracking** — captured here as `TASK-011 Property Opportunities`.
 - **Property Intelligence** — the whole of `EPIC-003`; treat as strategic.
+
+### Production Intelligence — strategic concepts (not committed)
+
+Direction is canonical (`docs/canonical/PRODUCTION_INTELLIGENCE.md`): Dovetails
+models **the work first**, and pricing is one projection of it. The model's
+*foundation* is **TASK-018** (the de facto PI-001), and **EPIC-008** is a
+deliberate stub holding only the two next pieces scoped so far — `TASK-047 Work
+Item Library` (PI-002) and `TASK-048 Confidence Engine` (PI-006). Both are
+`Proposed` (not yet committed for build); they are simply the only PI ideas
+promoted from concept to task.
+
+The remaining Production Intelligence ideas are recorded here so the thinking is
+not lost. They are **explicitly not committed backlog work** and earn task status
+only after TASK-018 proves the model in real use:
+
+- **PI-003 Production Profiles** — reusable production characteristics (rate,
+  crew, skill, dependencies) for a work item or job shape.
+- **PI-004 Pricing Intelligence Charter** — pricing as canonical business rules
+  the system references, derived from the production model.
+- **PI-005 Production Knowledge Base** — immutable business baselines (e.g.
+  "Bathroom Refresh v2", travel policy, visit fee).
+- **PI-007 Historical Production Learning** — completed work orders feed back to
+  improve future estimates of similar work.
+- **PI-008 Production Analytics** — reporting over the production model.
+- **PI-009 AI Production Advisor** — assistive guidance built on the model.
+- **PI-010 Estimate Explanation Engine** — human-readable "why this estimate".
+- **PI-011 Production Benchmark Dashboard** — estimate-vs-actual benchmarking.
+- **PI-012 Production Rule Editor** — owner-editable production/business rules.
