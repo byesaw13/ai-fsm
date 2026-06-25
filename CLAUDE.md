@@ -24,6 +24,7 @@ Use only these canonical docs for product direction:
 - `docs/canonical/ARCHITECTURE.md`
 - `docs/canonical/ROADMAP.md`
 - `docs/canonical/PRODUCTION_INTELLIGENCE.md`
+- `docs/canonical/OPERATIONS.md`
 
 Working, archived, and generated documents can provide implementation evidence or historical context, but they do not define product scope.
 

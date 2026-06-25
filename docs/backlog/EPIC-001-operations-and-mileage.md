@@ -6,6 +6,278 @@ trustworthy enough to feed tax mileage, vehicle cost, and job profitability.
 
 ## Active tasks
 
+> The TASK-049…057 block is the **Operations Engine** program. Canonical design:
+> `docs/canonical/OPERATIONS.md`. Build order and rationale: that doc + the
+> approved plan. The model treats the app as an Operations Engine (the historical
+> ledger is one component), keeps a live Current Operations State, and makes the
+> Business Day a pure aggregate. **Freeze gate: do not start TASK-049/050/054/055/
+> 057 until TASK-051/052/053/056 (Business Day + Payroll + Activity/State) are
+> stable.**
+
+# TASK-051: Business Day aggregate (decouple day close)
+
+Status:
+Proposed
+
+Problem:
+"End Day" conflates four unrelated lifecycle events — stopped driving, stopped
+tracking time, job done, day over. Ending one must not end the others.
+
+Business Value:
+A flexible day container that never auto-closes; the foundation every other
+Operations Engine concern hangs off.
+
+Scope:
+- New `business_days` table (migration 127): account/user/date, status
+  `OPEN|ACTIVE|PAUSED|READY_TO_CLOSE|CLOSED|REOPENED`, opened/closed_at,
+  reopened_reason, notes. Owns nothing — records reference it; it summarizes.
+- Replace "End Day" with "Review & Close Day" in `my-day/MyDayView.tsx`; migrate
+  `WorkdayPanel` start/end onto the container.
+
+Out of Scope:
+- Day Close checklist (TASK-054); payroll/activity/mileage internals.
+
+Acceptance Criteria:
+- [ ] Ending a trip / activity / job, or returning home, leaves the day OPEN.
+- [ ] Only an explicit close sets CLOSED; Reopen works with a reason.
+- [ ] Migration additive + reversible; account-scoped RLS.
+
+Notes:
+Phase 1. Foundation for the freeze gate.
+
+# TASK-052: Payroll clock + payroll policies
+
+Status:
+Proposed
+
+Problem:
+There is no record of paid working time distinct from what task was being done.
+
+Business Value:
+Employee-style "was this person working?" time, independent of activity — the
+basis for payroll and true labor burden.
+
+Scope:
+- New `time_clock_sessions` table (migration 128): business_day_id, clock_in/out,
+  status, `pay_type (hourly|salary|piecework|subcontractor|owner_draw)`,
+  hourly_rate_snapshot, break_policy, voided_at, correction_reason.
+- All pay types derive from the one clock; only the calculation differs.
+- Field Clock In / Clock Out; after clock-in prompt "What are you doing now?".
+
+Out of Scope:
+- Payroll calculation/payout; activity coupling (must stay independent).
+
+Acceptance Criteria:
+- [ ] Clock spans many activities; switching activity never touches the clock.
+- [ ] Corrections void + re-add, never delete.
+- [ ] Account-scoped RLS; additive migration.
+
+Notes:
+Phase 2.
+
+# TASK-053: Activity + Assignment model
+
+Status:
+Proposed
+
+Problem:
+Activity today conflates the verb (driving, working) with the business object
+(Job #241), so "same job, switched task" can't be expressed cleanly.
+
+Business Value:
+Clean job-costing: Activity = verb, Assignment = object; labor_bucket derives.
+
+Scope:
+- Extend `activity_entries` (migration 129, additive): `business_day_id`,
+  `time_clock_session_id`, `labor_bucket (billable|overhead|personal|warranty)`,
+  non-entity `assignment_kind (office|shop|inventory|training|none)`.
+- Reuse `entity_type/entity_id` as the assignment link; extend the activity-verb
+  enum + labels in `packages/domain/src/activities.ts`; map activity+assignment →
+  labor_bucket. Reuse `/api/v1/activities/switch` for Change Activity/Assignment.
+
+Out of Scope:
+- Current Operations State (TASK-056); presence (TASK-057).
+
+Acceptance Criteria:
+- [ ] Activity verb and Assignment object are independently settable.
+- [ ] labor_bucket mapping is a unit-tested pure rule.
+- [ ] Switching keeps payroll running; one-active invariant preserved.
+
+Notes:
+Phase 3.
+
+# TASK-056: Current Operations State (live state machine)
+
+Status:
+Proposed
+
+Problem:
+Nothing describes the user's current operational state, so automation has to
+search/reconstruct context every time.
+
+Business Value:
+The app always knows NOW (clocked-in? · activity · assignment · vehicle ·
+presence · pending question), making one-tap automation cheap.
+
+Scope:
+- A derived read-model (one API) computed from the open rows (clock session,
+  activity entry, vehicle session, latest presence) — derive-first, no
+  sync-prone cache table unless proven necessary.
+- Expose current state + valid transitions; power proactive prompts.
+
+Out of Scope:
+- The inbox UI (TASK-049); persisting state history.
+
+Acceptance Criteria:
+- [ ] One endpoint returns the live state from open records.
+- [ ] State transitions are documented and unit-tested.
+
+Notes:
+Phase 3. Pairs with TASK-053.
+
+# TASK-057: Presence timeline
+
+Status:
+Proposed
+
+Problem:
+"Where was I present" is not modeled distinctly from "what was I doing," so
+present-but-waiting (non-billable) time is invisible.
+
+Business Value:
+Presence vs Activity makes profitability and customer analytics honest (arrived
+8:10, waiting to 8:30, billable from 8:30).
+
+Scope:
+- New `presence_intervals` table (migration 131): business_day_id, place
+  (property/client or label), arrived_at, departed_at, source
+  (gps_confirmed|manual). Derived primarily from confirmed `visit_candidates`.
+
+Out of Scope:
+- Billable logic (lives in activity labor_bucket).
+
+Acceptance Criteria:
+- [ ] A presence interval can hold multiple activities of differing buckets.
+- [ ] Derives from confirmed visits; manual entry supported; additive + RLS.
+
+Notes:
+Phase 4 (after freeze gate).
+
+# TASK-050: Link mileage ↔ travel-time + capture-method + reconcile
+
+Status:
+Proposed
+
+Problem:
+`vehicle_sessions` has no link to travel-time, no record of how a mileage number
+was captured, and a drive can be logged twice (manual odometer + auto GPS).
+
+Business Value:
+Trustworthy mileage: one tap yields linked mileage + travel-time, every number
+shows its capture method, duplicates reconcile.
+
+Scope:
+- Extend `vehicle_sessions` (migration 130, additive): `business_day_id`,
+  `activity_entry_id` FK, `miles_source (odometer|manual_miles|gps_estimate|
+  bt_gps_estimate)`, `status (open|closed|voided)`.
+- One hybrid "Confirm trip" in `activities/segments/[id]`: atomic travel entry +
+  linked session + segment stamp; segment is the dedup key. Odometer-vs-GPS
+  reconcile (odometer wins, void never delete). Reuse `lib/mileage/sessions.ts`.
+
+Out of Scope:
+- BT pre-fill UI (rides this via TASK-025).
+
+Acceptance Criteria:
+- [ ] Confirming a drive yields one travel entry + one linked session; idempotent.
+- [ ] Enclosing odometer close offers reconcile and voids GPS estimates.
+- [ ] Capture method recorded and shown.
+
+Notes:
+Phase 5. Advances TASK-027; closes TASK-025's confirm UI.
+
+# TASK-049: Operational Inbox (single review surface)
+
+Status:
+Proposed
+
+Problem:
+The owner sees location segments, visit candidates, drives, and mileage conflicts
+as separate systems.
+
+Business Value:
+One review queue; one-tap arrival prompts powered by Current Operations State.
+
+Scope:
+- View-first `operational_review_items` (derived view/API; table only if
+  persistent snooze/dismiss is needed). Union: detected_drive, detected_visit,
+  unknown_stop, mileage_reconcile, missed_clock_out, idle_gap,
+  unassigned_activity. Dedup via candidate-owns-stop (segment UNIQUE already).
+- Confirm runs the TASK-050 hybrid action and stamps the matched scheduled
+  visit's `arrived_at` (advances TASK-044).
+
+Out of Scope:
+- Persistent per-item state until proven necessary.
+
+Acceptance Criteria:
+- [ ] A drive, a low-confidence stop, and a missed clock-out surface in one list.
+- [ ] No item appears twice; confirm links the right records.
+
+Notes:
+Phase 6. Relates to EPIC-007.
+
+# TASK-054: Day Close checklist + Reopen
+
+Status:
+Proposed
+
+Problem:
+The blunt End Day button closes everything at once with no review.
+
+Business Value:
+A deliberate close after review; Reopen is normal, not an error.
+
+Scope:
+- Checklist gating `business_days → CLOSED` (payroll, activities, mileage,
+  materials/expenses, inbox cleared/deferred, notes). Reopen with reason → ACTIVE.
+
+Out of Scope:
+- Locking historical records on close.
+
+Acceptance Criteria:
+- [ ] Close requires the checklist; Reopen records a reason and returns to ACTIVE.
+
+Notes:
+Phase 7.
+
+# TASK-055: Operational Intelligence (profitability → automation)
+
+Status:
+Proposed
+
+Problem:
+With payroll/activity/mileage separated, the data can finally drive profitability,
+pricing, and proactive automation — but nothing consumes it yet.
+
+Business Value:
+True labor burden feeds pricing (PI-004); the engine eventually acts on insights.
+
+Scope:
+- Daily roll-up (payroll vs billable vs overhead vs personal, mileage,
+  present-not-billable) and job profitability incl. true labor burden.
+- Wire true labor burden into PI-004
+  (`docs/working/PRICING_INTELLIGENCE_CHARTER_DRAFT.md`).
+- Value chain endpoint: insights → recommendations → automation (final consumer).
+
+Out of Scope:
+- Building automations before the data model is trustworthy.
+
+Acceptance Criteria:
+- [ ] Daily + per-job roll-ups derive purely from the separated ledgers.
+- [ ] True labor burden is exposed for pricing.
+
+Notes:
+Phase 8. Built last. Connects to the Production Intelligence direction.
+
 # TASK-040: False-drive detection
 
 Status:

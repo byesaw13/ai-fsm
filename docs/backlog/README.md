@@ -66,7 +66,7 @@ tasks in `done/`.
 
 ## Task index
 
-Next available ID: **TASK-049**.
+Next available ID: **TASK-058**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -117,6 +117,15 @@ Next available ID: **TASK-049**.
 | TASK-046 | Workday & privacy controls | 007 | In Progress |
 | TASK-047 | Work Item Library (PI-002) | 008 | Proposed |
 | TASK-048 | Confidence Engine (PI-006) | 008 | Proposed |
+| TASK-049 | Operational Inbox (single review surface) | 001 | Proposed |
+| TASK-050 | Link mileage ↔ travel-time + capture-method | 001 | Proposed |
+| TASK-051 | Business Day aggregate (decouple day close) | 001 | Proposed |
+| TASK-052 | Payroll clock + payroll policies | 001 | Proposed |
+| TASK-053 | Activity + Assignment model | 001 | Proposed |
+| TASK-054 | Day Close checklist + Reopen | 001 | Proposed |
+| TASK-055 | Operational Intelligence (profitability→automation) | 001 | Proposed |
+| TASK-056 | Current Operations State (live state machine) | 001 | Proposed |
+| TASK-057 | Presence timeline | 001 | Proposed |
 
 ## Status legend
 
