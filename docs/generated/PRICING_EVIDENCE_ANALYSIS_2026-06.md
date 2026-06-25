@@ -40,9 +40,12 @@ Actual client documents:
 | dovetails-woodworks-0000001 | 2019-10 | Legacy product invoice |
 
 **Caveat:** small sample (~5 real client docs + 1 calculator + the price book),
-and **no document records actual labor hours or job cost**. Margin statements
-below are *inferred from document structure*, not measured. That measurement gap
-is the central finding.
+and **no structured actual-hours or job-cost capture exists** — a few historical
+jobs note labor hours only in free text (e.g. `db/seeds/dovetails_historical_backfill.sql`
+records "24 hrs", "52 hrs", "60 hrs" in job notes from the Drive documents), but
+nothing systematic and nothing wired to pricing. Margin statements below are
+*inferred from document structure*, not measured. That measurement gap is the
+central finding.
 
 ## Per-document assessment
 
@@ -78,9 +81,10 @@ is the central finding.
 2. **15% materials handling is essentially never charged.** Real docs pass
    materials at cost (Tufts, Enhanced) or add a token flat fee ($295 on a $16k
    job). Margin is being left on the table on every materials-heavy job.
-3. **No estimate-vs-actual loop.** Hours are never recorded, so profitability per
-   job is unknown and the rates can never reconcile to a measured truth. Every
-   estimate starts from zero memory.
+3. **No systematic estimate-vs-actual loop.** Hours are recorded only
+   anecdotally (free-text notes on a few historical jobs), never structurally, so
+   profitability per job is unknown and the rates can never reconcile to a
+   measured truth. Every estimate starts from zero memory.
 
 ## What the evidence implies for pricing method
 

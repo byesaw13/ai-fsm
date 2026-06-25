@@ -8,12 +8,16 @@ the Pricing Codebook v2.0, and [`PRICING_AUDIT_REPORT_2026.md`](PRICING_AUDIT_RE
 
 ## What this is
 
-A first-draft set of **pricing business rules** the system (and AI) should treat
-as the source of truth for how Dovetails prices work. Per the Production
+A first-draft set of **proposed** pricing business rules for how Dovetails prices
+work. It is **not authoritative** and is **not** a source of truth yet: per the
+documentation hierarchy in `AGENTS.md` / `CLAUDE.md`, `docs/canonical/` is the
+authoritative truth and `docs/working/` (this file) is supporting notes only.
+When this draft and a canonical doc disagree, **canonical wins**. The system and
+AI should treat these rules as the source of truth for pricing **only after** the
+charter graduates to `docs/canonical/` — not before. Per the Production
 Intelligence model, **pricing is a projection of the work, not the organizing
-system** — this charter governs that final projection. It graduates to
-`docs/canonical/` only after it proves out (see
-[`PRODUCTION_INTELLIGENCE.md`](../canonical/PRODUCTION_INTELLIGENCE.md)).
+system**; this charter (once canonical) would govern that final projection. See
+[`PRODUCTION_INTELLIGENCE.md`](../canonical/PRODUCTION_INTELLIGENCE.md).
 
 ## Rule 0 — Pricing is an output, not an input
 
@@ -79,11 +83,15 @@ Engine). The Codebook §18 red-flag list (old house, hidden rot, access,
 scope-creep, price-shopping) becomes an explicit assumptions/risk line on the
 estimate. Risk adjusts price up; it does not get absorbed silently.
 
-## Rule 7 — Capture actuals (the missing loop)
+## Rule 7 — Capture actuals systematically (the missing loop)
 
-No current document records hours. Require a single **actual-hours number at
-closeout** per job. After ~20 jobs this calibrates Rule 1's rate and seeds the
-first Production Profiles (PI-003 / PI-007). Until then, all rate numbers here
+Actual hours are captured **only anecdotally** today — a handful of historical
+jobs note labor hours in free text (e.g. `db/seeds/dovetails_historical_backfill.sql`
+records "24 hrs", "52 hrs", "60 hrs" in job notes, lifted from the Drive
+documents). There is **no structured `labor_hours` field** and no systematic
+capture wired to pricing. Require a single **actual-hours number at closeout** per
+job, stored structurally. After ~20 jobs this calibrates Rule 1's rate and seeds
+the first Production Profiles (PI-003 / PI-007). Until then, all rate numbers here
 are **provisional estimates, explicitly flagged as such.**
 
 ## Open decisions for the owner
