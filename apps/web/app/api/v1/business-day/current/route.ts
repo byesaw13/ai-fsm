@@ -9,18 +9,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/middleware";
 import { withDbSession } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { getBusinessDay, openBusinessDay } from "@/lib/operations/business-day";
+import { businessToday, getBusinessDay, openBusinessDay } from "@/lib/operations/business-day";
 
 export const dynamic = "force-dynamic";
-
-function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export const GET = withAuth(async (_request: NextRequest, session) => {
   try {
     const day = await withDbSession(session, (client) =>
-      getBusinessDay(client, session.accountId, session.userId, todayKey()),
+      getBusinessDay(client, session.accountId, session.userId, businessToday()),
     );
     return NextResponse.json({ data: day });
   } catch (error) {
@@ -35,7 +31,7 @@ export const GET = withAuth(async (_request: NextRequest, session) => {
 export const POST = withAuth(async (_request: NextRequest, session) => {
   try {
     const day = await withDbSession(session, (client) =>
-      openBusinessDay(client, session.accountId, session.userId, todayKey(), session.userId),
+      openBusinessDay(client, session.accountId, session.userId, businessToday(), session.userId),
     );
     return NextResponse.json({ data: day });
   } catch (error) {

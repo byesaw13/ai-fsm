@@ -34,12 +34,18 @@ export const POST = withAuth(async (request: NextRequest, session) => {
   const { id, to, reason } = parsed.data;
 
   try {
+    const isManager = session.role === "owner" || session.role === "admin";
     const result = await withDbSession(session, async (client) => {
-      const day = await getBusinessDayById(client, session.accountId, id);
+      // Lock the row so concurrent transitions serialize (see setBusinessDayStatus).
+      const day = await getBusinessDayById(client, session.accountId, id, { lockForUpdate: true });
       if (!day) return { kind: "not_found" as const };
+      // A day belongs to a user; only its owner (or an owner/admin) may move it.
+      if (day.user_id !== session.userId && !isManager) return { kind: "not_found" as const };
       const check = checkBusinessDayTransition(day.status, to, { reason: reason ?? undefined });
       if (!check.ok) return { kind: "invalid" as const, reason: check.reason ?? "Invalid transition" };
-      const updated = await setBusinessDayStatus(client, session.accountId, id, to, reason ?? null);
+      const updated = await setBusinessDayStatus(client, session.accountId, id, day.status, to, reason ?? null);
+      // null = the row was raced (status moved) or RLS blocked the write.
+      if (!updated) return { kind: "conflict" as const };
       return { kind: "ok" as const, updated };
     });
 
@@ -49,9 +55,15 @@ export const POST = withAuth(async (request: NextRequest, session) => {
         { status: 404 },
       );
     }
-    if (result.kind === "invalid") {
+    if (result.kind === "invalid" || result.kind === "conflict") {
       return NextResponse.json(
-        { error: { code: "INVALID_TRANSITION", message: result.reason, traceId: session.traceId } },
+        {
+          error: {
+            code: "INVALID_TRANSITION",
+            message: result.kind === "conflict" ? "The business day changed — reload and retry." : result.reason,
+            traceId: session.traceId,
+          },
+        },
         { status: 409 },
       );
     }
