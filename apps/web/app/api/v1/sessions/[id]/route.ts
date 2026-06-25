@@ -11,9 +11,6 @@ export const dynamic = "force-dynamic";
 const closeSessionSchema = z.object({
   end_odometer: z.number().int().min(1),
   notes: z.string().max(2000).nullable().optional(),
-  // End Day closes the books (ends running activity entries). Closing a single
-  // mileage session mid-day (e.g. parking a vehicle) leaves the day running.
-  end_day: z.boolean().optional(),
 });
 
 function sessionIdFromPath(request: NextRequest): string | undefined {
@@ -93,16 +90,10 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       );
     }
 
-    // End Day closes the books: any still-running activity entry ends now.
-    // Switching/parking a vehicle (end_day omitted) must NOT end the work day.
-    if (parsed.data.end_day) {
-      await client.query(
-        `UPDATE activity_entries SET ended_at = now()
-         WHERE account_id = $1 AND ended_at IS NULL AND voided_at IS NULL`,
-        [session.accountId]
-      );
-    }
-
+    // Operations Engine: closing a vehicle's mileage is its own concern. It must
+    // NEVER end activity entries or the business day — those are independent
+    // lifecycles closed explicitly (Clock Out / Day Close). The former end_day
+    // flag was removed for this reason.
     const notes = parsed.data.notes === undefined ? row.notes : parsed.data.notes;
     const { rows } = await client.query(
       `UPDATE vehicle_sessions
