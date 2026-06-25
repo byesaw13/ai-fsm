@@ -6,6 +6,7 @@ import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, EmptyState, LinkButton, Modal, SectionHeader, StatusBadge, useToast } from "@/components/ui";
 import { NowBar, DayTimeSummary, type ActivityEntryDto } from "./ActivityTracker";
+import { BusinessDayBar } from "./BusinessDayBar";
 import type { StatusVariant } from "@/components/ui";
 import type { DayMileageSummary } from "@/lib/mileage/sessions";
 import { ACTIVITY_TYPE_META, type ActivityType } from "@ai-fsm/domain";
@@ -347,10 +348,12 @@ export function WorkdayPanel({
       return;
     }
     setPending(true);
+    // Operations Engine: closing the vehicle's mileage is its own concern — it must
+    // NOT end the running activity or the business day (those close independently).
     const res = await fetch(`/api/v1/sessions/${openSession.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ end_odometer: odometer, end_day: true }),
+      body: JSON.stringify({ end_odometer: odometer }),
     });
     setPending(false);
     if (!res.ok) {
@@ -484,7 +487,7 @@ export function WorkdayPanel({
         {[
           { key: "start_day", label: "Start Day", desc: openSession ? (activeVehicle?.nickname ?? "Vehicle active") : "Pre-flight & Vehicle", icon: "🏁" },
           { key: "work_day", label: "Work Day", desc: openSession ? `${todayJobs.length} jobs scheduled` : "Track time & jobs", icon: "🛠️" },
-          { key: "end_day", label: "End Day", desc: `${totalWarnings} tasks remaining`, icon: "🏁" },
+          { key: "end_day", label: "Review & Close Day", desc: `${totalWarnings} tasks remaining`, icon: "🏁" },
         ].map((step, i) => {
           const isCurrent = activeTab === step.key;
           const isCompleted = step.key === "start_day" && openSession;
@@ -703,11 +706,15 @@ export function WorkdayPanel({
           {/* STATE 3: End of Day */}
           {activeTab === "end_day" && (
             <>
+              {/* The Business Day lifecycle — independent of mileage/activity. */}
+              <BusinessDayBar />
+
               {/* Checklist Hero Card */}
               <Card style={{ padding: "var(--space-4)" }}>
-                <SectionHeader title="End of Day Checklist" count={warnings.missingReceiptPhotos + (activeEntry ? 1 : 0) + (openSession ? 1 : 0)} />
+                <SectionHeader title="Review & Close Day" count={warnings.missingReceiptPhotos + (activeEntry ? 1 : 0) + (openSession ? 1 : 0)} />
                 <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", margin: "-4px 0 var(--space-4)" }}>
-                  Resolve blockers below to complete your checkout and close the day.
+                  Review today below — each item is independent. Closing the business
+                  day is a separate, explicit step above.
                 </p>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", marginBottom: "var(--space-5)" }}>
