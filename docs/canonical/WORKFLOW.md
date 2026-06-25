@@ -45,6 +45,13 @@ The Daily Command Center at `/app` is an orchestration layer over existing workf
 
 The only stored addition for this loop is open vehicle-session state: a session may start with a start odometer and close later with an end odometer and computed miles. Receipts, material runs, follow-ups, tomorrow preview, and end-of-day warnings remain derived from existing records.
 
+The deeper architecture of this loop — separating payroll, presence, activity,
+vehicle, and location into independent lifecycles under a flexible Business Day,
+with a live Current Operations State — is defined in
+`docs/canonical/OPERATIONS.md` (the **Operations Engine**). That doc governs how
+the daily loop's concerns fit together; this section stays the simple product
+view.
+
 ## Status Model
 
 Detailed DB status definitions live in working technical references. The canonical product workflow should stay simple. Use derived presentation stages for humans and stored statuses only where application logic needs operational truth.

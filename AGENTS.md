@@ -22,6 +22,7 @@ Product direction:
 - `docs/canonical/ARCHITECTURE.md`
 - `docs/canonical/ROADMAP.md`
 - `docs/canonical/PRODUCTION_INTELLIGENCE.md`
+- `docs/canonical/OPERATIONS.md`
 
 Archived, generated, and working documents may provide evidence, implementation notes, or historical context. They do not override canonical docs.
 
