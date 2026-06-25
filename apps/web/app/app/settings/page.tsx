@@ -7,6 +7,7 @@ import { CompanyForm } from "./CompanyForm";
 import { TeamPanel, type TeamMember } from "./TeamPanel";
 import { ProfileForm } from "./ProfileForm";
 import { SquarePanel, type SquareStatus } from "./SquarePanel";
+import { WorkspaceModeSetting } from "./WorkspaceModeSetting";
 import { withDbSession } from "@/lib/db";
 import { loadSquareSettings } from "@/lib/integrations/square";
 import { isEncryptionConfigured } from "@/lib/crypto";
@@ -84,6 +85,19 @@ export default async function SettingsPage() {
       <PageHeader title="Settings" />
 
       <div style={{ display: "flex", flexDirection: "column", gap: 40, maxWidth: 800 }}>
+
+        {isOwner && (
+          <section>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Workspace</h2>
+            <Card style={{ padding: "var(--space-4)" }}>
+              <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: 0, marginBottom: "var(--space-3)" }}>
+                Which view the app opens to. By default it follows your device — phones
+                open to Field, tablets and computers open to Office.
+              </p>
+              <WorkspaceModeSetting />
+            </Card>
+          </section>
+        )}
 
         {isAdmin && account && (
           <section>
