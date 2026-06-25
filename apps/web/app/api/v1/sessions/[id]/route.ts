@@ -27,6 +27,25 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
   }
 
   const body = await request.json().catch(() => null);
+
+  // The end_day flag was removed: closing mileage must never end activity or the
+  // business day. Reject it loudly rather than silently ignoring it (Zod would
+  // strip it), so a stale client surfaces the contract change instead of leaving
+  // its timer running unexpectedly.
+  if (body && typeof body === "object" && "end_day" in body) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "END_DAY_REMOVED",
+          message:
+            "end_day is no longer supported — closing mileage no longer ends the day or activity. Clock Out and Day Close are separate. Please refresh.",
+          traceId: session.traceId,
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   const parsed = closeSessionSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
