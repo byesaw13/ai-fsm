@@ -9,7 +9,10 @@
 CREATE TABLE IF NOT EXISTS time_clock_sessions (
   id                     UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id             UUID         NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  user_id                UUID         NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  -- RESTRICT, not CASCADE: payroll time is financial history. Removing a team
+  -- member must not silently erase their clock records — deactivate the user
+  -- instead. (Account deletion still cascades the whole account.)
+  user_id                UUID         NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   -- The Business Day is an aggregate that owns nothing: a clock references its day
   -- but is never cascaded by it.
   business_day_id        UUID         REFERENCES business_days(id) ON DELETE SET NULL,
