@@ -63,10 +63,15 @@ export async function clockIn(
 
   const day = await openBusinessDay(client, accountId, userId, businessToday(), userId);
 
+  // FOR UPDATE above locks nothing when no open clock exists, so two concurrent
+  // clock-ins (double-tap / retry) both reach here. ON CONFLICT against the
+  // one-open-clock partial unique index makes the loser a no-op (rather than a
+  // 23505 → 500); we then re-read and return the winner's clock idempotently.
   const { rows } = await client.query<TimeClockRow>(
     `INSERT INTO time_clock_sessions
        (account_id, user_id, business_day_id, status, pay_type, hourly_rate_snapshot_cents, notes, created_by)
      VALUES ($1, $2, $3, 'open', $4, $5, $6, $2)
+     ON CONFLICT (account_id, user_id) WHERE status = 'open' AND voided_at IS NULL DO NOTHING
      RETURNING ${COLS}`,
     [
       accountId,
@@ -77,7 +82,12 @@ export async function clockIn(
       opts.notes ?? null,
     ],
   );
-  return { clock: rows[0], alreadyOpen: false };
+  if (rows[0]) return { clock: rows[0], alreadyOpen: false };
+
+  // Lost the race: another request opened the clock first — return it.
+  const raced = await getOpenClock(client, accountId, userId);
+  if (raced) return { clock: raced, alreadyOpen: true };
+  throw new Error("clockIn: conflict but no open clock found");
 }
 
 /** Clock out the open clock. Returns null if there was nothing open. */
