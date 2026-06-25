@@ -155,11 +155,13 @@ export function WorkdayPanel({
 
   const [activeTab, setActiveTab] = useState<TabState>(openSession ? "work_day" : "start_day");
 
-  // Keep state synced with open session
+  // Keep state synced with open session. Only the mileage-dependent Work Day tab
+  // is bounced when the session closes — Review & Close Day owns the business-day
+  // lifecycle (independent of mileage) and must stay reachable to close/reopen.
   useEffect(() => {
-    if (!openSession) {
+    if (!openSession && activeTab === "work_day") {
       setActiveTab("start_day");
-    } else if (activeTab === "start_day") {
+    } else if (openSession && activeTab === "start_day") {
       setActiveTab("work_day");
     }
   }, [openSession]);
@@ -491,7 +493,9 @@ export function WorkdayPanel({
         ].map((step, i) => {
           const isCurrent = activeTab === step.key;
           const isCompleted = step.key === "start_day" && openSession;
-          const isDisabled = !openSession && step.key !== "start_day";
+          // Only Work Day requires an open mileage session. Review & Close Day must
+          // stay reachable after mileage closes so the business day can be closed.
+          const isDisabled = !openSession && step.key === "work_day";
 
           return (
             <div
