@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ACTIVITY_TYPE_META, type ActivityType } from "@ai-fsm/domain";
+
+// Offered right after Clock In — "what are you doing now?" hands payroll off to
+// the activity ledger (the two stay independent; this is just a convenience).
+const QUICK_ACTIVITIES: ActivityType[] = ["job_work", "travel", "material_run", "estimate_visit", "admin"];
 
 /**
  * Payroll clock control (TASK-052, Operations Engine Phase 2 slice 3).
@@ -31,6 +36,8 @@ export function ClockBar() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  // After clocking in, prompt for the current activity.
+  const [promptActivity, setPromptActivity] = useState(false);
 
   async function load() {
     try {
@@ -78,8 +85,29 @@ export function ClockBar() {
       // Refresh the whole Today header — clock-in also opened the business day,
       // so BusinessDayBar must re-read, not just this component.
       window.dispatchEvent(new Event("ops:refresh"));
+      // Prompt for the current activity right after clocking in (not on out).
+      setPromptActivity(path === "clock-in");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Clock action failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function pickActivity(type: ActivityType) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/v1/activities/switch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ activity_type: type }),
+      });
+      if (!res.ok) throw new Error();
+      setPromptActivity(false);
+      window.dispatchEvent(new Event("ops:refresh"));
+    } catch {
+      setError("Couldn't set your activity — try the activity tracker below.");
     } finally {
       setBusy(false);
     }
@@ -114,26 +142,50 @@ export function ClockBar() {
   const clockedIn = clock?.status === "open";
 
   return (
-    <div style={wrap}>
-      <div style={{ fontSize: 20 }}>{clockedIn ? "🟢" : "⚪️"}</div>
-      <div style={{ flex: 1, minWidth: 140 }}>
-        <strong>Payroll</strong>
-        <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-          {clockedIn
-            ? `Clocked in at ${timeLabel(clock!.clock_in_at)} · ${elapsedLabel(clock!.clock_in_at, now)}`
-            : "Clocked out"}
+    <>
+      <div style={{ ...wrap, marginBottom: clockedIn && promptActivity ? "var(--space-1)" : wrap.marginBottom }}>
+        <div style={{ fontSize: 20 }}>{clockedIn ? "🟢" : "⚪️"}</div>
+        <div style={{ flex: 1, minWidth: 140 }}>
+          <strong>Payroll</strong>
+          <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+            {clockedIn
+              ? `Clocked in at ${timeLabel(clock!.clock_in_at)} · ${elapsedLabel(clock!.clock_in_at, now)}`
+              : "Clocked out"}
+          </div>
+          {error && <div style={{ color: "var(--color-red-600, #dc2626)", fontSize: 12, marginTop: 4 }}>{error}</div>}
         </div>
-        {error && <div style={{ color: "var(--color-red-600, #dc2626)", fontSize: 12, marginTop: 4 }}>{error}</div>}
+        {clockedIn ? (
+          <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" onClick={() => act("clock-out")} disabled={busy}>
+            Clock Out
+          </button>
+        ) : (
+          <button type="button" className="p7-btn p7-btn-primary p7-btn-sm" onClick={() => act("clock-in")} disabled={busy}>
+            Clock In
+          </button>
+        )}
       </div>
-      {clockedIn ? (
-        <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" onClick={() => act("clock-out")} disabled={busy}>
-          Clock Out
-        </button>
-      ) : (
-        <button type="button" className="p7-btn p7-btn-primary p7-btn-sm" onClick={() => act("clock-in")} disabled={busy}>
-          Clock In
-        </button>
+
+      {clockedIn && promptActivity && (
+        <div style={{ ...wrap, alignItems: "flex-start", flexDirection: "column", gap: "var(--space-2)" }}>
+          <strong style={{ fontSize: "var(--text-sm)" }}>What are you doing now?</strong>
+          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+            {QUICK_ACTIVITIES.map((t) => (
+              <button
+                key={t}
+                type="button"
+                className="p7-btn p7-btn-secondary p7-btn-sm"
+                onClick={() => pickActivity(t)}
+                disabled={busy}
+              >
+                {ACTIVITY_TYPE_META[t].emoji} {ACTIVITY_TYPE_META[t].label}
+              </button>
+            ))}
+            <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" onClick={() => setPromptActivity(false)} disabled={busy}>
+              Later
+            </button>
+          </div>
+        </div>
       )}
-    </div>
+    </>
   );
 }
