@@ -8,7 +8,7 @@ import type { Role } from "@ai-fsm/domain";
 import { ToastProvider } from "./ui/Toast";
 import { QuickLeadModal } from "./QuickLeadModal";
 import { FloatingActionButton } from "./FloatingActionButton";
-import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
+import { WorkspaceAutoRoute } from "./WorkspaceAutoRoute";
 import {
   IconEstimates,
   IconInbox,
@@ -268,8 +268,10 @@ export function AppShell({ role, userName, children }: AppShellProps) {
 
         {/* ---- Main content ---- */}
         <main className="p7-main" id="main-content">
-          {/* EPIC-006 Phase 5: owner-only Office/Field workspace switch + daily prompt. */}
-          {role === "owner" && <WorkspaceSwitcher />}
+          {/* TASK-058: workspace mode is automatic by device (phone → Field,
+              tablet/computer → Office) with an override in Settings — no on-screen
+              toggle or daily popup. This renders nothing; it only steers entry. */}
+          {role === "owner" && <WorkspaceAutoRoute />}
           {children}
         </main>
 
