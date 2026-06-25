@@ -1,6 +1,22 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { ASSESSMENT_TRADE_LABELS, type AssessmentSummary, type AssessmentTradeKey } from "@ai-fsm/domain";
 
+/**
+ * A materials-generation failure with a user-facing reason and HTTP status.
+ * The route surfaces these directly so the caller sees *why* it failed
+ * (not configured, scope too large, key rejected) instead of one opaque 500.
+ */
+export class MaterialsGenerationError extends Error {
+  constructor(
+    message: string,
+    readonly code: string,
+    readonly status: number
+  ) {
+    super(message);
+    this.name = "MaterialsGenerationError";
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -279,39 +295,73 @@ export function buildMaterialsUserMessage(input: GenerateMaterialsInput): string
 export async function generateMaterials(
   input: GenerateMaterialsInput
 ): Promise<MaterialsResult> {
+  // Unlike the other AI helpers (scope, review, item-suggester), the materials
+  // generator has no rule-based fallback — it genuinely needs the model. If the
+  // key is missing, fail with a clear, user-facing reason instead of letting the
+  // SDK throw an opaque error the route flattens into a generic 500.
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new MaterialsGenerationError(
+      "AI estimating isn't configured yet — set ANTHROPIC_API_KEY to enable the materials generator.",
+      "AI_NOT_CONFIGURED",
+      503
+    );
+  }
+
   const client = new Anthropic();
 
   const userMessage = buildMaterialsUserMessage(input);
 
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    // The tool allows up to 25 items plus the assumptions / missing_measurements
-    // / excluded arrays; 2048 truncated the tool call mid-JSON on richer,
-    // assessment-driven lists, which surfaced as a 500. 4096 leaves headroom.
-    max_tokens: 4096,
-    system: [
-      {
-        type: "text",
-        text: SYSTEM_PROMPT,
-        cache_control: { type: "ephemeral" },
-      },
-    ],
-    tools: [MATERIALS_TOOL],
-    tool_choice: { type: "tool", name: "generate_materials_list" },
-    messages: [{ role: "user", content: userMessage }],
-  });
+  let response: Anthropic.Message;
+  try {
+    response = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      // The tool allows up to 25 items plus the assumptions / missing_measurements
+      // / excluded arrays; 2048 truncated the tool call mid-JSON on richer,
+      // assessment-driven lists, which surfaced as a 500. 4096 leaves headroom.
+      max_tokens: 4096,
+      system: [
+        {
+          type: "text",
+          text: SYSTEM_PROMPT,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
+      tools: [MATERIALS_TOOL],
+      tool_choice: { type: "tool", name: "generate_materials_list" },
+      messages: [{ role: "user", content: userMessage }],
+    });
+  } catch (err) {
+    // A rejected/expired key is a configuration problem, not a transient one —
+    // tell the caller plainly rather than burying it in a generic 500.
+    if (err instanceof Anthropic.APIError && (err.status === 401 || err.status === 403)) {
+      throw new MaterialsGenerationError(
+        "The Anthropic API key was rejected — double-check ANTHROPIC_API_KEY.",
+        "AI_AUTH_FAILED",
+        502
+      );
+    }
+    throw err;
+  }
 
   // A max_tokens stop means generation was cut off — even when the tool call
   // already emitted a valid `items` array, the response is truncated (e.g.
   // mid summary_notes or the metadata arrays). Reject it before trusting any
   // part of the payload rather than returning a partial materials list.
   if (response.stop_reason === "max_tokens") {
-    throw new Error("Materials list was truncated (hit the token limit) — try a narrower scope");
+    throw new MaterialsGenerationError(
+      "The materials list was too long to finish — try a narrower scope or fewer rooms.",
+      "RESULT_TRUNCATED",
+      422
+    );
   }
 
   const toolUse = response.content.find((b) => b.type === "tool_use");
   if (!toolUse || toolUse.type !== "tool_use") {
-    throw new Error("Claude did not return a materials list");
+    throw new MaterialsGenerationError(
+      "The AI didn't return a materials list — please try again.",
+      "NO_RESULT",
+      502
+    );
   }
 
   const raw = toolUse.input as {
@@ -339,7 +389,11 @@ export async function generateMaterials(
   // Defensive: a non-truncated response should always carry an items array
   // (max_tokens is already handled above), but never throw a TypeError on `.map`.
   if (!Array.isArray(raw.items)) {
-    throw new Error("Claude returned an unexpected materials payload");
+    throw new MaterialsGenerationError(
+      "The AI returned an unexpected materials payload — please try again.",
+      "NO_RESULT",
+      502
+    );
   }
 
   const saved = input.saved_materials ?? [];

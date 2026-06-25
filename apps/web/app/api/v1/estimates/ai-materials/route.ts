@@ -10,7 +10,7 @@ import { withAuth } from "@/lib/auth/middleware";
 import type { AuthSession } from "@/lib/auth/middleware";
 import { query } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { generateMaterials } from "@/lib/estimates/materials-generator";
+import { generateMaterials, MaterialsGenerationError } from "@/lib/estimates/materials-generator";
 import type { RoomMeasurement, SavedMaterial } from "@/lib/estimates/materials-generator";
 import {
   loadAssessmentSummary,
@@ -124,6 +124,16 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
 
     return NextResponse.json({ data: result });
   } catch (err) {
+    // Known, explainable failures (not configured, scope too large, key
+    // rejected) carry their own user-facing message and status — surface them
+    // so the caller learns the real reason instead of a generic 500.
+    if (err instanceof MaterialsGenerationError) {
+      logger.warn("ai-materials: " + err.code, { traceId: session.traceId, message: err.message });
+      return NextResponse.json(
+        { error: { code: err.code, message: err.message, traceId: session.traceId } },
+        { status: err.status }
+      );
+    }
     logger.error("POST /api/v1/estimates/ai-materials error", err, { traceId: session.traceId });
     return NextResponse.json(
       { error: { code: "INTERNAL_ERROR", message: "Failed to generate materials list", traceId: session.traceId } },
