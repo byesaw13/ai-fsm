@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { Button, useToast } from "@/components/ui";
+import { MaterialsMetadata, type MaterialsMetadata as MaterialsMetadataShape } from "@/app/app/estimates/components/MaterialsMetadata";
 import type { WorkOrderDraft, WorkOrderRoomLine } from "@ai-fsm/domain";
 import { materialItemsToDraft } from "@ai-fsm/domain";
 
@@ -59,6 +60,7 @@ export function WorkOrderForm(props: WorkOrderFormProps) {
   const [status, setStatus] = useState<(typeof STATUS_OPTIONS)[number]>(initial.status);
   const [saving, setSaving] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
+  const [suggestionMeta, setSuggestionMeta] = useState<MaterialsMetadataShape | null>(null);
 
   const total = materials.reduce((s, m) => s + (m.total_cents || 0), 0);
 
@@ -103,6 +105,11 @@ export function WorkOrderForm(props: WorkOrderFormProps) {
         suggested: true,
       }));
       setMaterials((rows) => [...rows, ...suggested]);
+      setSuggestionMeta({
+        assumptions: json?.data?.assumptions,
+        missing_measurements: json?.data?.missing_measurements,
+        excluded_customer_supplied_items: json?.data?.excluded_customer_supplied_items,
+      });
       toast.success(`${suggested.length} suggested — review and confirm`);
     } finally {
       setSuggesting(false);
@@ -227,6 +234,7 @@ export function WorkOrderForm(props: WorkOrderFormProps) {
           ))}
           {materials.length === 0 && <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>No materials yet — suggest or add.</p>}
         </div>
+        <MaterialsMetadata metadata={suggestionMeta} />
       </div>
 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-2)" }}>
