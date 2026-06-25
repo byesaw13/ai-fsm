@@ -182,8 +182,10 @@ signal a commitment to build:
 Direction is canonical (`docs/canonical/PRODUCTION_INTELLIGENCE.md`): Dovetails
 models **the work first**, and pricing is one projection of it. The model's
 *foundation* is **TASK-018** (the de facto PI-001), and **EPIC-008** is a
-deliberate stub holding only the two committed next pieces — `TASK-047 Work Item
-Library` (PI-002) and `TASK-048 Confidence Engine` (PI-006).
+deliberate stub holding only the two next pieces scoped so far — `TASK-047 Work
+Item Library` (PI-002) and `TASK-048 Confidence Engine` (PI-006). Both are
+`Proposed` (not yet committed for build); they are simply the only PI ideas
+promoted from concept to task.
 
 The remaining Production Intelligence ideas are recorded here so the thinking is
 not lost. They are **explicitly not committed backlog work** and earn task status
