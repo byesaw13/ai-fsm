@@ -24,15 +24,19 @@ export function WorkspaceAutoRoute() {
   const router = useRouter();
 
   useEffect(() => {
-    // Only steer the office root on entry; never fight intentional navigation
-    // to a specific page.
-    if (pathname !== OFFICE_ROOT) return;
+    // Steer BOTH workspace roots on entry (login lands everyone on /app/my-day,
+    // so steering only the office root would never fire for desktop owners).
+    // Other pages are left alone — never fight intentional navigation.
+    const onOffice = pathname === OFFICE_ROOT;
+    const onField = pathname === FIELD_ROOT;
+    if (!onOffice && !onField) return;
     const explicit = readCookie(COOKIE_MODE); // 'field' | 'office' | null (auto)
     const isPhone =
       typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
     const mode =
       explicit === "field" || explicit === "office" ? explicit : isPhone ? "field" : "office";
-    if (mode === "field") router.replace(FIELD_ROOT);
+    if (mode === "field" && onOffice) router.replace(FIELD_ROOT);
+    else if (mode === "office" && onField) router.replace(OFFICE_ROOT);
   }, [pathname, router]);
 
   return null;
