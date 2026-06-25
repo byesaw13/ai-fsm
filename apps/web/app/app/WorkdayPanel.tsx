@@ -495,7 +495,7 @@ export function WorkdayPanel({
       {/* Modern Horizontal Stepper */}
       <div className="workflow-stepper">
         {[
-          { key: "start_day", label: "Start Day", desc: openSession ? (activeVehicle?.nickname ?? "Vehicle active") : "Pre-flight & Vehicle", icon: "🏁" },
+          { key: "start_day", label: "Start Mileage Session", desc: openSession ? (activeVehicle?.nickname ?? "Vehicle active") : "Vehicle & odometer", icon: "🚐" },
           { key: "work_day", label: "Work Day", desc: openSession ? `${todayJobs.length} jobs scheduled` : "Track time & jobs", icon: "🛠️" },
           { key: "end_day", label: "Review & Close Day", desc: `${totalWarnings} tasks remaining`, icon: "🏁" },
         ].map((step, i) => {
@@ -609,7 +609,7 @@ export function WorkdayPanel({
                       className="p7-btn p7-btn-primary"
                       style={{ minHeight: 48, fontSize: "var(--text-base)", fontWeight: 700 }}
                     >
-                      Start Day in {selectedVehicle?.nickname ?? "Default Vehicle"} ({fmtOdo(Number(startOdometer) || selectedVehicle?.current_odometer)} mi)
+                      Start mileage in {selectedVehicle?.nickname ?? "Default Vehicle"} ({fmtOdo(Number(startOdometer) || selectedVehicle?.current_odometer)} mi)
                     </button>
                   </div>
                 </Card>
