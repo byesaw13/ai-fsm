@@ -35,15 +35,28 @@ export function ClockBar() {
   async function load() {
     try {
       const res = await fetch("/api/v1/time-clock/current");
+      // A non-2xx (transient error, expired session) must NOT be read as
+      // "clocked out" — that would invite the wrong action. Surface it instead
+      // and leave the last known state untouched.
+      if (!res.ok) {
+        setError("Couldn't load payroll — tap retry.");
+        return;
+      }
       const json = await res.json().catch(() => ({}));
       setClock((json.data ?? null) as Clock);
+      setError(null);
     } catch {
-      setError("Couldn't load the clock.");
+      setError("Couldn't load payroll — tap retry.");
     }
   }
 
+  // Load on mount, and whenever any Today-header action fires the shared signal
+  // (e.g. Clock In opens the business day → BusinessDayBar must refresh too).
   useEffect(() => {
     void load();
+    const onRefresh = () => void load();
+    window.addEventListener("ops:refresh", onRefresh);
+    return () => window.removeEventListener("ops:refresh", onRefresh);
   }, []);
 
   // Tick the elapsed label while clocked in.
@@ -62,7 +75,9 @@ export function ClockBar() {
         const json = await res.json().catch(() => ({}));
         throw new Error(json.error?.message ?? "That didn't work — try again.");
       }
-      await load();
+      // Refresh the whole Today header — clock-in also opened the business day,
+      // so BusinessDayBar must re-read, not just this component.
+      window.dispatchEvent(new Event("ops:refresh"));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Clock action failed.");
     } finally {
@@ -83,7 +98,17 @@ export function ClockBar() {
   };
 
   if (clock === undefined) {
-    return <div style={{ ...wrap, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>Loading clock…</div>;
+    return (
+      <div style={{ ...wrap, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+        {error ? (
+          <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" onClick={() => void load()} disabled={busy}>
+            {error} ↻
+          </button>
+        ) : (
+          "Loading clock…"
+        )}
+      </div>
+    );
   }
 
   const clockedIn = clock?.status === "open";
