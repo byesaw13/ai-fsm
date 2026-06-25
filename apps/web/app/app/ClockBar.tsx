@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ACTIVITY_TYPE_META, type ActivityType } from "@ai-fsm/domain";
 
 // Offered right after Clock In — "what are you doing now?" hands payroll off to
@@ -32,6 +33,7 @@ function timeLabel(iso: string): string {
 }
 
 export function ClockBar() {
+  const router = useRouter();
   const [clock, setClock] = useState<Clock | undefined>(undefined); // undefined = loading
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +108,9 @@ export function ClockBar() {
       if (!res.ok) throw new Error();
       setPromptActivity(false);
       window.dispatchEvent(new Event("ops:refresh"));
+      // The active-activity display (NowBar) is server-rendered and doesn't listen
+      // to ops:refresh — re-fetch server props so it reflects the new activity.
+      router.refresh();
     } catch {
       setError("Couldn't set your activity — try the activity tracker below.");
     } finally {

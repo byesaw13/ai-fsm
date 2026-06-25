@@ -49,6 +49,12 @@ export function BusinessDayBar() {
     setChecked((c) => ({ ...c, [item]: !c[item] }));
   }
 
+  // Clear acknowledgments whenever the day isn't ready-to-close, so re-entering
+  // READY_TO_CLOSE always requires a fresh review (no stale all-checked state).
+  useEffect(() => {
+    if (day?.status !== "READY_TO_CLOSE") setChecked({});
+  }, [day?.status]);
+
   async function load() {
     try {
       const res = await fetch("/api/v1/business-day/current");
