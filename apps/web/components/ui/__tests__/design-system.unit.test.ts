@@ -146,23 +146,28 @@ describe("getNavSections (role filtering)", () => {
     expect(sections[0].label).toBe("");
   });
 
-  it("Owner nav has Today, My Day, Requests, Clients, Properties, Estimates, Jobs, Schedule, Invoices, Reports, Settings", () => {
-    const sections = getNavSections("owner");
-    const hrefs = sections[0].items.map((i) => i.href);
-    expect(hrefs).toContain("/app");
-    expect(hrefs).toContain("/app/my-day"); // EPIC-006 P5: only the owner switches to My Day
-    expect(hrefs).toContain("/app/requests");
-    expect(hrefs).toContain("/app/clients");
-    expect(hrefs).toContain("/app/properties");
-    expect(hrefs).toContain("/app/estimates");
-    expect(hrefs).toContain("/app/jobs");
-    expect(hrefs).toContain("/app/work-orders");
-    expect(hrefs).toContain("/app/schedule");
-    expect(hrefs).toContain("/app/invoices");
-    expect(hrefs).toContain("/app/reports");
-    expect(hrefs).toContain("/app/settings");
-    expect(hrefs).not.toContain("/app/mileage");
-    expect(hrefs).toHaveLength(12);
+  it("Owner nav has the active home + all shared business destinations", () => {
+    // The home swaps with the workspace (My Day in Field, Overview in Office);
+    // the shared destinations are present in both. (TASK-058 follow-up)
+    const shared = [
+      "/app/requests",
+      "/app/clients",
+      "/app/properties",
+      "/app/estimates",
+      "/app/jobs",
+      "/app/work-orders",
+      "/app/schedule",
+      "/app/invoices",
+      "/app/reports",
+      "/app/settings",
+    ];
+    for (const view of ["field", "office"] as const) {
+      const hrefs = getNavSections("owner", view)[0].items.map((i) => i.href);
+      for (const href of shared) expect(hrefs).toContain(href);
+      expect(hrefs).toContain(view === "field" ? "/app/my-day" : "/app");
+      expect(hrefs).not.toContain("/app/mileage");
+      expect(hrefs).toHaveLength(11);
+    }
   });
 
   it("Admin nav drops My Day (pure admins don't do field work) — 11 items", () => {
@@ -186,10 +191,20 @@ describe("getNavSections (role filtering)", () => {
     expect(hrefs).not.toContain("/app/booking-requests");
   });
 
-  it("returns the same 1-section nav for owner role with 12 items", () => {
-    const sections = getNavSections("owner");
-    expect(sections).toHaveLength(1);
-    expect(flattenSections(sections)).toHaveLength(12);
+  it("owner nav is one section of 11 items with a single home per workspace", () => {
+    for (const view of ["field", "office"] as const) {
+      const sections = getNavSections("owner", view);
+      expect(sections).toHaveLength(1);
+      const hrefs = flattenSections(sections).map((i) => i.href);
+      expect(hrefs).toHaveLength(11);
+      if (view === "field") {
+        expect(hrefs).toContain("/app/my-day");
+        expect(hrefs).not.toContain("/app"); // no Overview home in Field
+      } else {
+        expect(hrefs).toContain("/app");
+        expect(hrefs).not.toContain("/app/my-day"); // no My Day home in Office
+      }
+    }
   });
 
   it("returns only 2 items for tech role (My Day + Visits)", () => {
@@ -218,12 +233,22 @@ describe("getNavSections (role filtering)", () => {
     expect(adminFirst.label).toBe("Overview");
   });
 
-  it("owner keeps the Overview dashboard reachable, demoted before Reports", () => {
-    const items = flattenSections(getNavSections("owner"));
-    const overviewIdx = items.findIndex((i) => i.href === "/app");
-    const reportsIdx = items.findIndex((i) => i.href === "/app/reports");
-    expect(overviewIdx).toBeGreaterThan(0); // not the landing item
-    expect(overviewIdx).toBe(reportsIdx - 1); // sits just before Reports
+  it("owner sidebar shows the active workspace's home, not both", () => {
+    // Field surface: My Day leads, Overview is not in the sidebar (reach it from
+    // Settings → Workspace). Office surface: the reverse.
+    const field = flattenSections(getNavSections("owner", "field")).map((i) => i.href);
+    expect(field[0]).toBe("/app/my-day");
+    expect(field).not.toContain("/app");
+
+    const office = flattenSections(getNavSections("owner", "office")).map((i) => i.href);
+    expect(office[0]).toBe("/app");
+    expect(office).not.toContain("/app/my-day");
+
+    // Shared business destinations stay in both.
+    for (const href of ["/app/jobs", "/app/invoices", "/app/reports", "/app/settings"]) {
+      expect(field).toContain(href);
+      expect(office).toContain(href);
+    }
   });
 });
 

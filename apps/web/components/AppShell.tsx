@@ -81,8 +81,8 @@ const ADMIN_NAV_SECTIONS: NavSection[] = [
 // Pure functions
 // ---------------------------------------------------------------------------
 
-/** Returns filtered nav sections for a given role */
-export function getNavSections(role: Role): NavSection[] {
+/** Returns filtered nav sections for a given role and active workspace view. */
+export function getNavSections(role: Role, view: "office" | "field" = "field"): NavSection[] {
   if (role === "tech") {
     const myDay: NavItem = { href: "/app/my-day", label: "My Day", Icon: IconMyDay };
     const visits: NavItem = { href: "/app/visits", label: "Visits", Icon: IconVisits };
@@ -98,20 +98,15 @@ export function getNavSections(role: Role): NavSection[] {
     }));
   }
 
-  // Owner = the all-rounder. Leads with My Day (their daily home); the Overview
-  // dashboard is demoted next to Reports, since the owner rarely starts the day
-  // in the numbers. Same items as admin plus My Day, just reordered.
+  // Owner = the all-rounder, but the sidebar reflects the ACTIVE workspace so the
+  // two "homes" never sit side-by-side (TASK-058 follow-up): My Day leads in
+  // Field, Overview leads in Office; the other home is reached from Settings →
+  // Workspace. The shared business destinations appear in both.
   const base = ADMIN_NAV_SECTIONS[0].items.filter(
     (i) => i.href !== NAV_MY_DAY.href && i.href !== NAV_TODAY.href,
   );
-  const reportsIdx = base.findIndex((i) => i.href === NAV_REPORTS.href);
-  const ownerItems = [
-    NAV_MY_DAY,
-    ...base.slice(0, reportsIdx),
-    NAV_TODAY,
-    ...base.slice(reportsIdx),
-  ];
-  return [{ label: "", items: ownerItems }];
+  const home = view === "office" ? NAV_TODAY : NAV_MY_DAY;
+  return [{ label: "", items: [home, ...base] }];
 }
 
 /**
@@ -153,7 +148,9 @@ interface AppShellProps {
 
 export function AppShell({ role, userName, children }: AppShellProps) {
   const pathname = usePathname();
-  const sections = getNavSections(role);
+  // The sidebar follows the surface you're on: My Day = field, everything else =
+  // office. So Field never shows the Overview home and vice-versa.
+  const sections = getNavSections(role, pathname.startsWith("/app/my-day") ? "field" : "office");
   const bottomItems = getBottomNavItems(role);
   const [showQuickLead, setShowQuickLead] = useState(false);
   const [showMore, setShowMore] = useState(false);
