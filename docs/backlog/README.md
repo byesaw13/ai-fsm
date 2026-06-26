@@ -66,7 +66,7 @@ tasks in `done/`.
 
 ## Task index
 
-Next available ID: **TASK-059**.
+Next available ID: **TASK-060**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -127,6 +127,7 @@ Next available ID: **TASK-059**.
 | TASK-056 | Current Operations State (live state machine) | 001 | Proposed |
 | TASK-057 | Presence timeline | 001 | Proposed |
 | TASK-058 | Workspace mode auto-by-device + Settings override | 006 | In Progress |
+| TASK-059 | My Day start-surface consolidation | 001 | In Progress |
 
 ## Status legend
 
