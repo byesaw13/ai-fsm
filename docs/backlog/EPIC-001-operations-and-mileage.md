@@ -113,7 +113,7 @@ Phase 2.
 # TASK-053: Activity + Assignment model
 
 Status:
-Proposed
+In Progress
 
 Problem:
 Activity today conflates the verb (driving, working) with the business object

@@ -121,7 +121,7 @@ Next available ID: **TASK-060**.
 | TASK-050 | Link mileage ↔ travel-time + capture-method | 001 | Proposed |
 | TASK-051 | Business Day aggregate (decouple day close) | 001 | Proposed |
 | TASK-052 | Payroll clock + payroll policies | 001 | Proposed |
-| TASK-053 | Activity + Assignment model | 001 | Proposed |
+| TASK-053 | Activity + Assignment model | 001 | In Progress |
 | TASK-054 | Day Close checklist + Reopen | 001 | Proposed |
 | TASK-055 | Operational Intelligence (profitability→automation) | 001 | Proposed |
 | TASK-056 | Current Operations State (live state machine) | 001 | Proposed |
