@@ -29,6 +29,17 @@ const TYPE_LABELS: Record<LineItemType, string> = {
 
 const TYPES = Object.keys(TYPE_LABELS) as LineItemType[];
 
+// Shared field style for the editor rows. minWidth:0 lets flex items shrink below
+// their content so a narrow column wraps cleanly instead of clipping the controls.
+const fieldStyle: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-muted)",
+  minWidth: 0,
+};
+
 function dollarsToCents(value: string): number {
   return Math.round(Number(value || 0) * 100);
 }
@@ -123,54 +134,54 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
         <form
           key={item.id}
           action={(formData) => updateLineItem(item, formData)}
-          style={{ display: "grid", gridTemplateColumns: "1.2fr 130px 110px 140px 96px", gap: "var(--space-2)", alignItems: "end" }}
+          style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)", alignItems: "end" }}
           data-testid="invoice-line-item-edit-row"
         >
-          <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+          <label style={{ ...fieldStyle, flex: "3 1 180px" }}>
             Description
             <input name="description" defaultValue={item.description} disabled={pending} required className="input" />
           </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+          <label style={{ ...fieldStyle, flex: "2 1 120px" }}>
             Type
             <select name="line_item_type" defaultValue={item.line_item_type} disabled={pending} className="input">
               {TYPES.map((type) => <option key={type} value={type}>{TYPE_LABELS[type]}</option>)}
             </select>
           </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+          <label style={{ ...fieldStyle, flex: "1 1 70px" }}>
             Qty
             <input name="quantity" type="number" min="0.01" step="0.01" defaultValue={item.quantity} disabled={pending} required className="input" />
           </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+          <label style={{ ...fieldStyle, flex: "1 1 90px" }}>
             Unit price
             <input name="unit_price" type="number" min="0" step="0.01" defaultValue={centsToDollars(item.unit_price_cents)} disabled={pending} required className="input" />
           </label>
-          <div style={{ display: "flex", gap: "var(--space-1)" }}>
+          <div style={{ display: "flex", gap: "var(--space-1)", flex: "0 0 auto" }}>
             <button type="submit" disabled={pending} className="btn btn-secondary">Save</button>
             <button type="button" onClick={() => deleteLineItem(item)} disabled={pending} className="btn btn-secondary" aria-label={`Delete ${item.description}`}>Delete</button>
           </div>
         </form>
       ))}
 
-      <form onSubmit={addLineItem} style={{ display: "grid", gridTemplateColumns: "1.2fr 130px 110px 140px 76px", gap: "var(--space-2)", alignItems: "end", paddingTop: "var(--space-2)", borderTop: "1px solid var(--border)" }} data-testid="invoice-line-item-add-form">
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+      <form onSubmit={addLineItem} style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)", alignItems: "end", paddingTop: "var(--space-2)", borderTop: "1px solid var(--border)" }} data-testid="invoice-line-item-add-form">
+        <label style={{ ...fieldStyle, flex: "3 1 180px" }}>
           Description
           <input value={draft.description} onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))} disabled={pending} required className="input" />
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+        <label style={{ ...fieldStyle, flex: "2 1 120px" }}>
           Type
           <select value={draft.line_item_type} onChange={(e) => setDraft((d) => ({ ...d, line_item_type: e.target.value as LineItemType }))} disabled={pending} className="input">
             {TYPES.map((type) => <option key={type} value={type}>{TYPE_LABELS[type]}</option>)}
           </select>
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+        <label style={{ ...fieldStyle, flex: "1 1 70px" }}>
           Qty
           <input type="number" min="0.01" step="0.01" value={draft.quantity} onChange={(e) => setDraft((d) => ({ ...d, quantity: e.target.value }))} disabled={pending} required className="input" />
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+        <label style={{ ...fieldStyle, flex: "1 1 90px" }}>
           Unit price
           <input type="number" min="0" step="0.01" value={draft.unit_price} onChange={(e) => setDraft((d) => ({ ...d, unit_price: e.target.value }))} disabled={pending} required className="input" />
         </label>
-        <button type="submit" disabled={pending} className="btn btn-primary">Add</button>
+        <button type="submit" disabled={pending} className="btn btn-primary" style={{ flex: "0 0 auto" }}>Add</button>
       </form>
     </div>
   );

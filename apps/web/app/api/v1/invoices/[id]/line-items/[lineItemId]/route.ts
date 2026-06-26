@@ -21,9 +21,11 @@ const lineItemSchema = z.object({
 });
 
 function getIds(pathname: string): { invoiceId: string; lineItemId: string } {
+  // .../invoices/{invoiceId}/line-items/{lineItemId}
+  //   at(-1)=lineItemId, at(-2)="line-items", at(-3)=invoiceId, at(-4)="invoices"
   const parts = pathname.split("/");
   return {
-    invoiceId: parts.at(-4)!,
+    invoiceId: parts.at(-3)!,
     lineItemId: parts.at(-1)!,
   };
 }
