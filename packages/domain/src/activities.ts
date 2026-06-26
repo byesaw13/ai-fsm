@@ -66,3 +66,36 @@ export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number];
 export function activityCategoryFor(type: ActivityType): ActivityCategory {
   return ACTIVITY_TYPE_META[type].category;
 }
+
+// ---------------------------------------------------------------------------
+// Operations Engine: Assignment + labor bucket (TASK-053)
+// ---------------------------------------------------------------------------
+
+/**
+ * The work an activity attaches to. When it's a real business object the entry
+ * uses entity_type/entity_id (job, visit, estimate, …); these are the non-entity
+ * assignments (you're at the shop, doing office work, on inventory, in training).
+ */
+export const ASSIGNMENT_KINDS = ["office", "shop", "inventory", "training", "none"] as const;
+export type AssignmentKind = (typeof ASSIGNMENT_KINDS)[number];
+
+/** The profitability axis of an activity entry (true labor burden). */
+export const LABOR_BUCKETS = ["billable", "overhead", "personal", "warranty"] as const;
+export type LaborBucket = (typeof LABOR_BUCKETS)[number];
+
+/**
+ * Default labor bucket for an activity. DOCUMENTED DEFAULT — the billable vs
+ * overhead split is a business judgment the owner can refine; it drives
+ * true-labor-burden and profitability, not day-to-day behavior. Warranty is an
+ * assignment property (warranty job/visit), so it's passed in, not inferred from
+ * the verb.
+ */
+export function laborBucketFor(
+  type: ActivityType,
+  opts: { warranty?: boolean } = {},
+): LaborBucket {
+  if (opts.warranty) return "warranty";
+  if (type === "personal") return "personal";
+  if (type === "job_work") return "billable";
+  return "overhead";
+}
