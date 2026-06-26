@@ -31,3 +31,27 @@ WHERE labor_bucket IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_activity_entries_business_day ON activity_entries (business_day_id);
 CREATE INDEX IF NOT EXISTS idx_activity_entries_clock        ON activity_entries (time_clock_session_id);
+
+-- Default labor_bucket from the activity verb on INSERT when the caller doesn't
+-- set it, so EVERY new entry carries the profitability axis (not just the
+-- backfilled ones) regardless of which insert path created it. The app may still
+-- set labor_bucket explicitly (e.g. warranty from the assignment) — the trigger
+-- only fills NULL. Mirrors the domain laborBucketFor default.
+CREATE OR REPLACE FUNCTION activity_entries_default_labor_bucket()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.labor_bucket IS NULL THEN
+    NEW.labor_bucket := CASE
+      WHEN NEW.activity_type = 'job_work' THEN 'billable'
+      WHEN NEW.activity_type = 'personal' THEN 'personal'
+      ELSE 'overhead'
+    END;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_activity_entries_labor_bucket ON activity_entries;
+CREATE TRIGGER trg_activity_entries_labor_bucket
+  BEFORE INSERT ON activity_entries
+  FOR EACH ROW EXECUTE FUNCTION activity_entries_default_labor_bucket();
