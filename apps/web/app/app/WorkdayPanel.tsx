@@ -562,11 +562,12 @@ export function WorkdayPanel({
                   <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
                     <div>
                       <div style={{ fontSize: "var(--text-xs)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--accent)", fontWeight: 700, marginBottom: 4 }}>
-                        Dovetails Handyman System
+                        Vehicle &amp; Mileage
                       </div>
-                      <h2 style={{ fontSize: "var(--text-2xl)", fontWeight: 800, margin: 0 }}>Start Your Workday</h2>
+                      <h2 style={{ fontSize: "var(--text-2xl)", fontWeight: 800, margin: 0 }}>Start a Mileage Session</h2>
                       <p style={{ color: "var(--fg-muted)", margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)" }}>
-                        Welcome back, Nick! Log starting odometer to unlock day tracking.
+                        Log the starting odometer to track this vehicle&apos;s mileage. Your
+                        payroll clock and business day start separately, up top.
                       </p>
                     </div>
 
@@ -811,24 +812,14 @@ export function WorkdayPanel({
                   </div>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                  <button
-                    type="button"
-                    className="p7-btn p7-btn-primary"
-                    style={{ minHeight: 48, fontWeight: 700, width: "100%" }}
-                    disabled={openSession !== null || pending}
-                    onClick={() => {
-                      toast.success("Workday completed. See you tomorrow!");
-                      router.push("/app" as Route);
-                    }}
-                  >
-                    Complete & Close Day
-                  </button>
-                  {openSession && (
-                    <span style={{ fontSize: 11, color: "var(--color-red-600)", textAlign: "center", display: "block" }}>
-                      ⚠️ You must close your mileage session before you can finalize and close your day.
-                    </span>
-                  )}
+                {/* The day is closed from the Business Day control in the "Today"
+                    header above (its own checklist), not here — and closing a
+                    mileage session or stopping the timer never closes the day.
+                    This tab is just the end-of-day review. */}
+                <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", textAlign: "center", padding: "var(--space-2)" }}>
+                  Reviewed everything? Close the day from{" "}
+                  <strong>Business Day → Close Business Day</strong> in the header up
+                  top. Closing a mileage session or stopping the timer won&apos;t close it.
                 </div>
               </Card>
 
