@@ -144,7 +144,7 @@ Phase 3.
 # TASK-056: Current Operations State (live state machine)
 
 Status:
-Proposed
+In Progress
 
 Problem:
 Nothing describes the user's current operational state, so automation has to
