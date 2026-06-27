@@ -38,6 +38,22 @@ purity" disagree, field reality wins. TASK-021 (Quick Activity Switching),
 TASK-022 (Smart Start Day), and the prevention-over-correction framing of
 TASK-019 all derive directly from this principle.
 
+### Favor references over ownership
+
+> An aggregate that groups records should hold **references** to them, never a
+> second copy of the data.
+
+Each fact has exactly one source of truth: time is `activity_entries`, mileage is
+`vehicle_sessions`, materials are `visit_parts`, photos are `visit_media`,
+presence is `presence_intervals`. A Visit is a production-session *folder* — it
+references those records (activity IDs, vehicle-session IDs, material IDs, photo
+IDs, checklist IDs); it does not own or duplicate them. Before adding a column or
+a table, ask whether an existing source already holds the fact and a reference
+will do. This is the rule the `visit_time_logs` retirement (TASK-061…065) makes
+concrete, and the discipline that keeps "one operational record feeds every
+function" true as the model grows. When tempted by "I just need one more table,"
+this rule is the check.
+
 ## How this relates to the canonical docs
 
 - **`docs/canonical/ROADMAP.md` remains the product-direction source of truth.**
@@ -51,13 +67,13 @@ TASK-019 all derive directly from this principle.
 ## Structure
 
 - `README.md` — this file.
-- `EPIC-001-operations-and-mileage.md`
+- `EPIC-001-operations-and-mileage.md` — the Operations Engine: *how the engine works* (Business Day, Payroll, Activity, Current State, Day Close, time truth).
 - `EPIC-002-estimating-and-assessments.md`
 - `EPIC-003-property-intelligence.md`
 - `EPIC-004-billing-and-profitability.md`
 - `EPIC-005-platform-and-delivery.md`
 - `EPIC-006-role-based-workspaces.md`
-- `EPIC-007-location-intelligence.md`
+- `EPIC-007-location-intelligence.md` — **Field Execution**: *how a technician experiences the field* (Location Intelligence is one subsystem inside it).
 - `EPIC-008-production-intelligence.md` — deliberate stub (PI-002, PI-006 only).
 - `done/` — completed tasks, moved out of the active epics.
 
@@ -66,7 +82,7 @@ tasks in `done/`.
 
 ## Task index
 
-Next available ID: **TASK-061**.
+Next available ID: **TASK-068**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -93,10 +109,10 @@ Next available ID: **TASK-061**.
 | TASK-021 | Quick Activity Switching | 001 | Done |
 | TASK-022 | Smart Start Day | 001 | Done |
 | TASK-023 | End of Day Checklist Wizard | 001 | Proposed |
-| TASK-024 | Passive Location-Based Activity Capture | 001 | In Progress |
-| TASK-025 | Bluetooth-Triggered Vehicle-Aware Auto-Mileage | 001 | In Progress |
-| TASK-026 | Day Map (stops + drive routes) | 001 | In Progress |
-| TASK-027 | Hybrid Tracking (manual mileage, auto time) | 001 | In Progress |
+| TASK-024 | Passive Location-Based Activity Capture | 007 | In Progress |
+| TASK-025 | Bluetooth-Triggered Vehicle-Aware Auto-Mileage | 007 | In Progress |
+| TASK-026 | Day Map (stops + drive routes) | 007 | In Progress |
+| TASK-027 | Hybrid Tracking (manual mileage, auto time) | 007 | In Progress |
 | TASK-028 | Phase 0 — Extract WorkdayPanel | 006 | Proposed |
 | TASK-029 | Phase 1 — My Day becomes the field home | 006 | Proposed |
 | TASK-030 | Phase 2 — Slim the Owner Dashboard | 006 | Proposed |
@@ -108,7 +124,7 @@ Next available ID: **TASK-061**.
 | TASK-036 | PR Gatekeeper MCP Server | 005 | In Progress |
 | TASK-038 | Surface consolidation (one daily home) | 006 | Done |
 | TASK-039 | Job & estimate numbering | 005 | Done |
-| TASK-040 | False-drive detection | 001 | Done |
+| TASK-040 | False-drive detection | 007 | Done |
 | TASK-041 | Customer-property geofences | 007 | Done |
 | TASK-042 | Property matching engine + confidence | 007 | Done |
 | TASK-043 | visit_candidates table + creation from stops | 007 | Done |
@@ -117,18 +133,25 @@ Next available ID: **TASK-061**.
 | TASK-046 | Workday & privacy controls | 007 | In Progress |
 | TASK-047 | Work Item Library (PI-002) | 008 | Proposed |
 | TASK-048 | Confidence Engine (PI-006) | 008 | Proposed |
-| TASK-049 | Operational Inbox (single review surface) | 001 | Proposed |
+| TASK-049 | Operational Inbox (single review surface) | 007 | Proposed |
 | TASK-050 | Link mileage ↔ travel-time + capture-method | 001 | Proposed |
 | TASK-051 | Business Day aggregate (decouple day close) | 001 | Proposed |
 | TASK-052 | Payroll clock + payroll policies | 001 | Proposed |
 | TASK-053 | Activity + Assignment model | 001 | In Progress |
 | TASK-054 | Day Close checklist + Reopen | 001 | Proposed |
-| TASK-055 | Operational Intelligence (profitability→automation) | 001 | Proposed |
+| TASK-055 | Operational Intelligence (profitability→automation) | 008 | Proposed |
 | TASK-056 | Current Operations State (live state machine) | 001 | In Progress |
-| TASK-057 | Presence timeline | 001 | Proposed |
+| TASK-057 | Site Presence | 007 | Proposed |
 | TASK-058 | Workspace mode auto-by-device + Settings override | 006 | In Progress |
 | TASK-059 | My Day start-surface consolidation | 001 | In Progress |
 | TASK-060 | Invoice discounts (negative adjustment lines) | 004 | In Progress |
+| TASK-061 | Backfill legacy visit time into activity_entries | 001 | Proposed |
+| TASK-062 | Invoice labor parity test | 001 | Proposed |
+| TASK-063 | Swap invoice labor readers to activity_entries | 001 | Proposed |
+| TASK-064 | Remove visit_time_logs writer | 001 | Proposed |
+| TASK-065 | Retire visit_time_logs table | 001 | Proposed |
+| TASK-066 | Visit Production Rollup (Visit Summary page) | 007 | Proposed |
+| TASK-067 | Visit Timeline | 007 | Proposed |
 
 ## Status legend
 

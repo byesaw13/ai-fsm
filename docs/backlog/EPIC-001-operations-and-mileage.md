@@ -10,9 +10,198 @@ trustworthy enough to feed tax mileage, vehicle cost, and job profitability.
 > `docs/canonical/OPERATIONS.md`. Build order and rationale: that doc + the
 > approved plan. The model treats the app as an Operations Engine (the historical
 > ledger is one component), keeps a live Current Operations State, and makes the
-> Business Day a pure aggregate. **Freeze gate: do not start TASK-049/050/054/055/
-> 057 until TASK-051/052/053/056 (Business Day + Payroll + Activity/State) are
-> stable.**
+> Business Day a pure aggregate. **Freeze gate: do not start TASK-049/050/054/057
+> until TASK-051/052/053/056 (Business Day + Payroll + Activity/State) are
+> stable.** (Operational Intelligence moved to EPIC-008 as TASK-055 — it consumes
+> these ledgers and belongs with Production Intelligence, not inside the engine.)
+
+> **Time Truth Consolidation (TASK-061…065)** — a strictly-ordered sub-program
+> that makes `activity_entries` the single source of truth for time and retires
+> the legacy `visit_time_logs` table. Evidence: the audit found `visits/[id]/
+> transition/route.ts` already dual-writes both tables (same start, end, and
+> visit linkage), so this is a backfill + reader-swap, not a re-architecture.
+> The only consumers of `visit_time_logs` are the two invoice-labor readers
+> (`lib/invoices/final-invoice.ts`, `lib/invoices/line-items.ts`) — which cross
+> into EPIC-004 (billing). **Run in order: 061 → 062 → 063 → 064 → 065. Do not
+> touch Job vs Work Order during this program** — the interim model is fixed:
+> `Job → Visit → activity_entries`; Work Order stays separate until the time
+> truth is clean.
+
+# TASK-061: Backfill legacy visit time into activity_entries
+
+Status:
+Proposed
+
+Problem:
+`visit_time_logs` (legacy per-visit timer) and `activity_entries` (the Operations
+Engine time ledger) both record visit time. The transition route already
+dual-writes, so new visit time lands in both — but the 7 historical
+`visit_time_logs` rows predate the dual-write and are missing from
+`activity_entries`. Before `activity_entries` can be the single time truth, the
+old time must be visible in it.
+
+Business Value:
+Old visit time becomes visible in the new time truth, so invoice-labor and
+profitability rollups built on `activity_entries` see complete history.
+
+Scope:
+- Backfill existing `visit_time_logs` rows into `activity_entries`.
+- `activity_type='job_work'`, `entity_type='visit'`, `entity_id=visit_id`,
+  carrying `started_at`/`ended_at` from the source row.
+- Join visit → job only where a rollup needs `job_id` (activity_entries links to
+  the visit; `job_id` is recovered via `visits`).
+- Idempotent guard: rerunning must not duplicate entries (skip where a matching
+  open/closed `job_work`+`visit` entry already exists).
+- Additive, reversible migration; verify in a rolled-back transaction first.
+
+Out of Scope:
+- Changing any reader or writer (TASK-062…065).
+
+Acceptance Criteria:
+- [ ] Every closed `visit_time_logs` row has a corresponding `activity_entries`
+      row (job_work / visit / matching timestamps).
+- [ ] Rerunning the backfill creates zero new rows.
+- [ ] No invoice or report output changes (this step only adds ledger rows).
+
+Notes:
+Risk: low. Depends on nothing. Do not apply out-of-band on garonhome.
+
+# TASK-062: Invoice labor parity test
+
+Status:
+Proposed
+
+Problem:
+The two invoice-labor readers sum `visit_time_logs` by `job_id`. Before switching
+them to `activity_entries`, we must prove the new source yields identical labor —
+this is the money path; a silent drift changes what customers are billed.
+
+Business Value:
+Proves invoices do not change before the reader swap; converts a medium-risk
+change into a gated, evidence-backed one.
+
+Scope:
+- Compare labor minutes/cents from the old source (`visit_time_logs`) vs the new
+  bridge (`activity_entries JOIN visits ON v.id=ae.entity_id AND
+  ae.entity_type='visit'`, filtered to billable job_work) for the same job.
+- Cover the final-invoice labor fallback (`lib/invoices/final-invoice.ts`).
+- Cover the manual "pull labor from tracked time"
+  (`upsertLaborLineFromTrackedTime` in `lib/invoices/line-items.ts`).
+- Use real seeded job/visit examples where possible.
+- Must pass (cent-for-cent parity) before TASK-063 ships.
+
+Out of Scope:
+- Changing the readers themselves (TASK-063).
+
+Acceptance Criteria:
+- [ ] Parity test asserts identical billable labor cents (old vs bridge) for the
+      seeded jobs, for both the final-invoice path and the manual pull.
+- [ ] Test is wired into the gate and is green before TASK-063 merges.
+
+Notes:
+Risk: medium — the money path. Depends on TASK-061 (backfilled history must be
+present for parity to hold on historical jobs).
+
+# TASK-063: Swap invoice labor readers to activity_entries
+
+Status:
+Proposed
+
+Problem:
+`visit_time_logs` is the de-facto invoice-labor source only because the readers
+still point at it. With time truth in `activity_entries`, the readers should sum
+the ledger.
+
+Business Value:
+Makes `activity_entries` the invoice-labor source, so labor reflects the single
+time truth (including manually-logged billable job time the old timer never saw).
+
+Scope:
+- Update `apps/web/lib/invoices/final-invoice.ts` and
+  `apps/web/lib/invoices/line-items.ts`.
+- Replace the `visit_time_logs` sums with the `activity_entries + visits` bridge:
+  - `JOIN visits v ON v.id = ae.entity_id AND ae.entity_type='visit'`,
+    rolled up by `v.job_id`.
+  - Filters: `entity_type='visit'`, `activity_type='job_work'`,
+    `labor_bucket='billable'` (if reliable), `voided_at IS NULL`,
+    `started_at IS NOT NULL`, `ended_at IS NOT NULL`.
+
+Out of Scope:
+- Removing the `visit_time_logs` writer (TASK-064) — both still exist; only the
+  read source moves.
+
+Acceptance Criteria:
+- [ ] Both readers source labor from `activity_entries` via the bridge.
+- [ ] TASK-062 parity test passes against the new readers.
+- [ ] Invoice labor cents unchanged on the seeded jobs.
+
+Notes:
+Risk: medium. **Gated behind TASK-062** — do not merge until parity is green.
+
+# TASK-064: Remove visit_time_logs writer
+
+Status:
+Proposed
+
+Problem:
+After TASK-063, nothing reads `visit_time_logs`, but the transition route still
+writes it alongside `activity_entries` — a redundant dual-write.
+
+Business Value:
+Stops dual-writing time; one write path, one source of truth.
+
+Scope:
+- Remove the `visit_time_logs` INSERT (in_progress) and UPDATE-close
+  (completed/cancelled) from `apps/web/app/api/v1/visits/[id]/transition/
+  route.ts`.
+- Keep the adjacent `activity_entries` write unchanged.
+- Update `apps/web/app/api/v1/visits/__tests__/visits.unit.test.ts` to assert the
+  activity-entry behavior instead of the visit-timer behavior.
+
+Out of Scope:
+- Dropping the table (TASK-065).
+
+Acceptance Criteria:
+- [ ] No code writes `visit_time_logs`.
+- [ ] Visit transitions still produce the correct `activity_entries` job_work
+      segment (start on in_progress, close on completion/cancel).
+- [ ] Tests assert activity-entry behavior; gate green.
+
+Notes:
+Risk: low after TASK-063 (the write is already redundant once readers have moved).
+
+# TASK-065: Retire visit_time_logs table
+
+Status:
+Proposed
+
+Problem:
+Once nothing reads or writes `visit_time_logs`, the table is dead weight and a
+second, drift-prone time source.
+
+Business Value:
+Removes the old time source; `activity_entries` is the sole time truth.
+
+Scope:
+- Confirm no readers, no writers (grep + gate).
+- Confirm invoices source labor from `activity_entries` (TASK-063 deployed).
+- Drop `visit_time_logs` in a reversible migration (recreatable from
+  `db/migrations/043_visit_time_logs.sql`).
+- The historical time already lives in `activity_entries` via TASK-061 — the drop
+  loses no data.
+
+Out of Scope:
+- Job vs Work Order promotion (explicitly deferred; interim model is
+  `Job → Visit → activity_entries`).
+
+Acceptance Criteria:
+- [ ] `visit_time_logs` no longer exists in the schema.
+- [ ] Down-migration recreates it cleanly.
+- [ ] No reader/writer references remain.
+
+Notes:
+Risk: low, **but only after production verification** that invoices read from
+`activity_entries`. Do not apply out-of-band on garonhome.
 
 # TASK-059: My Day start-surface consolidation (remove odometer-unlocks-day framing)
 
@@ -170,34 +359,6 @@ Acceptance Criteria:
 Notes:
 Phase 3. Pairs with TASK-053.
 
-# TASK-057: Presence timeline
-
-Status:
-Proposed
-
-Problem:
-"Where was I present" is not modeled distinctly from "what was I doing," so
-present-but-waiting (non-billable) time is invisible.
-
-Business Value:
-Presence vs Activity makes profitability and customer analytics honest (arrived
-8:10, waiting to 8:30, billable from 8:30).
-
-Scope:
-- New `presence_intervals` table (migration 131): business_day_id, place
-  (property/client or label), arrived_at, departed_at, source
-  (gps_confirmed|manual). Derived primarily from confirmed `visit_candidates`.
-
-Out of Scope:
-- Billable logic (lives in activity labor_bucket).
-
-Acceptance Criteria:
-- [ ] A presence interval can hold multiple activities of differing buckets.
-- [ ] Derives from confirmed visits; manual entry supported; additive + RLS.
-
-Notes:
-Phase 4 (after freeze gate).
-
 # TASK-050: Link mileage ↔ travel-time + capture-method + reconcile
 
 Status:
@@ -230,36 +391,6 @@ Acceptance Criteria:
 Notes:
 Phase 5. Advances TASK-027; closes TASK-025's confirm UI.
 
-# TASK-049: Operational Inbox (single review surface)
-
-Status:
-Proposed
-
-Problem:
-The owner sees location segments, visit candidates, drives, and mileage conflicts
-as separate systems.
-
-Business Value:
-One review queue; one-tap arrival prompts powered by Current Operations State.
-
-Scope:
-- View-first `operational_review_items` (derived view/API; table only if
-  persistent snooze/dismiss is needed). Union: detected_drive, detected_visit,
-  unknown_stop, mileage_reconcile, missed_clock_out, idle_gap,
-  unassigned_activity. Dedup via candidate-owns-stop (segment UNIQUE already).
-- Confirm runs the TASK-050 hybrid action and stamps the matched scheduled
-  visit's `arrived_at` (advances TASK-044).
-
-Out of Scope:
-- Persistent per-item state until proven necessary.
-
-Acceptance Criteria:
-- [ ] A drive, a low-confidence stop, and a missed clock-out surface in one list.
-- [ ] No item appears twice; confirm links the right records.
-
-Notes:
-Phase 6. Relates to EPIC-007.
-
 # TASK-054: Day Close checklist + Reopen
 
 Status:
@@ -283,302 +414,6 @@ Acceptance Criteria:
 
 Notes:
 Phase 7.
-
-# TASK-055: Operational Intelligence (profitability → automation)
-
-Status:
-Proposed
-
-Problem:
-With payroll/activity/mileage separated, the data can finally drive profitability,
-pricing, and proactive automation — but nothing consumes it yet.
-
-Business Value:
-True labor burden feeds pricing (PI-004); the engine eventually acts on insights.
-
-Scope:
-- Daily roll-up (payroll vs billable vs overhead vs personal, mileage,
-  present-not-billable) and job profitability incl. true labor burden.
-- Wire true labor burden into PI-004
-  (`docs/working/PRICING_INTELLIGENCE_CHARTER_DRAFT.md`).
-- Value chain endpoint: insights → recommendations → automation (final consumer).
-
-Out of Scope:
-- Building automations before the data model is trustworthy.
-
-Acceptance Criteria:
-- [ ] Daily + per-job roll-ups derive purely from the separated ledgers.
-- [ ] True labor burden is exposed for pricing.
-
-Notes:
-Phase 8. Built last. Connects to the Production Intelligence direction.
-
-# TASK-040: False-drive detection
-
-Status:
-Done
-
-Problem:
-Passive location capture (TASK-024) produces false drives — parked Bluetooth
-connect/disconnect cycles, GPS drift, and sub-minute teleport blips — that pile
-up as unlabeled provisional segments the owner has to dismiss by hand.
-
-Business Value:
-The owner only ever sees real trips to label; noise is cleared automatically and
-borderline cases are one tap.
-
-Scope:
-- A pure `classifyDrive` (packages/domain) that grades a closed drive by average
-  speed: noise (<1 km/h, or under 60s), suspect (1–3 km/h), ok (≥3 km/h).
-- Apply at capture: auto-dismiss noise, flag suspect (`location_segments.is_likely_noise`).
-- One-time backfill of existing provisional drives (migration 120).
-- Surface a "Likely noise" badge in the captured-segments panel with Dismiss as
-  the primary action; Confirm stays available as an override.
-
-Out of Scope:
-- Auto-mileage from drives (still parked — see TASK-027).
-- Re-classifying already confirmed/dismissed segments.
-
-Acceptance Criteria:
-- [ ] Sub-walking-pace / sub-minute drives are auto-dismissed at capture.
-- [ ] Borderline drives are flagged and dismissable in one tap; real trips are
-      untouched.
-- [ ] Existing provisional drives are backfilled by the migration.
-- [ ] `classifyDrive` is unit-tested against the real-data examples.
-
-Notes:
-Refines TASK-024 (location capture) and TASK-027 (hybrid tracking). Thresholds
-live in `classifyDrive`; migration 120's backfill mirrors them.
-
-# TASK-027: Hybrid tracking — manual mileage, auto time
-
-Status:
-In Progress
-
-Problem:
-The old manual flow (Start Day → vehicle session + tapping activity chips) and
-the new auto location capture both record the same hours, so they collide: a
-manual `travel` entry overlaps the auto drive/stop segments, and the overlap
-guard then blocks confirming the auto data ("conflicts with time already
-marked"). GPS also can't match the odometer for mileage accuracy.
-
-Decision (owner, 2026-06-20):
-**Hybrid — manual mileage, auto time.** Keep Start Day's odometer session as the
-mileage record (odometer accuracy); let auto-capture own activities/time. Interim
-"until tracking is close to flawless."
-
-Approach (this pass):
-- Auto **drives confirm as a `travel` activity** (time), same as stops — not as
-  GPS mileage. The drive→mileage "Log trip" UI is removed from the segments panel
-  (the `log_trip` API stays for later); mileage comes from Start Day's odometer.
-- Guidance: don't tap the NowBar activity chips when auto-capture is on — let the
-  timeline fill and confirm there, so nothing overlaps.
-
-Out of Scope (this pass / follow-ups):
-- Overlap *resolution* (offer to replace an overlapping manual entry instead of a
-  hard block) — a follow-up if collisions still happen.
-- Suppressing/hiding the NowBar activity chips during an auto-captured day.
-- Trusting GPS mileage (revisit when tracking is tighter).
-
-Acceptance Criteria:
-- [ ] An auto drive can be confirmed as a `travel` activity in one tap.
-- [ ] Start Day mileage and auto activities no longer double-count the same time
-      when the owner stops manually tapping activities.
-
-Test gap (documented):
-This pass is a UI-wiring change — the segments panel now invokes the existing,
-already-exercised `confirm` action for drives (same path stops use) instead of
-`log_trip`. No new business logic: the segmentation reducer is unit-tested
-(`segments.test.ts`) and the `confirm` endpoint/overlap guard are unchanged and
-covered by integration/e2e. The web app has no React-component test harness
-(`@testing-library/react` is not a dependency), so a focused panel unit test is
-not added here; standing up RTL is out of scope for this fix.
-
-# TASK-026: Day Map (stops + drive routes)
-
-Status:
-In Progress
-
-Problem:
-The captured day is a list. Stops and drives carry GPS, but the owner can't see
-*where* they were — which makes labeling slower and gives no visual check on the
-auto-mileage.
-
-Approach:
-A map on the activity timeline (`/app/timeline`) that plots the day:
-- **stops as pins**, **drives as routes** drawn from the `location_events` GPS
-  breadcrumb (denser thanks to the drive-GPS-point automation).
-- Provisional vs confirmed are color-coded; popups show the place / trip miles.
-- Tiles: **Leaflet + OpenStreetMap** — free, no API key (aligns with the cost /
-  complexity policy). Loaded client-side only (`ssr: false`).
-
-Scope:
-- `GET /api/v1/activities/segments/geometry[?date=]` — stop pins + drive routes
-  for a day.
-- `DayMap` (imperative Leaflet client component) + `DayMapPanel` (dynamic, ssr
-  off) mounted on the timeline above the Captured Locations panel.
-- `leaflet` + `@types/leaflet` dependency.
-
-Out of Scope:
-- Geocoding client/property addresses onto the map (separate, needs geocoding).
-- Live "where am I now" tracking; offline tiles.
-
-Acceptance Criteria:
-- [ ] The timeline shows a map of the selected day's stops + drive routes.
-- [ ] Provisional/confirmed are visually distinguishable; popups identify each.
-- [ ] Empty days show a clear "nothing mapped yet" state.
-- [ ] No API key / external billing (OSM tiles).
-
-Notes:
-- Route quality tracks the breadcrumb density (sparse on older drives, real on
-  new ones via the periodic-GPS automation). Builds on TASK-024/025.
-
-# TASK-025: Bluetooth-triggered, vehicle-aware auto-mileage
-
-Status:
-Backlog (not started)
-
-Problem:
-Mileage is still entered by hand (start/end odometer per vehicle session). The
-owner wants trips logged automatically and attributed to the right vehicle,
-without thinking about it. No vehicle telematics are available (the RAM has no
-usable HA integration), but the phone's Bluetooth tells us which vehicle he is
-in and exactly when the engine is on.
-
-Business Value:
-- Hands-off mileage capture per vehicle → trustworthy tax mileage and vehicle
-  cost without manual odometer entry.
-- Precise trip boundaries (ignition on/off) instead of guessed-from-motion.
-
-Approach:
-Extend TASK-024. The HA Companion app's `sensor.<phone>_bluetooth_connection`
-identifies the connected car stereo. An HA automation maps a known vehicle BT
-identity → a vehicle and posts to the FSM ingest:
-- **connect** to a known vehicle BT → open a drive segment tied to that vehicle.
-- **disconnect** → close the drive; compute distance from the drive segment's GPS
-  and surface an **estimated trip mileage the owner confirms** (not auto-written —
-  GPS distance is an estimate) before it writes to that vehicle's
-  `vehicle_sessions` / `mileage_logs`.
-
-Vehicle BT map (see also the agent memory note):
-- RAM 2019 (plate DOVETLS, work truck) → "Uconnect" / `00:22:A0:A6:49:0D`
-- GMC Acadia 2018 → "GMC INTELLILINK" / `30:C3:D9:19:1E:C3`
-Decision: **both** vehicles auto-track, each attributed to its own record; miles
-are **owner-confirmed**, not auto-written.
-
-Scope:
-- Vehicle BT identity → `vehicles` row mapping (config; both vehicles).
-- Ingest: accept a vehicle identifier + a Bluetooth connect/disconnect signal;
-  associate the resulting drive segment with the vehicle. Likely a small additive
-  migration (vehicle reference on `location_segments`) + a new event kind.
-- Distance: compute trip miles from the drive segment's GPS (route between
-  start/end, or accumulate points). Document the estimate accuracy.
-- Confirm UI: on the timeline/mileage surface, present the auto-captured trip +
-  estimated miles for one-tap confirm (or edit) → writes the vehicle session.
-- HA automation watching the bluetooth_connection sensor + runbook.
-
-Out of Scope:
-- Auto-writing miles with no confirmation (explicitly rejected).
-- Vehicle telematics / OBD / odometer (none available; GPS estimate is the method).
-- Multi-driver attribution (single-owner first).
-
-Acceptance Criteria:
-- [ ] Connecting the phone to a known vehicle's Bluetooth opens a vehicle-tagged
-      drive; disconnecting closes it.
-- [ ] The closed trip surfaces estimated miles attributed to the correct vehicle.
-- [ ] Owner confirms/edits the miles in one tap → writes a `vehicle_sessions` /
-      `mileage_logs` entry; nothing is written without confirmation.
-- [ ] GPS-estimate accuracy + method documented.
-
-Prerequisites / Notes:
-- Both the RAM and GMC must exist as rows in the FSM `vehicles` table to attach
-  sessions (RAM likely already does).
-- Confirm what `connected_paired_devices` actually contains once the sensor
-  populates (friendly name vs MAC) so the automation matches correctly.
-- Builds directly on TASK-024 (`location_segments`, the ingest, the timeline).
-
-# TASK-024: Passive location-based activity capture (HA-fed time ledger)
-
-Status:
-Backlog (not started)
-
-Problem:
-The owner forgets to switch activity state during the day — Start Day, working a
-job, a material run to the supply house, travel. The time ledger
-(`activity_entries`, migration 111) ends up with gaps that have to be
-reconstructed from end-of-day memory, so `job_work` / `travel` / `material_run`
-times are inaccurate. The owner wants transitions captured automatically as facts
-he can label later, not an exact-activity guesser.
-
-Business Value:
-- Accurate time logging without relying on memory → trustworthy job
-  profitability, tax mileage, and vehicle-cost rollups.
-- Turns the day into a reviewable timeline of stop/drive segments to confirm,
-  instead of blank time that must be remembered.
-
-Platform constraint (why this is not a PWA feature):
-The installed PWA **cannot** do background geolocation — browsers suspend a web
-app's location watcher the moment the screen locks, and the browser Geofencing
-API was removed. Google Maps Timeline does the right segmentation but exposes no
-API and moved on-device (manual Takeout export only), so it is not a usable feed.
-The capture source must be something with real native background location that we
-can read from. The homelab already runs **Home Assistant**, whose Companion app
-has exactly that.
-
-Approach:
-Use the HA Companion app as the native background location source, bridged into
-FSM via the existing SMS-intake transport (n8n / MQTT / ntfy — see the SMS intake
-pipeline). Two complementary streams:
-- **Zones (optional)** for recurring places (home + frequent supply houses):
-  clean, low-battery enter/leave events that self-label (`material_run`,
-  `travel`).
-- **Background GPS + detected-activity (`still`/`in_vehicle`) + reverse-geocoded
-  address** for everything else: captures arbitrary customer stops with no
-  pre-listing. Zones are additive labels, not a requirement.
-HA automation publishes transition events to an authenticated FSM ingest
-endpoint, which writes **provisional** `activity_entries` rows (`source=auto_*` /
-`backfill`, `ended_at` open until the next transition). The owner labels/confirms
-or voids each segment later — the table's void+re-add model already supports this.
-
-Scope:
-- Authenticated ingest endpoint (internal key, like `SMS_INTERNAL_KEY`) accepting
-  `{ timestamp, lat/long or zone, detected_activity, geocoded_address }`.
-- Segment logic: cluster points → "stop" (stationary > N min at an address) vs
-  "drive" (`in_vehicle`); open/close `activity_entries` on transitions.
-- Map known zones → default `activity_type` (home / supply-house → `material_run`
-  or `travel`).
-- Day-timeline UI: show provisional segments; one-tap assign
-  job/visit/`activity_type`; confirm or void. Provisional entries visually
-  distinct and excluded from profitability until confirmed.
-- HA-side docs in `docs/working`: Companion app config (background location,
-  detected-activity + geocoded-location sensors), zone setup for home + supply
-  houses, and the publish automation.
-
-Out of Scope (v1):
-- Native app wrapper (Capacitor + background-geolocation) for first-party
-  geofencing — a separate future task only if HA proves insufficient for customer
-  addresses.
-- Multi-employee location tracking (single-owner first).
-- Silent/unconfirmed job attribution — provisional entries always require owner
-  confirmation; no guessing what the work was.
-- Real-time push reminders (can layer later).
-
-Acceptance Criteria:
-- [ ] Leaving/arriving a place produces a provisional `activity_entries` row with
-      no manual action, visible in the day timeline.
-- [ ] Known zones (home + ≥1 supply house) self-label correctly.
-- [ ] Unknown/customer stops appear as geocoded segments labelable in ≤1 tap.
-- [ ] Provisional entries are visually distinct and never affect profitability
-      until confirmed.
-- [ ] HA Companion config + battery impact documented in `docs/working`.
-- [ ] Ingest auth via env key (no secrets in repo); segment/ingest logic tested.
-
-Dependencies / Notes:
-- Builds on `activity_entries` (111), vehicle sessions (083/109/113), mileage
-  logs (008/082).
-- Reuses the SMS-intake transport (n8n / MQTT / ntfy).
-- Privacy: the owner's own location; store segment endpoints + address, not a
-  continuous breadcrumb trail, unless a need emerges.
 
 # TASK-023: Daily Command Center UX Modernization
 

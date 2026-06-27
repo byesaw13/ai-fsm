@@ -14,9 +14,13 @@ This epic is a **deliberate stub**. It does not open a large program of work.
   already the base of this model. **Finishing TASK-018 is the prerequisite for
   this epic.** Do not start the tasks below until TASK-018 has proven the model
   in real use.
-- Only two tasks live here on purpose. Everything else Production-Intelligence
-  shaped is held as **strategic concepts** (see the backlog README), explicitly
-  not committed, until use validates the foundation.
+- Three tasks live here: the two PI stubs below plus **TASK-055 (Operational
+  Intelligence)**, moved from EPIC-001 — it is the *consumer* of the Operations
+  Engine's separated ledgers (payroll/activity/mileage), so it belongs in the
+  value chain `Production → Pricing → Operations Intelligence → Recommendations`,
+  not inside the engine that produces the data. Everything else
+  Production-Intelligence shaped is held as **strategic concepts** (see the
+  backlog README), explicitly not committed, until use validates the foundation.
 
 The `PI-00x` labels below are the conceptual numbering from the Production
 Intelligence direction; the `TASK-0xx` IDs are the canonical backlog IDs.
@@ -108,6 +112,38 @@ The materials generator already emits `assumptions`, `missing_measurements`, and
 `excluded_customer_supplied_items` (TASK-018). This task surfaces and structures
 those into a confidence signal rather than inventing new capture. Gated on
 TASK-018.
+
+# TASK-055: Operational Intelligence (profitability → automation)
+
+Status:
+Proposed
+
+Problem:
+With payroll/activity/mileage separated by the Operations Engine (EPIC-001), the
+data can finally drive profitability, pricing, and proactive automation — but
+nothing consumes it yet.
+
+Business Value:
+True labor burden feeds pricing (PI-004); the engine eventually acts on insights.
+
+Scope:
+- Daily roll-up (payroll vs billable vs overhead vs personal, mileage,
+  present-not-billable) and job profitability incl. true labor burden.
+- Wire true labor burden into PI-004
+  (`docs/working/PRICING_INTELLIGENCE_CHARTER_DRAFT.md`).
+- Value chain endpoint: insights → recommendations → automation (final consumer).
+
+Out of Scope:
+- Building automations before the data model is trustworthy.
+
+Acceptance Criteria:
+- [ ] Daily + per-job roll-ups derive purely from the separated ledgers.
+- [ ] True labor burden is exposed for pricing.
+
+Notes:
+The last link in the chain — built only after the Operations Engine ledgers
+(EPIC-001) and Site Presence (TASK-057) are trustworthy in real use. Moved here
+from EPIC-001: it consumes the engine's output rather than being part of it.
 
 ## Completed
 
