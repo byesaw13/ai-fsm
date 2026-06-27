@@ -72,7 +72,10 @@ export async function recalculateInvoiceTotals(
      WHERE invoice_id = $1`,
     [invoiceId]
   );
-  const subtotalCents = Number(totals.rows[0]?.subtotal_cents ?? 0);
+  // Line items can include negative 'adjustment' (discount) lines, but the
+  // invoice rollup can't go below $0 (the invoices subtotal/total checks are
+  // >= 0, and you can't owe a negative amount). Clamp the discounted rollup at 0.
+  const subtotalCents = Math.max(0, Number(totals.rows[0]?.subtotal_cents ?? 0));
   const taxCents = 0;
   const totalCents = subtotalCents + taxCents;
 

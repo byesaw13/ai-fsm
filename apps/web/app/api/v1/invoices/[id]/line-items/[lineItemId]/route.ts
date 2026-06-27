@@ -13,12 +13,18 @@ import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
-const lineItemSchema = z.object({
-  description: z.string().trim().min(1).max(500),
-  quantity: z.coerce.number().positive().max(999999.99),
-  unit_price_cents: z.coerce.number().int().min(0).max(100_000_000),
-  line_item_type: z.enum(INVOICE_LINE_ITEM_TYPES),
-});
+const lineItemSchema = z
+  .object({
+    description: z.string().trim().min(1).max(500),
+    quantity: z.coerce.number().positive().max(999999.99),
+    unit_price_cents: z.coerce.number().int().min(-100_000_000).max(100_000_000),
+    line_item_type: z.enum(INVOICE_LINE_ITEM_TYPES),
+  })
+  // Only 'adjustment' lines may be negative — that's how a discount is entered.
+  .refine((d) => d.line_item_type === "adjustment" || d.unit_price_cents >= 0, {
+    message: "Only an adjustment line can be negative (use one as a discount).",
+    path: ["unit_price_cents"],
+  });
 
 function getIds(pathname: string): { invoiceId: string; lineItemId: string } {
   // .../invoices/{invoiceId}/line-items/{lineItemId}
