@@ -124,7 +124,7 @@ Next available ID: **TASK-061**.
 | TASK-053 | Activity + Assignment model | 001 | In Progress |
 | TASK-054 | Day Close checklist + Reopen | 001 | Proposed |
 | TASK-055 | Operational Intelligence (profitability→automation) | 001 | Proposed |
-| TASK-056 | Current Operations State (live state machine) | 001 | Proposed |
+| TASK-056 | Current Operations State (live state machine) | 001 | In Progress |
 | TASK-057 | Presence timeline | 001 | Proposed |
 | TASK-058 | Workspace mode auto-by-device + Settings override | 006 | In Progress |
 | TASK-059 | My Day start-surface consolidation | 001 | In Progress |
