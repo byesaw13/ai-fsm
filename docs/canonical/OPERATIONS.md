@@ -123,12 +123,29 @@ missing.
 
 ## Build discipline
 
-The program is phased in the backlog as TASK-049…057 (EPIC-001). Foundation first:
-**Business Day (051) → Payroll (052) → Activity+State (053/056).** A **freeze
-gate** follows: do not start the Operational Inbox, mileage automation, Bluetooth,
-AI, or dashboards until the foundation is stable, or later work builds on concepts
-about to change. Migrations are additive and reversible; corrections and
-reconciliation **void**, never delete; every table is account-scoped under RLS.
+The program is phased across three epics along a clean boundary — **EPIC-001 is
+the engine (how it works); EPIC-007 (Field Execution) is the technician's field
+experience on top of it; EPIC-008 (Production Intelligence) consumes the engine's
+ledgers.** Foundation first, all in EPIC-001: **Business Day (051) → Payroll (052)
+→ Activity + Current State (053/056)**, plus the **Time Truth Consolidation**
+sub-program (TASK-061…065) that makes `activity_entries` the single source of
+truth for time and retires the legacy `visit_time_logs` table — a backfill +
+reader-swap (the visit transition already dual-writes both), strictly ordered and
+gated behind an invoice-labor parity test. The mileage↔travel-time link
+(TASK-050) stays in EPIC-001 as engine infrastructure.
+
+A **freeze gate** follows the foundation: do not start the field-experience work —
+Operational Inbox (049), mileage automation, Bluetooth, Day Map, Site Presence
+(057), the Visit production surfaces (066/067), now in **EPIC-007** — or the
+Operational/Production Intelligence work (055, in **EPIC-008**) until the
+foundation is stable, or later work builds on concepts about to change.
+
+Sources of truth are single and referenced, never duplicated (see the backlog's
+"Favor references over ownership" principle): time is `activity_entries`, mileage
+`vehicle_sessions`, materials `visit_parts`, photos `visit_media`, presence
+`presence_intervals`; a Visit is a folder that references them. Migrations are
+additive and reversible; corrections and reconciliation **void**, never delete;
+every table is account-scoped under RLS.
 
 ## Status
 

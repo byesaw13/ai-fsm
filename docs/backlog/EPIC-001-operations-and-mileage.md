@@ -113,8 +113,11 @@ still point at it. With time truth in `activity_entries`, the readers should sum
 the ledger.
 
 Business Value:
-Makes `activity_entries` the invoice-labor source, so labor reflects the single
-time truth (including manually-logged billable job time the old timer never saw).
+Makes `activity_entries` the invoice-labor source so the engine has one time
+truth — **a strict source swap, not a billing change.** The bridge is scoped to
+reproduce exactly the time `visit_time_logs` recorded (the visit timer's
+`auto_visit` `job_work` segments, mirrored 1:1 by the dual-write and backfilled
+for history), so billed cents are identical.
 
 Scope:
 - Update `apps/web/lib/invoices/final-invoice.ts` and
@@ -123,20 +126,31 @@ Scope:
   - `JOIN visits v ON v.id = ae.entity_id AND ae.entity_type='visit'`,
     rolled up by `v.job_id`.
   - Filters: `entity_type='visit'`, `activity_type='job_work'`,
-    `labor_bucket='billable'` (if reliable), `voided_at IS NULL`,
-    `started_at IS NOT NULL`, `ended_at IS NOT NULL`.
+    `voided_at IS NULL`, `started_at IS NOT NULL`, `ended_at IS NOT NULL`.
+- The filter set must select exactly the visit-timer segments (and the TASK-061
+  backfill of them), so the bridge result equals the old `visit_time_logs` sum.
 
 Out of Scope:
 - Removing the `visit_time_logs` writer (TASK-064) — both still exist; only the
   read source moves.
+- **Billing any time the old timer never recorded.** Manually-logged billable
+  `job_work` time that has no `visit_time_logs` counterpart is deliberately *not*
+  pulled in here — that would change billed cents and break the TASK-062 parity
+  contract. Whether to start billing such time is a separate, opt-in product
+  decision (a future task), not part of this swap. If the parity test surfaces
+  such rows, the swap's filter must exclude them (e.g. require the backfilled/
+  `auto_visit` provenance), not absorb them.
 
 Acceptance Criteria:
 - [ ] Both readers source labor from `activity_entries` via the bridge.
 - [ ] TASK-062 parity test passes against the new readers.
-- [ ] Invoice labor cents unchanged on the seeded jobs.
+- [ ] Invoice labor cents unchanged on every seeded job — including any job that
+      has manual `job_work` time with no `visit_time_logs` row.
 
 Notes:
 Risk: medium. **Gated behind TASK-062** — do not merge until parity is green.
+Note on `labor_bucket='billable'`: only add that filter if it does not change the
+result vs. the visit-timer set; the parity contract wins over filter elegance.
 
 # TASK-064: Remove visit_time_logs writer
 
