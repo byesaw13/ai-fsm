@@ -3,7 +3,8 @@ import { z } from "zod";
 import { withAuth } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { ACTIVITY_TYPES, ACTIVITY_ENTITY_TYPES, activityCategoryFor } from "@ai-fsm/domain";
+import { ACTIVITY_TYPES, ACTIVITY_ENTITY_TYPES, ASSIGNMENT_KINDS, activityCategoryFor } from "@ai-fsm/domain";
+import { businessToday } from "@/lib/operations/business-day";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,9 @@ const switchSchema = z.object({
   activity_type: z.enum(ACTIVITY_TYPES),
   entity_type: z.enum(ACTIVITY_ENTITY_TYPES).nullable().optional(),
   entity_id: z.string().uuid().nullable().optional(),
+  // Non-entity assignment (Office / Shop / Inventory / Training). The entity
+  // assignments use entity_type/entity_id above; this is for the rest.
+  assignment_kind: z.enum(ASSIGNMENT_KINDS).nullable().optional(),
   note: z.string().max(500).nullable().optional(),
   source: z.enum(["manual", "auto_visit", "auto_material_run", "auto_estimate"]).default("manual"),
 }).refine((d) => (d.entity_type == null) === (d.entity_id == null), {
@@ -72,15 +76,31 @@ export const POST = withAuth(async (request: NextRequest, session) => {
       );
     }
 
+    // Link the new activity to today's business day and the open payroll clock,
+    // if they exist (references only — the activity stays independent; we never
+    // open a day or clock just to switch). labor_bucket auto-fills via trigger.
+    const dayRes = await client.query<{ id: string }>(
+      `SELECT id FROM business_days
+        WHERE account_id = $1 AND user_id = $2 AND business_date = $3 LIMIT 1`,
+      [session.accountId, session.userId, businessToday()]
+    );
+    const clockRes = await client.query<{ id: string }>(
+      `SELECT id FROM time_clock_sessions
+        WHERE account_id = $1 AND user_id = $2 AND status = 'open' AND voided_at IS NULL LIMIT 1`,
+      [session.accountId, session.userId]
+    );
+
     const { rows } = await client.query<{ id: string; started_at: string }>(
       `INSERT INTO activity_entries
          (account_id, user_id, session_date, activity_type, category,
-          entity_type, entity_id, source, note)
-       VALUES ($1, $2, CURRENT_DATE, $3, $4, $5, $6, $7, $8)
+          entity_type, entity_id, source, note,
+          business_day_id, time_clock_session_id, assignment_kind)
+       VALUES ($1, $2, CURRENT_DATE, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING id, started_at::text`,
       [
         session.accountId, session.userId, d.activity_type, category,
         d.entity_type ?? null, d.entity_id ?? null, d.source, d.note ?? null,
+        dayRes.rows[0]?.id ?? null, clockRes.rows[0]?.id ?? null, d.assignment_kind ?? null,
       ]
     );
 
