@@ -17,9 +17,16 @@ const switchSchema = z.object({
   assignment_kind: z.enum(ASSIGNMENT_KINDS).nullable().optional(),
   note: z.string().max(500).nullable().optional(),
   source: z.enum(["manual", "auto_visit", "auto_material_run", "auto_estimate"]).default("manual"),
-}).refine((d) => (d.entity_type == null) === (d.entity_id == null), {
-  message: "entity_type and entity_id must be provided together",
-});
+})
+  .refine((d) => (d.entity_type == null) === (d.entity_id == null), {
+    message: "entity_type and entity_id must be provided together",
+  })
+  // An activity attaches to ONE assignment: either an entity (job/visit/…) or a
+  // non-entity assignment_kind, never both.
+  .refine((d) => !(d.assignment_kind != null && d.entity_type != null), {
+    message: "An activity has one assignment — an entity or an assignment_kind, not both.",
+    path: ["assignment_kind"],
+  });
 
 /**
  * POST /api/v1/activities/switch
@@ -50,8 +57,8 @@ export const POST = withAuth(async (request: NextRequest, session) => {
       [session.userId, session.accountId, session.role]
     );
 
-    const active = await client.query<{ id: string; activity_type: string; entity_id: string | null; entity_type: string | null }>(
-      `SELECT id, activity_type, entity_type, entity_id
+    const active = await client.query<{ id: string; activity_type: string; entity_id: string | null; entity_type: string | null; assignment_kind: string | null }>(
+      `SELECT id, activity_type, entity_type, entity_id, assignment_kind
        FROM activity_entries
        WHERE account_id = $1 AND ended_at IS NULL AND voided_at IS NULL
        FOR UPDATE`,
@@ -62,9 +69,12 @@ export const POST = withAuth(async (request: NextRequest, session) => {
     if (
       current &&
       current.activity_type === d.activity_type &&
-      (current.entity_id ?? null) === (d.entity_id ?? null)
+      (current.entity_type ?? null) === (d.entity_type ?? null) &&
+      (current.entity_id ?? null) === (d.entity_id ?? null) &&
+      (current.assignment_kind ?? null) === (d.assignment_kind ?? null)
     ) {
-      // Idempotent: already doing exactly this.
+      // Idempotent: already doing exactly this — same verb AND same assignment
+      // (so switching e.g. Office → Shop is NOT swallowed).
       await client.query("COMMIT");
       return NextResponse.json({ data: { id: current.id, unchanged: true } });
     }
@@ -76,13 +86,18 @@ export const POST = withAuth(async (request: NextRequest, session) => {
       );
     }
 
+    // The business-local date — used for BOTH session_date and the business_day
+    // lookup so they always agree (a 10pm-ET switch on a UTC server must not store
+    // tomorrow's session_date while linking today's business day).
+    const today = businessToday();
+
     // Link the new activity to today's business day and the open payroll clock,
     // if they exist (references only — the activity stays independent; we never
     // open a day or clock just to switch). labor_bucket auto-fills via trigger.
     const dayRes = await client.query<{ id: string }>(
       `SELECT id FROM business_days
         WHERE account_id = $1 AND user_id = $2 AND business_date = $3 LIMIT 1`,
-      [session.accountId, session.userId, businessToday()]
+      [session.accountId, session.userId, today]
     );
     const clockRes = await client.query<{ id: string }>(
       `SELECT id FROM time_clock_sessions
@@ -95,10 +110,10 @@ export const POST = withAuth(async (request: NextRequest, session) => {
          (account_id, user_id, session_date, activity_type, category,
           entity_type, entity_id, source, note,
           business_day_id, time_clock_session_id, assignment_kind)
-       VALUES ($1, $2, CURRENT_DATE, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING id, started_at::text`,
       [
-        session.accountId, session.userId, d.activity_type, category,
+        session.accountId, session.userId, today, d.activity_type, category,
         d.entity_type ?? null, d.entity_id ?? null, d.source, d.note ?? null,
         dayRes.rows[0]?.id ?? null, clockRes.rows[0]?.id ?? null, d.assignment_kind ?? null,
       ]
