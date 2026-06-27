@@ -66,7 +66,7 @@ tasks in `done/`.
 
 ## Task index
 
-Next available ID: **TASK-060**.
+Next available ID: **TASK-061**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -128,6 +128,7 @@ Next available ID: **TASK-060**.
 | TASK-057 | Presence timeline | 001 | Proposed |
 | TASK-058 | Workspace mode auto-by-device + Settings override | 006 | In Progress |
 | TASK-059 | My Day start-surface consolidation | 001 | In Progress |
+| TASK-060 | Invoice discounts (negative adjustment lines) | 004 | In Progress |
 
 ## Status legend
 

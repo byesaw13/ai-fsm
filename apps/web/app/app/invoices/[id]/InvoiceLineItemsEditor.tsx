@@ -24,7 +24,7 @@ const TYPE_LABELS: Record<LineItemType, string> = {
   labor: "Labor",
   materials: "Materials",
   handling_fee: "Handling fee",
-  adjustment: "Adjustment",
+  adjustment: "Adjustment / Discount",
 };
 
 const TYPES = Object.keys(TYPE_LABELS) as LineItemType[];
@@ -153,7 +153,7 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
           </label>
           <label style={{ ...fieldStyle, flex: "1 1 90px" }}>
             Unit price
-            <input name="unit_price" type="number" min="0" step="0.01" defaultValue={centsToDollars(item.unit_price_cents)} disabled={pending} required className="input" />
+            <input name="unit_price" type="number" step="0.01" defaultValue={centsToDollars(item.unit_price_cents)} disabled={pending} required className="input" />
           </label>
           <div style={{ display: "flex", gap: "var(--space-1)", flex: "0 0 auto" }}>
             <button type="submit" disabled={pending} className="btn btn-secondary">Save</button>
@@ -179,7 +179,7 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
         </label>
         <label style={{ ...fieldStyle, flex: "1 1 90px" }}>
           Unit price
-          <input type="number" min="0" step="0.01" value={draft.unit_price} onChange={(e) => setDraft((d) => ({ ...d, unit_price: e.target.value }))} disabled={pending} required className="input" />
+          <input type="number" step="0.01" value={draft.unit_price} onChange={(e) => setDraft((d) => ({ ...d, unit_price: e.target.value }))} disabled={pending} required className="input" />
         </label>
         <button type="submit" disabled={pending} className="btn btn-primary" style={{ flex: "0 0 auto" }}>Add</button>
       </form>
