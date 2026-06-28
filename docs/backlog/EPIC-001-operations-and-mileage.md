@@ -30,7 +30,7 @@ trustworthy enough to feed tax mileage, vehicle cost, and job profitability.
 # TASK-061: Backfill legacy visit time into activity_entries
 
 Status:
-Proposed
+Done
 
 Problem:
 `visit_time_logs` (legacy per-visit timer) and `activity_entries` (the Operations
@@ -69,7 +69,7 @@ Risk: low. Depends on nothing. Do not apply out-of-band on garonhome.
 # TASK-062: Invoice labor parity test
 
 Status:
-Proposed
+Done
 
 Problem:
 The two invoice-labor readers sum `visit_time_logs` by `job_id`. Before switching
@@ -105,7 +105,7 @@ present for parity to hold on historical jobs).
 # TASK-063: Swap invoice labor readers to activity_entries
 
 Status:
-Proposed
+Done
 
 Problem:
 `visit_time_logs` is the de-facto invoice-labor source only because the readers
@@ -155,7 +155,7 @@ result vs. the visit-timer set; the parity contract wins over filter elegance.
 # TASK-064: Remove visit_time_logs writer
 
 Status:
-Proposed
+Done
 
 Problem:
 After TASK-063, nothing reads `visit_time_logs`, but the transition route still
@@ -187,7 +187,7 @@ Risk: low after TASK-063 (the write is already redundant once readers have moved
 # TASK-065: Retire visit_time_logs table
 
 Status:
-Proposed
+In Progress
 
 Problem:
 Once nothing reads or writes `visit_time_logs`, the table is dead weight and a
@@ -215,7 +215,9 @@ Acceptance Criteria:
 
 Notes:
 Risk: low, **but only after production verification** that invoices read from
-`activity_entries`. Do not apply out-of-band on garonhome.
+`activity_entries`. Do not apply out-of-band on garonhome. Implementation is
+prepared on PR #410 (migration + helper/test cleanup, gate green); held for the
+production check before merge — hence In Progress, not Done.
 
 # TASK-059: My Day start-surface consolidation (remove odometer-unlocks-day framing)
 

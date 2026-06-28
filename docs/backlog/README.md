@@ -145,11 +145,11 @@ Next available ID: **TASK-070**.
 | TASK-058 | Workspace mode auto-by-device + Settings override | 006 | In Progress |
 | TASK-059 | My Day start-surface consolidation | 001 | In Progress |
 | TASK-060 | Invoice discounts (negative adjustment lines) | 004 | In Progress |
-| TASK-061 | Backfill legacy visit time into activity_entries | 001 | Proposed |
-| TASK-062 | Invoice labor parity test | 001 | Proposed |
-| TASK-063 | Swap invoice labor readers to activity_entries | 001 | Proposed |
-| TASK-064 | Remove visit_time_logs writer | 001 | Proposed |
-| TASK-065 | Retire visit_time_logs table | 001 | Proposed |
+| TASK-061 | Backfill legacy visit time into activity_entries | 001 | Done |
+| TASK-062 | Invoice labor parity test | 001 | Done |
+| TASK-063 | Swap invoice labor readers to activity_entries | 001 | Done |
+| TASK-064 | Remove visit_time_logs writer | 001 | Done |
+| TASK-065 | Retire visit_time_logs table | 001 | In Progress |
 | TASK-066 | Visit Production Rollup (Visit Summary page) | 007 | Proposed |
 | TASK-067 | Visit Timeline | 007 | Proposed |
 | TASK-068 | Payment Provider Model & Enriched Recorder | 004 | In Progress |
