@@ -9,18 +9,7 @@
 // Money helpers
 // ============================================================================
 
-/**
- * Format cents as a USD dollar string (e.g. 12345 → "$123.45").
- * Handles negative values: -500 → "-$5.00"
- */
-export function formatCents(cents: number): string {
-  const abs = Math.abs(cents);
-  const formatted = (abs / 100).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  return cents < 0 ? `-$${formatted}` : `$${formatted}`;
-}
+export { formatCents } from "@/lib/money";
 
 /**
  * Net revenue: paid invoice revenue minus total expenses.

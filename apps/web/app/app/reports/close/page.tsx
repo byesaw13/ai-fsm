@@ -5,6 +5,7 @@ import { getSession } from "@/lib/auth/session";
 import { canViewReports, canCloseMonth, canReopenMonth } from "@/lib/auth/permissions";
 import { withReportContext } from "@/lib/reports/db";
 import { query } from "@/lib/db";
+import { formatCents } from "@/lib/money";
 import {
   PageContainer,
   PageHeader,
@@ -119,10 +120,6 @@ export default async function ClosePage({ searchParams }: PageProps) {
   if (month) currentValues.month = month;
 
   const exportBase = `/api/v1/reports/month-end-export?month=${encodeURIComponent(targetMonth)}`;
-
-  function formatCents(cents: number): string {
-    return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-  }
 
   return (
     <PageContainer>
