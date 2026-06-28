@@ -1,13 +1,14 @@
 /**
- * Integration test: invoice-labor PARITY between the legacy visit_time_logs source
- * and the new activity_entries bridge (TASK-062).
+ * Integration test: invoice-labor bridge correctness (activity_entries source).
  *
- * The money path. Before TASK-063 swaps the two invoice-labor readers
- * (final-invoice.ts, line-items.ts) from visit_time_logs to activity_entries, this
- * proves the bridge yields the SAME tracked minutes — and therefore the same
- * billed labor cents — on a controlled, realistic dataset. If the bridge ever
- * diverges (e.g. it starts counting manual time the old timer never recorded, or
- * its filters drift), this test fails and the swap is blocked.
+ * activity_entries is the single source of truth for invoice labor (Time Truth
+ * Consolidation, EPIC-001). This locks in that the bridge query
+ * (trackedLaborMinutesFromActivityEntries) sums exactly the right time — job_work
+ * on the visit, scoped to the job — and excludes everything else.
+ *
+ * History: this began as the TASK-062 parity test (activity_entries vs the legacy
+ * visit_time_logs). visit_time_logs was retired in TASK-065, so the legacy side is
+ * gone; what remains is the bridge's own correctness.
  *
  * Tier: DB integration (Tier 2). Skipped unless TEST_DATABASE_URL is set. No
  * running server needed. Everything runs in a single transaction that ROLLS BACK,
@@ -19,10 +20,11 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Client } from "pg";
 import type { PoolClient } from "pg";
 import {
-  trackedLaborMinutesFromVisitTimeLogs,
   trackedLaborMinutesFromActivityEntries,
   trackedLaborCents,
+  roundedQuarterHoursFromMinutes,
 } from "../tracked-labor";
+import { upsertLaborLineFromTrackedTime } from "../line-items";
 
 const RUN = !!process.env.TEST_DATABASE_URL;
 
@@ -30,20 +32,17 @@ const RUN = !!process.env.TEST_DATABASE_URL;
 const ACCOUNT = "11111111-1111-1111-1111-111111111111";
 const OWNER = "11111111-1111-1111-1111-aaaaaaaaaaaa";
 
-describe.skipIf(!RUN)("invoice labor parity — visit_time_logs vs activity_entries bridge", () => {
+describe.skipIf(!RUN)("invoice labor bridge — activity_entries source of truth", () => {
   let client: Client;
   // Ids created inside the rolled-back transaction.
   let jobA = "";
   let jobB = "";
   let jobEmpty = "";
+  let invoiceA = ""; // draft invoice for jobA, for the end-to-end money-path test
 
-  // A closed visit timer plus its dual-write activity entry. `min` minutes long.
-  async function visitTimer(visitId: string, jobId: string, startISO: string, min: number) {
-    await client.query(
-      `INSERT INTO visit_time_logs (account_id, visit_id, job_id, user_id, started_at, ended_at)
-       VALUES ($1,$2,$3,$4,$5::timestamptz, $5::timestamptz + ($6 || ' minutes')::interval)`,
-      [ACCOUNT, visitId, jobId, OWNER, startISO, min],
-    );
+  // A closed job_work segment on a visit — what the visit transition route writes
+  // when a visit starts/ends. `min` minutes long.
+  async function jobWorkOnVisit(visitId: string, startISO: string, min: number) {
     await client.query(
       `INSERT INTO activity_entries
          (account_id, user_id, session_date, activity_type, category,
@@ -54,8 +53,7 @@ describe.skipIf(!RUN)("invoice labor parity — visit_time_logs vs activity_entr
     );
   }
 
-  // An activity_entry with NO visit_time_logs counterpart — used for noise that
-  // the bridge must exclude (so it never inflates labor over the legacy source).
+  // An activity_entry the bridge must EXCLUDE (so it never inflates labor).
   async function noiseActivity(opts: {
     activity_type: string;
     entity_type: string | null;
@@ -102,24 +100,24 @@ describe.skipIf(!RUN)("invoice labor parity — visit_time_logs vs activity_entr
     // Anchor on the seed account/owner when present (CI), but self-bootstrap them
     // otherwise so the test runs against any migrated DB. All inside the rollback.
     await client.query(
-      `INSERT INTO accounts (id, name) VALUES ($1, 'parity-test account')
+      `INSERT INTO accounts (id, name) VALUES ($1, 'bridge-test account')
        ON CONFLICT (id) DO NOTHING`,
       [ACCOUNT],
     );
     await client.query(
       `INSERT INTO users (id, account_id, email, full_name, password_hash, role)
-       VALUES ($1, $2, 'parity-owner@test.local', 'Parity Owner', 'x', 'owner')
+       VALUES ($1, $2, 'bridge-owner@test.local', 'Bridge Owner', 'x', 'owner')
        ON CONFLICT (id) DO NOTHING`,
       [OWNER, ACCOUNT],
     );
 
     const c = await client.query<{ id: string }>(
-      `INSERT INTO clients (account_id, name) VALUES ($1,'parity-test client') RETURNING id`,
+      `INSERT INTO clients (account_id, name) VALUES ($1,'bridge-test client') RETURNING id`,
       [ACCOUNT],
     );
     const clientId = c.rows[0].id;
     const p = await client.query<{ id: string }>(
-      `INSERT INTO properties (account_id, client_id, address) VALUES ($1,$2,'1 Parity Way') RETURNING id`,
+      `INSERT INTO properties (account_id, client_id, address) VALUES ($1,$2,'1 Bridge Way') RETURNING id`,
       [ACCOUNT, clientId],
     );
     const propertyId = p.rows[0].id;
@@ -132,23 +130,29 @@ describe.skipIf(!RUN)("invoice labor parity — visit_time_logs vs activity_entr
       );
       return r.rows[0].id;
     };
-    jobA = await mkJob("parity job A");
-    jobB = await mkJob("parity job B");
-    jobEmpty = await mkJob("parity job empty");
+    jobA = await mkJob("bridge job A");
+    jobB = await mkJob("bridge job B");
+    jobEmpty = await mkJob("bridge job empty");
+
+    const inv = await client.query<{ id: string }>(
+      `INSERT INTO invoices (account_id, client_id, job_id, invoice_number, created_by)
+       VALUES ($1,$2,$3,'BRIDGE-TEST-1',$4) RETURNING id`,
+      [ACCOUNT, clientId, jobA, OWNER],
+    );
+    invoiceA = inv.rows[0].id;
 
     const visitA = await mkVisit(jobA);
     const visitB = await mkVisit(jobB);
     await mkVisit(jobEmpty); // visit exists but no time at all
 
-    // Job A: two real visit timers (90 + 35 = 125 min), mirrored 1:1 in the ledger.
-    await visitTimer(visitA, jobA, "2026-03-10T09:00:00Z", 90);
-    await visitTimer(visitA, jobA, "2026-03-10T13:00:00Z", 35);
+    // Job A: two job_work segments on its visit (90 + 35 = 125 min).
+    await jobWorkOnVisit(visitA, "2026-03-10T09:00:00Z", 90);
+    await jobWorkOnVisit(visitA, "2026-03-10T13:00:00Z", 35);
 
-    // Job B: a separate real timer (200 min) — proves job scoping in the bridge.
-    await visitTimer(visitB, jobB, "2026-03-11T08:00:00Z", 200);
+    // Job B: a separate segment (200 min) — proves job scoping in the bridge.
+    await jobWorkOnVisit(visitB, "2026-03-11T08:00:00Z", 200);
 
-    // Noise on Job A's visit that the bridge MUST exclude (none has a vtl row, so
-    // the legacy source never saw them — the bridge must not either):
+    // Noise on Job A's visit that the bridge MUST exclude:
     await noiseActivity({ activity_type: "travel", entity_type: "visit", entity_id: visitA, startISO: "2026-03-10T10:40:00Z", min: 60 }); // wrong verb
     await noiseActivity({ activity_type: "job_work", entity_type: "visit", entity_id: visitA, startISO: "2026-03-10T15:00:00Z", min: 45, voided: true }); // voided
     await noiseActivity({ activity_type: "job_work", entity_type: "job", entity_id: jobA, startISO: "2026-03-10T16:00:00Z", min: 70 }); // job-linked, not visit-linked
@@ -162,33 +166,36 @@ describe.skipIf(!RUN)("invoice labor parity — visit_time_logs vs activity_entr
 
   const cc = () => client as unknown as PoolClient;
 
-  it("job A: bridge reproduces the legacy tracked minutes exactly", async () => {
-    const legacy = await trackedLaborMinutesFromVisitTimeLogs(cc(), ACCOUNT, jobA);
-    const bridge = await trackedLaborMinutesFromActivityEntries(cc(), ACCOUNT, jobA);
-    expect(legacy).toBe(125);
-    expect(bridge).toBe(125); // noise (travel/voided/job-linked) excluded
-    expect(bridge).toBe(legacy);
+  it("job A: sums only its job_work-on-visit time (noise excluded)", async () => {
+    const minutes = await trackedLaborMinutesFromActivityEntries(cc(), ACCOUNT, jobA);
+    expect(minutes).toBe(125); // travel / voided / job-linked all excluded
   });
 
-  it("job A: billed labor cents are identical (both reader paths share this transform)", async () => {
-    const legacy = await trackedLaborMinutesFromVisitTimeLogs(cc(), ACCOUNT, jobA);
-    const bridge = await trackedLaborMinutesFromActivityEntries(cc(), ACCOUNT, jobA);
-    expect(trackedLaborCents(bridge)).toBe(trackedLaborCents(legacy));
-    expect(trackedLaborCents(bridge)).toBeGreaterThan(0);
+  it("job A: billed labor cents derive from the bridge minutes", async () => {
+    const minutes = await trackedLaborMinutesFromActivityEntries(cc(), ACCOUNT, jobA);
+    expect(trackedLaborCents(minutes)).toBeGreaterThan(0);
+  });
+
+  it("money path: the labor reader writes bridge-derived cents to the invoice line", async () => {
+    // End-to-end through the real reader (activity_entries -> upsertLaborLineFromTrackedTime
+    // -> invoice_line_items). This is the money-path guard: a reader/filter change
+    // that altered billed labor would change these numbers and fail here.
+    const { lineItem, tracked_minutes, billable_hours } =
+      await upsertLaborLineFromTrackedTime(cc(), invoiceA, ACCOUNT, jobA);
+    expect(tracked_minutes).toBe(125);
+    expect(billable_hours).toBe(roundedQuarterHoursFromMinutes(125));
+    expect(lineItem.line_item_type).toBe("labor");
+    expect(lineItem.total_cents).toBe(trackedLaborCents(125));
   });
 
   it("job B: scoping holds — the bridge counts only its own job's time", async () => {
-    const legacy = await trackedLaborMinutesFromVisitTimeLogs(cc(), ACCOUNT, jobB);
-    const bridge = await trackedLaborMinutesFromActivityEntries(cc(), ACCOUNT, jobB);
-    expect(legacy).toBe(200);
-    expect(bridge).toBe(200);
+    const minutes = await trackedLaborMinutesFromActivityEntries(cc(), ACCOUNT, jobB);
+    expect(minutes).toBe(200);
   });
 
-  it("empty job: both sources are zero (no false labor)", async () => {
-    const legacy = await trackedLaborMinutesFromVisitTimeLogs(cc(), ACCOUNT, jobEmpty);
-    const bridge = await trackedLaborMinutesFromActivityEntries(cc(), ACCOUNT, jobEmpty);
-    expect(legacy).toBe(0);
-    expect(bridge).toBe(0);
-    expect(trackedLaborCents(bridge)).toBe(0);
+  it("empty job: zero (no false labor)", async () => {
+    const minutes = await trackedLaborMinutesFromActivityEntries(cc(), ACCOUNT, jobEmpty);
+    expect(minutes).toBe(0);
+    expect(trackedLaborCents(minutes)).toBe(0);
   });
 });
