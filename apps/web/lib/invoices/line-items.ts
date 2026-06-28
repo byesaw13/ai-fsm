@@ -1,5 +1,13 @@
 import type { PoolClient } from "pg";
 import { LABOR_CUSTOMER_RATE_CENTS_PER_HOUR } from "@ai-fsm/domain";
+import {
+  roundedQuarterHoursFromMinutes,
+  trackedLaborMinutesFromActivityEntries,
+} from "./tracked-labor";
+
+// Re-exported for existing importers (final-invoice.ts, tests) that import it
+// from here; the definition now lives in tracked-labor.ts to avoid an import cycle.
+export { roundedQuarterHoursFromMinutes };
 
 export const INVOICE_LINE_ITEM_TYPES = ["labor", "materials", "handling_fee", "adjustment"] as const;
 export type InvoiceLineItemType = (typeof INVOICE_LINE_ITEM_TYPES)[number];
@@ -24,10 +32,6 @@ export interface InvoiceLineItemRow {
   created_at?: string;
 }
 
-export function roundedQuarterHoursFromMinutes(minutes: number): number {
-  if (minutes <= 0) return 0;
-  return Math.round((minutes / 60) * 4) / 4;
-}
 
 export async function assertDraftInvoice(
   client: PoolClient,
@@ -174,17 +178,7 @@ export async function upsertLaborLineFromTrackedTime(
   accountId: string,
   jobId: string
 ): Promise<{ lineItem: InvoiceLineItemRow; tracked_minutes: number; billable_hours: number }> {
-  const timeResult = await client.query<{ tracked_minutes: string }>(
-    `SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (ended_at - started_at)) / 60), 0)::numeric AS tracked_minutes
-     FROM visit_time_logs
-     WHERE account_id = $1
-       AND job_id = $2
-       AND started_at IS NOT NULL
-       AND ended_at IS NOT NULL`,
-    [accountId, jobId]
-  );
-
-  const trackedMinutes = Number(timeResult.rows[0]?.tracked_minutes ?? 0);
+  const trackedMinutes = await trackedLaborMinutesFromActivityEntries(client, accountId, jobId);
   const billableHours = roundedQuarterHoursFromMinutes(trackedMinutes);
   if (billableHours <= 0) {
     throw Object.assign(new Error("No completed visit time is available for this job"), {

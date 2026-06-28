@@ -1,6 +1,15 @@
 import type { PoolClient } from "pg";
 import { LABOR_CUSTOMER_RATE_CENTS_PER_HOUR } from "@ai-fsm/domain";
-import { roundedQuarterHoursFromMinutes } from "./line-items";
+
+/**
+ * Tracked minutes → billable hours, rounded to the nearest quarter hour. The unit
+ * in which labor is billed. Lives here (the labor-from-time module) and is
+ * re-exported from line-items.ts for its existing importers.
+ */
+export function roundedQuarterHoursFromMinutes(minutes: number): number {
+  if (minutes <= 0) return 0;
+  return Math.round((minutes / 60) * 4) / 4;
+}
 
 /**
  * Tracked billable labor for a job — the source-of-truth helpers behind invoice
