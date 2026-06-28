@@ -1,0 +1,37 @@
+-- Migration 134: retire the legacy visit_time_logs table (TASK-065).
+--
+-- Final step of the Time Truth Consolidation program. activity_entries is now the
+-- single source of truth for time: the invoice-labor readers were swapped to it
+-- (TASK-063) and the visit transition route stopped writing visit_time_logs
+-- (TASK-064). The historical visit-timer data already lives in activity_entries
+-- via the TASK-061 backfill, so dropping the table loses no time data.
+--
+-- Preconditions (must be true in production before applying):
+--   * No code reads or writes visit_time_logs (verified: TASK-063 + TASK-064).
+--   * Invoices compute labor from activity_entries.
+-- visit_time_logs is a leaf table — nothing has a foreign key to it — so the drop
+-- needs no CASCADE; its indexes, RLS policies, and updated_at trigger drop with it.
+
+DROP TABLE IF EXISTS visit_time_logs;
+
+-- Reversal: recreate the table exactly as migration 043 defined it. The original
+-- DDL (table + indexes + the one-active-per-visit unique index + updated_at
+-- trigger + RLS policies) is in db/migrations/043_visit_time_logs.sql; re-running
+-- that file recreates it. Note: the historical rows are NOT restored by recreating
+-- the table — they already live in activity_entries (source='backfill', TASK-061),
+-- which is the intended home. The minimal table-only reversal is:
+--
+--   CREATE TABLE IF NOT EXISTS visit_time_logs (
+--     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+--     account_id  uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+--     visit_id    uuid NOT NULL REFERENCES visits(id) ON DELETE CASCADE,
+--     job_id      uuid REFERENCES jobs(id) ON DELETE SET NULL,
+--     user_id     uuid REFERENCES users(id) ON DELETE SET NULL,
+--     started_at  timestamptz NOT NULL DEFAULT now(),
+--     ended_at    timestamptz,
+--     notes       text,
+--     created_at  timestamptz NOT NULL DEFAULT now(),
+--     updated_at  timestamptz NOT NULL DEFAULT now(),
+--     CHECK (ended_at IS NULL OR ended_at > started_at)
+--   );
+--   -- then re-add indexes, the updated_at trigger, and RLS policies per 043.

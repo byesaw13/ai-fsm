@@ -12,48 +12,17 @@ export function roundedQuarterHoursFromMinutes(minutes: number): number {
 }
 
 /**
- * Tracked billable labor for a job — the source-of-truth helpers behind invoice
- * labor (Time Truth Consolidation, EPIC-001).
+ * Tracked billable labor for a job — the source of truth behind invoice labor
+ * (Time Truth Consolidation, EPIC-001).
  *
- * Two implementations sum the SAME tracked time two ways. TASK-062 proves they
- * are equal (cent-for-cent) on real data; TASK-063 then swaps the invoice readers
- * from the visit_time_logs version to the activity_entries version. They live
- * here, side by side, so the parity test and the eventual swap share one query.
- */
-
-/**
- * LEGACY source: the per-visit timer table. This is exactly the query the two
- * invoice-labor readers run today (final-invoice.ts fallback and
- * line-items.ts upsertLaborLineFromTrackedTime), kept here verbatim as the parity
- * reference. The readers still inline it until TASK-063.
- */
-export async function trackedLaborMinutesFromVisitTimeLogs(
-  client: PoolClient,
-  accountId: string,
-  jobId: string,
-): Promise<number> {
-  const r = await client.query<{ tracked_minutes: string }>(
-    `SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (ended_at - started_at)) / 60), 0)::numeric AS tracked_minutes
-       FROM visit_time_logs
-      WHERE account_id = $1
-        AND job_id = $2
-        AND started_at IS NOT NULL
-        AND ended_at IS NOT NULL`,
-    [accountId, jobId],
-  );
-  return Number(r.rows[0]?.tracked_minutes ?? 0);
-}
-
-/**
- * NEW source: the time truth (activity_entries) via the visit linkage.
- * activity_entries attaches to the visit (entity_type='visit'); the job is
- * recovered by joining visits. Scoped to job_work segments so it reproduces
- * exactly the visit-timer set — the transition route's dual-write plus the
- * TASK-061 backfill make the two 1:1.
+ * Time lives in activity_entries via the visit linkage. activity_entries attaches
+ * to the visit (entity_type='visit'); the job is recovered by joining visits.
+ * Scoped to job_work segments, this reproduced exactly what the legacy per-visit
+ * timer (visit_time_logs) summed — proven cent-for-cent by the TASK-062 parity gate
+ * before the swap (TASK-063), after which the timer table was retired (TASK-065).
  *
- * Deliberately NO labor_bucket filter: visit_time_logs has no bucket concept, so
- * matching it (rather than filtering) is what preserves parity. The parity
- * contract (TASK-062) wins over filter elegance.
+ * Deliberately NO labor_bucket filter: it would change the result versus the
+ * job_work set the readers have always billed.
  */
 export async function trackedLaborMinutesFromActivityEntries(
   client: PoolClient,
