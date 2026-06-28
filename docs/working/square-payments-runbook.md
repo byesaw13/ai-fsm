@@ -4,7 +4,7 @@ How to connect Square so clients can pay invoices by card, how it works
 end-to-end, and how to troubleshoot. Square is the card processor; Dovetails OS
 remains the source of truth for invoices, balances, and payment history. Manual
 payment recording (Venmo, cash, check, Zelle, ACH) works whether or not Square
-is connected. (Stripe was archived in favour of Square — see EPIC-004 TASK-035.)
+is connected. (Stripe was archived in favour of Square — see EPIC-004 TASK-069.)
 
 ## Architecture in one paragraph
 

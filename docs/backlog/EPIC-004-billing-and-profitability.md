@@ -63,7 +63,7 @@ Notes:
 Partial: `apps/web/app/api/v1/reports/referrals/route.ts` exists; the full ROI
 rollup is not complete.
 
-# TASK-034: Payment Provider Model & Enriched Recorder
+# TASK-068: Payment Provider Model & Enriched Recorder
 
 Status:
 In Progress
@@ -92,7 +92,7 @@ Scope:
 Out of Scope:
 - Stripe.
 - Replacing Square invoices.
-- Online card processing (covered by TASK-035).
+- Online card processing (covered by TASK-069).
 
 Acceptance Criteria:
 - [ ] A payment can be recorded as deposit / progress / final, full or partial.
@@ -102,7 +102,7 @@ Acceptance Criteria:
 - [ ] Each payment writes a workflow event and appears on the timeline.
 - [ ] Manual recording works with no payment provider configured.
 
-# TASK-035: Square Card Payments
+# TASK-069: Square Card Payments
 
 Status:
 Proposed
