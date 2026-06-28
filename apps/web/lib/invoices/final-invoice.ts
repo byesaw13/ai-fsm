@@ -29,6 +29,7 @@ import {
   createInvoiceLineItem,
   roundedQuarterHoursFromMinutes,
 } from "@/lib/invoices/line-items";
+import { trackedLaborMinutesFromActivityEntries } from "@/lib/invoices/tracked-labor";
 import { LABOR_CUSTOMER_RATE_CENTS_PER_HOUR } from "@ai-fsm/domain";
 
 interface CreateFinalInvoiceParams {
@@ -150,20 +151,15 @@ export async function createDraftFinalInvoiceForJob(
   }
 
   // Fallback: tracked labor plus billable visit parts for T&M jobs with no
-  // estimate line items. Labor is sourced from completed visit timers, not parts.
+  // estimate line items. Labor is sourced from the time truth (activity_entries
+  // job_work on the visit), not parts. See lib/invoices/tracked-labor.ts.
   if (lineItems.length === 0) {
-    const trackedTime = await client.query<{ tracked_minutes: string }>(
-      `SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (ended_at - started_at)) / 60), 0)::numeric AS tracked_minutes
-       FROM visit_time_logs
-       WHERE account_id = $1
-         AND job_id = $2
-         AND started_at IS NOT NULL
-         AND ended_at IS NOT NULL`,
-      [accountId, jobId]
+    const trackedMinutes = await trackedLaborMinutesFromActivityEntries(
+      client,
+      accountId,
+      jobId
     );
-    const billableHours = roundedQuarterHoursFromMinutes(
-      Number(trackedTime.rows[0]?.tracked_minutes ?? 0)
-    );
+    const billableHours = roundedQuarterHoursFromMinutes(trackedMinutes);
     if (billableHours > 0) {
       lineItems.push({
         description: "Labor",
