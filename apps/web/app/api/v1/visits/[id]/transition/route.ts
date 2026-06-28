@@ -233,18 +233,10 @@ export const POST = withAuth(
       }
 
       if (effectiveStatus === "in_progress" && currentStatus !== "in_progress") {
-        await client.query(
-          `INSERT INTO visit_time_logs (account_id, visit_id, job_id, user_id, started_at)
-           SELECT $1, $2, $3, $4, now()
-           WHERE NOT EXISTS (
-             SELECT 1 FROM visit_time_logs
-             WHERE account_id = $1 AND visit_id = $2 AND ended_at IS NULL
-           )`,
-          [session.accountId, id, updated.job_id ?? null, updated.assigned_user_id ?? session.userId]
-        );
-
         // Activity ledger hard trigger: arriving on site IS doing job work.
-        // Close whatever was active, start job_work linked to this visit.
+        // activity_entries is the single source of truth for time (the legacy
+        // visit_time_logs writer was removed in TASK-064). Close whatever was
+        // active, start job_work linked to this visit.
         await client.query(
           `UPDATE activity_entries SET ended_at = now()
            WHERE account_id = $1 AND ended_at IS NULL AND voided_at IS NULL
@@ -264,18 +256,8 @@ export const POST = withAuth(
       }
 
       if (effectiveStatus === "completed" || effectiveStatus === "cancelled") {
-        await client.query(
-          `UPDATE visit_time_logs
-           SET ended_at = now(),
-               notes = COALESCE($3, notes),
-               updated_at = now()
-           WHERE account_id = $1
-             AND visit_id = $2
-             AND ended_at IS NULL`,
-          [session.accountId, id, techNotes ?? null]
-        );
-
         // Activity ledger: closing out the visit ends its job_work segment.
+        // (The legacy visit_time_logs close was removed in TASK-064.)
         await client.query(
           `UPDATE activity_entries SET ended_at = now()
            WHERE account_id = $1 AND ended_at IS NULL AND voided_at IS NULL
