@@ -12,8 +12,7 @@ Canonical inputs reviewed:
 
 - `docs/canonical/PRODUCT_VISION.md`
 - `docs/canonical/WORKFLOW.md`
-- `docs/generated/ESTIMATE_SYSTEM_DEEP_AUDIT.md`
-- `docs/generated/ESTIMATE_STABILIZATION_SPRINT_1_REPORT.md`
+- historical estimate-system audit and stabilization notes retained in git history
 - `DOVETAILS_PRICING_CONTRACT.md`
 
 ## Pricing Value Map

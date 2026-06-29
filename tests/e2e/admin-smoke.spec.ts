@@ -20,7 +20,7 @@ test.describe("Admin smoke — jobs and visits", () => {
     await page.fill('[id="email"]', ADMIN_EMAIL);
     await page.fill('[id="password"]', ADMIN_PASSWORD);
     await page.click('[type="submit"]');
-    await page.waitForURL(`${BASE}/app/jobs`);
+    await page.waitForURL(/\/app(?:\/my-day)?$/);
   });
 
   test("admin sees Jobs page with create button", async ({ page }) => {

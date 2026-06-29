@@ -147,37 +147,6 @@ importers:
         specifier: ^3.0.5
         version: 3.2.4(@types/node@22.19.11)(tsx@4.21.0)
 
-  services/pr-gatekeeper:
-    dependencies:
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.29.0
-        version: 1.29.0(zod@3.25.76)
-      zod:
-        specifier: ^3.25.1
-        version: 3.25.76
-    devDependencies:
-      '@types/node':
-        specifier: ^22.10.2
-        version: 22.19.11
-      '@typescript-eslint/eslint-plugin':
-        specifier: ^8.20.0
-        version: 8.56.0(@typescript-eslint/parser@8.56.0(eslint@8.57.1)(typescript@5.9.3))(eslint@8.57.1)(typescript@5.9.3)
-      '@typescript-eslint/parser':
-        specifier: ^8.20.0
-        version: 8.56.0(eslint@8.57.1)(typescript@5.9.3)
-      eslint:
-        specifier: ^8.57.1
-        version: 8.57.1
-      tsx:
-        specifier: ^4.19.2
-        version: 4.21.0
-      typescript:
-        specifier: ^5.7.2
-        version: 5.9.3
-      vitest:
-        specifier: ^3.0.5
-        version: 3.2.4(@types/node@22.19.11)(tsx@4.21.0)
-
   services/worker:
     dependencies:
       nodemailer:
@@ -186,9 +155,6 @@ importers:
       pg:
         specifier: ^8.13.1
         version: 8.18.0
-      tsx:
-        specifier: ^4.19.2
-        version: 4.21.0
     devDependencies:
       '@types/node':
         specifier: ^22.10.2
@@ -208,6 +174,9 @@ importers:
       eslint:
         specifier: ^8.57.1
         version: 8.57.1
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
       typescript:
         specifier: ^5.7.2
         version: 5.9.3

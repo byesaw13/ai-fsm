@@ -163,56 +163,9 @@ Originally framed as `MCP-RLS-001`.
 # TASK-036: PR Gatekeeper MCP Server
 
 Status:
-In Progress
+Retired
 
-Problem:
-Before merging a PR there is no single, repeatable "is this safe to merge?"
-check that simulates the merge into the latest `main` and runs the repo's gates
-plus Dovetails-specific rules. Reviewers re-derive this by hand each time.
-
-Business Value:
-- One command produces a clear merge verdict (yes/no) with blocking issues,
-  warnings, the checks that ran, and a suggested next action.
-- Catches the recurring footguns: duplicate/destructive migrations, routes
-  changed without tests, payment/invoice/Square changes without tests, SQL
-  missing `account_id` scoping, and mutating routes missing `withRole`.
-- Read-only and side-effect-free against GitHub and the active working tree.
-
-Scope:
-- New workspace `services/pr-gatekeeper` (`@ai-fsm/pr-gatekeeper`): a local stdio
-  MCP server, TypeScript + MCP SDK.
-- Seven tools: `analyze_pr`, `simulate_merge_to_main`, `run_repo_checks`,
-  `check_migrations`, `check_changed_api_contracts`,
-  `check_dovetails_business_rules`, `generate_merge_report`.
-- Merge simulation in a **temporary git worktree** only; always fetch
-  `origin/main` first; never mutate the user's active working tree.
-- Whitelisted commands only (git / gh / pnpm subcommands); no arbitrary commands
-  from PR text; secrets redacted from any captured output.
-- Repo checks: `pnpm install --frozen-lockfile`, `typecheck`, `lint`, `test`,
-  `build`.
-- Unit tests for every rule check; optional integration test that builds a temp
-  git repo and verifies merge-simulation behavior. Docs in
-  `docs/working/pr-gatekeeper.md`.
-
-Out of Scope:
-- Editing, committing, pushing, or merging anything.
-- Writing to GitHub (labels, reviews, statuses) — read-only this phase.
-- Auto-fixing findings.
-
-Acceptance Criteria:
-- [x] Seven tools return structured JSON; `generate_merge_report` yields a clear
-      verdict with blocking issues, warnings, checks run, files changed, and next
-      action.
-- [x] Merge simulation runs in a temp worktree and leaves the active tree
-      untouched (verified by integration test).
-- [x] Rule checks (migrations, API contracts, business rules) are pure and unit
-      tested.
-- [x] Only whitelisted commands run; disallowed commands are rejected.
-- [x] Local usage documented in `docs/working/pr-gatekeeper.md`.
-
-Notes:
-Read-only, "report don't act" by design — it advises a human, it does not gate
-CI or mutate state. A future task could add optional PR-comment output.
+The local PR Gatekeeper MCP experiment was removed in the ponytail cleanup. Use the simpler maintained workflow instead: `gh pr checks`, `gh pr diff`, GitHub branch protection, and the repo gate (`pnpm gate`). Historical implementation details remain available in git history.
 
 # TASK-039: Human-readable numbering for jobs and estimates
 
@@ -248,9 +201,7 @@ Acceptance Criteria:
 
 Notes:
 Invoice numbering is the reference implementation (`invoices.invoice_number`,
-unique index per account). Identified as a genuine gap in the June 2026 recovery
-fact-check (`docs/generated/RECOVERY_AUDIT_FACT_CHECK_2026-06.md`), which also
-corrected the earlier assumption that invoice numbering was missing — it exists.
+unique index per account). Identified as a genuine gap in the June 2026 recovery fact-check retained in git history; that fact-check also corrected the earlier assumption that invoice numbering was missing — it exists.
 
 ## Completed
 
