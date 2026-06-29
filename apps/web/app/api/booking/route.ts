@@ -4,6 +4,7 @@ import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { createIntakeRecords } from "../../../lib/intake/records";
 import { priceBookCategorySchema, scoreSiteVisitProbability } from "@ai-fsm/domain";
+import { checkRateLimit, getClientIp, BOOKING_RATE_LIMIT } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,23 @@ function getBookingAccountId(): string | null {
 }
 
 export async function POST(request: NextRequest) {
+  const ip = getClientIp(request);
+  const rl = checkRateLimit(`booking:${ip}`, BOOKING_RATE_LIMIT);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: { message: "Too many booking requests. Please try again later." } },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(rl.resetAt - Math.floor(Date.now() / 1000)),
+          "X-RateLimit-Limit": String(BOOKING_RATE_LIMIT.limit),
+          "X-RateLimit-Remaining": "0",
+          "X-RateLimit-Reset": String(rl.resetAt),
+        },
+      }
+    );
+  }
+
   const accountId = getBookingAccountId();
   if (!accountId) {
     logger.warn("BOOKING_ACCOUNT_ID is not set — booking submissions will fail");

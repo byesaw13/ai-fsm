@@ -6,7 +6,7 @@ import { query } from "@/lib/db";
 import { canTransitionJob, canViewAllJobs } from "@/lib/auth/permissions";
 import type { Job, JobStatus } from "@ai-fsm/domain";
 import { JOB_ACCEPTANCE_CATEGORY_LABELS, JOB_INTAKE_DECISION_LABELS, deriveCustomerStage, CUSTOMER_STAGE_LABELS, CUSTOMER_STAGE_COLORS } from "@ai-fsm/domain";
-import { SUB_STATUS_LABELS } from "@ai-fsm/domain";
+import { SUB_STATUS_LABELS, JOB_STATUS_LABELS } from "@ai-fsm/domain";
 import {
   PageContainer,
   PageHeader,
@@ -34,15 +34,6 @@ type JobRow = Job & {
   sub_status: string | null;
 };
 
-const JOB_STATUS_LABELS: Record<JobStatus, string> = {
-  draft: "Draft",
-  quoted: "Quoted",
-  scheduled: "Scheduled",
-  in_progress: "In Progress",
-  completed: "Completed",
-  invoiced: "Invoiced",
-  cancelled: "Cancelled",
-};
 
 type JobTier = "active" | "pending" | "done";
 

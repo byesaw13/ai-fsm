@@ -10,7 +10,8 @@ import { DeleteEstimateButton } from "./DeleteEstimateButton";
 import { EstimateEditForm } from "./EstimateEditForm";
 import { EstimateReviewPanel } from "./EstimateReviewPanel";
 import { SendEstimateButton } from "./SendEstimateButton";
-import { StatusStepper } from "@/components/ui";
+import { PageContainer, PageHeader, StatusBadge, StatusStepper } from "@/components/ui";
+import type { StatusVariant } from "@/components/ui";
 import { isEmailConfigured } from "@/lib/email/mailer";
 import { CopyPortalLinkButton } from "@/components/CopyPortalLinkButton";
 import { buildClientDocumentFilename } from "@/lib/estimates/guardrails";
@@ -57,55 +58,68 @@ export default async function EstimateDetailPage({
   });
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <div>
-          <Link href="/app/estimates" className="back-link">← Estimates</Link>
-          <h1 className="page-title">{estimate.estimate_number ? `${estimate.estimate_number} — ` : "Estimate — "}{estimate.client_name ?? "Unknown client"}</h1>
-          {estimate.job_title && <p className="page-subtitle">Job: {estimate.job_title}</p>}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
-          <CopyPortalLinkButton url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/estimates/${estimate.share_token}`} />
-          {/* One canonical PDF action; the /print view duplicated this artifact. */}
-          <a
-            href={`/api/v1/estimates/${estimate.id}/pdf`}
-            target="_blank"
-            rel="noopener noreferrer"
-            data-testid="estimate-download-pdf"
-            style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none", whiteSpace: "nowrap" }}
-          >
-            Download PDF →
-          </a>
-          <a href={`/app/estimates/${estimate.id}/shopping-list`} style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none", whiteSpace: "nowrap" }}>
-            Shopping List →
-          </a>
-          <span className={`status-pill status-${estimate.status}`} data-testid="estimate-status">
-            {STATUS_LABELS[currentStatus]}
-          </span>
-          {estimate.condition_tier === "yellow" && (
-            <span style={{
-              display: "inline-block", padding: "2px 8px", borderRadius: 99,
-              fontSize: "var(--text-xs)", fontWeight: 600,
-              background: "color-mix(in srgb, var(--color-warning) 15%, transparent)",
-              color: "var(--color-warning)",
-              border: "1px solid color-mix(in srgb, var(--color-warning) 40%, transparent)",
-            }}>
-              Elevated Risk
+    <PageContainer>
+      <PageHeader
+        backHref="/app/estimates"
+        backLabel="Estimates"
+        title={`${estimate.estimate_number ? `${estimate.estimate_number} — ` : "Estimate — "}${estimate.client_name ?? "Unknown client"}`}
+        actions={
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
+            <CopyPortalLinkButton url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/estimates/${estimate.share_token}`} />
+            {/* One canonical PDF action; the /print view duplicated this artifact. */}
+            <a
+              href={`/api/v1/estimates/${estimate.id}/pdf`}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="estimate-download-pdf"
+              style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none", whiteSpace: "nowrap" }}
+            >
+              Download PDF →
+            </a>
+            <a href={`/app/estimates/${estimate.id}/shopping-list`} style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none", whiteSpace: "nowrap" }}>
+              Shopping List →
+            </a>
+            <span data-testid="estimate-status">
+              <StatusBadge variant={estimate.status as StatusVariant}>
+                {STATUS_LABELS[currentStatus]}
+              </StatusBadge>
             </span>
-          )}
-          {estimate.condition_tier === "red" && (
-            <span style={{
-              display: "inline-block", padding: "2px 8px", borderRadius: 99,
-              fontSize: "var(--text-xs)", fontWeight: 600,
-              background: "color-mix(in srgb, var(--color-danger) 15%, transparent)",
-              color: "var(--color-danger)",
-              border: "1px solid color-mix(in srgb, var(--color-danger) 40%, transparent)",
-            }}>
-              Complex — Review
-            </span>
-          )}
-        </div>
-      </div>
+            {estimate.condition_tier === "yellow" && (
+              <span style={{
+                display: "inline-block", padding: "2px 8px", borderRadius: 99,
+                fontSize: "var(--text-xs)", fontWeight: 600,
+                background: "color-mix(in srgb, var(--color-warning) 15%, transparent)",
+                color: "var(--color-warning)",
+                border: "1px solid color-mix(in srgb, var(--color-warning) 40%, transparent)",
+              }}>
+                Elevated Risk
+              </span>
+            )}
+            {estimate.condition_tier === "red" && (
+              <span style={{
+                display: "inline-block", padding: "2px 8px", borderRadius: 99,
+                fontSize: "var(--text-xs)", fontWeight: 600,
+                background: "color-mix(in srgb, var(--color-danger) 15%, transparent)",
+                color: "var(--color-danger)",
+                border: "1px solid color-mix(in srgb, var(--color-danger) 40%, transparent)",
+              }}>
+                Complex — Review
+              </span>
+            )}
+          </div>
+        }
+      >
+        {estimate.job_title && (
+          <p className="p7-page-subtitle page-subtitle">
+            Job:{" "}
+            {estimate.job_id ? (
+              <Link href={`/app/jobs/${estimate.job_id}`}>{estimate.job_title}</Link>
+            ) : (
+              estimate.job_title
+            )}
+          </p>
+        )}
+      </PageHeader>
 
       <EstimateBanners
         estimate={estimate}
@@ -253,6 +267,6 @@ export default async function EstimateDetailPage({
           <DeleteEstimateButton estimateId={estimate.id} />
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }
