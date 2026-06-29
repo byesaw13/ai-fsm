@@ -476,6 +476,56 @@ export function WorkdayPanel({
           border-bottom: 1px solid var(--border);
           margin-bottom: var(--space-4);
         }
+        .stepper-item {
+          display: flex;
+          align-items: center;
+          gap: var(--space-3);
+          padding: var(--space-3);
+          border-radius: var(--radius-lg);
+          background: var(--bg-card);
+          border: 1px solid var(--border);
+          flex: 1;
+          min-width: 160px;
+          cursor: pointer;
+          transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .stepper-item:hover:not(.disabled) {
+          border-color: var(--border-strong);
+          box-shadow: var(--shadow-xs);
+          transform: translateY(-1px);
+        }
+        .stepper-item.active {
+          background: var(--accent-subtle);
+          border-color: var(--accent);
+          box-shadow: var(--shadow-xs);
+        }
+        .stepper-item.disabled {
+          cursor: not-allowed;
+          opacity: 0.45;
+        }
+        .stepper-badge {
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          font-size: 13px;
+          transition: all 0.15s ease;
+        }
+        .stepper-badge.completed {
+          background: var(--color-success);
+          color: #fff;
+        }
+        .stepper-badge.active {
+          background: var(--accent);
+          color: #fff;
+        }
+        .stepper-badge.default {
+          background: var(--color-slate-200);
+          color: var(--fg-muted);
+        }
         .chips-scroll {
           display: flex;
           gap: var(--space-2);
@@ -509,34 +559,10 @@ export function WorkdayPanel({
             <div
               key={step.key}
               onClick={() => { if (!isDisabled) setActiveTab(step.key as TabState); }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "var(--space-3)",
-                cursor: isDisabled ? "not-allowed" : "pointer",
-                opacity: isDisabled ? 0.45 : 1,
-                padding: "var(--space-2) var(--space-3)",
-                borderRadius: "var(--radius-md)",
-                background: isCurrent ? "var(--accent-subtle)" : "transparent",
-                border: isCurrent ? "1px solid var(--accent)" : "1px solid transparent",
-                flex: 1,
-                minWidth: 160,
-                transition: "all var(--transition-base)"
-              }}
+              className={`stepper-item ${isCurrent ? "active" : ""} ${isDisabled ? "disabled" : ""}`}
             >
               <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
-                  background: isCompleted ? "var(--color-green-500)" : isCurrent ? "var(--accent)" : "var(--color-slate-200)",
-                  color: isCompleted || isCurrent ? "#fff" : "var(--fg-muted)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontWeight: "bold",
-                  fontSize: 14
-                }}
+                className={`stepper-badge ${isCompleted ? "completed" : isCurrent ? "active" : "default"}`}
               >
                 {isCompleted ? "✓" : i + 1}
               </div>
@@ -558,13 +584,13 @@ export function WorkdayPanel({
           {activeTab === "start_day" && (
             <>
               {!openSession ? (
-                <Card style={{ border: "2px solid var(--accent)", boxShadow: "var(--shadow-md)", padding: "var(--space-5)" }}>
+                <Card style={{ border: "1px solid var(--border-strong)", boxShadow: "var(--shadow-xs)", padding: "var(--space-5)" }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
                     <div>
                       <div style={{ fontSize: "var(--text-xs)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--accent)", fontWeight: 700, marginBottom: 4 }}>
                         Vehicle &amp; Mileage
                       </div>
-                      <h2 style={{ fontSize: "var(--text-2xl)", fontWeight: 800, margin: 0 }}>Start a Mileage Session</h2>
+                      <h2 style={{ fontSize: "var(--text-xl)", fontWeight: 800, margin: 0 }}>Start a Mileage Session</h2>
                       <p style={{ color: "var(--fg-muted)", margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)" }}>
                         Log the starting odometer to track this vehicle&apos;s mileage. Your
                         payroll clock and business day start separately, up top.
@@ -572,10 +598,10 @@ export function WorkdayPanel({
                     </div>
 
                     {!showStartDetails ? (
-                      <div style={{ padding: "var(--space-3)", background: "var(--color-slate-50)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
-                          <strong>{selectedVehicle?.nickname ?? "No vehicle"}</strong>
-                          <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                          <strong style={{ fontSize: "var(--text-base)" }}>{selectedVehicle?.nickname ?? "No vehicle"}</strong>
+                          <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontFamily: "var(--font-mono), 'SF Mono', monospace", marginTop: 2 }}>
                             Last Odometer: {fmtOdo(selectedVehicle?.current_odometer)} mi {selectedVehicle?.plate ? `· ${selectedVehicle.plate}` : ""}
                           </div>
                         </div>
@@ -584,7 +610,7 @@ export function WorkdayPanel({
                         </button>
                       </div>
                     ) : (
-                      <div style={{ display: "grid", gap: "var(--space-3)", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", padding: "var(--space-3)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)" }}>
+                      <div style={{ display: "grid", gap: "var(--space-3)", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", padding: "var(--space-3)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", background: "var(--bg-subtle)" }}>
                         <label style={labelStyle}>
                           Select Vehicle
                           <select value={vehicleId} onChange={(e) => setVehicleId(e.target.value)} style={fieldStyle}>
@@ -594,7 +620,7 @@ export function WorkdayPanel({
                         </label>
                         <label style={labelStyle}>
                           Starting Odometer (mi)
-                          <input value={startOdometer} onChange={(e) => setStartOdometer(e.target.value)} inputMode="numeric" style={fieldStyle} />
+                          <input value={startOdometer} onChange={(e) => setStartOdometer(e.target.value)} inputMode="numeric" style={{ ...fieldStyle, fontFamily: "var(--font-mono), 'SF Mono', monospace" }} />
                         </label>
                         <div style={{ gridColumn: "1 / -1", textAlign: "right" }}>
                           <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" onClick={() => setShowStartDetails(false)}>
@@ -608,7 +634,7 @@ export function WorkdayPanel({
                       type="button"
                       onClick={beginStart}
                       className="p7-btn p7-btn-primary"
-                      style={{ minHeight: 48, fontSize: "var(--text-base)", fontWeight: 700 }}
+                      style={{ minHeight: 44, fontSize: "var(--text-sm)", fontWeight: 700 }}
                     >
                       Start mileage in {selectedVehicle?.nickname ?? "Default Vehicle"} ({fmtOdo(Number(startOdometer) || selectedVehicle?.current_odometer)} mi)
                     </button>
@@ -651,7 +677,7 @@ export function WorkdayPanel({
                     <span>
                       <strong>Driving: {openSession.vehicle_nickname ?? "No vehicle"}</strong>
                       <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginLeft: 8 }}>
-                        (Plate: {openSession.vehicle_plate ?? "—"}) · Started: {fmtOdo(openSession.start_odometer)} mi
+                        (Plate: <span style={{ fontFamily: "var(--font-mono), 'SF Mono', monospace", fontWeight: 500 }}>{openSession.vehicle_plate ?? "—"}</span>) · Started: <span style={{ fontFamily: "var(--font-mono), 'SF Mono', monospace", fontWeight: 600 }}>{fmtOdo(openSession.start_odometer)}</span> mi
                       </span>
                     </span>
                     <div style={{ display: "flex", gap: "var(--space-2)" }}>
@@ -724,25 +750,24 @@ export function WorkdayPanel({
               <Card style={{ padding: "var(--space-4)" }}>
                 <SectionHeader title="Review & Close Day" count={warnings.missingReceiptPhotos + (activeEntry ? 1 : 0) + (openSession ? 1 : 0)} />
                 <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", margin: "-4px 0 var(--space-4)" }}>
-                  Review today below — each item is independent. Closing the business
-                  day is a separate, explicit step above.
+                  Review today below — each item is independent. Closing the business day is a separate, explicit step above.
                 </p>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", marginBottom: "var(--space-5)" }}>
                   
                   {/* Item 1: Mileage Session */}
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)", padding: "var(--space-3)", background: "var(--color-slate-50)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
                     <div style={{ fontSize: 20 }}>{openSession ? "🔴" : "🟢"}</div>
                     <div style={{ flex: 1 }}>
                       <strong>Vehicle Session</strong>
                       <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
                         {openSession ? (
                           <>
-                            Active session open on <strong>{openSession.vehicle_nickname}</strong> (started at {fmtOdo(openSession.start_odometer)} mi).
+                            Active session open on <strong>{openSession.vehicle_nickname}</strong> (started at <span style={{ fontFamily: "var(--font-mono), 'SF Mono', monospace", fontWeight: 600 }}>{fmtOdo(openSession.start_odometer)}</span> mi).
                             <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "end", marginTop: "var(--space-2)", flexWrap: "wrap" }}>
                               <label style={{ ...labelStyle, fontWeight: 500, fontSize: 12 }}>
                                 Ending Odometer
-                                <input value={endOdometer} onChange={(e) => setEndOdometer(e.target.value)} inputMode="numeric" placeholder="Odo reading" style={{ ...fieldStyle, minHeight: 34, width: 120 }} />
+                                <input value={endOdometer} onChange={(e) => setEndOdometer(e.target.value)} inputMode="numeric" placeholder="Odo reading" style={{ ...fieldStyle, fontFamily: "var(--font-mono), 'SF Mono', monospace", minHeight: 34, width: 120 }} />
                               </label>
                               <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" style={{ minHeight: 34 }} onClick={closeSession} disabled={pending || !endOdometer}>
                                 Close Mileage
@@ -763,7 +788,7 @@ export function WorkdayPanel({
                   </div>
 
                   {/* Item 2: Unclosed Activity */}
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)", padding: "var(--space-3)", background: "var(--color-slate-50)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
                     <div style={{ fontSize: 20 }}>{activeEntry ? "🔴" : "🟢"}</div>
                     <div style={{ flex: 1 }}>
                       <strong>Active Time Tracking</strong>
@@ -781,7 +806,7 @@ export function WorkdayPanel({
                   </div>
 
                   {/* Item 3: Missing Receipt Photos */}
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)", padding: "var(--space-3)", background: "var(--color-slate-50)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
                     <div style={{ fontSize: 20 }}>{warnings.missingReceiptPhotos > 0 ? "🔴" : "🟢"}</div>
                     <div style={{ flex: 1 }}>
                       <strong>Receipt Photos</strong>
@@ -799,7 +824,7 @@ export function WorkdayPanel({
                   </div>
 
                   {/* Item 4: In-Progress Jobs */}
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)", padding: "var(--space-3)", background: "var(--color-slate-50)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
                     <div style={{ fontSize: 20 }}>{warnings.jobsInProgress > 0 ? "🟡" : "🟢"}</div>
                     <div style={{ flex: 1 }}>
                       <strong>Unclosed Jobs</strong>
@@ -908,13 +933,13 @@ export function WorkdayPanel({
           <Card style={{ padding: "var(--space-4)" }}>
             <SectionHeader title="Today's Stats" />
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)", marginTop: "var(--space-3)" }}>
-              <div style={{ background: "var(--color-slate-50)", padding: "var(--space-3)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+              <div style={{ background: "var(--bg-subtle)", padding: "var(--space-3)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
                 <span style={{ fontSize: 10, color: "var(--fg-muted)", textTransform: "uppercase" }}>Miles Today</span>
-                <div style={{ fontSize: "var(--text-lg)", fontWeight: 800 }}>{dayMileage.totalMiles} mi</div>
+                <div style={{ fontSize: "var(--text-lg)", fontWeight: 800, fontFamily: "var(--font-mono), 'SF Mono', monospace" }}>{dayMileage.totalMiles} mi</div>
               </div>
-              <div style={{ background: "var(--color-slate-50)", padding: "var(--space-3)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+              <div style={{ background: "var(--bg-subtle)", padding: "var(--space-3)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
                 <span style={{ fontSize: 10, color: "var(--fg-muted)", textTransform: "uppercase" }}>Yesterday</span>
-                <div style={{ fontSize: "var(--text-lg)", fontWeight: 800 }}>{yesterdayMiles} mi</div>
+                <div style={{ fontSize: "var(--text-lg)", fontWeight: 800, fontFamily: "var(--font-mono), 'SF Mono', monospace" }}>{yesterdayMiles} mi</div>
               </div>
             </div>
           </Card>
