@@ -135,7 +135,7 @@ Next available ID: **TASK-070**.
 | TASK-048 | Confidence Engine (PI-006) | 008 | Proposed |
 | TASK-049 | Operational Inbox (single review surface) | 007 | Proposed |
 | TASK-050 | Link mileage ↔ travel-time + capture-method | 001 | Proposed |
-| TASK-051 | Business Day aggregate (decouple day close) | 001 | Proposed |
+| TASK-051 | Business Day aggregate (decouple day close) | 001 | Done |
 | TASK-052 | Payroll clock + payroll policies | 001 | Proposed |
 | TASK-053 | Activity + Assignment model | 001 | In Progress |
 | TASK-054 | Day Close checklist + Reopen | 001 | Proposed |

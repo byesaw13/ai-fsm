@@ -258,7 +258,7 @@ Follow-up to TASK-051/052. Verified against the live app via screenshots.
 # TASK-051: Business Day aggregate (decouple day close)
 
 Status:
-Proposed
+Done
 
 Problem:
 "End Day" conflates four unrelated lifecycle events — stopped driving, stopped
@@ -279,12 +279,18 @@ Out of Scope:
 - Day Close checklist (TASK-054); payroll/activity/mileage internals.
 
 Acceptance Criteria:
-- [ ] Ending a trip / activity / job, or returning home, leaves the day OPEN.
-- [ ] Only an explicit close sets CLOSED; Reopen works with a reason.
-- [ ] Migration additive + reversible; account-scoped RLS.
+- [x] Ending a trip / activity / job, or returning home, leaves the day OPEN.
+- [x] Only an explicit close sets CLOSED; Reopen works with a reason.
+- [x] Migration additive + reversible; account-scoped RLS.
 
 Notes:
-Phase 1. Foundation for the freeze gate.
+Phase 1. Foundation for the freeze gate. Shipped in three slices: business_days
+table + state machine (#386/#387), business-day API current + transition (#388),
+My Day "Review & Close Day" + decouple mileage from close (#389). Implemented as
+migrations 127 (table + account RLS) and 128 (per-user write guard) rather than a
+single migration 127; the domain state machine (`packages/domain/src/business-day.ts`,
+unit-tested) encodes "CLOSED only via READY_TO_CLOSE" and "Reopen needs a reason",
+and the load-bearing invariant that closing any other concern never moves the day.
 
 # TASK-052: Payroll clock + payroll policies
 
