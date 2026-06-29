@@ -81,6 +81,8 @@
   --accent-fg:     var(--color-white);
   --ring:          var(--color-forest-700);
   --color-success: var(--color-green-600);
+  --color-warning: var(--color-amber-600);
+  --color-danger:  var(--color-red-600);
 
   /* -------------------------------------------------------------------------
      Status Semantic — used by Badge and status-pill components
