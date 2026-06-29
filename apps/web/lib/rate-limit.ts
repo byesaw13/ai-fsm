@@ -128,6 +128,12 @@ export const GENERAL_RATE_LIMIT: RateLimitConfig = {
   windowSeconds: 60,
 };
 
+/** Public booking form: 10 submissions per hour per IP */
+export const BOOKING_RATE_LIMIT: RateLimitConfig = {
+  limit: 10,
+  windowSeconds: 60 * 60,
+};
+
 /* ------------------------------------------------------------------ */
 /*  Test helpers                                                       */
 /* ------------------------------------------------------------------ */

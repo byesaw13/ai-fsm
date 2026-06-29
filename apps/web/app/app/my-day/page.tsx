@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { query, queryForSession } from "@/lib/db";
 import { isSameCalendarDay, isVisitOverdue, formatOverdueLabel } from "@/lib/visits/p7";
+import { VISIT_STATUS_LABELS } from "@/lib/visits/triage";
 import { MyDayView } from "./MyDayView";
 import { ManualSiteVisitButton } from "../ManualSiteVisitButton";
 import { LocationCaptureControl } from "../LocationCaptureControl";
@@ -12,7 +13,7 @@ import type { OpenSession, VehicleOption } from "../WorkdayPanel";
 import type { ActivityEntryDto } from "../ActivityTracker";
 import { summarizeDayMileage, type VehicleSessionRow } from "@/lib/mileage/sessions";
 import { PageContainer, PageHeader, EmptyState, LinkButton } from "@/components/ui";
-import type { Visit, VisitStatus } from "@ai-fsm/domain";
+import type { Visit } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -25,13 +26,6 @@ type VisitRow = Visit & {
   job_description: string | null;
 };
 
-const VISIT_STATUS_LABELS: Record<VisitStatus, string> = {
-  scheduled: "Scheduled",
-  arrived: "Arrived",
-  in_progress: "In Progress",
-  completed: "Completed",
-  cancelled: "Cancelled",
-};
 
 export default async function MyDayPage() {
   const session = await getSession();
@@ -79,9 +73,7 @@ export default async function MyDayPage() {
       [accountId]),
     queryForSession<VehicleOption>(session,
       `SELECT v.id, v.nickname, v.plate,
-              last_s.end_odometer AS current_odometer,
-              (SELECT max(started_at) FROM vehicle_sessions
-                 WHERE vehicle_id = v.id AND account_id = v.account_id)::text AS last_used_at
+              last_s.end_odometer AS current_odometer
        FROM vehicles v
        LEFT JOIN LATERAL (
          SELECT end_odometer, session_date FROM vehicle_sessions

@@ -59,7 +59,7 @@ export function InvoiceTransitionForm({
           key={status}
           onClick={() => handleTransition(status)}
           disabled={loading}
-          className="btn btn-secondary"
+          className="p7-btn p7-btn-secondary"
           data-testid={`invoice-transition-btn-${status}`}
         >
           {loading ? "Updating…" : `→ ${statusLabels[status]}`}

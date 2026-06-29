@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useToast } from "@/components/ui";
+import { ConfirmDialog, useToast } from "@/components/ui";
 import {
   ACTIVITY_TYPES,
   ACTIVITY_TYPE_META,
@@ -91,6 +91,9 @@ export function TimelineEditor({ date, entries }: { date: string; entries: Activ
   const [editId, setEditId] = useState<string | null>(null);
   const [splitId, setSplitId] = useState<string | null>(null);
   const [inserting, setInserting] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [rebalanceConfirm, setRebalanceConfirm] = useState<{ body: string } | null>(null);
+  const rebalanceResolveRef = useRef<((ok: boolean) => void) | null>(null);
 
   const sorted = useMemo(
     () => [...entries].sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime()),
@@ -101,16 +104,17 @@ export function TimelineEditor({ date, entries }: { date: string; entries: Activ
   // Offer to clamp/drop neighbours when a change overlaps them. Declining the
   // offer aborts the save — committing the change without rebalancing would
   // leave overlapping rows that inflate tracked time.
-  function resolveRebalance(change: { id?: string; started_at: string; ended_at: string }):
-    | { proceed: true; rebalance: RebalanceAdjustment[] }
-    | { proceed: false } {
+  async function resolveRebalance(change: { id?: string; started_at: string; ended_at: string }):
+    Promise<{ proceed: true; rebalance: RebalanceAdjustment[] } | { proceed: false }> {
     const proposed = proposeRebalance(timelineEntries, change);
     if (proposed.length === 0) return { proceed: true, rebalance: [] };
     const drops = proposed.filter((p) => p.delete).length;
     const detail = drops > 0 ? ` (${drops} fully-covered ${drops === 1 ? "entry" : "entries"} will be removed)` : "";
-    const ok = window.confirm(
-      `This overlaps ${proposed.length} surrounding ${proposed.length === 1 ? "activity" : "activities"}. Adjust ${proposed.length === 1 ? "it" : "them"} so the timeline stays consistent?${detail}`
-    );
+    const body = `This overlaps ${proposed.length} surrounding ${proposed.length === 1 ? "activity" : "activities"}${detail}. Adjust ${proposed.length === 1 ? "it" : "them"} to keep the timeline consistent.`;
+    const ok = await new Promise<boolean>((resolve) => {
+      rebalanceResolveRef.current = resolve;
+      setRebalanceConfirm({ body });
+    });
     return ok ? { proceed: true, rebalance: proposed } : { proceed: false };
   }
 
@@ -139,7 +143,7 @@ export function TimelineEditor({ date, entries }: { date: string; entries: Activ
       toast.error("End must be after start");
       return;
     }
-    const resolved = resolveRebalance({ id, started_at, ended_at });
+    const resolved = await resolveRebalance({ id, started_at, ended_at });
     if (!resolved.proceed) return;
     const ok = await send(`/api/v1/activities/${id}`, "PATCH", {
       activity_type: draft.activity_type, started_at, ended_at,
@@ -149,9 +153,8 @@ export function TimelineEditor({ date, entries }: { date: string; entries: Activ
     if (ok) setEditId(null);
   }
 
-  async function deleteRow(id: string) {
-    if (!window.confirm("Delete this activity? This cannot be undone.")) return;
-    await send(`/api/v1/activities/${id}`, "DELETE", {}, "Activity deleted");
+  function deleteRow(id: string) {
+    setDeleteConfirmId(id);
   }
 
   async function doSplit(row: ActivityEntryDto, boundary: string, secondType: ActivityType) {
@@ -178,7 +181,7 @@ export function TimelineEditor({ date, entries }: { date: string; entries: Activ
       toast.error("End must be after start");
       return;
     }
-    const resolved = resolveRebalance({ started_at, ended_at });
+    const resolved = await resolveRebalance({ started_at, ended_at });
     if (!resolved.proceed) return;
     const ok = await send("/api/v1/activities/insert", "POST", {
       activity_type: draft.activity_type, started_at, ended_at,
@@ -269,6 +272,37 @@ export function TimelineEditor({ date, entries }: { date: string; entries: Activ
           onSplit={(boundary, secondType) => doSplit(splitRow, boundary, secondType)}
         />
       )}
+
+      <ConfirmDialog
+        open={deleteConfirmId !== null}
+        title="Delete activity?"
+        body="This will permanently delete this activity. This cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          const id = deleteConfirmId!;
+          setDeleteConfirmId(null);
+          await send(`/api/v1/activities/${id}`, "DELETE", {}, "Activity deleted");
+        }}
+        onCancel={() => setDeleteConfirmId(null)}
+        loading={pending}
+      />
+
+      <ConfirmDialog
+        open={rebalanceConfirm !== null}
+        title="Adjust timeline?"
+        body={rebalanceConfirm?.body ?? ""}
+        confirmLabel="Adjust"
+        onConfirm={() => {
+          rebalanceResolveRef.current?.(true);
+          rebalanceResolveRef.current = null;
+          setRebalanceConfirm(null);
+        }}
+        onCancel={() => {
+          rebalanceResolveRef.current?.(false);
+          rebalanceResolveRef.current = null;
+          setRebalanceConfirm(null);
+        }}
+      />
     </div>
   );
 }

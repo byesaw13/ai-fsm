@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import { queryForSession } from "@/lib/db";
 import { LinkButton, PageContainer, PageHeader } from "@/components/ui";
 import { OwnerDashboard } from "./OwnerDashboard";
-import type { CommandVisit, CountAction, MaterialJob } from "./WorkdayPanel";
+import type { CommandVisit, CountAction, MaterialJob } from "./DashboardWidgets";
 
 export const dynamic = "force-dynamic";
 

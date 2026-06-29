@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PageContainer, PageHeader } from "@/components/ui";
 
 type AutomationType = "visit_reminder" | "invoice_followup" | "booking_confirmed" | "review_request";
 
@@ -343,13 +344,11 @@ export default function AutomationsClient({
     a ? () => handleRun(a.id, label) : () => {};
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Automations</h1>
-          <p className="page-subtitle">Manage automated client communications</p>
-        </div>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Automations"
+        subtitle="Manage automated client communications"
+      />
 
       {error && <div className="alert alert-error" data-testid="automation-error">{error}</div>}
       {success && <div className="alert alert-success" data-testid="automation-success">{success}</div>}
@@ -432,7 +431,7 @@ export default function AutomationsClient({
       {!isAdmin && (
         <p className="role-notice">You have limited view access. Run controls are available to admins only.</p>
       )}
-    </div>
+    </PageContainer>
   );
 }
 

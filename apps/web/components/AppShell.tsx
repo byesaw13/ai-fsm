@@ -10,6 +10,7 @@ import { QuickLeadModal } from "./QuickLeadModal";
 import { FloatingActionButton } from "./FloatingActionButton";
 import { WorkspaceAutoRoute } from "./WorkspaceAutoRoute";
 import {
+  IconDashboard,
   IconEstimates,
   IconInbox,
   IconSettings,
@@ -21,6 +22,7 @@ import {
   IconReports,
   IconVisits,
   IconSchedule,
+  IconQueue,
 } from "./NavIcons";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
@@ -61,7 +63,7 @@ interface NavSection {
 // Named constants for items referenced outside the array (mobile bottom bar)
 // The office overview/dashboard. Labelled "Overview" (not "Today") so it reads
 // as the numbers screen and doesn't compete with the My Day field surface.
-const NAV_TODAY:    NavItem = { href: "/app",              label: "Overview", Icon: IconMyDay };
+const NAV_TODAY:    NavItem = { href: "/app",              label: "Overview", Icon: IconDashboard };
 // EPIC-006 Phase 5: the field surface. Owners can switch into it; pure admins
 // (who don't do field work) and the all-techs list never see it here.
 const NAV_MY_DAY:   NavItem = { href: "/app/my-day",       label: "My Day",   Icon: IconMyDay };
@@ -84,7 +86,7 @@ const ADMIN_NAV_SECTIONS: NavSection[] = [
       NAV_PROPS,
       { href: "/app/estimates", label: "Estimates",  Icon: IconEstimates, adminOnly: true },
       NAV_JOBS,
-      { href: "/app/work-orders", label: "Work Orders", Icon: IconJobs, adminOnly: true },
+      { href: "/app/work-orders", label: "Work Orders", Icon: IconQueue, adminOnly: true },
       { href: "/app/schedule",  label: "Schedule",   Icon: IconSchedule,  adminOnly: true },
       NAV_INVOICES,
       NAV_REPORTS,
