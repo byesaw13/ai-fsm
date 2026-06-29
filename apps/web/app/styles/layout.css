@@ -545,6 +545,12 @@
   .p7-only-desktop { display: none; }
 }
 
+/* Properties: card list on mobile only (grid, so it can't reuse p7-only-mobile) */
+.p7-properties-cards { display: none; }
+@media (max-width: 767px) {
+  .p7-properties-cards { display: grid; gap: var(--space-3); margin-top: var(--space-4); }
+}
+
 /* ==========================================================================
    OWNER DASHBOARD GRID — two columns on desktop, single stack on a phone.
    Without the mobile rule the 2fr/1fr grid squeezes the money column into a
