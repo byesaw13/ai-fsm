@@ -125,7 +125,7 @@ export function BusinessDayBar() {
     gap: "var(--space-3)",
     flexWrap: "wrap",
     padding: "var(--space-3)",
-    background: "var(--color-slate-50)",
+    background: "var(--bg-subtle)",
     border: "1px solid var(--border)",
     borderRadius: "var(--radius-md)",
     marginBottom: "var(--space-4)",

@@ -64,6 +64,7 @@
      Color — Semantic Aliases
      ---------------------------------------------------------------------- */
   --bg:            var(--color-slate-50);
+  --bg-subtle:     var(--color-slate-50);
   --bg-card:       var(--color-white);
   --bg-elevated:   var(--color-white);
   --bg-overlay:    rgba(2, 6, 23, 0.4);
@@ -79,6 +80,7 @@
   --accent-subtle: var(--color-forest-50);
   --accent-fg:     var(--color-white);
   --ring:          var(--color-forest-700);
+  --color-success: var(--color-green-600);
 
   /* -------------------------------------------------------------------------
      Status Semantic — used by Badge and status-pill components
