@@ -17,17 +17,17 @@ export type IssueRow = {
 };
 
 const SEVERITY_COLOR: Record<IssueRow["severity"], { fg: string; bg: string }> = {
-  minor:    { fg: "#6b7280", bg: "#f3f4f6" },
-  moderate: { fg: "#d97706", bg: "#fef3c7" },
-  major:    { fg: "#dc2626", bg: "#fee2e2" },
-  critical: { fg: "#7f1d1d", bg: "#fecaca" },
+  minor:    { fg: "var(--status-draft-fg)", bg: "var(--status-draft-bg)" },
+  moderate: { fg: "var(--priority-high-fg)", bg: "var(--priority-high-bg)" },
+  major:    { fg: "var(--color-red-600)", bg: "var(--color-red-100)" },
+  critical: { fg: "var(--priority-urgent-fg)", bg: "var(--priority-urgent-bg)" },
 };
 
 const STATUS_COLOR: Record<IssueRow["status"], { fg: string; bg: string }> = {
-  open:       { fg: "#dc2626", bg: "#fee2e2" },
-  monitoring: { fg: "#d97706", bg: "#fef3c7" },
-  resolved:   { fg: "#16a34a", bg: "#dcfce7" },
-  referred:   { fg: "#6b7280", bg: "#f3f4f6" },
+  open:       { fg: "var(--color-red-600)", bg: "var(--color-red-100)" },
+  monitoring: { fg: "var(--priority-high-fg)", bg: "var(--priority-high-bg)" },
+  resolved:   { fg: "var(--status-completed-fg)", bg: "var(--status-completed-bg)" },
+  referred:   { fg: "var(--status-draft-fg)", bg: "var(--status-draft-bg)" },
 };
 
 function formatDate(iso: string) {
@@ -74,8 +74,8 @@ function IssueCard({
       style={{
         padding: "var(--space-3)",
         borderRadius: "var(--radius-md)",
-        border: `1px solid ${issue.severity === "critical" ? "#fca5a5" : "var(--color-border)"}`,
-        background: issue.severity === "critical" ? "#fff5f5" : "var(--bg-surface)",
+        border: `1px solid ${issue.severity === "critical" ? "var(--priority-urgent-fg)" : "var(--border)"}`,
+        background: issue.severity === "critical" ? "var(--priority-urgent-bg)" : "var(--bg-card)",
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-2)", marginBottom: "var(--space-1)" }}>
@@ -121,8 +121,8 @@ function IssueCard({
             disabled={saving}
             style={{
               fontSize: "var(--text-xs)", padding: "2px 10px", borderRadius: 99,
-              border: "1px solid #16a34a", background: "transparent",
-              cursor: saving ? "not-allowed" : "pointer", color: "#16a34a",
+              border: "1px solid var(--status-completed-fg)", background: "transparent",
+              cursor: saving ? "not-allowed" : "pointer", color: "var(--status-completed-fg)",
             }}
           >
             Resolve

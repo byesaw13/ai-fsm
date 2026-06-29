@@ -1,17 +1,13 @@
-import Link from "next/link";
-import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { query, queryOne } from "@/lib/db";
-import { CompanyForm } from "./CompanyForm";
-import { TeamPanel, type TeamMember } from "./TeamPanel";
-import { ProfileForm } from "./ProfileForm";
-import { SquarePanel, type SquareStatus } from "./SquarePanel";
-import { WorkspaceModeSetting } from "./WorkspaceModeSetting";
 import { withDbSession } from "@/lib/db";
 import { loadSquareSettings } from "@/lib/integrations/square";
 import { isEncryptionConfigured } from "@/lib/crypto";
-import { Card, PageContainer, PageHeader } from "@/components/ui";
+import { PageContainer, PageHeader } from "@/components/ui";
+import { SettingsTabsClient } from "./SettingsTabsClient";
+import type { TeamMember } from "./TeamPanel";
+import type { SquareStatus } from "./SquarePanel";
 
 export const dynamic = "force-dynamic";
 
@@ -83,125 +79,14 @@ export default async function SettingsPage() {
   return (
     <PageContainer>
       <PageHeader title="Settings" />
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 40, maxWidth: 800 }}>
-
-        {isOwner && (
-          <section>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Workspace</h2>
-            <Card style={{ padding: "var(--space-4)" }}>
-              <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: 0, marginBottom: "var(--space-3)" }}>
-                Which view the app opens to. By default it follows your device — phones
-                open to Field, tablets and computers open to Office.
-              </p>
-              <WorkspaceModeSetting />
-            </Card>
-          </section>
-        )}
-
-        {isAdmin && account && (
-          <section>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Company</h2>
-            <CompanyForm
-              accountId={account.id}
-              initialName={account.name}
-              initialSettings={account.settings ?? {}}
-            />
-          </section>
-        )}
-
-        {isAdmin && (
-          <section>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Team</h2>
-            <TeamPanel
-              initialMembers={users as TeamMember[]}
-              currentUserId={session.userId}
-              currentRole={session.role}
-            />
-          </section>
-        )}
-
-        {isAdmin && (
-          <section>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>System Health</h2>
-            <Card padding="default">
-              <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                Check booking, email, AI, Square, portal-link, and database configuration.
-              </p>
-              <Link
-                href={"/app/settings/system-health" as unknown as Route}
-                style={{ fontSize: "var(--text-sm)", color: "var(--accent)", fontWeight: "var(--font-medium)" }}
-              >
-                View System Health &rarr;
-              </Link>
-            </Card>
-          </section>
-        )}
-
-
-        {isOwner && square && (
-          <section>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Payments — Square</h2>
-            <Card padding="default">
-              <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                Connect Square to create hosted card-payment links for invoices.
-                Manual payment recording (Venmo, cash, check, Zelle, ACH) works
-                whether or not Square is enabled.
-              </p>
-              <SquarePanel initial={square} />
-            </Card>
-          </section>
-        )}
-
-        {isAdmin && (
-          <section>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Tools &amp; setup</h2>
-            <Card padding="default">
-              <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                Every workspace tool in one place — and your full menu on a phone, where the sidebar is hidden.
-              </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                {[
-                  // Day-to-day surfaces — also in the desktop sidebar, kept here so
-                  // they stay reachable on mobile (sidebar is hidden below 768px).
-                  { href: "/app/schedule",              label: "Schedule",             desc: "Week / month / year calendar views" },
-                  { href: "/app/requests",              label: "Requests",             desc: "Intake queue and request management" },
-                  { href: "/app/reports",               label: "Reports",              desc: "Revenue, pricing health, schedule utilization, and performance" },
-                  // Memberships paused — link hidden until feature is re-enabled
-                  // { href: "/app/membership-dashboard",  label: "Membership Dashboard", desc: "Active memberships, renewals, and labor cap status" },
-                  { href: "/app/price-book",            label: "Price Book",           desc: "Materials and labor pricing catalog" },
-                  { href: "/app/expenses",              label: "Expenses",             desc: "Job and business expense tracking" },
-                  { href: "/app/automations",           label: "Automations",          desc: "Workflow automation rules" },
-                ].map(({ href, label, desc }) => (
-                  <Link
-                    key={href}
-                    href={href as unknown as Route}
-                    style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "var(--space-2) 0", borderBottom: "1px solid var(--border)", textDecoration: "none", color: "inherit" }}
-                  >
-                    <span>
-                      <span style={{ fontWeight: 600, fontSize: "var(--text-sm)" }}>{label}</span>
-                      <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>{desc}</span>
-                    </span>
-                    <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>→</span>
-                  </Link>
-                ))}
-              </div>
-            </Card>
-          </section>
-        )}
-
-        <section>
-          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Your profile</h2>
-          <ProfileForm
-            userId={me.id}
-            initialName={me.full_name}
-            initialEmail={me.email}
-            initialPhone={me.phone}
-            role={session.role}
-          />
-        </section>
-
-      </div>
+      <SettingsTabsClient
+        role={session.role}
+        userId={session.userId}
+        me={me}
+        account={account}
+        users={users as TeamMember[]}
+        square={square}
+      />
     </PageContainer>
   );
 }

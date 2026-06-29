@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Input, Textarea, Button } from "@/components/ui";
 
 interface QuickLeadModalProps {
   onClose: () => void;
@@ -69,40 +70,39 @@ export function QuickLeadModal({ onClose }: QuickLeadModalProps) {
           <div style={{ textAlign: "center", padding: "8px 0 16px" }}>
             <p style={{ fontSize: 32, margin: "0 0 8px" }}>✅</p>
             <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>Request saved!</h2>
-            <p style={{ fontSize: 14, color: "#52525b", margin: "0 0 20px" }}>
+            <p style={{ fontSize: 14, color: "var(--fg-secondary)", margin: "0 0 20px" }}>
               {name} is in the system. What do you want to do next?
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <button
+              <Button
                 type="button"
                 onClick={() => { router.push(`/app/requests/${savedId}`); onClose(); }}
-                style={primaryBtnStyle}
               >
                 View request →
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={async () => {
                   await fetch(`/api/v1/booking-requests/${savedId}/send-intake`, { method: "POST" });
                   router.push(`/app/requests/${savedId}`);
                   onClose();
                 }}
-                style={secondaryBtnStyle}
+                variant="secondary"
               >
                 Send intake form to client
-              </button>
+              </Button>
               {savedClientId && (
-                <button
+                <Button
                   type="button"
                   onClick={() => { router.push(`/app/estimates/new?client_id=${savedClientId}`); onClose(); }}
-                  style={secondaryBtnStyle}
+                  variant="secondary"
                 >
                   Create estimate now
-                </button>
+                </Button>
               )}
-              <button type="button" onClick={onClose} style={ghostBtnStyle}>
+              <Button type="button" onClick={onClose} variant="ghost">
                 Done — I&apos;ll follow up later
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -119,40 +119,35 @@ export function QuickLeadModal({ onClose }: QuickLeadModalProps) {
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div>
-            <label style={labelStyle}>Name *</label>
-            <input
-              autoFocus
-              style={inputStyle}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Client name"
-              required
-            />
-          </div>
+          <Input
+            id="quick-lead-name"
+            label="Name *"
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Client name"
+            required
+          />
 
-          <div>
-            <label style={labelStyle}>Phone *</label>
-            <input
-              type="tel"
-              style={inputStyle}
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="(603) 555-0100"
-              required
-            />
-          </div>
+          <Input
+            id="quick-lead-phone"
+            label="Phone *"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="(603) 555-0100"
+            required
+          />
 
-          <div>
-            <label style={labelStyle}>Email <span style={{ fontWeight: 400, color: "#71717a" }}>(optional — needed to send intake form)</span></label>
-            <input
-              type="email"
-              style={inputStyle}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Optional"
-            />
-          </div>
+          <Input
+            id="quick-lead-email"
+            label="Email"
+            hint="optional — needed to send intake form"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Optional"
+          />
 
           <div>
             <label style={labelStyle}>They reached out by</label>
@@ -165,11 +160,11 @@ export function QuickLeadModal({ onClose }: QuickLeadModalProps) {
                   style={{
                     flex: 1,
                     padding: "8px 4px",
-                    borderRadius: 6,
-                    border: `1px solid ${source === s ? "#0f172a" : "#e4e4e7"}`,
-                    background: source === s ? "#0f172a" : "#fff",
-                    color: source === s ? "#fff" : "#18181b",
-                    fontSize: 13,
+                    borderRadius: "var(--radius-md)",
+                    border: `1px solid ${source === s ? "var(--accent)" : "var(--border)"}`,
+                    background: source === s ? "var(--accent)" : "var(--bg-card)",
+                    color: source === s ? "var(--accent-fg)" : "var(--fg)",
+                    fontSize: "var(--text-sm)",
                     fontWeight: source === s ? 600 : 400,
                     cursor: "pointer",
                   }}
@@ -180,21 +175,20 @@ export function QuickLeadModal({ onClose }: QuickLeadModalProps) {
             </div>
           </div>
 
-          <div>
-            <label style={labelStyle}>What do they need? <span style={{ fontWeight: 400, color: "#71717a" }}>(optional)</span></label>
-            <textarea
-              style={{ ...inputStyle, minHeight: 60, resize: "vertical" }}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Short description from the call..."
-            />
-          </div>
+          <Textarea
+            id="quick-lead-desc"
+            label="What do they need? (optional)"
+            rows={2}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Short description from the call..."
+          />
 
-          {error && <p style={{ color: "#dc2626", fontSize: 13, margin: 0 }}>{error}</p>}
+          {error && <p style={{ color: "var(--color-red-600)", fontSize: 13, margin: 0 }}>{error}</p>}
 
-          <button type="submit" disabled={submitting} style={{ ...primaryBtnStyle, marginTop: 4 }}>
-            {submitting ? "Saving…" : "Save Request"}
-          </button>
+          <Button type="submit" loading={submitting} style={{ marginTop: 4 }}>
+            Save Request
+          </Button>
         </form>
       </div>
     </div>
@@ -208,8 +202,8 @@ export function QuickLeadModal({ onClose }: QuickLeadModalProps) {
 const overlayStyle: React.CSSProperties = {
   position: "fixed",
   inset: 0,
-  background: "rgba(0,0,0,0.45)",
-  zIndex: 1000,
+  background: "var(--bg-overlay)",
+  zIndex: "var(--z-overlay, 300)",
   display: "flex",
   alignItems: "flex-start",
   justifyContent: "center",
@@ -217,55 +211,21 @@ const overlayStyle: React.CSSProperties = {
 };
 
 const modalStyle: React.CSSProperties = {
-  background: "#fff",
-  borderRadius: 10,
+  background: "var(--bg-card)",
+  borderRadius: "var(--radius-lg)",
   padding: 24,
   width: "100%",
   maxWidth: 420,
-  boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+  border: "1px solid var(--border)",
+  boxShadow: "var(--shadow-xl)",
 };
 
 const labelStyle: React.CSSProperties = {
   display: "block",
-  fontSize: 13,
+  fontSize: "var(--text-sm)",
   fontWeight: 600,
   marginBottom: 4,
-  color: "#374151",
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "9px 10px",
-  borderRadius: 6,
-  border: "1px solid #d1d5db",
-  fontSize: 14,
-  boxSizing: "border-box",
-};
-
-const primaryBtnStyle: React.CSSProperties = {
-  background: "#0f172a",
-  color: "#fff",
-  padding: "11px 16px",
-  borderRadius: 6,
-  border: "none",
-  fontSize: 14,
-  fontWeight: 600,
-  cursor: "pointer",
-  width: "100%",
-};
-
-const secondaryBtnStyle: React.CSSProperties = {
-  ...primaryBtnStyle,
-  background: "#fff",
-  color: "#0f172a",
-  border: "1px solid #e4e4e7",
-};
-
-const ghostBtnStyle: React.CSSProperties = {
-  ...primaryBtnStyle,
-  background: "transparent",
-  color: "#71717a",
-  border: "none",
+  color: "var(--fg)",
 };
 
 const closeStyle: React.CSSProperties = {
@@ -273,6 +233,7 @@ const closeStyle: React.CSSProperties = {
   border: "none",
   fontSize: 16,
   cursor: "pointer",
-  color: "#71717a",
+  color: "var(--fg-muted)",
   padding: "4px 8px",
 };
+

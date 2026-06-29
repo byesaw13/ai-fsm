@@ -449,15 +449,18 @@
 }
 
 .p7-toast-success {
-  border-left: 4px solid var(--color-green-500);
+  border-color: var(--color-green-600);
+  background: var(--color-green-50);
 }
 
 .p7-toast-error {
-  border-left: 4px solid var(--color-red-500);
+  border-color: var(--color-red-500);
+  background: var(--color-red-50);
 }
 
 .p7-toast-info {
-  border-left: 4px solid var(--color-blue-500);
+  border-color: var(--color-blue-500);
+  background: var(--color-blue-50);
 }
 
 .p7-toast-icon {
