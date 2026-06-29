@@ -152,10 +152,10 @@ export default async function ClientsPage({ searchParams }: PageProps) {
         />
       ) : (
         <>
-          <Card style={{ padding: 0 }}>
+          <Card className="p7-only-desktop" style={{ padding: 0 }}>
             <DataTable columns={columns} rows={clients} getKey={(r) => r.id} data-testid="clients-table" />
           </Card>
-          <div className="p7-mobile-stack" style={{ marginTop: "var(--space-4)" }}>
+          <div className="p7-only-mobile" style={{ marginTop: "var(--space-4)" }}>
             {clients.map((row) => (
               <ItemCard
                 key={row.id}
