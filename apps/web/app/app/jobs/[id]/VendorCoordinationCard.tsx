@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui";
+import { formatCents } from "@/lib/money";
 import {
   VENDOR_COORDINATION_MODES,
   VENDOR_COORDINATION_LABELS,
@@ -16,10 +17,6 @@ interface Props {
   vendorCoordination: VendorCoordinationMode | null;
   conciergeFeeCents: number | null;
   canEdit: boolean;
-}
-
-function formatCents(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
 }
 
 export function VendorCoordinationCard({ jobId, vendorCoordination, conciergeFeeCents, canEdit }: Props) {
