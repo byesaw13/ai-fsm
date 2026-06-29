@@ -864,49 +864,14 @@
   }
 }
 
-/* =========================================================================
-   LEGACY layout classes — deprecated, preserved for backward compatibility.
-   ========================================================================= */
-.app-layout { min-height: 100vh; }
-.app-header { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
-.app-header nav { display: flex; gap: 16px; }
-.user-info { display: flex; align-items: center; gap: 16px; font-size: 14px; }
-.user-info button { background: transparent; border: 1px solid var(--border); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; }
-.user-info button:hover { background: var(--bg); }
-.app-content { padding: 24px; max-width: 1200px; margin: 0 auto; }
-.app-nav { display: flex; gap: 16px; align-items: center; }
-.role-badge { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 12px; text-transform: uppercase; background: var(--border); color: var(--fg-muted); }
-.role-badge[data-role="owner"] { background: #d1fae5; color: #065f46; }
-.role-badge[data-role="admin"] { background: #dbeafe; color: #1e40af; }
-.role-badge[data-role="tech"]  { background: #fef3c7; color: #92400e; }
+/* Compatibility page classes still used by older routes. */
 .page-container { display: flex; flex-direction: column; gap: 20px; }
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .page-title { margin: 0; font-size: 24px; font-weight: 700; }
 .page-subtitle { margin: 4px 0 0; color: var(--fg-muted); font-size: 14px; }
 .back-link { font-size: 13px; color: var(--fg-muted); text-decoration: none; display: block; margin-bottom: 4px; }
 .back-link:hover { color: var(--accent); }
-.nav-link { padding: 8px 14px; border-radius: 6px; text-decoration: none; color: var(--fg-muted); font-weight: 500; font-size: 14px; transition: all 0.15s; }
-.nav-link:hover { color: var(--fg); background: var(--bg); }
-.nav-link.nav-active { color: var(--accent); background: rgba(13, 122, 95, 0.08); }
-.logout-btn { background: transparent; border: 1px solid var(--border); padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; color: var(--fg); transition: all 0.15s; }
-.logout-btn:hover { background: var(--bg); border-color: var(--fg-muted); }
-.logout-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.mobile-menu-btn { display: none; flex-direction: column; justify-content: center; gap: 4px; width: 32px; height: 32px; background: transparent; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; padding: 6px; }
-.hamburger-line { display: block; width: 100%; height: 2px; background: var(--fg); border-radius: 1px; transition: all 0.2s; }
-.app-header-left { display: flex; align-items: center; gap: 16px; }
-.app-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
-.app-logo { width: 36px; height: 36px; border-radius: 8px; background: linear-gradient(135deg, var(--accent) 0%, #0a5c4a 100%); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(13, 122, 95, 0.3); }
-.app-logo-text { color: white; font-weight: 700; font-size: 14px; }
-.app-title { font-weight: 700; font-size: 18px; color: var(--fg); }
 @media (max-width: 768px) {
-  .app-header { flex-wrap: wrap; gap: 12px; }
-  .mobile-menu-btn { display: flex; }
-  .app-nav { display: none; width: 100%; flex-direction: column; gap: 4px; order: 3; }
-  .app-nav.mobile-open { display: flex; }
-  .nav-link { width: 100%; padding: 12px 14px; }
-  .user-info { order: 2; gap: 8px; }
-  .app-title { display: none; }
-  .app-content { padding: 16px; }
   .page-header { flex-direction: column; gap: 12px; }
   .page-title { font-size: 20px; }
 }

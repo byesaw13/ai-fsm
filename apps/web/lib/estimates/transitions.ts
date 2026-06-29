@@ -9,7 +9,7 @@ import type { EstimateStatus } from "@ai-fsm/domain";
  * action, which emails the client AND flips the status). Offering a bare
  * "→ Sent" button let users mark an estimate sent without it ever being
  * delivered, and the immutability invariant then froze `sent_at` so it could
- * not be corrected. See docs/generated/ESTIMATE_SYSTEM_DEEP_AUDIT.md.
+ * not be corrected.
  *
  * The underlying domain transition map (estimateTransitions) is unchanged —
  * draft→sent remains valid for the send route to perform internally.

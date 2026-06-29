@@ -216,9 +216,7 @@ Acceptance Criteria:
 
 Notes:
 Refines the owner-dashboard-centric assumption in TASK-030/031/032: the owner's
-daily home is now My Day, not `/app`. Evidence basis for the broader cleanup is
-the June 2026 recovery fact-check
-(`docs/generated/RECOVERY_AUDIT_FACT_CHECK_2026-06.md`).
+daily home is now My Day, not `/app`. Evidence basis for the broader cleanup is the June 2026 recovery fact-check retained in git history.
 
 ## Completed
 

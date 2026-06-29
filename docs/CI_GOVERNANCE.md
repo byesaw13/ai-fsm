@@ -37,4 +37,4 @@ Do not remove a required check to merge a feature PR. If a required check itself
 
 ## Release Manifest
 
-The browser smoke is scoped by `docs/generated/RELEASE_MANIFEST.md`. If the launch spine changes, update the manifest and `tests/e2e/core-flow.spec.ts` in the same PR.
+The browser smoke is scoped by `tests/e2e/core-flow.spec.ts` and the release expectations in this document. If the launch spine changes, update both in the same PR.

@@ -3,7 +3,7 @@
 **Status:** Draft / working. **Not canonical, not committed.** Held under
 EPIC-008 as PI-004 until TASK-018 + PI-002 prove the model in real use.
 **Date:** 2026-06-25
-**Derived from:** [`docs/generated/PRICING_EVIDENCE_ANALYSIS_2026-06.md`](../generated/PRICING_EVIDENCE_ANALYSIS_2026-06.md),
+**Derived from:** historical pricing evidence retained in git history,
 the Pricing Codebook v2.0, and [`PRICING_AUDIT_REPORT_2026.md`](PRICING_AUDIT_REPORT_2026.md).
 
 ## What this is

@@ -9,7 +9,7 @@ test("admin can create client, property, and job from property context", async (
   await page.fill("#email", ADMIN_EMAIL);
   await page.fill("#password", ADMIN_PASSWORD);
   await page.click('button[type="submit"]');
-  await page.waitForURL(`${BASE}/app/jobs`);
+  await page.waitForURL(/\/app(?:\/my-day)?$/);
 
   const nonce = Date.now();
   const clientName = `E2E Client ${nonce}`;
@@ -25,7 +25,7 @@ test("admin can create client, property, and job from property context", async (
   await page.waitForURL(/\/app\/clients\/[0-9a-f-]+/);
   await expect(page.locator("h1")).toContainText(clientName);
 
-  await page.click('[data-testid="add-property-btn"]');
+  await page.getByRole("link", { name: "Add Property" }).click();
   await page.waitForURL(/\/app\/properties\/new\?client_id=/);
   await page.fill("#property_name", "Main Site");
   await page.fill("#address", propertyAddress);

@@ -1,8 +1,7 @@
 /**
  * Canonical deposit/final billing reconciliation.
  *
- * The Dovetails billing model (see docs/generated/ESTIMATE_SYSTEM_DEEP_AUDIT.md
- * and migration 104_invoice_kind.sql) is:
+ * The Dovetails billing model (see migration 104_invoice_kind.sql) is:
  *
  *   - An estimate may have at most ONE deposit invoice (kind='deposit') and
  *     at most ONE final invoice (kind='final').
