@@ -155,7 +155,7 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
           <Card className="p7-only-desktop" style={{ padding: 0 }}>
             <DataTable columns={columns} rows={properties} getKey={(r) => r.id} data-testid="properties-table" />
           </Card>
-          <div className="p7-only-mobile" style={{ marginTop: "var(--space-4)", display: "grid", gap: "var(--space-3)" }}>
+          <div className="p7-properties-cards">
             {properties.map((row) => (
               <ItemCard
                 key={row.id}
