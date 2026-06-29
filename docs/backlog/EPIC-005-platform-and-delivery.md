@@ -252,6 +252,46 @@ unique index per account). Identified as a genuine gap in the June 2026 recovery
 fact-check (`docs/generated/RECOVERY_AUDIT_FACT_CHECK_2026-06.md`), which also
 corrected the earlier assumption that invoice numbering was missing — it exists.
 
+# TASK-070: Consolidate money formatting (one formatCents helper)
+
+Status:
+Proposed
+
+Problem:
+`formatCents` was reimplemented ~8 times across `apps/web` with subtly diverging
+output (Intl currency vs `toFixed(2)` vs `toLocaleString` with varying fraction
+digits and ±sign handling), so the same dollar amount rendered differently
+across pages. PR #412 collapsed the 5 identical copies into one shared helper
+(`apps/web/lib/money.ts`); this task tracks the remainder.
+
+Business Value:
+Money renders consistently everywhere, and there is one place to change USD
+formatting. Retroactively gives the #412 cleanup a tracked home (backlog gating
+rule).
+
+Scope:
+- Done in #412: shared `apps/web/lib/money.ts`; repointed the 5 identical copies
+  (estimates/pricing, reports/format, reports/profitability now re-export it;
+  VendorCoordinationCard + reports/close import it).
+- Remaining: decide whether the deliberately-different variants fold into the
+  shared helper or stay distinct — `PropertyTimeline` (whole-dollar, no cents),
+  `formatCentsForCsv`, `expenses/math.ts formatCentsToDollars`, the invoice
+  editor's `centsToDollars` (input value, no `$`). This is a UX call, not a pure
+  dedup, since folding them changes rendered output.
+
+Out of Scope:
+- The MCP service's own `services/mcp/src/money.ts` — separate service, cannot
+  import web code; keeps its copy.
+
+Acceptance Criteria:
+- [x] One shared `formatCents` exists and the 5 identical copies use it (#412).
+- [ ] Each remaining variant is either folded into the shared helper or has a
+      one-line comment stating why it stays distinct.
+
+Notes:
+Surfaced by a repo over-engineering audit (June 2026). Low priority — purely
+internal cleanup; the money path is already correct and tested.
+
 ## Completed
 
 _None yet._

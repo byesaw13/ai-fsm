@@ -82,7 +82,7 @@ tasks in `done/`.
 
 ## Task index
 
-Next available ID: **TASK-070**.
+Next available ID: **TASK-071**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -154,6 +154,7 @@ Next available ID: **TASK-070**.
 | TASK-067 | Visit Timeline | 007 | Proposed |
 | TASK-068 | Payment Provider Model & Enriched Recorder | 004 | In Progress |
 | TASK-069 | Square Card Payments | 004 | Proposed |
+| TASK-070 | Consolidate money formatting (one formatCents) | 005 | Proposed |
 
 ## Status legend
 
