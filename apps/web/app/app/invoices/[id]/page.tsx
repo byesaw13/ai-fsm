@@ -2,16 +2,20 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
 import { getSession } from "@/lib/auth/session";
+import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { canCreateInvoices, canRecordPayments } from "@/lib/auth/permissions";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import { buildClientDocumentFilename, invoiceTransitions } from "@ai-fsm/domain";
 import type { InvoiceStatus } from "@ai-fsm/domain";
 import { InvoiceTransitionForm } from "./InvoiceTransitionForm";
 import { RecordPaymentForm } from "./RecordPaymentForm";
+import { SquareLinkActions } from "./SquareLinkActions";
+import { loadSquareSettings } from "@/lib/integrations/square";
 import { PaymentHistory } from "./PaymentHistory";
 import { InvoiceEditForm } from "./InvoiceEditForm";
 import { MarkDepositReceivedButton } from "./MarkDepositReceivedButton";
 import { SendInvoiceButton } from "./SendInvoiceButton";
+import { InvoiceLineItemsEditor } from "./InvoiceLineItemsEditor";
 import {
   PageContainer,
   PageHeader,
@@ -43,6 +47,7 @@ interface InvoiceRow {
   paid_cents: number;
   deposit_cents: number;
   balance_cents: number;
+  square_payment_link_url: string | null;
   deposit_paid_at: string | null;
   notes: string | null;
   due_date: string | null;
@@ -65,6 +70,7 @@ interface LineItemRow {
   quantity: number;
   unit_price_cents: number;
   total_cents: number;
+  line_item_type: "labor" | "materials" | "handling_fee" | "adjustment";
   sort_order: number;
   created_at: string;
 }
@@ -105,7 +111,7 @@ export default async function InvoiceDetailPage({
 
     const lineItemsResult = await client.query(
       `SELECT id, invoice_id, estimate_line_item_id,
-              description, quantity, unit_price_cents, total_cents, sort_order, created_at
+              description, quantity::float8 AS quantity, unit_price_cents, total_cents, line_item_type, sort_order, created_at
        FROM invoice_line_items
        WHERE invoice_id = $1
        ORDER BY sort_order ASC, created_at ASC`,
@@ -124,13 +130,24 @@ export default async function InvoiceDetailPage({
   const currentStatus = invoice.status;
   // paid/partial are driven by RecordPaymentForm (payment trigger), not manual transition
   const allowedTransitions = invoiceTransitions[currentStatus].filter(
-    (s) => s !== "paid" && s !== "partial"
+    (s) => s !== "paid" && s !== "partial" && (s !== "draft" || invoice.paid_cents === 0)
   );
   const canTransition = canCreateInvoices(session.role);
   const amountDue = invoice.total_cents - invoice.paid_cents;
   const depositPending = invoice.deposit_cents > 0 && !invoice.deposit_paid_at;
   const canMarkDeposit = canTransition && !["paid", "void"].includes(currentStatus);
   const canRecordPaymentAction = canRecordPayments(session.role) && ["sent", "partial", "overdue"].includes(currentStatus) && amountDue > 0;
+
+  // Square link actions: owner/admin only, on payable invoices, when Square is
+  // enabled. Settings are RLS-restricted to owner/admin so techs never load it.
+  let squareEnabled = false;
+  if (canRecordPaymentAction && (session.role === "owner" || session.role === "admin")) {
+    const sq = await withInvoiceContext(session, (client) =>
+      loadSquareSettings(client, session.accountId)
+    );
+    squareEnabled = !!sq?.enabled && !!sq?.config.locationId && !!sq?.secrets.accessToken;
+  }
+  const canEditLineItems = canTransition && currentStatus === "draft";
   const documentFilename = buildClientDocumentFilename({
     date: invoice.sent_at ?? invoice.created_at,
     clientName: invoice.client_name,
@@ -196,7 +213,13 @@ export default async function InvoiceDetailPage({
         <div className="p7-detail-primary">
           <Card>
             <SectionHeader title="Line Items" />
-            {lineItems.length === 0 ? (
+            {canEditLineItems ? (
+              <InvoiceLineItemsEditor
+                invoiceId={invoice.id}
+                jobId={invoice.job_id}
+                lineItems={lineItems}
+              />
+            ) : lineItems.length === 0 ? (
               <EmptyState title="No line items" description="Line items will appear when this invoice is created from an estimate." />
             ) : (
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }} data-testid="invoice-line-items-table">
@@ -423,12 +446,31 @@ export default async function InvoiceDetailPage({
             />
           )}
 
-          {/* Record Payment — owner/admin only, on payable invoices */}
+          {/* Square Payment Link — owner/admin, payable invoices, Square enabled */}
+          {squareEnabled && (
+            <Card data-testid="square-link-card">
+              <SectionHeader title="Square Payment Link" />
+              <SquareLinkActions
+                invoiceId={invoice.id}
+                hasDeposit={invoice.deposit_cents > 0}
+                remainingCents={amountDue}
+                existingLinkUrl={invoice.square_payment_link_url}
+              />
+            </Card>
+          )}
+
+          {/* Record Payment — owner/admin only. Shown on payable invoices, and
+              on paid invoices so refunds/adjustments stay reachable. */}
           {canRecordPayments(session.role) &&
-            ["sent", "partial", "overdue"].includes(currentStatus) &&
-            amountDue > 0 && (
+            ((["sent", "partial", "overdue"].includes(currentStatus) && amountDue > 0) ||
+              currentStatus === "paid") && (
               <Card className="p7-card-accent" data-testid="record-payment-panel" id="record-payment-panel">
-                <SectionHeader title="Record Payment" />
+                <SectionHeader title={currentStatus === "paid" ? "Record Refund / Adjustment" : "Record Payment"} />
+                {currentStatus === "paid" && (
+                  <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                    This invoice is paid. Use the <strong>Refund</strong> type to log money returned to the client.
+                  </p>
+                )}
                 <RecordPaymentForm
                   invoiceId={invoice.id}
                   remainingCents={amountDue}
@@ -437,7 +479,7 @@ export default async function InvoiceDetailPage({
             )}
 
           {/* Send to Client — owner/admin only, non-terminal invoices */}
-          {canTransition && !["paid", "void"].includes(currentStatus) && (
+          {canTransition && currentStatus === "draft" && (
             <Card data-testid="send-invoice-card">
               <SectionHeader title="Send to Client" />
               <SendInvoiceButton
@@ -460,6 +502,8 @@ export default async function InvoiceDetailPage({
               />
             </Card>
           )}
+
+          <LinkedDocuments session={session} entityType="invoice" entityId={invoice.id} />
         </div>
       </div>
     </PageContainer>

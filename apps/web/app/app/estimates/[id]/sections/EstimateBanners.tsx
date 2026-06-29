@@ -21,7 +21,7 @@ export function EstimateBanners({ estimate, canTransition, jobVisitCount, deposi
       {currentStatus === "approved" && canTransition && (
         <div
           className="card"
-          style={{ marginBottom: "var(--space-4)", borderLeft: "4px solid #059669", background: "#f0fdf4" }}
+          style={{ marginBottom: "var(--space-4)", border: "1px solid #10b981", background: "#f0fdf4" }}
           data-testid="approved-banner"
         >
           <p style={{ margin: 0, fontWeight: 600, color: "#065f46" }}>
@@ -88,7 +88,7 @@ export function EstimateBanners({ estimate, canTransition, jobVisitCount, deposi
       {currentStatus === "expired" && (
         <div
           className="card"
-          style={{ marginBottom: "var(--space-4)", borderLeft: "4px solid #d97706", background: "#fffbeb" }}
+          style={{ marginBottom: "var(--space-4)", border: "1px solid #f59e0b", background: "#fffbeb" }}
           data-testid="expired-banner"
         >
           <p style={{ margin: 0, fontWeight: 600, color: "#92400e" }}>

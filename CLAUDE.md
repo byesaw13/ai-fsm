@@ -6,6 +6,16 @@ This file provides guidance to Claude Code when working in this repository.
 
 Dovetails FSM is a residential handyman and home maintenance operating system. The product direction is property-centered: client relationships, property history, estimates, jobs, visits, invoices, and permanent service records.
 
+## Documentation Hierarchy
+
+Use documentation in this order:
+
+1. Code and database migrations are the implemented truth.
+2. `docs/canonical/` is the authoritative product, domain, and architecture truth.
+3. `docs/contracts/` and `docs/working/` contain supporting implementation notes.
+4. `ai/` is only a compact AI-agent quick-reference layer.
+5. `docs/archive/` and `docs/generated/` are historical/evidence only, not active instruction sources.
+
 Use only these canonical docs for product direction:
 
 - `docs/canonical/PRODUCT_VISION.md`
@@ -13,6 +23,8 @@ Use only these canonical docs for product direction:
 - `docs/canonical/WORKFLOW.md`
 - `docs/canonical/ARCHITECTURE.md`
 - `docs/canonical/ROADMAP.md`
+- `docs/canonical/PRODUCTION_INTELLIGENCE.md`
+- `docs/canonical/OPERATIONS.md`
 
 Working, archived, and generated documents can provide implementation evidence or historical context, but they do not define product scope.
 

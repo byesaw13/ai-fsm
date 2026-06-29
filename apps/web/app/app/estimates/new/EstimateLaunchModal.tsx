@@ -3,7 +3,7 @@
 // Estimate entry modes. The two dead paths from the old modal — "duplicate"
 // (never pre-filled) and "convert booking request" (never pre-filled) — were
 // removed because they only opened a blank manual form. See
-// docs/generated/ESTIMATE_SYSTEM_DEEP_AUDIT.md.
+// Historical estimate-system audit context was removed from the tree; git history retains it.
 //
 //   quick    → manual form defaulting to flat-rate (the most common Dovetails estimate)
 //   detailed → manual form defaulting to itemized line items + price book

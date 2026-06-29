@@ -11,6 +11,7 @@
 #   5. Build and start web + worker
 #   6. Wait for web healthcheck to pass
 #   7. Print service status + health endpoint response
+#   8. Report the PWA install origin (Cloudflare Tunnel), best-effort
 #
 # Pre-flight checks (run once before first deploy):
 #   docker network inspect business_proxy >/dev/null
@@ -190,3 +191,26 @@ done
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" ps
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T web \
   wget -qO- http://localhost:3000/api/health
+
+# -----------------------------------------------------------------------------
+# PWA install origin (best-effort): the app is only installable over a secure
+# origin. The secure origin is provided by a Cloudflare Tunnel routing to the
+# `ai-fsm-web` alias — independent of this deploy. Report the configured public
+# origin so the operator can confirm the install URL. Never fails the deploy.
+# See docs/working/pwa-https-deployment.md.
+# -----------------------------------------------------------------------------
+report_pwa_origin() {
+  echo
+  local origin
+  # `|| true` so a missing APP_URL (grep no-match → non-zero) does not trip
+  # `set -euo pipefail` and abort the deploy; we want to fall through to the hint.
+  origin="$(grep -E '^APP_URL=' "${ENV_FILE}" 2>/dev/null | head -1 | cut -d= -f2- || true)"
+  if [[ -n "${origin}" && "${origin}" == https://* ]]; then
+    echo "PWA install: secure origin ${origin} — open it in Chrome → menu → Install app"
+  else
+    echo "PWA install: no https APP_URL configured — set APP_URL/APP_BASE_URL to the"
+    echo "  Cloudflare Tunnel hostname and ensure the tunnel routes to ai-fsm-web:3000"
+    echo "  (docs/working/pwa-https-deployment.md). Install needs a secure HTTPS origin."
+  fi
+}
+report_pwa_origin

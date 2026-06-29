@@ -7,6 +7,8 @@ import {
   invoiceStatusSchema,
   auditActionSchema,
   paymentMethodSchema,
+  paymentTypeSchema,
+  paymentStatusSchema,
   accountSchema,
   userSchema,
   jobSchema,
@@ -116,8 +118,30 @@ describe('auditActionSchema', () => {
 
 describe('paymentMethodSchema', () => {
   it('accepts all defined methods', () => {
-    for (const m of ['cash','check','card','transfer','other']) {
+    for (const m of ['square','venmo','cash','check','zelle','ach','card','transfer','other']) {
       expect(paymentMethodSchema.parse(m)).toBe(m)
+    }
+  })
+  it('rejects unknown methods', () => {
+    expect(paymentMethodSchema.safeParse('paypal').success).toBe(false)
+  })
+})
+
+describe('paymentTypeSchema', () => {
+  it('accepts all defined types', () => {
+    for (const t of ['deposit','progress','final','refund','adjustment']) {
+      expect(paymentTypeSchema.parse(t)).toBe(t)
+    }
+  })
+  it('rejects unknown types', () => {
+    expect(paymentTypeSchema.safeParse('partial').success).toBe(false)
+  })
+})
+
+describe('paymentStatusSchema', () => {
+  it('accepts all defined statuses', () => {
+    for (const s of ['pending','paid','failed','refunded','cancelled']) {
+      expect(paymentStatusSchema.parse(s)).toBe(s)
     }
   })
 })

@@ -1,13 +1,6 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { loadStripe } from "@stripe/stripe-js";
-import {
-  Elements,
-  PaymentElement,
-  useStripe,
-  useElements,
-} from "@stripe/react-stripe-js";
 import { DOCUMENT_STANDARD_VERSION, STANDARD_INVOICE_TERMS } from "@ai-fsm/domain";
 
 interface LineItem {
@@ -42,73 +35,27 @@ interface Props {
   token: string;
   invoice: Invoice;
   lineItems: LineItem[];
-  stripePublishableKey: string;
+  /** Whether the account has Square enabled — controls the online pay button. */
+  onlinePaymentAvailable: boolean;
 }
 
 function cents(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n / 100);
 }
 
-function PaymentForm({ token, amountCents, onSuccess }: { token: string; amountCents: number; onSuccess: () => void }) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!stripe || !elements) return;
-    setError("");
-    setSubmitting(true);
-    try {
-      const { error: submitError } = await elements.submit();
-      if (submitError) { setError(submitError.message ?? "Payment failed"); return; }
-
-      const { error: confirmError } = await stripe.confirmPayment({
-        elements,
-        confirmParams: { return_url: window.location.href },
-        redirect: "if_required",
-      });
-      if (confirmError) {
-        setError(confirmError.message ?? "Payment failed");
-      } else {
-        onSuccess();
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <PaymentElement />
-      {error && <div style={{ color: "#dc2626", fontSize: 13, marginTop: 12 }}>{error}</div>}
-      <button
-        type="submit"
-        disabled={!stripe || submitting}
-        style={{ marginTop: 16, width: "100%", padding: "12px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: submitting ? "wait" : "pointer" }}
-      >
-        {submitting ? "Processing…" : `Pay ${cents(amountCents)}`}
-      </button>
-    </form>
-  );
-}
-
-export function InvoicePortalClient({ token, invoice, lineItems, stripePublishableKey }: Props) {
-  const [status, setStatus] = useState(invoice.status);
-  const [paidCents, setPaidCents] = useState(invoice.paid_cents);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
+export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAvailable }: Props) {
+  const [status] = useState(invoice.status);
+  const [paidCents] = useState(invoice.paid_cents);
   const [loadingPayment, setLoadingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState("");
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   const balance = invoice.total_cents - paidCents;
   const isPaid = status === "paid";
   const isVoid = status === "void";
   const isOverdue = invoice.due_date && new Date(invoice.due_date) < new Date() && !isPaid && !isVoid;
 
-  const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
-
+  // Redirect to the Square-hosted checkout page for the balance. On return, the
+  // Square webhook updates the invoice; the client sees it reflected on reload.
   const startPayment = useCallback(async () => {
     setPaymentError("");
     setLoadingPayment(true);
@@ -116,22 +63,20 @@ export function InvoicePortalClient({ token, invoice, lineItems, stripePublishab
       const res = await fetch(`/api/portal/invoices/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount_cents: balance }),
+        body: JSON.stringify({}),
       });
       const data = await res.json();
-      if (!res.ok) { setPaymentError(data.error ?? "Could not start payment"); return; }
-      setClientSecret(data.clientSecret);
+      if (!res.ok || !data.url) {
+        setPaymentError(data.error ?? "Could not start payment");
+        return;
+      }
+      window.location.href = data.url as string;
+    } catch {
+      setPaymentError("Could not start payment. Please try again.");
     } finally {
       setLoadingPayment(false);
     }
-  }, [token, balance]);
-
-  function handlePaymentSuccess() {
-    setPaymentSuccess(true);
-    setClientSecret(null);
-    setPaidCents(invoice.total_cents);
-    setStatus("paid");
-  }
+  }, [token]);
 
   const propertyLine = [invoice.property_address, invoice.property_city, invoice.property_state, invoice.property_zip]
     .filter(Boolean).join(", ");
@@ -158,11 +103,6 @@ export function InvoicePortalClient({ token, invoice, lineItems, stripePublishab
         {isPaid && (
           <div style={{ background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: 8, padding: "12px 16px", marginBottom: 24, color: "#065f46", fontWeight: 600 }}>
             Paid in full{invoice.paid_at ? ` on ${new Date(invoice.paid_at).toLocaleDateString()}` : ""}
-          </div>
-        )}
-        {paymentSuccess && !isPaid && (
-          <div style={{ background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: 8, padding: "12px 16px", marginBottom: 24, color: "#065f46" }}>
-            Payment received! Thank you.
           </div>
         )}
         {isVoid && (
@@ -228,25 +168,22 @@ export function InvoicePortalClient({ token, invoice, lineItems, stripePublishab
           </div>
         )}
 
-        {/* Pay button / Stripe form */}
-        {!isPaid && !isVoid && !paymentSuccess && stripePromise && (
+        {/* Pay online — redirects to Square-hosted checkout */}
+        {!isPaid && !isVoid && onlinePaymentAvailable && (
           <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: 20, marginBottom: 24 }}>
             <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 600 }}>Pay Online</h3>
             {paymentError && <div style={{ color: "#dc2626", fontSize: 13, marginBottom: 12 }}>{paymentError}</div>}
-            {!clientSecret ? (
-              <button
-                type="button"
-                onClick={startPayment}
-                disabled={loadingPayment}
-                style={{ width: "100%", padding: "12px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: loadingPayment ? "wait" : "pointer" }}
-              >
-                {loadingPayment ? "Loading…" : `Pay ${cents(balance)}`}
-              </button>
-            ) : (
-              <Elements stripe={stripePromise} options={{ clientSecret }}>
-                <PaymentForm token={token} amountCents={balance} onSuccess={handlePaymentSuccess} />
-              </Elements>
-            )}
+            <button
+              type="button"
+              onClick={startPayment}
+              disabled={loadingPayment}
+              style={{ width: "100%", padding: "12px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: loadingPayment ? "wait" : "pointer" }}
+            >
+              {loadingPayment ? "Redirecting…" : `Pay ${cents(balance)} by card`}
+            </button>
+            <p style={{ margin: "10px 0 0", fontSize: 12, color: "#6b7280" }}>
+              You&apos;ll be taken to Square&apos;s secure checkout to complete payment.
+            </p>
           </div>
         )}
 

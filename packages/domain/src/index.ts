@@ -8,6 +8,8 @@ export * from "./job-materials";
 export * from "./stages";
 export * from "./operational-visibility";
 export * from "./scope";
+export * from "./assessment-summary";
+export * from "./work-order";
 export { checkSchedulingPreconditions } from "./scheduling-guard";
 export type { SchedulingGuardError, SchedulingGuardResult } from "./scheduling-guard";
 export { scoreSiteVisitProbability } from "./walkthrough-decision";
@@ -54,3 +56,9 @@ export type {
   PaintRoom,
   PaintRoomOutput,
 } from "./painting";
+export * from "./activities";
+export * from "./business-day";
+export * from "./payroll";
+export * from "./location";
+export * from "./geo";
+export * from "./visit-matching";

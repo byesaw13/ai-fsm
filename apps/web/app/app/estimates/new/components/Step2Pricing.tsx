@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button, Card, Input, SectionHeader, Textarea } from "@/components/ui";
 import { MaterialsGenerator } from "../../components/MaterialsGenerator";
+import type { AssessmentContext } from "@/lib/estimates/assessment-context";
 import { PriceBookSelector } from "@/components/PriceBookSelector";
 import { ScopeBuilder } from "@/components/ScopeBuilder";
 import { getMaterialsByCategory, type MaterialSuggestion } from "@ai-fsm/domain";
@@ -115,6 +116,7 @@ interface Step2Props {
   taxRate: string;
   setTaxRate: (v: string) => void;
   lineTotal: (row: LineItemRow) => number;
+  assessmentContext: AssessmentContext | null;
 }
 
 export function Step2Pricing({
@@ -142,6 +144,7 @@ export function Step2Pricing({
   depositCents, balanceDueCents,
   taxRate, setTaxRate,
   lineTotal,
+  assessmentContext,
 }: Step2Props) {
   const [showMaterialsGen, setShowMaterialsGen] = useState(false);
   return (
@@ -161,7 +164,7 @@ export function Step2Pricing({
                 padding: "4px 12px",
                 borderRadius: "var(--radius-sm)",
                 border: `1px solid ${paintingMode === m ? "var(--accent)" : "var(--border)"}`,
-                background: paintingMode === m ? "var(--accent)" : "var(--bg-subtle)",
+                background: paintingMode === m ? "var(--accent)" : "var(--color-slate-100)",
                 color: paintingMode === m ? "#fff" : "var(--fg)",
                 cursor: "pointer",
                 fontWeight: paintingMode === m ? 600 : 400,
@@ -173,7 +176,7 @@ export function Step2Pricing({
         </div>
 
         {paintingMode === "room_by_room" ? (
-          <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-4)" }}>
+          <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "var(--space-4)" }}>
             <p style={{ margin: "0 0 var(--space-3)", fontWeight: 600, fontSize: "var(--text-sm)" }}>
               Room-by-room painting estimator
             </p>
@@ -201,7 +204,7 @@ export function Step2Pricing({
           paintingResult={paintingResult}
           prepLevelLabels={prepLevelLabels}
           scopeParserSlot={
-            <div style={{ marginBottom: "var(--space-4)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
+            <div style={{ marginBottom: "var(--space-4)", padding: "var(--space-3)", background: "var(--color-slate-100)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
                 <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 600 }}>
                   Parse from description
@@ -225,7 +228,7 @@ export function Step2Pricing({
                 disabled={pending || scopeParsing}
               />
               {scopeError && (
-                <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--status-error)" }}>
+                <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--color-red-600)" }}>
                   {scopeError}
                 </p>
               )}
@@ -234,14 +237,15 @@ export function Step2Pricing({
                   <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginBottom: "var(--space-1)" }}>
                     <span style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>Parsed</span>
                     <span style={{
-                      padding: "2px 8px", borderRadius: 99, fontSize: "var(--text-xs)", fontWeight: 600, color: "#fff",
-                      background: scopeResult.parsed.confidence >= 70 ? "var(--status-success)" : scopeResult.parsed.confidence >= 40 ? "var(--status-warning)" : "var(--status-error)",
+                      padding: "2px 8px", borderRadius: 99, fontSize: "var(--text-xs)", fontWeight: 600,
+                      color: scopeResult.parsed.confidence >= 70 ? "var(--color-green-600)" : scopeResult.parsed.confidence >= 40 ? "var(--color-amber-600)" : "var(--color-red-600)",
+                      background: scopeResult.parsed.confidence >= 70 ? "var(--color-green-100)" : scopeResult.parsed.confidence >= 40 ? "var(--color-amber-100)" : "var(--color-red-100)",
                     }}>
                       {scopeResult.parsed.confidence}% confidence
                     </span>
                   </div>
                   {scopeResult.parsed.confidence < 60 && (
-                    <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--status-warning)", fontWeight: 500 }}>
+                    <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--color-amber-600)", fontWeight: 500 }}>
                       ⚠ Low confidence — review all fields carefully before submitting.
                     </p>
                   )}
@@ -251,7 +255,7 @@ export function Step2Pricing({
                     ))}
                   </ul>
                   {scopeResult.parsed.warnings.map((w, i) => (
-                    <p key={i} style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--status-warning)", fontWeight: 500 }}>
+                    <p key={i} style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--color-amber-600)", fontWeight: 500 }}>
                       ⚠ {w}
                     </p>
                   ))}
@@ -282,9 +286,9 @@ export function Step2Pricing({
       {/* AI Draft panel — generic mode only */}
       {serviceType === "generic" && aiDraftMode !== "applied" && aiDraftMode !== "review" && (
         <div style={{
-          background: "var(--bg-subtle)",
+          background: "var(--color-slate-100)",
           border: "1px solid var(--border)",
-          borderRadius: "var(--radius)",
+          borderRadius: "var(--radius-md)",
           padding: "var(--space-4)",
           marginBottom: "var(--space-4)",
         }}>
@@ -339,9 +343,9 @@ export function Step2Pricing({
       {/* AI confidence notes banner */}
       {aiDraftMode === "applied" && aiConfidenceNotes && !aiConfidenceDismissed && (
         <div style={{
-          background: "var(--bg-subtle)",
+          background: "var(--color-slate-100)",
           border: "1px solid var(--border)",
-          borderRadius: "var(--radius)",
+          borderRadius: "var(--radius-md)",
           padding: "var(--space-3) var(--space-4)",
           marginBottom: "var(--space-4)",
           display: "flex",
@@ -389,8 +393,8 @@ export function Step2Pricing({
                             justifyContent: "space-between",
                             alignItems: "center",
                             padding: "var(--space-1) var(--space-2)",
-                            background: "var(--bg-subtle)",
-                            borderRadius: "var(--radius)",
+                            background: "var(--color-slate-100)",
+                            borderRadius: "var(--radius-md)",
                             fontSize: "var(--text-sm)",
                           }}
                         >
@@ -421,7 +425,7 @@ export function Step2Pricing({
                                 background: "none",
                                 border: "none",
                                 cursor: "pointer",
-                                color: "var(--color-danger)",
+                                color: "var(--color-red-600)",
                                 fontSize: "var(--text-sm)",
                                 padding: 0,
                                 lineHeight: 1,
@@ -463,7 +467,7 @@ export function Step2Pricing({
                 style={{
                   display: "flex",
                   border: "1px solid var(--border)",
-                  borderRadius: "var(--radius)",
+                  borderRadius: "var(--radius-md)",
                   overflow: "hidden",
                 }}
               >
@@ -519,7 +523,7 @@ export function Step2Pricing({
             ) : (
               <>
                 {/* Item Suggester */}
-                <div style={{ marginBottom: "var(--space-4)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
+                <div style={{ marginBottom: "var(--space-4)", padding: "var(--space-3)", background: "var(--color-slate-100)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-1)" }}>
                     <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 600 }}>
                       Suggest from description
@@ -544,7 +548,7 @@ export function Step2Pricing({
                   />
 
                   {itemSuggestError && (
-                    <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--status-error)" }}>
+                    <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--color-red-600)" }}>
                       {itemSuggestError}
                     </p>
                   )}
@@ -554,7 +558,7 @@ export function Step2Pricing({
                       marginTop: "var(--space-2)",
                       padding: "var(--space-2) var(--space-3)",
                       background: "#fef3c7",
-                      borderRadius: "var(--radius)",
+                      borderRadius: "var(--radius-md)",
                       fontSize: "var(--text-sm)",
                       color: "#92400e",
                       fontWeight: 500,
@@ -568,7 +572,7 @@ export function Step2Pricing({
                       marginTop: "var(--space-2)",
                       padding: "var(--space-2) var(--space-3)",
                       background: "#fef3c7",
-                      borderRadius: "var(--radius)",
+                      borderRadius: "var(--radius-md)",
                       fontSize: "var(--text-sm)",
                       color: "#92400e",
                       fontWeight: 500,
@@ -603,7 +607,7 @@ export function Step2Pricing({
                               padding: "var(--space-3)",
                               background: "var(--bg-card)",
                               border: "1px solid var(--border)",
-                              borderRadius: "var(--radius)",
+                              borderRadius: "var(--radius-md)",
                             }}
                           >
                             <div style={{ flex: 1, minWidth: 0 }}>
@@ -621,7 +625,7 @@ export function Step2Pricing({
                                 {s.labor_hours_typical !== null && (
                                   <span style={{
                                     fontSize: "var(--text-xs)", padding: "1px 6px",
-                                    background: "var(--color-surface-overlay)",
+                                    background: "var(--color-slate-100)",
                                     borderRadius: "var(--radius-sm)",
                                     color: "var(--fg-muted)", border: "1px solid var(--border)",
                                   }}>
@@ -663,7 +667,7 @@ export function Step2Pricing({
                                   background: "var(--accent)",
                                   color: "#fff",
                                   border: "none",
-                                  borderRadius: "var(--radius)",
+                                  borderRadius: "var(--radius-md)",
                                   fontSize: "var(--text-sm)",
                                   fontWeight: 600,
                                   cursor: "pointer",
@@ -680,7 +684,7 @@ export function Step2Pricing({
                                   background: "none",
                                   color: "var(--fg-muted)",
                                   border: "1px solid var(--border)",
-                                  borderRadius: "var(--radius)",
+                                  borderRadius: "var(--radius-md)",
                                   fontSize: "var(--text-sm)",
                                   cursor: "pointer",
                                 }}
@@ -699,7 +703,7 @@ export function Step2Pricing({
                 {resolvedJobType && Object.keys(getMaterialsByCategory(resolvedJobType)).length > 0 && (
                   <div style={{ marginBottom: "var(--space-4)" }}>
                     <SectionHeader title={`Suggested Materials — ${resolvedJobType.replace("_", " ")}`} as="h3" />
-                    <Card padding="sm" style={{ background: "var(--bg-subtle)" }}>
+                    <Card padding="sm" style={{ background: "var(--color-slate-100)" }}>
                       {Object.entries(getMaterialsByCategory(resolvedJobType)).map(([category, materials]) => (
                         <div key={category} style={{ marginBottom: "var(--space-3)" }}>
                           <div style={{ fontSize: "var(--text-xs)", fontWeight: 500, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "var(--space-1)" }}>
@@ -721,11 +725,11 @@ export function Step2Pricing({
                                     gap: "var(--space-1)",
                                     padding: "var(--space-1) var(--space-2)",
                                     fontSize: "var(--text-sm)",
-                                    background: alreadyAdded ? "var(--color-surface-raised)" : "var(--color-surface-overlay)",
-                                    border: `1px solid ${alreadyAdded ? "var(--color-border)" : "var(--color-primary-alpha)"}`,
+                                    background: alreadyAdded ? "var(--color-slate-200)" : "var(--color-slate-100)",
+                                    border: `1px solid ${alreadyAdded ? "var(--border)" : "var(--accent)"}`,
                                     borderRadius: "var(--radius-sm)",
                                     cursor: alreadyAdded ? "default" : "pointer",
-                                    color: alreadyAdded ? "var(--fg-muted)" : "var(--fg-primary)",
+                                    color: alreadyAdded ? "var(--fg-muted)" : "var(--fg)",
                                   }}
                                 >
                                   <span>{mat.name}</span>
@@ -733,9 +737,9 @@ export function Step2Pricing({
                                     {mat.typicalQty} {mat.unit}
                                   </span>
                                   {alreadyAdded ? (
-                                    <span style={{ fontSize: "var(--text-xs)", color: "var(--color-success)" }}>✓</span>
+                                    <span style={{ fontSize: "var(--text-xs)", color: "var(--color-green-600)" }}>✓</span>
                                   ) : (
-                                    <span style={{ fontSize: "var(--text-xs)", color: "var(--color-primary)" }}>+</span>
+                                    <span style={{ fontSize: "var(--text-xs)", color: "var(--accent)" }}>+</span>
                                   )}
                                 </button>
                               );
@@ -762,8 +766,10 @@ export function Step2Pricing({
 
                 {/* Materials Generator */}
                 {showMaterialsGen ? (
-                  <div style={{ marginTop: "var(--space-3)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
+                  <div style={{ marginTop: "var(--space-3)", padding: "var(--space-3)", background: "var(--color-slate-100)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
                     <MaterialsGenerator
+                      initialScope={assessmentContext?.generatedJobDescription ?? ""}
+                      rooms={assessmentContext?.rooms ?? []}
                       onAddToEstimate={(matItems) => {
                         addBulkLineItems(
                           matItems.map((m) => ({

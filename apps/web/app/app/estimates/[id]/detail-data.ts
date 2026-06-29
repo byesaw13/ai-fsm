@@ -11,6 +11,7 @@ export interface EstimateRow {
   id: string;
   account_id: string;
   client_id: string;
+  estimate_number: string | null;
   job_id: string | null;
   property_id: string | null;
   status: EstimateStatus;

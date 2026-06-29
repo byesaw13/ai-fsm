@@ -42,6 +42,10 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
   const [selectedReceiptFile, setSelectedReceiptFile] = useState<File | null>(null);
   const receiptInputRef = useRef<HTMLInputElement>(null);
 
+  // Activity ledger: a material run's time spans from opening this form to
+  // saving the expense — logged as a completed segment on save (run mode).
+  const formOpenedAtRef = useRef<string>(new Date().toISOString());
+
   async function handleScanReceipt(file: File) {
     setSelectedReceiptFile(file);
     setScanning(true);
@@ -128,6 +132,27 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
       }
 
       if (isMaterialRun) {
+        // Hard trigger: log the run as a completed time segment (form open → now).
+        if (expenseId) {
+          const startedAt = formOpenedAtRef.current;
+          const endedAt = new Date().toISOString();
+          if (new Date(endedAt) > new Date(startedAt)) {
+            await fetch("/api/v1/activities/log", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                activity_type: "material_run",
+                started_at: startedAt,
+                ended_at: endedAt,
+                entity_type: "expense",
+                entity_id: expenseId,
+                source: "auto_material_run",
+                note: vendorName.trim() || null,
+              }),
+            }).catch(() => null);
+          }
+        }
+
         const openRes = await fetch("/api/v1/sessions/open");
         const openJson = (await openRes.json().catch(() => ({ data: null }))) as OpenSessionResponse;
         if (openRes.ok && openJson.data?.id) {

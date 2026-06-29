@@ -2,6 +2,16 @@
 
 This repository uses AI-assisted development, but product direction is defined only by the canonical documentation set.
 
+## Documentation Hierarchy
+
+Use documentation in this order:
+
+1. Code and database migrations are the implemented truth.
+2. `docs/canonical/` is the authoritative product, domain, and architecture truth.
+3. `docs/contracts/` and `docs/working/` contain supporting implementation notes.
+4. `ai/` is only a compact AI-agent quick-reference layer.
+5. `docs/archive/` and `docs/generated/` are historical/evidence only, not active instruction sources.
+
 ## Read This First
 
 Product direction:
@@ -11,8 +21,12 @@ Product direction:
 - `docs/canonical/WORKFLOW.md`
 - `docs/canonical/ARCHITECTURE.md`
 - `docs/canonical/ROADMAP.md`
+- `docs/canonical/PRODUCTION_INTELLIGENCE.md`
+- `docs/canonical/OPERATIONS.md`
 
 Archived, generated, and working documents may provide evidence, implementation notes, or historical context. They do not override canonical docs.
+
+Active implementation backlog: docs/backlog/README.md
 
 ## Prime Directive
 
@@ -27,6 +41,7 @@ Complete requested tasks end-to-end while preserving reliability, traceability, 
 5. Business logic changes must include tests or an explicit documented test gap.
 6. Production runs on garonhome.local using `infra/compose.garonhome.yml`.
 7. Do not use archived or generated planning documents as product instructions.
+8. Do not start new work unless it maps to an existing `docs/backlog/` task, or a new task is added to `docs/backlog/` first.
 
 ## Decision Policy
 

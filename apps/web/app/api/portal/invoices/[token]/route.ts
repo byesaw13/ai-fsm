@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { queryOne, query, getPool } from "@/lib/db";
-import { getStripe } from "@/lib/stripe";
+import { loadSquareSettings, createSquarePaymentLink } from "@/lib/integrations/square";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
 interface InvoiceRow extends Record<string, unknown> {
   id: string;
+  account_id: string;
+  client_id: string;
+  job_id: string | null;
+  created_by: string;
   status: string;
   invoice_number: string;
   subtotal_cents: number;
@@ -18,7 +22,7 @@ interface InvoiceRow extends Record<string, unknown> {
   due_date: string | null;
   sent_at: string | null;
   paid_at: string | null;
-  stripe_payment_intent_id: string | null;
+  square_payment_link_url: string | null;
   client_name: string;
   property_address: string | null;
   property_city: string | null;
@@ -47,7 +51,7 @@ export async function GET(
     `SELECT
        i.id, i.status, i.invoice_number, i.subtotal_cents, i.tax_cents,
        i.total_cents, i.paid_cents, i.deposit_cents, i.notes, i.due_date,
-       i.sent_at, i.paid_at, i.stripe_payment_intent_id,
+       i.sent_at, i.paid_at, i.square_payment_link_url,
        c.name AS client_name,
        p.address AS property_address, p.city AS property_city,
        p.state AS property_state, p.zip AS property_zip,
@@ -75,10 +79,10 @@ export async function GET(
   return NextResponse.json({ invoice, lineItems });
 }
 
-const payBody = z.object({
-  amount_cents: z.number().int().positive(),
-});
-
+// POST — return a Square-hosted checkout link for the outstanding balance so the
+// client can pay by card. Reuses an existing link if one is already on the
+// invoice; otherwise creates one and records a PENDING payment. The Square
+// webhook marks the invoice paid when the customer completes checkout.
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
@@ -86,10 +90,10 @@ export async function POST(
   const { token } = await params;
 
   const invoice = await queryOne<InvoiceRow>(
-    `SELECT i.id, i.status, i.total_cents, i.paid_cents, i.stripe_payment_intent_id,
-            a.name AS account_name
+    `SELECT i.id, i.account_id, i.status, i.invoice_number, i.total_cents,
+            i.paid_cents, i.job_id, i.client_id, i.created_by,
+            i.square_payment_link_url
      FROM invoices i
-     JOIN accounts a ON a.id = i.account_id
      WHERE i.share_token = $1`,
     [token]
   );
@@ -99,44 +103,71 @@ export async function POST(
     return NextResponse.json({ error: "Invoice is not payable" }, { status: 422 });
   }
 
-  const body = await request.json().catch(() => null);
-  const parsed = payBody.safeParse(body);
-  if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 422 });
-
   const balance = invoice.total_cents - invoice.paid_cents;
-  if (parsed.data.amount_cents > balance) {
-    return NextResponse.json({ error: "Amount exceeds balance due" }, { status: 422 });
+  if (balance <= 0) {
+    return NextResponse.json({ error: "Nothing left to pay" }, { status: 422 });
   }
 
-  const stripe = getStripe();
-
-  // Reuse existing PaymentIntent if not yet succeeded
-  if (invoice.stripe_payment_intent_id) {
-    const existing = await stripe.paymentIntents.retrieve(invoice.stripe_payment_intent_id);
-    if (existing.status !== "succeeded" && existing.status !== "canceled") {
-      const updated = await stripe.paymentIntents.update(invoice.stripe_payment_intent_id, {
-        amount: parsed.data.amount_cents,
-      });
-      return NextResponse.json({ clientSecret: updated.client_secret });
-    }
+  // Reuse an existing link (owner may have already created one).
+  if (invoice.square_payment_link_url) {
+    return NextResponse.json({ url: invoice.square_payment_link_url });
   }
-
-  const pi = await stripe.paymentIntents.create({
-    amount: parsed.data.amount_cents,
-    currency: "usd",
-    metadata: {
-      invoice_id: invoice.id,
-      invoice_share_token: token,
-    },
-    description: `Payment for Invoice — ${invoice.account_name}`,
-    automatic_payment_methods: { enabled: true },
-  });
 
   const pool = getPool();
-  await pool.query(
-    `UPDATE invoices SET stripe_payment_intent_id = $1 WHERE id = $2`,
-    [pi.id, invoice.id]
-  );
+  const client = await pool.connect();
+  try {
+    const settings = await loadSquareSettings(client, invoice.account_id as string);
+    if (
+      !settings ||
+      !settings.enabled ||
+      !settings.secrets.accessToken ||
+      !settings.config.locationId
+    ) {
+      return NextResponse.json(
+        { error: "Online payment is not available for this invoice." },
+        { status: 422 }
+      );
+    }
 
-  return NextResponse.json({ clientSecret: pi.client_secret });
+    const link = await createSquarePaymentLink(settings, {
+      name: `${invoice.invoice_number} — Balance`,
+      amountCents: balance,
+      idempotencyKey: `portal:${invoice.id}:${balance}`,
+    });
+
+    await client.query("BEGIN");
+    await client.query(
+      `UPDATE invoices
+       SET square_order_id = $2, square_checkout_id = $3, square_payment_link_url = $4
+       WHERE id = $1`,
+      [invoice.id, link.orderId, link.paymentLinkId, link.url]
+    );
+    await client.query(
+      `INSERT INTO payments
+         (account_id, invoice_id, job_id, customer_id, amount_cents, method,
+          payment_type, status, external_provider, external_checkout_url, created_by)
+       VALUES ($1, $2, $3, $4, $5, 'square', 'progress', 'pending', 'square', $6, $7)`,
+      [
+        invoice.account_id,
+        invoice.id,
+        invoice.job_id,
+        invoice.client_id,
+        balance,
+        link.url,
+        invoice.created_by,
+      ]
+    );
+    await client.query("COMMIT");
+
+    return NextResponse.json({ url: link.url });
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    logger.error("Portal Square link creation failed", err);
+    return NextResponse.json(
+      { error: "Could not start payment. Please try again." },
+      { status: 500 }
+    );
+  } finally {
+    client.release();
+  }
 }

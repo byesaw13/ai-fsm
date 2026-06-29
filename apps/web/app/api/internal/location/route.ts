@@ -1,0 +1,412 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { randomUUID } from "crypto";
+import { getPool, queryOne } from "@/lib/db";
+import { logger } from "@/lib/logger";
+import { DETECTED_ACTIVITIES, LOCATION_EVENT_KINDS, classifyDrive, haversineMeters, pathDistanceMeters, rankVisitCandidates, VISIT_CONFIDENCE_FLOOR } from "@ai-fsm/domain";
+import type { PoolClient } from "pg";
+import { reduceLocationEvent, type OpenSegment } from "@/lib/location/segments";
+
+export const dynamic = "force-dynamic";
+
+// TASK-024: ingest endpoint for location transitions from the Home Assistant
+// Companion app (bridged via n8n/MQTT). Authenticated by a dedicated internal
+// key — the PWA itself cannot produce background location, so this is the feed.
+const LOCATION_KEY = process.env.LOCATION_INTERNAL_KEY;
+
+const bodySchema = z.object({
+  kind: z.enum(LOCATION_EVENT_KINDS),
+  occurred_at: z.string().datetime().optional(),
+  zone: z.string().max(120).nullish(),
+  latitude: z.number().min(-90).max(90).nullish(),
+  longitude: z.number().min(-180).max(180).nullish(),
+  geocoded_address: z.string().max(500).nullish(),
+  detected_activity: z.enum(DETECTED_ACTIVITIES).nullish(),
+  external_id: z.string().max(255).optional(),
+  // TASK-025: car-stereo BT id (MAC) on vehicle_connect → resolves the vehicle.
+  vehicle_bluetooth: z.string().max(120).nullish(),
+});
+
+// ── owner account discovery (cached; single-owner model, mirrors SMS ingest) ──
+let _accountId: string | null = null;
+async function getOwnerAccountId(): Promise<string> {
+  if (_accountId) return _accountId;
+  const row = await queryOne<{ account_id: string }>(
+    `SELECT a.id AS account_id
+     FROM accounts a JOIN users u ON u.account_id = a.id
+     WHERE u.role = 'owner' ORDER BY u.created_at LIMIT 1`,
+  );
+  if (!row) throw new Error("No owner account found in database");
+  _accountId = row.account_id;
+  return _accountId;
+}
+
+type SegmentRow = {
+  id: string;
+  kind: "stop" | "drive";
+  started_at: string;
+  ended_at: string | null;
+  zone: string | null;
+  place_label: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  suggested_activity_type: string | null;
+  status: string;
+  vehicle_id: string | null;
+};
+
+// POST /api/internal/location — record one HA location event, update segments.
+export async function POST(req: NextRequest) {
+  const traceId = randomUUID();
+
+  if (!LOCATION_KEY || req.headers.get("x-api-key") !== LOCATION_KEY) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+  const parsed = bodySchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+      { status: 422 },
+    );
+  }
+  const data = parsed.data;
+  const occurredAt = data.occurred_at ?? new Date().toISOString();
+
+  let accountId: string;
+  try {
+    accountId = await getOwnerAccountId();
+  } catch (err) {
+    logger.error("location ingest: owner context failed", err as Error, { traceId });
+    return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
+  }
+
+  // Privacy gating (TASK-046): only capture when tracking is enabled, not
+  // paused, and an active Start-Day workday session exists for the event's date.
+  // Otherwise drop the event entirely — nothing is stored off-workday.
+  const gate = await queryOne<{ enabled: boolean; paused: boolean; active_session: boolean }>(
+    `SELECT a.location_tracking_enabled AS enabled,
+            (a.location_paused_until IS NOT NULL AND a.location_paused_until > now()) AS paused,
+            EXISTS (
+              SELECT 1 FROM vehicle_sessions vs
+              WHERE vs.account_id = a.id
+                AND vs.session_date = ($2::timestamptz)::date
+                AND vs.ended_at IS NULL
+            ) AS active_session
+     FROM accounts a WHERE a.id = $1`,
+    [accountId, occurredAt],
+  );
+  const ignored = !gate?.enabled ? "tracking_disabled"
+    : gate.paused ? "paused"
+    : !gate.active_session ? "no_active_workday"
+    : null;
+  if (ignored) {
+    logger.info("location event dropped by privacy gate", { traceId, reason: ignored });
+    return NextResponse.json({ ok: true, ignored });
+  }
+
+  // Idempotency: HA may retry the same event.
+  if (data.external_id) {
+    const seen = await queryOne<{ id: string }>(
+      `SELECT id FROM location_events WHERE account_id = $1 AND external_id = $2 LIMIT 1`,
+      [accountId, data.external_id],
+    );
+    if (seen) {
+      logger.info("location event duplicate ignored", { traceId, external_id: data.external_id });
+      return NextResponse.json({ duplicate: true });
+    }
+  }
+
+  // Persist the event and apply segment mutations atomically. A single
+  // transaction keeps the raw event and its derived segment changes consistent
+  // (the bot's P2), and `FOR UPDATE` on the open segment serializes concurrent
+  // transitions against the one-open invariant. We also set the RLS session
+  // context for the resolved owner so the writes are correct whether or not the
+  // app DB role bypasses RLS (the bot's P1).
+  const client = await getPool().connect();
+  let mutOpenKind: string | null = null;
+  let mutClosed = false;
+  let segmentId: string | null = null;
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `SELECT set_config('app.current_account_id', $1, true),
+              set_config('app.current_role', 'owner', true)`,
+      [accountId],
+    );
+
+    // 1. Raw event (append-only feed).
+    await client.query(
+      `INSERT INTO location_events
+         (account_id, occurred_at, kind, zone, latitude, longitude,
+          geocoded_address, detected_activity, external_id, raw)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        accountId,
+        occurredAt,
+        data.kind,
+        data.zone ?? null,
+        data.latitude ?? null,
+        data.longitude ?? null,
+        data.geocoded_address ?? null,
+        data.detected_activity ?? null,
+        data.external_id ?? null,
+        JSON.stringify(body),
+      ],
+    );
+
+    // Resolve which vehicle a vehicle_connect refers to (match the BT id/MAC
+    // against vehicles.bluetooth_id; tolerant of a stored "MAC (Name)" string).
+    let resolvedVehicleId: string | null = null;
+    if (data.kind === "vehicle_connect" && data.vehicle_bluetooth) {
+      const { rows: veh } = await client.query<{ id: string }>(
+        `SELECT id FROM vehicles
+         WHERE account_id = $1 AND bluetooth_id IS NOT NULL
+           AND (bluetooth_id = $2 OR bluetooth_id ILIKE '%' || $2 || '%')
+         LIMIT 1`,
+        [accountId, data.vehicle_bluetooth],
+      );
+      resolvedVehicleId = veh[0]?.id ?? null;
+    }
+
+    // 2. Currently-open segment (locked) → reducer.
+    const { rows: openRows } = await client.query<SegmentRow>(
+      `SELECT id, kind, started_at::text, ended_at::text, zone, place_label,
+              latitude, longitude, suggested_activity_type, status, vehicle_id
+       FROM location_segments
+       WHERE account_id = $1 AND ended_at IS NULL
+       ORDER BY started_at DESC LIMIT 1
+       FOR UPDATE`,
+      [accountId],
+    );
+    const openRow = openRows[0] ?? null;
+    const open: OpenSegment | null = openRow
+      ? {
+          id: openRow.id,
+          kind: openRow.kind,
+          startedAt: openRow.started_at,
+          zone: openRow.zone,
+          placeLabel: openRow.place_label,
+          latitude: openRow.latitude,
+          longitude: openRow.longitude,
+          vehicleId: openRow.vehicle_id,
+        }
+      : null;
+    segmentId = open?.id ?? null;
+
+    const mut = reduceLocationEvent(open, {
+      kind: data.kind,
+      occurredAt,
+      zone: data.zone ?? null,
+      latitude: data.latitude ?? null,
+      longitude: data.longitude ?? null,
+      geocodedAddress: data.geocoded_address ?? null,
+      detectedActivity: data.detected_activity ?? null,
+      vehicleId: resolvedVehicleId,
+    });
+    mutOpenKind = mut.open?.kind ?? null;
+    mutClosed = Boolean(mut.closeOpen);
+
+    // 3. Apply. Close BEFORE open so the one-open invariant always holds.
+    if (mut.closeOpen && open) {
+      // For a closing drive, estimate distance by accumulating great-circle
+      // legs over the GPS points captured during the drive (periodic location
+      // updates make this realistic; with only endpoints it's a straight line).
+      // An estimate the owner confirms/edits before it becomes mileage.
+      let distanceMeters: number | null = null;
+      if (open.kind === "drive") {
+        const { rows: pts } = await client.query<{ latitude: number; longitude: number }>(
+          `SELECT latitude, longitude FROM location_events
+           WHERE account_id = $1 AND latitude IS NOT NULL AND longitude IS NOT NULL
+             AND occurred_at >= $2::timestamptz AND occurred_at <= $3::timestamptz
+           ORDER BY occurred_at ASC`,
+          [accountId, open.startedAt, mut.closeOpen.endedAt],
+        );
+        if (pts.length >= 2) {
+          distanceMeters = pathDistanceMeters(pts.map((p) => ({ latitude: p.latitude, longitude: p.longitude })));
+        } else if (open.latitude != null && open.longitude != null && data.latitude != null && data.longitude != null) {
+          distanceMeters = haversineMeters(
+            { latitude: open.latitude, longitude: open.longitude },
+            { latitude: data.latitude, longitude: data.longitude },
+          );
+        }
+      }
+      // Classify a closing drive by average speed: auto-dismiss the obvious
+      // noise (parked Bluetooth cycle, GPS drift, sub-minute blip) and flag the
+      // borderline so the owner can clear it in one tap. Shared rule:
+      // classifyDrive (packages/domain). Stops are never classified.
+      let isLikelyNoise = false;
+      let dismissAsNoise = false;
+      if (open.kind === "drive") {
+        const durationSeconds =
+          (new Date(mut.closeOpen.endedAt).getTime() - new Date(open.startedAt).getTime()) / 1000;
+        const cls = classifyDrive({ distanceMeters, durationSeconds });
+        isLikelyNoise = cls !== "ok";
+        dismissAsNoise = cls === "noise";
+      }
+      await client.query(
+        `UPDATE location_segments
+         SET ended_at = $1,
+             distance_meters = COALESCE($4, distance_meters),
+             is_likely_noise = $5,
+             status = CASE WHEN $6 THEN 'dismissed' ELSE status END,
+             updated_at = now()
+         WHERE id = $2 AND account_id = $3 AND ended_at IS NULL`,
+        [mut.closeOpen.endedAt, open.id, accountId, distanceMeters, isLikelyNoise, dismissAsNoise],
+      );
+
+      // EPIC-007 slice 1: a closed stop may be a customer visit. Score it against
+      // the account's properties (schedule + open-job signals now, distance once
+      // coords are learned) and persist the top match as a pending candidate.
+      if (open.kind === "stop") {
+        await detectVisitCandidate(client, accountId, open, mut.closeOpen.endedAt);
+      }
+    }
+    if (mut.updateOpen && open) {
+      const u = mut.updateOpen;
+      await client.query(
+        `UPDATE location_segments SET
+           place_label = COALESCE($1, place_label),
+           zone        = COALESCE($2, zone),
+           latitude    = COALESCE($3, latitude),
+           longitude   = COALESCE($4, longitude),
+           vehicle_id  = COALESCE($5, vehicle_id),
+           updated_at  = now()
+         WHERE id = $6 AND account_id = $7 AND ended_at IS NULL`,
+        [u.placeLabel ?? null, u.zone ?? null, u.latitude ?? null, u.longitude ?? null, u.vehicleId ?? null, open.id, accountId],
+      );
+    }
+    if (mut.open) {
+      const o = mut.open;
+      // segment_date derives from the event's own timestamp, not the server's
+      // current date, so backfilled/retried events land on the right day (P2).
+      const { rows: ins } = await client.query<{ id: string }>(
+        `INSERT INTO location_segments
+           (account_id, segment_date, kind, started_at, zone, place_label,
+            latitude, longitude, suggested_activity_type, vehicle_id)
+         VALUES ($1, ($2::timestamptz)::date, $3, $2, $4, $5, $6, $7, $8, $9)
+         RETURNING id`,
+        [accountId, o.startedAt, o.kind, o.zone, o.placeLabel, o.latitude, o.longitude, o.suggestedActivityType, o.vehicleId],
+      );
+      segmentId = ins[0]?.id ?? segmentId;
+    }
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    logger.error("location ingest: transaction failed", err as Error, { traceId });
+    return NextResponse.json({ error: "Failed to record location event" }, { status: 500 });
+  } finally {
+    client.release();
+  }
+
+  logger.info("location event ingested", {
+    traceId,
+    kind: data.kind,
+    transition: mutOpenKind ? `open_${mutOpenKind}` : "none",
+  });
+
+  return NextResponse.json({
+    ok: true,
+    current_segment_id: segmentId,
+    opened: mutOpenKind,
+    closed: mutClosed,
+  });
+}
+
+interface ClosedStop {
+  id: string;
+  startedAt: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+interface CandidateRow {
+  property_id: string;
+  client_id: string;
+  latitude: number | null;
+  longitude: number | null;
+  today_visit_id: string | null;
+  today_job_id: string | null;
+  open_job_id: string | null;
+  recent_client: boolean;
+  job_count: string;
+}
+
+/**
+ * Score a closed stop against the account's properties and persist the top
+ * match (>= confidence floor) as a pending visit_candidate. Runs in the same
+ * transaction as the segment close. Schedule/open-job signals work without
+ * coordinates; distance is added once a property has learned coords.
+ */
+async function detectVisitCandidate(
+  client: PoolClient,
+  accountId: string,
+  stop: ClosedStop,
+  endedAt: string,
+): Promise<void> {
+  const durationMinutes = (new Date(endedAt).getTime() - new Date(stop.startedAt).getTime()) / 60000;
+
+  const { rows } = await client.query<CandidateRow>(
+    `SELECT p.id AS property_id, p.client_id, p.latitude, p.longitude,
+            tv.visit_id AS today_visit_id, tv.job_id AS today_job_id,
+            oj.id AS open_job_id,
+            EXISTS (SELECT 1 FROM jobs j WHERE j.client_id = p.client_id
+                      AND j.created_at >= now() - interval '30 days') AS recent_client,
+            (SELECT count(*) FROM jobs j WHERE j.client_id = p.client_id) AS job_count
+     FROM properties p
+     LEFT JOIN LATERAL (
+       SELECT v.id AS visit_id, v.job_id
+       FROM visits v JOIN jobs j ON j.id = v.job_id
+       WHERE j.property_id = p.id AND v.status IN ('scheduled','arrived')
+         AND v.scheduled_start::date = ($2::timestamptz)::date
+       ORDER BY v.scheduled_start ASC LIMIT 1
+     ) tv ON true
+     LEFT JOIN LATERAL (
+       SELECT j.id FROM jobs j
+       WHERE j.property_id = p.id AND j.status IN ('scheduled','in_progress')
+       ORDER BY j.scheduled_start ASC NULLS LAST LIMIT 1
+     ) oj ON true
+     WHERE p.account_id = $1
+       AND (p.latitude IS NOT NULL OR tv.visit_id IS NOT NULL OR oj.id IS NOT NULL)`,
+    [accountId, stop.startedAt],
+  );
+  if (rows.length === 0) return;
+
+  const ranked = rankVisitCandidates({
+    stop: { latitude: stop.latitude, longitude: stop.longitude, durationMinutes },
+    candidates: rows.map((r) => ({
+      propertyId: r.property_id,
+      clientId: r.client_id,
+      latitude: r.latitude,
+      longitude: r.longitude,
+      scheduledToday: r.today_visit_id != null,
+      openJob: r.open_job_id != null,
+      jobId: r.today_job_id ?? r.open_job_id ?? null,
+      visitId: r.today_visit_id ?? null,
+      recentClient: r.recent_client,
+      repeatClient: Number(r.job_count) > 1,
+    })),
+  });
+
+  const top = ranked[0];
+  if (!top || top.score < VISIT_CONFIDENCE_FLOOR) return;
+
+  await client.query(
+    `INSERT INTO visit_candidates
+       (account_id, location_segment_id, property_id, matched_client_id, job_id, visit_id,
+        distance_meters, confidence_score, arrival_time, departure_time, duration_minutes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     ON CONFLICT (location_segment_id) DO NOTHING`,
+    [
+      accountId, stop.id, top.propertyId, top.clientId, top.jobId, top.visitId,
+      top.distanceMeters, top.score, stop.startedAt, endedAt, Math.round(durationMinutes),
+    ],
+  );
+}

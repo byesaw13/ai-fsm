@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
 import { QuickBookModal } from "./QuickBookModal";
+import { ScheduleViewToggle } from "./ScheduleViewToggle";
 
 export interface VisitRow {
   id: string;
@@ -19,7 +20,7 @@ export interface VisitRow {
   [key: string]: unknown;
 }
 
-export type ViewMode = "week" | "month" | "year";
+export type ViewMode = "week" | "month" | "year" | "list";
 
 interface Props {
   visits: VisitRow[];
@@ -127,11 +128,8 @@ function VisitCard({ visit, isAdmin, isDragging, compact = false, onDragStart, o
       style={{
         textDecoration: "none",
         display: "block",
-        borderLeft: `3px solid ${color}`,
         background: "#fff",
-        border: `1px solid var(--border)`,
-        borderLeftColor: color,
-        borderLeftWidth: 3,
+        border: `1px solid ${color}`,
         borderRadius: 6,
         padding: compact ? "2px 6px" : "var(--space-2)",
         cursor: isAdmin ? "grab" : "pointer",
@@ -442,13 +440,13 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
     <div>
       {/* View toggle + navigation */}
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-4)", flexWrap: "wrap" }}>
-        <div style={{ display: "flex", gap: 2, background: "var(--bg-muted, #f4f4f5)", padding: 2, borderRadius: 8 }}>
-          {(["week", "month", "year"] as ViewMode[]).map(v => (
-            <button key={v} type="button" onClick={() => router.push((v === "week" ? toWeekUrl : v === "month" ? toMonthUrl : toYearUrl) as Route)} style={{ padding: "4px 12px", borderRadius: 6, border: "none", fontSize: "var(--text-sm)", fontWeight: 500, cursor: "pointer", background: view === v ? "#fff" : "transparent", color: view === v ? "var(--fg)" : "var(--fg-muted)", boxShadow: view === v ? "0 1px 3px rgba(0,0,0,0.1)" : "none", transition: "all 0.1s" }}>
-              {v.charAt(0).toUpperCase() + v.slice(1)}
-            </button>
-          ))}
-        </div>
+        <ScheduleViewToggle
+          current={view}
+          isAdmin={isAdmin}
+          weekUrl={toWeekUrl}
+          monthUrl={toMonthUrl}
+          yearUrl={toYearUrl}
+        />
 
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontSize: "var(--text-sm)" }}>
           <button type="button" onClick={() => router.push(prevUrl as Route)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 10px", cursor: "pointer", color: "var(--fg)", fontSize: "var(--text-sm)" }}>←</button>
@@ -474,7 +472,7 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
       {localVisits.length === 0 && view !== "year" && (
         <div style={{ marginTop: "var(--space-8)", textAlign: "center", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
           No visits scheduled for this {view}.{" "}
-          <Link href="/app/visits" style={{ color: "var(--accent)" }}>View all visits →</Link>
+          <Link href={(isAdmin ? "/app/schedule?view=list" : "/app/visits") as Route} style={{ color: "var(--accent)" }}>View all visits →</Link>
         </div>
       )}
 

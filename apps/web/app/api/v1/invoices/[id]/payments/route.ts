@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withAuth, withRole } from "@/lib/auth/middleware";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import { appendAuditLog } from "@/lib/db/audit";
-import { paymentMethodSchema } from "@ai-fsm/domain";
+import { paymentMethodSchema, paymentTypeSchema } from "@ai-fsm/domain";
 import { validatePaymentAmount } from "@/lib/invoices/payments";
 import { logger } from "@/lib/logger";
 import { z } from "zod";
@@ -13,6 +13,7 @@ export const dynamic = "force-dynamic";
 const recordPaymentSchema = z.object({
   amount_cents: z.number().int().positive(),
   method: paymentMethodSchema,
+  payment_type: paymentTypeSchema.default("progress"),
   received_at: z.string().datetime().optional(),
   notes: z.string().nullable().optional(),
   idempotency_key: z.string().min(1).max(128).optional(),
@@ -34,6 +35,7 @@ export const GET = withAuth(async (request, session) => {
 
       const result = await client.query(
         `SELECT p.id, p.invoice_id, p.amount_cents, p.method,
+                p.payment_type, p.status, p.external_provider, p.paid_at,
                 p.received_at, p.notes, p.created_by, p.created_at,
                 u.full_name AS created_by_name
          FROM payments p
@@ -113,7 +115,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     );
   }
 
-  const { amount_cents, method, received_at, notes, idempotency_key } =
+  const { amount_cents, method, payment_type, received_at, notes, idempotency_key } =
     parsed.data;
 
   try {
@@ -124,8 +126,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         status: string;
         total_cents: number;
         paid_cents: number;
+        client_id: string;
+        job_id: string | null;
       }>(
-        `SELECT id, status, total_cents, paid_cents
+        `SELECT id, status, total_cents, paid_cents, client_id, job_id
          FROM invoices
          WHERE id = $1 AND account_id = $2
          FOR UPDATE`,
@@ -141,26 +145,33 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       const invoice = invoiceResult.rows[0];
 
       // Only allow payments on payable invoices
-      const payableStatuses = ["sent", "partial", "overdue"];
-      if (!payableStatuses.includes(invoice.status)) {
-        throw Object.assign(
-          new Error(
-            `Cannot record payment on invoice with status "${invoice.status}"`
-          ),
-          { code: "INVALID_TRANSITION" }
-        );
-      }
+      // Refunds are ledger-only records: they may apply to a fully-paid
+      // invoice and are not bounded by the remaining balance. Crediting
+      // payments (deposit/progress/final/adjustment) keep the original guards.
+      const isRefund = payment_type === "refund";
 
-      // Validate amount
-      const amountError = validatePaymentAmount(
-        amount_cents,
-        invoice.total_cents,
-        invoice.paid_cents
-      );
-      if (amountError) {
-        throw Object.assign(new Error(amountError), {
-          code: "VALIDATION_ERROR",
-        });
+      if (!isRefund) {
+        const payableStatuses = ["sent", "partial", "overdue"];
+        if (!payableStatuses.includes(invoice.status)) {
+          throw Object.assign(
+            new Error(
+              `Cannot record payment on invoice with status "${invoice.status}"`
+            ),
+            { code: "INVALID_TRANSITION" }
+          );
+        }
+
+        // Validate amount
+        const amountError = validatePaymentAmount(
+          amount_cents,
+          invoice.total_cents,
+          invoice.paid_cents
+        );
+        if (amountError) {
+          throw Object.assign(new Error(amountError), {
+            code: "VALIDATION_ERROR",
+          });
+        }
       }
 
       // Idempotency check: if idempotency_key is provided, check for duplicate
@@ -203,16 +214,31 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         ? `[idem:${idempotency_key}]${notes ?? ""}`
         : notes ?? null;
 
+      // Manual entries record a completed payment; refunds are tracked as
+      // their own rows with status 'refunded' (they do not credit the invoice).
+      const paymentStatus = payment_type === "refund" ? "refunded" : "paid";
+      const paidAt =
+        paymentStatus === "paid"
+          ? received_at ?? new Date().toISOString()
+          : null;
+
       const insertResult = await client.query<{ id: string }>(
-        `INSERT INTO payments (account_id, invoice_id, amount_cents, method, received_at, notes, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO payments
+           (account_id, invoice_id, job_id, customer_id, amount_cents, method,
+            payment_type, status, received_at, paid_at, notes, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          RETURNING id`,
         [
           session.accountId,
           invoiceId,
+          invoice.job_id,
+          invoice.client_id,
           amount_cents,
           method,
+          payment_type,
+          paymentStatus,
           received_at ?? new Date().toISOString(),
+          paidAt,
           notesValue,
           session.userId,
         ]
@@ -242,7 +268,24 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           invoice_id: invoiceId,
           amount_cents,
           method,
+          payment_type,
           received_at: received_at ?? "now",
+        },
+      });
+
+      // Daily Operations Log / timeline: every payment is an event.
+      await writeWorkflowEvent(client, {
+        accountId: session.accountId,
+        eventType: "payment.recorded",
+        entityType: "payment",
+        entityId: paymentId,
+        payload: {
+          invoiceId,
+          jobId: invoice.job_id,
+          clientId: invoice.client_id,
+          amountCents: amount_cents,
+          method,
+          paymentType: payment_type,
         },
       });
 

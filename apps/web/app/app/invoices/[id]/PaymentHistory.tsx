@@ -3,12 +3,22 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog } from "@/components/ui";
+import {
+  paymentMethodLabels,
+  paymentTypeLabels,
+  paymentStatusLabels,
+  type PaymentMethod,
+  type PaymentType,
+  type PaymentStatus,
+} from "@ai-fsm/domain";
 
 interface PaymentRow {
   id: string;
   invoice_id: string;
   amount_cents: number;
   method: string;
+  payment_type: string | null;
+  status: string | null;
   received_at: string;
   notes: string | null;
   created_by: string;
@@ -26,13 +36,19 @@ function formatDollars(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-const METHOD_LABELS: Record<string, string> = {
-  cash: "Cash",
-  check: "Check",
-  card: "Card",
-  transfer: "Transfer",
-  other: "Other",
-};
+function methodLabel(method: string): string {
+  return paymentMethodLabels[method as PaymentMethod] ?? method;
+}
+
+function typeLabel(type: string | null): string {
+  if (!type) return "—";
+  return paymentTypeLabels[type as PaymentType] ?? type;
+}
+
+function statusLabel(status: string | null): string {
+  if (!status) return "—";
+  return paymentStatusLabels[status as PaymentStatus] ?? status;
+}
 
 // Payments can be deleted by owner when invoice is not in a terminal state
 const TERMINAL_STATUSES = new Set(["paid", "void"]);
@@ -115,6 +131,8 @@ export function PaymentHistory({ invoiceId, invoiceStatus, role }: Props) {
           <tr>
             <th>Date</th>
             <th>Method</th>
+            <th>Type</th>
+            <th>Status</th>
             <th>Amount</th>
             <th>Notes</th>
             <th>Recorded By</th>
@@ -127,7 +145,9 @@ export function PaymentHistory({ invoiceId, invoiceStatus, role }: Props) {
             return (
               <tr key={payment.id} data-testid="payment-history-row">
                 <td>{new Date(payment.received_at).toLocaleDateString()}</td>
-                <td>{METHOD_LABELS[payment.method] ?? payment.method}</td>
+                <td>{methodLabel(payment.method)}</td>
+                <td>{typeLabel(payment.payment_type)}</td>
+                <td>{statusLabel(payment.status)}</td>
                 <td>{formatDollars(payment.amount_cents)}</td>
                 <td>{displayNotes}</td>
                 <td>{payment.created_by_name ?? "—"}</td>
@@ -135,7 +155,7 @@ export function PaymentHistory({ invoiceId, invoiceStatus, role }: Props) {
                   <td>
                     <button
                       type="button"
-                      className="btn btn-danger btn-sm"
+                      className="p7-btn p7-btn-danger p7-btn-sm"
                       onClick={() => setConfirmPaymentId(payment.id)}
                       data-testid={`delete-payment-${payment.id}`}
                       aria-label="Delete payment"

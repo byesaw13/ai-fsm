@@ -6,7 +6,7 @@ import { query } from "@/lib/db";
 import { canTransitionJob, canViewAllJobs } from "@/lib/auth/permissions";
 import type { Job, JobStatus } from "@ai-fsm/domain";
 import { JOB_ACCEPTANCE_CATEGORY_LABELS, JOB_INTAKE_DECISION_LABELS, deriveCustomerStage, CUSTOMER_STAGE_LABELS, CUSTOMER_STAGE_COLORS } from "@ai-fsm/domain";
-import { SUB_STATUS_LABELS } from "@ai-fsm/domain";
+import { SUB_STATUS_LABELS, JOB_STATUS_LABELS } from "@ai-fsm/domain";
 import {
   PageContainer,
   PageHeader,
@@ -34,15 +34,6 @@ type JobRow = Job & {
   sub_status: string | null;
 };
 
-const JOB_STATUS_LABELS: Record<JobStatus, string> = {
-  draft: "Draft",
-  quoted: "Quoted",
-  scheduled: "Scheduled",
-  in_progress: "In Progress",
-  completed: "Completed",
-  invoiced: "Invoiced",
-  cancelled: "Cancelled",
-};
 
 type JobTier = "active" | "pending" | "done";
 
@@ -445,7 +436,7 @@ function JobItemCard({ job, showStatus = false }: { job: JobRow; showStatus?: bo
           )}
           {progressPct > 0 && progressPct < 100 && (
             <div style={{ width: 60, height: 3, background: "var(--color-border)", borderRadius: 2, overflow: "hidden" }}>
-              <div style={{ width: `${progressPct}%`, height: "100%", background: progressColor, borderRadius: 2, transition: "width 0.3s ease" }} />
+              <div style={{ width: "100%", height: "100%", transform: `scaleX(${progressPct / 100})`, transformOrigin: "left", background: progressColor, borderRadius: 2, transition: "transform 0.3s ease" }} />
             </div>
           )}
           {progressPct === 100 && (

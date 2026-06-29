@@ -51,6 +51,7 @@ export function CompletionChecklist({
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [removingPhotoId, setRemovingPhotoId] = useState<string | null>(null);
   const [draftPhotoUrl, setDraftPhotoUrl] = useState("");
   const [photoEntries, setPhotoEntries] = useState<CompletionPhotoEntry[]>(
@@ -74,8 +75,8 @@ export function CompletionChecklist({
   const missingMessage = guard.ok ? null : ERROR_LABELS[guard.error ?? ""] ?? "Completion packet is incomplete.";
   const signatureStatus = signatureWaiver ? "waived" : signatureUrl.trim() ? "captured" : "missing";
 
-  async function uploadPhoto(file: File) {
-    setUploadingPhoto(true);
+  // Returns an error message, or null on success.
+  async function uploadPhoto(file: File): Promise<string | null> {
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -87,15 +88,13 @@ export function CompletionChecklist({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(data.error?.message ?? "Photo upload failed");
-        return;
+        return data.error?.message ?? "Photo upload failed";
       }
 
       const mediaId = data.data?.id as string | undefined;
       const originalName = data.data?.original_name as string | undefined;
       if (!mediaId) {
-        toast.error("Photo upload failed");
-        return;
+        return "Photo upload failed";
       }
 
       setPhotoEntries((prev) => [
@@ -106,20 +105,44 @@ export function CompletionChecklist({
           mediaId,
         },
       ]);
-      router.refresh();
-      toast.success("Photo uploaded");
+      return null;
     } catch {
-      toast.error("Photo upload failed");
-    } finally {
-      setUploadingPhoto(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      return "Photo upload failed";
     }
   }
 
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    await uploadPhoto(file);
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) return;
+    setUploadingPhoto(true);
+    const failures: string[] = [];
+    let lastErrorMessage: string | null = null;
+    try {
+      for (let i = 0; i < files.length; i++) {
+        setUploadProgress(files.length > 1 ? `${i + 1} of ${files.length}` : null);
+        const errorMessage = await uploadPhoto(files[i]);
+        if (errorMessage) {
+          failures.push(files[i].name);
+          lastErrorMessage = errorMessage;
+        }
+      }
+      const uploaded = files.length - failures.length;
+      if (uploaded > 0) {
+        router.refresh();
+        toast.success(uploaded === 1 ? "Photo uploaded" : `${uploaded} photos uploaded`);
+      }
+      if (failures.length > 0) {
+        toast.error(
+          files.length === 1
+            ? lastErrorMessage ?? "Photo upload failed"
+            : `${failures.length} of ${files.length} photos failed to upload (${failures.join(", ")})`
+        );
+      }
+    } finally {
+      setUploadingPhoto(false);
+      setUploadProgress(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   }
 
   function addPhotoUrl() {
@@ -239,7 +262,7 @@ export function CompletionChecklist({
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            capture="environment"
+            multiple
             hidden
             onChange={handleFileChange}
             disabled={!canUpdate || saving || completing || uploadingPhoto}
@@ -250,7 +273,7 @@ export function CompletionChecklist({
             onClick={() => fileInputRef.current?.click()}
             disabled={!canUpdate || saving || completing || uploadingPhoto}
           >
-            {uploadingPhoto ? "Uploading..." : "Upload Photo"}
+            {uploadingPhoto ? `Uploading${uploadProgress ? ` ${uploadProgress}` : ""}...` : "Upload Photos"}
           </Button>
           <div style={{ flex: "1 1 260px" }}>
             <label className="p7-label" htmlFor="completion-photo-url" style={{ marginBottom: "var(--space-1)" }}>

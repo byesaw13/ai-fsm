@@ -2,6 +2,16 @@
 
 Dovetails FSM is a residential handyman and home maintenance operating system focused on preserving property history, managing client relationships, creating accurate estimates, executing work efficiently, and maintaining a permanent service record for every property.
 
+## Documentation Hierarchy
+
+Use documentation in this order:
+
+1. Code and database migrations are the implemented truth.
+2. `docs/canonical/` is the authoritative product, domain, and architecture truth.
+3. `docs/contracts/` and `docs/working/` contain supporting implementation notes.
+4. `ai/` is only a compact AI-agent quick-reference layer.
+5. `docs/archive/` and `docs/generated/` are historical/evidence only, not active instruction sources.
+
 ## Canonical Product Docs
 
 Product direction comes only from:

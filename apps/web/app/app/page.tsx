@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { queryForSession } from "@/lib/db";
 import { LinkButton, PageContainer, PageHeader } from "@/components/ui";
-import { DailyCommandCenter } from "./DailyCommandCenter";
-import type { CommandVisit, CountAction, EndWarnings, MaterialJob, OpenSession, VehicleOption } from "./DailyCommandCenter";
+import { OwnerDashboard } from "./OwnerDashboard";
+import type { CommandVisit, CountAction, MaterialJob } from "./DashboardWidgets";
 
 export const dynamic = "force-dynamic";
 
@@ -30,16 +30,16 @@ export default async function AppPage() {
   const [
     todayJobs,
     tomorrowJobs,
-    openSessionRows,
-    vehicles,
     draftInvoiceCountRows,
     scheduleApprovedCountRows,
     estimateFollowUpCountRows,
     depositCountRows,
     materialCountRows,
     materialJobs,
-    missingReceiptRows,
-    inProgressRows,
+    outstandingInvoicesCentsRows,
+    pendingDepositsCentsRows,
+    paidThisMonthCentsRows,
+    pendingSegmentRows,
   ] = await Promise.all([
     queryForSession<CommandVisit>(session,
       `SELECT DISTINCT ON (j.id)
@@ -80,34 +80,6 @@ export default async function AppPage() {
          AND v.scheduled_start::date = CURRENT_DATE + interval '1 day'
        ORDER BY j.id, v.scheduled_start ASC
        LIMIT 3`,
-      [accountId]),
-
-    queryForSession<OpenSession>(session,
-      `SELECT s.id, s.session_date::text, s.vehicle_id, v.nickname AS vehicle_nickname,
-              v.plate AS vehicle_plate, s.start_odometer
-       FROM vehicle_sessions s
-       LEFT JOIN vehicles v ON v.id = s.vehicle_id
-       WHERE s.account_id = $1
-         AND s.session_date = CURRENT_DATE
-         AND s.end_odometer IS NULL
-         AND s.miles IS NULL
-       ORDER BY s.created_at DESC
-       LIMIT 1`,
-      [accountId]),
-
-    queryForSession<VehicleOption>(session,
-      `SELECT v.id, v.nickname, v.plate,
-              last_s.end_odometer AS current_odometer
-       FROM vehicles v
-       LEFT JOIN LATERAL (
-         SELECT end_odometer, session_date
-         FROM vehicle_sessions
-         WHERE vehicle_id = v.id AND account_id = v.account_id AND end_odometer IS NOT NULL
-         ORDER BY session_date DESC, created_at DESC
-         LIMIT 1
-       ) last_s ON true
-       WHERE v.account_id = $1 AND v.is_active = true
-       ORDER BY v.nickname ASC`,
       [accountId]),
 
     queryForSession<CountRow>(session,
@@ -167,25 +139,43 @@ export default async function AppPage() {
       [accountId]),
 
     queryForSession<CountRow>(session,
-      `SELECT COUNT(*)::text AS count
-       FROM expenses
-       WHERE account_id = $1
-         AND expense_date = CURRENT_DATE
-         AND receipt_url IS NULL`,
+      `SELECT COALESCE(SUM(total_cents - paid_cents), 0)::text AS count
+       FROM invoices
+       WHERE account_id = $1 AND status IN ('sent', 'partial', 'overdue')`,
       [accountId]),
 
     queryForSession<CountRow>(session,
+      `SELECT COALESCE(SUM(total_cents - paid_cents), 0)::text AS count
+       FROM invoices
+       WHERE account_id = $1 AND invoice_kind = 'deposit' AND status IN ('draft', 'sent', 'partial', 'overdue')`,
+      [accountId]),
+
+    queryForSession<CountRow>(session,
+      `SELECT COALESCE(SUM(amount_cents), 0)::text AS count
+       FROM payments
+       WHERE account_id = $1 AND status = 'paid'
+         AND received_at >= DATE_TRUNC('month', CURRENT_DATE)`,
+      [accountId]),
+
+    // TASK-024: ended, still-unlabelled location segments waiting to be logged.
+    queryForSession<CountRow>(session,
       `SELECT COUNT(*)::text AS count
-       FROM visits
+       FROM location_segments
        WHERE account_id = $1
-         AND scheduled_start::date = CURRENT_DATE
-         AND status IN ('arrived','in_progress')`,
+         AND segment_date = CURRENT_DATE
+         AND status = 'provisional'
+         AND ended_at IS NOT NULL`,
       [accountId]),
   ]);
 
   const draftInvoices = parseN(draftInvoiceCountRows[0]);
   const deposits = parseN(depositCountRows[0]);
   const materialCount = parseN(materialCountRows[0]);
+  const pendingSegments = parseN(pendingSegmentRows[0]);
+
+  const outstandingInvoicesCents = parseN(outstandingInvoicesCentsRows[0]);
+  const pendingDepositsCents = parseN(pendingDepositsCentsRows[0]);
+  const paidThisMonthCents = parseN(paidThisMonthCentsRows[0]);
 
   const actionQueue = ([
     {
@@ -223,34 +213,38 @@ export default async function AppPage() {
       detail: "Approved jobs with materials to stage",
       tone: "warning",
     },
+    {
+      label: "Label Captured Locations",
+      count: pendingSegments,
+      href: "/app/timeline" as Route,
+      detail: "Auto-recorded stops & drives to log to your day",
+      tone: "default",
+    },
   ] satisfies CountAction[])
     .filter((item) => item.count > 0)
     .sort((a, b) => ({ danger: 0, warning: 1, default: 2 })[a.tone] - ({ danger: 0, warning: 1, default: 2 })[b.tone]);
 
-  const warnings: EndWarnings = {
-    missingReceiptPhotos: parseN(missingReceiptRows[0]),
-    jobsInProgress: parseN(inProgressRows[0]),
-    draftInvoices,
-    deposits,
-  };
-
   return (
     <PageContainer>
       <PageHeader
-        title="Daily Command Center"
+        title="Dashboard"
         subtitle={todayLabel}
-        actions={<LinkButton href="/app/intake/new" variant="primary" size="sm">+ New Request</LinkButton>}
+        actions={
+          <>
+            <LinkButton href="/app/my-day" variant="secondary" size="sm">My Day</LinkButton>
+            <LinkButton href="/app/intake/new" variant="primary" size="sm">+ New Request</LinkButton>
+          </>
+        }
       />
-      <DailyCommandCenter
-        todayLabel={todayLabel}
-        openSession={openSessionRows[0] ?? null}
-        vehicles={vehicles}
+      <OwnerDashboard
         actionQueue={actionQueue}
         todayJobs={todayJobs}
         materialCount={materialCount}
         materialJobs={materialJobs}
-        warnings={warnings}
         tomorrowJobs={tomorrowJobs}
+        outstandingInvoicesCents={outstandingInvoicesCents}
+        pendingDepositsCents={pendingDepositsCents}
+        paidThisMonthCents={paidThisMonthCents}
       />
     </PageContainer>
   );

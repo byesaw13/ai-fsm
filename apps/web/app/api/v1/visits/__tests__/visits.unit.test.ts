@@ -344,8 +344,11 @@ describe("POST /api/v1/visits/[id]/transition", () => {
 	    expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data.status).toBe("in_progress");
+    // Time truth: starting the visit opens a job_work activity entry on the visit
+    // (the legacy visit_time_logs writer was removed in TASK-064).
     expect(mockClientQuery.mock.calls.some((call) =>
-      String(call[0]).includes("INSERT INTO visit_time_logs")
+      String(call[0]).includes("INSERT INTO activity_entries") &&
+      String(call[0]).includes("'job_work'")
     )).toBe(true);
   });
 
@@ -364,8 +367,11 @@ describe("POST /api/v1/visits/[id]/transition", () => {
 	    expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data.status).toBe("in_progress");
+    // Time truth: starting the visit opens a job_work activity entry on the visit
+    // (the legacy visit_time_logs writer was removed in TASK-064).
     expect(mockClientQuery.mock.calls.some((call) =>
-      String(call[0]).includes("INSERT INTO visit_time_logs")
+      String(call[0]).includes("INSERT INTO activity_entries") &&
+      String(call[0]).includes("'job_work'")
     )).toBe(true);
   });
 
@@ -388,11 +394,14 @@ describe("POST /api/v1/visits/[id]/transition", () => {
 	    expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data.status).toBe("completed");
-    const closeLogCall = mockClientQuery.mock.calls.find((call) =>
-      String(call[0]).includes("UPDATE visit_time_logs")
+    // Time truth: completing the visit closes its job_work activity segment
+    // (the legacy visit_time_logs close was removed in TASK-064).
+    const closeActivityCall = mockClientQuery.mock.calls.find((call) =>
+      String(call[0]).includes("UPDATE activity_entries") &&
+      String(call[0]).includes("entity_type = 'visit' AND entity_id = $2")
     );
-    expect(closeLogCall).toBeTruthy();
-    expect(closeLogCall?.[1]).toEqual([mockSession.accountId, VISIT_ID, "All done"]);
+    expect(closeActivityCall).toBeTruthy();
+    expect(closeActivityCall?.[1]).toEqual([mockSession.accountId, VISIT_ID]);
   });
 
   it("in_progress → completed without a completion packet → 422 MISSING_PHOTO", async () => {

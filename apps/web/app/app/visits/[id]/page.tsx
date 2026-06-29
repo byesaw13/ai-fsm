@@ -65,6 +65,7 @@ import {
   isVisitOverdue,
 } from "@/lib/visits/p7";
 import { withChecklistContext, getOrSeedChecklist } from "@/lib/visits/checklist";
+import { VISIT_STATUS_LABELS } from "@/lib/visits/triage";
 
 export const dynamic = "force-dynamic";
 
@@ -113,13 +114,6 @@ type VisitRow = Visit & {
 type CountRow = { membership_visit_number: number | string };
 type VaultCategoryRow = { category: VaultCategory };
 
-const VISIT_STATUS_LABELS: Record<VisitStatus, string> = {
-  scheduled: "Scheduled",
-  arrived: "Arrived",
-  in_progress: "In Progress",
-  completed: "Completed",
-  cancelled: "Cancelled",
-};
 
 export default async function VisitDetailPage({
   params,

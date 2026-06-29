@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
-import type { Route } from "next";
-import { Card, SectionHeader } from "@/components/ui";
+import { Card, PageContainer, PageHeader, SectionHeader } from "@/components/ui";
 
 interface Vehicle {
   id: string;
@@ -13,9 +11,13 @@ interface Vehicle {
   year: number | null;
   plate: string | null;
   is_active: boolean;
+  is_default: boolean;
+  bluetooth_id: string | null;
+  current_odometer: number | null;
+  total_miles: string | null;
 }
 
-const EMPTY_FORM = { nickname: "", make: "", model: "", year: "", plate: "" };
+const EMPTY_FORM = { nickname: "", make: "", model: "", year: "", plate: "", bluetooth_id: "", is_default: false };
 
 export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -78,6 +80,8 @@ export default function VehiclesPage() {
       model:    v.model ?? "",
       year:     v.year ? String(v.year) : "",
       plate:    v.plate ?? "",
+      bluetooth_id: v.bluetooth_id ?? "",
+      is_default: v.is_default,
     });
     setEditError("");
   }
@@ -97,6 +101,8 @@ export default function VehiclesPage() {
         model:    editForm.model.trim() || null,
         year:     editForm.year ? parseInt(editForm.year, 10) : null,
         plate:    editForm.plate.trim() || null,
+        bluetooth_id: editForm.bluetooth_id.trim() || null,
+        is_default: editForm.is_default,
       }),
     });
     const data = await res.json();
@@ -118,20 +124,21 @@ export default function VehiclesPage() {
   const inputStyle: React.CSSProperties = { width: "100%" };
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <div>
-          <Link href={"/app/mileage" as Route} className="back-link">← Mileage</Link>
-          <h1 className="page-title">Vehicles</h1>
-        </div>
-        <button
-          className="p7-btn p7-btn-primary"
-          onClick={() => { setShowAdd(true); setAddError(""); }}
-          style={{ display: showAdd ? "none" : undefined }}
-        >
-          + Add Vehicle
-        </button>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Vehicles"
+        backHref="/app/mileage"
+        backLabel="Mileage"
+        actions={
+          <button
+            className="p7-btn p7-btn-primary"
+            onClick={() => { setShowAdd(true); setAddError(""); }}
+            style={{ display: showAdd ? "none" : undefined }}
+          >
+            + Add Vehicle
+          </button>
+        }
+      />
 
       {error && <div className="p7-alert p7-alert-danger">{error}</div>}
 
@@ -206,6 +213,15 @@ export default function VehiclesPage() {
                         <input className="p7-input" style={inputStyle} type="number" min="1900" max="2100" value={editForm.year} onChange={e => setEditForm(f => ({ ...f, year: e.target.value }))} disabled={editPending} />
                       </div>
                     </div>
+                    <div>
+                      <label className="p7-label">Bluetooth ID (car stereo MAC)</label>
+                      <input className="p7-input" style={inputStyle} value={editForm.bluetooth_id} onChange={e => setEditForm(f => ({ ...f, bluetooth_id: e.target.value }))} placeholder="e.g. 00:22:A0:A6:49:0D (Uconnect)" disabled={editPending} />
+                      <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>Auto-tags trips to this vehicle when your phone connects to its stereo.</span>
+                    </div>
+                    <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontSize: "var(--text-sm)" }}>
+                      <input type="checkbox" checked={editForm.is_default} onChange={e => setEditForm(f => ({ ...f, is_default: e.target.checked }))} disabled={editPending} />
+                      Default vehicle (pre-selected when logging a trip)
+                    </label>
                     <div className="p7-form-actions">
                       <button type="submit" className="p7-btn p7-btn-primary" disabled={editPending}>{editPending ? "Saving…" : "Save"}</button>
                       <button type="button" className="p7-btn p7-btn-ghost" onClick={() => setEditId(null)}>Cancel</button>
@@ -225,12 +241,22 @@ export default function VehiclesPage() {
                       {!v.is_active && (
                         <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", padding: "2px 6px", background: "var(--surface-raised)", borderRadius: "var(--radius-sm)" }}>Inactive</span>
                       )}
+                      {v.is_default && (
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--accent)", padding: "2px 6px", background: "var(--surface-raised)", borderRadius: "var(--radius-sm)" }}>Default</span>
+                      )}
+                      {v.bluetooth_id && (
+                        <span title={v.bluetooth_id} style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", padding: "2px 6px", background: "var(--surface-raised)", borderRadius: "var(--radius-sm)" }}>🔵 BT linked</span>
+                      )}
                     </div>
                     {(v.make || v.model || v.year) && (
                       <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: "var(--space-1)" }}>
                         {[v.year, v.make, v.model].filter(Boolean).join(" ")}
                       </div>
                     )}
+                    <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: "var(--space-1)" }}>
+                      Last known odometer: <strong>{v.current_odometer != null ? Number(v.current_odometer).toLocaleString() : "—"}</strong>
+                      {" · "}Lifetime miles: <strong>{v.total_miles != null ? Math.round(Number(v.total_miles)).toLocaleString() : "0"}</strong>
+                    </div>
                   </div>
                   <div style={{ display: "flex", gap: "var(--space-2)", flexShrink: 0 }}>
                     <button className="p7-btn p7-btn-ghost" style={{ fontSize: "var(--text-xs)" }} onClick={() => startEdit(v)}>Edit</button>
@@ -244,6 +270,6 @@ export default function VehiclesPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

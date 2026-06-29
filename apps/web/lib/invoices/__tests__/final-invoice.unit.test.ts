@@ -117,8 +117,8 @@ describe("createDraftFinalInvoiceForJob", () => {
       // Estimate line items
       {
         rows: [
-          { description: "Labor", quantity: "2", unit_price_cents: 15000, sort_order: 0 },
-          { description: "Parts", quantity: "1", unit_price_cents: 20000, sort_order: 1 },
+          { description: "Labor", quantity: "2", unit_price_cents: 15000, line_item_type: "labor", sort_order: 0 },
+          { description: "Parts", quantity: "1", unit_price_cents: 20000, line_item_type: "materials", sort_order: 1 },
         ],
         rowCount: 2,
       },
@@ -178,6 +178,8 @@ describe("createDraftFinalInvoiceForJob", () => {
         }],
         rowCount: 1,
       },
+      // Tracked time: none
+      { rows: [{ tracked_minutes: "0" }], rowCount: 1 },
       // Visit parts (fallback)
       {
         rows: [
@@ -214,6 +216,67 @@ describe("createDraftFinalInvoiceForJob", () => {
     expect(estimateItemCalls).toHaveLength(0);
   });
 
+
+  it("creates a labor-only invoice from completed visit time when there are no estimate items or parts", async () => {
+    const { createDraftFinalInvoiceForJob } = await import("../final-invoice");
+
+    const client = makeClient([
+      // Guard: no existing final invoice
+      { rows: [], rowCount: 0 },
+      // Job with no approved estimate
+      {
+        rows: [{
+          client_id: "client-1",
+          property_id: null,
+          estimate_id: null,
+          presentation_mode: null,
+          subtotal_cents: null,
+          tax_cents: null,
+          total_cents: null,
+          estimate_notes: null,
+          deposit_cents: null,
+        }],
+        rowCount: 1,
+      },
+      // Tracked time: 130 minutes rounds to 2.25 hours
+      { rows: [{ tracked_minutes: "130" }], rowCount: 1 },
+      // Invoice INSERT
+      { rows: [{ id: "labor-inv-id" }], rowCount: 1 },
+      // Labor line INSERT
+      { rows: [{ id: "labor-line-id" }], rowCount: 1 },
+    ]);
+
+    const result = await createDraftFinalInvoiceForJob({
+      client,
+      jobId: "job-1",
+      accountId: "acct-1",
+      userId: "user-1",
+    });
+
+    expect(result?.invoiceId).toBe("labor-inv-id");
+    expect(result?.lineItemCount).toBe(1);
+
+    const insertCall = (client.query as ReturnType<typeof vi.fn>).mock.calls.find(
+      (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("INSERT INTO invoices")
+    );
+    const args = insertCall![1] as unknown[];
+    expect(args[6]).toBe(25875);
+    expect(args[8]).toBe(25875);
+
+    const lineInsertCall = (client.query as ReturnType<typeof vi.fn>).mock.calls.find(
+      (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("INSERT INTO invoice_line_items")
+    );
+    expect(lineInsertCall?.[1]).toEqual([
+      "labor-inv-id",
+      "Labor",
+      2.25,
+      11500,
+      25875,
+      "labor",
+      0,
+    ]);
+  });
+
   it("excludes voided deposit invoices from the deposit credit", async () => {
     const { createDraftFinalInvoiceForJob } = await import("../final-invoice");
 
@@ -237,7 +300,7 @@ describe("createDraftFinalInvoiceForJob", () => {
       },
       // One line item
       {
-        rows: [{ description: "Work", quantity: "1", unit_price_cents: 40000, sort_order: 0 }],
+        rows: [{ description: "Work", quantity: "1", unit_price_cents: 40000, line_item_type: "labor", sort_order: 0 }],
         rowCount: 1,
       },
       // Deposit invoices: one voided, one live

@@ -103,6 +103,12 @@ export type BelowMinimumEstimateRow = {
   job_title: string | null;
 };
 
+// Activity ledger — where the owner's time went (month-scoped)
+export type TimeByCategoryRow = {
+  category: string;
+  minutes: number;
+};
+
 // ---------------------------------------------------------------------------
 // Aggregate shape returned to the page
 // ---------------------------------------------------------------------------
@@ -120,6 +126,7 @@ export interface ReportData {
   pricingSummary: PricingSummaryRow;
   overrideReasonRows: OverrideReasonRow[];
   belowMinimumEstimates: BelowMinimumEstimateRow[];
+  timeByCategory: TimeByCategoryRow[];
 
   // Derived aggregates
   revenueTotalCents: number;
@@ -401,6 +408,19 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
     [accountId, MINIMUM_SERVICE_FEE_CENTS]
   );
 
+  // === Where the owner's time went (activity ledger, month-scoped) ===
+  const timeByCategory = await query<TimeByCategoryRow>(
+    `SELECT category,
+            ROUND(SUM(EXTRACT(EPOCH FROM (COALESCE(ended_at, now()) - started_at)) / 60))::int AS minutes
+     FROM activity_entries
+     WHERE account_id = $1
+       AND voided_at IS NULL
+       AND to_char(session_date, 'YYYY-MM') = $2
+     GROUP BY category
+     ORDER BY minutes DESC`,
+    [accountId, targetMonth]
+  );
+
   // === Derived aggregates ===
   const netCents = revenuePaidCents - expensesTotalCents;
   const hasAnyData = revenueTotalCents > 0 || expensesTotalCents > 0 || mileageTripCount > 0;
@@ -421,6 +441,7 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
     pricingSummary,
     overrideReasonRows,
     belowMinimumEstimates,
+    timeByCategory,
     revenueTotalCents,
     revenuePaidCents,
     revenueOutstandingCents,
@@ -432,5 +453,42 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
     totalEstimates,
     conversionRate,
     totalJobs: jobProfitRows.length,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Invoice aging — relocated from the Overview dashboard (TASK-038 step 3).
+// Account-wide unpaid balance bucketed by how overdue it is (not month-scoped).
+// ---------------------------------------------------------------------------
+
+export type InvoiceAgingData = {
+  current: number;
+  d30: number;
+  d60: number;
+  d90: number;
+};
+
+export async function loadInvoiceAging(accountId: string): Promise<InvoiceAgingData> {
+  const rows = await query<{
+    current_cents: string;
+    d30_cents: string;
+    d60_cents: string;
+    d90_cents: string;
+  }>(
+    `SELECT
+       COALESCE(SUM(total_cents - paid_cents) FILTER (WHERE due_date IS NULL OR due_date >= CURRENT_DATE), 0)::text AS current_cents,
+       COALESCE(SUM(total_cents - paid_cents) FILTER (WHERE due_date < CURRENT_DATE AND due_date >= CURRENT_DATE - interval '30 days'), 0)::text AS d30_cents,
+       COALESCE(SUM(total_cents - paid_cents) FILTER (WHERE due_date < CURRENT_DATE - interval '30 days' AND due_date >= CURRENT_DATE - interval '60 days'), 0)::text AS d60_cents,
+       COALESCE(SUM(total_cents - paid_cents) FILTER (WHERE due_date < CURRENT_DATE - interval '60 days'), 0)::text AS d90_cents
+     FROM invoices
+     WHERE account_id = $1 AND status IN ('sent','partial','overdue')`,
+    [accountId]
+  );
+  const r = rows[0];
+  return {
+    current: parseInt(r?.current_cents ?? "0", 10),
+    d30: parseInt(r?.d30_cents ?? "0", 10),
+    d60: parseInt(r?.d60_cents ?? "0", 10),
+    d90: parseInt(r?.d90_cents ?? "0", 10),
   };
 }

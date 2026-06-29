@@ -195,10 +195,12 @@ export function ProgressBar({ value, max = 100, label, color, showValue }: Progr
         <div
           style={{
             height: "100%",
-            width: `${pct}%`,
+            width: "100%",
+            transform: `scaleX(${pct / 100})`,
+            transformOrigin: "left",
             background: barColor,
             borderRadius: "var(--radius-full)",
-            transition: "width 0.3s ease",
+            transition: "transform 0.3s ease",
           }}
         />
       </div>

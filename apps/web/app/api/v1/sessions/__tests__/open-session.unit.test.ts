@@ -53,25 +53,12 @@ describe("POST /api/v1/sessions/start", () => {
     expect(json.error.code).toBe("VALIDATION_ERROR");
   });
 
-  it("returns 409 when the day already has an open session", async () => {
+  it("creates an open session for a vehicle-less start (BEGIN, set_config, INSERT, COMMIT)", async () => {
     mockClientQuery
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" }] });
-
-    const res = await startDay(request("POST", "http://localhost/api/v1/sessions/start", { start_odometer: 1200 }));
-    expect(res.status).toBe(409);
-    const json = await res.json();
-    expect(json.error.code).toBe("OPEN_SESSION_EXISTS");
-  });
-
-  it("creates an open session with no miles or end odometer", async () => {
-    mockClientQuery
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", session_date: "2026-06-10", vehicle_id: null, start_odometer: 1200 }] })
-      .mockResolvedValueOnce({ rows: [] });
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // set_config
+      .mockResolvedValueOnce({ rows: [{ id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", session_date: "2026-06-10", vehicle_id: null, start_odometer: 1200 }] }) // INSERT
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
 
     const res = await startDay(request("POST", "http://localhost/api/v1/sessions/start", { start_odometer: 1200, session_date: "2026-06-10" }));
     expect(res.status).toBe(201);

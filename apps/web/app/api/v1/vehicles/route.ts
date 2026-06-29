@@ -22,17 +22,21 @@ type VehicleRow = {
   year: number | null;
   plate: string | null;
   is_active: boolean;
+  is_default: boolean;
+  bluetooth_id: string | null;
   created_at: string;
   current_odometer: number | null;  // derived from most recent session end_odometer
   last_session_date: string | null;
+  total_miles: string | null;        // lifetime miles rolled up across this vehicle's sessions
 };
 
 export const GET = withRole(["owner", "admin", "tech"], async (_req: NextRequest, session) => {
   try {
     const rows = await query<VehicleRow>(
-      `SELECT v.id, v.nickname, v.make, v.model, v.year, v.plate, v.is_active, v.created_at::text,
+      `SELECT v.id, v.nickname, v.make, v.model, v.year, v.plate, v.is_active, v.is_default, v.bluetooth_id, v.created_at::text,
               last_s.end_odometer   AS current_odometer,
-              last_s.session_date::text AS last_session_date
+              last_s.session_date::text AS last_session_date,
+              roll.total_miles::text AS total_miles
        FROM vehicles v
        LEFT JOIN LATERAL (
          SELECT end_odometer, session_date
@@ -41,6 +45,12 @@ export const GET = withRole(["owner", "admin", "tech"], async (_req: NextRequest
          ORDER BY session_date DESC, created_at DESC
          LIMIT 1
        ) last_s ON true
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(SUM(COALESCE(miles, end_odometer - start_odometer)), 0) AS total_miles
+         FROM vehicle_sessions
+         WHERE vehicle_id = v.id AND account_id = v.account_id
+           AND (miles IS NOT NULL OR end_odometer IS NOT NULL)
+       ) roll ON true
        WHERE v.account_id = $1
        ORDER BY v.is_active DESC, v.nickname ASC`,
       [session.accountId]

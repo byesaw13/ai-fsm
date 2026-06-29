@@ -19,10 +19,12 @@ const ADMIN_EMAIL = "admin@test.com";
 const ADMIN_PASSWORD = "password";
 
 async function completeEstimateWizard(page: import("@playwright/test").Page, description: string, quantity: string, unitPrice: string) {
+  void description;
+  void quantity;
   await page.getByRole("button", { name: "Next" }).click();
-  await page.fill('[data-testid="line-item-desc-0"]', description);
-  await page.fill('[data-testid="line-item-qty-0"]', quantity);
-  await page.fill('[data-testid="line-item-price-0"]', unitPrice);
+  await page.getByRole("button", { name: /Drywall patch <=6/ }).click();
+  await page.locator("#pb-custom-price").fill(unitPrice);
+  await page.getByRole("button", { name: /Add to Estimate/ }).click();
   await page.getByRole("button", { name: "Next" }).click();
   await page.getByRole("button", { name: "Next" }).click();
   await Promise.all([
@@ -37,7 +39,7 @@ test.describe("Estimates smoke — admin role", () => {
     await page.fill('[id="email"]', ADMIN_EMAIL);
     await page.fill('[id="password"]', ADMIN_PASSWORD);
     await page.click('[type="submit"]');
-    await page.waitForURL(`${BASE}/app/jobs`);
+    await page.waitForURL(/\/app(?:\/my-day)?$/);
   });
 
   test("admin sees Estimates page with create button", async ({ page }) => {
@@ -75,7 +77,8 @@ test.describe("Estimates smoke — admin role", () => {
   test("admin can create an estimate and see it in detail", async ({
     page,
   }) => {
-    await page.goto(`${BASE}/app/estimates/new`);
+    await page.goto(`/app/estimates/new`);
+    await page.click('[data-testid="estimate-mode-detailed"]');
 
     // Select first available client
     const clientSelect = page.locator("#client_id");
@@ -89,13 +92,14 @@ test.describe("Estimates smoke — admin role", () => {
       "Draft"
     );
     await expect(page.locator('[data-testid="estimate-total"]')).toContainText(
-      "$400.00"
+      "$200.00"
     );
   });
 
   test("admin can transition estimate draft → sent", async ({ page }) => {
     // Navigate to new estimate, create it
-    await page.goto(`${BASE}/app/estimates/new`);
+    await page.goto(`/app/estimates/new`);
+    await page.click('[data-testid="estimate-mode-detailed"]');
     const clientSelect = page.locator("#client_id");
     await clientSelect.selectOption({ index: 1 });
     await completeEstimateWizard(page, "Test service", "1", "200.00");
@@ -121,7 +125,8 @@ test.describe("Estimates smoke — admin role", () => {
   });
 
   test("estimate detail shows line items table", async ({ page }) => {
-    await page.goto(`${BASE}/app/estimates/new`);
+    await page.goto(`/app/estimates/new`);
+    await page.click('[data-testid="estimate-mode-detailed"]');
     const clientSelect = page.locator("#client_id");
     await clientSelect.selectOption({ index: 1 });
     await completeEstimateWizard(page, "Consultation", "3", "100.00");
@@ -135,14 +140,15 @@ test.describe("Estimates smoke — admin role", () => {
     ).toHaveCount(1);
     await expect(
       page.locator('[data-testid="estimate-total"]')
-    ).toContainText("$300.00");
+    ).toContainText("$100.00");
   });
 
   test("danger zone is visible for draft estimates (owner role would delete)", async ({
     page,
   }) => {
     // Create a new draft estimate
-    await page.goto(`${BASE}/app/estimates/new`);
+    await page.goto(`/app/estimates/new`);
+    await page.click('[data-testid="estimate-mode-detailed"]');
     const clientSelect = page.locator("#client_id");
     await clientSelect.selectOption({ index: 1 });
     await completeEstimateWizard(page, "Deletion test", "1", "200.00");

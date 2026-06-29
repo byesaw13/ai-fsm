@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth/session";
+import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { canManageClients, canTransitionJob, canCreateEstimates } from "@/lib/auth/permissions";
 import { query, queryOne } from "@/lib/db";
 import { buildJobCreateHref, formatPropertyAddress } from "@/lib/crm/p7";
@@ -124,12 +125,38 @@ type VisitMediaRow = {
 
 function Disclosure({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
   return (
-    <details style={{ border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", padding: "var(--space-3)" }}>
-      <summary style={{ cursor: "pointer", fontWeight: 800, display: "flex", justifyContent: "space-between", gap: "var(--space-3)" }}>
+    <details style={{
+      border: "1px solid var(--border)",
+      borderRadius: "var(--radius-lg)",
+      background: "var(--bg-card)",
+      padding: "var(--space-4)",
+      marginBottom: "var(--space-4)"
+    }}>
+      <summary style={{
+        cursor: "pointer",
+        fontWeight: 600,
+        fontSize: "var(--text-sm)",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        color: "var(--fg)",
+        userSelect: "none"
+      }}>
         <span>{title}</span>
-        {typeof count === "number" ? <span className="ops-section-count">{count}</span> : null}
+        {typeof count === "number" ? (
+          <span style={{
+            fontSize: "var(--text-xs)",
+            fontWeight: 600,
+            background: "var(--color-slate-100)",
+            color: "var(--fg-muted)",
+            padding: "2px 8px",
+            borderRadius: "var(--radius-full)"
+          }}>
+            {count}
+          </span>
+        ) : null}
       </summary>
-      <div style={{ marginTop: "var(--space-3)" }}>{children}</div>
+      <div style={{ marginTop: "var(--space-4)" }}>{children}</div>
     </details>
   );
 }
@@ -266,7 +293,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
     ),
 
     // Unified property timeline — sourced from property_timeline_v (single source of truth).
-    // Covers: visit, estimate, invoice, vault_item, photo, issue, note, membership.
+    // Covers: visit, estimate, invoice, payment, work_order, vault_item, photo, issue, note, membership.
     query<TimelineEvent>(
       `SELECT event_type,
               entity_id::text          AS id,
@@ -692,25 +719,31 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
             </dl>
           </Card>
 
-          <Card data-testid="property-edit-panel">
-            <SectionHeader title="Edit Property" />
-            <PropertyForm
-              mode="edit"
-              actionUrl={`/api/v1/properties/${property.id}`}
-              cancelHref={`/app/properties/${property.id}`}
-              propertyId={property.id}
-              clients={clients}
-              initialValues={{
-                client_id: property.client_id,
-                name: property.name ?? "",
-                address: property.address,
-                city: property.city ?? "",
-                state: property.state ?? "",
-                zip: property.zip ?? "",
-                notes: property.notes ?? "",
-              }}
-            />
-          </Card>
+          <details style={{ marginTop: "var(--space-4)" }}>
+            <summary style={{ cursor: "pointer", fontSize: "var(--text-sm)", color: "var(--accent)", fontWeight: 600, userSelect: "none" }}>
+              Edit Property Details
+            </summary>
+            <Card data-testid="property-edit-panel" style={{ marginTop: "var(--space-2)" }}>
+              <PropertyForm
+                mode="edit"
+                actionUrl={`/api/v1/properties/${property.id}`}
+                cancelHref={`/app/properties/${property.id}`}
+                propertyId={property.id}
+                clients={clients}
+                initialValues={{
+                  client_id: property.client_id,
+                  name: property.name ?? "",
+                  address: property.address,
+                  city: property.city ?? "",
+                  state: property.state ?? "",
+                  zip: property.zip ?? "",
+                  notes: property.notes ?? "",
+                }}
+              />
+            </Card>
+          </details>
+
+          <LinkedDocuments session={session} entityType="property" entityId={property.id} />
         </div>
       </div>
     </PageContainer>

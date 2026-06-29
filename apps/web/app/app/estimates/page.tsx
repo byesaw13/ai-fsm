@@ -16,6 +16,7 @@ import {
   LinkButton,
   MetricGrid,
 } from "@/components/ui";
+import { formatCents } from "@/lib/money";
 import type { FilterDef, StatusVariant, MetricCardData } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ interface EstimateRow {
   sent_at: string | null;
   expires_at: string | null;
   created_at: string;
+  estimate_number: string | null;
   client_name: string | null;
   job_title: string | null;
 }
@@ -72,19 +74,18 @@ const ESTIMATE_FILTERS: FilterDef[] = [
 ];
 
 interface PageProps {
-  searchParams: Promise<{ q?: string; status?: string; tier?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; tier?: string; view?: string }>;
 }
 
-function formatDollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 export default async function EstimatesPage({ searchParams }: PageProps) {
-  const { q, status, tier } = await searchParams;
+  const { q, status, tier, view } = await searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.role === "tech") redirect("/app/my-day"); // EPIC-006: techs have no estimate access
 
   const canCreate = canCreateEstimates(session.role);
+  const isBoardView = view !== "list"; // default to Kanban Board view!
 
   const searchPattern = q ? `%${q.toLowerCase()}%` : null;
   const activeTier = (tier && tier in ESTIMATE_TIER_STATUSES) ? tier as EstimateTier : null;
@@ -116,7 +117,7 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
 
     const r = await client.query(
       `SELECT e.id, e.status, e.subtotal_cents, e.tax_cents, e.total_cents,
-              e.sent_at, e.expires_at, e.created_at,
+              e.sent_at, e.expires_at, e.created_at, e.estimate_number,
               c.name AS client_name,
               j.title AS job_title
        FROM estimates e
@@ -157,39 +158,90 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
   const metrics: MetricCardData[] = [
     {
       label: "Total Pipeline",
-      value: formatDollars(totalValue),
+      value: formatCents(totalValue),
       sub: `${estimates.length} estimates`,
     },
     {
       label: "Pending",
-      value: formatDollars(pendingValue),
+      value: formatCents(pendingValue),
       sub: `${pendingEstimates.length} awaiting response`,
       variant: hasExpired ? "alert" : "default",
     },
     {
       label: "Won",
-      value: formatDollars(wonValue),
+      value: formatCents(wonValue),
       sub: `${wonEstimates.length} approved`,
       variant: wonEstimates.length > 0 ? "success" : "default",
     },
   ];
 
-  // Group by status for unfiltered view
+  // Group by status for board column sorting
   const grouped = STATUS_ORDER.reduce<Record<string, EstimateRow[]>>(
     (acc, s) => ({ ...acc, [s]: [] }),
     {}
   );
-  if (!hasFilter) {
-    for (const est of estimates) {
-      grouped[est.status]?.push(est);
+  for (const est of estimates) {
+    if (grouped[est.status]) {
+      grouped[est.status].push(est);
     }
   }
-  const activeStatuses = hasFilter
-    ? []
-    : STATUS_ORDER.filter((s) => grouped[s].length > 0);
+
+  const activeStatuses = STATUS_ORDER.filter((s) => grouped[s].length > 0);
 
   return (
     <PageContainer>
+      <style>{`
+        .kanban-board {
+          display: flex;
+          gap: var(--space-4);
+          overflow-x: auto;
+          padding-bottom: var(--space-4);
+          align-items: flex-start;
+          width: 100%;
+          -webkit-overflow-scrolling: touch;
+        }
+        .kanban-column {
+          flex: 1;
+          min-width: 260px;
+          max-width: 320px;
+          display: flex;
+          flex-direction: column;
+          gap: var(--space-3);
+          background: var(--bg-subtle);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-lg);
+          padding: var(--space-3);
+        }
+        .kanban-column-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding-bottom: var(--space-2);
+          border-bottom: 1px solid var(--border);
+          font-weight: 700;
+          font-size: var(--text-sm);
+          color: var(--fg);
+        }
+        .kanban-card {
+          background: var(--bg-card);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          padding: var(--space-3);
+          display: flex;
+          flex-direction: column;
+          gap: var(--space-1);
+          text-decoration: none;
+          color: inherit;
+          box-shadow: var(--shadow-xs);
+          transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .kanban-card:hover {
+          transform: translateY(-1px);
+          border-color: var(--border-strong);
+          box-shadow: var(--shadow-md);
+        }
+      `}</style>
+
       <PageHeader
         title="Estimates"
         subtitle={`${estimates.length} ${hasFilter ? "matching" : "total"}`}
@@ -215,41 +267,79 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
         }
       />
 
-      {estimates.length > 0 && !hasFilter && (
+      {estimates.length > 0 && (
         <MetricGrid metrics={metrics} />
       )}
 
-      {/* Tier tabs — quick filter: open (draft/sent) vs closed (approved/declined/expired) */}
-      <div style={{ display: "flex", gap: "var(--space-1)", marginBottom: "var(--space-3)", flexWrap: "wrap" }}>
-        {([
-          { tier: null,      label: "All" },
-          { tier: "open",    label: "Open" },
-          { tier: "closed",  label: "Closed" },
-        ] as { tier: EstimateTier | null; label: string }[]).map(({ tier: t, label }) => {
-          const isActive = activeTier === t;
-          const params = new URLSearchParams();
-          if (t) params.set("tier", t);
-          if (q) params.set("q", q);
-          const qs = params.toString();
-          return (
-            <Link
-              key={label}
-              href={`/app/estimates${qs ? `?${qs}` : ""}` as Route}
-              style={{
-                padding: "var(--space-1) var(--space-3)",
-                borderRadius: "var(--radius-full)",
-                fontSize: "var(--text-sm)",
-                fontWeight: isActive ? 700 : 500,
-                textDecoration: "none",
-                background: isActive ? "var(--accent)" : "var(--color-surface-2, var(--bg-card))",
-                color: isActive ? "#fff" : "var(--fg-muted)",
-                border: isActive ? "1px solid var(--accent)" : "1px solid var(--border)",
-              }}
-            >
-              {label}
-            </Link>
-          );
-        })}
+      {/* View Toggle (List vs Board) & Tier tabs */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-4)", flexWrap: "wrap", gap: "var(--space-2)" }}>
+        <div style={{ display: "flex", gap: "var(--space-1)" }}>
+          {([
+            { key: "board", label: "📋 Board View" },
+            { key: "list", label: "☰ List View" },
+          ] as const).map(({ key, label }) => {
+            const isActive = isBoardView ? key === "board" : key === "list";
+            const params = new URLSearchParams();
+            if (key !== "board") params.set("view", key);
+            if (q) params.set("q", q);
+            if (status) params.set("status", status);
+            if (tier) params.set("tier", tier);
+            const qs = params.toString();
+            return (
+              <Link
+                key={key}
+                href={`/app/estimates${qs ? `?${qs}` : ""}` as Route}
+                style={{
+                  padding: "var(--space-1) var(--space-3)",
+                  borderRadius: "var(--radius-md)",
+                  fontSize: "var(--text-xs)",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  background: isActive ? "var(--accent-subtle)" : "var(--bg-card)",
+                  color: isActive ? "var(--accent)" : "var(--fg-muted)",
+                  border: isActive ? "1px solid var(--accent)" : "1px solid var(--border)",
+                  transition: "all var(--transition-base)"
+                }}
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </div>
+        
+        <div style={{ display: "flex", gap: "var(--space-1)" }}>
+          {([
+            { tier: null,      label: "All" },
+            { tier: "open",    label: "Open" },
+            { tier: "closed",  label: "Closed" },
+          ] as { tier: EstimateTier | null; label: string }[]).map(({ tier: t, label }) => {
+            const isActive = activeTier === t;
+            const params = new URLSearchParams();
+            if (t) params.set("tier", t);
+            if (q) params.set("q", q);
+            if (status) params.set("status", status);
+            if (!isBoardView) params.set("view", "list");
+            const qs = params.toString();
+            return (
+              <Link
+                key={label}
+                href={`/app/estimates${qs ? `?${qs}` : ""}` as Route}
+                style={{
+                  padding: "var(--space-1) var(--space-3)",
+                  borderRadius: "var(--radius-full)",
+                  fontSize: "var(--text-xs)",
+                  fontWeight: isActive ? 700 : 500,
+                  textDecoration: "none",
+                  background: isActive ? "var(--accent)" : "var(--bg-card)",
+                  color: isActive ? "#fff" : "var(--fg-muted)",
+                  border: isActive ? "1px solid var(--accent)" : "1px solid var(--border)",
+                }}
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </div>
       </div>
 
       <FilterBar
@@ -278,25 +368,92 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
           }
           data-testid="estimates-empty"
         />
-      ) : hasFilter ? (
-        <div>
-          {estimates.map((est) => (
-            <EstimateItemCard key={est.id} est={est} showStatus />
-          ))}
+      ) : isBoardView ? (
+        <div className="kanban-board">
+          {STATUS_ORDER.map((s) => {
+            const colEstimates = grouped[s] ?? [];
+            const colTotalCents = colEstimates.reduce((sum, e) => sum + e.total_cents, 0);
+            
+            return (
+              <div key={s} className="kanban-column" data-testid={`column-${s}`}>
+                <div className="kanban-column-header">
+                  <span>
+                    {STATUS_LABELS[s]} 
+                    <span style={{ color: "var(--fg-muted)", fontWeight: 500, marginLeft: 4 }}>({colEstimates.length})</span>
+                  </span>
+                  <span style={{ fontFamily: "var(--font-mono), 'SF Mono', monospace", fontSize: 12, fontWeight: 600 }}>
+                    {formatCents(colTotalCents)}
+                  </span>
+                </div>
+                
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", minHeight: 150 }}>
+                  {colEstimates.length === 0 ? (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 100, border: "1px dashed var(--border)", borderRadius: "var(--radius-md)", color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+                      No {STATUS_LABELS[s].toLowerCase()}
+                    </div>
+                  ) : (
+                    colEstimates.map((est) => {
+                      const nowTime = Date.now();
+                      const isExpired = est.expires_at && new Date(est.expires_at).getTime() < nowTime;
+                      const isExpiringSoon = !isExpired && est.expires_at && new Date(est.expires_at).getTime() < nowTime + 7 * 24 * 60 * 60 * 1000;
+                      
+                      return (
+                        <Link key={est.id} href={`/app/estimates/${est.id}`} className="kanban-card" data-testid="estimate-card">
+                          <div style={{ fontWeight: 700, fontSize: "var(--text-sm)", color: "var(--fg)" }}>
+                            {est.estimate_number ? `${est.estimate_number} · ` : ""}{est.client_name ?? "Unknown client"}
+                          </div>
+                          {est.job_title && (
+                            <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                              {est.job_title}
+                            </div>
+                          )}
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                            <span style={{ fontFamily: "var(--font-mono), 'SF Mono', monospace", fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--fg)" }}>
+                              {formatCents(est.total_cents)}
+                            </span>
+                            
+                            {est.expires_at && est.status === "sent" && (
+                              <span style={{
+                                fontSize: 10,
+                                fontWeight: 600,
+                                color: isExpired ? "var(--color-danger)" : isExpiringSoon ? "var(--color-warning)" : "var(--fg-muted)"
+                              }}>
+                                {isExpired ? "Expired" : `Exp: ${new Date(est.expires_at).toLocaleDateString([], { month: "numeric", day: "numeric" })}`}
+                              </span>
+                            )}
+                          </div>
+                        </Link>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div>
-          {activeStatuses.map((s) => (
-            <StatusSection
-              key={s}
-              title={STATUS_LABELS[s as EstimateStatus]}
-              count={grouped[s].length}
-            >
-              {grouped[s].map((est) => (
-                <EstimateItemCard key={est.id} est={est} />
+          {hasFilter ? (
+            <div>
+              {estimates.map((est) => (
+                <EstimateItemCard key={est.id} est={est} showStatus />
               ))}
-            </StatusSection>
-          ))}
+            </div>
+          ) : (
+            <div>
+              {activeStatuses.map((s) => (
+                <StatusSection
+                  key={s}
+                  title={STATUS_LABELS[s as EstimateStatus]}
+                  count={grouped[s].length}
+                >
+                  {grouped[s].map((est) => (
+                    <EstimateItemCard key={est.id} est={est} />
+                  ))}
+                </StatusSection>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </PageContainer>
@@ -326,8 +483,8 @@ function EstimateItemCard({ est, showStatus = false }: { est: EstimateRow; showS
           {est.job_title}
         </span>
       )}
-      <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-        {formatDollars(est.total_cents)}
+      <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", fontFamily: "var(--font-mono), 'SF Mono', monospace" }}>
+        {formatCents(est.total_cents)}
       </span>
       {est.expires_at && est.status === "sent" && (
         <span
@@ -350,7 +507,7 @@ function EstimateItemCard({ est, showStatus = false }: { est: EstimateRow; showS
   return (
     <ItemCard
       href={`/app/estimates/${est.id}`}
-      title={est.client_name ?? "Unknown client"}
+      title={`${est.estimate_number ? `${est.estimate_number} · ` : ""}${est.client_name ?? "Unknown client"}`}
       meta={meta}
       overdue={!!(isExpired && est.status === "sent")}
       actions={

@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { AssessmentRoom } from "@ai-fsm/domain";
+import { preserveScope } from "@/lib/estimates/assessment-context";
+import { MaterialsMetadata } from "./MaterialsMetadata";
 
 const JOB_TYPES = [
   { value: "deck_build", label: "Deck Build (new)" },
@@ -46,19 +49,16 @@ export interface MaterialItem {
   price_book_id: string | null;
 }
 
-export interface RoomMeasurement {
-  id: string;
-  name: string;
-  length_ft: number | null;
-  width_ft: number | null;
-  height_ft: number | null;
-  notes?: string;
-}
+// One canonical room shape across assessment-derived flows (TASK-018).
+export type RoomMeasurement = AssessmentRoom;
 
 interface Props {
   initialScope?: string;
   initialJobType?: string;
   rooms?: RoomMeasurement[];
+  /** Source assessment, so generation can pull the canonical summary server-side. */
+  visitId?: string | null;
+  assessmentId?: string | null;
   onAddToEstimate: (items: MaterialItem[]) => void;
   onClose: () => void;
 }
@@ -71,17 +71,36 @@ export function MaterialsGenerator({
   initialScope = "",
   initialJobType = "",
   rooms = [],
+  visitId = null,
+  assessmentId = null,
   onAddToEstimate,
   onClose,
 }: Props) {
   const [scope, setScope] = useState(initialScope);
+  // Tracks whether the user has hand-edited the scope field. Once they have,
+  // we stop overwriting their text when a fresh initialScope arrives.
+  const [scopeDirty, setScopeDirty] = useState(false);
   const [jobType, setJobType] = useState(initialJobType);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ items: MaterialItem[]; summary_notes: string; total_cost_cents: number } | null>(null);
+  const [result, setResult] = useState<{
+    items: MaterialItem[];
+    summary_notes: string;
+    total_cost_cents: number;
+    assumptions?: string[];
+    missing_measurements?: string[];
+    excluded_customer_supplied_items?: string[];
+  } | null>(null);
   const [editedItems, setEditedItems] = useState<MaterialItem[]>([]);
   const [savingPrices, setSavingPrices] = useState(false);
   const [saveToBook, setSaveToBook] = useState(true);
+
+  // Resync scope when a fresh initialScope arrives (e.g. the assessment is
+  // edited while the generator is open) — but only while the user has not
+  // manually edited the field, so we never wipe their typing (preserveScope).
+  useEffect(() => {
+    setScope((current) => preserveScope(current, initialScope, scopeDirty));
+  }, [initialScope, scopeDirty]);
 
   async function generate() {
     if (!scope.trim() || !jobType) return;
@@ -92,7 +111,13 @@ export function MaterialsGenerator({
       const res = await fetch("/api/v1/estimates/ai-materials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope, job_type: jobType, rooms }),
+        body: JSON.stringify({
+          scope,
+          job_type: jobType,
+          rooms,
+          ...(visitId ? { visit_id: visitId } : {}),
+          ...(assessmentId ? { assessment_id: assessmentId } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -196,7 +221,10 @@ export function MaterialsGenerator({
               id="mat-scope"
               rows={4}
               value={scope}
-              onChange={(e) => setScope(e.target.value)}
+              onChange={(e) => {
+                setScope(e.target.value);
+                setScopeDirty(true);
+              }}
               placeholder="e.g. Build a 10x10 freestanding ground-level deck with pressure treated lumber, diagonal decking pattern, 3 steps, no railing..."
               style={{ width: "100%", fontFamily: "inherit", fontSize: "var(--text-sm)" }}
             />
@@ -230,10 +258,12 @@ export function MaterialsGenerator({
       {result && (
         <>
           {result.summary_notes && (
-            <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", background: "var(--bg-subtle)", padding: "var(--space-3)", borderRadius: "var(--radius)", borderLeft: "3px solid var(--color-primary, #3b82f6)" }}>
+            <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", background: "var(--bg-subtle)", padding: "var(--space-3)", borderRadius: "var(--radius)", border: "1px solid var(--accent)" }}>
               {result.summary_notes}
             </div>
           )}
+
+          <MaterialsMetadata metadata={result} />
 
           {Object.entries(grouped).map(([cat, group]) => (
             <div key={cat}>

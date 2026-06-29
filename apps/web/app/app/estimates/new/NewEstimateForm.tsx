@@ -100,6 +100,7 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
     reviewTotal,
     handleSubmit,
     liveIntel,
+    assessmentContext,
   } = useEstimateForm(props);
 
   return (
@@ -243,6 +244,7 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
           balanceDueCents={balanceDueCents}
           taxRate={taxRate} setTaxRate={setTaxRate}
           lineTotal={lineTotal}
+          assessmentContext={assessmentContext}
         />
       )}
 

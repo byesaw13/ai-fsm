@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { PriceBookService } from "@/components/PriceBookSelector";
 import { formatCents, getStandardEstimateTerms } from "@/lib/estimates/pricing";
 import type { DepositDueTrigger, DepositType } from "@/lib/estimates/deposit-policy";
@@ -11,6 +11,10 @@ import {
   type EstimateSpec,
 } from "@ai-fsm/domain";
 import { useEstimateAI } from "./useEstimateAI";
+import {
+  resolveAssessmentContext,
+  type AssessmentContext,
+} from "@/lib/estimates/assessment-context";
 import type { ShoppingList, SpecifiedMaterial, RoomSpec, ProjectOptions, PaintingProjectResult } from "@ai-fsm/domain";
 import { roomResultToLegacyFields } from "@ai-fsm/domain";
 import { useEstimatePriceBook } from "./useEstimatePriceBook";
@@ -71,6 +75,9 @@ export interface NewEstimateFormProps {
   initialNotes?: string;
   /** Booking request that originated this estimate — stored for chain traceability. */
   bookingRequestId?: string;
+  /** Server-loaded assessment summary, used to recover context when the
+   * sessionStorage hand-off is missing (refresh / deep-link). TASK-018 slice 2. */
+  serverAssessmentContext?: AssessmentContext | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,8 +97,10 @@ export function useEstimateForm({
   initialInterviewDraft,
   initialNotes,
   bookingRequestId,
+  serverAssessmentContext = null,
 }: NewEstimateFormProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(1);
@@ -154,6 +163,18 @@ export function useEstimateForm({
     } catch { /* ignore parse errors */ }
     return [{ ...EMPTY_ROW }];
   });
+
+  // Assessment hand-off (generated description + rooms). Consume once at form
+  // level: storage is always cleared so it can't survive into a later estimate,
+  // but the context is only applied when this estimate was opened from an
+  // assessment (from_assessment=1) — a plain new-estimate never inherits stale
+  // context left behind by an abandoned hand-off.
+  const [assessmentContext] = useState<AssessmentContext | null>(() =>
+    resolveAssessmentContext(
+      searchParams.get("from_assessment") === "1",
+      serverAssessmentContext
+    )
+  );
 
   const [tripCount, setTripCount] = useState<"one_trip" | "multi_trip">("one_trip");
   const [requiresDryingOrCuring, setRequiresDryingOrCuring] = useState(false);
@@ -730,6 +751,7 @@ export function useEstimateForm({
   return {
     // UI state
     pending, error, step, setStep,
+    assessmentContext,
     inlineForm, setInlineForm,
     // Entity lists
     clientList, jobList, propertyList,

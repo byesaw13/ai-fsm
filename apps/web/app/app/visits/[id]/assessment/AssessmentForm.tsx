@@ -1,8 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
+import { buildAssessmentJobDescription } from "@ai-fsm/domain";
+import { useToast } from "@/components/ui";
+import { writeAssessmentContext } from "@/lib/estimates/assessment-context";
 import { MaterialsGenerator } from "@/app/app/estimates/components/MaterialsGenerator";
 import type { MaterialItem } from "@/app/app/estimates/components/MaterialsGenerator";
 
@@ -58,6 +62,7 @@ function newRoom(): Room {
 
 export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId, initialAssessment, initialPhotos, canEdit }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const [rooms, setRooms] = useState<Room[]>(
     initialAssessment?.rooms?.length ? initialAssessment.rooms : [newRoom()]
   );
@@ -69,9 +74,11 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
   const [leadPaintRisk, setLeadPaintRisk] = useState(initialAssessment?.lead_paint_risk ?? false);
   const [photos, setPhotos] = useState<PhotoMeta[]>(initialPhotos);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [showMaterials, setShowMaterials] = useState(false);
 
@@ -142,24 +149,48 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
   }
 
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
     setUploading(true);
+    setUploadError(null);
+    const failures: string[] = [];
+    let lastErrorMessage: string | null = null;
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("category", "assessment");
-      const res = await fetch(`/api/v1/visits/${visitId}/media`, { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error?.message ?? "Upload failed");
-      } else {
-        setPhotos((prev) => [...prev, data.data]);
+      for (let i = 0; i < files.length; i++) {
+        setUploadProgress(files.length > 1 ? `${i + 1} of ${files.length}` : null);
+        const file = files[i];
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("category", "assessment");
+          const res = await fetch(`/api/v1/visits/${visitId}/media`, { method: "POST", body: formData });
+          const data = await res.json();
+          if (!res.ok) {
+            failures.push(file.name);
+            lastErrorMessage = data.error?.message ?? "Upload failed";
+          } else {
+            setPhotos((prev) => [...prev, data.data]);
+          }
+        } catch {
+          failures.push(file.name);
+          lastErrorMessage = "Upload failed";
+        }
       }
-    } catch {
-      setError("Upload failed");
+      const uploaded = files.length - failures.length;
+      if (uploaded > 0) {
+        toast.success(uploaded === 1 ? "Photo uploaded" : `${uploaded} photos uploaded`);
+      }
+      if (failures.length > 0) {
+        const message =
+          files.length === 1
+            ? lastErrorMessage ?? "Upload failed"
+            : `${failures.length} of ${files.length} photos failed to upload (${failures.join(", ")})`;
+        setUploadError(message);
+        toast.error(message);
+      }
     } finally {
       setUploading(false);
+      setUploadProgress(null);
       if (e.target) e.target.value = "";
     }
   }
@@ -174,6 +205,24 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
   }
 
   const disabled = !canEdit || saving || completing;
+
+  // Seed the materials generator with the full assessment, not just scope
+  // notes. The generator's scope textarea stays editable as the preview.
+  const generatedJobDescription = useMemo(
+    () =>
+      buildAssessmentJobDescription({
+        rooms,
+        scope_notes: scopeNotes,
+        access_notes: accessNotes,
+        has_pets: hasPets,
+        difficult_access: difficultAccess,
+        asbestos_risk: asbestosRisk,
+        lead_paint_risk: leadPaintRisk,
+        total_sqft: totalSqft > 0 ? totalSqft : null,
+        photo_count: photos.length,
+      }),
+    [rooms, scopeNotes, accessNotes, hasPets, difficultAccess, asbestosRisk, leadPaintRisk, totalSqft, photos.length]
+  );
 
   return (
     <div className="p7-form-stack" style={{ maxWidth: 680 }}>
@@ -370,11 +419,11 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
                 borderRadius: "var(--radius)",
               }}
             >
-              {uploading ? "Uploading…" : "+ Add Photo"}
+              {uploading ? `Uploading${uploadProgress ? ` ${uploadProgress}` : ""}…` : "+ Add Photos"}
               <input
                 type="file"
                 accept="image/*"
-                capture="environment"
+                multiple
                 onChange={handlePhotoUpload}
                 disabled={uploading}
                 style={{ display: "none" }}
@@ -382,6 +431,11 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
             </label>
           )}
         </div>
+        {uploadError && (
+          <div className="p7-card-danger" role="alert" style={{ marginBottom: "var(--space-2)" }}>
+            {uploadError}
+          </div>
+        )}
         {photos.length > 0 ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: "var(--space-2)" }}>
             {photos.map((photo) => (
@@ -447,13 +501,18 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
         </div>
         {showMaterials && (
           <MaterialsGenerator
-            initialScope={scopeNotes}
+            initialScope={generatedJobDescription}
             rooms={rooms}
+            visitId={visitId}
+            assessmentId={initialAssessment?.id ?? null}
             onAddToEstimate={(matItems: MaterialItem[]) => {
               const params = new URLSearchParams();
               if (clientId) params.set("client_id", clientId);
               if (jobId) params.set("job_id", jobId);
               if (propertyId) params.set("property_id", propertyId);
+              // Carry the source visit so the estimate page can recover the
+              // assessment summary from persistence if sessionStorage is gone.
+              params.set("visit_id", visitId);
               // Store generated materials in sessionStorage for the estimate form to pick up
               const lineItems = matItems.map((m) => ({
                 description: `${m.name}${m.brand ? ` (${m.brand})` : ""} — ${m.quantity} ${m.unit}`,
@@ -461,6 +520,14 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
                 unit_price: (m.total_cost_cents / 100).toFixed(2),
               }));
               sessionStorage.setItem("estimate_prefill_materials", JSON.stringify(lineItems));
+              // Carry the assessment context so the estimate-page materials
+              // generator keeps the generated description + room measurements.
+              writeAssessmentContext({
+                generatedJobDescription,
+                rooms,
+                visitId,
+                assessmentId: initialAssessment?.id ?? null,
+              });
               router.push(`/app/estimates/new?${params.toString()}&from_assessment=1`);
             }}
             onClose={() => setShowMaterials(false)}
@@ -485,6 +552,20 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
             className="p7-btn p7-btn-primary p7-btn-sm"
           >
             {completing ? "Completing…" : "Mark Assessment Complete"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const params = new URLSearchParams();
+              if (clientId) params.set("client_id", clientId);
+              if (jobId) params.set("job_id", jobId);
+              if (propertyId) params.set("property_id", propertyId);
+              params.set("visit_id", visitId);
+              router.push(`/app/work-orders/new?${params.toString()}` as Route);
+            }}
+            className="p7-btn p7-btn-ghost p7-btn-sm"
+          >
+            Create Work Order →
           </button>
           <a href={`/app/visits/${visitId}`} className="p7-btn p7-btn-ghost p7-btn-sm">
             Back to Visit

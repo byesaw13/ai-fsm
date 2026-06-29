@@ -10,6 +10,7 @@ export type WorkflowEventType =
   | "invoice.sent"
   | "invoice.paid"
   | "invoice.void"
+  | "payment.recorded"
   | "membership.cancelled";
 
 export async function writeWorkflowEvent(

@@ -8,7 +8,9 @@ import type { Role } from "@ai-fsm/domain";
 import { ToastProvider } from "./ui/Toast";
 import { QuickLeadModal } from "./QuickLeadModal";
 import { FloatingActionButton } from "./FloatingActionButton";
+import { WorkspaceAutoRoute } from "./WorkspaceAutoRoute";
 import {
+  IconDashboard,
   IconEstimates,
   IconInbox,
   IconSettings,
@@ -20,9 +22,26 @@ import {
   IconReports,
   IconVisits,
   IconSchedule,
+  IconQueue,
 } from "./NavIcons";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
+
+function IconChevronLeft({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  );
+}
+
+function IconChevronRight({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
 
 interface NavItem {
   href: string;
@@ -42,7 +61,12 @@ interface NavSection {
 // ---------------------------------------------------------------------------
 
 // Named constants for items referenced outside the array (mobile bottom bar)
-const NAV_TODAY:    NavItem = { href: "/app",              label: "Today",    Icon: IconMyDay };
+// The office overview/dashboard. Labelled "Overview" (not "Today") so it reads
+// as the numbers screen and doesn't compete with the My Day field surface.
+const NAV_TODAY:    NavItem = { href: "/app",              label: "Overview", Icon: IconDashboard };
+// EPIC-006 Phase 5: the field surface. Owners can switch into it; pure admins
+// (who don't do field work) and the all-techs list never see it here.
+const NAV_MY_DAY:   NavItem = { href: "/app/my-day",       label: "My Day",   Icon: IconMyDay };
 const NAV_REQUESTS: NavItem = { href: "/app/requests",     label: "Requests", Icon: IconInbox };
 const NAV_PROPS:    NavItem = { href: "/app/properties", label: "Properties", Icon: IconProperties, adminOnly: true };
 const NAV_JOBS:     NavItem = { href: "/app/jobs",       label: "Jobs",       Icon: IconJobs,       adminOnly: true };
@@ -56,11 +80,13 @@ const ADMIN_NAV_SECTIONS: NavSection[] = [
     label: "",
     items: [
       NAV_TODAY,
+      NAV_MY_DAY,
       NAV_REQUESTS,
       { href: "/app/clients",   label: "Clients",    Icon: IconClients,   adminOnly: true },
       NAV_PROPS,
       { href: "/app/estimates", label: "Estimates",  Icon: IconEstimates, adminOnly: true },
       NAV_JOBS,
+      { href: "/app/work-orders", label: "Work Orders", Icon: IconQueue, adminOnly: true },
       { href: "/app/schedule",  label: "Schedule",   Icon: IconSchedule,  adminOnly: true },
       NAV_INVOICES,
       NAV_REPORTS,
@@ -73,15 +99,32 @@ const ADMIN_NAV_SECTIONS: NavSection[] = [
 // Pure functions
 // ---------------------------------------------------------------------------
 
-/** Returns filtered nav sections for a given role */
-export function getNavSections(role: Role): NavSection[] {
+/** Returns filtered nav sections for a given role and active workspace view. */
+export function getNavSections(role: Role, view: "office" | "field" = "field"): NavSection[] {
   if (role === "tech") {
     const myDay: NavItem = { href: "/app/my-day", label: "My Day", Icon: IconMyDay };
     const visits: NavItem = { href: "/app/visits", label: "Visits", Icon: IconVisits };
     return [{ label: "", items: [myDay, visits] }];
   }
 
-  return ADMIN_NAV_SECTIONS;
+  // EPIC-006 Phase 5: only the owner does field work, so only the owner gets the
+  // My Day switch. Pure admins run the business and never see the field surface.
+  if (role === "admin") {
+    return ADMIN_NAV_SECTIONS.map((s) => ({
+      ...s,
+      items: s.items.filter((i) => i.href !== NAV_MY_DAY.href),
+    }));
+  }
+
+  // Owner = the all-rounder, but the sidebar reflects the ACTIVE workspace so the
+  // two "homes" never sit side-by-side (TASK-058 follow-up): My Day leads in
+  // Field, Overview leads in Office; the other home is reached from Settings →
+  // Workspace. The shared business destinations appear in both.
+  const base = ADMIN_NAV_SECTIONS[0].items.filter(
+    (i) => i.href !== NAV_MY_DAY.href && i.href !== NAV_TODAY.href,
+  );
+  const home = view === "office" ? NAV_TODAY : NAV_MY_DAY;
+  return [{ label: "", items: [home, ...base] }];
 }
 
 /**
@@ -95,6 +138,11 @@ export function getBottomNavItems(role: Role): NavItem[] {
     const myDay: NavItem = { href: "/app/my-day", label: "My Day", Icon: IconMyDay };
     const visits: NavItem = { href: "/app/visits", label: "Visits", Icon: IconVisits };
     return [myDay, visits];
+  }
+
+  // Owner leads with My Day; pure admins keep the Overview dashboard up front.
+  if (role === "owner") {
+    return [NAV_MY_DAY, NAV_REQUESTS, NAV_JOBS];
   }
 
   return [NAV_TODAY, NAV_REQUESTS, NAV_JOBS];
@@ -118,11 +166,31 @@ interface AppShellProps {
 
 export function AppShell({ role, userName, children }: AppShellProps) {
   const pathname = usePathname();
-  const sections = getNavSections(role);
+  // The sidebar follows the surface you're on: My Day = field, everything else =
+  // office. So Field never shows the Overview home and vice-versa.
+  const sections = getNavSections(role, pathname.startsWith("/app/my-day") ? "field" : "office");
   const bottomItems = getBottomNavItems(role);
   const [showQuickLead, setShowQuickLead] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    const val = localStorage.getItem("p7-sidebar-collapsed");
+    if (val === "true") {
+      setCollapsed(true);
+    }
+  }, []);
+
+  const toggleCollapse = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    localStorage.setItem("p7-sidebar-collapsed", String(next));
+  };
+
   const isAdminOrOwner = role === "owner" || role === "admin";
+  // Logo goes to each role's home: My Day for field roles, the office dashboard
+  // for pure admins (who get bounced there from My Day anyway).
+  const homeHref = role === "admin" ? "/app" : "/app/my-day";
 
   // Close the More sheet whenever navigation happens.
   useEffect(() => {
@@ -134,16 +202,27 @@ export function AppShell({ role, userName, children }: AppShellProps) {
 
   return (
     <ToastProvider>
-      <div className="p7-layout">
+      <div className={`p7-layout ${collapsed ? "p7-layout-collapsed" : ""}`}>
         {/* ---- Desktop/Tablet Sidebar ---- */}
         <aside className="p7-sidebar" aria-label="Main navigation">
           {/* Brand */}
-          <Link href={"/app" as Route} className="p7-sidebar-brand">
-            <div className="p7-brand-logo" aria-hidden="true">
-              <span className="p7-brand-logo-text">DV</span>
-            </div>
-            <span className="p7-brand-name">Dovetails</span>
-          </Link>
+          <div style={{ position: "relative" }}>
+            <Link href={homeHref as Route} className="p7-sidebar-brand">
+              <div className="p7-brand-logo" aria-hidden="true">
+                <span className="p7-brand-logo-text">DV</span>
+              </div>
+              <span className="p7-brand-name">Dovetails</span>
+            </Link>
+            <button
+              type="button"
+              onClick={toggleCollapse}
+              className="p7-sidebar-toggle-btn"
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {collapsed ? <IconChevronRight /> : <IconChevronLeft />}
+            </button>
+          </div>
 
           {/* New Request button — owner/admin only */}
           {isAdminOrOwner && (
@@ -200,8 +279,21 @@ export function AppShell({ role, userName, children }: AppShellProps) {
 
           {/* Footer — user chip + logout */}
           <div className="p7-sidebar-footer">
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-              <div className="p7-user-chip">
+            {/* Tech sidebar nav has no Settings entry — surface it here so the
+                profile + sign out are reachable on desktop too (EPIC-006 P5). */}
+            {role === "tech" && (
+              <Link
+                href={"/app/settings" as Route}
+                className={`p7-nav-item ${isNavActive(pathname, "/app/settings") ? "p7-nav-active" : ""}`}
+                title="Settings"
+                style={{ marginBottom: "var(--space-2)" }}
+              >
+                <span className="p7-nav-icon" aria-hidden="true"><IconSettings size={18} /></span>
+                <span className="p7-nav-label">Settings</span>
+              </Link>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", width: "100%" }}>
+              <div className="p7-user-chip" title={displayName}>
                 <div className="p7-user-avatar" aria-hidden="true">
                   {avatarLetter}
                 </div>
@@ -217,6 +309,10 @@ export function AppShell({ role, userName, children }: AppShellProps) {
 
         {/* ---- Main content ---- */}
         <main className="p7-main" id="main-content">
+          {/* TASK-058: workspace mode is automatic by device (phone → Field,
+              tablet/computer → Office) with an override in Settings — no on-screen
+              toggle or daily popup. This renders nothing; it only steers entry. */}
+          {role === "owner" && <WorkspaceAutoRoute />}
           {children}
         </main>
 
@@ -239,7 +335,9 @@ export function AppShell({ role, userName, children }: AppShellProps) {
                 </Link>
               );
             })}
-            {isAdminOrOwner && (
+            {/* EPIC-006 Phase 5: every role gets the More sheet so Settings and
+                Sign out are reachable on a phone (sidebar is hidden < 768px). */}
+            {(
               <button
                 type="button"
                 className={`p7-bottom-nav-item p7-more-btn ${showMore ? "p7-nav-active" : ""}`}
@@ -296,7 +394,18 @@ export function AppShell({ role, userName, children }: AppShellProps) {
                     <span className="p7-user-role">{role}</span>
                   </div>
                 </div>
-                <LogoutButton />
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                  <Link
+                    href={"/app/settings" as Route}
+                    className="p7-nav-item"
+                    style={{ padding: "6px 10px", fontSize: 13 }}
+                    onClick={() => setShowMore(false)}
+                  >
+                    <span className="p7-nav-icon" aria-hidden="true"><IconSettings size={18} /></span>
+                    <span className="p7-nav-label">Settings</span>
+                  </Link>
+                  <LogoutButton />
+                </div>
               </div>
             </div>
           </>

@@ -11,7 +11,7 @@ import {
   canCreateVisit,
   canDeleteRecords,
 } from "@/lib/auth/permissions";
-import { jobTransitions } from "@ai-fsm/domain";
+import { jobTransitions, JOB_STATUS_LABELS } from "@ai-fsm/domain";
 import type { Job, Visit, JobStatus, JobAcceptanceCategory, JobIntakeDecision } from "@ai-fsm/domain";
 import { JOB_SUB_STATUSES, SUB_STATUS_LABELS } from "@ai-fsm/domain";
 import { JobTransitionForm } from "./JobTransitionForm";
@@ -19,6 +19,7 @@ import { DeleteJobButton } from "./DeleteJobButton";
 import { JobEditForm } from "./JobEditFormWrapper";
 import { JobIntakePanel } from "./JobIntakePanel";
 import { AssetLinksPanel } from "./AssetLinksPanel";
+import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { JobCommandPanel } from "./JobCommandPanel";
 import { WhatNextBanner } from "./WhatNextBanner";
 import { VendorCoordinationCard } from "./VendorCoordinationCard";
@@ -60,15 +61,6 @@ type VisitRow = Visit & {
   assigned_user_name: string | null;
 };
 
-const JOB_STATUS_LABELS: Record<JobStatus, string> = {
-  draft: "Draft",
-  quoted: "Quoted",
-  scheduled: "Scheduled",
-  in_progress: "In Progress",
-  completed: "Completed",
-  invoiced: "Invoiced",
-  cancelled: "Cancelled",
-};
 
 function AdvancedDetails({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -230,8 +222,8 @@ export default async function JobDetailPage({
              (SELECT sent_at FROM estimates WHERE job_id = $1 AND account_id = $2 AND status IN ('sent','approved') ORDER BY created_at DESC LIMIT 1) AS last_estimate_sent_at,
              EXISTS(SELECT 1 FROM estimates WHERE job_id = $1 AND account_id = $2 AND status = 'approved') AS has_approved_estimate,
              (SELECT id FROM estimates WHERE job_id = $1 AND account_id = $2 AND status = 'approved' ORDER BY created_at DESC LIMIT 1) AS approved_estimate_id,
-             EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND notes LIKE 'Deposit: %') AS has_deposit_invoice,
-             EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND notes LIKE 'Deposit: %' AND status IN ('partial','paid')) AS deposit_paid,
+             EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND invoice_kind = 'deposit') AS has_deposit_invoice,
+             EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND invoice_kind = 'deposit' AND status IN ('partial','paid')) AS deposit_paid,
              EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND status IN ('sent','partial','overdue')) AS has_unpaid_invoice,
              EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND status = 'paid') AS has_paid_invoice,
              (SELECT id FROM booking_requests
@@ -332,7 +324,9 @@ export default async function JobDetailPage({
   // viewport width (p7-only-* utilities), replacing the workspace-mode cookie.
   const currentVisit = activeVisits.find((v) => v.status === "in_progress" || v.status === "arrived") ?? activeVisits[0] ?? visits[0] ?? null;
   const visitHref = currentVisit ? (`/app/visits/${currentVisit.id}` as Route) : null;
-  const mapHref = job.property_address ? `https://maps.apple.com/?q=${encodeURIComponent(job.property_address)}` : null;
+  // Universal maps link: opens the native maps app on both iOS and Android
+  // (and the browser as fallback). maps.apple.com only deep-links cleanly on iOS.
+  const mapHref = job.property_address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.property_address)}` : null;
 
   const mobileView = (
       <div style={{ padding: "var(--space-4) var(--space-4) var(--space-12)", display: "flex", flexDirection: "column", gap: "var(--space-5)", maxWidth: 760 }}>
@@ -344,7 +338,7 @@ export default async function JobDetailPage({
             <div>
               <h1 style={{ margin: 0, fontSize: "var(--text-2xl)", fontWeight: 800 }}>{job.title}</h1>
               <p style={{ margin: "var(--space-1) 0 0", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-                {job.client_name ?? "Current job"}{job.property_address ? ` / ${job.property_address}` : ""}
+                {job.job_number ? `${job.job_number} · ` : ""}{job.client_name ?? "Current job"}{job.property_address ? ` / ${job.property_address}` : ""}
               </p>
             </div>
             <StatusBadge variant={currentStatus as StatusVariant}>{JOB_STATUS_LABELS[currentStatus]}</StatusBadge>
@@ -395,6 +389,8 @@ export default async function JobDetailPage({
             {!isTech && <div className="p7-detail-row"><dt>Invoices</dt><dd>{invoiceCount}</dd></div>}
           </dl>
         </AdvancedDetails>
+
+        <LinkedDocuments session={session} entityType="job" entityId={job.id} />
       </div>
   );
 
@@ -402,7 +398,7 @@ export default async function JobDetailPage({
     <PageContainer>
       <PageHeader
         title={job.title}
-        subtitle={job.client_name ?? undefined}
+        subtitle={[job.job_number, job.client_name].filter(Boolean).join(" · ") || undefined}
         backHref="/app/jobs"
         backLabel="Jobs"
         actions={
@@ -792,6 +788,8 @@ export default async function JobDetailPage({
                 />
               </AdvancedDetails>
             )}
+
+            <LinkedDocuments session={session} entityType="job" entityId={job.id} />
           </div>
         )}
 

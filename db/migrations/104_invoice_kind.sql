@@ -1,7 +1,7 @@
 -- 104_invoice_kind.sql
 -- Make the deposit-vs-final billing model explicit and impossible to confuse.
 --
--- Problem this fixes (see docs/generated/ESTIMATE_SYSTEM_DEEP_AUDIT.md):
+-- Problem this fixes:
 --   - On approval a deposit invoice is auto-created.
 --   - The estimate→invoice "Convert" idempotency guard matched ANY invoice for
 --     the estimate, so once a deposit invoice existed, Convert returned the

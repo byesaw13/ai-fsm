@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "pg": "^8.13.1",
-    "tsx": "^4.19.2",
     "nodemailer": "~6.9.16"
   },
   "devDependencies": {
@@ -22,6 +21,7 @@
     "@typescript-eslint/eslint-plugin": "^8.20.0",
     "@typescript-eslint/parser": "^8.20.0",
     "eslint": "^8.57.1",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^3.0.5",
     "@types/nodemailer": "~6.4.17"

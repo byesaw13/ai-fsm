@@ -146,21 +146,37 @@ describe("getNavSections (role filtering)", () => {
     expect(sections[0].label).toBe("");
   });
 
-  it("Owner/admin nav has Today, Requests, Clients, Properties, Estimates, Jobs, Schedule, Invoices, Reports, Settings", () => {
+  it("Owner nav has the active home + all shared business destinations", () => {
+    // The home swaps with the workspace (My Day in Field, Overview in Office);
+    // the shared destinations are present in both. (TASK-058 follow-up)
+    const shared = [
+      "/app/requests",
+      "/app/clients",
+      "/app/properties",
+      "/app/estimates",
+      "/app/jobs",
+      "/app/work-orders",
+      "/app/schedule",
+      "/app/invoices",
+      "/app/reports",
+      "/app/settings",
+    ];
+    for (const view of ["field", "office"] as const) {
+      const hrefs = getNavSections("owner", view)[0].items.map((i) => i.href);
+      for (const href of shared) expect(hrefs).toContain(href);
+      expect(hrefs).toContain(view === "field" ? "/app/my-day" : "/app");
+      expect(hrefs).not.toContain("/app/mileage");
+      expect(hrefs).toHaveLength(11);
+    }
+  });
+
+  it("Admin nav drops My Day (pure admins don't do field work) — 11 items", () => {
     const sections = getNavSections("admin");
     const hrefs = sections[0].items.map((i) => i.href);
+    expect(hrefs).not.toContain("/app/my-day"); // EPIC-006 P5
     expect(hrefs).toContain("/app");
-    expect(hrefs).toContain("/app/requests");
-    expect(hrefs).toContain("/app/clients");
-    expect(hrefs).toContain("/app/properties");
-    expect(hrefs).toContain("/app/estimates");
-    expect(hrefs).toContain("/app/jobs");
-    expect(hrefs).toContain("/app/schedule");
-    expect(hrefs).toContain("/app/invoices");
-    expect(hrefs).toContain("/app/reports");
     expect(hrefs).toContain("/app/settings");
-    expect(hrefs).not.toContain("/app/mileage");
-    expect(hrefs).toHaveLength(10);
+    expect(hrefs).toHaveLength(11);
   });
 
   it("Layer 2+ tools are not in main nav", () => {
@@ -175,10 +191,20 @@ describe("getNavSections (role filtering)", () => {
     expect(hrefs).not.toContain("/app/booking-requests");
   });
 
-  it("returns the same 1-section nav for owner role with 10 items", () => {
-    const sections = getNavSections("owner");
-    expect(sections).toHaveLength(1);
-    expect(flattenSections(sections)).toHaveLength(10);
+  it("owner nav is one section of 11 items with a single home per workspace", () => {
+    for (const view of ["field", "office"] as const) {
+      const sections = getNavSections("owner", view);
+      expect(sections).toHaveLength(1);
+      const hrefs = flattenSections(sections).map((i) => i.href);
+      expect(hrefs).toHaveLength(11);
+      if (view === "field") {
+        expect(hrefs).toContain("/app/my-day");
+        expect(hrefs).not.toContain("/app"); // no Overview home in Field
+      } else {
+        expect(hrefs).toContain("/app");
+        expect(hrefs).not.toContain("/app/my-day"); // no My Day home in Office
+      }
+    }
   });
 
   it("returns only 2 items for tech role (My Day + Visits)", () => {
@@ -196,14 +222,32 @@ describe("getNavSections (role filtering)", () => {
     expect(hrefs).not.toContain("/app/automations");
   });
 
-  it("includes Today first for admin/owner, My Day first for tech", () => {
-    const techItems = flattenSections(getNavSections("tech"));
-    expect(techItems[0].href).toBe("/app/my-day");
+  it("leads with My Day for owner/tech, Overview for pure admin", () => {
+    for (const role of ["tech", "owner"] as const) {
+      const items = flattenSections(getNavSections(role));
+      expect(items[0].href).toBe("/app/my-day");
+    }
 
-    for (const role of ["admin", "owner"] as const) {
-      const sections = getNavSections(role);
-      expect(sections[0].items[0].href).toBe("/app");
-      expect(sections[0].items[0].label).toBe("Today");
+    const adminFirst = getNavSections("admin")[0].items[0];
+    expect(adminFirst.href).toBe("/app");
+    expect(adminFirst.label).toBe("Overview");
+  });
+
+  it("owner sidebar shows the active workspace's home, not both", () => {
+    // Field surface: My Day leads, Overview is not in the sidebar (reach it from
+    // Settings → Workspace). Office surface: the reverse.
+    const field = flattenSections(getNavSections("owner", "field")).map((i) => i.href);
+    expect(field[0]).toBe("/app/my-day");
+    expect(field).not.toContain("/app");
+
+    const office = flattenSections(getNavSections("owner", "office")).map((i) => i.href);
+    expect(office[0]).toBe("/app");
+    expect(office).not.toContain("/app/my-day");
+
+    // Shared business destinations stay in both.
+    for (const href of ["/app/jobs", "/app/invoices", "/app/reports", "/app/settings"]) {
+      expect(field).toContain(href);
+      expect(office).toContain(href);
     }
   });
 });
@@ -230,6 +274,15 @@ describe("getBottomNavItems (mobile)", () => {
     expect(hrefs).toContain("/app/visits");
     expect(hrefs).not.toContain("/app/field");
     expect(hrefs).not.toContain("/app/jobs");
+  });
+
+  it("returns 3 link items for owner role leading with My Day", () => {
+    const items = getBottomNavItems("owner");
+    expect(items.map((i) => i.href)).toEqual([
+      "/app/my-day",
+      "/app/requests",
+      "/app/jobs",
+    ]);
   });
 });
 

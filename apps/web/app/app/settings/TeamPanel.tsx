@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { ConfirmDialog } from "@/components/ui";
 
 export interface TeamMember {
   id: string;
@@ -30,6 +31,7 @@ export function TeamPanel({ initialMembers, currentUserId, currentRole }: Props)
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<TeamMember>>({});
+  const [removeTarget, setRemoveTarget] = useState<TeamMember | null>(null);
 
   const isOwner = currentRole === "owner";
 
@@ -77,8 +79,7 @@ export function TeamPanel({ initialMembers, currentUserId, currentRole }: Props)
   }
 
   // --- Remove user ---
-  async function handleRemove(member: TeamMember) {
-    if (!confirm(`Remove ${member.full_name} from the team? This cannot be undone.`)) return;
+  async function doRemove(member: TeamMember) {
     try {
       const res = await fetch(`/api/v1/users/${member.id}`, { method: "DELETE" });
       const data = await res.json();
@@ -140,7 +141,7 @@ export function TeamPanel({ initialMembers, currentUserId, currentRole }: Props)
                 <button type="button" className="btn btn-sm" onClick={() => { setEditId(m.id); setEditForm({}); }}>Edit</button>
               )}
               {isOwner && m.id !== currentUserId && (
-                <button type="button" className="btn btn-sm btn-danger" onClick={() => handleRemove(m)}>Remove</button>
+                <button type="button" className="btn btn-sm btn-danger" onClick={() => setRemoveTarget(m)}>Remove</button>
               )}
             </div>
           )}
@@ -190,6 +191,19 @@ export function TeamPanel({ initialMembers, currentUserId, currentRole }: Props)
           + Add team member
         </button>
       )}
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        title="Remove team member?"
+        body={`Remove ${removeTarget?.full_name ?? ""} from the team? This cannot be undone.`}
+        confirmLabel="Remove"
+        onConfirm={() => {
+          const member = removeTarget!;
+          setRemoveTarget(null);
+          doRemove(member);
+        }}
+        onCancel={() => setRemoveTarget(null)}
+      />
     </div>
   );
 }

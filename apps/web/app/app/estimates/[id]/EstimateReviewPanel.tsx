@@ -129,7 +129,7 @@ export function EstimateReviewPanel({ estimateId }: Props) {
                     style={{
                       padding: "var(--space-2) var(--space-3)",
                       borderRadius: "var(--radius)",
-                      borderLeft: `3px solid ${ts.color}`,
+                      border: `1px solid ${ts.color}`,
                       background: "var(--bg-subtle)",
                     }}
                   >

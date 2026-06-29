@@ -10,8 +10,13 @@ import { withAuth } from "@/lib/auth/middleware";
 import type { AuthSession } from "@/lib/auth/middleware";
 import { query } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { generateMaterials } from "@/lib/estimates/materials-generator";
-import type { SavedMaterial } from "@/lib/estimates/materials-generator";
+import { generateMaterials, MaterialsGenerationError } from "@/lib/estimates/materials-generator";
+import type { RoomMeasurement, SavedMaterial } from "@/lib/estimates/materials-generator";
+import {
+  loadAssessmentSummary,
+  loadAssessmentSummaryById,
+} from "@/lib/estimates/assessment-summary-loader";
+import type { AssessmentSummary } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -24,10 +29,17 @@ const roomSchema = z.object({
   notes: z.string().optional(),
 });
 
+// scope/job_type become optional when an assessment is supplied — they are
+// derived from the persisted summary. assessment_id / visit_id load the
+// canonical summary server-side; assessment_summary is a client-provided
+// fallback (only used when neither id resolves).
 const bodySchema = z.object({
-  scope: z.string().min(3).max(5000),
-  job_type: z.string().min(1).max(100),
+  scope: z.string().max(5000).optional(),
+  job_type: z.string().max(100).optional(),
   rooms: z.array(roomSchema).optional().default([]),
+  assessment_id: z.string().uuid().optional(),
+  visit_id: z.string().uuid().optional(),
+  assessment_summary: z.unknown().optional(),
 });
 
 export const POST = withAuth(async (request: NextRequest, session: AuthSession) => {
@@ -41,6 +53,45 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
       { status: 422 }
     );
   }
+
+  // Resolve the canonical assessment summary, preferring persistence over any
+  // client-provided fallback. visit_id wins, then assessment_id, then the
+  // client-supplied summary (typed from the canonical contract).
+  let summary: AssessmentSummary | null = null;
+  try {
+    if (parsed.data.visit_id) {
+      summary = await loadAssessmentSummary(session, parsed.data.visit_id);
+    } else if (parsed.data.assessment_id) {
+      summary = await loadAssessmentSummaryById(session, parsed.data.assessment_id);
+    }
+  } catch (err) {
+    logger.error("ai-materials: failed to load assessment summary", err, { traceId: session.traceId });
+  }
+  if (!summary && parsed.data.assessment_summary && typeof parsed.data.assessment_summary === "object") {
+    summary = parsed.data.assessment_summary as AssessmentSummary;
+  }
+
+  // scope/job_type are derived from the assessment when not provided directly.
+  const scope = (parsed.data.scope ?? "").trim() || summary?.generatedJobDescription || "";
+  const jobType = (parsed.data.job_type ?? "").trim() || "general";
+  if (scope.length < 3) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: "A scope or an assessment with usable content is required", traceId: session.traceId } },
+      { status: 422 }
+    );
+  }
+  // Prefer rooms from the request; otherwise fall back to the assessment rooms.
+  const rooms: RoomMeasurement[] =
+    parsed.data.rooms.length > 0
+      ? parsed.data.rooms
+      : (summary?.rooms ?? []).map((r) => ({
+          id: r.id,
+          name: r.name,
+          length_ft: r.length_ft,
+          width_ft: r.width_ft,
+          height_ft: r.height_ft,
+          notes: r.notes,
+        }));
 
   // Load the account's saved materials price book
   const savedRows = (await query(
@@ -63,15 +114,26 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
 
   try {
     const result = await generateMaterials({
-      scope: parsed.data.scope,
-      job_type: parsed.data.job_type,
-      rooms: parsed.data.rooms,
+      scope,
+      job_type: jobType,
+      rooms,
       saved_materials: savedRows,
       material_markup_pct: materialMarkupPct,
+      assessmentSummary: summary ?? undefined,
     });
 
     return NextResponse.json({ data: result });
   } catch (err) {
+    // Known, explainable failures (not configured, scope too large, key
+    // rejected) carry their own user-facing message and status — surface them
+    // so the caller learns the real reason instead of a generic 500.
+    if (err instanceof MaterialsGenerationError) {
+      logger.warn("ai-materials: " + err.code, { traceId: session.traceId, message: err.message });
+      return NextResponse.json(
+        { error: { code: err.code, message: err.message, traceId: session.traceId } },
+        { status: err.status }
+      );
+    }
     logger.error("POST /api/v1/estimates/ai-materials error", err, { traceId: session.traceId });
     return NextResponse.json(
       { error: { code: "INTERNAL_ERROR", message: "Failed to generate materials list", traceId: session.traceId } },

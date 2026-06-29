@@ -36,6 +36,16 @@ export const jobStatusSchema = z.enum([
 ]);
 export type JobStatus = z.infer<typeof jobStatusSchema>;
 
+export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
+  draft: "Draft",
+  quoted: "Quoted",
+  scheduled: "Scheduled",
+  in_progress: "In Progress",
+  completed: "Completed",
+  invoiced: "Invoiced",
+  cancelled: "Cancelled",
+};
+
 export const jobTransitions: Record<JobStatus, readonly JobStatus[]> = {
   draft: ["quoted", "scheduled"],
   quoted: ["scheduled", "draft"],
@@ -142,9 +152,9 @@ export type InvoiceStatus = z.infer<typeof invoiceStatusSchema>;
 
 export const invoiceTransitions: Record<InvoiceStatus, readonly InvoiceStatus[]> = {
   draft: ["sent", "void"],
-  sent: ["partial", "paid", "overdue", "void"],
-  partial: ["paid", "overdue", "void"],
-  overdue: ["partial", "paid", "void"],
+  sent: ["draft", "partial", "paid", "overdue", "void"],
+  partial: ["draft", "paid", "overdue", "void"],
+  overdue: ["draft", "partial", "paid", "void"],
   paid: [],
   void: [],
 };
@@ -152,13 +162,64 @@ export const invoiceTransitions: Record<InvoiceStatus, readonly InvoiceStatus[]>
 // === Payment ===
 
 export const paymentMethodSchema = z.enum([
+  "square",
+  "venmo",
   "cash",
   "check",
+  "zelle",
+  "ach",
+  // legacy values retained for back-compat with existing payment rows
   "card",
   "transfer",
   "other",
 ]);
 export type PaymentMethod = z.infer<typeof paymentMethodSchema>;
+
+export const paymentMethodLabels: Record<PaymentMethod, string> = {
+  square: "Square",
+  venmo: "Venmo",
+  cash: "Cash",
+  check: "Check",
+  zelle: "Zelle",
+  ach: "ACH",
+  card: "Card",
+  transfer: "Transfer",
+  other: "Other",
+};
+
+export const paymentTypeSchema = z.enum([
+  "deposit",
+  "progress",
+  "final",
+  "refund",
+  "adjustment",
+]);
+export type PaymentType = z.infer<typeof paymentTypeSchema>;
+
+export const paymentTypeLabels: Record<PaymentType, string> = {
+  deposit: "Deposit",
+  progress: "Progress",
+  final: "Final",
+  refund: "Refund",
+  adjustment: "Adjustment",
+};
+
+export const paymentStatusSchema = z.enum([
+  "pending",
+  "paid",
+  "failed",
+  "refunded",
+  "cancelled",
+]);
+export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
+
+export const paymentStatusLabels: Record<PaymentStatus, string> = {
+  pending: "Pending",
+  paid: "Paid",
+  failed: "Failed",
+  refunded: "Refunded",
+  cancelled: "Cancelled",
+};
 
 // === Automation ===
 

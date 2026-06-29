@@ -20,19 +20,27 @@ export async function withInvoiceContext<T>(
 
 /**
  * Generate the next invoice number for an account.
- * Format: INV-{zero-padded 4-digit count}
+ * Format: INV-{zero-padded 4-digit sequence}
  * Example: INV-0001, INV-0042, INV-1234
  *
- * Must be called inside a transaction to avoid race conditions.
+ * Allocates from the highest existing suffix + 1 (not a row count): a
+ * count-based sequence reuses a live number after a non-latest invoice is
+ * removed/voided and collides with the (account_id, invoice_number) unique
+ * index. Gaps are acceptable. Must run inside a transaction to avoid races.
  */
 export async function generateInvoiceNumber(
   client: PoolClient,
   accountId: string
 ): Promise<string> {
-  const result = await client.query<{ count: string }>(
-    `SELECT COUNT(*) AS count FROM invoices WHERE account_id = $1`,
+  // Only consider numbers this generator produced (INV-####); custom/historical
+  // invoice numbers in other formats are left out of the sequence (the unique
+  // index still keeps everything distinct).
+  const result = await client.query<{ next: string }>(
+    `SELECT COALESCE(MAX(substring(invoice_number from '^INV-(\\d+)$')::int), 0) + 1 AS next
+     FROM invoices
+     WHERE account_id = $1 AND invoice_number ~ '^INV-\\d+$'`,
     [accountId]
   );
-  const count = parseInt(result.rows[0]?.count ?? "0", 10) + 1;
-  return `INV-${String(count).padStart(4, "0")}`;
+  const next = parseInt(result.rows[0]?.next ?? "1", 10);
+  return `INV-${String(next).padStart(4, "0")}`;
 }

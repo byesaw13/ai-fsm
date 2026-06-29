@@ -4,6 +4,7 @@ import { withAuth } from "../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../lib/auth/middleware";
 import { getPool } from "../../../../../lib/db";
 import { normalizeClientName } from "../../../../../lib/crm/p7";
+import { logger } from "../../../../../lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -95,7 +96,7 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
     return NextResponse.json({ data: { imported, skipped } });
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error("[clients/import]", err);
+    logger.error("[clients/import]", err);
     return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: "Import failed" } }, { status: 500 });
   } finally {
     client.release();
