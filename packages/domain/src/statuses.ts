@@ -36,6 +36,16 @@ export const jobStatusSchema = z.enum([
 ]);
 export type JobStatus = z.infer<typeof jobStatusSchema>;
 
+export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
+  draft: "Draft",
+  quoted: "Quoted",
+  scheduled: "Scheduled",
+  in_progress: "In Progress",
+  completed: "Completed",
+  invoiced: "Invoiced",
+  cancelled: "Cancelled",
+};
+
 export const jobTransitions: Record<JobStatus, readonly JobStatus[]> = {
   draft: ["quoted", "scheduled"],
   quoted: ["scheduled", "draft"],

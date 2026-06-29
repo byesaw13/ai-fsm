@@ -38,7 +38,7 @@ export function MarkDepositReceivedButton({ invoiceId, depositCents }: MarkDepos
 
   return (
     <button
-      className="btn btn-secondary"
+      className="p7-btn p7-btn-secondary"
       onClick={handleClick}
       disabled={pending}
       data-testid="mark-deposit-received-btn"

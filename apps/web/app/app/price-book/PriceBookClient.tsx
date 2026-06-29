@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Card, Input, SectionHeader } from "@/components/ui";
+import { Card, Input, PageContainer, PageHeader, SectionHeader } from "@/components/ui";
+import { formatCents } from "@/lib/money";
 import {
   PRICE_BOOK_CATEGORY_LABELS,
   PRICE_BOOK_TIER_LABELS,
@@ -51,9 +52,6 @@ interface Props {
   services: Service[];
 }
 
-function formatPrice(cents: number): string {
-  return `$${(cents / 100).toFixed(0)}`;
-}
 
 function tierColor(tier: string): string {
   switch (tier) {
@@ -121,16 +119,11 @@ export default function PriceBookClient({ services }: Props) {
   }, [services]);
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Price Book</h1>
-          <p className="page-subtitle">
-            {services.length} services across {categories.length} categories.
-            Browse and select items when creating estimates.
-          </p>
-        </div>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Price Book"
+        subtitle={`${services.length} services across ${categories.length} categories. Browse and select items when creating estimates.`}
+      />
 
       {/* Filters */}
       <div
@@ -260,10 +253,10 @@ export default function PriceBookClient({ services }: Props) {
                           {PRICE_BOOK_TIER_LABELS[service.tier as keyof typeof PRICE_BOOK_TIER_LABELS]}
                         </span>
                         <span style={{ fontWeight: 600, fontSize: "var(--text-sm)" }}>
-                          {formatPrice(service.price_min_cents)}
+                          {formatCents(service.price_min_cents)}
                           {service.price_max_cents
                             ? service.price_max_cents !== service.price_min_cents
-                              ? `–${formatPrice(service.price_max_cents)}`
+                              ? `–${formatCents(service.price_max_cents)}`
                               : ""
                             : "+"}
                         </span>
@@ -321,7 +314,7 @@ export default function PriceBookClient({ services }: Props) {
                           {service.default_price_cents !== null && (
                             <>
                               <span style={{ color: "var(--fg-muted)" }}>Default price:</span>
-                              <span>${((service.default_price_cents || 0) / 100).toFixed(2)}</span>
+                              <span>{formatCents(service.default_price_cents || 0)}</span>
                               <span></span>
                             </>
                           )}
@@ -329,7 +322,7 @@ export default function PriceBookClient({ services }: Props) {
                           {service.add_on_price_cents !== null && (
                             <>
                               <span style={{ color: "var(--fg-muted)" }}>Add-on price:</span>
-                              <span>${((service.add_on_price_cents || 0) / 100).toFixed(2)}</span>
+                              <span>{formatCents(service.add_on_price_cents || 0)}</span>
                               <span></span>
                             </>
                           )}
@@ -369,6 +362,6 @@ export default function PriceBookClient({ services }: Props) {
           </div>
         ))
       )}
-    </div>
+    </PageContainer>
   );
 }

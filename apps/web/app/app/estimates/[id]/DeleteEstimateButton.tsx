@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button, ConfirmDialog } from "@/components/ui";
 
 interface Props {
   estimateId: string;
@@ -11,15 +12,9 @@ export function DeleteEstimateButton({ estimateId }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   async function handleDelete() {
-    if (
-      !window.confirm(
-        "Delete this estimate permanently? This action cannot be undone."
-      )
-    ) {
-      return;
-    }
     setLoading(true);
     setError("");
     try {
@@ -42,15 +37,27 @@ export function DeleteEstimateButton({ estimateId }: Props) {
   return (
     <div data-testid="delete-estimate-panel">
       {error && <p className="error-inline" data-testid="delete-estimate-error">{error}</p>}
-      <button
-        type="button"
-        onClick={handleDelete}
+      <Button
+        variant="danger"
+        onClick={() => setConfirmOpen(true)}
         disabled={loading}
-        className="btn btn-danger"
         data-testid="delete-estimate-btn"
       >
         {loading ? "Deleting…" : "Delete Estimate"}
-      </button>
+      </Button>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete Estimate?"
+        body="This will permanently delete this estimate. This action cannot be undone."
+        confirmLabel="Delete Estimate"
+        onConfirm={() => {
+          setConfirmOpen(false);
+          handleDelete();
+        }}
+        onCancel={() => setConfirmOpen(false)}
+        loading={loading}
+      />
     </div>
   );
 }

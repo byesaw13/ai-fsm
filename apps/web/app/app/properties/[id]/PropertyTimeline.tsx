@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
+import { formatCents } from "@/lib/money";
 
 export type TimelineEventType = "visit" | "estimate" | "invoice" | "payment" | "work_order" | "vault_item" | "membership" | "photo" | "issue" | "note";
 
@@ -60,9 +61,6 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 }
 
-function formatCents(cents: number): string {
-  return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 0 })}`;
-}
 
 export function PropertyTimeline({ events }: { events: TimelineEvent[] }) {
   if (events.length === 0) {

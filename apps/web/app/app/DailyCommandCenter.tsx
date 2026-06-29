@@ -3,13 +3,6 @@
 // alias — `/app` (the owner dashboard) still renders `DailyCommandCenter`, which
 // is `WorkdayPanel`. Behavior is unchanged. The field/business separation is a
 // later phase (TASK-030).
-export type {
-  CountAction,
-  CommandVisit,
-  VehicleOption,
-  OpenSession,
-  MaterialJob,
-  EndWarnings,
-} from "./WorkdayPanel";
-
+export type { CountAction, CommandVisit, MaterialJob } from "./DashboardWidgets";
+export type { VehicleOption, OpenSession, EndWarnings } from "./WorkdayPanel";
 export { WorkdayPanel as DailyCommandCenter } from "./WorkdayPanel";

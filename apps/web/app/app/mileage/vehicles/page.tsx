@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
-import type { Route } from "next";
-import { Card, SectionHeader } from "@/components/ui";
+import { Card, PageContainer, PageHeader, SectionHeader } from "@/components/ui";
 
 interface Vehicle {
   id: string;
@@ -126,20 +124,21 @@ export default function VehiclesPage() {
   const inputStyle: React.CSSProperties = { width: "100%" };
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <div>
-          <Link href={"/app/mileage" as Route} className="back-link">← Mileage</Link>
-          <h1 className="page-title">Vehicles</h1>
-        </div>
-        <button
-          className="p7-btn p7-btn-primary"
-          onClick={() => { setShowAdd(true); setAddError(""); }}
-          style={{ display: showAdd ? "none" : undefined }}
-        >
-          + Add Vehicle
-        </button>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Vehicles"
+        backHref="/app/mileage"
+        backLabel="Mileage"
+        actions={
+          <button
+            className="p7-btn p7-btn-primary"
+            onClick={() => { setShowAdd(true); setAddError(""); }}
+            style={{ display: showAdd ? "none" : undefined }}
+          >
+            + Add Vehicle
+          </button>
+        }
+      />
 
       {error && <div className="p7-alert p7-alert-danger">{error}</div>}
 
@@ -271,6 +270,6 @@ export default function VehiclesPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

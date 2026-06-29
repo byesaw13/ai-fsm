@@ -11,7 +11,7 @@ import {
   canCreateVisit,
   canDeleteRecords,
 } from "@/lib/auth/permissions";
-import { jobTransitions } from "@ai-fsm/domain";
+import { jobTransitions, JOB_STATUS_LABELS } from "@ai-fsm/domain";
 import type { Job, Visit, JobStatus, JobAcceptanceCategory, JobIntakeDecision } from "@ai-fsm/domain";
 import { JOB_SUB_STATUSES, SUB_STATUS_LABELS } from "@ai-fsm/domain";
 import { JobTransitionForm } from "./JobTransitionForm";
@@ -61,15 +61,6 @@ type VisitRow = Visit & {
   assigned_user_name: string | null;
 };
 
-const JOB_STATUS_LABELS: Record<JobStatus, string> = {
-  draft: "Draft",
-  quoted: "Quoted",
-  scheduled: "Scheduled",
-  in_progress: "In Progress",
-  completed: "Completed",
-  invoiced: "Invoiced",
-  cancelled: "Cancelled",
-};
 
 function AdvancedDetails({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -231,8 +222,8 @@ export default async function JobDetailPage({
              (SELECT sent_at FROM estimates WHERE job_id = $1 AND account_id = $2 AND status IN ('sent','approved') ORDER BY created_at DESC LIMIT 1) AS last_estimate_sent_at,
              EXISTS(SELECT 1 FROM estimates WHERE job_id = $1 AND account_id = $2 AND status = 'approved') AS has_approved_estimate,
              (SELECT id FROM estimates WHERE job_id = $1 AND account_id = $2 AND status = 'approved' ORDER BY created_at DESC LIMIT 1) AS approved_estimate_id,
-             EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND notes LIKE 'Deposit: %') AS has_deposit_invoice,
-             EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND notes LIKE 'Deposit: %' AND status IN ('partial','paid')) AS deposit_paid,
+             EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND invoice_kind = 'deposit') AS has_deposit_invoice,
+             EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND invoice_kind = 'deposit' AND status IN ('partial','paid')) AS deposit_paid,
              EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND status IN ('sent','partial','overdue')) AS has_unpaid_invoice,
              EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND status = 'paid') AS has_paid_invoice,
              (SELECT id FROM booking_requests

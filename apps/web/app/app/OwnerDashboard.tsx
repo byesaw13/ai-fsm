@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { Card, SectionHeader } from "@/components/ui";
-import { ActionQueue, JobsToday, Materials } from "./WorkdayPanel";
-import type { CommandVisit, CountAction, MaterialJob } from "./WorkdayPanel";
+import { ActionQueue, JobsToday, Materials } from "./DashboardWidgets";
+import type { CommandVisit, CountAction, MaterialJob } from "./DashboardWidgets";
 import { OWNER_QUICK_ACTIONS } from "@/lib/navigation/quick-actions";
+import { formatCents } from "@/lib/money";
 
 // EPIC-006 TASK-030: the Owner Dashboard — "run the business." Business widgets
 // only (revenue, action queue, today's jobs, materials, tomorrow, quick links).
@@ -11,10 +12,6 @@ import { OWNER_QUICK_ACTIONS } from "@/lib/navigation/quick-actions";
 
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
-
-function dollars(cents: number): string {
-  return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 }
 
 export function OwnerDashboard({
@@ -83,15 +80,15 @@ export function OwnerDashboard({
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", marginTop: "var(--space-3)" }}>
               <div>
                 <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", textTransform: "uppercase", fontWeight: 600 }}>Outstanding Invoices</span>
-                <div style={{ fontSize: "var(--text-xl)", fontWeight: 800, color: "var(--color-red-600)" }}>{dollars(outstandingInvoicesCents)}</div>
+                <div style={{ fontSize: "var(--text-xl)", fontWeight: 800, color: "var(--color-red-600)" }}>{formatCents(outstandingInvoicesCents)}</div>
               </div>
               <div>
                 <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", textTransform: "uppercase", fontWeight: 600 }}>Deposits Pending</span>
-                <div style={{ fontSize: "var(--text-xl)", fontWeight: 800, color: "var(--color-amber-600)" }}>{dollars(pendingDepositsCents)}</div>
+                <div style={{ fontSize: "var(--text-xl)", fontWeight: 800, color: "var(--color-amber-600)" }}>{formatCents(pendingDepositsCents)}</div>
               </div>
               <div>
                 <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", textTransform: "uppercase", fontWeight: 600 }}>Collected This Month</span>
-                <div style={{ fontSize: "var(--text-xl)", fontWeight: 800, color: "var(--color-green-600)" }}>{dollars(paidThisMonthCents)}</div>
+                <div style={{ fontSize: "var(--text-xl)", fontWeight: 800, color: "var(--color-green-600)" }}>{formatCents(paidThisMonthCents)}</div>
               </div>
             </div>
             <div style={{ marginTop: "var(--space-4)", borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)" }}>
