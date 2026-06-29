@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useToast } from "@/components/ui";
+import { useToast, Input, Select, Textarea, Button, LinkButton } from "@/components/ui";
 import { computeVaultCompleteness, VAULT_CATEGORIES, VAULT_CATEGORY_LABELS } from "@ai-fsm/domain";
 import type { VaultCategory } from "@ai-fsm/domain";
 import { VaultItemPhotoPanel } from "./VaultItemPhotoPanel";
@@ -192,6 +192,12 @@ export function PropertyVaultSection({ propertyId, clientId, initialItems, canEd
     onCancel: () => void;
     saveLabel: string;
   }) {
+    const prefix = saveLabel === "Add Item" ? "add" : "edit";
+    const categoryOptions = VAULT_CATEGORIES.map((c) => ({
+      value: c,
+      label: VAULT_CATEGORY_LABELS[c],
+    }));
+
     return (
       <div
         style={{
@@ -201,63 +207,84 @@ export function PropertyVaultSection({ propertyId, clientId, initialItems, canEd
           marginBottom: "var(--space-3)",
         }}
       >
-        <div style={{ gridColumn: "1 / -1" }}>
-          <label className="p7-label">Category</label>
-          <select className="p7-select" style={inputStyle} value={values.category}
-            onChange={(e) => onChange({ category: e.target.value as VaultCategory })}>
-            {VAULT_CATEGORIES.map((c) => (
-              <option key={c} value={c}>{VAULT_CATEGORY_LABELS[c]}</option>
-            ))}
-          </select>
-        </div>
-        <div style={{ gridColumn: "1 / -1" }}>
-          <label className="p7-label">Name *</label>
-          <input className="p7-input" style={inputStyle} value={values.name}
-            onChange={(e) => onChange({ name: e.target.value })} placeholder="e.g. HVAC System, Refrigerator" />
-        </div>
-        <div>
-          <label className="p7-label">Location</label>
-          <input className="p7-input" style={inputStyle} value={values.location}
-            onChange={(e) => onChange({ location: e.target.value })} placeholder="e.g. Basement" />
-        </div>
-        <div>
-          <label className="p7-label">Manufacturer</label>
-          <input className="p7-input" style={inputStyle} value={values.manufacturer}
-            onChange={(e) => onChange({ manufacturer: e.target.value })} />
-        </div>
-        <div>
-          <label className="p7-label">Model Number</label>
-          <input className="p7-input" style={inputStyle} value={values.model_number}
-            onChange={(e) => onChange({ model_number: e.target.value })} />
-        </div>
-        <div>
-          <label className="p7-label">Serial Number</label>
-          <input className="p7-input" style={inputStyle} value={values.serial_number}
-            onChange={(e) => onChange({ serial_number: e.target.value })} />
-        </div>
-        <div>
-          <label className="p7-label">Install Date</label>
-          <input className="p7-input" type="date" style={inputStyle} value={values.install_date}
-            onChange={(e) => onChange({ install_date: e.target.value })} />
-        </div>
-        <div>
-          <label className="p7-label">Last Serviced</label>
-          <input className="p7-input" type="date" style={inputStyle} value={values.last_serviced_date}
-            onChange={(e) => onChange({ last_serviced_date: e.target.value })} />
-        </div>
-        <div>
-          <label className="p7-label">Next Service</label>
-          <input className="p7-input" type="date" style={inputStyle} value={values.next_service_date}
-            onChange={(e) => onChange({ next_service_date: e.target.value })} />
-        </div>
-        <div style={{ gridColumn: "1 / -1" }}>
-          <label className="p7-label">Notes</label>
-          <textarea className="p7-textarea" style={inputStyle} rows={2} value={values.notes}
-            onChange={(e) => onChange({ notes: e.target.value })} placeholder="Filter size, paint color code, vendor contact…" />
-        </div>
+        <Select
+          id={`${prefix}-vault-item-category`}
+          label="Category"
+          containerClassName="col-span-2"
+          style={{ gridColumn: "1 / -1" }}
+          options={categoryOptions}
+          value={values.category}
+          onChange={(e) => onChange({ category: e.target.value as VaultCategory })}
+        />
+        <Input
+          id={`${prefix}-vault-item-name`}
+          label="Name"
+          required
+          containerClassName="col-span-2"
+          style={{ gridColumn: "1 / -1" }}
+          value={values.name}
+          onChange={(e) => onChange({ name: e.target.value })}
+          placeholder="e.g. HVAC System, Refrigerator"
+        />
+        <Input
+          id={`${prefix}-vault-item-location`}
+          label="Location"
+          value={values.location ?? ""}
+          onChange={(e) => onChange({ location: e.target.value })}
+          placeholder="e.g. Basement"
+        />
+        <Input
+          id={`${prefix}-vault-item-manufacturer`}
+          label="Manufacturer"
+          value={values.manufacturer ?? ""}
+          onChange={(e) => onChange({ manufacturer: e.target.value })}
+        />
+        <Input
+          id={`${prefix}-vault-item-model-number`}
+          label="Model Number"
+          value={values.model_number ?? ""}
+          onChange={(e) => onChange({ model_number: e.target.value })}
+        />
+        <Input
+          id={`${prefix}-vault-item-serial-number`}
+          label="Serial Number"
+          value={values.serial_number ?? ""}
+          onChange={(e) => onChange({ serial_number: e.target.value })}
+        />
+        <Input
+          id={`${prefix}-vault-item-install-date`}
+          label="Install Date"
+          type="date"
+          value={values.install_date ?? ""}
+          onChange={(e) => onChange({ install_date: e.target.value })}
+        />
+        <Input
+          id={`${prefix}-vault-item-last-serviced-date`}
+          label="Last Serviced"
+          type="date"
+          value={values.last_serviced_date ?? ""}
+          onChange={(e) => onChange({ last_serviced_date: e.target.value })}
+        />
+        <Input
+          id={`${prefix}-vault-item-next-service-date`}
+          label="Next Service"
+          type="date"
+          value={values.next_service_date ?? ""}
+          onChange={(e) => onChange({ next_service_date: e.target.value })}
+        />
+        <Textarea
+          id={`${prefix}-vault-item-notes`}
+          label="Notes"
+          containerClassName="col-span-2"
+          style={{ gridColumn: "1 / -1" }}
+          rows={2}
+          value={values.notes ?? ""}
+          onChange={(e) => onChange({ notes: e.target.value })}
+          placeholder="Filter size, paint color code, vendor contact…"
+        />
         <div style={{ gridColumn: "1 / -1", display: "flex", gap: "var(--space-2)" }}>
-          <button className="p7-btn p7-btn-primary" onClick={onSave} disabled={saving}>{saving ? "Saving…" : saveLabel}</button>
-          <button className="p7-btn p7-btn-secondary" onClick={onCancel} disabled={saving}>Cancel</button>
+          <Button variant="primary" onClick={onSave} loading={saving}>{saveLabel}</Button>
+          <Button variant="secondary" onClick={onCancel} disabled={saving}>Cancel</Button>
         </div>
       </div>
     );
@@ -304,9 +331,9 @@ export function PropertyVaultSection({ propertyId, clientId, initialItems, canEd
 
       {canEdit && !showAdd && (
         <div style={{ marginBottom: "var(--space-4)" }}>
-          <button className="p7-btn p7-btn-primary" onClick={() => setShowAdd(true)} data-testid="add-vault-item-btn">
+          <Button variant="primary" onClick={() => setShowAdd(true)} data-testid="add-vault-item-btn">
             + Add Vault Item
-          </button>
+          </Button>
         </div>
       )}
 
@@ -401,29 +428,32 @@ export function PropertyVaultSection({ propertyId, clientId, initialItems, canEd
                           )}
                         </div>
                         <div style={{ display: "flex", gap: "var(--space-2)", flexShrink: 0, alignItems: "center", flexWrap: "wrap" }}>
-                          <button
-                            className="p7-btn p7-btn-ghost p7-btn-sm"
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
                           >
                             {expandedId === item.id ? "Less" : "Details"}
-                          </button>
+                          </Button>
                           {canEdit && (
                             <>
-                              <a
+                              <LinkButton
                                 href={`/app/estimates/new?client_id=${encodeURIComponent(clientId)}&property_id=${encodeURIComponent(propertyId)}&vault_item_id=${encodeURIComponent(item.id)}`}
-                                className="p7-btn p7-btn-secondary p7-btn-sm"
+                                variant="secondary"
+                                size="sm"
                               >
                                 Estimate
-                              </a>
-                              <button className="p7-btn p7-btn-ghost p7-btn-sm" onClick={() => startEdit(item)}>Edit</button>
-                              <button
-                                className="p7-btn p7-btn-ghost p7-btn-sm"
+                              </LinkButton>
+                              <Button variant="ghost" size="sm" onClick={() => startEdit(item)}>Edit</Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => handleDelete(item.id)}
                                 disabled={deletingId === item.id}
                                 style={{ color: "var(--color-error, #dc2626)" }}
                               >
                                 {deletingId === item.id ? "…" : "Delete"}
-                              </button>
+                              </Button>
                             </>
                           )}
                         </div>

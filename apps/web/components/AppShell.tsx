@@ -25,6 +25,22 @@ import {
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
 
+function IconChevronLeft({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  );
+}
+
+function IconChevronRight({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
+
 interface NavItem {
   href: string;
   label: string;
@@ -154,6 +170,21 @@ export function AppShell({ role, userName, children }: AppShellProps) {
   const bottomItems = getBottomNavItems(role);
   const [showQuickLead, setShowQuickLead] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    const val = localStorage.getItem("p7-sidebar-collapsed");
+    if (val === "true") {
+      setCollapsed(true);
+    }
+  }, []);
+
+  const toggleCollapse = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    localStorage.setItem("p7-sidebar-collapsed", String(next));
+  };
+
   const isAdminOrOwner = role === "owner" || role === "admin";
   // Logo goes to each role's home: My Day for field roles, the office dashboard
   // for pure admins (who get bounced there from My Day anyway).
@@ -169,16 +200,27 @@ export function AppShell({ role, userName, children }: AppShellProps) {
 
   return (
     <ToastProvider>
-      <div className="p7-layout">
+      <div className={`p7-layout ${collapsed ? "p7-layout-collapsed" : ""}`}>
         {/* ---- Desktop/Tablet Sidebar ---- */}
         <aside className="p7-sidebar" aria-label="Main navigation">
           {/* Brand */}
-          <Link href={homeHref as Route} className="p7-sidebar-brand">
-            <div className="p7-brand-logo" aria-hidden="true">
-              <span className="p7-brand-logo-text">DV</span>
-            </div>
-            <span className="p7-brand-name">Dovetails</span>
-          </Link>
+          <div style={{ position: "relative" }}>
+            <Link href={homeHref as Route} className="p7-sidebar-brand">
+              <div className="p7-brand-logo" aria-hidden="true">
+                <span className="p7-brand-logo-text">DV</span>
+              </div>
+              <span className="p7-brand-name">Dovetails</span>
+            </Link>
+            <button
+              type="button"
+              onClick={toggleCollapse}
+              className="p7-sidebar-toggle-btn"
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {collapsed ? <IconChevronRight /> : <IconChevronLeft />}
+            </button>
+          </div>
 
           {/* New Request button — owner/admin only */}
           {isAdminOrOwner && (
@@ -248,8 +290,8 @@ export function AppShell({ role, userName, children }: AppShellProps) {
                 <span className="p7-nav-label">Settings</span>
               </Link>
             )}
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-              <div className="p7-user-chip">
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", width: "100%" }}>
+              <div className="p7-user-chip" title={displayName}>
                 <div className="p7-user-avatar" aria-hidden="true">
                   {avatarLetter}
                 </div>

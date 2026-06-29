@@ -12,19 +12,19 @@ export type ConditionRow = {
 };
 
 const CONDITION_COLOR: Record<ConditionLevel, { fg: string; bg: string; label: string }> = {
-  good:         { fg: "#16a34a", bg: "#dcfce7", label: "Good" },
-  fair:         { fg: "#d97706", bg: "#fef3c7", label: "Fair" },
-  poor:         { fg: "#dc2626", bg: "#fee2e2", label: "Poor" },
-  critical:     { fg: "#991b1b", bg: "#fecaca", label: "Critical" },
-  not_assessed: { fg: "#6b7280", bg: "#f3f4f6", label: "—" },
+  good:         { fg: "var(--status-completed-fg)", bg: "var(--status-completed-bg)", label: "Good" },
+  fair:         { fg: "var(--priority-high-fg)", bg: "var(--priority-high-bg)", label: "Fair" },
+  poor:         { fg: "var(--color-red-600)", bg: "var(--color-red-100)", label: "Poor" },
+  critical:     { fg: "var(--priority-urgent-fg)", bg: "var(--priority-urgent-bg)", label: "Critical" },
+  not_assessed: { fg: "var(--status-draft-fg)", bg: "var(--status-draft-bg)", label: "—" },
 };
 
 const TREND_DOT: Record<ConditionLevel, string> = {
-  good:         "#16a34a",
-  fair:         "#d97706",
-  poor:         "#dc2626",
-  critical:     "#991b1b",
-  not_assessed: "#d1d5db",
+  good:         "var(--status-completed-fg)",
+  fair:         "var(--priority-high-fg)",
+  poor:         "var(--color-red-600)",
+  critical:     "var(--priority-urgent-fg)",
+  not_assessed: "var(--color-slate-400)",
 };
 
 function ConditionBadge({ condition }: { condition: ConditionLevel }) {
