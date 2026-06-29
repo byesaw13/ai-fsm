@@ -155,7 +155,7 @@ export function PaymentHistory({ invoiceId, invoiceStatus, role }: Props) {
                   <td>
                     <button
                       type="button"
-                      className="btn btn-danger btn-sm"
+                      className="p7-btn p7-btn-danger p7-btn-sm"
                       onClick={() => setConfirmPaymentId(payment.id)}
                       data-testid={`delete-payment-${payment.id}`}
                       aria-label="Delete payment"

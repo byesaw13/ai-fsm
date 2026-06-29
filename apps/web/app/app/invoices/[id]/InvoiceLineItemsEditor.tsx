@@ -122,7 +122,7 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
           type="button"
           onClick={laborFromTime}
           disabled={pending}
-          className="btn btn-secondary"
+          className="p7-btn p7-btn-secondary"
           data-testid="invoice-labor-from-time-btn"
           style={{ alignSelf: "flex-start" }}
         >
@@ -156,8 +156,8 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
             <input name="unit_price" type="number" step="0.01" defaultValue={centsToDollars(item.unit_price_cents)} disabled={pending} required className="input" />
           </label>
           <div style={{ display: "flex", gap: "var(--space-1)", flex: "0 0 auto" }}>
-            <button type="submit" disabled={pending} className="btn btn-secondary">Save</button>
-            <button type="button" onClick={() => deleteLineItem(item)} disabled={pending} className="btn btn-secondary" aria-label={`Delete ${item.description}`}>Delete</button>
+            <button type="submit" disabled={pending} className="p7-btn p7-btn-secondary">Save</button>
+            <button type="button" onClick={() => deleteLineItem(item)} disabled={pending} className="p7-btn p7-btn-secondary" aria-label={`Delete ${item.description}`}>Delete</button>
           </div>
         </form>
       ))}
@@ -181,7 +181,7 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
           Unit price
           <input type="number" step="0.01" value={draft.unit_price} onChange={(e) => setDraft((d) => ({ ...d, unit_price: e.target.value }))} disabled={pending} required className="input" />
         </label>
-        <button type="submit" disabled={pending} className="btn btn-primary" style={{ flex: "0 0 auto" }}>Add</button>
+        <button type="submit" disabled={pending} className="p7-btn p7-btn-primary" style={{ flex: "0 0 auto" }}>Add</button>
       </form>
     </div>
   );
