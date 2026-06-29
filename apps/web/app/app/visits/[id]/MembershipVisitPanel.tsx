@@ -312,12 +312,14 @@ export function MembershipVisitPanel({
               data-testid="labor-cap-bar"
               style={{
                 height: "100%",
-                width: `${capPct}%`,
+                width: "100%",
+                transform: `scaleX(${capPct / 100})`,
+                transformOrigin: "left",
                 background:
                   capStatus === "cap_reached"
                     ? "var(--color-warning, #f59e0b)"
                     : "var(--color-primary)",
-                transition: "width 0.2s ease",
+                transition: "transform 0.2s ease",
               }}
             />
           </div>

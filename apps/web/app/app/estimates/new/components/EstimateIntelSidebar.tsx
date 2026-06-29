@@ -120,7 +120,7 @@ export function EstimateIntelSidebar({ intel }: EstimateIntelSidebarProps) {
               <span style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: mc }}>{fmtPct(grossMarginPct)}</span>
             </div>
             <div style={{ height: 6, background: "var(--bg-subtle)", borderRadius: 3, marginBottom: "var(--space-2)" }}>
-              <div style={{ height: "100%", width: `${Math.min(100, grossMarginPct)}%`, background: mc, borderRadius: 3, transition: "width 0.2s" }} />
+              <div style={{ height: "100%", width: "100%", transform: `scaleX(${Math.max(0, Math.min(100, grossMarginPct)) / 100})`, transformOrigin: "left", background: mc, borderRadius: 3, transition: "transform 0.2s" }} />
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-xs)" }}>
               <span style={{ color: "var(--fg-muted)" }}>Est. Profit</span>

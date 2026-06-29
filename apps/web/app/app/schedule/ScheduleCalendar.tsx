@@ -128,11 +128,8 @@ function VisitCard({ visit, isAdmin, isDragging, compact = false, onDragStart, o
       style={{
         textDecoration: "none",
         display: "block",
-        borderLeft: `3px solid ${color}`,
         background: "#fff",
-        border: `1px solid var(--border)`,
-        borderLeftColor: color,
-        borderLeftWidth: 3,
+        border: `1px solid ${color}`,
         borderRadius: 6,
         padding: compact ? "2px 6px" : "var(--space-2)",
         cursor: isAdmin ? "grab" : "pointer",

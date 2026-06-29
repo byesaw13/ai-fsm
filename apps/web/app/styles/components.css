@@ -1429,7 +1429,7 @@
 .funnel-stage { flex: 1; display: flex; flex-direction: column; gap: 6px; }
 .funnel-label { font-size: 13px; font-weight: 500; color: var(--fg-muted); }
 .funnel-bar-container { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
-.funnel-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
+.funnel-bar-fill { height: 100%; border-radius: 4px; }
 .funnel-fill-draft { background: #94a3b8; }
 .funnel-fill-sent { background: #3b82f6; }
 .funnel-fill-approved { background: var(--accent); }

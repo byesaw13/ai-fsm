@@ -445,7 +445,7 @@ function JobItemCard({ job, showStatus = false }: { job: JobRow; showStatus?: bo
           )}
           {progressPct > 0 && progressPct < 100 && (
             <div style={{ width: 60, height: 3, background: "var(--color-border)", borderRadius: 2, overflow: "hidden" }}>
-              <div style={{ width: `${progressPct}%`, height: "100%", background: progressColor, borderRadius: 2, transition: "width 0.3s ease" }} />
+              <div style={{ width: "100%", height: "100%", transform: `scaleX(${progressPct / 100})`, transformOrigin: "left", background: progressColor, borderRadius: 2, transition: "transform 0.3s ease" }} />
             </div>
           )}
           {progressPct === 100 && (
