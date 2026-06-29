@@ -26,3 +26,8 @@ docs/research
 # (not app features; keep business data and ad-hoc scripts out of the repo)
 docs/Purchase_History_*.csv
 scripts/import-expenses.js
+
+# impeccable (design skill) — the root .impeccable/ is the skill's own embedded
+# repo plus per-run outputs (critique snapshots, live config). Never commit it.
+# Root-anchored so it does NOT match the intentional apps/web/.impeccable/design.json.
+/.impeccable/
