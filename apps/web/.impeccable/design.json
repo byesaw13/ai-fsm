@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-29T00:00:00.000Z",
+  "title": "Design System: Dovetails FSM",
+  "extensions": {
+    "colorMeta": {
+      "forest-800": {
+        "role": "primary",
+        "displayName": "Forest 800",
+        "canonical": "#166534",
+        "tonalRamp": ["#14532d", "#166534", "#15803d", "#16a34a", "#22c55e", "#86efac", "#dcfce7", "#e9f6ee"]
+      },
+      "stone-900": {
+        "role": "neutral",
+        "displayName": "Warm Ink",
+        "canonical": "#1c1917",
+        "tonalRamp": ["#0c0a09", "#1c1917", "#292524", "#44403c", "#57534e", "#78716c", "#d6d3d1", "#fafaf9"]
+      },
+      "stone-50": {
+        "role": "neutral",
+        "displayName": "Stone Background",
+        "canonical": "#fafaf9",
+        "tonalRamp": ["#0c0a09", "#1c1917", "#44403c", "#78716c", "#a8a29e", "#e7e5e4", "#f5f5f4", "#fafaf9"]
+      },
+      "success-600": { "role": "tertiary", "displayName": "Paid Green", "canonical": "#16a34a", "tonalRamp": ["#14532d", "#166534", "#16a34a", "#22c55e", "#4ade80", "#86efac", "#dcfce7", "#f0fdf4"] },
+      "info-600": { "role": "tertiary", "displayName": "Scheduled Blue", "canonical": "#2563eb", "tonalRamp": ["#1e3a8a", "#1d4ed8", "#2563eb", "#3b82f6", "#60a5fa", "#93c5fd", "#dbeafe", "#eff6ff"] },
+      "warning-600": { "role": "tertiary", "displayName": "Partial Amber", "canonical": "#d97706", "tonalRamp": ["#7c2d12", "#b45309", "#d97706", "#f59e0b", "#fbbf24", "#fcd34d", "#fef3c7", "#fffbeb"] },
+      "danger-600": { "role": "tertiary", "displayName": "Overdue Red", "canonical": "#dc2626", "tonalRamp": ["#7f1d1d", "#b91c1c", "#dc2626", "#ef4444", "#f87171", "#fca5a5", "#fee2e2", "#fef2f2"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page title, one per screen." },
+      "headline": { "displayName": "Headline", "purpose": "Major section headers." },
+      "title": { "displayName": "Title", "purpose": "Card/panel headers and list-row primary text." },
+      "body": { "displayName": "Body", "purpose": "Default dense app text (15px base)." },
+      "label": { "displayName": "Label", "purpose": "Form labels, button text, table headers, badges." },
+      "mono": { "displayName": "Mono", "purpose": "Money, IDs, quantities — aligned tabular figures." }
+    },
+    "shadows": [
+      { "name": "resting-card", "value": "0 1px 2px rgba(0,0,0,0.04)", "purpose": "Default card lift at rest — barely there." },
+      { "name": "hover-lift", "value": "0 4px 6px rgba(0,0,0,0.04), 0 2px 4px rgba(0,0,0,0.04)", "purpose": "Interactive cards on hover." },
+      { "name": "overlay", "value": "0 10px 15px rgba(0,0,0,0.06), 0 4px 6px rgba(0,0,0,0.04)", "purpose": "Dropdowns and popovers." },
+      { "name": "modal", "value": "0 20px 25px rgba(0,0,0,0.08), 0 8px 10px rgba(0,0,0,0.04)", "purpose": "Dialogs above the backdrop." },
+      { "name": "focus-ring", "value": "0 0 0 3px #e9f6ee", "purpose": "Forest-subtle focus glow on inputs and buttons." }
+    ],
+    "motion": [
+      { "name": "fast", "value": "100ms ease", "purpose": "Quick state feedback (button/hover color)." },
+      { "name": "base", "value": "150ms ease", "purpose": "Default UI transition." },
+      { "name": "slow", "value": "250ms ease", "purpose": "Larger elements, panels." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single most important action on a screen. Forest accent, used sparingly.",
+      "html": "<button class=\"ds-btn-primary\">Send estimate</button>",
+      "css": ".ds-btn-primary { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:600; border:1px solid var(--accent,#166534); background:var(--accent,#166534); color:#fff; cursor:pointer; transition:background 150ms ease, border-color 150ms ease; } .ds-btn-primary:hover { background:var(--accent-hover,#15803d); border-color:var(--accent-hover,#15803d); } .ds-btn-primary:focus-visible { outline:none; box-shadow:0 0 0 3px var(--accent-subtle,#e9f6ee); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The default for any action that isn't the primary one. Stone, quiet.",
+      "html": "<button class=\"ds-btn-secondary\">Cancel</button>",
+      "css": ".ds-btn-secondary { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:600; border:1px solid var(--border,#e7e5e4); background:#fff; color:var(--fg,#1c1917); cursor:pointer; transition:background 150ms ease, border-color 150ms ease; } .ds-btn-secondary:hover { background:#fafaf9; border-color:var(--border-strong,#d6d3d1); } .ds-btn-secondary:focus-visible { outline:none; box-shadow:0 0 0 3px var(--accent-subtle,#e9f6ee); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Default surface. White on stone background, separated by a 1px border first, shadow only on hover. Never nested.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-title\">Job #J-2026-0142</div><div class=\"ds-card-body\">14 Cedar Lane — gutter repair &amp; fascia</div></div>",
+      "css": ".ds-card { background:#fff; border:1px solid var(--border,#e7e5e4); border-radius:12px; box-shadow:0 1px 2px rgba(0,0,0,0.04); padding:24px; transition:box-shadow 150ms ease, border-color 150ms ease; } .ds-card:hover { box-shadow:0 4px 6px rgba(0,0,0,0.04), 0 2px 4px rgba(0,0,0,0.04); border-color:var(--border-strong,#d6d3d1); } .ds-card-title { font-size:18px; font-weight:600; color:var(--fg,#1c1917); } .ds-card-body { margin-top:6px; font-size:15px; color:var(--fg-secondary,#57534e); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Form field. White fill, 1px stone border, forest focus glow.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Search clients\" />",
+      "css": ".ds-input { width:100%; padding:9px 12px; border:1px solid var(--border,#e7e5e4); border-radius:8px; font-size:13px; color:var(--fg,#1c1917); background:#fff; transition:border-color 150ms ease, box-shadow 150ms ease; } .ds-input::placeholder { color:var(--fg-muted,#78716c); } .ds-input:hover:not(:focus) { border-color:var(--border-strong,#d6d3d1); } .ds-input:focus { outline:none; border-color:var(--accent,#166534); box-shadow:0 0 0 3px var(--accent-subtle,#e9f6ee); }"
+    },
+    {
+      "name": "Status Badge (Paid)",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Lifecycle status pill. Tinted background + matching darker text from the status family; always carries a label, never color-only.",
+      "html": "<span class=\"ds-badge ds-badge-paid\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\"><path d=\"M5 13l4 4L19 7\"/></svg>Paid</span>",
+      "css": ".ds-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:9999px; font-size:13px; font-weight:600; } .ds-badge-paid { background:#dcfce7; color:#16a34a; }"
+    },
+    {
+      "name": "Status Badge (Overdue)",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Negative-state pill from the danger family. Same shape, different reserved hue.",
+      "html": "<span class=\"ds-badge ds-badge-overdue\">Overdue</span>",
+      "css": ".ds-badge-overdue { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:9999px; font-size:13px; font-weight:600; background:#fee2e2; color:#dc2626; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Well-Kept Toolbox",
+    "overview": "Dovetails FSM looks and feels like a craftsman's well-kept toolbox: every control solid, labeled, and in its place; nothing decorative that doesn't carry weight. A product register — the design serves the work of running a residential handyman business, it doesn't perform. The identity is 'Forest & Cedar': a deep forest-green accent used sparingly on warm stone neutrals, a trade brand not a generic SaaS. Density is deliberate (15px base) for desk-efficient scanning of clients, estimates, and invoices; field-facing surfaces flip to high-contrast, large-target, one-tap for a technician on a phone outdoors.",
+    "keyCharacteristics": [
+      "Forest-green accent on warm stone neutrals; green earns its place at <=10% of a screen.",
+      "Dense, legible, information-first layout — desk-efficient, never cramped in the field.",
+      "Status pills everywhere (estimates, invoices, visits), never conveyed by color alone.",
+      "Flat-by-default surfaces; 1px border separates, shadow only on real elevation/hover.",
+      "One number, one source of truth — money and lifecycle state render identically everywhere."
+    ],
+    "rules": [
+      { "name": "The Green-Is-Earned Rule", "body": "Forest accent covers <=10% of any screen — the single primary action or the live operational state, nothing else. If two greens compete, one is wrong.", "section": "colors" },
+      { "name": "The Status-Never-Decorates Rule", "body": "The four status hues mean exactly one thing each (paid/sent/partial/overdue). Never reuse a status color as an accent or background flourish.", "section": "colors" },
+      { "name": "The One-Family Rule", "body": "No second typeface. Hierarchy comes from weight and size, not font pairing.", "section": "typography" },
+      { "name": "The Border-Then-Shadow Rule", "body": "Separation is a 1px stone border first; shadow only on genuine elevation/hover. Never pair a 1px border with a >=16px soft drop shadow on a resting element.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the Forest accent to <=10% of a screen — one primary action or the live state.",
+      "Do pair every status color with a label or icon; status is never color-only.",
+      "Do separate surfaces with a 1px stone border first, shadow only on real elevation/hover.",
+      "Do size field-facing touch targets >=44px and lean on high contrast for outdoor one-handed use.",
+      "Do render money and lifecycle state identically everywhere; mono figures for aligned money columns.",
+      "Do keep prefers-reduced-motion fallbacks on every transition."
+    ],
+    "donts": [
+      "Don't build the SaaS dashboard suite — no KPI-card walls, gradient hero-metrics, or widget command-centers.",
+      "Don't present as an AI-first estimator; AI is a quiet helper, never the headline.",
+      "Don't add membership/subscription or multi-company 'platform' scaffolding.",
+      "Don't round cards past 16px or pair a 1px border with a >=16px soft drop shadow on a resting element.",
+      "Don't introduce a second typeface or use Forest green as decoration.",
+      "Don't use stone-500 for body copy/placeholders where it drops below 4.5:1 — bump toward stone-600/900.",
+      "Don't use side-stripe borders, gradient text, or decorative glassmorphism."
+    ]
+  }
+}
