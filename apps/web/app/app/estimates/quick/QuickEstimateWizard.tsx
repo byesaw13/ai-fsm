@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { formatCents } from "@/lib/money";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
@@ -57,9 +58,6 @@ const CATEGORY_EMOJI: Record<string, string> = {
   specialty_expansion: "⭐",
 };
 
-function fmt(cents: number) {
-  return `$${Math.round(cents / 100).toLocaleString("en-US")}`;
-}
 
 function parseDollars(s: string): number {
   return Math.round(parseFloat(s.replace(/[^0-9.]/g, "") || "0") * 100);
@@ -222,8 +220,8 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
           {filteredServices.map((svc) => {
             const price = svc.default_price_cents ?? svc.price_min_cents;
             const priceLabel = svc.price_max_cents
-              ? `${fmt(svc.price_min_cents)}–${fmt(svc.price_max_cents)}`
-              : `${fmt(svc.price_min_cents)}+`;
+              ? `${formatCents(svc.price_min_cents)}–${formatCents(svc.price_max_cents)}`
+              : `${formatCents(svc.price_min_cents)}+`;
             return (
               <button
                 key={svc.id}
@@ -250,7 +248,7 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
                   )}
                 </span>
                 <span style={{ fontWeight: 700, fontSize: "var(--text-sm)", color: "var(--accent)", whiteSpace: "nowrap" }}>
-                  {fmt(price)}
+                  {formatCents(price)}
                 </span>
               </button>
             );
@@ -413,8 +411,8 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
         </div>
         {selectedService && selectedService.price_min_cents > 0 && (
           <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-            Typical range: {fmt(selectedService.price_min_cents)}
-            {selectedService.price_max_cents ? `–${fmt(selectedService.price_max_cents)}` : "+"}
+            Typical range: {formatCents(selectedService.price_min_cents)}
+            {selectedService.price_max_cents ? `–${formatCents(selectedService.price_max_cents)}` : "+"}
           </p>
         )}
       </div>

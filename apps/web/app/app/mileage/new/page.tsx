@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
-import { Card, SectionHeader } from "@/components/ui";
+import { Card, PageContainer, PageHeader, SectionHeader } from "@/components/ui";
 
 interface Vehicle { id: string; nickname: string; plate: string | null; make: string | null; model: string | null; }
 
@@ -145,13 +145,12 @@ export default function NewSessionPage() {
   const hasAnySuggestions = allSuggestions.length > 0;
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <div>
-          <Link href={"/app/mileage" as Route} className="back-link">← Mileage</Link>
-          <h1 className="page-title">Log Vehicle Session</h1>
-        </div>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Log Vehicle Session"
+        backHref="/app/mileage"
+        backLabel="Mileage"
+      />
 
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)", maxWidth: 640 }}>
         {error && <div className="p7-alert p7-alert-danger" role="alert">{error}</div>}
@@ -346,6 +345,6 @@ export default function NewSessionPage() {
           <Link href={"/app/mileage" as Route} className="p7-btn p7-btn-ghost">Cancel</Link>
         </div>
       </form>
-    </div>
+    </PageContainer>
   );
 }

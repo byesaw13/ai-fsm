@@ -16,6 +16,7 @@ import {
   LinkButton,
   MetricGrid,
 } from "@/components/ui";
+import { formatCents } from "@/lib/money";
 import type { FilterDef, StatusVariant, MetricCardData } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -76,9 +77,6 @@ interface PageProps {
   searchParams: Promise<{ q?: string; status?: string; tier?: string; view?: string }>;
 }
 
-function formatDollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 export default async function EstimatesPage({ searchParams }: PageProps) {
   const { q, status, tier, view } = await searchParams;
@@ -160,18 +158,18 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
   const metrics: MetricCardData[] = [
     {
       label: "Total Pipeline",
-      value: formatDollars(totalValue),
+      value: formatCents(totalValue),
       sub: `${estimates.length} estimates`,
     },
     {
       label: "Pending",
-      value: formatDollars(pendingValue),
+      value: formatCents(pendingValue),
       sub: `${pendingEstimates.length} awaiting response`,
       variant: hasExpired ? "alert" : "default",
     },
     {
       label: "Won",
-      value: formatDollars(wonValue),
+      value: formatCents(wonValue),
       sub: `${wonEstimates.length} approved`,
       variant: wonEstimates.length > 0 ? "success" : "default",
     },
@@ -384,7 +382,7 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
                     <span style={{ color: "var(--fg-muted)", fontWeight: 500, marginLeft: 4 }}>({colEstimates.length})</span>
                   </span>
                   <span style={{ fontFamily: "var(--font-mono), 'SF Mono', monospace", fontSize: 12, fontWeight: 600 }}>
-                    {formatDollars(colTotalCents)}
+                    {formatCents(colTotalCents)}
                   </span>
                 </div>
                 
@@ -411,7 +409,7 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
                           )}
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
                             <span style={{ fontFamily: "var(--font-mono), 'SF Mono', monospace", fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--fg)" }}>
-                              {formatDollars(est.total_cents)}
+                              {formatCents(est.total_cents)}
                             </span>
                             
                             {est.expires_at && est.status === "sent" && (
@@ -486,7 +484,7 @@ function EstimateItemCard({ est, showStatus = false }: { est: EstimateRow; showS
         </span>
       )}
       <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", fontFamily: "var(--font-mono), 'SF Mono', monospace" }}>
-        {formatDollars(est.total_cents)}
+        {formatCents(est.total_cents)}
       </span>
       {est.expires_at && est.status === "sent" && (
         <span
