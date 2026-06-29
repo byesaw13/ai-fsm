@@ -646,7 +646,7 @@ export function WorkdayPanel({
 
               {/* Active Vehicle Ribbon */}
               {openSession && (
-                <Card padding="sm" style={{ background: "var(--bg-subtle)", borderLeft: "4px solid var(--color-success)" }}>
+                <Card padding="sm" style={{ background: "var(--bg-subtle)", borderColor: "var(--color-success)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
                     <span>
                       <strong>Driving: {openSession.vehicle_nickname ?? "No vehicle"}</strong>
@@ -970,7 +970,7 @@ export function ActionQueue({ items }: { items: CountAction[] }) {
           {items.map((item) => {
             const accent = accentForTone(item.tone);
             return (
-              <Link key={item.label} href={item.href} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)", padding: "var(--space-3)", borderRadius: "var(--radius)", border: "1px solid var(--border)", borderLeft: `4px solid ${accent}`, textDecoration: "none", color: "inherit", background: "var(--bg-card)" }}>
+              <Link key={item.label} href={item.href} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)", padding: "var(--space-3)", borderRadius: "var(--radius)", border: `1px solid ${accent}`, textDecoration: "none", color: "inherit", background: "var(--bg-card)" }}>
                 <span style={{ display: "flex", flexDirection: "column" }}>
                   <strong>{item.label}</strong>
                   <small style={{ color: "var(--fg-muted)" }}>{item.detail}</small>

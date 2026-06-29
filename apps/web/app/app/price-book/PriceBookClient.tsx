@@ -220,7 +220,7 @@ export default function PriceBookClient({ services }: Props) {
                     padding="sm"
                     style={{
                       cursor: "pointer",
-                      borderLeft: `3px solid ${tierColor(service.tier)}`,
+                      border: `1px solid ${tierColor(service.tier)}`,
                     }}
                     onClick={() => setExpandedCode(isExpanded ? null : service.code)}
                   >

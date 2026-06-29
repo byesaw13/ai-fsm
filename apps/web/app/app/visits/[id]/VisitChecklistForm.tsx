@@ -155,9 +155,11 @@ export function VisitChecklistForm({ visitId, initialItems, canUpdate, propertyI
             data-testid="checklist-progress-bar"
             style={{
               height: "100%",
-              width: `${progressPct}%`,
+              width: "100%",
+              transform: `scaleX(${progressPct / 100})`,
+              transformOrigin: "left",
               background: progressPct === 100 ? "var(--color-success)" : "var(--color-primary)",
-              transition: "width 0.2s ease",
+              transition: "transform 0.2s ease",
             }}
           />
         </div>

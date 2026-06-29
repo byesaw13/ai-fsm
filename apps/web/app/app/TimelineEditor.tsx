@@ -213,7 +213,7 @@ export function TimelineEditor({ date, entries }: { date: string; entries: Activ
             const meta = ACTIVITY_TYPE_META[e.activity_type as ActivityType];
             const active = e.ended_at === null;
             return (
-              <li key={e.id} style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "var(--space-3)", border: "1px solid var(--border)", borderLeft: `4px solid ${active ? "var(--accent)" : "var(--border-strong)"}`, borderRadius: "var(--radius)", background: "var(--bg-card)" }}>
+              <li key={e.id} style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "var(--space-3)", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, borderRadius: "var(--radius)", background: "var(--bg-card)" }}>
                 <span style={{ fontVariantNumeric: "tabular-nums", color: "var(--fg-muted)", fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>
                   {fmtClock(e.started_at)}{e.ended_at ? `–${fmtClock(e.ended_at)}` : " · active"}
                 </span>

@@ -258,7 +258,7 @@ export function MaterialsGenerator({
       {result && (
         <>
           {result.summary_notes && (
-            <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", background: "var(--bg-subtle)", padding: "var(--space-3)", borderRadius: "var(--radius)", borderLeft: "3px solid var(--color-primary, #3b82f6)" }}>
+            <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", background: "var(--bg-subtle)", padding: "var(--space-3)", borderRadius: "var(--radius)", border: "1px solid var(--accent)" }}>
               {result.summary_notes}
             </div>
           )}
