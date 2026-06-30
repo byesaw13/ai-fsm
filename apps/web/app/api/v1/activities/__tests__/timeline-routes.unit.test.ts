@@ -32,6 +32,7 @@ import { PATCH as editActivity, DELETE as deleteActivity } from "../[id]/route";
 import { POST as splitActivity } from "../[id]/split/route";
 import { POST as insertActivity } from "../insert/route";
 import { PATCH as patchSegment } from "../segments/[id]/route";
+import { PATCH as patchVisitCandidate } from "../../visit-candidates/[id]/route";
 
 const EXISTING = {
   id: "11111111-1111-1111-1111-111111111111",
@@ -270,6 +271,51 @@ describe("PATCH /api/v1/activities/segments/[id]", () => {
     expect(res.status).toBe(200);
     expect(mockAppendAuditLog).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       entity_type: "activity_entry",
+      entity_id: MANUAL_ID,
+      action: "delete",
+    }));
+  });
+});
+
+
+const CANDIDATE_ID = "55555555-5555-5555-5555-555555555555";
+const VISIT_ID = "66666666-6666-6666-6666-666666666666";
+
+const PENDING_CANDIDATE = {
+  id: CANDIDATE_ID,
+  status: "pending",
+  location_segment_id: SEGMENT_ID,
+  property_id: "77777777-7777-7777-7777-777777777777",
+  matched_client_id: "88888888-8888-8888-8888-888888888888",
+  job_id: null,
+  visit_id: VISIT_ID,
+  arrival_time: "2026-06-11T12:00:00.000Z",
+  departure_time: "2026-06-11T13:00:00.000Z",
+};
+
+describe("PATCH /api/v1/visit-candidates/[id]", () => {
+  it("confirms an overlapping visit candidate when rebalance is accepted", async () => {
+    mockClientQuery.mockImplementation((sql: string) => {
+      if (sql.includes("FROM visit_candidates")) return Promise.resolve({ rows: [PENDING_CANDIDATE] });
+      if (sql.includes("FROM activity_entries") && sql.includes("LIMIT 1")) {
+        return Promise.resolve({ rows: [{ id: MANUAL_ID }] });
+      }
+      if (sql.startsWith("INSERT INTO activity_entries")) return Promise.resolve({ rows: [{ id: "new-visit-entry" }] });
+      if (sql.startsWith("DELETE FROM activity_entries")) return Promise.resolve({ rows: [{ ...EXISTING, id: MANUAL_ID }] });
+      return Promise.resolve({ rows: [] });
+    });
+
+    const res = await patchVisitCandidate(req(`/api/v1/visit-candidates/${CANDIDATE_ID}`, "PATCH", {
+      action: "confirm",
+      classification: "job_work",
+      rebalance: [{ id: MANUAL_ID, delete: true }],
+    }));
+
+    expect(res.status).toBe(200);
+    const insertCall = mockClientQuery.mock.calls.find((call) => String(call[0]).startsWith("INSERT INTO activity_entries"));
+    expect(insertCall?.[1]).toContain("visit");
+    expect(insertCall?.[1]).toContain(VISIT_ID);
+    expect(mockAppendAuditLog).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       entity_id: MANUAL_ID,
       action: "delete",
     }));
