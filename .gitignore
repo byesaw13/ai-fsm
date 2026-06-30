@@ -31,3 +31,6 @@ scripts/import-expenses.js
 # repo plus per-run outputs (critique snapshots, live config). Never commit it.
 # Root-anchored so it does NOT match the intentional apps/web/.impeccable/design.json.
 /.impeccable/
+
+# superpowers (agent tooling) — local run outputs and session state. Never commit it.
+/.superpowers/
