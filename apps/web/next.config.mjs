@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: [
+    "@ai-fsm/domain",
+    "@ai-fsm/log",
+    "@ai-fsm/money",
+    "@ai-fsm/email-templates",
+  ],
   webpack: (config) => {
     config.resolve.extensionAlias = {
       ".js": [".ts", ".tsx", ".js", ".jsx"],
