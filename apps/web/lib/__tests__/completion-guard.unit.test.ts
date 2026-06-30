@@ -53,4 +53,14 @@ describe("checkCompletionPacket", () => {
       photos_waived: false,
     })).toEqual({ ok: false, error: "MISSING_PHOTO" });
   });
+
+  it("waiver satisfies photo but does not bypass signature requirement (full waiver flow case)", () => {
+    expect(checkCompletionPacket({
+      photo_urls: [],
+      signature_url: null,
+      signature_waiver: false,
+      photos_waived: true,
+      photos_waiver_reason: "Client declined photos",
+    })).toEqual({ ok: false, error: "MISSING_SIGNATURE" });
+  });
 });
