@@ -1,7 +1,7 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
 import { appUrl } from "./mailer.js";
-import type { AutomationRow, ReminderResult } from "./visit-reminder.js";
+import type { AutomationRow, RunResult } from "./automations/types.js";
 import { enqueueNotification } from "./notification/enqueue.js";
 import { PRIORITY } from "./notification/priority.js";
 
@@ -139,8 +139,8 @@ async function emitLeadFollowup(
   return true;
 }
 
-async function processLeadFollowups(client: Client, automation: AutomationRow): Promise<ReminderResult> {
-  const result: ReminderResult = {
+export async function processLeadFollowups(client: Client, automation: AutomationRow): Promise<RunResult> {
+  const result: RunResult = {
     automationId: automation.id,
     accountId: automation.account_id,
     sent: 0,
@@ -160,29 +160,5 @@ async function processLeadFollowups(client: Client, automation: AutomationRow): 
     }
   }
 
-  await client.query(
-    `UPDATE automations
-        SET last_run_at = now(),
-            next_run_at = now() + interval '1 hour',
-            updated_at = now()
-      WHERE id = $1`,
-    [automation.id]
-  );
-
   return result;
-}
-
-export async function runLeadFollowups(client: Client): Promise<ReminderResult[]> {
-  const automations = await findDueLeadFollowups(client);
-  const results: ReminderResult[] = [];
-
-  for (const automation of automations) {
-    try {
-      results.push(await processLeadFollowups(client, automation));
-    } catch (error) {
-      logger.error("lead-followup: automation failed", error, { automationId: automation.id });
-    }
-  }
-
-  return results;
 }

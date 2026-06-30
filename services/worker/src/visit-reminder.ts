@@ -3,6 +3,7 @@ import { logger } from "./logger.js";
 import { visitReminderEmailHtml } from "@ai-fsm/email-templates";
 import { enqueueNotification } from "./notification/enqueue.js";
 import { PRIORITY } from "./notification/priority.js";
+import type { AutomationRow, RunResult } from "./automations/types.js";
 
 /**
  * Visit Reminder Automation
@@ -27,14 +28,7 @@ import { PRIORITY } from "./notification/priority.js";
  *   - Dovelite: scripts/preflight.mjs — safe retry/check-before-act pattern
  */
 
-export interface AutomationRow {
-  id: string;
-  account_id: string;
-  type: string;
-  config: { hours_before?: number };
-  enabled: boolean;
-  next_run_at: string;
-}
+export type { AutomationRow, RunResult };
 
 export interface EligibleVisit {
   id: string;
@@ -48,14 +42,6 @@ export interface EligibleVisit {
   client_email: string | null;
   property_address: string | null;
   tech_name: string | null;
-}
-
-export interface ReminderResult {
-  automationId: string;
-  accountId: string;
-  sent: number;
-  skipped: number;
-  errors: number;
 }
 
 /**
@@ -85,7 +71,7 @@ export async function findEligibleVisits(
   client: Client,
   automation: AutomationRow
 ): Promise<EligibleVisit[]> {
-  const hoursBefore = automation.config.hours_before ?? 24;
+  const hoursBefore = (automation.config.hours_before as number | undefined) ?? 24;
 
   const { rows } = await client.query<EligibleVisit>(
     `SELECT v.id, v.account_id, v.job_id, c.id AS client_id, v.assigned_user_id,
@@ -200,36 +186,18 @@ export async function emitVisitReminder(
 }
 
 /**
- * Update the automation's timestamps after a run.
- * Sets `last_run_at = now()` and advances `next_run_at` by 1 hour.
- */
-export async function markAutomationRun(
-  client: Client,
-  automationId: string
-): Promise<void> {
-  await client.query(
-    `UPDATE automations
-     SET last_run_at = now(),
-         next_run_at = now() + interval '1 hour',
-         updated_at = now()
-     WHERE id = $1`,
-    [automationId]
-  );
-}
-
-/**
  * Process a single visit_reminder automation:
  * 1. Find eligible visits
  * 2. Emit reminders for each (idempotent)
- * 3. Update automation timestamps
  *
  * Each visit is processed independently — errors on one don't block others.
+ * Runner owns next_run_at advancement via advanceNextRun.
  */
 export async function processVisitReminder(
   client: Client,
   automation: AutomationRow
-): Promise<ReminderResult> {
-  const result: ReminderResult = {
+): Promise<RunResult> {
+  const result: RunResult = {
     automationId: automation.id,
     accountId: automation.account_id,
     sent: 0,
@@ -253,34 +221,5 @@ export async function processVisitReminder(
     }
   }
 
-  await markAutomationRun(client, automation.id);
-
   return result;
-}
-
-/**
- * Top-level: run all due visit_reminder automations.
- * Called by the worker poll loop. Safe to call repeatedly.
- */
-export async function runVisitReminders(client: Client): Promise<ReminderResult[]> {
-  const automations = await findDueReminders(client);
-  const results: ReminderResult[] = [];
-
-  for (const automation of automations) {
-    try {
-      const result = await processVisitReminder(client, automation);
-      results.push(result);
-      logger.info("visit-reminder: processed", {
-        automationId: automation.id,
-        accountId: automation.account_id,
-        sent: result.sent,
-        skipped: result.skipped,
-        errors: result.errors,
-      });
-    } catch (error) {
-      logger.error("visit-reminder: failed to process automation", error, { automationId: automation.id });
-    }
-  }
-
-  return results;
 }

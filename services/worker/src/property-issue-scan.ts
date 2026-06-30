@@ -1,6 +1,6 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
-import type { AutomationRow, ReminderResult } from "./visit-reminder.js";
+import type { AutomationRow, RunResult } from "./automations/types.js";
 
 /**
  * Property Issue Scan Automation
@@ -122,11 +122,11 @@ async function upsertPropertyIssue(
   return true;
 }
 
-async function processPropertyIssueScan(
+export async function processPropertyIssueScan(
   client: Client,
   automation: AutomationRow
-): Promise<ReminderResult> {
-  const result: ReminderResult = {
+): Promise<RunResult> {
+  const result: RunResult = {
     automationId: automation.id,
     accountId: automation.account_id,
     sent: 0,
@@ -147,31 +147,5 @@ async function processPropertyIssueScan(
     }
   }
 
-  await client.query(
-    `UPDATE automations
-        SET last_run_at = now(),
-            next_run_at = now() + interval '24 hours',
-            updated_at  = now()
-      WHERE id = $1`,
-    [automation.id]
-  );
-
   return result;
-}
-
-export async function runPropertyIssueScans(client: Client): Promise<ReminderResult[]> {
-  const automations = await findDuePropertyIssueScans(client);
-  const results: ReminderResult[] = [];
-
-  for (const automation of automations) {
-    try {
-      results.push(await processPropertyIssueScan(client, automation));
-    } catch (error) {
-      logger.error("property-issue-scan: automation failed", error, {
-        automationId: automation.id,
-      });
-    }
-  }
-
-  return results;
 }

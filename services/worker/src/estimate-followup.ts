@@ -2,7 +2,7 @@ import type { Client } from "pg";
 import { logger } from "./logger.js";
 import { estimateFollowupHtml } from "@ai-fsm/email-templates";
 import { appUrl } from "./mailer.js";
-import type { AutomationRow, ReminderResult } from "./visit-reminder.js";
+import type { AutomationRow, RunResult } from "./automations/types.js";
 import { enqueueNotification } from "./notification/enqueue.js";
 import { PRIORITY } from "./notification/priority.js";
 
@@ -135,8 +135,8 @@ async function emitEstimateFollowup(
   return true;
 }
 
-async function processEstimateFollowups(client: Client, automation: AutomationRow): Promise<ReminderResult> {
-  const result: ReminderResult = {
+export async function processEstimateFollowups(client: Client, automation: AutomationRow): Promise<RunResult> {
+  const result: RunResult = {
     automationId: automation.id,
     accountId: automation.account_id,
     sent: 0,
@@ -156,29 +156,5 @@ async function processEstimateFollowups(client: Client, automation: AutomationRo
     }
   }
 
-  await client.query(
-    `UPDATE automations
-        SET last_run_at = now(),
-            next_run_at = now() + interval '4 hours',
-            updated_at = now()
-      WHERE id = $1`,
-    [automation.id]
-  );
-
   return result;
-}
-
-export async function runEstimateFollowups(client: Client): Promise<ReminderResult[]> {
-  const automations = await findDueEstimateFollowups(client);
-  const results: ReminderResult[] = [];
-
-  for (const automation of automations) {
-    try {
-      results.push(await processEstimateFollowups(client, automation));
-    } catch (error) {
-      logger.error("estimate-followup: automation failed", error, { automationId: automation.id });
-    }
-  }
-
-  return results;
 }

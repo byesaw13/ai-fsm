@@ -4,10 +4,10 @@ import {
   findDueFollowups,
   findOverdueInvoices,
   emitInvoiceFollowup,
-  processInvoiceFollowup,
-  runInvoiceFollowups,
 } from "./invoice-followup.js";
 import type { AutomationRow, OverdueInvoice } from "./invoice-followup.js";
+import { runAutomationType } from "./automations/runner.js";
+import { invoiceFollowupDef } from "./automations/registry.js";
 
 /**
  * Integration tests for invoice-followup automation.
@@ -164,7 +164,7 @@ describe.skipIf(!shouldRun)("invoice-followup integration", () => {
     expect(rows.length).toBe(1);
   });
 
-  it("processInvoiceFollowup updates automation timestamps", async () => {
+  it("runAutomationType updates automation timestamps", async () => {
     // Clean audit log for fresh run
     await client.query(`DELETE FROM audit_log WHERE account_id = $1 AND entity_type = 'invoice_followup'`, [accountId]);
     // Reset automation
@@ -173,19 +173,11 @@ describe.skipIf(!shouldRun)("invoice-followup integration", () => {
       [automationId]
     );
 
-    const automation: AutomationRow = {
-      id: automationId,
-      account_id: accountId,
-      type: "invoice_followup",
-      config: { days_overdue: [7, 14, 30] },
-      enabled: true,
-      next_run_at: new Date().toISOString(),
-    };
+    const results = await runAutomationType(invoiceFollowupDef, client);
+    const ours = results.find((r) => r.automationId === automationId);
+    expect(ours).toBeDefined();
+    expect(ours!.sent).toBeGreaterThan(0);
 
-    const result = await processInvoiceFollowup(client, automation);
-    expect(result.sent).toBeGreaterThan(0);
-
-    // Check timestamps updated
     const { rows } = await client.query(
       `SELECT last_run_at, next_run_at FROM automations WHERE id = $1`,
       [automationId]
@@ -194,7 +186,7 @@ describe.skipIf(!shouldRun)("invoice-followup integration", () => {
     expect(new Date(rows[0].next_run_at).getTime()).toBeGreaterThan(Date.now());
   });
 
-  it("runInvoiceFollowups processes end-to-end", async () => {
+  it("runAutomationType processes end-to-end", async () => {
     // Clean audit log for fresh run
     await client.query(`DELETE FROM audit_log WHERE account_id = $1 AND entity_type = 'invoice_followup'`, [accountId]);
     // Reset automation
@@ -203,7 +195,7 @@ describe.skipIf(!shouldRun)("invoice-followup integration", () => {
       [automationId]
     );
 
-    const results = await runInvoiceFollowups(client);
+    const results = await runAutomationType(invoiceFollowupDef, client);
     const ours = results.find((r) => r.automationId === automationId);
     expect(ours).toBeDefined();
     expect(ours!.sent).toBeGreaterThan(0);
@@ -216,7 +208,7 @@ describe.skipIf(!shouldRun)("invoice-followup integration", () => {
       [automationId]
     );
 
-    const results = await runInvoiceFollowups(client);
+    const results = await runAutomationType(invoiceFollowupDef, client);
     const ours = results.find((r) => r.automationId === automationId);
     expect(ours).toBeDefined();
     expect(ours!.sent).toBe(0);

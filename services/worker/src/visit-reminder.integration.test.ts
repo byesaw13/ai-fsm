@@ -14,10 +14,10 @@ import {
   findDueReminders,
   findEligibleVisits,
   emitVisitReminder,
-  processVisitReminder,
-  runVisitReminders,
 } from "./visit-reminder.js";
 import type { AutomationRow, EligibleVisit } from "./visit-reminder.js";
+import { runAutomationType } from "./automations/runner.js";
+import { visitReminderDef } from "./automations/registry.js";
 
 const TEST_DB_URL = process.env.TEST_DATABASE_URL;
 const shouldRun = !!TEST_DB_URL;
@@ -212,23 +212,19 @@ describe.skipIf(!shouldRun)("Visit Reminder Integration Tests", () => {
     expect(rows[0].count).toBe(1);
   });
 
-  it("processVisitReminder processes visits and updates automation timestamps", async () => {
-    const automation: AutomationRow = {
-      id: testAutomationId,
-      account_id: ACCOUNT_A,
-      type: "visit_reminder",
-      config: { hours_before: 24 },
-      enabled: true,
-      next_run_at: new Date().toISOString(),
-    };
+  it("runAutomationType processes visits and updates automation timestamps", async () => {
+    await client.query(
+      `UPDATE automations SET next_run_at = now() - interval '1 minute', last_run_at = NULL WHERE id = $1`,
+      [testAutomationId]
+    );
 
-    const result = await processVisitReminder(client, automation);
+    const results = await runAutomationType(visitReminderDef, client);
+    const myResult = results.find((r) => r.automationId === testAutomationId);
 
-    expect(result.automationId).toBe(testAutomationId);
-    expect(result.sent).toBeGreaterThanOrEqual(1);
-    expect(result.errors).toBe(0);
+    expect(myResult).toBeDefined();
+    expect(myResult!.sent).toBeGreaterThanOrEqual(1);
+    expect(myResult!.errors).toBe(0);
 
-    // Verify automation timestamps were updated
     const { rows } = await client.query(
       `SELECT last_run_at, next_run_at FROM automations WHERE id = $1`,
       [testAutomationId]
@@ -237,14 +233,14 @@ describe.skipIf(!shouldRun)("Visit Reminder Integration Tests", () => {
     expect(new Date(rows[0].next_run_at).getTime()).toBeGreaterThan(Date.now());
   });
 
-  it("runVisitReminders processes all due automations end-to-end", async () => {
+  it("runAutomationType processes all due automations end-to-end", async () => {
     // Reset the automation to be due again
     await client.query(
       `UPDATE automations SET next_run_at = now() - interval '1 minute', last_run_at = NULL WHERE id = $1`,
       [testAutomationId]
     );
 
-    const results = await runVisitReminders(client);
+    const results = await runAutomationType(visitReminderDef, client);
 
     expect(results.length).toBeGreaterThanOrEqual(1);
     const myResult = results.find((r) => r.automationId === testAutomationId);
@@ -253,7 +249,7 @@ describe.skipIf(!shouldRun)("Visit Reminder Integration Tests", () => {
     expect(myResult!.errors).toBe(0);
   });
 
-  it("repeated runVisitReminders does not emit duplicate reminders", async () => {
+  it("repeated runAutomationType does not emit duplicate reminders", async () => {
     // Reset automation
     await client.query(
       `UPDATE automations SET next_run_at = now() - interval '1 minute' WHERE id = $1`,
@@ -261,7 +257,7 @@ describe.skipIf(!shouldRun)("Visit Reminder Integration Tests", () => {
     );
 
     // First run
-    await runVisitReminders(client);
+    await runAutomationType(visitReminderDef, client);
 
     // Reset automation again
     await client.query(
@@ -270,7 +266,7 @@ describe.skipIf(!shouldRun)("Visit Reminder Integration Tests", () => {
     );
 
     // Second run — should not create duplicates
-    const results = await runVisitReminders(client);
+    const results = await runAutomationType(visitReminderDef, client);
     const myResult = results.find((r) => r.automationId === testAutomationId);
 
     // All visits should be skipped (already reminded) or 0 eligible

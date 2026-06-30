@@ -1,7 +1,7 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
 import { seasonalReminderHtml } from "@ai-fsm/email-templates";
-import type { AutomationRow, ReminderResult } from "./visit-reminder.js";
+import type { AutomationRow, RunResult } from "./automations/types.js";
 import { enqueueNotification } from "./notification/enqueue.js";
 import { PRIORITY } from "./notification/priority.js";
 
@@ -20,21 +20,29 @@ interface SeasonalClient {
   email: string;
 }
 
-function getCurrentSeason(automationType: string): Season {
+export function getCurrentSeason(automationType: string): Season {
   return automationType.includes("spring") ? "spring" : "fall";
 }
 
-function isInSeason(season: Season): boolean {
+export function isInSeason(season: Season): boolean {
   const month = new Date().getMonth() + 1; // 1-12
   return SEASON_MONTHS[season].includes(month);
 }
 
-function nextSeasonStartDate(season: Season): Date {
+export function nextSeasonStartDate(season: Season): Date {
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const startMonth = SEASON_MONTHS[season][0]; // first month of season
   const year = currentMonth > startMonth ? now.getFullYear() + 1 : now.getFullYear();
   return new Date(Date.UTC(year, startMonth - 1, 1, 0, 0, 0));
+}
+
+export async function findDueSeasonalSpring(client: Client): Promise<AutomationRow[]> {
+  return findDueSeasonalRemindersForType(client, "seasonal_reminder_spring");
+}
+
+export async function findDueSeasonalFall(client: Client): Promise<AutomationRow[]> {
+  return findDueSeasonalRemindersForType(client, "seasonal_reminder_fall");
 }
 
 async function findDueSeasonalRemindersForType(
@@ -144,11 +152,11 @@ async function emitSeasonalReminder(
   return true;
 }
 
-async function processSeasonalReminders(
+export async function processSeasonalReminder(
   client: Client,
   automation: AutomationRow
-): Promise<ReminderResult> {
-  const result: ReminderResult = {
+): Promise<RunResult> {
+  const result: RunResult = {
     automationId: automation.id,
     accountId: automation.account_id,
     sent: 0,
@@ -160,18 +168,11 @@ async function processSeasonalReminders(
 
   // Only run during the appropriate calendar months — gate prevents out-of-season
   // sends when the automation fires immediately after seeding or re-enabling.
+  // Runner owns next_run_at advancement via advanceSeasonalNextRun.
   if (!isInSeason(season)) {
-    const nextStart = nextSeasonStartDate(season);
-    await client.query(
-      `UPDATE automations
-          SET last_run_at = now(), next_run_at = $1, updated_at = now()
-        WHERE id = $2`,
-      [nextStart.toISOString(), automation.id]
-    );
-    logger.info("seasonal-reminder: out of season, advancing next_run_at", {
+    logger.info("seasonal-reminder: out of season, skipping client dispatch", {
       automationId: automation.id,
       season,
-      nextStart,
     });
     return result;
   }
@@ -188,44 +189,5 @@ async function processSeasonalReminders(
     }
   }
 
-  // Run again in 7 days (handles batching if > 100 clients)
-  await client.query(
-    `UPDATE automations
-        SET last_run_at = now(),
-            next_run_at = now() + interval '7 days',
-            updated_at = now()
-      WHERE id = $1`,
-    [automation.id]
-  );
-
   return result;
-}
-
-export async function runSeasonalReminders(client: Client): Promise<ReminderResult[]> {
-  const [springAutomations, fallAutomations] = await Promise.all([
-    findDueSeasonalRemindersForType(client, "seasonal_reminder_spring"),
-    findDueSeasonalRemindersForType(client, "seasonal_reminder_fall"),
-  ]);
-
-  const automations = [...springAutomations, ...fallAutomations];
-  const results: ReminderResult[] = [];
-
-  for (const automation of automations) {
-    try {
-      const result = await processSeasonalReminders(client, automation);
-      results.push(result);
-      logger.info("seasonal-reminder: processed", {
-        automationId: automation.id,
-        type: automation.type,
-        accountId: automation.account_id,
-        sent: result.sent,
-        skipped: result.skipped,
-        errors: result.errors,
-      });
-    } catch (error) {
-      logger.error("seasonal-reminder: automation failed", error, { automationId: automation.id });
-    }
-  }
-
-  return results;
 }
