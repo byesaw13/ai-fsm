@@ -1,6 +1,6 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
-import { seasonalReminderHtml } from "./mailer.js";
+import { seasonalReminderHtml } from "@ai-fsm/email-templates";
 import type { AutomationRow, ReminderResult } from "./visit-reminder.js";
 import { enqueueNotification } from "./notification/enqueue.js";
 import { PRIORITY } from "./notification/priority.js";
