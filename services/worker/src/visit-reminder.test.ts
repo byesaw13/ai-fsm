@@ -4,9 +4,7 @@ import {
   findDueReminders,
   findEligibleVisits,
   emitVisitReminder,
-  markAutomationRun,
   processVisitReminder,
-  runVisitReminders,
 } from "./visit-reminder.js";
 import type { AutomationRow, EligibleVisit } from "./visit-reminder.js";
 import { logger } from "./logger.js";
@@ -216,22 +214,6 @@ describe("emitVisitReminder", () => {
   });
 });
 
-describe("markAutomationRun", () => {
-  it("updates last_run_at and advances next_run_at", async () => {
-    const client = mockClient();
-
-    await markAutomationRun(client, AUTOMATION.id);
-
-    expect(client.query).toHaveBeenCalledWith(
-      expect.stringContaining("last_run_at = now()"),
-      [AUTOMATION.id]
-    );
-    expect(
-      (client.query as ReturnType<typeof vi.fn>).mock.calls[0][0]
-    ).toContain("next_run_at = now() + interval '1 hour'");
-  });
-});
-
 describe("processVisitReminder", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => {});
@@ -248,8 +230,6 @@ describe("processVisitReminder", () => {
     // emitVisitReminder for visit-1: audit_log insert
     queryFn.mockResolvedValueOnce({ rowCount: 1 });
     // emitVisitReminder for visit-2: idempotency check (already exists)
-    queryFn.mockResolvedValueOnce({ rowCount: 1 });
-    // markAutomationRun
     queryFn.mockResolvedValueOnce({ rowCount: 1 });
 
     const client = { query: queryFn } as unknown as Client;
@@ -273,8 +253,6 @@ describe("processVisitReminder", () => {
     queryFn.mockResolvedValueOnce({ rowCount: 0 });
     // visit-2: audit_log insert
     queryFn.mockResolvedValueOnce({ rowCount: 1 });
-    // markAutomationRun
-    queryFn.mockResolvedValueOnce({ rowCount: 1 });
 
     const client = { query: queryFn } as unknown as Client;
     const result = await processVisitReminder(client, AUTOMATION);
@@ -288,91 +266,16 @@ describe("processVisitReminder", () => {
     );
   });
 
-  it("marks automation run even with zero eligible visits", async () => {
+  it("returns zero counts with no eligible visits", async () => {
     const queryFn = vi.fn();
     // findEligibleVisits: none
     queryFn.mockResolvedValueOnce({ rows: [] });
-    // markAutomationRun
-    queryFn.mockResolvedValueOnce({ rowCount: 1 });
 
     const client = { query: queryFn } as unknown as Client;
     const result = await processVisitReminder(client, AUTOMATION);
 
     expect(result.sent).toBe(0);
     expect(result.skipped).toBe(0);
-    // markAutomationRun was called (second query)
-    expect(queryFn).toHaveBeenCalledTimes(2);
-  });
-});
-
-describe("runVisitReminders", () => {
-  beforeEach(() => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.spyOn(console, "log").mockImplementation(() => {});
-    vi.spyOn(logger, "error").mockImplementation(() => {});
-    vi.spyOn(logger, "info").mockImplementation(() => {});
-  });
-
-  it("returns empty array when no automations are due", async () => {
-    const client = mockClient();
-    const results = await runVisitReminders(client);
-    expect(results).toEqual([]);
-  });
-
-  it("processes each due automation independently", async () => {
-    const auto2: AutomationRow = {
-      ...AUTOMATION,
-      id: "auto-2",
-      account_id: "acct-2",
-    };
-
-    const queryFn = vi.fn();
-    // findDueReminders: 2 automations
-    queryFn.mockResolvedValueOnce({ rows: [AUTOMATION, auto2] });
-    // auto-1 findEligibleVisits: none
-    queryFn.mockResolvedValueOnce({ rows: [] });
-    // auto-1 markAutomationRun
-    queryFn.mockResolvedValueOnce({ rowCount: 1 });
-    // auto-2 findEligibleVisits: none
-    queryFn.mockResolvedValueOnce({ rows: [] });
-    // auto-2 markAutomationRun
-    queryFn.mockResolvedValueOnce({ rowCount: 1 });
-
-    const client = { query: queryFn } as unknown as Client;
-    const results = await runVisitReminders(client);
-
-    expect(results).toHaveLength(2);
-    expect(results[0].automationId).toBe("auto-1");
-    expect(results[1].automationId).toBe("auto-2");
-  });
-
-  it("continues after a failed automation", async () => {
-    const auto2: AutomationRow = {
-      ...AUTOMATION,
-      id: "auto-2",
-      account_id: "acct-2",
-    };
-
-    const queryFn = vi.fn();
-    // findDueReminders: 2 automations
-    queryFn.mockResolvedValueOnce({ rows: [AUTOMATION, auto2] });
-    // auto-1 findEligibleVisits: throws
-    queryFn.mockRejectedValueOnce(new Error("db error"));
-    // auto-2 findEligibleVisits: none
-    queryFn.mockResolvedValueOnce({ rows: [] });
-    // auto-2 markAutomationRun
-    queryFn.mockResolvedValueOnce({ rowCount: 1 });
-
-    const client = { query: queryFn } as unknown as Client;
-    const results = await runVisitReminders(client);
-
-    // Only auto-2 succeeded
-    expect(results).toHaveLength(1);
-    expect(results[0].automationId).toBe("auto-2");
-    expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining("visit-reminder"),
-      expect.any(Error),
-      expect.objectContaining({ automationId: "auto-1" })
-    );
+    expect(queryFn).toHaveBeenCalledTimes(1);
   });
 });

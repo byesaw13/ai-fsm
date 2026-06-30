@@ -1,7 +1,7 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
 import { bookingConfirmedEmailHtml } from "@ai-fsm/email-templates";
-import type { AutomationRow, ReminderResult } from "./visit-reminder.js";
+import type { AutomationRow, RunResult } from "./automations/types.js";
 import { enqueueNotification } from "./notification/enqueue.js";
 import { PRIORITY } from "./notification/priority.js";
 
@@ -145,11 +145,11 @@ async function emitBookingConfirmation(
   return true;
 }
 
-async function processBookingConfirmation(
+export async function processBookingConfirmation(
   client: Client,
   automation: AutomationRow
-): Promise<ReminderResult> {
-  const result: ReminderResult = {
+): Promise<RunResult> {
+  const result: RunResult = {
     automationId: automation.id,
     accountId: automation.account_id,
     sent: 0,
@@ -173,37 +173,5 @@ async function processBookingConfirmation(
     }
   }
 
-  await client.query(
-    `UPDATE automations
-     SET last_run_at = now(),
-         next_run_at = now() + interval '30 minutes',
-         updated_at = now()
-     WHERE id = $1`,
-    [automation.id]
-  );
-
   return result;
-}
-
-export async function runBookingConfirmations(client: Client): Promise<ReminderResult[]> {
-  const automations = await findDueBookingConfirmations(client);
-  const results: ReminderResult[] = [];
-
-  for (const automation of automations) {
-    try {
-      const result = await processBookingConfirmation(client, automation);
-      results.push(result);
-      logger.info("booking-confirmed: processed", {
-        automationId: automation.id,
-        accountId: automation.account_id,
-        sent: result.sent,
-        skipped: result.skipped,
-        errors: result.errors,
-      });
-    } catch (error) {
-      logger.error("booking-confirmed: failed to process automation", error, { automationId: automation.id });
-    }
-  }
-
-  return results;
 }

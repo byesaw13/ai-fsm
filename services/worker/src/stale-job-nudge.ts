@@ -1,6 +1,6 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
-import type { AutomationRow, ReminderResult } from "./visit-reminder.js";
+import type { AutomationRow, RunResult } from "./automations/types.js";
 
 /**
  * Stale Job Nudge Automation
@@ -106,8 +106,8 @@ async function emitStaleJobNudge(
   return true;
 }
 
-async function processStaleJobs(client: Client, automation: AutomationRow): Promise<ReminderResult> {
-  const result: ReminderResult = {
+export async function processStaleJobs(client: Client, automation: AutomationRow): Promise<RunResult> {
+  const result: RunResult = {
     automationId: automation.id,
     accountId: automation.account_id,
     sent: 0,
@@ -127,29 +127,5 @@ async function processStaleJobs(client: Client, automation: AutomationRow): Prom
     }
   }
 
-  await client.query(
-    `UPDATE automations
-        SET last_run_at = now(),
-            next_run_at = now() + interval '6 hours',
-            updated_at = now()
-      WHERE id = $1`,
-    [automation.id]
-  );
-
   return result;
-}
-
-export async function runStaleJobNudges(client: Client): Promise<ReminderResult[]> {
-  const automations = await findDueStaleJobNudges(client);
-  const results: ReminderResult[] = [];
-
-  for (const automation of automations) {
-    try {
-      results.push(await processStaleJobs(client, automation));
-    } catch (error) {
-      logger.error("stale-job-nudge: automation failed", error, { automationId: automation.id });
-    }
-  }
-
-  return results;
 }

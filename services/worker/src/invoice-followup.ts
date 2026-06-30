@@ -4,6 +4,7 @@ import { invoiceFollowupEmailHtml } from "@ai-fsm/email-templates";
 import { appUrl } from "./mailer.js";
 import { enqueueNotification } from "./notification/enqueue.js";
 import { PRIORITY } from "./notification/priority.js";
+import type { AutomationRow, RunResult } from "./automations/types.js";
 
 /**
  * Overdue Invoice Follow-Up Automation
@@ -34,14 +35,7 @@ import { PRIORITY } from "./notification/priority.js";
  *   - Dovelite: scripts/preflight.mjs — safe retry/check-before-act pattern
  */
 
-export interface AutomationRow {
-  id: string;
-  account_id: string;
-  type: string;
-  config: { days_overdue?: number[] };
-  enabled: boolean;
-  next_run_at: string;
-}
+export type { AutomationRow, RunResult };
 
 export interface OverdueInvoice {
   id: string;
@@ -54,14 +48,6 @@ export interface OverdueInvoice {
   due_date: string;
   client_name: string | null;
   client_email: string | null;
-}
-
-export interface FollowupResult {
-  automationId: string;
-  accountId: string;
-  sent: number;
-  skipped: number;
-  errors: number;
 }
 
 const DEFAULT_DAYS_OVERDUE = [7, 14, 30];
@@ -219,37 +205,19 @@ export async function emitInvoiceFollowup(
 }
 
 /**
- * Update the automation's timestamps after a run.
- * Sets `last_run_at = now()` and advances `next_run_at` by 1 hour.
- */
-export async function markAutomationRun(
-  client: Client,
-  automationId: string
-): Promise<void> {
-  await client.query(
-    `UPDATE automations
-     SET last_run_at = now(),
-         next_run_at = now() + interval '1 hour',
-         updated_at = now()
-     WHERE id = $1`,
-    [automationId]
-  );
-}
-
-/**
  * Process a single invoice_followup automation:
  * 1. Find overdue invoices
  * 2. For each invoice, determine which cadence steps have been crossed
  * 3. Emit follow-ups for each crossed step (idempotent)
- * 4. Update automation timestamps
  *
  * Each invoice is processed independently — errors on one don't block others.
+ * Runner owns next_run_at advancement via advanceNextRun.
  */
 export async function processInvoiceFollowup(
   client: Client,
   automation: AutomationRow
-): Promise<FollowupResult> {
-  const result: FollowupResult = {
+): Promise<RunResult> {
+  const result: RunResult = {
     automationId: automation.id,
     accountId: automation.account_id,
     sent: 0,
@@ -257,7 +225,8 @@ export async function processInvoiceFollowup(
     errors: 0,
   };
 
-  const daysOverdue = automation.config.days_overdue ?? DEFAULT_DAYS_OVERDUE;
+  const daysOverdue =
+    (automation.config.days_overdue as number[] | undefined) ?? DEFAULT_DAYS_OVERDUE;
   const invoices = await findOverdueInvoices(client, automation);
 
   for (const invoice of invoices) {
@@ -288,34 +257,5 @@ export async function processInvoiceFollowup(
     }
   }
 
-  await markAutomationRun(client, automation.id);
-
   return result;
-}
-
-/**
- * Top-level: run all due invoice_followup automations.
- * Called by the worker poll loop. Safe to call repeatedly.
- */
-export async function runInvoiceFollowups(client: Client): Promise<FollowupResult[]> {
-  const automations = await findDueFollowups(client);
-  const results: FollowupResult[] = [];
-
-  for (const automation of automations) {
-    try {
-      const result = await processInvoiceFollowup(client, automation);
-      results.push(result);
-      logger.info("invoice-followup: processed", {
-        automationId: automation.id,
-        accountId: automation.account_id,
-        sent: result.sent,
-        skipped: result.skipped,
-        errors: result.errors,
-      });
-    } catch (error) {
-      logger.error("invoice-followup: failed to process automation", error, { automationId: automation.id });
-    }
-  }
-
-  return results;
 }

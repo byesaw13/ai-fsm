@@ -1,7 +1,7 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
 import { clientReactivationHtml } from "@ai-fsm/email-templates";
-import type { AutomationRow, ReminderResult } from "./visit-reminder.js";
+import type { AutomationRow, RunResult } from "./automations/types.js";
 import { enqueueNotification } from "./notification/enqueue.js";
 import { PRIORITY } from "./notification/priority.js";
 
@@ -119,11 +119,11 @@ async function emitClientReactivation(
   return true;
 }
 
-async function processClientReactivation(
+export async function processClientReactivation(
   client: Client,
   automation: AutomationRow
-): Promise<ReminderResult> {
-  const result: ReminderResult = {
+): Promise<RunResult> {
+  const result: RunResult = {
     automationId: automation.id,
     accountId: automation.account_id,
     sent: 0,
@@ -143,37 +143,5 @@ async function processClientReactivation(
     }
   }
 
-  await client.query(
-    `UPDATE automations
-        SET last_run_at = now(),
-            next_run_at = now() + interval '24 hours',
-            updated_at = now()
-      WHERE id = $1`,
-    [automation.id]
-  );
-
   return result;
-}
-
-export async function runClientReactivations(client: Client): Promise<ReminderResult[]> {
-  const automations = await findDueClientReactivations(client);
-  const results: ReminderResult[] = [];
-
-  for (const automation of automations) {
-    try {
-      const result = await processClientReactivation(client, automation);
-      results.push(result);
-      logger.info("client-reactivation: processed", {
-        automationId: automation.id,
-        accountId: automation.account_id,
-        sent: result.sent,
-        skipped: result.skipped,
-        errors: result.errors,
-      });
-    } catch (error) {
-      logger.error("client-reactivation: automation failed", error, { automationId: automation.id });
-    }
-  }
-
-  return results;
 }

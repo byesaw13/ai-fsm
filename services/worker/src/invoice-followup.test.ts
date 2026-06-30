@@ -5,9 +5,7 @@ import {
   findOverdueInvoices,
   getCadenceSteps,
   emitInvoiceFollowup,
-  markAutomationRun,
   processInvoiceFollowup,
-  runInvoiceFollowups,
 } from "./invoice-followup.js";
 import type { AutomationRow, OverdueInvoice } from "./invoice-followup.js";
 import { logger } from "./logger.js";
@@ -209,22 +207,6 @@ describe("emitInvoiceFollowup", () => {
   });
 });
 
-describe("markAutomationRun", () => {
-  it("updates last_run_at and advances next_run_at", async () => {
-    const client = mockClient();
-
-    await markAutomationRun(client, AUTOMATION.id);
-
-    expect(client.query).toHaveBeenCalledWith(
-      expect.stringContaining("last_run_at = now()"),
-      [AUTOMATION.id]
-    );
-    expect(
-      (client.query as ReturnType<typeof vi.fn>).mock.calls[0][0]
-    ).toContain("next_run_at = now() + interval '1 hour'");
-  });
-});
-
 describe("processInvoiceFollowup", () => {
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => {});
@@ -245,8 +227,6 @@ describe("processInvoiceFollowup", () => {
     // emitInvoiceFollowup for step 7: insert
     queryFn.mockResolvedValueOnce({ rowCount: 1 });
     // emitInvoiceFollowup for step 14: check (already exists)
-    queryFn.mockResolvedValueOnce({ rowCount: 1 });
-    // markAutomationRun
     queryFn.mockResolvedValueOnce({ rowCount: 1 });
 
     const client = { query: queryFn } as unknown as Client;
@@ -274,8 +254,6 @@ describe("processInvoiceFollowup", () => {
     queryFn.mockResolvedValueOnce({ rowCount: 0 });
     // emitInvoiceFollowup for step 7: insert
     queryFn.mockResolvedValueOnce({ rowCount: 1 });
-    // markAutomationRun
-    queryFn.mockResolvedValueOnce({ rowCount: 1 });
 
     const client = { query: queryFn } as unknown as Client;
     const result = await processInvoiceFollowup(client, autoNoConfig);
@@ -300,8 +278,6 @@ describe("processInvoiceFollowup", () => {
     queryFn.mockResolvedValueOnce({ rowCount: 0 });
     // inv-2 step 7 insert
     queryFn.mockResolvedValueOnce({ rowCount: 1 });
-    // markAutomationRun
-    queryFn.mockResolvedValueOnce({ rowCount: 1 });
 
     const client = { query: queryFn } as unknown as Client;
     const result = await processInvoiceFollowup(client, AUTOMATION);
@@ -315,19 +291,17 @@ describe("processInvoiceFollowup", () => {
     );
   });
 
-  it("marks automation run even with zero overdue invoices", async () => {
+  it("returns zero counts with no overdue invoices", async () => {
     const queryFn = vi.fn();
     // findOverdueInvoices: none
     queryFn.mockResolvedValueOnce({ rows: [] });
-    // markAutomationRun
-    queryFn.mockResolvedValueOnce({ rowCount: 1 });
 
     const client = { query: queryFn } as unknown as Client;
     const result = await processInvoiceFollowup(client, AUTOMATION);
 
     expect(result.sent).toBe(0);
     expect(result.skipped).toBe(0);
-    expect(queryFn).toHaveBeenCalledTimes(2);
+    expect(queryFn).toHaveBeenCalledTimes(1);
   });
 
   it("skips invoices with no crossed cadence steps", async () => {
@@ -338,8 +312,6 @@ describe("processInvoiceFollowup", () => {
       due_date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
     };
     queryFn.mockResolvedValueOnce({ rows: [invoice3days] });
-    // markAutomationRun
-    queryFn.mockResolvedValueOnce({ rowCount: 1 });
 
     const client = { query: queryFn } as unknown as Client;
     const result = await processInvoiceFollowup(client, AUTOMATION);
@@ -347,76 +319,5 @@ describe("processInvoiceFollowup", () => {
     expect(result.sent).toBe(0);
     expect(result.skipped).toBe(0);
     expect(result.errors).toBe(0);
-  });
-});
-
-describe("runInvoiceFollowups", () => {
-  beforeEach(() => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.spyOn(console, "log").mockImplementation(() => {});
-    vi.spyOn(logger, "error").mockImplementation(() => {});
-    vi.spyOn(logger, "info").mockImplementation(() => {});
-  });
-
-  it("returns empty array when no automations are due", async () => {
-    const client = mockClient();
-    const results = await runInvoiceFollowups(client);
-    expect(results).toEqual([]);
-  });
-
-  it("processes each due automation independently", async () => {
-    const auto2: AutomationRow = {
-      ...AUTOMATION,
-      id: "auto-f2",
-      account_id: "acct-2",
-    };
-
-    const queryFn = vi.fn();
-    // findDueFollowups: 2 automations
-    queryFn.mockResolvedValueOnce({ rows: [AUTOMATION, auto2] });
-    // auto-f1 findOverdueInvoices: none
-    queryFn.mockResolvedValueOnce({ rows: [] });
-    // auto-f1 markAutomationRun
-    queryFn.mockResolvedValueOnce({ rowCount: 1 });
-    // auto-f2 findOverdueInvoices: none
-    queryFn.mockResolvedValueOnce({ rows: [] });
-    // auto-f2 markAutomationRun
-    queryFn.mockResolvedValueOnce({ rowCount: 1 });
-
-    const client = { query: queryFn } as unknown as Client;
-    const results = await runInvoiceFollowups(client);
-
-    expect(results).toHaveLength(2);
-    expect(results[0].automationId).toBe("auto-f1");
-    expect(results[1].automationId).toBe("auto-f2");
-  });
-
-  it("continues after a failed automation", async () => {
-    const auto2: AutomationRow = {
-      ...AUTOMATION,
-      id: "auto-f2",
-      account_id: "acct-2",
-    };
-
-    const queryFn = vi.fn();
-    // findDueFollowups: 2 automations
-    queryFn.mockResolvedValueOnce({ rows: [AUTOMATION, auto2] });
-    // auto-f1 findOverdueInvoices: throws
-    queryFn.mockRejectedValueOnce(new Error("db error"));
-    // auto-f2 findOverdueInvoices: none
-    queryFn.mockResolvedValueOnce({ rows: [] });
-    // auto-f2 markAutomationRun
-    queryFn.mockResolvedValueOnce({ rowCount: 1 });
-
-    const client = { query: queryFn } as unknown as Client;
-    const results = await runInvoiceFollowups(client);
-
-    expect(results).toHaveLength(1);
-    expect(results[0].automationId).toBe("auto-f2");
-    expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining("invoice-followup"),
-      expect.any(Error),
-      expect.objectContaining({ automationId: "auto-f1" })
-    );
   });
 });
