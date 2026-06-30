@@ -15,15 +15,19 @@ import {
   resolveAssessmentContext,
   type AssessmentContext,
 } from "@/lib/estimates/assessment-context";
-import type { ShoppingList, SpecifiedMaterial, RoomSpec, ProjectOptions, PaintingProjectResult } from "@ai-fsm/domain";
-import { roomResultToLegacyFields } from "@ai-fsm/domain";
+import type { ShoppingList, SpecifiedMaterial, RoomSpec, ProjectOptions, EstimateResult } from "@ai-fsm/domain";
+import {
+  estimateResultToLegacyFields,
+  buildShoppingListFromEstimateResult,
+  roomSpecsToEstimateSpec,
+} from "@ai-fsm/domain";
 import { useEstimatePriceBook } from "./useEstimatePriceBook";
 import { useEstimateTiers } from "./useEstimateTiers";
 import {
   parseCents, lineTotal, mapPrepLevel,
   EMPTY_ROW, PREP_LEVEL_LABELS, STEP_LABELS, DEFAULT_TIERS,
   buildManualShoppingList,
-  buildShoppingListFromPaintingSummary,
+
   type LineItemRow, type OptionTier,
 } from "@/lib/estimates/form-helpers";
 import { useEstimatePricing } from "./useEstimatePricing";
@@ -409,22 +413,19 @@ export function useEstimateForm({
     );
   }
 
-  function handleRoomByRoomChange(rooms: RoomSpec[], opts: ProjectOptions, result: PaintingProjectResult) {
+  function handleRoomByRoomChange(rooms: RoomSpec[], opts: ProjectOptions, result: EstimateResult) {
     setRoomSpecs(rooms);
     setProjectOptions(opts);
-    // Sync legacy fields so the submit path and painting estimate preview stay consistent
-    const legacy = roomResultToLegacyFields(result);
+    const legacy = estimateResultToLegacyFields(result, rooms);
     setSqFt(legacy.sq_ft.toString());
     setPrepLevel(legacy.prep_level);
     setIncludesTrim(legacy.includes_trim);
     setIncludesCeiling(legacy.includes_ceiling);
-    setMaterialCostDollars((result.material_subtotal_cents / 100).toFixed(2));
-    // Rough labor hours estimate for internal costing
-    const estHours = (result.total_wall_sqft + result.total_ceiling_sqft) / 100 * 0.85 * opts.coat_count;
+    setMaterialCostDollars((result.summary.materialCents / 100).toFixed(2));
+    const paintableSqft = legacy.sq_ft;
+    const estHours = paintableSqft / 100 * 0.85 * opts.coat_count;
     setLaborHours(estHours.toFixed(1));
-    // Build shopping list from the room-by-room result (authoritative source for painting)
-    // shopping_summary has actual gallons by grade — this is the correct source, not scope builder
-    setRoomShoppingList(buildShoppingListFromPaintingSummary(result));
+    setRoomShoppingList(buildShoppingListFromEstimateResult(result, rooms, opts));
   }
 
   function handleAddMaterial(mat: MaterialSuggestion) {
@@ -489,7 +490,10 @@ export function useEstimateForm({
           setPending(false);
           return;
         }
-        baseEngineSpec = paintingResult._spec;
+        baseEngineSpec =
+          paintingMode === "room_by_room" && roomSpecs.length > 0
+            ? roomSpecsToEstimateSpec(roomSpecs, projectOptions)
+            : paintingResult._spec;
         payload = {
           client_id: clientId,
           job_id: jobId || null,

@@ -1,7 +1,14 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { query } from "@/lib/db";
-import { computeMaterials, groupMaterialsBySection, computePaintingProject } from "@ai-fsm/domain";
+import {
+  computeMaterials,
+  groupMaterialsBySection,
+  computeEstimate,
+  roomSpecsToEstimateSpec,
+  buildShoppingListFromEstimateResult,
+  CURRENT_RULES,
+} from "@ai-fsm/domain";
 import type { ServiceMaterial, ScopeComponentValues, ComplexityValues, MaterialsBySection, RoomSpec } from "@ai-fsm/domain";
 import { PrintButton } from "../print/PrintButton";
 
@@ -154,14 +161,21 @@ export default async function ShoppingListPage({
   if (sections.length === 0 && estimate.room_specs) {
     const roomSpecs = estimate.room_specs as RoomSpec[];
     if (Array.isArray(roomSpecs) && roomSpecs.length > 0) {
-      const paintResult = computePaintingProject(roomSpecs, {
+      const projectOptions = {
         coat_count: 2,
         occupied_home: false,
         vaulted_ceilings: false,
-      });
-      // Convert shopping_summary into a single "Paint & Supplies" section
-      if (paintResult.shopping_summary.length > 0) {
-        const sectionItems = paintResult.shopping_summary;
+      };
+      const spec = roomSpecsToEstimateSpec(roomSpecs, projectOptions);
+      const engine = computeEstimate(spec, CURRENT_RULES);
+      const shoppingList = buildShoppingListFromEstimateResult(engine, roomSpecs, projectOptions);
+      const sectionItems = (shoppingList?.sections[0]?.specified_items ?? []).map((item) => ({
+        item: item.name,
+        qty: item.quantity_needed,
+        unit: item.unit_label,
+        cost_cents: (item.unit_cost_cents ?? 0) * item.quantity_needed,
+      }));
+      if (sectionItems.length > 0) {
         materialTotalCents = sectionItems.reduce((s, i) => s + i.cost_cents, 0);
         // Use a pseudo-section for display (not MaterialsBySection format — rendered separately below)
         // Store in sections as a synthetic entry with a sentinel

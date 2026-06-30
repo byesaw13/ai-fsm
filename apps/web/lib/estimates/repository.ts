@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import { appendAuditLog } from "@/lib/db/audit";
 import { calcTotals, lineItemTotal } from "./math";
-import { calculatePaintingEstimate } from "./pricing";
+import { computeEstimate, sqftPaintingToSpec, CURRENT_RULES } from "@ai-fsm/domain";
 import { calculateDepositPolicy, estimateMaterialsDepositBasis } from "./deposit-policy";
 import { computeConditionTier } from "./guardrails";
 
@@ -290,16 +290,19 @@ export async function updateEstimateById(
     let new_internal_material: number | null = null;
 
     if (has_painting_fields) {
-      const result = calculatePaintingEstimate({
-        sq_ft: patch.sq_ft!,
-        prep_level: patch.prep_level!,
-        includes_trim: patch.includes_trim ?? false,
-        includes_ceiling: patch.includes_ceiling ?? false,
-        material_cost_cents: patch.material_cost_cents ?? 0,
-        labor_hours_estimate: patch.labor_hours_estimate!,
-      });
-      subtotal_cents = result.total_cents;
-      new_internal_labor = result.internal_labor_cost_cents;
+      const engine = computeEstimate(
+        sqftPaintingToSpec({
+          sq_ft: patch.sq_ft!,
+          prep_level: patch.prep_level!,
+          includes_trim: patch.includes_trim ?? false,
+          includes_ceiling: patch.includes_ceiling ?? false,
+          material_cost_cents: patch.material_cost_cents ?? 0,
+          labor_hours_estimate: patch.labor_hours_estimate!,
+        }),
+        CURRENT_RULES
+      );
+      subtotal_cents = engine.summary.totalCents;
+      new_internal_labor = engine.internalSummary.estimatedCostCents;
       new_internal_material = patch.material_cost_cents ?? null;
     } else {
       if (patch.flat_rate_cents !== undefined) {

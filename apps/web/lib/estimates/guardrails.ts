@@ -4,10 +4,15 @@ import {
   BUNDLE_DISCOUNT_MIN_TASKS,
   HALF_DAY_RATE_CENTS,
   FULL_DAY_RATE_CENTS,
+  evaluateGuardrails,
+  CURRENT_RULES,
+  ENGINE_VERSION,
   type EstimateFinishExpectation,
   type EstimateMinimumOverrideReason,
   type EstimateTripCount,
   type ComputedMaterial,
+  type EstimateSpec,
+  type GuardrailWarning,
 } from "@ai-fsm/domain";
 
 export { buildClientDocumentFilename } from "@ai-fsm/domain";
@@ -23,7 +28,6 @@ export interface EstimateGuardrailInput {
   travel_surcharge_cents: number;
   risk_adjustment_cents: number;
   minimum_service_override_reason: EstimateMinimumOverrideReason | null;
-  // New in pricing upgrade
   margin_pct: number | null;
   has_ma_regulated_items: boolean;
   line_item_count: number;
@@ -40,74 +44,87 @@ export interface EstimateGuardrailReview {
   warnings: EstimateGuardrailIssue[];
 }
 
+const WARNING_CODE_TO_FIELD: Record<string, string> = {
+  BELOW_MINIMUM: "minimum_service_override_reason",
+  BELOW_MARGIN_FLOOR: "margin_pct",
+  MA_REGULATED: "legal",
+  BLOCK_PRICING_SUGGESTED: "pricing",
+  DRYING_NEEDS_MULTI_TRIP: "trip_count",
+  MULTI_TRIP_NO_SURCHARGE: "risk_adjustment_cents",
+  RISK_FLAGS_NO_SURCHARGE: "risk_adjustment_cents",
+};
+
+function webInputToEngineSpec(input: EstimateGuardrailInput): EstimateSpec {
+  const adjustments: NonNullable<EstimateSpec["adjustments"]> = [];
+  if (input.travel_surcharge_cents > 0) {
+    adjustments.push({
+      id: "guardrail-travel",
+      type: "trip_fee",
+      label: "Travel surcharge",
+      amountCents: input.travel_surcharge_cents,
+    });
+  }
+  if (input.risk_adjustment_cents > 0) {
+    adjustments.push({
+      id: "guardrail-risk",
+      type: "surcharge",
+      label: "Risk adjustment",
+      amountCents: input.risk_adjustment_cents,
+    });
+  }
+
+  const overrides = input.minimum_service_override_reason
+    ? [{
+        rule: "minimum_service_fee",
+        reason: input.minimum_service_override_reason,
+        approvedBy: "owner",
+        approvedAt: new Date().toISOString(),
+      }]
+    : undefined;
+
+  return {
+    engineVersion: ENGINE_VERSION,
+    type: "general",
+    tripCount: input.trip_count,
+    requiresDryingOrCuring: input.requires_drying_or_curing,
+    difficultAccess: input.difficult_access,
+    oldHouseRisk: input.old_house_risk,
+    coordinationRequired: input.coordination_required,
+    finishExpectation: input.finish_expectation,
+    hasMaRegulatedItems: input.has_ma_regulated_items,
+    ...(adjustments.length > 0 ? { adjustments } : {}),
+    ...(overrides ? { overrides } : {}),
+  };
+}
+
+function engineWarningToIssue(warning: GuardrailWarning): EstimateGuardrailIssue {
+  return {
+    field: WARNING_CODE_TO_FIELD[warning.code] ?? warning.code.toLowerCase(),
+    message: warning.message,
+  };
+}
+
 export function reviewEstimateGuardrails(input: EstimateGuardrailInput): EstimateGuardrailReview {
-  const blockers: EstimateGuardrailIssue[] = [];
-  const warnings: EstimateGuardrailIssue[] = [];
+  const spec = webInputToEngineSpec(input);
+  const grossMarginPct = input.margin_pct ?? 1;
+  const warnings = evaluateGuardrails(
+    spec,
+    input.total_cents,
+    grossMarginPct,
+    input.line_item_count,
+    CURRENT_RULES
+  );
 
-  if (
-    input.total_cents < MINIMUM_SERVICE_FEE_CENTS &&
-    !input.minimum_service_override_reason
-  ) {
-    blockers.push({
-      field: "minimum_service_override_reason",
-      message: "Estimate is below the $185 minimum service value and needs a structured override.",
-    });
-  }
+  const blockers = warnings
+    .filter((w) => w.severity === "block")
+    .map(engineWarningToIssue);
+  const engineWarns = warnings
+    .filter((w) => w.severity === "warn")
+    .map(engineWarningToIssue);
 
-  if (input.margin_pct !== null && input.margin_pct < BUNDLE_MARGIN_FLOOR) {
-    blockers.push({
-      field: "margin_pct",
-      message: `Estimate is below the 30% margin floor (current: ${Math.round(input.margin_pct * 100)}%). Raise pricing or reduce scope before sending.`,
-    });
-  }
-
-  if (input.has_ma_regulated_items) {
-    warnings.push({
-      field: "legal",
-      message:
-        "One or more line items involve licensed-trade gray areas in Massachusetts. Confirm authorization to perform this work or route to a licensed subcontractor.",
-    });
-  }
-
-  if (input.line_item_count >= BUNDLE_DISCOUNT_MIN_TASKS) {
-    warnings.push({
-      field: "pricing",
-      message: `${input.line_item_count} tasks detected. Consider half-day ($${(HALF_DAY_RATE_CENTS / 100).toFixed(0)}) or full-day ($${(FULL_DAY_RATE_CENTS / 100).toFixed(0)}) block pricing instead of per-task rates.`,
-    });
-  }
-
-  if (input.requires_drying_or_curing && input.trip_count !== "multi_trip") {
-    warnings.push({
-      field: "trip_count",
-      message: "Drying or curing work usually requires multi-trip pricing.",
-    });
-  }
-
-  if (
-    input.trip_count === "multi_trip" &&
-    input.risk_adjustment_cents === 0
-  ) {
-    warnings.push({
-      field: "risk_adjustment_cents",
-      message: "Multi-trip work has no return-trip or risk adjustment captured.",
-    });
-  }
-
-  if (
-    (input.difficult_access ||
-      input.old_house_risk ||
-      input.coordination_required ||
-      input.finish_expectation === "premium") &&
-    input.risk_adjustment_cents === 0
-  ) {
-    warnings.push({
-      field: "risk_adjustment_cents",
-      message: "Risk or premium-condition flags are set without a risk adjustment.",
-    });
-  }
-
-  if (blockers.length === 0 && warnings.length === 0) {
-    warnings.push({
+  const resultWarnings = [...engineWarns];
+  if (blockers.length === 0 && resultWarnings.length === 0) {
+    resultWarnings.push({
       field: "pricing",
       message: "Pricing guardrails passed.",
     });
@@ -116,7 +133,7 @@ export function reviewEstimateGuardrails(input: EstimateGuardrailInput): Estimat
   return {
     status: blockers.length > 0 ? "blocked" : "passed",
     blockers,
-    warnings,
+    warnings: resultWarnings,
   };
 }
 
@@ -132,9 +149,6 @@ const TRADE_MATERIAL_BLOCKLIST: Record<string, string[]> = {
   drywall: ["thinset", "grout", "tile spacers", "lvp underlayment", "self-leveling", "feather finish"],
 };
 
-// Maps price-book category values to the trade key used in the blocklist above.
-// Price book categories use compound names (painting_finishes, carpentry_furniture)
-// while trade keys are the base trade name.
 const CATEGORY_TO_TRADE: Record<string, string> = {
   painting_finishes: "painting",
   carpentry_furniture: "carpentry",
@@ -190,3 +204,6 @@ export function computeConditionTier(flags: {
   }
   return "green";
 }
+
+// Re-export engine constants used in tests
+export { MINIMUM_SERVICE_FEE_CENTS, BUNDLE_MARGIN_FLOOR, BUNDLE_DISCOUNT_MIN_TASKS, HALF_DAY_RATE_CENTS, FULL_DAY_RATE_CENTS };

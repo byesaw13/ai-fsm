@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth } from "@/lib/auth/middleware";
 import { translateScope } from "@/lib/estimates/scope";
-import { calculatePaintingEstimate, formatCents } from "@/lib/estimates/pricing";
+import { formatCents } from "@/lib/estimates/pricing";
+import { computeEstimate, sqftPaintingToSpec, CURRENT_RULES } from "@ai-fsm/domain";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -51,23 +52,26 @@ export const POST = withAuth(async (request: NextRequest, session) => {
     let estimate_preview: Record<string, string> | null = null;
     if (parsed.suggested_job_type === "painting" && parsed.sq_ft !== null && parsed.prep_level !== null) {
       const hours = parsed.labor_hours_estimate ?? Math.round((parsed.sq_ft / 100) * 4 * 10) / 10;
-      const result = calculatePaintingEstimate({
-        sq_ft: parsed.sq_ft,
-        prep_level: parsed.prep_level,
-        includes_trim: parsed.includes_trim,
-        includes_ceiling: parsed.includes_ceiling,
-        material_cost_cents: parsed.material_cost_cents ?? 0,
-        labor_hours_estimate: hours,
-      });
+      const engine = computeEstimate(
+        sqftPaintingToSpec({
+          sq_ft: parsed.sq_ft,
+          prep_level: parsed.prep_level,
+          includes_trim: parsed.includes_trim,
+          includes_ceiling: parsed.includes_ceiling,
+          material_cost_cents: parsed.material_cost_cents ?? 0,
+          labor_hours_estimate: hours,
+        }),
+        CURRENT_RULES
+      );
       estimate_preview = {
-        labor: formatCents(result.labor_flat_rate_cents),
+        labor: formatCents(engine.summary.laborCents),
         materials: parsed.material_cost_cents ? formatCents(parsed.material_cost_cents) : "Not specified",
-        handling_fee: formatCents(result.material_handling_cents),
-        total: formatCents(result.total_cents),
-        deposit: formatCents(result.deposit_cents),
-        balance: formatCents(result.balance_cents),
+        handling_fee: formatCents(engine.summary.handlingCents),
+        total: formatCents(engine.summary.totalCents),
+        deposit: formatCents(engine.summary.depositCents),
+        balance: formatCents(engine.summary.balanceDueCents),
         estimated_hours: String(hours),
-        margin_pct: `${result.gross_margin_pct}%`,
+        margin_pct: `${Math.round(engine.internalSummary.grossMarginPct * 1000) / 10}%`,
       };
     }
 

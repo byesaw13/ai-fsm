@@ -26,7 +26,7 @@ describe("reviewEstimateGuardrails", () => {
     expect(review.status).toBe("blocked");
     expect(review.blockers).toContainEqual({
       field: "minimum_service_override_reason",
-      message: "Estimate is below the $185 minimum service value and needs a structured override.",
+      message: "Total ($125.00) is below the $185.00 minimum service fee. Add a structured override to proceed.",
     });
   });
 
@@ -51,7 +51,7 @@ describe("reviewEstimateGuardrails", () => {
     });
 
     expect(review.status).toBe("passed");
-    expect(review.warnings.some((w) => w.field === "risk_adjustment_cents")).toBe(true);
+    expect(review.warnings.some((w) => w.field === "risk_adjustment_cents" && w.message.includes("surcharge"))).toBe(true);
   });
 
   it("blocks estimates below 30% gross margin", () => {
@@ -83,6 +83,40 @@ describe("reviewEstimateGuardrails", () => {
     });
 
     expect(review.warnings.some((w) => w.field === "pricing")).toBe(true);
+  });
+
+  it("warns on multi-trip work without a risk adjustment", () => {
+    const review = reviewEstimateGuardrails({
+      ...baseInput,
+      total_cents: 30000,
+      trip_count: "multi_trip",
+      risk_adjustment_cents: 0,
+    });
+
+    expect(review.warnings.some((w) => w.field === "risk_adjustment_cents")).toBe(true);
+  });
+
+  it("passes multi-trip work when a risk adjustment is captured", () => {
+    const review = reviewEstimateGuardrails({
+      ...baseInput,
+      total_cents: 30000,
+      trip_count: "multi_trip",
+      risk_adjustment_cents: 7500,
+    });
+
+    expect(review.warnings.some((w) => w.field === "risk_adjustment_cents")).toBe(false);
+  });
+
+  it("does not warn on risk flags when travel surcharge is present", () => {
+    const review = reviewEstimateGuardrails({
+      ...baseInput,
+      total_cents: 30000,
+      difficult_access: true,
+      travel_surcharge_cents: 7500,
+      risk_adjustment_cents: 0,
+    });
+
+    expect(review.warnings.some((w) => w.field === "risk_adjustment_cents")).toBe(false);
   });
 });
 
