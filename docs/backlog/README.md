@@ -235,7 +235,8 @@ only after TASK-018 proves the model in real use:
   the system references, derived from the production model. First draft (from a
   pricing-evidence analysis of real estimates/invoices) exists at
   `docs/working/PRICING_INTELLIGENCE_CHARTER_DRAFT.md`; evidence at
-  historical pricing evidence retained in git history. Still not committed work.
+  [PRICING_AUDIT_REPORT_2026.md](../generated/PRICING_AUDIT_REPORT_2026.md).
+  Still not committed work.
 - **PI-005 Production Knowledge Base** — immutable business baselines (e.g.
   "Bathroom Refresh v2", travel policy, visit fee).
 - **PI-007 Historical Production Learning** — completed work orders feed back to

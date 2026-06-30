@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Opt-in local cleanup for machine-local artifacts.
+# Opt-in local cleanup for machine-local artifacts and generated PDFs.
 #
 # Usage:
-#   scripts/clean-local-artifacts.sh --confirm
+#   scripts/clean-local-artifacts.sh --dry-run   # list targets, no deletes
+#   scripts/clean-local-artifacts.sh --confirm   # delete listed targets
 #
-# Requires --confirm. Deletes from repo root only:
+# Targets (repo root only):
 #   - .impeccable/
 #   - .superpowers/
 #   - docs/*.pdf
@@ -14,14 +15,18 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 CONFIRM=false
+DRY_RUN=false
 for arg in "$@"; do
-  if [[ "$arg" == "--confirm" ]]; then
-    CONFIRM=true
-  fi
+  case "$arg" in
+    --confirm) CONFIRM=true ;;
+    --dry-run) DRY_RUN=true ;;
+  esac
 done
 
-if [[ "$CONFIRM" != true ]]; then
-  echo "Refusing to delete without --confirm. Re-run with: scripts/clean-local-artifacts.sh --confirm" >&2
+if [[ "$DRY_RUN" != true && "$CONFIRM" != true ]]; then
+  echo "Refusing to run without --dry-run or --confirm." >&2
+  echo "  scripts/clean-local-artifacts.sh --dry-run" >&2
+  echo "  scripts/clean-local-artifacts.sh --confirm" >&2
   exit 1
 fi
 
@@ -38,7 +43,15 @@ while IFS= read -r -d '' pdf; do
 done < <(find "$REPO_ROOT/docs" -maxdepth 1 -name '*.pdf' -print0 2>/dev/null || true)
 
 if [[ ${#targets[@]} -eq 0 ]]; then
-  echo "No local artifacts found to delete."
+  echo "No local artifacts found."
+  exit 0
+fi
+
+if [[ "$DRY_RUN" == true ]]; then
+  echo "Dry run — would delete:"
+  for target in "${targets[@]}"; do
+    echo "  - $target"
+  done
   exit 0
 fi
 
