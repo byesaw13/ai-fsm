@@ -524,11 +524,11 @@ real daily use and TASK-034 (non-superuser RLS verification) is considered.
 
 ## Completed
 
-- [TASK-001: Vehicle Mileage Sessions](done/TASK-001-vehicle-mileage-sessions.md) — Done
-- [TASK-002: Vehicle Session Recovery](done/TASK-002-vehicle-session-recovery.md) — Done
-- [TASK-003: Wrong Vehicle Correction](done/TASK-003-wrong-vehicle-correction.md) — Done
-- [TASK-004: Daily Operations Log](done/TASK-004-daily-operations-log.md) — Done
-- [TASK-005: Activity Tracking](done/TASK-005-activity-tracking.md) — Done
-- [TASK-019: Activity Timeline Correction](done/TASK-019-activity-timeline-correction.md) — Done
-- [TASK-021: Quick Activity Switching](done/TASK-021-quick-activity-switching.md) — Done
-- [TASK-022: Smart Start Day](done/TASK-022-smart-start-day.md) — Done
+- [TASK-001: Vehicle Mileage Sessions](../archive/backlog-done/TASK-001-vehicle-mileage-sessions.md) — Done
+- [TASK-002: Vehicle Session Recovery](../archive/backlog-done/TASK-002-vehicle-session-recovery.md) — Done
+- [TASK-003: Wrong Vehicle Correction](../archive/backlog-done/TASK-003-wrong-vehicle-correction.md) — Done
+- [TASK-004: Daily Operations Log](../archive/backlog-done/TASK-004-daily-operations-log.md) — Done
+- [TASK-005: Activity Tracking](../archive/backlog-done/TASK-005-activity-tracking.md) — Done
+- [TASK-019: Activity Timeline Correction](../archive/backlog-done/TASK-019-activity-timeline-correction.md) — Done
+- [TASK-021: Quick Activity Switching](../archive/backlog-done/TASK-021-quick-activity-switching.md) — Done
+- [TASK-022: Smart Start Day](../archive/backlog-done/TASK-022-smart-start-day.md) — Done
