@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { canCreateEstimates, canManageClients, canTransitionJob } from "@/lib/auth/permissions";
 import { query, queryOne } from "@/lib/db";
-import { buildJobCreateHref, formatClientContact, formatPropertyAddress } from "@/lib/crm/p7";
+import { buildJobCreateHref, formatClientContact, formatPropertyAddress } from "@/lib/crm/normalization";
 import {
   Card,
   EmptyState,

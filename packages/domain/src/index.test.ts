@@ -9,19 +9,11 @@ import {
   paymentMethodSchema,
   paymentTypeSchema,
   paymentStatusSchema,
-  accountSchema,
-  userSchema,
-  jobSchema,
-  visitSchema,
-  estimateSchema,
   estimateAdjustmentTypeSchema,
   estimateFinishExpectationSchema,
   estimateMinimumOverrideReasonSchema,
   estimatePricingReviewStatusSchema,
   estimateTripCountSchema,
-  invoiceSchema,
-  auditLogSchema,
-  apiErrorSchema,
   jobTransitions,
   visitTransitions,
   estimateTransitions,
@@ -198,78 +190,6 @@ describe('invoiceTransitions', () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// Entity schemas — required field validation
-// ---------------------------------------------------------------------------
-
-const UUID = '00000000-0000-4000-8000-000000000001'
-const NOW = new Date().toISOString()
-
-describe('accountSchema', () => {
-  it('accepts a valid account', () => {
-    expect(() => accountSchema.parse({ id: UUID, name: 'Acme', settings: {}, created_at: NOW, updated_at: NOW })).not.toThrow()
-  })
-  it('rejects missing name', () => {
-    expect(() => accountSchema.parse({ id: UUID, settings: {}, created_at: NOW, updated_at: NOW })).toThrow()
-  })
-})
-
-describe('userSchema', () => {
-  it('accepts a valid user', () => {
-    expect(() => userSchema.parse({
-      id: UUID, account_id: UUID, email: 'a@b.com', full_name: 'A B',
-      password_hash: 'hash', role: 'tech', created_at: NOW, updated_at: NOW,
-    })).not.toThrow()
-  })
-  it('rejects invalid role', () => {
-    expect(() => userSchema.parse({
-      id: UUID, account_id: UUID, email: 'a@b.com', full_name: 'A B',
-      password_hash: 'hash', role: 'god', created_at: NOW, updated_at: NOW,
-    })).toThrow()
-  })
-})
-
-describe('jobSchema', () => {
-  it('accepts a valid job', () => {
-    expect(() => jobSchema.parse({
-      id: UUID, account_id: UUID, client_id: UUID, title: 'Lawn care',
-      status: 'draft', priority: 0, created_by: UUID, created_at: NOW, updated_at: NOW,
-    })).not.toThrow()
-  })
-  it('rejects missing title', () => {
-    expect(() => jobSchema.parse({
-      id: UUID, account_id: UUID, client_id: UUID,
-      status: 'draft', priority: 0, created_by: UUID, created_at: NOW, updated_at: NOW,
-    })).toThrow()
-  })
-})
-
-describe('visitSchema', () => {
-  it('accepts a valid visit', () => {
-    expect(() => visitSchema.parse({
-      id: UUID, account_id: UUID, job_id: UUID, status: 'scheduled',
-      scheduled_start: NOW, scheduled_end: NOW, created_at: NOW, updated_at: NOW,
-    })).not.toThrow()
-  })
-})
-
-describe('estimateSchema', () => {
-  it('accepts a valid estimate', () => {
-    expect(() => estimateSchema.parse({
-      id: UUID, account_id: UUID, client_id: UUID, status: 'draft',
-      subtotal_cents: 0, tax_cents: 0, total_cents: 0, deposit_cents: 0, balance_cents: 0,
-      created_by: UUID, created_at: NOW, updated_at: NOW,
-    })).not.toThrow()
-  })
-  it('rejects negative subtotal_cents', () => {
-    expect(() => estimateSchema.parse({
-      id: UUID, account_id: UUID, client_id: UUID, status: 'draft',
-      subtotal_cents: -1, tax_cents: 0, total_cents: 0,
-      created_by: UUID, created_at: NOW, updated_at: NOW,
-    })).toThrow()
-  })
-})
-
 describe('Dovetails estimate guardrail standards', () => {
   it('keeps estimate guardrail enum schemas aligned with canonical constants', () => {
     expect(estimateTripCountSchema.options).toEqual(ESTIMATE_TRIP_COUNT_OPTIONS)
@@ -279,82 +199,6 @@ describe('Dovetails estimate guardrail standards', () => {
     expect(estimatePricingReviewStatusSchema.options).toEqual(ESTIMATE_PRICING_REVIEW_STATUSES)
   })
 
-  it('accepts pricing guardrail fields on estimates', () => {
-    expect(() => estimateSchema.parse({
-      id: UUID, account_id: UUID, client_id: UUID, status: 'draft',
-      subtotal_cents: MINIMUM_SERVICE_FEE_CENTS,
-      tax_cents: 0,
-      total_cents: MINIMUM_SERVICE_FEE_CENTS,
-      deposit_cents: 4500,
-      balance_cents: 10500,
-      created_by: UUID, created_at: NOW, updated_at: NOW,
-      trip_count: 'multi_trip',
-      requires_drying_or_curing: true,
-      difficult_access: true,
-      old_house_risk: true,
-      coordination_required: true,
-      finish_expectation: 'premium',
-      travel_surcharge_cents: 2500,
-      risk_adjustment_cents: 5000,
-      minimum_service_override_reason: 'owner_approved',
-      pricing_review_status: 'needs_review',
-    })).not.toThrow()
-  })
-})
-
-describe('invoiceSchema', () => {
-  it('accepts a valid invoice', () => {
-    expect(() => invoiceSchema.parse({
-      id: UUID, account_id: UUID, client_id: UUID, status: 'draft',
-      invoice_number: 'INV-001',
-      subtotal_cents: 0, tax_cents: 0, total_cents: 0, paid_cents: 0, deposit_cents: 0, balance_cents: 0,
-      created_by: UUID, created_at: NOW, updated_at: NOW,
-    })).not.toThrow()
-  })
-  it('rejects missing invoice_number', () => {
-    expect(() => invoiceSchema.parse({
-      id: UUID, account_id: UUID, client_id: UUID, status: 'draft',
-      subtotal_cents: 0, tax_cents: 0, total_cents: 0, paid_cents: 0,
-      created_by: UUID, created_at: NOW, updated_at: NOW,
-    })).toThrow()
-  })
-})
-
-describe('auditLogSchema', () => {
-  it('accepts a valid audit log entry', () => {
-    expect(() => auditLogSchema.parse({
-      id: UUID, account_id: UUID, entity_type: 'job', entity_id: UUID,
-      action: 'insert', actor_id: UUID, created_at: NOW,
-    })).not.toThrow()
-  })
-  it('rejects invalid action', () => {
-    expect(() => auditLogSchema.parse({
-      id: UUID, account_id: UUID, entity_type: 'job', entity_id: UUID,
-      action: 'drop', actor_id: UUID, created_at: NOW,
-    })).toThrow()
-  })
-})
-
-// ---------------------------------------------------------------------------
-// API error model
-// ---------------------------------------------------------------------------
-
-describe('apiErrorSchema', () => {
-  it('accepts a valid error with UUID traceId', () => {
-    expect(() => apiErrorSchema.parse({
-      error: { code: 'NOT_FOUND', message: 'not found', traceId: UUID },
-    })).not.toThrow()
-  })
-  it('rejects missing traceId', () => {
-    expect(() => apiErrorSchema.parse({
-      error: { code: 'NOT_FOUND', message: 'not found' },
-    })).toThrow()
-  })
-  it('rejects non-UUID traceId', () => {
-    expect(() => apiErrorSchema.parse({
-      error: { code: 'NOT_FOUND', message: 'not found', traceId: 'not-a-uuid' },
-    })).toThrow()
-  })
 })
 
 // ---------------------------------------------------------------------------

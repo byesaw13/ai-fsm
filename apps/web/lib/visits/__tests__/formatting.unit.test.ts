@@ -6,9 +6,9 @@ import {
   formatVisitTime,
   isSameCalendarDay,
   isVisitOverdue,
-} from "../p7";
+} from "../formatting";
 
-describe("visits/p7 UI helpers", () => {
+describe("visits/formatting UI helpers", () => {
   const base = "2026-02-23T15:00:00.000Z";
   const nowMs = new Date("2026-02-23T16:30:00.000Z").getTime();
 
