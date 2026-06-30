@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@ai-fsm/domain": "workspace:*",
+    "@ai-fsm/email-templates": "workspace:*",
     "@ai-fsm/log": "workspace:*",
     "@ai-fsm/money": "workspace:*",
     "@anthropic-ai/sdk": "^0.92.0",

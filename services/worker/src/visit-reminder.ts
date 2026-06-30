@@ -1,6 +1,6 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
-import { visitReminderHtml } from "./mailer.js";
+import { visitReminderEmailHtml } from "@ai-fsm/email-templates";
 import { enqueueNotification } from "./notification/enqueue.js";
 import { PRIORITY } from "./notification/priority.js";
 
@@ -152,10 +152,10 @@ export async function emitVisitReminder(
       priority: PRIORITY.MEDIUM,
       toAddress: visit.client_email,
       subject: `Reminder: ${visit.job_title} visit on ${when}`,
-      htmlBody: visitReminderHtml({
+      htmlBody: visitReminderEmailHtml({
         clientName: visit.client_name,
         jobTitle: visit.job_title,
-        when,
+        scheduledStart: visit.scheduled_start,
         propertyAddress: visit.property_address,
         techName: visit.tech_name,
       }),

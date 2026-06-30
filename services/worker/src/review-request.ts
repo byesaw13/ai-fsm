@@ -1,6 +1,6 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
-import { reviewRequestHtml } from "./mailer.js";
+import { reviewRequestEmailHtml } from "@ai-fsm/email-templates";
 import type { AutomationRow, ReminderResult } from "./visit-reminder.js";
 import { enqueueNotification } from "./notification/enqueue.js";
 import { PRIORITY } from "./notification/priority.js";
@@ -104,7 +104,7 @@ async function emitReviewRequest(
       priority: PRIORITY.LOW,
       toAddress: job.client_email,
       subject: `How did we do? — ${job.title}`,
-      htmlBody: reviewRequestHtml({
+      htmlBody: reviewRequestEmailHtml({
         clientName: job.client_name,
         jobTitle: job.title,
         techName: job.tech_name,
