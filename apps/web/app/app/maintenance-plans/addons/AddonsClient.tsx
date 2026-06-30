@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatCentsShort } from "@ai-fsm/money";
 
 interface Addon {
   id: string;
@@ -15,10 +16,6 @@ interface Addon {
 
 interface Props {
   initialAddons: Addon[];
-}
-
-function dollars(cents: number) {
-  return (cents / 100).toFixed(0);
 }
 
 export function AddonsClient({ initialAddons }: Props) {
@@ -38,7 +35,7 @@ export function AddonsClient({ initialAddons }: Props) {
     setForm({
       name: a.name,
       description: a.description ?? "",
-      annual_price_dollars: dollars(a.annual_price_cents),
+      annual_price_dollars: String(Math.round(a.annual_price_cents / 100)),
       is_active: a.is_active,
       sort_order: String(a.sort_order),
     });
@@ -174,7 +171,7 @@ export function AddonsClient({ initialAddons }: Props) {
                   <td style={{ padding: "var(--space-3)", fontSize: "var(--font-size-sm)", fontWeight: 600 }}>{a.name}</td>
                   <td style={{ padding: "var(--space-3)", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>{a.description ?? "—"}</td>
                   <td style={{ padding: "var(--space-3)", fontSize: "var(--font-size-sm)", fontWeight: 600 }}>
-                    ${dollars(a.annual_price_cents)}<span style={{ fontWeight: 400, color: "var(--color-text-secondary)" }}>/yr</span>
+                    {formatCentsShort(a.annual_price_cents)}<span style={{ fontWeight: 400, color: "var(--color-text-secondary)" }}>/yr</span>
                   </td>
                   <td style={{ padding: "var(--space-3)" }}>
                     <button
