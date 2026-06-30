@@ -4,7 +4,7 @@ import { withAuth, type AuthSession } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { canViewReports } from "@/lib/auth/permissions";
 import { logger } from "@/lib/logger";
-import { applyRebalance } from "@/lib/activities/rebalance";
+import { applyRebalance, rebalanceCoversOverlaps } from "@/lib/activities/rebalance";
 import {
   VISIT_CLASSIFICATIONS,
   CLASSIFICATION_TO_ACTIVITY,
@@ -114,14 +114,14 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     }
 
     // confirm — refuse to double-count time already in the ledger.
-    const { rows: overlap } = await client.query<{ id: string }>(
-      `SELECT id FROM activity_entries
+    const { rows: overlap } = await client.query<{ id: string; started_at: string; ended_at: string | null }>(
+      `SELECT id, started_at::text, ended_at::text FROM activity_entries
        WHERE account_id = $1 AND voided_at IS NULL
          AND started_at < $3 AND COALESCE(ended_at, 'infinity'::timestamptz) > $2
-       LIMIT 1`,
+       FOR UPDATE`,
       [session.accountId, cand.arrival_time, cand.departure_time],
     );
-    if (overlap.length > 0 && !d.rebalance?.length) {
+    if (!rebalanceCoversOverlaps(overlap, d.rebalance, { started_at: cand.arrival_time, ended_at: cand.departure_time })) {
       await client.query("ROLLBACK");
       return err(
         "CONFLICT",

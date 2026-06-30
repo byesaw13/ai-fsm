@@ -99,6 +99,34 @@ describe("PATCH /api/v1/activities/[id]", () => {
     expect(res.status).toBe(400);
   });
 
+
+  it("audits a trimmed neighbour via rebalance", async () => {
+    mockClientQuery.mockImplementation((sql: string, params?: unknown[]) => {
+      if (sql.includes("FOR UPDATE")) {
+        const id = params?.[0];
+        return Promise.resolve({ rows: [{ ...EXISTING, id: id === MANUAL_ID ? MANUAL_ID : EXISTING.id }] });
+      }
+      if (sql.startsWith("UPDATE activity_entries") && sql.includes("RETURNING id")) {
+        const id = params?.[2];
+        return Promise.resolve({ rows: [{ ...EXISTING, id: id === MANUAL_ID ? MANUAL_ID : EXISTING.id, ended_at: params?.[1] ?? EXISTING.ended_at }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const res = await editActivity(req("/api/v1/activities/" + EXISTING.id, "PATCH", {
+      started_at: "2026-06-11T12:00:00.000Z",
+      ended_at: "2026-06-11T15:00:00.000Z",
+      rebalance: [{ id: MANUAL_ID, ended_at: "2026-06-11T12:00:00.000Z" }],
+    }));
+
+    expect(res.status).toBe(200);
+    expect(mockAppendAuditLog).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      entity_type: "activity_entry",
+      entity_id: MANUAL_ID,
+      action: "update",
+    }));
+  });
+
   it("drops an engulfed neighbour via rebalance and audits the delete", async () => {
     mockClientQuery.mockImplementation((sql: string) => {
       if (sql.includes("FOR UPDATE")) return Promise.resolve({ rows: [EXISTING] });
@@ -236,8 +264,8 @@ describe("PATCH /api/v1/activities/segments/[id]", () => {
   it("keeps rejecting overlap without an accepted rebalance", async () => {
     mockClientQuery.mockImplementation((sql: string) => {
       if (sql.includes("FROM location_segments")) return Promise.resolve({ rows: [PROVISIONAL_SEGMENT] });
-      if (sql.includes("FROM activity_entries") && sql.includes("LIMIT 1")) {
-        return Promise.resolve({ rows: [{ id: MANUAL_ID }] });
+      if (sql.includes("FROM activity_entries") && sql.includes("FOR UPDATE")) {
+        return Promise.resolve({ rows: [{ id: MANUAL_ID, started_at: "2026-06-11T11:00:00.000Z", ended_at: "2026-06-11T14:00:00.000Z" }] });
       }
       return Promise.resolve({ rows: [] });
     });
@@ -250,11 +278,70 @@ describe("PATCH /api/v1/activities/segments/[id]", () => {
     expect(res.status).toBe(409);
   });
 
+
+  it("rejects a rebalance that does not cover every current overlap", async () => {
+    mockClientQuery.mockImplementation((sql: string) => {
+      if (sql.includes("FROM location_segments")) return Promise.resolve({ rows: [PROVISIONAL_SEGMENT] });
+      if (sql.includes("FROM activity_entries") && sql.includes("FOR UPDATE")) {
+        return Promise.resolve({ rows: [{ id: MANUAL_ID }, { id: "55555555-5555-5555-5555-555555555555" }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const res = await patchSegment(req(`/api/v1/activities/segments/${SEGMENT_ID}`, "PATCH", {
+      action: "confirm",
+      activity_type: "job_work",
+      rebalance: [{ id: MANUAL_ID, delete: true }],
+    }));
+
+    expect(res.status).toBe(409);
+    expect(mockClientQuery.mock.calls.some((call) => String(call[0]).startsWith("INSERT INTO activity_entries"))).toBe(false);
+  });
+
+  it("rejects a rebalance for an unrelated activity", async () => {
+    mockClientQuery.mockImplementation((sql: string) => {
+      if (sql.includes("FROM location_segments")) return Promise.resolve({ rows: [PROVISIONAL_SEGMENT] });
+      if (sql.includes("FROM activity_entries") && sql.includes("FOR UPDATE")) {
+        return Promise.resolve({ rows: [{ id: MANUAL_ID }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const res = await patchSegment(req(`/api/v1/activities/segments/${SEGMENT_ID}`, "PATCH", {
+      action: "confirm",
+      activity_type: "job_work",
+      rebalance: [{ id: "99999999-9999-9999-9999-999999999999", delete: true }],
+    }));
+
+    expect(res.status).toBe(409);
+    expect(mockClientQuery.mock.calls.some((call) => String(call[0]).startsWith("INSERT INTO activity_entries"))).toBe(false);
+  });
+
+
+  it("rejects a rebalance payload when there is no current overlap", async () => {
+    mockClientQuery.mockImplementation((sql: string) => {
+      if (sql.includes("FROM location_segments")) return Promise.resolve({ rows: [PROVISIONAL_SEGMENT] });
+      if (sql.includes("FROM activity_entries") && sql.includes("FOR UPDATE")) {
+        return Promise.resolve({ rows: [] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const res = await patchSegment(req(`/api/v1/activities/segments/${SEGMENT_ID}`, "PATCH", {
+      action: "confirm",
+      activity_type: "job_work",
+      rebalance: [{ id: MANUAL_ID, delete: true }],
+    }));
+
+    expect(res.status).toBe(409);
+    expect(mockClientQuery.mock.calls.some((call) => String(call[0]).startsWith("INSERT INTO activity_entries"))).toBe(false);
+  });
+
   it("confirms an overlapping segment when rebalance is accepted and audits the replaced manual row", async () => {
     mockClientQuery.mockImplementation((sql: string) => {
       if (sql.includes("FROM location_segments")) return Promise.resolve({ rows: [PROVISIONAL_SEGMENT] });
-      if (sql.includes("FROM activity_entries") && sql.includes("LIMIT 1")) {
-        return Promise.resolve({ rows: [{ id: MANUAL_ID }] });
+      if (sql.includes("FROM activity_entries") && sql.includes("FOR UPDATE")) {
+        return Promise.resolve({ rows: [{ id: MANUAL_ID, started_at: "2026-06-11T11:00:00.000Z", ended_at: "2026-06-11T12:00:00.000Z" }] });
       }
       if (sql.startsWith("INSERT INTO activity_entries")) return Promise.resolve({ rows: [{ id: "new-segment-entry" }] });
       if (sql.startsWith("DELETE FROM activity_entries")) {
@@ -298,8 +385,8 @@ describe("PATCH /api/v1/visit-candidates/[id]", () => {
   it("confirms an overlapping visit candidate when rebalance is accepted", async () => {
     mockClientQuery.mockImplementation((sql: string) => {
       if (sql.includes("FROM visit_candidates")) return Promise.resolve({ rows: [PENDING_CANDIDATE] });
-      if (sql.includes("FROM activity_entries") && sql.includes("LIMIT 1")) {
-        return Promise.resolve({ rows: [{ id: MANUAL_ID }] });
+      if (sql.includes("FROM activity_entries") && sql.includes("FOR UPDATE")) {
+        return Promise.resolve({ rows: [{ id: MANUAL_ID, started_at: "2026-06-11T11:00:00.000Z", ended_at: "2026-06-11T12:00:00.000Z" }] });
       }
       if (sql.startsWith("INSERT INTO activity_entries")) return Promise.resolve({ rows: [{ id: "new-visit-entry" }] });
       if (sql.startsWith("DELETE FROM activity_entries")) return Promise.resolve({ rows: [{ ...EXISTING, id: MANUAL_ID }] });

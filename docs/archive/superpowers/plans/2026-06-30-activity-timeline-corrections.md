@@ -127,7 +127,7 @@ describe("PATCH /api/v1/activities/segments/[id]", () => {
 Run:
 
 ```bash
-pnpm --filter @ai-fsm/web test:unit apps/web/app/api/v1/activities/__tests__/timeline-routes.unit.test.ts
+pnpm --filter @ai-fsm/web test:unit app/api/v1/activities/__tests__/timeline-routes.unit.test.ts
 ```
 
 Expected: FAIL because `rebalance` is not accepted by the segment confirmation schema and the route still returns `409`.
@@ -182,7 +182,7 @@ await applyRebalance(
 Run:
 
 ```bash
-pnpm --filter @ai-fsm/web test:unit apps/web/app/api/v1/activities/__tests__/timeline-routes.unit.test.ts
+pnpm --filter @ai-fsm/web test:unit app/api/v1/activities/__tests__/timeline-routes.unit.test.ts
 ```
 
 Expected: PASS.
@@ -259,7 +259,7 @@ describe("PATCH /api/v1/visit-candidates/[id]", () => {
 Run:
 
 ```bash
-pnpm --filter @ai-fsm/web test:unit apps/web/app/api/v1/activities/__tests__/timeline-routes.unit.test.ts
+pnpm --filter @ai-fsm/web test:unit app/api/v1/activities/__tests__/timeline-routes.unit.test.ts
 ```
 
 Expected: FAIL because visit candidate confirmation does not accept `rebalance`.
@@ -303,7 +303,7 @@ await applyRebalance(
 Run:
 
 ```bash
-pnpm --filter @ai-fsm/web test:unit apps/web/app/api/v1/activities/__tests__/timeline-routes.unit.test.ts
+pnpm --filter @ai-fsm/web test:unit app/api/v1/activities/__tests__/timeline-routes.unit.test.ts
 ```
 
 Expected: PASS.
@@ -357,7 +357,7 @@ describe("GET /api/v1/activities/needs-job-link", () => {
 Run:
 
 ```bash
-pnpm --filter @ai-fsm/web test:unit apps/web/app/api/v1/activities/__tests__/timeline-routes.unit.test.ts
+pnpm --filter @ai-fsm/web test:unit app/api/v1/activities/__tests__/timeline-routes.unit.test.ts
 ```
 
 Expected: FAIL because the route does not exist.
@@ -412,7 +412,7 @@ export const GET = withAuth(async (request: NextRequest, session: AuthSession) =
 Run:
 
 ```bash
-pnpm --filter @ai-fsm/web test:unit apps/web/app/api/v1/activities/__tests__/timeline-routes.unit.test.ts
+pnpm --filter @ai-fsm/web test:unit app/api/v1/activities/__tests__/timeline-routes.unit.test.ts
 ```
 
 Expected: PASS.
@@ -705,7 +705,7 @@ git commit -m "Surface activities needing job links"
 Run:
 
 ```bash
-pnpm --filter @ai-fsm/web test:unit apps/web/app/api/v1/activities/__tests__/timeline-routes.unit.test.ts
+pnpm --filter @ai-fsm/web test:unit app/api/v1/activities/__tests__/timeline-routes.unit.test.ts
 ```
 
 Expected: PASS.

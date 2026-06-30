@@ -4,7 +4,7 @@ import { withAuth, type AuthSession } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { ACTIVITY_TYPES, ACTIVITY_ENTITY_TYPES, activityCategoryFor } from "@ai-fsm/domain";
-import { applyRebalance } from "@/lib/activities/rebalance";
+import { applyRebalance, rebalanceCoversOverlaps } from "@/lib/activities/rebalance";
 
 export const dynamic = "force-dynamic";
 
@@ -204,14 +204,14 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
 
     // Refuse to create overlapping ledger time (double-counting). The owner
     // resolves the conflict in the timeline editor or dismisses the segment.
-    const { rows: overlap } = await client.query<{ id: string }>(
-      `SELECT id FROM activity_entries
+    const { rows: overlap } = await client.query<{ id: string; started_at: string; ended_at: string | null }>(
+      `SELECT id, started_at::text, ended_at::text FROM activity_entries
        WHERE account_id = $1 AND voided_at IS NULL
          AND started_at < $3 AND COALESCE(ended_at, 'infinity'::timestamptz) > $2
-       LIMIT 1`,
+       FOR UPDATE`,
       [session.accountId, seg.started_at, seg.ended_at],
     );
-    if (overlap.length > 0 && !d.rebalance?.length) {
+    if (!rebalanceCoversOverlaps(overlap, d.rebalance, { started_at: seg.started_at, ended_at: seg.ended_at })) {
       await client.query("ROLLBACK");
       return err(
         "CONFLICT",
