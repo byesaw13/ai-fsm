@@ -156,6 +156,6 @@ credentials.
 
 ## Completed
 
-- [TASK-014: Invoice Generation from Visits](done/TASK-014-invoice-generation-from-visits.md) — Done
-- [TASK-015: Payment Tracking](done/TASK-015-payment-tracking.md) — Done
-- [TASK-016: Job Profitability](done/TASK-016-job-profitability.md) — Done
+- [TASK-014: Invoice Generation from Visits](../archive/backlog-done/TASK-014-invoice-generation-from-visits.md) — Done
+- [TASK-015: Payment Tracking](../archive/backlog-done/TASK-015-payment-tracking.md) — Done
+- [TASK-016: Job Profitability](../archive/backlog-done/TASK-016-job-profitability.md) — Done

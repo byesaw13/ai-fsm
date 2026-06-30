@@ -85,4 +85,4 @@ no fit scoring is built.
 
 ## Completed
 
-- [TASK-010: Property Timeline](done/TASK-010-property-timeline.md) — Done
+- [TASK-010: Property Timeline](../archive/backlog-done/TASK-010-property-timeline.md) — Done

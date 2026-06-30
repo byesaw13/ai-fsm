@@ -4,7 +4,7 @@
 EPIC-008 as PI-004 until TASK-018 + PI-002 prove the model in real use.
 **Date:** 2026-06-25
 **Derived from:** historical pricing evidence retained in git history,
-the Pricing Codebook v2.0, and [`PRICING_AUDIT_REPORT_2026.md`](PRICING_AUDIT_REPORT_2026.md).
+the Pricing Codebook v2.0, and [`PRICING_AUDIT_REPORT_2026.md`](../generated/PRICING_AUDIT_REPORT_2026.md).
 
 ## What this is
 
