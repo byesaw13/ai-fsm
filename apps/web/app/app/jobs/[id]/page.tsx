@@ -4,7 +4,7 @@ import type { Route } from "next";
 import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth/session";
 import { queryForSession, queryOneForSession } from "@/lib/db";
-import { formatVisitTime, isVisitOverdue } from "@/lib/visits/p7";
+import { formatVisitTime, isVisitOverdue } from "@/lib/visits/formatting";
 import {
   canCreateInvoices,
   canTransitionJob,
