@@ -3,8 +3,8 @@
 **Authoritative reference** for triage, diagnosis, recovery, and escalation for the ai-fsm application
 running on a garonhome.local with Docker Compose.
 
-> This document consolidates and supersedes `docs/INCIDENT_RESPONSE_RUNBOOK.md`.
-> The older file is retained for historical reference. This file is the single authoritative path.
+> This document consolidates and supersedes `docs/archive/INCIDENT_RESPONSE_RUNBOOK.md`.
+> The older file is archived for historical reference. This file is the single authoritative path.
 
 ---
 
