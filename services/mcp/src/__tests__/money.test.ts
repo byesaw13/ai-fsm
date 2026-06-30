@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { formatCents, money, durationMinutes, todayIso } from "../money.js";
+import { formatCents, money } from "../money.js";
+import { durationMinutes, todayIso } from "../utils.js";
 
 describe("money helpers", () => {
   it("formats cents as USD", () => {
