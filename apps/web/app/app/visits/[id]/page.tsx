@@ -63,7 +63,7 @@ import {
   formatVisitDateLabel,
   formatVisitTime,
   isVisitOverdue,
-} from "@/lib/visits/p7";
+} from "@/lib/visits/formatting";
 import { withChecklistContext, getOrSeedChecklist } from "@/lib/visits/checklist";
 import { VISIT_STATUS_LABELS } from "@/lib/visits/triage";
 

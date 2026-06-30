@@ -1,5 +1,5 @@
 import type { Visit, VisitStatus } from "@ai-fsm/domain";
-import { isSameCalendarDay, isVisitOverdue } from "./p7";
+import { isSameCalendarDay, isVisitOverdue } from "./formatting";
 
 /**
  * Row shape shared by every owner/admin visit-triage surface (the Visits page

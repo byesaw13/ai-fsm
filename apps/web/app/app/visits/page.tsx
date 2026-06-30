@@ -6,7 +6,7 @@ import {
   formatOverdueLabel,
   isSameCalendarDay,
   isVisitOverdue,
-} from "@/lib/visits/p7";
+} from "@/lib/visits/formatting";
 import { getTriageVisits } from "@/lib/visits/queries";
 import {
   STATUS_ORDER,

@@ -5,9 +5,9 @@ import {
   formatPropertyAddress,
   matchesSearch,
   normalizeSearch,
-} from "../p7";
+} from "../normalization";
 
-describe("crm/p7 helpers", () => {
+describe("crm/normalization helpers", () => {
   it("normalizes search text", () => {
     expect(normalizeSearch("  Alice SMITH  ")).toBe("alice smith");
     expect(normalizeSearch(undefined)).toBe("");
