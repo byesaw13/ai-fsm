@@ -18,6 +18,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@ai-fsm/log": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "pg": "^8.13.1",
     "zod": "^3.25.1"
