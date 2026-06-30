@@ -437,12 +437,32 @@ export function WorkdayPanel({
         .workflow-stepper {
           display: flex;
           gap: var(--space-3);
-          align-items: center;
+          align-items: stretch;
           width: 100%;
-          overflow-x: auto;
           padding-bottom: var(--space-2);
           border-bottom: 1px solid var(--border);
           margin-bottom: var(--space-4);
+        }
+        @media (max-width: 767px) {
+          .workflow-stepper {
+            flex-direction: column;
+            overflow-x: visible;
+          }
+          .workflow-stepper .stepper-item {
+            min-width: 0;
+            width: 100%;
+            flex: none;
+          }
+        }
+        @media (min-width: 768px) {
+          .workflow-stepper {
+            overflow-x: auto;
+            align-items: center;
+          }
+          .workflow-stepper .stepper-item {
+            flex: 1;
+            min-width: 160px;
+          }
         }
         .stepper-item {
           display: flex;
@@ -452,8 +472,6 @@ export function WorkdayPanel({
           border-radius: var(--radius-lg);
           background: var(--bg-card);
           border: 1px solid var(--border);
-          flex: 1;
-          min-width: 160px;
           cursor: pointer;
           transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
         }
@@ -507,8 +525,12 @@ export function WorkdayPanel({
           Payroll (Clock In/Out) and the Business Day (Open / Close / Reopen).
           These are how the day actually starts and ends; the stepper below is
           the working flow within it. */}
-      <ClockBar />
-      <BusinessDayBar />
+      {surface !== "my_day" && (
+        <>
+          <ClockBar />
+          <BusinessDayBar />
+        </>
+      )}
 
       {/* Modern Horizontal Stepper */}
       <div className="workflow-stepper">
@@ -644,8 +666,9 @@ export function WorkdayPanel({
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
                     <span>
                       <strong>Driving: {openSession.vehicle_nickname ?? "No vehicle"}</strong>
-                      <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginLeft: 8 }}>
-                        (Plate: <span style={{ fontFamily: "var(--font-mono), 'SF Mono', monospace", fontWeight: 500 }}>{openSession.vehicle_plate ?? "—"}</span>) · Started: <span style={{ fontFamily: "var(--font-mono), 'SF Mono', monospace", fontWeight: 600 }}>{fmtOdo(openSession.start_odometer)}</span> mi
+                      <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", display: "block", overflowWrap: "anywhere" }}>
+                        {openSession.vehicle_plate ? <>Plate: <span style={{ fontFamily: "var(--font-mono), 'SF Mono', monospace", fontWeight: 500 }}>{openSession.vehicle_plate}</span> · </> : null}
+                        Started: <span style={{ fontFamily: "var(--font-mono), 'SF Mono', monospace", fontWeight: 600 }}>{fmtOdo(openSession.start_odometer)}</span> mi
                       </span>
                     </span>
                     <div style={{ display: "flex", gap: "var(--space-2)" }}>

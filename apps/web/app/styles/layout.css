@@ -818,6 +818,12 @@
 @media (max-width: 767px) {
   .p7-sidebar { display: none; }
 
+  .p7-main,
+  .p7-page-container {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
   .p7-main {
     margin-left: 0;
     /* Clear the bottom nav plus the floating action button above it. */

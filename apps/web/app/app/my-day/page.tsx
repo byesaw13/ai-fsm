@@ -5,10 +5,11 @@ import { getSession } from "@/lib/auth/session";
 import { query, queryForSession } from "@/lib/db";
 import { isSameCalendarDay, isVisitOverdue, formatOverdueLabel } from "@/lib/visits/p7";
 import { VISIT_STATUS_LABELS } from "@/lib/visits/triage";
+import { pickHeroVisit, excludeHeroVisit } from "@/lib/my-day/visit-hero";
 import { MyDayView } from "./MyDayView";
+import { MyDayMobileLayout } from "./MyDayMobileLayout";
 import { ManualSiteVisitButton } from "../ManualSiteVisitButton";
 import { LocationCaptureControl } from "../LocationCaptureControl";
-import { WorkdayPanel } from "../WorkdayPanel";
 import type { OpenSession, VehicleOption } from "../WorkdayPanel";
 import type { ActivityEntryDto } from "../ActivityTracker";
 import { summarizeDayMileage, type VehicleSessionRow } from "@/lib/mileage/sessions";
@@ -21,6 +22,7 @@ type VisitRow = Visit & {
   job_title: string | null;
   assigned_user_name: string | null;
   client_name: string | null;
+  client_phone: string | null;
   property_address: string | null;
   job_type: string | null;
   job_description: string | null;
@@ -48,6 +50,7 @@ export default async function MyDayPage() {
         j.description AS job_description,
         u.full_name AS assigned_user_name,
         c.name AS client_name,
+        c.phone AS client_phone,
         p.address AS property_address
      FROM visits v
      LEFT JOIN jobs j ON j.id = v.job_id
@@ -62,7 +65,7 @@ export default async function MyDayPage() {
 
   // Field workday data (EPIC-006 TASK-029) — Start/End Day, vehicle, activity,
   // mileage. Duplicated from the owner dashboard's queries so /app stays untouched.
-  const [openSessionRows, fieldVehicles, fieldActivity, todaySessionRows, yesterdayMilesRows] = await Promise.all([
+  const [openSessionRows, fieldVehicles, fieldActivity, todaySessionRows, yesterdayMilesRows, clockRows] = await Promise.all([
     queryForSession<OpenSession>(session,
       `SELECT s.id, s.session_date::text, s.vehicle_id, v.nickname AS vehicle_nickname,
               v.plate AS vehicle_plate, s.start_odometer, s.started_at::text AS started_at
@@ -102,9 +105,15 @@ export default async function MyDayPage() {
        FROM vehicle_sessions
        WHERE account_id = $1 AND session_date = CURRENT_DATE - interval '1 day'`,
       [accountId]),
+    queryForSession<{ status: string }>(session,
+      `SELECT status FROM time_clock_sessions
+       WHERE account_id = $1 AND user_id = $2 AND status = 'open' AND voided_at IS NULL
+       ORDER BY clock_in_at DESC LIMIT 1`,
+      [accountId, session.userId]),
   ]);
   const dayMileage = summarizeDayMileage(todaySessionRows);
   const yesterdayMiles = parseInt(yesterdayMilesRows[0]?.count ?? "0", 10);
+  const clockedIn = clockRows[0]?.status === "open";
 
   // EPIC-006 Phase 5: a light "business peek" so the owner-in-the-field is never
   // fully blind to the office. One glance + a tap back to the dashboard.
@@ -170,6 +179,8 @@ export default async function MyDayPage() {
   const pendingToday = todayVisits.filter(
     (v) => v.status !== "completed" && v.status !== "cancelled"
   );
+  const heroVisit = pickHeroVisit(pendingToday, now.getTime());
+  const listVisits = excludeHeroVisit(pendingToday, heroVisit?.id ?? null);
   // Wrap the callback — passing isVisitOverdue directly makes Array.filter hand
   // it the element index as its `nowMs` arg, which silently emptied this list.
   const overdueVisits = todayVisits.filter((v) => isVisitOverdue(v));
@@ -246,35 +257,34 @@ export default async function MyDayPage() {
         </Link>
       )}
 
-      {/* Field workday: Start/End Day, vehicle, activity, mileage (EPIC-006) */}
-      <div style={{ marginBottom: "var(--space-6)" }}>
-        <WorkdayPanel
-          surface="my_day"
-          todayLabel={todayLabel}
-          openSession={openSessionRows[0] ?? null}
-          vehicles={fieldVehicles}
-          activityEntries={fieldActivity}
-          dayMileage={dayMileage}
-          yesterdayMiles={yesterdayMiles}
-        />
-      </div>
-
-      {todayVisits.length === 0 && upcomingVisits.length === 0 ? (
-        <EmptyState
-          title="No visits assigned"
-          description="Visits assigned to you appear here. Your workday actions are above."
-        />
-      ) : (
-        <MyDayView
-          visits={pendingToday}
-          completedVisits={completedToday}
-          upcomingVisits={upcomingVisits}
-          pastOverdueVisits={pastOverdueVisits}
-          role={session.role}
-          now={nowISO}
-          statusLabels={VISIT_STATUS_LABELS}
-        />
-      )}
+      <MyDayMobileLayout
+        todayLabel={todayLabel}
+        openSession={openSessionRows[0] ?? null}
+        vehicles={fieldVehicles}
+        activityEntries={fieldActivity}
+        dayMileage={dayMileage}
+        yesterdayMiles={yesterdayMiles}
+        heroVisit={heroVisit}
+        clockedIn={clockedIn}
+      >
+        {!heroVisit && todayVisits.length === 0 && upcomingVisits.length === 0 ? (
+          <EmptyState
+            title="No visits assigned"
+            description="Visits assigned to you appear here. Your workday actions are above."
+          />
+        ) : listVisits.length > 0 || completedToday.length > 0 || upcomingVisits.length > 0 || pastOverdueVisits.length > 0 ? (
+          <MyDayView
+            visits={listVisits}
+            completedVisits={completedToday}
+            upcomingVisits={upcomingVisits}
+            pastOverdueVisits={pastOverdueVisits}
+            role={session.role}
+            now={nowISO}
+            statusLabels={VISIT_STATUS_LABELS}
+            heroVisitId={heroVisit?.id ?? null}
+          />
+        ) : null}
+      </MyDayMobileLayout>
     </PageContainer>
   );
 }

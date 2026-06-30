@@ -28,6 +28,8 @@ interface MyDayViewProps {
   role: string;
   now: string;
   statusLabels: Record<string, string>;
+  /** When set, this visit is shown in the hero — skip "Next" badge on list cards. */
+  heroVisitId?: string | null;
 }
 
 function formatTime(iso: string): string {
@@ -89,9 +91,9 @@ function VisitCard({
   transitioning: string | null;
 }) {
   const overdue = isOverdue(visit);
-  const isTech = role === "tech";
-  const canStart = isTech && visit.status === "scheduled";
-  const canComplete = isTech && (visit.status === "arrived" || visit.status === "in_progress");
+  const isFieldRole = role === "tech" || role === "owner";
+  const canStart = isFieldRole && visit.status === "scheduled";
+  const canComplete = isFieldRole && (visit.status === "arrived" || visit.status === "in_progress");
 
   return (
     <Card
@@ -170,8 +172,8 @@ function VisitCard({
         </p>
       )}
 
-      {/* Action buttons — only for tech */}
-      {isTech && (
+      {/* Action buttons — field roles (tech + owner) */}
+      {isFieldRole && (
         <div style={{ marginTop: "var(--space-3)", display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           {/* Primary action: Start or Complete */}
           {(canStart || canComplete) && (
@@ -303,12 +305,7 @@ function VisitCard({
         </div>
       )}
 
-      {/* For non-techs, just show link */}
-      {!isTech && (
-        <Link href={`/app/visits/${visit.id}` as Route} style={{ fontSize: "var(--text-sm)", color: "var(--color-primary)" }}>
-          View details →
-        </Link>
-      )}
+
     </Card>
   );
 }
@@ -320,6 +317,7 @@ export function MyDayView({
   pastOverdueVisits,
   role,
   now,
+  heroVisitId = null,
 }: MyDayViewProps) {
   const router = useRouter();
   const toast = useToast();
@@ -343,7 +341,9 @@ export function MyDayView({
     (v) => v.status === "scheduled" && !isOverdue(v, nowMs)
   );
   const overdueVisit = sortedVisits.find((v) => isOverdue(v, nowMs));
-  const nextId = activeVisit?.id ?? overdueVisit?.id ?? nextScheduled?.id ?? null;
+  const nextId = heroVisitId
+    ? null
+    : activeVisit?.id ?? overdueVisit?.id ?? nextScheduled?.id ?? null;
 
   async function handleTransition(visitId: string, targetStatus: string) {
     setTransitioning(visitId);
@@ -478,7 +478,7 @@ export function MyDayView({
         </div>
       )}
 
-      {sortedVisits.length === 0 && completedVisits.length === 0 && (
+      {sortedVisits.length === 0 && completedVisits.length === 0 && !heroVisitId && (
         <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", textAlign: "center", padding: "var(--space-6) 0" }}>
           No visits today. Enjoy the free time!
         </p>
