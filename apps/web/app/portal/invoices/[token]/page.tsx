@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { queryOne, query, getPool } from "@/lib/db";
-import { loadSquareSettings } from "@/lib/integrations/square";
+import { loadSquareSettings } from "@/lib/integrations/square-payments";
 import { InvoicePortalClient } from "./InvoicePortalClient";
 
 export const dynamic = "force-dynamic";

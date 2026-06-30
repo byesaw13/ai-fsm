@@ -29,7 +29,7 @@ import {
   createSquarePaymentLink,
   verifySquareWebhook,
   type SquareSettingsRow,
-} from "../square";
+} from "../square-payments";
 
 function row(overrides: Partial<SquareSettingsRow> = {}): SquareSettingsRow {
   return {

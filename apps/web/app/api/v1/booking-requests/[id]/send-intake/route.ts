@@ -4,7 +4,7 @@ import { withRole } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { sendEmail, appUrl, isEmailConfigured } from "@/lib/email/mailer";
-import { intakeInviteEmailHtml, intakeInviteEmailText } from "@/lib/email/templates";
+import { intakeInviteEmailHtml, intakeInviteEmailText } from "@ai-fsm/email-templates";
 import { logCommunication } from "@/lib/communications-log";
 
 export const dynamic = "force-dynamic";

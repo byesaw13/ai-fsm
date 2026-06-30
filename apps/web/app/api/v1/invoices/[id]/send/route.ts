@@ -4,7 +4,7 @@ import { withInvoiceContext } from "@/lib/invoices/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
 import { sendEmail, appUrl, isEmailConfigured } from "@/lib/email/mailer";
-import { invoiceEmailHtml, invoiceEmailText } from "@/lib/email/templates";
+import { invoiceEmailHtml, invoiceEmailText } from "@ai-fsm/email-templates";
 import { logCommunication } from "@/lib/communications-log";
 import { loadInvoicePdf } from "@/lib/pdf/load";
 

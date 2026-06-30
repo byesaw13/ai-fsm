@@ -5,7 +5,7 @@ import { withEstimateContext } from "@/lib/estimates/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
 import { sendEmail, appUrl, isEmailConfigured } from "@/lib/email/mailer";
-import { estimateEmailHtml, estimateEmailText } from "@/lib/email/templates";
+import { estimateEmailHtml, estimateEmailText } from "@ai-fsm/email-templates";
 import { getEnv } from "@/lib/env";
 import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
 import { logCommunication } from "@/lib/communications-log";

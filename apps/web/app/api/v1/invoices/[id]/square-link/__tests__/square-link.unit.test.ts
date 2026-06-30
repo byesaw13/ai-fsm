@@ -20,7 +20,7 @@ vi.mock("@/lib/invoices/db", () => ({
 
 const mockLoad = vi.fn();
 const mockCreateLink = vi.fn();
-vi.mock("@/lib/integrations/square", () => ({
+vi.mock("@/lib/integrations/square-payments", () => ({
   loadSquareSettings: (...a: unknown[]) => mockLoad(...a),
   createSquarePaymentLink: (...a: unknown[]) => mockCreateLink(...a),
 }));

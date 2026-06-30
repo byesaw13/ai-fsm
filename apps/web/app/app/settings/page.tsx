@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { query, queryOne } from "@/lib/db";
 import { withDbSession } from "@/lib/db";
-import { loadSquareSettings } from "@/lib/integrations/square";
+import { loadSquareSettings } from "@/lib/integrations/square-payments";
 import { isEncryptionConfigured } from "@/lib/crypto";
 import { PageContainer, PageHeader } from "@/components/ui";
 import { SettingsTabsClient } from "./SettingsTabsClient";

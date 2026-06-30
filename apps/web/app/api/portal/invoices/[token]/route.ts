@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, query, getPool } from "@/lib/db";
-import { loadSquareSettings, createSquarePaymentLink } from "@/lib/integrations/square";
+import { loadSquareSettings, createSquarePaymentLink } from "@/lib/integrations/square-payments";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";

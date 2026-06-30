@@ -21,7 +21,7 @@ vi.mock("@/lib/crypto", () => ({
 }));
 
 const mockVerify = vi.fn();
-vi.mock("@/lib/integrations/square", () => ({
+vi.mock("@/lib/integrations/square-payments", () => ({
   verifySquareWebhook: (...a: unknown[]) => mockVerify(...a),
 }));
 
