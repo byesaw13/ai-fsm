@@ -1,3 +1,5 @@
+import { formatCents } from "@ai-fsm/money";
+
 // Pure helper functions for the Client 360 page.
 // Kept in a separate file so they can be imported by tests without pulling in
 // the Next.js server component or its database dependencies.
@@ -16,6 +18,4 @@ export function activeJobStatusColor(status: string): string {
   }
 }
 
-export function dollars(cents: number): string {
-  return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(cents / 100);
-}
+export const dollars = formatCents;

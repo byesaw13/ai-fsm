@@ -1,3 +1,5 @@
+import { formatCentsShort } from "@ai-fsm/money";
+
 /**
  * Pure helpers for creating a job from an approved estimate.
  *
@@ -12,11 +14,6 @@ export interface EstimateForJob {
   property_address: string | null;
   client_name: string | null;
   total_cents: number;
-}
-
-/** Format cents as a plain dollar string, e.g. 162500 → "$1,625". */
-function dollarsShort(cents: number): string {
-  return `$${Math.round(cents / 100).toLocaleString("en-US")}`;
 }
 
 /**
@@ -54,6 +51,6 @@ export function deriveJobTitle(est: EstimateForJob): string {
 export function deriveJobDescription(est: EstimateForJob): string {
   const parts: string[] = [];
   if (est.notes?.trim()) parts.push(est.notes.trim());
-  parts.push(`Created from approved estimate (${dollarsShort(est.total_cents)}).`);
+  parts.push(`Created from approved estimate (${formatCentsShort(est.total_cents)}).`);
   return parts.join("\n\n");
 }

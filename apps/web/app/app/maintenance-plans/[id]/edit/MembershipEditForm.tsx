@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
 import { LinkButton, Select } from "@/components/ui";
+import { formatCentsShort } from "@ai-fsm/money";
 
 interface Template {
   id: string;
@@ -51,10 +52,6 @@ const TIER_COLORS: Record<string, { bg: string; text: string; border: string }> 
   plus:      { bg: "#eff6ff", text: "#1e40af", border: "#bfdbfe" },
   premier:   { bg: "#faf5ff", text: "#6b21a8", border: "#e9d5ff" },
 };
-
-function dollars(cents: number) {
-  return (cents / 100).toFixed(0);
-}
 
 export function MembershipEditForm({ id, membership, template, allAddons, currentAddonIds }: Props) {
   const router = useRouter();
@@ -153,7 +150,7 @@ export function MembershipEditForm({ id, membership, template, allAddons, curren
             </div>
             <div style={{ textAlign: "right", flexShrink: 0 }}>
               <div style={{ fontWeight: 700, fontSize: "var(--font-size-lg)" }}>
-                {template.base_price_cents > 0 ? `$${dollars(template.base_price_cents)}/yr` : "Price TBD"}
+                {template.base_price_cents > 0 ? `${formatCentsShort(template.base_price_cents)}/yr` : "Price TBD"}
               </div>
               <Link
                 href={`/app/maintenance-plans/templates/${template.id}/edit` as unknown as Route}
@@ -199,7 +196,7 @@ export function MembershipEditForm({ id, membership, template, allAddons, curren
                     )}
                   </div>
                   <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 600, flexShrink: 0 }}>
-                    +${dollars(a.annual_price_cents)}/yr
+                    +{formatCentsShort(a.annual_price_cents)}/yr
                   </span>
                 </label>
               );
@@ -213,17 +210,17 @@ export function MembershipEditForm({ id, membership, template, allAddons, curren
         <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 600, marginBottom: "var(--space-2)" }}>Pricing Summary</div>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--font-size-sm)", marginBottom: "var(--space-1)" }}>
           <span>{template?.name ?? "Base"}</span>
-          <span>${dollars(basePrice)}/yr</span>
+          <span>{formatCentsShort(basePrice)}/yr</span>
         </div>
         {selectedAddons.map((a) => (
           <div key={a.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--font-size-sm)", marginBottom: "var(--space-1)", color: "var(--color-text-secondary)" }}>
             <span>+ {a.name}</span>
-            <span>${dollars(a.annual_price_cents)}/yr</span>
+            <span>{formatCentsShort(a.annual_price_cents)}/yr</span>
           </div>
         ))}
         <div style={{ borderTop: "1px solid var(--color-border)", marginTop: "var(--space-2)", paddingTop: "var(--space-2)", display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: "var(--font-size-base)" }}>
           <span>Total</span>
-          <span>${dollars(totalAnnual)}/yr</span>
+          <span>{formatCentsShort(totalAnnual)}/yr</span>
         </div>
       </div>
 

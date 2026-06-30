@@ -8,4 +8,9 @@ describe("formatCents", () => {
     expect(formatCents(123456789)).toBe("$1,234,567.89");
     expect(formatCents("250")).toBe("$2.50");
   });
+
+  it("handles null and undefined as zero", () => {
+    expect(formatCents(null)).toBe("$0.00");
+    expect(formatCents(undefined)).toBe("$0.00");
+  });
 });
