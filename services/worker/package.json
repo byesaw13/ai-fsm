@@ -12,6 +12,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@ai-fsm/log": "workspace:*",
     "pg": "^8.13.1",
     "nodemailer": "~6.9.16"
   },

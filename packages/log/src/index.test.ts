@@ -2,15 +2,16 @@
  * Logger unit tests
  *
  * Tier: Unit (Tier 1) — no external dependencies.
- * Tests the web logger wrapper (service=web) around @ai-fsm/log.
+ * Tests the structured JSON logger emitted by @ai-fsm/log.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { logger, _setWriter } from "../logger";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { createLogger } from "./index.js";
 
-// Capture log lines emitted during each test.
 let lines: string[] = [];
 let restore: (() => void) | null = null;
+
+const { logger, _setWriter } = createLogger({ service: "test" });
 
 beforeEach(() => {
   lines = [];
@@ -29,13 +30,13 @@ function lastParsed(): Record<string, unknown> {
   return JSON.parse(last) as Record<string, unknown>;
 }
 
-describe("logger", () => {
+describe("createLogger", () => {
   it("emits valid JSON on logger.info", () => {
     logger.info("test message");
     const rec = lastParsed();
     expect(rec.level).toBe("info");
     expect(rec.msg).toBe("test message");
-    expect(rec.service).toBe("web");
+    expect(rec.service).toBe("test");
     expect(typeof rec.ts).toBe("string");
   });
 
@@ -64,7 +65,7 @@ describe("logger", () => {
 
   it("logger.error handles non-Error catch values", () => {
     logger.error("something went wrong", "plain string error");
-    const err = (lastParsed().err as Record<string, unknown>);
+    const err = lastParsed().err as Record<string, unknown>;
     expect(err.message).toBe("plain string error");
     expect(err.name).toBe("UnknownError");
   });
@@ -110,5 +111,19 @@ describe("logger", () => {
     for (const line of lines) {
       expect(() => JSON.parse(line)).not.toThrow();
     }
+  });
+
+  it("sink: stderr writes to process.stderr, not stdout", () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    const { logger: mcpLogger } = createLogger({ service: "mcp", sink: "stderr" });
+    mcpLogger.info("mcp ready");
+
+    expect(stderrSpy).toHaveBeenCalled();
+    expect(stdoutSpy).not.toHaveBeenCalled();
+
+    stderrSpy.mockRestore();
+    stdoutSpy.mockRestore();
   });
 });
