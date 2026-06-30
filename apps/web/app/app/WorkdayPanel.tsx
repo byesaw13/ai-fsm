@@ -525,8 +525,12 @@ export function WorkdayPanel({
           Payroll (Clock In/Out) and the Business Day (Open / Close / Reopen).
           These are how the day actually starts and ends; the stepper below is
           the working flow within it. */}
-      <ClockBar />
-      <BusinessDayBar />
+      {surface !== "my_day" && (
+        <>
+          <ClockBar />
+          <BusinessDayBar />
+        </>
+      )}
 
       {/* Modern Horizontal Stepper */}
       <div className="workflow-stepper">
