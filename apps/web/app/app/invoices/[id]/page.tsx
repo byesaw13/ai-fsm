@@ -376,7 +376,7 @@ export default async function InvoiceDetailPage({
 
               <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: "var(--text-base)", color: amountDue > 0 ? "var(--color-danger)" : "var(--fg)" }}>
                 <span>Balance remaining</span>
-                <span style={{ fontFamily: "var(--font-mono)" }} data-testid="invoice-closeout-remaining">{formatDollars(amountDue)}</span>
+                <span style={{ fontFamily: "var(--font-mono)" }} data-testid="invoice-due">{formatDollars(amountDue)}</span>
               </div>
             </div>
 
@@ -408,7 +408,7 @@ export default async function InvoiceDetailPage({
           {/* Record payment / refund (the money action) */}
           {canRecordPayments(session.role) &&
             ((["sent", "partial", "overdue"].includes(currentStatus) && amountDue > 0) || currentStatus === "paid") && (
-              <Card className="p7-card-accent" id="record-payment-panel">
+              <Card className="p7-card-accent" id="record-payment-panel" data-testid="record-payment-panel">
                 <SectionHeader title={currentStatus === "paid" ? "Refund or Adjustment" : "Record Payment"} />
                 {currentStatus === "paid" && (
                   <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
