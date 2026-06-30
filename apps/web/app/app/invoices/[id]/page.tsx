@@ -133,7 +133,10 @@ export default async function InvoiceDetailPage({
     (s) => s !== "paid" && s !== "partial" && (s !== "draft" || invoice.paid_cents === 0)
   );
   const canTransition = canCreateInvoices(session.role);
-  const amountDue = invoice.total_cents - invoice.paid_cents;
+  // balance_cents already credits the deposit (= total - deposit). Subtracting
+  // payments gives what the client still owes — do NOT use total - paid, which
+  // would ignore the deposit credit and over-state the amount owed.
+  const amountDue = invoice.balance_cents - invoice.paid_cents;
   const depositPending = invoice.deposit_cents > 0 && !invoice.deposit_paid_at;
   const canMarkDeposit = canTransition && !["paid", "void"].includes(currentStatus);
   const canRecordPaymentAction = canRecordPayments(session.role) && ["sent", "partial", "overdue"].includes(currentStatus) && amountDue > 0;
@@ -164,23 +167,20 @@ export default async function InvoiceDetailPage({
         backHref="/app/invoices"
         backLabel="Invoices"
         actions={
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
             <CopyPortalLinkButton
               url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/invoices/${invoice.share_token}`}
-              label="Copy client link"
+              label="Copy link"
             />
             <a
               href={`/api/v1/invoices/${invoice.id}/pdf`}
               target="_blank"
               rel="noopener noreferrer"
               data-testid="invoice-download-pdf"
-              style={{
-                display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
-                padding: "6px 12px", borderRadius: 6, border: "1px solid var(--border)",
-                color: "var(--fg)", textDecoration: "none", fontSize: "var(--text-sm)", fontWeight: 600,
-              }}
+              className="p7-btn p7-btn-secondary p7-btn-sm"
+              style={{ textDecoration: "none" }}
             >
-              Download PDF
+              PDF
             </a>
             <span data-testid="invoice-status">
               <StatusBadge variant={currentStatus as StatusVariant}>
@@ -191,7 +191,61 @@ export default async function InvoiceDetailPage({
         }
       />
 
-      {/* Status Stepper — main path only */}
+      {/* Trustworthy money bar — always visible, the point of an invoice */}
+      <div style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: "var(--space-4)",
+        alignItems: "flex-end",
+        marginBottom: "var(--space-4)",
+        paddingBottom: "var(--space-4)",
+        borderBottom: "1px solid var(--border)"
+      }}>
+        <div>
+          <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 600, letterSpacing: "0.04em" }}>TOTAL</div>
+          <div style={{ fontSize: "2rem", fontWeight: 700, fontFamily: "var(--font-mono)", lineHeight: 1 }} data-testid="invoice-total">
+            {formatDollars(invoice.total_cents)}
+          </div>
+        </div>
+
+        <div style={{ flex: 1, minWidth: 160 }}>
+          <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 600, letterSpacing: "0.04em" }}>BALANCE DUE</div>
+          <div
+            style={{
+              fontSize: "2rem",
+              fontWeight: 700,
+              fontFamily: "var(--font-mono)",
+              lineHeight: 1,
+              color: amountDue > 0 ? "var(--color-danger)" : "var(--fg)"
+            }}
+            data-testid="invoice-balance"
+          >
+            {formatDollars(amountDue)}
+          </div>
+          {amountDue > 0 && currentStatus !== "draft" && (
+            <div style={{ fontSize: "var(--text-xs)", color: "var(--color-danger)", marginTop: 2 }}>Client owes this now</div>
+          )}
+        </div>
+
+        <div>
+          <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 600, letterSpacing: "0.04em" }}>PAID</div>
+          <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: "var(--font-mono)" }} data-testid="invoice-paid">
+            {formatDollars(invoice.paid_cents)}
+          </div>
+        </div>
+
+        {invoice.deposit_cents > 0 && (
+          <div style={{ marginLeft: "auto", textAlign: "right" }}>
+            <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Deposit</div>
+            <div style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}>
+              {formatDollars(invoice.deposit_cents)}
+              {invoice.deposit_paid_at ? " ✓" : " (pending)"}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Status Stepper */}
       {(["draft", "sent", "partial", "paid"] as InvoiceStatus[]).includes(currentStatus) && (
         <Card style={{ marginBottom: "var(--space-4)" }}>
           <StatusStepper
@@ -207,12 +261,18 @@ export default async function InvoiceDetailPage({
         </Card>
       )}
 
-      {/* Detail layout */}
+      {/* Two-column detail */}
       <div className="p7-detail-layout">
-        {/* LEFT: Line items + Payment history */}
+        {/* Primary: Line items + history */}
         <div className="p7-detail-primary">
           <Card>
-            <SectionHeader title="Line Items" />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)" }}>
+              <SectionHeader title="Line Items" />
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                {lineItems.length} lines · {formatDollars(invoice.subtotal_cents)} subtotal
+              </div>
+            </div>
+
             {canEditLineItems ? (
               <InvoiceLineItemsEditor
                 invoiceId={invoice.id}
@@ -220,44 +280,58 @@ export default async function InvoiceDetailPage({
                 lineItems={lineItems}
               />
             ) : lineItems.length === 0 ? (
-              <EmptyState title="No line items" description="Line items will appear when this invoice is created from an estimate." />
+              <EmptyState title="No line items" description="Line items are usually pulled from an approved estimate." />
             ) : (
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }} data-testid="invoice-line-items-table">
-                <thead>
-                  <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                    <th style={{ textAlign: "left", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Description</th>
-                    <th style={{ width: 140, textAlign: "right", padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: "var(--font-semibold)" }}>Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lineItems.map((item) => (
-                    <tr key={item.id} style={{ borderBottom: "1px solid var(--border)" }} data-testid="invoice-line-item-row">
-                      <td style={{ padding: "var(--space-2) var(--space-3)" }}>{item.description}</td>
-                      <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{formatDollars(item.total_cents)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr style={{ borderTop: "2px solid var(--border)" }}>
-                    <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right", fontWeight: 600 }}>Subtotal</td>
-                    <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{formatDollars(invoice.subtotal_cents)}</td>
-                  </tr>
-                  {invoice.tax_cents > 0 && (
+              <div className="p7-table-wrapper">
+                <table className="p7-table" data-testid="invoice-line-items-table">
+                  <thead>
                     <tr>
-                      <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>Tax</td>
-                      <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{formatDollars(invoice.tax_cents)}</td>
+                      <th>Description</th>
+                      <th style={{ width: "14%" }}>Type</th>
+                      <th style={{ width: 80, textAlign: "right" }}>Qty</th>
+                      <th style={{ width: 110, textAlign: "right" }}>Amount</th>
                     </tr>
-                  )}
-                  <tr style={{ fontWeight: 700 }}>
-                    <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>Total</td>
-                    <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }} data-testid="invoice-total-footer">{formatDollars(invoice.total_cents)}</td>
-                  </tr>
-                </tfoot>
-              </table>
+                  </thead>
+                  <tbody>
+                    {lineItems.map((item) => (
+                      <tr key={item.id} data-testid="invoice-line-item-row">
+                        <td>{item.description}</td>
+                        <td>
+                          <span className="p7-badge p7-badge-count" style={{ fontSize: "10px" }}>
+                            {item.line_item_type.replace("_", " ")}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: "right", fontFamily: "var(--font-mono)" }}>{item.quantity}</td>
+                        <td style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontWeight: 600 }}>
+                          {formatDollars(item.total_cents)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ borderTop: "2px solid var(--border)" }}>
+                      <td colSpan={3} style={{ textAlign: "right", fontWeight: 600 }}>Subtotal</td>
+                      <td style={{ textAlign: "right", fontFamily: "var(--font-mono)" }}>{formatDollars(invoice.subtotal_cents)}</td>
+                    </tr>
+                    {invoice.tax_cents > 0 && (
+                      <tr>
+                        <td colSpan={3} style={{ textAlign: "right" }}>Tax</td>
+                        <td style={{ textAlign: "right", fontFamily: "var(--font-mono)" }}>{formatDollars(invoice.tax_cents)}</td>
+                      </tr>
+                    )}
+                    <tr style={{ fontWeight: 700, fontSize: "var(--text-base)" }}>
+                      <td colSpan={3} style={{ textAlign: "right" }}>Total</td>
+                      <td style={{ textAlign: "right", fontFamily: "var(--font-mono)" }} data-testid="invoice-total-footer">
+                        {formatDollars(invoice.total_cents)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             )}
           </Card>
 
-          {/* Payment History */}
+          {/* Payment History — visible and direct once invoiced */}
           {currentStatus !== "draft" && (
             <Card data-testid="payment-history-panel" id="payment-history-panel">
               <SectionHeader title="Payment History" />
@@ -270,117 +344,106 @@ export default async function InvoiceDetailPage({
           )}
         </div>
 
-        {/* RIGHT: Summary + Actions */}
+        {/* Sidebar controls + facts */}
         <div className="p7-detail-sidebar">
-          {(currentStatus !== "draft" && currentStatus !== "void") && (
-            <Card className="p7-card-accent" data-testid="invoice-closeout-card">
-              <SectionHeader title="Invoice Closeout" />
-              <dl className="p7-detail-list">
-                <div className="p7-detail-row">
-                  <dt>Status</dt>
-                  <dd>
-                    <StatusBadge variant={currentStatus as StatusVariant}>
-                      {STATUS_LABELS[currentStatus]}
-                    </StatusBadge>
-                  </dd>
+          {/* Financial breakdown (always honest) */}
+          <Card>
+            <SectionHeader title="Financials" />
+            <div style={{ display: "grid", gap: "var(--space-2)", fontSize: "var(--text-sm)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>Subtotal</span>
+                <span style={{ fontFamily: "var(--font-mono)" }}>{formatDollars(invoice.subtotal_cents)}</span>
+              </div>
+              {invoice.tax_cents > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>Tax</span>
+                  <span style={{ fontFamily: "var(--font-mono)" }}>{formatDollars(invoice.tax_cents)}</span>
                 </div>
-                <div className="p7-detail-row">
-                  <dt>Remaining</dt>
-                  <dd data-testid="invoice-closeout-remaining">{formatDollars(amountDue)}</dd>
-                </div>
-                {invoice.deposit_cents > 0 && (
-                  <div className="p7-detail-row">
-                    <dt>Deposit</dt>
-                    <dd>
-                      {formatDollars(invoice.deposit_cents)}
-                      {invoice.deposit_paid_at ? (
-                        <span style={{ marginLeft: "var(--space-2)", color: "var(--color-success, green)", fontSize: "var(--text-xs)" }}>
-                          received
-                        </span>
-                      ) : (
-                        <span style={{ marginLeft: "var(--space-2)", color: "var(--color-warning, orange)", fontSize: "var(--text-xs)" }}>
-                          pending
-                        </span>
-                      )}
-                    </dd>
-                  </div>
-                )}
-              </dl>
-              <p style={{ margin: "var(--space-3) 0 0", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                {currentStatus === "paid"
-                  ? "This invoice is closed out. Use the payment history if you need to audit the receipt trail."
-                  : amountDue > 0
-                    ? "Record the payment, then keep the payment history in one place while the balance clears."
-                    : "The balance is clear. Keep the record for audit and closeout."}
-              </p>
-              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginTop: "var(--space-3)" }}>
-                {canRecordPaymentAction && (
-                  <a href="#record-payment-panel" className="p7-btn p7-btn-primary p7-btn-sm">
-                    Record Payment ↓
-                  </a>
-                )}
-                <a href="#payment-history-panel" className="p7-btn p7-btn-secondary p7-btn-sm">
-                  Payment History ↓
-                </a>
-                {invoice.estimate_id && (
-                  <Link href={("/app/estimates/" + invoice.estimate_id) as Route} className="p7-btn p7-btn-secondary p7-btn-sm">
-                    View Estimate
-                  </Link>
-                )}
+              )}
+              <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, borderTop: "1px solid var(--border)", paddingTop: "var(--space-2)" }}>
+                <span>Total</span>
+                <span style={{ fontFamily: "var(--font-mono)" }}>{formatDollars(invoice.total_cents)}</span>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", paddingTop: "var(--space-1)" }}>
+                <span>Paid to date</span>
+                <span style={{ fontFamily: "var(--font-mono)", color: "var(--color-success)" }}>-{formatDollars(invoice.paid_cents)}</span>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: "var(--text-base)", color: amountDue > 0 ? "var(--color-danger)" : "var(--fg)" }}>
+                <span>Balance remaining</span>
+                <span style={{ fontFamily: "var(--font-mono)" }} data-testid="invoice-closeout-remaining">{formatDollars(amountDue)}</span>
+              </div>
+            </div>
+
+            {canMarkDeposit && depositPending && (
+              <div style={{ marginTop: "var(--space-3)" }}>
+                <MarkDepositReceivedButton invoiceId={invoice.id} depositCents={invoice.deposit_cents} />
+              </div>
+            )}
+          </Card>
+
+          {/* Primary actions — grouped by intent */}
+          {currentStatus === "draft" && canTransition && (
+            <Card>
+              <SectionHeader title="Next" />
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                <SendInvoiceButton
+                  invoiceId={invoice.id}
+                  clientEmail={invoice.client_email}
+                  sentAt={invoice.sent_at}
+                  emailConfigured={isEmailConfigured()}
+                />
+                <p style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", margin: "var(--space-1) 0 0" }}>
+                  Draft invoices can still be edited. Send when the numbers are locked.
+                </p>
               </div>
             </Card>
           )}
-          {/* Summary */}
+
+          {/* Record payment / refund (the money action) */}
+          {canRecordPayments(session.role) &&
+            ((["sent", "partial", "overdue"].includes(currentStatus) && amountDue > 0) || currentStatus === "paid") && (
+              <Card className="p7-card-accent" id="record-payment-panel">
+                <SectionHeader title={currentStatus === "paid" ? "Refund or Adjustment" : "Record Payment"} />
+                {currentStatus === "paid" && (
+                  <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                    Use Refund to log money returned.
+                  </p>
+                )}
+                <RecordPaymentForm invoiceId={invoice.id} remainingCents={amountDue} />
+              </Card>
+            )}
+
+          {/* Square online pay link */}
+          {squareEnabled && (
+            <Card>
+              <SectionHeader title="Online Payment" />
+              <SquareLinkActions
+                invoiceId={invoice.id}
+                hasDeposit={invoice.deposit_cents > 0}
+                remainingCents={amountDue}
+                existingLinkUrl={invoice.square_payment_link_url}
+              />
+            </Card>
+          )}
+
+          {/* Status transitions for non-payment moves */}
+          {canTransition && allowedTransitions.length > 0 && (
+            <Card>
+              <SectionHeader title="Status" />
+              <InvoiceTransitionForm
+                invoiceId={invoice.id}
+                allowedTransitions={allowedTransitions as InvoiceStatus[]}
+                statusLabels={STATUS_LABELS}
+              />
+            </Card>
+          )}
+
+          {/* Secondary facts + edit */}
           <Card>
-            <SectionHeader title="Summary" />
-            <dl className="p7-detail-list">
-              <div className="p7-detail-row">
-                <dt>Total</dt>
-                <dd style={{ fontSize: "var(--text-lg)", fontWeight: "var(--font-semibold)" }} data-testid="invoice-total">
-                  {formatDollars(invoice.total_cents)}
-                </dd>
-              </div>
-              <div className="p7-detail-row">
-                <dt>Document filename</dt>
-                <dd><code>{documentFilename}</code></dd>
-              </div>
-              {invoice.deposit_cents > 0 && (
-                <div className="p7-detail-row">
-                  <dt>Deposit due</dt>
-                  <dd>
-                    <span data-testid="invoice-deposit">{formatDollars(invoice.deposit_cents)}</span>
-                    {invoice.deposit_paid_at ? (
-                      <span style={{ marginLeft: "var(--space-2)", color: "var(--color-success, green)", fontSize: "var(--text-xs)" }}>
-                        received {new Date(invoice.deposit_paid_at).toLocaleDateString()}
-                      </span>
-                    ) : (
-                      <span style={{ marginLeft: "var(--space-2)", color: "var(--color-warning, orange)", fontSize: "var(--text-xs)" }}>
-                        pending
-                      </span>
-                    )}
-                  </dd>
-                </div>
-              )}
-              {invoice.balance_cents > 0 && (
-                <div className="p7-detail-row">
-                  <dt>Balance Due</dt>
-                  <dd data-testid="invoice-balance">{formatDollars(invoice.balance_cents)}</dd>
-                </div>
-              )}
-              {invoice.paid_cents > 0 && (
-                <div className="p7-detail-row">
-                  <dt>Paid</dt>
-                  <dd data-testid="invoice-paid">{formatDollars(invoice.paid_cents)}</dd>
-                </div>
-              )}
-              {amountDue > 0 && (
-                <div className="p7-detail-row">
-                  <dt>Remaining</dt>
-                  <dd data-testid="invoice-due" style={{ color: amountDue > 0 ? "var(--color-danger)" : "var(--fg-base)" }}>
-                    {formatDollars(amountDue)}
-                  </dd>
-                </div>
-              )}
+            <SectionHeader title="Details" />
+            <dl className="p7-detail-list" style={{ fontSize: "var(--text-sm)" }}>
               {invoice.due_date && (
                 <div className="p7-detail-row">
                   <dt>Due</dt>
@@ -393,17 +456,11 @@ export default async function InvoiceDetailPage({
                   <dd>{new Date(invoice.sent_at).toLocaleDateString()}</dd>
                 </div>
               )}
-              {invoice.paid_at && (
-                <div className="p7-detail-row">
-                  <dt>Paid on</dt>
-                  <dd>{new Date(invoice.paid_at).toLocaleDateString()}</dd>
-                </div>
-              )}
               {invoice.job_title && (
                 <div className="p7-detail-row">
                   <dt>Job</dt>
                   <dd>
-                    <Link href={`/app/jobs/${invoice.job_id}`} style={{ color: "var(--accent)", textDecoration: "none" }}>
+                    <Link href={`/app/jobs/${invoice.job_id}`} style={{ color: "var(--accent)" }}>
                       {invoice.job_title}
                     </Link>
                   </dd>
@@ -411,10 +468,10 @@ export default async function InvoiceDetailPage({
               )}
               {invoice.estimate_id && (
                 <div className="p7-detail-row">
-                  <dt>From Estimate</dt>
+                  <dt>From</dt>
                   <dd>
-                    <Link href={`/app/estimates/${invoice.estimate_id}`} style={{ color: "var(--accent)", textDecoration: "none" }}>
-                      View original estimate →
+                    <Link href={`/app/estimates/${invoice.estimate_id}`} style={{ color: "var(--accent)" }}>
+                      Estimate
                     </Link>
                   </dd>
                 </div>
@@ -425,83 +482,22 @@ export default async function InvoiceDetailPage({
                   <dd style={{ whiteSpace: "pre-wrap" }}>{invoice.notes}</dd>
                 </div>
               )}
+              <div className="p7-detail-row">
+                <dt>File</dt>
+                <dd><code style={{ fontSize: "11px" }}>{documentFilename}</code></dd>
+              </div>
             </dl>
 
-            {canMarkDeposit && depositPending && (
+            {canTransition && currentStatus === "draft" && (
               <div style={{ marginTop: "var(--space-3)" }}>
-                <MarkDepositReceivedButton
+                <InvoiceEditForm
                   invoiceId={invoice.id}
-                  depositCents={invoice.deposit_cents}
+                  initialNotes={invoice.notes}
+                  initialDueDate={invoice.due_date}
                 />
               </div>
             )}
           </Card>
-
-          {/* Edit Invoice — owner/admin only, draft only */}
-          {canTransition && currentStatus === "draft" && (
-            <InvoiceEditForm
-              invoiceId={invoice.id}
-              initialNotes={invoice.notes}
-              initialDueDate={invoice.due_date}
-            />
-          )}
-
-          {/* Square Payment Link — owner/admin, payable invoices, Square enabled */}
-          {squareEnabled && (
-            <Card data-testid="square-link-card">
-              <SectionHeader title="Square Payment Link" />
-              <SquareLinkActions
-                invoiceId={invoice.id}
-                hasDeposit={invoice.deposit_cents > 0}
-                remainingCents={amountDue}
-                existingLinkUrl={invoice.square_payment_link_url}
-              />
-            </Card>
-          )}
-
-          {/* Record Payment — owner/admin only. Shown on payable invoices, and
-              on paid invoices so refunds/adjustments stay reachable. */}
-          {canRecordPayments(session.role) &&
-            ((["sent", "partial", "overdue"].includes(currentStatus) && amountDue > 0) ||
-              currentStatus === "paid") && (
-              <Card className="p7-card-accent" data-testid="record-payment-panel" id="record-payment-panel">
-                <SectionHeader title={currentStatus === "paid" ? "Record Refund / Adjustment" : "Record Payment"} />
-                {currentStatus === "paid" && (
-                  <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                    This invoice is paid. Use the <strong>Refund</strong> type to log money returned to the client.
-                  </p>
-                )}
-                <RecordPaymentForm
-                  invoiceId={invoice.id}
-                  remainingCents={amountDue}
-                />
-              </Card>
-            )}
-
-          {/* Send to Client — owner/admin only, non-terminal invoices */}
-          {canTransition && currentStatus === "draft" && (
-            <Card data-testid="send-invoice-card">
-              <SectionHeader title="Send to Client" />
-              <SendInvoiceButton
-                invoiceId={invoice.id}
-                clientEmail={invoice.client_email}
-                sentAt={invoice.sent_at}
-                emailConfigured={isEmailConfigured()}
-              />
-            </Card>
-          )}
-
-          {/* Status Transitions — owner/admin only */}
-          {canTransition && allowedTransitions.length > 0 && (
-            <Card data-testid="invoice-transition-panel">
-              <SectionHeader title="Transition Status" />
-              <InvoiceTransitionForm
-                invoiceId={invoice.id}
-                allowedTransitions={allowedTransitions as InvoiceStatus[]}
-                statusLabels={STATUS_LABELS}
-              />
-            </Card>
-          )}
 
           <LinkedDocuments session={session} entityType="invoice" entityId={invoice.id} />
         </div>
