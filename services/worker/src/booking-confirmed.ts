@@ -1,6 +1,6 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
-import { bookingConfirmedHtml } from "./mailer.js";
+import { bookingConfirmedEmailHtml } from "@ai-fsm/email-templates";
 import type { AutomationRow, ReminderResult } from "./visit-reminder.js";
 import { enqueueNotification } from "./notification/enqueue.js";
 import { PRIORITY } from "./notification/priority.js";
@@ -104,7 +104,7 @@ async function emitBookingConfirmation(
       priority: PRIORITY.MEDIUM,
       toAddress: booking.client_email,
       subject: `Appointment Confirmed — ${booking.job_title}`,
-      htmlBody: bookingConfirmedHtml({
+      htmlBody: bookingConfirmedEmailHtml({
         clientName: booking.client_name,
         jobTitle: booking.job_title,
         scheduledStart: booking.scheduled_start,

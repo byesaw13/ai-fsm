@@ -1,6 +1,7 @@
 import type { Client } from "pg";
 import { logger } from "./logger.js";
-import { invoiceFollowupHtml, appUrl } from "./mailer.js";
+import { invoiceFollowupEmailHtml } from "@ai-fsm/email-templates";
+import { appUrl } from "./mailer.js";
 import { enqueueNotification } from "./notification/enqueue.js";
 import { PRIORITY } from "./notification/priority.js";
 
@@ -170,7 +171,7 @@ export async function emitInvoiceFollowup(
       priority: PRIORITY.HIGH,
       toAddress: invoice.client_email,
       subject: `Payment reminder: Invoice ${invoice.invoice_number} is ${cadenceStep} days overdue`,
-      htmlBody: invoiceFollowupHtml({
+      htmlBody: invoiceFollowupEmailHtml({
         clientName: invoice.client_name,
         invoiceNumber: invoice.invoice_number,
         totalCents: invoice.total_cents,

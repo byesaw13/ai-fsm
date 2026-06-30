@@ -1,0 +1,425 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`canonical email template snapshots > bookingConfirmedEmailHtml 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:system-ui,sans-serif;color:#18181b;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="100%" style="max-width:560px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e4e4e7;">
+      <tr><td style="background:#0f172a;padding:20px 32px;">
+        <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.5px;">Dovetails Services LLC</span>
+      </td></tr>
+      <tr><td style="padding:32px;">
+    <h2 style="margin:0 0 8px;font-size:22px;color:#16a34a;">Booking Confirmed</h2>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi Jane Doe, your visit with Dovetails Services LLC is confirmed. We look forward to seeing you!</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Service:</td><td style="padding:4px 0;font-size:13px;font-weight:600;">Kitchen Repair</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Date &amp; Time:</td><td style="padding:4px 0;font-size:13px;">Wednesday, July 15, 2026 at 10:00 AM – 12:00 PM</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Location:</td><td style="padding:4px 0;font-size:13px;">123 Main St</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Technician:</td><td style="padding:4px 0;font-size:13px;">Alex Tech</td></tr>
+    </table>
+    <p style="margin:0;font-size:14px;color:#52525b;">Need to reschedule or have questions? Just reply to this email or give us a call — we're happy to help.</p>
+  </td></tr>
+      <tr><td style="padding:16px 32px;border-top:1px solid #e4e4e7;font-size:12px;color:#71717a;">
+        Dovetails Services LLC &mdash; This is an automated message.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"
+`;
+
+exports[`canonical email template snapshots > clientReactivationHtml 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:system-ui,sans-serif;color:#18181b;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="100%" style="max-width:560px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e4e4e7;">
+      <tr><td style="background:#0f172a;padding:20px 32px;">
+        <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.5px;">Dovetails Services LLC</span>
+      </td></tr>
+      <tr><td style="padding:32px;">
+    <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">We Miss You!</h2>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi Jane Doe, it's been about 6 months since we last worked together, and we wanted to check in.</p>
+    <p style="margin:0 0 16px;font-size:15px;color:#18181b;">Whether it's routine maintenance, a repair, or a new project — we're here when you need us. As a past client, you're always a priority on our schedule.</p>
+    <p style="margin:0;font-size:13px;color:#71717a;">Just reply to this email or give us a call to get back on the books. We'd love to hear from you!</p>
+  </td></tr>
+      <tr><td style="padding:16px 32px;border-top:1px solid #e4e4e7;font-size:12px;color:#71717a;">
+        Dovetails Services LLC &mdash; This is an automated message.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"
+`;
+
+exports[`canonical email template snapshots > estimateEmailHtml 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:system-ui,sans-serif;color:#18181b;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="100%" style="max-width:560px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e4e4e7;">
+      <tr><td style="background:#0f172a;padding:20px 32px;">
+        <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.5px;">Dovetails Services LLC</span>
+      </td></tr>
+      <tr><td style="padding:32px;">
+    <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">Estimate EST-42</h2>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi Jane Doe, here is your estimate from Dovetails Services LLC.</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Estimate #:</td><td style="padding:4px 0;font-weight:600;font-size:13px;">EST-42</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Total:</td><td style="padding:4px 0;font-weight:700;font-size:15px;color:#0f172a;">$1,000.00</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Deposit due:</td><td style="padding:4px 0;font-size:13px;">$300.00</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Balance due:</td><td style="padding:4px 0;font-size:13px;">$700.00</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Expires:</td><td style="padding:4px 0;font-size:13px;">August 1, 2026</td></tr>
+    </table>
+    <p style="margin:0 0 24px;padding:12px;background:#f4f4f5;border-radius:6px;font-size:13px;color:#52525b;">Includes materials.</p>
+    <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0f172a;">Please review and respond:</p>
+    <p>
+      <a href="https://example.test/approve" style="display:inline-block;background:#16a34a;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:4px 4px 4px 0;">✓ Approve Estimate</a>
+      <a href="https://example.test/decline" style="display:inline-block;background:#dc2626;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:4px 4px 4px 0;">✗ Decline</a>
+    </p>
+    <p style="margin:16px 0 0;font-size:13px;color:#71717a;">Or <a href="https://example.test/view" style="color:#2563eb;">view the full estimate</a> for itemized details.</p>
+    <p style="margin:8px 0 0;font-size:12px;color:#a1a1aa;">These links are unique to you and expire when the estimate closes.</p>
+  </td></tr>
+      <tr><td style="padding:16px 32px;border-top:1px solid #e4e4e7;font-size:12px;color:#71717a;">
+        Dovetails Services LLC &mdash; This is an automated message.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"
+`;
+
+exports[`canonical email template snapshots > estimateEmailText 1`] = `
+"Estimate EST-42
+
+Hi Jane Doe,
+
+Total: $1,000.00
+
+Approve: https://example.test/approve
+Decline: https://example.test/decline
+
+Dovetails Services LLC"
+`;
+
+exports[`canonical email template snapshots > estimateFollowupHtml 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:system-ui,sans-serif;color:#18181b;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="100%" style="max-width:560px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e4e4e7;">
+      <tr><td style="background:#0f172a;padding:20px 32px;">
+        <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.5px;">Dovetails Services LLC</span>
+      </td></tr>
+      <tr><td style="padding:32px;">
+    <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">Just Checking In</h2>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi Jane Doe, we sent over your estimate 3 days ago and wanted to make sure it reached you.</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Estimate #:</td><td style="padding:4px 0;font-size:13px;font-weight:600;">EST-42</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Total:</td><td style="padding:4px 0;font-size:13px;">$1,000.00</td></tr>
+    </table>
+    <p style="margin:0 0 24px;font-size:15px;color:#18181b;"><a href="https://example.test/estimates/est-42" style="color:#0f172a;font-weight:600;">View your estimate &rarr;</a></p>
+    <p style="margin:0;font-size:13px;color:#71717a;">No rush — just let us know if you have questions or want to schedule.</p>
+  </td></tr>
+      <tr><td style="padding:16px 32px;border-top:1px solid #e4e4e7;font-size:12px;color:#71717a;">
+        Dovetails Services LLC &mdash; This is an automated message.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"
+`;
+
+exports[`canonical email template snapshots > intakeInviteEmailHtml 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:system-ui,sans-serif;color:#18181b;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="100%" style="max-width:560px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e4e4e7;">
+      <tr><td style="background:#0f172a;padding:20px 32px;">
+        <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.5px;">Dovetails Services LLC</span>
+      </td></tr>
+      <tr><td style="padding:32px;">
+    <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">Tell us about your project</h2>
+    <p style="margin:0 0 16px;color:#52525b;font-size:15px;">Hi Jane Doe,</p>
+    <p style="margin:0 0 16px;color:#52525b;font-size:15px;">Thanks for reaching out to Dovetails Services LLC! To get you an accurate estimate, we'd love to hear a bit more about your project.</p>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">It only takes a couple of minutes — just click below and fill out a short form at your convenience.</p>
+    <p style="margin:0 0 24px;"><a href="https://example.test/intake/token-abc" style="display:inline-block;background:#0f172a;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:4px 4px 4px 0;">Fill out intake form</a></p>
+    <p style="margin:0 0 8px;font-size:13px;color:#71717a;">This link expires in 48 hours. If it's expired, just reply to this email and we'll send a new one.</p>
+    <p style="margin:0;font-size:13px;color:#71717a;">Not expecting this email? Feel free to ignore it — no action is required.</p>
+  </td></tr>
+      <tr><td style="padding:16px 32px;border-top:1px solid #e4e4e7;font-size:12px;color:#71717a;">
+        Dovetails Services LLC &mdash; This is an automated message.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"
+`;
+
+exports[`canonical email template snapshots > intakeInviteEmailText 1`] = `
+"Hi Jane Doe,
+
+Thanks for reaching out to Dovetails Services LLC! To get you an accurate estimate, we'd love to hear a bit more about your project.
+
+Fill out our short intake form here: https://example.test/intake/token-abc
+
+This link expires in 48 hours.
+
+Not expecting this email? Feel free to ignore it."
+`;
+
+exports[`canonical email template snapshots > invoiceEmailHtml 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:system-ui,sans-serif;color:#18181b;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="100%" style="max-width:560px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e4e4e7;">
+      <tr><td style="background:#0f172a;padding:20px 32px;">
+        <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.5px;">Dovetails Services LLC</span>
+      </td></tr>
+      <tr><td style="padding:32px;">
+    <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">Invoice INV-1001</h2>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi Jane Doe, please find your invoice details below.</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Invoice #:</td><td style="padding:4px 0;font-weight:600;font-size:13px;">INV-1001</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Total:</td><td style="padding:4px 0;font-weight:600;font-size:13px;">$1,500.00</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Balance due:</td><td style="padding:4px 0;font-weight:700;font-size:15px;color:#0f172a;">$750.00</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Due date:</td><td style="padding:4px 0;font-size:13px;">July 15, 2026</td></tr>
+    </table>
+    <p style="margin:0 0 24px;padding:12px;background:#f4f4f5;border-radius:6px;font-size:13px;color:#52525b;">Thank you for your business.</p>
+    <p><a href="https://example.test/invoices/inv-1001" style="display:inline-block;background:#0f172a;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:4px 4px 4px 0;">View Invoice</a></p>
+    <p style="margin:16px 0 0;font-size:12px;color:#a1a1aa;">To pay or discuss this invoice, please contact us directly.</p>
+  </td></tr>
+      <tr><td style="padding:16px 32px;border-top:1px solid #e4e4e7;font-size:12px;color:#71717a;">
+        Dovetails Services LLC &mdash; This is an automated message.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"
+`;
+
+exports[`canonical email template snapshots > invoiceEmailText 1`] = `
+"Invoice INV-1001
+
+Hi Jane Doe,
+
+Total: $1,500.00
+Balance due: $750.00
+Due: July 15, 2026
+
+View: https://example.test/invoices/inv-1001
+
+Dovetails Services LLC"
+`;
+
+exports[`canonical email template snapshots > invoiceFollowupEmailHtml 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:system-ui,sans-serif;color:#18181b;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="100%" style="max-width:560px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e4e4e7;">
+      <tr><td style="background:#0f172a;padding:20px 32px;">
+        <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.5px;">Dovetails Services LLC</span>
+      </td></tr>
+      <tr><td style="padding:32px;">
+    <h2 style="margin:0 0 8px;font-size:22px;color:#dc2626;">Payment Reminder</h2>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi Jane Doe, your invoice is now 7 days overdue. Please arrange payment at your earliest convenience.</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Invoice #:</td><td style="padding:4px 0;font-size:13px;font-weight:600;">INV-1001</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Total:</td><td style="padding:4px 0;font-size:13px;">$1,500.00</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Balance due:</td><td style="padding:4px 0;font-weight:700;font-size:15px;color:#dc2626;">$750.00</td></tr>
+    </table>
+    <p><a href="https://example.test/invoices/inv-1001" style="display:inline-block;background:#0f172a;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin:4px 4px 4px 0;">View Invoice</a></p>
+    <p style="margin:16px 0 0;font-size:12px;color:#a1a1aa;">Please contact us if you have any questions about this invoice.</p>
+  </td></tr>
+      <tr><td style="padding:16px 32px;border-top:1px solid #e4e4e7;font-size:12px;color:#71717a;">
+        Dovetails Services LLC &mdash; This is an automated message.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"
+`;
+
+exports[`canonical email template snapshots > onMyWayEmailHtml 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:system-ui,sans-serif;color:#18181b;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="100%" style="max-width:560px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e4e4e7;">
+      <tr><td style="background:#0f172a;padding:20px 32px;">
+        <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.5px;">Dovetails Services LLC</span>
+      </td></tr>
+      <tr><td style="padding:32px;">
+    <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">On My Way!</h2>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi Jane Doe, your technician is on their way to your service visit.</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Service:</td><td style="padding:4px 0;font-size:13px;font-weight:600;">Kitchen Repair</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Scheduled:</td><td style="padding:4px 0;font-size:13px;">Tuesday, July 15, 2026, 10:00 AM</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Location:</td><td style="padding:4px 0;font-size:13px;">123 Main St</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Technician:</td><td style="padding:4px 0;font-size:13px;">Alex Tech</td></tr>
+    </table>
+    <p style="margin:0;font-size:14px;color:#52525b;">Please ensure someone is available to provide access. Questions? Contact us and we'll be happy to help.</p>
+  </td></tr>
+      <tr><td style="padding:16px 32px;border-top:1px solid #e4e4e7;font-size:12px;color:#71717a;">
+        Dovetails Services LLC &mdash; This is an automated message.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"
+`;
+
+exports[`canonical email template snapshots > recurringInspectionHtml 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:system-ui,sans-serif;color:#18181b;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="100%" style="max-width:560px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e4e4e7;">
+      <tr><td style="background:#0f172a;padding:20px 32px;">
+        <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.5px;">Dovetails Services LLC</span>
+      </td></tr>
+      <tr><td style="padding:32px;">
+    <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">Time for Your Annual Inspection</h2>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi Jane Doe, your Gold Maintenance includes an annual inspection and it's time to schedule yours.</p>
+    <p style="margin:0 0 16px;font-size:14px;color:#52525b;"><strong>Property:</strong> 123 Main St</p>
+    <p style="margin:0 0 16px;font-size:15px;color:#18181b;">Annual inspections help catch small issues before they become costly repairs — and they're included in your plan at no extra charge.</p>
+    <p style="margin:0;font-size:13px;color:#71717a;">Just reply to this email to pick a date that works for you. We look forward to seeing you!</p>
+  </td></tr>
+      <tr><td style="padding:16px 32px;border-top:1px solid #e4e4e7;font-size:12px;color:#71717a;">
+        Dovetails Services LLC &mdash; This is an automated message.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"
+`;
+
+exports[`canonical email template snapshots > reviewRequestEmailHtml 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:system-ui,sans-serif;color:#18181b;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="100%" style="max-width:560px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e4e4e7;">
+      <tr><td style="background:#0f172a;padding:20px 32px;">
+        <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.5px;">Dovetails Services LLC</span>
+      </td></tr>
+      <tr><td style="padding:32px;">
+    <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">How Did We Do?</h2>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi Jane Doe, thank you for choosing Dovetails Services LLC and working with Alex Tech. We hope everything went smoothly with your Kitchen Repair service.</p>
+    <p style="margin:0 0 16px;font-size:15px;color:#18181b;">Your feedback means the world to a small, local business like ours. If you had a great experience, we'd really appreciate a quick review — it helps other homeowners find us.</p>
+    <p style="margin:0 0 24px;font-size:14px;color:#52525b;">And if anything wasn't perfect, please reach out directly — we want to make it right.</p>
+    <p style="margin:0;font-size:13px;color:#71717a;">Thank you again for your business — we appreciate you!</p>
+  </td></tr>
+      <tr><td style="padding:16px 32px;border-top:1px solid #e4e4e7;font-size:12px;color:#71717a;">
+        Dovetails Services LLC &mdash; This is an automated message.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"
+`;
+
+exports[`canonical email template snapshots > seasonalReminderHtml fall 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:system-ui,sans-serif;color:#18181b;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="100%" style="max-width:560px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e4e4e7;">
+      <tr><td style="background:#0f172a;padding:20px 32px;">
+        <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.5px;">Dovetails Services LLC</span>
+      </td></tr>
+      <tr><td style="padding:32px;">
+    <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">Fall Is Here — Get Your Home Ready</h2>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi Jane Doe, Before the cold sets in, let's make sure your home is ready. From weatherproofing to pre-winter maintenance, we're booking fall appointments now.</p>
+    <p style="margin:0;font-size:13px;color:#71717a;">Reply to this email or reach out to schedule — spots fill up fast this time of year!</p>
+  </td></tr>
+      <tr><td style="padding:16px 32px;border-top:1px solid #e4e4e7;font-size:12px;color:#71717a;">
+        Dovetails Services LLC &mdash; This is an automated message.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"
+`;
+
+exports[`canonical email template snapshots > seasonalReminderHtml spring 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:system-ui,sans-serif;color:#18181b;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="100%" style="max-width:560px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e4e4e7;">
+      <tr><td style="background:#0f172a;padding:20px 32px;">
+        <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.5px;">Dovetails Services LLC</span>
+      </td></tr>
+      <tr><td style="padding:32px;">
+    <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">Spring Is Here — Time for a Home Checkup</h2>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi Jane Doe, As the weather warms up, it's a great time to address any winter wear and get your home in shape for the season ahead. We're booking spring appointments now.</p>
+    <p style="margin:0;font-size:13px;color:#71717a;">Reply to this email or reach out to schedule — spots fill up fast this time of year!</p>
+  </td></tr>
+      <tr><td style="padding:16px 32px;border-top:1px solid #e4e4e7;font-size:12px;color:#71717a;">
+        Dovetails Services LLC &mdash; This is an automated message.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"
+`;
+
+exports[`canonical email template snapshots > visitReminderEmailHtml 1`] = `
+"<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:system-ui,sans-serif;color:#18181b;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+  <tr><td align="center">
+    <table width="100%" style="max-width:560px;background:#fff;border-radius:8px;overflow:hidden;border:1px solid #e4e4e7;">
+      <tr><td style="background:#0f172a;padding:20px 32px;">
+        <span style="color:#fff;font-size:18px;font-weight:700;letter-spacing:-0.5px;">Dovetails Services LLC</span>
+      </td></tr>
+      <tr><td style="padding:32px;">
+    <h2 style="margin:0 0 8px;font-size:22px;color:#0f172a;">Visit Reminder</h2>
+    <p style="margin:0 0 24px;color:#52525b;font-size:15px;">Hi Jane Doe, this is a reminder about your upcoming service visit.</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Service:</td><td style="padding:4px 0;font-size:13px;font-weight:600;">Kitchen Repair</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">When:</td><td style="padding:4px 0;font-size:13px;">Wednesday, July 15, 2026 at 10:00 AM</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Where:</td><td style="padding:4px 0;font-size:13px;">123 Main St</td></tr>
+      <tr><td style="padding:4px 0;color:#71717a;font-size:13px;">Technician:</td><td style="padding:4px 0;font-size:13px;">Alex Tech</td></tr>
+    </table>
+    <p style="margin:0;font-size:14px;color:#52525b;">Questions? Please contact us and we'll be happy to help.</p>
+  </td></tr>
+      <tr><td style="padding:16px 32px;border-top:1px solid #e4e4e7;font-size:12px;color:#71717a;">
+        Dovetails Services LLC &mdash; This is an automated message.
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>"
+`;
