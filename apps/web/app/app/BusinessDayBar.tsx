@@ -150,10 +150,17 @@ export function BusinessDayBar() {
     <div style={wrap}>
       <div style={{ flex: 1, minWidth: 160 }}>
         <strong>Business Day</strong>
-        <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+        <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", overflowWrap: "anywhere" }}>
           {day === null
             ? "Not opened yet"
-            : `${STATUS_LABEL[day.status]}${day.status === "CLOSED" ? "" : " — closing a trip or stopping the timer won't close it"}`}
+            : (
+              <>
+                <span className="my-day-mobile-only">{STATUS_LABEL[day.status]}</span>
+                <span className="my-day-desktop-only" style={{ display: "none" }}>
+                  {`${STATUS_LABEL[day.status]}${day.status === "CLOSED" ? "" : " — closing a trip or stopping the timer won't close it"}`}
+                </span>
+              </>
+            )}
         </div>
         {error && <div style={{ color: "var(--color-red-600, #dc2626)", fontSize: 12, marginTop: 4 }}>{error}</div>}
       </div>

@@ -185,7 +185,7 @@ export function NowBar({
 
         {/* One-tap quick switch chips — top activities, no modal (TASK-021). */}
         {quickTypes.length > 0 && (
-          <div style={{ display: "flex", gap: "var(--space-2)", overflowX: "auto", paddingBottom: 2, margin: "0 -4px" }} className="chips-scroll" data-testid="quick-switch-chips">
+          <div className="my-day-contained-scroll chips-scroll" style={{ display: "flex", gap: "var(--space-2)", paddingBottom: 2, margin: 0 }} data-testid="quick-switch-chips">
             {quickTypes.map((t) => {
               const m = ACTIVITY_TYPE_META[t];
               const isCurrent = displayType === t;
