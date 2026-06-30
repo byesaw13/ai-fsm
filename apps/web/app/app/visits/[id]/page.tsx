@@ -272,6 +272,9 @@ export default async function VisitDetailPage({
         )
       : [];
 
+  const closePhotosItem = checklistItems.find(i => i.item_key === 'close_photos');
+  const closePhotosItemId = closePhotosItem?.id;
+
   // Load media and parts for repair/painting/custom visits
   const [beforePhotos, afterPhotos, visitParts] =
     isRepairFlow && currentStatus !== "cancelled"
@@ -700,6 +703,7 @@ export default async function VisitDetailPage({
                 initialPacket={completionPacket}
                 canUpdate={canNotes}
                 canComplete={canTransition}
+                closePhotosItemId={closePhotosItemId}
               />
             </Card>
           )}
