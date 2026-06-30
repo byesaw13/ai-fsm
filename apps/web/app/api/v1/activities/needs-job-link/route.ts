@@ -23,7 +23,7 @@ export const GET = withAuth(async (request: NextRequest, session: AuthSession) =
           AND voided_at IS NULL
           AND entity_id IS NULL
           AND ended_at IS NOT NULL
-          AND activity_type IN ('job_work','travel','material_run','estimate','warranty_callback','walkthrough','material_drop')
+          AND activity_type IN ('job_work','travel','material_run','estimate_visit','follow_up')
         ORDER BY started_at ASC`,
       [session.accountId, day],
     );
