@@ -912,7 +912,7 @@
   }
 }
 
-.p7-invoice-line-items .p7-table-wrapper {
+.p7-table-wrapper.p7-invoice-line-items {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }

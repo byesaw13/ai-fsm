@@ -133,10 +133,14 @@ export default async function InvoiceDetailPage({
     (s) => s !== "paid" && s !== "partial" && (s !== "draft" || invoice.paid_cents === 0)
   );
   const canTransition = canCreateInvoices(session.role);
-  // balance_cents already credits the deposit (= total - deposit). Subtracting
-  // payments gives what the client still owes — do NOT use total - paid, which
-  // would ignore the deposit credit and over-state the amount owed.
-  const amountDue = invoice.balance_cents - invoice.paid_cents;
+  // Keep amountDue aligned with the payment/status logic (which currently
+  // compares paid_cents against total_cents in validatePaymentAmount,
+  // deriveInvoiceStatus, and trg_payment_sync_invoice). Using balance_cents
+  // here can produce amountDue===0 (or negative) while the invoice is still
+  // treated as "partial" by the backend, hiding the record-payment UI.
+  // TODO: when payment logic migrates to balance_cents, switch this back
+  // and update the callers.
+  const amountDue = Math.max(0, invoice.total_cents - invoice.paid_cents);
   const depositPending = invoice.deposit_cents > 0 && !invoice.deposit_paid_at;
   const canMarkDeposit = canTransition && !["paid", "void"].includes(currentStatus);
   const canRecordPaymentAction = canRecordPayments(session.role) && ["sent", "partial", "overdue"].includes(currentStatus) && amountDue > 0;
