@@ -8,7 +8,7 @@ import {
   loadSquareSettings,
   encryptSquareSecrets,
   type SquareSecrets,
-} from "@/lib/integrations/square";
+} from "@/lib/integrations/square-payments";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";

@@ -5,7 +5,7 @@ import { logger } from "@/lib/logger";
 import {
   loadSquareSettings,
   testSquareConnection,
-} from "@/lib/integrations/square";
+} from "@/lib/integrations/square-payments";
 
 export const dynamic = "force-dynamic";
 
