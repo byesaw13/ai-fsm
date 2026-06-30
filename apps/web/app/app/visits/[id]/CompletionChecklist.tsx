@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Textarea, useToast } from "@/components/ui";
 import { checkCompletionPacket } from "@/lib/completion-guard";
@@ -10,6 +10,8 @@ type CompletionPacketValues = {
   signature_url: string | null;
   signature_waiver: boolean;
   notes: string | null;
+  photos_waived?: boolean;
+  photos_waiver_reason?: string | null;
 };
 
 interface CompletionChecklistProps {
@@ -17,6 +19,7 @@ interface CompletionChecklistProps {
   initialPacket: CompletionPacketValues | null;
   canUpdate: boolean;
   canComplete: boolean;
+  closePhotosItemId?: string;
 }
 
 type CompletionPhotoEntry = {
@@ -44,6 +47,7 @@ export function CompletionChecklist({
   initialPacket,
   canUpdate,
   canComplete,
+  closePhotosItemId,
 }: CompletionChecklistProps) {
   const router = useRouter();
   const toast = useToast();
@@ -65,12 +69,25 @@ export function CompletionChecklist({
   const [signatureUrl, setSignatureUrl] = useState(initialPacket?.signature_url ?? "");
   const [signatureWaiver, setSignatureWaiver] = useState(initialPacket?.signature_waiver ?? false);
   const [notes, setNotes] = useState(initialPacket?.notes ?? "");
+  const [photosWaived, setPhotosWaived] = useState(initialPacket?.photos_waived ?? false);
+  const [photosWaiverReason, setPhotosWaiverReason] = useState(initialPacket?.photos_waiver_reason ?? "");
 
   const photoUrls = useMemo(() => photoEntries.map((entry) => entry.url).filter(Boolean), [photoEntries]);
+
+  // Clear waiver automatically if photos are uploaded (photos take precedence)
+  useEffect(() => {
+    if (photoUrls.length > 0 && photosWaived) {
+      setPhotosWaived(false);
+      setPhotosWaiverReason("");
+    }
+  }, [photoUrls.length, photosWaived]);
+
   const guard = checkCompletionPacket({
     photo_urls: photoUrls,
     signature_url: signatureUrl.trim() || null,
     signature_waiver: signatureWaiver,
+    photos_waived: photosWaived,
+    photos_waiver_reason: photosWaived ? photosWaiverReason : null,
   });
   const missingMessage = guard.ok ? null : ERROR_LABELS[guard.error ?? ""] ?? "Completion packet is incomplete.";
   const signatureStatus = signatureWaiver ? "waived" : signatureUrl.trim() ? "captured" : "missing";
@@ -105,6 +122,9 @@ export function CompletionChecklist({
           mediaId,
         },
       ]);
+      // If waiver was active, uploading a photo clears it (photos take precedence)
+      setPhotosWaived(false);
+      setPhotosWaiverReason("");
       return null;
     } catch {
       return "Photo upload failed";
@@ -158,6 +178,9 @@ export function CompletionChecklist({
 
     setPhotoEntries((prev) => [...prev, { url, label: photoLabelFromUrl(url), mediaId: null }]);
     setDraftPhotoUrl("");
+    // If waiver was active, adding a photo by URL clears it (photos take precedence)
+    setPhotosWaived(false);
+    setPhotosWaiverReason("");
   }
 
   async function removePhoto(entry: CompletionPhotoEntry) {
@@ -198,6 +221,8 @@ export function CompletionChecklist({
           signature_url: signatureUrl.trim() || null,
           signature_waiver: signatureWaiver,
           notes: notes.trim() || null,
+          photos_waived: photosWaived,
+          photos_waiver_reason: photosWaived ? photosWaiverReason : null,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -207,6 +232,18 @@ export function CompletionChecklist({
       }
       toast.success("Completion packet saved");
       router.refresh();
+      // Auto-PATCH close_photos item to "ok" when photos waived (best-effort side effect)
+      if (photosWaived && closePhotosItemId) {
+        try {
+          await fetch(`/api/v1/visits/${visitId}/checklist/${closePhotosItemId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ disposition: "ok" }),
+          });
+        } catch {
+          // ignore failures — this is a convenience side-effect, not required for packet save
+        }
+      }
       return true;
     } catch {
       toast.error("Unexpected error saving completion packet");
@@ -247,7 +284,13 @@ export function CompletionChecklist({
       <dl className="p7-detail-list">
         <div className="p7-detail-row">
           <dt>Photos</dt>
-          <dd>{photoUrls.length > 0 ? `${photoUrls.length} added` : "none"}</dd>
+          <dd>
+            {photoUrls.length > 0
+              ? `${photoUrls.length} added`
+              : photosWaived
+              ? `waived — ${photosWaiverReason || "no reason"}`
+              : "none"}
+          </dd>
         </div>
         <div className="p7-detail-row">
           <dt>Signature</dt>
@@ -301,6 +344,91 @@ export function CompletionChecklist({
             </div>
           </div>
         </div>
+
+        {/* Quick photo waiver UI (large touch-friendly) - shown when no photos or waiver active */}
+        {(!photoUrls.length || photosWaived) && (
+          <div style={{ marginTop: "var(--space-2)" }}>
+            <span className="p7-label">No photos needed?</span>
+            <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginTop: "var(--space-1)" }}>
+              {["Forgot to take photos", "No visual change / not needed", "Client declined photos"].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => {
+                    setPhotosWaived(true);
+                    setPhotosWaiverReason(preset);
+                  }}
+                  disabled={!canUpdate || saving || completing}
+                  style={{
+                    padding: "10px 14px",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    background: photosWaived && photosWaiverReason === preset ? "var(--accent, #0066cc)" : "var(--bg-subtle, #f8f8f9)",
+                    color: photosWaived && photosWaiverReason === preset ? "#fff" : "inherit",
+                    fontSize: "var(--text-sm)",
+                    cursor: "pointer",
+                    minHeight: "44px",
+                  }}
+                >
+                  {preset}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setPhotosWaived(true);
+                  setPhotosWaiverReason("");
+                }}
+                disabled={!canUpdate || saving || completing}
+                style={{
+                  padding: "10px 14px",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-sm)",
+                  background: photosWaived && photosWaiverReason === "" ? "var(--accent, #0066cc)" : "var(--bg-subtle, #f8f8f9)",
+                  color: photosWaived && photosWaiverReason === "" ? "#fff" : "inherit",
+                  fontSize: "var(--text-sm)",
+                  cursor: "pointer",
+                  minHeight: "44px",
+                }}
+              >
+                Other
+              </button>
+            </div>
+            {photosWaived && (
+              <div style={{ marginTop: "var(--space-2)" }}>
+                <textarea
+                  className="p7-input"
+                  value={photosWaiverReason}
+                  onChange={(e) => setPhotosWaiverReason(e.target.value)}
+                  placeholder="Reason for waiving photos"
+                  disabled={!canUpdate || saving || completing}
+                  style={{ width: "100%", minHeight: "60px", resize: "vertical", fontSize: "var(--text-sm)" }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhotosWaived(false);
+                    setPhotosWaiverReason("");
+                  }}
+                  disabled={!canUpdate || saving || completing}
+                  style={{
+                    marginTop: "var(--space-1)",
+                    fontSize: "var(--text-xs)",
+                    color: "var(--fg-muted)",
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: 0,
+                    textDecoration: "underline",
+                  }}
+                >
+                  Clear waiver
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {photoEntries.length > 0 ? (
           <div
             style={{

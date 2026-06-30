@@ -89,6 +89,8 @@ interface CompletionPacketRow extends Record<string, unknown> {
   signature_url: string | null;
   signature_waiver: boolean;
   notes: string | null;
+  photos_waived: boolean;
+  photos_waiver_reason: string | null;
 }
 
 type VisitRow = Visit & {
@@ -270,6 +272,9 @@ export default async function VisitDetailPage({
         )
       : [];
 
+  const closePhotosItem = checklistItems.find(i => i.item_key === 'close_photos');
+  const closePhotosItemId = closePhotosItem?.id;
+
   // Load media and parts for repair/painting/custom visits
   const [beforePhotos, afterPhotos, visitParts] =
     isRepairFlow && currentStatus !== "cancelled"
@@ -302,7 +307,7 @@ export default async function VisitDetailPage({
     currentStatus !== "cancelled"
       ? await queryOneForSession<CompletionPacketRow>(
           session,
-          `SELECT photo_urls, signature_url, signature_waiver, notes
+          `SELECT photo_urls, signature_url, signature_waiver, notes, photos_waived, photos_waiver_reason
            FROM completion_packets
            WHERE visit_id = $1 AND account_id = $2`,
           [id, session.accountId]
@@ -698,6 +703,7 @@ export default async function VisitDetailPage({
                 initialPacket={completionPacket}
                 canUpdate={canNotes}
                 canComplete={canTransition}
+                closePhotosItemId={closePhotosItemId}
               />
             </Card>
           )}
@@ -747,7 +753,11 @@ export default async function VisitDetailPage({
             <Card data-testid="visit-completion-record">
               <SectionHeader title="Visit Record" />
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", fontSize: "var(--text-sm)" }}>
-                {completionPacket.photo_urls.length > 0 && (
+                {completionPacket.photos_waived ? (
+                  <div style={{ color: "var(--fg-muted)" }}>
+                    Photos waived: {completionPacket.photos_waiver_reason}
+                  </div>
+                ) : completionPacket.photo_urls.length > 0 && (
                   <div style={{ color: "var(--fg-secondary)" }}>
                     {completionPacket.photo_urls.length} completion photo{completionPacket.photo_urls.length !== 1 ? "s" : ""} captured
                   </div>
@@ -770,7 +780,7 @@ export default async function VisitDetailPage({
                     {completionPacket.notes}
                   </div>
                 )}
-                {!completionPacket.photo_urls.length && !completionPacket.signature_url && !completionPacket.signature_waiver && !completionPacket.notes && (
+                {!completionPacket.photo_urls.length && !completionPacket.signature_url && !completionPacket.signature_waiver && !completionPacket.notes && !completionPacket.photos_waived && (
                   <div style={{ color: "var(--fg-muted)" }}>No completion notes or photos recorded.</div>
                 )}
               </div>

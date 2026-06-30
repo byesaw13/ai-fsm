@@ -168,7 +168,7 @@ export const POST = withAuth(
 
       if (targetStatus === "completed") {
         const packetResult = await client.query(
-          `SELECT photo_urls, signature_url, signature_waiver
+          `SELECT photo_urls, signature_url, signature_waiver, photos_waived, photos_waiver_reason
            FROM completion_packets
            WHERE visit_id = $1 AND account_id = $2`,
           [id, session.accountId]
@@ -178,7 +178,7 @@ export const POST = withAuth(
         if (!guard.ok) {
           await client.query("ROLLBACK");
           const message = guard.error === "MISSING_PHOTO"
-            ? "At least one photo is required before completing this visit"
+            ? "At least one photo is required before completing this visit (or waive photos)"
             : "A signature or waiver is required before completing this visit";
           return NextResponse.json(
             { error: { code: guard.error, message, traceId: session.traceId } },
