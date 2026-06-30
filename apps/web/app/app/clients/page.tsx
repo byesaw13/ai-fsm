@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { canManageClients } from "@/lib/auth/permissions";
 import { query } from "@/lib/db";
-import { formatClientContact } from "@/lib/crm/p7";
+import { formatClientContact } from "@/lib/crm/normalization";
 import {
   Card,
   DataTable,

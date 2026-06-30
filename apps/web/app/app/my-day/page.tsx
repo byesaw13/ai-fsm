@@ -3,7 +3,7 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { query, queryForSession } from "@/lib/db";
-import { isSameCalendarDay, isVisitOverdue, formatOverdueLabel } from "@/lib/visits/p7";
+import { isSameCalendarDay, isVisitOverdue, formatOverdueLabel } from "@/lib/visits/formatting";
 import { VISIT_STATUS_LABELS } from "@/lib/visits/triage";
 import { pickHeroVisit, excludeHeroVisit } from "@/lib/my-day/visit-hero";
 import { MyDayView } from "./MyDayView";

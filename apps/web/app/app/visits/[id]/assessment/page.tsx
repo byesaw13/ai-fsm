@@ -4,7 +4,7 @@ import { queryOneForSession, queryForSession } from "@/lib/db";
 import { Card, PageContainer, PageHeader } from "@/components/ui";
 import { AssessmentForm } from "./AssessmentForm";
 import type { Assessment } from "./AssessmentForm";
-import { formatVisitDateLabel } from "@/lib/visits/p7";
+import { formatVisitDateLabel } from "@/lib/visits/formatting";
 
 export const dynamic = "force-dynamic";
 

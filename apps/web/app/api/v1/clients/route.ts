@@ -3,7 +3,7 @@ import { z } from "zod";
 import { withRole } from "@/lib/auth/middleware";
 import type { AuthSession } from "@/lib/auth/middleware";
 import { getPool, query } from "@/lib/db";
-import { normalizeClientName } from "@/lib/crm/p7";
+import { normalizeClientName } from "@/lib/crm/normalization";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
 
