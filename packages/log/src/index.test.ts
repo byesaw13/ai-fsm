@@ -5,7 +5,7 @@
  * Tests the structured JSON logger emitted by @ai-fsm/log.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createLogger } from "./index.js";
 
 let lines: string[] = [];
@@ -111,5 +111,19 @@ describe("createLogger", () => {
     for (const line of lines) {
       expect(() => JSON.parse(line)).not.toThrow();
     }
+  });
+
+  it("sink: stderr writes to process.stderr, not stdout", () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    const { logger: mcpLogger } = createLogger({ service: "mcp", sink: "stderr" });
+    mcpLogger.info("mcp ready");
+
+    expect(stderrSpy).toHaveBeenCalled();
+    expect(stdoutSpy).not.toHaveBeenCalled();
+
+    stderrSpy.mockRestore();
+    stdoutSpy.mockRestore();
   });
 });
