@@ -412,7 +412,7 @@ export function AppShell({ role, userName, children }: AppShellProps) {
         )}
       </div>
       {showQuickLead && <QuickLeadModal onClose={() => setShowQuickLead(false)} />}
-      {isAdminOrOwner && <FloatingActionButton />}
+      {isAdminOrOwner && !pathname.startsWith("/app/my-day") && <FloatingActionButton />}
     </ToastProvider>
   );
 }

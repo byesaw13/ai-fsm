@@ -8,6 +8,7 @@ import { VISIT_STATUS_LABELS } from "@/lib/visits/triage";
 import { pickHeroVisit, excludeHeroVisit } from "@/lib/my-day/visit-hero";
 import { MyDayView } from "./MyDayView";
 import { NextVisitHero } from "./NextVisitHero";
+import { FieldQuickActions } from "./FieldQuickActions";
 import { ManualSiteVisitButton } from "../ManualSiteVisitButton";
 import { LocationCaptureControl } from "../LocationCaptureControl";
 import { WorkdayPanel } from "../WorkdayPanel";
@@ -257,6 +258,10 @@ export default async function MyDayPage() {
           <NextVisitHero visit={heroVisit} />
         </div>
       )}
+
+      <div style={{ marginBottom: "var(--space-6)" }}>
+        <FieldQuickActions />
+      </div>
 
       {/* Field workday: Start/End Day, vehicle, activity, mileage (EPIC-006) */}
       <div style={{ marginBottom: "var(--space-6)" }}>
