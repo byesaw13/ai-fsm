@@ -83,41 +83,72 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
   const invoiceTerms = invoice.account_settings?.invoice_terms ?? STANDARD_INVOICE_TERMS;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f9fafb", padding: "24px 16px" }}>
-      <div style={{ maxWidth: 720, margin: "0 auto" }}>
+    <div style={{ minHeight: "100vh", background: "#f8f7f6", padding: "32px 16px" }}>
+      <div style={{ maxWidth: 680, margin: "0 auto" }}>
 
-        {/* Header */}
-        <div style={{ marginBottom: 32 }}>
-          <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 4 }}>{invoice.account_name}</div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Invoice #{invoice.invoice_number}</h1>
-          {propertyLine && <div style={{ color: "#6b7280", marginTop: 4 }}>{propertyLine}</div>}
-          <div style={{ color: "#6b7280", marginTop: 2 }}>Billed to: {invoice.client_name}</div>
-          {invoice.due_date && (
-            <div style={{ color: isOverdue ? "#dc2626" : "#6b7280", marginTop: 2, fontWeight: isOverdue ? 600 : 400 }}>
-              Due: {new Date(invoice.due_date).toLocaleDateString()}{isOverdue ? " — Overdue" : ""}
+        {/* Header — clean and direct */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#57534e", marginBottom: 2 }}>{invoice.account_name}</div>
+          <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>Invoice {invoice.invoice_number}</h1>
+
+          <div style={{ marginTop: 8, fontSize: 14, color: "#57534e" }}>
+            {propertyLine && <div>{propertyLine}</div>}
+            <div>Billed to {invoice.client_name}</div>
+            {invoice.due_date && (
+              <div style={{ marginTop: 2, color: isOverdue ? "#b91c1c" : "#57534e", fontWeight: isOverdue ? 600 : 400 }}>
+                Due {new Date(invoice.due_date).toLocaleDateString()} {isOverdue ? "— OVERDUE" : ""}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Prominent money callout */}
+        <div style={{
+          display: "flex",
+          gap: 32,
+          alignItems: "baseline",
+          padding: "16px 20px",
+          background: "#fff",
+          border: "1px solid #e7e5e4",
+          borderRadius: 10,
+          marginBottom: 20
+        }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#78716c" }}>TOTAL</div>
+            <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "var(--font-mono, monospace)", lineHeight: 1 }}>{cents(invoice.total_cents)}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#78716c" }}>BALANCE</div>
+            <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "var(--font-mono, monospace)", lineHeight: 1, color: balance > 0 ? "#b91c1c" : "#166534" }}>
+              {cents(balance)}
+            </div>
+          </div>
+          {invoice.paid_cents > 0 && (
+            <div style={{ marginLeft: "auto", textAlign: "right", fontSize: 13 }}>
+              Paid {cents(invoice.paid_cents)}
             </div>
           )}
         </div>
 
         {/* Status banners */}
         {isPaid && (
-          <div style={{ background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: 8, padding: "12px 16px", marginBottom: 24, color: "#065f46", fontWeight: 600 }}>
-            Paid in full{invoice.paid_at ? ` on ${new Date(invoice.paid_at).toLocaleDateString()}` : ""}
+          <div style={{ background: "#dcfce7", border: "1px solid #86efac", borderRadius: 8, padding: "10px 14px", marginBottom: 20, color: "#166534", fontWeight: 600, fontSize: 14 }}>
+            ✓ Paid in full{invoice.paid_at ? ` — ${new Date(invoice.paid_at).toLocaleDateString()}` : ""}
           </div>
         )}
         {isVoid && (
-          <div style={{ background: "#f3f4f6", border: "1px solid #d1d5db", borderRadius: 8, padding: "12px 16px", marginBottom: 24, color: "#6b7280" }}>
+          <div style={{ background: "#f5f5f4", border: "1px solid #d6d3d1", borderRadius: 8, padding: "10px 14px", marginBottom: 20, color: "#57534e" }}>
             This invoice has been voided.
           </div>
         )}
 
         {/* Line items */}
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden", marginBottom: 24 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <div style={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: 10, overflow: "hidden", marginBottom: 20 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
-              <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                <th style={{ textAlign: "left", padding: "10px 16px", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Description</th>
-                <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 12, fontWeight: 600, color: "#6b7280" }}>Amount</th>
+              <tr style={{ background: "#fafaf9", borderBottom: "1px solid #e7e5e4" }}>
+                <th style={{ textAlign: "left", padding: "10px 16px", fontSize: 11, fontWeight: 600, color: "#57534e" }}>Description</th>
+                <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 11, fontWeight: 600, color: "#57534e" }}>Amount</th>
               </tr>
             </thead>
             <tbody>
@@ -129,64 +160,71 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
               ))}
             </tbody>
           </table>
-          <div style={{ padding: "12px 16px", borderTop: "1px solid #e5e7eb", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-            <div style={{ display: "flex", gap: 32, color: "#6b7280", fontSize: 13 }}>
-              <span>Subtotal</span><span>{cents(invoice.subtotal_cents)}</span>
+          <div style={{ padding: "14px 16px", borderTop: "1px solid #e7e5e4", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, fontSize: 14 }}>
+            <div style={{ display: "flex", gap: 36, color: "#57534e" }}>
+              <span>Subtotal</span><span style={{ fontFamily: "monospace" }}>{cents(invoice.subtotal_cents)}</span>
             </div>
             {invoice.tax_cents > 0 && (
-              <div style={{ display: "flex", gap: 32, color: "#6b7280", fontSize: 13 }}>
-                <span>Tax</span><span>{cents(invoice.tax_cents)}</span>
+              <div style={{ display: "flex", gap: 36, color: "#57534e" }}>
+                <span>Tax</span><span style={{ fontFamily: "monospace" }}>{cents(invoice.tax_cents)}</span>
               </div>
             )}
-            {paidCents > 0 && paidCents < invoice.total_cents && (
-              <div style={{ display: "flex", gap: 32, color: "#6b7280", fontSize: 13 }}>
-                <span>Paid</span><span>−{cents(paidCents)}</span>
+            {paidCents > 0 && (
+              <div style={{ display: "flex", gap: 36, color: "#15803d" }}>
+                <span>Paid</span><span style={{ fontFamily: "monospace" }}>−{cents(paidCents)}</span>
               </div>
             )}
-            <div style={{ display: "flex", gap: 32, fontWeight: 700, fontSize: 16, marginTop: 4 }}>
+            <div style={{ display: "flex", gap: 36, fontWeight: 700, fontSize: 17, paddingTop: 4, borderTop: "1px solid #d6d3d1", marginTop: 4 }}>
               <span>{isPaid ? "Total" : "Balance due"}</span>
-              <span>{cents(isPaid ? invoice.total_cents : balance)}</span>
+              <span style={{ fontFamily: "monospace", color: balance > 0 ? "#b91c1c" : "#166534" }}>{cents(isPaid ? invoice.total_cents : balance)}</span>
             </div>
           </div>
         </div>
 
         {/* Notes */}
         {invoice.notes && (
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, marginBottom: 24 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 6 }}>NOTES</div>
-            <div style={{ whiteSpace: "pre-wrap", color: "#374151" }}>{invoice.notes}</div>
+          <div style={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#78716c", marginBottom: 4 }}>NOTES</div>
+            <div style={{ whiteSpace: "pre-wrap", color: "#44403c" }}>{invoice.notes}</div>
           </div>
         )}
 
-        {/* Invoice terms */}
+        {/* Terms */}
         {invoiceTerms && (
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: 16, marginBottom: 24 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", marginBottom: 6 }}>
-              TERMS · STANDARD {DOCUMENT_STANDARD_VERSION}
-            </div>
-            <div style={{ whiteSpace: "pre-wrap", color: "#6b7280", fontSize: 13 }}>{invoiceTerms}</div>
+          <div style={{ fontSize: 12, color: "#78716c", lineHeight: 1.45, marginBottom: 24, padding: "0 4px" }}>
+            {invoiceTerms}
           </div>
         )}
 
-        {/* Pay online — redirects to Square-hosted checkout */}
+        {/* Pay action */}
         {!isPaid && !isVoid && onlinePaymentAvailable && (
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: 20, marginBottom: 24 }}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 600 }}>Pay Online</h3>
-            {paymentError && <div style={{ color: "#dc2626", fontSize: 13, marginBottom: 12 }}>{paymentError}</div>}
+          <div style={{ marginBottom: 24 }}>
             <button
               type="button"
               onClick={startPayment}
               disabled={loadingPayment}
-              style={{ width: "100%", padding: "12px", background: "#2563eb", color: "#fff", border: "none", borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: loadingPayment ? "wait" : "pointer" }}
+              style={{
+                width: "100%",
+                padding: "14px",
+                background: "#166534",
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                fontSize: 15,
+                fontWeight: 700,
+                cursor: loadingPayment ? "default" : "pointer"
+              }}
             >
-              {loadingPayment ? "Redirecting…" : `Pay ${cents(balance)} by card`}
+              {loadingPayment ? "Starting secure checkout…" : `Pay ${cents(balance)} by card`}
             </button>
-            <p style={{ margin: "10px 0 0", fontSize: 12, color: "#6b7280" }}>
-              You&apos;ll be taken to Square&apos;s secure checkout to complete payment.
-            </p>
+            <div style={{ textAlign: "center", fontSize: 11, color: "#78716c", marginTop: 8 }}>Secure payment powered by Square</div>
+            {paymentError && <div style={{ color: "#b91c1c", fontSize: 13, marginTop: 8, textAlign: "center" }}>{paymentError}</div>}
           </div>
         )}
 
+        <div style={{ textAlign: "center", fontSize: 12, color: "#a8a29e" }}>
+          Contact {invoice.account_name} about this invoice.
+        </div>
       </div>
     </div>
   );

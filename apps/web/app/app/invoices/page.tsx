@@ -157,28 +157,18 @@ export default async function InvoicesPage() {
       {invoices.length > 0 && <MetricGrid metrics={metrics} />}
 
       {priorityInvoice && (
-        <Card style={{ marginBottom: "var(--space-4)" }} data-testid="billing-queue-card">
-          <SectionHeader title="Billing Queue" />
+        <Card style={{ marginBottom: "var(--space-4)", background: "var(--color-red-50)", borderColor: "var(--color-danger)" }} data-testid="billing-queue-card">
           <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap", alignItems: "center" }}>
-            <div style={{ minWidth: 240, flex: "1 1 320px" }}>
-              <p style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 700 }}>
-                {priorityLabel}
-              </p>
-              <p style={{ margin: "var(--space-1) 0 0", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-                {priorityInvoice.invoice_number}{priorityInvoice.client_name ? ` · ${priorityInvoice.client_name}` : ""}
-              </p>
-              <p style={{ margin: "var(--space-1) 0 0", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-                {priorityInvoice.due_date ? `Due ${new Date(priorityInvoice.due_date).toLocaleDateString()}` : "No due date set"}
-              </p>
+            <div>
+              <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--color-danger)", letterSpacing: "0.04em" }}>BILLING QUEUE — ACTION NEEDED</div>
+              <div style={{ fontSize: "var(--text-lg)", fontWeight: 700, marginTop: 2 }}>{priorityLabel}</div>
+              <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: 2 }}>
+                {priorityInvoice.invoice_number} · {priorityInvoice.client_name ?? "Client"} · {priorityInvoice.due_date ? new Date(priorityInvoice.due_date).toLocaleDateString() : "No due date"}
+              </div>
             </div>
-            <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
-              <LinkButton href={(`/app/invoices/${priorityInvoice.id}`) as Route} variant="primary" size="sm">
-                Open Invoice →
-              </LinkButton>
-              <LinkButton href="/app/invoices" variant="secondary" size="sm">
-                View Queue
-              </LinkButton>
-            </div>
+            <LinkButton href={(`/app/invoices/${priorityInvoice.id}`) as Route} variant="primary" size="sm">
+              Open &amp; Collect →
+            </LinkButton>
           </div>
         </Card>
       )}
@@ -210,39 +200,28 @@ export default async function InvoicesPage() {
                     href={`/app/invoices/${inv.id}`}
                     title={inv.invoice_number}
                     titleBadge={
-                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-                        {inv.client_name && (
-                          <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-                            — {inv.client_name}
-                          </span>
-                        )}
-                      </div>
+                      inv.client_name ? (
+                        <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>· {inv.client_name}</span>
+                      ) : null
                     }
                     meta={
-                      inv.due_date && (
-                        <span
-                          style={{
-                            color: isOverdue ? "var(--color-danger)" : isDueSoon ? "var(--color-warning)" : "var(--fg-muted)",
-                            fontSize: "var(--text-sm)",
-                          }}
-                        >
-                          {aging || `Due: ${new Date(inv.due_date).toLocaleDateString()}`}
-                        </span>
-                      )
+                      <span style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", fontSize: "var(--text-sm)" }}>
+                        {inv.due_date && (
+                          <span style={{ color: isOverdue ? "var(--color-danger)" : isDueSoon ? "var(--color-warning)" : "var(--fg-muted)" }}>
+                            {aging || `Due ${new Date(inv.due_date).toLocaleDateString()}`}
+                          </span>
+                        )}
+                        <span style={{ color: "var(--fg-muted)" }}>·</span>
+                        <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}>{formatDollars(inv.total_cents)}</span>
+                        {amountDue > 0 && (
+                          <span style={{ color: "var(--color-danger)", fontFamily: "var(--font-mono)" }}>
+                            {formatDollars(amountDue)} due
+                          </span>
+                        )}
+                      </span>
                     }
                     overdue={isOverdue && inv.status !== "overdue"}
-                    actions={
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontWeight: "var(--font-semibold)", fontSize: "var(--text-sm)" }}>
-                          {formatDollars(inv.total_cents)}
-                        </div>
-                        {amountDue > 0 && amountDue !== inv.total_cents && (
-                          <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                            {formatDollars(amountDue)} due
-                          </div>
-                        )}
-                      </div>
-                    }
+                    actions={null}
                     data-testid="invoice-card"
                   />
                 );

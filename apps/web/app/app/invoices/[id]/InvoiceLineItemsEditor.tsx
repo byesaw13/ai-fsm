@@ -48,6 +48,10 @@ function centsToDollars(cents: number): string {
   return (cents / 100).toFixed(2);
 }
 
+function formatDollars(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
 export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -79,11 +83,12 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
 
   async function addLineItem(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!draft.description.trim()) return;
     await request(`/api/v1/invoices/${invoiceId}/line-items`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        description: draft.description,
+        description: draft.description.trim(),
         quantity: Number(draft.quantity),
         unit_price_cents: dollarsToCents(draft.unit_price),
         line_item_type: draft.line_item_type,
@@ -92,20 +97,22 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
     setDraft({ description: "", quantity: "1", unit_price: "0.00", line_item_type: "labor" });
   }
 
-  async function updateLineItem(item: LineItem, formData: FormData) {
+  async function updateLineItem(item: LineItem, updates: Partial<LineItem>) {
+    // Backend expects the full validated schema on PATCH; merge with current values.
     await request(`/api/v1/invoices/${invoiceId}/line-items/${item.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        description: String(formData.get("description") ?? ""),
-        quantity: Number(formData.get("quantity") ?? 0),
-        unit_price_cents: dollarsToCents(String(formData.get("unit_price") ?? "0")),
-        line_item_type: String(formData.get("line_item_type") ?? item.line_item_type),
+        description: updates.description ?? item.description,
+        quantity: updates.quantity ?? item.quantity,
+        unit_price_cents: updates.unit_price_cents ?? item.unit_price_cents,
+        line_item_type: updates.line_item_type ?? item.line_item_type,
       }),
     });
   }
 
   async function deleteLineItem(item: LineItem) {
+    if (!confirm(`Delete "${item.description}"?`)) return;
     await request(`/api/v1/invoices/${invoiceId}/line-items/${item.id}`, { method: "DELETE" });
   }
 
@@ -113,75 +120,227 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
     await request(`/api/v1/invoices/${invoiceId}/labor-from-time`, { method: "POST" });
   }
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }} data-testid="invoice-line-items-editor">
-      {error && <p className="error-inline" data-testid="invoice-line-items-error">{error}</p>}
+  const subtotal = lineItems.reduce((s, i) => s + i.total_cents, 0);
 
-      {jobId && (
-        <button
-          type="button"
-          onClick={laborFromTime}
-          disabled={pending}
-          className="p7-btn p7-btn-secondary"
-          data-testid="invoice-labor-from-time-btn"
-          style={{ alignSelf: "flex-start" }}
-        >
-          Labor from tracked time
-        </button>
+  return (
+    <div data-testid="invoice-line-items-editor">
+      {error && (
+        <div style={{
+          padding: "var(--space-2) var(--space-3)",
+          background: "var(--color-red-50)",
+          color: "var(--color-danger)",
+          borderRadius: "var(--radius-sm)",
+          fontSize: "var(--text-sm)",
+          marginBottom: "var(--space-3)"
+        }} data-testid="invoice-line-items-error">
+          {error}
+        </div>
       )}
 
-      {lineItems.map((item) => (
-        <form
-          key={item.id}
-          action={(formData) => updateLineItem(item, formData)}
-          style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)", alignItems: "end" }}
-          data-testid="invoice-line-item-edit-row"
-        >
-          <label style={{ ...fieldStyle, flex: "3 1 180px" }}>
-            Description
-            <input name="description" defaultValue={item.description} disabled={pending} required className="input" />
-          </label>
-          <label style={{ ...fieldStyle, flex: "2 1 120px" }}>
-            Type
-            <select name="line_item_type" defaultValue={item.line_item_type} disabled={pending} className="input">
-              {TYPES.map((type) => <option key={type} value={type}>{TYPE_LABELS[type]}</option>)}
-            </select>
-          </label>
-          <label style={{ ...fieldStyle, flex: "1 1 70px" }}>
-            Qty
-            <input name="quantity" type="number" min="0.01" step="0.01" defaultValue={item.quantity} disabled={pending} required className="input" />
-          </label>
-          <label style={{ ...fieldStyle, flex: "1 1 90px" }}>
-            Unit price
-            <input name="unit_price" type="number" step="0.01" defaultValue={centsToDollars(item.unit_price_cents)} disabled={pending} required className="input" />
-          </label>
-          <div style={{ display: "flex", gap: "var(--space-1)", flex: "0 0 auto" }}>
-            <button type="submit" disabled={pending} className="p7-btn p7-btn-secondary">Save</button>
-            <button type="button" onClick={() => deleteLineItem(item)} disabled={pending} className="p7-btn p7-btn-secondary" aria-label={`Delete ${item.description}`}>Delete</button>
-          </div>
-        </form>
-      ))}
+      {jobId && (
+        <div style={{ marginBottom: "var(--space-3)" }}>
+          <button
+            type="button"
+            onClick={laborFromTime}
+            disabled={pending}
+            className="p7-btn p7-btn-secondary p7-btn-sm"
+            data-testid="invoice-labor-from-time-btn"
+          >
+            + Pull labor from tracked time
+          </button>
+        </div>
+      )}
 
-      <form onSubmit={addLineItem} style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)", alignItems: "end", paddingTop: "var(--space-2)", borderTop: "1px solid var(--border)" }} data-testid="invoice-line-item-add-form">
-        <label style={{ ...fieldStyle, flex: "3 1 180px" }}>
+      {/* Line items table — sturdy and scannable */}
+      <div className="p7-table-wrapper">
+        <table className="p7-table" style={{ fontSize: "var(--text-sm)" }}>
+          <thead>
+            <tr>
+              <th style={{ width: "28%" }}>Description</th>
+              <th style={{ width: "14%" }}>Type</th>
+              <th style={{ width: "10%", textAlign: "right" }}>Qty</th>
+              <th style={{ width: "18%", textAlign: "right" }}>Unit Price</th>
+              <th style={{ width: "18%", textAlign: "right" }}>Line Total</th>
+              <th style={{ width: "12%" }} aria-label="Actions" />
+            </tr>
+          </thead>
+          <tbody>
+            {lineItems.length === 0 && (
+              <tr>
+                <td colSpan={6} style={{ padding: "var(--space-6)", textAlign: "center", color: "var(--fg-muted)" }}>
+                  No line items yet. Add below.
+                </td>
+              </tr>
+            )}
+
+            {lineItems.map((item) => {
+              const lineTotal = item.total_cents;
+              return (
+                <tr key={item.id} data-testid="invoice-line-item-edit-row">
+                  <td>
+                    <input
+                      type="text"
+                      defaultValue={item.description}
+                      disabled={pending}
+                      className="input"
+                      style={{ width: "100%", fontSize: "inherit", padding: "6px 8px" }}
+                      onBlur={(e) => {
+                        const val = e.target.value.trim();
+                        if (val && val !== item.description) updateLineItem(item, { description: val });
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                      }}
+                    />
+                  </td>
+                  <td>
+                    <select
+                      defaultValue={item.line_item_type}
+                      disabled={pending}
+                      className="input"
+                      style={{ fontSize: "inherit", padding: "6px 6px" }}
+                      onChange={(e) => updateLineItem(item, { line_item_type: e.target.value as LineItemType })}
+                    >
+                      {TYPES.map((t) => (
+                        <option key={t} value={t}>{TYPE_LABELS[t]}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td style={{ textAlign: "right" }}>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      defaultValue={item.quantity}
+                      disabled={pending}
+                      className="input"
+                      style={{ width: 78, textAlign: "right", fontSize: "inherit", padding: "6px 6px" }}
+                      onBlur={(e) => {
+                        const q = Number(e.target.value);
+                        if (!isNaN(q) && q > 0 && q !== item.quantity) updateLineItem(item, { quantity: q });
+                      }}
+                    />
+                  </td>
+                  <td style={{ textAlign: "right", fontFamily: "var(--font-mono)" }}>
+                    <input
+                      type="number"
+                      step="0.01"
+                      defaultValue={centsToDollars(item.unit_price_cents)}
+                      disabled={pending}
+                      className="input"
+                      style={{ width: 92, textAlign: "right", fontSize: "inherit", padding: "6px 6px" }}
+                      onBlur={(e) => {
+                        const c = dollarsToCents(e.target.value);
+                        if (c !== item.unit_price_cents) updateLineItem(item, { unit_price_cents: c });
+                      }}
+                    />
+                  </td>
+                  <td style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontWeight: 600 }}>
+                    {formatDollars(lineTotal)}
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      onClick={() => deleteLineItem(item)}
+                      disabled={pending}
+                      aria-label="Delete line item"
+                      style={{
+                        border: "none", background: "transparent", color: "var(--fg-muted)",
+                        fontSize: 16, lineHeight: 1, cursor: "pointer", padding: "2px 6px"
+                      }}
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr style={{ borderTop: "1px solid var(--border-strong)" }}>
+              <td colSpan={4} style={{ textAlign: "right", fontWeight: 600, paddingTop: "var(--space-2)" }}>Subtotal (items)</td>
+              <td style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontWeight: 700, paddingTop: "var(--space-2)" }}>
+                {formatDollars(subtotal)}
+              </td>
+              <td />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      {/* Add new line — always available, commits cleanly */}
+      <form
+        onSubmit={addLineItem}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "3fr 1.4fr 0.9fr 1.1fr 1.1fr auto",
+          gap: "var(--space-2)",
+          alignItems: "end",
+          marginTop: "var(--space-3)",
+          paddingTop: "var(--space-3)",
+          borderTop: "1px solid var(--border)"
+        }}
+        data-testid="invoice-line-item-add-form"
+      >
+        <label style={fieldStyle}>
           Description
-          <input value={draft.description} onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))} disabled={pending} required className="input" />
+          <input
+            value={draft.description}
+            onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+            placeholder="Describe the work or material"
+            disabled={pending}
+            required
+            className="input"
+          />
         </label>
-        <label style={{ ...fieldStyle, flex: "2 1 120px" }}>
+        <label style={fieldStyle}>
           Type
-          <select value={draft.line_item_type} onChange={(e) => setDraft((d) => ({ ...d, line_item_type: e.target.value as LineItemType }))} disabled={pending} className="input">
+          <select
+            value={draft.line_item_type}
+            onChange={(e) => setDraft((d) => ({ ...d, line_item_type: e.target.value as LineItemType }))}
+            disabled={pending}
+            className="input"
+          >
             {TYPES.map((type) => <option key={type} value={type}>{TYPE_LABELS[type]}</option>)}
           </select>
         </label>
-        <label style={{ ...fieldStyle, flex: "1 1 70px" }}>
+        <label style={fieldStyle}>
           Qty
-          <input type="number" min="0.01" step="0.01" value={draft.quantity} onChange={(e) => setDraft((d) => ({ ...d, quantity: e.target.value }))} disabled={pending} required className="input" />
+          <input
+            type="number"
+            step="0.01"
+            min="0.01"
+            value={draft.quantity}
+            onChange={(e) => setDraft((d) => ({ ...d, quantity: e.target.value }))}
+            disabled={pending}
+            className="input"
+          />
         </label>
-        <label style={{ ...fieldStyle, flex: "1 1 90px" }}>
+        <label style={fieldStyle}>
           Unit price
-          <input type="number" step="0.01" value={draft.unit_price} onChange={(e) => setDraft((d) => ({ ...d, unit_price: e.target.value }))} disabled={pending} required className="input" />
+          <input
+            type="number"
+            step="0.01"
+            value={draft.unit_price}
+            onChange={(e) => setDraft((d) => ({ ...d, unit_price: e.target.value }))}
+            disabled={pending}
+            className="input"
+          />
         </label>
-        <button type="submit" disabled={pending} className="p7-btn p7-btn-primary" style={{ flex: "0 0 auto" }}>Add</button>
+
+        <button
+          type="submit"
+          disabled={pending || !draft.description.trim()}
+          className="p7-btn p7-btn-primary"
+          style={{ height: 38 }}
+        >
+          Add line
+        </button>
+
+        <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", paddingBottom: 4 }}>
+          Live totals update on save
+        </div>
       </form>
     </div>
   );
