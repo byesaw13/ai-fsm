@@ -5,7 +5,9 @@ import { getSession } from "@/lib/auth/session";
 import { query, queryForSession } from "@/lib/db";
 import { isSameCalendarDay, isVisitOverdue, formatOverdueLabel } from "@/lib/visits/p7";
 import { VISIT_STATUS_LABELS } from "@/lib/visits/triage";
+import { pickHeroVisit, excludeHeroVisit } from "@/lib/my-day/visit-hero";
 import { MyDayView } from "./MyDayView";
+import { NextVisitHero } from "./NextVisitHero";
 import { ManualSiteVisitButton } from "../ManualSiteVisitButton";
 import { LocationCaptureControl } from "../LocationCaptureControl";
 import { WorkdayPanel } from "../WorkdayPanel";
@@ -21,6 +23,7 @@ type VisitRow = Visit & {
   job_title: string | null;
   assigned_user_name: string | null;
   client_name: string | null;
+  client_phone: string | null;
   property_address: string | null;
   job_type: string | null;
   job_description: string | null;
@@ -48,6 +51,7 @@ export default async function MyDayPage() {
         j.description AS job_description,
         u.full_name AS assigned_user_name,
         c.name AS client_name,
+        c.phone AS client_phone,
         p.address AS property_address
      FROM visits v
      LEFT JOIN jobs j ON j.id = v.job_id
@@ -170,6 +174,8 @@ export default async function MyDayPage() {
   const pendingToday = todayVisits.filter(
     (v) => v.status !== "completed" && v.status !== "cancelled"
   );
+  const heroVisit = pickHeroVisit(pendingToday, now.getTime());
+  const listVisits = excludeHeroVisit(pendingToday, heroVisit?.id ?? null);
   // Wrap the callback — passing isVisitOverdue directly makes Array.filter hand
   // it the element index as its `nowMs` arg, which silently emptied this list.
   const overdueVisits = todayVisits.filter((v) => isVisitOverdue(v));
@@ -246,6 +252,12 @@ export default async function MyDayPage() {
         </Link>
       )}
 
+      {heroVisit && (
+        <div style={{ marginBottom: "var(--space-4)" }}>
+          <NextVisitHero visit={heroVisit} />
+        </div>
+      )}
+
       {/* Field workday: Start/End Day, vehicle, activity, mileage (EPIC-006) */}
       <div style={{ marginBottom: "var(--space-6)" }}>
         <WorkdayPanel
@@ -266,7 +278,7 @@ export default async function MyDayPage() {
         />
       ) : (
         <MyDayView
-          visits={pendingToday}
+          visits={listVisits}
           completedVisits={completedToday}
           upcomingVisits={upcomingVisits}
           pastOverdueVisits={pastOverdueVisits}

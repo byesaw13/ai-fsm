@@ -89,9 +89,9 @@ function VisitCard({
   transitioning: string | null;
 }) {
   const overdue = isOverdue(visit);
-  const isTech = role === "tech";
-  const canStart = isTech && visit.status === "scheduled";
-  const canComplete = isTech && (visit.status === "arrived" || visit.status === "in_progress");
+  const isFieldRole = role === "tech" || role === "owner";
+  const canStart = isFieldRole && visit.status === "scheduled";
+  const canComplete = isFieldRole && (visit.status === "arrived" || visit.status === "in_progress");
 
   return (
     <Card
@@ -170,8 +170,8 @@ function VisitCard({
         </p>
       )}
 
-      {/* Action buttons — only for tech */}
-      {isTech && (
+      {/* Action buttons — field roles (tech + owner) */}
+      {isFieldRole && (
         <div style={{ marginTop: "var(--space-3)", display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           {/* Primary action: Start or Complete */}
           {(canStart || canComplete) && (
@@ -303,12 +303,7 @@ function VisitCard({
         </div>
       )}
 
-      {/* For non-techs, just show link */}
-      {!isTech && (
-        <Link href={`/app/visits/${visit.id}` as Route} style={{ fontSize: "var(--text-sm)", color: "var(--color-primary)" }}>
-          View details →
-        </Link>
-      )}
+
     </Card>
   );
 }
