@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Executor, Session } from "../types.js";
-import { money, durationMinutes, todayIso } from "../money.js";
+import { money } from "../money.js";
+import { durationMinutes, todayIso } from "../utils.js";
 import type { ToolModule } from "./types.js";
 
 const inputShape = {

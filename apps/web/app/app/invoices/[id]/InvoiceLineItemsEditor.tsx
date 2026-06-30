@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatCents, parseDollarsToCents } from "@ai-fsm/money";
 
 type LineItemType = "labor" | "materials" | "handling_fee" | "adjustment";
 
@@ -40,16 +41,8 @@ const fieldStyle: React.CSSProperties = {
   minWidth: 0,
 };
 
-function dollarsToCents(value: string): number {
-  return Math.round(Number(value || 0) * 100);
-}
-
 function centsToDollars(cents: number): string {
   return (cents / 100).toFixed(2);
-}
-
-function formatDollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
 }
 
 export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
@@ -90,7 +83,7 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
       body: JSON.stringify({
         description: draft.description.trim(),
         quantity: Number(draft.quantity),
-        unit_price_cents: dollarsToCents(draft.unit_price),
+        unit_price_cents: parseDollarsToCents(draft.unit_price),
         line_item_type: draft.line_item_type,
       }),
     });
@@ -106,7 +99,7 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
     return {
       description: get("description").trim(),
       quantity: Number(get("quantity")),
-      unit_price_cents: dollarsToCents(get("price")),
+      unit_price_cents: parseDollarsToCents(get("price")),
       line_item_type: get("type") as LineItemType,
     };
   }
@@ -249,7 +242,7 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
                     />
                   </td>
                   <td style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontWeight: 600 }}>
-                    {formatDollars(lineTotal)}
+                    {formatCents(lineTotal)}
                   </td>
                   <td>
                     <button
@@ -289,7 +282,7 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
             <tr style={{ borderTop: "1px solid var(--border-strong)" }}>
               <td colSpan={4} style={{ textAlign: "right", fontWeight: 600, paddingTop: "var(--space-2)" }}>Subtotal (items)</td>
               <td style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontWeight: 700, paddingTop: "var(--space-2)" }}>
-                {formatDollars(subtotal)}
+                {formatCents(subtotal)}
               </td>
               <td />
             </tr>

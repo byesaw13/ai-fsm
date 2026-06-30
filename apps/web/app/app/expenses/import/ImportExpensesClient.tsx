@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, useToast } from "@/components/ui";
+import { formatCents } from "@ai-fsm/money";
 
 type LineItem = { sku: string | null; name: string; category: string; unit_cost_cents: number; quantity: number };
 type Txn = {
@@ -22,10 +23,6 @@ type Summary = {
   returns_skipped: number; total_cents: number; material_lines: number;
 };
 type JobOption = { id: string; title: string };
-
-function dollars(cents: number): string {
-  return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
 
 export function ImportExpensesClient() {
   const router = useRouter();
@@ -145,7 +142,7 @@ export function ImportExpensesClient() {
         <Card>
           <div style={{ display: "flex", gap: "var(--space-6)", flexWrap: "wrap", fontSize: "var(--text-sm)" }}>
             <Stat label="New to import" value={String(summary.new_importable)} accent="var(--accent)" />
-            <Stat label="Total" value={dollars(summary.total_cents)} />
+            <Stat label="Total" value={formatCents(summary.total_cents)} />
             <Stat label="Material prices" value={String(summary.material_lines)} />
             <Stat label="Already imported" value={String(summary.duplicates)} muted />
             <Stat label="Returns skipped" value={String(summary.returns_skipped)} muted />
@@ -177,7 +174,7 @@ export function ImportExpensesClient() {
                       <td style={{ padding: "var(--space-2) var(--space-3)", whiteSpace: "nowrap" }}>{t.date}</td>
                       <td style={{ padding: "var(--space-2) var(--space-3)" }}>{t.job_name ?? <span style={{ color: "var(--fg-muted)" }}>—</span>}</td>
                       <td style={{ padding: "var(--space-2) var(--space-3)" }}>{t.line_items.length}</td>
-                      <td style={{ padding: "var(--space-2) var(--space-3)", whiteSpace: "nowrap", fontWeight: 600 }}>{dollars(t.amount_cents)}</td>
+                      <td style={{ padding: "var(--space-2) var(--space-3)", whiteSpace: "nowrap", fontWeight: 600 }}>{formatCents(t.amount_cents)}</td>
                       <td style={{ padding: "var(--space-2) var(--space-3)", textTransform: "capitalize" }}>{t.expense_category}</td>
                       <td style={{ padding: "var(--space-2) var(--space-3)" }}>
                         {inactive ? <span style={{ color: "var(--fg-muted)" }}>—</span> : (

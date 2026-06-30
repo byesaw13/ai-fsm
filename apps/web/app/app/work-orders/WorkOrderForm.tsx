@@ -7,6 +7,7 @@ import { Button, useToast } from "@/components/ui";
 import { MaterialsMetadata, type MaterialsMetadata as MaterialsMetadataShape } from "@/app/app/estimates/components/MaterialsMetadata";
 import type { WorkOrderDraft, WorkOrderRoomLine } from "@ai-fsm/domain";
 import { materialItemsToDraft } from "@ai-fsm/domain";
+import { formatCents } from "@ai-fsm/money";
 
 // TASK-018 slice 3: create/edit a work order. Everything is editable; materials
 // can be AI-suggested (owner confirms/edits) or added by hand.
@@ -40,10 +41,6 @@ export interface WorkOrderFormProps {
     materials: MaterialRow[];
     status: (typeof STATUS_OPTIONS)[number];
   };
-}
-
-function dollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
 }
 
 export function WorkOrderForm(props: WorkOrderFormProps) {
@@ -211,7 +208,7 @@ export function WorkOrderForm(props: WorkOrderFormProps) {
 
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)" }}>
-          <label style={{ ...labelStyle, marginBottom: 0 }}>Materials · {dollars(total)}</label>
+          <label style={{ ...labelStyle, marginBottom: 0 }}>Materials · {formatCents(total)}</label>
           <div style={{ display: "flex", gap: "var(--space-2)" }}>
             <Button size="sm" variant="ghost" loading={suggesting} onClick={suggestMaterials}>Suggest materials</Button>
             <Button size="sm" variant="ghost" onClick={() => setMaterials((m) => [...m, { description: "", quantity: 1, unit_price_cents: 0, total_cents: 0 }])}>+ Add</Button>
@@ -227,7 +224,7 @@ export function WorkOrderForm(props: WorkOrderFormProps) {
               <input style={{ ...inputStyle, width: 90 }} type="number" min={0} placeholder="$ each"
                 value={(m.unit_price_cents / 100).toString()}
                 onChange={(e) => updateMaterial(i, { unit_price_cents: Math.round((parseFloat(e.target.value) || 0) * 100) })} />
-              <span style={{ width: 80, textAlign: "right", fontSize: "var(--text-sm)" }}>{dollars(m.total_cents)}</span>
+              <span style={{ width: 80, textAlign: "right", fontSize: "var(--text-sm)" }}>{formatCents(m.total_cents)}</span>
               <button type="button" aria-label="Remove" onClick={() => setMaterials((rows) => rows.filter((_, idx) => idx !== i))}
                 style={{ border: "none", background: "none", cursor: "pointer", color: "var(--fg-muted)", fontSize: 18 }}>×</button>
             </div>
