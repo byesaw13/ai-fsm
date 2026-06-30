@@ -97,17 +97,35 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
     setDraft({ description: "", quantity: "1", unit_price: "0.00", line_item_type: "labor" });
   }
 
-  async function updateLineItem(item: LineItem, updates: Partial<LineItem>) {
-    // Backend expects the full validated schema on PATCH; merge with current values.
+  // Read the whole row's current (uncommitted) input values, so a PATCH always
+  // sends the latest of every field together. Per-field merges against the
+  // `item` prop are stale until a refresh lands, so a second edit could revert
+  // the first; reading the live DOM avoids that.
+  function readRow(tr: HTMLTableRowElement) {
+    const get = (f: string) => tr.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-f="${f}"]`)?.value ?? "";
+    return {
+      description: get("description").trim(),
+      quantity: Number(get("quantity")),
+      unit_price_cents: dollarsToCents(get("price")),
+      line_item_type: get("type") as LineItemType,
+    };
+  }
+
+  async function commitRow(item: LineItem, el: HTMLElement) {
+    const tr = el.closest("tr");
+    if (!tr) return;
+    const v = readRow(tr as HTMLTableRowElement);
+    if (!v.description || isNaN(v.quantity) || v.quantity <= 0) return; // invalid — leave as-is
+    const unchanged =
+      v.description === item.description &&
+      v.quantity === item.quantity &&
+      v.unit_price_cents === item.unit_price_cents &&
+      v.line_item_type === item.line_item_type;
+    if (unchanged) return;
     await request(`/api/v1/invoices/${invoiceId}/line-items/${item.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        description: updates.description ?? item.description,
-        quantity: updates.quantity ?? item.quantity,
-        unit_price_cents: updates.unit_price_cents ?? item.unit_price_cents,
-        line_item_type: updates.line_item_type ?? item.line_item_type,
-      }),
+      body: JSON.stringify(v),
     });
   }
 
@@ -180,14 +198,12 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
                   <td>
                     <input
                       type="text"
+                      data-f="description"
                       defaultValue={item.description}
                       disabled={pending}
                       className="input"
                       style={{ width: "100%", fontSize: "inherit", padding: "6px 8px" }}
-                      onBlur={(e) => {
-                        const val = e.target.value.trim();
-                        if (val && val !== item.description) updateLineItem(item, { description: val });
-                      }}
+                      onBlur={(e) => commitRow(item, e.target)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                       }}
@@ -195,11 +211,12 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
                   </td>
                   <td>
                     <select
+                      data-f="type"
                       defaultValue={item.line_item_type}
                       disabled={pending}
                       className="input"
                       style={{ fontSize: "inherit", padding: "6px 6px" }}
-                      onChange={(e) => updateLineItem(item, { line_item_type: e.target.value as LineItemType })}
+                      onChange={(e) => commitRow(item, e.target)}
                     >
                       {TYPES.map((t) => (
                         <option key={t} value={t}>{TYPE_LABELS[t]}</option>
@@ -211,28 +228,24 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
                       type="number"
                       step="0.01"
                       min="0.01"
+                      data-f="quantity"
                       defaultValue={item.quantity}
                       disabled={pending}
                       className="input"
                       style={{ width: 78, textAlign: "right", fontSize: "inherit", padding: "6px 6px" }}
-                      onBlur={(e) => {
-                        const q = Number(e.target.value);
-                        if (!isNaN(q) && q > 0 && q !== item.quantity) updateLineItem(item, { quantity: q });
-                      }}
+                      onBlur={(e) => commitRow(item, e.target)}
                     />
                   </td>
                   <td style={{ textAlign: "right", fontFamily: "var(--font-mono)" }}>
                     <input
                       type="number"
                       step="0.01"
+                      data-f="price"
                       defaultValue={centsToDollars(item.unit_price_cents)}
                       disabled={pending}
                       className="input"
                       style={{ width: 92, textAlign: "right", fontSize: "inherit", padding: "6px 6px" }}
-                      onBlur={(e) => {
-                        const c = dollarsToCents(e.target.value);
-                        if (c !== item.unit_price_cents) updateLineItem(item, { unit_price_cents: c });
-                      }}
+                      onBlur={(e) => commitRow(item, e.target)}
                     />
                   </td>
                   <td style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontWeight: 600 }}>

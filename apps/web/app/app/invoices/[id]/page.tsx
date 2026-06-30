@@ -133,7 +133,10 @@ export default async function InvoiceDetailPage({
     (s) => s !== "paid" && s !== "partial" && (s !== "draft" || invoice.paid_cents === 0)
   );
   const canTransition = canCreateInvoices(session.role);
-  const amountDue = invoice.total_cents - invoice.paid_cents;
+  // balance_cents already credits the deposit (= total - deposit). Subtracting
+  // payments gives what the client still owes — do NOT use total - paid, which
+  // would ignore the deposit credit and over-state the amount owed.
+  const amountDue = invoice.balance_cents - invoice.paid_cents;
   const depositPending = invoice.deposit_cents > 0 && !invoice.deposit_paid_at;
   const canMarkDeposit = canTransition && !["paid", "void"].includes(currentStatus);
   const canRecordPaymentAction = canRecordPayments(session.role) && ["sent", "partial", "overdue"].includes(currentStatus) && amountDue > 0;
