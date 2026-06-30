@@ -4,6 +4,7 @@ import { withAuth, type AuthSession } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { ACTIVITY_TYPES, ACTIVITY_ENTITY_TYPES, activityCategoryFor } from "@ai-fsm/domain";
+import { applyRebalance } from "@/lib/activities/rebalance";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,13 @@ function err(code: string, message: string, status: number, traceId: string, ext
   return NextResponse.json({ error: { code, message, traceId, ...(extra ?? {}) } }, { status });
 }
 
+const rebalanceSchema = z.array(z.object({
+  id: z.string().uuid(),
+  started_at: z.string().datetime().optional(),
+  ended_at: z.string().datetime().optional(),
+  delete: z.boolean().optional(),
+})).optional();
+
 const confirmSchema = z
   .object({
     action: z.literal("confirm"),
@@ -30,6 +38,7 @@ const confirmSchema = z
     entity_type: z.enum(ACTIVITY_ENTITY_TYPES).nullish(),
     entity_id: z.string().uuid().nullish(),
     note: z.string().max(500).nullish(),
+    rebalance: rebalanceSchema,
   })
   .refine((d) => (d.entity_type == null) === (d.entity_id == null), {
     message: "entity_type and entity_id must be set together",
@@ -202,7 +211,7 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
        LIMIT 1`,
       [session.accountId, seg.started_at, seg.ended_at],
     );
-    if (overlap.length > 0) {
+    if (overlap.length > 0 && !d.rebalance?.length) {
       await client.query("ROLLBACK");
       return err(
         "CONFLICT",
@@ -233,6 +242,12 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       ],
     );
     const entryId = ins[0].id;
+
+    await applyRebalance(
+      client,
+      { accountId: session.accountId, userId: session.userId, traceId: session.traceId },
+      d.rebalance,
+    );
 
     await client.query(
       `UPDATE location_segments

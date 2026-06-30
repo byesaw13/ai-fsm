@@ -31,6 +31,7 @@ vi.mock("@/lib/db/audit", () => ({
 import { PATCH as editActivity, DELETE as deleteActivity } from "../[id]/route";
 import { POST as splitActivity } from "../[id]/split/route";
 import { POST as insertActivity } from "../insert/route";
+import { PATCH as patchSegment } from "../segments/[id]/route";
 
 const EXISTING = {
   id: "11111111-1111-1111-1111-111111111111",
@@ -210,5 +211,67 @@ describe("POST /api/v1/activities/insert", () => {
       ended_at: "2026-06-11T14:00:00.000Z",
     }));
     expect(res.status).toBe(400);
+  });
+});
+
+
+const SEGMENT_ID = "33333333-3333-3333-3333-333333333333";
+const MANUAL_ID = "44444444-4444-4444-4444-444444444444";
+
+const PROVISIONAL_SEGMENT = {
+  id: SEGMENT_ID,
+  kind: "stop",
+  segment_date: "2026-06-11",
+  started_at: "2026-06-11T12:00:00.000Z",
+  ended_at: "2026-06-11T13:00:00.000Z",
+  place_label: "Smith kitchen",
+  status: "provisional",
+  activity_entry_id: null,
+  vehicle_session_id: null,
+};
+
+describe("PATCH /api/v1/activities/segments/[id]", () => {
+  it("keeps rejecting overlap without an accepted rebalance", async () => {
+    mockClientQuery.mockImplementation((sql: string) => {
+      if (sql.includes("FROM location_segments")) return Promise.resolve({ rows: [PROVISIONAL_SEGMENT] });
+      if (sql.includes("FROM activity_entries") && sql.includes("LIMIT 1")) {
+        return Promise.resolve({ rows: [{ id: MANUAL_ID }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const res = await patchSegment(req(`/api/v1/activities/segments/${SEGMENT_ID}`, "PATCH", {
+      action: "confirm",
+      activity_type: "job_work",
+    }));
+
+    expect(res.status).toBe(409);
+  });
+
+  it("confirms an overlapping segment when rebalance is accepted and audits the replaced manual row", async () => {
+    mockClientQuery.mockImplementation((sql: string) => {
+      if (sql.includes("FROM location_segments")) return Promise.resolve({ rows: [PROVISIONAL_SEGMENT] });
+      if (sql.includes("FROM activity_entries") && sql.includes("LIMIT 1")) {
+        return Promise.resolve({ rows: [{ id: MANUAL_ID }] });
+      }
+      if (sql.startsWith("INSERT INTO activity_entries")) return Promise.resolve({ rows: [{ id: "new-segment-entry" }] });
+      if (sql.startsWith("DELETE FROM activity_entries")) {
+        return Promise.resolve({ rows: [{ ...EXISTING, id: MANUAL_ID }] });
+      }
+      return Promise.resolve({ rows: [] });
+    });
+
+    const res = await patchSegment(req(`/api/v1/activities/segments/${SEGMENT_ID}`, "PATCH", {
+      action: "confirm",
+      activity_type: "job_work",
+      rebalance: [{ id: MANUAL_ID, delete: true }],
+    }));
+
+    expect(res.status).toBe(200);
+    expect(mockAppendAuditLog).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      entity_type: "activity_entry",
+      entity_id: MANUAL_ID,
+      action: "delete",
+    }));
   });
 });
