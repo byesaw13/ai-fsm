@@ -14,6 +14,8 @@ const completionPacketBody = z.object({
   signature_url: z.string().url().nullable().optional(),
   signature_waiver: z.boolean().default(false),
   notes: z.string().max(2000).nullable().optional(),
+  photos_waived: z.boolean().default(false),
+  photos_waiver_reason: z.string().max(500).nullable().optional(),
 });
 
 export const PATCH = withAuth(async (request: NextRequest, session: AuthSession) => {
@@ -36,6 +38,22 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
           code: "VALIDATION_ERROR",
           message: "Invalid request body",
           details: parsed.error.flatten().fieldErrors,
+          traceId: session.traceId,
+        },
+      },
+      { status: 422 }
+    );
+  }
+
+  const data = parsed.data;
+
+  // Light validation: waived requires reason. UI primarily enforces; this is defensive.
+  if (data.photos_waived && !data.photos_waiver_reason?.trim()) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "photos_waiver_reason is required when photos_waived is true",
           traceId: session.traceId,
         },
       },
@@ -77,17 +95,19 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       );
     }
 
-    const data = parsed.data;
     const result = await client.query(
       `INSERT INTO completion_packets (
-         account_id, visit_id, photo_urls, signature_url, signature_waiver, notes, created_by
+         account_id, visit_id, photo_urls, signature_url, signature_waiver, notes,
+         photos_waived, photos_waiver_reason, created_by
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (visit_id) DO UPDATE
        SET photo_urls = EXCLUDED.photo_urls,
            signature_url = EXCLUDED.signature_url,
            signature_waiver = EXCLUDED.signature_waiver,
-           notes = EXCLUDED.notes
+           notes = EXCLUDED.notes,
+           photos_waived = EXCLUDED.photos_waived,
+           photos_waiver_reason = EXCLUDED.photos_waiver_reason
        RETURNING *`,
       [
         session.accountId,
@@ -96,6 +116,8 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
         data.signature_url || null,
         data.signature_waiver,
         data.notes || null,
+        data.photos_waived ?? false,
+        data.photos_waiver_reason || null,
         session.userId,
       ]
     );
