@@ -1,3 +1,5 @@
+import { formatCents } from "@ai-fsm/money";
+
 /**
  * Canonical deposit/final billing reconciliation.
  *
@@ -36,10 +38,6 @@ export interface FinalInvoiceReconciliation {
   reconciliationNote: string | null;
 }
 
-function dollars(cents: number): string {
-  return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
 /**
  * Compute how a final invoice should credit deposits already billed.
  *
@@ -65,8 +63,8 @@ export function reconcileFinalInvoice(input: {
   if (depositCreditCents > 0) {
     const refs = liveDeposits.map((d) => d.invoice_number).join(", ");
     reconciliationNote =
-      `Project total ${dollars(invoiceTotalCents)} less deposit already invoiced ` +
-      `${dollars(depositCreditCents)} (${refs}). Balance due ${dollars(balanceDueCents)}.`;
+      `Project total ${formatCents(invoiceTotalCents)} less deposit already invoiced ` +
+      `${formatCents(depositCreditCents)} (${refs}). Balance due ${formatCents(balanceDueCents)}.`;
   }
 
   return {

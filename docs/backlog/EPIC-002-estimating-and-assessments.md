@@ -164,5 +164,5 @@ warranty tracking, opportunities, and invoice generation from a work order.
 
 ## Completed
 
-- [TASK-006: Assessment → Materials Generator Context](done/TASK-006-assessment-to-materials-generator-context.md) — Done
-- [TASK-007: Assessment → Estimate Context](done/TASK-007-assessment-to-estimate-context.md) — Done
+- [TASK-006: Assessment → Materials Generator Context](../archive/backlog-done/TASK-006-assessment-to-materials-generator-context.md) — Done
+- [TASK-007: Assessment → Estimate Context](../archive/backlog-done/TASK-007-assessment-to-estimate-context.md) — Done

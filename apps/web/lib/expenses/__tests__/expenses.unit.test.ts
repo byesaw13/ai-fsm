@@ -4,11 +4,7 @@ import {
   EXPENSE_CATEGORY_LABELS,
   expenseCategorySchema,
 } from "@ai-fsm/domain";
-import {
-  parseDollarsToCents,
-  formatCentsToDollars,
-  isValidCategory,
-} from "../math";
+import { isValidCategory } from "../math";
 import {
   canManageExpenses,
   canViewExpenses,
@@ -63,48 +59,6 @@ describe("isValidCategory", () => {
     expect(isValidCategory("random")).toBe(false);
     expect(isValidCategory("")).toBe(false);
     expect(isValidCategory("FUEL")).toBe(false);
-  });
-});
-
-// ===
-// Money math
-// ===
-
-describe("parseDollarsToCents", () => {
-  it("converts dollar string to cents", () => {
-    expect(parseDollarsToCents("12.50")).toBe(1250);
-    expect(parseDollarsToCents("100")).toBe(10000);
-    expect(parseDollarsToCents("0.01")).toBe(1);
-  });
-
-  it("rounds to nearest cent", () => {
-    // 1.005 in IEEE-754 is stored as ~1.00499... so Math.round gives 100
-    expect(parseDollarsToCents("1.005")).toBe(100);
-    expect(parseDollarsToCents("1.004")).toBe(100);
-    // Use a value that genuinely rounds up
-    expect(parseDollarsToCents("1.006")).toBe(101);
-  });
-
-  it("returns 0 for empty string", () => {
-    expect(parseDollarsToCents("")).toBe(0);
-  });
-
-  it("returns 0 for non-numeric input", () => {
-    expect(parseDollarsToCents("abc")).toBe(0);
-    expect(parseDollarsToCents("$10")).toBe(0);
-  });
-
-  it("returns 0 for negative values", () => {
-    expect(parseDollarsToCents("-5")).toBe(0);
-  });
-});
-
-describe("formatCentsToDollars", () => {
-  it("formats cents to dollar string with 2 decimal places", () => {
-    expect(formatCentsToDollars(1250)).toBe("$12.50");
-    expect(formatCentsToDollars(10000)).toBe("$100.00");
-    expect(formatCentsToDollars(1)).toBe("$0.01");
-    expect(formatCentsToDollars(0)).toBe("$0.00");
   });
 });
 
