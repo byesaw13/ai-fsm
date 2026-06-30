@@ -16,7 +16,8 @@ task is added to this backlog first.** If nothing fits, add a `Proposed` task
 can be the first step of the same effort, but the task must exist before the
 work.
 
-A task closes when its acceptance criteria are met — it then moves to `done/`.
+A task closes when its acceptance criteria are met — it then moves to
+`docs/archive/backlog-done/`.
 Do not keep a task open because new ideas surfaced during the build; new ideas
 become new tasks, which earn their place only after the shipped feature proves
 its value in use.
@@ -75,10 +76,10 @@ this rule is the check.
 - `EPIC-006-role-based-workspaces.md`
 - `EPIC-007-location-intelligence.md` — **Field Execution**: *how a technician experiences the field* (Location Intelligence is one subsystem inside it).
 - `EPIC-008-production-intelligence.md` — deliberate stub (PI-002, PI-006 only).
-- `done/` — completed tasks, moved out of the active epics.
+- `docs/archive/backlog-done/` — completed tasks, archived out of the active epics.
 
 Each epic file lists its **active** tasks in full and links to its **completed**
-tasks in `done/`.
+tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
@@ -162,13 +163,13 @@ Next available ID: **TASK-070**.
 | `Proposed` | Idea captured; not yet committed or scoped for build. |
 | `Ready` | Scoped and ready to pick up. |
 | `In Progress` | Actively being built. |
-| `Done` | Shipped. Lives in `done/`. |
+| `Done` | Shipped. Lives in `docs/archive/backlog-done/`. |
 | `Deferred` | Intentionally on hold. |
 
 ## Handling completed work
 
 When a task is finished, set its status to `Done` and move its file into
-`docs/backlog/done/`. Leave a one-line link to it under the epic's
+`docs/archive/backlog-done/`. Leave a one-line link to it under the epic's
 "Completed" section so the epic still reads as a coherent history.
 
 **Task IDs are permanent and must never be reused, even after moving tasks to
@@ -234,7 +235,8 @@ only after TASK-018 proves the model in real use:
   the system references, derived from the production model. First draft (from a
   pricing-evidence analysis of real estimates/invoices) exists at
   `docs/working/PRICING_INTELLIGENCE_CHARTER_DRAFT.md`; evidence at
-  historical pricing evidence retained in git history. Still not committed work.
+  [PRICING_AUDIT_REPORT_2026.md](../generated/PRICING_AUDIT_REPORT_2026.md).
+  Still not committed work.
 - **PI-005 Production Knowledge Base** — immutable business baselines (e.g.
   "Bathroom Refresh v2", travel policy, visit fee).
 - **PI-007 Historical Production Learning** — completed work orders feed back to
