@@ -25,7 +25,7 @@ vi.mock("@/lib/crypto", () => ({
 
 const mockLoad = vi.fn();
 const mockEncrypt = vi.fn(() => Buffer.from("ENC"));
-vi.mock("@/lib/integrations/square", () => ({
+vi.mock("@/lib/integrations/square-payments", () => ({
   loadSquareSettings: (...a: unknown[]) => mockLoad(...a),
   encryptSquareSecrets: (...a: unknown[]) => mockEncrypt(...a),
 }));

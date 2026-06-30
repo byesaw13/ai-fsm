@@ -81,11 +81,6 @@ export const PAINTING_RATE_MIN_CENTS = 175;   // $1.75/sq ft (floor rate)
 export const PAINTING_RATE_LABOR_CENTS = 205;  // $2.05/sq ft (labor basis)
 
 /**
- * @deprecated Use PAINTING_RATE_LABOR_CENTS. Kept for backward compatibility.
- */
-export const PAINTING_RATE_STANDARD_CENTS = PAINTING_RATE_LABOR_CENTS;
-
-/**
  * All-in customer-facing rate seeded in the price book catalog (service 5012).
  * Covers labor + overhead + margin. Do NOT use in the painting estimate engine
  * (which uses PAINTING_RATE_LABOR_CENTS) — this is for catalog display only.
@@ -126,12 +121,6 @@ export const PREP_LEVEL_MULTIPLIERS: Record<number, number> = {
  * For internal cost accounting, use MATERIAL_MARKUP_TIERS instead.
  */
 export const MATERIAL_HANDLING_CLIENT_RATE = 0.15;
-
-/**
- * @deprecated Use MATERIAL_HANDLING_CLIENT_RATE.
- * Kept for backward compatibility — will be removed in a future cleanup.
- */
-export const MATERIAL_HANDLING_RATE = MATERIAL_HANDLING_CLIENT_RATE;
 
 /**
  * Tiered material markup rates.

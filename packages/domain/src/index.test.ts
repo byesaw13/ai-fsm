@@ -32,7 +32,7 @@ import {
   priceFromMargin,
   PRICE_BOOK_TIER_MARGINS,
   MINIMUM_SERVICE_FEE_CENTS,
-  MATERIAL_HANDLING_RATE,
+  MATERIAL_HANDLING_CLIENT_RATE,
   DEPOSIT_RATE,
   ESTIMATE_ADJUSTMENT_TYPES,
   ESTIMATE_FINISH_EXPECTATIONS,
@@ -450,7 +450,7 @@ describe('PRICE_BOOK_TIER_MARGINS', () => {
 describe('Dovetails standards', () => {
   it('exposes canonical pricing standards', () => {
     expect(MINIMUM_SERVICE_FEE_CENTS).toBe(18500)
-    expect(MATERIAL_HANDLING_RATE).toBe(0.15)
+    expect(MATERIAL_HANDLING_CLIENT_RATE).toBe(0.15)
     expect(DEPOSIT_RATE).toBe(0.30)
   })
 

@@ -6,7 +6,7 @@ import { logger } from "@/lib/logger";
 import {
   loadSquareSettings,
   createSquarePaymentLink,
-} from "@/lib/integrations/square";
+} from "@/lib/integrations/square-payments";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
