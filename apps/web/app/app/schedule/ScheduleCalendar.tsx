@@ -131,26 +131,27 @@ function VisitCard({ visit, isAdmin, isDragging, compact = false, onDragStart, o
         background: "#fff",
         border: `1px solid ${color}`,
         borderRadius: 6,
-        padding: compact ? "2px 6px" : "var(--space-2)",
+        padding: compact ? "2px 6px" : "var(--space-3)",
         cursor: isAdmin ? "grab" : "pointer",
         opacity: isDragging ? 0.4 : 1,
-        transition: "opacity 0.15s",
+        transition: "opacity 0.15s, transform 0.1s",
       }}
+      className="p7-card-hover"
     >
-      <div style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--fg)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--fg)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {visit.job_title}
       </div>
       {!compact && visit.client_name && (
-        <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 2 }}>
           {visit.client_name}
         </div>
       )}
-      <div style={{ fontSize: "var(--text-xs)", color, fontWeight: 500, marginTop: 1 }}>
+      <div style={{ fontSize: "var(--text-xs)", color, fontWeight: 600, marginTop: 4 }}>
         {formatTimeRange(visit.scheduled_start, visit.scheduled_end)}
       </div>
       {!compact && visit.tech_name && (
-        <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 1 }}>
-          {visit.tech_name}
+        <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
+          Tech: {visit.tech_name}
         </div>
       )}
     </a>
@@ -197,6 +198,7 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [dropError, setDropError] = useState<string | null>(null);
   const [quickBookDate, setQuickBookDate] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>(toDateStr(new Date()));
   const visitsRef = useRef(visits);
 
   useEffect(() => {
@@ -206,6 +208,24 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
 
   const todayStr = toDateStr(new Date());
   const rangeDate = new Date(rangeStart + "T00:00:00");
+
+  // Sync selectedDate with rangeStart when visible range updates
+  useEffect(() => {
+    const today = new Date();
+    const todayS = toDateStr(today);
+    
+    if (view === "month") {
+      const currentYear = rangeDate.getFullYear();
+      const currentMonth = rangeDate.getMonth() + 1;
+      if (today.getFullYear() === currentYear && today.getMonth() + 1 === currentMonth) {
+        setSelectedDate(todayS);
+      } else {
+        setSelectedDate(rangeStart);
+      }
+    } else {
+      setSelectedDate(rangeStart);
+    }
+  }, [rangeStart, view]);
 
   // ── Navigation ──────────────────────────────────────────────────────────────
   let prevUrl: string, nextUrl: string, todayUrl: string, rangeLabel: string;
@@ -341,6 +361,77 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
     );
   }
 
+  function renderWeekViewMobile() {
+    const ws = getWeekStartFromStr(rangeStart);
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+        {DAY_LABELS.map((label, i) => {
+          const dayDate = addDays(ws, i);
+          const dayStr = toDateStr(dayDate);
+          const isToday = dayStr === todayStr;
+          const dayVisits = byDate.get(dayStr) ?? [];
+          
+          return (
+            <div
+              key={label}
+              style={{
+                background: "var(--bg-card)",
+                border: isToday ? "1px solid var(--accent)" : "1px solid var(--border)",
+                borderRadius: "var(--radius-lg)",
+                padding: "var(--space-3)",
+                boxShadow: isToday ? "var(--shadow-sm)" : "var(--shadow-xs)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)" }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-2)" }}>
+                  <span style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: isToday ? "var(--accent)" : "var(--fg)" }}>
+                    {dayDate.toLocaleDateString("en-US", { weekday: "short" })}
+                  </span>
+                  <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                    {dayDate.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+                  <span style={{ fontSize: "var(--text-xs)", background: "var(--bg-subtle)", padding: "2px 8px", borderRadius: "var(--radius-full)", color: "var(--fg-muted)" }}>
+                    {dayVisits.length} visit{dayVisits.length !== 1 ? "s" : ""}
+                  </span>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      className="p7-btn p7-btn-ghost p7-btn-sm"
+                      style={{ padding: "2px 8px", minHeight: 24 }}
+                      onClick={() => setQuickBookDate(dayStr)}
+                    >
+                      + Book
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                {dayVisits.map(v => (
+                  <VisitCard
+                    key={v.id}
+                    visit={v}
+                    isAdmin={isAdmin}
+                    isDragging={draggingId === v.id}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                  />
+                ))}
+                {dayVisits.length === 0 && (
+                  <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontStyle: "italic", padding: "4px 0" }}>
+                    No visits scheduled
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   // ── Month view ──────────────────────────────────────────────────────────────
   function renderMonthView() {
     const year = rangeDate.getFullYear();
@@ -379,6 +470,99 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
             })}
           </div>
         ))}
+      </div>
+    );
+  }
+
+  function renderMonthViewMobile() {
+    const year = rangeDate.getFullYear();
+    const month = rangeDate.getMonth() + 1;
+    const grid = getMonthGrid(year, month);
+    
+    // Format selectedDate for header display
+    const selectedDateObj = new Date(selectedDate + "T00:00:00");
+    const formattedSelected = isNaN(selectedDateObj.getTime()) 
+      ? selectedDate 
+      : selectedDateObj.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+      
+    const dayVisits = byDate.get(selectedDate) ?? [];
+    
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+        {/* Compact Dot Grid */}
+        <div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "var(--space-1)", marginBottom: "var(--space-1)" }}>
+            {["M","T","W","T","F","S","S"].map((l, i) => (
+              <div key={i} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, color: "var(--fg-muted)", padding: "4px 0" }}>{l}</div>
+            ))}
+          </div>
+          {grid.map((row, ri) => (
+            <div key={ri} style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "var(--space-1)", marginBottom: "var(--space-1)" }}>
+              {row.map((day, ci) => {
+                if (!day) return <div key={ci} style={{ minHeight: 48 }} />;
+                const dayStr = toDateStr(day);
+                const isToday = dayStr === todayStr;
+                const isSelected = dayStr === selectedDate;
+                const hasVisits = (byDate.get(dayStr) ?? []).length > 0;
+                
+                return (
+                  <button
+                    key={ci}
+                    type="button"
+                    onClick={() => setSelectedDate(dayStr)}
+                    className={`mobile-day-cell ${isSelected ? "selected" : ""} ${isToday ? "today" : ""}`}
+                    style={{
+                      border: isToday ? "1px solid var(--accent)" : "1px solid var(--border)",
+                      color: isSelected ? "var(--accent)" : "var(--fg)"
+                    }}
+                  >
+                    <span style={{ fontSize: 13, fontWeight: isToday || isSelected ? 700 : 500 }}>
+                      {day.getDate()}
+                    </span>
+                    {hasVisits && <span className="mobile-day-dot" />}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+        
+        {/* Agenda Section for Selected Date */}
+        <div className="mobile-visit-list">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-3)", borderBottom: "1px solid var(--border)", paddingBottom: "var(--space-2)" }}>
+            <h4 style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 700 }}>
+              {formattedSelected}
+            </h4>
+            {isAdmin && (
+              <button
+                type="button"
+                className="p7-btn p7-btn-secondary p7-btn-sm"
+                style={{ minHeight: 28 }}
+                onClick={() => setQuickBookDate(selectedDate)}
+              >
+                + Book
+              </button>
+            )}
+          </div>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+            {dayVisits.map(v => (
+              <VisitCard
+                key={v.id}
+                visit={v}
+                isAdmin={isAdmin}
+                isDragging={draggingId === v.id}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+              />
+            ))}
+            {dayVisits.length === 0 && (
+              <div style={{ textAlign: "center", padding: "var(--space-4)", color: "var(--fg-muted)", fontSize: "var(--text-sm)", fontStyle: "italic" }}>
+                No visits scheduled for this day
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     );
   }
@@ -438,8 +622,70 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div>
+      <style>{`
+        .desktop-only {
+          display: block;
+        }
+        .mobile-only {
+          display: none;
+        }
+        .mobile-flex {
+          display: none;
+        }
+        @media (max-width: 768px) {
+          .desktop-only {
+            display: none !important;
+          }
+          .mobile-only {
+            display: block !important;
+          }
+          .mobile-flex {
+            display: flex !important;
+          }
+        }
+        /* Style for mobile calendar day dots */
+        .mobile-day-cell {
+          aspect-ratio: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid var(--border);
+          background: var(--bg-card);
+          border-radius: var(--radius-md);
+          cursor: pointer;
+          position: relative;
+          padding: 2px;
+          min-height: 48px;
+        }
+        .mobile-day-cell.selected {
+          border-color: var(--accent) !important;
+          background: var(--accent-subtle) !important;
+        }
+        .mobile-day-cell.today {
+          font-weight: 700;
+          color: var(--accent);
+          border-color: var(--accent);
+        }
+        .mobile-day-dot {
+          width: 5px;
+          height: 5px;
+          border-radius: var(--radius-full);
+          background: var(--accent);
+          position: absolute;
+          bottom: 4px;
+        }
+        .mobile-visit-list {
+          margin-top: var(--space-4);
+          background: var(--bg-subtle);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-lg);
+          padding: var(--space-4);
+        }
+      `}</style>
+
       {/* View toggle + navigation */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-4)", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-4)", flexWrap: "wrap", justifyContent: "space-between" }}>
         <ScheduleViewToggle
           current={view}
           isAdmin={isAdmin}
@@ -448,12 +694,12 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
           yearUrl={toYearUrl}
         />
 
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontSize: "var(--text-sm)" }}>
-          <button type="button" onClick={() => router.push(prevUrl as Route)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 10px", cursor: "pointer", color: "var(--fg)", fontSize: "var(--text-sm)" }}>←</button>
-          <span style={{ fontWeight: 500, color: "var(--fg)", minWidth: view === "year" ? 48 : view === "month" ? 150 : 200, textAlign: "center" }}>{rangeLabel}</span>
-          <button type="button" onClick={() => router.push(nextUrl as Route)} style={{ background: "none", border: "1px solid var(--border)", borderRadius: 6, padding: "4px 10px", cursor: "pointer", color: "var(--fg)", fontSize: "var(--text-sm)" }}>→</button>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+          <button type="button" className="p7-btn p7-btn-secondary" style={{ minHeight: 38, padding: "0 var(--space-3)" }} onClick={() => router.push(prevUrl as Route)}>←</button>
+          <span style={{ fontWeight: 600, color: "var(--fg)", minWidth: view === "year" ? 54 : view === "month" ? 130 : 180, textAlign: "center", fontSize: "var(--text-sm)" }}>{rangeLabel}</span>
+          <button type="button" className="p7-btn p7-btn-secondary" style={{ minHeight: 38, padding: "0 var(--space-3)" }} onClick={() => router.push(nextUrl as Route)}>→</button>
           {!isCurrent && (
-            <button type="button" onClick={() => router.push(todayUrl as Route)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--accent)", fontSize: "var(--text-sm)", padding: "4px" }}>Today</button>
+            <button type="button" className="p7-btn p7-btn-ghost" style={{ minHeight: 38, color: "var(--accent)" }} onClick={() => router.push(todayUrl as Route)}>Today</button>
           )}
         </div>
       </div>
@@ -465,8 +711,23 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
         </div>
       )}
 
-      {view === "week" && renderWeekView()}
-      {view === "month" && renderMonthView()}
+      {/* Week View */}
+      {view === "week" && (
+        <>
+          <div className="desktop-only">{renderWeekView()}</div>
+          <div className="mobile-only">{renderWeekViewMobile()}</div>
+        </>
+      )}
+
+      {/* Month View */}
+      {view === "month" && (
+        <>
+          <div className="desktop-only">{renderMonthView()}</div>
+          <div className="mobile-only">{renderMonthViewMobile()}</div>
+        </>
+      )}
+
+      {/* Year View */}
       {view === "year" && renderYearView()}
 
       {localVisits.length === 0 && view !== "year" && (
@@ -477,7 +738,7 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
       )}
 
       {isAdmin && view !== "year" && draggingId === null && (
-        <p style={{ marginTop: "var(--space-3)", fontSize: "var(--text-xs)", color: "var(--fg-muted)", textAlign: "center" }}>
+        <p className="desktop-only" style={{ marginTop: "var(--space-3)", fontSize: "var(--text-xs)", color: "var(--fg-muted)", textAlign: "center" }}>
           Drag visits to reschedule · Click + to quick book
         </p>
       )}
