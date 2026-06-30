@@ -10,7 +10,7 @@ import type { InvoiceStatus } from "@ai-fsm/domain";
 import { InvoiceTransitionForm } from "./InvoiceTransitionForm";
 import { RecordPaymentForm } from "./RecordPaymentForm";
 import { SquareLinkActions } from "./SquareLinkActions";
-import { loadSquareSettings } from "@/lib/integrations/square";
+import { loadSquareSettings } from "@/lib/integrations/square-payments";
 import { PaymentHistory } from "./PaymentHistory";
 import { InvoiceEditForm } from "./InvoiceEditForm";
 import { MarkDepositReceivedButton } from "./MarkDepositReceivedButton";

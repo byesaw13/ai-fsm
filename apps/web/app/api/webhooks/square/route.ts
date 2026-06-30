@@ -3,7 +3,7 @@ import type { PoolClient } from "pg";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { decryptJson } from "@/lib/crypto";
-import { verifySquareWebhook, type SquareSecrets } from "@/lib/integrations/square";
+import { verifySquareWebhook, type SquareSecrets } from "@/lib/integrations/square-payments";
 
 export const dynamic = "force-dynamic";
 

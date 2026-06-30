@@ -5,7 +5,7 @@ import { getPool } from "../../../../../../lib/db";
 import { appendAuditLog } from "../../../../../../lib/db/audit";
 import { logger } from "../../../../../../lib/logger";
 import { sendEmail, isEmailConfigured } from "../../../../../../lib/email/mailer";
-import { onMyWayEmailHtml } from "../../../../../../lib/email/templates";
+import { onMyWayEmailHtml } from "@ai-fsm/email-templates";
 import { logCommunication } from "../../../../../../lib/communications-log";
 
 export const dynamic = "force-dynamic";

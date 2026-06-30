@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import {
-  PAINTING_RATE_STANDARD_CENTS,
+  PAINTING_RATE_LABOR_CENTS,
   PREP_LEVEL_MULTIPLIERS,
   PAINTING_TRIM_ADD_CENTS,
 } from "@ai-fsm/domain";
@@ -42,7 +42,7 @@ const SYSTEM_PROMPT = `You are an expert business analyst for Dovetails Services
 ## Dovetails Pricing Rules
 
 ### Painting rates (per sq ft, in cents)
-- Standard base rate: ${PAINTING_RATE_STANDARD_CENTS}¢/sq ft ($${(PAINTING_RATE_STANDARD_CENTS / 100).toFixed(2)}/sq ft)
+- Standard base rate: ${PAINTING_RATE_LABOR_CENTS}¢/sq ft ($${(PAINTING_RATE_LABOR_CENTS / 100).toFixed(2)}/sq ft)
 - Trim addon: +${PAINTING_TRIM_ADD_CENTS}¢/sq ft (+$${(PAINTING_TRIM_ADD_CENTS / 100).toFixed(2)}/sq ft of base sq ft)
 - Ceiling inclusion: adds 30% to effective surface area (effective_sq_ft = sq_ft × 1.3)
 
@@ -301,7 +301,7 @@ function computeEffectiveRate(estimate: EstimateInput): number {
   const sqFt = estimate.sq_ft!;
   const prepLevel = estimate.prep_level!;
   const prepMultiplier = PREP_LEVEL_MULTIPLIERS[Math.max(1, Math.min(10, prepLevel))] ?? 1;
-  const ratePerSqFt = Math.round(PAINTING_RATE_STANDARD_CENTS * prepMultiplier);
+  const ratePerSqFt = Math.round(PAINTING_RATE_LABOR_CENTS * prepMultiplier);
   const effectiveSqFt = estimate.includes_ceiling ? sqFt * 1.3 : sqFt;
   const trimAdd = estimate.includes_trim ? Math.round(sqFt * PAINTING_TRIM_ADD_CENTS) : 0;
   const expectedLabor = Math.round(effectiveSqFt * ratePerSqFt) + trimAdd;
