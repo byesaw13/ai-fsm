@@ -107,7 +107,7 @@ export default async function MyDayPage() {
       [accountId]),
     queryForSession<{ status: string }>(session,
       `SELECT status FROM time_clock_sessions
-       WHERE account_id = $1 AND user_id = $2 AND status = 'open'
+       WHERE account_id = $1 AND user_id = $2 AND status = 'open' AND voided_at IS NULL
        ORDER BY clock_in_at DESC LIMIT 1`,
       [accountId, session.userId]),
   ]);

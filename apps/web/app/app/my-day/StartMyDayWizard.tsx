@@ -21,11 +21,13 @@ const STEPS: { key: DaySetupStep; label: string }[] = [
 export function StartMyDayWizard({
   open,
   onClose,
+  onVehicleReady,
   initialState,
   vehicles,
 }: {
   open: boolean;
   onClose: () => void;
+  onVehicleReady: () => void;
   initialState: DaySetupState;
   vehicles: VehicleOption[];
 }) {
@@ -51,11 +53,18 @@ export function StartMyDayWizard({
   }, [open]);
 
   useEffect(() => {
+    if (!open) return;
+    setState(initialState);
+    setActiveStep(nextIncompleteStep(initialState) ?? "clock");
+  }, [open, initialState]);
+
+  useEffect(() => {
+    if (!open) return;
     if (isDaySetupComplete(state)) {
       onClose();
       router.refresh();
     }
-  }, [state, onClose, router]);
+  }, [open, state, onClose, router]);
 
   async function startMileage() {
     const odo = Number(startOdometer);
@@ -147,7 +156,7 @@ export function StartMyDayWizard({
                 style={{ minHeight: 44, padding: "0 var(--space-3)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }} />
             </label>
             <button type="button" className="p7-btn p7-btn-secondary" style={{ minHeight: 44 }}
-              onClick={() => setState((s) => ({ ...s, vehicleReady: true }))}>
+              onClick={onVehicleReady}>
               Continue
             </button>
           </div>

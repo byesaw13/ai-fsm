@@ -34,10 +34,11 @@ export function MyDayMobileLayout({
   children: React.ReactNode;
 }) {
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [vehicleStepDone, setVehicleStepDone] = useState(!!openSession);
   const setup: DaySetupState = {
     clockedIn,
     hasOpenSession: !!openSession,
-    vehicleReady: !!openSession || vehicles.length > 0,
+    vehicleReady: !!openSession || vehicleStepDone,
   };
   const complete = isDaySetupComplete(setup);
 
@@ -67,6 +68,7 @@ export function MyDayMobileLayout({
       <StartMyDayWizard
         open={wizardOpen}
         onClose={() => setWizardOpen(false)}
+        onVehicleReady={() => setVehicleStepDone(true)}
         initialState={setup}
         vehicles={vehicles}
       />
