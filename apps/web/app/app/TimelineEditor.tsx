@@ -41,6 +41,8 @@ function toTimelineEntry(e: ActivityEntryDto): TimelineEntry {
 
 // ---------------------------------------------------------------------------
 
+export type TimelineEditorEntry = ActivityEntryDto;
+
 type RowDraft = {
   activity_type: ActivityType;
   start: string;  // HH:MM

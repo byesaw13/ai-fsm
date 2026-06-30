@@ -62,13 +62,13 @@ export default async function TimelinePage({
       />
       <TimelineEditor date={day} entries={entries} />
       <div style={{ marginTop: "var(--space-6)" }}>
-        <VisitCandidatesPanel day={day} />
+        <VisitCandidatesPanel day={day} entries={entries} />
       </div>
       <div style={{ marginTop: "var(--space-6)" }}>
         <DayMapPanel day={day} />
       </div>
       <div style={{ marginTop: "var(--space-6)" }}>
-        <LocationSegmentsPanel day={day} />
+        <LocationSegmentsPanel day={day} entries={entries} />
       </div>
       <div style={{ marginTop: "var(--space-6)" }}>
         <LocationDebugPanel day={day} />
