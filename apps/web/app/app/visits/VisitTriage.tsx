@@ -13,7 +13,7 @@ import {
   formatOverdueLabel,
   formatVisitDateTime,
   isVisitOverdue,
-} from "@/lib/visits/p7";
+} from "@/lib/visits/formatting";
 import {
   buildVisitTriage,
   VISIT_STATUS_LABELS,

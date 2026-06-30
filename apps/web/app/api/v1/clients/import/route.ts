@@ -3,7 +3,7 @@ import { z } from "zod";
 import { withAuth } from "../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../lib/auth/middleware";
 import { getPool } from "../../../../../lib/db";
-import { normalizeClientName } from "../../../../../lib/crm/p7";
+import { normalizeClientName } from "../../../../../lib/crm/normalization";
 import { logger } from "../../../../../lib/logger";
 
 export const dynamic = "force-dynamic";
