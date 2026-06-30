@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import type { Route } from "next";
 import { Card, useToast } from "@/components/ui";
 import {
   buildMapsUrl,
@@ -120,6 +122,47 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
           </button>
         )}
       </div>
+
+      {(visit.status === "arrived" || visit.status === "in_progress") && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
+          {[
+            { label: "Photos", icon: "📸" },
+            { label: "Checklist", icon: "✅" },
+            { label: "Parts", icon: "🔩" },
+            { label: "Notes", icon: "📝" },
+          ].map((tool) => (
+            <Link
+              key={tool.label}
+              href={`/app/visits/${visit.id}` as Route}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 4,
+                padding: "var(--space-3) var(--space-1)",
+                background: "var(--color-surface-raised)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "var(--radius-sm)",
+                fontSize: "var(--text-xs)",
+                fontWeight: 500,
+                color: "var(--fg-primary)",
+                textDecoration: "none",
+                minHeight: 44,
+              }}
+            >
+              <span style={{ fontSize: "var(--text-lg)" }}>{tool.icon}</span>
+              {tool.label}
+            </Link>
+          ))}
+        </div>
+      )}
+
+      <Link
+        href={`/app/visits/${visit.id}` as Route}
+        style={{ display: "block", marginTop: "var(--space-3)", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--accent)", textDecoration: "none" }}
+      >
+        Open visit →
+      </Link>
     </Card>
   );
 }

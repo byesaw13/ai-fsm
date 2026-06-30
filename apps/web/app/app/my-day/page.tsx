@@ -267,12 +267,12 @@ export default async function MyDayPage() {
         heroVisit={heroVisit}
         clockedIn={clockedIn}
       >
-        {todayVisits.length === 0 && upcomingVisits.length === 0 ? (
+        {!heroVisit && todayVisits.length === 0 && upcomingVisits.length === 0 ? (
           <EmptyState
             title="No visits assigned"
             description="Visits assigned to you appear here. Your workday actions are above."
           />
-        ) : (
+        ) : listVisits.length > 0 || completedToday.length > 0 || upcomingVisits.length > 0 || pastOverdueVisits.length > 0 ? (
           <MyDayView
             visits={listVisits}
             completedVisits={completedToday}
@@ -281,8 +281,9 @@ export default async function MyDayPage() {
             role={session.role}
             now={nowISO}
             statusLabels={VISIT_STATUS_LABELS}
+            heroVisitId={heroVisit?.id ?? null}
           />
-        )}
+        ) : null}
       </MyDayMobileLayout>
     </PageContainer>
   );

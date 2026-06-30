@@ -5,6 +5,8 @@ import { StartMyDayWizard } from "./StartMyDayWizard";
 import { DayStatusPill } from "./DayStatusPill";
 import { NextVisitHero } from "./NextVisitHero";
 import { FieldQuickActions } from "./FieldQuickActions";
+import { ClockBar } from "../ClockBar";
+import { BusinessDayBar } from "../BusinessDayBar";
 import { WorkdayPanel } from "../WorkdayPanel";
 import { isDaySetupComplete, type DaySetupState } from "@/lib/my-day/day-setup";
 import type { HeroVisit } from "@/lib/my-day/visit-hero";
@@ -55,14 +57,18 @@ export function MyDayMobileLayout({
           Start My Day
         </button>
       ) : (
-        <div style={{ marginBottom: "var(--space-4)" }}>
-          <DayStatusPill
-            state={setup}
-            vehicleLabel={openSession?.vehicle_nickname ?? null}
-            milesToday={dayMileage.totalMiles}
-            onReopen={() => setWizardOpen(true)}
-          />
-        </div>
+        <>
+          <div style={{ marginBottom: "var(--space-4)" }}>
+            <DayStatusPill
+              state={setup}
+              vehicleLabel={openSession?.vehicle_nickname ?? null}
+              milesToday={dayMileage.totalMiles}
+              onReopen={() => setWizardOpen(true)}
+            />
+          </div>
+          <ClockBar />
+          <BusinessDayBar />
+        </>
       )}
 
       <StartMyDayWizard
