@@ -2,7 +2,13 @@ import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { withEstimateContext } from "@/lib/estimates/db";
 import { getStandardEstimateTerms, formatCents } from "@/lib/estimates/pricing";
-import { PAYMENT_OPTIONS, computePaintingProject } from "@ai-fsm/domain";
+import {
+  PAYMENT_OPTIONS,
+  computeEstimate,
+  roomSpecsToEstimateSpec,
+  buildShoppingListFromEstimateResult,
+  CURRENT_RULES,
+} from "@ai-fsm/domain";
 import type { EstimateStatus, RoomSpec } from "@ai-fsm/domain";
 import { PrintButton } from "./PrintButton";
 import { buildClientDocumentFilename } from "@/lib/estimates/guardrails";
@@ -250,8 +256,15 @@ export default async function EstimatePrintPage({
           if (!hasSL && estimate.room_specs) {
             const rooms = estimate.room_specs as RoomSpec[];
             if (Array.isArray(rooms) && rooms.length > 0) {
-              const pr = computePaintingProject(rooms, { coat_count: 2, occupied_home: false, vaulted_ceilings: false });
-              roomItems = pr.shopping_summary;
+              const options = { coat_count: 2, occupied_home: false, vaulted_ceilings: false };
+              const spec = roomSpecsToEstimateSpec(rooms, options);
+              const engine = computeEstimate(spec, CURRENT_RULES);
+              const sl = buildShoppingListFromEstimateResult(engine, rooms, options);
+              roomItems = (sl?.sections[0]?.specified_items ?? []).map((item) => ({
+                item: item.name,
+                qty: item.quantity_needed,
+                unit: item.unit_label,
+              }));
             }
           }
 

@@ -17,7 +17,7 @@ import type { EditableSuggestion, ScopeResult } from "../hooks/useEstimateAI";
 import type { DraftEstimate } from "@/lib/estimates/ai-draft";
 import { DraftReviewPanel } from "./DraftReviewPanel";
 import { RoomByRoomEditor } from "./RoomByRoomEditor";
-import type { ShoppingList, RoomSpec, ProjectOptions, PaintingProjectResult } from "@ai-fsm/domain";
+import type { ShoppingList, RoomSpec, ProjectOptions, EstimateResult } from "@ai-fsm/domain";
 import type { PriceBookEntry } from "../hooks/useEstimatePriceBook";
 import type { ScopeBuilderResult } from "@/components/ScopeBuilder";
 import type { PriceBookService } from "@/components/PriceBookSelector";
@@ -72,7 +72,7 @@ interface Step2Props {
   setPaintingMode: (m: "quick" | "room_by_room") => void;
   roomSpecs: RoomSpec[];
   projectOptions: ProjectOptions;
-  handleRoomByRoomChange: (rooms: RoomSpec[], options: ProjectOptions, result: PaintingProjectResult) => void;
+  handleRoomByRoomChange: (rooms: RoomSpec[], options: ProjectOptions, result: EstimateResult) => void;
   // Tiers / flat rate
   flatRate: string;
   setFlatRate: (v: string) => void;

@@ -43,7 +43,7 @@ Use block pricing when 4+ services are bundled in one visit. Guardrail warning f
 
 | Constant | Value | Purpose |
 |---|---|---|
-| `PAINTING_RATE_LABOR_CENTS` | $2.05/sqft | **Labor cost basis.** Used inside `calculatePaintingEstimate()` to price labor. Internal calculation only. |
+| `PAINTING_RATE_LABOR_CENTS` | $2.05/sqft | **Labor cost basis.** Used inside `computeEstimate()` / `sqftPaintingToSpec()` to price labor. Internal calculation only. |
 | `PAINTING_RATE_CATALOG_CENTS` | $3.25/sqft | **Customer-facing catalog price** (service 5012). Includes labor + overhead + margin. Do NOT use in the estimator engine. |
 | `PAINTING_RATE_MIN_CENTS` | $1.75/sqft | **Floor rate.** Use only when scope is uncertain or explicitly pricing at minimum. |
 | `PAINTING_TRIM_ADD_CENTS` | +$0.20/sqft | Added to wall sqft total when baseboard/trim is included. |
@@ -58,7 +58,7 @@ Use block pricing when 4+ services are bundled in one visit. Guardrail warning f
 
 ### System 1: Painting Estimator (numeric 1–10)
 
-Used by `calculatePaintingEstimate()` and the painting estimate UI.
+Used by `computeEstimate()` (via `sqftPaintingToSpec`) and the painting estimate UI.
 
 | `PREP_LEVEL_MULTIPLIERS` | Multiplier |
 |---|---|
@@ -138,9 +138,25 @@ Used by `estimate-engine/rules.ts` for room-by-room estimates.
 
 1. **Never hard-code a dollar value in app code.** Always import active pricing constants from `@ai-fsm/domain`. Deposit policy is explicit per estimate and must not default from a pricing constant.
 2. **Never show `LABOR_COST_CENTS_PER_HOUR` to a customer.** It is internal only.
-3. **Never use `PAINTING_RATE_CATALOG_CENTS` in `calculatePaintingEstimate()`.** It would price labor ~60% too high.
+3. **Never use `PAINTING_RATE_CATALOG_CENTS` in the estimate engine.** It would price labor ~60% too high.
 4. **When adding a new rate**, update this file AND `dovetails.ts` in the same commit.
-5. **Before changing any value**, check `apps/web/lib/estimates/pricing.ts` and `estimate-engine/rules.ts` — both must stay in sync.
+5. **Before changing any value**, check `packages/domain/src/estimate-engine/rules.ts` — it imports from `dovetails.ts` and is the single computation path after PR8.
+
+## Canonical computation path (PR8)
+
+All estimate pricing flows through:
+
+```typescript
+import { computeEstimate, CURRENT_RULES, sqftPaintingToSpec, roomSpecsToEstimateSpec } from "@ai-fsm/domain";
+```
+
+| Flow | Adapter | Notes |
+|---|---|---|
+| Sqft / quick painting | `sqftPaintingToSpec(input)` | Preserves legacy `calculatePaintingEstimate` totals via flat line items |
+| Room-by-room painting | `roomSpecsToEstimateSpec(rooms, options)` | Maps dimensional `room_specs` → engine surfaces |
+| Guardrails (web) | `reviewEstimateGuardrails()` in `apps/web/lib/estimates/guardrails.ts` | Thin adapter over `evaluateGuardrails()` |
+
+Read paths for materials: `shopping_list_json` first, then `room_specs` fallback via `buildShoppingListFromEstimateResult()`.
 
 
 ## Deposit Policy Update
