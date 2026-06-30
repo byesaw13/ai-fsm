@@ -170,16 +170,16 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
       )}
 
       {/* Line items table — sturdy and scannable */}
-      <div className="p7-table-wrapper">
+      <div className="p7-table-wrapper p7-invoice-line-items">
         <table className="p7-table" style={{ fontSize: "var(--text-sm)" }}>
           <thead>
             <tr>
-              <th style={{ width: "28%" }}>Description</th>
-              <th style={{ width: "14%" }}>Type</th>
-              <th style={{ width: "10%", textAlign: "right" }}>Qty</th>
-              <th style={{ width: "18%", textAlign: "right" }}>Unit Price</th>
-              <th style={{ width: "18%", textAlign: "right" }}>Line Total</th>
-              <th style={{ width: "12%" }} aria-label="Actions" />
+              <th className="p7-col-desc">Description</th>
+              <th className="p7-col-type">Type</th>
+              <th className="p7-col-qty" style={{ textAlign: "right" }}>Qty</th>
+              <th className="p7-col-price" style={{ textAlign: "right" }}>Unit Price</th>
+              <th className="p7-col-total" style={{ textAlign: "right" }}>Line Total</th>
+              <th className="p7-col-actions" aria-label="Actions" />
             </tr>
           </thead>
           <tbody>
@@ -232,7 +232,7 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
                       defaultValue={item.quantity}
                       disabled={pending}
                       className="input"
-                      style={{ width: 78, textAlign: "right", fontSize: "inherit", padding: "6px 6px" }}
+                      style={{ width: '100%', maxWidth: '80px', textAlign: "right", fontSize: "inherit", padding: "6px 6px" }}
                       onBlur={(e) => commitRow(item, e.target)}
                     />
                   </td>
@@ -244,7 +244,7 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
                       defaultValue={centsToDollars(item.unit_price_cents)}
                       disabled={pending}
                       className="input"
-                      style={{ width: 92, textAlign: "right", fontSize: "inherit", padding: "6px 6px" }}
+                      style={{ width: '100%', maxWidth: '100px', textAlign: "right", fontSize: "inherit", padding: "6px 6px" }}
                       onBlur={(e) => commitRow(item, e.target)}
                     />
                   </td>
@@ -257,13 +257,28 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
                       onClick={() => deleteLineItem(item)}
                       disabled={pending}
                       aria-label="Delete line item"
+                      className="p7-btn p7-btn-secondary"
                       style={{
-                        border: "none", background: "transparent", color: "var(--fg-muted)",
-                        fontSize: 16, lineHeight: 1, cursor: "pointer", padding: "2px 6px"
+                        minWidth: 44, minHeight: 44, padding: "8px 12px", fontSize: 20, lineHeight: 1,
+                        border: "1px solid var(--border)", background: "transparent", color: "var(--fg-muted)"
                       }}
                       title="Remove"
                     >
                       ×
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => commitRow(item, e.currentTarget)}
+                      disabled={pending}
+                      aria-label="Save changes to this line"
+                      className="p7-btn p7-btn-secondary"
+                      style={{
+                        minWidth: 44, minHeight: 44, padding: "6px 8px", fontSize: 14, lineHeight: 1,
+                        border: "1px solid var(--border)", background: "transparent", color: "var(--fg-muted)"
+                      }}
+                      title="Save"
+                    >
+                      ✓
                     </button>
                   </td>
                 </tr>
@@ -285,11 +300,8 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
       {/* Add new line — always available, commits cleanly */}
       <form
         onSubmit={addLineItem}
+        className="p7-invoice-add-form"
         style={{
-          display: "grid",
-          gridTemplateColumns: "3fr 1.4fr 0.9fr 1.1fr 1.1fr auto",
-          gap: "var(--space-2)",
-          alignItems: "end",
           marginTop: "var(--space-3)",
           paddingTop: "var(--space-3)",
           borderTop: "1px solid var(--border)"

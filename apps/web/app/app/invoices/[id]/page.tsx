@@ -192,7 +192,7 @@ export default async function InvoiceDetailPage({
       />
 
       {/* Trustworthy money bar — always visible, the point of an invoice */}
-      <div style={{
+      <div className="p7-invoice-money-bar" style={{
         display: "flex",
         flexWrap: "wrap",
         gap: "var(--space-4)",
@@ -203,7 +203,7 @@ export default async function InvoiceDetailPage({
       }}>
         <div>
           <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 600, letterSpacing: "0.04em" }}>TOTAL</div>
-          <div style={{ fontSize: "2rem", fontWeight: 700, fontFamily: "var(--font-mono)", lineHeight: 1 }} data-testid="invoice-total">
+          <div style={{ fontSize: "clamp(1.25rem, 5vw, 2rem)", fontWeight: 700, fontFamily: "var(--font-mono)", lineHeight: 1 }} data-testid="invoice-total">
             {formatDollars(invoice.total_cents)}
           </div>
         </div>
@@ -212,7 +212,7 @@ export default async function InvoiceDetailPage({
           <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 600, letterSpacing: "0.04em" }}>BALANCE DUE</div>
           <div
             style={{
-              fontSize: "2rem",
+              fontSize: "clamp(1.25rem, 5vw, 2rem)",
               fontWeight: 700,
               fontFamily: "var(--font-mono)",
               lineHeight: 1,
@@ -229,7 +229,7 @@ export default async function InvoiceDetailPage({
 
         <div>
           <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 600, letterSpacing: "0.04em" }}>PAID</div>
-          <div style={{ fontSize: "1.5rem", fontWeight: 600, fontFamily: "var(--font-mono)" }} data-testid="invoice-paid">
+          <div style={{ fontSize: "clamp(1rem, 4vw, 1.5rem)", fontWeight: 600, fontFamily: "var(--font-mono)" }} data-testid="invoice-paid">
             {formatDollars(invoice.paid_cents)}
           </div>
         </div>
@@ -282,14 +282,14 @@ export default async function InvoiceDetailPage({
             ) : lineItems.length === 0 ? (
               <EmptyState title="No line items" description="Line items are usually pulled from an approved estimate." />
             ) : (
-              <div className="p7-table-wrapper">
+              <div className="p7-table-wrapper p7-invoice-line-items">
                 <table className="p7-table" data-testid="invoice-line-items-table">
                   <thead>
                     <tr>
                       <th>Description</th>
-                      <th style={{ width: "14%" }}>Type</th>
-                      <th style={{ width: 80, textAlign: "right" }}>Qty</th>
-                      <th style={{ width: 110, textAlign: "right" }}>Amount</th>
+                      <th className="p7-col-type">Type</th>
+                      <th className="p7-col-qty" style={{ textAlign: "right" }}>Qty</th>
+                      <th className="p7-col-amount" style={{ textAlign: "right" }}>Amount</th>
                     </tr>
                   </thead>
                   <tbody>

@@ -864,6 +864,59 @@
   }
 }
 
+/* Invoice form and table responsive */
+.p7-invoice-add-form {
+  display: grid;
+  grid-template-columns: 3fr 1.4fr 0.9fr 1.1fr 1.1fr auto;
+  gap: var(--space-2);
+  align-items: end;
+}
+
+@media (max-width: 767px) {
+  .p7-invoice-add-form {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+  }
+  .p7-invoice-add-form > label:first-child {
+    grid-column: 1 / -1;
+  }
+  .p7-invoice-add-form button {
+    grid-column: 1 / -1;
+    height: 44px !important;
+  }
+  .p7-invoice-line-items .p7-table th,
+  .p7-invoice-line-items .p7-table td {
+    padding: var(--space-2) var(--space-2);
+    font-size: var(--text-xs);
+  }
+  .p7-invoice-line-items .p7-table th[style*="width: 10%"],
+  .p7-invoice-line-items .p7-table th[style*="width: 14%"],
+  .p7-invoice-line-items .p7-table th[style*="width: 18%"] {
+    width: auto !important;
+  }
+  .p7-invoice-line-items input {
+    min-width: 40px;
+  }
+  .p7-col-type, .p7-col-qty, .p7-col-amount,
+  .p7-col-desc, .p7-col-price, .p7-col-total, .p7-col-actions {
+    width: auto !important;
+  }
+  .p7-invoice-money-bar {
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+    padding-bottom: var(--space-3);
+  }
+  .p7-invoice-money-bar > div:first-child > div:last-child,
+  .p7-invoice-money-bar > div:nth-child(2) > div:last-child {
+    font-size: 1.5rem;
+  }
+}
+
+.p7-invoice-line-items .p7-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Compatibility page classes still used by older routes. */
 .page-container { display: flex; flex-direction: column; gap: 20px; }
 .page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
