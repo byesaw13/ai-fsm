@@ -7,7 +7,7 @@ import {
   calcTotals,
   lineItemTotal,
 } from "@/lib/estimates/db";
-import { calculatePaintingEstimate } from "@/lib/estimates/pricing";
+import { computeEstimate, sqftPaintingToSpec, CURRENT_RULES } from "@ai-fsm/domain";
 import {
   estimateAdjustmentTypeSchema,
   estimateFinishExpectationSchema,
@@ -328,17 +328,20 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
   let painting_margin_pct: number | null = null;
 
   if (is_painting) {
-    const result = calculatePaintingEstimate({
-      sq_ft,
-      prep_level,
-      includes_trim,
-      includes_ceiling,
-      material_cost_cents: material_cost_cents ?? 0,
-      labor_hours_estimate,
-    });
-    subtotal_cents = result.total_cents;
-    internal_labor_cost_cents = result.internal_labor_cost_cents;
-    painting_margin_pct = result.gross_margin_pct / 100;
+    const engine = computeEstimate(
+      sqftPaintingToSpec({
+        sq_ft,
+        prep_level,
+        includes_trim,
+        includes_ceiling,
+        material_cost_cents: material_cost_cents ?? 0,
+        labor_hours_estimate,
+      }),
+      CURRENT_RULES
+    );
+    subtotal_cents = engine.summary.totalCents;
+    internal_labor_cost_cents = engine.internalSummary.estimatedCostCents;
+    painting_margin_pct = engine.internalSummary.grossMarginPct;
   } else if (is_multi_option) {
     subtotal_cents = 0;
   } else {

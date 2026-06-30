@@ -11,22 +11,23 @@ import {
   Textarea,
   useToast,
 } from "@/components/ui";
-import {
-  calculatePaintingEstimate,
-  formatCents,
-} from "@/lib/estimates/pricing";
+import { formatCents } from "@/lib/estimates/pricing";
 import { EstimateTierEditor } from "../components/EstimateTierEditor";
 import { GuardrailsSection } from "../components/GuardrailsSection";
 import { LineItemsTable } from "../components/LineItemsTable";
 import { PaintingEstimatorSection } from "../components/PaintingEstimatorSection";
 import {
   PREP_LEVEL_MULTIPLIERS,
-  computePaintingProject,
-  roomResultToLegacyFields,
+  computeEstimate,
+  sqftPaintingToSpec,
+  roomSpecsToEstimateSpec,
+  estimateResultToLegacyFields,
+  buildShoppingListFromEstimateResult,
+  CURRENT_RULES,
 } from "@ai-fsm/domain";
-import type { RoomSpec, ProjectOptions, PaintingProjectResult } from "@ai-fsm/domain";
+import type { RoomSpec, ProjectOptions, EstimateResult } from "@ai-fsm/domain";
 import type { OptionTier } from "@/lib/estimates/form-helpers";
-import { parseCents, lineTotal, EMPTY_ROW, buildShoppingListFromPaintingSummary, type LineItemRow } from "@/lib/estimates/form-helpers";
+import { parseCents, lineTotal, EMPTY_ROW, type LineItemRow } from "@/lib/estimates/form-helpers";
 import { RoomByRoomEditor } from "../../estimates/new/components/RoomByRoomEditor";
 
 // ---------------------------------------------------------------------------
@@ -229,16 +230,16 @@ function StandardEstimateEditForm({
   const [roomSpecs, setRoomSpecs] = useState<RoomSpec[]>(initialRoomSpecs ?? []);
   const [projectOptions, setProjectOptions] = useState<ProjectOptions>({ coat_count: 2, occupied_home: false, vaulted_ceilings: false });
 
-  function handleRoomByRoomChange(rooms: RoomSpec[], opts: ProjectOptions, result: PaintingProjectResult) {
+  function handleRoomByRoomChange(rooms: RoomSpec[], opts: ProjectOptions, result: EstimateResult) {
     setRoomSpecs(rooms);
     setProjectOptions(opts);
-    const legacy = roomResultToLegacyFields(result);
+    const legacy = estimateResultToLegacyFields(result, rooms);
     setSqFt(legacy.sq_ft.toString());
     setPrepLevel(legacy.prep_level);
     setIncludesTrim(legacy.includes_trim);
     setIncludesCeiling(legacy.includes_ceiling);
-    setMaterialCostDollars((result.material_subtotal_cents / 100).toFixed(2));
-    const estHours = (result.total_wall_sqft + result.total_ceiling_sqft) / 100 * 0.85 * opts.coat_count;
+    setMaterialCostDollars((result.summary.materialCents / 100).toFixed(2));
+    const estHours = legacy.sq_ft / 100 * 0.85 * opts.coat_count;
     setLaborHours(estHours.toFixed(1));
   }
 
@@ -294,7 +295,7 @@ function StandardEstimateEditForm({
     const mat = parseCents(materialCostDollars);
     const hrs = parseFloat(laborHours);
     if (isNaN(sq) || sq <= 0 || isNaN(hrs) || hrs <= 0) return null;
-    return calculatePaintingEstimate({
+    const spec = sqftPaintingToSpec({
       sq_ft: sq,
       prep_level: prepLevel,
       includes_trim: includesTrim,
@@ -302,6 +303,18 @@ function StandardEstimateEditForm({
       material_cost_cents: mat,
       labor_hours_estimate: hrs,
     });
+    const engine = computeEstimate(spec, CURRENT_RULES);
+    return {
+      labor_flat_rate_cents: engine.summary.laborCents,
+      material_subtotal_cents: engine.summary.materialCents,
+      material_handling_cents: engine.summary.handlingCents,
+      total_cents: engine.summary.totalCents,
+      deposit_cents: engine.summary.depositCents,
+      balance_cents: engine.summary.balanceDueCents,
+      internal_labor_cost_cents: engine.internalSummary.estimatedCostCents,
+      gross_margin_cents: engine.internalSummary.grossMarginCents,
+      gross_margin_pct: Math.round(engine.internalSummary.grossMarginPct * 1000) / 10,
+    };
   }, [sqFt, prepLevel, includesTrim, includesCeiling, materialCostDollars, laborHours]);
 
   function handleModeChange(newMode: "itemized" | "flat_rate") {
@@ -404,8 +417,9 @@ function StandardEstimateEditForm({
           // Build shopping list from room result if available
           ...((() => {
             if (paintingMode === "room_by_room" && roomSpecs.length > 0) {
-              const result = computePaintingProject(roomSpecs, projectOptions);
-              const sl = buildShoppingListFromPaintingSummary(result);
+              const spec = roomSpecsToEstimateSpec(roomSpecs, projectOptions);
+              const engine = computeEstimate(spec, CURRENT_RULES);
+              const sl = buildShoppingListFromEstimateResult(engine, roomSpecs, projectOptions);
               return sl ? { shopping_list_json: sl } : {};
             }
             return {};

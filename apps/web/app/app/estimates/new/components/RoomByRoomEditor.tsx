@@ -5,8 +5,11 @@ import { Button } from "@/components/ui";
 import {
   computeRoomMeasurements,
   computePaintingProject,
+  computeEstimate,
+  roomSpecsToEstimateSpec,
+  CURRENT_RULES,
 } from "@ai-fsm/domain";
-import type { RoomSpec, RoomPrepLevel, PaintGrade, PaintSupplier, PaintingProjectResult, ProjectOptions } from "@ai-fsm/domain";
+import type { RoomSpec, RoomPrepLevel, PaintGrade, PaintSupplier, ProjectOptions, EstimateResult } from "@ai-fsm/domain";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -15,7 +18,7 @@ import type { RoomSpec, RoomPrepLevel, PaintGrade, PaintSupplier, PaintingProjec
 interface RoomByRoomEditorProps {
   rooms: RoomSpec[];
   options: ProjectOptions;
-  onChange: (rooms: RoomSpec[], options: ProjectOptions, result: PaintingProjectResult) => void;
+  onChange: (rooms: RoomSpec[], options: ProjectOptions, result: EstimateResult) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -339,7 +342,8 @@ function RoomCard({
 
 export function RoomByRoomEditor({ rooms, options, onChange }: RoomByRoomEditorProps) {
   const recompute = useCallback((nextRooms: RoomSpec[], nextOptions: ProjectOptions) => {
-    const result = computePaintingProject(nextRooms, nextOptions);
+    const spec = roomSpecsToEstimateSpec(nextRooms, nextOptions);
+    const result = computeEstimate(spec, CURRENT_RULES);
     onChange(nextRooms, nextOptions, result);
   }, [onChange]);
 
@@ -364,7 +368,10 @@ export function RoomByRoomEditor({ rooms, options, onChange }: RoomByRoomEditorP
   }
 
   const hasValidRooms = rooms.some((r) => r.length_ft > 0 && r.width_ft > 0);
-  const result = hasValidRooms ? computePaintingProject(rooms, options) : null;
+  const metrics = hasValidRooms ? computePaintingProject(rooms, options) : null;
+  const engineResult = hasValidRooms
+    ? computeEstimate(roomSpecsToEstimateSpec(rooms, options), CURRENT_RULES)
+    : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
@@ -414,7 +421,7 @@ export function RoomByRoomEditor({ rooms, options, onChange }: RoomByRoomEditorP
       </Button>
 
       {/* Live estimate preview */}
-      {result && (
+      {metrics && engineResult && (
         <div style={{
           border: "1px solid var(--border)",
           borderRadius: "var(--radius-sm)",
@@ -426,15 +433,15 @@ export function RoomByRoomEditor({ rooms, options, onChange }: RoomByRoomEditorP
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "var(--space-2)" }}>
             {[
-              { label: "Wall area", value: `${result.total_wall_sqft.toFixed(0)} sqft` },
-              { label: "Ceiling", value: result.total_ceiling_sqft > 0 ? `${result.total_ceiling_sqft.toFixed(0)} sqft` : "—" },
-              { label: "Trim", value: result.total_trim_lf > 0 ? `${result.total_trim_lf.toFixed(0)} LF` : "—" },
-              { label: "Paint", value: result.total_paint_gallons > 0 ? `${result.total_paint_gallons} gal` : "Client supplied" },
-              ...(result.total_primer_gallons > 0 ? [{ label: "Primer", value: `${result.total_primer_gallons} gal` }] : []),
-              { label: "Labor", value: formatDollars(result.labor_cents) },
-              ...(result.material_subtotal_cents > 0 ? [{ label: "Materials", value: formatDollars(result.material_subtotal_cents) }] : []),
-              { label: "Est. total", value: formatDollars(result.total_cents) },
-              ...(result.deposit_cents > 0 ? [{ label: "Deposit due", value: formatDollars(result.deposit_cents) }] : []),
+              { label: "Wall area", value: `${metrics.total_wall_sqft.toFixed(0)} sqft` },
+              { label: "Ceiling", value: metrics.total_ceiling_sqft > 0 ? `${metrics.total_ceiling_sqft.toFixed(0)} sqft` : "—" },
+              { label: "Trim", value: metrics.total_trim_lf > 0 ? `${metrics.total_trim_lf.toFixed(0)} LF` : "—" },
+              { label: "Paint", value: metrics.total_paint_gallons > 0 ? `${metrics.total_paint_gallons} gal` : "Client supplied" },
+              ...(metrics.total_primer_gallons > 0 ? [{ label: "Primer", value: `${metrics.total_primer_gallons} gal` }] : []),
+              { label: "Labor", value: formatDollars(engineResult.summary.laborCents) },
+              ...(engineResult.summary.materialCents > 0 ? [{ label: "Materials", value: formatDollars(engineResult.summary.materialCents) }] : []),
+              { label: "Est. total", value: formatDollars(engineResult.summary.totalCents) },
+              ...(engineResult.summary.depositCents > 0 ? [{ label: "Deposit due", value: formatDollars(engineResult.summary.depositCents) }] : []),
             ].map(({ label, value }) => (
               <div key={label}>
                 <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{label}</p>
@@ -442,9 +449,9 @@ export function RoomByRoomEditor({ rooms, options, onChange }: RoomByRoomEditorP
               </div>
             ))}
           </div>
-          {result.gross_margin_pct < 30 && (
+          {engineResult.internalSummary.grossMarginPct < 0.30 && (
             <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "#dc2626" }}>
-              ⚠ Margin {result.gross_margin_pct.toFixed(1)}% is below the 30% floor — check pricing.
+              ⚠ Margin {(engineResult.internalSummary.grossMarginPct * 100).toFixed(1)}% is below the 30% floor — check pricing.
             </p>
           )}
         </div>

@@ -431,8 +431,9 @@ export function computePaintRooms(rooms: PaintRoom[], coatCount = 2): {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Roll room-by-room result back into the legacy sq_ft / prep_level fields
- *  for backward-compatible storage in existing estimate columns. */
+/**
+ * @deprecated Use estimateResultToLegacyFields from @ai-fsm/domain estimate-engine adapters.
+ */
 export function roomResultToLegacyFields(result: PaintingProjectResult): {
   sq_ft: number;
   prep_level: number;
@@ -440,10 +441,9 @@ export function roomResultToLegacyFields(result: PaintingProjectResult): {
   includes_ceiling: boolean;
 } {
   const sq_ft = Math.round(result.total_wall_sqft + result.total_ceiling_sqft);
-  const has_trim = result.rooms.some((r) => r.measurements.trim_lf > 0);
-  const has_ceiling = result.rooms.some((r) => r.measurements.ceiling_sqft > 0);
+  const has_trim = result.rooms.some((r) => r.room.include_trim && r.measurements.trim_lf > 0);
+  const has_ceiling = result.rooms.some((r) => r.room.include_ceiling);
 
-  // Map the most common prep level to the 1-10 numeric scale
   const prepCounts: Partial<Record<RoomPrepLevel, number>> = {};
   for (const r of result.rooms) {
     prepCounts[r.room.prep_level] = (prepCounts[r.room.prep_level] ?? 0) + 1;
