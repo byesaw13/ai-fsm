@@ -84,10 +84,12 @@ require_uuid_env BOOKING_ACCOUNT_ID
 
 cd "${REPO_ROOT}"
 
-sync_repo_to_main() {
-  echo "syncing repo to origin/main"
+DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
 
-  git fetch origin main
+sync_repo() {
+  echo "syncing repo to origin/${DEPLOY_BRANCH}"
+
+  git fetch origin "${DEPLOY_BRANCH}"
 
   if ! git diff --quiet || ! git diff --cached --quiet; then
     echo "deploy checkout has uncommitted changes; refusing to overwrite:" >&2
@@ -99,18 +101,20 @@ sync_repo_to_main() {
   local current_head backup_branch
   current_head="$(git rev-parse --short HEAD)"
 
-  if git merge-base --is-ancestor HEAD origin/main; then
-    git reset --hard origin/main
+  if git merge-base --is-ancestor HEAD "origin/${DEPLOY_BRANCH}"; then
+    git checkout "${DEPLOY_BRANCH}"
+    git reset --hard "origin/${DEPLOY_BRANCH}"
     return
   fi
 
   backup_branch="deploy-backup/${current_head}-$(date -u +%Y%m%dT%H%M%SZ)"
-  echo "local deploy checkout has commits not on origin/main; saving ${current_head} as ${backup_branch}"
+  echo "local deploy checkout has commits not on origin/${DEPLOY_BRANCH}; saving ${current_head} as ${backup_branch}"
   git branch "${backup_branch}" HEAD
-  git reset --hard origin/main
+  git checkout "${DEPLOY_BRANCH}"
+  git reset --hard "origin/${DEPLOY_BRANCH}"
 }
 
-sync_repo_to_main
+sync_repo
 
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" up -d postgres
 
