@@ -11,6 +11,7 @@ import {
 import { PageContainer, PageHeader, Card, SectionHeader, LinkButton, Timeline } from "@/components/ui";
 import { fetchWorkOrderTimeline } from "@/lib/work-orders/timeline";
 import { FieldWorkActions } from "../FieldWorkActions";
+import { FieldCloseout } from "../FieldCloseout";
 
 export const dynamic = "force-dynamic";
 
@@ -130,6 +131,12 @@ export default async function MyWorkOrderPage({
             activeVisitId={activeVisit[0]?.id ?? null}
           />
         </div>
+        <FieldCloseout
+          workOrderId={workOrderId}
+          initialCriteria={criteria}
+          woStatus={wo.status}
+          hasActiveVisit={!!activeVisit[0]}
+        />
       </Card>
 
       <Card>
