@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { WORK_ORDER_UI_STATUSES } from "@ai-fsm/domain";
+import { WORK_ORDER_STATUSES } from "@/lib/work-orders/constants";
 import { withAuth, type AuthSession } from "@/lib/auth/middleware";
 import { getPool, queryForSession } from "@/lib/db";
 import { canCreateEstimates } from "@/lib/auth/permissions";
@@ -26,8 +26,6 @@ const roomSchema = z.object({
   dimensions: z.string().max(120).nullable().optional(),
   description: z.string().max(1000),
 });
-
-export const WORK_ORDER_STATUSES = WORK_ORDER_UI_STATUSES;
 
 const createSchema = z.object({
   client_id: z.string().uuid(),

@@ -4,7 +4,7 @@ import { withAuth, type AuthSession } from "@/lib/auth/middleware";
 import { getPool, queryForSession } from "@/lib/db";
 import { canCreateEstimates } from "@/lib/auth/permissions";
 import { logger } from "@/lib/logger";
-import { WORK_ORDER_STATUSES } from "../route";
+import { WORK_ORDER_STATUSES } from "@/lib/work-orders/constants";
 import type { CompletionCriterion } from "@ai-fsm/domain";
 import {
   enforceDraftOnlyFromAssessment,
