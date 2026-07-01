@@ -9,6 +9,7 @@ import { TeamPanel, type TeamMember } from "./TeamPanel";
 import { ProfileForm } from "./ProfileForm";
 import { SquarePanel, type SquareStatus } from "./SquarePanel";
 import { WorkspaceModeSetting } from "./WorkspaceModeSetting";
+import { LocationDaySettings, type LocationDayValues } from "./LocationDaySettings";
 
 interface Props {
   role: "owner" | "admin" | "tech";
@@ -17,9 +18,10 @@ interface Props {
   account: { id: string; name: string; settings: any } | null;
   users: TeamMember[];
   square: SquareStatus | null;
+  locationDay?: LocationDayValues;
 }
 
-export function SettingsTabsClient({ role, userId, me, account, users, square }: Props) {
+export function SettingsTabsClient({ role, userId, me, account, users, square, locationDay }: Props) {
   const isAdmin = role === "owner" || role === "admin";
   const isOwner = role === "owner";
 
@@ -30,6 +32,7 @@ export function SettingsTabsClient({ role, userId, me, account, users, square }:
     ...(isAdmin && account ? [{ id: "company", label: "Company", icon: <CompanyIcon /> }] : []),
     ...(isAdmin ? [{ id: "team", label: "Team", icon: <TeamIcon /> }] : []),
     ...(isOwner && square ? [{ id: "payments", label: "Payments", icon: <PaymentsIcon /> }] : []),
+    ...(isOwner && locationDay ? [{ id: "location-day", label: "Location & Day", icon: <LocationDayIcon /> }] : []),
     ...(isAdmin ? [{ id: "system-health", label: "System Health", icon: <HealthIcon /> }] : []),
     ...(isAdmin ? [{ id: "tools", label: "Tools & Setup", icon: <ToolsIcon /> }] : []),
   ];
@@ -130,6 +133,18 @@ export function SettingsTabsClient({ role, userId, me, account, users, square }:
                 whether or not Square is enabled.
               </p>
               <SquarePanel initial={square} />
+            </Card>
+          </section>
+        )}
+
+        {activeTab === "location-day" && isOwner && locationDay && (
+          <section>
+            <h2 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 8px 0" }}>Location & Day Review</h2>
+            <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: 0, marginBottom: 24 }}>
+              Configure when end-of-day review prompts appear and how location stops are classified.
+            </p>
+            <Card padding="default">
+              <LocationDaySettings {...locationDay} />
             </Card>
           </section>
         )}
@@ -274,6 +289,15 @@ function ToolsIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 1.4l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z" />
+    </svg>
+  );
+}
+
+function LocationDayIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="10" r="3" />
+      <path d="M12 2a8 8 0 0 1 8 8c0 5-8 13-8 13S4 15 4 10a8 8 0 0 1 8-8z" />
     </svg>
   );
 }

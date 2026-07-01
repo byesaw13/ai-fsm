@@ -249,3 +249,12 @@ export function IconInbox(props: IconProps) {
     </Icon>
   );
 }
+
+export function IconDayReview(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="3" width="14" height="14" rx="2" />
+      <path d="M7 10l2 2 4-4" />
+    </Icon>
+  );
+}

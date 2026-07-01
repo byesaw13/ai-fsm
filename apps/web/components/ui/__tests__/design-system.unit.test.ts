@@ -166,17 +166,17 @@ describe("getNavSections (role filtering)", () => {
       for (const href of shared) expect(hrefs).toContain(href);
       expect(hrefs).toContain(view === "field" ? "/app/my-day" : "/app");
       expect(hrefs).not.toContain("/app/mileage");
-      expect(hrefs).toHaveLength(11);
+      expect(hrefs).toHaveLength(12);
     }
   });
 
-  it("Admin nav drops My Day (pure admins don't do field work) — 11 items", () => {
+  it("Admin nav drops My Day (pure admins don't do field work) — 12 items", () => {
     const sections = getNavSections("admin");
     const hrefs = sections[0].items.map((i) => i.href);
     expect(hrefs).not.toContain("/app/my-day"); // EPIC-006 P5
     expect(hrefs).toContain("/app");
     expect(hrefs).toContain("/app/settings");
-    expect(hrefs).toHaveLength(11);
+    expect(hrefs).toHaveLength(12);
   });
 
   it("Layer 2+ tools are not in main nav", () => {
@@ -191,12 +191,12 @@ describe("getNavSections (role filtering)", () => {
     expect(hrefs).not.toContain("/app/booking-requests");
   });
 
-  it("owner nav is one section of 11 items with a single home per workspace", () => {
+  it("owner nav is one section of 12 items with a single home per workspace", () => {
     for (const view of ["field", "office"] as const) {
       const sections = getNavSections("owner", view);
       expect(sections).toHaveLength(1);
       const hrefs = flattenSections(sections).map((i) => i.href);
-      expect(hrefs).toHaveLength(11);
+      expect(hrefs).toHaveLength(12);
       if (view === "field") {
         expect(hrefs).toContain("/app/my-day");
         expect(hrefs).not.toContain("/app"); // no Overview home in Field
