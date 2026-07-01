@@ -1,7 +1,7 @@
 # Work Order–Centric Field Model — Design Spec
 
 **Date:** 2026-07-02  
-**Status:** Draft — pending user review  
+**Status:** Approved — canonical assignment/field UX per `docs/canonical/DOMAIN_MODEL.md`  
 **Supersedes (partially):** `2026-07-01-job-work-order-visit-model-design.md` — field UX, assignment, completion authority, and customer communication sections  
 **Preserves:** July 2026 schema (`work_orders`, `visits.work_order_id`, completion criteria, visit-scoped labor/ledger)
 

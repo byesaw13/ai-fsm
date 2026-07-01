@@ -61,7 +61,7 @@ Does not own:
 
 - Client contact identity.
 - Invoice payment state.
-- Technician assignment state outside visits.
+- Work order lead assignment (use work orders).
 
 ## Estimate
 
@@ -107,14 +107,14 @@ A work order is an executable packet of work under a project — operational pla
 Owns:
 
 - Scope, rooms, tasks, and materials plan.
-- Priority, preferred technician or required trade (planning hints only).
+- **Lead technician assignment** (`assigned_user_id` — single lead responsible for scope, closeout, and field comms).
 - Completion criteria (objective checklist for done).
 - Work order status (planning lifecycle: draft, ready, scheduled, dispatched, waiting, completed, cancelled).
 - Traceability to source assessment or estimate.
 
 Does not own:
 
-- Technician assignment (visits).
+- Per-visit crew/helpers (visits; deferred).
 - Dispatch, travel, arrival, or active field work (visits).
 - GPS, photos, notes, signatures (visits).
 - Labor time entries (visits).
@@ -141,7 +141,7 @@ A visit is a scheduled or actual field execution event.
 
 Owns:
 
-- Scheduled start/end and **technician assignment** (including multi-tech).
+- Scheduled start/end and **visit execution assignment** (`assigned_user_id`; defaults to work order lead for that day's log).
 - Visit execution status (scheduled, dispatched, traveling, arrived, in_progress, waiting, completed, cancelled).
 - Field time markers, GPS, photos, notes, customer signature.
 - Materials actually used.
