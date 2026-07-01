@@ -64,6 +64,7 @@ const VISITS_BASE = "http://localhost:3000/api/v1/visits";
 const JOB_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 const VISIT_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc";
 const BOOKING_REQUEST_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+const WORK_ORDER_ID = "dddddddd-dddd-dddd-dddd-dddddddddddd";
 const USER_ID = "00000000-0000-0000-0000-000000000001";
 const NOW = new Date().toISOString();
 
@@ -122,6 +123,7 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
       .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
       .mockResolvedValueOnce({ rows: [{ status: "quoted" }] }) // SELECT job status
       .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
+      .mockResolvedValueOnce({ rows: [{ id: WORK_ORDER_ID }] }) // resolve work order
       .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // INSERT
       .mockResolvedValueOnce({ rows: [] }); // COMMIT
 
@@ -142,6 +144,7 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
       .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
       .mockResolvedValueOnce({ rows: [{ status: "quoted" }] }) // SELECT job status
       .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
+      .mockResolvedValueOnce({ rows: [{ id: WORK_ORDER_ID }] }) // resolve work order
       .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // INSERT visit
       .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // UPDATE booking request
       .mockResolvedValueOnce({ rows: [] }); // COMMIT
@@ -175,6 +178,7 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
       .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
       .mockResolvedValueOnce({ rows: [{ status: "quoted" }] }) // SELECT job status
       .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
+      .mockResolvedValueOnce({ rows: [{ id: WORK_ORDER_ID }] }) // resolve work order
       .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // INSERT visit
       .mockResolvedValueOnce({ rows: [] }) // UPDATE booking request missing
       .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
@@ -230,6 +234,27 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
     expect(res.status).toBe(422);
     const json = await res.json();
     expect(json.error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("returns 422 when no work order exists for a standard visit", async () => {
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
+      .mockResolvedValueOnce({ rows: [{ status: "quoted" }] }) // SELECT job status
+      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
+      .mockResolvedValueOnce({ rows: [] }) // resolve work order — none found
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+    const res = await visitCreate(
+      makeRequest("POST", `${JOBS_BASE}/${JOB_ID}/visits`, {
+        scheduled_start: NOW,
+        scheduled_end: NOW,
+        visit_type: "standard",
+      }),
+    );
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.error.code).toBe("PRECONDITION_FAILED");
   });
 });
 

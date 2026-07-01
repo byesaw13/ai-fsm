@@ -2,7 +2,12 @@ import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { canCreateEstimates } from "@/lib/auth/permissions";
 import { queryForSession } from "@/lib/db";
-import { WORK_ORDER_UI_STATUSES, WORK_ORDER_STATUS_LABELS, type WorkOrderRoomLine } from "@ai-fsm/domain";
+import {
+  WORK_ORDER_UI_STATUSES,
+  WORK_ORDER_STATUS_LABELS,
+  type WorkOrderRoomLine,
+  type CompletionCriterion,
+} from "@ai-fsm/domain";
 import { PageContainer, PageHeader, Card } from "@/components/ui";
 import { WorkOrderForm, type MaterialRow } from "../WorkOrderForm";
 
@@ -23,6 +28,9 @@ type WorkOrderRow = {
   status: string;
   total_cents: number;
   completed_at: string | null;
+  source_visit_id: string | null;
+  source_assessment_id: string | null;
+  completion_criteria: unknown;
 };
 
 type MaterialDbRow = {
@@ -44,7 +52,8 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
     session,
     `SELECT w.id, w.client_id, c.name AS client_name, w.property_id, p.address AS property_address,
             w.job_id, w.title, w.scope, w.site_notes, w.safety_notes, w.rooms, w.status,
-            w.total_cents, w.completed_at::text
+            w.total_cents, w.completed_at::text, w.source_visit_id, w.source_assessment_id,
+            w.completion_criteria
      FROM work_orders w
      LEFT JOIN clients c ON c.id = w.client_id
      LEFT JOIN properties p ON p.id = w.property_id
@@ -73,6 +82,9 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
   const status = (STATUSES as readonly string[]).includes(wo.status)
     ? (wo.status as (typeof STATUSES)[number])
     : "draft";
+  const completionCriteria: CompletionCriterion[] = Array.isArray(wo.completion_criteria)
+    ? (wo.completion_criteria as CompletionCriterion[])
+    : [];
 
   return (
     <PageContainer>
@@ -91,6 +103,8 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
           propertyId={wo.property_id}
           propertyAddress={wo.property_address}
           jobId={wo.job_id}
+          sourceVisitId={wo.source_visit_id}
+          sourceAssessmentId={wo.source_assessment_id}
           initial={{
             title: wo.title,
             scope: wo.scope ?? "",
@@ -99,6 +113,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
             rooms,
             materials,
             status,
+            completionCriteria,
           }}
         />
       </Card>

@@ -160,6 +160,8 @@ describe("createJobFromEstimate", () => {
         }],
         rowCount: 1,
       },
+      // promoteOrCreateWorkOrderFromEstimate — existing WO for estimate
+      { rows: [{ id: "wo-existing" }], rowCount: 1 },
     ]);
 
     const result = await createJobFromEstimate({
@@ -171,6 +173,7 @@ describe("createJobFromEstimate", () => {
 
     expect(result.jobId).toBe("existing-job");
     expect(result.created).toBe(false);
+    expect(result.workOrderId).toBe("wo-existing");
     // No INSERT should have been called
     const insertCalls = (client.query as ReturnType<typeof vi.fn>).mock.calls.filter(
       (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("INSERT INTO jobs")
@@ -221,6 +224,18 @@ describe("createJobFromEstimate", () => {
       { rows: [{ id: "new-job-1" }], rowCount: 1 },
       // Estimate UPDATE (link job_id)
       { rows: [], rowCount: 1 },
+      // promoteOrCreateWorkOrderFromEstimate
+      { rows: [], rowCount: 0 }, // no existing WO
+      {
+        rows: [{
+          id: "est-1", client_id: "c1", property_id: "p1", notes: "Fix deck boards",
+          total_cents: 35000, client_name: "Bob", property_address: "10 Oak St",
+        }],
+        rowCount: 1,
+      },
+      { rows: [], rowCount: 0 }, // no draft WO
+      { rows: [], rowCount: 0 }, // no line items
+      { rows: [{ id: "wo-new-1" }], rowCount: 1 }, // WO INSERT
     ]);
 
     const result = await createJobFromEstimate({
@@ -232,6 +247,7 @@ describe("createJobFromEstimate", () => {
 
     expect(result.jobId).toBe("new-job-1");
     expect(result.created).toBe(true);
+    expect(result.workOrderId).toBe("wo-new-1");
 
     // Verify booking_request_id is threaded through to the job
     const insertCall = (client.query as ReturnType<typeof vi.fn>).mock.calls.find(

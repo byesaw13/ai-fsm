@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { checkSchedulingPreconditions } from "@ai-fsm/domain";
+import { checkSchedulingPreconditions, EXECUTION_VISIT_TYPES } from "@ai-fsm/domain";
+import {
+  resolveWorkOrderForVisit,
+  syncWorkOrdersForJob,
+} from "../../../../../../lib/work-orders/sync-status";
 import { withAuth, withRole } from "../../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../../lib/auth/middleware";
 import { query, getPool } from "../../../../../../lib/db";
@@ -15,6 +19,7 @@ const createVisitBody = z.object({
   scheduled_end: z.string().datetime(),
   tech_notes: z.string().optional(),
   booking_request_id: z.string().uuid().optional(),
+  work_order_id: z.string().uuid().optional(),
   visit_type: z.enum(["standard", "realtor_baseline", "membership_health_check", "punch_list"]).default("standard"),
 });
 
@@ -79,6 +84,7 @@ export const POST = withRole(
       scheduled_end,
       tech_notes,
       booking_request_id,
+      work_order_id,
       visit_type,
     } = parsed.data;
 
@@ -97,7 +103,9 @@ export const POST = withRole(
         [jobId, session.accountId]
       );
       const { rows: activeVisitRows } = await client.query<{ count: string }>(
-        `SELECT COUNT(*) FROM visits WHERE job_id = $1 AND status IN ('scheduled','arrived','in_progress')`,
+        `SELECT COUNT(*) FROM visits WHERE job_id = $1 AND status IN (
+           'scheduled','dispatched','traveling','arrived','in_progress','waiting'
+         )`,
         [jobId]
       );
       const guard = checkSchedulingPreconditions({
@@ -110,13 +118,39 @@ export const POST = withRole(
         return NextResponse.json({ error: guard.error }, { status: 422 });
       }
 
+      let resolvedWorkOrderId: string | null = null;
+      if ((EXECUTION_VISIT_TYPES as readonly string[]).includes(visit_type)) {
+        resolvedWorkOrderId = await resolveWorkOrderForVisit(
+          client,
+          jobId,
+          session.accountId,
+          work_order_id,
+        );
+        if (!resolvedWorkOrderId) {
+          await client.query("ROLLBACK");
+          return NextResponse.json(
+            {
+              error: {
+                code: "PRECONDITION_FAILED",
+                message: work_order_id
+                  ? "Work order not found or not schedulable for this project"
+                  : "Select a work order — this project has multiple active work orders",
+                traceId: session.traceId,
+              },
+            },
+            { status: 422 },
+          );
+        }
+      }
+
       const { rows } = await client.query(
-        `INSERT INTO visits (account_id, job_id, assigned_user_id, scheduled_start, scheduled_end, tech_notes, visit_type)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO visits (account_id, job_id, work_order_id, assigned_user_id, scheduled_start, scheduled_end, tech_notes, visit_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
         [
           session.accountId,
           jobId,
+          resolvedWorkOrderId,
           assigned_user_id ?? null,
           scheduled_start,
           scheduled_end,
@@ -189,6 +223,10 @@ export const POST = withRole(
           old_value: { status: jobStatus },
           new_value: { status: "scheduled" },
         });
+      }
+
+      if (resolvedWorkOrderId) {
+        await syncWorkOrdersForJob(client, jobId, session.accountId);
       }
 
       await client.query("COMMIT");

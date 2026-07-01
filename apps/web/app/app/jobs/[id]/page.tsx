@@ -23,6 +23,7 @@ import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { JobCommandPanel } from "./JobCommandPanel";
 import { WhatNextBanner } from "./WhatNextBanner";
 import { VendorCoordinationCard } from "./VendorCoordinationCard";
+import { JobWorkOrdersPanel, type JobWorkOrderRow } from "./JobWorkOrdersPanel";
 import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { isHomeboxEnabled } from "@/lib/homebox/client";
 import { withAssetContext, listAssetLinks } from "@/lib/homebox/db";
@@ -150,7 +151,7 @@ export default async function JobDetailPage({
 
   const homeboxEnabled = isHomeboxEnabled();
 
-  const [visits, commercialCounts, assetLinks] = await Promise.all([
+  const [visits, workOrders, commercialCounts, assetLinks] = await Promise.all([
     session.role === "tech"
       ? queryForSession<VisitRow>(
           session,
@@ -170,6 +171,22 @@ export default async function JobDetailPage({
            ORDER BY v.scheduled_start ASC`,
           [id, session.accountId]
         ),
+    session.role !== "tech"
+      ? queryForSession<JobWorkOrderRow>(
+          session,
+          `SELECT w.id, w.title, w.status,
+                  COUNT(v.id)::text AS visit_count,
+                  COUNT(v.id) FILTER (
+                    WHERE v.status NOT IN ('completed','cancelled')
+                  )::text AS active_visit_count
+           FROM work_orders w
+           LEFT JOIN visits v ON v.work_order_id = w.id
+           WHERE w.job_id = $1 AND w.account_id = $2 AND w.status <> 'draft'
+           GROUP BY w.id
+           ORDER BY w.created_at ASC`,
+          [id, session.accountId],
+        )
+      : Promise.resolve([] as JobWorkOrderRow[]),
     // Count estimates and invoices + profitability snapshot + pipeline state (owner/admin only)
     session.role !== "tech"
       ? queryOneForSession<{
@@ -450,8 +467,23 @@ export default async function JobDetailPage({
 
       {/* Detail Hub Layout: two-column on desktop, stacked on mobile */}
       <div className="p7-detail-layout">
-        {/* LEFT: Visits Timeline + Danger Zone */}
+        {/* LEFT: Work Orders + Visits Timeline + Danger Zone */}
         <div className="p7-detail-primary">
+          {!isTech && workOrders.length > 0 && (
+            <Card data-testid="job-work-orders-panel">
+              <SectionHeader title="Work Orders" count={workOrders.length} />
+              <JobWorkOrdersPanel
+                jobId={job.id}
+                workOrders={workOrders.map((wo) => ({
+                  ...wo,
+                  visit_count: parseInt(wo.visit_count as unknown as string, 10) || 0,
+                  active_visit_count: parseInt(wo.active_visit_count as unknown as string, 10) || 0,
+                }))}
+                canManage={canAddVisit}
+              />
+            </Card>
+          )}
+
           <Card>
             <SectionHeader
               title="Visits"

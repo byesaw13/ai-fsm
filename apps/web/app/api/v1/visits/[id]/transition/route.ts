@@ -23,6 +23,7 @@ interface VisitRow {
 }
 import { seedConditionSnapshots } from "../../../../../../lib/visits/condition-seeding";
 import { writeWorkflowEvent } from "../../../../../../lib/workflow-events";
+import { syncWorkOrdersForJob } from "../../../../../../lib/work-orders/sync-status";
 
 export const dynamic = "force-dynamic";
 
@@ -356,7 +357,7 @@ export const POST = withAuth(
               const stillActive = await client.query(
                 `SELECT 1 FROM visits
                  WHERE job_id = $1 AND account_id = $2
-                   AND status IN ('in_progress','arrived')
+                   AND status IN ('in_progress','arrived','dispatched','traveling','waiting')
                  LIMIT 1`,
                 [updated.job_id, session.accountId]
               );
@@ -413,6 +414,10 @@ export const POST = withAuth(
           await client.query("RELEASE SAVEPOINT before_auto_invoice");
           logger.error("visit completion: auto-create invoice draft failed (non-fatal)", invoiceErr, { traceId: session.traceId });
         }
+      }
+
+      if (updated.job_id) {
+        await syncWorkOrdersForJob(client, updated.job_id, session.accountId);
       }
 
       // Emit workflow events for automation cancellation and downstream processing

@@ -25,15 +25,30 @@ interface FormErrors {
   schedule_time?: string;
 }
 
+interface WorkOrderOption {
+  id: string;
+  title: string;
+}
+
 interface VisitScheduleFormProps {
   jobId: string;
   users: User[];
   canAssign: boolean;
   jobCategory?: string | null;
   bookingRequestId?: string;
+  workOrders?: WorkOrderOption[];
+  initialWorkOrderId?: string | null;
 }
 
-export function VisitScheduleForm({ jobId, users, canAssign, jobCategory, bookingRequestId }: VisitScheduleFormProps) {
+export function VisitScheduleForm({
+  jobId,
+  users,
+  canAssign,
+  jobCategory,
+  bookingRequestId,
+  workOrders = [],
+  initialWorkOrderId = null,
+}: VisitScheduleFormProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +64,11 @@ export function VisitScheduleForm({ jobId, users, canAssign, jobCategory, bookin
   const [visitType, setVisitType] = useState<VisitType>(
     jobCategory === "realtor_baseline" ? "realtor_baseline" : "standard"
   );
+  const [workOrderId, setWorkOrderId] = useState(
+    initialWorkOrderId ?? (workOrders.length === 1 ? workOrders[0].id : ""),
+  );
+  const needsWorkOrder =
+    visitType === "standard" || visitType === "punch_list";
 
   function validate(): boolean {
     const errs: FormErrors = {};
@@ -68,12 +88,19 @@ export function VisitScheduleForm({ jobId, users, canAssign, jobCategory, bookin
 
     try {
       const { start, end } = scheduleToISOPair(schedule);
+      if (needsWorkOrder && !workOrderId) {
+        setError("Select a work order for this visit");
+        setPending(false);
+        return;
+      }
+
       const body = {
         scheduled_start: start!,
         scheduled_end: end!,
         assigned_user_id: assignedUserId || undefined,
         booking_request_id: bookingRequestId,
         visit_type: visitType,
+        ...(needsWorkOrder && workOrderId ? { work_order_id: workOrderId } : {}),
       };
 
       const res = await fetch(`/api/v1/jobs/${jobId}/visits`, {
@@ -146,6 +173,19 @@ export function VisitScheduleForm({ jobId, users, canAssign, jobCategory, bookin
         options={VISIT_TYPES.map((t) => ({ value: t, label: VISIT_TYPE_LABELS[t] }))}
         hint={visitType === "realtor_baseline" ? "Seeds a pre-listing inspection checklist." : undefined}
       />
+
+      {needsWorkOrder && workOrders.length > 0 && (
+        <Select
+          id="work_order_id"
+          label="Work Order"
+          value={workOrderId}
+          onChange={(e) => setWorkOrderId(e.target.value)}
+          disabled={pending}
+          required
+          options={workOrders.map((wo) => ({ value: wo.id, label: wo.title }))}
+          placeholder="Select work order"
+        />
+      )}
 
       {canAssign && (
         <Select

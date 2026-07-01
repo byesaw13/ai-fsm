@@ -9,6 +9,7 @@
 
 import type { PoolClient } from "pg";
 import { deriveJobTitle, deriveJobDescription } from "./job-from-estimate";
+import { promoteOrCreateWorkOrderFromEstimate } from "../work-orders/from-estimate";
 
 interface CreateJobFromEstimateOptions {
   client: PoolClient;
@@ -22,6 +23,8 @@ interface CreateJobFromEstimateOptions {
 interface CreateJobResult {
   jobId: string;
   created: boolean;
+  workOrderId?: string;
+  workOrderCreated?: boolean;
 }
 
 /**
@@ -72,9 +75,21 @@ export async function createJobFromEstimate({
     );
   }
 
-  // Idempotent — already has a job, nothing to do.
+  // Idempotent — already has a job; ensure a work order exists too.
   if (est.job_id) {
-    return { jobId: est.job_id, created: false };
+    const wo = await promoteOrCreateWorkOrderFromEstimate({
+      client,
+      estimateId,
+      jobId: est.job_id,
+      accountId,
+      createdBy,
+    });
+    return {
+      jobId: est.job_id,
+      created: false,
+      workOrderId: wo.workOrderId,
+      workOrderCreated: wo.created,
+    };
   }
 
   const title = deriveJobTitle({
@@ -114,7 +129,20 @@ export async function createJobFromEstimate({
     [jobId, estimateId]
   );
 
-  return { jobId, created: true };
+  const wo = await promoteOrCreateWorkOrderFromEstimate({
+    client,
+    estimateId,
+    jobId,
+    accountId,
+    createdBy,
+  });
+
+  return {
+    jobId,
+    created: true,
+    workOrderId: wo.workOrderId,
+    workOrderCreated: wo.created || wo.promoted,
+  };
 }
 
 /**
