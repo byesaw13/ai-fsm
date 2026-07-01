@@ -8,7 +8,8 @@ import {
   type WorkOrderRoomLine,
   type CompletionCriterion,
 } from "@ai-fsm/domain";
-import { PageContainer, PageHeader, Card } from "@/components/ui";
+import { PageContainer, PageHeader, Card, SectionHeader, Timeline } from "@/components/ui";
+import { fetchWorkOrderTimeline } from "@/lib/work-orders/timeline";
 import { WorkOrderForm, type MaterialRow } from "../WorkOrderForm";
 
 export const dynamic = "force-dynamic";
@@ -86,6 +87,8 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
     ? (wo.completion_criteria as CompletionCriterion[])
     : [];
 
+  const timeline = await fetchWorkOrderTimeline(session, id);
+
   return (
     <PageContainer>
       <PageHeader
@@ -94,6 +97,12 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
         backHref="/app/work-orders"
         backLabel="Work Orders"
       />
+      {timeline.length > 0 && (
+        <Card style={{ marginBottom: "var(--space-4)" }}>
+          <SectionHeader title="Timeline" count={timeline.length} />
+          <Timeline entries={timeline} />
+        </Card>
+      )}
       <Card>
         <WorkOrderForm
           mode="edit"

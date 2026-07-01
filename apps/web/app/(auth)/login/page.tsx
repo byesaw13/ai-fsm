@@ -33,7 +33,7 @@ export default function LoginPage() {
       // Full page navigation so the session cookie is included in the next request.
       // Everyone lands on My Day (the daily home); pure admins are bounced to the
       // office dashboard by the redirect in app/app/my-day/page.tsx.
-      window.location.href = "/app/my-day";
+      window.location.href = "/app/my-work";
     } catch {
       setError("An unexpected error occurred");
       setLoading(false);
