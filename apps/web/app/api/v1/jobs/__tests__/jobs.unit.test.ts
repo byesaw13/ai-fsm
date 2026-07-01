@@ -107,8 +107,8 @@ describe("POST /api/v1/jobs", () => {
     mockClientQuery
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
       .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
-      .mockResolvedValueOnce({ rows: [SAMPLE_JOB] }) // INSERT
-      .mockResolvedValueOnce({ rows: [] }) // appendAuditLog (mocked but client.query still called)
+      .mockResolvedValueOnce({ rows: [SAMPLE_JOB] }) // INSERT job
+      .mockResolvedValueOnce({ rows: [{ id: "wo-1" }] }) // default work order
       .mockResolvedValueOnce({ rows: [] }); // COMMIT
 
     const res = await jobCreate(
