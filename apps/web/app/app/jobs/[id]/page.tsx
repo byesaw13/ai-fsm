@@ -61,6 +61,14 @@ type JobRow = Job & {
 type VisitRow = Visit & {
   assigned_user_name: string | null;
 };
+type DbWorkOrderRow = {
+  id: string;
+  title: string;
+  status: string;
+  visit_count: string;
+  active_visit_count: string;
+  [key: string]: unknown;
+};
 
 
 function AdvancedDetails({ title, children }: { title: string; children: ReactNode }) {
@@ -172,7 +180,7 @@ export default async function JobDetailPage({
           [id, session.accountId]
         ),
     session.role !== "tech"
-      ? queryForSession<JobWorkOrderRow>(
+      ? queryForSession<DbWorkOrderRow>(
           session,
           `SELECT w.id, w.title, w.status,
                   COUNT(v.id)::text AS visit_count,
@@ -186,7 +194,7 @@ export default async function JobDetailPage({
            ORDER BY w.created_at ASC`,
           [id, session.accountId],
         )
-      : Promise.resolve([] as JobWorkOrderRow[]),
+      : Promise.resolve([] as DbWorkOrderRow[]),
     // Count estimates and invoices + profitability snapshot + pipeline state (owner/admin only)
     session.role !== "tech"
       ? queryOneForSession<{
@@ -474,10 +482,12 @@ export default async function JobDetailPage({
               <SectionHeader title="Work Orders" count={workOrders.length} />
               <JobWorkOrdersPanel
                 jobId={job.id}
-                workOrders={workOrders.map((wo) => ({
-                  ...wo,
-                  visit_count: parseInt(wo.visit_count as unknown as string, 10) || 0,
-                  active_visit_count: parseInt(wo.active_visit_count as unknown as string, 10) || 0,
+                workOrders={workOrders.map((wo): JobWorkOrderRow => ({
+                  id: wo.id,
+                  title: wo.title,
+                  status: wo.status,
+                  visit_count: parseInt(wo.visit_count, 10) || 0,
+                  active_visit_count: parseInt(wo.active_visit_count, 10) || 0,
                 }))}
                 canManage={canAddVisit}
               />

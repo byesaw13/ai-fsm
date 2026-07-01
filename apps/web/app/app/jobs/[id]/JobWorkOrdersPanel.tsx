@@ -14,9 +14,8 @@ export interface JobWorkOrderRow {
   id: string;
   title: string;
   status: string;
-  visit_count: number | string;
-  active_visit_count: number | string;
-  [key: string]: unknown;
+  visit_count: number;
+  active_visit_count: number;
 }
 
 interface JobWorkOrdersPanelProps {
