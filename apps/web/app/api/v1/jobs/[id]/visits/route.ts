@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { checkSchedulingPreconditions, EXECUTION_VISIT_TYPES } from "@ai-fsm/domain";
+import { checkSchedulingPreconditions, EXECUTION_VISIT_TYPES, VISIT_TYPES } from "@ai-fsm/domain";
+import type { VisitType } from "@ai-fsm/domain";
 import {
   resolveWorkOrderForVisit,
-  syncWorkOrdersForJob,
+  syncWorkOrderStatus,
 } from "../../../../../../lib/work-orders/sync-status";
 import { withAuth, withRole } from "../../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../../lib/auth/middleware";
@@ -20,7 +21,7 @@ const createVisitBody = z.object({
   tech_notes: z.string().optional(),
   booking_request_id: z.string().uuid().optional(),
   work_order_id: z.string().uuid().optional(),
-  visit_type: z.enum(["standard", "realtor_baseline", "membership_health_check", "punch_list"]).default("standard"),
+  visit_type: z.enum(VISIT_TYPES as [VisitType, ...VisitType[]]).default("standard"),
 });
 
 export const GET = withAuth(
@@ -226,7 +227,7 @@ export const POST = withRole(
       }
 
       if (resolvedWorkOrderId) {
-        await syncWorkOrdersForJob(client, jobId, session.accountId);
+        await syncWorkOrderStatus(client, resolvedWorkOrderId, session.accountId);
       }
 
       await client.query("COMMIT");

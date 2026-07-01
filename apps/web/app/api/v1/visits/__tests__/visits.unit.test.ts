@@ -83,12 +83,11 @@ const SAMPLE_VISIT = {
   updated_at: NOW,
 };
 
-/** Mocks emitted by syncWorkOrdersForJob after a successful INSERT. */
+/** Mocks emitted by syncWorkOrderStatus after a successful INSERT. */
 function appendPostInsertSyncMocks(chain: ReturnType<typeof vi.fn>) {
   return chain
     .mockResolvedValueOnce({ rows: [] }) // audit log
     .mockResolvedValueOnce({ rows: [] }) // job status advance (optional)
-    .mockResolvedValueOnce({ rows: [{ id: WORK_ORDER_ID }] }) // sync: list WOs
     .mockResolvedValueOnce({ rows: [{ status: "ready", completion_criteria: [] }] }) // sync: lock WO
     .mockResolvedValueOnce({ rows: [] }) // sync: load visits
     .mockResolvedValueOnce({ rows: [] }); // COMMIT

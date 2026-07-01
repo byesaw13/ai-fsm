@@ -23,7 +23,10 @@ interface VisitRow {
 }
 import { seedConditionSnapshots } from "../../../../../../lib/visits/condition-seeding";
 import { writeWorkflowEvent } from "../../../../../../lib/workflow-events";
-import { syncWorkOrdersForJob } from "../../../../../../lib/work-orders/sync-status";
+import {
+  syncWorkOrderStatus,
+  syncWorkOrdersForJob,
+} from "../../../../../../lib/work-orders/sync-status";
 
 export const dynamic = "force-dynamic";
 
@@ -416,7 +419,9 @@ export const POST = withAuth(
         }
       }
 
-      if (updated.job_id) {
+      if (updated.work_order_id) {
+        await syncWorkOrderStatus(client, updated.work_order_id, session.accountId);
+      } else if (updated.job_id) {
         await syncWorkOrdersForJob(client, updated.job_id, session.accountId);
       }
 

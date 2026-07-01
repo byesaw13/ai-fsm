@@ -10,6 +10,16 @@ import {
 } from "@ai-fsm/domain";
 import type { VisitStatus, WorkOrderStatus } from "@ai-fsm/domain";
 
+/** Planning statuses that may receive new execution visits. */
+export const SCHEDULABLE_WORK_ORDER_STATUSES = [
+  "ready",
+  "scheduled",
+  "dispatched",
+  "waiting",
+] as const;
+
+const schedulableList = SCHEDULABLE_WORK_ORDER_STATUSES.map((s) => `'${s}'`).join(", ");
+
 export async function syncWorkOrderStatus(
   client: PoolClient,
   workOrderId: string,
@@ -66,7 +76,8 @@ export async function syncWorkOrdersForJob(
 ): Promise<void> {
   const rows = await client.query<{ id: string }>(
     `SELECT id FROM work_orders
-     WHERE job_id = $1 AND account_id = $2 AND status NOT IN ('draft', 'cancelled')`,
+     WHERE job_id = $1 AND account_id = $2
+       AND status IN (${schedulableList})`,
     [jobId, accountId],
   );
   for (const row of rows.rows) {
@@ -85,7 +96,7 @@ export async function resolveWorkOrderForVisit(
     const check = await client.query<{ id: string }>(
       `SELECT id FROM work_orders
        WHERE id = $1 AND job_id = $2 AND account_id = $3
-         AND status NOT IN ('draft', 'cancelled')`,
+         AND status IN (${schedulableList})`,
       [workOrderId, jobId, accountId],
     );
     return check.rows[0]?.id ?? null;
@@ -93,7 +104,8 @@ export async function resolveWorkOrderForVisit(
 
   const rows = await client.query<{ id: string }>(
     `SELECT id FROM work_orders
-     WHERE job_id = $1 AND account_id = $2 AND status NOT IN ('draft', 'cancelled')
+     WHERE job_id = $1 AND account_id = $2
+       AND status IN (${schedulableList})
      ORDER BY created_at ASC`,
     [jobId, accountId],
   );
