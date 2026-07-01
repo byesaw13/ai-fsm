@@ -46,7 +46,7 @@ export function DeleteJobButton({ jobId }: Props) {
 
       <ConfirmDialog
         open={confirmOpen}
-        title="Delete Job?"
+        title="Delete Project?"
         body="This will permanently delete this job. This action cannot be undone."
         confirmLabel="Delete Job"
         onConfirm={() => {

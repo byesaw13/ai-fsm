@@ -384,7 +384,7 @@ Project
 
 | Slice | Delivers |
 |---|---|
-| **0 — Canon** | This spec; update `DOMAIN_MODEL.md`, `workflow-model.md`, `vocabulary.ts` |
+| **0 — Canon** | This spec; update `DOMAIN_MODEL.md`, `workflow-model.md`, `vocabulary.ts` — **shipped 2026-07-01** |
 | **1 — Schema** | `visits.work_order_id`, status/type CHECK constraints, work order status expansion, completion criteria column |
 | **2 — Estimate accept** | Accept → project + default work order; promote assessment draft |
 | **3 — Visit linkage** | Standard visits require work order; derived work order status; technician on visit only |

@@ -61,28 +61,28 @@ function actionForStage(props: Props): CommandAction | null {
     case "new_lead":
       return props.bookingRequestId
         ? { label: "Review Request", href: `/app/requests/${props.bookingRequestId}` }
-        : { label: isTm ? "Open T&M Job" : "Open Project", href: `/app/jobs/${props.jobId}` };
+        : { label: isTm ? "Open T&M Project" : "Open Project", href: `/app/jobs/${props.jobId}` };
     case "estimate_needed":
       return isTm
-        ? { label: "Open T&M Job", href: `/app/jobs/${props.jobId}` }
+        ? { label: "Open T&M Project", href: `/app/jobs/${props.jobId}` }
         : {
             label: "Create Estimate",
             href: `/app/estimates/new?job_id=${props.jobId}${clientParam}&pricing_mode=flat_rate`,
           };
     case "estimate_sent":
       return isTm
-        ? { label: "Open T&M Job", href: `/app/jobs/${props.jobId}` }
+        ? { label: "Open T&M Project", href: `/app/jobs/${props.jobId}` }
         : { label: "View Estimates", href: `/app/estimates?job_id=${props.jobId}` };
     case "approved_ready":
       return isTm
-        ? { label: "Open T&M Job", href: `/app/jobs/${props.jobId}` }
+        ? { label: "Open T&M Project", href: `/app/jobs/${props.jobId}` }
         : { label: "Book Walkthrough", href: `/app/jobs/${props.jobId}/visits/new` };
     case "scheduled":
     case "in_progress":
     case "waiting":
       return props.activeVisitId || props.latestVisitId
         ? { label: isTm ? "Open T&M Visit" : "Open Visit", href: `/app/visits/${props.activeVisitId ?? props.latestVisitId}` }
-        : { label: isTm ? "Open T&M Job" : "Book Walkthrough", href: `/app/jobs/${props.jobId}/visits/new` };
+        : { label: isTm ? "Open T&M Project" : "Book Walkthrough", href: `/app/jobs/${props.jobId}/visits/new` };
     case "completed":
       return {
         label: "Create Invoice",

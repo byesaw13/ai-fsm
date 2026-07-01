@@ -25,9 +25,9 @@ interface Props {
 // The "arrived" entry here handles the rare case where a visit is already in
 // arrived state (e.g. if the tech was on an older app version).
 const TECH_ACTIONS: Partial<Record<VisitStatus, { label: string; next: VisitStatus; variant: ButtonVariant }>> = {
-  scheduled:   { label: "Start Job",    next: "arrived",     variant: "primary"   },
-  arrived:     { label: "Start Job",    next: "in_progress", variant: "primary"   },
-  in_progress: { label: "Complete Job", next: "completed",   variant: "secondary" },
+  scheduled:   { label: "Start Visit",    next: "arrived",     variant: "primary"   },
+  arrived:     { label: "Start Visit",    next: "in_progress", variant: "primary"   },
+  in_progress: { label: "Complete Visit", next: "completed",   variant: "secondary" },
 };
 
 export function VisitTransitionForm({

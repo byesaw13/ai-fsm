@@ -56,7 +56,7 @@ export default async function NewVisitPage({
         title="Schedule Visit"
         subtitle={job.title ?? undefined}
         backHref={`/app/jobs/${id}`}
-        backLabel={job.title ?? "Job"}
+        backLabel={job.title ?? "Project"}
       />
       <Card>
         <VisitScheduleForm

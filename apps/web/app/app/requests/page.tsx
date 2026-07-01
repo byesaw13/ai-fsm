@@ -84,7 +84,7 @@ function getAction(row: RequestRow): { label: string; href: string; detail: stri
 
   if (guidance.followUpKind && guidance.followUpHref) {
     return {
-      label: guidance.followUpKind === "view_visit" ? "Open Walkthrough" : "Open Job",
+      label: guidance.followUpKind === "view_visit" ? "Open Walkthrough" : "Open Project",
       href: guidance.followUpHref,
       detail: guidance.recommendedDetail,
     };

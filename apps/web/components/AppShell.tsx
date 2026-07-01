@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import type { Route } from "next";
-import type { Role } from "@ai-fsm/domain";
+import { PRIMARY_UI_LABELS, type Role } from "@ai-fsm/domain";
 import { ToastProvider } from "./ui/Toast";
 import { QuickLeadModal } from "./QuickLeadModal";
 import { FloatingActionButton } from "./FloatingActionButton";
@@ -71,7 +71,7 @@ const NAV_MY_DAY:     NavItem = { href: "/app/my-day",       label: "My Day",   
 const NAV_DAY_REVIEW: NavItem = { href: "/app/day-review",   label: "Day Review", Icon: IconDayReview };
 const NAV_REQUESTS:   NavItem = { href: "/app/requests",     label: "Requests",   Icon: IconInbox };
 const NAV_PROPS:    NavItem = { href: "/app/properties", label: "Properties", Icon: IconProperties, adminOnly: true };
-const NAV_JOBS:     NavItem = { href: "/app/jobs",       label: "Jobs",       Icon: IconJobs,       adminOnly: true };
+const NAV_JOBS:     NavItem = { href: "/app/jobs",       label: PRIMARY_UI_LABELS.jobs, Icon: IconJobs, adminOnly: true };
 const NAV_INVOICES: NavItem = { href: "/app/invoices",   label: "Invoices",   Icon: IconInvoices,   adminOnly: true };
 const NAV_REPORTS:  NavItem = { href: "/app/reports",    label: "Reports",    Icon: IconReports,    adminOnly: true };
 const NAV_SETTINGS: NavItem = { href: "/app/settings",   label: "Settings",   Icon: IconSettings,   adminOnly: true };

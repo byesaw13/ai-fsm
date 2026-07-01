@@ -462,7 +462,7 @@ export default async function InvoiceDetailPage({
               )}
               {invoice.job_title && (
                 <div className="p7-detail-row">
-                  <dt>Job</dt>
+                  <dt>Project</dt>
                   <dd>
                     <Link href={`/app/jobs/${invoice.job_id}`} style={{ color: "var(--accent)" }}>
                       {invoice.job_title}

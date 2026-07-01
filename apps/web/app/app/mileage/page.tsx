@@ -44,7 +44,7 @@ interface PageProps {
 }
 
 const ENTITY_TYPE_LABELS: Record<string, string> = {
-  job:          "Job",
+  job:          "Project",
   visit:        "Visit",
   estimate:     "Estimate",
   supplier_run: "Supplier",

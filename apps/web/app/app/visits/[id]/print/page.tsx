@@ -251,7 +251,7 @@ export default async function VisitReportPrintPage({
             <tbody>
               {visit.job_title && (
                 <tr>
-                  <td>Job</td>
+                  <td>Project</td>
                   <td>{visit.job_title}</td>
                 </tr>
               )}

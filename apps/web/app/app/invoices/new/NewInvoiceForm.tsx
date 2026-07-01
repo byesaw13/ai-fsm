@@ -225,7 +225,7 @@ export function NewInvoiceForm({
 
         <Select
           id="job_id"
-          label="Job (optional)"
+          label="Project (optional)"
           value={jobId}
           onChange={(e) => setJobId(e.target.value)}
           disabled={pending || !clientId}

@@ -48,7 +48,7 @@ export function InlineJobForm({ clientId, onCreated, onCancel }: InlineJobFormPr
       }}
     >
       <p style={{ margin: "0 0 var(--space-3)", fontWeight: 500, fontSize: "var(--text-sm)" }}>
-        New Job
+        New Project
       </p>
       {error && (
         <p style={{ margin: "0 0 var(--space-3)", color: "var(--color-red-600)", fontSize: "var(--text-sm)" }}>
@@ -69,7 +69,7 @@ export function InlineJobForm({ clientId, onCreated, onCancel }: InlineJobFormPr
         </div>
         <div style={{ display: "flex", gap: "var(--space-2)" }}>
           <Button type="button" size="sm" disabled={pending || !title.trim()} loading={pending} onClick={handleSubmit}>
-            Create Job
+            Create Project
           </Button>
           <Button type="button" variant="secondary" size="sm" onClick={onCancel} disabled={pending}>
             Cancel

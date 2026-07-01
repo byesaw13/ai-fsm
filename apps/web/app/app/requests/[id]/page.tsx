@@ -359,7 +359,7 @@ export default async function BookingRequestDetailPage({
               <dl className="p7-detail-list">
                 {br.job_id && (
                   <div className="p7-detail-row">
-                    <dt>Job</dt>
+                    <dt>Project</dt>
                     <dd>
                       <Link href={`/app/jobs/${br.job_id}`} style={{ color: "var(--accent)" }}>
                         {br.job_title ?? br.job_id}
@@ -400,7 +400,7 @@ export default async function BookingRequestDetailPage({
         {/* Right — review panel */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
           <Card>
-            <SectionHeader title="Job Fit" />
+            <SectionHeader title="Project Fit" />
             <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginBottom: "var(--space-3)" }}>
               <div style={{
                 width: 52, height: 52, borderRadius: "50%", flexShrink: 0,
@@ -456,7 +456,7 @@ export default async function BookingRequestDetailPage({
 
           {br.job_id && (
             <LinkButton href={`/app/jobs/${br.job_id}`} variant="secondary" style={{ width: "100%" }}>
-              Open Job →
+              Open Project →
             </LinkButton>
           )}
         </div>

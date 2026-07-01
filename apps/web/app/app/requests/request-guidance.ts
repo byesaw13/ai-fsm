@@ -58,9 +58,9 @@ const OUTCOME_META: Record<RequestPrimaryActionKind, { label: string; detail: st
     destination: "Estimate",
   },
   create_job: {
-    label: "Create Job",
+    label: "Create Project",
     detail: "Create the work thread first, then continue from the job.",
-    destination: "Job",
+    destination: "Project",
   },
   schedule_walkthrough: {
     label: "Schedule Walkthrough",
@@ -133,10 +133,10 @@ export function getRequestGuidance(input: RequestGuidanceInput): RequestGuidance
           ? "This request should go straight to an estimate."
           : "Use the job-fit details to classify the request.";
 
-  const recommendedLabel = meta?.label ?? (followUpKind === "view_visit" ? "Open Walkthrough" : followUpKind === "view_job" ? "Open Job" : "Close Request");
+  const recommendedLabel = meta?.label ?? (followUpKind === "view_visit" ? "Open Walkthrough" : followUpKind === "view_job" ? "Open Project" : "Close Request");
   const recommendedDetail = meta?.detail ?? (followUpKind === "view_visit" ? "Continue from the scheduled walkthrough." : followUpKind === "view_job" ? "Continue from the linked job." : "Keep the request closed and review the record in history.");
 
-  const destinationRecord = meta?.destination ?? (followUpKind === "view_visit" ? "Visit" : followUpKind === "view_job" ? "Job" : destinationFor("close_request"));
+  const destinationRecord = meta?.destination ?? (followUpKind === "view_visit" ? "Visit" : followUpKind === "view_job" ? "Project" : destinationFor("close_request"));
 
   return {
     currentStateLabel: STATE_LABELS[status],

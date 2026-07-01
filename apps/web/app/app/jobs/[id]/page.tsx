@@ -332,7 +332,7 @@ export default async function JobDetailPage({
       <div style={{ padding: "var(--space-4) var(--space-4) var(--space-12)", display: "flex", flexDirection: "column", gap: "var(--space-5)", maxWidth: 760 }}>
         <header style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           <Link href="/app/jobs" style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", textDecoration: "none", fontWeight: 700 }}>
-            Jobs
+            Projects
           </Link>
           <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)", alignItems: "flex-start" }}>
             <div>
@@ -400,7 +400,7 @@ export default async function JobDetailPage({
         title={job.title}
         subtitle={[job.job_number, job.client_name].filter(Boolean).join(" · ") || undefined}
         backHref="/app/jobs"
-        backLabel="Jobs"
+        backLabel="Projects"
         actions={
           <span data-testid="job-status" style={{ display: "inline-flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
             <StatusBadge variant={currentStatus as StatusVariant}>
@@ -476,7 +476,7 @@ export default async function JobDetailPage({
           {/* Status Transitions — admin/owner only */}
           {canTransition && allowedTransitions.length > 0 && (
             <Card data-testid="job-transition-panel">
-              <SectionHeader title="Close Out Job" />
+              <SectionHeader title="Close Out Project" />
               <JobTransitionForm
                 jobId={job.id}
                 allowedTransitions={allowedTransitions as JobStatus[]}
@@ -503,7 +503,7 @@ export default async function JobDetailPage({
           <div className="p7-detail-sidebar">
             {/* Job details */}
             <Card>
-              <SectionHeader title="Job Details" />
+              <SectionHeader title="Project Details" />
               <dl className="p7-detail-list">
                 <div className="p7-detail-row">
                   <dt>Status</dt>
@@ -556,7 +556,7 @@ export default async function JobDetailPage({
             </Card>
 
             {/* Edit form — admin/owner only */}
-            <AdvancedDetails title="Edit Job Details">
+            <AdvancedDetails title="Edit Project Details">
               <JobEditForm
                 jobId={job.id}
                 initialTitle={job.title}
@@ -797,7 +797,7 @@ export default async function JobDetailPage({
         {isTech && (
           <div className="p7-detail-sidebar">
             <Card>
-              <SectionHeader title="Job Details" />
+              <SectionHeader title="Project Details" />
               <dl className="p7-detail-list">
                 {job.client_name && (
                   <div className="p7-detail-row">

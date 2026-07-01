@@ -565,7 +565,7 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
             }}
             className="p7-btn p7-btn-ghost p7-btn-sm"
           >
-            Create Work Order →
+            Prepare Work Order Draft →
           </button>
           <a href={`/app/visits/${visitId}`} className="p7-btn p7-btn-ghost p7-btn-sm">
             Back to Visit

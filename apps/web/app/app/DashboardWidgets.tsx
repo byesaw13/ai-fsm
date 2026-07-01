@@ -117,7 +117,7 @@ export function JobsToday({ jobs, readOnly = false }: { jobs: CommandVisit[]; re
 
   return (
     <Card>
-      <SectionHeader title="Today's Jobs" count={jobs.length} action={<LinkButton href="/app/jobs" variant="ghost" size="sm">View all</LinkButton>} />
+      <SectionHeader title="Today's Projects" count={jobs.length} action={<LinkButton href="/app/jobs" variant="ghost" size="sm">View all</LinkButton>} />
       {jobs.length === 0 ? <EmptyState title="No jobs scheduled today" description="Scheduled visits for today appear here." /> : (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
           {jobs.map((job) => {

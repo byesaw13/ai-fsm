@@ -82,7 +82,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           { label: "Net (Paid − Expenses)", value: formatCents(data.netCents), variant: data.netCents < 0 ? "alert" : data.netCents > 0 ? "success" : "default" },
           { label: "Outstanding AR", value: formatCents(data.revenueOutstandingCents), variant: data.revenueOutstandingCents > 0 ? "alert" : "default" },
           { label: "Estimate Conversion", value: `${data.conversionRate}%`, variant: data.conversionRate >= 30 ? "success" : data.conversionRate > 0 ? "default" : "alert" },
-          { label: "Active Jobs", value: String(data.totalJobs), variant: "default" },
+          { label: "Active Projects", value: String(data.totalJobs), variant: "default" },
         ]}
       />
 

@@ -2,6 +2,7 @@ export const CANONICAL_BACKEND_TERMS = {
   client: "client",
   property: "property",
   job: "job",
+  work_order: "work_order",
   visit: "visit",
   booking_request: "booking_request",
   estimate: "estimate",
@@ -17,10 +18,27 @@ export const CANONICAL_BACKEND_TERMS = {
 
 export type CanonicalBackendTerm = keyof typeof CANONICAL_BACKEND_TERMS;
 
+/** Primary owner/staff UI labels. Backend table names stay stable. */
+export const PRIMARY_UI_LABELS = {
+  job: "Project",
+  jobs: "Projects",
+  work_order: "Work Order",
+  work_orders: "Work Orders",
+  visit: "Visit",
+  visits: "Visits",
+} as const;
+
+export type PrimaryUiLabelKey = keyof typeof PRIMARY_UI_LABELS;
+
+export function primaryUiLabel(key: PrimaryUiLabelKey): string {
+  return PRIMARY_UI_LABELS[key];
+}
+
 export const UI_DISPLAY_TERMS = {
   booking_request: ["Request", "New Request", "Intake"],
-  job: ["Job", "Project"],
-  visit: ["Visit", "Walkthrough", "Work Order"],
+  job: ["Project"],
+  work_order: ["Work Order"],
+  visit: ["Visit", "Walkthrough"],
   estimate: ["Estimate", "Quote"],
   membership: ["Membership", "Maintenance Plan"],
   workflow: ["Workflow"],
