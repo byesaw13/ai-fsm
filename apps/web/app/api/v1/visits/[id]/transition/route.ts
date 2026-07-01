@@ -14,6 +14,7 @@ interface VisitRow {
   id: string;
   account_id: string;
   job_id: string | null;
+  work_order_id: string | null;
   assigned_user_id: string | null;
   status: VisitStatus;
   arrived_at: string | null;

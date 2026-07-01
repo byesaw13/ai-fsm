@@ -37,7 +37,6 @@ export function deriveWorkOrderStatus({
   if (currentStatus === "cancelled") return "cancelled";
   if (currentStatus === "draft") return "draft";
 
-  const activeVisits = visits.filter((v) => !TERMINAL_VISIT_STATUSES.includes(v.status));
   const allVisitsDone =
     visits.length > 0 &&
     visits.every((v) => TERMINAL_VISIT_STATUSES.includes(v.status)) &&

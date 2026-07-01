@@ -21,7 +21,7 @@ const createVisitBody = z.object({
   tech_notes: z.string().optional(),
   booking_request_id: z.string().uuid().optional(),
   work_order_id: z.string().uuid().optional(),
-  visit_type: z.enum(VISIT_TYPES as [VisitType, ...VisitType[]]).default("standard"),
+  visit_type: z.enum([...VISIT_TYPES] as [VisitType, ...VisitType[]]).default("standard"),
 });
 
 export const GET = withAuth(
