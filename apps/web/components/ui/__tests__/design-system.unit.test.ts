@@ -164,7 +164,7 @@ describe("getNavSections (role filtering)", () => {
     for (const view of ["field", "office"] as const) {
       const hrefs = getNavSections("owner", view)[0].items.map((i) => i.href);
       for (const href of shared) expect(hrefs).toContain(href);
-      expect(hrefs).toContain(view === "field" ? "/app/my-day" : "/app");
+      expect(hrefs).toContain(view === "field" ? "/app/my-work" : "/app");
       expect(hrefs).not.toContain("/app/mileage");
       expect(hrefs).toHaveLength(12);
     }
@@ -173,7 +173,7 @@ describe("getNavSections (role filtering)", () => {
   it("Admin nav drops My Day (pure admins don't do field work) — 12 items", () => {
     const sections = getNavSections("admin");
     const hrefs = sections[0].items.map((i) => i.href);
-    expect(hrefs).not.toContain("/app/my-day"); // EPIC-006 P5
+    expect(hrefs).not.toContain("/app/my-work"); // EPIC-006 P5
     expect(hrefs).toContain("/app");
     expect(hrefs).toContain("/app/settings");
     expect(hrefs).toHaveLength(12);
@@ -198,11 +198,11 @@ describe("getNavSections (role filtering)", () => {
       const hrefs = flattenSections(sections).map((i) => i.href);
       expect(hrefs).toHaveLength(12);
       if (view === "field") {
-        expect(hrefs).toContain("/app/my-day");
+        expect(hrefs).toContain("/app/my-work");
         expect(hrefs).not.toContain("/app"); // no Overview home in Field
       } else {
         expect(hrefs).toContain("/app");
-        expect(hrefs).not.toContain("/app/my-day"); // no My Day home in Office
+        expect(hrefs).not.toContain("/app/my-work"); // no My Day home in Office
       }
     }
   });
@@ -212,7 +212,7 @@ describe("getNavSections (role filtering)", () => {
     const items = flattenSections(sections);
     expect(items).toHaveLength(2);
     const hrefs = items.map((i) => i.href);
-    expect(hrefs).toContain("/app/my-day");
+    expect(hrefs).toContain("/app/my-work");
     expect(hrefs).toContain("/app/visits");
     expect(hrefs).not.toContain("/app/field");
     expect(hrefs).not.toContain("/app/settings");
@@ -225,7 +225,7 @@ describe("getNavSections (role filtering)", () => {
   it("leads with My Day for owner/tech, Overview for pure admin", () => {
     for (const role of ["tech", "owner"] as const) {
       const items = flattenSections(getNavSections(role));
-      expect(items[0].href).toBe("/app/my-day");
+      expect(items[0].href).toBe("/app/my-work");
     }
 
     const adminFirst = getNavSections("admin")[0].items[0];
@@ -237,12 +237,12 @@ describe("getNavSections (role filtering)", () => {
     // Field surface: My Day leads, Overview is not in the sidebar (reach it from
     // Settings → Workspace). Office surface: the reverse.
     const field = flattenSections(getNavSections("owner", "field")).map((i) => i.href);
-    expect(field[0]).toBe("/app/my-day");
+    expect(field[0]).toBe("/app/my-work");
     expect(field).not.toContain("/app");
 
     const office = flattenSections(getNavSections("owner", "office")).map((i) => i.href);
     expect(office[0]).toBe("/app");
-    expect(office).not.toContain("/app/my-day");
+    expect(office).not.toContain("/app/my-work");
 
     // Shared business destinations stay in both.
     for (const href of ["/app/jobs", "/app/invoices", "/app/reports", "/app/settings"]) {
@@ -270,7 +270,7 @@ describe("getBottomNavItems (mobile)", () => {
     const items = getBottomNavItems("tech");
     expect(items).toHaveLength(2);
     const hrefs = items.map((i) => i.href);
-    expect(hrefs).toContain("/app/my-day");
+    expect(hrefs).toContain("/app/my-work");
     expect(hrefs).toContain("/app/visits");
     expect(hrefs).not.toContain("/app/field");
     expect(hrefs).not.toContain("/app/jobs");
@@ -279,7 +279,7 @@ describe("getBottomNavItems (mobile)", () => {
   it("returns 3 link items for owner role leading with My Day", () => {
     const items = getBottomNavItems("owner");
     expect(items.map((i) => i.href)).toEqual([
-      "/app/my-day",
+      "/app/my-work",
       "/app/requests",
       "/app/jobs",
     ]);

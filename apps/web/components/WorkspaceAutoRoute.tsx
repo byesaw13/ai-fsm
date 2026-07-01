@@ -11,7 +11,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 const COOKIE_MODE = "dv_ws_mode";
 const OFFICE_ROOT = "/app";
-const FIELD_ROOT = "/app/my-day";
+const FIELD_ROOT = "/app/my-work";
 
 function readCookie(name: string): string | null {
   if (typeof document === "undefined") return null;

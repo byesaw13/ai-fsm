@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { checkSchedulingPreconditions, EXECUTION_VISIT_TYPES, VISIT_TYPES } from "@ai-fsm/domain";
 import type { VisitType } from "@ai-fsm/domain";
+import { syncWorkOrderLeadFromVisit } from "../../../../../../lib/work-orders/assign-lead";
 import {
   resolveWorkOrderForVisit,
   syncWorkOrderStatus,
@@ -227,6 +228,12 @@ export const POST = withRole(
       }
 
       if (resolvedWorkOrderId) {
+        await syncWorkOrderLeadFromVisit(
+          client,
+          resolvedWorkOrderId,
+          session.accountId,
+          assigned_user_id ?? null,
+        );
         await syncWorkOrderStatus(client, resolvedWorkOrderId, session.accountId);
       }
 
