@@ -1,0 +1,192 @@
+import { query, queryOne } from "@/lib/db";
+import { detectGaps, preSelectCandidates, checkMileageDelta } from "@ai-fsm/domain";
+
+export type DayReviewPayload = {
+  businessDayId: string;
+  date: string;
+  status: string;
+  reviewPromptedAt: string | null;
+  closedAt: string | null;
+  visits: {
+    id: string;
+    propertyName: string;
+    clientName: string;
+    arrivalTime: string;
+    departureTime: string;
+    durationMinutes: number;
+    confidenceScore: number;
+    preSelected: boolean;
+    linkedJobId: string | null;
+    classification: string | null;
+    status: string;
+  }[];
+  segments: {
+    id: string;
+    kind: "stop" | "drive";
+    startedAt: string;
+    endedAt: string;
+    placeLabel: string | null;
+    zone: string | null;
+    status: string;
+    isLikelyNoise: boolean;
+  }[];
+  gaps: { startsAt: string; endsAt: string; durationMinutes: number }[];
+  mileage: {
+    vehicleSessionId: string | null;
+    vehicleName: string | null;
+    odometerMiles: number | null;
+    gpsMiles: number;
+    deltaPercent: number | null;
+    flagged: boolean;
+  };
+};
+
+export async function getDayReview(
+  accountId: string,
+  date: string,
+): Promise<DayReviewPayload | null> {
+  const day = await queryOne<{
+    id: string;
+    status: string;
+    review_prompted_at: string | null;
+    closed_at: string | null;
+    confidence_threshold: number;
+    min_dwell: number;
+  }>(
+    `SELECT bd.id, bd.status,
+            bd.review_prompted_at::text, bd.closed_at::text,
+            a.visit_confidence_threshold AS confidence_threshold,
+            a.min_stop_dwell_minutes AS min_dwell
+     FROM business_days bd
+     JOIN accounts a ON a.id = bd.account_id
+     WHERE bd.account_id = $1 AND bd.business_date = $2::date`,
+    [accountId, date],
+  );
+  if (!day) return null;
+
+  const candidateRows = await query<{
+    id: string;
+    property_name: string;
+    client_name: string;
+    arrival_time: string;
+    departure_time: string;
+    duration_minutes: number;
+    confidence_score: number;
+    job_id: string | null;
+    classification: string | null;
+    status: string;
+  }>(
+    `SELECT vc.id, p.address AS property_name, c.name AS client_name,
+            vc.arrival_time::text, vc.departure_time::text,
+            vc.duration_minutes, vc.confidence_score,
+            vc.job_id, vc.classification, vc.status
+     FROM visit_candidates vc
+     JOIN properties p ON p.id = vc.property_id
+     JOIN clients c ON c.id = vc.matched_client_id
+     WHERE vc.account_id = $1
+       AND vc.arrival_time::date = $2::date
+       AND vc.status = 'pending'
+     ORDER BY vc.arrival_time ASC`,
+    [accountId, date],
+  );
+
+  const scored = candidateRows.map((r) => ({
+    id: r.id,
+    confidenceScore: r.confidence_score,
+    propertyName: r.property_name,
+    clientName: r.client_name,
+    arrivalTime: r.arrival_time,
+    departureTime: r.departure_time,
+    durationMinutes: r.duration_minutes,
+    linkedJobId: r.job_id,
+    classification: r.classification,
+    status: r.status,
+  }));
+  const preSelectedIds = new Set(preSelectCandidates(scored, day.confidence_threshold).map((c) => c.id));
+
+  const segmentRows = await query<{
+    id: string;
+    kind: "stop" | "drive";
+    started_at: string;
+    ended_at: string;
+    place_label: string | null;
+    zone: string | null;
+    status: string;
+    is_likely_noise: boolean;
+  }>(
+    `SELECT id, kind, started_at::text, ended_at::text,
+            place_label, zone, status, is_likely_noise
+     FROM location_segments
+     WHERE account_id = $1 AND segment_date = $2::date AND ended_at IS NOT NULL
+     ORDER BY started_at ASC`,
+    [accountId, date],
+  );
+
+  const entryRows = await query<{ started_at: string; ended_at: string }>(
+    `SELECT started_at::text AS started_at, ended_at::text AS ended_at
+     FROM activity_entries
+     WHERE account_id = $1 AND started_at::date = $2::date
+       AND voided_at IS NULL AND ended_at IS NOT NULL`,
+    [accountId, date],
+  );
+
+  const gaps = detectGaps(
+    segmentRows.map((s) => ({ startedAt: s.started_at, endedAt: s.ended_at })),
+    entryRows.map((e) => ({ startedAt: e.started_at, endedAt: e.ended_at })),
+    day.min_dwell,
+  );
+
+  const mileageRow = await queryOne<{
+    vehicle_session_id: string | null;
+    vehicle_name: string | null;
+    odometer_miles: number | null;
+    gps_meters: string | null;
+  }>(
+    `SELECT vs.id AS vehicle_session_id,
+            v.name AS vehicle_name,
+            vs.distance_miles AS odometer_miles,
+            SUM(ls.distance_meters)::text AS gps_meters
+     FROM vehicle_sessions vs
+     LEFT JOIN vehicles v ON v.id = vs.vehicle_id
+     LEFT JOIN location_segments ls
+       ON ls.account_id = vs.account_id
+       AND ls.segment_date = vs.session_date
+       AND ls.kind = 'drive'
+       AND ls.status = 'confirmed'
+     WHERE vs.account_id = $1 AND vs.session_date = $2::date
+     GROUP BY vs.id, v.name, vs.distance_miles
+     LIMIT 1`,
+    [accountId, date],
+  );
+
+  const gpsMiles = mileageRow?.gps_meters ? Number(mileageRow.gps_meters) / 1609.34 : 0;
+  const delta = checkMileageDelta(mileageRow?.odometer_miles ?? null, gpsMiles);
+
+  return {
+    businessDayId: day.id,
+    date,
+    status: day.status,
+    reviewPromptedAt: day.review_prompted_at,
+    closedAt: day.closed_at,
+    visits: scored.map((c) => ({ ...c, preSelected: preSelectedIds.has(c.id) })),
+    segments: segmentRows.map((s) => ({
+      id: s.id,
+      kind: s.kind,
+      startedAt: s.started_at,
+      endedAt: s.ended_at,
+      placeLabel: s.place_label,
+      zone: s.zone,
+      status: s.status,
+      isLikelyNoise: s.is_likely_noise,
+    })),
+    gaps,
+    mileage: {
+      vehicleSessionId: mileageRow?.vehicle_session_id ?? null,
+      vehicleName: mileageRow?.vehicle_name ?? null,
+      odometerMiles: mileageRow?.odometer_miles ?? null,
+      gpsMiles: Math.round(gpsMiles * 10) / 10,
+      deltaPercent: delta.deltaPercent,
+      flagged: delta.flagged,
+    },
+  };
+}
