@@ -46,6 +46,27 @@ export default async function TimelinePage({
     [session.accountId, day]
   );
 
+
+  const needsJobLink = await queryForSession<{
+    id: string;
+    activity_type: string;
+    started_at: string;
+    ended_at: string;
+    note: string | null;
+  }>(
+    session,
+    `SELECT id, activity_type, started_at::text, ended_at::text, note
+     FROM activity_entries
+     WHERE account_id = $1
+       AND session_date = $2::date
+       AND voided_at IS NULL
+       AND entity_id IS NULL
+       AND ended_at IS NOT NULL
+       AND activity_type IN ('job_work','travel','material_run','estimate_visit','follow_up')
+     ORDER BY started_at ASC`,
+    [session.accountId, day]
+  );
+
   const label = new Date(`${day}T12:00:00`).toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -60,15 +81,15 @@ export default async function TimelinePage({
         subtitle={label}
         actions={<ManualSiteVisitButton />}
       />
-      <TimelineEditor date={day} entries={entries} />
+      <TimelineEditor date={day} entries={entries} needsJobLink={needsJobLink} />
       <div style={{ marginTop: "var(--space-6)" }}>
-        <VisitCandidatesPanel day={day} />
+        <VisitCandidatesPanel day={day} entries={entries} />
       </div>
       <div style={{ marginTop: "var(--space-6)" }}>
         <DayMapPanel day={day} />
       </div>
       <div style={{ marginTop: "var(--space-6)" }}>
-        <LocationSegmentsPanel day={day} />
+        <LocationSegmentsPanel day={day} entries={entries} />
       </div>
       <div style={{ marginTop: "var(--space-6)" }}>
         <LocationDebugPanel day={day} />

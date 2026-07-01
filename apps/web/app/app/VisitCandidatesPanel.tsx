@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Badge, SectionHeader, LocalTime, useToast } from "@/components/ui";
+import { Button, Badge, SectionHeader, LocalTime, useToast, ConfirmDialog } from "@/components/ui";
 import type { VisitClassification } from "@ai-fsm/domain";
+import { proposeRebalance, type RebalanceAdjustment, type TimelineEntry } from "@/lib/activities/timeline";
+import type { ActivityEntryDto } from "./ActivityTracker";
 
 // EPIC-007: detected customer visits awaiting review. The owner classifies each
 // (or ignores it); confirming writes a ledger entry and, the first time, learns
@@ -29,12 +31,26 @@ const CLASSIFY_BUTTONS: { value: Exclude<VisitClassification, "ignore">; label: 
   { value: "realtor", label: "Realtor" },
 ];
 
-export function VisitCandidatesPanel({ day }: { day?: string }) {
+export function VisitCandidatesPanel({ day, entries }: { day?: string; entries: ActivityEntryDto[] }) {
   const router = useRouter();
   const toast = useToast();
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState<string | null>(null);
+  const [confirmReplace, setConfirmReplace] = useState<{
+    id: string;
+    body: Record<string, unknown>;
+    rebalance: RebalanceAdjustment[];
+  } | null>(null);
+
+  function timelineEntries(): TimelineEntry[] {
+    return entries.map((e) => ({
+      id: e.id,
+      activity_type: e.activity_type,
+      started_at: e.started_at,
+      ended_at: e.ended_at,
+    }));
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -115,7 +131,18 @@ export function VisitCandidatesPanel({ day }: { day?: string }) {
                   size="sm"
                   variant="secondary"
                   disabled={pending === c.id}
-                  onClick={() => patch(c.id, { action: "confirm", classification: b.value }, "Logged to your day")}
+                  onClick={() => {
+                    const body = { action: "confirm", classification: b.value };
+                    const rebalance = proposeRebalance(timelineEntries(), {
+                      started_at: c.arrival_time,
+                      ended_at: c.departure_time,
+                    });
+                    if (rebalance.length > 0) {
+                      setConfirmReplace({ id: c.id, body, rebalance });
+                      return;
+                    }
+                    void patch(c.id, body, "Logged to your day");
+                  }}
                 >
                   {b.label}
                 </Button>
@@ -132,6 +159,25 @@ export function VisitCandidatesPanel({ day }: { day?: string }) {
           </div>
         ))}
       </div>
+      <ConfirmDialog
+        open={confirmReplace !== null}
+        title="Replace manual activity?"
+        body="This detected visit overlaps manual time. Confirming will archive the original manual activity for reporting and prevent double-counted time."
+        confirmLabel="Confirm and archive"
+        onConfirm={() => {
+          const pendingReplace = confirmReplace;
+          setConfirmReplace(null);
+          if (pendingReplace) {
+            void patch(
+              pendingReplace.id,
+              { ...pendingReplace.body, rebalance: pendingReplace.rebalance },
+              "Logged to your day",
+            );
+          }
+        }}
+        onCancel={() => setConfirmReplace(null)}
+        loading={pending === confirmReplace?.id}
+      />
     </div>
   );
 }

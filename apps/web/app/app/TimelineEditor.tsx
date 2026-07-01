@@ -41,6 +41,16 @@ function toTimelineEntry(e: ActivityEntryDto): TimelineEntry {
 
 // ---------------------------------------------------------------------------
 
+export type TimelineEditorEntry = ActivityEntryDto;
+
+type NeedsJobLinkRow = {
+  id: string;
+  activity_type: string;
+  started_at: string;
+  ended_at: string;
+  note: string | null;
+};
+
 type RowDraft = {
   activity_type: ActivityType;
   start: string;  // HH:MM
@@ -84,7 +94,15 @@ const timeInputStyle: React.CSSProperties = {
   minHeight: 38, border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "0 var(--space-2)", background: "var(--bg-card)",
 };
 
-export function TimelineEditor({ date, entries }: { date: string; entries: ActivityEntryDto[] }) {
+export function TimelineEditor({
+  date,
+  entries,
+  needsJobLink,
+}: {
+  date: string;
+  entries: ActivityEntryDto[];
+  needsJobLink: NeedsJobLinkRow[];
+}) {
   const router = useRouter();
   const toast = useToast();
   const [pending, setPending] = useState(false);
@@ -206,6 +224,23 @@ export function TimelineEditor({ date, entries }: { date: string; entries: Activ
       </div>
 
       <DayTimeSummary entries={entries} />
+
+      {needsJobLink.length > 0 ? (
+        <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-3)", background: "var(--bg-card)" }}>
+          <strong>Needs job link</strong>
+          <p style={{ margin: "var(--space-1) 0 var(--space-2)", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+            These confirmed activities affect job costing but are not attached to a job yet.
+          </p>
+          <ul style={{ margin: 0, paddingLeft: "1.25rem", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+            {needsJobLink.map((row) => (
+              <li key={row.id}>
+                {fmtClock(row.started_at)}-{fmtClock(row.ended_at)} {ACTIVITY_TYPE_META[row.activity_type as ActivityType]?.label ?? row.activity_type}
+                {row.note ? ` - ${row.note}` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {/* Timeline */}
       {sorted.length === 0 ? (

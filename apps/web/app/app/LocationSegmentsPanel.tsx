@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Select, Badge, SectionHeader, EmptyState, LocalTime, useToast } from "@/components/ui";
+import { Button, Select, Badge, SectionHeader, EmptyState, LocalTime, useToast, ConfirmDialog } from "@/components/ui";
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_META, type ActivityType } from "@ai-fsm/domain";
+import { proposeRebalance, type RebalanceAdjustment, type TimelineEntry } from "@/lib/activities/timeline";
+import type { ActivityEntryDto } from "./ActivityTracker";
 
 // TASK-024 (slice 2): the labelable day timeline. Shows captured stop/drive
 // segments fed in from Home Assistant; the owner assigns an activity to each and
@@ -56,13 +58,27 @@ function confidenceLabel(seg: Segment): "high" | "medium" | "low" {
   return "low";
 }
 
-export function LocationSegmentsPanel({ day }: { day?: string }) {
+export function LocationSegmentsPanel({ day, entries }: { day?: string; entries: ActivityEntryDto[] }) {
   const router = useRouter();
   const toast = useToast();
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState(true);
   const [choice, setChoice] = useState<Record<string, ActivityType>>({});
   const [pending, setPending] = useState<string | null>(null);
+  const [confirmReplace, setConfirmReplace] = useState<{
+    id: string;
+    body: Record<string, unknown>;
+    rebalance: RebalanceAdjustment[];
+  } | null>(null);
+
+  function timelineEntries(): TimelineEntry[] {
+    return entries.map((e) => ({
+      id: e.id,
+      activity_type: e.activity_type,
+      started_at: e.started_at,
+      ended_at: e.ended_at,
+    }));
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -178,7 +194,19 @@ export function LocationSegmentsPanel({ day }: { day?: string }) {
                     variant={flagged ? "ghost" : "primary"}
                     loading={pending === seg.id}
                     disabled={isOpen}
-                    onClick={() => patch(seg.id, { action: "confirm", activity_type: choice[seg.id] ?? defaultActivity(seg) }, "Logged to your day")}
+                    onClick={() => {
+                      const body = { action: "confirm", activity_type: choice[seg.id] ?? defaultActivity(seg) };
+                      if (!seg.ended_at) return;
+                      const rebalance = proposeRebalance(timelineEntries(), {
+                        started_at: seg.started_at,
+                        ended_at: seg.ended_at,
+                      });
+                      if (rebalance.length > 0) {
+                        setConfirmReplace({ id: seg.id, body, rebalance });
+                        return;
+                      }
+                      void patch(seg.id, body, "Logged to your day");
+                    }}
                   >
                     Confirm
                   </Button>
@@ -222,6 +250,25 @@ export function LocationSegmentsPanel({ day }: { day?: string }) {
           ) : null}
         </div>
       )}
+      <ConfirmDialog
+        open={confirmReplace !== null}
+        title="Replace manual activity?"
+        body="This auto-captured activity overlaps manual time. Confirming will archive the original manual activity for reporting and prevent double-counted time."
+        confirmLabel="Confirm and archive"
+        onConfirm={() => {
+          const pendingReplace = confirmReplace;
+          setConfirmReplace(null);
+          if (pendingReplace) {
+            void patch(
+              pendingReplace.id,
+              { ...pendingReplace.body, rebalance: pendingReplace.rebalance },
+              "Logged to your day",
+            );
+          }
+        }}
+        onCancel={() => setConfirmReplace(null)}
+        loading={pending === confirmReplace?.id}
+      />
     </section>
   );
 }
