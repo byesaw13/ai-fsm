@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth } from "../../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../../lib/auth/middleware";
-import { getPool } from "../../../../../../lib/db";
-import { assertAssignedLead } from "../../../../../../lib/work-orders/lead-access";
+import type { CompletionCriterion } from "@ai-fsm/domain";
+import {
+  assertAssignedLead,
+  mergeCompletionCriteriaToggles,
+  withLeadWorkOrderContext,
+} from "../../../../../../lib/work-orders/lead-access";
 import { logger } from "../../../../../../lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +16,6 @@ const bodySchema = z.object({
   completion_criteria: z.array(
     z.object({
       id: z.string(),
-      label: z.string(),
-      required: z.boolean(),
       completed: z.boolean(),
     }),
   ),
@@ -37,41 +39,57 @@ export const PATCH = withAuth(
       );
     }
 
-    const client = await getPool().connect();
     try {
-      await client.query("BEGIN");
-      const wo = await assertAssignedLead(client, id, session.accountId, session.userId);
-      if (!wo) {
-        await client.query("ROLLBACK");
+      const result = await withLeadWorkOrderContext(session, async (client) => {
+        const wo = await assertAssignedLead(client, id, session.accountId, session.userId);
+        if (!wo) {
+          return { kind: "forbidden" as const };
+        }
+        if (wo.status === "completed" || wo.status === "cancelled") {
+          return { kind: "closed" as const };
+        }
+
+        const existing = Array.isArray(wo.completion_criteria)
+          ? (wo.completion_criteria as CompletionCriterion[])
+          : [];
+        const merged = mergeCompletionCriteriaToggles(existing, parsed.data.completion_criteria);
+        if ("error" in merged) {
+          return { kind: "validation" as const, message: merged.error };
+        }
+
+        await client.query(
+          `UPDATE work_orders SET completion_criteria = $3::jsonb, updated_at = now()
+           WHERE id = $1 AND account_id = $2`,
+          [id, session.accountId, JSON.stringify(merged)],
+        );
+        return { kind: "ok" as const, completion_criteria: merged };
+      });
+
+      if (result.kind === "forbidden") {
         return NextResponse.json(
           { error: { code: "FORBIDDEN", message: "Not assigned to this work order", traceId: session.traceId } },
           { status: 403 },
         );
       }
-      if (wo.status === "completed" || wo.status === "cancelled") {
-        await client.query("ROLLBACK");
+      if (result.kind === "closed") {
         return NextResponse.json(
           { error: { code: "PRECONDITION_FAILED", message: "Work order is closed", traceId: session.traceId } },
           { status: 422 },
         );
       }
-
-      await client.query(
-        `UPDATE work_orders SET completion_criteria = $3::jsonb, updated_at = now()
-         WHERE id = $1 AND account_id = $2`,
-        [id, session.accountId, JSON.stringify(parsed.data.completion_criteria)],
-      );
-      await client.query("COMMIT");
-      return NextResponse.json({ data: { completion_criteria: parsed.data.completion_criteria } });
+      if (result.kind === "validation") {
+        return NextResponse.json(
+          { error: { code: "VALIDATION_ERROR", message: result.message, traceId: session.traceId } },
+          { status: 422 },
+        );
+      }
+      return NextResponse.json({ data: { completion_criteria: result.completion_criteria } });
     } catch (err) {
-      await client.query("ROLLBACK");
       logger.error("[work-orders completion-criteria]", err, { traceId: session.traceId });
       return NextResponse.json(
         { error: { code: "INTERNAL_ERROR", message: "Failed to update checklist", traceId: session.traceId } },
         { status: 500 },
       );
-    } finally {
-      client.release();
     }
   },
 );

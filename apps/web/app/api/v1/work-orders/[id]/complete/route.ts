@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "../../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../../lib/auth/middleware";
-import { getPool } from "../../../../../../lib/db";
 import type { CompletionCriterion } from "@ai-fsm/domain";
-import { assertAssignedLead } from "../../../../../../lib/work-orders/lead-access";
+import { assertAssignedLead, withLeadWorkOrderContext } from "../../../../../../lib/work-orders/lead-access";
 import { validateWorkOrderCompletion } from "../../../../../../lib/work-orders/validate";
 import { logger } from "../../../../../../lib/logger";
 
@@ -21,64 +20,67 @@ export const POST = withAuth(
       );
     }
 
-    const client = await getPool().connect();
     try {
-      await client.query("BEGIN");
-      const wo = await assertAssignedLead(client, id, session.accountId, session.userId);
-      if (!wo) {
-        await client.query("ROLLBACK");
+      const result = await withLeadWorkOrderContext(session, async (client) => {
+        const wo = await assertAssignedLead(client, id, session.accountId, session.userId);
+        if (!wo) {
+          return { kind: "forbidden" as const };
+        }
+        if (wo.status === "completed") {
+          return { kind: "ok" as const, status: "completed" as const };
+        }
+
+        const active = await client.query(
+          `SELECT 1 FROM visits
+           WHERE work_order_id = $1 AND account_id = $2
+             AND status = ANY($3::text[]) LIMIT 1`,
+          [id, session.accountId, ACTIVE_VISIT],
+        );
+        if (active.rowCount) {
+          return { kind: "active_visit" as const };
+        }
+
+        const criteria = Array.isArray(wo.completion_criteria)
+          ? (wo.completion_criteria as CompletionCriterion[])
+          : [];
+        const gateErr = await validateWorkOrderCompletion(client, id, session.accountId, criteria);
+        if (gateErr) {
+          return { kind: "gate" as const, message: gateErr };
+        }
+
+        await client.query(
+          `UPDATE work_orders SET status = 'completed', completed_at = COALESCE(completed_at, now()), updated_at = now()
+           WHERE id = $1 AND account_id = $2`,
+          [id, session.accountId],
+        );
+        return { kind: "ok" as const, status: "completed" as const };
+      });
+
+      if (result.kind === "forbidden") {
         return NextResponse.json(
           { error: { code: "FORBIDDEN", message: "Only the assigned lead can complete this work order", traceId: session.traceId } },
           { status: 403 },
         );
       }
-      if (wo.status === "completed") {
-        await client.query("COMMIT");
-        return NextResponse.json({ data: { status: "completed" } });
-      }
-
-      const active = await client.query(
-        `SELECT 1 FROM visits
-         WHERE work_order_id = $1 AND account_id = $2
-           AND status = ANY($3::text[]) LIMIT 1`,
-        [id, session.accountId, ACTIVE_VISIT],
-      );
-      if (active.rowCount) {
-        await client.query("ROLLBACK");
+      if (result.kind === "active_visit") {
         return NextResponse.json(
           { error: { code: "PRECONDITION_FAILED", message: "End the active visit before completing this work order", traceId: session.traceId } },
           { status: 422 },
         );
       }
-
-      const criteria = Array.isArray(wo.completion_criteria)
-        ? (wo.completion_criteria as CompletionCriterion[])
-        : [];
-      const gateErr = await validateWorkOrderCompletion(client, id, session.accountId, criteria);
-      if (gateErr) {
-        await client.query("ROLLBACK");
+      if (result.kind === "gate") {
         return NextResponse.json(
-          { error: { code: "PRECONDITION_FAILED", message: gateErr, traceId: session.traceId } },
+          { error: { code: "PRECONDITION_FAILED", message: result.message, traceId: session.traceId } },
           { status: 422 },
         );
       }
-
-      await client.query(
-        `UPDATE work_orders SET status = 'completed', completed_at = COALESCE(completed_at, now()), updated_at = now()
-         WHERE id = $1 AND account_id = $2`,
-        [id, session.accountId],
-      );
-      await client.query("COMMIT");
-      return NextResponse.json({ data: { status: "completed" } });
+      return NextResponse.json({ data: { status: result.status } });
     } catch (err) {
-      await client.query("ROLLBACK");
       logger.error("[work-orders complete]", err, { traceId: session.traceId });
       return NextResponse.json(
         { error: { code: "INTERNAL_ERROR", message: "Failed to complete work order", traceId: session.traceId } },
         { status: 500 },
       );
-    } finally {
-      client.release();
     }
   },
 );
