@@ -39,19 +39,29 @@ describe("rankVisitCandidates", () => {
 
   it("ranks an open job above a merely recent client", () => {
     const ranked = rankVisitCandidates({
-      stop: { latitude: null, longitude: null, durationMinutes: 6 },
+      stop: { latitude: 42.87, longitude: -71.31, durationMinutes: 6 },
       candidates: [
-        prop({ propertyId: "open", clientId: "c1", openJob: true, jobId: "j1" }),
-        prop({ propertyId: "recent", clientId: "c2", recentClient: true }),
+        prop({ propertyId: "open", clientId: "c1", latitude: 42.8701, longitude: -71.3101, openJob: true, jobId: "j1" }),
+        prop({ propertyId: "recent", clientId: "c2", latitude: 42.8702, longitude: -71.3102, recentClient: true }),
       ],
     });
     expect(ranked[0].propertyId).toBe("open");
   });
 
+  it("does not score an open job when distance cannot be checked", () => {
+    const [match] = rankVisitCandidates({
+      stop: { latitude: 42.87, longitude: -71.31, durationMinutes: 77 },
+      candidates: [prop({ propertyId: "mary", clientId: "c1", openJob: true, jobId: "j1" })],
+    });
+    expect(match.rawScore).toBe(0);
+    expect(match.score).toBeLessThan(VISIT_CONFIDENCE_FLOOR);
+  });
+
   it("penalizes poor GPS accuracy", () => {
-    const base = { latitude: null, longitude: null, durationMinutes: 20 };
-    const good = rankVisitCandidates({ stop: base, candidates: [prop({ propertyId: "p", clientId: "c", openJob: true })] })[0];
-    const poor = rankVisitCandidates({ stop: { ...base, gpsAccuracyMeters: 120 }, candidates: [prop({ propertyId: "p", clientId: "c", openJob: true })] })[0];
+    const base = { latitude: 42.87, longitude: -71.31, durationMinutes: 20 };
+    const candidate = prop({ propertyId: "p", clientId: "c", latitude: 42.8701, longitude: -71.3101, openJob: true });
+    const good = rankVisitCandidates({ stop: base, candidates: [candidate] })[0];
+    const poor = rankVisitCandidates({ stop: { ...base, gpsAccuracyMeters: 120 }, candidates: [candidate] })[0];
     expect(poor.rawScore).toBe(good.rawScore - 25);
     expect(poor.reasons).toContain("poor_gps");
   });

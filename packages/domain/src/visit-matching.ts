@@ -81,23 +81,29 @@ export function rankVisitCandidates(input: VisitMatchInput): VisitMatch[] {
     const reasons: string[] = [];
 
     if (c.scheduledToday) { raw += 100; reasons.push("scheduled_today"); }
-    if (c.openJob) { raw += 75; reasons.push("open_job"); }
-    if (c.recentClient) { raw += 40; reasons.push("recent_client"); }
-    if (c.repeatClient) { raw += 30; reasons.push("repeat_client"); }
 
     let distanceMeters: number | null = null;
-    if (stop.latitude != null && stop.longitude != null && c.latitude != null && c.longitude != null) {
+    const canCheckDistance = stop.latitude != null && stop.longitude != null && c.latitude != null && c.longitude != null;
+    if (canCheckDistance) {
+      if (c.openJob) { raw += 75; reasons.push("open_job"); }
+      if (c.recentClient) { raw += 40; reasons.push("recent_client"); }
+      if (c.repeatClient) { raw += 30; reasons.push("repeat_client"); }
+
       distanceMeters = haversineMeters(
-        { latitude: stop.latitude, longitude: stop.longitude },
-        { latitude: c.latitude, longitude: c.longitude },
+        { latitude: stop.latitude!, longitude: stop.longitude! },
+        { latitude: c.latitude!, longitude: c.longitude! },
       );
       if (distanceMeters <= WITHIN_NEAR_FEET * FEET_TO_METERS) { raw += 40; reasons.push("within_150ft"); }
       else if (distanceMeters <= WITHIN_FAR_FEET * FEET_TO_METERS) { raw += 25; reasons.push("within_250ft"); }
-    }
 
-    if (dwell) { raw += dwell.pts; reasons.push(dwell.reason); }
-    if (c.supplierZone) { raw += 25; reasons.push("supplier_zone"); }
-    if (poorGps) { raw -= 25; reasons.push("poor_gps"); }
+      if (dwell) { raw += dwell.pts; reasons.push(dwell.reason); }
+      if (c.supplierZone) { raw += 25; reasons.push("supplier_zone"); }
+      if (poorGps) { raw -= 25; reasons.push("poor_gps"); }
+    } else if (c.scheduledToday && dwell) {
+      // ponytail: scheduled visit can match without learned coords; unscheduled jobs need distance proof.
+      raw += dwell.pts;
+      reasons.push(dwell.reason);
+    }
 
     return {
       propertyId: c.propertyId,
