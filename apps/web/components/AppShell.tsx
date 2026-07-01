@@ -23,6 +23,7 @@ import {
   IconVisits,
   IconSchedule,
   IconQueue,
+  IconDayReview,
 } from "./NavIcons";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
@@ -63,11 +64,12 @@ interface NavSection {
 // Named constants for items referenced outside the array (mobile bottom bar)
 // The office overview/dashboard. Labelled "Overview" (not "Today") so it reads
 // as the numbers screen and doesn't compete with the My Day field surface.
-const NAV_TODAY:    NavItem = { href: "/app",              label: "Overview", Icon: IconDashboard };
+const NAV_TODAY:      NavItem = { href: "/app",              label: "Overview",   Icon: IconDashboard };
 // EPIC-006 Phase 5: the field surface. Owners can switch into it; pure admins
 // (who don't do field work) and the all-techs list never see it here.
-const NAV_MY_DAY:   NavItem = { href: "/app/my-day",       label: "My Day",   Icon: IconMyDay };
-const NAV_REQUESTS: NavItem = { href: "/app/requests",     label: "Requests", Icon: IconInbox };
+const NAV_MY_DAY:     NavItem = { href: "/app/my-day",       label: "My Day",     Icon: IconMyDay };
+const NAV_DAY_REVIEW: NavItem = { href: "/app/day-review",   label: "Day Review", Icon: IconDayReview };
+const NAV_REQUESTS:   NavItem = { href: "/app/requests",     label: "Requests",   Icon: IconInbox };
 const NAV_PROPS:    NavItem = { href: "/app/properties", label: "Properties", Icon: IconProperties, adminOnly: true };
 const NAV_JOBS:     NavItem = { href: "/app/jobs",       label: "Jobs",       Icon: IconJobs,       adminOnly: true };
 const NAV_INVOICES: NavItem = { href: "/app/invoices",   label: "Invoices",   Icon: IconInvoices,   adminOnly: true };
@@ -81,6 +83,7 @@ const ADMIN_NAV_SECTIONS: NavSection[] = [
     items: [
       NAV_TODAY,
       NAV_MY_DAY,
+      NAV_DAY_REVIEW,
       NAV_REQUESTS,
       { href: "/app/clients",   label: "Clients",    Icon: IconClients,   adminOnly: true },
       NAV_PROPS,
@@ -161,10 +164,11 @@ export function isNavActive(pathname: string, href: string): boolean {
 interface AppShellProps {
   role: Role;
   userName?: string;
+  reviewPending?: boolean;
   children: ReactNode;
 }
 
-export function AppShell({ role, userName, children }: AppShellProps) {
+export function AppShell({ role, userName, reviewPending, children }: AppShellProps) {
   const pathname = usePathname();
   // The sidebar follows the surface you're on: My Day = field, everything else =
   // office. So Field never shows the Overview home and vice-versa.
@@ -266,8 +270,11 @@ export function AppShell({ role, userName, children }: AppShellProps) {
                       aria-current={active ? "page" : undefined}
                       title={item.label}
                     >
-                      <span className="p7-nav-icon" aria-hidden="true">
+                      <span className="p7-nav-icon" aria-hidden="true" style={{ position: "relative" }}>
                         <item.Icon size={18} />
+                        {item.href === NAV_DAY_REVIEW.href && reviewPending && (
+                          <span style={{ position: "absolute", top: -3, right: -3, width: 8, height: 8, borderRadius: "50%", background: "#ef4444", border: "1.5px solid var(--bg)" }} aria-label="Review pending" />
+                        )}
                       </span>
                       <span className="p7-nav-label">{item.label}</span>
                     </Link>
@@ -378,8 +385,11 @@ export function AppShell({ role, userName, children }: AppShellProps) {
                       aria-current={active ? "page" : undefined}
                       onClick={() => setShowMore(false)}
                     >
-                      <span className="p7-nav-icon" aria-hidden="true">
+                      <span className="p7-nav-icon" aria-hidden="true" style={{ position: "relative" }}>
                         <item.Icon size={20} />
+                        {item.href === NAV_DAY_REVIEW.href && reviewPending && (
+                          <span style={{ position: "absolute", top: -3, right: -3, width: 8, height: 8, borderRadius: "50%", background: "#ef4444", border: "1.5px solid var(--bg)" }} />
+                        )}
                       </span>
                       <span>{item.label}</span>
                     </Link>

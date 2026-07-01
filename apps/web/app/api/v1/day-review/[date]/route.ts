@@ -6,7 +6,7 @@ import { getDayReview } from "@/lib/day-review/queries";
 export const dynamic = "force-dynamic";
 
 export const GET = withAuth(async (request: NextRequest, session) => {
-  const date = request.url.match(/\/day-review\/([^/]+)/)?.[1];
+  const date = request.url.match(/\/day-review\/([^/]+)/)?.[1] ?? "";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: "date must be YYYY-MM-DD" } },

@@ -23,6 +23,22 @@
 
 # --- rest_commands.yaml -------------------------------------------------------
 rest_command:
+  fsm_start_day_prompt:
+    url: "http://fsm.garonhome.local/api/internal/start-day-prompt"
+    method: post
+    content_type: "application/json"
+    headers:
+      x-api-key: !secret fsm_location_internal_key
+    payload: "{}"
+
+  fsm_day_review_prompt:
+    url: "http://fsm.garonhome.local/api/internal/day-review-prompt"
+    method: post
+    content_type: "application/json"
+    headers:
+      x-api-key: !secret fsm_location_internal_key
+    payload: "{}"
+
   fsm_location_event:
     url: "http://fsm.garonhome.local/api/internal/location"
     method: post
@@ -230,6 +246,71 @@ automation:
           external_id: "ha-pt-{{ now().timestamp() | int }}"
     mode: queued
     max: 20
+
+  # --- Start-day prompt on RAM BT connect (2026-07-01) ----------------------
+  # When the RAM connects, ask FSM whether to start the day. FSM checks:
+  #   - no open business day exists
+  #   - not a suppressed weekend (per account settings)
+  # If the FSM says "start", push a Companion notification.
+  #
+  # Requires HA ≥ 2023.11 (response_variable support on rest_command actions).
+  # Replace "mobile_app_nicks_s25" with your actual notify entity name
+  # (check Settings → People → your user → Companion app → notify entity).
+  - id: fsm_start_day_prompt_ram
+    alias: FSM - start-day prompt on RAM connect
+    triggers:
+      - trigger: state
+        entity_id: sensor.nick_s_s25_ultra_bluetooth_connection
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ ('00:22:A0:A6:49:0D' in (trigger.to_state.attributes.connected_paired_devices | default([]) | join(', ')))
+             and not ('00:22:A0:A6:49:0D' in (trigger.from_state.attributes.connected_paired_devices | default([]) | join(', '))) }}
+    actions:
+      - action: rest_command.fsm_start_day_prompt
+        response_variable: prompt_result
+      - condition: template
+        value_template: "{{ prompt_result['content']['signal'] == 'start' }}"
+      - action: notify.mobile_app_nicks_s25
+        data:
+          title: "Start your day?"
+          message: "RAM connected — tap to open Day Review and begin tracking."
+          data:
+            url: "/app/my-day"
+    mode: single
+
+  # --- Day-review nudge on home arrival after cutoff time (2026-07-01) ------
+  # Fires when Nick arrives at the Home zone after 5 PM (or the configured
+  # cutoff). The FSM endpoint checks if the day is open and hasn't been prompted
+  # yet. On success it stamps review_prompted_at (enabling the nav badge) and
+  # the automation pushes a Companion notification.
+  - id: fsm_day_review_prompt_home_arrival
+    alias: FSM - day-review prompt on home arrival
+    triggers:
+      - trigger: state
+        entity_id: device_tracker.nick_s_s25
+        to: "home"
+    conditions:
+      - condition: template
+        # Respect the default 5 PM cutoff; for a dynamic cutoff, replace 17
+        # with a helper that reads the FSM account setting via a REST sensor.
+        value_template: "{{ now().hour >= 17 }}"
+      - condition: template
+        value_template: >-
+          {{ trigger.from_state.state not in ['unknown', 'unavailable']
+             and trigger.to_state.state not in ['unknown', 'unavailable'] }}
+    actions:
+      - action: rest_command.fsm_day_review_prompt
+        response_variable: review_result
+      - condition: template
+        value_template: "{{ review_result['content']['result'] == 'prompted' }}"
+      - action: notify.mobile_app_nicks_s25
+        data:
+          title: "Time to close out your day"
+          message: "You're home — review today's visits and close the day."
+          data:
+            url: "/app/day-review"
+    mode: single
 
   # Refresh the open stop's address as the geocode updates while still. This is
   # intentionally gated to `still` so it enriches parked stops without flooding

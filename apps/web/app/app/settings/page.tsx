@@ -8,6 +8,7 @@ import { PageContainer, PageHeader } from "@/components/ui";
 import { SettingsTabsClient } from "./SettingsTabsClient";
 import type { TeamMember } from "./TeamPanel";
 import type { SquareStatus } from "./SquarePanel";
+import type { LocationDayValues } from "./LocationDaySettings";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,13 @@ interface AccountRow extends Record<string, unknown> {
   id: string;
   name: string;
   settings: { invoice_terms?: string; estimate_expiry_days?: number };
+  day_review_cutoff_time: string;
+  min_stop_dwell_minutes: number;
+  visit_confidence_threshold: number;
+  suppress_weekend_start_prompt: boolean;
+  close_day_followup_hours: number | null;
+  tracking_start_time: string | null;
+  tracking_end_time: string | null;
 }
 
 interface UserRow extends Record<string, unknown> {
@@ -37,7 +45,14 @@ export default async function SettingsPage() {
 
   const [account, users, me] = await Promise.all([
     isAdmin
-      ? queryOne<AccountRow>(`SELECT id, name, settings FROM accounts WHERE id = $1`, [session.accountId])
+      ? queryOne<AccountRow>(
+          `SELECT id, name, settings,
+                  day_review_cutoff_time::text, min_stop_dwell_minutes,
+                  visit_confidence_threshold, suppress_weekend_start_prompt,
+                  close_day_followup_hours, tracking_start_time::text, tracking_end_time::text
+           FROM accounts WHERE id = $1`,
+          [session.accountId]
+        )
       : null,
     isAdmin
       ? query<UserRow>(
@@ -53,8 +68,20 @@ export default async function SettingsPage() {
 
   if (!me) redirect("/login");
 
-  // Square payment integration is owner-only (secrets). Load current status.
   const isOwner = session.role === "owner";
+  const locationDay: LocationDayValues | undefined = isOwner && account
+    ? {
+        dayReviewCutoffTime: account.day_review_cutoff_time,
+        minStopDwellMinutes: account.min_stop_dwell_minutes,
+        visitConfidenceThreshold: account.visit_confidence_threshold,
+        suppressWeekendStartPrompt: account.suppress_weekend_start_prompt,
+        closeDayFollowupHours: account.close_day_followup_hours,
+        trackingStartTime: account.tracking_start_time,
+        trackingEndTime: account.tracking_end_time,
+      }
+    : undefined;
+
+  // Square payment integration is owner-only (secrets). Load current status.
   let square: SquareStatus | null = null;
   if (isOwner) {
     const row = await withDbSession(session, (client) =>
@@ -86,6 +113,7 @@ export default async function SettingsPage() {
         account={account}
         users={users as TeamMember[]}
         square={square}
+        locationDay={locationDay}
       />
     </PageContainer>
   );
