@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { Route } from "next";
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
@@ -9,7 +8,8 @@ import {
   type CompletionCriterion,
   type WorkOrderStatus,
 } from "@ai-fsm/domain";
-import { PageContainer, PageHeader, Card, SectionHeader, LinkButton } from "@/components/ui";
+import { PageContainer, PageHeader, Card, SectionHeader, LinkButton, Timeline } from "@/components/ui";
+import { fetchWorkOrderTimeline } from "@/lib/work-orders/timeline";
 import { FieldWorkActions } from "../FieldWorkActions";
 import { FieldCloseout } from "../FieldCloseout";
 
@@ -51,7 +51,7 @@ export default async function MyWorkOrderPage({
   const wo = rows[0];
   if (!wo) notFound();
 
-  const [activeVisit, nextVisit, visitLogs, criteria] = await Promise.all([
+  const [activeVisit, nextVisit, timeline, criteria] = await Promise.all([
     queryForSession<{ id: string }>(
       session,
       `SELECT id FROM visits
@@ -68,13 +68,7 @@ export default async function MyWorkOrderPage({
        ORDER BY scheduled_start ASC LIMIT 1`,
       [workOrderId, session.accountId],
     ),
-    queryForSession<{ id: string; scheduled_start: string; status: string; tech_notes: string | null }>(
-      session,
-      `SELECT id, scheduled_start, status, tech_notes FROM visits
-       WHERE work_order_id = $1 AND account_id = $2
-       ORDER BY scheduled_start DESC LIMIT 20`,
-      [workOrderId, session.accountId],
-    ),
+    fetchWorkOrderTimeline(session, workOrderId),
     Promise.resolve(
       Array.isArray(wo.completion_criteria)
         ? (wo.completion_criteria as CompletionCriterion[])
@@ -146,34 +140,8 @@ export default async function MyWorkOrderPage({
       </Card>
 
       <Card>
-        <SectionHeader title="Visit log" count={visitLogs.length} />
-        {visitLogs.length === 0 ? (
-          <p style={{ color: "var(--fg-muted)", margin: 0 }}>No visits yet.</p>
-        ) : (
-          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-            {visitLogs.map((v) => (
-              <li
-                key={v.id}
-                style={{
-                  padding: "var(--space-2) 0",
-                  borderBottom: "1px solid var(--border)",
-                }}
-              >
-                <Link href={`/app/visits/${v.id}` as Route} style={{ fontWeight: 600 }}>
-                  {new Date(v.scheduled_start).toLocaleDateString()}
-                </Link>
-                <span style={{ color: "var(--fg-muted)", marginLeft: "var(--space-2)" }}>
-                  {v.status}
-                </span>
-                {v.tech_notes && (
-                  <p style={{ margin: "4px 0 0", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                    {v.tech_notes}
-                  </p>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+        <SectionHeader title="Timeline" count={timeline.length} />
+        <Timeline entries={timeline} emptyMessage="No activity yet." />
         <div style={{ marginTop: "var(--space-3)" }}>
           <LinkButton href={`/app/jobs/${wo.job_id}` as Route} variant="ghost" size="sm">
             Project hub →
