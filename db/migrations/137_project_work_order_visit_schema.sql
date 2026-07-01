@@ -26,7 +26,21 @@ CREATE INDEX IF NOT EXISTS idx_visits_work_order ON visits (work_order_id)
   WHERE work_order_id IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
--- 3. Status vocabulary migration (work_orders)
+-- 3. work_orders status CHECK (expand before data backfill uses new values)
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE work_orders DROP CONSTRAINT IF EXISTS work_orders_status_check;
+
+ALTER TABLE work_orders
+  ADD CONSTRAINT work_orders_status_check
+  CHECK (status IN (
+    'draft', 'ready', 'scheduled', 'dispatched', 'waiting',
+    'completed', 'cancelled', 'approved', 'closed',
+    'in_progress'
+  ));
+
+-- ---------------------------------------------------------------------------
+-- 4. Status vocabulary migration (work_orders)
 -- ---------------------------------------------------------------------------
 
 UPDATE work_orders
@@ -61,7 +75,7 @@ WHERE wo.status = 'scheduled'
   );
 
 -- ---------------------------------------------------------------------------
--- 4. Default work orders for projects with unlinked execution visits
+-- 5. Default work orders for projects with unlinked execution visits
 -- ---------------------------------------------------------------------------
 
 INSERT INTO work_orders (
@@ -138,9 +152,16 @@ WHERE wo.status IN ('ready', 'scheduled')
   );
 
 -- ---------------------------------------------------------------------------
--- 5. work_orders status CHECK (expanded; approved/closed reserved)
+-- 6. work_orders job required when non-draft
 -- ---------------------------------------------------------------------------
 
+ALTER TABLE work_orders DROP CONSTRAINT IF EXISTS work_orders_job_required_non_draft;
+
+ALTER TABLE work_orders
+  ADD CONSTRAINT work_orders_job_required_non_draft
+  CHECK (status = 'draft' OR job_id IS NOT NULL);
+
+-- Drop legacy in_progress from allowed statuses after vocabulary migration
 ALTER TABLE work_orders DROP CONSTRAINT IF EXISTS work_orders_status_check;
 
 ALTER TABLE work_orders
@@ -150,14 +171,8 @@ ALTER TABLE work_orders
     'completed', 'cancelled', 'approved', 'closed'
   ));
 
-ALTER TABLE work_orders DROP CONSTRAINT IF EXISTS work_orders_job_required_non_draft;
-
-ALTER TABLE work_orders
-  ADD CONSTRAINT work_orders_job_required_non_draft
-  CHECK (status = 'draft' OR job_id IS NOT NULL);
-
 -- ---------------------------------------------------------------------------
--- 6. visits status CHECK (expanded execution statuses)
+-- 7. visits status CHECK (expanded execution statuses)
 -- ---------------------------------------------------------------------------
 
 ALTER TABLE visits DROP CONSTRAINT IF EXISTS visits_status_check;
@@ -170,7 +185,7 @@ ALTER TABLE visits
   ));
 
 -- ---------------------------------------------------------------------------
--- 7. visit_type — add sales_walkthrough
+-- 8. visit_type — add sales_walkthrough
 -- ---------------------------------------------------------------------------
 
 ALTER TABLE visits DROP CONSTRAINT IF EXISTS visits_visit_type_check;
@@ -187,7 +202,7 @@ ALTER TABLE visits
   ));
 
 -- ---------------------------------------------------------------------------
--- 8. visit_type ↔ work_order_id mutual exclusion
+-- 9. visit_type ↔ work_order_id mutual exclusion
 -- ---------------------------------------------------------------------------
 
 ALTER TABLE visits DROP CONSTRAINT IF EXISTS visits_work_order_type_check;
@@ -206,7 +221,7 @@ ALTER TABLE visits
   );
 
 -- ---------------------------------------------------------------------------
--- 9. visits.work_order_id must match work_orders.job_id
+-- 10. visits.work_order_id must match work_orders.job_id
 -- ---------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION validate_visit_work_order_consistency()
@@ -252,7 +267,7 @@ CREATE TRIGGER trg_visits_work_order_consistency
   EXECUTE FUNCTION validate_visit_work_order_consistency();
 
 -- ---------------------------------------------------------------------------
--- 10. Visit transition guard — execution layer statuses
+-- 11. Visit transition guard — execution layer statuses
 -- ---------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION validate_visit_transition()

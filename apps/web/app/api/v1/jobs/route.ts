@@ -6,6 +6,7 @@ import { query, getPool } from "../../../../lib/db";
 import { appendAuditLog } from "../../../../lib/db/audit";
 import { logger } from "../../../../lib/logger";
 import { JOB_ACCEPTANCE_CATEGORIES } from "@ai-fsm/domain";
+import { createDefaultWorkOrderForJob } from "../../../../lib/work-orders/create-default";
 
 export const dynamic = "force-dynamic";
 
@@ -94,6 +95,16 @@ export const POST = withRole(
         actor_id: session.userId,
         trace_id: session.traceId,
         new_value: job,
+      });
+
+      await createDefaultWorkOrderForJob({
+        client,
+        accountId: session.accountId,
+        clientId: client_id,
+        jobId: job.id,
+        title,
+        scope: description ?? null,
+        createdBy: session.userId,
       });
 
       await client.query("COMMIT");
