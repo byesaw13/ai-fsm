@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   allRequiredCriteriaMet,
+  completionGateMessage,
   seedCompletionCriteriaFromLineItems,
 } from "../completion-criteria";
 
@@ -14,6 +15,26 @@ describe("seedCompletionCriteriaFromLineItems", () => {
     expect(criteria[0].label).toBe("Install faucet");
     expect(criteria[0].required).toBe(true);
     expect(criteria[0].completed).toBe(false);
+  });
+});
+
+describe("completionGateMessage", () => {
+  it("blocks completion when criteria are unchecked", () => {
+    expect(
+      completionGateMessage(
+        [{ status: "completed" }],
+        [{ id: "1", label: "Install vanity", required: true, completed: false }],
+      ),
+    ).toContain("completion criteria");
+  });
+
+  it("allows completion when visits and criteria are satisfied", () => {
+    expect(
+      completionGateMessage(
+        [{ status: "completed" }],
+        [{ id: "1", label: "Install vanity", required: true, completed: true }],
+      ),
+    ).toBeNull();
   });
 });
 

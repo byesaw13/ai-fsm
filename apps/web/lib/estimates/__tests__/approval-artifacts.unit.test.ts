@@ -233,7 +233,8 @@ describe("createJobFromEstimate", () => {
         }],
         rowCount: 1,
       },
-      { rows: [], rowCount: 0 }, // no draft WO
+      { rows: [], rowCount: 0 }, // no assessment-linked draft
+      { rows: [], rowCount: 0 }, // no fallback draft WO
       { rows: [], rowCount: 0 }, // no line items
       { rows: [{ id: "wo-new-1" }], rowCount: 1 }, // WO INSERT
     ]);

@@ -5,8 +5,10 @@ import { getPool, queryForSession } from "@/lib/db";
 import { canCreateEstimates } from "@/lib/auth/permissions";
 import { logger } from "@/lib/logger";
 import { WORK_ORDER_STATUSES } from "../route";
+import type { CompletionCriterion } from "@ai-fsm/domain";
 import {
   enforceDraftOnlyFromAssessment,
+  validateWorkOrderCompletion,
   validateWorkOrderForeignKeys,
 } from "@/lib/work-orders/validate";
 
@@ -111,8 +113,10 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       source_visit_id: string | null;
       source_assessment_id: string | null;
       status: string;
+      completion_criteria: unknown;
     }>(
-      `SELECT id, client_id, job_id, source_visit_id, source_assessment_id, status
+      `SELECT id, client_id, job_id, source_visit_id, source_assessment_id, status,
+              completion_criteria
        FROM work_orders WHERE id = $1 AND account_id = $2 FOR UPDATE`,
       [id, session.accountId],
     );
@@ -144,6 +148,23 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       if (fkErr) {
         await client.query("ROLLBACK");
         return err("VALIDATION_ERROR", fkErr, 400, session.traceId);
+      }
+    }
+
+    if (nextStatus === "completed" && wo.status !== "completed") {
+      const criteria: CompletionCriterion[] = d.completion_criteria
+        ?? (Array.isArray(wo.completion_criteria)
+          ? (wo.completion_criteria as CompletionCriterion[])
+          : []);
+      const completionErr = await validateWorkOrderCompletion(
+        client,
+        id,
+        session.accountId,
+        criteria,
+      );
+      if (completionErr) {
+        await client.query("ROLLBACK");
+        return err("VALIDATION_ERROR", completionErr, 422, session.traceId);
       }
     }
 

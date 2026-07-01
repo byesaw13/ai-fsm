@@ -47,6 +47,10 @@ export function deriveWorkOrderStatus({
     return "completed";
   }
 
+  if (allVisitsDone && !allRequiredCriteriaMet(completionCriteria)) {
+    return "dispatched";
+  }
+
   if (currentStatus === "waiting") return "waiting";
 
   const hasActiveField = visits.some((v) => ACTIVE_FIELD_STATUSES.includes(v.status));

@@ -64,33 +64,59 @@ export async function promoteOrCreateWorkOrderFromEstimate({
     throw Object.assign(new Error("Estimate not found"), { code: "NOT_FOUND" });
   }
 
-  const draftRes = await client.query<{ id: string }>(
+  // Prefer a draft explicitly tied to the latest assessment for this property.
+  const linkedDraft = await client.query<{ id: string }>(
     `SELECT wo.id
      FROM work_orders wo
+     JOIN LATERAL (
+       SELECT a.id AS assessment_id, a.visit_id, a.created_at
+       FROM site_visit_assessments a
+       JOIN visits sv ON sv.id = a.visit_id
+       LEFT JOIN jobs sj ON sj.id = sv.job_id
+       WHERE a.account_id = $1
+         AND ($3::uuid IS NULL OR sj.property_id = $3)
+       ORDER BY a.created_at DESC
+       LIMIT 1
+     ) ctx ON wo.source_assessment_id = ctx.assessment_id
+           OR wo.source_visit_id = ctx.visit_id
      WHERE wo.account_id = $1
        AND wo.status = 'draft'
        AND wo.job_id IS NULL
        AND wo.client_id = $2
-       AND ($3::uuid IS NULL OR wo.property_id = $3 OR wo.property_id IS NULL)
-       AND (
-         wo.source_assessment_id IN (
-           SELECT a.id FROM site_visit_assessments a
-           JOIN visits sv ON sv.id = a.visit_id
-           LEFT JOIN jobs sj ON sj.id = sv.job_id
-           WHERE a.account_id = $1
-             AND ($3::uuid IS NULL OR sj.property_id = $3 OR wo.property_id = $3)
-         )
-         OR wo.source_visit_id IN (
-           SELECT v.id FROM visits v
-           LEFT JOIN jobs j ON j.id = v.job_id
-           WHERE v.account_id = $1 AND v.visit_type = 'site_visit'
-             AND ($3::uuid IS NULL OR j.property_id = $3)
-         )
-       )
-     ORDER BY wo.created_at DESC
+     ORDER BY ctx.created_at DESC, wo.created_at DESC
      LIMIT 1`,
     [accountId, est.client_id, est.property_id],
   );
+
+  const draftRes = linkedDraft.rows[0]
+    ? linkedDraft
+    : await client.query<{ id: string }>(
+        `SELECT wo.id
+         FROM work_orders wo
+         WHERE wo.account_id = $1
+           AND wo.status = 'draft'
+           AND wo.job_id IS NULL
+           AND wo.client_id = $2
+           AND ($3::uuid IS NULL OR wo.property_id = $3 OR wo.property_id IS NULL)
+           AND (
+             wo.source_assessment_id IN (
+               SELECT a.id FROM site_visit_assessments a
+               JOIN visits sv ON sv.id = a.visit_id
+               LEFT JOIN jobs sj ON sj.id = sv.job_id
+               WHERE a.account_id = $1
+                 AND ($3::uuid IS NULL OR sj.property_id = $3 OR wo.property_id = $3)
+             )
+             OR wo.source_visit_id IN (
+               SELECT v.id FROM visits v
+               LEFT JOIN jobs j ON j.id = v.job_id
+               WHERE v.account_id = $1 AND v.visit_type = 'site_visit'
+                 AND ($3::uuid IS NULL OR j.property_id = $3)
+             )
+           )
+         ORDER BY wo.created_at DESC
+         LIMIT 1`,
+        [accountId, est.client_id, est.property_id],
+      );
 
   const lineItemsRes = await client.query<{
     description: string;

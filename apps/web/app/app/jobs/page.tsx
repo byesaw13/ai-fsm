@@ -203,8 +203,8 @@ export default async function JobsPage({ searchParams }: PageProps) {
         title="Projects"
         subtitle={
           isAdmin
-            ? `${jobs.length} job${jobs.length !== 1 ? "s" : ""}`
-            : `${jobs.length} assigned job${jobs.length !== 1 ? "s" : ""}`
+            ? `${jobs.length} project${jobs.length !== 1 ? "s" : ""}`
+            : `${jobs.length} assigned project${jobs.length !== 1 ? "s" : ""}`
         }
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
@@ -257,16 +257,16 @@ export default async function JobsPage({ searchParams }: PageProps) {
         <EmptyState
           title={
             hasFilter
-              ? "No jobs match your filters"
+              ? "No projects match your filters"
               : isAdmin
-                ? "No jobs yet"
-                : "No assigned jobs"
+                ? "No projects yet"
+                : "No assigned projects"
           }
           description={
             hasFilter
               ? "Try adjusting your search or filters."
               : isAdmin
-                ? "You'll need a client before creating a job."
+                ? "You'll need a client before creating a project."
                 : "Projects will appear here when you're assigned to visits."
           }
           action={

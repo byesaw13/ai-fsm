@@ -132,7 +132,8 @@ canon + Slice 4 guardrails). Owner edits preserved.
 **Architecture follow-on (Slice 0 canon approved 2026-07-01):** `jobs` = **Project**
 in UI; work orders sit between projects and visits; assessment → **draft** work order
 only (no orphan operational path); estimate acceptance → project + default work order.
-See spec for full model. Schema/enforcement slices 1–5 not started.
+See spec for full model. Schema/enforcement slices 1–5 shipped 2026-07-01
+(`137_project_work_order_visit_schema.sql` + app slices 2–5).
 
 Slice 4 shipped: completed work orders feed the Property Timeline. Migration
 `db/migrations/126_property_timeline_work_orders.sql` adds a `work_order` arm to

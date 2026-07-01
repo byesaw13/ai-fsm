@@ -48,7 +48,7 @@ describe("deriveWorkOrderStatus", () => {
     ).toBe("completed");
   });
 
-  it("does not complete when criteria remain unchecked", () => {
+  it("stays dispatched when visits are done but criteria remain unchecked", () => {
     expect(
       deriveWorkOrderStatus({
         currentStatus: "dispatched",
@@ -56,7 +56,7 @@ describe("deriveWorkOrderStatus", () => {
         completionCriteria: criteria,
         now,
       }),
-    ).toBe("ready");
+    ).toBe("dispatched");
   });
 
   it("respects manual waiting hold", () => {

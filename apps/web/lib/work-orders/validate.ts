@@ -1,4 +1,8 @@
 import type { PoolClient } from "pg";
+import {
+  completionGateMessage,
+  type CompletionCriterion,
+} from "@ai-fsm/domain";
 
 export async function validateWorkOrderForeignKeys(
   client: PoolClient,
@@ -69,4 +73,18 @@ export function enforceDraftOnlyFromAssessment(input: {
     return "Work orders without a project must remain draft";
   }
   return null;
+}
+
+/** Reject work order `completed` when visits or criteria are not satisfied. */
+export async function validateWorkOrderCompletion(
+  client: PoolClient,
+  workOrderId: string,
+  accountId: string,
+  completionCriteria: CompletionCriterion[],
+): Promise<string | null> {
+  const visitRes = await client.query<{ status: string }>(
+    `SELECT status FROM visits WHERE work_order_id = $1 AND account_id = $2`,
+    [workOrderId, accountId],
+  );
+  return completionGateMessage(visitRes.rows, completionCriteria);
 }

@@ -83,6 +83,17 @@ const SAMPLE_VISIT = {
   updated_at: NOW,
 };
 
+/** Mocks emitted by syncWorkOrdersForJob after a successful INSERT. */
+function appendPostInsertSyncMocks(chain: ReturnType<typeof vi.fn>) {
+  return chain
+    .mockResolvedValueOnce({ rows: [] }) // audit log
+    .mockResolvedValueOnce({ rows: [] }) // job status advance (optional)
+    .mockResolvedValueOnce({ rows: [{ id: WORK_ORDER_ID }] }) // sync: list WOs
+    .mockResolvedValueOnce({ rows: [{ status: "ready", completion_criteria: [] }] }) // sync: lock WO
+    .mockResolvedValueOnce({ rows: [] }) // sync: load visits
+    .mockResolvedValueOnce({ rows: [] }); // COMMIT
+}
+
 beforeEach(() => {
   // resetAllMocks drains mockResolvedValueOnce queues between tests
   vi.resetAllMocks();
@@ -118,14 +129,15 @@ describe("GET /api/v1/jobs/[jobId]/visits", () => {
 // ---------------------------------------------------------------------------
 describe("POST /api/v1/jobs/[jobId]/visits", () => {
   it("returns 201 with created visit on valid body", async () => {
-    mockClientQuery
-      .mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
-      .mockResolvedValueOnce({ rows: [{ status: "quoted" }] }) // SELECT job status
-      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
-      .mockResolvedValueOnce({ rows: [{ id: WORK_ORDER_ID }] }) // resolve work order
-      .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // INSERT
-      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+    appendPostInsertSyncMocks(
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
+        .mockResolvedValueOnce({ rows: [{ status: "quoted" }] }) // SELECT job status
+        .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
+        .mockResolvedValueOnce({ rows: [{ id: WORK_ORDER_ID }] }) // resolve work order
+        .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }), // INSERT
+    );
 
     const res = await visitCreate(
       makeRequest("POST", `${JOBS_BASE}/${JOB_ID}/visits`, {
@@ -139,15 +151,16 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
   });
 
   it("converts a booking request atomically when booking_request_id is provided", async () => {
-    mockClientQuery
-      .mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
-      .mockResolvedValueOnce({ rows: [{ status: "quoted" }] }) // SELECT job status
-      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
-      .mockResolvedValueOnce({ rows: [{ id: WORK_ORDER_ID }] }) // resolve work order
-      .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // INSERT visit
-      .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // UPDATE booking request
-      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+    appendPostInsertSyncMocks(
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] }) // BEGIN
+        .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
+        .mockResolvedValueOnce({ rows: [{ status: "quoted" }] }) // SELECT job status
+        .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
+        .mockResolvedValueOnce({ rows: [{ id: WORK_ORDER_ID }] }) // resolve work order
+        .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // INSERT visit
+        .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }), // UPDATE booking request
+    );
 
     const res = await visitCreate(
       makeRequest("POST", `${JOBS_BASE}/${JOB_ID}/visits`, {
@@ -234,6 +247,36 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
     expect(res.status).toBe(422);
     const json = await res.json();
     expect(json.error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("returns 201 for operational realtor_baseline without work_order_id", async () => {
+    const opVisit = { ...SAMPLE_VISIT, visit_type: "realtor_baseline", work_order_id: null };
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
+      .mockResolvedValueOnce({ rows: [{ status: "quoted" }] }) // SELECT job status
+      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
+      .mockResolvedValueOnce({ rows: [opVisit] }) // INSERT (no WO resolve/sync)
+      .mockResolvedValueOnce({ rows: [] }) // job status advance
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await visitCreate(
+      makeRequest("POST", `${JOBS_BASE}/${JOB_ID}/visits`, {
+        scheduled_start: NOW,
+        scheduled_end: NOW,
+        visit_type: "realtor_baseline",
+      }),
+    );
+    expect(res.status).toBe(201);
+    const insertCall = mockClientQuery.mock.calls.find((call) =>
+      String(call[0]).includes("INSERT INTO visits"),
+    );
+    expect(insertCall?.[1]?.[2] ?? null).toBeNull(); // work_order_id param
+    expect(
+      mockClientQuery.mock.calls.some((call) =>
+        String(call[0]).includes("FROM work_orders"),
+      ),
+    ).toBe(false);
   });
 
   it("returns 422 when no work order exists for a standard visit", async () => {

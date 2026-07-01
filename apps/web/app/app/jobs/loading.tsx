@@ -5,7 +5,7 @@ export default function JobsLoading() {
     <PageContainer>
       <PageHeader
         title="Projects"
-        subtitle="Loading jobs…"
+        subtitle="Loading projects…"
         actions={<Skeleton width="96px" height="36px" />}
       />
       <Skeleton height="56px" />
