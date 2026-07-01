@@ -23,6 +23,7 @@ import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { JobCommandPanel } from "./JobCommandPanel";
 import { WhatNextBanner } from "./WhatNextBanner";
 import { VendorCoordinationCard } from "./VendorCoordinationCard";
+import { JobWorkOrdersPanel, type JobWorkOrderRow } from "./JobWorkOrdersPanel";
 import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { isHomeboxEnabled } from "@/lib/homebox/client";
 import { withAssetContext, listAssetLinks } from "@/lib/homebox/db";
@@ -59,6 +60,14 @@ type JobRow = Job & {
 };
 type VisitRow = Visit & {
   assigned_user_name: string | null;
+};
+type DbWorkOrderRow = {
+  id: string;
+  title: string;
+  status: string;
+  visit_count: string;
+  active_visit_count: string;
+  [key: string]: unknown;
 };
 
 
@@ -150,7 +159,7 @@ export default async function JobDetailPage({
 
   const homeboxEnabled = isHomeboxEnabled();
 
-  const [visits, commercialCounts, assetLinks] = await Promise.all([
+  const [visits, workOrders, commercialCounts, assetLinks] = await Promise.all([
     session.role === "tech"
       ? queryForSession<VisitRow>(
           session,
@@ -170,6 +179,22 @@ export default async function JobDetailPage({
            ORDER BY v.scheduled_start ASC`,
           [id, session.accountId]
         ),
+    session.role !== "tech"
+      ? queryForSession<DbWorkOrderRow>(
+          session,
+          `SELECT w.id, w.title, w.status,
+                  COUNT(v.id)::text AS visit_count,
+                  COUNT(v.id) FILTER (
+                    WHERE v.status NOT IN ('completed','cancelled')
+                  )::text AS active_visit_count
+           FROM work_orders w
+           LEFT JOIN visits v ON v.work_order_id = w.id
+           WHERE w.job_id = $1 AND w.account_id = $2 AND w.status <> 'draft'
+           GROUP BY w.id
+           ORDER BY w.created_at ASC`,
+          [id, session.accountId],
+        )
+      : Promise.resolve([] as DbWorkOrderRow[]),
     // Count estimates and invoices + profitability snapshot + pipeline state (owner/admin only)
     session.role !== "tech"
       ? queryOneForSession<{
@@ -332,7 +357,7 @@ export default async function JobDetailPage({
       <div style={{ padding: "var(--space-4) var(--space-4) var(--space-12)", display: "flex", flexDirection: "column", gap: "var(--space-5)", maxWidth: 760 }}>
         <header style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           <Link href="/app/jobs" style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", textDecoration: "none", fontWeight: 700 }}>
-            Jobs
+            Projects
           </Link>
           <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)", alignItems: "flex-start" }}>
             <div>
@@ -400,7 +425,7 @@ export default async function JobDetailPage({
         title={job.title}
         subtitle={[job.job_number, job.client_name].filter(Boolean).join(" · ") || undefined}
         backHref="/app/jobs"
-        backLabel="Jobs"
+        backLabel="Projects"
         actions={
           <span data-testid="job-status" style={{ display: "inline-flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
             <StatusBadge variant={currentStatus as StatusVariant}>
@@ -450,8 +475,25 @@ export default async function JobDetailPage({
 
       {/* Detail Hub Layout: two-column on desktop, stacked on mobile */}
       <div className="p7-detail-layout">
-        {/* LEFT: Visits Timeline + Danger Zone */}
+        {/* LEFT: Work Orders + Visits Timeline + Danger Zone */}
         <div className="p7-detail-primary">
+          {!isTech && workOrders.length > 0 && (
+            <Card data-testid="job-work-orders-panel">
+              <SectionHeader title="Work Orders" count={workOrders.length} />
+              <JobWorkOrdersPanel
+                jobId={job.id}
+                workOrders={workOrders.map((wo): JobWorkOrderRow => ({
+                  id: wo.id,
+                  title: wo.title,
+                  status: wo.status,
+                  visit_count: parseInt(wo.visit_count, 10) || 0,
+                  active_visit_count: parseInt(wo.active_visit_count, 10) || 0,
+                }))}
+                canManage={canAddVisit}
+              />
+            </Card>
+          )}
+
           <Card>
             <SectionHeader
               title="Visits"
@@ -476,7 +518,7 @@ export default async function JobDetailPage({
           {/* Status Transitions — admin/owner only */}
           {canTransition && allowedTransitions.length > 0 && (
             <Card data-testid="job-transition-panel">
-              <SectionHeader title="Close Out Job" />
+              <SectionHeader title="Close Out Project" />
               <JobTransitionForm
                 jobId={job.id}
                 allowedTransitions={allowedTransitions as JobStatus[]}
@@ -503,7 +545,7 @@ export default async function JobDetailPage({
           <div className="p7-detail-sidebar">
             {/* Job details */}
             <Card>
-              <SectionHeader title="Job Details" />
+              <SectionHeader title="Project Details" />
               <dl className="p7-detail-list">
                 <div className="p7-detail-row">
                   <dt>Status</dt>
@@ -556,7 +598,7 @@ export default async function JobDetailPage({
             </Card>
 
             {/* Edit form — admin/owner only */}
-            <AdvancedDetails title="Edit Job Details">
+            <AdvancedDetails title="Edit Project Details">
               <JobEditForm
                 jobId={job.id}
                 initialTitle={job.title}
@@ -797,7 +839,7 @@ export default async function JobDetailPage({
         {isTech && (
           <div className="p7-detail-sidebar">
             <Card>
-              <SectionHeader title="Job Details" />
+              <SectionHeader title="Project Details" />
               <dl className="p7-detail-list">
                 {job.client_name && (
                   <div className="p7-detail-row">

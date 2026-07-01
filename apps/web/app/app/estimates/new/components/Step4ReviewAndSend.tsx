@@ -79,7 +79,7 @@ export function Step4ReviewAndSend({
           <span style={{ color: "var(--fg-muted)" }}>Client</span>
           <span style={{ fontWeight: 600 }}>{selectedClient?.name ?? "—"}</span>
           {selectedJob && (<>
-            <span style={{ color: "var(--fg-muted)" }}>Job</span>
+            <span style={{ color: "var(--fg-muted)" }}>Project</span>
             <span>{selectedJob.title}</span>
           </>)}
           {selectedProperty && (<>

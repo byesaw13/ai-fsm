@@ -5,6 +5,12 @@ import { getPool, queryForSession } from "@/lib/db";
 import { canCreateEstimates } from "@/lib/auth/permissions";
 import { logger } from "@/lib/logger";
 import { WORK_ORDER_STATUSES } from "../route";
+import type { CompletionCriterion } from "@ai-fsm/domain";
+import {
+  enforceDraftOnlyFromAssessment,
+  validateWorkOrderCompletion,
+  validateWorkOrderForeignKeys,
+} from "@/lib/work-orders/validate";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +46,16 @@ const patchSchema = z.object({
   job_id: z.string().uuid().nullable().optional(),
   property_id: z.string().uuid().nullable().optional(),
   materials: z.array(materialSchema).optional(),
+  completion_criteria: z
+    .array(
+      z.object({
+        id: z.string(),
+        label: z.string().min(1),
+        required: z.boolean(),
+        completed: z.boolean(),
+      }),
+    )
+    .optional(),
 });
 
 export const GET = withAuth(async (request: NextRequest, session: AuthSession) => {
@@ -90,13 +106,66 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       [session.userId, session.accountId, session.role],
     );
 
-    const { rows: existing } = await client.query<{ id: string }>(
-      `SELECT id FROM work_orders WHERE id = $1 AND account_id = $2 FOR UPDATE`,
+    const { rows: existing } = await client.query<{
+      id: string;
+      client_id: string;
+      job_id: string | null;
+      source_visit_id: string | null;
+      source_assessment_id: string | null;
+      status: string;
+      completion_criteria: unknown;
+    }>(
+      `SELECT id, client_id, job_id, source_visit_id, source_assessment_id, status,
+              completion_criteria
+       FROM work_orders WHERE id = $1 AND account_id = $2 FOR UPDATE`,
       [id, session.accountId],
     );
     if (existing.length === 0) {
       await client.query("ROLLBACK");
       return err("NOT_FOUND", "Work order not found", 404, session.traceId);
+    }
+    const wo = existing[0];
+
+    const nextJobId = d.job_id !== undefined ? d.job_id : wo.job_id;
+    const nextStatus = d.status ?? wo.status;
+    const draftErr = enforceDraftOnlyFromAssessment({
+      status: nextStatus,
+      job_id: nextJobId,
+      source_visit_id: wo.source_visit_id,
+      source_assessment_id: wo.source_assessment_id,
+    });
+    if (draftErr) {
+      await client.query("ROLLBACK");
+      return err("VALIDATION_ERROR", draftErr, 400, session.traceId);
+    }
+
+    if (d.job_id !== undefined || d.property_id !== undefined) {
+      const fkErr = await validateWorkOrderForeignKeys(client, session.accountId, {
+        client_id: wo.client_id,
+        job_id: nextJobId,
+        property_id: d.property_id,
+      });
+      if (fkErr) {
+        await client.query("ROLLBACK");
+        return err("VALIDATION_ERROR", fkErr, 400, session.traceId);
+      }
+    }
+
+    if (nextStatus === "completed" && wo.status !== "completed") {
+      const criteria: CompletionCriterion[] = d.completion_criteria
+        ?? (Array.isArray(wo.completion_criteria)
+          ? (wo.completion_criteria as CompletionCriterion[])
+          : []);
+      const completionErr = await validateWorkOrderCompletion(
+        client,
+        id,
+        session.accountId,
+        criteria,
+      );
+      if (completionErr) {
+        await client.query("ROLLBACK");
+        return err("VALIDATION_ERROR", completionErr, 422, session.traceId);
+      }
     }
 
     // Scalar fields — COALESCE keeps unset fields; status='completed' stamps
@@ -112,6 +181,7 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
          notes        = CASE WHEN $13 THEN $14 ELSE notes END,
          job_id       = CASE WHEN $15 THEN $16 ELSE job_id END,
          property_id  = CASE WHEN $17 THEN $18 ELSE property_id END,
+         completion_criteria = CASE WHEN $19 THEN $20::jsonb ELSE completion_criteria END,
          completed_at = CASE WHEN $12 = 'completed' THEN COALESCE(completed_at, now())
                              WHEN $12 IS NOT NULL THEN NULL
                              ELSE completed_at END,
@@ -128,21 +198,24 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
         d.notes !== undefined, d.notes ?? null,
         d.job_id !== undefined, d.job_id ?? null,
         d.property_id !== undefined, d.property_id ?? null,
+        d.completion_criteria !== undefined,
+        d.completion_criteria ? JSON.stringify(d.completion_criteria) : null,
       ],
     );
 
     // Materials, when provided, replace the set and recompute total.
     if (d.materials !== undefined) {
+      const materials = d.materials.filter((m) => m.description.trim().length > 0);
       await client.query(`DELETE FROM work_order_materials WHERE work_order_id = $1`, [id]);
-      for (let i = 0; i < d.materials.length; i++) {
-        const m = d.materials[i];
+      for (let i = 0; i < materials.length; i++) {
+        const m = materials[i];
         await client.query(
           `INSERT INTO work_order_materials (work_order_id, description, quantity, unit_price_cents, total_cents, sort_order)
            VALUES ($1,$2,$3,$4,$5,$6)`,
           [id, m.description, m.quantity, m.unit_price_cents, m.total_cents, i],
         );
       }
-      const total = d.materials.reduce((s, m) => s + m.total_cents, 0);
+      const total = materials.reduce((s, m) => s + m.total_cents, 0);
       await client.query(`UPDATE work_orders SET total_cents = $2 WHERE id = $1`, [id, total]);
     }
 

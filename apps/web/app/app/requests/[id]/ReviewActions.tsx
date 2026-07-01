@@ -218,7 +218,7 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
         return <LinkButton href={`/app/estimates/new?${params.toString()}`} variant="primary" size="sm">Create Estimate →</LinkButton>;
       }
       case "create_job":
-        return <Button variant="primary" onClick={handleRepair} loading={pending === "repair"} disabled={!!pending} size="sm">Create Job →</Button>;
+        return <Button variant="primary" onClick={handleRepair} loading={pending === "repair"} disabled={!!pending} size="sm">Create Project →</Button>;
       case "schedule_walkthrough":
         return !showWalkthroughForm
           ? <Button variant="primary" onClick={() => setShowWalkthroughForm(true)} disabled={!!pending} size="sm">Schedule Walkthrough →</Button>
@@ -289,7 +289,7 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
             {primaryAction}
             {!primaryAction && guidance.followUpKind && guidance.followUpHref && (
               <LinkButton href={guidance.followUpHref} variant="primary" size="sm">
-                {guidance.followUpKind === "view_visit" ? "Open Walkthrough →" : "Open Job →"}
+                {guidance.followUpKind === "view_visit" ? "Open Walkthrough →" : "Open Project →"}
               </LinkButton>
             )}
           </div>

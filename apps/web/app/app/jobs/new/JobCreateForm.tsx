@@ -257,7 +257,7 @@ export function JobCreateForm({
           Cancel
         </LinkButton>
         <Button type="submit" disabled={pending} loading={pending}>
-          {pending ? "Creating..." : "Create Job"}
+          {pending ? "Creating..." : "Create Project"}
         </Button>
       </div>
     </form>

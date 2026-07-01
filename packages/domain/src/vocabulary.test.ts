@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   CANONICAL_BACKEND_TERMS,
   DEPRECATED_FRONTEND_TERMS,
+  PRIMARY_UI_LABELS,
   REQUIRED_ADAPTER_RULES,
   UI_DISPLAY_TERMS,
+  primaryUiLabel,
 } from "./vocabulary";
 
 describe("canonical vocabulary", () => {
@@ -12,6 +14,7 @@ describe("canonical vocabulary", () => {
       client: "client",
       property: "property",
       job: "job",
+      work_order: "work_order",
       visit: "visit",
       booking_request: "booking_request",
       estimate: "estimate",
@@ -26,10 +29,24 @@ describe("canonical vocabulary", () => {
     });
   });
 
+  it("uses Project as the primary job UI label", () => {
+    expect(PRIMARY_UI_LABELS.job).toBe("Project");
+    expect(PRIMARY_UI_LABELS.jobs).toBe("Projects");
+    expect(primaryUiLabel("job")).toBe("Project");
+    expect(primaryUiLabel("jobs")).toBe("Projects");
+  });
+
+  it("does not alias visits as work orders", () => {
+    expect(PRIMARY_UI_LABELS.visit).toBe("Visit");
+    expect(PRIMARY_UI_LABELS.work_order).toBe("Work Order");
+    expect(UI_DISPLAY_TERMS.visit).toEqual(["Visit", "Walkthrough"]);
+    expect(UI_DISPLAY_TERMS.work_order).toEqual(["Work Order"]);
+    expect(UI_DISPLAY_TERMS.visit).not.toContain("Work Order");
+  });
+
   it("allows only the expected UI aliases", () => {
     expect(UI_DISPLAY_TERMS.booking_request).toEqual(["Request", "New Request", "Intake"]);
-    expect(UI_DISPLAY_TERMS.job).toEqual(["Job", "Project"]);
-    expect(UI_DISPLAY_TERMS.visit).toEqual(["Visit", "Walkthrough", "Work Order"]);
+    expect(UI_DISPLAY_TERMS.job).toEqual(["Project"]);
     expect(UI_DISPLAY_TERMS.estimate).toEqual(["Estimate", "Quote"]);
     expect(UI_DISPLAY_TERMS.membership).toEqual(["Membership", "Maintenance Plan"]);
     expect(UI_DISPLAY_TERMS.workflow).toEqual(["Workflow"]);

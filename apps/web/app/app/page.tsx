@@ -186,7 +186,7 @@ export default async function AppPage() {
       tone: "warning",
     },
     {
-      label: "Schedule Approved Jobs",
+      label: "Schedule Approved Projects",
       count: parseN(scheduleApprovedCountRows[0]),
       href: "/app/jobs" as Route,
       detail: "Active work without a next visit",

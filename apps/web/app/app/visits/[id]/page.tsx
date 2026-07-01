@@ -841,7 +841,7 @@ export default async function VisitDetailPage({
             <dl className="p7-detail-list">
               {visit.job_title && (
                 <div className="p7-detail-row">
-                  <dt>Job</dt>
+                  <dt>Project</dt>
                   <dd>
                     {visit.job_id ? (
                       <LinkButton href={`/app/jobs/${visit.job_id}`} variant="ghost" size="sm">

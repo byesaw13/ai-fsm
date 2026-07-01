@@ -60,7 +60,7 @@ const JOB_STATUS_ORDER: JobStatus[] = [
 ];
 
 const JOB_FILTERS: FilterDef[] = [
-  { name: "q", type: "text", label: "Search", placeholder: "Job title or client…" },
+  { name: "q", type: "text", label: "Search", placeholder: "Project title or client…" },
   {
     name: "status",
     type: "select",
@@ -200,11 +200,11 @@ export default async function JobsPage({ searchParams }: PageProps) {
   return (
     <PageContainer>
       <PageHeader
-        title="Jobs"
+        title="Projects"
         subtitle={
           isAdmin
-            ? `${jobs.length} job${jobs.length !== 1 ? "s" : ""}`
-            : `${jobs.length} assigned job${jobs.length !== 1 ? "s" : ""}`
+            ? `${jobs.length} project${jobs.length !== 1 ? "s" : ""}`
+            : `${jobs.length} assigned project${jobs.length !== 1 ? "s" : ""}`
         }
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
@@ -236,7 +236,7 @@ export default async function JobsPage({ searchParams }: PageProps) {
             </div>
             {canCreate && (
               <LinkButton href="/app/jobs/new" variant="primary" data-testid="create-job-btn">
-                + New Job
+                + New Project
               </LinkButton>
             )}
           </div>
@@ -257,17 +257,17 @@ export default async function JobsPage({ searchParams }: PageProps) {
         <EmptyState
           title={
             hasFilter
-              ? "No jobs match your filters"
+              ? "No projects match your filters"
               : isAdmin
-                ? "No jobs yet"
-                : "No assigned jobs"
+                ? "No projects yet"
+                : "No assigned projects"
           }
           description={
             hasFilter
               ? "Try adjusting your search or filters."
               : isAdmin
-                ? "You'll need a client before creating a job."
-                : "Jobs will appear here when you're assigned to visits."
+                ? "You'll need a client before creating a project."
+                : "Projects will appear here when you're assigned to visits."
           }
           action={
             canCreate && !hasFilter ? (
@@ -276,7 +276,7 @@ export default async function JobsPage({ searchParams }: PageProps) {
                   + New Client
                 </LinkButton>
                 <LinkButton href="/app/jobs/new" variant="primary">
-                  + New Job
+                  + New Project
                 </LinkButton>
               </div>
             ) : undefined

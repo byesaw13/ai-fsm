@@ -12,7 +12,7 @@ interface QuickAction {
 
 const ACTIONS: QuickAction[] = [
   { href: "/app/estimates/quick", label: "Quick Estimate", emoji: "⚡" },
-  { href: "/app/jobs/new",        label: "New Job",        emoji: "🧰" },
+  { href: "/app/jobs/new",        label: "New Project",    emoji: "🧰" },
   { href: "/app/intake/new",      label: "New Request",    emoji: "📋" },
   { href: "/app/expenses/new?mode=run", label: "Material Run", emoji: "🧾" },
   { href: "/app/mileage/new",     label: "Log Mileage",    emoji: "🚗" },

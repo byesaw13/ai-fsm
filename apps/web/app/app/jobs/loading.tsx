@@ -4,8 +4,8 @@ export default function JobsLoading() {
   return (
     <PageContainer>
       <PageHeader
-        title="Jobs"
-        subtitle="Loading jobs…"
+        title="Projects"
+        subtitle="Loading projects…"
         actions={<Skeleton width="96px" height="36px" />}
       />
       <Skeleton height="56px" />

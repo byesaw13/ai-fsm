@@ -108,7 +108,7 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
     },
     {
       key: "jobs",
-      label: "Jobs",
+      label: "Projects",
       align: "right",
       width: "100px",
       render: (row) => Number(row.job_count),
@@ -121,7 +121,7 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
       render: (row) => (
         <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
           <LinkButton href={`/app/properties/${row.id}`} variant="secondary" size="sm">Open</LinkButton>
-          {canCreateJobs ? <LinkButton href={buildJobCreateHref(row.client_id, row.id)} variant="ghost" size="sm">+ Job</LinkButton> : null}
+          {canCreateJobs ? <LinkButton href={buildJobCreateHref(row.client_id, row.id)} variant="ghost" size="sm">+ Project</LinkButton> : null}
         </div>
       ),
     },

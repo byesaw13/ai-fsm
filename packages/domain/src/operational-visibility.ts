@@ -20,8 +20,11 @@ export function getJobOperationalVisibility(status: JobStatus): OperationalVisib
 export function getVisitOperationalVisibility(status: VisitStatus): OperationalVisibility {
   switch (status) {
     case "scheduled":
+    case "dispatched":
+    case "traveling":
     case "arrived":
     case "in_progress":
+    case "waiting":
       return "active";
     case "completed":
       return "historical";
@@ -60,7 +63,14 @@ export const ACTIVE_JOB_STATUSES: readonly JobStatus[] = ["draft", "quoted", "sc
 export const HISTORICAL_JOB_STATUSES: readonly JobStatus[] = ["completed", "invoiced"];
 export const ARCHIVED_JOB_STATUSES: readonly JobStatus[] = ["cancelled"];
 
-export const ACTIVE_VISIT_STATUSES: readonly VisitStatus[] = ["scheduled", "arrived", "in_progress"];
+export const ACTIVE_VISIT_STATUSES: readonly VisitStatus[] = [
+  "scheduled",
+  "dispatched",
+  "traveling",
+  "arrived",
+  "in_progress",
+  "waiting",
+];
 export const HISTORICAL_VISIT_STATUSES: readonly VisitStatus[] = ["completed"];
 export const ARCHIVED_VISIT_STATUSES: readonly VisitStatus[] = ["cancelled"];
 

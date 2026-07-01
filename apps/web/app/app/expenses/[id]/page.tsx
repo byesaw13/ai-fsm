@@ -126,7 +126,7 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
               </div>
               {expense.job_title && (
                 <div className="p7-detail-row">
-                  <dt>Job</dt>
+                  <dt>Project</dt>
                   <dd>
                     <a
                       href={`/app/jobs/${expense.job_id}`}

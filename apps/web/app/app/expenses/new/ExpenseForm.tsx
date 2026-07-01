@@ -307,7 +307,7 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
       {(jobs.length > 0 || isMaterialRun) && (
         <Select
           id="job_id"
-          label={isMaterialRun ? "Job" : "Link to Job (optional)"}
+          label={isMaterialRun ? "Project" : "Link to Project (optional)"}
           value={jobId}
           onChange={(e) => setJobId(e.target.value)}
           options={jobOptions}

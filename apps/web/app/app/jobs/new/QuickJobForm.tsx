@@ -181,7 +181,7 @@ export function QuickJobForm({
 
       <div style={{ display: "flex", gap: "var(--space-3)", alignItems: "center" }}>
         <Button type="submit" disabled={pending || !title.trim() || !clientId} loading={pending}>
-          {pending ? "Creating..." : "Create Job"}
+          {pending ? "Creating..." : "Create Project"}
         </Button>
         <button
           type="button"

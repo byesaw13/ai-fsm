@@ -1,7 +1,29 @@
 # Workflow Model — Dovetails Services LLC
 
 > How state moves through the system. Three layers: DB statuses (frozen), sub-statuses (soft signals), and presentation states (user-facing).
-> Last updated: 2026-05-16
+> Last updated: 2026-07-01
+
+---
+
+## Four execution layers
+
+Backend tables keep stable names. Owner/staff UI labels:
+
+| Backend | UI |
+|---|---|
+| `jobs` | **Project** |
+| `work_orders` | **Work Order** |
+| `visits` | **Visit** |
+
+```text
+Project (jobs)
+  └── Work Order(s)
+        └── Visit(s)   [standard / punch_list only]
+```
+
+Operational visit types (`site_visit`, `membership_health_check`, `realtor_baseline`, `sales_walkthrough`) do not use work orders. See `docs/superpowers/specs/2026-07-01-job-work-order-visit-model-design.md`.
+
+**Billing rule:** invoice and payment status stay at the project (`jobs`) level. Work order state is never driven by billing.
 
 ---
 
@@ -17,7 +39,7 @@ The system has three distinct status layers. Never conflate them.
 
 ---
 
-## Job Lifecycle
+## Project lifecycle (`jobs` table, UI: Project)
 
 ```
 draft ──► quoted ──► scheduled ──► in_progress ──► completed ──► invoiced
@@ -30,47 +52,107 @@ draft ──► quoted ──► scheduled ──► in_progress ──► compl
 | Status | Meaning | Typical entry condition |
 |---|---|---|
 | `draft` | Intake received, not yet priced | Booking request accepted or manual creation |
-| `quoted` | Estimate sent or created | At least one estimate on the job |
-| `scheduled` | Work committed to calendar | Visit scheduled under the job |
-| `in_progress` | Technician on site | Active visit transitions to `arrived` or `in_progress` |
-| `completed` | All work done | Final visit completed |
-| `invoiced` | Invoice issued | Invoice created against the job |
-| `cancelled` | Job abandoned | Manual or policy action |
+| `quoted` | Estimate sent or created | At least one estimate on the project |
+| `scheduled` | Work committed to calendar | Visit scheduled under a work order on the project |
+| `in_progress` | Field work underway | Active visit transitions to `arrived` or `in_progress` |
+| `completed` | All work done | Final visit / work order completion |
+| `invoiced` | Invoice issued | Invoice created against the project |
+| `cancelled` | Project abandoned | Manual or policy action |
 
-### Job sub-statuses (soft signals)
+### Project sub-statuses (soft signals)
 
 Applied alongside any main status. Do not drive state machine transitions from sub-status.
 
 | Sub-status | Meaning |
 |---|---|
-| `waiting_parts` | Job blocked pending material delivery |
+| `waiting_parts` | Project blocked pending material delivery |
 | `customer_hold` | Client requested pause |
 | `dispute` | Pricing or scope disagreement active |
 | `quote_revision` | Estimate revision in progress |
 
 ### Scheduling truth
 
-`jobs.scheduled_start` and `jobs.scheduled_end` are **legacy fields**. Do not read them for display or logic. Derive scheduling state from `visits.scheduled_start` instead. A job is considered "scheduled" when it has at least one visit in `scheduled` or `in_progress` status.
+`jobs.scheduled_start` and `jobs.scheduled_end` are **legacy fields**. Do not read them for display or logic. Derive scheduling state from `visits.scheduled_start` instead. A project is considered "scheduled" when it has at least one visit in `scheduled` or `in_progress` status on a work order.
 
 ---
 
-## Visit Lifecycle
+## Work Order lifecycle (planning)
+
+Target v1 statuses (schema alignment in implementation slice 1):
 
 ```
-scheduled ──► arrived ──► in_progress ──► completed
-     │                                         
-     └──────────────────────────────────────► cancelled
+draft ──► ready ──► scheduled ──► dispatched ──► waiting ──► completed
+  │                                                      │
+  └──────────────────────────────────────────────────────► cancelled
 ```
 
-### DB status meanings
+| Status | Meaning |
+|---|---|
+| `draft` | Pre-acceptance scope packet from assessment; not schedulable; no visits |
+| `ready` | Estimate accepted; project exists; awaiting first visit |
+| `scheduled` | At least one future standard visit on calendar (derived) |
+| `dispatched` | Planning milestone: crew assigned, today's work begun (not travel) |
+| `waiting` | Blocked (parts, customer hold, weather) |
+| `completed` | Required completion criteria met; visits done |
+| `cancelled` | Abandoned |
+
+Reserved for a future slice (not exposed in UI yet): `approved`, `closed`.
+
+### Assessment → draft work order (allowed)
+
+Assessment may seed or update a **draft** work order (scope, materials, notes, completion criteria).
+
+**Forbidden while draft:** visits, scheduling, completion, billing, property timeline as completed work.
+
+**Forbidden entirely:** assessment → standalone **operational** work order. The assessment UI prepares a draft only; estimate acceptance promotes the work order onto a project.
+
+### Estimate acceptance
+
+When estimate → `approved`:
+
+1. Create or link project (`jobs`)
+2. Promote assessment draft work order to `ready`, or create default work order from estimate scope
+3. Owner may split into multiple work orders from the project screen
+
+Default pattern: one project, one work order (handyman). Multi-phase remodels: owner splits work orders manually.
+
+---
+
+## Visit Lifecycle (execution)
+
+Target v1 statuses for **standard** / **punch_list** visits (schema alignment in slice 1):
+
+```
+scheduled ──► dispatched ──► traveling ──► arrived ──► in_progress ──► completed
+     │              │                                                     
+     └──────────────┴────────────────────────────────────────────────────► cancelled
+```
+
+Current DB may still use the legacy subset until migrated. Dispatch, travel, arrival, and active field work live **only** on visits — never on work orders.
+
+### DB status meanings (target)
 
 | Status | Meaning |
 |---|---|
 | `scheduled` | Appointment on calendar, not started |
-| `arrived` | Technician checked in on site ("On My Way" sent) |
+| `dispatched` | Crew notified / assigned for this visit |
+| `traveling` | Technician en route (GPS/live) |
+| `arrived` | Technician checked in on site |
 | `in_progress` | Active field work |
+| `waiting` | Paused on site (parts, customer, weather) |
 | `completed` | Visit wrapped up, completion packet available |
 | `cancelled` | Visit did not happen |
+
+### `visit_type` and `work_order_id`
+
+| `visit_type` | `work_order_id` |
+|---|---|
+| `standard`, `punch_list` | **Required** |
+| `site_visit`, `membership_health_check`, `realtor_baseline`, `sales_walkthrough` | **Forbidden** |
+
+When `work_order_id` is set, `visits.job_id` must equal `work_orders.job_id`.
+
+Technician assignment lives on the visit, not the work order. Work orders may carry `preferred_technician` or `required_trade` as planning hints only.
 
 ### Visit sub-statuses (soft signals)
 
@@ -81,13 +163,15 @@ scheduled ──► arrived ──► in_progress ──► completed
 | `waiting_parts` | Visit partially complete, waiting on materials |
 | `reschedule_requested` | Client wants a new time |
 
-### Visit → Job promotion
+### Visit → Project promotion
 
-When a visit completes, the parent job status advances automatically:
-- First completed visit → job moves to `in_progress` or `completed` (depending on visit count and job config)
-- All visits complete → job moves to `completed`
+When a visit completes, the parent project status advances automatically:
+- First completed visit → project moves to `in_progress` or `completed` (depending on visit count and project config)
+- All visits complete → project moves to `completed`
 
-This is the only automated status promotion path. Do not create additional automated cross-object promotions without documenting them here.
+Work order `scheduled` / `dispatched` / `completed` should be derived from child visit states where possible.
+
+This is the primary automated cross-object promotion path. Do not create additional automated cross-object promotions without documenting them here.
 
 ---
 
@@ -101,13 +185,14 @@ draft ──► sent ──► approved
   └──────────────────────────────► expired
 ```
 
-After `approved`, change orders may be added. Approved estimates convert to jobs (if not already linked) and trigger job status changes.
+After `approved`, change orders may be added. Approved estimates create or link a project and a default work order.
 
-### Estimate → Job relationship
+### Estimate → Project relationship
 
-- An estimate can exist without a job (early pricing before job creation).
-- An estimate linked to a job and approved → job transitions to `quoted`.
+- An estimate can exist without a project (early pricing before project creation).
+- An estimate linked to a project and approved → project transitions to `quoted`; default work order promoted to `ready`.
 - An estimate can be linked to a vault item (sourced from a visit scope observation).
+- Assessment may maintain a draft work order before acceptance; acceptance promotes it — no orphan operational work order.
 
 ---
 
@@ -121,37 +206,37 @@ draft ──► sent ──► partial ──► paid
   └──────────────────────────────► void
 ```
 
-Invoices do not automatically advance job status. The owner manually marks a job `invoiced` after issuing the invoice.
+Invoices do not automatically advance project status. The owner manually marks a project `invoiced` after issuing the invoice. Invoice state never drives work order status.
 
 ---
 
 ## Booking Request Lifecycle
 
 ```
-new ──► reviewed ──► accepted ──► [conversion creates job + client + property]
+new ──► reviewed ──► accepted ──► [conversion creates project + client + property]
            │
            └──────────────────► declined
 ```
 
-After accepted, the booking request is read-only. All further work happens on the job.
+After accepted, the booking request is read-only. All further work happens on the project.
 
 ---
 
 ## Presentation Stage (Customer-Visible)
 
-Derived from job state — never stored. Defined in `packages/domain/src/stages.ts`.
+Derived from project (`jobs`) state — never stored. Defined in `packages/domain/src/stages.ts`.
 
 | Stage | Label | Derived from |
 |---|---|---|
-| `intake` | Intake | job.status = `draft` |
-| `estimate` | Estimate | job.status = `quoted` + no approved estimate |
-| `accepted` | Accepted | job.status = `quoted` + approved estimate + no active visit |
-| `scheduled` | Scheduled | job.status = `scheduled` or `in_progress`, or `quoted` + active visit |
-| `completed` | Completed | job.status = `completed`, `invoiced`, or `cancelled` |
+| `intake` | Intake | project.status = `draft` |
+| `estimate` | Estimate | project.status = `quoted` + no approved estimate |
+| `accepted` | Accepted | project.status = `quoted` + approved estimate + no active visit |
+| `scheduled` | Scheduled | project.status = `scheduled` or `in_progress`, or `quoted` + active visit |
+| `completed` | Completed | project.status = `completed`, `invoiced`, or `cancelled` |
 
 ### Portal-only stage derivation
 
-When job records are unavailable (portal estimate-only view), stage is derived from document statuses. See `derivePortalStage()` in `packages/domain/src/stages.ts`.
+When project records are unavailable (portal estimate-only view), stage is derived from document statuses. See `derivePortalStage()` in `packages/domain/src/stages.ts`.
 
 ---
 
@@ -204,10 +289,11 @@ Q: Is this a business rule that fires on a state change?
 
 | Object | DB statuses | Sub-statuses | Presentation stages |
 |---|---|---|---|
-| Job | 7 | 4 | 5 (shared CustomerStage) |
-| Visit | 5 | 4 | — (inherits job's stage) |
+| Project (`jobs`) | 7 | 4 | 5 (shared CustomerStage) |
+| Work order | 7 (v1 target) | — | — |
+| Visit | 8 (v1 target) | 4 | — (inherits project's stage) |
 | Estimate | 5 | — | — |
 | Invoice | 6 | — | — |
 | Booking request | 3 | — | — |
 
-Total internal statuses: 30 across 5 objects. Presentation statuses shown to clients: **5**.
+Presentation statuses shown to clients: **5**.

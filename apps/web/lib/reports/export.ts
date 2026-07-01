@@ -96,7 +96,7 @@ export interface MileageExportRow {
 // ---------------------------------------------------------------------------
 
 export function formatExpensesCsv(rows: ExpenseExportRow[]): string {
-  const headers = ["Date", "Vendor", "Category", "Amount", "Job", "Notes"];
+  const headers = ["Date", "Vendor", "Category", "Amount", "Project", "Notes"];
   const mapped: Record<string, unknown>[] = rows.map((r) => ({
     Date: formatDateForCsv(r.expense_date),
     Vendor: r.vendor_name ?? "",
@@ -151,7 +151,7 @@ export function formatPaymentsCsv(rows: PaymentExportRow[]): string {
 }
 
 export function formatMileageCsv(rows: MileageExportRow[]): string {
-  const headers = ["Date", "Purpose", "Miles", "Job", "Notes"];
+  const headers = ["Date", "Purpose", "Miles", "Project", "Notes"];
   const mapped: Record<string, unknown>[] = rows.map((r) => ({
     Date: formatDateForCsv(r.trip_date),
     Purpose: r.purpose ?? "",

@@ -27,14 +27,21 @@ This is the user-facing workflow model for Dovetails.
 - `Request detail`: triage, follow-up, decision, and conversion.
 - `Visit`: walkthrough, measurements, photos, access notes, and field evidence.
 - `Estimate`: scope, pricing, approval, and change orders.
-- `Job`: the active project thread that ties everything together.
-- `Invoice`: billing and payment collection.
+- `Project` (`/app/jobs`): the active customer commitment that ties work orders, visits, and invoices together.
+- `Work Order`: operational work packet under a project.
+- `Invoice`: billing and payment collection (project-level).
 
 ## Rules
 
 - A booking request is intake only.
-- A job is the active project thread.
-- A visit is the field appointment.
+- A **project** (`jobs` backend) is the active customer commitment.
+- A **work order** is the executable work packet; standard visits belong to exactly one work order.
+- A **visit** is the field appointment or execution event.
 - An estimate is the pricing proposal.
+- Assessment may seed a **draft** work order only — not an operational work order. Estimate acceptance creates the project and promotes the default work order.
 - Change orders are attached to the estimate and approved separately.
-- Do not show internal jargon first when a simpler customer-facing label exists.
+- Do not show internal jargon first when a simpler customer-facing label exists. Use **Project**, not Job, in owner-facing copy.
+
+## Architecture reference
+
+`docs/superpowers/specs/2026-07-01-job-work-order-visit-model-design.md`

@@ -44,11 +44,11 @@ export default async function NewJobPage({ searchParams }: PageProps) {
 
   return (
     <PageContainer>
-      <PageHeader title="New Job" backHref="/app/jobs" backLabel="Jobs" />
+      <PageHeader title="New Project" backHref="/app/jobs" backLabel="Projects" />
 
       {/* Quick Job — primary path */}
       <Card>
-        <SectionHeader title="Quick Job" />
+        <SectionHeader title="Quick Project" />
         <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", marginTop: "-8px", marginBottom: "var(--space-3)" }}>
           Title + client, done. Fill in details later.
         </p>

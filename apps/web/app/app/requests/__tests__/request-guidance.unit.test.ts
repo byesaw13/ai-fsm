@@ -18,7 +18,7 @@ describe("getRequestGuidance", () => {
     expect(guidance.requestTypeLabel).toBe("Fixed Bid");
   });
 
-  it("treats a handyman repair request as Create Job", () => {
+  it("treats a handyman repair request as Create Project", () => {
     const guidance = getRequestGuidance({
       status: "pending",
       pricing_mode: "hourly_internal",
@@ -29,8 +29,8 @@ describe("getRequestGuidance", () => {
     });
 
     expect(guidance.primaryActionKind).toBe("create_job");
-    expect(guidance.recommendedLabel).toBe("Create Job");
-    expect(guidance.destinationRecord).toBe("Job");
+    expect(guidance.recommendedLabel).toBe("Create Project");
+    expect(guidance.destinationRecord).toBe("Project");
     expect(guidance.requestTypeLabel).toBe("Time and Materials");
   });
 

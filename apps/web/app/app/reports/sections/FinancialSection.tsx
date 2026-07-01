@@ -215,16 +215,16 @@ export function FinancialSection({ data, monthLabel }: { data: ReportData; month
       {/* === Job Profitability Section === */}
       {jobProfitRows.length > 0 && (
         <Card style={{ marginTop: "var(--space-4)" }}>
-          <SectionHeader title="Job Profitability" />
+          <SectionHeader title="Project Profitability" />
           <p style={{ padding: "0 var(--space-3) var(--space-2)", color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
             Revenue = all non-void invoices linked to job (any date). Expenses and mileage filtered to {monthLabel}.
-            Jobs without linked invoices show partial data — marked with *.
+            Projects without linked invoices show partial data — marked with *.
           </p>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)", minWidth: 600 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                  <th style={TH_LEFT}>Job</th>
+                  <th style={TH_LEFT}>Project</th>
                   <th style={TH_RIGHT}>Revenue</th>
                   <th style={TH_RIGHT}>Expenses</th>
                   <th style={TH_RIGHT}>Miles</th>

@@ -83,7 +83,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
   }
 
   let createdDepositInvoiceId: string | null = null;
-  let createdJobId: string | null = null;
+    let createdJobId: string | null = null;
+    let createdWorkOrderId: string | null = null;
 
   try {
     await withEstimateContext(session, async (client) => {
@@ -157,13 +158,14 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         // the estimate approval itself.
         await client.query("SAVEPOINT before_auto_job");
         try {
-          const { jobId } = await createJobFromEstimate({
+          const { jobId, workOrderId } = await createJobFromEstimate({
             client,
             estimateId: id,
             accountId: session.accountId,
             createdBy: session.userId,
           });
           createdJobId = jobId;
+          createdWorkOrderId = workOrderId ?? null;
           await client.query("RELEASE SAVEPOINT before_auto_job");
         } catch (jobErr) {
           await client.query("ROLLBACK TO SAVEPOINT before_auto_job");
@@ -181,7 +183,12 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         actor_id: session.userId,
         trace_id: session.traceId,
         old_value: { status: currentStatus },
-        new_value: { status: targetStatus, deposit_invoice_id: createdDepositInvoiceId, job_id: createdJobId },
+        new_value: {
+          status: targetStatus,
+          deposit_invoice_id: createdDepositInvoiceId,
+          job_id: createdJobId,
+          work_order_id: createdWorkOrderId,
+        },
       });
     });
 
@@ -191,6 +198,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     }
     if (createdJobId) {
       response.job_id = createdJobId;
+    }
+    if (createdWorkOrderId) {
+      response.work_order_id = createdWorkOrderId;
     }
     return NextResponse.json(response);
   } catch (error) {

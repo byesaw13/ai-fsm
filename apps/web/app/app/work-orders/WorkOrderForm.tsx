@@ -5,8 +5,12 @@ import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { Button, useToast } from "@/components/ui";
 import { MaterialsMetadata, type MaterialsMetadata as MaterialsMetadataShape } from "@/app/app/estimates/components/MaterialsMetadata";
-import type { WorkOrderDraft, WorkOrderRoomLine } from "@ai-fsm/domain";
-import { materialItemsToDraft } from "@ai-fsm/domain";
+import type { WorkOrderDraft, WorkOrderRoomLine, CompletionCriterion } from "@ai-fsm/domain";
+import {
+  materialItemsToDraft,
+  WORK_ORDER_UI_STATUSES,
+  WORK_ORDER_STATUS_LABELS,
+} from "@ai-fsm/domain";
 import { formatCents } from "@ai-fsm/money";
 
 // TASK-018 slice 3: create/edit a work order. Everything is editable; materials
@@ -20,7 +24,7 @@ export interface MaterialRow {
   suggested?: boolean;
 }
 
-const STATUS_OPTIONS = ["draft", "scheduled", "in_progress", "completed", "cancelled"] as const;
+const STATUS_OPTIONS = WORK_ORDER_UI_STATUSES;
 
 export interface WorkOrderFormProps {
   mode: "create" | "edit";
@@ -40,6 +44,7 @@ export interface WorkOrderFormProps {
     rooms: WorkOrderRoomLine[];
     materials: MaterialRow[];
     status: (typeof STATUS_OPTIONS)[number];
+    completionCriteria?: CompletionCriterion[];
   };
 }
 
@@ -54,7 +59,13 @@ export function WorkOrderForm(props: WorkOrderFormProps) {
   const [safetyNotes, setSafetyNotes] = useState(initial.safetyNotes);
   const [rooms, setRooms] = useState<WorkOrderRoomLine[]>(initial.rooms);
   const [materials, setMaterials] = useState<MaterialRow[]>(initial.materials);
-  const [status, setStatus] = useState<(typeof STATUS_OPTIONS)[number]>(initial.status);
+  const fromAssessment = !!(props.sourceVisitId || props.sourceAssessmentId) && !props.jobId;
+  const [status, setStatus] = useState<(typeof STATUS_OPTIONS)[number]>(
+    fromAssessment ? "draft" : initial.status,
+  );
+  const [completionCriteria, setCompletionCriteria] = useState<CompletionCriterion[]>(
+    initial.completionCriteria ?? [],
+  );
   const [saving, setSaving] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [suggestionMeta, setSuggestionMeta] = useState<MaterialsMetadataShape | null>(null);
@@ -124,8 +135,9 @@ export function WorkOrderForm(props: WorkOrderFormProps) {
         site_notes: siteNotes,
         safety_notes: safetyNotes,
         rooms,
-        status,
-        materials: materials.map((m) => ({
+        status: fromAssessment ? "draft" : status,
+        completion_criteria: completionCriteria,
+        materials: materials.filter((m) => m.description.trim()).map((m) => ({
           description: m.description,
           quantity: m.quantity,
           unit_price_cents: m.unit_price_cents,
@@ -172,11 +184,16 @@ export function WorkOrderForm(props: WorkOrderFormProps) {
       <div><label style={labelStyle}>Title</label>
         <input style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} /></div>
 
-      {props.mode === "edit" && (
+      {props.mode === "edit" && !fromAssessment && (
         <div><label style={labelStyle}>Status</label>
           <select style={inputStyle} value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
-            {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
+            {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{WORK_ORDER_STATUS_LABELS[s]}</option>)}
           </select></div>
+      )}
+      {fromAssessment && (
+        <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+          Draft only — becomes schedulable when the estimate is accepted.
+        </p>
       )}
 
       <div><label style={labelStyle}>Scope</label>
@@ -205,6 +222,64 @@ export function WorkOrderForm(props: WorkOrderFormProps) {
           </div>
         </div>
       )}
+
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)" }}>
+          <label style={{ ...labelStyle, marginBottom: 0 }}>Completion criteria</label>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() =>
+              setCompletionCriteria((rows) => [
+                ...rows,
+                { id: `c-${Date.now()}`, label: "", required: true, completed: false },
+              ])
+            }
+          >
+            + Add
+          </Button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)", marginBottom: "var(--space-3)" }}>
+          {completionCriteria.map((c, i) => (
+            <div key={c.id} style={{ display: "flex", gap: "var(--space-1)", alignItems: "center" }}>
+              {props.mode === "edit" && (
+                <input
+                  type="checkbox"
+                  checked={c.completed}
+                  onChange={(e) =>
+                    setCompletionCriteria((rows) =>
+                      rows.map((x, idx) => (idx === i ? { ...x, completed: e.target.checked } : x)),
+                    )
+                  }
+                />
+              )}
+              <input
+                style={inputStyle}
+                placeholder="Criterion (e.g. Vanity installed)"
+                value={c.label}
+                onChange={(e) =>
+                  setCompletionCriteria((rows) =>
+                    rows.map((x, idx) => (idx === i ? { ...x, label: e.target.value } : x)),
+                  )
+                }
+              />
+              <button
+                type="button"
+                aria-label="Remove criterion"
+                onClick={() => setCompletionCriteria((rows) => rows.filter((_, idx) => idx !== i))}
+                style={{ border: "none", background: "none", cursor: "pointer", color: "var(--fg-muted)", fontSize: 18 }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          {completionCriteria.length === 0 && (
+            <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+              Objective conditions for done — seeded from estimate on accept.
+            </p>
+          )}
+        </div>
+      </div>
 
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)" }}>

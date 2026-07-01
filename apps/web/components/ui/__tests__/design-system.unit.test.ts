@@ -253,7 +253,7 @@ describe("getNavSections (role filtering)", () => {
 });
 
 describe("getBottomNavItems (mobile)", () => {
-  it("returns 3 link items for admin role (Today, Requests, Jobs) — the 4th slot is the More button", () => {
+  it("returns 3 link items for admin role (Today, Requests, Projects) — the 4th slot is the More button", () => {
     const items = getBottomNavItems("admin");
     expect(items).toHaveLength(3);
     expect(items.map((i) => i.href)).toEqual([
@@ -313,7 +313,7 @@ describe("isNavActive (route detection)", () => {
     expect(isNavActive("/app/visits", "/app/operations")).toBe(false);
   });
 
-  // Jobs — prefix match
+  // Projects (/app/jobs) — prefix match
   it("returns true for /app/jobs when pathname is /app/jobs", () => {
     expect(isNavActive("/app/jobs", "/app/jobs")).toBe(true);
   });

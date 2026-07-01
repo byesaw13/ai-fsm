@@ -15,15 +15,21 @@ export type TriageVisitRow = Visit & {
 
 export const VISIT_STATUS_LABELS: Record<VisitStatus, string> = {
   scheduled: "Scheduled",
+  dispatched: "Dispatched",
+  traveling: "Traveling",
   arrived: "Arrived",
   in_progress: "In Progress",
+  waiting: "Waiting",
   completed: "Completed",
   cancelled: "Cancelled",
 };
 
 export const STATUS_ORDER: VisitStatus[] = [
   "in_progress",
+  "traveling",
   "arrived",
+  "dispatched",
+  "waiting",
   "scheduled",
   "completed",
   "cancelled",

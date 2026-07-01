@@ -101,7 +101,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
     },
     {
       key: "jobs",
-      label: "Jobs",
+      label: "Projects",
       align: "right",
       render: (row) => Number(row.job_count),
       width: "100px",

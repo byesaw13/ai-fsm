@@ -10,6 +10,8 @@ import type { AuthSession } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
+import { createDefaultWorkOrderForJob } from "@/lib/work-orders/create-default";
+import { syncWorkOrderStatus } from "@/lib/work-orders/sync-status";
 
 export const dynamic = "force-dynamic";
 
@@ -113,12 +115,30 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       new_value: { title: d.job_title, job_type: d.job_type, client_id: clientId },
     });
 
-    // ── 3. Create visit ──────────────────────────────────────────────────────
+    // ── 3. Default work order (standard visits require work_order_id post-migration 137)
+    const workOrderId = await createDefaultWorkOrderForJob({
+      client,
+      accountId: session.accountId,
+      clientId,
+      jobId,
+      title: d.job_title,
+      scope: d.notes ?? null,
+      createdBy: session.userId,
+    });
+
+    // ── 4. Create visit ──────────────────────────────────────────────────────
     const { rows: visitRows } = await client.query(
-      `INSERT INTO visits (account_id, job_id, assigned_user_id, scheduled_start, scheduled_end, visit_type)
-       VALUES ($1, $2, $3, $4, $5, 'standard')
+      `INSERT INTO visits (account_id, job_id, work_order_id, assigned_user_id, scheduled_start, scheduled_end, visit_type)
+       VALUES ($1, $2, $3, $4, $5, $6, 'standard')
        RETURNING *`,
-      [session.accountId, jobId, d.assigned_user_id ?? null, d.scheduled_start, d.scheduled_end]
+      [
+        session.accountId,
+        jobId,
+        workOrderId,
+        d.assigned_user_id ?? null,
+        d.scheduled_start,
+        d.scheduled_end,
+      ],
     );
     const visit = visitRows[0];
     await appendAuditLog(client, {
@@ -131,7 +151,9 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       new_value: visit,
     });
 
-    // ── 4. Advance job to 'scheduled' ────────────────────────────────────────
+    await syncWorkOrderStatus(client, workOrderId, session.accountId);
+
+    // ── 5. Advance job to 'scheduled' ────────────────────────────────────────
     await client.query(
       `UPDATE jobs SET status = 'scheduled', updated_at = now() WHERE id = $1 AND account_id = $2`,
       [jobId, session.accountId]
@@ -148,7 +170,10 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     });
 
     await client.query("COMMIT");
-    return NextResponse.json({ data: { job_id: jobId, visit_id: visit.id, client_id: clientId } }, { status: 201 });
+    return NextResponse.json(
+      { data: { job_id: jobId, visit_id: visit.id, client_id: clientId, work_order_id: workOrderId } },
+      { status: 201 },
+    );
   } catch (err) {
     await client.query("ROLLBACK");
     logger.error("POST /api/v1/quick-book error", err, { traceId: session.traceId });

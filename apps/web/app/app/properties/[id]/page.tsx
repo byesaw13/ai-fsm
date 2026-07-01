@@ -431,7 +431,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                 size="sm"
                 data-testid="create-job-from-property-btn"
               >
-                + Job
+                + Project
               </LinkButton>
             )}
           </div>

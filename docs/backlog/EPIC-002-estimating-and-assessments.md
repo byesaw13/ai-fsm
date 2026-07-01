@@ -125,8 +125,15 @@ API `apps/web/app/api/v1/work-orders/` (GET/POST + `[id]` GET/PATCH); a Work Ord
 Create/Edit screen (`apps/web/app/app/work-orders/`) where the owner edits everything,
 materials are a happy medium (AI-suggested via the estimate materials generator, owner
 confirms/edits, or adds manually), plus a status-grouped list and a "Work Orders" nav
-item. Entry point: a "Create Work Order →" button on the assessment page. Owner edits
-preserved.
+item. Entry point: assessment page (being repositioned to draft-only per
+`docs/superpowers/specs/2026-07-01-job-work-order-visit-model-design.md` — Slice 0
+canon + Slice 4 guardrails). Owner edits preserved.
+
+**Architecture follow-on (Slice 0 canon approved 2026-07-01):** `jobs` = **Project**
+in UI; work orders sit between projects and visits; assessment → **draft** work order
+only (no orphan operational path); estimate acceptance → project + default work order.
+See spec for full model. Schema/enforcement slices 1–5 shipped 2026-07-01
+(`137_project_work_order_visit_schema.sql` + app slices 2–5).
 
 Slice 4 shipped: completed work orders feed the Property Timeline. Migration
 `db/migrations/126_property_timeline_work_orders.sql` adds a `work_order` arm to

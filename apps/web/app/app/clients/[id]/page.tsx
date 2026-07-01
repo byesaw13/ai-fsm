@@ -246,7 +246,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             <CopyPortalLinkButton url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/${client.portal_token}`} label="Copy portal link" />
             <LinkButton href={`/app/properties/new?client_id=${client.id}`} variant="secondary" size="sm">+ Property</LinkButton>
             {canCreateEstimate ? <LinkButton href={`/app/estimates/new?client_id=${client.id}`} variant="secondary" size="sm">+ Estimate</LinkButton> : null}
-            {canCreateJobs ? <LinkButton href={buildJobCreateHref(client.id)} variant="primary" size="sm">+ Job</LinkButton> : null}
+            {canCreateJobs ? <LinkButton href={buildJobCreateHref(client.id)} variant="primary" size="sm">+ Project</LinkButton> : null}
           </div>
         }
       />

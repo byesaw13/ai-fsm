@@ -26,10 +26,10 @@ export default async function NewVisitPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ bookingRequestId?: string }>;
+  searchParams: Promise<{ bookingRequestId?: string; work_order_id?: string }>;
 }) {
   const { id } = await params;
-  const { bookingRequestId } = await searchParams;
+  const { bookingRequestId, work_order_id } = await searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
   if (!canCreateVisit(session.role)) redirect(`/app/jobs/${id}`);
@@ -50,13 +50,20 @@ export default async function NewVisitPage({
       )
     : [];
 
+  const workOrders = await query<{ id: string; title: string }>(
+    `SELECT id, title FROM work_orders
+     WHERE job_id = $1 AND account_id = $2 AND status NOT IN ('draft','cancelled')
+     ORDER BY created_at ASC`,
+    [id, session.accountId],
+  );
+
   return (
     <PageContainer>
       <PageHeader
         title="Schedule Visit"
         subtitle={job.title ?? undefined}
         backHref={`/app/jobs/${id}`}
-        backLabel={job.title ?? "Job"}
+        backLabel={job.title ?? "Project"}
       />
       <Card>
         <VisitScheduleForm
@@ -65,6 +72,8 @@ export default async function NewVisitPage({
           canAssign={canAssign}
           jobCategory={job.job_category ?? null}
           bookingRequestId={bookingRequestId}
+          workOrders={workOrders}
+          initialWorkOrderId={work_order_id ?? null}
         />
       </Card>
     </PageContainer>
