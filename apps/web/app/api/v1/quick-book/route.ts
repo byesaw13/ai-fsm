@@ -10,6 +10,7 @@ import type { AuthSession } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
+import { syncWorkOrderLeadFromVisit } from "@/lib/work-orders/assign-lead";
 import { createDefaultWorkOrderForJob } from "@/lib/work-orders/create-default";
 import { syncWorkOrderStatus } from "@/lib/work-orders/sync-status";
 
@@ -151,6 +152,12 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       new_value: visit,
     });
 
+    await syncWorkOrderLeadFromVisit(
+      client,
+      workOrderId,
+      session.accountId,
+      d.assigned_user_id ?? null,
+    );
     await syncWorkOrderStatus(client, workOrderId, session.accountId);
 
     // ── 5. Advance job to 'scheduled' ────────────────────────────────────────

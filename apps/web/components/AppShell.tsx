@@ -67,7 +67,7 @@ interface NavSection {
 const NAV_TODAY:      NavItem = { href: "/app",              label: "Overview",   Icon: IconDashboard };
 // EPIC-006 Phase 5: the field surface. Owners can switch into it; pure admins
 // (who don't do field work) and the all-techs list never see it here.
-const NAV_MY_DAY:     NavItem = { href: "/app/my-day",       label: "My Day",     Icon: IconMyDay };
+const NAV_MY_DAY:     NavItem = { href: "/app/my-work",      label: "My Work",    Icon: IconMyDay };
 const NAV_DAY_REVIEW: NavItem = { href: "/app/day-review",   label: "Day Review", Icon: IconDayReview };
 const NAV_REQUESTS:   NavItem = { href: "/app/requests",     label: "Requests",   Icon: IconInbox };
 const NAV_PROPS:    NavItem = { href: "/app/properties", label: "Properties", Icon: IconProperties, adminOnly: true };
@@ -105,7 +105,7 @@ const ADMIN_NAV_SECTIONS: NavSection[] = [
 /** Returns filtered nav sections for a given role and active workspace view. */
 export function getNavSections(role: Role, view: "office" | "field" = "field"): NavSection[] {
   if (role === "tech") {
-    const myDay: NavItem = { href: "/app/my-day", label: "My Day", Icon: IconMyDay };
+    const myDay: NavItem = { href: "/app/my-work", label: "My Work", Icon: IconMyDay };
     const visits: NavItem = { href: "/app/visits", label: "Visits", Icon: IconVisits };
     return [{ label: "", items: [myDay, visits] }];
   }
@@ -138,7 +138,7 @@ export function getNavSections(role: Role, view: "office" | "field" = "field"): 
  */
 export function getBottomNavItems(role: Role): NavItem[] {
   if (role === "tech") {
-    const myDay: NavItem = { href: "/app/my-day", label: "My Day", Icon: IconMyDay };
+    const myDay: NavItem = { href: "/app/my-work", label: "My Work", Icon: IconMyDay };
     const visits: NavItem = { href: "/app/visits", label: "Visits", Icon: IconVisits };
     return [myDay, visits];
   }
@@ -172,7 +172,7 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
   const pathname = usePathname();
   // The sidebar follows the surface you're on: My Day = field, everything else =
   // office. So Field never shows the Overview home and vice-versa.
-  const sections = getNavSections(role, pathname.startsWith("/app/my-day") ? "field" : "office");
+  const sections = getNavSections(role, pathname.startsWith("/app/my-work") || pathname.startsWith("/app/my-day") ? "field" : "office");
   const bottomItems = getBottomNavItems(role);
   const [showQuickLead, setShowQuickLead] = useState(false);
   const [showMore, setShowMore] = useState(false);
@@ -194,7 +194,7 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
   const isAdminOrOwner = role === "owner" || role === "admin";
   // Logo goes to each role's home: My Day for field roles, the office dashboard
   // for pure admins (who get bounced there from My Day anyway).
-  const homeHref = role === "admin" ? "/app" : "/app/my-day";
+  const homeHref = role === "admin" ? "/app" : "/app/my-work";
 
   // Close the More sheet whenever navigation happens.
   useEffect(() => {
@@ -422,7 +422,7 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
         )}
       </div>
       {showQuickLead && <QuickLeadModal onClose={() => setShowQuickLead(false)} />}
-      {isAdminOrOwner && !pathname.startsWith("/app/my-day") && <FloatingActionButton />}
+      {isAdminOrOwner && !pathname.startsWith("/app/my-work") && !pathname.startsWith("/app/my-day") && <FloatingActionButton />}
     </ToastProvider>
   );
 }
