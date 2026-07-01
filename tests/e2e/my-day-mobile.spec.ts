@@ -12,11 +12,11 @@ test.describe("My Day mobile", () => {
     await page.fill('[id="email"]', OWNER_EMAIL);
     await page.fill('[id="password"]', OWNER_PASSWORD);
     await page.click('[type="submit"]');
-    await page.waitForURL(/\/app\/my-day/);
+    await page.waitForURL(/\/app\/my-(?:day|work)/);
   });
 
   test("no horizontal page overflow", async ({ page }) => {
-    await page.goto(`${BASE}/app/my-day`);
+    await page.goto(`${BASE}/app/my-work`);
     const overflow = await page.evaluate(() => ({
       sw: document.documentElement.scrollWidth,
       cw: document.documentElement.clientWidth,
@@ -25,14 +25,14 @@ test.describe("My Day mobile", () => {
   });
 
   test("start my day entry visible", async ({ page }) => {
-    await page.goto(`${BASE}/app/my-day`);
+    await page.goto(`${BASE}/app/my-work`);
     const startBtn = page.getByTestId("start-my-day-button");
     const statusPill = page.getByTestId("day-status-pill");
     await expect(startBtn.or(statusPill)).toBeVisible();
   });
 
   test("wizard opens with three steps", async ({ page }) => {
-    await page.goto(`${BASE}/app/my-day`);
+    await page.goto(`${BASE}/app/my-work`);
     const startBtn = page.getByTestId("start-my-day-button");
     if (!(await startBtn.isVisible())) {
       test.skip();
@@ -46,13 +46,13 @@ test.describe("My Day mobile", () => {
   });
 
   test("quick actions grid visible", async ({ page }) => {
-    await page.goto(`${BASE}/app/my-day`);
+    await page.goto(`${BASE}/app/my-work`);
     await expect(page.getByTestId("field-quick-actions")).toBeVisible();
     await expect(page.getByText("Log Mileage")).toBeVisible();
   });
 
   test("FAB hidden on my day", async ({ page }) => {
-    await page.goto(`${BASE}/app/my-day`);
+    await page.goto(`${BASE}/app/my-work`);
     await expect(page.locator(".p7-fab-wrap button[aria-label*='quick actions']")).not.toBeVisible();
   });
 });
