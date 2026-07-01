@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
-import { query, queryForSession } from "@/lib/db";
+import { queryForSession } from "@/lib/db";
 import { isSameCalendarDay } from "@/lib/visits/formatting";
 import { pickHeroVisit, type HeroVisit } from "@/lib/my-day/visit-hero";
 import { loadFieldDayData } from "@/lib/my-work/field-day-data";
@@ -87,7 +87,8 @@ export default async function MyWorkPage() {
        LIMIT 50`,
       [session.accountId, session.userId, opTypes],
     ),
-    query<HeroVisit>(
+    queryForSession<HeroVisit>(
+      session,
       `SELECT v.id, v.status, v.scheduled_start::text, j.title AS job_title,
               p.address AS property_address, c.name AS client_name, c.phone AS client_phone
        FROM visits v
