@@ -16,6 +16,9 @@ describe("operational visibility", () => {
 
   it("maps visits by operational visibility", () => {
     expect(getVisitOperationalVisibility("scheduled")).toBe("active");
+    expect(getVisitOperationalVisibility("dispatched")).toBe("active");
+    expect(getVisitOperationalVisibility("traveling")).toBe("active");
+    expect(getVisitOperationalVisibility("waiting")).toBe("active");
     expect(getVisitOperationalVisibility("completed")).toBe("historical");
     expect(getVisitOperationalVisibility("cancelled")).toBe("archived");
   });

@@ -6,7 +6,11 @@ import type { Route } from "next";
 import { Button, useToast } from "@/components/ui";
 import { MaterialsMetadata, type MaterialsMetadata as MaterialsMetadataShape } from "@/app/app/estimates/components/MaterialsMetadata";
 import type { WorkOrderDraft, WorkOrderRoomLine } from "@ai-fsm/domain";
-import { materialItemsToDraft } from "@ai-fsm/domain";
+import {
+  materialItemsToDraft,
+  WORK_ORDER_UI_STATUSES,
+  WORK_ORDER_STATUS_LABELS,
+} from "@ai-fsm/domain";
 import { formatCents } from "@ai-fsm/money";
 
 // TASK-018 slice 3: create/edit a work order. Everything is editable; materials
@@ -20,7 +24,7 @@ export interface MaterialRow {
   suggested?: boolean;
 }
 
-const STATUS_OPTIONS = ["draft", "scheduled", "in_progress", "completed", "cancelled"] as const;
+const STATUS_OPTIONS = WORK_ORDER_UI_STATUSES;
 
 export interface WorkOrderFormProps {
   mode: "create" | "edit";
@@ -175,7 +179,7 @@ export function WorkOrderForm(props: WorkOrderFormProps) {
       {props.mode === "edit" && (
         <div><label style={labelStyle}>Status</label>
           <select style={inputStyle} value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
-            {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
+            {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{WORK_ORDER_STATUS_LABELS[s]}</option>)}
           </select></div>
       )}
 

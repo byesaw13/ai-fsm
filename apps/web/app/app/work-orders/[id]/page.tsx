@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { canCreateEstimates } from "@/lib/auth/permissions";
 import { queryForSession } from "@/lib/db";
-import type { WorkOrderRoomLine } from "@ai-fsm/domain";
+import { WORK_ORDER_UI_STATUSES, WORK_ORDER_STATUS_LABELS, type WorkOrderRoomLine } from "@ai-fsm/domain";
 import { PageContainer, PageHeader, Card } from "@/components/ui";
 import { WorkOrderForm, type MaterialRow } from "../WorkOrderForm";
 
@@ -32,7 +32,7 @@ type MaterialDbRow = {
   total_cents: number;
 };
 
-const STATUSES = ["draft", "scheduled", "in_progress", "completed", "cancelled"] as const;
+const STATUSES = WORK_ORDER_UI_STATUSES;
 
 export default async function WorkOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -78,7 +78,7 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
     <PageContainer>
       <PageHeader
         title={wo.title}
-        subtitle={`${wo.status.replace("_", " ")}${wo.completed_at ? " · completed" : ""}`}
+        subtitle={`${WORK_ORDER_STATUS_LABELS[wo.status as keyof typeof WORK_ORDER_STATUS_LABELS] ?? wo.status}${wo.completed_at ? " · completed" : ""}`}
         backHref="/app/work-orders"
         backLabel="Work Orders"
       />

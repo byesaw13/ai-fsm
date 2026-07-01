@@ -60,27 +60,52 @@ export const jobTransitions: Record<JobStatus, readonly JobStatus[]> = {
 
 export const visitStatusSchema = z.enum([
   "scheduled",
+  "dispatched",
+  "traveling",
   "arrived",
   "in_progress",
+  "waiting",
   "completed",
   "cancelled",
 ]);
 export type VisitStatus = z.infer<typeof visitStatusSchema>;
 
+export const VISIT_STATUS_LABELS: Record<VisitStatus, string> = {
+  scheduled: "Scheduled",
+  dispatched: "Dispatched",
+  traveling: "Traveling",
+  arrived: "Arrived",
+  in_progress: "In Progress",
+  waiting: "Waiting",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
 export const visitTransitions: Record<VisitStatus, readonly VisitStatus[]> = {
-  scheduled: ["arrived", "cancelled"],
-  arrived: ["in_progress", "cancelled"],
-  in_progress: ["completed", "cancelled"],
+  scheduled: ["dispatched", "arrived", "cancelled"],
+  dispatched: ["traveling", "arrived", "cancelled"],
+  traveling: ["arrived", "cancelled"],
+  arrived: ["in_progress", "waiting", "cancelled"],
+  in_progress: ["waiting", "completed", "cancelled"],
+  waiting: ["in_progress", "cancelled"],
   completed: [],
   cancelled: [],
 };
 
-export const VISIT_TYPES = [
-  "standard",
+/** Visit types that require a work_order_id (execution visits). */
+export const EXECUTION_VISIT_TYPES = ["standard", "punch_list"] as const;
+
+/** Visit types that must not have a work_order_id (operational / pre-sale). */
+export const OPERATIONAL_VISIT_TYPES = [
   "site_visit",
-  "realtor_baseline",
   "membership_health_check",
-  "punch_list",
+  "realtor_baseline",
+  "sales_walkthrough",
+] as const;
+
+export const VISIT_TYPES = [
+  ...EXECUTION_VISIT_TYPES,
+  ...OPERATIONAL_VISIT_TYPES,
 ] as const;
 export type VisitType = typeof VISIT_TYPES[number];
 
@@ -90,6 +115,46 @@ export const VISIT_TYPE_LABELS: Record<VisitType, string> = {
   realtor_baseline: "Realtor Baseline Inspection",
   membership_health_check: "Membership Health Check",
   punch_list: "Punch List",
+  sales_walkthrough: "Sales Walkthrough",
+};
+
+// === Work Order (planning layer) ===
+
+/** v1 UI statuses; approved/closed reserved in DB for a future slice. */
+export const WORK_ORDER_UI_STATUSES = [
+  "draft",
+  "ready",
+  "scheduled",
+  "dispatched",
+  "waiting",
+  "completed",
+  "cancelled",
+] as const;
+export type WorkOrderUiStatus = typeof WORK_ORDER_UI_STATUSES[number];
+
+export const workOrderStatusSchema = z.enum([
+  "draft",
+  "ready",
+  "scheduled",
+  "dispatched",
+  "waiting",
+  "completed",
+  "cancelled",
+  "approved",
+  "closed",
+]);
+export type WorkOrderStatus = z.infer<typeof workOrderStatusSchema>;
+
+export const WORK_ORDER_STATUS_LABELS: Record<WorkOrderStatus, string> = {
+  draft: "Draft",
+  ready: "Ready",
+  scheduled: "Scheduled",
+  dispatched: "Dispatched",
+  waiting: "Waiting",
+  completed: "Completed",
+  cancelled: "Cancelled",
+  approved: "Approved",
+  closed: "Closed",
 };
 
 // === Booking Request ===

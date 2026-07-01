@@ -385,7 +385,7 @@ Project
 | Slice | Delivers |
 |---|---|
 | **0 — Canon** | This spec; update `DOMAIN_MODEL.md`, `workflow-model.md`, `vocabulary.ts` — **shipped 2026-07-01** |
-| **1 — Schema** | `visits.work_order_id`, status/type CHECK constraints, work order status expansion, completion criteria column |
+| **1 — Schema** | `visits.work_order_id`, status/type CHECK constraints, work order status expansion, completion criteria column — **shipped 2026-07-01** (`137_project_work_order_visit_schema.sql`) |
 | **2 — Estimate accept** | Accept → project + default work order; promote assessment draft |
 | **3 — Visit linkage** | Standard visits require work order; derived work order status; technician on visit only |
 | **4 — Assessment guardrails** | Draft-only work order from assessment; remove orphan operational path |

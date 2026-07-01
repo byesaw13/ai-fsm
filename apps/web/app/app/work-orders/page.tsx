@@ -4,6 +4,7 @@ import { canCreateEstimates } from "@/lib/auth/permissions";
 import { queryForSession } from "@/lib/db";
 import { PageContainer, PageHeader, ItemCard, StatusSection, EmptyState, StatusBadge } from "@/components/ui";
 import type { StatusVariant } from "@/components/ui";
+import { WORK_ORDER_UI_STATUSES, WORK_ORDER_STATUS_LABELS } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -17,10 +18,10 @@ type Row = {
   completed_at: string | null;
 };
 
-const STATUS_ORDER = ["in_progress", "scheduled", "draft", "completed", "cancelled"] as const;
-const STATUS_LABELS: Record<string, string> = {
-  draft: "Draft", scheduled: "Scheduled", in_progress: "In Progress", completed: "Completed", cancelled: "Cancelled",
-};
+const STATUS_ORDER = ["dispatched", "scheduled", "ready", "waiting", "draft", "completed", "cancelled"] as const;
+const STATUS_LABELS: Record<string, string> = Object.fromEntries(
+  WORK_ORDER_UI_STATUSES.map((s) => [s, WORK_ORDER_STATUS_LABELS[s]]),
+);
 
 export default async function WorkOrdersPage() {
   const session = await getSession();
