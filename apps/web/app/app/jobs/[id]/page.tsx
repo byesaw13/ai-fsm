@@ -228,6 +228,8 @@ export default async function JobDetailPage({
           booking_status: string | null;
           booking_pricing_mode: string | null;
           expired_estimate_count: string;
+          latest_expired_estimate_id: string | null;
+          has_draft_work_order_with_pricing: boolean;
         }>(
           session,
           `SELECT
@@ -271,7 +273,15 @@ export default async function JobDetailPage({
               WHERE job_id = $1 AND account_id = $2
               ORDER BY created_at DESC LIMIT 1) AS booking_pricing_mode,
              (SELECT COUNT(*) FROM estimates
-              WHERE job_id = $1 AND account_id = $2 AND status = 'expired') AS expired_estimate_count
+              WHERE job_id = $1 AND account_id = $2 AND status = 'expired') AS expired_estimate_count,
+             (SELECT id FROM estimates
+              WHERE job_id = $1 AND account_id = $2 AND status = 'expired'
+              ORDER BY created_at DESC LIMIT 1) AS latest_expired_estimate_id,
+             EXISTS(
+               SELECT 1 FROM work_orders
+               WHERE job_id = $1 AND account_id = $2
+                 AND status = 'draft' AND total_cents > 0
+             ) AS has_draft_work_order_with_pricing
            FROM jobs j WHERE j.id = $1 AND j.account_id = $2`,
           [id, session.accountId]
         )
@@ -301,6 +311,11 @@ export default async function JobDetailPage({
   const openPreSaleSiteVisits = preSaleSiteVisits.filter(
     (v) => !["completed", "cancelled"].includes(v.status)
   );
+  const openPreSaleSiteVisit = openPreSaleSiteVisits[0] ?? null;
+  const hasCompletedPreSaleSiteVisit = preSaleSiteVisits.some((v) => v.status === "completed");
+  const expiredEstimateCount = commercialCounts
+    ? parseInt(commercialCounts.expired_estimate_count, 10)
+    : 0;
   const latestVisit = visits[0] ?? null;
   const pipelineStage = derivePipelineStage({
     jobStatus: currentStatus,
@@ -313,9 +328,7 @@ export default async function JobDetailPage({
     executionInProgressCount: executionVisits.filter((v) => v.status === "in_progress").length,
     preSaleOpenSiteVisitCount: openPreSaleSiteVisits.length,
     completedPreSaleSiteVisit: preSaleSiteVisits.some((v) => v.status === "completed"),
-    expiredEstimateCount: commercialCounts
-      ? parseInt(commercialCounts.expired_estimate_count, 10)
-      : 0,
+    expiredEstimateCount,
     completedVisitCount: visits.filter((v) => v.status === "completed").length,
     unpaidInvoiceCount: commercialCounts?.has_unpaid_invoice ? 1 : 0,
     paidInvoiceCount: commercialCounts?.has_paid_invoice ? 1 : 0,
@@ -483,6 +496,12 @@ export default async function JobDetailPage({
             hasUnpaidInvoice={commercialCounts.has_unpaid_invoice}
             hasPaidInvoice={commercialCounts.has_paid_invoice}
             latestInvoiceId={commercialCounts.latest_invoice_id}
+            hasOpenPreSaleSiteVisit={openPreSaleSiteVisits.length > 0}
+            hasCompletedPreSaleSiteVisit={hasCompletedPreSaleSiteVisit}
+            hasExpiredEstimate={expiredEstimateCount > 0}
+            latestExpiredEstimateId={commercialCounts.latest_expired_estimate_id}
+            hasDraftWorkOrderWithPricing={commercialCounts.has_draft_work_order_with_pricing}
+            preSaleSiteVisitId={openPreSaleSiteVisit?.id ?? null}
           />
           <JobCommandPanel
             stage={pipelineStage}

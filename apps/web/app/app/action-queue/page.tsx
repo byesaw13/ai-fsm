@@ -38,6 +38,7 @@ export default async function ActionQueuePage() {
     draftInvoices,
     sentEstimates,
     expiringEstimates,
+    expiredEstimates,
     depositsNeeded,
     jobsNoNextVisit,
     materialsNeeded,
@@ -66,6 +67,11 @@ export default async function ActionQueuePage() {
          AND status IN ('draft','sent')
          AND expires_at IS NOT NULL
          AND expires_at < NOW() + INTERVAL '7 days'`,
+      [accountId]),
+    queryForSession<CountRow>(session,
+      `SELECT COUNT(*)::text AS count
+       FROM estimates
+       WHERE account_id = $1 AND status = 'expired'`,
       [accountId]),
     queryForSession<CountRow>(session,
       `SELECT COUNT(*)::text AS count
@@ -115,6 +121,7 @@ export default async function ActionQueuePage() {
   const draftInvoiceCount = parseN(draftInvoices[0]);
   const sentEstimateCount = parseN(sentEstimates[0]);
   const expiringEstimateCount = parseN(expiringEstimates[0]);
+  const expiredEstimateCount = parseN(expiredEstimates[0]);
   const depositCount = parseN(depositsNeeded[0]);
   const scheduleCount = parseN(jobsNoNextVisit[0]);
   const materialCount = parseN(materialsNeeded[0]);
@@ -127,7 +134,17 @@ export default async function ActionQueuePage() {
   const items = ([
     { label: "Review Draft Invoices", count: draftInvoiceCount, href: "/app/invoices?status=draft" as Route, detail: "Completed work waiting for invoice review", tone: "warning" },
     { label: "Schedule Approved Jobs", count: scheduleCount, href: "/app/jobs" as Route, detail: "Approved or active jobs without a next visit", tone: "warning" },
-    { label: "Follow Up Estimates", count: sentEstimateCount + expiringEstimateCount, href: "/app/estimates?status=sent" as Route, detail: expiringEstimateCount > 0 ? "Some expire within 7 days" : "Sent estimates awaiting response", tone: "warning" },
+    {
+      label: "Follow Up Estimates",
+      count: sentEstimateCount + expiringEstimateCount + expiredEstimateCount,
+      href: "/app/estimates?status=sent" as Route,
+      detail: expiredEstimateCount > 0
+        ? `${expiredEstimateCount} expired — revise and resend${expiringEstimateCount > 0 ? "; some expire within 7 days" : ""}`
+        : expiringEstimateCount > 0
+          ? "Some expire within 7 days"
+          : "Sent estimates awaiting response",
+      tone: "warning",
+    },
     { label: "Collect Deposits", count: depositCount, href: "/app/invoices?kind=deposit" as Route, detail: "Deposit invoices not fully collected", tone: "danger" },
     { label: "Order Materials", count: materialCount, href: "/app/estimates?status=approved" as Route, detail: "Approved jobs with materials to stage", tone: "warning" },
     { label: "Review Requests", count: requestCount, href: "/app/requests" as Route, detail: "Needs routing or follow-up", tone: "warning" },

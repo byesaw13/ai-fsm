@@ -185,6 +185,7 @@ export default async function VisitDetailPage({
     propertyContextIssues,
     propertyContextNotes,
     lastServiceVisit,
+    siteVisitAssessment,
   ] = await Promise.all([
     isMembershipVisit
       ? queryOneForSession<CountRow>(
@@ -252,6 +253,15 @@ export default async function VisitDetailPage({
            ORDER BY v2.completed_at DESC
            LIMIT 1`,
           [visit.job_property_id!, session.accountId, id]
+        )
+      : Promise.resolve(null),
+
+    isSiteVisit && !["completed", "cancelled"].includes(currentStatus)
+      ? queryOneForSession<{ completed_at: string | Date | null }>(
+          session,
+          `SELECT completed_at FROM site_visit_assessments
+           WHERE visit_id = $1 AND account_id = $2`,
+          [id, session.accountId]
         )
       : Promise.resolve(null),
   ]);
@@ -355,6 +365,10 @@ export default async function VisitDetailPage({
   // pg returns timestamptz as Date objects — normalise to ISO strings throughout
   const toISO = (v: unknown): string =>
     v instanceof Date ? v.toISOString() : String(v);
+
+  const assessmentCompletedAt = siteVisitAssessment?.completed_at
+    ? toISO(siteVisitAssessment.completed_at)
+    : null;
 
   const timelineEntries: TimelineEntryData[] = [
     {
@@ -534,8 +548,28 @@ export default async function VisitDetailPage({
             </Card>
           )}
 
+          {/* ── Site visit: assessment complete but walkthrough still open (cascade edge) ── */}
+          {isSiteVisit && currentStatus !== "cancelled" && currentStatus !== "completed" && assessmentCompletedAt && (
+            <Card data-testid="site-visit-closeout-card">
+              <SectionHeader title="Close Walkthrough" />
+              <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", marginBottom: "var(--space-3)" }}>
+                Assessment complete — finish closing walkthrough.
+              </div>
+              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
+                <a href={`/app/visits/${visit.id}/assessment`} className="p7-btn p7-btn-ghost p7-btn-sm">
+                  View Assessment
+                </a>
+                {canTransition && (
+                  <a href="#visit-actions" className="p7-btn p7-btn-primary p7-btn-sm">
+                    Complete Walkthrough →
+                  </a>
+                )}
+              </div>
+            </Card>
+          )}
+
           {/* ── Site visit: assessment form link (active visits) ── */}
-          {isSiteVisit && currentStatus !== "cancelled" && currentStatus !== "completed" && (
+          {isSiteVisit && currentStatus !== "cancelled" && currentStatus !== "completed" && !assessmentCompletedAt && (
             <Card data-testid="site-visit-assessment-card">
               <SectionHeader title="Site Assessment" />
               <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", marginBottom: "var(--space-3)" }}>

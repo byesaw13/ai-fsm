@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 
-interface WhatNextBannerProps {
+export interface WhatNextBannerProps {
   jobId: string;
   clientId: string | null;
   jobStatus: string;
@@ -17,6 +17,12 @@ interface WhatNextBannerProps {
   hasUnpaidInvoice: boolean;
   hasPaidInvoice: boolean;
   latestInvoiceId: string | null;
+  hasOpenPreSaleSiteVisit: boolean;
+  hasCompletedPreSaleSiteVisit: boolean;
+  hasExpiredEstimate: boolean;
+  latestExpiredEstimateId: string | null;
+  hasDraftWorkOrderWithPricing: boolean;
+  preSaleSiteVisitId: string | null;
 }
 
 // Returns the day difference from a date string to now
@@ -36,11 +42,13 @@ interface BannerContent {
   secondary?: { label: string; href: string };
 }
 
-function computeBanner(props: WhatNextBannerProps): BannerContent | null {
+export function computeBanner(props: WhatNextBannerProps): BannerContent | null {
   const {
     jobId, clientId, jobStatus, estimateCount, hasSentEstimate, lastEstimateSentAt,
     hasApprovedEstimate, approvedEstimateId, hasDepositInvoice, depositPaid, hasActiveVisit,
     invoiceCount, hasUnpaidInvoice, hasPaidInvoice, latestInvoiceId,
+    hasOpenPreSaleSiteVisit, hasCompletedPreSaleSiteVisit, hasExpiredEstimate,
+    latestExpiredEstimateId, hasDraftWorkOrderWithPricing, preSaleSiteVisitId,
   } = props;
 
   const days = daysSince(lastEstimateSentAt);
@@ -133,6 +141,42 @@ function computeBanner(props: WhatNextBannerProps): BannerContent | null {
     };
   }
 
+  // Open pre-sale site visit — finish assessment before estimating
+  if (hasOpenPreSaleSiteVisit && preSaleSiteVisitId) {
+    return {
+      color: "#1e40af",
+      bg: "#dbeafe",
+      icon: "→",
+      message: "Complete site assessment",
+      actionLabel: "Open Assessment",
+      actionHref: `/app/visits/${preSaleSiteVisitId}/assessment`,
+    };
+  }
+
+  // Walkthrough complete, no commercial estimate yet
+  if (hasCompletedPreSaleSiteVisit && estimateCount === 0) {
+    return {
+      color: "#1e40af",
+      bg: "#dbeafe",
+      icon: "→",
+      message: "Create estimate from walkthrough",
+      actionLabel: "Create Estimate",
+      actionHref: `/app/estimates/new?job_id=${jobId}${clientParam}&pricing_mode=flat_rate`,
+    };
+  }
+
+  // Draft work order has scope pricing but no estimate row
+  if (hasDraftWorkOrderWithPricing && estimateCount === 0) {
+    return {
+      color: "#1e40af",
+      bg: "#dbeafe",
+      icon: "→",
+      message: "Create estimate from work order scope",
+      actionLabel: "Create Estimate",
+      actionHref: `/app/estimates/new?job_id=${jobId}${clientParam}&pricing_mode=flat_rate`,
+    };
+  }
+
   // Estimate sent, waiting on customer
   if (hasSentEstimate && !hasApprovedEstimate) {
     const sentMsg = days !== null && days > 0
@@ -144,6 +188,18 @@ function computeBanner(props: WhatNextBannerProps): BannerContent | null {
       icon: "◷",
       message: sentMsg,
       secondary: { label: "View estimates →", href: `/app/estimates?job_id=${jobId}` },
+    };
+  }
+
+  // Expired estimate with no active sent estimate to follow up on
+  if (hasExpiredEstimate && !hasSentEstimate && latestExpiredEstimateId) {
+    return {
+      color: "#92400e",
+      bg: "#fef3c7",
+      icon: "⟳",
+      message: "Estimate expired — revise and resend",
+      actionLabel: "Revise Estimate",
+      actionHref: `/app/estimates/${latestExpiredEstimateId}`,
     };
   }
 
