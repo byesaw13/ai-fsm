@@ -11,5 +11,8 @@ echo "Deploying branch: $BRANCH"
 ssh garonhome "
   set -euo pipefail
   cd /opt/business/ai-fsm/repo &&
-  DEPLOY_BRANCH='$BRANCH' bash scripts/deploy-garonhome.sh
+  git fetch origin '$BRANCH' &&
+  git checkout '$BRANCH' &&
+  git reset --hard origin/'$BRANCH' &&
+  bash scripts/deploy-garonhome.sh
 "
