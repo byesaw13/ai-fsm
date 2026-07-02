@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { deriveCustomerStage, derivePortalStage } from "./stages";
+import { deriveCustomerStage, derivePortalStage, derivePipelineStage } from "./stages";
 
 describe("deriveCustomerStage", () => {
   it("draft → intake", () => {
@@ -88,5 +88,51 @@ describe("derivePortalStage", () => {
       hasApprovedEstimate: true,
       hasSentEstimate: true,
     })).toBe("completed");
+  });
+});
+
+describe("derivePipelineStage — pre-sale vs execution visits", () => {
+  it("open site_visit in_progress only → estimate_needed, not in_progress", () => {
+    expect(derivePipelineStage({
+      jobStatus: "in_progress",
+      executionInProgressCount: 0,
+      preSaleOpenSiteVisitCount: 1,
+      inProgressVisitCount: 1,
+    })).toBe("estimate_needed");
+  });
+
+  it("standard visit in_progress → in_progress", () => {
+    expect(derivePipelineStage({
+      jobStatus: "in_progress",
+      executionInProgressCount: 1,
+    })).toBe("in_progress");
+  });
+
+  it("sent estimate + open site_visit → estimate_sent", () => {
+    expect(derivePipelineStage({
+      jobStatus: "draft",
+      sentEstimateCount: 1,
+      preSaleOpenSiteVisitCount: 1,
+    })).toBe("estimate_sent");
+  });
+
+  it("completed pre-sale site visit with no estimate → estimate_needed", () => {
+    expect(derivePipelineStage({
+      jobStatus: "draft",
+      completedPreSaleSiteVisit: true,
+      estimateCount: 0,
+    })).toBe("estimate_needed");
+  });
+
+  it("falls back to legacy visit counts when execution counts are absent", () => {
+    expect(derivePipelineStage({
+      jobStatus: "scheduled",
+      inProgressVisitCount: 1,
+    })).toBe("in_progress");
+
+    expect(derivePipelineStage({
+      jobStatus: "draft",
+      activeVisitCount: 1,
+    })).toBe("scheduled");
   });
 });

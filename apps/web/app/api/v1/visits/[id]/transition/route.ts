@@ -330,7 +330,8 @@ export const POST = withAuth(
                  COUNT(*) FILTER (WHERE status NOT IN ('completed','cancelled')) AS pending,
                  COUNT(*) FILTER (WHERE status = 'completed') AS completed
                FROM visits
-               WHERE job_id = $1 AND account_id = $2`,
+               WHERE job_id = $1 AND account_id = $2
+                 AND visit_type IN ('standard','punch_list')`,
               [updated.job_id, session.accountId]
             );
             const { pending, completed: completedCount } = siblingCounts.rows[0];

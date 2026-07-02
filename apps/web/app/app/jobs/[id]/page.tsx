@@ -60,7 +60,16 @@ type JobRow = Job & {
 };
 type VisitRow = Visit & {
   assigned_user_name: string | null;
+  visit_type: string;
 };
+
+function isExecutionVisit(visit: VisitRow): boolean {
+  return visit.visit_type === "standard" || visit.visit_type === "punch_list";
+}
+
+function isPreSaleSiteVisit(visit: VisitRow): boolean {
+  return visit.visit_type === "site_visit";
+}
 type DbWorkOrderRow = {
   id: string;
   title: string;
@@ -218,6 +227,7 @@ export default async function JobDetailPage({
           booking_request_id: string | null;
           booking_status: string | null;
           booking_pricing_mode: string | null;
+          expired_estimate_count: string;
         }>(
           session,
           `SELECT
@@ -259,7 +269,9 @@ export default async function JobDetailPage({
               ORDER BY created_at DESC LIMIT 1) AS booking_status,
              (SELECT pricing_mode FROM booking_requests
               WHERE job_id = $1 AND account_id = $2
-              ORDER BY created_at DESC LIMIT 1) AS booking_pricing_mode
+              ORDER BY created_at DESC LIMIT 1) AS booking_pricing_mode,
+             (SELECT COUNT(*) FROM estimates
+              WHERE job_id = $1 AND account_id = $2 AND status = 'expired') AS expired_estimate_count
            FROM jobs j WHERE j.id = $1 AND j.account_id = $2`,
           [id, session.accountId]
         )
@@ -281,6 +293,14 @@ export default async function JobDetailPage({
   const invoiceCount = commercialCounts ? parseInt(commercialCounts.invoice_count) : 0;
   const changeOrderCount = commercialCounts ? parseInt(commercialCounts.change_order_count) : 0;
   const activeVisits = visits.filter((v) => !["completed", "cancelled"].includes(v.status));
+  const executionVisits = visits.filter(isExecutionVisit);
+  const preSaleSiteVisits = visits.filter(isPreSaleSiteVisit);
+  const activeExecutionVisits = executionVisits.filter(
+    (v) => !["completed", "cancelled"].includes(v.status)
+  );
+  const openPreSaleSiteVisits = preSaleSiteVisits.filter(
+    (v) => !["completed", "cancelled"].includes(v.status)
+  );
   const latestVisit = visits[0] ?? null;
   const pipelineStage = derivePipelineStage({
     jobStatus: currentStatus,
@@ -289,8 +309,13 @@ export default async function JobDetailPage({
     estimateCount,
     sentEstimateCount: commercialCounts?.has_sent_estimate ? 1 : 0,
     approvedEstimateCount: commercialCounts?.has_approved_estimate ? 1 : 0,
-    activeVisitCount: activeVisits.length,
-    inProgressVisitCount: visits.filter((v) => v.status === "in_progress").length,
+    executionActiveVisitCount: activeExecutionVisits.length,
+    executionInProgressCount: executionVisits.filter((v) => v.status === "in_progress").length,
+    preSaleOpenSiteVisitCount: openPreSaleSiteVisits.length,
+    completedPreSaleSiteVisit: preSaleSiteVisits.some((v) => v.status === "completed"),
+    expiredEstimateCount: commercialCounts
+      ? parseInt(commercialCounts.expired_estimate_count, 10)
+      : 0,
     completedVisitCount: visits.filter((v) => v.status === "completed").length,
     unpaidInvoiceCount: commercialCounts?.has_unpaid_invoice ? 1 : 0,
     paidInvoiceCount: commercialCounts?.has_paid_invoice ? 1 : 0,
