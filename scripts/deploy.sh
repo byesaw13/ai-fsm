@@ -14,5 +14,5 @@ ssh garonhome "
   git fetch origin '$BRANCH' &&
   git checkout '$BRANCH' &&
   git reset --hard origin/'$BRANCH' &&
-  bash scripts/deploy-garonhome.sh
+  DEPLOY_BRANCH='$BRANCH' bash scripts/deploy-garonhome.sh
 "

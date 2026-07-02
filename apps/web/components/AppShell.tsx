@@ -172,7 +172,7 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
   const pathname = usePathname();
   // The sidebar follows the surface you're on: My Day = field, everything else =
   // office. So Field never shows the Overview home and vice-versa.
-  const sections = getNavSections(role, pathname.startsWith("/app/my-day") ? "field" : "office");
+  const sections = getNavSections(role, pathname.startsWith("/app/my-work") ? "field" : "office");
   const bottomItems = getBottomNavItems(role);
   const [showQuickLead, setShowQuickLead] = useState(false);
   const [showMore, setShowMore] = useState(false);
