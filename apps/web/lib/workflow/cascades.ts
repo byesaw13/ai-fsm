@@ -11,6 +11,7 @@ export interface CompleteAssessmentCascadeCtx {
 
 /**
  * When an assessment is marked complete, auto-close the parent site visit.
+ * Closes any open pre-sale status (scheduled, arrived, in_progress, etc.).
  * Idempotent: no-op if visit is already completed/cancelled or not a site_visit.
  * Does not advance job status (pre-sale walkthrough ≠ execution complete).
  */
