@@ -517,6 +517,77 @@ describe("POST /api/v1/visits/[id]/transition", () => {
     expect(json.error.code).toBe("INVALID_TRANSITION");
   });
 
+  it("site_visit scheduled → arrived does not promote job scheduled → in_progress", async () => {
+    const updatedInProgress = {
+      ...SAMPLE_VISIT,
+      visit_type: "site_visit",
+      status: "in_progress",
+      arrived_at: NOW,
+    };
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // set_config
+      .mockResolvedValueOnce({
+        rows: [{
+          ...SAMPLE_VISIT,
+          visit_type: "site_visit",
+          status: "scheduled",
+          assigned_user_id: USER_ID,
+        }],
+      }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE 1: scheduled → arrived
+      .mockResolvedValueOnce({ rows: [updatedInProgress] }) // UPDATE 2: arrived → in_progress
+      .mockResolvedValueOnce({ rows: [] }) // activity_entries close
+      .mockResolvedValueOnce({ rows: [] }) // activity_entries insert
+      .mockResolvedValueOnce({ rows: [{ id: JOB_ID, status: "scheduled" }] }) // job SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] }) // syncWorkOrdersForJob
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await visitTransition(
+      makeRequest("POST", `${VISITS_BASE}/${VISIT_ID}/transition`, { status: "arrived" })
+    );
+    expect(res.status).toBe(200);
+    expect(mockClientQuery.mock.calls.some((call) =>
+      String(call[0]).includes("UPDATE jobs SET status = 'in_progress'")
+    )).toBe(false);
+  });
+
+  it("standard visit scheduled → arrived promotes job scheduled → in_progress", async () => {
+    const updatedInProgress = {
+      ...SAMPLE_VISIT,
+      visit_type: "standard",
+      status: "in_progress",
+      arrived_at: NOW,
+    };
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // set_config
+      .mockResolvedValueOnce({
+        rows: [{
+          ...SAMPLE_VISIT,
+          visit_type: "standard",
+          status: "scheduled",
+          assigned_user_id: USER_ID,
+        }],
+      }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE 1: scheduled → arrived
+      .mockResolvedValueOnce({ rows: [updatedInProgress] }) // UPDATE 2: arrived → in_progress
+      .mockResolvedValueOnce({ rows: [] }) // activity_entries close
+      .mockResolvedValueOnce({ rows: [] }) // activity_entries insert
+      .mockResolvedValueOnce({ rows: [{ id: JOB_ID, status: "scheduled" }] }) // job SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] }) // job scheduled → in_progress
+      .mockResolvedValueOnce({ rows: [] }) // syncWorkOrdersForJob
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await visitTransition(
+      makeRequest("POST", `${VISITS_BASE}/${VISIT_ID}/transition`, { status: "arrived" })
+    );
+    expect(res.status).toBe(200);
+    expect(mockClientQuery.mock.calls.some((call) =>
+      String(call[0]).includes("UPDATE jobs SET status = 'in_progress'")
+    )).toBe(true);
+  });
+
   it("owner scheduled → arrived without assigned_user_id assigns actor and starts visit", async () => {
     const updatedInProgress = { ...SAMPLE_VISIT, status: "in_progress", assigned_user_id: USER_ID, arrived_at: NOW };
     mockClientQuery

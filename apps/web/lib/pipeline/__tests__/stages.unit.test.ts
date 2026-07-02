@@ -141,6 +141,22 @@ describe("derivePipelineStage", () => {
       preSaleOpenSiteVisitCount: 1,
     })).toBe("estimate_sent");
   });
+
+  it("does not treat completed pre-sale site_visit as execution closeout", () => {
+    expect(derivePipelineStage({
+      jobStatus: "draft",
+      completedPreSaleSiteVisit: true,
+      completedVisitCount: 0,
+      estimateCount: 0,
+    })).toBe("estimate_needed");
+
+    expect(derivePipelineStage({
+      jobStatus: "draft",
+      completedPreSaleSiteVisit: true,
+      completedVisitCount: 0,
+      estimateCount: 0,
+    })).not.toBe("completed");
+  });
 });
 
 describe("getPipelineNextAction", () => {

@@ -329,7 +329,7 @@ export default async function JobDetailPage({
     preSaleOpenSiteVisitCount: openPreSaleSiteVisits.length,
     completedPreSaleSiteVisit: preSaleSiteVisits.some((v) => v.status === "completed"),
     expiredEstimateCount,
-    completedVisitCount: visits.filter((v) => v.status === "completed").length,
+    completedVisitCount: executionVisits.filter((v) => v.status === "completed").length,
     unpaidInvoiceCount: commercialCounts?.has_unpaid_invoice ? 1 : 0,
     paidInvoiceCount: commercialCounts?.has_paid_invoice ? 1 : 0,
   });
@@ -491,7 +491,7 @@ export default async function JobDetailPage({
             approvedEstimateId={commercialCounts.approved_estimate_id}
             hasDepositInvoice={commercialCounts.has_deposit_invoice}
             depositPaid={commercialCounts.deposit_paid}
-            hasActiveVisit={activeVisits.length > 0}
+            hasActiveVisit={activeExecutionVisits.length > 0}
             invoiceCount={invoiceCount}
             hasUnpaidInvoice={commercialCounts.has_unpaid_invoice}
             hasPaidInvoice={commercialCounts.has_paid_invoice}
@@ -509,7 +509,7 @@ export default async function JobDetailPage({
             clientId={job.client_id ?? null}
             bookingRequestId={commercialCounts.booking_request_id}
             pricingMode={commercialCounts.booking_pricing_mode as "flat_rate" | "hourly_internal" | null}
-            activeVisitId={activeVisits[0]?.id ?? null}
+            activeVisitId={activeExecutionVisits[0]?.id ?? null}
             latestVisitId={latestVisit?.id ?? null}
             approvedEstimateId={commercialCounts.approved_estimate_id}
             latestInvoiceId={commercialCounts.latest_invoice_id}

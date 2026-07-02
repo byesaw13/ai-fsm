@@ -300,8 +300,15 @@ export const POST = withAuth(
         const job = jobRow.rows[0];
 
         if (job) {
-          if (effectiveStatus === "in_progress" && job.status === "scheduled") {
-            // Visit started — advance job from scheduled → in_progress
+          const isExecutionVisit =
+            visit.visit_type === "standard" || visit.visit_type === "punch_list";
+
+          if (
+            effectiveStatus === "in_progress" &&
+            job.status === "scheduled" &&
+            isExecutionVisit
+          ) {
+            // Execution visit started — advance job from scheduled → in_progress
             await client.query(
               `UPDATE jobs SET status = 'in_progress', updated_at = now()
                WHERE id = $1 AND account_id = $2`,
