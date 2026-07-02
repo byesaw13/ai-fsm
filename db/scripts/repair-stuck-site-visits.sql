@@ -2,13 +2,14 @@
 -- Repair stuck pre-sale site visits (Peter Marinelli pattern)
 -- ============================================================================
 -- Problem: Assessment was marked complete (site_visit_assessments.completed_at
--- set) but the parent site_visit never auto-closed (status still in_progress).
+-- set) but the parent site_visit never auto-closed (status still scheduled,
+-- arrived, in_progress, etc.).
 -- Jobs then show the wrong pipeline stage ("Working" instead of estimate
 -- needed) and stale "do the site visit" prompts in the UI.
 --
--- Peter Marinelli pattern: assessment complete, visit still in_progress; scope
--- lived only in a draft work order with no estimates row, so the commercial
--- pipeline never advanced.
+-- Peter Marinelli pattern: assessment complete, visit still in_progress.
+-- Joseph Legerstee pattern: assessment complete, visit still scheduled
+-- (cascade was not deployed when assessment was saved).
 --
 -- Prerequisite: workflow close-out cascade code must be deployed so new
 -- assessment completions auto-close visits. This script is a one-time repair
@@ -37,7 +38,7 @@ FROM visits v
 JOIN site_visit_assessments sva ON sva.visit_id = v.id
 LEFT JOIN jobs j ON j.id = v.job_id
 WHERE v.visit_type = 'site_visit'
-  AND v.status = 'in_progress'
+  AND v.status NOT IN ('completed', 'cancelled')
   AND sva.completed_at IS NOT NULL
 ORDER BY v.account_id, sva.completed_at;
 
@@ -55,7 +56,7 @@ SET
 FROM site_visit_assessments sva
 WHERE visits.id = sva.visit_id
   AND visits.visit_type = 'site_visit'
-  AND visits.status = 'in_progress'
+  AND visits.status NOT IN ('completed', 'cancelled')
   AND sva.completed_at IS NOT NULL;
   -- Optional: AND visits.account_id = '<your-main-account-uuid>';
 

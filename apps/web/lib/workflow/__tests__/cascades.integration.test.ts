@@ -128,6 +128,26 @@ describe.skipIf(!RUN)("completeAssessmentCascade (integration)", () => {
     expect(audit.rows[0].new_value.status).toBe("completed");
   });
 
+  it("completes a scheduled site visit (Joseph Legerstee pattern)", async () => {
+    await client.query(
+      `UPDATE visits SET status = 'scheduled', completed_at = NULL WHERE id = $1`,
+      [visitId],
+    );
+
+    await completeAssessmentCascade(poolClient(), {
+      visitId,
+      accountId: ACCOUNT,
+      userId: OWNER,
+      traceId: "aaaaaaaa-bbbb-cccc-dddd-111111111111",
+      assessmentCompletedAt: assessmentCompletedAt,
+    });
+
+    const visit = await visitStatus();
+    expect(visit.status).toBe("completed");
+    expect(new Date(visit.completed_at!).toISOString()).toBe(assessmentCompletedAt);
+    expect(await jobStatus()).toBe("draft");
+  });
+
   it("amending a completed assessment does not reopen the visit (idempotent)", async () => {
     await client.query(
       `UPDATE site_visit_assessments
