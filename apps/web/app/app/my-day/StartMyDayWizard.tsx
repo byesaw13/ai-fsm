@@ -238,7 +238,13 @@ export function StartMyDayWizard({
         )}
       </div>
 
-      <Modal open={!!prior} onClose={() => setPrior(null)} title="Close the open session first" data-testid="prior-session-prompt">
+      <Modal
+        open={!!prior}
+        onClose={() => setPrior(null)}
+        title="Close the open session first"
+        data-testid="prior-session-prompt"
+        zIndex={520}
+      >
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
           <p style={{ margin: 0 }}>
             This vehicle still has an open mileage session from a prior day. Enter its end odometer to close it before starting today&apos;s session.

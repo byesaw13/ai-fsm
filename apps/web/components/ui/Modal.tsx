@@ -12,6 +12,8 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   footer?: ReactNode;
+  /** Override overlay z-index when stacking above other overlays (e.g. bottom sheets). */
+  zIndex?: number;
   "data-testid"?: string;
 }
 
@@ -21,6 +23,7 @@ export function Modal({
   title,
   children,
   footer,
+  zIndex,
   "data-testid": testId,
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -71,6 +74,7 @@ export function Modal({
   return (
     <div
       className="p7-modal-overlay"
+      style={zIndex != null ? { zIndex } : undefined}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
