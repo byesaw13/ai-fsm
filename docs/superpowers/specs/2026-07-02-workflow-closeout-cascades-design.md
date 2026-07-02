@@ -1,7 +1,7 @@
 # Workflow Close-Out Cascades — Design Spec
 
 **Date:** 2026-07-02  
-**Status:** Draft — pending user review  
+**Status:** Implemented
 **Problem:** Pre-sale workflow steps (request → site visit → estimate) do not reliably close out or advance. Artifacts sit in ambiguous open states (e.g. assessment complete but visit `in_progress`, estimate sent but job still `draft`), causing the UI to show stale “do the site visit” prompts and wrong pipeline stages.
 
 **Canonical alignment:** `docs/canonical/WORKFLOW.md`, `docs/working/domain/workflow-model.md`
