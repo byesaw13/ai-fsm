@@ -149,6 +149,11 @@ export type PipelineStageFacts = {
   approvedEstimateCount?: number;
   activeVisitCount?: number;
   inProgressVisitCount?: number;
+  executionActiveVisitCount?: number;
+  executionInProgressCount?: number;
+  preSaleOpenSiteVisitCount?: number;
+  completedPreSaleSiteVisit?: boolean;
+  expiredEstimateCount?: number;
   completedVisitCount?: number;
   unpaidInvoiceCount?: number;
   paidInvoiceCount?: number;
@@ -174,13 +179,31 @@ export function derivePipelineStage(facts: PipelineStageFacts): PipelineStage {
     return "waiting";
   }
 
-  if (facts.jobStatus === "in_progress" || _count(facts.inProgressVisitCount) > 0) return "in_progress";
+  const executionInProgress = _count(
+    facts.executionInProgressCount ?? facts.inProgressVisitCount
+  );
+  if (executionInProgress > 0) return "in_progress";
 
-  if (facts.jobStatus === "scheduled" || _count(facts.activeVisitCount) > 0) return "scheduled";
+  const executionActive = _count(
+    facts.executionActiveVisitCount ?? facts.activeVisitCount
+  );
+  if (facts.jobStatus === "scheduled" || executionActive > 0) return "scheduled";
 
   if (_count(facts.approvedEstimateCount) > 0) return "approved_ready";
 
   if (_count(facts.sentEstimateCount) > 0 || facts.jobStatus === "quoted") return "estimate_sent";
+
+  if (
+    _count(facts.preSaleOpenSiteVisitCount) > 0 &&
+    _count(facts.sentEstimateCount) === 0 &&
+    _count(facts.approvedEstimateCount) === 0
+  ) {
+    return "estimate_needed";
+  }
+
+  if (facts.completedPreSaleSiteVisit && _count(facts.estimateCount) === 0) {
+    return "estimate_needed";
+  }
 
   if (
     facts.hasBookingRequest &&

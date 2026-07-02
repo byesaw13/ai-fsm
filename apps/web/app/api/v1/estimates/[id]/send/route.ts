@@ -10,6 +10,10 @@ import { getEnv } from "@/lib/env";
 import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
 import { logCommunication } from "@/lib/communications-log";
 import { loadEstimatePdf } from "@/lib/pdf/load";
+import {
+  resolveEstimateExpiryDays,
+  sendEstimateCascade,
+} from "@/lib/workflow/cascades";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +31,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
   try {
     const result = await withEstimateContext(session, async (client) => {
       const { rows, rowCount } = await client.query(
-        `SELECT e.id, e.status, e.total_cents, e.deposit_cents, e.balance_cents,
+        `SELECT e.id, e.status, e.job_id, e.total_cents, e.deposit_cents, e.balance_cents,
                 e.expires_at, e.notes, e.sent_at, e.share_token,
                 e.trip_count, e.requires_drying_or_curing, e.difficult_access,
                 e.old_house_risk, e.coordination_required, e.finish_expectation,
@@ -45,7 +49,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       if (!rowCount || rowCount === 0) return { status: 404 };
 
       const est = rows[0] as {
-        id: string; status: string; total_cents: number;
+        id: string; status: string; job_id: string | null; total_cents: number;
         deposit_cents: number; balance_cents: number;
         expires_at: string | null; notes: string | null; sent_at: string | null;
         share_token: string;
@@ -100,6 +104,13 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       // can progress on servers where SMTP is not configured (dev / CI).
       if (process.env.E2E_SKIP_EMAIL_DELIVERY === "1" || !isEmailConfigured()) {
         if (est.status === "draft") {
+          await sendEstimateCascade(client, {
+            estimateId: id,
+            accountId: session.accountId,
+            userId: session.userId,
+            traceId: session.traceId,
+            jobId: est.job_id,
+          });
           await client.query(
             `UPDATE estimates SET status = 'sent', sent_at = now(), updated_at = now() WHERE id = $1`,
             [id],
@@ -145,7 +156,12 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
       const expiresStr = est.expires_at
         ? new Date(est.expires_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
-        : null;
+        : est.status === "draft"
+          ? new Date(
+              Date.now() +
+                (await resolveEstimateExpiryDays(client, session.accountId)) * 86_400_000
+            ).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+          : null;
 
       const emailResult = await sendEmail({
         to: est.client_email,
@@ -208,6 +224,13 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       // the estimate is in sent state, so a re-send must not touch it — the
       // send is recorded via the communications + audit log.
       if (est.status === "draft") {
+        await sendEstimateCascade(client, {
+          estimateId: id,
+          accountId: session.accountId,
+          userId: session.userId,
+          traceId: session.traceId,
+          jobId: est.job_id,
+        });
         await client.query(
           `UPDATE estimates SET status = 'sent', sent_at = now(), updated_at = now() WHERE id = $1`,
           [id],

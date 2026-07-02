@@ -8,6 +8,7 @@ import { withAuth } from "../../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../../lib/auth/middleware";
 import { getPool } from "../../../../../../lib/db";
 import { logger } from "../../../../../../lib/logger";
+import { completeAssessmentCascade } from "@/lib/workflow/cascades";
 
 export const dynamic = "force-dynamic";
 
@@ -162,6 +163,15 @@ export const PUT = withAuth(async (request: NextRequest, session: AuthSession) =
     }
 
     const d = parsed.data;
+
+    const { rows: existingAssessmentRows } = await client.query<{ completed_at: Date | null }>(
+      `SELECT completed_at FROM site_visit_assessments WHERE visit_id = $1 AND account_id = $2`,
+      [visitId, session.accountId]
+    );
+    const previousCompletedAt = existingAssessmentRows[0]?.completed_at ?? null;
+    const assessmentJustCompleted =
+      d.completed_at != null && previousCompletedAt == null;
+
     const { rows } = await client.query(
       `INSERT INTO site_visit_assessments
          (visit_id, account_id, rooms, scope_notes, access_notes,
@@ -195,6 +205,16 @@ export const PUT = withAuth(async (request: NextRequest, session: AuthSession) =
         session.userId,
       ]
     );
+
+    if (assessmentJustCompleted) {
+      await completeAssessmentCascade(client, {
+        visitId,
+        accountId: session.accountId,
+        userId: session.userId,
+        traceId: session.traceId,
+        assessmentCompletedAt: d.completed_at ?? null,
+      });
+    }
 
     await client.query("COMMIT");
     return NextResponse.json({ data: rows[0] }, { status: 200 });

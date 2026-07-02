@@ -60,7 +60,16 @@ type JobRow = Job & {
 };
 type VisitRow = Visit & {
   assigned_user_name: string | null;
+  visit_type: string;
 };
+
+function isExecutionVisit(visit: VisitRow): boolean {
+  return visit.visit_type === "standard" || visit.visit_type === "punch_list";
+}
+
+function isPreSaleSiteVisit(visit: VisitRow): boolean {
+  return visit.visit_type === "site_visit";
+}
 type DbWorkOrderRow = {
   id: string;
   title: string;
@@ -218,6 +227,9 @@ export default async function JobDetailPage({
           booking_request_id: string | null;
           booking_status: string | null;
           booking_pricing_mode: string | null;
+          expired_estimate_count: string;
+          latest_expired_estimate_id: string | null;
+          has_draft_work_order_with_pricing: boolean;
         }>(
           session,
           `SELECT
@@ -259,7 +271,17 @@ export default async function JobDetailPage({
               ORDER BY created_at DESC LIMIT 1) AS booking_status,
              (SELECT pricing_mode FROM booking_requests
               WHERE job_id = $1 AND account_id = $2
-              ORDER BY created_at DESC LIMIT 1) AS booking_pricing_mode
+              ORDER BY created_at DESC LIMIT 1) AS booking_pricing_mode,
+             (SELECT COUNT(*) FROM estimates
+              WHERE job_id = $1 AND account_id = $2 AND status = 'expired') AS expired_estimate_count,
+             (SELECT id FROM estimates
+              WHERE job_id = $1 AND account_id = $2 AND status = 'expired'
+              ORDER BY created_at DESC LIMIT 1) AS latest_expired_estimate_id,
+             EXISTS(
+               SELECT 1 FROM work_orders
+               WHERE job_id = $1 AND account_id = $2
+                 AND status = 'draft' AND total_cents > 0
+             ) AS has_draft_work_order_with_pricing
            FROM jobs j WHERE j.id = $1 AND j.account_id = $2`,
           [id, session.accountId]
         )
@@ -281,6 +303,19 @@ export default async function JobDetailPage({
   const invoiceCount = commercialCounts ? parseInt(commercialCounts.invoice_count) : 0;
   const changeOrderCount = commercialCounts ? parseInt(commercialCounts.change_order_count) : 0;
   const activeVisits = visits.filter((v) => !["completed", "cancelled"].includes(v.status));
+  const executionVisits = visits.filter(isExecutionVisit);
+  const preSaleSiteVisits = visits.filter(isPreSaleSiteVisit);
+  const activeExecutionVisits = executionVisits.filter(
+    (v) => !["completed", "cancelled"].includes(v.status)
+  );
+  const openPreSaleSiteVisits = preSaleSiteVisits.filter(
+    (v) => !["completed", "cancelled"].includes(v.status)
+  );
+  const openPreSaleSiteVisit = openPreSaleSiteVisits[0] ?? null;
+  const hasCompletedPreSaleSiteVisit = preSaleSiteVisits.some((v) => v.status === "completed");
+  const expiredEstimateCount = commercialCounts
+    ? parseInt(commercialCounts.expired_estimate_count, 10)
+    : 0;
   const latestVisit = visits[0] ?? null;
   const pipelineStage = derivePipelineStage({
     jobStatus: currentStatus,
@@ -289,9 +324,12 @@ export default async function JobDetailPage({
     estimateCount,
     sentEstimateCount: commercialCounts?.has_sent_estimate ? 1 : 0,
     approvedEstimateCount: commercialCounts?.has_approved_estimate ? 1 : 0,
-    activeVisitCount: activeVisits.length,
-    inProgressVisitCount: visits.filter((v) => v.status === "in_progress").length,
-    completedVisitCount: visits.filter((v) => v.status === "completed").length,
+    executionActiveVisitCount: activeExecutionVisits.length,
+    executionInProgressCount: executionVisits.filter((v) => v.status === "in_progress").length,
+    preSaleOpenSiteVisitCount: openPreSaleSiteVisits.length,
+    completedPreSaleSiteVisit: preSaleSiteVisits.some((v) => v.status === "completed"),
+    expiredEstimateCount,
+    completedVisitCount: executionVisits.filter((v) => v.status === "completed").length,
     unpaidInvoiceCount: commercialCounts?.has_unpaid_invoice ? 1 : 0,
     paidInvoiceCount: commercialCounts?.has_paid_invoice ? 1 : 0,
   });
@@ -453,11 +491,17 @@ export default async function JobDetailPage({
             approvedEstimateId={commercialCounts.approved_estimate_id}
             hasDepositInvoice={commercialCounts.has_deposit_invoice}
             depositPaid={commercialCounts.deposit_paid}
-            hasActiveVisit={activeVisits.length > 0}
+            hasActiveVisit={activeExecutionVisits.length > 0}
             invoiceCount={invoiceCount}
             hasUnpaidInvoice={commercialCounts.has_unpaid_invoice}
             hasPaidInvoice={commercialCounts.has_paid_invoice}
             latestInvoiceId={commercialCounts.latest_invoice_id}
+            hasOpenPreSaleSiteVisit={openPreSaleSiteVisits.length > 0}
+            hasCompletedPreSaleSiteVisit={hasCompletedPreSaleSiteVisit}
+            hasExpiredEstimate={expiredEstimateCount > 0}
+            latestExpiredEstimateId={commercialCounts.latest_expired_estimate_id}
+            hasDraftWorkOrderWithPricing={commercialCounts.has_draft_work_order_with_pricing}
+            preSaleSiteVisitId={openPreSaleSiteVisit?.id ?? null}
           />
           <JobCommandPanel
             stage={pipelineStage}
@@ -465,7 +509,7 @@ export default async function JobDetailPage({
             clientId={job.client_id ?? null}
             bookingRequestId={commercialCounts.booking_request_id}
             pricingMode={commercialCounts.booking_pricing_mode as "flat_rate" | "hourly_internal" | null}
-            activeVisitId={activeVisits[0]?.id ?? null}
+            activeVisitId={activeExecutionVisits[0]?.id ?? null}
             latestVisitId={latestVisit?.id ?? null}
             approvedEstimateId={commercialCounts.approved_estimate_id}
             latestInvoiceId={commercialCounts.latest_invoice_id}

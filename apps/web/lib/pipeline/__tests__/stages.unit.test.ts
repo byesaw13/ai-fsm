@@ -50,10 +50,10 @@ describe("derivePipelineStage", () => {
     })).toBe("approved_ready");
   });
 
-  it("routes jobs with an active visit to Scheduled", () => {
+  it("routes jobs with an active execution visit to Scheduled", () => {
     expect(derivePipelineStage({
       jobStatus: "scheduled",
-      activeVisitCount: 1,
+      executionActiveVisitCount: 1,
     })).toBe("scheduled");
   });
 
@@ -61,7 +61,7 @@ describe("derivePipelineStage", () => {
     expect(derivePipelineStage({
       jobStatus: "scheduled",
       subStatus: "waiting_parts",
-      activeVisitCount: 1,
+      executionActiveVisitCount: 1,
     })).toBe("waiting");
 
     expect(derivePipelineStage({
@@ -75,10 +75,10 @@ describe("derivePipelineStage", () => {
     })).toBe("waiting");
   });
 
-  it("routes in-progress visits to In Progress", () => {
+  it("routes in-progress execution visits to In Progress", () => {
     expect(derivePipelineStage({
       jobStatus: "in_progress",
-      inProgressVisitCount: 1,
+      executionInProgressCount: 1,
     })).toBe("in_progress");
   });
 
@@ -116,7 +116,7 @@ describe("derivePipelineStage", () => {
       jobStatus: "scheduled",
       hasBookingRequest: true,
       bookingStatus: "pending",
-      activeVisitCount: 1,
+      executionActiveVisitCount: 1,
     })).toBe("scheduled");
 
     expect(derivePipelineStage({
@@ -124,6 +124,38 @@ describe("derivePipelineStage", () => {
       approvedEstimateCount: 1,
       completedVisitCount: 1,
     })).toBe("completed");
+  });
+
+  it("does not treat pre-sale site_visit in_progress as Working", () => {
+    expect(derivePipelineStage({
+      jobStatus: "in_progress",
+      executionInProgressCount: 0,
+      preSaleOpenSiteVisitCount: 1,
+    })).toBe("estimate_needed");
+  });
+
+  it("keeps estimate_sent when estimate is out despite open site_visit", () => {
+    expect(derivePipelineStage({
+      jobStatus: "quoted",
+      sentEstimateCount: 1,
+      preSaleOpenSiteVisitCount: 1,
+    })).toBe("estimate_sent");
+  });
+
+  it("does not treat completed pre-sale site_visit as execution closeout", () => {
+    expect(derivePipelineStage({
+      jobStatus: "draft",
+      completedPreSaleSiteVisit: true,
+      completedVisitCount: 0,
+      estimateCount: 0,
+    })).toBe("estimate_needed");
+
+    expect(derivePipelineStage({
+      jobStatus: "draft",
+      completedPreSaleSiteVisit: true,
+      completedVisitCount: 0,
+      estimateCount: 0,
+    })).not.toBe("completed");
   });
 });
 

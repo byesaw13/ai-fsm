@@ -76,7 +76,7 @@ function actionForStage(props: Props): CommandAction | null {
     case "approved_ready":
       return isTm
         ? { label: "Open T&M Project", href: `/app/jobs/${props.jobId}` }
-        : { label: "Book Walkthrough", href: `/app/jobs/${props.jobId}/visits/new` };
+        : { label: "Schedule Work", href: `/app/jobs/${props.jobId}/visits/new` };
     case "scheduled":
     case "in_progress":
     case "waiting":
