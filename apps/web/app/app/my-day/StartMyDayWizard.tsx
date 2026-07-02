@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ClockBar } from "../ClockBar";
-import { useToast } from "@/components/ui";
+import { Button, Modal, useToast } from "@/components/ui";
 import {
   isDaySetupComplete,
   nextIncompleteStep,
   type DaySetupState,
   type DaySetupStep,
 } from "@/lib/my-day/day-setup";
+import { pickStartVehicle } from "@/lib/mileage/start-day";
 import type { VehicleOption } from "../WorkdayPanel";
 
 const STEPS: { key: DaySetupStep; label: string }[] = [
@@ -17,6 +18,12 @@ const STEPS: { key: DaySetupStep; label: string }[] = [
   { key: "vehicle", label: "Vehicle & odometer" },
   { key: "mileage", label: "Start mileage" },
 ];
+
+type PriorPrompt = {
+  openSessionId: string;
+  suggestedEnd: number;
+  retry: () => Promise<void>;
+};
 
 export function StartMyDayWizard({
   open,
@@ -33,11 +40,14 @@ export function StartMyDayWizard({
 }) {
   const router = useRouter();
   const toast = useToast();
+  const defaultVehicle = useMemo(() => pickStartVehicle(vehicles), [vehicles]);
   const [state, setState] = useState(initialState);
   const [activeStep, setActiveStep] = useState<DaySetupStep>(nextIncompleteStep(initialState) ?? "clock");
-  const [vehicleId, setVehicleId] = useState(vehicles[0]?.id ?? "");
-  const [startOdometer, setStartOdometer] = useState(String(vehicles[0]?.current_odometer ?? ""));
+  const [vehicleId, setVehicleId] = useState(defaultVehicle?.id ?? "");
+  const [startOdometer, setStartOdometer] = useState(String(defaultVehicle?.current_odometer ?? ""));
   const [pending, setPending] = useState(false);
+  const [prior, setPrior] = useState<PriorPrompt | null>(null);
+  const [priorEnd, setPriorEnd] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -54,9 +64,29 @@ export function StartMyDayWizard({
 
   useEffect(() => {
     if (!open) return;
-    setState(initialState);
+    setState((s) => ({
+      ...initialState,
+      clockedIn: s.clockedIn || initialState.clockedIn,
+    }));
     setActiveStep(nextIncompleteStep(initialState) ?? "clock");
   }, [open, initialState]);
+
+  useEffect(() => {
+    if (!open || !defaultVehicle) return;
+    setVehicleId(defaultVehicle.id);
+    setStartOdometer(String(defaultVehicle.current_odometer ?? ""));
+  }, [open, defaultVehicle?.id]);
+
+  useEffect(() => {
+    if (!open) return;
+    const stepDone =
+      (activeStep === "clock" && state.clockedIn) ||
+      (activeStep === "vehicle" && state.vehicleReady) ||
+      (activeStep === "mileage" && state.hasOpenSession);
+    if (!stepDone) return;
+    const next = nextIncompleteStep(state);
+    if (next) setActiveStep(next);
+  }, [open, state, activeStep]);
 
   useEffect(() => {
     if (!open) return;
@@ -66,20 +96,24 @@ export function StartMyDayWizard({
     }
   }, [open, state, onClose, router]);
 
-  async function startMileage() {
-    const odo = Number(startOdometer);
-    if (!Number.isInteger(odo) || odo < 0) {
-      toast.error("Enter a valid start odometer");
-      return;
-    }
+  const postStart = useCallback(async (vId: string | null, start: number) => {
     setPending(true);
     const res = await fetch("/api/v1/sessions/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ vehicle_id: vehicleId || null, start_odometer: odo }),
+      body: JSON.stringify({ vehicle_id: vId, start_odometer: start }),
     });
     const json = await res.json().catch(() => ({}));
     setPending(false);
+    if (res.status === 409 && json.error?.code === "INCOMPLETE_PRIOR_SESSION") {
+      setPrior({
+        openSessionId: json.error.open_session_id,
+        suggestedEnd: json.error.suggested_end_odometer ?? start,
+        retry: () => postStart(vId, start),
+      });
+      setPriorEnd(String(json.error.suggested_end_odometer ?? start));
+      return;
+    }
     if (!res.ok) {
       toast.error(json.error?.message ?? "Could not start session");
       return;
@@ -88,6 +122,41 @@ export function StartMyDayWizard({
     setState((s) => ({ ...s, hasOpenSession: true, vehicleReady: true }));
     window.dispatchEvent(new Event("ops:refresh"));
     router.refresh();
+  }, [router, toast]);
+
+  async function startMileage() {
+    const odo = Number(startOdometer);
+    if (!Number.isInteger(odo) || odo < 0) {
+      toast.error("Enter a valid start odometer");
+      return;
+    }
+    await postStart(vehicleId || null, odo);
+  }
+
+  async function resolvePrior() {
+    if (!prior) return;
+    const end = Number(priorEnd);
+    if (!Number.isInteger(end) || end < 1) {
+      toast.error("Enter the end odometer for the open session");
+      return;
+    }
+    setPending(true);
+    const res = await fetch(`/api/v1/sessions/${prior.openSessionId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ end_odometer: end }),
+    });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      setPending(false);
+      toast.error(json.error?.message ?? "Could not close the open session");
+      return;
+    }
+    const retry = prior.retry;
+    setPrior(null);
+    setPending(false);
+    toast.success("Prior session closed");
+    await retry();
   }
 
   if (!open) return null;
@@ -168,6 +237,33 @@ export function StartMyDayWizard({
           </button>
         )}
       </div>
+
+      <Modal
+        open={!!prior}
+        onClose={() => setPrior(null)}
+        title="Close the open session first"
+        data-testid="prior-session-prompt"
+        zIndex={520}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          <p style={{ margin: 0 }}>
+            This vehicle still has an open mileage session from a prior day. Enter its end odometer to close it before starting today&apos;s session.
+          </p>
+          <label style={{ display: "flex", flexDirection: "column", gap: 6, fontWeight: 600, fontSize: "var(--text-sm)" }}>
+            End odometer
+            <input
+              value={priorEnd}
+              onChange={(e) => setPriorEnd(e.target.value)}
+              inputMode="numeric"
+              style={{ minHeight: 44, padding: "0 var(--space-3)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}
+            />
+          </label>
+          <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
+            <Button variant="secondary" onClick={() => setPrior(null)} disabled={pending}>Cancel</Button>
+            <Button variant="primary" onClick={resolvePrior} loading={pending} disabled={pending}>Close &amp; continue</Button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }

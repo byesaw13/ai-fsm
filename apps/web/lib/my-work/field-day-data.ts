@@ -34,16 +34,22 @@ export async function loadFieldDayData(
          ORDER BY s.started_at DESC LIMIT 1`,
         [accountId],
       ),
-      queryForSession<VehicleOption>(
+      queryForSession<VehicleOption & { last_used_at?: string | null }>(
         session,
         `SELECT v.id, v.nickname, v.plate,
-                last_s.end_odometer AS current_odometer
+                last_s.end_odometer AS current_odometer,
+                recent.started_at::text AS last_used_at
          FROM vehicles v
          LEFT JOIN LATERAL (
            SELECT end_odometer, session_date FROM vehicle_sessions
            WHERE vehicle_id = v.id AND account_id = v.account_id AND end_odometer IS NOT NULL
            ORDER BY session_date DESC, created_at DESC LIMIT 1
          ) last_s ON true
+         LEFT JOIN LATERAL (
+           SELECT started_at FROM vehicle_sessions
+           WHERE vehicle_id = v.id AND account_id = v.account_id
+           ORDER BY started_at DESC LIMIT 1
+         ) recent ON true
          WHERE v.account_id = $1 AND v.is_active = true
          ORDER BY v.nickname ASC`,
         [accountId],

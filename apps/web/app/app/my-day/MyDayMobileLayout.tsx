@@ -43,6 +43,7 @@ export function MyDayMobileLayout({
     vehicleReady: !!openSession || vehicleStepDone,
   };
   const complete = isDaySetupComplete(setup);
+  const partial = !complete && clockedIn;
 
   return (
     <>
@@ -54,7 +55,7 @@ export function MyDayMobileLayout({
           style={{ width: "100%", minHeight: 48, marginBottom: "var(--space-4)", fontWeight: 700 }}
           onClick={() => setWizardOpen(true)}
         >
-          Start My Day
+          {partial ? "Continue My Day" : "Start My Day"}
         </button>
       ) : (
         <>

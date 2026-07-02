@@ -12,15 +12,16 @@ export async function POST(req: NextRequest) {
 
   const row = await queryOne<{
     suppress_weekend_start_prompt: boolean;
-    has_open_day: boolean;
+    has_open_mileage_today: boolean;
   }>(
     `SELECT a.suppress_weekend_start_prompt,
             EXISTS (
-              SELECT 1 FROM business_days bd
-              WHERE bd.account_id = a.id
-                AND bd.business_date = CURRENT_DATE
-                AND bd.status NOT IN ('CLOSED','REOPENED')
-            ) AS has_open_day
+              SELECT 1 FROM vehicle_sessions vs
+              WHERE vs.account_id = a.id
+                AND vs.session_date = CURRENT_DATE
+                AND vs.end_odometer IS NULL
+                AND vs.miles IS NULL
+            ) AS has_open_mileage_today
      FROM accounts a
      JOIN users u ON u.account_id = a.id
      WHERE u.role = 'owner'
@@ -28,7 +29,9 @@ export async function POST(req: NextRequest) {
   );
 
   if (!row) return NextResponse.json({ signal: "no_action" });
-  if (row.has_open_day) return NextResponse.json({ signal: "already_started" });
+  // Clock-in opens the business day but does not start mileage tracking — only
+  // suppress the RAM prompt once today's mileage session is actually open.
+  if (row.has_open_mileage_today) return NextResponse.json({ signal: "already_started" });
 
   const day = new Date().getDay(); // 0=Sun, 6=Sat
   if ((day === 0 || day === 6) && row.suppress_weekend_start_prompt) {
