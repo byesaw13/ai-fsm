@@ -1,7 +1,7 @@
 # Day Close Checklist — Design Spec
 
 **Date:** 2026-07-03  
-**Status:** Draft — pending user review  
+**Status:** Approved (2026-07-03)  
 **Context:** Stabilize-in-place (no rebuild). Follows PR #460 (clock out + End My Day discoverability).
 
 ---
