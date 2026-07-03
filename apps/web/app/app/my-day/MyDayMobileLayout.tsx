@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { StartMyDayWizard } from "./StartMyDayWizard";
 import { DayStatusPill } from "./DayStatusPill";
@@ -58,19 +59,40 @@ export function MyDayMobileLayout({
           {partial ? "Continue My Day" : "Start My Day"}
         </button>
       ) : (
+        <div style={{ marginBottom: "var(--space-4)" }}>
+          <DayStatusPill
+            state={setup}
+            vehicleLabel={openSession?.vehicle_nickname ?? null}
+            milesToday={dayMileage.totalMiles}
+            onReopen={() => setWizardOpen(true)}
+          />
+        </div>
+      )}
+
+      {clockedIn && (
         <>
-          <div style={{ marginBottom: "var(--space-4)" }}>
-            <DayStatusPill
-              state={setup}
-              vehicleLabel={openSession?.vehicle_nickname ?? null}
-              milesToday={dayMileage.totalMiles}
-              onReopen={() => setWizardOpen(true)}
-            />
-          </div>
           <ClockBar />
-          <BusinessDayBar />
+          <Link
+            href="/app/day-review"
+            data-testid="end-my-day-button"
+            className="p7-btn p7-btn-secondary"
+            style={{
+              width: "100%",
+              minHeight: 48,
+              marginBottom: "var(--space-4)",
+              fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "var(--space-2)",
+            }}
+          >
+            End My Day
+          </Link>
         </>
       )}
+
+      {complete && <BusinessDayBar />}
 
       <StartMyDayWizard
         open={wizardOpen}
