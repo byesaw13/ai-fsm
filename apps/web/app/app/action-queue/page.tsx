@@ -31,7 +31,7 @@ function fmt(cents: number | string): string {
 export default async function ActionQueuePage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.role === "tech") redirect("/app/my-day");
+  if (session.role === "tech") redirect("/app/my-work");
 
   const accountId = session.accountId;
   const [

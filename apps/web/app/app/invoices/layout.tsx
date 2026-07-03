@@ -8,6 +8,6 @@ import { getSession } from "@/lib/auth/session";
 export default async function InvoicesLayout({ children }: { children: ReactNode }) {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.role === "tech") redirect("/app/my-day");
+  if (session.role === "tech") redirect("/app/my-work");
   return <>{children}</>;
 }

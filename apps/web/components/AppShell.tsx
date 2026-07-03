@@ -194,7 +194,7 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
   const isAdminOrOwner = role === "owner" || role === "admin";
   // Logo goes to each role's home: My Day for field roles, the office dashboard
   // for pure admins (who get bounced there from My Day anyway).
-  const homeHref = role === "admin" ? "/app" : "/app/my-day";
+  const homeHref = role === "admin" ? "/app" : "/app/my-work";
 
   // Close the More sheet whenever navigation happens.
   useEffect(() => {
@@ -422,7 +422,7 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
         )}
       </div>
       {showQuickLead && <QuickLeadModal onClose={() => setShowQuickLead(false)} />}
-      {isAdminOrOwner && !pathname.startsWith("/app/my-day") && <FloatingActionButton />}
+      {isAdminOrOwner && !pathname.startsWith("/app/my-work") && !pathname.startsWith("/app/my-day") && <FloatingActionButton />}
     </ToastProvider>
   );
 }

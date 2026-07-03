@@ -82,7 +82,7 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
   const { q, status, tier, view } = await searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.role === "tech") redirect("/app/my-day"); // EPIC-006: techs have no estimate access
+  if (session.role === "tech") redirect("/app/my-work"); // EPIC-006: techs have no estimate access
 
   const canCreate = canCreateEstimates(session.role);
   const isBoardView = view !== "list"; // default to Kanban Board view!

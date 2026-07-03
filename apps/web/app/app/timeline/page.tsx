@@ -31,7 +31,7 @@ export default async function TimelinePage({
   // The timeline edits the account-wide time ledger (entries keyed by account,
   // not by user), so it is owner/admin-only. Techs track their own time via the
   // My Day activity bar. EPIC-006: techs land on My Day.
-  if (session.role === "tech") redirect("/app/my-day");
+  if (session.role === "tech") redirect("/app/my-work");
 
   const { date } = await searchParams;
   const day = normalizeDate(date);

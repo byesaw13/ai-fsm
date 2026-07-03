@@ -39,7 +39,7 @@ test.describe("Estimates smoke — admin role", () => {
     await page.fill('[id="email"]', ADMIN_EMAIL);
     await page.fill('[id="password"]', ADMIN_PASSWORD);
     await page.click('[type="submit"]');
-    await page.waitForURL(/\/app(?:\/my-day)?$/);
+    await page.waitForURL(/\/app(?:\/my-work)?$/);
   });
 
   test("admin sees Estimates page with create button", async ({ page }) => {

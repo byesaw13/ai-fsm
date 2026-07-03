@@ -74,7 +74,7 @@ function formatAging(days: number | null): string | null {
 export default async function InvoicesPage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.role === "tech") redirect("/app/my-day"); // EPIC-006: techs have no invoice access
+  if (session.role === "tech") redirect("/app/my-work"); // EPIC-006: techs have no invoice access
 
   const invoices = await withInvoiceContext(session, async (client) => {
     const r = await client.query(

@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 // Workspace mode = which landing surface the owner uses: Office (/app, run the
-// business) or Field (/app/my-day, do the work). Default is AUTOMATIC by device —
+// business) or Field (/app/my-work, do the work). Default is AUTOMATIC by device —
 // phones open to Field, tablets/computers open to Office — with an explicit
 // override saved from Settings (cookie dv_ws_mode). No popup, no on-screen toggle
 // (TASK-058). This component renders nothing; it only steers the office root.
@@ -24,7 +24,7 @@ export function WorkspaceAutoRoute() {
   const router = useRouter();
 
   useEffect(() => {
-    // Steer BOTH workspace roots on entry (login lands everyone on /app/my-day,
+    // Steer BOTH workspace roots on entry (login lands everyone on /app/my-work,
     // so steering only the office root would never fire for desktop owners).
     // Other pages are left alone — never fight intentional navigation.
     const onOffice = pathname === OFFICE_ROOT;

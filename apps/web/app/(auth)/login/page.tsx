@@ -31,8 +31,8 @@ export default function LoginPage() {
       }
 
       // Full page navigation so the session cookie is included in the next request.
-      // Everyone lands on My Day (the daily home); pure admins are bounced to the
-      // office dashboard by the redirect in app/app/my-day/page.tsx.
+      // Everyone lands on My Work (the daily field home); desktop owners in office
+      // mode are steered to /app by WorkspaceAutoRoute.
       window.location.href = "/app/my-work";
     } catch {
       setError("An unexpected error occurred");

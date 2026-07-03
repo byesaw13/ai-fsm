@@ -9,7 +9,7 @@ test("admin can create client, property, and job from property context", async (
   await page.fill("#email", ADMIN_EMAIL);
   await page.fill("#password", ADMIN_PASSWORD);
   await page.click('button[type="submit"]');
-  await page.waitForURL(/\/app(?:\/my-day)?$/);
+  await page.waitForURL(/\/app(?:\/my-work)?$/);
 
   const nonce = Date.now();
   const clientName = `E2E Client ${nonce}`;

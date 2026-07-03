@@ -34,3 +34,6 @@ scripts/import-expenses.js
 
 # superpowers (agent tooling) — local run outputs and session state. Never commit it.
 /.superpowers/
+
+# graphify — local knowledge-graph artifacts. Regenerate with /graphify when needed.
+/graphify-out/

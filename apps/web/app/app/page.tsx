@@ -17,7 +17,7 @@ function parseN(row: CountRow | undefined | null): number {
 export default async function AppPage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.role === "tech") redirect("/app/my-day");
+  if (session.role === "tech") redirect("/app/my-work");
 
   const accountId = session.accountId;
   const todayLabel = new Date().toLocaleDateString("en-US", {
@@ -231,7 +231,7 @@ export default async function AppPage() {
         subtitle={todayLabel}
         actions={
           <>
-            <LinkButton href="/app/my-day" variant="secondary" size="sm">My Day</LinkButton>
+            <LinkButton href="/app/my-work" variant="secondary" size="sm">My Day</LinkButton>
             <LinkButton href="/app/intake/new" variant="primary" size="sm">+ New Request</LinkButton>
           </>
         }
