@@ -4,10 +4,23 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui";
+import { SUSPICIOUS_SESSION_MILES } from "@/lib/mileage/sessions";
 import type { OpenSession, VehicleOption } from "../WorkdayPanel";
 
 function fmtOdo(n: number | null | undefined): string {
   return n == null ? "—" : n.toLocaleString();
+}
+
+function odometerWarning(v: VehicleOption | null, start: number): string | null {
+  const last = v?.current_odometer;
+  if (last == null) return null;
+  if (start < last) {
+    return `That is ${fmtOdo(last - start)} mi below the last known reading — a reason is required.`;
+  }
+  if (start - last > SUSPICIOUS_SESSION_MILES) {
+    return `That jumps ${fmtOdo(start - last)} mi from the last reading — double-check the number.`;
+  }
+  return null;
 }
 
 export function VehicleRow({
@@ -31,12 +44,24 @@ export function VehicleRow({
   const [switchVehicleId, setSwitchVehicleId] = useState("");
   const [switchEnd, setSwitchEnd] = useState("");
   const [switchStart, setSwitchStart] = useState("");
+  const [switchCorrectionReason, setSwitchCorrectionReason] = useState("");
   const [closeOdo, setCloseOdo] = useState("");
 
   const activeVehicle = openSession
     ? vehicles.find((v) => v.id === openSession.vehicle_id) ?? null
     : null;
   const nickname = openSession?.vehicle_nickname ?? activeVehicle?.nickname ?? "Vehicle";
+  const switchTarget = vehicles.find((v) => v.id === switchVehicleId) ?? null;
+  const switchStartNum = Number(switchStart);
+  const switchWarn =
+    Number.isInteger(switchStartNum) && switchTarget
+      ? odometerWarning(switchTarget, switchStartNum)
+      : null;
+  const switchNeedsReason = !!(
+    switchTarget?.current_odometer != null &&
+    Number.isInteger(switchStartNum) &&
+    switchStartNum < switchTarget.current_odometer
+  );
 
   async function saveCheckpoint() {
     if (!openSession) return;
@@ -79,6 +104,12 @@ export function VehicleRow({
       toast.error("Enter the new vehicle's start odometer");
       return;
     }
+    const needsReason =
+      (newVehicle.current_odometer ?? 0) > newStart;
+    if (needsReason && !switchCorrectionReason.trim()) {
+      toast.error("A correction reason is required");
+      return;
+    }
     setPending(true);
     const res = await fetch("/api/v1/sessions/switch", {
       method: "POST",
@@ -88,6 +119,9 @@ export function VehicleRow({
         end_odometer: end,
         new_vehicle_id: switchVehicleId,
         new_start_odometer: newStart,
+        ...(needsReason
+          ? { correction: true, correction_reason: switchCorrectionReason.trim() }
+          : {}),
       }),
     });
     setPending(false);
@@ -98,6 +132,7 @@ export function VehicleRow({
     }
     toast.success(`Switched to ${newVehicle.nickname}`);
     setShowSwitch(false);
+    setSwitchCorrectionReason("");
     router.refresh();
   }
 
@@ -281,6 +316,30 @@ export function VehicleRow({
                   }}
                 />
               </label>
+              {switchWarn && (
+                <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--color-amber-700)" }}>
+                  {switchWarn}
+                </p>
+              )}
+              {switchNeedsReason && (
+                <label style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                  Correction reason
+                  <input
+                    value={switchCorrectionReason}
+                    onChange={(e) => setSwitchCorrectionReason(e.target.value)}
+                    placeholder="Odometer replaced, wrong truck, etc."
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      minHeight: 40,
+                      marginTop: 6,
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-md)",
+                      padding: "0 var(--space-3)",
+                    }}
+                  />
+                </label>
+              )}
               <div style={{ display: "flex", gap: "var(--space-2)" }}>
                 <button
                   type="button"
@@ -293,7 +352,10 @@ export function VehicleRow({
                 <button
                   type="button"
                   className="p7-btn p7-btn-ghost p7-btn-sm"
-                  onClick={() => setShowSwitch(false)}
+                  onClick={() => {
+                    setShowSwitch(false);
+                    setSwitchCorrectionReason("");
+                  }}
                 >
                   Cancel
                 </button>

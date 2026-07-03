@@ -75,6 +75,26 @@ describe("POST /api/v1/sessions/[id]/checkpoint", () => {
     expect(json.error.message).toContain("start reading");
   });
 
+  it("rejects odometer below last checkpoint", async () => {
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: SESSION_ID,
+          start_odometer: 1200,
+          end_odometer: null,
+          miles: null,
+          notes: "Prior note\n[checkpoint 2026-07-03T12:00:00.000Z] 1500 mi",
+        }],
+      });
+
+    const res = await checkpoint(request({ odometer: 1400 }));
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error.message).toContain("last checkpoint");
+  });
+
   it("appends checkpoint to notes on open session", async () => {
     mockClientQuery
       .mockResolvedValueOnce({ rows: [] })

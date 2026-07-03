@@ -4,6 +4,7 @@ import { withAuth } from "@/lib/auth/middleware";
 import type { AuthSession } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { appendAuditLog } from "@/lib/db/audit";
+import { lastCheckpointOdometer } from "@/lib/mileage/sessions";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -89,13 +90,17 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
       );
     }
 
-    if (parsed.data.odometer < row.start_odometer) {
+    const floor = lastCheckpointOdometer(row.notes, row.start_odometer);
+    if (parsed.data.odometer < floor) {
       await client.query("ROLLBACK");
       return NextResponse.json(
         {
           error: {
             code: "VALIDATION_ERROR",
-            message: "Odometer must be at or above the session start reading",
+            message:
+              floor > row.start_odometer
+                ? "Odometer must be at or above the last checkpoint reading"
+                : "Odometer must be at or above the session start reading",
             traceId: session.traceId,
           },
         },
