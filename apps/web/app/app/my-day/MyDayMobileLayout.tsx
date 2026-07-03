@@ -7,7 +7,7 @@ import { DayStatusPill } from "./DayStatusPill";
 import { NextVisitHero } from "./NextVisitHero";
 import { FieldQuickActions } from "./FieldQuickActions";
 import { ClockBar } from "../ClockBar";
-import { WorkdayPanel } from "../WorkdayPanel";
+import { FieldRightNowCard } from "../my-work/FieldRightNowCard";
 import { isDaySetupComplete, type DaySetupState } from "@/lib/my-day/day-setup";
 import type { HeroVisit } from "@/lib/my-day/visit-hero";
 import type { OpenSession, VehicleOption } from "../WorkdayPanel";
@@ -15,22 +15,18 @@ import type { ActivityEntryDto } from "../ActivityTracker";
 import type { DayMileageSummary } from "@/lib/mileage/sessions";
 
 export function MyDayMobileLayout({
-  todayLabel,
   openSession,
   vehicles,
   activityEntries,
   dayMileage,
-  yesterdayMiles,
   heroVisit,
   clockedIn,
   children,
 }: {
-  todayLabel: string;
   openSession: OpenSession | null;
   vehicles: VehicleOption[];
   activityEntries: ActivityEntryDto[];
   dayMileage: DayMileageSummary;
-  yesterdayMiles: number;
   heroVisit: HeroVisit | null;
   clockedIn: boolean;
   children: React.ReactNode;
@@ -88,6 +84,15 @@ export function MyDayMobileLayout({
           >
             End My Day
           </Link>
+          <div style={{ marginBottom: "var(--space-4)" }}>
+            <FieldRightNowCard
+              openSession={openSession}
+              vehicles={vehicles}
+              activityEntries={activityEntries}
+              milesToday={dayMileage.totalMiles}
+              onStartMileage={() => setWizardOpen(true)}
+            />
+          </div>
         </>
       )}
 
@@ -110,23 +115,6 @@ export function MyDayMobileLayout({
       </div>
 
       {children}
-
-      <details style={{ marginTop: "var(--space-6)" }}>
-        <summary style={{ fontWeight: 700, cursor: "pointer", minHeight: 44, display: "flex", alignItems: "center" }}>
-          Manage day
-        </summary>
-        <div style={{ marginTop: "var(--space-4)" }}>
-          <WorkdayPanel
-            surface="my_day"
-            todayLabel={todayLabel}
-            openSession={openSession}
-            vehicles={vehicles}
-            activityEntries={activityEntries}
-            dayMileage={dayMileage}
-            yesterdayMiles={yesterdayMiles}
-          />
-        </div>
-      </details>
     </>
   );
 }

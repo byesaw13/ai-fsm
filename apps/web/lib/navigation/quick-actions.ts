@@ -32,10 +32,8 @@ export const OWNER_QUICK_ACTIONS: QuickAction[] = [
  * as owners, so it intentionally omits the owner/admin-only Activity Timeline.
  */
 export const FIELD_QUICK_ACTIONS: QuickAction[] = [
-  { label: "End My Day", href: "/app/day-review", icon: "🌙" },
   { label: "New Estimate", href: "/app/estimates", icon: "📝" },
   { label: "New Project", href: "/app/jobs", icon: "🛠️" },
-  { label: "Log Mileage", href: "/app/mileage", icon: "🚗" },
   { label: "Add Expense", href: "/app/expenses/new", icon: "🛒" },
   { label: "Upload Receipt", href: "/app/expenses/new", icon: "🧾" },
   { label: "New Request", href: "/app/intake/new", icon: "⚡" },
