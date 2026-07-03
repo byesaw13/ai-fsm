@@ -733,131 +733,17 @@ export function WorkdayPanel({
             </>
           )}
 
-          {/* STATE 3: End of Day */}
+          {/* STATE 3: End of Day — close ritual lives on Day Review */}
           {activeTab === "end_day" && (
-            <>
-              {/* Checklist Hero Card (the Business Day control lives in the
-                  always-visible "Today" header above the stepper). */}
-              <Card style={{ padding: "var(--space-4)" }}>
-                <SectionHeader title="Review & Close Day" count={warnings.missingReceiptPhotos + (activeEntry ? 1 : 0) + (openSession ? 1 : 0)} />
-                <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", margin: "-4px 0 var(--space-4)" }}>
-                  Review today below — each item is independent. Closing the business day is a separate, explicit step above.
-                </p>
-
-                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", marginBottom: "var(--space-5)" }}>
-                  
-                  {/* Item 1: Mileage Session */}
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
-                    <div style={{ fontSize: 20 }}>{openSession ? "🔴" : "🟢"}</div>
-                    <div style={{ flex: 1 }}>
-                      <strong>Vehicle Session</strong>
-                      <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                        {openSession ? (
-                          <>
-                            Active session open on <strong>{openSession.vehicle_nickname}</strong> (started at <span style={{ fontFamily: "var(--font-mono), 'SF Mono', monospace", fontWeight: 600 }}>{fmtOdo(openSession.start_odometer)}</span> mi).
-                            <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "end", marginTop: "var(--space-2)", flexWrap: "wrap" }}>
-                              <label style={{ ...labelStyle, fontWeight: 500, fontSize: 12 }}>
-                                Ending Odometer
-                                <input value={endOdometer} onChange={(e) => setEndOdometer(e.target.value)} inputMode="numeric" placeholder="Odo reading" style={{ ...fieldStyle, fontFamily: "var(--font-mono), 'SF Mono', monospace", minHeight: 34, width: 120 }} />
-                              </label>
-                              <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" style={{ minHeight: 34 }} onClick={closeSession} disabled={pending || !endOdometer}>
-                                Close Mileage
-                              </button>
-                              <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" style={{ minHeight: 34 }} onClick={() => setDiscardOpen(true)} disabled={pending}>
-                                Discard session
-                              </button>
-                            </div>
-                            <span style={{ display: "block", color: "var(--fg-muted)", fontSize: 11, marginTop: "var(--space-1)" }}>
-                              Wrong start odometer? Use Discard to clear it without recording mileage.
-                            </span>
-                          </>
-                        ) : (
-                          "All mileage sessions closed successfully."
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Item 2: Unclosed Activity */}
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
-                    <div style={{ fontSize: 20 }}>{activeEntry ? "🔴" : "🟢"}</div>
-                    <div style={{ flex: 1 }}>
-                      <strong>Active Time Tracking</strong>
-                      <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                        {activeEntry ? (
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
-                            <span>Active tracker running: <strong>{ACTIVITY_TYPE_META[activeEntry.activity_type as ActivityType]?.emoji} {ACTIVITY_TYPE_META[activeEntry.activity_type as ActivityType]?.label}</strong>.</span>
-                            <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" onClick={stopTracking}>Stop Tracking</button>
-                          </div>
-                        ) : (
-                          "All activity trackers stopped."
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Item 3: Missing Receipt Photos */}
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
-                    <div style={{ fontSize: 20 }}>{warnings.missingReceiptPhotos > 0 ? "🔴" : "🟢"}</div>
-                    <div style={{ flex: 1 }}>
-                      <strong>Receipt Photos</strong>
-                      <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "var(--space-2)" }}>
-                        <span>
-                          {warnings.missingReceiptPhotos > 0 
-                            ? `${warnings.missingReceiptPhotos} receipt expense records are missing attached photos.` 
-                            : "All of today's receipts have photos attached."}
-                        </span>
-                        {warnings.missingReceiptPhotos > 0 && (
-                          <Link href={"/app/expenses" as Route} className="p7-btn p7-btn-secondary p7-btn-sm">Attach Photos</Link>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Item 4: In-Progress Jobs */}
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)", padding: "var(--space-3)", background: "var(--bg-subtle)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
-                    <div style={{ fontSize: 20 }}>{warnings.jobsInProgress > 0 ? "🟡" : "🟢"}</div>
-                    <div style={{ flex: 1 }}>
-                      <strong>Unclosed Jobs</strong>
-                      <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                        {warnings.jobsInProgress > 0 
-                          ? `${warnings.jobsInProgress} job(s) are still active or in progress.` 
-                          : "All of today's scheduled jobs are completed."}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* The day is closed from the Business Day control in the "Today"
-                    header above (its own checklist), not here — and closing a
-                    mileage session or stopping the timer never closes the day.
-                    This tab is just the end-of-day review. */}
-                <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", textAlign: "center", padding: "var(--space-2)" }}>
-                  Reviewed everything? Close the day from{" "}
-                  <strong>Business Day → Close Business Day</strong> in the header up
-                  top. Closing a mileage session or stopping the timer won&apos;t close it.
-                </div>
-              </Card>
-
-              {/* Tomorrow's Schedule (owner planning view) */}
-              {showOwnerExtras && (
-                <Card>
-                  <SectionHeader title="Tomorrow's Plan" count={tomorrowJobs.length} />
-                  {tomorrowJobs.length === 0 ? (
-                    <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", margin: 0 }}>No visits scheduled tomorrow.</p>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-                      {tomorrowJobs.map((job) => (
-                        <Link key={job.id} href={(job.visit_id ? `/app/visits/${job.visit_id}` : `/app/jobs/${job.id}`) as Route} style={{ display: "flex", justifyContent: "space-between", padding: "var(--space-2)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", textDecoration: "none", color: "inherit", background: "var(--bg-card)" }}>
-                          <span><strong>{fmtTime(job.scheduled_start)}</strong> · {job.title}</span>
-                          <small style={{ color: "var(--fg-muted)" }}>{job.client_name}</small>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </Card>
-              )}
-            </>
+            <Card style={{ padding: "var(--space-5)" }}>
+              <SectionHeader title="Review & Close Day" />
+              <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", margin: "0 0 var(--space-4)" }}>
+                Clock out, close mileage, and finish the day on the Day Review screen — one checklist with actions for each item.
+              </p>
+              <Link href={"/app/day-review" as Route} className="p7-btn p7-btn-primary">
+                Open Day Review
+              </Link>
+            </Card>
           )}
 
         </div>
