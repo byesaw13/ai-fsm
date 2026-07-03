@@ -207,13 +207,14 @@ describe("getNavSections (role filtering)", () => {
     }
   });
 
-  it("returns only 2 items for tech role (My Day + Visits)", () => {
+  it("returns My Day, Visits, and Day Review for tech role", () => {
     const sections = getNavSections("tech");
     const items = flattenSections(sections);
-    expect(items).toHaveLength(2);
+    expect(items).toHaveLength(3);
     const hrefs = items.map((i) => i.href);
     expect(hrefs).toContain("/app/my-work");
     expect(hrefs).toContain("/app/visits");
+    expect(hrefs).toContain("/app/day-review");
     expect(hrefs).not.toContain("/app/field");
     expect(hrefs).not.toContain("/app/settings");
     expect(hrefs).not.toContain("/app/jobs");

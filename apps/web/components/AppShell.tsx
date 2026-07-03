@@ -107,7 +107,7 @@ export function getNavSections(role: Role, view: "office" | "field" = "field"): 
   if (role === "tech") {
     const myDay: NavItem = { href: "/app/my-work", label: "My Day", Icon: IconMyDay };
     const visits: NavItem = { href: "/app/visits", label: "Visits", Icon: IconVisits };
-    return [{ label: "", items: [myDay, visits] }];
+    return [{ label: "", items: [myDay, visits, NAV_DAY_REVIEW] }];
   }
 
   // EPIC-006 Phase 5: only the owner does field work, so only the owner gets the
