@@ -131,9 +131,11 @@ export default async function MyWorkPage() {
           ) : (
             <span style={{ display: "inline-flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
               <ManualSiteVisitButton />
-              <LinkButton href="/app" variant="secondary" size="sm">
-                ← Dashboard
-              </LinkButton>
+              <span className="p7-only-desktop">
+                <LinkButton href="/app" variant="secondary" size="sm">
+                  ← Dashboard
+                </LinkButton>
+              </span>
             </span>
           )
         }
@@ -151,7 +153,7 @@ export default async function MyWorkPage() {
 
       {fieldDay.ownerPeek && (
         <Link
-          href={"/app" as Route}
+          href={"/app/action-queue" as Route}
           style={{
             display: "flex",
             alignItems: "center",
@@ -197,12 +199,10 @@ export default async function MyWorkPage() {
       )}
 
       <MyDayMobileLayout
-        todayLabel={fieldDay.todayLabel}
         openSession={fieldDay.openSession}
         vehicles={fieldDay.vehicles}
         activityEntries={fieldDay.activityEntries}
         dayMileage={fieldDay.dayMileage}
-        yesterdayMiles={fieldDay.yesterdayMiles}
         heroVisit={heroVisit}
         clockedIn={fieldDay.clockedIn}
       >

@@ -6,6 +6,7 @@ import {
   dailyMileageTotal,
   findOpenSessionForVehicle,
   isSuspiciousMiles,
+  lastCheckpointOdometer,
   lastKnownOdometer,
   summarizeDayMileage,
   validateStartOdometer,
@@ -32,6 +33,17 @@ describe("validateStartOdometer — mileage cannot go backward", () => {
 
   it("accepts any start when the vehicle has no history", () => {
     expect(validateStartOdometer(null, 0)).toEqual({ ok: true });
+  });
+});
+
+describe("lastCheckpointOdometer", () => {
+  it("returns start when notes are empty", () => {
+    expect(lastCheckpointOdometer(null, 1200)).toBe(1200);
+  });
+
+  it("returns the highest checkpoint in notes", () => {
+    const notes = "x\n[checkpoint 2026-07-03T10:00:00.000Z] 1500 mi\n[checkpoint 2026-07-03T14:00:00.000Z] 1520 mi";
+    expect(lastCheckpointOdometer(notes, 1200)).toBe(1520);
   });
 });
 

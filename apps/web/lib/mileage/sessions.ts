@@ -79,6 +79,19 @@ export function validateStartOdometer(
   return { ok: true };
 }
 
+const CHECKPOINT_NOTE_RE = /\[checkpoint [^\]]+\] (\d+) mi/g;
+
+/** Highest checkpoint (or session start) recorded in session notes. */
+export function lastCheckpointOdometer(notes: string | null, startOdometer: number): number {
+  let floor = startOdometer;
+  if (!notes) return floor;
+  for (const match of notes.matchAll(CHECKPOINT_NOTE_RE)) {
+    const n = Number(match[1]);
+    if (Number.isInteger(n) && n > floor) floor = n;
+  }
+  return floor;
+}
+
 /** True when a session's mileage span looks implausibly large. */
 export function isSuspiciousMiles(
   startOdometer: number,
