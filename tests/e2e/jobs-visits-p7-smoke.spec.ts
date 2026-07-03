@@ -12,7 +12,7 @@ test.describe("P7 jobs/visits smoke", () => {
     await page.fill("#email", ADMIN_EMAIL);
     await page.fill("#password", ADMIN_PASSWORD);
     await page.click('button[type="submit"]');
-    await page.waitForURL(/\/app(?:\/my-day)?$/);
+    await page.waitForURL(/\/app(?:\/my-work)?$/);
 
     await page.goto(`${BASE}/app/jobs`);
     await expect(page.locator("h1")).toContainText("Jobs");

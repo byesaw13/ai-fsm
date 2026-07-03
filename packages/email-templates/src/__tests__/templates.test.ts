@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   bookingConfirmedEmailHtml,
-  bookingConfirmedHtml,
   clientReactivationHtml,
   estimateEmailHtml,
   estimateEmailText,
@@ -11,14 +10,11 @@ import {
   invoiceEmailHtml,
   invoiceEmailText,
   invoiceFollowupEmailHtml,
-  invoiceFollowupHtml,
   onMyWayEmailHtml,
   recurringInspectionHtml,
   reviewRequestEmailHtml,
-  reviewRequestHtml,
   seasonalReminderHtml,
   visitReminderEmailHtml,
-  visitReminderHtml,
 } from "../index.js";
 
 describe("canonical email template snapshots", () => {
@@ -210,62 +206,5 @@ describe("canonical email template snapshots", () => {
         propertyAddress: "123 Main St",
       }),
     ).toMatchSnapshot();
-  });
-});
-
-describe("deprecated worker aliases re-export canonical", () => {
-  const followupData = {
-    clientName: "Jane Doe",
-    invoiceNumber: "INV-1001",
-    totalCents: 150000,
-    balanceCents: 75000,
-    daysOverdue: 7,
-    viewUrl: "https://example.test/invoices/inv-1001",
-  };
-
-  const bookingData = {
-    clientName: "Jane Doe",
-    jobTitle: "Kitchen Repair",
-    scheduledStart: "2026-07-15T14:00:00.000Z",
-    scheduledEnd: "2026-07-15T16:00:00.000Z",
-    propertyAddress: "123 Main St",
-    techName: "Alex Tech",
-  };
-
-  const reviewData = {
-    clientName: "Jane Doe",
-    jobTitle: "Kitchen Repair",
-    techName: "Alex Tech",
-  };
-
-  it("invoiceFollowupHtml === invoiceFollowupEmailHtml", () => {
-    expect(invoiceFollowupHtml(followupData)).toBe(invoiceFollowupEmailHtml(followupData));
-  });
-
-  it("bookingConfirmedHtml === bookingConfirmedEmailHtml", () => {
-    expect(bookingConfirmedHtml(bookingData)).toBe(bookingConfirmedEmailHtml(bookingData));
-  });
-
-  it("reviewRequestHtml === reviewRequestEmailHtml", () => {
-    expect(reviewRequestHtml(reviewData)).toBe(reviewRequestEmailHtml(reviewData));
-  });
-
-  it("visitReminderHtml delegates to visitReminderEmailHtml for ISO scheduledStart", () => {
-    const data = {
-      clientName: "Jane Doe",
-      jobTitle: "Kitchen Repair",
-      when: "2026-07-15T14:00:00.000Z",
-      propertyAddress: "123 Main St",
-      techName: "Alex Tech",
-    };
-    expect(visitReminderHtml(data)).toBe(
-      visitReminderEmailHtml({
-        clientName: data.clientName,
-        jobTitle: data.jobTitle,
-        scheduledStart: data.when,
-        propertyAddress: data.propertyAddress,
-        techName: data.techName,
-      }),
-    );
   });
 });

@@ -20,7 +20,7 @@ test.describe("Tech smoke — assigned jobs and visits", () => {
     await page.fill('[id="email"]', TECH_EMAIL);
     await page.fill('[id="password"]', TECH_PASSWORD);
     await page.click('[type="submit"]');
-    await page.waitForURL(/\/app(?:\/my-day)?$/);
+    await page.waitForURL(/\/app(?:\/my-work)?$/);
   });
 
   test("tech sees Jobs page without create button", async ({ page }) => {

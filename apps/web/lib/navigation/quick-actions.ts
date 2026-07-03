@@ -28,7 +28,7 @@ export const OWNER_QUICK_ACTIONS: QuickAction[] = [
 ];
 
 /**
- * Field My Day (`/app/my-day`) quick actions. Rendered for technicians as well
+ * Field My Day (`/app/my-work`) quick actions. Rendered for technicians as well
  * as owners, so it intentionally omits the owner/admin-only Activity Timeline.
  */
 export const FIELD_QUICK_ACTIONS: QuickAction[] = [

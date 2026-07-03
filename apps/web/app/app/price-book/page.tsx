@@ -33,7 +33,7 @@ type PriceBookRow = {
 export default async function PriceBookPage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (session.role === "tech") redirect("/app/my-day"); // EPIC-006: techs have no pricing access
+  if (session.role === "tech") redirect("/app/my-work"); // EPIC-006: techs have no pricing access
 
   const services = await query<PriceBookRow>(
     `SELECT id, code, name, category, tier, price_min_cents, price_max_cents,

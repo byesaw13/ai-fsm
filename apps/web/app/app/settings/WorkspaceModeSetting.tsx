@@ -41,7 +41,7 @@ export function WorkspaceModeSetting() {
     setChoice(next);
     if (next === "auto") clearCookie(COOKIE_MODE);
     else writeCookie(COOKIE_MODE, next);
-    if (next === "field") router.push("/app/my-day");
+    if (next === "field") router.push("/app/my-work");
     else if (next === "office") router.push("/app");
     else router.refresh();
   }

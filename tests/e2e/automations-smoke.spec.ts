@@ -23,7 +23,7 @@ test.describe("Automations page — admin role", () => {
     await page.fill('[id="email"]', ADMIN_EMAIL);
     await page.fill('[id="password"]', ADMIN_PASSWORD);
     await page.click('[type="submit"]');
-    await page.waitForURL(/\/app(?:\/my-day)?$/);
+    await page.waitForURL(/\/app(?:\/my-work)?$/);
   });
 
   test("admin sees automations page with sections", async ({ page }) => {
@@ -62,7 +62,7 @@ test.describe("Automations page — tech role", () => {
     await page.fill('[id="email"]', TECH_EMAIL);
     await page.fill('[id="password"]', TECH_PASSWORD);
     await page.click('[type="submit"]');
-    await page.waitForURL(/\/app(?:\/my-day)?$/);
+    await page.waitForURL(/\/app(?:\/my-work)?$/);
   });
 
   test("tech sees automations page in read-only mode", async ({ page }) => {
