@@ -143,8 +143,11 @@ export async function getDayReview(
     gps_meters: string | null;
   }>(
     `SELECT vs.id AS vehicle_session_id,
-            v.name AS vehicle_name,
-            vs.distance_miles AS odometer_miles,
+            v.nickname AS vehicle_name,
+            COALESCE(
+              vs.miles,
+              (vs.end_odometer - vs.start_odometer)::numeric
+            )::float8 AS odometer_miles,
             SUM(ls.distance_meters)::text AS gps_meters
      FROM vehicle_sessions vs
      LEFT JOIN vehicles v ON v.id = vs.vehicle_id
@@ -154,7 +157,8 @@ export async function getDayReview(
        AND ls.kind = 'drive'
        AND ls.status = 'confirmed'
      WHERE vs.account_id = $1 AND vs.session_date = $2::date
-     GROUP BY vs.id, v.name, vs.distance_miles
+     GROUP BY vs.id, v.nickname, vs.miles, vs.start_odometer, vs.end_odometer
+     ORDER BY vs.started_at DESC NULLS LAST
      LIMIT 1`,
     [accountId, date],
   );
