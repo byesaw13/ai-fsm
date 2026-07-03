@@ -1,7 +1,7 @@
 # My Work Field Tools — Design Spec
 
 **Date:** 2026-07-03  
-**Status:** Draft — pending user review  
+**Status:** Approved (2026-07-03)  
 **Context:** Stabilize-in-place. Follows day-close checklist (PR #461). Owner-operator field use on phone.
 
 ---
