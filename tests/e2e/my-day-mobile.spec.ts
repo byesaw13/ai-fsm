@@ -48,7 +48,24 @@ test.describe("My Day mobile", () => {
   test("quick actions grid visible", async ({ page }) => {
     await page.goto(`${BASE}/app/my-work`);
     await expect(page.getByTestId("field-quick-actions")).toBeVisible();
-    await expect(page.getByText("Log Mileage")).toBeVisible();
+    await expect(page.getByText("New Estimate")).toBeVisible();
+  });
+
+  test("field right now visible when clocked in", async ({ page }) => {
+    await page.goto(`${BASE}/app/my-work`);
+    await expect(
+      page.getByTestId("field-right-now").or(page.getByTestId("start-my-day-button")),
+    ).toBeVisible();
+  });
+
+  test("no manage day accordion", async ({ page }) => {
+    await page.goto(`${BASE}/app/my-work`);
+    await expect(page.getByText("Manage day")).not.toBeVisible();
+  });
+
+  test("no dashboard button on mobile", async ({ page }) => {
+    await page.goto(`${BASE}/app/my-work`);
+    await expect(page.getByRole("link", { name: "← Dashboard" })).not.toBeVisible();
   });
 
   test("FAB hidden on my day", async ({ page }) => {
