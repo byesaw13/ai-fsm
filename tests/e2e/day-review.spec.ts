@@ -20,6 +20,17 @@ test.describe("Day Review", () => {
     await expect(page.getByText("Day Review")).toBeVisible();
   });
 
+  test("shows close checklist when business day exists", async ({ page }) => {
+    await page.goto(`${BASE}/app/day-review`);
+    const checklist = page.getByTestId("day-close-checklist");
+    const empty = page.getByText(/No business day found/i);
+    await expect(checklist.or(empty)).toBeVisible();
+    if (await checklist.isVisible()) {
+      await expect(page.getByText("Payroll")).toBeVisible();
+      await expect(page.getByRole("button", { name: /Close Day/i })).toBeVisible();
+    }
+  });
+
   test("shows empty state when no business day exists for past date", async ({ page }) => {
     await page.goto(`${BASE}/app/day-review?date=1990-01-01`);
     await expect(page.getByText(/No business day found/i)).toBeVisible();

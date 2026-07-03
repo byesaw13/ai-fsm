@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { getDayReview } from "@/lib/day-review/queries";
+import { loadDayCloseStatus } from "@/lib/day-review/close-status";
 import { PageContainer, PageHeader } from "@/components/ui";
+import { DayCloseChecklist } from "../day-close/DayCloseChecklist";
 import { VisitsSection } from "./VisitsSection";
 import { TimeSection } from "./TimeSection";
 import { MileageSection } from "./MileageSection";
-import { CloseButton } from "./CloseButton";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,10 @@ export default async function DayReviewPage({
 
   const sp = await searchParams;
   const date = sp.date ?? new Date().toISOString().slice(0, 10);
-  const payload = await getDayReview(session.accountId, date);
+  const [payload, closeStatus] = await Promise.all([
+    getDayReview(session.accountId, date),
+    loadDayCloseStatus(session, date),
+  ]);
 
   if (!payload) {
     return (
@@ -42,16 +46,18 @@ export default async function DayReviewPage({
           day: "numeric",
         })}
       />
-      <VisitsSection visits={payload.visits} />
-      <TimeSection segments={payload.segments} gaps={payload.gaps} />
-      <MileageSection mileage={payload.mileage} />
-      <div className="mt-8 pb-8">
-        <CloseButton
-          businessDayId={payload.businessDayId}
-          status={payload.status}
-          closedAt={payload.closedAt}
-        />
-      </div>
+      <DayCloseChecklist
+        businessDayId={payload.businessDayId}
+        dayStatus={payload.status}
+        closedAt={payload.closedAt}
+        initial={closeStatus}
+      />
+      <details className="mb-8">
+        <summary className="cursor-pointer font-semibold mb-4">Today&apos;s details</summary>
+        <VisitsSection visits={payload.visits} />
+        <TimeSection segments={payload.segments} gaps={payload.gaps} />
+        <MileageSection mileage={payload.mileage} />
+      </details>
     </PageContainer>
   );
 }

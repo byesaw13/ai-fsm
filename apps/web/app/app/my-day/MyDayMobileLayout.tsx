@@ -7,7 +7,6 @@ import { DayStatusPill } from "./DayStatusPill";
 import { NextVisitHero } from "./NextVisitHero";
 import { FieldQuickActions } from "./FieldQuickActions";
 import { ClockBar } from "../ClockBar";
-import { BusinessDayBar } from "../BusinessDayBar";
 import { WorkdayPanel } from "../WorkdayPanel";
 import { isDaySetupComplete, type DaySetupState } from "@/lib/my-day/day-setup";
 import type { HeroVisit } from "@/lib/my-day/visit-hero";
@@ -91,8 +90,6 @@ export function MyDayMobileLayout({
           </Link>
         </>
       )}
-
-      {complete && <BusinessDayBar />}
 
       <StartMyDayWizard
         open={wizardOpen}

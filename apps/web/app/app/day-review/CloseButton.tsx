@@ -6,10 +6,14 @@ export function CloseButton({
   businessDayId,
   status,
   closedAt,
+  disabled: disabledProp,
+  label,
 }: {
   businessDayId: string;
   status: string;
   closedAt: string | null;
+  disabled?: boolean;
+  label?: string;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -46,10 +50,10 @@ export function CloseButton({
   return (
     <button
       onClick={() => act("/api/v1/day-review/close", { id: businessDayId })}
-      disabled={loading}
+      disabled={loading || disabledProp}
       className="w-full bg-primary text-primary-foreground rounded-lg py-3 text-base font-medium disabled:opacity-50"
     >
-      {loading ? "Closing…" : "Close Day"}
+      {loading ? "Closing…" : (label ?? "Close Day")}
     </button>
   );
 }

@@ -1,13 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 /**
  * Business Day lifecycle control (TASK-051, Operations Engine Phase 1 slice 3).
  *
- * Self-contained: it owns the day's status via /api/v1/business-day/* and is
- * independent of mileage/activity. Closing a trip or stopping the timer does NOT
- * close the day — only "Close Business Day" here does, and Reopen is normal.
+ * Status display for non-field surfaces. Day close ritual lives on Day Review.
  */
 
 type Day = {
@@ -26,40 +25,16 @@ const STATUS_LABEL: Record<NonNullable<Day>["status"], string> = {
   REOPENED: "Reopened",
 };
 
-// A real Day Close checklist: closing the business day is a deliberate review,
-// not a one-tap. Every item must be acknowledged before CLOSED is offered.
-const CLOSE_CHECKLIST = [
-  "Payroll reviewed (clocked out if done)",
-  "Activities reviewed",
-  "Mileage reviewed",
-  "Materials & expenses entered",
-  "Notes complete",
-];
-
 export function BusinessDayBar() {
-  const [day, setDay] = useState<Day | undefined>(undefined); // undefined = loading
+  const [day, setDay] = useState<Day | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reopening, setReopening] = useState(false);
   const [reason, setReason] = useState("");
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
-
-  const allChecked = CLOSE_CHECKLIST.every((item) => checked[item]);
-  function toggle(item: string) {
-    setChecked((c) => ({ ...c, [item]: !c[item] }));
-  }
-
-  // Clear acknowledgments whenever the day isn't ready-to-close, so re-entering
-  // READY_TO_CLOSE always requires a fresh review (no stale all-checked state).
-  useEffect(() => {
-    if (day?.status !== "READY_TO_CLOSE") setChecked({});
-  }, [day?.status]);
 
   async function load() {
     try {
       const res = await fetch("/api/v1/business-day/current");
-      // A non-2xx must NOT be read as "not opened yet" — surface it and keep the
-      // last known state rather than inviting a redundant Open Day.
       if (!res.ok) {
         setError("Couldn't load today — tap retry.");
         return;
@@ -72,8 +47,6 @@ export function BusinessDayBar() {
     }
   }
 
-  // Load on mount and on the shared Today-header signal (e.g. Clock In opens the
-  // day server-side, so this bar must refresh even though its own buttons weren't used).
   useEffect(() => {
     void load();
     const onRefresh = () => void load();
@@ -145,8 +118,9 @@ export function BusinessDayBar() {
     );
   }
 
+  const canEndDay = day && day.status !== "CLOSED";
+
   return (
-    <>
     <div style={wrap}>
       <div style={{ flex: 1, minWidth: 160 }}>
         <strong>Business Day</strong>
@@ -157,7 +131,7 @@ export function BusinessDayBar() {
               <>
                 <span className="my-day-mobile-only">{STATUS_LABEL[day.status]}</span>
                 <span className="my-day-desktop-only" style={{ display: "none" }}>
-                  {`${STATUS_LABEL[day.status]}${day.status === "CLOSED" ? "" : " — closing a trip or stopping the timer won't close it"}`}
+                  {`${STATUS_LABEL[day.status]}${day.status === "CLOSED" ? "" : " — close the day from Day Review"}`}
                 </span>
               </>
             )}
@@ -172,16 +146,10 @@ export function BusinessDayBar() {
           </button>
         )}
 
-        {day && ["OPEN", "ACTIVE", "PAUSED", "REOPENED"].includes(day.status) && (
-          <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" onClick={() => transition("READY_TO_CLOSE")} disabled={busy}>
-            Mark day ready to close
-          </button>
-        )}
-
-        {day && day.status === "READY_TO_CLOSE" && (
-          <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" onClick={() => transition("ACTIVE")} disabled={busy}>
-            Back to active
-          </button>
+        {canEndDay && (
+          <Link href="/app/day-review" className="p7-btn p7-btn-secondary p7-btn-sm">
+            End day on Day Review
+          </Link>
         )}
 
         {day && day.status === "CLOSED" && !reopening && (
@@ -205,30 +173,5 @@ export function BusinessDayBar() {
         )}
       </div>
     </div>
-
-    {day && day.status === "READY_TO_CLOSE" && (
-      <div style={{ ...wrap, flexDirection: "column", alignItems: "stretch", gap: "var(--space-2)" }}>
-        <strong style={{ fontSize: "var(--text-sm)" }}>Ready to close today?</strong>
-        {CLOSE_CHECKLIST.map((item) => (
-          <label key={item} style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", fontSize: "var(--text-sm)", cursor: "pointer" }}>
-            <input type="checkbox" checked={!!checked[item]} onChange={() => toggle(item)} />
-            {item}
-          </label>
-        ))}
-        <button
-          type="button"
-          className="p7-btn p7-btn-primary p7-btn-sm"
-          onClick={() => transition("CLOSED")}
-          disabled={busy || !allChecked}
-          style={{ alignSelf: "flex-start", marginTop: "var(--space-1)" }}
-        >
-          Close Business Day
-        </button>
-        {!allChecked && (
-          <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>Check every item to close.</span>
-        )}
-      </div>
-    )}
-    </>
   );
 }
