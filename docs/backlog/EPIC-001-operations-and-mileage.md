@@ -225,6 +225,9 @@ through the normal migration path after confirming invoices read from
 Status:
 In Progress
 
+Phase:
+0
+
 Problem:
 After the Operations Engine landed, My Day still carried the old framing that
 fought the new model: a "Start Your Workday — log starting odometer to unlock day
@@ -327,6 +330,9 @@ Phase 2.
 Status:
 In Progress
 
+Phase:
+1
+
 Problem:
 Activity today conflates the verb (driving, working) with the business object
 (Job #241), so "same job, switched task" can't be expressed cleanly.
@@ -357,6 +363,9 @@ Phase 3.
 
 Status:
 In Progress
+
+Phase:
+1
 
 Problem:
 Nothing describes the user's current operational state, so automation has to

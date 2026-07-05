@@ -61,6 +61,9 @@ No implementation found in repo.
 Status:
 In Progress
 
+Phase:
+3
+
 Problem:
 Assessment data is now used by the materials generator, but the broader flow
 still needs one reusable assessment summary/context object that can support

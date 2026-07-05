@@ -19,3 +19,9 @@ these files are kept for historical reference.
 | [TASK-019](TASK-019-activity-timeline-correction.md) | Activity Timeline Correction |
 | [TASK-021](TASK-021-quick-activity-switching.md) | Quick Activity Switching |
 | [TASK-022](TASK-022-smart-start-day.md) | Smart Start Day |
+| [TASK-024](TASK-024-passive-location-capture.md) | Passive Location Capture |
+| [TASK-025](TASK-025-bluetooth-auto-mileage.md) | Bluetooth Auto Mileage |
+| [TASK-026](TASK-026-day-map.md) | Day Map |
+| [TASK-027](TASK-027-hybrid-tracking.md) | Hybrid Tracking |
+| [TASK-033](TASK-033-read-only-mcp.md) | Read-Only Business MCP Server |
+| [TASK-060](TASK-060-invoice-discounts.md) | Invoice Discounts |

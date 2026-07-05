@@ -30,7 +30,10 @@ Intelligence direction; the `TASK-0xx` IDs are the canonical backlog IDs.
 # TASK-047: Work Item Library (PI-002)
 
 Status:
-Proposed
+Deferred
+
+Phase:
+4
 
 Problem:
 Work items are invented per estimate by the AI rather than owned by the
@@ -75,7 +78,10 @@ TASK-018 proving the shared model in use.
 # TASK-048: Confidence Engine (PI-006)
 
 Status:
-Proposed
+Deferred
+
+Phase:
+4
 
 Problem:
 Estimates present a single number as if certain, hiding how much is actually
