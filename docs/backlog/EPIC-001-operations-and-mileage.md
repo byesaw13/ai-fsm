@@ -32,6 +32,9 @@ trustworthy enough to feed tax mileage, vehicle cost, and job profitability.
 Status:
 Done
 
+Phase:
+1
+
 Problem:
 `visit_time_logs` (legacy per-visit timer) and `activity_entries` (the Operations
 Engine time ledger) both record visit time. The transition route already
@@ -71,6 +74,9 @@ Risk: low. Depends on nothing. Do not apply out-of-band on garonhome.
 Status:
 Done
 
+Phase:
+1
+
 Problem:
 The two invoice-labor readers sum `visit_time_logs` by `job_id`. Before switching
 them to `activity_entries`, we must prove the new source yields identical labor —
@@ -106,6 +112,9 @@ present for parity to hold on historical jobs).
 
 Status:
 Done
+
+Phase:
+1
 
 Problem:
 `visit_time_logs` is the de-facto invoice-labor source only because the readers
@@ -157,6 +166,9 @@ result vs. the visit-timer set; the parity contract wins over filter elegance.
 Status:
 Done
 
+Phase:
+1
+
 Problem:
 After TASK-063, nothing reads `visit_time_logs`, but the transition route still
 writes it alongside `activity_entries` — a redundant dual-write.
@@ -188,6 +200,9 @@ Risk: low after TASK-063 (the write is already redundant once readers have moved
 
 Status:
 Done
+
+Phase:
+1
 
 Problem:
 Once nothing reads or writes `visit_time_logs`, the table is dead weight and a
@@ -225,6 +240,9 @@ through the normal migration path after confirming invoices read from
 Status:
 In Progress
 
+Phase:
+0
+
 Problem:
 After the Operations Engine landed, My Day still carried the old framing that
 fought the new model: a "Start Your Workday — log starting odometer to unlock day
@@ -259,6 +277,9 @@ Follow-up to TASK-051/052. Verified against the live app via screenshots.
 
 Status:
 Done
+
+Phase:
+1
 
 Problem:
 "End Day" conflates four unrelated lifecycle events — stopped driving, stopped
@@ -297,6 +318,9 @@ and the load-bearing invariant that closing any other concern never moves the da
 Status:
 Proposed
 
+Phase:
+1
+
 Problem:
 There is no record of paid working time distinct from what task was being done.
 
@@ -326,6 +350,9 @@ Phase 2.
 
 Status:
 In Progress
+
+Phase:
+1
 
 Problem:
 Activity today conflates the verb (driving, working) with the business object
@@ -358,6 +385,9 @@ Phase 3.
 Status:
 In Progress
 
+Phase:
+1
+
 Problem:
 Nothing describes the user's current operational state, so automation has to
 search/reconstruct context every time.
@@ -386,6 +416,9 @@ Phase 3. Pairs with TASK-053.
 
 Status:
 Proposed
+
+Phase:
+1
 
 Problem:
 `vehicle_sessions` has no link to travel-time, no record of how a mileage number
@@ -419,6 +452,9 @@ Phase 5. Advances TASK-027; closes TASK-025's confirm UI.
 Status:
 Proposed
 
+Phase:
+1
+
 Problem:
 The blunt End Day button closes everything at once with no review.
 
@@ -442,6 +478,9 @@ Phase 7.
 
 Status:
 Completed
+
+Phase:
+0
 
 Goal:
 Redesign the Daily Command Center so it feels like the supplied mockups: clean, mobile-first, visually polished, fast to use, and organized around the technician's real workday.
@@ -473,6 +512,9 @@ Acceptance Criteria:
 
 Status:
 Proposed
+
+Phase:
+cross-cutting
 
 Problem:
 The MCP server (TASK-033) is read-only. Once it proves useful in daily use, the

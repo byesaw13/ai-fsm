@@ -5,41 +5,13 @@ of what each job actually earned.
 
 ## Active tasks
 
-# TASK-060: Invoice discounts (negative adjustment lines)
-
-Status:
-In Progress
-
-Problem:
-Invoices had no way to apply a discount. The `adjustment` line type existed but
-the API/DB capped unit price at >= 0, so it couldn't subtract.
-
-Business Value:
-Apply a discount (loyalty, goodwill, promo) directly on a draft invoice.
-
-Scope:
-- Migration 132: `invoice_line_items` allows negative `unit_price_cents`/
-  `total_cents` ONLY for `adjustment` lines; other types stay >= 0.
-- API line-item schemas allow negatives only for `adjustment` (refine).
-- `recalculateInvoiceTotals` clamps the invoice rollup at $0 (no negative owed).
-- Editor: relabel the type "Adjustment / Discount"; unit-price inputs accept
-  negatives.
-
-Out of Scope:
-- A dedicated invoice-level discount field (percent/amount) or coupon system.
-
-Acceptance Criteria:
-- [ ] A negative `adjustment` line subtracts from the invoice total.
-- [ ] A negative non-adjustment line is rejected (API 400 + DB check).
-- [ ] An over-discount floors the invoice at $0, never negative.
-
-Notes:
-Follows the line-item editing fix (#400). Discoverable via the type dropdown.
-
 # TASK-017: Lead Source / Referral ROI
 
 Status:
 In Progress
+
+Phase:
+3
 
 Problem:
 It is hard to tell which lead sources and referrals actually produce profitable
@@ -67,6 +39,9 @@ rollup is not complete.
 
 Status:
 In Progress
+
+Phase:
+3
 
 Problem:
 Payments are tracked but the model is thin: no payment type (deposit / progress /
@@ -106,6 +81,9 @@ Acceptance Criteria:
 
 Status:
 Proposed
+
+Phase:
+3
 
 Problem:
 Customers want to pay by card online, but Dovetails OS has no way to create a
@@ -159,3 +137,4 @@ credentials.
 - [TASK-014: Invoice Generation from Visits](../archive/backlog-done/TASK-014-invoice-generation-from-visits.md) — Done
 - [TASK-015: Payment Tracking](../archive/backlog-done/TASK-015-payment-tracking.md) — Done
 - [TASK-016: Job Profitability](../archive/backlog-done/TASK-016-job-profitability.md) — Done
+- [TASK-060: Invoice discounts (negative adjustment lines)](../archive/backlog-done/TASK-060-invoice-discounts.md) — Done

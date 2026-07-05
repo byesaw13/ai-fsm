@@ -10,7 +10,10 @@ stable. Recorded so the ideas are not lost — not a commitment to build.
 # TASK-011: Property Opportunities
 
 Status:
-Proposed
+Deferred
+
+Phase:
+2
 
 Problem:
 Issues a tech notices on site ("deck needs sealing next year") are lost if not
@@ -37,7 +40,10 @@ Strategic. Not implemented. (Also referred to as "Opportunity Tracking".)
 # TASK-012: Property Health Records
 
 Status:
-Proposed
+Deferred
+
+Phase:
+2
 
 Problem:
 There is no consolidated view of a property's systems, materials, and condition
@@ -62,7 +68,10 @@ Strategic. Not implemented.
 # TASK-013: Maintenance Plan Fit Scoring
 
 Status:
-Proposed
+Deferred
+
+Phase:
+2
 
 Problem:
 No signal for which properties are good candidates for a maintenance plan.

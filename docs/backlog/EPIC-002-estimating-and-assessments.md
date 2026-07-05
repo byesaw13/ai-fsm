@@ -10,6 +10,9 @@ re-keying, and keeping estimate structure consistent across jobs.
 Status:
 Proposed
 
+Phase:
+3
+
 Problem:
 Repeated estimate structures (e.g. per-room line sets) are rebuilt by hand each
 time.
@@ -36,6 +39,9 @@ specs), but no template system is built yet.
 Status:
 Proposed
 
+Phase:
+3
+
 Problem:
 When an estimate changes after being sent, there is no clean record of what the
 client previously saw.
@@ -60,6 +66,9 @@ No implementation found in repo.
 
 Status:
 In Progress
+
+Phase:
+3
 
 Problem:
 Assessment data is now used by the materials generator, but the broader flow

@@ -65,6 +65,18 @@ this rule is the check.
 - Product-scope changes still follow the rules in `CLAUDE.md`: canonical docs
   are updated first or in the same change.
 
+### Phase mapping (required)
+
+Every task must include a `Phase:` field matching `docs/canonical/ROADMAP.md`:
+
+```text
+Phase: 0 | 1 | 2 | 3 | 4 | cross-cutting
+```
+
+- Tasks **without** a ROADMAP phase are invalid. Add the phase to ROADMAP before creating the task.
+- When backlog and ROADMAP disagree on scope, **ROADMAP wins**.
+- Backlog is an execution queue, not product strategy.
+
 ## Structure
 
 - `README.md` — this file.
@@ -97,9 +109,9 @@ Next available ID: **TASK-070**.
 | TASK-008 | Room-Based Estimate Templates | 002 | Proposed |
 | TASK-009 | Estimate Versioning | 002 | Proposed |
 | TASK-010 | Property Timeline | 003 | Done |
-| TASK-011 | Property Opportunities | 003 | Proposed |
-| TASK-012 | Property Health Records | 003 | Proposed |
-| TASK-013 | Maintenance Plan Fit Scoring | 003 | Proposed |
+| TASK-011 | Property Opportunities | 003 | Deferred |
+| TASK-012 | Property Health Records | 003 | Deferred |
+| TASK-013 | Maintenance Plan Fit Scoring | 003 | Deferred |
 | TASK-014 | Invoice Generation from Visits | 004 | Done |
 | TASK-015 | Payment Tracking | 004 | Done |
 | TASK-016 | Job Profitability | 004 | Done |
@@ -110,19 +122,19 @@ Next available ID: **TASK-070**.
 | TASK-021 | Quick Activity Switching | 001 | Done |
 | TASK-022 | Smart Start Day | 001 | Done |
 | TASK-023 | End of Day Checklist Wizard | 001 | Proposed |
-| TASK-024 | Passive Location-Based Activity Capture | 007 | In Progress |
-| TASK-025 | Bluetooth-Triggered Vehicle-Aware Auto-Mileage | 007 | In Progress |
-| TASK-026 | Day Map (stops + drive routes) | 007 | In Progress |
-| TASK-027 | Hybrid Tracking (manual mileage, auto time) | 007 | In Progress |
+| TASK-024 | Passive Location-Based Activity Capture | 007 | Done |
+| TASK-025 | Bluetooth-Triggered Vehicle-Aware Auto-Mileage | 007 | Done |
+| TASK-026 | Day Map (stops + drive routes) | 007 | Done |
+| TASK-027 | Hybrid Tracking (manual mileage, auto time) | 007 | Done |
 | TASK-028 | Phase 0 — Extract WorkdayPanel | 006 | Proposed |
 | TASK-029 | Phase 1 — My Day becomes the field home | 006 | Proposed |
 | TASK-030 | Phase 2 — Slim the Owner Dashboard | 006 | Proposed |
 | TASK-031 | Phase 3 — Role routing & hardening | 006 | Proposed |
 | TASK-032 | Phase 4 — Owner widgets & polish | 006 | Proposed |
-| TASK-033 | Read-Only Business MCP Server | 005 | In Progress |
+| TASK-033 | Read-Only Business MCP Server | 005 | Done |
 | TASK-034 | MCP Non-Superuser RLS Verification | 005 | Proposed |
 | TASK-035 | MCP Write Tools v1 (operations writes) | 001 | Proposed |
-| TASK-036 | PR Gatekeeper MCP Server | 005 | In Progress |
+| TASK-036 | PR Gatekeeper MCP Server | 005 | Deferred |
 | TASK-038 | Surface consolidation (one daily home) | 006 | Done |
 | TASK-039 | Job & estimate numbering | 005 | Done |
 | TASK-040 | False-drive detection | 007 | Done |
@@ -132,8 +144,8 @@ Next available ID: **TASK-070**.
 | TASK-044 | Visit review card + classification → ledger | 007 | Done |
 | TASK-045 | "I'm at customer site" manual override | 007 | Done |
 | TASK-046 | Workday & privacy controls | 007 | In Progress |
-| TASK-047 | Work Item Library (PI-002) | 008 | Proposed |
-| TASK-048 | Confidence Engine (PI-006) | 008 | Proposed |
+| TASK-047 | Work Item Library (PI-002) | 008 | Deferred |
+| TASK-048 | Confidence Engine (PI-006) | 008 | Deferred |
 | TASK-049 | Operational Inbox (single review surface) | 007 | Proposed |
 | TASK-050 | Link mileage ↔ travel-time + capture-method | 001 | Proposed |
 | TASK-051 | Business Day aggregate (decouple day close) | 001 | Done |
@@ -145,7 +157,7 @@ Next available ID: **TASK-070**.
 | TASK-057 | Site Presence | 007 | Proposed |
 | TASK-058 | Workspace mode auto-by-device + Settings override | 006 | In Progress |
 | TASK-059 | My Day start-surface consolidation | 001 | In Progress |
-| TASK-060 | Invoice discounts (negative adjustment lines) | 004 | In Progress |
+| TASK-060 | Invoice discounts (negative adjustment lines) | 004 | Done |
 | TASK-061 | Backfill legacy visit time into activity_entries | 001 | Done |
 | TASK-062 | Invoice labor parity test | 001 | Done |
 | TASK-063 | Swap invoice labor readers to activity_entries | 001 | Done |
@@ -183,6 +195,9 @@ next unused `TASK-XXX`.
 
 Status:
 Proposed | Ready | In Progress | Done | Deferred
+
+Phase:
+0 | 1 | 2 | 3 | 4 | cross-cutting
 
 Problem:
 What pain this solves.
