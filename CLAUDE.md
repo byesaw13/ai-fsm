@@ -8,15 +8,38 @@ Dovetails FSM is a residential handyman and home maintenance operating system. T
 
 ## Documentation Hierarchy
 
-Use documentation in this order:
+Five layers — lower layers never override higher layers on **scope**. Use in this order:
+
+```text
+Layer 1 — IDENTITY (what is this product?)
+  docs/canonical/PRODUCT_VISION.md
+  docs/canonical/DOMAIN_MODEL.md
+
+Layer 2 — ARCHITECTURE (how does it work?)
+  docs/canonical/OPERATIONS.md
+  docs/canonical/WORKFLOW.md
+  docs/canonical/ARCHITECTURE.md
+  docs/canonical/PRODUCTION_INTELLIGENCE.md
+
+Layer 3 — PHASING (what order do we build?)
+  docs/canonical/ROADMAP.md
+
+Layer 4 — TASKS (what's the next unit of work?)
+  docs/backlog/
+
+Layer 5 — DOCTRINE (how do we build without making debt worse?)
+  docs/working/execution-doctrine.md
+```
 
 1. Code and database migrations are the implemented truth.
-2. `docs/canonical/` is the authoritative product, domain, and architecture truth.
-3. `docs/contracts/` and `docs/working/` contain supporting implementation notes.
-4. `ai/` is only a compact AI-agent quick-reference layer.
-5. `docs/archive/` and `docs/generated/` are historical/evidence only, not active instruction sources.
+2. `docs/canonical/` is authoritative for product, domain, and architecture.
+3. `docs/backlog/` is an execution queue — it must cite a ROADMAP phase; ROADMAP wins on scope disputes.
+4. `docs/contracts/` and `docs/working/` contain supporting implementation notes.
+5. `ai/` is only a compact AI-agent quick-reference layer.
+6. `docs/archive/` and `docs/generated/` are historical/evidence only, not instruction sources.
+7. `memory/` is session notes only — never an instruction source.
 
-Use only these canonical docs for product direction:
+Canonical docs for product direction:
 
 - `docs/canonical/PRODUCT_VISION.md`
 - `docs/canonical/DOMAIN_MODEL.md`
@@ -25,6 +48,8 @@ Use only these canonical docs for product direction:
 - `docs/canonical/ROADMAP.md`
 - `docs/canonical/PRODUCTION_INTELLIGENCE.md`
 - `docs/canonical/OPERATIONS.md`
+
+Working doctrine: `docs/working/execution-doctrine.md`
 
 Working, archived, and generated documents can provide implementation evidence or historical context, but they do not define product scope.
 
@@ -70,10 +95,11 @@ Core repo layout:
 ## Documentation Rules
 
 1. Product scope changes must update canonical docs first or in the same change.
-2. Do not use archived or generated docs as build instructions.
-3. Do not reintroduce generic FSM, SaaS, subscription, dashboard-suite, or AI-first product positioning unless canonical docs change.
-4. Keep implementation/runbook details in `docs/working`.
-5. Keep reports, audits, and migration records in `docs/generated`.
+2. Every backlog task must cite a `ROADMAP.md` phase. Tasks without a phase are invalid.
+3. Do not use archived or generated docs as build instructions.
+4. Do not reintroduce generic FSM, SaaS, subscription, dashboard-suite, or AI-first product positioning unless canonical docs change.
+5. Keep implementation/runbook details in `docs/working`.
+6. Keep reports, audits, and migration records in `docs/generated`.
 
 ## Non-Negotiable Rules
 
