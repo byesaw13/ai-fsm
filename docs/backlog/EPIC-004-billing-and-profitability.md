@@ -82,6 +82,9 @@ Acceptance Criteria:
 Status:
 Proposed
 
+Phase:
+3
+
 Problem:
 Customers want to pay by card online, but Dovetails OS has no way to create a
 hosted payment link or to learn when an online payment completes.

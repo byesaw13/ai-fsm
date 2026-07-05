@@ -124,6 +124,9 @@ TASK-018.
 Status:
 Proposed
 
+Phase:
+4
+
 Problem:
 With payroll/activity/mileage separated by the Operations Engine (EPIC-001), the
 data can finally drive profitability, pricing, and proactive automation — but

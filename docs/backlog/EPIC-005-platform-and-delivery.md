@@ -81,6 +81,9 @@ cannot serve clients, and `tailscale serve` collided with NPM on host 443.
 Status:
 Proposed
 
+Phase:
+cross-cutting
+
 Problem:
 The MCP integration tests (TASK-033) run as a Postgres superuser, which bypasses
 RLS. Account isolation is therefore proven only through the tools' explicit
@@ -130,6 +133,9 @@ The local PR Gatekeeper MCP experiment was removed in the ponytail cleanup. Use 
 Status:
 Done
 
+Phase:
+cross-cutting
+
 Problem:
 Invoices have human-readable per-account numbers (`invoices.invoice_number`,
 unique per account), but jobs and estimates do not. There is no stable
@@ -163,4 +169,4 @@ unique index per account). Identified as a genuine gap in the June 2026 recovery
 
 ## Completed
 
-- [TASK-033: Read-Only Business MCP Server](../../archive/backlog-done/TASK-033-read-only-mcp.md)
+- [TASK-033: Read-Only Business MCP Server](../archive/backlog-done/TASK-033-read-only-mcp.md)

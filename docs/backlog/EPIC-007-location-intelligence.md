@@ -64,6 +64,9 @@ manual override (045), privacy controls (046).
 Status:
 Done
 
+Phase:
+1
+
 Problem:
 Passive location capture (TASK-024) produces false drives — parked Bluetooth
 connect/disconnect cycles, GPS drift, and sub-minute teleport blips — that pile
@@ -101,6 +104,9 @@ live in `classifyDrive`; migration 120's backfill mirrors them.
 Status:
 Done
 
+Phase:
+1
+
 Problem:
 `properties` has only `address` — no coordinates — so the system can match the
 generic supplier zones but not specific customer addresses.
@@ -130,6 +136,9 @@ Acceptance Criteria:
 Status:
 Done
 
+Phase:
+1
+
 Problem:
 A closed stop has lat/long but no notion of *whose* property it is or how sure we
 are.
@@ -157,6 +166,9 @@ Acceptance Criteria:
 
 Status:
 Done
+
+Phase:
+1
 
 Problem:
 Detected visits need to be stored as reviewable items, separate from scheduled
@@ -192,6 +204,9 @@ Acceptance Criteria:
 Status:
 Done
 
+Phase:
+1
+
 Problem:
 Pending candidates need owner review and a way to become real records.
 
@@ -225,6 +240,9 @@ Acceptance Criteria:
 
 Status:
 Done
+
+Phase:
+1
 
 Problem:
 GPS can be wrong or the address new; the owner needs to attach a visit by hand.
@@ -268,6 +286,9 @@ home/private-location filtering in reports and the GPS retention pruning job.
 Status:
 Proposed
 
+Phase:
+1
+
 Problem:
 The owner sees location segments, visit candidates, drives, and mileage conflicts
 as separate systems.
@@ -298,6 +319,9 @@ Phase 6. Relates to EPIC-007.
 Status:
 Proposed
 
+Phase:
+1
+
 Problem:
 "Where was I present" is not modeled distinctly from "what was I doing," so
 present-but-waiting (non-billable) time is invisible.
@@ -325,6 +349,9 @@ Phase 4 (after freeze gate).
 
 Status:
 Proposed
+
+Phase:
+1
 
 Problem:
 A Visit owns scheduling and field execution but exposes no production summary.
@@ -365,6 +392,9 @@ owner will actually use day-to-day.
 Status:
 Proposed
 
+Phase:
+1
+
 Problem:
 The Visit Production Rollup (TASK-066) shows totals, but not the *sequence* of a
 visit — when the clock started, the arrival, the demo / material-run / install
@@ -397,8 +427,8 @@ feeds the Production Intelligence learning loop (EPIC-008) later.
 
 ## Completed
 
-- [TASK-024: Passive location-based activity capture](../../archive/backlog-done/TASK-024-passive-location-capture.md)
-- [TASK-025: Bluetooth-triggered, vehicle-aware auto-mileage](../../archive/backlog-done/TASK-025-bluetooth-auto-mileage.md)
-- [TASK-026: Day Map (stops + drive routes)](../../archive/backlog-done/TASK-026-day-map.md)
-- [TASK-027: Hybrid tracking — manual mileage, auto time](../../archive/backlog-done/TASK-027-hybrid-tracking.md)
+- [TASK-024: Passive location-based activity capture](../archive/backlog-done/TASK-024-passive-location-capture.md)
+- [TASK-025: Bluetooth-triggered, vehicle-aware auto-mileage](../archive/backlog-done/TASK-025-bluetooth-auto-mileage.md)
+- [TASK-026: Day Map (stops + drive routes)](../archive/backlog-done/TASK-026-day-map.md)
+- [TASK-027: Hybrid tracking — manual mileage, auto time](../archive/backlog-done/TASK-027-hybrid-tracking.md)
 - TASK-041..045 shipped — see git history (PRs #368/#372).

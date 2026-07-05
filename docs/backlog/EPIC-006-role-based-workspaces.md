@@ -117,7 +117,11 @@ Mode remains route-derived (Office=/app, Field=/app/my-day). Mobile-first rule
 
 # TASK-028: Phase 0 — Extract WorkdayPanel (pure refactor)
 
-Status: Proposed
+Status:
+Proposed
+
+Phase:
+0
 
 Extract the field-workday UI (`start_day`/`work_day`/`end_day` tabs, vehicle +
 odometer, Start/End Day, switch/correct/discard, `NowBar`, mileage summary) from
@@ -132,7 +136,11 @@ Acceptance:
 
 # TASK-029: Phase 1 — My Day becomes the field home
 
-Status: Proposed
+Status:
+Proposed
+
+Phase:
+0
 
 Mount `WorkdayPanel` + activity + mileage in `MyDayView`; move the field queries
 (`openSession`, `vehicles`, `activityEntries`, mileage) into `my-day/page.tsx`;
@@ -144,7 +152,11 @@ Acceptance:
 
 # TASK-030: Phase 2 — Slim the Owner Dashboard
 
-Status: Proposed
+Status:
+Proposed
+
+Phase:
+0
 
 Remove `WorkdayPanel`/activity/mileage from `/app`; keep action-queue + revenue +
 material widgets; drop the field queries from `/app/page.tsx`; restyle as the
@@ -156,7 +168,11 @@ Acceptance:
 
 # TASK-031: Phase 3 — Role routing & hardening
 
-Status: Proposed
+Status:
+Proposed
+
+Phase:
+0
 
 Generalize landing (`owner/admin → /app`, `tech → /app/my-day`); add the header
 Dashboard ↔ My Day switch; close URL-level guards so techs can't reach business
@@ -168,7 +184,11 @@ Acceptance:
 
 # TASK-032: Phase 4 — Owner widgets & polish
 
-Status: Proposed
+Status:
+Proposed
+
+Phase:
+0
 
 Owner widgets (invoice aging, technician productivity, open decisions), mobile
 bottom-bar updates per role, tests.
@@ -181,6 +201,9 @@ Acceptance:
 
 Status:
 Done
+
+Phase:
+0
 
 Problem:
 Five operational surfaces — Today (`/app`), My Day, Schedule, Visits, Timeline —
