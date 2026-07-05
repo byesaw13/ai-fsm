@@ -137,10 +137,11 @@ Until then: `lib/db/` module helpers are sufficient.
 
 ## Success Criteria
 
-### Works (Phase 0) — measurable within 2 weeks
-- [ ] My Day start-day flow completes without blocked modals (mileage + clock)
-- [ ] `pnpm gate:fast` green on main
+### Works (Phase 0) — complete pending field-day validation
+- [x] My Day start-day flow ships without Manage day accordion (#463)
+- [x] `pnpm gate:fast` green on main
 - [ ] `my-day-mobile` + `day-review` E2E pass locally
+- [ ] One production/staging field day without workaround
 - [ ] Zero P0 field bugs open for 7 consecutive operating days
 
 ### Clean (ongoing) — measurable within 90 days
@@ -156,7 +157,9 @@ Until then: `lib/db/` module helpers are sufficient.
 
 | Blocker | Status |
 |---------|--------|
-| My Work field tools merge | In progress |
+| My Work field tools merge | Done (#463) |
+| Phase 0 field ops | Complete — validate one field day on device |
+| Phase 1 operations engine | Active — see `docs/superpowers/plans/2026-07-06-phase-1-operations-kickoff.md` |
 | Canonical docs alignment | `docs/canonical/ROADMAP.md` — use as scope gate |
 | `docs/generated/REBUILD_AUDIT_REPORT.md` | Inventory reference only — Section 23 blueprint is out of scope |
 | Production deploy (`garonhome`) | Unchanged — deploy after gate |
