@@ -101,7 +101,8 @@ export async function getCurrentOperationsState(
   const vehicleRes = await client.query<NonNullable<CurrentOperationsState["vehicle_session"]>>(
     `SELECT id, vehicle_id, started_at::text AS started_at
        FROM vehicle_sessions
-      WHERE account_id = $1 AND end_odometer IS NULL AND miles IS NULL
+      WHERE account_id = $1 AND status = 'open'
+        AND end_odometer IS NULL AND miles IS NULL
       ORDER BY started_at DESC NULLS LAST
       LIMIT 1`,
     [accountId],

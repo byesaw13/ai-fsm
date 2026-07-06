@@ -260,7 +260,39 @@ const PROVISIONAL_SEGMENT = {
   vehicle_session_id: null,
 };
 
+const DRIVE_SEGMENT = {
+  ...PROVISIONAL_SEGMENT,
+  kind: "drive" as const,
+  place_label: "Driving",
+  vehicle_id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  distance_meters: 19912,
+};
+
 describe("PATCH /api/v1/activities/segments/[id]", () => {
+  it("confirm_trip creates linked travel entry and mileage session", async () => {
+    mockClientQuery.mockImplementation((sql: string) => {
+      if (sql.includes("FROM location_segments")) return Promise.resolve({ rows: [DRIVE_SEGMENT] });
+      if (sql.includes("FROM vehicles")) return Promise.resolve({ rows: [{ id: DRIVE_SEGMENT.vehicle_id }] });
+      if (sql.includes("FROM activity_entries") && sql.includes("FOR UPDATE")) return Promise.resolve({ rows: [] });
+      if (sql.includes("FROM business_days")) return Promise.resolve({ rows: [{ id: "day-1" }] });
+      if (sql.startsWith("INSERT INTO activity_entries")) return Promise.resolve({ rows: [{ id: "entry-trip" }] });
+      if (sql.startsWith("INSERT INTO vehicle_sessions")) return Promise.resolve({ rows: [{ id: "sess-trip" }] });
+      return Promise.resolve({ rows: [] });
+    });
+
+    const res = await patchSegment(req(`/api/v1/activities/segments/${SEGMENT_ID}`, "PATCH", {
+      action: "confirm_trip",
+      vehicle_id: DRIVE_SEGMENT.vehicle_id,
+      miles: 12.4,
+    }));
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.activity_entry_id).toBe("entry-trip");
+    expect(json.data.vehicle_session_id).toBe("sess-trip");
+    expect(json.data.miles_source).toBe("bt_gps_estimate");
+  });
+
   it("keeps rejecting overlap without an accepted rebalance", async () => {
     mockClientQuery.mockImplementation((sql: string) => {
       if (sql.includes("FROM location_segments")) return Promise.resolve({ rows: [PROVISIONAL_SEGMENT] });

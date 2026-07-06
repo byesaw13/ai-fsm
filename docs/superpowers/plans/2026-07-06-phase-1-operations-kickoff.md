@@ -69,9 +69,13 @@ See `EPIC-007` TASK-046 notes.
 
 ## Slice 5: TASK-050 — Mileage ↔ travel-time
 
-**Status:** Proposed; migration 130 scope.
+**Status:** Done — `confirm_trip` links travel + mileage; capture method + reconcile on odometer close.
 
-Defer until Slices 1–3 boring.
+**Shipped:**
+- Migration 141: `miles_source`, `status` on `vehicle_sessions`
+- `PATCH segments/[id]` `confirm_trip` — atomic travel entry + linked session (segment dedup key)
+- Odometer close voids enclosed GPS estimates (`lib/mileage/linking.ts`)
+- Timeline UI: vehicle picker + miles + Confirm trip for drives
 
 ---
 

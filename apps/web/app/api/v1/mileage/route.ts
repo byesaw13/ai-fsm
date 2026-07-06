@@ -10,7 +10,7 @@ export const GET = withAuth(async (request: NextRequest, session: AuthSession) =
   const month = request.nextUrl.searchParams.get("month");
 
   try {
-    const conditions: string[] = ["s.account_id = $1"];
+    const conditions: string[] = ["s.account_id = $1", "s.status <> 'voided'"];
     const params: unknown[] = [session.accountId];
     let idx = 2;
 
@@ -26,7 +26,8 @@ export const GET = withAuth(async (request: NextRequest, session: AuthSession) =
               s.start_odometer, s.end_odometer,
               s.vehicle_id,
               v.nickname AS vehicle_nickname, v.plate AS vehicle_plate,
-              s.notes,
+              s.notes, s.miles_source, s.status,
+              s.activity_entry_id,
               s.created_by, s.created_at::text,
               u.full_name AS created_by_name
        FROM vehicle_sessions s

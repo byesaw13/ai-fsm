@@ -378,7 +378,7 @@ Phase 3. Pairs with TASK-053.
 # TASK-050: Link mileage ↔ travel-time + capture-method + reconcile
 
 Status:
-Proposed
+Done
 
 Phase:
 1
@@ -403,9 +403,9 @@ Out of Scope:
 - BT pre-fill UI (rides this via TASK-025).
 
 Acceptance Criteria:
-- [ ] Confirming a drive yields one travel entry + one linked session; idempotent.
-- [ ] Enclosing odometer close offers reconcile and voids GPS estimates.
-- [ ] Capture method recorded and shown.
+- [x] Confirming a drive yields one travel entry + one linked session; idempotent.
+- [x] Enclosing odometer close offers reconcile and voids GPS estimates.
+- [x] Capture method recorded and shown.
 
 Notes:
 Phase 5. Advances TASK-027; closes TASK-025's confirm UI.

@@ -7,11 +7,6 @@ import { ACTIVITY_TYPES, ACTIVITY_TYPE_META, type ActivityType } from "@ai-fsm/d
 import { proposeRebalance, type RebalanceAdjustment, type TimelineEntry } from "@/lib/activities/timeline";
 import type { ActivityEntryDto } from "./ActivityTracker";
 
-// TASK-024 (slice 2): the labelable day timeline. Shows captured stop/drive
-// segments fed in from Home Assistant; the owner assigns an activity to each and
-// confirms it into the ledger, or dismisses it. Nothing reaches activity_entries
-// until confirmed here.
-
 type Segment = {
   id: string;
   kind: "stop" | "drive";
@@ -22,9 +17,18 @@ type Segment = {
   suggested_activity_type: string | null;
   status: string;
   activity_entry_id: string | null;
+  vehicle_id: string | null;
+  vehicle_session_id: string | null;
+  estimated_miles: number | null;
   latitude: number | null;
   longitude: number | null;
   is_likely_noise?: boolean;
+};
+
+type VehicleOption = {
+  id: string;
+  nickname: string;
+  is_default?: boolean;
 };
 
 const ACTIVITY_OPTIONS = ACTIVITY_TYPES.map((t) => ({
@@ -62,13 +66,17 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
   const router = useRouter();
   const toast = useToast();
   const [segments, setSegments] = useState<Segment[]>([]);
+  const [vehicles, setVehicles] = useState<VehicleOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [choice, setChoice] = useState<Record<string, ActivityType>>({});
+  const [vehicleChoice, setVehicleChoice] = useState<Record<string, string>>({});
+  const [milesChoice, setMilesChoice] = useState<Record<string, string>>({});
   const [pending, setPending] = useState<string | null>(null);
   const [confirmReplace, setConfirmReplace] = useState<{
     id: string;
     body: Record<string, unknown>;
     rebalance: RebalanceAdjustment[];
+    successMsg: string;
   } | null>(null);
 
   function timelineEntries(): TimelineEntry[] {
@@ -80,17 +88,49 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
     }));
   }
 
+  function defaultVehicleId(seg: Segment): string {
+    if (seg.vehicle_id && vehicles.some((v) => v.id === seg.vehicle_id)) return seg.vehicle_id;
+    return vehicles.find((v) => v.is_default)?.id ?? vehicles[0]?.id ?? "";
+  }
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const qs = day ? `?date=${day}` : "";
-      const segRes = await fetch(`/api/v1/activities/segments${qs}`);
+      const [segRes, vehRes] = await Promise.all([
+        fetch(`/api/v1/activities/segments${qs}`),
+        fetch("/api/v1/vehicles"),
+      ]);
       const segJson = await segRes.json();
+      const vehJson = await vehRes.json();
       const list: Segment[] = segJson?.data?.segments ?? [];
+      const vehList: VehicleOption[] = vehJson?.data ?? [];
       setSegments(list);
+      setVehicles(vehList);
       setChoice((prev) => {
         const next = { ...prev };
         for (const s of list) if (!next[s.id]) next[s.id] = defaultActivity(s);
+        return next;
+      });
+      setVehicleChoice((prev) => {
+        const next = { ...prev };
+        for (const s of list) {
+          if (s.kind !== "drive" || next[s.id]) continue;
+          const vid =
+            s.vehicle_id && vehList.some((v) => v.id === s.vehicle_id)
+              ? s.vehicle_id
+              : vehList.find((v) => v.is_default)?.id ?? vehList[0]?.id ?? "";
+          next[s.id] = vid;
+        }
+        return next;
+      });
+      setMilesChoice((prev) => {
+        const next = { ...prev };
+        for (const s of list) {
+          if (s.kind === "drive" && !next[s.id] && s.estimated_miles != null) {
+            next[s.id] = String(s.estimated_miles);
+          }
+        }
         return next;
       });
     } catch {
@@ -119,21 +159,66 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
       }
       toast.success(successMsg);
       await load();
-      router.refresh(); // refresh the activity_entries timeline above
-      window.dispatchEvent(new CustomEvent("fsm:segments-changed")); // refresh the day map (TASK-026)
+      router.refresh();
+      window.dispatchEvent(new CustomEvent("fsm:segments-changed"));
     } finally {
       setPending(null);
     }
   }
 
+  function confirmDrive(seg: Segment) {
+    const vehicleId = vehicleChoice[seg.id] ?? defaultVehicleId(seg);
+    const miles = Number(milesChoice[seg.id]);
+    if (!vehicleId) {
+      toast.error("Pick a vehicle for this drive");
+      return;
+    }
+    if (!Number.isFinite(miles) || miles <= 0) {
+      toast.error("Enter the trip miles");
+      return;
+    }
+    const body = {
+      action: "confirm_trip",
+      vehicle_id: vehicleId,
+      miles,
+      activity_type: choice[seg.id] ?? defaultActivity(seg),
+    };
+    if (!seg.ended_at) return;
+    const rebalance = proposeRebalance(timelineEntries(), {
+      started_at: seg.started_at,
+      ended_at: seg.ended_at,
+    });
+    if (rebalance.length > 0) {
+      setConfirmReplace({ id: seg.id, body, rebalance, successMsg: "Trip logged — time and mileage linked" });
+      return;
+    }
+    void patch(seg.id, body, "Trip logged — time and mileage linked");
+  }
+
+  function confirmStop(seg: Segment) {
+    const body = { action: "confirm", activity_type: choice[seg.id] ?? defaultActivity(seg) };
+    if (!seg.ended_at) return;
+    const rebalance = proposeRebalance(timelineEntries(), {
+      started_at: seg.started_at,
+      ended_at: seg.ended_at,
+    });
+    if (rebalance.length > 0) {
+      setConfirmReplace({ id: seg.id, body, rebalance, successMsg: "Logged to your day" });
+      return;
+    }
+    void patch(seg.id, body, "Logged to your day");
+  }
+
   const provisional = segments.filter((s) => s.status === "provisional");
   const confirmed = segments.filter((s) => s.status === "confirmed");
+
+  const vehicleOptions = vehicles.map((v) => ({ value: v.id, label: v.nickname }));
 
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
       <SectionHeader title="Captured locations" />
       <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: "calc(-1 * var(--space-2)) 0 0" }}>
-        Auto-recorded stops &amp; drives — label each into your day.
+        Auto-recorded stops &amp; drives — label each into your day. Drives log travel time and mileage together.
       </p>
 
       {loading ? (
@@ -148,6 +233,7 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
           {provisional.map((seg) => {
             const isOpen = seg.ended_at === null;
             const flagged = !!seg.is_likely_noise;
+            const isDrive = seg.kind === "drive";
             return (
               <div
                 key={seg.id}
@@ -162,9 +248,9 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "1.1rem" }}>{seg.kind === "drive" ? "🚗" : "📍"}</span>
+                  <span style={{ fontSize: "1.1rem" }}>{isDrive ? "🚗" : "📍"}</span>
                   <strong style={{ fontSize: "0.95rem" }}>
-                    {seg.place_label ?? (seg.kind === "drive" ? "Driving" : "Stop")}
+                    {seg.place_label ?? (isDrive ? "Driving" : "Stop")}
                   </strong>
                   <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
                     <LocalTime iso={seg.started_at} />
@@ -178,8 +264,6 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
-                  {/* Auto owns time: confirm the segment as an activity (drives
-                      default to travel). Mileage stays manual via Start Day. */}
                   <Select
                     id={`seg-activity-${seg.id}`}
                     options={ACTIVITY_OPTIONS}
@@ -187,28 +271,42 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
                     onChange={(e) => setChoice((c) => ({ ...c, [seg.id]: e.target.value as ActivityType }))}
                     disabled={isOpen || pending === seg.id}
                   />
-                  {/* Flagged drives lead with Dismiss (one-tap clear); Confirm
-                      stays available as an override. */}
+                  {isDrive ? (
+                    <>
+                      <Select
+                        id={`seg-vehicle-${seg.id}`}
+                        options={vehicleOptions.length ? vehicleOptions : [{ value: "", label: "No vehicles" }]}
+                        value={vehicleChoice[seg.id] ?? defaultVehicleId(seg)}
+                        onChange={(e) => setVehicleChoice((c) => ({ ...c, [seg.id]: e.target.value }))}
+                        disabled={isOpen || pending === seg.id || vehicleOptions.length === 0}
+                      />
+                      <label style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", fontSize: "0.85rem" }}>
+                        <span style={{ color: "var(--text-muted)" }}>mi</span>
+                        <input
+                          type="number"
+                          min={0.1}
+                          step={0.1}
+                          value={milesChoice[seg.id] ?? ""}
+                          onChange={(e) => setMilesChoice((c) => ({ ...c, [seg.id]: e.target.value }))}
+                          disabled={isOpen || pending === seg.id}
+                          style={{
+                            width: "4.5rem",
+                            padding: "var(--space-1) var(--space-2)",
+                            borderRadius: "var(--radius-md)",
+                            border: "1px solid var(--border)",
+                          }}
+                        />
+                      </label>
+                    </>
+                  ) : null}
                   <Button
                     size="sm"
                     variant={flagged ? "ghost" : "primary"}
                     loading={pending === seg.id}
-                    disabled={isOpen}
-                    onClick={() => {
-                      const body = { action: "confirm", activity_type: choice[seg.id] ?? defaultActivity(seg) };
-                      if (!seg.ended_at) return;
-                      const rebalance = proposeRebalance(timelineEntries(), {
-                        started_at: seg.started_at,
-                        ended_at: seg.ended_at,
-                      });
-                      if (rebalance.length > 0) {
-                        setConfirmReplace({ id: seg.id, body, rebalance });
-                        return;
-                      }
-                      void patch(seg.id, body, "Logged to your day");
-                    }}
+                    disabled={isOpen || (isDrive && vehicleOptions.length === 0)}
+                    onClick={() => (isDrive ? confirmDrive(seg) : confirmStop(seg))}
                   >
-                    Confirm
+                    {isDrive ? "Confirm trip" : "Confirm"}
                   </Button>
                   <Button
                     size="sm"
@@ -221,11 +319,15 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
                 </div>
                 {isOpen ? (
                   <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", margin: 0 }}>
-                    {seg.kind === "drive" ? "Confirm this once the drive ends." : "Label this once it ends."}
+                    {isDrive ? "Confirm this trip once the drive ends." : "Label this once it ends."}
                   </p>
                 ) : flagged ? (
                   <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", margin: 0 }}>
                     Looks like you didn’t really go anywhere — probably safe to dismiss.
+                  </p>
+                ) : isDrive && seg.estimated_miles != null ? (
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", margin: 0 }}>
+                    GPS estimate: {seg.estimated_miles} mi — edit before confirming if needed.
                   </p>
                 ) : null}
               </div>
@@ -238,12 +340,15 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
               {confirmed.map((seg) => (
                 <div
                   key={seg.id}
-                  style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontSize: "0.85rem", color: "var(--text-muted)" }}
+                  style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontSize: "0.85rem", color: "var(--text-muted)", flexWrap: "wrap" }}
                 >
                   <span>✓</span>
                   <span>{seg.kind === "drive" ? "🚗" : "📍"}</span>
                   <span>{seg.place_label ?? (seg.kind === "drive" ? "Driving" : "Stop")}</span>
                   <span>· {durationLabel(seg.started_at, seg.ended_at)}</span>
+                  {seg.kind === "drive" && seg.vehicle_session_id ? (
+                    <Badge>Trip linked</Badge>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -262,7 +367,7 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
             void patch(
               pendingReplace.id,
               { ...pendingReplace.body, rebalance: pendingReplace.rebalance },
-              "Logged to your day",
+              pendingReplace.successMsg,
             );
           }
         }}
