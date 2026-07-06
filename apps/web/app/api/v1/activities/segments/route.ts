@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/middleware";
 import { queryForSession } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { isPrivateLocation } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -47,8 +48,9 @@ export const GET = withAuth(async (request: NextRequest, session) => {
        ORDER BY started_at ASC`,
       [session.accountId, day],
     );
-    const open = rows.find((r) => r.ended_at === null) ?? null;
-    return NextResponse.json({ data: { segments: rows, open } });
+    const reportable = rows.filter((r) => !isPrivateLocation(r.zone, r.place_label));
+    const open = reportable.find((r) => r.ended_at === null) ?? null;
+    return NextResponse.json({ data: { segments: reportable, open } });
   } catch (error) {
     logger.error("GET /api/v1/activities/segments error", error, { traceId: session.traceId });
     return NextResponse.json(

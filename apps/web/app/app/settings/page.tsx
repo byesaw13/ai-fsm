@@ -23,6 +23,7 @@ interface AccountRow extends Record<string, unknown> {
   close_day_followup_hours: number | null;
   tracking_start_time: string | null;
   tracking_end_time: string | null;
+  location_retention_days: number;
 }
 
 interface UserRow extends Record<string, unknown> {
@@ -49,7 +50,8 @@ export default async function SettingsPage() {
           `SELECT id, name, settings,
                   day_review_cutoff_time::text, min_stop_dwell_minutes,
                   visit_confidence_threshold, suppress_weekend_start_prompt,
-                  close_day_followup_hours, tracking_start_time::text, tracking_end_time::text
+                  close_day_followup_hours, tracking_start_time::text, tracking_end_time::text,
+                  location_retention_days
            FROM accounts WHERE id = $1`,
           [session.accountId]
         )
@@ -78,6 +80,7 @@ export default async function SettingsPage() {
         closeDayFollowupHours: account.close_day_followup_hours,
         trackingStartTime: account.tracking_start_time,
         trackingEndTime: account.tracking_end_time,
+        locationRetentionDays: account.location_retention_days,
       }
     : undefined;
 

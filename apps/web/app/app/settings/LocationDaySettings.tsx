@@ -9,6 +9,7 @@ export type LocationDayValues = {
   closeDayFollowupHours: number | null;
   trackingStartTime: string | null;
   trackingEndTime: string | null;
+  locationRetentionDays: number;
 };
 
 export function LocationDaySettings(props: LocationDayValues) {
@@ -19,6 +20,7 @@ export function LocationDaySettings(props: LocationDayValues) {
   const [followup, setFollowup] = useState(props.closeDayFollowupHours?.toString() ?? "");
   const [trackStart, setTrackStart] = useState(props.trackingStartTime?.slice(0, 5) ?? "");
   const [trackEnd, setTrackEnd] = useState(props.trackingEndTime?.slice(0, 5) ?? "");
+  const [retentionDays, setRetentionDays] = useState(props.locationRetentionDays);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -35,6 +37,7 @@ export function LocationDaySettings(props: LocationDayValues) {
         close_day_followup_hours: followup === "" ? null : Number(followup),
         tracking_start_time: trackStart || null,
         tracking_end_time: trackEnd || null,
+        location_retention_days: retentionDays,
       }),
     });
     setSaving(false);
@@ -93,6 +96,23 @@ export function LocationDaySettings(props: LocationDayValues) {
             </span>
           </div>
           <input type="number" min={1} max={24} value={followup} onChange={(e) => setFollowup(e.target.value)} placeholder="Off" className={input} />
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "var(--space-3) 0", borderBottom: "1px solid var(--border)" }}>
+          <div>
+            <span style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>GPS breadcrumb retention ({retentionDays} days)</span>
+            <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
+              Raw location events older than this are pruned; confirmed activity entries are kept.
+            </span>
+          </div>
+          <input
+            type="number"
+            min={30}
+            max={90}
+            value={retentionDays}
+            onChange={(e) => setRetentionDays(Number(e.target.value))}
+            className={input}
+          />
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "var(--space-3) 0", borderBottom: "1px solid var(--border)" }}>

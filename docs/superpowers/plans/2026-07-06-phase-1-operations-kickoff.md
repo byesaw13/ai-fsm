@@ -56,7 +56,12 @@
 
 ## Slice 4: TASK-046 — Privacy controls
 
-**Status:** Migration 124 + settings; retention pruning and home/private filtering remain.
+**Status:** Done — home/private filtered from reports; retention pruning job; settings knob.
+
+**Shipped:**
+- `isPrivateLocation()` filters home/private from segments API, day map, day review
+- Worker `pruneLocationEvents` deletes stale `location_events` per `location_retention_days`
+- Settings exposes retention window (30–90 days)
 
 See `EPIC-007` TASK-046 notes.
 

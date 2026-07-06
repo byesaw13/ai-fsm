@@ -23,6 +23,7 @@ const patchSchema = z.object({
   close_day_followup_hours: z.number().int().min(1).max(24).nullable().optional(),
   tracking_start_time: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
   tracking_end_time: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+  location_retention_days: z.number().int().min(30).max(90).optional(),
 });
 
 export const PATCH = withAuth(async (request: NextRequest, session: AuthSession) => {
@@ -58,6 +59,7 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       close_day_followup_hours: number | null;
       tracking_start_time: string | null;
       tracking_end_time: string | null;
+      location_retention_days: number;
     }>(
       session,
       `UPDATE accounts
@@ -70,13 +72,15 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
            close_day_followup_hours         = CASE WHEN $9::boolean THEN $10 ELSE close_day_followup_hours END,
            tracking_start_time              = CASE WHEN $11::boolean THEN $12::time ELSE tracking_start_time END,
            tracking_end_time                = CASE WHEN $13::boolean THEN $14::time ELSE tracking_end_time END,
+           location_retention_days          = COALESCE($15, location_retention_days),
            updated_at = now()
        WHERE id = $1
        RETURNING location_tracking_enabled, location_paused_until::text,
                  day_review_cutoff_time::text, min_stop_dwell_minutes,
                  visit_confidence_threshold, suppress_weekend_start_prompt,
                  close_day_followup_hours,
-                 tracking_start_time::text, tracking_end_time::text`,
+                 tracking_start_time::text, tracking_end_time::text,
+                 location_retention_days`,
       [
         session.accountId,
         d.enabled ?? null,
@@ -92,6 +96,7 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
         d.tracking_start_time ?? null,
         d.tracking_end_time !== undefined,
         d.tracking_end_time ?? null,
+        d.location_retention_days ?? null,
       ],
     );
     return NextResponse.json({ data: rows[0] });

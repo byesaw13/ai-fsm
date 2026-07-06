@@ -143,7 +143,7 @@ Next available ID: **TASK-070**.
 | TASK-043 | visit_candidates table + creation from stops | 007 | Done |
 | TASK-044 | Visit review card + classification → ledger | 007 | Done |
 | TASK-045 | "I'm at customer site" manual override | 007 | Done |
-| TASK-046 | Workday & privacy controls | 007 | In Progress |
+| TASK-046 | Workday & privacy controls | 007 | Done |
 | TASK-047 | Work Item Library (PI-002) | 008 | Deferred |
 | TASK-048 | Confidence Engine (PI-006) | 008 | Deferred |
 | TASK-049 | Operational Inbox (single review surface) | 007 | Proposed |

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/middleware";
 import { queryForSession } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { isPrivateLocation } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +60,8 @@ export const GET = withAuth(async (request: NextRequest, session) => {
 
     const stops = segs
       .filter((s) => s.kind === "stop" && s.latitude != null && s.longitude != null)
-      .map((s) => ({ id: s.id, label: s.place_label, lat: s.latitude, lng: s.longitude, status: s.status }));
+      .filter((s) => !isPrivateLocation(null, s.place_label))
+      .map((s) => ({ id: s.id, label: s.place_label, lat: s.latitude!, lng: s.longitude!, status: s.status }));
 
     const drives = segs
       .filter((s) => s.kind === "drive")

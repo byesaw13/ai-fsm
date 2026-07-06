@@ -272,14 +272,12 @@ Scope:
 
 Acceptance Criteria:
 - [x] Tracking can be paused and is bounded to the workday. (slice 1, PR #373)
-- [ ] Home/private locations don't surface in reports; raw GPS ages out on
-      schedule while confirmed entries persist. (deferred)
+- [x] Home/private locations don't surface in reports; raw GPS ages out on
+      schedule while confirmed entries persist. (slice 2, Phase 1)
 
 Notes:
-Slice 1 shipped (PR #373): master enable/disable + pause + Start-Day workday
-gating on the ingest (drops events unless enabled, not paused, and a workday
-session is open); `accounts.location_retention_days` reserved. Remaining:
-home/private-location filtering in reports and the GPS retention pruning job.
+Slice 1 (PR #373): master enable/disable + pause + Start-Day workday gating.
+Slice 2: `isPrivateLocation` report filtering, worker retention prune, settings UI.
 
 # TASK-049: Operational Inbox (single review surface)
 

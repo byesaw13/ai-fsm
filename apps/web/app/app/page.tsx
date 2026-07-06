@@ -164,7 +164,9 @@ export default async function AppPage() {
        WHERE account_id = $1
          AND segment_date = CURRENT_DATE
          AND status = 'provisional'
-         AND ended_at IS NOT NULL`,
+         AND ended_at IS NOT NULL
+         AND LOWER(COALESCE(zone, '')) NOT IN ('home', 'private')
+         AND LOWER(COALESCE(place_label, '')) NOT IN ('home', 'private')`,
       [accountId]),
   ]);
 

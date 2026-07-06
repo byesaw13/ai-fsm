@@ -1,6 +1,7 @@
 import { Client } from "pg";
 import { runAllDueAutomations } from "./automations/runner.js";
 import { expireEstimates } from "./expire-estimates.js";
+import { pruneLocationEvents } from "./prune-location-events.js";
 import { processWorkflowEvents } from "./workflow-events.js";
 import { dispatchNotificationQueue } from "./notification/dispatch.js";
 import { logger } from "./logger.js";
@@ -42,6 +43,11 @@ async function runPollIteration(client: Client): Promise<void> {
     const expireResult = await expireEstimates(client);
     if (expireResult.expired > 0) {
       logger.info("expire-estimates complete", { expired: expireResult.expired });
+    }
+
+    const pruneResult = await pruneLocationEvents(client);
+    if (pruneResult.deleted > 0) {
+      logger.info("prune-location-events complete", { deleted: pruneResult.deleted });
     }
   } catch (error) {
     logger.error("worker poll failed", error);
