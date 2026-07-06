@@ -12,8 +12,10 @@ export type DayCloseGateResult =
 export async function assertDayCloseAllowed(
   session: SessionPayload,
   date: string,
+  /** The day owner — defaults to the caller; managers closing another user's day pass `day.user_id`. */
+  userId: string = session.userId,
 ): Promise<DayCloseGateResult> {
-  const payload = await loadDayCloseStatus(session, date);
+  const payload = await loadDayCloseStatus(session, date, userId);
   const derived = deriveDayCloseStatus(payload);
   if (!derived.canClose) {
     return { ok: false, reason: derived.closeButtonHint, code: "CHECKLIST_INCOMPLETE" };
@@ -24,6 +26,7 @@ export async function assertDayCloseAllowed(
 export async function loadDayCloseStatus(
   session: SessionPayload,
   date: string,
+  userId: string = session.userId,
 ): Promise<DayCloseStatusPayload> {
   const [clockRows, activityRows, sessionRows, receiptRows, visitRows] = await Promise.all([
     queryForSession<{ status: string }>(
@@ -31,14 +34,14 @@ export async function loadDayCloseStatus(
       `SELECT status FROM time_clock_sessions
        WHERE account_id = $1 AND user_id = $2 AND status = 'open' AND voided_at IS NULL
        ORDER BY clock_in_at DESC LIMIT 1`,
-      [session.accountId, session.userId],
+      [session.accountId, userId],
     ),
     queryForSession<{ id: string; activity_type: string }>(
       session,
       `SELECT id, activity_type FROM activity_entries
        WHERE account_id = $1 AND user_id = $2 AND ended_at IS NULL AND voided_at IS NULL
        ORDER BY started_at DESC LIMIT 1`,
-      [session.accountId, session.userId],
+      [session.accountId, userId],
     ),
     queryForSession<{ id: string; vehicle_nickname: string | null; start_odometer: number }>(
       session,
@@ -62,7 +65,7 @@ export async function loadDayCloseStatus(
        WHERE account_id = $1 AND assigned_user_id = $3
          AND scheduled_start::date = $2::date
          AND status NOT IN ('cancelled')`,
-      [session.accountId, date, session.userId],
+      [session.accountId, date, userId],
     ),
   ]);
 

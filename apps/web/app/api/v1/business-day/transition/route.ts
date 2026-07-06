@@ -45,7 +45,7 @@ export const POST = withAuth(async (request: NextRequest, session) => {
       const check = checkBusinessDayTransition(day.status, to, { reason: reason ?? undefined });
       if (!check.ok) return { kind: "invalid" as const, reason: check.reason ?? "Invalid transition" };
       if (to === "CLOSED") {
-        const gate = await assertDayCloseAllowed(session, day.business_date);
+        const gate = await assertDayCloseAllowed(session, day.business_date, day.user_id);
         if (!gate.ok) return { kind: "blocked" as const, reason: gate.reason };
       }
       const updated = await setBusinessDayStatus(client, session.accountId, id, day.status, to, reason ?? null);
