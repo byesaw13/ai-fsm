@@ -28,7 +28,7 @@
 
 ## Slice 2: TASK-053 — Activity + Assignment (finish consumers)
 
-**Status:** Migration 129 landed; partial UI/API consumption.
+**Status:** Done — migration 131 consumers wired; verb/assignment independence tested.
 
 **Files:**
 - Audit `activity_entries` writers/readers for `assignment_kind`, `labor_bucket`
@@ -36,8 +36,8 @@
 - Tests for verb + assignment independence
 
 **Acceptance:**
-- [ ] Switching activity on same assignment does not touch clock
-- [ ] labor_bucket mapping unit-tested
+- [x] Switching activity on same assignment does not touch clock
+- [x] labor_bucket mapping unit-tested
 
 ---
 

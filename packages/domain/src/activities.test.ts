@@ -4,6 +4,7 @@ import {
   LABOR_BUCKETS,
   laborBucketFor,
   activityCategoryFor,
+  isSameActivitySnapshot,
 } from "./activities";
 
 describe("laborBucketFor (TASK-053 default mapping)", () => {
@@ -35,5 +36,32 @@ describe("laborBucketFor (TASK-053 default mapping)", () => {
 
   it("category mapping still works (unchanged)", () => {
     expect(activityCategoryFor("job_work")).toBe("revenue");
+  });
+});
+
+describe("isSameActivitySnapshot (TASK-053 verb + assignment independence)", () => {
+  const visitId = "00000000-0000-0000-0000-000000000101";
+
+  it("treats identical verb and assignment as a no-op", () => {
+    const snap = { activity_type: "job_work", entity_type: "visit", entity_id: visitId, assignment_kind: null };
+    expect(isSameActivitySnapshot(snap, { ...snap })).toBe(true);
+  });
+
+  it("detects a verb change on the same assignment", () => {
+    const current = { activity_type: "job_work", entity_type: "visit", entity_id: visitId };
+    const next = { activity_type: "travel", entity_type: "visit", entity_id: visitId };
+    expect(isSameActivitySnapshot(current, next)).toBe(false);
+  });
+
+  it("detects an assignment change with the same verb", () => {
+    const current = { activity_type: "admin", assignment_kind: "office" };
+    const next = { activity_type: "admin", assignment_kind: "shop" };
+    expect(isSameActivitySnapshot(current, next)).toBe(false);
+  });
+
+  it("detects entity vs non-entity assignment changes", () => {
+    const current = { activity_type: "job_work", entity_type: "visit", entity_id: visitId };
+    const next = { activity_type: "job_work", assignment_kind: "office" };
+    expect(isSameActivitySnapshot(current, next)).toBe(false);
   });
 });

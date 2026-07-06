@@ -7,8 +7,11 @@ import {
   ACTIVITY_TYPES,
   ACTIVITY_TYPE_META,
   ACTIVITY_CATEGORY_LABELS,
+  ASSIGNMENT_KIND_LABELS,
+  isSameActivitySnapshot,
   type ActivityType,
   type ActivityCategory,
+  type AssignmentKind,
 } from "@ai-fsm/domain";
 import { summarizeDay, formatMinutes, type DayEntry } from "@/lib/activities/summary";
 
@@ -16,8 +19,22 @@ export type ActivityEntryDto = DayEntry & {
   id: string;
   entity_type: string | null;
   entity_id: string | null;
+  assignment_kind: string | null;
+  labor_bucket: string | null;
   note: string | null;
 };
+
+function assignmentLabel(entry: ActivityEntryDto | null): string | null {
+  if (!entry) return null;
+  if (entry.assignment_kind) {
+    return ASSIGNMENT_KIND_LABELS[entry.assignment_kind as AssignmentKind] ?? entry.assignment_kind;
+  }
+  if (entry.entity_type && entry.entity_id) {
+    const label = entry.entity_type.charAt(0).toUpperCase() + entry.entity_type.slice(1);
+    return `${label} · ${entry.entity_id.slice(0, 8)}`;
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Now bar — what am I doing right now, with one-tap switching
@@ -64,13 +81,16 @@ export function NowBar({
   const displayType: ActivityType | null = optimistic?.type ?? (active?.activity_type as ActivityType ?? null);
   const displayStartedAt = optimistic?.startedAt ?? active?.started_at ?? null;
   const displayNote = optimistic ? null : active?.note ?? null;
+  const displayAssignment = optimistic ? null : assignmentLabel(active);
 
   async function switchTo(type: ActivityType) {
     // Skip only on a TRUE no-op: same type AND the current entry is unlinked.
     // Chips never carry an entity link, so tapping the same type while the
     // active entry IS linked (e.g. job_work auto-started by a visit) is a real
     // transition to unlinked work — let it through to the (idempotent) API.
-    const isNoOp = optimistic ? optimistic.type === type : active?.activity_type === type && active?.entity_id == null;
+    const isNoOp = optimistic
+      ? optimistic.type === type
+      : active != null && isSameActivitySnapshot(active, { activity_type: type });
     if (isNoOp) {
       setSheetOpen(false);
       return;
@@ -136,8 +156,13 @@ export function NowBar({
                 <span style={{ fontWeight: 800, fontSize: "var(--text-lg)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {meta.label}
                 </span>
-                {displayNote && (
+                {displayAssignment && (
                   <span style={{ color: "rgba(255, 255, 255, 0.8)", fontSize: "var(--text-sm)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    · {displayAssignment}
+                  </span>
+                )}
+                {displayNote && (
+                  <span style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: "var(--text-sm)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     · {displayNote}
                   </span>
                 )}

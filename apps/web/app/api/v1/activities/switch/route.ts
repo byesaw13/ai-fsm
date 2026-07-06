@@ -3,7 +3,13 @@ import { z } from "zod";
 import { withAuth } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { ACTIVITY_TYPES, ACTIVITY_ENTITY_TYPES, ASSIGNMENT_KINDS, activityCategoryFor } from "@ai-fsm/domain";
+import {
+  ACTIVITY_TYPES,
+  ACTIVITY_ENTITY_TYPES,
+  ASSIGNMENT_KINDS,
+  activityCategoryFor,
+  isSameActivitySnapshot,
+} from "@ai-fsm/domain";
 import { businessToday } from "@/lib/operations/business-day";
 
 export const dynamic = "force-dynamic";
@@ -66,15 +72,8 @@ export const POST = withAuth(async (request: NextRequest, session) => {
     );
 
     const current = active.rows[0];
-    if (
-      current &&
-      current.activity_type === d.activity_type &&
-      (current.entity_type ?? null) === (d.entity_type ?? null) &&
-      (current.entity_id ?? null) === (d.entity_id ?? null) &&
-      (current.assignment_kind ?? null) === (d.assignment_kind ?? null)
-    ) {
-      // Idempotent: already doing exactly this — same verb AND same assignment
-      // (so switching e.g. Office → Shop is NOT swallowed).
+    if (current && isSameActivitySnapshot(current, d)) {
+      // Idempotent: same verb AND same assignment (Office → Shop is NOT swallowed).
       await client.query("COMMIT");
       return NextResponse.json({ data: { id: current.id, unchanged: true } });
     }
