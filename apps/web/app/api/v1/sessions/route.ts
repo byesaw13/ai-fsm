@@ -123,10 +123,13 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
       [session.userId, session.accountId, session.role]
     );
 
+    const milesSource =
+      d.start_odometer !== undefined && d.end_odometer !== undefined ? "odometer" : "manual_miles";
     const { rows } = await client.query(
       `INSERT INTO vehicle_sessions
-         (account_id, vehicle_id, session_date, start_odometer, end_odometer, miles, notes, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         (account_id, vehicle_id, session_date, start_odometer, end_odometer, miles, notes,
+          created_by, miles_source, status, started_at, ended_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'closed', now(), now())
        RETURNING id`,
       [
         session.accountId,
@@ -137,6 +140,7 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
         computedMiles,
         d.notes ?? null,
         session.userId,
+        milesSource,
       ]
     );
     const sessionId = rows[0].id;

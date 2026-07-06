@@ -23,7 +23,12 @@ describe("inferTripMilesSource", () => {
 });
 
 describe("voidEnclosedGpsEstimates", () => {
-  it("voids closed GPS trip sessions on the same day", async () => {
+  const interval = {
+    startedAt: "2026-07-06T08:00:00.000Z",
+    endedAt: "2026-07-06T17:00:00.000Z",
+  };
+
+  it("voids GPS trips enclosed by the odometer session interval", async () => {
     const query = vi
       .fn()
       .mockResolvedValueOnce({
@@ -35,10 +40,25 @@ describe("voidEnclosedGpsEstimates", () => {
       .mockResolvedValue({ rows: [] });
     const client = { query } as unknown as PoolClient;
 
-    const result = await voidEnclosedGpsEstimates(client, "acct", "2026-07-06", "odo-1", "veh-1");
+    const result = await voidEnclosedGpsEstimates(
+      client,
+      "acct",
+      "2026-07-06",
+      "odo-1",
+      "veh-1",
+      interval,
+    );
 
     expect(result.voidedIds).toEqual(["gps-1", "gps-2"]);
     expect(result.voidedMiles).toBe(17);
+    expect(query.mock.calls[0][1]).toEqual([
+      "acct",
+      "2026-07-06",
+      "odo-1",
+      "veh-1",
+      interval.startedAt,
+      interval.endedAt,
+    ]);
     expect(query).toHaveBeenCalledTimes(3);
   });
 });

@@ -84,7 +84,12 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
 
     await client.query(
       `UPDATE vehicle_sessions
-       SET end_odometer = $1, miles = $1 - start_odometer, ended_at = now(), updated_at = now()
+       SET end_odometer = $1,
+           miles = $1 - start_odometer,
+           miles_source = 'odometer',
+           status = 'closed',
+           ended_at = now(),
+           updated_at = now()
        WHERE id = $2 AND account_id = $3`,
       [d.end_odometer, cur.id, session.accountId]
     );

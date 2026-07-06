@@ -75,12 +75,14 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       id: string;
       vehicle_id: string | null;
       session_date: string;
+      started_at: string;
       start_odometer: number | null;
       end_odometer: number | null;
       miles: string | null;
       notes: string | null;
     }>(
       `SELECT id, vehicle_id, session_date::text AS session_date,
+              started_at::text AS started_at,
               start_odometer, end_odometer, miles::text AS miles, notes
        FROM vehicle_sessions
        WHERE id = $1 AND account_id = $2
@@ -132,12 +134,14 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       [parsed.data.end_odometer, id, session.accountId, notes ?? null]
     );
 
+    const odometerEndedAt = new Date().toISOString();
     const reconcile = await voidEnclosedGpsEstimates(
       client,
       session.accountId,
       row.session_date,
       id,
       row.vehicle_id,
+      { startedAt: row.started_at, endedAt: odometerEndedAt },
     );
 
     await appendAuditLog(client, {

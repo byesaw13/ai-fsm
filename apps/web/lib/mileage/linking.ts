@@ -36,6 +36,7 @@ export async function voidEnclosedGpsEstimates(
   sessionDate: string,
   odometerSessionId: string,
   vehicleId: string | null,
+  interval: { startedAt: string; endedAt: string },
 ): Promise<{ voidedIds: string[]; voidedMiles: number }> {
   const { rows } = await client.query<GpsSessionToVoid>(
     `SELECT id, miles, start_odometer, end_odometer, miles_source
@@ -46,9 +47,13 @@ export async function voidEnclosedGpsEstimates(
         AND status = 'closed'
         AND miles_source IN ('gps_estimate', 'bt_gps_estimate')
         AND activity_entry_id IS NOT NULL
+        AND started_at IS NOT NULL
+        AND ended_at IS NOT NULL
+        AND started_at >= $5::timestamptz
+        AND ended_at <= $6::timestamptz
         AND ($4::uuid IS NULL OR vehicle_id = $4 OR vehicle_id IS NULL)
       FOR UPDATE`,
-    [accountId, sessionDate, odometerSessionId, vehicleId],
+    [accountId, sessionDate, odometerSessionId, vehicleId, interval.startedAt, interval.endedAt],
   );
 
   const voidedIds: string[] = [];
