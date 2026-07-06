@@ -1,5 +1,5 @@
 import { query, queryOne } from "@/lib/db";
-import { detectGaps, preSelectCandidates, checkMileageDelta } from "@ai-fsm/domain";
+import { detectGaps, preSelectCandidates, checkMileageDelta, isPrivateLocation } from "@ai-fsm/domain";
 
 export type DayReviewPayload = {
   businessDayId: string;
@@ -130,8 +130,10 @@ export async function getDayReview(
     [accountId, date],
   );
 
+  const reportableSegments = segmentRows.filter((s) => !isPrivateLocation(s.zone, s.place_label));
+
   const gaps = detectGaps(
-    segmentRows.map((s) => ({ startedAt: s.started_at, endedAt: s.ended_at })),
+    reportableSegments.map((s) => ({ startedAt: s.started_at, endedAt: s.ended_at })),
     entryRows.map((e) => ({ startedAt: e.started_at, endedAt: e.ended_at })),
     day.min_dwell,
   );
@@ -173,7 +175,7 @@ export async function getDayReview(
     reviewPromptedAt: day.review_prompted_at,
     closedAt: day.closed_at,
     visits: scored.map((c) => ({ ...c, preSelected: preSelectedIds.has(c.id) })),
-    segments: segmentRows.map((s) => ({
+    segments: reportableSegments.map((s) => ({
       id: s.id,
       kind: s.kind,
       startedAt: s.started_at,

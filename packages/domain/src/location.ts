@@ -116,3 +116,19 @@ export function classifyDrive(input: {
   if (avgKmh < SUSPECT_MAX_KMH) return "suspect";
   return "ok";
 }
+
+// ---------------------------------------------------------------------------
+// Privacy (TASK-046): home/private zones must not surface in reports or maps.
+// ---------------------------------------------------------------------------
+
+/** True when a segment's zone or label is a private/home place (HA zones). */
+export function isPrivateLocation(
+  zone: string | null | undefined,
+  placeLabel: string | null | undefined,
+): boolean {
+  const z = (zone ?? "").trim().toLowerCase();
+  const p = (placeLabel ?? "").trim().toLowerCase();
+  if (z === "home" || p === "home") return true;
+  if (z === "private" || p === "private") return true;
+  return false;
+}
