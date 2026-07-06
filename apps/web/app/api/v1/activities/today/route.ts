@@ -13,6 +13,8 @@ type EntryRow = {
   ended_at: string | null;
   entity_type: string | null;
   entity_id: string | null;
+  assignment_kind: string | null;
+  labor_bucket: string | null;
   note: string | null;
 };
 
@@ -22,7 +24,7 @@ export const GET = withAuth(async (_request: NextRequest, session) => {
     const rows = await queryForSession<EntryRow>(
       session,
       `SELECT id, activity_type, category, started_at::text, ended_at::text,
-              entity_type, entity_id, note
+              entity_type, entity_id, assignment_kind, labor_bucket, note
        FROM activity_entries
        WHERE account_id = $1 AND session_date = CURRENT_DATE AND voided_at IS NULL
        ORDER BY started_at ASC`,

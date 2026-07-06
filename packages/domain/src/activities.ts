@@ -79,6 +79,32 @@ export function activityCategoryFor(type: ActivityType): ActivityCategory {
 export const ASSIGNMENT_KINDS = ["office", "shop", "inventory", "training", "none"] as const;
 export type AssignmentKind = (typeof ASSIGNMENT_KINDS)[number];
 
+export const ASSIGNMENT_KIND_LABELS: Record<AssignmentKind, string> = {
+  office: "Office",
+  shop: "Shop",
+  inventory: "Inventory",
+  training: "Training",
+  none: "Unassigned",
+};
+
+/** Fields that define the activity verb + assignment snapshot (TASK-053). */
+export interface ActivitySnapshot {
+  activity_type: ActivityType | string;
+  entity_type?: string | null;
+  entity_id?: string | null;
+  assignment_kind?: string | null;
+}
+
+/** True when verb and assignment are both unchanged — switch is a no-op. */
+export function isSameActivitySnapshot(current: ActivitySnapshot, next: ActivitySnapshot): boolean {
+  return (
+    current.activity_type === next.activity_type &&
+    (current.entity_type ?? null) === (next.entity_type ?? null) &&
+    (current.entity_id ?? null) === (next.entity_id ?? null) &&
+    (current.assignment_kind ?? null) === (next.assignment_kind ?? null)
+  );
+}
+
 /** The profitability axis of an activity entry (true labor burden). */
 export const LABOR_BUCKETS = ["billable", "overhead", "personal", "warranty"] as const;
 export type LaborBucket = (typeof LABOR_BUCKETS)[number];

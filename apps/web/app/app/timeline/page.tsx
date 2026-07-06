@@ -39,7 +39,7 @@ export default async function TimelinePage({
   const entries = await queryForSession<ActivityEntryDto>(
     session,
     `SELECT id, activity_type, category, started_at::text, ended_at::text,
-            entity_type, entity_id, note
+            entity_type, entity_id, assignment_kind, labor_bucket, note
      FROM activity_entries
      WHERE account_id = $1 AND session_date = $2::date AND voided_at IS NULL
      ORDER BY started_at ASC`,
