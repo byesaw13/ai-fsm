@@ -1,7 +1,25 @@
 import { queryForSession } from "@/lib/db";
 import type { SessionPayload } from "@/lib/auth/session";
 import { ACTIVITY_TYPE_META, type ActivityType } from "@ai-fsm/domain";
+import { deriveDayCloseStatus } from "@/app/app/day-close/day-close-status";
 import type { DayCloseStatusPayload } from "@/app/app/day-close/types";
+
+export type DayCloseGateResult =
+  | { ok: true }
+  | { ok: false; reason: string; code: "CHECKLIST_INCOMPLETE" };
+
+/** Server-side hard-blocker gate (payroll, activity, mileage). TASK-054. */
+export async function assertDayCloseAllowed(
+  session: SessionPayload,
+  date: string,
+): Promise<DayCloseGateResult> {
+  const payload = await loadDayCloseStatus(session, date);
+  const derived = deriveDayCloseStatus(payload);
+  if (!derived.canClose) {
+    return { ok: false, reason: derived.closeButtonHint, code: "CHECKLIST_INCOMPLETE" };
+  }
+  return { ok: true };
+}
 
 export async function loadDayCloseStatus(
   session: SessionPayload,

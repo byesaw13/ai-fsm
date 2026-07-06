@@ -43,14 +43,14 @@
 
 ## Slice 3: TASK-054 — Day Close + Reopen (verify gaps)
 
-**Status:** Day review checklist shipped (#461); reopen exists on `CloseButton`.
+**Status:** Done — server gate + reopen reason UX; inbox deferred (no `action_items` consumer yet).
 
 **Verify:**
-- [ ] Checklist gates close (payroll, activities, mileage, inbox)
-- [ ] Reopen records reason on `business_days`
-- [ ] No second fake close path on My Work / WorkdayPanel
+- [x] Checklist gates close (payroll, activities, mileage) — server-enforced on both close paths
+- [x] Reopen records reason on `business_days` — `CloseButton` + `BusinessDayBar` prompt for reason
+- [x] No second fake close path on My Work / WorkdayPanel — links to Day Review only
 
-Close TASK-054 or file gap tasks if missing.
+**Deferred:** Operational inbox (`action_items`) soft gate — table exists, no field checklist row yet.
 
 ---
 
