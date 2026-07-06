@@ -11,6 +11,16 @@ import { businessToday, getBusinessDay } from "./business-day";
  * locks or mutates (unlike the clock-in helper's FOR UPDATE).
  */
 
+export type OpsTransition =
+  | "open_business_day"
+  | "clock_in"
+  | "clock_out"
+  | "switch_activity"
+  | "start_mileage_session"
+  | "close_mileage_session"
+  | "close_business_day"
+  | "reopen_business_day";
+
 export interface CurrentOperationsState {
   /** The day container (today), if opened. */
   business_day: { id: string; status: BusinessDayStatus } | null;
@@ -29,7 +39,37 @@ export interface CurrentOperationsState {
   } | null;
   /** How they're travelling: the open (unclosed) mileage session, if any. */
   vehicle_session: { id: string; vehicle_id: string | null; started_at: string | null } | null;
+  /** Valid next actions given the current derived state (TASK-056). */
+  valid_transitions: OpsTransition[];
   // presence: reserved for Phase 4 (presence_intervals not built yet).
+}
+
+/** Pure: which operational actions are legal from this snapshot. */
+export function deriveValidTransitions(state: Omit<CurrentOperationsState, "valid_transitions">): OpsTransition[] {
+  const out: OpsTransition[] = [];
+  const day = state.business_day;
+
+  if (!day) {
+    out.push("open_business_day");
+  } else if (day.status === "CLOSED") {
+    out.push("reopen_business_day");
+  } else {
+    out.push("close_business_day");
+  }
+
+  if (!state.clocked_in) {
+    out.push("clock_in");
+  } else {
+    out.push("clock_out", "switch_activity");
+  }
+
+  if (!state.vehicle_session) {
+    out.push("start_mileage_session");
+  } else {
+    out.push("close_mileage_session");
+  }
+
+  return out;
 }
 
 export async function getCurrentOperationsState(
@@ -67,11 +107,12 @@ export async function getCurrentOperationsState(
     [accountId],
   );
 
-  return {
+  const snapshot = {
     business_day: day ? { id: day.id, status: day.status } : null,
     clocked_in: !!clock,
     clock,
     activity: activityRes.rows[0] ?? null,
     vehicle_session: vehicleRes.rows[0] ?? null,
   };
+  return { ...snapshot, valid_transitions: deriveValidTransitions(snapshot) };
 }

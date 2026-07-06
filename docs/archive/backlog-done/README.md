@@ -25,3 +25,6 @@ these files are kept for historical reference.
 | [TASK-027](TASK-027-hybrid-tracking.md) | Hybrid Tracking |
 | [TASK-033](TASK-033-read-only-mcp.md) | Read-Only Business MCP Server |
 | [TASK-060](TASK-060-invoice-discounts.md) | Invoice Discounts |
+| [TASK-058](TASK-058-workspace-auto-route.md) | Workspace mode auto-by-device |
+| [TASK-059](TASK-059-my-day-start-surface.md) | My Day start-surface consolidation |
+| [TASK-020](TASK-020-pwa-installability.md) | PWA Installability |

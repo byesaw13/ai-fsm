@@ -235,43 +235,6 @@ garonhome production remains a deploy step — do not apply out-of-band; run it
 through the normal migration path after confirming invoices read from
 `activity_entries`.
 
-# TASK-059: My Day start-surface consolidation (remove odometer-unlocks-day framing)
-
-Status:
-In Progress
-
-Phase:
-0
-
-Problem:
-After the Operations Engine landed, My Day still carried the old framing that
-fought the new model: a "Start Your Workday — log starting odometer to unlock day
-tracking" hero (the day does NOT start via mileage anymore) and a "Complete &
-Close Day" button that faked a close (toast + navigate, no business_days change)
-and re-coupled mileage to the day ("close your mileage session before you can
-close your day").
-
-Business Value:
-The Today header (Clock In / Open Day) is the unambiguous day-start; the rest of
-My Day stops contradicting it.
-
-Scope:
-- Reframe the start_day hero to a Mileage Session (it lives under the "Start
-  Mileage Session" tab), not "your workday"; drop the odometer-unlocks-day copy
-  and the hardcoded name.
-- Remove the fake, mileage-coupled "Complete & Close Day" button; the real,
-  checklist-gated close is the Business Day control in the header. The tab becomes
-  end-of-day review only.
-
-Out of Scope:
-- A full visual merge of the header + stepper into one block (later if wanted).
-
-Acceptance Criteria:
-- [ ] No "unlock day tracking" / "Start Your Workday" framing on the mileage tab.
-- [ ] One day-close path (header); closing mileage/timer never closes the day.
-
-Notes:
-Follow-up to TASK-051/052. Verified against the live app via screenshots.
 
 # TASK-051: Business Day aggregate (decouple day close)
 
@@ -565,6 +528,8 @@ tasks if the build proves large. Do **not** start until TASK-033 has been in
 real daily use and TASK-034 (non-superuser RLS verification) is considered.
 
 ## Completed
+
+- [TASK-059: My Day start-surface consolidation](../archive/backlog-done/TASK-059-my-day-start-surface.md) — Done
 
 - [TASK-001: Vehicle Mileage Sessions](../archive/backlog-done/TASK-001-vehicle-mileage-sessions.md) — Done
 - [TASK-002: Vehicle Session Recovery](../archive/backlog-done/TASK-002-vehicle-session-recovery.md) — Done

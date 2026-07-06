@@ -28,28 +28,39 @@ Full engineering doctrine: `docs/working/execution-doctrine.md`.
 
 | Phase | Name | Status | Scope |
 |-------|------|--------|-------|
-| **0** | Field Ops Reliability | **Active** | Technician day flow boring: start day → clock → work orders → day close |
-| **1** | Operations Engine Completion | In progress | Business Day, activity, vehicle, day close, current ops state per `docs/canonical/OPERATIONS.md`. Location capture, day map, and hybrid tracking are Phase 1 **infrastructure**. |
+| **0** | Field Ops Reliability | **Complete** | Technician day flow: start day → clock → work orders → day close (#463, #461, TASK-058/059) |
+| **1** | Operations Engine Completion | **Active** | Business Day, activity, vehicle, day close, current ops state per `docs/canonical/OPERATIONS.md`. Location capture, day map, and hybrid tracking are Phase 1 **infrastructure**. |
 | **2** | Property-Centered Surfaces | Next | Property history findable from every workflow page; visit evidence promoted to permanent record |
 | **3** | Estimate & Billing Closure | Planned | Assessment summary complete; estimate→job handoff explicit; invoice/payment connected to completed work |
 | **4** | Production Intelligence | Deferred | Only after Phases 0–3 stable. See `docs/canonical/PRODUCTION_INTELLIGENCE.md` |
 
-### Phase 0 — Field Ops Reliability (active)
+### Phase 0 — Field Ops Reliability (complete)
 
-- Merge My Work field tools (`FieldRightNowCard`, odometer checkpoints, decluttered layout)
-- Day close checklist actionable on My Work
-- PWA installability when HTTPS origin is available (TASK-020)
-- Workspace routing: owner reaches My Work without broken mobile links
+Shipped on main (2026-07):
 
-**Done when:** A full field day completes without workaround — start day, clock, work order, visit action, day review.
+- My Work field tools — `FieldRightNowCard`, odometer checkpoints, decluttered layout (#463)
+- Day close checklist on day review (#461)
+- PWA app layer — manifest, icons, service worker (TASK-020); production install requires HTTPS origin (`docs/working/pwa-https-deployment.md`)
+- Workspace auto-route by device + Settings override (TASK-058)
+- My Day start-surface consolidation — no odometer-unlocks-day framing (TASK-059)
 
-### Phase 1 — Operations Engine Completion
+**Validation:** Run one full field day on device; file any blocker as P0 before Phase 1 expansion.
+
+### Phase 1 — Operations Engine Completion (active)
+
+See kickoff plan: `docs/superpowers/plans/2026-07-06-phase-1-operations-kickoff.md`.
 
 Canonical architecture: `docs/canonical/OPERATIONS.md`.
 
-- Finish current ops state, activity + assignment model, day close + reopen
-- Location capture, visit candidates, day map, hybrid tracking (shipped infrastructure — maintain, don't expand scope)
-- Privacy controls for location data (TASK-046)
+**Priority order:**
+
+1. TASK-056 — Current Operations State: valid transitions + tests; wire into field surfaces
+2. TASK-053 — Activity + Assignment model: finish migration 129 consumers
+3. TASK-054 — Day Close checklist + Reopen (verify against #461; close gaps)
+4. TASK-046 — Location privacy controls (retention pruning, home/private filtering)
+5. TASK-050 — Mileage ↔ travel-time link (migration 130)
+
+Location capture, visit candidates, day map, hybrid tracking are **shipped infrastructure** — maintain only, no scope expansion.
 
 **Done when:** Payroll, activity, vehicle, and location concerns are independently lifecyclable; day close does not overload unrelated concerns.
 
