@@ -159,6 +159,7 @@ export async function getDayReview(
        AND ls.kind = 'drive'
        AND ls.status = 'confirmed'
      WHERE vs.account_id = $1 AND vs.session_date = $2::date
+       AND vs.status <> 'voided'
      GROUP BY vs.id, v.nickname, vs.miles, vs.start_odometer, vs.end_odometer
      ORDER BY vs.started_at DESC NULLS LAST
      LIMIT 1`,

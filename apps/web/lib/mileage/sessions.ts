@@ -54,6 +54,7 @@ export async function findOpenSessionForVehicle(
        FROM vehicle_sessions
       WHERE account_id = $1
         AND vehicle_id = $2
+        AND status = 'open'
         AND end_odometer IS NULL
         AND miles IS NULL
       ORDER BY started_at DESC
@@ -104,6 +105,7 @@ export type SessionMiles = {
   miles: number | null;
   start_odometer: number | null;
   end_odometer: number | null;
+  status?: string | null;
 };
 
 /**
@@ -112,6 +114,7 @@ export type SessionMiles = {
  * odometer movement: vehicle sessions are the only mileage truth.
  */
 export function completedSessionMiles(s: SessionMiles): number | null {
+  if (s.status === "voided") return null;
   if (s.miles != null) return s.miles;
   if (s.start_odometer != null && s.end_odometer != null) {
     return s.end_odometer - s.start_odometer;

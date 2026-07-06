@@ -55,15 +55,16 @@ describe("isSuspiciousMiles", () => {
 });
 
 describe("completedSessionMiles / dailyMileageTotal — daily total across vehicles", () => {
-  it("ignores open sessions and sums completed ones across vehicles", () => {
+  it("ignores voided and open sessions when totaling", () => {
     const sessions = [
       { miles: null, start_odometer: 100, end_odometer: 140 }, // Ram, 40 mi
       { miles: 25, start_odometer: 5000, end_odometer: 5025 }, // Pathfinder, 25 mi (stored)
+      { miles: 12, start_odometer: null, end_odometer: null, status: "voided" }, // voided GPS — 0
       { miles: null, start_odometer: 200, end_odometer: null }, // open — contributes 0
     ];
     expect(completedSessionMiles(sessions[0])).toBe(40);
     expect(completedSessionMiles(sessions[2])).toBeNull();
-    expect(dailyMileageTotal(sessions)).toBe(65);
+    expect(dailyMileageTotal(sessions)).toBe(65); // voided 12 mi excluded
   });
 });
 

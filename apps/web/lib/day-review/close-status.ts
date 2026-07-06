@@ -48,6 +48,7 @@ export async function loadDayCloseStatus(
       `SELECT s.id, v.nickname AS vehicle_nickname, s.start_odometer
        FROM vehicle_sessions s LEFT JOIN vehicles v ON v.id = s.vehicle_id
        WHERE s.account_id = $1 AND s.session_date = $2::date
+         AND s.status = 'open'
          AND s.end_odometer IS NULL AND s.miles IS NULL
        ORDER BY s.started_at DESC LIMIT 1`,
       [session.accountId, date],

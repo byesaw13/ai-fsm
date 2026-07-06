@@ -5,6 +5,7 @@ import type { AuthSession } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
+import { voidEnclosedGpsEstimates } from "@/lib/mileage/linking";
 
 export const dynamic = "force-dynamic";
 
@@ -72,12 +73,15 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
 
     const existing = await client.query<{
       id: string;
+      vehicle_id: string | null;
+      session_date: string;
       start_odometer: number | null;
       end_odometer: number | null;
       miles: string | null;
       notes: string | null;
     }>(
-      `SELECT id, start_odometer, end_odometer, miles::text AS miles, notes
+      `SELECT id, vehicle_id, session_date::text AS session_date,
+              start_odometer, end_odometer, miles::text AS miles, notes
        FROM vehicle_sessions
        WHERE id = $1 AND account_id = $2
        FOR UPDATE`,
@@ -118,12 +122,22 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       `UPDATE vehicle_sessions
        SET end_odometer = $1,
            miles = $1 - start_odometer,
+           miles_source = 'odometer',
+           status = 'closed',
            notes = $4,
            ended_at = now(),
            updated_at = now()
        WHERE id = $2 AND account_id = $3
-       RETURNING id, session_date::text, start_odometer, end_odometer, miles::text, notes`,
+       RETURNING id, session_date::text, start_odometer, end_odometer, miles::text, notes, miles_source, status`,
       [parsed.data.end_odometer, id, session.accountId, notes ?? null]
+    );
+
+    const reconcile = await voidEnclosedGpsEstimates(
+      client,
+      session.accountId,
+      row.session_date,
+      id,
+      row.vehicle_id,
     );
 
     await appendAuditLog(client, {
@@ -138,7 +152,12 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     });
 
     await client.query("COMMIT");
-    return NextResponse.json({ data: rows[0] });
+    return NextResponse.json({
+      data: rows[0],
+      reconcile: reconcile.voidedIds.length
+        ? { voided_session_ids: reconcile.voidedIds, voided_miles: reconcile.voidedMiles }
+        : null,
+    });
   } catch (error) {
     await client.query("ROLLBACK");
     logger.error("PATCH /api/v1/sessions/[id] error", error, { traceId: session.traceId });

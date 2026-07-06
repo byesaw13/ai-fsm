@@ -155,7 +155,14 @@ export function VehicleRow({
       toast.error(json.error?.message ?? "Could not close session");
       return;
     }
-    toast.success("Mileage session closed");
+    const reconcile = json.reconcile as { voided_miles?: number; voided_session_ids?: string[] } | null;
+    if (reconcile?.voided_session_ids?.length) {
+      toast.success(
+        `Mileage closed — voided ${reconcile.voided_miles ?? 0} mi of GPS estimates (odometer wins)`,
+      );
+    } else {
+      toast.success("Mileage session closed");
+    }
     setShowClose(false);
     router.refresh();
   }

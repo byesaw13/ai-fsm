@@ -30,6 +30,7 @@ export async function loadFieldDayData(
                 v.plate AS vehicle_plate, s.start_odometer, s.started_at::text AS started_at
          FROM vehicle_sessions s LEFT JOIN vehicles v ON v.id = s.vehicle_id
          WHERE s.account_id = $1 AND s.session_date = CURRENT_DATE
+           AND s.status = 'open'
            AND s.end_odometer IS NULL AND s.miles IS NULL
          ORDER BY s.started_at DESC LIMIT 1`,
         [accountId],
@@ -69,6 +70,7 @@ export async function loadFieldDayData(
                 s.start_odometer, s.end_odometer, s.miles::float8 AS miles
          FROM vehicle_sessions s LEFT JOIN vehicles v ON v.id = s.vehicle_id
          WHERE s.account_id = $1 AND s.session_date = CURRENT_DATE
+           AND s.status <> 'voided'
          ORDER BY s.started_at ASC`,
         [accountId],
       ),
@@ -76,7 +78,8 @@ export async function loadFieldDayData(
         session,
         `SELECT COALESCE(SUM(miles), 0)::text AS count
          FROM vehicle_sessions
-         WHERE account_id = $1 AND session_date = CURRENT_DATE - interval '1 day'`,
+         WHERE account_id = $1 AND session_date = CURRENT_DATE - interval '1 day'
+           AND status <> 'voided'`,
         [accountId],
       ),
       queryForSession<{ status: string }>(
