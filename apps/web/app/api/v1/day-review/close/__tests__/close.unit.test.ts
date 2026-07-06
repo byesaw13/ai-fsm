@@ -50,6 +50,7 @@ beforeEach(() => {
   mockWithDbSession.mockImplementation(async (_session, fn) => fn({}));
   mockGetBusinessDayById.mockResolvedValue({
     id: DAY_ID,
+    user_id: mockSession.userId,
     status: "ACTIVE",
     business_date: "2026-07-06",
     closed_at: null,
@@ -76,7 +77,7 @@ describe("POST /api/v1/day-review/close", () => {
   it("closes when checklist passes", async () => {
     const res = await closeDay(request({ id: DAY_ID }));
     expect(res.status).toBe(200);
-    expect(mockAssertDayCloseAllowed).toHaveBeenCalledWith(mockSession, "2026-07-06");
+    expect(mockAssertDayCloseAllowed).toHaveBeenCalledWith(mockSession, "2026-07-06", mockSession.userId);
     expect(mockSetBusinessDayStatus).toHaveBeenCalled();
   });
 });
