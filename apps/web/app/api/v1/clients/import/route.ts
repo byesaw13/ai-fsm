@@ -8,16 +8,32 @@ import { logger } from "../../../../../lib/logger";
 
 export const dynamic = "force-dynamic";
 
+const nullableStr = (max: number) =>
+  z.string().max(max).optional().or(z.literal("")).transform((v) => v || null);
+// YYYY-MM-DD or empty → null (the importer already normalizes to this shape).
+const nullableDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")).transform((v) => v || null);
+
 const rowSchema = z.object({
   name: z.string().min(1).max(255),
+  nickname: nullableStr(255),
   email: z.string().email().optional().or(z.literal("")).transform((v) => v || null),
-  phone: z.string().max(50).optional().or(z.literal("")).transform((v) => v || null),
-  company_name: z.string().max(255).optional().or(z.literal("")).transform((v) => v || null),
-  address_line1: z.string().max(500).optional().or(z.literal("")).transform((v) => v || null),
-  city: z.string().max(100).optional().or(z.literal("")).transform((v) => v || null),
-  state: z.string().max(100).optional().or(z.literal("")).transform((v) => v || null),
-  zip: z.string().max(20).optional().or(z.literal("")).transform((v) => v || null),
+  phone: nullableStr(50),
+  company_name: nullableStr(255),
+  address_line1: nullableStr(500),
+  address_line2: nullableStr(500),
+  city: nullableStr(100),
+  state: nullableStr(100),
+  zip: nullableStr(20),
   notes: z.string().optional().or(z.literal("")).transform((v) => v || null),
+  birthday: nullableDate,
+  square_customer_id: nullableStr(128),
+  creation_source: nullableStr(64),
+  first_visit_at: nullableDate,
+  last_visit_at: nullableDate,
+  transaction_count: z.number().int().nonnegative().optional().default(0),
+  lifetime_spend_cents: z.number().int().nonnegative().optional().default(0),
+  email_subscription_status: nullableStr(64),
+  instant_profile: z.boolean().optional().default(false),
 });
 
 export const POST = withAuth(async (request: NextRequest, session: AuthSession) => {
@@ -74,20 +90,35 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
     );
 
     for (const row of parsed) {
-      // Skip exact name+email duplicates already in the account
-      const exists = await client.query(
-        `SELECT id FROM clients WHERE account_id = $1 AND LOWER(name) = LOWER($2) AND LOWER(COALESCE(email,'')) = LOWER(COALESCE($3,''))`,
-        [session.accountId, row.name, row.email ?? ""]
-      );
+      // Dedupe: prefer the Square customer id (stable, and many rows have no
+      // email); otherwise fall back to exact name+email.
+      const exists = row.square_customer_id
+        ? await client.query(
+            `SELECT id FROM clients WHERE account_id = $1 AND square_customer_id = $2`,
+            [session.accountId, row.square_customer_id]
+          )
+        : await client.query(
+            `SELECT id FROM clients WHERE account_id = $1 AND LOWER(name) = LOWER($2) AND LOWER(COALESCE(email,'')) = LOWER(COALESCE($3,''))`,
+            [session.accountId, row.name, row.email ?? ""]
+          );
       if (exists.rows.length > 0) {
         skipped++;
         continue;
       }
 
       await client.query(
-        `INSERT INTO clients (account_id, name, email, phone, company_name, address_line1, city, state, zip, notes)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-        [session.accountId, normalizeClientName(row.name), row.email, row.phone, row.company_name, row.address_line1, row.city, row.state, row.zip, row.notes]
+        `INSERT INTO clients (
+           account_id, name, nickname, email, phone, company_name,
+           address_line1, address_line2, city, state, zip, notes, birthday,
+           square_customer_id, creation_source, first_visit_at, last_visit_at,
+           transaction_count, lifetime_spend_cents, email_subscription_status, instant_profile
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
+        [
+          session.accountId, normalizeClientName(row.name), row.nickname, row.email, row.phone, row.company_name,
+          row.address_line1, row.address_line2, row.city, row.state, row.zip, row.notes, row.birthday,
+          row.square_customer_id, row.creation_source, row.first_visit_at, row.last_visit_at,
+          row.transaction_count, row.lifetime_spend_cents, row.email_subscription_status, row.instant_profile,
+        ]
       );
       imported++;
     }
