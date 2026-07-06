@@ -3,45 +3,71 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, LinkButton, SectionHeader } from "@/components/ui";
+import { spendToCents, toDateStr, cleanPhone } from "@/lib/clients/csv-parse";
 
 // Square CSV column headers → our field names
 // Handles both Square's exact headers and common variations.
 const COLUMN_MAP: Record<string, string | null> = {
-  "first name":     "first_name",
-  "last name":      "last_name",
-  "display name":   "name",
-  "email address":  "email",
-  "email":          "email",
-  "phone number":   "phone",
-  "phone":          "phone",
-  "company name":   "company_name",
-  "company":        "company_name",
-  "street address": "address_line1",
-  "address line 1": "address_line1",
-  "address":        "address_line1",
-  "city":           "city",
-  "state":          "state",
-  "province":       "state",
-  "postal code":    "zip",
-  "zip":            "zip",
-  "zip code":       "zip",
-  "notes":          "notes",
-  "note":           "notes",
-  "reference id":   null,   // ignored
-  "birthday":       null,
-  "country":        null,
+  "first name":       "first_name",
+  "last name":        "last_name",
+  "display name":     "name",
+  "nickname":         "nickname",
+  "email address":    "email",
+  "email":            "email",
+  "phone number":     "phone",
+  "phone":            "phone",
+  "company name":     "company_name",
+  "company":          "company_name",
+  "street address":   "address_line1",
+  "street address 1": "address_line1",
+  "address line 1":   "address_line1",
+  "address":          "address_line1",
+  "street address 2": "address_line2",
+  "address line 2":   "address_line2",
+  "city":             "city",
+  "state":            "state",
+  "province":         "state",
+  "postal code":      "zip",
+  "zip":              "zip",
+  "zip code":         "zip",
+  "notes":            "notes",
+  "note":             "notes",
+  "memo":             "notes",
+  "birthday":         "birthday",
+  // Square customer-directory fields
+  "square customer id":        "square_customer_id",
+  "creation source":           "creation_source",
+  "first visit":               "first_visit_at",
+  "last visit":                "last_visit_at",
+  "transaction count":         "transaction_count",
+  "lifetime spend":            "lifetime_spend_cents",
+  "email subscription status": "email_subscription_status",
+  "instant profile":           "instant_profile",
+  "reference id":              null,   // Square internal, ignored
+  "country":                   null,
 };
 
 interface ParsedRow {
   name: string;
+  nickname: string;
   email: string;
   phone: string;
   company_name: string;
   address_line1: string;
+  address_line2: string;
   city: string;
   state: string;
   zip: string;
   notes: string;
+  birthday: string;
+  square_customer_id: string;
+  creation_source: string;
+  first_visit_at: string;
+  last_visit_at: string;
+  transaction_count: number;
+  lifetime_spend_cents: number;
+  email_subscription_status: string;
+  instant_profile: boolean;
 }
 
 function parseCSV(text: string): { rows: ParsedRow[]; warnings: string[] } {
@@ -96,14 +122,25 @@ function parseCSV(text: string): { rows: ParsedRow[]; warnings: string[] } {
 
     rows.push({
       name,
-      email:        raw.email        ?? "",
-      phone:        raw.phone        ?? "",
-      company_name: raw.company_name ?? "",
+      nickname:      raw.nickname      ?? "",
+      email:         raw.email         ?? "",
+      phone:         cleanPhone(raw.phone ?? ""),
+      company_name:  raw.company_name  ?? "",
       address_line1: raw.address_line1 ?? "",
-      city:         raw.city         ?? "",
-      state:        raw.state        ?? "",
-      zip:          raw.zip          ?? "",
-      notes:        raw.notes        ?? "",
+      address_line2: raw.address_line2 ?? "",
+      city:          raw.city          ?? "",
+      state:         raw.state         ?? "",
+      zip:           raw.zip           ?? "",
+      notes:         raw.notes         ?? "",
+      birthday:      toDateStr(raw.birthday ?? ""),
+      square_customer_id:        raw.square_customer_id ?? "",
+      creation_source:           raw.creation_source ?? "",
+      first_visit_at:            toDateStr(raw.first_visit_at ?? ""),
+      last_visit_at:             toDateStr(raw.last_visit_at ?? ""),
+      transaction_count:         parseInt(raw.transaction_count ?? "0", 10) || 0,
+      lifetime_spend_cents:      spendToCents(raw.lifetime_spend_cents ?? ""),
+      email_subscription_status: raw.email_subscription_status ?? "",
+      instant_profile:           /^yes$/i.test((raw.instant_profile ?? "").trim()),
     });
   }
 
@@ -204,7 +241,7 @@ export function ClientImportForm() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }}>
               <thead>
                 <tr style={{ borderBottom: "2px solid var(--color-border)" }}>
-                  {["Name", "Email", "Phone", "Company", "Address", "City", "State", "Zip"].map((h) => (
+                  {["Name", "Email", "Phone", "Company", "Address", "City", "State", "Zip", "Txns", "Lifetime", "Last Visit", "Square ID"].map((h) => (
                     <th key={h} style={{ padding: "var(--space-2) var(--space-3)", textAlign: "left", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
@@ -220,6 +257,10 @@ export function ClientImportForm() {
                     <td style={{ padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)" }}>{row.city || "—"}</td>
                     <td style={{ padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)" }}>{row.state || "—"}</td>
                     <td style={{ padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)" }}>{row.zip || "—"}</td>
+                    <td style={{ padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", textAlign: "right" }}>{row.transaction_count || "—"}</td>
+                    <td style={{ padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", textAlign: "right", whiteSpace: "nowrap" }}>{row.lifetime_spend_cents ? `$${(row.lifetime_spend_cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—"}</td>
+                    <td style={{ padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", whiteSpace: "nowrap" }}>{row.last_visit_at || "—"}</td>
+                    <td style={{ padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)" }}>{row.square_customer_id || "—"}</td>
                   </tr>
                 ))}
               </tbody>
