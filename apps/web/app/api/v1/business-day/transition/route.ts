@@ -13,6 +13,7 @@ import { withDbSession } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { BUSINESS_DAY_STATUSES, checkBusinessDayTransition } from "@ai-fsm/domain";
 import { getBusinessDayById, setBusinessDayStatus } from "@/lib/operations/business-day";
+import { assertDayCloseAllowed } from "@/lib/day-review/close-status";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,10 @@ export const POST = withAuth(async (request: NextRequest, session) => {
       if (day.user_id !== session.userId && !isManager) return { kind: "not_found" as const };
       const check = checkBusinessDayTransition(day.status, to, { reason: reason ?? undefined });
       if (!check.ok) return { kind: "invalid" as const, reason: check.reason ?? "Invalid transition" };
+      if (to === "CLOSED") {
+        const gate = await assertDayCloseAllowed(session, day.business_date, day.user_id);
+        if (!gate.ok) return { kind: "blocked" as const, reason: gate.reason };
+      }
       const updated = await setBusinessDayStatus(client, session.accountId, id, day.status, to, reason ?? null);
       // null = the row was raced (status moved) or RLS blocked the write.
       if (!updated) return { kind: "conflict" as const };
@@ -53,6 +58,12 @@ export const POST = withAuth(async (request: NextRequest, session) => {
       return NextResponse.json(
         { error: { code: "NOT_FOUND", message: "Business day not found", traceId: session.traceId } },
         { status: 404 },
+      );
+    }
+    if (result.kind === "blocked") {
+      return NextResponse.json(
+        { error: { code: "CHECKLIST_INCOMPLETE", message: result.reason, traceId: session.traceId } },
+        { status: 409 },
       );
     }
     if (result.kind === "invalid" || result.kind === "conflict") {
