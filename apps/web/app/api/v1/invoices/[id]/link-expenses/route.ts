@@ -109,6 +109,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       err.code === "NO_EXPENSES_LINKED" ||
       err.code === "INVALID_EXPENSE" ||
       err.code === "EXPENSE_ON_OTHER_JOB" ||
+      err.code === "EXPENSE_ON_OTHER_CLIENT" ||
       err.code === "EXPENSE_ALREADY_BILLED"
     ) {
       return NextResponse.json(

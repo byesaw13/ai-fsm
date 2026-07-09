@@ -107,6 +107,7 @@ export function resolveDocumentLinkPatch(
   } else if (body.location_mode === "property") {
     propertyId = body.property_id ?? null;
   } else if (body.location_mode === "client_billing") {
+    jobId = null;
     propertyId = null;
   }
 

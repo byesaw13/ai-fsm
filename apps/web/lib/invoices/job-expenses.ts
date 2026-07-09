@@ -229,11 +229,11 @@ async function appendExpenseMaterialLines(
   return { lineItems, nextOrder: order };
 }
 
+/** Job material expenses not yet billed on any invoice. */
 export async function fetchUninvoicedJobMaterialExpenses(
   client: PoolClient,
   accountId: string,
   jobId: string,
-  invoiceId: string,
 ): Promise<JobMaterialExpenseRow[]> {
   const result = await client.query<JobMaterialExpenseRow>(
     `SELECT e.id, e.vendor_name, e.amount_cents, e.notes
@@ -243,11 +243,10 @@ export async function fetchUninvoicedJobMaterialExpenses(
        AND e.category = 'materials'
        AND NOT EXISTS (
          SELECT 1 FROM invoice_line_items ili
-         WHERE ili.invoice_id = $3
-           AND ili.source_expense_id = e.id
+         WHERE ili.source_expense_id = e.id
        )
      ORDER BY e.expense_date ASC, e.created_at ASC`,
-    [accountId, jobId, invoiceId],
+    [accountId, jobId],
   );
   return result.rows;
 }
@@ -345,9 +344,10 @@ export async function linkMaterialExpensesToJob(
   const candidates = await client.query<{
     id: string;
     job_id: string | null;
+    client_id: string | null;
     category: string;
   }>(
-    `SELECT id, job_id, category
+    `SELECT id, job_id, client_id, category
      FROM expenses
      WHERE account_id = $1 AND id = ANY($2::uuid[])`,
     [accountId, expenseIds],
@@ -368,6 +368,11 @@ export async function linkMaterialExpensesToJob(
     if (row.job_id && row.job_id !== job.id) {
       throw Object.assign(new Error("Expense is already linked to a different job"), {
         code: "EXPENSE_ON_OTHER_JOB",
+      });
+    }
+    if (row.client_id && row.client_id !== job.client_id) {
+      throw Object.assign(new Error("Expense belongs to a different client"), {
+        code: "EXPENSE_ON_OTHER_CLIENT",
       });
     }
     const billed = await client.query(
@@ -441,7 +446,7 @@ export async function appendMaterialsFromJobExpenses(
   accountId: string,
   jobId: string,
 ): Promise<{ lineItems: InvoiceLineItemRow[]; skipped: number }> {
-  const expenses = await fetchUninvoicedJobMaterialExpenses(client, accountId, jobId, invoiceId);
+  const expenses = await fetchUninvoicedJobMaterialExpenses(client, accountId, jobId);
   const lineItems: InvoiceLineItemRow[] = [];
   let sortOrder = await client.query<{ next: number }>(
     `SELECT COALESCE(MAX(sort_order), -1) + 1 AS next
@@ -482,13 +487,7 @@ export async function refreshJobMaterialsOnInvoice(
     [invoiceId],
   );
 
-  const expenses = await client.query<JobMaterialExpenseRow>(
-    `SELECT id, vendor_name, amount_cents, notes
-     FROM expenses
-     WHERE account_id = $1 AND job_id = $2 AND category = 'materials'
-     ORDER BY expense_date ASC, created_at ASC`,
-    [accountId, jobId],
-  );
+  const expenses = await fetchUninvoicedJobMaterialExpenses(client, accountId, jobId);
 
   const lineItems: InvoiceLineItemRow[] = [];
   let sortOrder = await client.query<{ next: number }>(
@@ -498,7 +497,7 @@ export async function refreshJobMaterialsOnInvoice(
   );
   let order = sortOrder.rows[0]?.next ?? 0;
 
-  for (const expense of expenses.rows) {
+  for (const expense of expenses) {
     const added = await appendExpenseMaterialLines(client, invoiceId, accountId, expense, order);
     lineItems.push(...added.lineItems);
     order = added.nextOrder;
