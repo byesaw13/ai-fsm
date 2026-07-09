@@ -4,6 +4,8 @@ import { withInvoiceContext } from "@/lib/invoices/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
 import { getPathId } from "@/lib/route-utils";
+import { upsertMaterialHandlingFeeLine } from "@/lib/invoices/job-expenses";
+import { recalculateInvoiceTotals } from "@/lib/invoices/line-items";
 
 export const dynamic = "force-dynamic";
 
@@ -100,7 +102,7 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
   }
 
   const TERMINAL = ["paid", "void"];
-  const DRAFT_ONLY_FIELDS = ["notes", "due_date"] as const;
+  const DRAFT_ONLY_FIELDS = ["notes", "due_date", "apply_material_handling"] as const;
   const NON_TERMINAL_FIELDS = ["deposit_paid_at"] as const;
 
   try {
@@ -153,6 +155,11 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
           `UPDATE invoices SET ${setClauses.join(", ")} WHERE id = $${idx} AND account_id = $${idx + 1}`,
           params
         );
+      }
+
+      if (inv.status === "draft" && "apply_material_handling" in body) {
+        await upsertMaterialHandlingFeeLine(client, id, session.accountId);
+        await recalculateInvoiceTotals(client, id, session.accountId);
       }
 
       await appendAuditLog(client, {

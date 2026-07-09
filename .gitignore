@@ -37,3 +37,4 @@ scripts/import-expenses.js
 
 # graphify — local knowledge-graph artifacts. Regenerate with /graphify when needed.
 /graphify-out/
+.gstack/
