@@ -17,7 +17,7 @@ import { InvoiceEditForm } from "./InvoiceEditForm";
 import { MarkDepositReceivedButton } from "./MarkDepositReceivedButton";
 import { SendInvoiceButton } from "./SendInvoiceButton";
 import { InvoiceLineItemsEditor } from "./InvoiceLineItemsEditor";
-import { LinkForgottenExpensesPanel } from "./LinkForgottenExpensesPanel";
+import { LinkForgottenExpensesPanel } from "@/components/invoices/LinkForgottenExpensesPanel";
 import { MaterialHandlingPanel } from "./MaterialHandlingPanel";
 import {
   DEFAULT_MATERIAL_HANDLING_PCT,
@@ -365,6 +365,7 @@ export default async function InvoiceDetailPage({
             />
             {invoice.job_id && (
               <LinkForgottenExpensesPanel
+                mode="invoice"
                 invoiceId={invoice.id}
                 jobId={invoice.job_id}
                 handlingPct={handlingPct}
