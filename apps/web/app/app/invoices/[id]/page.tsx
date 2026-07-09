@@ -16,6 +16,8 @@ import { InvoiceEditForm } from "./InvoiceEditForm";
 import { MarkDepositReceivedButton } from "./MarkDepositReceivedButton";
 import { SendInvoiceButton } from "./SendInvoiceButton";
 import { InvoiceLineItemsEditor } from "./InvoiceLineItemsEditor";
+import { LinkForgottenExpensesPanel } from "@/components/invoices/LinkForgottenExpensesPanel";
+import { materialHandlingRateFromSettings } from "@/lib/invoices/material-handling";
 import {
   PageContainer,
   PageHeader,
@@ -109,6 +111,11 @@ export default async function InvoiceDetailPage({
 
     if (invoiceResult.rowCount === 0) return null;
 
+    const accountResult = await client.query<{ settings: Record<string, unknown> }>(
+      `SELECT settings FROM accounts WHERE id = $1`,
+      [session.accountId],
+    );
+
     const lineItemsResult = await client.query(
       `SELECT id, invoice_id, estimate_line_item_id,
               description, quantity::float8 AS quantity, unit_price_cents, total_cents, line_item_type, sort_order, created_at
@@ -121,12 +128,17 @@ export default async function InvoiceDetailPage({
     return {
       invoice: invoiceResult.rows[0] as InvoiceRow,
       lineItems: lineItemsResult.rows as LineItemRow[],
+      accountSettings: accountResult.rows[0]?.settings ?? {},
     };
   });
 
   if (!result) notFound();
 
-  const { invoice, lineItems } = result;
+  const { invoice, lineItems, accountSettings } = result;
+  // Preserve explicit 0% overrides (do not use || — 0 is valid).
+  const handlingPct = Math.round(
+    materialHandlingRateFromSettings(accountSettings) * 100,
+  );
   const currentStatus = invoice.status;
   // paid/partial are driven by RecordPaymentForm (payment trigger), not manual transition
   const allowedTransitions = invoiceTransitions[currentStatus].filter(
@@ -276,6 +288,15 @@ export default async function InvoiceDetailPage({
                 {lineItems.length} lines · {formatDollars(invoice.subtotal_cents)} subtotal
               </div>
             </div>
+
+            {canEditLineItems && invoice.job_id && (
+              <LinkForgottenExpensesPanel
+                mode="invoice"
+                invoiceId={invoice.id}
+                jobId={invoice.job_id}
+                handlingPct={handlingPct}
+              />
+            )}
 
             {canEditLineItems ? (
               <InvoiceLineItemsEditor

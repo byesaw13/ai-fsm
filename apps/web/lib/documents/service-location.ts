@@ -43,24 +43,18 @@ export function resolveServiceLocation(fields: LocationFields): string {
   return "Address not on file";
 }
 
-/** Subquery: client's earliest property when document has no explicit link. */
-const CLIENT_FIRST_PROPERTY = `(
-  SELECT p2.id
-  FROM properties p2
-  WHERE p2.client_id = c.id AND p2.account_id = i.account_id
-  ORDER BY p2.created_at ASC
-  LIMIT 1
-)`;
-
-/** SQL fragment: join chain that resolves property from invoice → job → estimate → client. */
-export const INVOICE_DOCUMENT_JOINS = `
-  JOIN clients c ON c.id = i.client_id
-  LEFT JOIN jobs j ON j.id = i.job_id
-  LEFT JOIN estimates e ON e.id = i.estimate_id
-  LEFT JOIN properties p ON p.id = COALESCE(i.property_id, j.property_id, e.property_id, ${CLIENT_FIRST_PROPERTY})
-`;
-
-export const INVOICE_LOCATION_SELECT = `
+/**
+ * Client + property columns for document letterhead / print / PDF loaders.
+ * Includes resolved property id + job (and optionally estimate) property ids.
+ */
+export function documentLocationSelect(opts: {
+  /** When true (invoice joins), also select estimate.property_id. */
+  includeEstimateProperty?: boolean;
+} = {}): string {
+  const estimateCol = opts.includeEstimateProperty
+    ? `\n  e.property_id AS estimate_property_id,`
+    : "";
+  return `
   c.name AS client_name,
   c.email AS client_email,
   c.phone AS client_phone,
@@ -68,41 +62,63 @@ export const INVOICE_LOCATION_SELECT = `
   c.city AS client_city,
   c.state AS client_state,
   c.zip AS client_zip,
-  j.property_id AS job_property_id,
-  e.property_id AS estimate_property_id,
+  j.property_id AS job_property_id,${estimateCol}
   p.id AS resolved_property_id,
   p.address AS property_address,
   p.city AS property_city,
   p.state AS property_state,
   p.zip AS property_zip
 `;
+}
 
-const ESTIMATE_CLIENT_FIRST_PROPERTY = `(
+/**
+ * Join chain from document root → client → job → optional estimate → property.
+ * root "i" = invoices alias; root "e" = estimates alias.
+ */
+export function documentJoins(opts: {
+  root: "i" | "e";
+  /** When true (invoices), also COALESCE property via linked estimate. */
+  includeEstimateProperty?: boolean;
+}): string {
+  const { root, includeEstimateProperty = false } = opts;
+  const clientFirstProperty = `(
   SELECT p2.id
   FROM properties p2
-  WHERE p2.client_id = c.id AND p2.account_id = e.account_id
+  WHERE p2.client_id = c.id AND p2.account_id = ${root}.account_id
   ORDER BY p2.created_at ASC
   LIMIT 1
 )`;
 
-export const ESTIMATE_DOCUMENT_JOINS = `
-  JOIN clients c ON c.id = e.client_id
-  LEFT JOIN jobs j ON j.id = e.job_id
-  LEFT JOIN properties p ON p.id = COALESCE(e.property_id, j.property_id, ${ESTIMATE_CLIENT_FIRST_PROPERTY})
-`;
+  const estimateJoin =
+    includeEstimateProperty && root === "i"
+      ? `\n  LEFT JOIN estimates e ON e.id = i.estimate_id`
+      : "";
 
-export const ESTIMATE_LOCATION_SELECT = `
-  c.name AS client_name,
-  c.email AS client_email,
-  c.phone AS client_phone,
-  c.address_line1 AS client_address_line1,
-  c.city AS client_city,
-  c.state AS client_state,
-  c.zip AS client_zip,
-  j.property_id AS job_property_id,
-  p.id AS resolved_property_id,
-  p.address AS property_address,
-  p.city AS property_city,
-  p.state AS property_state,
-  p.zip AS property_zip
+  const coalesceParts =
+    includeEstimateProperty && root === "i"
+      ? `${root}.property_id, j.property_id, e.property_id, ${clientFirstProperty}`
+      : `${root}.property_id, j.property_id, ${clientFirstProperty}`;
+
+  return `
+  JOIN clients c ON c.id = ${root}.client_id
+  LEFT JOIN jobs j ON j.id = ${root}.job_id${estimateJoin}
+  LEFT JOIN properties p ON p.id = COALESCE(${coalesceParts})
 `;
+}
+
+/** @deprecated Use documentJoins({ root: "i", includeEstimateProperty: true }) */
+export const INVOICE_DOCUMENT_JOINS = documentJoins({
+  root: "i",
+  includeEstimateProperty: true,
+});
+
+/** @deprecated Use documentLocationSelect({ includeEstimateProperty: true }) */
+export const INVOICE_LOCATION_SELECT = documentLocationSelect({
+  includeEstimateProperty: true,
+});
+
+/** @deprecated Use documentJoins({ root: "e" }) */
+export const ESTIMATE_DOCUMENT_JOINS = documentJoins({ root: "e" });
+
+/** @deprecated Use documentLocationSelect() */
+export const ESTIMATE_LOCATION_SELECT = documentLocationSelect();

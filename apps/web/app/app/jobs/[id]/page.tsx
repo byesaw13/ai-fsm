@@ -7,6 +7,7 @@ import { queryForSession, queryOneForSession } from "@/lib/db";
 import { formatVisitTime, isVisitOverdue } from "@/lib/visits/formatting";
 import {
   canCreateInvoices,
+  canManageExpenses,
   canTransitionJob,
   canCreateVisit,
   canDeleteRecords,
@@ -24,6 +25,7 @@ import { JobCommandPanel } from "./JobCommandPanel";
 import { WhatNextBanner } from "./WhatNextBanner";
 import { VendorCoordinationCard } from "./VendorCoordinationCard";
 import { JobWorkOrdersPanel, type JobWorkOrderRow } from "./JobWorkOrdersPanel";
+import { LinkForgottenExpensesPanel } from "@/components/invoices/LinkForgottenExpensesPanel";
 import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { isHomeboxEnabled } from "@/lib/homebox/client";
 import { withAssetContext, listAssetLinks } from "@/lib/homebox/db";
@@ -297,6 +299,7 @@ export default async function JobDetailPage({
   const canAddVisit = canCreateVisit(session.role);
   const canDelete = canDeleteRecords(session.role);
   const canCreateInvoice = canCreateInvoices(session.role);
+  const canLinkExpenses = canManageExpenses(session.role);
   const isTech = session.role === "tech";
 
   const estimateCount = commercialCounts ? parseInt(commercialCounts.estimate_count) : 0;
@@ -521,6 +524,9 @@ export default async function JobDetailPage({
       <div className="p7-detail-layout">
         {/* LEFT: Work Orders + Visits Timeline + Danger Zone */}
         <div className="p7-detail-primary">
+          {canLinkExpenses && (
+            <LinkForgottenExpensesPanel mode="job" jobId={job.id} />
+          )}
           {!isTech && workOrders.length > 0 && (
             <Card data-testid="job-work-orders-panel">
               <SectionHeader title="Work Orders" count={workOrders.length} />
