@@ -41,8 +41,6 @@ function toTimelineEntry(e: ActivityEntryDto): TimelineEntry {
 
 // ---------------------------------------------------------------------------
 
-export type TimelineEditorEntry = ActivityEntryDto;
-
 type NeedsJobLinkRow = {
   id: string;
   activity_type: string;

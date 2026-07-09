@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button, Select, Badge, SectionHeader, EmptyState, LocalTime, useToast, ConfirmDialog } from "@/components/ui";
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_META, type ActivityType } from "@ai-fsm/domain";
 import { proposeRebalance, type RebalanceAdjustment, type TimelineEntry } from "@/lib/activities/timeline";
+import { formatElapsed } from "@/lib/activities/summary";
+import { segmentConfidenceLevel } from "@/lib/location/segment-confidence";
 import type { ActivityEntryDto } from "./ActivityTracker";
 
 type Segment = {
@@ -36,30 +38,10 @@ const ACTIVITY_OPTIONS = ACTIVITY_TYPES.map((t) => ({
   label: `${ACTIVITY_TYPE_META[t].emoji} ${ACTIVITY_TYPE_META[t].label}`,
 }));
 
-function durationLabel(startedAt: string, endedAt: string | null): string {
-  const end = endedAt ? new Date(endedAt).getTime() : Date.now();
-  const mins = Math.max(0, Math.round((end - new Date(startedAt).getTime()) / 60000));
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
-}
-
 function defaultActivity(seg: Segment): ActivityType {
   const s = seg.suggested_activity_type;
   if (s && (ACTIVITY_TYPES as readonly string[]).includes(s)) return s as ActivityType;
   return seg.kind === "drive" ? "travel" : "job_work";
-}
-
-function confidenceLabel(seg: Segment): "high" | "medium" | "low" {
-  if (seg.kind === "drive") return "high";
-  const score =
-    (seg.zone ? 2 : 0) +
-    (seg.place_label ? 1 : 0) +
-    (seg.latitude != null && seg.longitude != null ? 1 : 0) +
-    (seg.ended_at ? 1 : 0);
-  if (score >= 4) return "high";
-  if (score >= 2) return "medium";
-  return "low";
 }
 
 export function LocationSegmentsPanel({ day, entries }: { day?: string; entries: ActivityEntryDto[] }) {
@@ -256,11 +238,11 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
                     <LocalTime iso={seg.started_at} />
                     {seg.ended_at ? <> – <LocalTime iso={seg.ended_at} /></> : " – now"}
                     {" · "}
-                    {durationLabel(seg.started_at, seg.ended_at)}
+                    {formatElapsed(seg.started_at, seg.ended_at ? new Date(seg.ended_at).getTime() : Date.now())}
                   </span>
                   {isOpen ? <Badge>In progress</Badge> : null}
                   {flagged ? <Badge className="p7-badge-status-overdue">Likely noise</Badge> : null}
-                  <Badge>{confidenceLabel(seg)} confidence</Badge>
+                  <Badge>{segmentConfidenceLevel(seg)} confidence</Badge>
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
@@ -345,7 +327,7 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
                   <span>✓</span>
                   <span>{seg.kind === "drive" ? "🚗" : "📍"}</span>
                   <span>{seg.place_label ?? (seg.kind === "drive" ? "Driving" : "Stop")}</span>
-                  <span>· {durationLabel(seg.started_at, seg.ended_at)}</span>
+                  <span>· {formatElapsed(seg.started_at, seg.ended_at ? new Date(seg.ended_at).getTime() : Date.now())}</span>
                   {seg.kind === "drive" && seg.vehicle_session_id ? (
                     <Badge>Trip linked</Badge>
                   ) : null}
