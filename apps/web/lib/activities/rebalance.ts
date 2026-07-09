@@ -1,13 +1,6 @@
 import type { PoolClient } from "pg";
 import { appendAuditLog } from "@/lib/db/audit";
-
-/** One neighbour adjustment as accepted by the correction routes. */
-export interface RebalanceInput {
-  id: string;
-  started_at?: string;
-  ended_at?: string;
-  delete?: boolean;
-}
+import type { RebalanceAdjustment } from "./timeline";
 
 export interface OverlapRow {
   id: string;
@@ -21,7 +14,7 @@ function time(iso: string): number {
 
 export function rebalanceCoversOverlaps(
   overlaps: OverlapRow[],
-  adjustments: RebalanceInput[] | undefined,
+  adjustments: RebalanceAdjustment[] | undefined,
   change: { started_at: string; ended_at: string },
 ): boolean {
   if (overlaps.length === 0) return !adjustments?.length;
@@ -59,7 +52,7 @@ interface RebalanceContext {
 export async function applyRebalance(
   client: PoolClient,
   ctx: RebalanceContext,
-  adjustments: RebalanceInput[] | undefined,
+  adjustments: RebalanceAdjustment[] | undefined,
 ): Promise<void> {
   for (const adj of adjustments ?? []) {
     if (ctx.skipId != null && adj.id === ctx.skipId) continue;
