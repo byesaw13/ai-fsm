@@ -17,7 +17,7 @@ import { MarkDepositReceivedButton } from "./MarkDepositReceivedButton";
 import { SendInvoiceButton } from "./SendInvoiceButton";
 import { InvoiceLineItemsEditor } from "./InvoiceLineItemsEditor";
 import { LinkForgottenExpensesPanel } from "@/components/invoices/LinkForgottenExpensesPanel";
-import { DEFAULT_MATERIAL_HANDLING_PCT, materialHandlingRateFromSettings } from "@/lib/invoices/material-handling";
+import { materialHandlingRateFromSettings } from "@/lib/invoices/material-handling";
 import {
   PageContainer,
   PageHeader,
@@ -135,9 +135,10 @@ export default async function InvoiceDetailPage({
   if (!result) notFound();
 
   const { invoice, lineItems, accountSettings } = result;
-  const handlingPct =
-    Math.round(materialHandlingRateFromSettings(accountSettings) * 100) ||
-    DEFAULT_MATERIAL_HANDLING_PCT;
+  // Preserve explicit 0% overrides (do not use || — 0 is valid).
+  const handlingPct = Math.round(
+    materialHandlingRateFromSettings(accountSettings) * 100,
+  );
   const currentStatus = invoice.status;
   // paid/partial are driven by RecordPaymentForm (payment trigger), not manual transition
   const allowedTransitions = invoiceTransitions[currentStatus].filter(
