@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs";
-import { STANDARD_ESTIMATE_TERMS, STANDARD_INVOICE_TERMS } from "@ai-fsm/domain";
+import { STANDARD_ESTIMATE_NOTES, STANDARD_INVOICE_TERMS } from "@ai-fsm/domain";
 
 /** Company profile fields stored in accounts.settings JSONB. */
 export interface CompanyProfileSettings {
@@ -62,7 +62,7 @@ export function resolveCompanyBranding(
     email: s.company_email?.trim() || null,
     website: s.company_website?.trim() || DEFAULT_WEBSITE,
     invoiceTerms: s.invoice_terms?.trim() || STANDARD_INVOICE_TERMS,
-    estimateTerms: s.estimate_terms?.trim() || STANDARD_ESTIMATE_TERMS,
+    estimateTerms: s.estimate_terms?.trim() || STANDARD_ESTIMATE_NOTES,
     logoPath: accountId ? resolveLogoPath(accountId, s.logo_filename) : null,
   };
 }
