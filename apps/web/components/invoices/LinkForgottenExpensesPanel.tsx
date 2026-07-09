@@ -117,7 +117,7 @@ export function LinkForgottenExpensesPanel({
   if (loading) return null;
   if (isInvoice) {
     if (expenses.length === 0 && !error) return null;
-  } else if (expenses.length === 0) {
+  } else if (expenses.length === 0 && !success) {
     return null;
   }
 
