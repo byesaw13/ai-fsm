@@ -12,8 +12,8 @@ import { DocumentPrintBar } from "@/components/documents/DocumentPrintBar";
 import { PaidStamp } from "@/components/invoices/PaidStamp";
 import { formatLineQuantityDisplay } from "@/lib/invoices/quantity";
 import {
-  INVOICE_DOCUMENT_JOINS,
-  INVOICE_LOCATION_SELECT,
+  documentJoins,
+  documentLocationSelect,
   resolveServiceLocation,
 } from "@/lib/documents/service-location";
 
@@ -83,10 +83,10 @@ export default async function InvoicePrintPage({
          i.notes, i.due_date, i.sent_at, i.created_at,
          j.title AS job_title,
          a.name AS account_name, a.settings AS account_settings,
-         ${INVOICE_LOCATION_SELECT}
+         ${documentLocationSelect({ includeEstimateProperty: true })}
        FROM invoices i
        JOIN accounts a ON a.id = i.account_id
-       ${INVOICE_DOCUMENT_JOINS}
+       ${documentJoins({ root: "i", includeEstimateProperty: true })}
        WHERE i.id = $1 AND i.account_id = $2`,
       [id, session.accountId],
     );
