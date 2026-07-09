@@ -44,6 +44,12 @@ RUN sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|' \
       packages/log/package.json \
       packages/money/package.json \
       packages/email-templates/package.json \
+ && sed -i \
+      -e 's|"./src/web.ts"|"./dist/web.js"|g' \
+      -e 's|"./src/worker.ts"|"./dist/worker.js"|g' \
+      -e 's|"./src/mcp.ts"|"./dist/mcp.js"|g' \
+      -e 's|"./src/index.ts"|"./dist/index.js"|g' \
+      packages/log/package.json \
  && mkdir -p node_modules/@ai-fsm \
  && ln -s ../../packages/log node_modules/@ai-fsm/log \
  && ln -s ../../packages/money node_modules/@ai-fsm/money \
