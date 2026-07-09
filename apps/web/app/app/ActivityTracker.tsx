@@ -13,7 +13,7 @@ import {
   type ActivityCategory,
   type AssignmentKind,
 } from "@ai-fsm/domain";
-import { summarizeDay, formatMinutes, type DayEntry } from "@/lib/activities/summary";
+import { summarizeDay, formatMinutes, formatElapsed, type DayEntry } from "@/lib/activities/summary";
 
 export type ActivityEntryDto = DayEntry & {
   id: string;
@@ -39,13 +39,6 @@ function assignmentLabel(entry: ActivityEntryDto | null): string | null {
 // ---------------------------------------------------------------------------
 // Now bar — what am I doing right now, with one-tap switching
 // ---------------------------------------------------------------------------
-
-function elapsedLabel(startedAt: string, nowMs: number): string {
-  const mins = Math.max(0, Math.floor((nowMs - new Date(startedAt).getTime()) / 60000));
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return h > 0 ? `${h}:${String(m).padStart(2, "0")}` : `0:${String(m).padStart(2, "0")}`;
-}
 
 export function NowBar({
   active,
@@ -168,7 +161,7 @@ export function NowBar({
                 )}
               </div>
               <span style={{ fontSize: "var(--text-2xl)", fontWeight: 800, fontVariantNumeric: "tabular-nums", letterSpacing: "-0.02em" }}>
-                {elapsedLabel(displayStartedAt, nowMs)}
+                {formatElapsed(displayStartedAt, nowMs)}
               </span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "var(--space-1)" }}>

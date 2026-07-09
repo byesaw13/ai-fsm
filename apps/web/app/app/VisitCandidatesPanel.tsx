@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Badge, SectionHeader, LocalTime, useToast, ConfirmDialog } from "@/components/ui";
 import type { VisitClassification } from "@ai-fsm/domain";
-import { proposeRebalance, type RebalanceAdjustment, type TimelineEntry } from "@/lib/activities/timeline";
+import { asTimelineEntry, proposeRebalance, type RebalanceAdjustment } from "@/lib/activities/timeline";
 import type { ActivityEntryDto } from "./ActivityTracker";
 
 // EPIC-007: detected customer visits awaiting review. The owner classifies each
@@ -43,13 +43,8 @@ export function VisitCandidatesPanel({ day, entries }: { day?: string; entries: 
     rebalance: RebalanceAdjustment[];
   } | null>(null);
 
-  function timelineEntries(): TimelineEntry[] {
-    return entries.map((e) => ({
-      id: e.id,
-      activity_type: e.activity_type,
-      started_at: e.started_at,
-      ended_at: e.ended_at,
-    }));
+  function timelineEntries() {
+    return entries.map(asTimelineEntry);
   }
 
   const load = useCallback(async () => {

@@ -17,6 +17,16 @@ export interface TimelineEntry {
   ended_at: string | null;   // null = still active
 }
 
+/** Narrow a DTO-like row to the fields proposeRebalance needs. */
+export function asTimelineEntry(e: {
+  id: string;
+  activity_type: string;
+  started_at: string;
+  ended_at: string | null;
+}): TimelineEntry {
+  return { id: e.id, activity_type: e.activity_type, started_at: e.started_at, ended_at: e.ended_at };
+}
+
 /** A completed block we are about to split. */
 export interface SplitTarget {
   started_at: string;        // ISO
@@ -130,36 +140,4 @@ export function proposeRebalance(
     }
   }
   return adjustments;
-}
-
-export interface ChronologyIssue {
-  kind: "overlap" | "reversed";
-  a: string; // entry id
-  b: string; // entry id (overlap) or same id (reversed bounds)
-}
-
-/**
- * Validate that completed entries are ordered and non-overlapping. The active
- * entry (ended_at null) is ignored. Returns every issue found (empty = clean).
- */
-export function validateChronology(entries: TimelineEntry[]): ChronologyIssue[] {
-  const issues: ChronologyIssue[] = [];
-  const completed = entries
-    .filter((e) => e.ended_at != null)
-    .sort((x, y) => ms(x.started_at) - ms(y.started_at));
-
-  for (const e of completed) {
-    if (!(ms(e.ended_at as string) > ms(e.started_at))) {
-      issues.push({ kind: "reversed", a: e.id, b: e.id });
-    }
-  }
-
-  for (let i = 0; i < completed.length - 1; i++) {
-    const cur = completed[i];
-    const next = completed[i + 1];
-    if (ms(cur.ended_at as string) > ms(next.started_at)) {
-      issues.push({ kind: "overlap", a: cur.id, b: next.id });
-    }
-  }
-  return issues;
 }

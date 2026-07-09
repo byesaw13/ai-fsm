@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { splitSegments, proposeRebalance, validateChronology, type TimelineEntry } from "../timeline";
+import { splitSegments, proposeRebalance, type TimelineEntry } from "../timeline";
 
 const T = (h: number, m = 0) => `2026-06-11T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00.000Z`;
 
@@ -81,37 +81,5 @@ describe("proposeRebalance", () => {
     const withActive: TimelineEntry[] = [...entries, { id: "c", activity_type: "job_work", started_at: T(16), ended_at: null }];
     const adj = proposeRebalance(withActive, { started_at: T(16, 30), ended_at: T(17) });
     expect(adj.find((x) => x.id === "c")).toBeUndefined();
-  });
-});
-
-describe("validateChronology", () => {
-  it("returns no issues for an ordered, non-overlapping day", () => {
-    const entries: TimelineEntry[] = [
-      { id: "a", activity_type: "travel", started_at: T(7), ended_at: T(8) },
-      { id: "b", activity_type: "job_work", started_at: T(8), ended_at: T(11) },
-    ];
-    expect(validateChronology(entries)).toEqual([]);
-  });
-
-  it("flags an overlap between consecutive entries", () => {
-    const entries: TimelineEntry[] = [
-      { id: "a", activity_type: "travel", started_at: T(7), ended_at: T(9) },
-      { id: "b", activity_type: "job_work", started_at: T(8), ended_at: T(11) },
-    ];
-    expect(validateChronology(entries)).toContainEqual({ kind: "overlap", a: "a", b: "b" });
-  });
-
-  it("flags a reversed block (end before start)", () => {
-    const entries: TimelineEntry[] = [
-      { id: "a", activity_type: "travel", started_at: T(9), ended_at: T(8) },
-    ];
-    expect(validateChronology(entries)).toContainEqual({ kind: "reversed", a: "a", b: "a" });
-  });
-
-  it("ignores the active entry", () => {
-    const entries: TimelineEntry[] = [
-      { id: "a", activity_type: "job_work", started_at: T(7), ended_at: null },
-    ];
-    expect(validateChronology(entries)).toEqual([]);
   });
 });

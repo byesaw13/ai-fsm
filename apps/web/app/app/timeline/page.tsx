@@ -7,7 +7,6 @@ import { LocationSegmentsPanel } from "../LocationSegmentsPanel";
 import { VisitCandidatesPanel } from "../VisitCandidatesPanel";
 import { ManualSiteVisitButton } from "../ManualSiteVisitButton";
 import { DayMapPanel } from "../DayMapPanel";
-import { LocationDebugPanel } from "../LocationDebugPanel";
 import type { ActivityEntryDto } from "../ActivityTracker";
 
 export const dynamic = "force-dynamic";
@@ -90,9 +89,6 @@ export default async function TimelinePage({
       </div>
       <div style={{ marginTop: "var(--space-6)" }}>
         <LocationSegmentsPanel day={day} entries={entries} />
-      </div>
-      <div style={{ marginTop: "var(--space-6)" }}>
-        <LocationDebugPanel day={day} />
       </div>
     </PageContainer>
   );

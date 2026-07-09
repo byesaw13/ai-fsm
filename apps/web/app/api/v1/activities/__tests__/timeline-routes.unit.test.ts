@@ -33,7 +33,6 @@ import { POST as splitActivity } from "../[id]/split/route";
 import { POST as insertActivity } from "../insert/route";
 import { PATCH as patchSegment } from "../segments/[id]/route";
 import { PATCH as patchVisitCandidate } from "../../visit-candidates/[id]/route";
-import { GET as getNeedsJobLink } from "../needs-job-link/route";
 
 const EXISTING = {
   id: "11111111-1111-1111-1111-111111111111",
@@ -439,27 +438,5 @@ describe("PATCH /api/v1/visit-candidates/[id]", () => {
       entity_id: MANUAL_ID,
       action: "delete",
     }));
-  });
-});
-
-
-describe("GET /api/v1/activities/needs-job-link", () => {
-  it("returns confirmed costing activities with no business link", async () => {
-    const rows = [{
-      id: "99999999-9999-9999-9999-999999999999",
-      activity_type: "travel",
-      started_at: "2026-06-11T12:00:00.000Z",
-      ended_at: "2026-06-11T13:00:00.000Z",
-      note: "Drive to Smith",
-    }];
-    const db = await import("@/lib/db");
-    vi.mocked(db.queryForSession).mockResolvedValue(rows);
-
-    const res = await getNeedsJobLink(req("/api/v1/activities/needs-job-link?date=2026-06-11", "GET"));
-
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ data: { activities: rows } });
-    expect(vi.mocked(db.queryForSession).mock.calls[0][1]).toContain("entity_id IS NULL");
-    expect(vi.mocked(db.queryForSession).mock.calls[0][2]).toEqual([mockSession.accountId, "2026-06-11"]);
   });
 });

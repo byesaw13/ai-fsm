@@ -9,7 +9,7 @@ import {
   type ActivityType,
 } from "@ai-fsm/domain";
 import { DayTimeSummary, type ActivityEntryDto } from "./ActivityTracker";
-import { proposeRebalance, type RebalanceAdjustment, type TimelineEntry } from "@/lib/activities/timeline";
+import { asTimelineEntry, proposeRebalance, type RebalanceAdjustment } from "@/lib/activities/timeline";
 
 // ---------------------------------------------------------------------------
 // Time helpers — the page works in one local day; <input type="time"> values
@@ -35,13 +35,7 @@ function shiftDay(day: string, deltaDays: number): string {
   return d.toLocaleDateString("en-CA");
 }
 
-function toTimelineEntry(e: ActivityEntryDto): TimelineEntry {
-  return { id: e.id, activity_type: e.activity_type, started_at: e.started_at, ended_at: e.ended_at };
-}
-
 // ---------------------------------------------------------------------------
-
-export type TimelineEditorEntry = ActivityEntryDto;
 
 type NeedsJobLinkRow = {
   id: string;
@@ -117,7 +111,7 @@ export function TimelineEditor({
     () => [...entries].sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime()),
     [entries]
   );
-  const timelineEntries = useMemo(() => sorted.map(toTimelineEntry), [sorted]);
+  const timelineEntries = useMemo(() => sorted.map(asTimelineEntry), [sorted]);
 
   // Offer to clamp/drop neighbours when a change overlaps them. Declining the
   // offer aborts the save — committing the change without rebalancing would

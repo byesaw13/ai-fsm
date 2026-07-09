@@ -86,3 +86,12 @@ export function formatMinutes(mins: number): string {
   if (m === 0) return `${h}h`;
   return `${h}h ${m}m`;
 }
+
+/** Elapsed wall time from start ISO to now (or given end ms). */
+export function formatElapsed(
+  startedAt: string,
+  endMs: number = Date.now(),
+): string {
+  const mins = Math.max(0, Math.floor((endMs - new Date(startedAt).getTime()) / 60000));
+  return formatMinutes(mins);
+}
