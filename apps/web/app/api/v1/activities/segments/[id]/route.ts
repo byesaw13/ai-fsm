@@ -5,7 +5,12 @@ import { withAuth, type AuthSession } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { ACTIVITY_TYPES, ACTIVITY_ENTITY_TYPES, activityCategoryFor } from "@ai-fsm/domain";
-import { applyRebalance, rebalanceCoversOverlaps } from "@/lib/activities/rebalance";
+import {
+  applyRebalance,
+  resolveOverlapRebalance,
+  type OverlapRow,
+} from "@/lib/activities/rebalance";
+import type { RebalanceAdjustment } from "@/lib/activities/timeline";
 import { confirmDriveTrip, type DriveSegmentRow } from "@/lib/mileage/confirm-trip";
 import { inferTripMilesSource } from "@/lib/mileage/linking";
 
@@ -75,30 +80,55 @@ function estimatedMilesFromSegment(seg: SegRow): number | null {
   return Math.round((seg.distance_meters / 1609.344) * 10) / 10;
 }
 
-async function assertNoOverlap(
+/**
+ * Server-owned overlap resolution: soft trims/stop-clock auto-apply;
+ * deletes require client rebalance; otherwise 409 with proposed_rebalance.
+ */
+async function resolveSegmentOverlaps(
   client: PoolClient,
   accountId: string,
   startedAt: string,
   endedAt: string,
-  rebalance: z.infer<typeof rebalanceSchema>,
+  clientRebalance: z.infer<typeof rebalanceSchema>,
   traceId: string,
-): Promise<NextResponse | null> {
-  const { rows: overlap } = await client.query<{ id: string; started_at: string; ended_at: string | null }>(
-    `SELECT id, started_at::text, ended_at::text FROM activity_entries
+): Promise<{ ok: true; rebalance: RebalanceAdjustment[] } | { ok: false; response: NextResponse }> {
+  const { rows: overlap } = await client.query<OverlapRow & { activity_type: string }>(
+    `SELECT id, activity_type, started_at::text, ended_at::text FROM activity_entries
      WHERE account_id = $1 AND voided_at IS NULL
        AND started_at < $3 AND COALESCE(ended_at, 'infinity'::timestamptz) > $2
      FOR UPDATE`,
     [accountId, startedAt, endedAt],
   );
-  if (!rebalanceCoversOverlaps(overlap, rebalance, { started_at: startedAt, ended_at: endedAt })) {
-    return err(
-      "CONFLICT",
-      "This time range overlaps activity already logged. Adjust it in the timeline or dismiss the segment.",
-      409,
-      traceId,
-    );
+  const resolved = resolveOverlapRebalance({
+    overlaps: overlap,
+    entriesForProposal: overlap.map((r) => ({
+      id: r.id,
+      activity_type: r.activity_type,
+      started_at: r.started_at,
+      ended_at: r.ended_at,
+    })),
+    change: { started_at: startedAt, ended_at: endedAt },
+    clientRebalance: clientRebalance as RebalanceAdjustment[] | undefined,
+  });
+  if (resolved.ok) {
+    return { ok: true, rebalance: resolved.rebalance };
   }
-  return null;
+  return {
+    ok: false,
+    response: NextResponse.json(
+      {
+        error: {
+          code: resolved.code,
+          message: resolved.message,
+          proposed_rebalance: resolved.proposed_rebalance,
+          overlaps: resolved.overlaps,
+          requires_delete_confirm: resolved.requires_delete_confirm,
+          traceId,
+        },
+      },
+      { status: 409 },
+    ),
+  };
 }
 
 export const PATCH = withAuth(async (request: NextRequest, session: AuthSession) => {
@@ -180,7 +210,7 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
         });
       }
 
-      const overlapErr = await assertNoOverlap(
+      const overlapRes = await resolveSegmentOverlaps(
         client,
         session.accountId,
         seg.started_at,
@@ -188,15 +218,15 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
         d.rebalance,
         session.traceId,
       );
-      if (overlapErr) {
+      if (!overlapRes.ok) {
         await client.query("ROLLBACK");
-        return overlapErr;
+        return overlapRes.response;
       }
 
       await applyRebalance(
         client,
         { accountId: session.accountId, userId: session.userId, traceId: session.traceId },
-        d.rebalance,
+        overlapRes.rebalance,
       );
 
       const result = await confirmDriveTrip(client, {
@@ -329,7 +359,7 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       return err("CONFLICT", "Segment is still in progress; label it once it ends.", 409, session.traceId);
     }
 
-    const overlapErr = await assertNoOverlap(
+    const overlapRes = await resolveSegmentOverlaps(
       client,
       session.accountId,
       seg.started_at,
@@ -337,9 +367,9 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       d.rebalance,
       session.traceId,
     );
-    if (overlapErr) {
+    if (!overlapRes.ok) {
       await client.query("ROLLBACK");
-      return overlapErr;
+      return overlapRes.response;
     }
 
     const category = activityCategoryFor(d.activity_type);
@@ -373,7 +403,7 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     await applyRebalance(
       client,
       { accountId: session.accountId, userId: session.userId, traceId: session.traceId },
-      d.rebalance,
+      overlapRes.rebalance,
     );
 
     await client.query(

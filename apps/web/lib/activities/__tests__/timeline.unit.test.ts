@@ -77,9 +77,32 @@ describe("proposeRebalance", () => {
     expect(adj.find((x) => x.id === "a")).toBeUndefined();
   });
 
-  it("ignores the active (open) entry", () => {
-    const withActive: TimelineEntry[] = [...entries, { id: "c", activity_type: "job_work", started_at: T(16), ended_at: null }];
+  it("stops an open activity that started before the change (stop the clock)", () => {
+    const withActive: TimelineEntry[] = [
+      ...entries,
+      { id: "c", activity_type: "job_work", started_at: T(16), ended_at: null },
+    ];
     const adj = proposeRebalance(withActive, { started_at: T(16, 30), ended_at: T(17) });
-    expect(adj.find((x) => x.id === "c")).toBeUndefined();
+    expect(adj).toContainEqual({ id: "c", ended_at: T(16, 30) });
+  });
+
+  it("shifts an open activity that started during the change", () => {
+    const withActive: TimelineEntry[] = [
+      { id: "c", activity_type: "job_work", started_at: T(16, 15), ended_at: null },
+    ];
+    const adj = proposeRebalance(withActive, { started_at: T(16), ended_at: T(17) });
+    expect(adj).toContainEqual({ id: "c", started_at: T(17) });
+  });
+});
+
+describe("rebalanceCoversOverlaps + open activities", () => {
+  // Imported inline to keep this file focused; covers check lives in rebalance.ts
+  it("accepts closing an open overlap with ended_at", async () => {
+    const { rebalanceCoversOverlaps } = await import("../rebalance");
+    const change = { started_at: T(16, 30), ended_at: T(17) };
+    const overlaps = [{ id: "c", started_at: T(16), ended_at: null as string | null }];
+    expect(
+      rebalanceCoversOverlaps(overlaps, [{ id: "c", ended_at: T(16, 30) }], change),
+    ).toBe(true);
   });
 });

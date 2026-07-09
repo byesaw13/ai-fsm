@@ -9,7 +9,12 @@ import {
   type ActivityType,
 } from "@ai-fsm/domain";
 import { DayTimeSummary, type ActivityEntryDto } from "./ActivityTracker";
-import { asTimelineEntry, proposeRebalance, type RebalanceAdjustment } from "@/lib/activities/timeline";
+import {
+  asTimelineEntry,
+  proposeRebalance,
+  rebalanceHasDeletes,
+  type RebalanceAdjustment,
+} from "@/lib/activities/timeline";
 
 // ---------------------------------------------------------------------------
 // Time helpers — the page works in one local day; <input type="time"> values
@@ -113,16 +118,18 @@ export function TimelineEditor({
   );
   const timelineEntries = useMemo(() => sorted.map(asTimelineEntry), [sorted]);
 
-  // Offer to clamp/drop neighbours when a change overlaps them. Declining the
-  // offer aborts the save — committing the change without rebalancing would
-  // leave overlapping rows that inflate tracked time.
+  // Soft trims + stop-clock: apply without dialog. Deletes: confirm first.
   async function resolveRebalance(change: { id?: string; started_at: string; ended_at: string }):
     Promise<{ proceed: true; rebalance: RebalanceAdjustment[] } | { proceed: false }> {
     const proposed = proposeRebalance(timelineEntries, change);
     if (proposed.length === 0) return { proceed: true, rebalance: [] };
+    if (!rebalanceHasDeletes(proposed)) {
+      return { proceed: true, rebalance: proposed };
+    }
     const drops = proposed.filter((p) => p.delete).length;
-    const detail = drops > 0 ? ` (${drops} fully-covered ${drops === 1 ? "entry" : "entries"} will be removed)` : "";
-    const body = `This overlaps ${proposed.length} surrounding ${proposed.length === 1 ? "activity" : "activities"}${detail}. Adjust ${proposed.length === 1 ? "it" : "them"} to keep the timeline consistent.`;
+    const body =
+      `This fully covers ${drops} existing ${drops === 1 ? "activity" : "activities"}. ` +
+      `Confirm to archive ${drops === 1 ? "it" : "them"} and keep the timeline consistent.`;
     const ok = await new Promise<boolean>((resolve) => {
       rebalanceResolveRef.current = resolve;
       setRebalanceConfirm({ body });
@@ -130,19 +137,70 @@ export function TimelineEditor({
     return ok ? { proceed: true, rebalance: proposed } : { proceed: false };
   }
 
-  async function send(url: string, method: string, body: unknown, okMsg: string): Promise<boolean> {
+  async function send(
+    url: string,
+    method: string,
+    body: unknown,
+    okMsg: string,
+  ): Promise<boolean> {
     setPending(true);
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    setPending(false);
     if (!res.ok) {
       const json = await res.json().catch(() => ({}));
+      const proposed = json.error?.proposed_rebalance as RebalanceAdjustment[] | undefined;
+      // Server-owned proposal (e.g. open activity the client missed): accept deletes or retry soft.
+      if (res.status === 409 && Array.isArray(proposed) && proposed.length > 0) {
+        const needsConfirm = json.error?.requires_delete_confirm === true || rebalanceHasDeletes(proposed);
+        if (!needsConfirm) {
+          const retry = await fetch(url, {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...(body as object), rebalance: proposed }),
+          });
+          setPending(false);
+          if (retry.ok) {
+            toast.success(okMsg);
+            router.refresh();
+            return true;
+          }
+          const retryJson = await retry.json().catch(() => ({}));
+          toast.error(retryJson.error?.message ?? "Something went wrong");
+          return false;
+        }
+        const ok = await new Promise<boolean>((resolve) => {
+          rebalanceResolveRef.current = resolve;
+          setRebalanceConfirm({
+            body: json.error?.message ?? "This overlaps existing activity. Confirm to archive and continue.",
+          });
+        });
+        if (!ok) {
+          setPending(false);
+          return false;
+        }
+        const retry = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...(body as object), rebalance: proposed }),
+        });
+        setPending(false);
+        if (!retry.ok) {
+          const retryJson = await retry.json().catch(() => ({}));
+          toast.error(retryJson.error?.message ?? "Something went wrong");
+          return false;
+        }
+        toast.success(okMsg);
+        router.refresh();
+        return true;
+      }
+      setPending(false);
       toast.error(json.error?.message ?? "Something went wrong");
       return false;
     }
+    setPending(false);
     toast.success(okMsg);
     router.refresh();
     return true;

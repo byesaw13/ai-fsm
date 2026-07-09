@@ -4,7 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Badge, SectionHeader, LocalTime, useToast, ConfirmDialog } from "@/components/ui";
 import type { VisitClassification } from "@ai-fsm/domain";
-import { asTimelineEntry, proposeRebalance, type RebalanceAdjustment } from "@/lib/activities/timeline";
+import {
+  asTimelineEntry,
+  proposeRebalance,
+  rebalanceHasDeletes,
+  type RebalanceAdjustment,
+} from "@/lib/activities/timeline";
 import type { ActivityEntryDto } from "./ActivityTracker";
 
 // EPIC-007: detected customer visits awaiting review. The owner classifies each
@@ -75,6 +80,27 @@ export function VisitCandidatesPanel({ day, entries }: { day?: string; entries: 
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
+        const proposed = json.error?.proposed_rebalance as RebalanceAdjustment[] | undefined;
+        if (res.status === 409 && Array.isArray(proposed) && proposed.length > 0) {
+          if (!json.error?.requires_delete_confirm && !rebalanceHasDeletes(proposed)) {
+            const retry = await fetch(`/api/v1/visit-candidates/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ...body, rebalance: proposed }),
+            });
+            if (retry.ok) {
+              toast.success(successMsg);
+              await load();
+              router.refresh();
+              return;
+            }
+            const retryJson = await retry.json().catch(() => ({}));
+            toast.error(retryJson.error?.message ?? "Could not update visit");
+            return;
+          }
+          setConfirmReplace({ id, body: { ...body, rebalance: proposed }, rebalance: proposed });
+          return;
+        }
         toast.error(json.error?.message ?? "Could not update visit");
         return;
       }
@@ -132,11 +158,11 @@ export function VisitCandidatesPanel({ day, entries }: { day?: string; entries: 
                       started_at: c.arrival_time,
                       ended_at: c.departure_time,
                     });
-                    if (rebalance.length > 0) {
-                      setConfirmReplace({ id: c.id, body, rebalance });
+                    if (rebalance.length === 0 || !rebalanceHasDeletes(rebalance)) {
+                      void patch(c.id, { ...body, rebalance }, "Logged to your day");
                       return;
                     }
-                    void patch(c.id, body, "Logged to your day");
+                    setConfirmReplace({ id: c.id, body: { ...body, rebalance }, rebalance });
                   }}
                 >
                   {b.label}
@@ -156,18 +182,14 @@ export function VisitCandidatesPanel({ day, entries }: { day?: string; entries: 
       </div>
       <ConfirmDialog
         open={confirmReplace !== null}
-        title="Replace manual activity?"
-        body="This detected visit overlaps manual time. Confirming will archive the original manual activity for reporting and prevent double-counted time."
+        title="Archive overlapping activity?"
+        body="This visit fully covers existing time on your ledger. Confirming archives those blocks so minutes are not double-counted."
         confirmLabel="Confirm and archive"
         onConfirm={() => {
           const pendingReplace = confirmReplace;
           setConfirmReplace(null);
           if (pendingReplace) {
-            void patch(
-              pendingReplace.id,
-              { ...pendingReplace.body, rebalance: pendingReplace.rebalance },
-              "Logged to your day",
-            );
+            void patch(pendingReplace.id, pendingReplace.body, "Logged to your day");
           }
         }}
         onCancel={() => setConfirmReplace(null)}
