@@ -11,9 +11,17 @@ import { buildClientDocumentFilename } from "@ai-fsm/domain";
 import {
   buildInvoicePdf,
   buildEstimatePdf,
+  toDocumentBranding,
   type PdfLineItem,
   type EstimateOptionGroup,
 } from "./document-pdf";
+import { resolveCompanyBranding, type CompanyProfileSettings } from "@/lib/company/branding";
+import {
+  DOCUMENT_LOCATION_SELECT,
+  documentJoins,
+  resolveServiceLocation,
+} from "@/lib/documents/service-location";
+import { parseLineQuantity } from "@/lib/invoices/quantity";
 
 export interface LoadedPdf {
   filename: string;
@@ -26,7 +34,7 @@ export interface LoadedPdf {
 function mapLineItems(rows: Array<Record<string, unknown>>): PdfLineItem[] {
   return rows.map((r) => ({
     description: String(r.description ?? ""),
-    quantity: Number(r.quantity ?? 0),
+    quantity: parseLineQuantity(r.quantity),
     unitPriceCents: Number(r.unit_price_cents ?? 0),
     totalCents: Number(r.total_cents ?? 0),
   }));
@@ -47,23 +55,29 @@ export async function loadInvoicePdf(
 ): Promise<LoadedPdf | null> {
   const { rows, rowCount } = await client.query(
     `SELECT i.id, i.invoice_number, i.status, i.subtotal_cents, i.tax_cents,
-            i.total_cents, i.paid_cents, i.due_date, i.notes, i.sent_at, i.created_at,
-            c.id AS client_id, c.name AS client_name, c.email AS client_email,
+            i.total_cents, i.paid_cents, i.paid_at, i.due_date, i.notes, i.sent_at, i.created_at,
+            c.id AS client_id,
             j.title AS job_title,
-            p.address AS property_address
+            a.name AS account_name, a.settings AS account_settings,
+            ${DOCUMENT_LOCATION_SELECT}
      FROM invoices i
-     JOIN clients c ON c.id = i.client_id
-     LEFT JOIN jobs j ON j.id = i.job_id
-     LEFT JOIN properties p ON p.id = i.property_id
+     JOIN accounts a ON a.id = i.account_id
+     ${documentJoins({ root: "i", includeEstimateProperty: true })}
      WHERE i.id = $1 AND i.account_id = $2`,
     [id, accountId],
   );
   if (!rowCount) return null;
   const inv = rows[0];
+  const accountSettings = (inv.account_settings ?? {}) as CompanyProfileSettings;
+  const branding = resolveCompanyBranding(
+    String(inv.account_name ?? ""),
+    accountSettings,
+    accountId,
+  );
 
   // Match the customer portal: never expose internal-only line items.
   const lineItems = await client.query(
-    `SELECT description, quantity, unit_price_cents, total_cents
+    `SELECT description, quantity::float8 AS quantity, unit_price_cents, total_cents
      FROM invoice_line_items WHERE invoice_id = $1
        AND visible_to_customer = true
      ORDER BY sort_order ASC, created_at ASC`,
@@ -76,14 +90,26 @@ export async function loadInvoicePdf(
     clientName: inv.client_name as string | null,
     clientEmail: inv.client_email as string | null,
     jobTitle: inv.job_title as string | null,
-    propertyAddress: inv.property_address as string | null,
+    propertyAddress: resolveServiceLocation({
+      property_address: inv.property_address as string | null,
+      property_city: inv.property_city as string | null,
+      property_state: inv.property_state as string | null,
+      property_zip: inv.property_zip as string | null,
+      client_address_line1: inv.client_address_line1 as string | null,
+      client_city: inv.client_city as string | null,
+      client_state: inv.client_state as string | null,
+      client_zip: inv.client_zip as string | null,
+    }),
     issueDate: (inv.sent_at ?? inv.created_at) as string | null,
     dueDate: inv.due_date as string | null,
     subtotalCents: Number(inv.subtotal_cents ?? 0),
     taxCents: Number(inv.tax_cents ?? 0),
     totalCents: Number(inv.total_cents ?? 0),
     paidCents: Number(inv.paid_cents ?? 0),
+    paidAt: inv.paid_at as string | null,
     notes: inv.notes as string | null,
+    paymentTerms: branding.invoiceTerms,
+    branding: toDocumentBranding(branding),
     lineItems: mapLineItems(lineItems.rows),
   });
 
@@ -112,18 +138,24 @@ export async function loadEstimatePdf(
   const { rows, rowCount } = await client.query(
     `SELECT e.id, e.status, e.presentation_mode, e.subtotal_cents, e.tax_cents, e.total_cents,
             e.deposit_cents, e.expires_at, e.notes, e.sent_at, e.created_at,
-            c.id AS client_id, c.name AS client_name, c.email AS client_email,
+            c.id AS client_id,
             j.title AS job_title,
-            p.address AS property_address
+            a.name AS account_name, a.settings AS account_settings,
+            ${DOCUMENT_LOCATION_SELECT}
      FROM estimates e
-     JOIN clients c ON c.id = e.client_id
-     LEFT JOIN jobs j ON j.id = e.job_id
-     LEFT JOIN properties p ON p.id = e.property_id
+     JOIN accounts a ON a.id = e.account_id
+     ${documentJoins({ root: "e" })}
      WHERE e.id = $1 AND e.account_id = $2`,
     [id, accountId],
   );
   if (!rowCount) return null;
   const est = rows[0];
+  const accountSettings = (est.account_settings ?? {}) as CompanyProfileSettings;
+  const branding = resolveCompanyBranding(
+    String(est.account_name ?? ""),
+    accountSettings,
+    accountId,
+  );
 
   const lineItems = await client.query(
     `SELECT description, quantity, unit_price_cents, total_cents
@@ -172,7 +204,16 @@ export async function loadEstimatePdf(
     clientName: est.client_name as string | null,
     clientEmail: est.client_email as string | null,
     jobTitle: est.job_title as string | null,
-    propertyAddress: est.property_address as string | null,
+    propertyAddress: resolveServiceLocation({
+      property_address: est.property_address as string | null,
+      property_city: est.property_city as string | null,
+      property_state: est.property_state as string | null,
+      property_zip: est.property_zip as string | null,
+      client_address_line1: est.client_address_line1 as string | null,
+      client_city: est.client_city as string | null,
+      client_state: est.client_state as string | null,
+      client_zip: est.client_zip as string | null,
+    }),
     issueDate: (est.sent_at ?? est.created_at) as string | null,
     expiresDate: est.expires_at as string | null,
     subtotalCents: Number(est.subtotal_cents ?? 0),
@@ -180,6 +221,8 @@ export async function loadEstimatePdf(
     totalCents: Number(est.total_cents ?? 0),
     depositCents: Number(est.deposit_cents ?? 0),
     notes: est.notes as string | null,
+    estimateTerms: branding.estimateTerms,
+    branding: toDocumentBranding(branding),
     lineItems: mapLineItems(lineItems.rows),
     options,
   });
