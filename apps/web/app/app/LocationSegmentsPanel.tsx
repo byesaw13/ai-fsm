@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Select, Badge, SectionHeader, EmptyState, LocalTime, useToast, ConfirmDialog } from "@/components/ui";
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_META, type ActivityType } from "@ai-fsm/domain";
-import { proposeRebalance, type RebalanceAdjustment, type TimelineEntry } from "@/lib/activities/timeline";
+import { asTimelineEntry, proposeRebalance, type RebalanceAdjustment } from "@/lib/activities/timeline";
 import { formatElapsed } from "@/lib/activities/summary";
 import { segmentConfidenceLevel } from "@/lib/location/segment-confidence";
 import type { ActivityEntryDto } from "./ActivityTracker";
@@ -61,13 +61,8 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
     successMsg: string;
   } | null>(null);
 
-  function timelineEntries(): TimelineEntry[] {
-    return entries.map((e) => ({
-      id: e.id,
-      activity_type: e.activity_type,
-      started_at: e.started_at,
-      ended_at: e.ended_at,
-    }));
+  function timelineEntries() {
+    return entries.map(asTimelineEntry);
   }
 
   function defaultVehicleId(seg: Segment): string {

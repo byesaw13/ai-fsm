@@ -17,6 +17,16 @@ export interface TimelineEntry {
   ended_at: string | null;   // null = still active
 }
 
+/** Narrow a DTO-like row to the fields proposeRebalance needs. */
+export function asTimelineEntry(e: {
+  id: string;
+  activity_type: string;
+  started_at: string;
+  ended_at: string | null;
+}): TimelineEntry {
+  return { id: e.id, activity_type: e.activity_type, started_at: e.started_at, ended_at: e.ended_at };
+}
+
 /** A completed block we are about to split. */
 export interface SplitTarget {
   started_at: string;        // ISO
