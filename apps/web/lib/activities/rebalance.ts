@@ -108,14 +108,20 @@ export async function applyRebalance(
     // Include open rows so we can stop the clock (set ended_at).
     const existing = await client.query<{
       id: string;
+      user_id: string;
       activity_type: string;
+      category: string;
       started_at: string;
       ended_at: string | null;
       entity_type: string | null;
       entity_id: string | null;
       note: string | null;
+      source: string;
+      assignment_kind: string | null;
+      labor_bucket: string | null;
     }>(
-      `SELECT id, activity_type, started_at::text, ended_at::text, entity_type, entity_id, note
+      `SELECT id, user_id, activity_type, category, started_at::text, ended_at::text,
+              entity_type, entity_id, note, source, assignment_kind, labor_bucket
          FROM activity_entries
         WHERE id = $1 AND account_id = $2 AND voided_at IS NULL
         FOR UPDATE`,
@@ -170,8 +176,59 @@ export async function applyRebalance(
         reason: nowClosed
           ? "rebalanced (stopped open activity for timeline correction)"
           : "rebalanced (trimmed by timeline correction)",
+        preserve_tail: adj.preserve_tail ?? null,
       },
     });
+
+    // Re-insert the trailing portion after a spanning trim so soft auto-rebalance
+    // does not drop post-change minutes (e.g. 13:00–14:00 after inserting 12–13).
+    if (adj.preserve_tail) {
+      const tail = adj.preserve_tail;
+      if (new Date(tail.ended_at) > new Date(tail.started_at)) {
+        const ins = await client.query<{ id: string }>(
+          `INSERT INTO activity_entries
+             (account_id, user_id, session_date, activity_type, category,
+              started_at, ended_at, entity_type, entity_id, source, note,
+              assignment_kind, labor_bucket)
+           VALUES (
+             $1, $2, ($3::timestamptz)::date, $4, $5,
+             $3::timestamptz, $6::timestamptz, $7, $8, $9, $10,
+             $11, $12
+           )
+           RETURNING id`,
+          [
+            ctx.accountId,
+            row.user_id,
+            tail.started_at,
+            row.activity_type,
+            row.category,
+            tail.ended_at,
+            row.entity_type,
+            row.entity_id,
+            row.source,
+            row.note,
+            row.assignment_kind,
+            row.labor_bucket,
+          ],
+        );
+        await appendAuditLog(client, {
+          account_id: ctx.accountId,
+          entity_type: "activity_entry",
+          entity_id: ins.rows[0].id,
+          action: "insert",
+          actor_id: ctx.userId,
+          trace_id: ctx.traceId,
+          old_value: null,
+          new_value: {
+            activity_type: row.activity_type,
+            started_at: tail.started_at,
+            ended_at: tail.ended_at,
+            split_from: row.id,
+            reason: "rebalanced (preserved tail after spanning trim)",
+          },
+        });
+      }
+    }
   }
 }
 

@@ -29,6 +29,10 @@ const insertSchema = z.object({
       started_at: z.string().datetime().optional(),
       ended_at: z.string().datetime().optional(),
       delete: z.boolean().optional(),
+      preserve_tail: z.object({
+        started_at: z.string().datetime(),
+        ended_at: z.string().datetime(),
+      }).optional(),
     })
   ).optional(),
 }).refine((d) => (d.entity_type == null) === (d.entity_id == null), {

@@ -47,14 +47,23 @@ export interface SplitSegment {
 
 /**
  * A proposed change to one neighbour so the timeline stays consistent: either
- * clamp its bounds, close an open activity, or — when the change fully engulfs
- * a completed block — drop it (`delete`).
+ * clamp its bounds, close an open activity, split a spanning block (trim + tail),
+ * or — when the change fully engulfs a completed block — drop it (`delete`).
  */
 export interface RebalanceAdjustment {
   id: string;
   started_at?: string;
   ended_at?: string;
   delete?: boolean;
+  /**
+   * When a completed entry spans both sides of the change (starts before and
+   * ends after), trim the head via ended_at and re-insert the trailing portion
+   * after the change so soft auto-rebalance does not silently drop time.
+   */
+  preserve_tail?: {
+    started_at: string;
+    ended_at: string;
+  };
 }
 
 const ms = (iso: string): number => new Date(iso).getTime();
@@ -134,9 +143,19 @@ export function proposeRebalance(
       continue;
     }
 
-    if (eStart < changeStart && eEnd > changeStart) {
+    if (eStart < changeStart && eEnd > changeEnd) {
+      // Spans the whole change: keep head before + tail after (do not drop 13–14 when
+      // inserting 12–13 into an 11–14 block).
+      adjustments.push({
+        id: e.id,
+        ended_at: change.started_at,
+        preserve_tail: { started_at: change.ended_at, ended_at: e.ended_at as string },
+      });
+    } else if (eStart < changeStart && eEnd > changeStart) {
+      // Runs into the change from before but ends inside/at it → trim end only.
       adjustments.push({ id: e.id, ended_at: change.started_at });
     } else if (eStart < changeEnd && eEnd > changeEnd) {
+      // Starts inside the change and runs past it → push start forward.
       adjustments.push({ id: e.id, started_at: change.ended_at });
     } else {
       adjustments.push({ id: e.id, delete: true });
