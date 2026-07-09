@@ -292,11 +292,83 @@ describe("PATCH /api/v1/activities/segments/[id]", () => {
     expect(json.data.miles_source).toBe("bt_gps_estimate");
   });
 
-  it("keeps rejecting overlap without an accepted rebalance", async () => {
+  it("auto-soft-rebalances a spanning overlap and preserves the trailing tail", async () => {
+    // Segment 12:00–13:00 overlaps manual 11:00–14:00 → trim head + re-insert 13:00–14:00.
+    let insertCount = 0;
+    mockClientQuery.mockImplementation((sql: string) => {
+      if (sql.includes("FROM location_segments")) return Promise.resolve({ rows: [PROVISIONAL_SEGMENT] });
+      if (sql.includes("FROM activity_entries") && sql.includes("FOR UPDATE") && sql.includes("SELECT id, user_id")) {
+        return Promise.resolve({
+          rows: [{
+            id: MANUAL_ID,
+            user_id: mockSession.userId,
+            activity_type: "job_work",
+            category: "revenue",
+            started_at: "2026-06-11T11:00:00.000Z",
+            ended_at: "2026-06-11T14:00:00.000Z",
+            entity_type: null,
+            entity_id: null,
+            note: null,
+            source: "manual",
+            assignment_kind: null,
+            labor_bucket: null,
+          }],
+        });
+      }
+      if (sql.includes("FROM activity_entries") && sql.includes("FOR UPDATE")) {
+        return Promise.resolve({
+          rows: [{
+            id: MANUAL_ID,
+            activity_type: "job_work",
+            started_at: "2026-06-11T11:00:00.000Z",
+            ended_at: "2026-06-11T14:00:00.000Z",
+          }],
+        });
+      }
+      if (sql.startsWith("SELECT id FROM business_days")) return Promise.resolve({ rows: [] });
+      if (sql.startsWith("INSERT INTO activity_entries")) {
+        insertCount += 1;
+        return Promise.resolve({ rows: [{ id: insertCount === 1 ? "new-soft-entry" : "tail-entry" }] });
+      }
+      if (sql.startsWith("UPDATE activity_entries")) {
+        return Promise.resolve({
+          rows: [{
+            id: MANUAL_ID,
+            activity_type: "job_work",
+            started_at: "2026-06-11T11:00:00.000Z",
+            ended_at: "2026-06-11T12:00:00.000Z",
+            entity_type: null,
+            entity_id: null,
+            note: null,
+          }],
+        });
+      }
+      if (sql.startsWith("UPDATE location_segments")) return Promise.resolve({ rows: [] });
+      return Promise.resolve({ rows: [] });
+    });
+
+    const res = await patchSegment(req(`/api/v1/activities/segments/${SEGMENT_ID}`, "PATCH", {
+      action: "confirm",
+      activity_type: "job_work",
+    }));
+
+    expect(res.status).toBe(200);
+    // Segment entry + preserved tail
+    expect(insertCount).toBeGreaterThanOrEqual(2);
+  });
+
+  it("returns proposed_rebalance when delete confirm is required", async () => {
+    // Segment fully engulfs a shorter completed block → delete proposal.
+    const engulfed = {
+      id: MANUAL_ID,
+      activity_type: "admin",
+      started_at: "2026-06-11T12:15:00.000Z",
+      ended_at: "2026-06-11T12:45:00.000Z",
+    };
     mockClientQuery.mockImplementation((sql: string) => {
       if (sql.includes("FROM location_segments")) return Promise.resolve({ rows: [PROVISIONAL_SEGMENT] });
       if (sql.includes("FROM activity_entries") && sql.includes("FOR UPDATE")) {
-        return Promise.resolve({ rows: [{ id: MANUAL_ID, started_at: "2026-06-11T11:00:00.000Z", ended_at: "2026-06-11T14:00:00.000Z" }] });
+        return Promise.resolve({ rows: [engulfed] });
       }
       return Promise.resolve({ rows: [] });
     });
@@ -307,14 +379,24 @@ describe("PATCH /api/v1/activities/segments/[id]", () => {
     }));
 
     expect(res.status).toBe(409);
+    const json = await res.json();
+    expect(json.error.proposed_rebalance).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: MANUAL_ID, delete: true })]),
+    );
+    expect(json.error.requires_delete_confirm).toBe(true);
+    expect(mockClientQuery.mock.calls.some((call) => String(call[0]).startsWith("INSERT INTO activity_entries"))).toBe(false);
   });
-
 
   it("rejects a rebalance that does not cover every current overlap", async () => {
     mockClientQuery.mockImplementation((sql: string) => {
       if (sql.includes("FROM location_segments")) return Promise.resolve({ rows: [PROVISIONAL_SEGMENT] });
       if (sql.includes("FROM activity_entries") && sql.includes("FOR UPDATE")) {
-        return Promise.resolve({ rows: [{ id: MANUAL_ID }, { id: "55555555-5555-5555-5555-555555555555" }] });
+        return Promise.resolve({
+          rows: [
+            { id: MANUAL_ID, activity_type: "job_work", started_at: "2026-06-11T12:10:00.000Z", ended_at: "2026-06-11T12:20:00.000Z" },
+            { id: "55555555-5555-5555-5555-555555555555", activity_type: "admin", started_at: "2026-06-11T12:30:00.000Z", ended_at: "2026-06-11T12:50:00.000Z" },
+          ],
+        });
       }
       return Promise.resolve({ rows: [] });
     });
@@ -333,7 +415,9 @@ describe("PATCH /api/v1/activities/segments/[id]", () => {
     mockClientQuery.mockImplementation((sql: string) => {
       if (sql.includes("FROM location_segments")) return Promise.resolve({ rows: [PROVISIONAL_SEGMENT] });
       if (sql.includes("FROM activity_entries") && sql.includes("FOR UPDATE")) {
-        return Promise.resolve({ rows: [{ id: MANUAL_ID }] });
+        return Promise.resolve({
+          rows: [{ id: MANUAL_ID, activity_type: "job_work", started_at: "2026-06-11T12:15:00.000Z", ended_at: "2026-06-11T12:45:00.000Z" }],
+        });
       }
       return Promise.resolve({ rows: [] });
     });
@@ -347,7 +431,6 @@ describe("PATCH /api/v1/activities/segments/[id]", () => {
     expect(res.status).toBe(409);
     expect(mockClientQuery.mock.calls.some((call) => String(call[0]).startsWith("INSERT INTO activity_entries"))).toBe(false);
   });
-
 
   it("rejects a rebalance payload when there is no current overlap", async () => {
     mockClientQuery.mockImplementation((sql: string) => {

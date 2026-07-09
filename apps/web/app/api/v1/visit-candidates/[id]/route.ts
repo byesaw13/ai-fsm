@@ -4,7 +4,12 @@ import { withAuth, type AuthSession } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { canViewReports } from "@/lib/auth/permissions";
 import { logger } from "@/lib/logger";
-import { applyRebalance, rebalanceCoversOverlaps } from "@/lib/activities/rebalance";
+import {
+  applyRebalance,
+  resolveOverlapRebalance,
+  type OverlapRow,
+} from "@/lib/activities/rebalance";
+import type { RebalanceAdjustment } from "@/lib/activities/timeline";
 import {
   VISIT_CLASSIFICATIONS,
   CLASSIFICATION_TO_ACTIVITY,
@@ -32,6 +37,10 @@ const rebalanceSchema = z.array(z.object({
   started_at: z.string().datetime().optional(),
   ended_at: z.string().datetime().optional(),
   delete: z.boolean().optional(),
+  preserve_tail: z.object({
+    started_at: z.string().datetime(),
+    ended_at: z.string().datetime(),
+  }).optional(),
 })).optional();
 
 const bodySchema = z.object({
@@ -114,20 +123,38 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     }
 
     // confirm — refuse to double-count time already in the ledger.
-    const { rows: overlap } = await client.query<{ id: string; started_at: string; ended_at: string | null }>(
-      `SELECT id, started_at::text, ended_at::text FROM activity_entries
+    const { rows: overlap } = await client.query<OverlapRow & { activity_type: string }>(
+      `SELECT id, activity_type, started_at::text, ended_at::text FROM activity_entries
        WHERE account_id = $1 AND voided_at IS NULL
          AND started_at < $3 AND COALESCE(ended_at, 'infinity'::timestamptz) > $2
        FOR UPDATE`,
       [session.accountId, cand.arrival_time, cand.departure_time],
     );
-    if (!rebalanceCoversOverlaps(overlap, d.rebalance, { started_at: cand.arrival_time, ended_at: cand.departure_time })) {
+    const resolved = resolveOverlapRebalance({
+      overlaps: overlap,
+      entriesForProposal: overlap.map((r) => ({
+        id: r.id,
+        activity_type: r.activity_type,
+        started_at: r.started_at,
+        ended_at: r.ended_at,
+      })),
+      change: { started_at: cand.arrival_time, ended_at: cand.departure_time },
+      clientRebalance: d.rebalance as RebalanceAdjustment[] | undefined,
+    });
+    if (!resolved.ok) {
       await client.query("ROLLBACK");
-      return err(
-        "CONFLICT",
-        "This time overlaps activity already logged. Resolve it in the timeline first.",
-        409,
-        session.traceId,
+      return NextResponse.json(
+        {
+          error: {
+            code: resolved.code,
+            message: resolved.message,
+            proposed_rebalance: resolved.proposed_rebalance,
+            overlaps: resolved.overlaps,
+            requires_delete_confirm: resolved.requires_delete_confirm,
+            traceId: session.traceId,
+          },
+        },
+        { status: 409 },
       );
     }
 
@@ -159,7 +186,7 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     await applyRebalance(
       client,
       { accountId: session.accountId, userId: session.userId, traceId: session.traceId },
-      d.rebalance,
+      resolved.rebalance,
     );
 
     await client.query(

@@ -3,8 +3,7 @@ import type { ActivityType } from "@ai-fsm/domain";
 /**
  * Pure timeline-correction math over activity entries: splitting a block into
  * contiguous segments, proposing minimal neighbour adjustments to keep the day
- * chronological ("rebalancing"), and detecting overlaps. No I/O — the API
- * routes own the transaction, audit, and persistence.
+ * chronological ("rebalancing"). No I/O — the API routes own the transaction.
  *
  * All times are ISO strings; helpers convert to epoch millis internally and
  * return ISO strings so callers never juggle Date objects.
@@ -13,8 +12,8 @@ import type { ActivityType } from "@ai-fsm/domain";
 export interface TimelineEntry {
   id: string;
   activity_type: string;
-  started_at: string;        // ISO
-  ended_at: string | null;   // null = still active
+  started_at: string; // ISO
+  ended_at: string | null; // null = still active
 }
 
 /** Narrow a DTO-like row to the fields proposeRebalance needs. */
@@ -24,47 +23,59 @@ export function asTimelineEntry(e: {
   started_at: string;
   ended_at: string | null;
 }): TimelineEntry {
-  return { id: e.id, activity_type: e.activity_type, started_at: e.started_at, ended_at: e.ended_at };
+  return {
+    id: e.id,
+    activity_type: e.activity_type,
+    started_at: e.started_at,
+    ended_at: e.ended_at,
+  };
 }
 
 /** A completed block we are about to split. */
 export interface SplitTarget {
-  started_at: string;        // ISO
-  ended_at: string;          // ISO (split only applies to completed blocks)
+  started_at: string;
+  ended_at: string;
   activity_type: ActivityType;
 }
 
 /** One segment a split produces, ready to become an activity_entries row. */
 export interface SplitSegment {
   activity_type: ActivityType;
-  started_at: string;        // ISO
-  ended_at: string;          // ISO
+  started_at: string;
+  ended_at: string;
 }
 
 /**
  * A proposed change to one neighbour so the timeline stays consistent: either
- * clamp its bounds, or — when the change fully engulfs it — drop it (`delete`),
- * since no non-zero duration would avoid the overlap.
+ * clamp its bounds, close an open activity, split a spanning block (trim + tail),
+ * or — when the change fully engulfs a completed block — drop it (`delete`).
  */
 export interface RebalanceAdjustment {
   id: string;
-  started_at?: string;       // ISO
-  ended_at?: string;         // ISO
+  started_at?: string;
+  ended_at?: string;
   delete?: boolean;
+  /**
+   * When a completed entry spans both sides of the change (starts before and
+   * ends after), trim the head via ended_at and re-insert the trailing portion
+   * after the change so soft auto-rebalance does not silently drop time.
+   */
+  preserve_tail?: {
+    started_at: string;
+    ended_at: string;
+  };
 }
 
 const ms = (iso: string): number => new Date(iso).getTime();
 const iso = (millis: number): string => new Date(millis).toISOString();
 
+export function rebalanceHasDeletes(adjustments: RebalanceAdjustment[]): boolean {
+  return adjustments.some((a) => a.delete === true);
+}
+
 /**
  * Split a completed block at one or more interior boundary times into N
- * contiguous segments that exactly cover [started_at, ended_at] with no gaps or
- * overlaps. The first segment keeps the original's type; callers re-type the
- * later segments afterwards (the common case is one block becoming
- * Travel → Job Work → Travel).
- *
- * Boundaries must be strictly inside the block and strictly increasing.
- * Throws on any boundary at/outside the bounds or out of order.
+ * contiguous segments that exactly cover [started_at, ended_at].
  */
 export function splitSegments(target: SplitTarget, boundaries: string[]): SplitSegment[] {
   const start = ms(target.started_at);
@@ -98,18 +109,13 @@ export function splitSegments(target: SplitTarget, boundaries: string[]): SplitS
 }
 
 /**
- * Given the day's existing entries and a single change (an edit that moved a
- * block's bounds, or a newly inserted block), propose the minimal set of
- * neighbour adjustments that remove any overlap the change introduced.
+ * Propose neighbour adjustments so `change` does not overlap existing entries.
  *
- * Strategy: clamp the entry immediately before the change's start (pull its
- * `ended_at` back to the change's start) and the entry immediately after the
- * change's end (push its `started_at` forward to the change's end), but only
- * when they actually overlap the change. The changed entry itself is excluded
- * by `changeId` so an edit doesn't try to adjust the row being edited.
+ * Open activities (ended_at null) are first-class:
+ * - started before change → close at change.started_at ("stop the clock")
+ * - started inside change → push open start to change.ended_at
  *
- * Returns at most one adjustment per neighbour. Callers present this as the
- * "Adjust surrounding activities?" offer and apply it in the same transaction.
+ * Completed blocks use trim/delete as before.
  */
 export function proposeRebalance(
   entries: TimelineEntry[],
@@ -121,21 +127,37 @@ export function proposeRebalance(
 
   for (const e of entries) {
     if (change.id != null && e.id === change.id) continue;
-    if (e.ended_at == null) continue; // never reshape the active block
     const eStart = ms(e.started_at);
-    const eEnd = ms(e.ended_at);
+    const isOpen = e.ended_at == null;
+    const eEnd = isOpen ? Number.POSITIVE_INFINITY : ms(e.ended_at as string);
     if (eEnd <= changeStart || eStart >= changeEnd) continue; // no overlap
 
-    if (eStart < changeStart && eEnd > changeStart) {
-      // Neighbour starts before and runs into the change → pull its end back.
+    if (isOpen) {
+      if (eStart < changeStart) {
+        // Active work started before the new block → stop it when the block starts.
+        adjustments.push({ id: e.id, ended_at: change.started_at });
+      } else {
+        // Active work started during the new block → reopen after it ends.
+        adjustments.push({ id: e.id, started_at: change.ended_at });
+      }
+      continue;
+    }
+
+    if (eStart < changeStart && eEnd > changeEnd) {
+      // Spans the whole change: keep head before + tail after (do not drop 13–14 when
+      // inserting 12–13 into an 11–14 block).
+      adjustments.push({
+        id: e.id,
+        ended_at: change.started_at,
+        preserve_tail: { started_at: change.ended_at, ended_at: e.ended_at as string },
+      });
+    } else if (eStart < changeStart && eEnd > changeStart) {
+      // Runs into the change from before but ends inside/at it → trim end only.
       adjustments.push({ id: e.id, ended_at: change.started_at });
     } else if (eStart < changeEnd && eEnd > changeEnd) {
-      // Neighbour starts inside the change and runs past it → push start forward.
+      // Starts inside the change and runs past it → push start forward.
       adjustments.push({ id: e.id, started_at: change.ended_at });
     } else {
-      // Neighbour is fully engulfed by the change; no valid non-zero duration
-      // avoids the overlap, so propose dropping it (clamping to a zero-width
-      // seam would violate the ended_at > started_at constraint).
       adjustments.push({ id: e.id, delete: true });
     }
   }

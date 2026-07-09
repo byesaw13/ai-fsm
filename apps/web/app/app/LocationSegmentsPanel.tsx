@@ -4,7 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Select, Badge, SectionHeader, EmptyState, LocalTime, useToast, ConfirmDialog } from "@/components/ui";
 import { ACTIVITY_TYPES, ACTIVITY_TYPE_META, type ActivityType } from "@ai-fsm/domain";
-import { asTimelineEntry, proposeRebalance, type RebalanceAdjustment } from "@/lib/activities/timeline";
+import {
+  asTimelineEntry,
+  proposeRebalance,
+  rebalanceHasDeletes,
+  type RebalanceAdjustment,
+} from "@/lib/activities/timeline";
 import { formatElapsed } from "@/lib/activities/summary";
 import { segmentConfidenceLevel } from "@/lib/location/segment-confidence";
 import type { ActivityEntryDto } from "./ActivityTracker";
@@ -131,6 +136,34 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
+        const proposed = json.error?.proposed_rebalance as RebalanceAdjustment[] | undefined;
+        if (res.status === 409 && Array.isArray(proposed) && proposed.length > 0) {
+          // Server-owned proposal: soft auto-retry; deletes need confirm.
+          if (!json.error?.requires_delete_confirm && !rebalanceHasDeletes(proposed)) {
+            const retry = await fetch(`/api/v1/activities/segments/${id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ...body, rebalance: proposed }),
+            });
+            if (retry.ok) {
+              toast.success(successMsg);
+              await load();
+              router.refresh();
+              window.dispatchEvent(new CustomEvent("fsm:segments-changed"));
+              return;
+            }
+            const retryJson = await retry.json().catch(() => ({}));
+            toast.error(retryJson.error?.message ?? "Could not update segment");
+            return;
+          }
+          setConfirmReplace({
+            id,
+            body: { ...body, rebalance: proposed },
+            rebalance: proposed,
+            successMsg,
+          });
+          return;
+        }
         toast.error(json.error?.message ?? "Could not update segment");
         return;
       }
@@ -141,6 +174,25 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
     } finally {
       setPending(null);
     }
+  }
+
+  function maybeConfirmThenPatch(
+    id: string,
+    body: Record<string, unknown>,
+    startedAt: string,
+    endedAt: string,
+    successMsg: string,
+  ) {
+    const rebalance = proposeRebalance(timelineEntries(), {
+      started_at: startedAt,
+      ended_at: endedAt,
+    });
+    // Soft only (stop open work / trim) — send without dialog; server also auto-softs.
+    if (rebalance.length === 0 || !rebalanceHasDeletes(rebalance)) {
+      void patch(id, { ...body, rebalance }, successMsg);
+      return;
+    }
+    setConfirmReplace({ id, body: { ...body, rebalance }, rebalance, successMsg });
   }
 
   function confirmDrive(seg: Segment) {
@@ -161,29 +213,13 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
       activity_type: choice[seg.id] ?? defaultActivity(seg),
     };
     if (!seg.ended_at) return;
-    const rebalance = proposeRebalance(timelineEntries(), {
-      started_at: seg.started_at,
-      ended_at: seg.ended_at,
-    });
-    if (rebalance.length > 0) {
-      setConfirmReplace({ id: seg.id, body, rebalance, successMsg: "Trip logged — time and mileage linked" });
-      return;
-    }
-    void patch(seg.id, body, "Trip logged — time and mileage linked");
+    maybeConfirmThenPatch(seg.id, body, seg.started_at, seg.ended_at, "Trip logged — time and mileage linked");
   }
 
   function confirmStop(seg: Segment) {
     const body = { action: "confirm", activity_type: choice[seg.id] ?? defaultActivity(seg) };
     if (!seg.ended_at) return;
-    const rebalance = proposeRebalance(timelineEntries(), {
-      started_at: seg.started_at,
-      ended_at: seg.ended_at,
-    });
-    if (rebalance.length > 0) {
-      setConfirmReplace({ id: seg.id, body, rebalance, successMsg: "Logged to your day" });
-      return;
-    }
-    void patch(seg.id, body, "Logged to your day");
+    maybeConfirmThenPatch(seg.id, body, seg.started_at, seg.ended_at, "Logged to your day");
   }
 
   const provisional = segments.filter((s) => s.status === "provisional");
@@ -334,18 +370,14 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
       )}
       <ConfirmDialog
         open={confirmReplace !== null}
-        title="Replace manual activity?"
-        body="This auto-captured activity overlaps manual time. Confirming will archive the original manual activity for reporting and prevent double-counted time."
+        title="Archive overlapping activity?"
+        body="This fully covers existing time on your ledger. Confirming archives those blocks (still in audit) so minutes are not double-counted."
         confirmLabel="Confirm and archive"
         onConfirm={() => {
           const pendingReplace = confirmReplace;
           setConfirmReplace(null);
           if (pendingReplace) {
-            void patch(
-              pendingReplace.id,
-              { ...pendingReplace.body, rebalance: pendingReplace.rebalance },
-              pendingReplace.successMsg,
-            );
+            void patch(pendingReplace.id, pendingReplace.body, pendingReplace.successMsg);
           }
         }}
         onCancel={() => setConfirmReplace(null)}
