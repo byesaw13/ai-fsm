@@ -496,7 +496,6 @@ export default async function JobDetailPage({
           hasActiveVisit={activeExecutionVisits.length > 0}
           activeVisitId={activeExecutionVisits[0]?.id ?? null}
           latestVisitId={latestVisit?.id ?? null}
-          invoiceCount={invoiceCount}
           hasUnpaidInvoice={commercialCounts.has_unpaid_invoice}
           hasPaidInvoice={commercialCounts.has_paid_invoice}
           latestInvoiceId={commercialCounts.latest_invoice_id}

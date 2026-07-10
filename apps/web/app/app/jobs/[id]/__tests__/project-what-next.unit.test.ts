@@ -34,7 +34,6 @@ function baseProps(overrides: Partial<ProjectWhatNextProps> = {}): ProjectWhatNe
     hasActiveVisit: false,
     activeVisitId: null,
     latestVisitId: null,
-    invoiceCount: 0,
     hasUnpaidInvoice: false,
     hasPaidInvoice: false,
     latestInvoiceId: null,
@@ -152,7 +151,6 @@ describe("computeWhatNext — money, field, T&M", () => {
       baseProps({
         jobStatus: "completed",
         stage: "completed",
-        invoiceCount: 0,
         approvedEstimateId: ESTIMATE_ID,
       }),
     );
@@ -163,13 +161,33 @@ describe("computeWhatNext — money, field, T&M", () => {
     expect(next.actionHref).toContain(`approved_estimate_id=${ESTIMATE_ID}`);
   });
 
+  it("opens existing invoice when completed with draft final (or deposit already on file)", () => {
+    const next = computeWhatNext(
+      baseProps({
+        jobStatus: "completed",
+        stage: "completed",
+        hasDepositInvoice: true,
+        depositPaid: true,
+        hasApprovedEstimate: true,
+        approvedEstimateId: ESTIMATE_ID,
+        latestInvoiceId: INVOICE_ID,
+        hasUnpaidInvoice: false, // draft is not "unpaid" in commercial counts
+      }),
+    );
+
+    expect(next.message).toMatch(/Work complete/);
+    expect(next.actionLabel).toBe("Open Invoice");
+    expect(next.actionHref).toBe(`/app/invoices/${INVOICE_ID}`);
+    // Must not fall through to "schedule the work"
+    expect(next.message).not.toMatch(/schedule/i);
+  });
+
   it("T&M completed copy mentions time and materials", () => {
     const next = computeWhatNext(
       baseProps({
         jobStatus: "completed",
         stage: "completed",
         pricingMode: "hourly_internal",
-        invoiceCount: 0,
       }),
     );
 

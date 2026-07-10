@@ -26,7 +26,6 @@ export interface ProjectWhatNextProps {
   hasActiveVisit: boolean;
   activeVisitId: string | null;
   latestVisitId: string | null;
-  invoiceCount: number;
   hasUnpaidInvoice: boolean;
   hasPaidInvoice: boolean;
   latestInvoiceId: string | null;
@@ -83,7 +82,6 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
     hasActiveVisit,
     activeVisitId,
     latestVisitId,
-    invoiceCount,
     hasUnpaidInvoice,
     hasPaidInvoice,
     latestInvoiceId,
@@ -121,17 +119,33 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
     };
   }
 
-  if (jobStatus === "completed" && invoiceCount === 0) {
+  // Completed always means close-out — even when a deposit or auto-draft final
+  // invoice already exists. Drafts are not counted as hasUnpaidInvoice.
+  if (jobStatus === "completed") {
     const estimateParam = approvedEstimateId ? `&approved_estimate_id=${approvedEstimateId}` : "";
+    const extras = approvedEstimateId
+      ? [{ label: "Open approved estimate", href: `/app/estimates/${approvedEstimateId}` }]
+      : undefined;
+
+    if (latestInvoiceId) {
+      return {
+        message: isTm
+          ? "Work complete — review and send the invoice"
+          : "Work complete — review and send the final invoice",
+        actionLabel: "Open Invoice",
+        actionHref: `/app/invoices/${latestInvoiceId}`,
+        secondary: { label: "All invoices", href: `/app/invoices?job_id=${jobId}` },
+        extras,
+      };
+    }
+
     return {
       message: isTm
         ? "Work complete — invoice actual time and materials"
         : "Work complete — send the final invoice",
       actionLabel: "Create Invoice",
       actionHref: `/app/invoices/new?job_id=${jobId}${cq}${estimateParam}`,
-      extras: approvedEstimateId
-        ? [{ label: "Open approved estimate", href: `/app/estimates/${approvedEstimateId}` }]
-        : undefined,
+      extras,
     };
   }
 
