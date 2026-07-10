@@ -6,7 +6,6 @@ import { getSession } from "@/lib/auth/session";
 import { queryForSession, queryOneForSession } from "@/lib/db";
 import { formatVisitTime, isVisitOverdue } from "@/lib/visits/formatting";
 import {
-  canCreateInvoices,
   canManageExpenses,
   canTransitionJob,
   canCreateVisit,
@@ -21,8 +20,7 @@ import { JobEditForm } from "./JobEditFormWrapper";
 import { JobIntakePanel } from "./JobIntakePanel";
 import { AssetLinksPanel } from "./AssetLinksPanel";
 import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
-import { JobCommandPanel } from "./JobCommandPanel";
-import { WhatNextBanner } from "./WhatNextBanner";
+import { ProjectWhatNext } from "./ProjectWhatNext";
 import { VendorCoordinationCard } from "./VendorCoordinationCard";
 import { JobWorkOrdersPanel, type JobWorkOrderRow } from "./JobWorkOrdersPanel";
 import { LinkForgottenExpensesPanel } from "@/components/invoices/LinkForgottenExpensesPanel";
@@ -298,7 +296,6 @@ export default async function JobDetailPage({
   const canTransition = canTransitionJob(session.role);
   const canAddVisit = canCreateVisit(session.role);
   const canDelete = canDeleteRecords(session.role);
-  const canCreateInvoice = canCreateInvoices(session.role);
   const canLinkExpenses = canManageExpenses(session.role);
   const isTech = session.role === "tech";
 
@@ -482,42 +479,33 @@ export default async function JobDetailPage({
       />
 
       {!isTech && commercialCounts && (
-        <>
-          <WhatNextBanner
-            jobId={job.id}
-            clientId={job.client_id ?? null}
-            jobStatus={currentStatus}
-            estimateCount={estimateCount}
-            hasSentEstimate={commercialCounts.has_sent_estimate}
-            lastEstimateSentAt={commercialCounts.last_estimate_sent_at}
-            hasApprovedEstimate={commercialCounts.has_approved_estimate}
-            approvedEstimateId={commercialCounts.approved_estimate_id}
-            hasDepositInvoice={commercialCounts.has_deposit_invoice}
-            depositPaid={commercialCounts.deposit_paid}
-            hasActiveVisit={activeExecutionVisits.length > 0}
-            invoiceCount={invoiceCount}
-            hasUnpaidInvoice={commercialCounts.has_unpaid_invoice}
-            hasPaidInvoice={commercialCounts.has_paid_invoice}
-            latestInvoiceId={commercialCounts.latest_invoice_id}
-            hasOpenPreSaleSiteVisit={openPreSaleSiteVisits.length > 0}
-            hasCompletedPreSaleSiteVisit={hasCompletedPreSaleSiteVisit}
-            hasExpiredEstimate={expiredEstimateCount > 0}
-            latestExpiredEstimateId={commercialCounts.latest_expired_estimate_id}
-            hasDraftWorkOrderWithPricing={commercialCounts.has_draft_work_order_with_pricing}
-            preSaleSiteVisitId={openPreSaleSiteVisit?.id ?? null}
-          />
-          <JobCommandPanel
-            stage={pipelineStage}
-            jobId={job.id}
-            clientId={job.client_id ?? null}
-            bookingRequestId={commercialCounts.booking_request_id}
-            pricingMode={commercialCounts.booking_pricing_mode as "flat_rate" | "hourly_internal" | null}
-            activeVisitId={activeExecutionVisits[0]?.id ?? null}
-            latestVisitId={latestVisit?.id ?? null}
-            approvedEstimateId={commercialCounts.approved_estimate_id}
-            latestInvoiceId={commercialCounts.latest_invoice_id}
-          />
-        </>
+        <ProjectWhatNext
+          jobId={job.id}
+          clientId={job.client_id ?? null}
+          jobStatus={currentStatus}
+          stage={pipelineStage}
+          pricingMode={commercialCounts.booking_pricing_mode as "flat_rate" | "hourly_internal" | null}
+          bookingRequestId={commercialCounts.booking_request_id}
+          estimateCount={estimateCount}
+          hasSentEstimate={commercialCounts.has_sent_estimate}
+          lastEstimateSentAt={commercialCounts.last_estimate_sent_at}
+          hasApprovedEstimate={commercialCounts.has_approved_estimate}
+          approvedEstimateId={commercialCounts.approved_estimate_id}
+          hasDepositInvoice={commercialCounts.has_deposit_invoice}
+          depositPaid={commercialCounts.deposit_paid}
+          hasActiveVisit={activeExecutionVisits.length > 0}
+          activeVisitId={activeExecutionVisits[0]?.id ?? null}
+          latestVisitId={latestVisit?.id ?? null}
+          hasUnpaidInvoice={commercialCounts.has_unpaid_invoice}
+          hasPaidInvoice={commercialCounts.has_paid_invoice}
+          latestInvoiceId={commercialCounts.latest_invoice_id}
+          hasOpenPreSaleSiteVisit={openPreSaleSiteVisits.length > 0}
+          hasCompletedPreSaleSiteVisit={hasCompletedPreSaleSiteVisit}
+          hasExpiredEstimate={expiredEstimateCount > 0}
+          latestExpiredEstimateId={commercialCounts.latest_expired_estimate_id}
+          hasDraftWorkOrderWithPricing={commercialCounts.has_draft_work_order_with_pricing}
+          preSaleSiteVisitId={openPreSaleSiteVisit?.id ?? null}
+        />
       )}
 
       {/* Detail Hub Layout: two-column on desktop, stacked on mobile */}
@@ -791,15 +779,6 @@ export default async function JobDetailPage({
                       >
                         {invoiceCount} invoice{invoiceCount !== 1 ? "s" : ""} →
                       </Link>
-                    ) : canCreateInvoice && ["completed", "in_progress"].includes(currentStatus) ? (
-                      <LinkButton
-                        href={`/app/invoices/new?job_id=${job.id}${job.client_id ? `&client_id=${job.client_id}` : ""}${commercialCounts?.approved_estimate_id ? `&approved_estimate_id=${commercialCounts.approved_estimate_id}` : ""}`}
-                        variant="primary"
-                        size="sm"
-                        data-testid="create-invoice-from-job-btn"
-                      >
-                        + Create Invoice
-                      </LinkButton>
                     ) : (
                       <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>None</span>
                     )}
