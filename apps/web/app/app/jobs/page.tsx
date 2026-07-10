@@ -284,11 +284,12 @@ export default async function JobsPage({ searchParams }: PageProps) {
           data-testid="jobs-empty"
         />
       ) : isBoardView ? (
-        // Kanban pipeline board
+        // Kanban pipeline board — drag cards to change status (owner/admin)
         <JobBoard
           jobs={jobs}
           statusLabels={JOB_STATUS_LABELS}
           statusOrder={JOB_STATUS_ORDER}
+          canDrag={canCreate}
         />
       ) : hasFilter ? (
         // Flat list when filtered
