@@ -71,6 +71,11 @@ function formatAging(days: number | null): string | null {
   return null;
 }
 
+/** Aging/overdue only applies while money is still open. */
+function isOpenBalance(status: InvoiceStatus): boolean {
+  return status === "sent" || status === "partial" || status === "overdue" || status === "draft";
+}
+
 export default async function InvoicesPage() {
   const session = await getSession();
   if (!session) redirect("/login");
@@ -189,10 +194,21 @@ export default async function InvoicesPage() {
             >
               {grouped[status].map((inv) => {
                 const amountDue = inv.total_cents - inv.paid_cents;
-                const daysUntilDue = getDaysUntilDue(inv.due_date);
+                const open = isOpenBalance(inv.status);
+                const daysUntilDue = open ? getDaysUntilDue(inv.due_date) : null;
                 const aging = formatAging(daysUntilDue);
-                const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
-                const isDueSoon = daysUntilDue !== null && daysUntilDue >= 0 && daysUntilDue <= 7;
+                // Past due_date alone must not mark paid/void invoices overdue
+                // (e.g. Gina INV-0019 paid same day but due_date still in the past).
+                const isOverdue = open && daysUntilDue !== null && daysUntilDue < 0;
+                const isDueSoon = open && daysUntilDue !== null && daysUntilDue >= 0 && daysUntilDue <= 7;
+                const dueLabel =
+                  inv.status === "paid"
+                    ? "Paid"
+                    : inv.status === "void"
+                      ? "Void"
+                      : inv.due_date
+                        ? aging || `Due ${new Date(inv.due_date).toLocaleDateString()}`
+                        : null;
 
                 return (
                   <ItemCard
@@ -206,14 +222,14 @@ export default async function InvoicesPage() {
                     }
                     meta={
                       <span style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", fontSize: "var(--text-sm)" }}>
-                        {inv.due_date && (
+                        {dueLabel && (
                           <span style={{ color: isOverdue ? "var(--color-danger)" : isDueSoon ? "var(--color-warning)" : "var(--fg-muted)" }}>
-                            {aging || `Due ${new Date(inv.due_date).toLocaleDateString()}`}
+                            {dueLabel}
                           </span>
                         )}
                         <span style={{ color: "var(--fg-muted)" }}>·</span>
                         <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}>{formatDollars(inv.total_cents)}</span>
-                        {amountDue > 0 && (
+                        {amountDue > 0 && open && (
                           <span style={{ color: "var(--color-danger)", fontFamily: "var(--font-mono)" }}>
                             {formatDollars(amountDue)} due
                           </span>
