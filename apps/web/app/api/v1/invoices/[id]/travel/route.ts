@@ -258,33 +258,50 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
 
       if (invoice.job_id && data.billing_mode === "actual" && manualMiles == null) {
         // Prefer vehicle_sessions (source of truth for odometer/mileage capture).
-        // Sessions linked via vehicle_session_activities.entity_type = 'job'.
-        // Fall back to legacy mileage_logs when no session miles exist.
+        // Sessions may link as entity_type='job' OR entity_type='visit' (sessions UI).
+        // Dedupe by session id so a session tagged with both job + visit is counted once.
+        // Fall back to mileage_logs (job_id or visit→job) when no session miles exist.
         const sessions = await client.query<{ total_miles: string }>(
-          `SELECT COALESCE(
-                    SUM(COALESCE(s.miles, (s.end_odometer - s.start_odometer)::numeric)),
-                    0
-                  )::text AS total_miles
-           FROM vehicle_sessions s
-           JOIN vehicle_session_activities a ON a.session_id = s.id
-           WHERE s.account_id = $1
-             AND a.entity_type = 'job'
-             AND a.entity_id = $2
-             AND s.status IS DISTINCT FROM 'voided'
-             AND (
-               s.miles IS NOT NULL
-               OR (s.start_odometer IS NOT NULL AND s.end_odometer IS NOT NULL)
-             )`,
+          `SELECT COALESCE(SUM(session_miles), 0)::text AS total_miles
+           FROM (
+             SELECT DISTINCT ON (s.id)
+                    s.id,
+                    COALESCE(s.miles, (s.end_odometer - s.start_odometer)::numeric) AS session_miles
+             FROM vehicle_sessions s
+             JOIN vehicle_session_activities a ON a.session_id = s.id
+             LEFT JOIN visits v
+               ON v.id = a.entity_id
+              AND a.entity_type = 'visit'
+              AND v.account_id = s.account_id
+             WHERE s.account_id = $1
+               AND s.status IS DISTINCT FROM 'voided'
+               AND (
+                 (a.entity_type = 'job' AND a.entity_id = $2)
+                 OR (a.entity_type = 'visit' AND v.job_id = $2)
+               )
+               AND (
+                 s.miles IS NOT NULL
+                 OR (s.start_odometer IS NOT NULL AND s.end_odometer IS NOT NULL)
+               )
+             ORDER BY s.id
+           ) deduped`,
           [session.accountId, invoice.job_id]
         );
         let total = Number(sessions.rows[0]?.total_miles ?? 0);
 
         if (total <= 0) {
           const logs = await client.query<{ total_miles: string }>(
-            `SELECT COALESCE(SUM(miles), 0)::text AS total_miles
-             FROM mileage_logs
-             WHERE account_id = $1 AND job_id = $2
-               AND (trip_type IS NULL OR trip_type IN ('job', 'mixed'))`,
+            `SELECT COALESCE(SUM(ml.miles), 0)::text AS total_miles
+             FROM mileage_logs ml
+             LEFT JOIN visits v
+               ON v.id = ml.visit_id
+              AND v.account_id = ml.account_id
+             WHERE ml.account_id = $1
+               AND (ml.trip_type IS NULL OR ml.trip_type IN ('job', 'mixed'))
+               AND (
+                 ml.job_id = $2
+                 OR v.job_id = $2
+               )`,
             [session.accountId, invoice.job_id]
           );
           total = Number(logs.rows[0]?.total_miles ?? 0);
