@@ -72,7 +72,8 @@ export function SendEstimateButton({ estimateId, clientEmail, sentAt, emailConfi
         type="button"
         onClick={() => handleAction("mark")}
         disabled={!!pending}
-        data-testid="transition-btn-mark-sent"
+        // Primary action when email is unavailable — e2e + staff offline path
+        data-testid={canEmail ? "transition-btn-mark-sent" : "transition-btn-sent"}
         style={{
           display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
           padding: "8px 16px", borderRadius: 6,
