@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { DOCUMENT_STANDARD_VERSION, STANDARD_INVOICE_TERMS } from "@ai-fsm/domain";
+import { STANDARD_INVOICE_TERMS } from "@ai-fsm/domain";
+import { PaidStamp } from "@/components/invoices/PaidStamp";
 
 interface LineItem {
   id: string;
@@ -49,8 +50,11 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
   const [loadingPayment, setLoadingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState("");
 
-  const balance = invoice.total_cents - paidCents;
-  const isPaid = status === "paid";
+  const balance = Math.max(0, invoice.total_cents - paidCents);
+  // Match print/PDF: paid status OR fully covered by payments.
+  const isPaid =
+    status === "paid" ||
+    (invoice.total_cents > 0 && paidCents >= invoice.total_cents);
   const isVoid = status === "void";
   const isOverdue = invoice.due_date && new Date(invoice.due_date) < new Date() && !isPaid && !isVoid;
 
@@ -81,61 +85,105 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
   const propertyLine = [invoice.property_address, invoice.property_city, invoice.property_state, invoice.property_zip]
     .filter(Boolean).join(", ");
   const invoiceTerms = invoice.account_settings?.invoice_terms ?? STANDARD_INVOICE_TERMS;
+  const paidDateLabel = invoice.paid_at
+    ? new Date(invoice.paid_at).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    : null;
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8f7f6", padding: "32px 16px" }}>
-      <div style={{ maxWidth: 680, margin: "0 auto" }}>
+      <div style={{ maxWidth: 680, margin: "0 auto", position: "relative" }}>
+        {isPaid && <PaidStamp paidAt={invoice.paid_at} />}
 
         {/* Header — clean and direct */}
         <div style={{ marginBottom: 24 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: "#57534e", marginBottom: 2 }}>{invoice.account_name}</div>
-          <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>Invoice {invoice.invoice_number}</h1>
+          <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0, letterSpacing: "-0.01em" }}>
+            {isPaid ? "Receipt" : "Invoice"} {invoice.invoice_number}
+          </h1>
 
           <div style={{ marginTop: 8, fontSize: 14, color: "#57534e" }}>
             {propertyLine && <div>{propertyLine}</div>}
             <div>Billed to {invoice.client_name}</div>
-            {invoice.due_date && (
+            {isPaid ? (
+              <div style={{ marginTop: 2, color: "#166534", fontWeight: 700 }}>
+                Paid in full{paidDateLabel ? ` — ${paidDateLabel}` : ""}
+              </div>
+            ) : invoice.due_date ? (
               <div style={{ marginTop: 2, color: isOverdue ? "#b91c1c" : "#57534e", fontWeight: isOverdue ? 600 : 400 }}>
                 Due {new Date(invoice.due_date).toLocaleDateString()} {isOverdue ? "— OVERDUE" : ""}
               </div>
-            )}
+            ) : null}
           </div>
         </div>
+
+        {/* Paid: big green zero-balance banner — impossible to miss */}
+        {isPaid && (
+          <div
+            role="status"
+            aria-label="Paid in full. No balance due."
+            style={{
+              background: "linear-gradient(180deg, #dcfce7 0%, #bbf7d0 100%)",
+              border: "2px solid #166534",
+              borderRadius: 12,
+              padding: "18px 20px",
+              marginBottom: 20,
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.12em", color: "#166534", textTransform: "uppercase" }}>
+              Paid in full
+            </div>
+            <div style={{ fontSize: 32, fontWeight: 800, fontFamily: "var(--font-mono, monospace)", color: "#166534", lineHeight: 1.15, marginTop: 6 }}>
+              {cents(0)} balance due
+            </div>
+            <div style={{ fontSize: 14, color: "#15803d", marginTop: 8, fontWeight: 600 }}>
+              No payment is owed on this invoice
+              {paidDateLabel ? ` · paid ${paidDateLabel}` : ""}
+            </div>
+          </div>
+        )}
 
         {/* Prominent money callout */}
         <div style={{
           display: "flex",
+          flexWrap: "wrap",
           gap: 32,
           alignItems: "baseline",
           padding: "16px 20px",
-          background: "#fff",
-          border: "1px solid #e7e5e4",
+          background: isPaid ? "#f0fdf4" : "#fff",
+          border: isPaid ? "2px solid #86efac" : "1px solid #e7e5e4",
           borderRadius: 10,
-          marginBottom: 20
+          marginBottom: 20,
         }}>
           <div>
             <div style={{ fontSize: 11, fontWeight: 600, color: "#78716c" }}>TOTAL</div>
             <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "var(--font-mono, monospace)", lineHeight: 1 }}>{cents(invoice.total_cents)}</div>
           </div>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "#78716c" }}>BALANCE</div>
-            <div style={{ fontSize: 28, fontWeight: 700, fontFamily: "var(--font-mono, monospace)", lineHeight: 1, color: balance > 0 ? "#b91c1c" : "#166534" }}>
-              {cents(balance)}
+            <div style={{ fontSize: 11, fontWeight: 700, color: isPaid ? "#166534" : "#78716c", letterSpacing: "0.04em" }}>
+              {isPaid ? "BALANCE DUE" : "BALANCE"}
             </div>
+            <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "var(--font-mono, monospace)", lineHeight: 1, color: balance > 0 ? "#b91c1c" : "#166534" }}>
+              {cents(isPaid ? 0 : balance)}
+            </div>
+            {isPaid && (
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#166534", marginTop: 4 }}>
+                Nothing owed
+              </div>
+            )}
           </div>
-          {invoice.paid_cents > 0 && (
-            <div style={{ marginLeft: "auto", textAlign: "right", fontSize: 13 }}>
-              Paid {cents(invoice.paid_cents)}
+          {paidCents > 0 && (
+            <div style={{ marginLeft: "auto", textAlign: "right", fontSize: 13, color: "#166534", fontWeight: 600 }}>
+              Paid {cents(paidCents)}
             </div>
           )}
         </div>
 
         {/* Status banners */}
-        {isPaid && (
-          <div style={{ background: "#dcfce7", border: "1px solid #86efac", borderRadius: 8, padding: "10px 14px", marginBottom: 20, color: "#166534", fontWeight: 600, fontSize: 14 }}>
-            ✓ Paid in full{invoice.paid_at ? ` — ${new Date(invoice.paid_at).toLocaleDateString()}` : ""}
-          </div>
-        )}
         {isVoid && (
           <div style={{ background: "#f5f5f4", border: "1px solid #d6d3d1", borderRadius: 8, padding: "10px 14px", marginBottom: 20, color: "#57534e" }}>
             This invoice has been voided.
@@ -143,7 +191,7 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
         )}
 
         {/* Line items */}
-        <div style={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: 10, overflow: "hidden", marginBottom: 20 }}>
+        <div style={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: 10, overflow: "hidden", marginBottom: 20, position: "relative" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
               <tr style={{ background: "#fafaf9", borderBottom: "1px solid #e7e5e4" }}>
@@ -154,7 +202,9 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
             <tbody>
               {lineItems.map((item) => (
                 <tr key={item.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                  <td style={{ padding: "10px 16px" }}>{item.description}</td>
+                  <td style={{ padding: "10px 16px", whiteSpace: "pre-line" }}>
+                    {item.description.replace(/<!--travel-charge-->/g, "").trim()}
+                  </td>
                   <td style={{ padding: "10px 16px", textAlign: "right", fontWeight: 500 }}>{cents(item.total_cents)}</td>
                 </tr>
               ))}
@@ -169,15 +219,34 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
                 <span>Tax</span><span style={{ fontFamily: "monospace" }}>{cents(invoice.tax_cents)}</span>
               </div>
             )}
+            <div style={{ display: "flex", gap: 36, fontWeight: 700, color: "#166534" }}>
+              <span>Total</span><span style={{ fontFamily: "monospace" }}>{cents(invoice.total_cents)}</span>
+            </div>
             {paidCents > 0 && (
-              <div style={{ display: "flex", gap: 36, color: "#15803d" }}>
+              <div style={{ display: "flex", gap: 36, color: "#15803d", fontWeight: 600 }}>
                 <span>Paid</span><span style={{ fontFamily: "monospace" }}>−{cents(paidCents)}</span>
               </div>
             )}
-            <div style={{ display: "flex", gap: 36, fontWeight: 700, fontSize: 17, paddingTop: 4, borderTop: "1px solid #d6d3d1", marginTop: 4 }}>
-              <span>{isPaid ? "Total" : "Balance due"}</span>
-              <span style={{ fontFamily: "monospace", color: balance > 0 ? "#b91c1c" : "#166534" }}>{cents(isPaid ? invoice.total_cents : balance)}</span>
+            <div
+              style={{
+                display: "flex",
+                gap: 36,
+                fontWeight: 800,
+                fontSize: 18,
+                paddingTop: 8,
+                borderTop: "2px solid #166534",
+                marginTop: 6,
+                color: isPaid ? "#166534" : balance > 0 ? "#b91c1c" : "#166534",
+              }}
+            >
+              <span>Balance due</span>
+              <span style={{ fontFamily: "monospace" }}>{cents(isPaid ? 0 : balance)}</span>
             </div>
+            {isPaid && (
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#166534", marginTop: 2 }}>
+                No balance remaining
+              </div>
+            )}
           </div>
         </div>
 
@@ -196,8 +265,8 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
           </div>
         )}
 
-        {/* Pay action */}
-        {!isPaid && !isVoid && onlinePaymentAvailable && (
+        {/* Pay action — only when money is still owed */}
+        {!isPaid && !isVoid && balance > 0 && onlinePaymentAvailable && (
           <div style={{ marginBottom: 24 }}>
             <button
               type="button"
