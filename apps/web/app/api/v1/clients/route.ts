@@ -19,6 +19,24 @@ const createClientBody = z.object({
   city: z.string().max(100).optional().or(z.literal("")),
   state: z.string().max(100).optional().or(z.literal("")),
   zip: z.string().max(20).optional().or(z.literal("")),
+  relationship_type: z
+    .enum(["standard", "realtor", "preferred", "referral_partner"])
+    .optional()
+    .default("standard"),
+  travel_rule: z
+    .enum([
+      "standard_policy",
+      "mileage_waived",
+      "travel_time_waived",
+      "all_travel_waived",
+      "custom_included_radius",
+      "custom_mileage_rate",
+      "custom_travel_time_rate",
+      "minimum_project_value_exemption",
+      "manual_review_required",
+    ])
+    .optional()
+    .default("standard_policy"),
 });
 
 function validationError(parsed: z.SafeParseError<unknown>, traceId: string) {
@@ -81,10 +99,24 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       [session.userId, session.accountId, session.role]
     );
 
-    const { name, email, phone, notes, company_name, address_line1, city, state, zip } = parsed.data;
+    const {
+      name,
+      email,
+      phone,
+      notes,
+      company_name,
+      address_line1,
+      city,
+      state,
+      zip,
+      relationship_type,
+      travel_rule,
+    } = parsed.data;
     const result = await client.query(
-      `INSERT INTO clients (account_id, name, email, phone, notes, company_name, address_line1, city, state, zip)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO clients
+         (account_id, name, email, phone, notes, company_name, address_line1, city, state, zip,
+          relationship_type, travel_rule)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         session.accountId,
@@ -97,6 +129,8 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
         city || null,
         state || null,
         zip || null,
+        relationship_type ?? "standard",
+        travel_rule ?? "standard_policy",
       ]
     );
 

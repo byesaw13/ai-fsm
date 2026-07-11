@@ -12,6 +12,11 @@ import {
   WORK_ORDER_STATUS_LABELS,
 } from "@ai-fsm/domain";
 import { formatCents } from "@ai-fsm/money";
+import {
+  TravelRecommendation,
+  applyTravelRecommendationToWorkOrder,
+  type TravelRecommendationValue,
+} from "@/components/travel/TravelRecommendation";
 
 // TASK-018 slice 3: create/edit a work order. Everything is editable; materials
 // can be AI-suggested (owner confirms/edits) or added by hand.
@@ -69,6 +74,7 @@ export function WorkOrderForm(props: WorkOrderFormProps) {
   const [saving, setSaving] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
   const [suggestionMeta, setSuggestionMeta] = useState<MaterialsMetadataShape | null>(null);
+  const [travelRec, setTravelRec] = useState<TravelRecommendationValue | null>(null);
 
   const total = materials.reduce((s, m) => s + (m.total_cents || 0), 0);
 
@@ -164,8 +170,21 @@ export function WorkOrderForm(props: WorkOrderFormProps) {
         return;
       }
       const json = await res.json();
+      const savedId = props.mode === "create" ? json.data.id : props.workOrderId;
+
+      // Attach travel snapshot for planning (does not bill)
+      if (travelRec?.accepted && savedId && props.propertyId) {
+        const applied = await applyTravelRecommendationToWorkOrder(savedId, travelRec, {
+          propertyId: props.propertyId,
+          clientId: props.clientId,
+        });
+        if (!applied.ok) {
+          toast.error(applied.error ?? "Work order saved, but travel snapshot failed");
+        }
+      }
+
       toast.success("Work order saved");
-      router.push(`/app/work-orders/${props.mode === "create" ? json.data.id : props.workOrderId}` as Route);
+      router.push(`/app/work-orders/${savedId}` as Route);
       router.refresh();
     } finally {
       setSaving(false);
@@ -180,6 +199,29 @@ export function WorkOrderForm(props: WorkOrderFormProps) {
       <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
         {props.clientName ?? "Customer"}{props.propertyAddress ? ` · ${props.propertyAddress}` : ""}
       </p>
+
+      {props.propertyId ? (
+        <TravelRecommendation
+          propertyId={props.propertyId}
+          clientId={props.clientId}
+          disabled={saving}
+          onChange={setTravelRec}
+        />
+      ) : (
+        <p
+          data-testid="work-order-travel-no-property"
+          style={{
+            margin: 0,
+            padding: "var(--space-3)",
+            border: "1px dashed var(--border)",
+            borderRadius: "var(--radius-md)",
+            fontSize: "var(--text-sm)",
+            color: "var(--fg-muted)",
+          }}
+        >
+          No property on this work order — travel will be available once a property is assigned.
+        </p>
+      )}
 
       <div><label style={labelStyle}>Title</label>
         <input style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} /></div>

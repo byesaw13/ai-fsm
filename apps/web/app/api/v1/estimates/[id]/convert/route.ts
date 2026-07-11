@@ -34,7 +34,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       const estimateResult = await client.query(
         `SELECT e.id, e.status, e.client_id, e.job_id, e.property_id,
                 e.subtotal_cents, e.tax_cents, e.total_cents, e.deposit_cents,
-                e.notes, e.created_by
+                e.notes, e.created_by, e.travel_snapshot_id
          FROM estimates e
          WHERE e.id = $1 AND e.account_id = $2`,
         [id, session.accountId]
@@ -58,6 +58,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         deposit_cents: number;
         notes: string | null;
         created_by: string;
+        travel_snapshot_id: string | null;
       };
 
       // 2. Enforce prerequisite: only approved estimates can be converted
@@ -145,11 +146,11 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
            (account_id, client_id, job_id, estimate_id, property_id,
             status, invoice_kind, invoice_number,
             subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
-            notes, created_by)
+            notes, created_by, travel_snapshot_id, travel_billing_mode)
          VALUES ($1, $2, $3, $4, $5,
                  'draft', 'final', $6,
                  $7, $8, $9, 0, $10,
-                 $11, $12)
+                 $11, $12, $13, $14)
          RETURNING id`,
         [
           session.accountId,
@@ -164,9 +165,21 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           reconciliation.depositCreditCents,
           finalNotes,
           session.userId,
+          estimate.travel_snapshot_id,
+          estimate.travel_snapshot_id ? "estimated" : null,
         ]
       );
       const invoiceId = invoiceResult.rows[0].id;
+
+      // Carry travel snapshot forward (do not recalculate — rate/charge frozen at estimate time)
+      if (estimate.travel_snapshot_id) {
+        await client.query(
+          `UPDATE travel_calculation_snapshots
+           SET invoice_id = $1, updated_at = now()
+           WHERE id = $2 AND account_id = $3 AND invoice_id IS NULL`,
+          [invoiceId, estimate.travel_snapshot_id, session.accountId]
+        );
+      }
 
       // 7. Copy line items with traceability FK (estimate_line_item_id)
       for (const item of lineItems) {

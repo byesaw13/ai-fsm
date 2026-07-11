@@ -31,6 +31,7 @@ import {
 import type { StatusVariant } from "@/components/ui";
 import { isEmailConfigured } from "@/lib/email/mailer";
 import { CopyPortalLinkButton } from "@/components/CopyPortalLinkButton";
+import { TravelPanel } from "@/components/travel/TravelPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -295,6 +296,17 @@ export default async function InvoiceDetailPage({
                 invoiceId={invoice.id}
                 jobId={invoice.job_id}
                 handlingPct={handlingPct}
+              />
+            )}
+
+            {canCreateInvoices(session.role) && (
+              <TravelPanel
+                entityType="invoice"
+                entityId={invoice.id}
+                propertyId={invoice.property_id}
+                clientId={invoice.client_id}
+                projectValueCents={invoice.total_cents}
+                editable={canEditLineItems}
               />
             )}
 

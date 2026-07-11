@@ -21,6 +21,26 @@ const patchClientBody = z
     city: z.string().max(100).optional().or(z.literal("")),
     state: z.string().max(100).optional().or(z.literal("")),
     zip: z.string().max(20).optional().or(z.literal("")),
+    relationship_type: z
+      .enum(["standard", "realtor", "preferred", "referral_partner"])
+      .optional(),
+    travel_rule: z
+      .enum([
+        "standard_policy",
+        "mileage_waived",
+        "travel_time_waived",
+        "all_travel_waived",
+        "custom_included_radius",
+        "custom_mileage_rate",
+        "custom_travel_time_rate",
+        "minimum_project_value_exemption",
+        "manual_review_required",
+      ])
+      .optional(),
+    custom_included_one_way_miles: z.number().min(0).max(500).nullable().optional(),
+    custom_mileage_rate_cents: z.number().int().min(0).nullable().optional(),
+    custom_travel_time_rate_cents: z.number().int().min(0).nullable().optional(),
+    minimum_project_value_exempt: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: "At least one field is required" });
 
@@ -127,6 +147,30 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
     if (patch.zip !== undefined) {
       setClauses.push(`zip = $${idx++}`);
       params.push(patch.zip || null);
+    }
+    if (patch.relationship_type !== undefined) {
+      setClauses.push(`relationship_type = $${idx++}`);
+      params.push(patch.relationship_type);
+    }
+    if (patch.travel_rule !== undefined) {
+      setClauses.push(`travel_rule = $${idx++}`);
+      params.push(patch.travel_rule);
+    }
+    if (patch.custom_included_one_way_miles !== undefined) {
+      setClauses.push(`custom_included_one_way_miles = $${idx++}`);
+      params.push(patch.custom_included_one_way_miles);
+    }
+    if (patch.custom_mileage_rate_cents !== undefined) {
+      setClauses.push(`custom_mileage_rate_cents = $${idx++}`);
+      params.push(patch.custom_mileage_rate_cents);
+    }
+    if (patch.custom_travel_time_rate_cents !== undefined) {
+      setClauses.push(`custom_travel_time_rate_cents = $${idx++}`);
+      params.push(patch.custom_travel_time_rate_cents);
+    }
+    if (patch.minimum_project_value_exempt !== undefined) {
+      setClauses.push(`minimum_project_value_exempt = $${idx++}`);
+      params.push(patch.minimum_project_value_exempt);
     }
     params.push(id, session.accountId);
 

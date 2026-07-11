@@ -17,6 +17,17 @@ interface ClientFormValues {
   city: string;
   state: string;
   zip: string;
+  relationship_type: "standard" | "realtor" | "preferred" | "referral_partner";
+  travel_rule:
+    | "standard_policy"
+    | "mileage_waived"
+    | "travel_time_waived"
+    | "all_travel_waived"
+    | "custom_included_radius"
+    | "custom_mileage_rate"
+    | "custom_travel_time_rate"
+    | "minimum_project_value_exemption"
+    | "manual_review_required";
 }
 
 interface ClientFormProps {
@@ -55,6 +66,8 @@ export function ClientForm({ mode, actionUrl, cancelHref, initialValues, clientI
     city: initialValues?.city ?? "",
     state: initialValues?.state ?? "",
     zip: initialValues?.zip ?? "",
+    relationship_type: initialValues?.relationship_type ?? "standard",
+    travel_rule: initialValues?.travel_rule ?? "standard_policy",
   });
 
   function validate() {
@@ -84,6 +97,8 @@ export function ClientForm({ mode, actionUrl, cancelHref, initialValues, clientI
           city: form.city.trim(),
           state: form.state.trim(),
           zip: form.zip.trim(),
+          relationship_type: form.relationship_type,
+          travel_rule: form.travel_rule,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -146,6 +161,65 @@ export function ClientForm({ mode, actionUrl, cancelHref, initialValues, clientI
           disabled={pending}
           placeholder="(555) 555-5555"
         />
+      </div>
+
+      {/* Relationship & travel rules */}
+      <div style={{
+        borderTop: "1px solid var(--border)",
+        paddingTop: "var(--space-4)",
+        marginTop: "var(--space-2)",
+      }}>
+        <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-xs)", fontWeight: "var(--font-semibold)", color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+          Relationship &amp; travel
+        </p>
+        <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+          Marking someone as a Realtor does not auto-waive travel. Set the travel rule explicitly.
+        </p>
+        <div className="p7-form-grid p7-form-grid-2">
+          <div className="form-group">
+            <label htmlFor="relationship_type">Customer type</label>
+            <select
+              id="relationship_type"
+              value={form.relationship_type}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  relationship_type: e.target.value as ClientFormValues["relationship_type"],
+                }))
+              }
+              disabled={pending}
+            >
+              <option value="standard">Standard Customer</option>
+              <option value="realtor">Realtor</option>
+              <option value="preferred">Preferred Client</option>
+              <option value="referral_partner">Referral Partner</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="travel_rule">Travel rule</label>
+            <select
+              id="travel_rule"
+              value={form.travel_rule}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  travel_rule: e.target.value as ClientFormValues["travel_rule"],
+                }))
+              }
+              disabled={pending}
+            >
+              <option value="standard_policy">Standard policy</option>
+              <option value="mileage_waived">Mileage waived</option>
+              <option value="travel_time_waived">Travel time waived</option>
+              <option value="all_travel_waived">All travel waived</option>
+              <option value="custom_included_radius">Custom included radius</option>
+              <option value="custom_mileage_rate">Custom mileage rate</option>
+              <option value="custom_travel_time_rate">Custom travel-time rate</option>
+              <option value="minimum_project_value_exemption">Min project value exemption</option>
+              <option value="manual_review_required">Manual review required</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       {/* Company & Address */}

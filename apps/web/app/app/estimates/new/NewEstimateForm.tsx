@@ -56,6 +56,7 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
     coordinationRequired, setCoordinationRequired,
     finishExpectation, setFinishExpectation,
     travelSurcharge, setTravelSurcharge,
+    setTravelRecommendation,
     riskAdjustment, setRiskAdjustment,
     minimumOverrideReason, setMinimumOverrideReason,
     minimumOverrideNote, setMinimumOverrideNote,
@@ -256,6 +257,10 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
           tripCount={tripCount} setTripCount={setTripCount}
           finishExpectation={finishExpectation} setFinishExpectation={setFinishExpectation}
           travelSurcharge={travelSurcharge} setTravelSurcharge={setTravelSurcharge}
+          clientId={clientId}
+          propertyId={propertyId}
+          projectValueCents={genericTotalCents}
+          onTravelRecommendationChange={setTravelRecommendation}
           riskAdjustment={riskAdjustment} setRiskAdjustment={setRiskAdjustment}
           minimumOverrideReason={minimumOverrideReason} setMinimumOverrideReason={setMinimumOverrideReason}
           minimumOverrideNote={minimumOverrideNote} setMinimumOverrideNote={setMinimumOverrideNote}

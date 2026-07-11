@@ -23,6 +23,7 @@ import { EstimateBanners } from "./sections/EstimateBanners";
 import { EstimateSummaryCard } from "./sections/EstimateSummaryCard";
 import { EstimateLineItems } from "./sections/EstimateLineItems";
 import { ApprovedHandoff } from "./sections/ApprovedHandoff";
+import { TravelPanel } from "@/components/travel/TravelPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -155,6 +156,17 @@ export default async function EstimateDetailPage({
         lineItems={lineItems}
         options={options}
       />
+
+      {canTransition && (
+        <TravelPanel
+          entityType="estimate"
+          entityId={estimate.id}
+          propertyId={estimate.property_id}
+          clientId={estimate.client_id}
+          projectValueCents={estimate.total_cents}
+          editable={currentStatus === "draft"}
+        />
+      )}
 
       {/* Edit form — owner/admin only, draft only */}
       {canTransition && currentStatus === "draft" && (
