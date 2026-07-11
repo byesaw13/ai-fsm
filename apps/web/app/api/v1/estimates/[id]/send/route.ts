@@ -178,8 +178,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             ).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
           : null;
 
+      // Narrowed: skipEmail returned early when client_email was missing.
+      const toEmail = est.client_email as string;
       const emailResult = await sendEmail({
-        to: est.client_email,
+        to: toEmail,
         subject: `Estimate ${estimateRef} from Dovetails Services LLC`,
         html: estimateEmailHtml({
           estimateRef,
@@ -260,10 +262,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         actor_id: session.userId,
         trace_id: session.traceId,
         old_value: { status: est.status, sent_at: est.sent_at },
-        new_value: { sent_to: est.client_email, status: est.status === "draft" ? "sent" : est.status },
+        new_value: { sent_to: toEmail, status: est.status === "draft" ? "sent" : est.status },
       });
 
-      return { status: 200, sentTo: est.client_email };
+      return { status: 200, sentTo: toEmail };
     });
 
     if (result.status === 404) {
