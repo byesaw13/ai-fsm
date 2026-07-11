@@ -351,7 +351,7 @@ export function calculateTravelCharges(
   includedOneWay = Math.max(0, includedOneWay);
   const includedMiles = roundMiles(includedOneWay * legsPerTrip * tripCount);
 
-  let mileageRate =
+  const mileageRate =
     client.travel_rule === "custom_mileage_rate" &&
     client.custom_mileage_rate_cents != null
       ? client.custom_mileage_rate_cents
