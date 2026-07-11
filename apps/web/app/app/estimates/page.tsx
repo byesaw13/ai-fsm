@@ -18,6 +18,7 @@ import {
 } from "@/components/ui";
 import { formatCents } from "@/lib/money";
 import type { FilterDef, StatusVariant, MetricCardData } from "@/components/ui";
+import { EstimateBoard } from "./EstimateBoard";
 
 export const dynamic = "force-dynamic";
 
@@ -190,58 +191,6 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
 
   return (
     <PageContainer>
-      <style>{`
-        .kanban-board {
-          display: flex;
-          gap: var(--space-4);
-          overflow-x: auto;
-          padding-bottom: var(--space-4);
-          align-items: flex-start;
-          width: 100%;
-          -webkit-overflow-scrolling: touch;
-        }
-        .kanban-column {
-          flex: 1;
-          min-width: 260px;
-          max-width: 320px;
-          display: flex;
-          flex-direction: column;
-          gap: var(--space-3);
-          background: var(--bg-subtle);
-          border: 1px solid var(--border);
-          border-radius: var(--radius-lg);
-          padding: var(--space-3);
-        }
-        .kanban-column-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding-bottom: var(--space-2);
-          border-bottom: 1px solid var(--border);
-          font-weight: 700;
-          font-size: var(--text-sm);
-          color: var(--fg);
-        }
-        .kanban-card {
-          background: var(--bg-card);
-          border: 1px solid var(--border);
-          border-radius: var(--radius-md);
-          padding: var(--space-3);
-          display: flex;
-          flex-direction: column;
-          gap: var(--space-1);
-          text-decoration: none;
-          color: inherit;
-          box-shadow: var(--shadow-xs);
-          transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-        }
-        .kanban-card:hover {
-          transform: translateY(-1px);
-          border-color: var(--border-strong);
-          box-shadow: var(--shadow-md);
-        }
-      `}</style>
-
       <PageHeader
         title="Estimates"
         subtitle={`${estimates.length} ${hasFilter ? "matching" : "total"}`}
@@ -369,68 +318,12 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
           data-testid="estimates-empty"
         />
       ) : isBoardView ? (
-        <div className="kanban-board">
-          {STATUS_ORDER.map((s) => {
-            const colEstimates = grouped[s] ?? [];
-            const colTotalCents = colEstimates.reduce((sum, e) => sum + e.total_cents, 0);
-            
-            return (
-              <div key={s} className="kanban-column" data-testid={`column-${s}`}>
-                <div className="kanban-column-header">
-                  <span>
-                    {STATUS_LABELS[s]} 
-                    <span style={{ color: "var(--fg-muted)", fontWeight: 500, marginLeft: 4 }}>({colEstimates.length})</span>
-                  </span>
-                  <span style={{ fontFamily: "var(--font-mono), 'SF Mono', monospace", fontSize: 12, fontWeight: 600 }}>
-                    {formatCents(colTotalCents)}
-                  </span>
-                </div>
-                
-                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", minHeight: 150 }}>
-                  {colEstimates.length === 0 ? (
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 100, border: "1px dashed var(--border)", borderRadius: "var(--radius-md)", color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
-                      No {STATUS_LABELS[s].toLowerCase()}
-                    </div>
-                  ) : (
-                    colEstimates.map((est) => {
-                      const nowTime = Date.now();
-                      const isExpired = est.expires_at && new Date(est.expires_at).getTime() < nowTime;
-                      const isExpiringSoon = !isExpired && est.expires_at && new Date(est.expires_at).getTime() < nowTime + 7 * 24 * 60 * 60 * 1000;
-                      
-                      return (
-                        <Link key={est.id} href={`/app/estimates/${est.id}`} className="kanban-card" data-testid="estimate-card">
-                          <div style={{ fontWeight: 700, fontSize: "var(--text-sm)", color: "var(--fg)" }}>
-                            {est.estimate_number ? `${est.estimate_number} · ` : ""}{est.client_name ?? "Unknown client"}
-                          </div>
-                          {est.job_title && (
-                            <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                              {est.job_title}
-                            </div>
-                          )}
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
-                            <span style={{ fontFamily: "var(--font-mono), 'SF Mono', monospace", fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--fg)" }}>
-                              {formatCents(est.total_cents)}
-                            </span>
-                            
-                            {est.expires_at && est.status === "sent" && (
-                              <span style={{
-                                fontSize: 10,
-                                fontWeight: 600,
-                                color: isExpired ? "var(--color-danger)" : isExpiringSoon ? "var(--color-warning)" : "var(--fg-muted)"
-                              }}>
-                                {isExpired ? "Expired" : `Exp: ${new Date(est.expires_at).toLocaleDateString([], { month: "numeric", day: "numeric" })}`}
-                              </span>
-                            )}
-                          </div>
-                        </Link>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <EstimateBoard
+          estimates={estimates}
+          statusOrder={STATUS_ORDER}
+          statusLabels={STATUS_LABELS}
+          canDrag={canCreate}
+        />
       ) : (
         <div>
           {hasFilter ? (

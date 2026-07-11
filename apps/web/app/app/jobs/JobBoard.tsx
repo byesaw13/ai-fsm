@@ -1,9 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback } from "react";
 import { StatusBadge, PriorityBadge, priorityNumToVariant, priorityLabel } from "@/components/ui";
-import type { StatusVariant, PriorityVariant } from "@/components/ui";
-import { deriveCustomerStage, CUSTOMER_STAGE_LABELS, CUSTOMER_STAGE_COLORS, SUB_STATUS_LABELS } from "@ai-fsm/domain";
+import type { PriorityVariant } from "@/components/ui";
+import {
+  deriveCustomerStage,
+  CUSTOMER_STAGE_LABELS,
+  CUSTOMER_STAGE_COLORS,
+  SUB_STATUS_LABELS,
+} from "@ai-fsm/domain";
+import { StatusKanbanBoard } from "@/components/kanban/StatusKanbanBoard";
+import { canJobBoardDrop } from "@/lib/kanban/board-transitions";
 
 interface JobRow {
   id: string;
@@ -26,104 +35,61 @@ interface JobBoardProps {
   jobs: JobRow[];
   statusLabels: Record<string, string>;
   statusOrder: string[];
-  groupBy?: "status" | "pipeline_stage";
+  /** When true, cards can be dragged between status columns. */
+  canDrag?: boolean;
 }
 
-// ---------------------------------------------------------------------------
-// JobBoard — Kanban-style pipeline board grouped by job status
-//
-// Columns are ordered by workflow stage (in_progress first, then scheduled,
-// quoted, draft, completed, invoiced). Only columns with jobs are shown.
-// Cards are read-only — click goes to the job detail page.
-// ---------------------------------------------------------------------------
+export function JobBoard({
+  jobs,
+  statusLabels,
+  statusOrder,
+  canDrag = false,
+}: JobBoardProps) {
+  const router = useRouter();
 
-export function JobBoard({ jobs, statusLabels, statusOrder, groupBy = "status" }: JobBoardProps) {
-  // Group jobs by status, only include statuses with jobs
-  const grouped: Record<string, JobRow[]> = {};
-  for (const status of statusOrder) {
-    grouped[status] = [];
-  }
-  for (const job of jobs) {
-    const groupKey = groupBy === "pipeline_stage" ? job.pipeline_stage : job.status;
-    if (groupKey && grouped[groupKey]) {
-      grouped[groupKey].push(job);
-    }
-  }
+  const onMove = useCallback(
+    async (itemId: string, _from: string, toStatus: string) => {
+      try {
+        const res = await fetch(`/api/v1/jobs/${itemId}/transition`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: toStatus }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => null)) as {
+            error?: { message?: string };
+          } | null;
+          return {
+            ok: false,
+            message: data?.error?.message ?? "Could not update project status",
+          };
+        }
+        router.refresh();
+        return { ok: true };
+      } catch {
+        return { ok: false, message: "Network error — status not updated" };
+      }
+    },
+    [router],
+  );
 
-  const activeStatuses = statusOrder.filter((s) => grouped[s].length > 0);
-
-  if (activeStatuses.length === 0) {
-    return (
-      <p style={{ color: "var(--fg-muted)", padding: "var(--space-6)" }}>
-        No jobs to display.
-      </p>
-    );
-  }
+  const columns = statusOrder.map((id) => ({
+    id,
+    label: statusLabels[id] ?? id,
+  }));
 
   return (
-    <div
-      data-testid="job-board"
-      style={{
-        display: "flex",
-        gap: "var(--space-4)",
-        overflowX: "auto",
-        paddingBottom: "var(--space-4)",
-        // Allow horizontal scroll on mobile
-        WebkitOverflowScrolling: "touch",
-      }}
-    >
-      {activeStatuses.map((status) => (
-        <div
-          key={status}
-          data-testid={`board-column-${status}`}
-          style={{
-            flex: "0 0 260px",
-            minWidth: 220,
-          }}
-        >
-          {/* Column header */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--space-2)",
-              marginBottom: "var(--space-3)",
-              padding: "var(--space-2) var(--space-3)",
-              background: "var(--bg-card)",
-              borderRadius: "var(--radius)",
-              border: "1px solid var(--border)",
-            }}
-          >
-          <span
-            style={{
-              fontSize: "var(--text-xs)",
-              fontWeight: "var(--font-semibold)",
-              color: "var(--fg)",
-            }}
-          >
-            {statusLabels[status] ?? status}
-          </span>
-            <span
-              style={{
-                marginLeft: "auto",
-                fontSize: "var(--text-xs)",
-                color: "var(--fg-muted)",
-                fontWeight: "var(--font-semibold)",
-              }}
-            >
-              {grouped[status].length}
-            </span>
-          </div>
-
-          {/* Cards */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-            {grouped[status].map((job) => (
-              <BoardCard key={job.id} job={job} />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
+    <StatusKanbanBoard
+      columns={columns}
+      items={jobs}
+      canDrag={canDrag}
+      canDrop={canJobBoardDrop}
+      onMove={onMove}
+      showEmptyColumns={canDrag}
+      testId="job-board"
+      cardTestId="board-job-card"
+      renderCard={(job) => <BoardCard job={job} />}
+    />
   );
 }
 
@@ -140,8 +106,8 @@ function BoardCard({ job }: { job: JobRow }) {
   return (
     <Link
       href={`/app/jobs/${job.id}`}
-      data-testid="board-job-card"
-      style={{ textDecoration: "none" }}
+      style={{ textDecoration: "none", display: "block" }}
+      draggable={false}
     >
       <div
         style={{
@@ -149,16 +115,7 @@ function BoardCard({ job }: { job: JobRow }) {
           border: "1px solid var(--border)",
           borderRadius: "var(--radius)",
           padding: "var(--space-3)",
-          cursor: "pointer",
           transition: "box-shadow 0.15s, border-color 0.15s",
-        }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.12)";
-          (e.currentTarget as HTMLElement).style.borderColor = "var(--accent)";
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLElement).style.boxShadow = "none";
-          (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
         }}
       >
         <p
@@ -180,16 +137,30 @@ function BoardCard({ job }: { job: JobRow }) {
           )}
           {job.title}
           {job.estimate_condition_tier === "yellow" && (
-            <span title="Elevated risk estimate" style={{
-              display: "inline-block", width: 8, height: 8, borderRadius: "50%",
-              background: "var(--color-warning)", flexShrink: 0,
-            }} />
+            <span
+              title="Elevated risk estimate"
+              style={{
+                display: "inline-block",
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: "var(--color-warning)",
+                flexShrink: 0,
+              }}
+            />
           )}
           {job.estimate_condition_tier === "red" && (
-            <span title="Complex — review required" style={{
-              display: "inline-block", width: 8, height: 8, borderRadius: "50%",
-              background: "var(--color-danger)", flexShrink: 0,
-            }} />
+            <span
+              title="Complex — review required"
+              style={{
+                display: "inline-block",
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: "var(--color-danger)",
+                flexShrink: 0,
+              }}
+            />
           )}
         </p>
         {job.client_name && (
@@ -226,7 +197,8 @@ function BoardCard({ job }: { job: JobRow }) {
           )}
           {job.next_visit_start && (
             <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-              Next visit {new Date(job.next_visit_start).toLocaleDateString(undefined, {
+              Next visit{" "}
+              {new Date(job.next_visit_start).toLocaleDateString(undefined, {
                 month: "short",
                 day: "numeric",
               })}
