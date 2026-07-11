@@ -28,6 +28,12 @@ interface ClientFormValues {
     | "custom_travel_time_rate"
     | "minimum_project_value_exemption"
     | "manual_review_required";
+  /** One-way miles included before billing (custom_included_radius). */
+  custom_included_one_way_miles: string;
+  /** Miles rate as dollars per mile in the UI (stored as cents). */
+  custom_mileage_rate_dollars: string;
+  /** Travel-time rate as dollars per hour in the UI (stored as cents/hr). */
+  custom_travel_time_rate_dollars: string;
 }
 
 interface ClientFormProps {
@@ -68,6 +74,21 @@ export function ClientForm({ mode, actionUrl, cancelHref, initialValues, clientI
     zip: initialValues?.zip ?? "",
     relationship_type: initialValues?.relationship_type ?? "standard",
     travel_rule: initialValues?.travel_rule ?? "standard_policy",
+    custom_included_one_way_miles:
+      initialValues?.custom_included_one_way_miles != null &&
+      initialValues.custom_included_one_way_miles !== ""
+        ? String(initialValues.custom_included_one_way_miles)
+        : "",
+    custom_mileage_rate_dollars:
+      initialValues?.custom_mileage_rate_dollars != null &&
+      initialValues.custom_mileage_rate_dollars !== ""
+        ? String(initialValues.custom_mileage_rate_dollars)
+        : "",
+    custom_travel_time_rate_dollars:
+      initialValues?.custom_travel_time_rate_dollars != null &&
+      initialValues.custom_travel_time_rate_dollars !== ""
+        ? String(initialValues.custom_travel_time_rate_dollars)
+        : "",
   });
 
   function validate() {
@@ -78,28 +99,54 @@ export function ClientForm({ mode, actionUrl, cancelHref, initialValues, clientI
     return Object.keys(next).length === 0;
   }
 
+  function parseOptionalNumber(raw: string): number | null {
+    const t = raw.trim();
+    if (!t) return null;
+    const n = Number(t);
+    return Number.isFinite(n) ? n : null;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     if (!validate()) return;
     setPending(true);
     try {
+      const includedMiles = parseOptionalNumber(form.custom_included_one_way_miles);
+      const mileageDollars = parseOptionalNumber(form.custom_mileage_rate_dollars);
+      const travelTimeDollars = parseOptionalNumber(form.custom_travel_time_rate_dollars);
+
+      const payload: Record<string, unknown> = {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        notes: form.notes.trim(),
+        company_name: form.company_name.trim(),
+        address_line1: form.address_line1.trim(),
+        city: form.city.trim(),
+        state: form.state.trim(),
+        zip: form.zip.trim(),
+        relationship_type: form.relationship_type,
+        travel_rule: form.travel_rule,
+      };
+
+      // PATCH already accepts these; only send when relevant so create stays lean.
+      if (form.travel_rule === "custom_included_radius") {
+        payload.custom_included_one_way_miles = includedMiles;
+      }
+      if (form.travel_rule === "custom_mileage_rate") {
+        payload.custom_mileage_rate_cents =
+          mileageDollars == null ? null : Math.round(mileageDollars * 100);
+      }
+      if (form.travel_rule === "custom_travel_time_rate") {
+        payload.custom_travel_time_rate_cents =
+          travelTimeDollars == null ? null : Math.round(travelTimeDollars * 100);
+      }
+
       const res = await fetch(actionUrl, {
         method: mode === "create" ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          email: form.email.trim(),
-          phone: form.phone.trim(),
-          notes: form.notes.trim(),
-          company_name: form.company_name.trim(),
-          address_line1: form.address_line1.trim(),
-          city: form.city.trim(),
-          state: form.state.trim(),
-          zip: form.zip.trim(),
-          relationship_type: form.relationship_type,
-          travel_rule: form.travel_rule,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -220,6 +267,61 @@ export function ClientForm({ mode, actionUrl, cancelHref, initialValues, clientI
             </select>
           </div>
         </div>
+
+        {form.travel_rule === "custom_included_radius" ||
+        form.travel_rule === "custom_mileage_rate" ||
+        form.travel_rule === "custom_travel_time_rate" ? (
+          <div className="p7-form-grid p7-form-grid-2" style={{ marginTop: "var(--space-3)" }}>
+            {form.travel_rule === "custom_included_radius" ? (
+              <Input
+                id="custom_included_one_way_miles"
+                label="Included one-way miles"
+                type="number"
+                min={0}
+                step="0.1"
+                value={form.custom_included_one_way_miles}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, custom_included_one_way_miles: e.target.value }))
+                }
+                disabled={pending}
+                placeholder="e.g. 25"
+                hint="Miles included before billing travel"
+              />
+            ) : null}
+            {form.travel_rule === "custom_mileage_rate" ? (
+              <Input
+                id="custom_mileage_rate_dollars"
+                label="Custom mileage rate ($/mi)"
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.custom_mileage_rate_dollars}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, custom_mileage_rate_dollars: e.target.value }))
+                }
+                disabled={pending}
+                placeholder="e.g. 0.70"
+                hint="Billed per mile beyond included radius"
+              />
+            ) : null}
+            {form.travel_rule === "custom_travel_time_rate" ? (
+              <Input
+                id="custom_travel_time_rate_dollars"
+                label="Custom travel-time rate ($/hr)"
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.custom_travel_time_rate_dollars}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, custom_travel_time_rate_dollars: e.target.value }))
+                }
+                disabled={pending}
+                placeholder="e.g. 65.00"
+                hint="Hourly rate for billable travel time"
+              />
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {/* Company & Address */}
