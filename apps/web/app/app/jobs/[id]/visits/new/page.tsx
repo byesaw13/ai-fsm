@@ -26,10 +26,10 @@ export default async function NewVisitPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ bookingRequestId?: string; work_order_id?: string }>;
+  searchParams: Promise<{ bookingRequestId?: string; work_order_id?: string; multi?: string }>;
 }) {
   const { id } = await params;
-  const { bookingRequestId, work_order_id } = await searchParams;
+  const { bookingRequestId, work_order_id, multi } = await searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
   if (!canCreateVisit(session.role)) redirect(`/app/jobs/${id}`);
@@ -50,22 +50,35 @@ export default async function NewVisitPage({
       )
     : [];
 
-  const workOrders = await query<{ id: string; title: string }>(
-    `SELECT id, title FROM work_orders
-     WHERE job_id = $1 AND account_id = $2 AND status NOT IN ('draft','cancelled')
+  // Bookable WOs only (draft promoted to ready on book). Completed/cancelled excluded.
+  const workOrders = await query<{ id: string; title: string; status: string }>(
+    `SELECT id, title, status FROM work_orders
+     WHERE job_id = $1 AND account_id = $2
+       AND status IN ('draft','ready','scheduled','dispatched','waiting')
      ORDER BY created_at ASC`,
     [id, session.accountId],
   );
 
+  // If a specific WO was requested but not in list (wrong job), still pass id for error clarity
+  const initialWorkOrderId = work_order_id ?? null;
+  const backHref = initialWorkOrderId
+    ? `/app/work-orders/${initialWorkOrderId}`
+    : `/app/jobs/${id}`;
+  const backLabel = initialWorkOrderId ? "Work Order" : (job.title ?? "Project");
+
   return (
     <PageContainer>
       <PageHeader
-        title="Schedule Visit"
+        title={multi === "1" ? "Schedule Multiple Days" : "Schedule Visit"}
         subtitle={job.title ?? undefined}
-        backHref={`/app/jobs/${id}`}
-        backLabel={job.title ?? "Project"}
+        backHref={backHref}
+        backLabel={backLabel}
       />
       <Card>
+        <p className="muted" style={{ marginTop: 0, marginBottom: "var(--space-3)", fontSize: "var(--text-sm)" }}>
+          Field days are <strong>visits</strong> under a work order. The work order holds scope;
+          each visit is one calendar day of work.
+        </p>
         <VisitScheduleForm
           jobId={id}
           users={users}
@@ -73,7 +86,8 @@ export default async function NewVisitPage({
           jobCategory={job.job_category ?? null}
           bookingRequestId={bookingRequestId}
           workOrders={workOrders}
-          initialWorkOrderId={work_order_id ?? null}
+          initialWorkOrderId={initialWorkOrderId}
+          initialMultiDay={multi === "1"}
         />
       </Card>
     </PageContainer>
