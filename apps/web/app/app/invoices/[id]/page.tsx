@@ -190,6 +190,16 @@ export default async function InvoiceDetailPage({
               label="Copy link"
             />
             <a
+              href={`/app/invoices/${invoice.id}/print`}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="invoice-print-preview"
+              className="p7-btn p7-btn-secondary p7-btn-sm"
+              style={{ textDecoration: "none" }}
+            >
+              Print preview
+            </a>
+            <a
               href={`/api/v1/invoices/${invoice.id}/pdf`}
               target="_blank"
               rel="noopener noreferrer"

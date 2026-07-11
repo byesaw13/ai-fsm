@@ -154,6 +154,7 @@ export default async function InvoicePrintPage({
   return (
     <>
       <style>{`
+        /* Forest & Cedar — aligned with tokens.css + server PDF accents */
         @media print {
           body { margin: 0; }
           .no-print { display: none !important; }
@@ -161,26 +162,32 @@ export default async function InvoicePrintPage({
         @media (max-width: 767px) {
           .wrap { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
         }
-        body { font-family: Georgia, serif; color: #111; background: #fff; margin: 0; }
+        body { font-family: Georgia, "Times New Roman", serif; color: #1c1917; background: #fff; margin: 0; }
         .wrap { max-width: 780px; margin: 0 auto; padding: 48px 40px; position: relative; }
-        h1 { font-size: 28px; margin: 0; }
-        h2 { font-size: 14px; font-weight: 600; text-transform: uppercase;
-             letter-spacing: 0.08em; color: #555; margin: 32px 0 8px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
-        p { margin: 4px 0; line-height: 1.5; }
-        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-        th { text-align: left; padding: 8px 10px; border-bottom: 2px solid #222;
-             font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
-        td { padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 14px; vertical-align: top; }
-        .amt { text-align: right; }
-        tfoot td { font-weight: 600; border-top: 2px solid #222; border-bottom: none; }
-        tfoot tr.total-row td { font-size: 16px; }
-        .terms { font-size: 13px; color: #444; line-height: 1.6; white-space: pre-wrap; }
-        .section-block { margin-top: 24px; }
-        .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+        h1 { font-size: 28px; margin: 0; color: #1c1917; letter-spacing: -0.01em; }
+        h2 { font-size: 13px; font-weight: 700; text-transform: uppercase;
+             letter-spacing: 0.08em; color: #166534; margin: 36px 0 10px;
+             border-bottom: 1.5px solid #166534; padding-bottom: 6px; }
+        p { margin: 4px 0; line-height: 1.55; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { text-align: left; padding: 10px 10px; border-bottom: 2px solid #1c1917;
+             font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+             color: #57534e; font-weight: 700; }
+        td { padding: 10px; border-bottom: 1px solid #e7e5e4; font-size: 14px; vertical-align: top; }
+        .amt { text-align: right; font-variant-numeric: tabular-nums; }
+        tfoot td { font-weight: 600; border-top: 2px solid #1c1917; border-bottom: none; padding-top: 12px; }
+        tfoot tr.total-row td { font-size: 16px; color: #166534; }
+        .terms { font-size: 13px; color: #44403c; line-height: 1.65; white-space: pre-wrap; }
+        .section-block { margin-top: 28px; }
+        .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 28px;
+                      padding-bottom: 20px; border-bottom: 1.5px solid #166534; margin-bottom: 8px; }
         .letterhead { display: flex; gap: 16px; align-items: flex-start; }
-        .company-name { font-size: 20px; font-weight: 700; }
-        .meta-label { color: #666; font-size: 12px; }
+        .company-name { font-size: 20px; font-weight: 700; color: #166534; }
+        .meta-label { color: #57534e; font-size: 12px; }
+        .meta-status { color: #166534; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
         .company-logo { max-height: 56px; max-width: 160px; object-fit: contain; }
+        .bill-row { display: flex; gap: 48px; margin-top: 28px; }
+        .footer-thanks { margin-top: 44px; font-size: 12px; color: #78716c; }
       `}</style>
 
       <DocumentPrintBar pdfUrl={`/api/v1/invoices/${id}/pdf`} />
@@ -199,9 +206,9 @@ export default async function InvoicePrintPage({
             )}
             <div>
               <div className="company-name">{branding.name}</div>
-              {branding.tagline && <p style={{ color: "#666", fontSize: 13, margin: "2px 0 0" }}>{branding.tagline}</p>}
+              {branding.tagline && <p style={{ color: "#57534e", fontSize: 13, margin: "2px 0 0" }}>{branding.tagline}</p>}
               {contactLines.map((line) => (
-                <p key={line} style={{ color: "#666", fontSize: 12, margin: "2px 0 0" }}>{line}</p>
+                <p key={line} style={{ color: "#57534e", fontSize: 12, margin: "2px 0 0" }}>{line}</p>
               ))}
             </div>
           </div>
@@ -212,18 +219,18 @@ export default async function InvoicePrintPage({
             <p className="meta-label">Document standard: {DOCUMENT_STANDARD_VERSION}</p>
             <p className="meta-label">Issued: {issuedDate}</p>
             {invoice.due_date && <p className="meta-label">Due: {dueDate}</p>}
-            <p className="meta-label" style={{ textTransform: "uppercase", fontWeight: 600 }}>{invoice.status}</p>
+            <p className="meta-label meta-status">{invoice.status}</p>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 48, marginTop: 32 }}>
+        <div className="bill-row">
           <div>
-            <h2 style={{ margin: "0 0 6px" }}>Bill To</h2>
+            <h2 style={{ margin: "0 0 8px" }}>Bill To</h2>
             <p style={{ fontWeight: 600 }}>{invoice.client_name ?? "—"}</p>
             {invoice.client_email && <p>{invoice.client_email}</p>}
           </div>
           <div>
-            <h2 style={{ margin: "0 0 6px" }}>Service Location</h2>
+            <h2 style={{ margin: "0 0 8px" }}>Service Location</h2>
             <p>{serviceLocation}</p>
           </div>
         </div>
@@ -303,7 +310,7 @@ export default async function InvoicePrintPage({
           <p className="terms">{paymentTerms}</p>
         </div>
 
-        <p style={{ marginTop: 40, fontSize: 12, color: "#888" }}>
+        <p className="footer-thanks">
           Thank you for your business. Please reference {invoice.invoice_number} with any payment.
         </p>
       </div>

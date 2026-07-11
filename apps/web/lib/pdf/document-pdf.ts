@@ -15,13 +15,16 @@ const DEFAULT_BRAND_URL = "mydovetails.com";
 
 const PAGE_W = 612; // US Letter @ 72dpi
 const PAGE_H = 792;
+/** ~0.75" margins — matches HTML print page breathing room. */
 const MARGIN = 54;
 const CONTENT_W = PAGE_W - MARGIN * 2;
 
-const INK = rgb(0.1, 0.1, 0.12);
-const MUTED = rgb(0.42, 0.45, 0.5);
-const RULE = rgb(0.82, 0.84, 0.87);
-const ACCENT = rgb(0.13, 0.32, 0.52);
+// Forest & Cedar identity (tokens.css): deep forest accent + warm stone neutrals.
+const INK = rgb(0.11, 0.1, 0.09); // slate-900 #1c1917
+const MUTED = rgb(0.47, 0.44, 0.42); // slate-500 #78716c
+const RULE_STRONG = rgb(0.16, 0.15, 0.14); // near ink for table header/totals
+const ACCENT = rgb(0.086, 0.396, 0.204); // forest-800 #166534
+const ROW_RULE = rgb(0.91, 0.9, 0.89); // slate-200-ish
 
 export interface PdfLineItem {
   description: string;
@@ -237,49 +240,50 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
   }
 
   text(brandName, headerLeft, ctx.y, 16, bold, ACCENT);
-  let headerY = ctx.y - 14;
+  let headerY = ctx.y - 15;
   if (brandTagline) {
     text(brandTagline, headerLeft, headerY, 9, font, MUTED);
-    headerY -= 12;
+    headerY -= 13;
   }
   text(brandUrl, headerLeft, headerY, 9, font, MUTED);
-  headerY -= 12;
+  headerY -= 13;
   for (const line of brandContact.slice(0, 3)) {
     text(line, headerLeft, headerY, 8, font, MUTED);
     headerY -= 11;
   }
 
   const rightX = PAGE_W - MARGIN;
-  rightText(input.docType, rightX, ctx.y, 20, bold, INK);
-  rightText(`#${input.ref}`, rightX, ctx.y - 16, 10, font, MUTED);
-  rightText(input.status.toUpperCase(), rightX, ctx.y - 30, 9, bold, ACCENT);
+  rightText(input.docType, rightX, ctx.y, 22, bold, INK);
+  rightText(`#${input.ref}`, rightX, ctx.y - 18, 10, font, MUTED);
+  rightText(input.status.toUpperCase(), rightX, ctx.y - 32, 9, bold, ACCENT);
 
-  ctx.y = Math.min(headerY, ctx.y - 40) - 8;
+  ctx.y = Math.min(headerY, ctx.y - 44) - 10;
+  // Accent rule under letterhead (matches print-page section emphasis)
   ctx.page.drawLine({
     start: { x: MARGIN, y: ctx.y },
     end: { x: PAGE_W - MARGIN, y: ctx.y },
-    thickness: 1,
-    color: RULE,
+    thickness: 1.5,
+    color: ACCENT,
   });
-  ctx.y -= 22;
+  ctx.y -= 26;
 
   // --- Bill-to + meta -------------------------------------------------------
   const metaTop = ctx.y;
-  text("BILL TO", MARGIN, ctx.y, 8, bold, MUTED);
-  ctx.y -= 14;
+  text("BILL TO", MARGIN, ctx.y, 8, bold, ACCENT);
+  ctx.y -= 15;
   text(input.clientName ?? "—", MARGIN, ctx.y, 11, bold);
-  ctx.y -= 14;
+  ctx.y -= 15;
   if (input.propertyAddress) {
     text(input.propertyAddress, MARGIN, ctx.y, 10, font, MUTED);
-    ctx.y -= 13;
+    ctx.y -= 14;
   }
   if (input.clientEmail) {
     text(input.clientEmail, MARGIN, ctx.y, 10, font, MUTED);
-    ctx.y -= 13;
+    ctx.y -= 14;
   }
   if (input.jobTitle) {
     text(input.jobTitle, MARGIN, ctx.y, 10, font, MUTED);
-    ctx.y -= 13;
+    ctx.y -= 14;
   }
 
   // meta column (right)
@@ -289,12 +293,12 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
     if (!value) return;
     text(label, metaLabelX, my, 9, bold, MUTED);
     rightText(value, rightX, my, 10, font, INK);
-    my -= 15;
+    my -= 16;
   };
   drawMeta(input.dateLabel1, input.dateValue1);
   drawMeta(input.dateLabel2, input.dateValue2);
 
-  ctx.y = Math.min(ctx.y, my) - 18;
+  ctx.y = Math.min(ctx.y, my) - 22;
 
   // --- Line-item table ------------------------------------------------------
   const colDescX = MARGIN;
@@ -313,16 +317,16 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
     ctx.page.drawLine({
       start: { x: MARGIN, y: ctx.y },
       end: { x: PAGE_W - MARGIN, y: ctx.y },
-      thickness: 0.75,
-      color: RULE,
+      thickness: 1.5,
+      color: RULE_STRONG,
     });
-    ctx.y -= 16;
+    ctx.y -= 18;
   };
 
   const drawRows = (items: PdfLineItem[]) => {
     for (const item of items) {
       const lines = wrap(item.description || "—", font, 10, descW);
-      const rowH = Math.max(lines.length * 13, 14) + 6;
+      const rowH = Math.max(lines.length * 13, 14) + 8;
       ensureSpace(ctx, rowH + 10);
       if (ctx.y === PAGE_H - MARGIN) drawTableHeader(); // redrew header on new page
       const rowTop = ctx.y;
@@ -335,7 +339,7 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
         start: { x: MARGIN, y: ctx.y + 6 },
         end: { x: PAGE_W - MARGIN, y: ctx.y + 6 },
         thickness: 0.4,
-        color: rgb(0.92, 0.93, 0.95),
+        color: ROW_RULE,
       });
     }
     if (items.length === 0) {
@@ -345,22 +349,22 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
   };
 
   const drawTotals = (totals: RenderInput["totals"]) => {
-    ctx.y -= 10;
-    ensureSpace(ctx, totals.length * 16 + 30);
+    ctx.y -= 12;
+    ensureSpace(ctx, totals.length * 18 + 30);
     for (const t of totals) {
       const f = t.strong ? bold : font;
       const size = t.strong ? 12 : 10;
       if (t.strong) {
         ctx.page.drawLine({
-          start: { x: totalsLabelX, y: ctx.y + 12 },
-          end: { x: PAGE_W - MARGIN, y: ctx.y + 12 },
-          thickness: 0.75,
-          color: RULE,
+          start: { x: totalsLabelX, y: ctx.y + 14 },
+          end: { x: PAGE_W - MARGIN, y: ctx.y + 14 },
+          thickness: 1.5,
+          color: RULE_STRONG,
         });
       }
       text(t.label, totalsLabelX, ctx.y, size, f, t.strong ? INK : MUTED);
       rightText(t.value, colAmtRight, ctx.y, size, f, t.strong ? ACCENT : INK);
-      ctx.y -= t.strong ? 20 : 16;
+      ctx.y -= t.strong ? 22 : 17;
     }
   };
 
@@ -372,27 +376,27 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
       if (gi > 0) ctx.y -= 6;
       text(`OPTION ${gi + 1}: ${group.label}`, MARGIN, ctx.y, 12, bold, ACCENT);
       if (group.isRecommended) rightText("RECOMMENDED", colAmtRight, ctx.y, 9, bold, ACCENT);
-      ctx.y -= 16;
+      ctx.y -= 18;
       if (group.description && group.description.trim()) {
         for (const ln of wrap(group.description.trim(), font, 9, CONTENT_W)) {
           ensureSpace(ctx, 14);
           text(ln, MARGIN, ctx.y, 9, font, MUTED);
           ctx.y -= 12;
         }
-        ctx.y -= 2;
+        ctx.y -= 4;
       }
       drawTableHeader();
       drawRows(group.lineItems);
-      ctx.y -= 2;
+      ctx.y -= 4;
       ctx.page.drawLine({
-        start: { x: totalsLabelX, y: ctx.y + 10 },
-        end: { x: PAGE_W - MARGIN, y: ctx.y + 10 },
-        thickness: 0.75,
-        color: RULE,
+        start: { x: totalsLabelX, y: ctx.y + 12 },
+        end: { x: PAGE_W - MARGIN, y: ctx.y + 12 },
+        thickness: 1.5,
+        color: RULE_STRONG,
       });
       text(`Option ${gi + 1} total`, totalsLabelX, ctx.y, 11, bold, INK);
       rightText(money(group.totalCents), colAmtRight, ctx.y, 11, bold, ACCENT);
-      ctx.y -= 20;
+      ctx.y -= 22;
     });
   } else {
     drawTableHeader();
@@ -402,14 +406,14 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
 
   // --- Notes ----------------------------------------------------------------
   if (input.notes && input.notes.trim()) {
-    ctx.y -= 14;
+    ctx.y -= 18;
     ensureSpace(ctx, 60);
-    text("NOTES", MARGIN, ctx.y, 8, bold, MUTED);
-    ctx.y -= 14;
+    text("NOTES", MARGIN, ctx.y, 8, bold, ACCENT);
+    ctx.y -= 15;
     for (const ln of wrap(input.notes.trim(), font, 10, CONTENT_W)) {
       ensureSpace(ctx, 16);
       text(ln, MARGIN, ctx.y, 10, font, INK);
-      ctx.y -= 13;
+      ctx.y -= 14;
     }
   }
 
