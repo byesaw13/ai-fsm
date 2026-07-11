@@ -10,8 +10,8 @@
  */
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 
-const BRAND = "Dovetails Services LLC";
-const BRAND_URL = "mydovetails.com";
+const DEFAULT_BRAND = "Dovetails Services LLC";
+const DEFAULT_BRAND_URL = "mydovetails.com";
 
 const PAGE_W = 612; // US Letter @ 72dpi
 const PAGE_H = 792;
@@ -38,6 +38,20 @@ export interface EstimateOptionGroup {
   lineItems: PdfLineItem[];
 }
 
+/** Optional company branding so the PDF matches Settings / print letterhead. */
+export interface PdfBranding {
+  name?: string | null;
+  tagline?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  /** Absolute path to a PNG/JPEG logo on disk. */
+  logoPath?: string | null;
+  invoiceTerms?: string | null;
+  estimateTerms?: string | null;
+}
+
 export interface InvoicePdfData {
   invoiceNumber: string;
   status: string;
@@ -53,6 +67,7 @@ export interface InvoicePdfData {
   paidCents: number;
   notes?: string | null;
   lineItems: PdfLineItem[];
+  branding?: PdfBranding | null;
 }
 
 export interface EstimatePdfData {
@@ -73,6 +88,7 @@ export interface EstimatePdfData {
   /** When set (multi_option estimates), render priced option sections instead
    *  of a flat line-item table + parent total. */
   options?: EstimateOptionGroup[];
+  branding?: PdfBranding | null;
 }
 
 function money(cents: number): string {
@@ -92,23 +108,42 @@ function fmtDate(d: string | Date | null | undefined): string | null {
   return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 }
 
-/** Greedy word-wrap to a max pixel width for the given font/size. */
+/** Strip internal markers customers should not see. */
+function cleanDescription(text: string): string {
+  return (text ?? "")
+    .replace(/<!--travel-charge-->/g, "")
+    .replace(/\r\n/g, "\n")
+    .trim();
+}
+
+/**
+ * Word-wrap preserving intentional newlines (e.g. travel title + description).
+ * Flatten only runs of spaces/tabs within each paragraph.
+ */
 function wrap(text: string, font: PDFFont, size: number, maxW: number): string[] {
-  const words = (text ?? "").replace(/\s+/g, " ").trim().split(" ");
-  if (words.length === 0 || words[0] === "") return [""];
-  const lines: string[] = [];
-  let cur = "";
-  for (const w of words) {
-    const candidate = cur ? `${cur} ${w}` : w;
-    if (font.widthOfTextAtSize(candidate, size) > maxW && cur) {
-      lines.push(cur);
-      cur = w;
-    } else {
-      cur = candidate;
+  const cleaned = cleanDescription(text);
+  if (!cleaned) return [""];
+  const paragraphs = cleaned.split("\n");
+  const out: string[] = [];
+  for (const para of paragraphs) {
+    const words = para.replace(/[ \t]+/g, " ").trim().split(" ");
+    if (words.length === 0 || words[0] === "") {
+      out.push("");
+      continue;
     }
+    let cur = "";
+    for (const w of words) {
+      const candidate = cur ? `${cur} ${w}` : w;
+      if (font.widthOfTextAtSize(candidate, size) > maxW && cur) {
+        out.push(cur);
+        cur = w;
+      } else {
+        cur = candidate;
+      }
+    }
+    if (cur) out.push(cur);
   }
-  if (cur) lines.push(cur);
-  return lines;
+  return out.length ? out : [""];
 }
 
 interface Ctx {
@@ -145,13 +180,15 @@ interface RenderInput {
   optionGroups?: EstimateOptionGroup[];
   notes?: string | null;
   footer: string;
+  branding?: PdfBranding | null;
 }
 
 async function renderDocument(input: RenderInput): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.setTitle(`${input.docType} ${input.ref}`);
-  doc.setProducer(BRAND);
-  doc.setCreator(BRAND);
+  const producer = input.branding?.name?.trim() || DEFAULT_BRAND;
+  doc.setProducer(producer);
+  doc.setCreator(producer);
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const ctx: Ctx = { doc, page: doc.addPage([PAGE_W, PAGE_H]), font, bold, y: PAGE_H - MARGIN };
@@ -161,16 +198,63 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
   const rightText = (s: string, rightX: number, y: number, size: number, f: PDFFont = font, color = INK) =>
     ctx.page.drawText(s, { x: rightX - f.widthOfTextAtSize(s, size), y, size, font: f, color });
 
-  // --- Header ---------------------------------------------------------------
-  text(BRAND, MARGIN, ctx.y, 20, bold, ACCENT);
-  text(BRAND_URL, MARGIN, ctx.y - 16, 9, font, MUTED);
+  // --- Header (account branding when provided) ------------------------------
+  const brandName = (input.branding?.name?.trim() || DEFAULT_BRAND);
+  const brandUrl = (input.branding?.website?.trim() || DEFAULT_BRAND_URL).replace(/^https?:\/\//, "");
+  const brandTagline = input.branding?.tagline?.trim() || null;
+  const brandContact: string[] = [];
+  if (input.branding?.address) {
+    brandContact.push(
+      ...input.branding.address.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+    );
+  }
+  if (input.branding?.phone) brandContact.push(input.branding.phone);
+  if (input.branding?.email) brandContact.push(input.branding.email);
+
+  // Optional logo (PNG/JPG) — left of company name when present
+  let headerLeft = MARGIN;
+  if (input.branding?.logoPath) {
+    try {
+      const fs = await import("fs");
+      const bytes = fs.readFileSync(input.branding.logoPath);
+      const isPng = bytes[0] === 0x89 && bytes[1] === 0x50;
+      const img = isPng ? await ctx.doc.embedPng(bytes) : await ctx.doc.embedJpg(bytes);
+      const maxH = 42;
+      const maxW = 120;
+      const scale = Math.min(maxW / img.width, maxH / img.height, 1);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      ctx.page.drawImage(img, {
+        x: MARGIN,
+        y: ctx.y - h + 8,
+        width: w,
+        height: h,
+      });
+      headerLeft = MARGIN + w + 12;
+    } catch {
+      /* logo optional — fall back to text brand */
+    }
+  }
+
+  text(brandName, headerLeft, ctx.y, 16, bold, ACCENT);
+  let headerY = ctx.y - 14;
+  if (brandTagline) {
+    text(brandTagline, headerLeft, headerY, 9, font, MUTED);
+    headerY -= 12;
+  }
+  text(brandUrl, headerLeft, headerY, 9, font, MUTED);
+  headerY -= 12;
+  for (const line of brandContact.slice(0, 3)) {
+    text(line, headerLeft, headerY, 8, font, MUTED);
+    headerY -= 11;
+  }
 
   const rightX = PAGE_W - MARGIN;
   rightText(input.docType, rightX, ctx.y, 20, bold, INK);
   rightText(`#${input.ref}`, rightX, ctx.y - 16, 10, font, MUTED);
   rightText(input.status.toUpperCase(), rightX, ctx.y - 30, 9, bold, ACCENT);
 
-  ctx.y -= 46;
+  ctx.y = Math.min(headerY, ctx.y - 40) - 8;
   ctx.page.drawLine({
     start: { x: MARGIN, y: ctx.y },
     end: { x: PAGE_W - MARGIN, y: ctx.y },
@@ -354,6 +438,13 @@ export async function buildInvoicePdf(d: InvoicePdfData): Promise<Uint8Array> {
   if (d.paidCents > 0) totals.push({ label: "Paid", value: `-${money(d.paidCents)}` });
   totals.push({ label: "Balance Due", value: money(balance), strong: true });
 
+  const site = (d.branding?.website?.trim() || DEFAULT_BRAND_URL).replace(/^https?:\/\//, "");
+  const terms = d.branding?.invoiceTerms?.trim();
+  const footer = terms
+    ? terms.slice(0, 900)
+    : "Thank you for your business. Please reference the invoice number with any payment. " +
+      `Questions? Reply to this email or reach us at ${site}.`;
+
   return renderDocument({
     docType: "INVOICE",
     ref: d.invoiceNumber,
@@ -369,9 +460,8 @@ export async function buildInvoicePdf(d: InvoicePdfData): Promise<Uint8Array> {
     lineItems: d.lineItems,
     totals,
     notes: d.notes,
-    footer:
-      "Thank you for your business. Please reference the invoice number with any payment. " +
-      `Questions? Reply to this email or reach us at ${BRAND_URL}.`,
+    footer,
+    branding: d.branding,
   });
 }
 
@@ -385,6 +475,13 @@ export async function buildEstimatePdf(d: EstimatePdfData): Promise<Uint8Array> 
   if (d.depositCents && d.depositCents > 0) {
     totals.push({ label: "Deposit due", value: money(d.depositCents) });
   }
+
+  const site = (d.branding?.website?.trim() || DEFAULT_BRAND_URL).replace(/^https?:\/\//, "");
+  const estTerms = d.branding?.estimateTerms?.trim();
+  const footer = estTerms
+    ? estTerms.slice(0, 900)
+    : "This estimate is provided in good faith and may be adjusted if scope or conditions change. " +
+      `Questions? Reply to this email or reach us at ${site}.`;
 
   return renderDocument({
     optionGroups: multiOption ? d.options : undefined,
@@ -402,8 +499,7 @@ export async function buildEstimatePdf(d: EstimatePdfData): Promise<Uint8Array> 
     lineItems: d.lineItems,
     totals,
     notes: d.notes,
-    footer:
-      "This estimate is provided in good faith and may be adjusted if scope or conditions change. " +
-      `Questions? Reply to this email or reach us at ${BRAND_URL}.`,
+    footer,
+    branding: d.branding,
   });
 }
