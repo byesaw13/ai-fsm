@@ -14,19 +14,20 @@ RUN pnpm install --frozen-lockfile
 
 FROM deps AS build
 COPY . .
-# Refresh workspace links after full source copy (avoids stale Docker cache misses).
-RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @ai-fsm/web build
 
 FROM node:20-alpine AS run
 WORKDIR /app
 ENV NODE_ENV=production
-RUN corepack enable
-COPY --from=build /app/apps/web/.next /app/apps/web/.next
-COPY --from=build /app/apps/web/public /app/apps/web/public
-COPY --from=build /app/apps/web/package.json /app/apps/web/package.json
-COPY --from=build /app/apps/web/node_modules /app/apps/web/node_modules
-COPY --from=build /app/node_modules /app/node_modules
+# Docker sets HOSTNAME to the container ID by default; Next's standalone
+# server.js binds to that unless overridden, which makes it unreachable via
+# localhost (breaks the healthcheck) even though it's reachable on the
+# container's network IP.
+ENV HOSTNAME="0.0.0.0"
+ENV PORT=3000
+COPY --from=build /app/apps/web/.next/standalone ./
+COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=build /app/apps/web/public ./apps/web/public
 WORKDIR /app/apps/web
 EXPOSE 3000
-CMD ["/app/apps/web/node_modules/.bin/next", "start", "--port", "3000"]
+CMD ["node", "server.js"]
