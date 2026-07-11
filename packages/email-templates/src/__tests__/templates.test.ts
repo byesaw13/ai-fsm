@@ -46,6 +46,38 @@ describe("canonical email template snapshots", () => {
     ).toMatchSnapshot();
   });
 
+  it("invoiceEmailHtml paid receipt", () => {
+    expect(
+      invoiceEmailHtml({
+        invoiceNumber: "INV-1001",
+        clientName: "Jane Doe",
+        totalCents: 150000,
+        balanceCents: 0,
+        dueDateStr: null,
+        viewUrl: "https://example.test/invoices/inv-1001",
+        notes: null,
+        isPaid: true,
+        paidAtStr: "July 10, 2026",
+      }),
+    ).toMatchSnapshot();
+  });
+
+  it("invoiceEmailText paid receipt", () => {
+    expect(
+      invoiceEmailText({
+        invoiceNumber: "INV-1001",
+        clientName: "Jane Doe",
+        totalCents: 150000,
+        balanceCents: 0,
+        dueDateStr: null,
+        viewUrl: "https://example.test/invoices/inv-1001",
+        notes: null,
+        isPaid: true,
+        paidAtStr: "July 10, 2026",
+      }),
+    ).toMatchSnapshot();
+  });
+
   it("invoiceFollowupEmailHtml", () => {
     expect(
       invoiceFollowupEmailHtml({
