@@ -24,10 +24,15 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const daySchema = z.object({
-  scheduled_start: z.string().datetime(),
-  scheduled_end: z.string().datetime(),
-});
+const daySchema = z
+  .object({
+    scheduled_start: z.string().datetime(),
+    scheduled_end: z.string().datetime(),
+  })
+  .refine(
+    (d) => new Date(d.scheduled_end).getTime() > new Date(d.scheduled_start).getTime(),
+    { message: "scheduled_end must be after scheduled_start", path: ["scheduled_end"] },
+  );
 
 const bulkBody = z.object({
   assigned_user_id: z.string().uuid().optional(),
