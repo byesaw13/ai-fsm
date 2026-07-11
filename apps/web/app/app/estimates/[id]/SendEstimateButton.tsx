@@ -12,25 +12,32 @@ interface Props {
 }
 
 export function SendEstimateButton({ estimateId, clientEmail, sentAt, emailConfigured }: Props) {
-  const [pending, setPending] = useState(false);
+  const [pending, setPending] = useState<"send" | "mark" | null>(null);
   const { success, error } = useToast();
   const router = useRouter();
 
-  if (!clientEmail && emailConfigured) {
-    return (
-      <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-        Add an email address to this client to enable sending.
-      </p>
-    );
-  }
+  const canEmail = emailConfigured && !!clientEmail;
 
-  async function handleSend() {
-    setPending(true);
+  async function handleAction(mode: "send" | "mark") {
+    setPending(mode);
     try {
-      const res = await fetch(`/api/v1/estimates/${estimateId}/send`, { method: "POST" });
-      const json = await res.json() as { sent?: boolean; sentTo?: string | null; emailSkipped?: boolean; error?: { message?: string } };
+      const res = await fetch(`/api/v1/estimates/${estimateId}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mode === "mark" ? { markOnly: true } : {}),
+      });
+      const json = await res.json() as {
+        sent?: boolean;
+        sentTo?: string | null;
+        emailSkipped?: boolean;
+        error?: { message?: string };
+      };
       if (res.ok && json.sent) {
-        success(json.sentTo ? `Estimate sent to ${json.sentTo}` : "Estimate marked as sent");
+        if (json.emailSkipped || mode === "mark" || !json.sentTo) {
+          success(sentAt ? "Estimate marked as resent" : "Estimate marked as sent");
+        } else {
+          success(`Estimate sent to ${json.sentTo}`);
+        }
         router.refresh();
       } else {
         error(json.error?.message ?? "Failed to send estimate");
@@ -38,44 +45,62 @@ export function SendEstimateButton({ estimateId, clientEmail, sentAt, emailConfi
     } catch {
       error("Network error — could not send estimate");
     } finally {
-      setPending(false);
+      setPending(null);
     }
   }
 
-  const buttonLabel = pending
-    ? "Sending…"
-    : !emailConfigured
-    ? sentAt ? "Mark as Resent" : "Mark as Sent"
-    : sentAt ? "Resend to Client" : "Send to Client";
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+      {canEmail && (
+        <button
+          type="button"
+          onClick={() => handleAction("send")}
+          disabled={!!pending}
+          data-testid="transition-btn-sent"
+          style={{
+            display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
+            padding: "8px 16px", borderRadius: 6, border: "none", cursor: pending ? "not-allowed" : "pointer",
+            background: "var(--accent)", color: "#fff", fontWeight: 600, fontSize: "var(--text-sm)",
+            opacity: pending ? 0.7 : 1,
+          }}
+        >
+          {pending === "send" ? "Sending…" : sentAt ? "Resend to Client" : "Send to Client"}
+        </button>
+      )}
+
       <button
         type="button"
-        onClick={handleSend}
-        disabled={pending}
-        data-testid="transition-btn-sent"
+        onClick={() => handleAction("mark")}
+        disabled={!!pending}
+        // Primary action when email is unavailable — e2e + staff offline path
+        data-testid={canEmail ? "transition-btn-mark-sent" : "transition-btn-sent"}
         style={{
           display: "inline-flex", alignItems: "center", gap: "var(--space-2)",
-          padding: "8px 16px", borderRadius: 6, border: "none", cursor: pending ? "not-allowed" : "pointer",
-          background: "var(--accent)", color: "#fff", fontWeight: 600, fontSize: "var(--text-sm)",
+          padding: "8px 16px", borderRadius: 6,
+          border: canEmail ? "1px solid var(--border)" : "none",
+          cursor: pending ? "not-allowed" : "pointer",
+          background: canEmail ? "var(--bg-elevated, #fff)" : "var(--accent)",
+          color: canEmail ? "var(--fg)" : "#fff",
+          fontWeight: 600, fontSize: "var(--text-sm)",
           opacity: pending ? 0.7 : 1,
         }}
       >
-        {buttonLabel}
+        {pending === "mark"
+          ? "Updating…"
+          : sentAt
+            ? "Mark as Resent (no email)"
+            : "Mark as Sent"}
       </button>
-      {emailConfigured && clientEmail && (
-        <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-          {sentAt
-            ? `Last sent ${new Date(sentAt).toLocaleDateString()} — ${clientEmail}. Client can approve/decline via email.`
-            : `Will be sent to ${clientEmail} with approve/decline links.`}
-        </p>
-      )}
-      {!emailConfigured && (
-        <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-          Email not configured — status will be updated without sending.
-        </p>
-      )}
+
+      <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+        {canEmail
+          ? sentAt
+            ? `Last sent ${new Date(sentAt).toLocaleDateString()} — ${clientEmail}. Or mark sent without re-emailing.`
+            : `Email to ${clientEmail} with approve/decline links, or mark as sent if you delivered it in person / offline.`
+          : !clientEmail
+            ? "No client email on file — use Mark as Sent after delivering offline (portal link / PDF / in person)."
+            : "Email not configured — Mark as Sent updates status without delivery."}
+      </p>
     </div>
   );
 }

@@ -225,10 +225,13 @@ export default async function EstimateDetailPage({
         <EstimateReviewPanel estimateId={estimate.id} />
       )}
 
-      {/* Send to Client — owner/admin only, non-terminal estimates */}
+      {/* Send / Mark as Sent — owner/admin only, non-terminal estimates */}
       {canTransition && !["approved", "declined", "expired"].includes(currentStatus) && (
-        <div className="card action-card">
-          <h2>Send to Client</h2>
+        <div className="card action-card" data-testid="estimate-send-panel">
+          <h2>{currentStatus === "draft" ? "Send or Mark as Sent" : "Resend"}</h2>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Email the client when you have an address, or manually mark as sent after offline delivery (PDF, portal link, in person).
+          </p>
           <SendEstimateButton
             estimateId={estimate.id}
             clientEmail={estimate.client_email}
@@ -238,10 +241,10 @@ export default async function EstimateDetailPage({
         </div>
       )}
 
-      {/* Status Transitions — owner/admin only */}
+      {/* Manual approve / decline / expire — owner/admin only */}
       {canTransition && allowedTransitions.length > 0 && (
         <div className="card action-card" data-testid="estimate-transition-panel">
-          <h2>Transition Status</h2>
+          <h2>Manual Status</h2>
           <EstimateTransitionForm
             estimateId={estimate.id}
             allowedTransitions={allowedTransitions as EstimateStatus[]}
