@@ -1,10 +1,11 @@
 import type { PoolClient } from "pg";
-import type {
-  TravelCalculationResult,
-  TravelCalculationSource,
-  TravelChargeMode,
-  TripCalculationMethod,
-  TripDirectionMode,
+import {
+  buildTravelInvoiceLineDrafts,
+  type TravelCalculationResult,
+  type TravelCalculationSource,
+  type TravelChargeMode,
+  type TripCalculationMethod,
+  type TripDirectionMode,
 } from "@ai-fsm/domain";
 
 export interface TravelSnapshotRow {
@@ -190,11 +191,18 @@ function normalizeSnapshot(row: TravelSnapshotRow): TravelSnapshotRow {
   };
 }
 
+/** Stable marker embedded in customer-facing travel line descriptions. */
+export const TRAVEL_LINE_MARKER = "<!--travel-charge-->";
+
 /**
  * Apply travel charge to an estimate:
  * - updates travel_surcharge_cents
  * - upserts customer-facing line when charge_mode = separate_line
  * - stores snapshot pointer
+ *
+ * Multi-option estimates store priced choices under option_id; parent totals are
+ * intentionally option-driven. Travel apply is blocked at the API for multi_option;
+ * this helper still refuses to rewrite parent totals from option_id IS NULL lines.
  */
 export async function applyTravelToEstimate(
   client: PoolClient,
@@ -213,6 +221,13 @@ export async function applyTravelToEstimate(
       ? 0
       : snapshot.total_travel_charge_cents;
 
+  const modeRow = await client.query<{ presentation_mode: string | null }>(
+    `SELECT presentation_mode FROM estimates WHERE id = $1 AND account_id = $2`,
+    [estimateId, opts.accountId]
+  );
+  const presentationMode = modeRow.rows[0]?.presentation_mode ?? "standard";
+  const isMultiOption = presentationMode === "multi_option";
+
   // Remove prior travel surcharge line items (we manage a single travel line)
   await client.query(
     `DELETE FROM estimate_line_items
@@ -221,30 +236,50 @@ export async function applyTravelToEstimate(
     [estimateId]
   );
 
-  if (chargeMode === "separate_line" && chargeCents > 0) {
+  // Separate itemized travel lines on multi_option would attach as base
+  // (option_id NULL) lines and corrupt totals — only emit for standard estimates.
+  if (!isMultiOption && chargeMode === "separate_line" && chargeCents > 0) {
+    const drafts = buildTravelInvoiceLineDrafts({
+      mileage_charge_cents: snapshot.mileage_charge_cents,
+      travel_time_charge_cents: snapshot.travel_time_charge_cents,
+      total_travel_charge_cents: snapshot.total_travel_charge_cents,
+      billable_miles: snapshot.billable_miles,
+      billable_travel_minutes: snapshot.billable_travel_minutes,
+      mileage_rate_cents: snapshot.mileage_rate_cents,
+      travel_time_rate_cents: snapshot.travel_time_rate_cents,
+      title: settingsLineTitle,
+      description: settingsLineDescription,
+      marker: TRAVEL_LINE_MARKER,
+    });
     const maxSort = await client.query<{ m: number }>(
       `SELECT COALESCE(MAX(sort_order), -1) AS m FROM estimate_line_items WHERE estimate_id = $1`,
       [estimateId]
     );
-    const sortOrder = Number(maxSort.rows[0]?.m ?? -1) + 1;
-    const desc = `${settingsLineTitle}\n${settingsLineDescription}`;
-    await client.query(
-      `INSERT INTO estimate_line_items
-         (estimate_id, description, quantity, unit_price_cents, total_cents,
-          sort_order, line_item_type, visible_to_customer, adjustment_type)
-       VALUES ($1, $2, 1, $3, $3, $4, 'adjustment', true, 'travel_surcharge')`,
-      [estimateId, desc, chargeCents, sortOrder]
-    );
+    let sortOrder = Number(maxSort.rows[0]?.m ?? -1) + 1;
+    for (const draft of drafts) {
+      const qty = draft.quantity > 0 ? draft.quantity : 1;
+      await client.query(
+        `INSERT INTO estimate_line_items
+           (estimate_id, description, quantity, unit_price_cents, total_cents,
+            sort_order, line_item_type, visible_to_customer, adjustment_type)
+         VALUES ($1, $2, $3, $4, $5, $6, 'adjustment', true, 'travel_surcharge')`,
+        [estimateId, draft.description, qty, draft.unit_price_cents, draft.total_cents, sortOrder++]
+      );
+    }
   }
 
   // travel_surcharge_cents: used for include_in_labor / custom without a line item.
   // separate_line puts the amount on the line item only — leave field 0 to avoid double-count.
+  // For multi_option we still store the snapshot + surcharge field for audit, but do not
+  // rewrite parent totals (see recalculateEstimateTotals).
   const surchargeField =
     chargeMode === "include_in_labor"
       ? snapshot.total_travel_charge_cents
       : chargeMode === "custom"
         ? chargeCents
-        : 0;
+        : chargeMode === "separate_line" && isMultiOption
+          ? chargeCents
+          : 0;
 
   await client.query(
     `UPDATE estimates
@@ -256,7 +291,7 @@ export async function applyTravelToEstimate(
     [snapshot.id, chargeMode, surchargeField, estimateId, opts.accountId]
   );
 
-  // Recalculate estimate totals from line items + surcharge fields
+  // Recalculate estimate totals from line items + surcharge fields (no-op for multi_option)
   await recalculateEstimateTotals(client, estimateId, opts.accountId);
 }
 
@@ -269,12 +304,19 @@ async function recalculateEstimateTotals(
     travel_surcharge_cents: number;
     risk_adjustment_cents: number;
     tax_cents: number;
+    presentation_mode: string | null;
   }>(
-    `SELECT travel_surcharge_cents, risk_adjustment_cents, tax_cents
+    `SELECT travel_surcharge_cents, risk_adjustment_cents, tax_cents, presentation_mode
      FROM estimates WHERE id = $1 AND account_id = $2`,
     [estimateId, accountId]
   );
   if (!est.rowCount) return;
+
+  // Multi-option: priced choices live under option_id; parent subtotal/total are not
+  // derived from option_id IS NULL lines. Never overwrite them from that SUM.
+  if (est.rows[0].presentation_mode === "multi_option") {
+    return;
+  }
 
   // If travel is a separate line item, it is already in SUM(line items).
   // travel_surcharge_cents may also be set — only add surcharge field when
@@ -306,8 +348,146 @@ async function recalculateEstimateTotals(
   );
 }
 
+/** Delete any prior travel charge lines on an invoice. */
+export async function deleteInvoiceTravelLines(
+  client: PoolClient,
+  invoiceId: string,
+  settingsLineTitle: string
+): Promise<void> {
+  await client.query(
+    `DELETE FROM invoice_line_items
+     WHERE invoice_id = $1
+       AND (
+         description ILIKE $2 || '%'
+         OR description ILIKE 'Travel and Service-Area Adjustment%'
+         OR description ILIKE 'Travel & mileage%'
+         OR description LIKE '%' || $3 || '%'
+       )`,
+    [invoiceId, settingsLineTitle, TRAVEL_LINE_MARKER]
+  );
+}
+
 /**
- * Apply travel to a draft invoice as a line item (or remove).
+ * Insert itemized travel lines (mileage + travel time when both present)
+ * from a snapshot. Does not update invoice totals.
+ */
+export async function insertInvoiceTravelLines(
+  client: PoolClient,
+  opts: {
+    invoiceId: string;
+    snapshot: Pick<
+      TravelSnapshotRow,
+      | "mileage_charge_cents"
+      | "travel_time_charge_cents"
+      | "total_travel_charge_cents"
+      | "billable_miles"
+      | "billable_travel_minutes"
+      | "mileage_rate_cents"
+      | "travel_time_rate_cents"
+    >;
+    settingsLineTitle: string;
+    settingsLineDescription: string;
+  }
+): Promise<number> {
+  const drafts = buildTravelInvoiceLineDrafts({
+    mileage_charge_cents: opts.snapshot.mileage_charge_cents,
+    travel_time_charge_cents: opts.snapshot.travel_time_charge_cents,
+    total_travel_charge_cents: opts.snapshot.total_travel_charge_cents,
+    billable_miles: opts.snapshot.billable_miles,
+    billable_travel_minutes: opts.snapshot.billable_travel_minutes,
+    mileage_rate_cents: opts.snapshot.mileage_rate_cents,
+    travel_time_rate_cents: opts.snapshot.travel_time_rate_cents,
+    title: opts.settingsLineTitle,
+    description: opts.settingsLineDescription,
+    marker: TRAVEL_LINE_MARKER,
+  });
+  if (drafts.length === 0) return 0;
+
+  const maxSort = await client.query<{ m: number }>(
+    `SELECT COALESCE(MAX(sort_order), -1) AS m FROM invoice_line_items WHERE invoice_id = $1`,
+    [opts.invoiceId]
+  );
+  let sortOrder = Number(maxSort.rows[0]?.m ?? -1) + 1;
+
+  for (const draft of drafts) {
+    // quantity must be > 0 per check constraint
+    const qty = draft.quantity > 0 ? draft.quantity : 1;
+    await client.query(
+      `INSERT INTO invoice_line_items
+         (invoice_id, description, quantity, unit_price_cents, total_cents,
+          line_item_type, sort_order, visible_to_customer)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, true)`,
+      [
+        opts.invoiceId,
+        draft.description,
+        qty,
+        draft.unit_price_cents,
+        draft.total_cents,
+        draft.line_item_type,
+        sortOrder++,
+      ]
+    );
+  }
+  return drafts.length;
+}
+
+/**
+ * Ensure an invoice has itemized travel lines for a carried snapshot.
+ * Used on estimate→invoice convert when travel was include_in_labor (no line)
+ * or when a single combined line should be expanded to mileage + time.
+ *
+ * When `replaceExisting` is true, removes prior travel lines first.
+ * Does not rewrite invoice totals (convert keeps estimate totals).
+ */
+export async function ensureInvoiceTravelLinesFromSnapshot(
+  client: PoolClient,
+  opts: {
+    invoiceId: string;
+    snapshot: TravelSnapshotRow;
+    settingsLineTitle: string;
+    settingsLineDescription: string;
+    replaceExisting?: boolean;
+  }
+): Promise<number> {
+  if (opts.snapshot.total_travel_charge_cents <= 0) return 0;
+  if (opts.snapshot.charge_mode === "waive") return 0;
+
+  if (opts.replaceExisting) {
+    await deleteInvoiceTravelLines(client, opts.invoiceId, opts.settingsLineTitle);
+  } else {
+    const existing = await client.query(
+      `SELECT 1 FROM invoice_line_items
+       WHERE invoice_id = $1 AND description LIKE '%' || $2 || '%'
+       LIMIT 1`,
+      [opts.invoiceId, TRAVEL_LINE_MARKER]
+    );
+    // Also detect legacy single travel lines without marker
+    const legacy = await client.query(
+      `SELECT 1 FROM invoice_line_items
+       WHERE invoice_id = $1
+         AND (
+           description ILIKE $2 || '%'
+           OR description ILIKE 'Travel and Service-Area Adjustment%'
+         )
+       LIMIT 1`,
+      [opts.invoiceId, opts.settingsLineTitle]
+    );
+    if ((existing.rowCount ?? 0) > 0 || (legacy.rowCount ?? 0) > 0) {
+      // Expand a single legacy line into itemized components when possible
+      await deleteInvoiceTravelLines(client, opts.invoiceId, opts.settingsLineTitle);
+    }
+  }
+
+  return insertInvoiceTravelLines(client, {
+    invoiceId: opts.invoiceId,
+    snapshot: opts.snapshot,
+    settingsLineTitle: opts.settingsLineTitle,
+    settingsLineDescription: opts.settingsLineDescription,
+  });
+}
+
+/**
+ * Apply travel to a draft invoice as itemized line items (or remove).
  */
 export async function applyTravelToInvoice(
   client: PoolClient,
@@ -322,33 +502,15 @@ export async function applyTravelToInvoice(
 ): Promise<void> {
   const { invoiceId, snapshot, billingMode } = opts;
 
-  // Remove prior travel lines (match by description prefix or store via notes pattern)
-  await client.query(
-    `DELETE FROM invoice_line_items
-     WHERE invoice_id = $1
-       AND (
-         description ILIKE 'Travel and Service-Area Adjustment%'
-         OR description ILIKE 'Travel & mileage%'
-       )`,
-    [invoiceId]
-  );
+  await deleteInvoiceTravelLines(client, invoiceId, opts.settingsLineTitle);
 
-  const chargeCents =
-    billingMode === "none" ? 0 : snapshot.total_travel_charge_cents;
-
-  if (chargeCents > 0 && billingMode !== "none") {
-    const maxSort = await client.query<{ m: number }>(
-      `SELECT COALESCE(MAX(sort_order), -1) AS m FROM invoice_line_items WHERE invoice_id = $1`,
-      [invoiceId]
-    );
-    const sortOrder = Number(maxSort.rows[0]?.m ?? -1) + 1;
-    const desc = `${opts.settingsLineTitle}\n${opts.settingsLineDescription}`;
-    await client.query(
-      `INSERT INTO invoice_line_items
-         (invoice_id, description, quantity, unit_price_cents, total_cents, line_item_type, sort_order)
-       VALUES ($1, $2, 1, $3, $3, 'adjustment', $4)`,
-      [invoiceId, desc, chargeCents, sortOrder]
-    );
+  if (billingMode !== "none" && snapshot.total_travel_charge_cents > 0) {
+    await insertInvoiceTravelLines(client, {
+      invoiceId,
+      snapshot,
+      settingsLineTitle: opts.settingsLineTitle,
+      settingsLineDescription: opts.settingsLineDescription,
+    });
   }
 
   await client.query(
@@ -360,7 +522,7 @@ export async function applyTravelToInvoice(
     [snapshot.id, billingMode, invoiceId, opts.accountId]
   );
 
-  // Recalc invoice totals
+  // Recalc invoice totals from all lines (itemized travel included)
   const totals = await client.query<{ subtotal: string }>(
     `SELECT COALESCE(SUM(total_cents), 0)::text AS subtotal
      FROM invoice_line_items WHERE invoice_id = $1`,

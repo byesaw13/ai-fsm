@@ -31,6 +31,12 @@ import {
 } from "@/lib/invoices/line-items";
 import { trackedLaborMinutesFromActivityEntries } from "@/lib/invoices/tracked-labor";
 import { LABOR_CUSTOMER_RATE_CENTS_PER_HOUR } from "@ai-fsm/domain";
+import { loadTravelSettings } from "@/lib/travel/settings";
+import {
+  TRAVEL_LINE_MARKER,
+  ensureInvoiceTravelLinesFromSnapshot,
+  getTravelSnapshot,
+} from "@/lib/travel/snapshots";
 
 interface CreateFinalInvoiceParams {
   client: PoolClient;
@@ -85,6 +91,7 @@ export async function createDraftFinalInvoiceForJob(
     total_cents: number | null;
     estimate_notes: string | null;
     deposit_cents: number | null;
+    travel_snapshot_id: string | null;
   }>(
     `SELECT j.client_id, j.property_id,
             e.id           AS estimate_id,
@@ -93,11 +100,12 @@ export async function createDraftFinalInvoiceForJob(
             e.tax_cents,
             e.total_cents,
             e.notes        AS estimate_notes,
-            e.deposit_cents
+            e.deposit_cents,
+            e.travel_snapshot_id
      FROM jobs j
      LEFT JOIN LATERAL (
        SELECT id, presentation_mode, subtotal_cents, tax_cents, total_cents,
-              notes, deposit_cents
+              notes, deposit_cents, travel_snapshot_id
        FROM estimates
        WHERE job_id = j.id AND account_id = j.account_id AND status = 'approved'
        ORDER BY created_at DESC
@@ -129,8 +137,10 @@ export async function createDraftFinalInvoiceForJob(
       unit_price_cents: number;
       line_item_type: "labor" | "materials" | "handling_fee" | "adjustment";
       sort_order: number;
+      adjustment_type: string | null;
     }>(
-      `SELECT description, quantity, unit_price_cents, line_item_type, sort_order
+      `SELECT description, quantity, unit_price_cents, line_item_type, sort_order,
+              adjustment_type
        FROM estimate_line_items
        WHERE estimate_id = $1
          AND option_id IS NULL
@@ -139,6 +149,15 @@ export async function createDraftFinalInvoiceForJob(
       [job.estimate_id]
     );
     for (const row of estItems.rows) {
+      // Skip estimate travel lines — re-materialize as itemized invoice lines
+      // from the travel snapshot so mileage + travel time both appear.
+      if (
+        row.adjustment_type === "travel_surcharge" ||
+        row.description.includes(TRAVEL_LINE_MARKER) ||
+        row.description.toLowerCase().includes("travel and service-area")
+      ) {
+        continue;
+      }
       lineItems.push({
         description: row.description,
         quantity: parseFloat(row.quantity),
@@ -252,11 +271,11 @@ export async function createDraftFinalInvoiceForJob(
        (account_id, client_id, job_id, estimate_id, property_id,
         status, invoice_kind, invoice_number,
         subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
-        notes, created_by)
+        notes, created_by, travel_snapshot_id, travel_billing_mode)
      VALUES ($1, $2, $3, $4, $5,
              'draft', 'final', $6,
              $7, $8, $9, 0, $10,
-             $11, $12)
+             $11, $12, $13, $14)
      RETURNING id`,
     [
       accountId,
@@ -271,6 +290,8 @@ export async function createDraftFinalInvoiceForJob(
       depositCreditCents,
       finalNotes,
       userId,
+      job.travel_snapshot_id,
+      job.travel_snapshot_id ? "estimated" : null,
     ]
   );
   const invoiceId = invoiceRes.rows[0].id;
@@ -285,6 +306,28 @@ export async function createDraftFinalInvoiceForJob(
       line_item_type: li.line_item_type,
       sort_order: i,
     });
+  }
+
+  // Itemized travel (mileage + travel time) so customer-facing invoices list them
+  let travelLineCount = 0;
+  if (job.travel_snapshot_id) {
+    const snap = await getTravelSnapshot(client, job.travel_snapshot_id);
+    if (snap && snap.total_travel_charge_cents > 0 && snap.charge_mode !== "waive") {
+      const travelSettings = await loadTravelSettings(client, accountId);
+      travelLineCount = await ensureInvoiceTravelLinesFromSnapshot(client, {
+        invoiceId,
+        snapshot: snap,
+        settingsLineTitle: travelSettings.customer_facing_line_title,
+        settingsLineDescription: travelSettings.customer_facing_description,
+        replaceExisting: true,
+      });
+      await client.query(
+        `UPDATE travel_calculation_snapshots
+         SET invoice_id = $1, updated_at = now()
+         WHERE id = $2 AND account_id = $3 AND invoice_id IS NULL`,
+        [invoiceId, job.travel_snapshot_id, accountId]
+      );
+    }
   }
 
   // ── Audit log ────────────────────────────────────────────────────────────
@@ -302,9 +345,10 @@ export async function createDraftFinalInvoiceForJob(
       estimate_id: job.estimate_id,
       total_cents: totalCents,
       deposit_credit_cents: depositCreditCents,
-      line_item_count: lineItems.length,
+      line_item_count: lineItems.length + travelLineCount,
+      travel_line_count: travelLineCount,
     },
   });
 
-  return { invoiceId, lineItemCount: lineItems.length };
+  return { invoiceId, lineItemCount: lineItems.length + travelLineCount };
 }

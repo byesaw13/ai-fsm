@@ -9,10 +9,15 @@
 import type { PoolClient } from "pg";
 import { buildClientDocumentFilename } from "@ai-fsm/domain";
 import {
+  resolveCompanyBranding,
+  type CompanyProfileSettings,
+} from "@/lib/company/branding";
+import {
   buildInvoicePdf,
   buildEstimatePdf,
   type PdfLineItem,
   type EstimateOptionGroup,
+  type PdfBranding,
 } from "./document-pdf";
 
 export interface LoadedPdf {
@@ -30,6 +35,29 @@ function mapLineItems(rows: Array<Record<string, unknown>>): PdfLineItem[] {
     unitPriceCents: Number(r.unit_price_cents ?? 0),
     totalCents: Number(r.total_cents ?? 0),
   }));
+}
+
+function brandingFromAccount(
+  accountName: string,
+  settings: unknown,
+  accountId: string
+): PdfBranding {
+  const b = resolveCompanyBranding(
+    accountName,
+    settings as CompanyProfileSettings | null,
+    accountId
+  );
+  return {
+    name: b.name,
+    tagline: b.tagline,
+    address: b.address,
+    phone: b.phone,
+    email: b.email,
+    website: b.website,
+    logoPath: b.logoPath,
+    invoiceTerms: b.invoiceTerms,
+    estimateTerms: b.estimateTerms,
+  };
 }
 
 /** Filename status bucket — mirrors the invoice/estimate detail pages. */
@@ -50,9 +78,11 @@ export async function loadInvoicePdf(
             i.total_cents, i.paid_cents, i.due_date, i.notes, i.sent_at, i.created_at,
             c.id AS client_id, c.name AS client_name, c.email AS client_email,
             j.title AS job_title,
-            p.address AS property_address
+            p.address AS property_address,
+            a.name AS account_name, a.settings AS account_settings
      FROM invoices i
      JOIN clients c ON c.id = i.client_id
+     JOIN accounts a ON a.id = i.account_id
      LEFT JOIN jobs j ON j.id = i.job_id
      LEFT JOIN properties p ON p.id = i.property_id
      WHERE i.id = $1 AND i.account_id = $2`,
@@ -70,6 +100,12 @@ export async function loadInvoicePdf(
     [id],
   );
 
+  const branding = brandingFromAccount(
+    String(inv.account_name ?? ""),
+    inv.account_settings,
+    accountId
+  );
+
   const bytes = await buildInvoicePdf({
     invoiceNumber: String(inv.invoice_number),
     status: String(inv.status),
@@ -85,6 +121,7 @@ export async function loadInvoicePdf(
     paidCents: Number(inv.paid_cents ?? 0),
     notes: inv.notes as string | null,
     lineItems: mapLineItems(lineItems.rows),
+    branding,
   });
 
   const filename = buildClientDocumentFilename({
@@ -114,9 +151,11 @@ export async function loadEstimatePdf(
             e.deposit_cents, e.expires_at, e.notes, e.sent_at, e.created_at,
             c.id AS client_id, c.name AS client_name, c.email AS client_email,
             j.title AS job_title,
-            p.address AS property_address
+            p.address AS property_address,
+            a.name AS account_name, a.settings AS account_settings
      FROM estimates e
      JOIN clients c ON c.id = e.client_id
+     JOIN accounts a ON a.id = e.account_id
      LEFT JOIN jobs j ON j.id = e.job_id
      LEFT JOIN properties p ON p.id = e.property_id
      WHERE e.id = $1 AND e.account_id = $2`,
@@ -166,6 +205,11 @@ export async function loadEstimatePdf(
   }
 
   const ref = id.slice(0, 8).toUpperCase();
+  const branding = brandingFromAccount(
+    String(est.account_name ?? ""),
+    est.account_settings,
+    accountId
+  );
   const bytes = await buildEstimatePdf({
     estimateRef: ref,
     status: String(est.status),
@@ -182,6 +226,7 @@ export async function loadEstimatePdf(
     notes: est.notes as string | null,
     lineItems: mapLineItems(lineItems.rows),
     options,
+    branding,
   });
 
   const filename = buildClientDocumentFilename({

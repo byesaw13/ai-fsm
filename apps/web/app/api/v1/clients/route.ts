@@ -37,6 +37,10 @@ const createClientBody = z.object({
     ])
     .optional()
     .default("standard_policy"),
+  custom_included_one_way_miles: z.number().min(0).max(500).nullable().optional(),
+  custom_mileage_rate_cents: z.number().int().min(0).nullable().optional(),
+  custom_travel_time_rate_cents: z.number().int().min(0).nullable().optional(),
+  minimum_project_value_exempt: z.boolean().optional(),
 });
 
 function validationError(parsed: z.SafeParseError<unknown>, traceId: string) {
@@ -111,12 +115,18 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       zip,
       relationship_type,
       travel_rule,
+      custom_included_one_way_miles,
+      custom_mileage_rate_cents,
+      custom_travel_time_rate_cents,
+      minimum_project_value_exempt,
     } = parsed.data;
     const result = await client.query(
       `INSERT INTO clients
          (account_id, name, email, phone, notes, company_name, address_line1, city, state, zip,
-          relationship_type, travel_rule)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          relationship_type, travel_rule,
+          custom_included_one_way_miles, custom_mileage_rate_cents, custom_travel_time_rate_cents,
+          minimum_project_value_exempt)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        RETURNING *`,
       [
         session.accountId,
@@ -131,6 +141,10 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
         zip || null,
         relationship_type ?? "standard",
         travel_rule ?? "standard_policy",
+        custom_included_one_way_miles ?? null,
+        custom_mileage_rate_cents ?? null,
+        custom_travel_time_rate_cents ?? null,
+        minimum_project_value_exempt ?? false,
       ]
     );
 

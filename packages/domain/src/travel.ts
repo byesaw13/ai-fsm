@@ -550,6 +550,108 @@ export function resolveTripCount(input: {
 }
 
 /**
+ * Customer-facing invoice/estimate line drafts for itemized travel.
+ *
+ * Prefer separate mileage + travel-time lines when both components are present
+ * and sum to the charged total. Fall back to a single combined line for custom
+ * overrides or single-component charges.
+ */
+export interface TravelInvoiceLineDraft {
+  description: string;
+  quantity: number;
+  unit_price_cents: number;
+  total_cents: number;
+  line_item_type: "adjustment";
+}
+
+export function buildTravelInvoiceLineDrafts(input: {
+  mileage_charge_cents: number;
+  travel_time_charge_cents: number;
+  total_travel_charge_cents: number;
+  billable_miles: number;
+  billable_travel_minutes: number;
+  mileage_rate_cents: number;
+  travel_time_rate_cents: number;
+  /** Customer-facing title (e.g. Travel and Service-Area Adjustment). */
+  title: string;
+  /** Customer-facing description body. */
+  description: string;
+  /** Marker appended so re-apply can find lines reliably. */
+  marker?: string;
+}): TravelInvoiceLineDraft[] {
+  const total = Math.max(0, Math.round(input.total_travel_charge_cents));
+  if (total <= 0) return [];
+
+  const marker = input.marker ?? "";
+  const footer = [input.description.trim(), marker].filter(Boolean).join("\n");
+  const miles = Math.max(0, Number(input.billable_miles) || 0);
+  const mileageCharge = Math.max(0, Math.round(input.mileage_charge_cents));
+  const timeCharge = Math.max(0, Math.round(input.travel_time_charge_cents));
+  const minutes = Math.max(0, Math.round(input.billable_travel_minutes));
+  const hours = minutes / 60;
+  const componentsSum = mileageCharge + timeCharge;
+  const componentsMatchTotal = componentsSum === total;
+
+  const lines: TravelInvoiceLineDraft[] = [];
+
+  if (componentsMatchTotal && mileageCharge > 0 && miles > 0) {
+    const rate = input.mileage_rate_cents;
+    // Prefer qty=miles × rate when it multiplies cleanly; else lump sum.
+    const unit = rate > 0 ? rate : mileageCharge;
+    const qty = rate > 0 ? Math.round((mileageCharge / rate) * 1000) / 1000 : 1;
+    lines.push({
+      description: [
+        `${input.title} — Mileage`,
+        `${miles.toFixed(1)} billable mi @ $${(rate / 100).toFixed(2)}/mi`,
+        footer,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      quantity: qty > 0 ? qty : 1,
+      unit_price_cents: unit,
+      total_cents: mileageCharge,
+      line_item_type: "adjustment",
+    });
+  }
+
+  if (componentsMatchTotal && timeCharge > 0 && minutes > 0) {
+    const rate = input.travel_time_rate_cents;
+    const unit = rate > 0 ? rate : timeCharge;
+    const qty = rate > 0 ? Math.round((timeCharge / rate) * 1000) / 1000 : 1;
+    const hrsLabel =
+      hours >= 1
+        ? `${hours % 1 === 0 ? hours.toFixed(0) : hours.toFixed(2)} hr`
+        : `${minutes} min`;
+    lines.push({
+      description: [
+        `${input.title} — Travel time`,
+        `${hrsLabel} @ $${(rate / 100).toFixed(2)}/hr`,
+        footer,
+      ]
+        .filter(Boolean)
+        .join("\n"),
+      quantity: qty > 0 ? qty : 1,
+      unit_price_cents: unit,
+      total_cents: timeCharge,
+      line_item_type: "adjustment",
+    });
+  }
+
+  if (lines.length > 0) return lines;
+
+  // Custom total / waived components / single combined charge
+  return [
+    {
+      description: [input.title, footer].filter(Boolean).join("\n"),
+      quantity: 1,
+      unit_price_cents: total,
+      total_cents: total,
+      line_item_type: "adjustment",
+    },
+  ];
+}
+
+/**
  * Diff estimated vs actual travel for invoice reconciliation.
  * Never auto-applies a higher charge — caller must require owner review.
  */

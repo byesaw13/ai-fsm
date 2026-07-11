@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_TRAVEL_SETTINGS,
+  buildTravelInvoiceLineDrafts,
   calculateTravelCharges,
   compareTravelSnapshots,
   determinePolicyTier,
@@ -227,6 +228,63 @@ describe("invoice estimate vs actual", () => {
       actual_total_cents: 8000,
     });
     expect(d.requires_owner_review).toBe(false);
+  });
+});
+
+describe("buildTravelInvoiceLineDrafts", () => {
+  const base = {
+    title: "Travel and Service-Area Adjustment",
+    description: "Outside standard service area.",
+    marker: "<!--travel-charge-->",
+  };
+
+  it("splits mileage and travel time into separate itemized lines", () => {
+    const lines = buildTravelInvoiceLineDrafts({
+      ...base,
+      mileage_charge_cents: 5880,
+      travel_time_charge_cents: 19125,
+      total_travel_charge_cents: 25005,
+      billable_miles: 84,
+      billable_travel_minutes: 135,
+      mileage_rate_cents: 70,
+      travel_time_rate_cents: 8500,
+    });
+    expect(lines).toHaveLength(2);
+    expect(lines[0].description).toContain("Mileage");
+    expect(lines[0].total_cents).toBe(5880);
+    expect(lines[1].description).toContain("Travel time");
+    expect(lines[1].total_cents).toBe(19125);
+    expect(lines.every((l) => l.description.includes("<!--travel-charge-->"))).toBe(true);
+  });
+
+  it("uses a single combined line for custom totals", () => {
+    const lines = buildTravelInvoiceLineDrafts({
+      ...base,
+      mileage_charge_cents: 5880,
+      travel_time_charge_cents: 19125,
+      total_travel_charge_cents: 10000, // override
+      billable_miles: 84,
+      billable_travel_minutes: 135,
+      mileage_rate_cents: 70,
+      travel_time_rate_cents: 8500,
+    });
+    expect(lines).toHaveLength(1);
+    expect(lines[0].total_cents).toBe(10000);
+  });
+
+  it("returns empty when total is zero", () => {
+    expect(
+      buildTravelInvoiceLineDrafts({
+        ...base,
+        mileage_charge_cents: 0,
+        travel_time_charge_cents: 0,
+        total_travel_charge_cents: 0,
+        billable_miles: 0,
+        billable_travel_minutes: 0,
+        mileage_rate_cents: 70,
+        travel_time_rate_cents: 8500,
+      })
+    ).toEqual([]);
   });
 });
 

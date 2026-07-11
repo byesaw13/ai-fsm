@@ -190,6 +190,16 @@ export default async function InvoiceDetailPage({
               label="Copy link"
             />
             <a
+              href={`/app/invoices/${invoice.id}/print`}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="invoice-print-preview"
+              className="p7-btn p7-btn-secondary p7-btn-sm"
+              style={{ textDecoration: "none" }}
+            >
+              Print preview
+            </a>
+            <a
               href={`/api/v1/invoices/${invoice.id}/pdf`}
               target="_blank"
               rel="noopener noreferrer"
@@ -332,7 +342,11 @@ export default async function InvoiceDetailPage({
                   <tbody>
                     {lineItems.map((item) => (
                       <tr key={item.id} data-testid="invoice-line-item-row">
-                        <td>{item.description}</td>
+                        <td style={{ whiteSpace: "pre-line" }}>
+                          {item.description
+                            .replace(/<!--travel-charge-->/g, "")
+                            .trim()}
+                        </td>
                         <td>
                           <span className="p7-badge p7-badge-count" style={{ fontSize: "10px" }}>
                             {item.line_item_type.replace("_", " ")}
