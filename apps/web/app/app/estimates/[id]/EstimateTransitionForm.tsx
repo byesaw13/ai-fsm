@@ -50,21 +50,55 @@ export function EstimateTransitionForm({
     }
   }
 
+  const actionLabel = (status: EstimateStatus): string => {
+    switch (status) {
+      case "approved":
+        return "Mark as Approved";
+      case "declined":
+        return "Mark as Declined";
+      case "expired":
+        return "Mark as Expired";
+      default:
+        return `→ ${statusLabels[status]}`;
+    }
+  };
+
   return (
-    <div className="transition-buttons" data-testid="transition-buttons">
+    <div className="transition-buttons" data-testid="transition-buttons" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
       {error && <p className="error-inline" data-testid="estimate-transition-error">{error}</p>}
       {success && <p className="success-inline" data-testid="estimate-transition-success">{success}</p>}
-      {allowedTransitions.map((status) => (
-        <button
-          key={status}
-          onClick={() => handleTransition(status)}
-          disabled={loading}
-          className="btn btn-secondary"
-          data-testid={`transition-btn-${status}`}
-        >
-          {loading ? "Updating…" : `→ ${statusLabels[status]}`}
-        </button>
-      ))}
+      <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+        Manual status for offline approvals. Approving creates the materials deposit invoice and project handoff.
+      </p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
+        {allowedTransitions.map((status) => (
+          <button
+            key={status}
+            type="button"
+            onClick={() => handleTransition(status)}
+            disabled={loading}
+            className={status === "approved" ? "btn btn-primary" : "btn btn-secondary"}
+            data-testid={`transition-btn-${status}`}
+            style={
+              status === "approved"
+                ? {
+                    padding: "8px 16px",
+                    borderRadius: 6,
+                    border: "none",
+                    background: "var(--accent)",
+                    color: "#fff",
+                    fontWeight: 600,
+                    fontSize: "var(--text-sm)",
+                    cursor: loading ? "not-allowed" : "pointer",
+                    opacity: loading ? 0.7 : 1,
+                  }
+                : undefined
+            }
+          >
+            {loading ? "Updating…" : actionLabel(status)}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

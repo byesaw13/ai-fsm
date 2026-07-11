@@ -28,6 +28,16 @@ async function signToken(payload: Record<string, string>, secret: Uint8Array): P
 export const POST = withRole(["owner", "admin"], async (request, session) => {
   const id = request.nextUrl.pathname.split("/").at(-2)!;
 
+  // Optional body: { markOnly: true } marks the estimate sent without emailing
+  // (in-person delivery, no client email, or staff override).
+  let markOnly = false;
+  try {
+    const body = (await request.json()) as { markOnly?: unknown };
+    markOnly = body?.markOnly === true;
+  } catch {
+    /* empty body is fine — email delivery when possible */
+  }
+
   try {
     const result = await withEstimateContext(session, async (client) => {
       const { rows, rowCount } = await client.query(
@@ -70,10 +80,6 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         return { status: 422, message: `Cannot send a ${est.status} estimate` };
       }
 
-      if (!est.client_email) {
-        return { status: 422, message: "Client has no email address on file" };
-      }
-
       const pricingReview = reviewEstimateGuardrails({
         ...est,
         margin_pct: null,
@@ -99,10 +105,15 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         };
       }
 
+      // Mark-as-sent without email: no client email, explicit markOnly, or SMTP off.
+      // Staff must be able to progress the workflow after in-person / verbal delivery.
+      const skipEmail =
+        markOnly ||
+        !est.client_email ||
+        process.env.E2E_SKIP_EMAIL_DELIVERY === "1" ||
+        !isEmailConfigured();
 
-      // No-email path: flip status to sent without delivery so the workflow
-      // can progress on servers where SMTP is not configured (dev / CI).
-      if (process.env.E2E_SKIP_EMAIL_DELIVERY === "1" || !isEmailConfigured()) {
+      if (skipEmail) {
         if (est.status === "draft") {
           await sendEstimateCascade(client, {
             estimateId: id,
@@ -124,7 +135,11 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           actor_id: session.userId,
           trace_id: session.traceId,
           old_value: { status: est.status },
-          new_value: { status: "sent", email_skipped: true },
+          new_value: {
+            status: est.status === "draft" ? "sent" : est.status,
+            email_skipped: true,
+            mark_only: markOnly || !est.client_email,
+          },
         });
         return { status: 200, sentTo: null, emailSkipped: true };
       }
@@ -267,7 +282,11 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       );
     }
 
-    return NextResponse.json({ sent: true, sentTo: result.sentTo });
+    return NextResponse.json({
+      sent: true,
+      sentTo: result.sentTo ?? null,
+      emailSkipped: result.emailSkipped === true,
+    });
   } catch (error) {
     logger.error("POST /api/v1/estimates/[id]/send error", error, { traceId: session.traceId });
     return NextResponse.json(
