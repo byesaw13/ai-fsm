@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { getSession } from "@/lib/auth/session";
 import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
-import { canCreateInvoices, canRecordPayments } from "@/lib/auth/permissions";
+import { canCreateInvoices, canRecordPayments, canSendInvoices } from "@/lib/auth/permissions";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import { buildClientDocumentFilename, invoiceTransitions } from "@ai-fsm/domain";
 import type { InvoiceStatus } from "@ai-fsm/domain";
@@ -449,6 +449,37 @@ export default async function InvoiceDetailPage({
                   Draft invoices can still be edited. Send when the numbers are locked.
                 </p>
               </div>
+            </Card>
+          )}
+
+          {/* Resend unpaid invoice (PDF + optional portal link, no login required) */}
+          {canSendInvoices(session.role) &&
+            ["sent", "partial", "overdue"].includes(currentStatus) && (
+              <Card>
+                <SectionHeader title="Email Client" />
+                <SendInvoiceButton
+                  invoiceId={invoice.id}
+                  clientEmail={invoice.client_email}
+                  sentAt={invoice.sent_at}
+                  emailConfigured={isEmailConfigured()}
+                />
+              </Card>
+            )}
+
+          {/* Paid receipt — email final PDF even if client never uses the portal */}
+          {canSendInvoices(session.role) && currentStatus === "paid" && (
+            <Card data-testid="email-paid-receipt-panel">
+              <SectionHeader title="Email Receipt" />
+              <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                Send the paid invoice PDF to the client for their records. No customer portal required.
+              </p>
+              <SendInvoiceButton
+                invoiceId={invoice.id}
+                clientEmail={invoice.client_email}
+                sentAt={invoice.sent_at}
+                emailConfigured={isEmailConfigured()}
+                isPaid
+              />
             </Card>
           )}
 

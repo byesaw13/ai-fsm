@@ -44,6 +44,32 @@ describe("buildInvoicePdf", () => {
     expect(isPdf(bytes)).toBe(true);
   });
 
+  it("renders a paid invoice with stamp and payment terms", async () => {
+    const bytes = await buildInvoicePdf({
+      invoiceNumber: "DHS-PAID-1",
+      status: "paid",
+      clientName: "Paid Client",
+      clientEmail: "paid@example.com",
+      propertyAddress: "12 Oak St, Concord NH 03301",
+      issueDate: "2026-06-01",
+      dueDate: "2026-06-15",
+      paidAt: "2026-06-10",
+      subtotalCents: 50000,
+      totalCents: 50000,
+      paidCents: 50000,
+      notes: "Thank you.",
+      lineItems: [
+        { description: "Service call", quantity: 1, unitPriceCents: 50000, totalCents: 50000 },
+      ],
+      branding: {
+        name: "Dovetails Services LLC",
+        invoiceTerms: "Payment is due on receipt.",
+      },
+    });
+    expect(isPdf(bytes)).toBe(true);
+    expect(bytes.length).toBeGreaterThan(1500);
+  });
+
   it("wraps very long descriptions across multiple lines without throwing", async () => {
     const long = "Repair ".repeat(80).trim();
     const bytes = await buildInvoicePdf({

@@ -13,6 +13,11 @@ import {
   type CompanyProfileSettings,
 } from "@/lib/company/branding";
 import {
+  documentJoins,
+  documentLocationSelect,
+  resolveServiceLocation,
+} from "@/lib/documents/service-location";
+import {
   buildInvoicePdf,
   buildEstimatePdf,
   type PdfLineItem,
@@ -73,18 +78,17 @@ export async function loadInvoicePdf(
   accountId: string,
   id: string,
 ): Promise<LoadedPdf | null> {
+  // Same location joins/select as the HTML print page so service address matches.
   const { rows, rowCount } = await client.query(
     `SELECT i.id, i.invoice_number, i.status, i.subtotal_cents, i.tax_cents,
-            i.total_cents, i.paid_cents, i.due_date, i.notes, i.sent_at, i.created_at,
-            c.id AS client_id, c.name AS client_name, c.email AS client_email,
+            i.total_cents, i.paid_cents, i.paid_at, i.due_date, i.notes,
+            i.sent_at, i.created_at, i.client_id,
             j.title AS job_title,
-            p.address AS property_address,
-            a.name AS account_name, a.settings AS account_settings
+            a.name AS account_name, a.settings AS account_settings,
+            ${documentLocationSelect({ includeEstimateProperty: true })}
      FROM invoices i
-     JOIN clients c ON c.id = i.client_id
      JOIN accounts a ON a.id = i.account_id
-     LEFT JOIN jobs j ON j.id = i.job_id
-     LEFT JOIN properties p ON p.id = i.property_id
+     ${documentJoins({ root: "i", includeEstimateProperty: true })}
      WHERE i.id = $1 AND i.account_id = $2`,
     [id, accountId],
   );
@@ -106,15 +110,27 @@ export async function loadInvoicePdf(
     accountId
   );
 
+  const serviceLocation = resolveServiceLocation({
+    property_address: inv.property_address as string | null,
+    property_city: inv.property_city as string | null,
+    property_state: inv.property_state as string | null,
+    property_zip: inv.property_zip as string | null,
+    client_address_line1: inv.client_address_line1 as string | null,
+    client_city: inv.client_city as string | null,
+    client_state: inv.client_state as string | null,
+    client_zip: inv.client_zip as string | null,
+  });
+
   const bytes = await buildInvoicePdf({
     invoiceNumber: String(inv.invoice_number),
     status: String(inv.status),
     clientName: inv.client_name as string | null,
     clientEmail: inv.client_email as string | null,
     jobTitle: inv.job_title as string | null,
-    propertyAddress: inv.property_address as string | null,
+    propertyAddress: serviceLocation,
     issueDate: (inv.sent_at ?? inv.created_at) as string | null,
     dueDate: inv.due_date as string | null,
+    paidAt: inv.paid_at as string | null,
     subtotalCents: Number(inv.subtotal_cents ?? 0),
     taxCents: Number(inv.tax_cents ?? 0),
     totalCents: Number(inv.total_cents ?? 0),
@@ -148,16 +164,13 @@ export async function loadEstimatePdf(
 ): Promise<LoadedPdf | null> {
   const { rows, rowCount } = await client.query(
     `SELECT e.id, e.status, e.presentation_mode, e.subtotal_cents, e.tax_cents, e.total_cents,
-            e.deposit_cents, e.expires_at, e.notes, e.sent_at, e.created_at,
-            c.id AS client_id, c.name AS client_name, c.email AS client_email,
+            e.deposit_cents, e.expires_at, e.notes, e.sent_at, e.created_at, e.client_id,
             j.title AS job_title,
-            p.address AS property_address,
-            a.name AS account_name, a.settings AS account_settings
+            a.name AS account_name, a.settings AS account_settings,
+            ${documentLocationSelect()}
      FROM estimates e
-     JOIN clients c ON c.id = e.client_id
      JOIN accounts a ON a.id = e.account_id
-     LEFT JOIN jobs j ON j.id = e.job_id
-     LEFT JOIN properties p ON p.id = e.property_id
+     ${documentJoins({ root: "e" })}
      WHERE e.id = $1 AND e.account_id = $2`,
     [id, accountId],
   );
@@ -210,13 +223,23 @@ export async function loadEstimatePdf(
     est.account_settings,
     accountId
   );
+  const serviceLocation = resolveServiceLocation({
+    property_address: est.property_address as string | null,
+    property_city: est.property_city as string | null,
+    property_state: est.property_state as string | null,
+    property_zip: est.property_zip as string | null,
+    client_address_line1: est.client_address_line1 as string | null,
+    client_city: est.client_city as string | null,
+    client_state: est.client_state as string | null,
+    client_zip: est.client_zip as string | null,
+  });
   const bytes = await buildEstimatePdf({
     estimateRef: ref,
     status: String(est.status),
     clientName: est.client_name as string | null,
     clientEmail: est.client_email as string | null,
     jobTitle: est.job_title as string | null,
-    propertyAddress: est.property_address as string | null,
+    propertyAddress: serviceLocation,
     issueDate: (est.sent_at ?? est.created_at) as string | null,
     expiresDate: est.expires_at as string | null,
     subtotalCents: Number(est.subtotal_cents ?? 0),

@@ -6,6 +6,9 @@ export interface InvoiceEmailData {
   dueDateStr: string | null;
   viewUrl: string;
   notes: string | null;
+  /** When true, email is a paid receipt (PDF is the primary artifact). */
+  isPaid?: boolean;
+  paidAtStr?: string | null;
 }
 
 export interface InvoiceFollowupEmailData {
