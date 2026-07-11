@@ -4,6 +4,11 @@ import { appendAuditLog } from "@/lib/db/audit";
 import { withInvoiceContext, generateInvoiceNumber } from "@/lib/invoices/db";
 import { reconcileFinalInvoice } from "@/lib/invoices/billing";
 import { logger } from "@/lib/logger";
+import { loadTravelSettings } from "@/lib/travel/settings";
+import {
+  ensureInvoiceTravelLinesFromSnapshot,
+  getTravelSnapshot,
+} from "@/lib/travel/snapshots";
 
 export const dynamic = "force-dynamic";
 
@@ -111,22 +116,32 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         depositInvoices: depositInvoices.rows,
       });
 
-      // 4. Fetch estimate line items for copying
+      // 4. Fetch estimate line items for copying (exclude travel — re-materialized
+      //    as itemized mileage + travel-time lines from the snapshot below)
       const lineItemsResult = await client.query(
-        `SELECT id, description, quantity, unit_price_cents, total_cents, sort_order
+        `SELECT id, description, quantity, unit_price_cents, total_cents, sort_order,
+                adjustment_type
          FROM estimate_line_items
          WHERE estimate_id = $1
          ORDER BY sort_order ASC, created_at ASC`,
         [id]
       );
-      const lineItems = lineItemsResult.rows as Array<{
-        id: string;
-        description: string;
-        quantity: number;
-        unit_price_cents: number;
-        total_cents: number;
-        sort_order: number;
-      }>;
+      const lineItems = (
+        lineItemsResult.rows as Array<{
+          id: string;
+          description: string;
+          quantity: number;
+          unit_price_cents: number;
+          total_cents: number;
+          sort_order: number;
+          adjustment_type: string | null;
+        }>
+      ).filter(
+        (item) =>
+          item.adjustment_type !== "travel_surcharge" &&
+          !item.description.includes("<!--travel-charge-->") &&
+          !item.description.toLowerCase().includes("travel and service-area")
+      );
 
       // 5. Generate unique invoice number (inside transaction to avoid race)
       const invoiceNumber = await generateInvoiceNumber(
@@ -197,6 +212,23 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             item.sort_order,
           ]
         );
+      }
+
+      // 7b. Materialize itemized travel lines (mileage + travel time) from the
+      //     carried snapshot so the invoice itemization always shows travel —
+      //     even when the estimate used include_in_labor (surcharge field only).
+      if (estimate.travel_snapshot_id) {
+        const snap = await getTravelSnapshot(client, estimate.travel_snapshot_id);
+        if (snap && snap.total_travel_charge_cents > 0 && snap.charge_mode !== "waive") {
+          const travelSettings = await loadTravelSettings(client, session.accountId);
+          await ensureInvoiceTravelLinesFromSnapshot(client, {
+            invoiceId,
+            snapshot: snap,
+            settingsLineTitle: travelSettings.customer_facing_line_title,
+            settingsLineDescription: travelSettings.customer_facing_description,
+            replaceExisting: true,
+          });
+        }
       }
 
       // 8. Audit log the conversion event

@@ -252,7 +252,9 @@ export default async function InvoicePrintPage({
               ) : (
                 lineItems.map((item) => (
                   <tr key={item.id}>
-                    <td>{item.description}</td>
+                    <td style={{ whiteSpace: "pre-line" }}>
+                      {item.description.replace(/<!--travel-charge-->/g, "").trim()}
+                    </td>
                     <td>{formatLineQuantityDisplay(item.quantity)}</td>
                     <td className="amt">{formatCents(item.unit_price_cents)}</td>
                     <td className="amt">{formatCents(item.total_cents)}</td>

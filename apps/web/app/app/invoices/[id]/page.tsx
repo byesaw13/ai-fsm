@@ -332,7 +332,11 @@ export default async function InvoiceDetailPage({
                   <tbody>
                     {lineItems.map((item) => (
                       <tr key={item.id} data-testid="invoice-line-item-row">
-                        <td>{item.description}</td>
+                        <td style={{ whiteSpace: "pre-line" }}>
+                          {item.description
+                            .replace(/<!--travel-charge-->/g, "")
+                            .trim()}
+                        </td>
                         <td>
                           <span className="p7-badge p7-badge-count" style={{ fontSize: "10px" }}>
                             {item.line_item_type.replace("_", " ")}
