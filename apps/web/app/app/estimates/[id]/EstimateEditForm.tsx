@@ -16,6 +16,7 @@ import { EstimateTierEditor } from "../components/EstimateTierEditor";
 import { GuardrailsSection } from "../components/GuardrailsSection";
 import { LineItemsTable } from "../components/LineItemsTable";
 import { PaintingEstimatorSection } from "../components/PaintingEstimatorSection";
+import { TravelRecommendation } from "@/components/travel/TravelRecommendation";
 import {
   PREP_LEVEL_MULTIPLIERS,
   computeEstimate,
@@ -549,6 +550,30 @@ function StandardEstimateEditForm({
                 : undefined
             }
           />
+
+          {propertyId && (
+            <div className="p7-form-grid-span-2" data-testid="edit-est-travel-prompt">
+              <TravelRecommendation
+                variant="banner"
+                propertyId={propertyId}
+                clientId={clientId}
+                projectValueCents={initialSubtotalCents}
+                disabled={pending}
+                onChange={(value) => {
+                  if (!value) return;
+                  if (value.charge_mode === "waive") {
+                    setTravelSurcharge("0.00");
+                  } else {
+                    setTravelSurcharge((value.total_travel_charge_cents / 100).toFixed(2));
+                  }
+                }}
+              />
+              <p style={{ margin: "6px 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                Banner accepts a recommended amount into Travel Surcharge. Use the Travel panel on
+                the estimate page for full snapshot apply (line item, waiver reason, multi-trip).
+              </p>
+            </div>
+          )}
 
           <Input
             id="edit-est-expires"

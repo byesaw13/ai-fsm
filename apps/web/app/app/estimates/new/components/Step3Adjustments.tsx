@@ -3,6 +3,10 @@
 import { Textarea } from "@/components/ui";
 import { GuardrailsSection } from "../../components/GuardrailsSection";
 import type { DepositDueTrigger, DepositType } from "@/lib/estimates/deposit-policy";
+import {
+  TravelRecommendation,
+  type TravelRecommendationValue,
+} from "@/components/travel/TravelRecommendation";
 
 interface Step3Props {
   pending: boolean;
@@ -16,6 +20,11 @@ interface Step3Props {
   setFinishExpectation: (v: "basic" | "clean" | "premium") => void;
   travelSurcharge: string;
   setTravelSurcharge: (v: string) => void;
+  /** Client/property for auto travel calculation */
+  clientId?: string;
+  propertyId?: string;
+  projectValueCents?: number;
+  onTravelRecommendationChange?: (value: TravelRecommendationValue | null) => void;
   riskAdjustment: string;
   setRiskAdjustment: (v: string) => void;
   minimumOverrideReason: string;
@@ -54,6 +63,8 @@ export function Step3Adjustments({
   tripCount, setTripCount,
   finishExpectation, setFinishExpectation,
   travelSurcharge, setTravelSurcharge,
+  clientId, propertyId, projectValueCents,
+  onTravelRecommendationChange,
   riskAdjustment, setRiskAdjustment,
   minimumOverrideReason, setMinimumOverrideReason,
   minimumOverrideNote, setMinimumOverrideNote,
@@ -72,6 +83,27 @@ export function Step3Adjustments({
 }: Step3Props) {
   return (
     <div className="p7-form-stack">
+      <TravelRecommendation
+        propertyId={propertyId}
+        clientId={clientId}
+        projectValueCents={projectValueCents}
+        disabled={pending}
+        onChange={(value) => {
+          onTravelRecommendationChange?.(value);
+          if (!value) return;
+          // Keep legacy surcharge field in sync for totals preview
+          if (value.charge_mode === "waive") {
+            setTravelSurcharge("0.00");
+          } else if (
+            value.charge_mode === "separate_line" ||
+            value.charge_mode === "include_in_labor" ||
+            value.charge_mode === "custom"
+          ) {
+            setTravelSurcharge((value.total_travel_charge_cents / 100).toFixed(2));
+          }
+        }}
+      />
+
       <GuardrailsSection
         idPrefix="new"
         disabled={pending}

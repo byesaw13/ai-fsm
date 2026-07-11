@@ -187,6 +187,8 @@ export function useEstimateForm({
   const [coordinationRequired, setCoordinationRequired] = useState(false);
   const [finishExpectation, setFinishExpectation] = useState<"basic" | "clean" | "premium">("clean");
   const [travelSurcharge, setTravelSurcharge] = useState("0.00");
+  // Full travel recommendation from TravelRecommendation widget (applied post-create)
+  const [travelRecommendation, setTravelRecommendation] = useState<import("@/components/travel/TravelRecommendation").TravelRecommendationValue | null>(null);
   const [riskAdjustment, setRiskAdjustment] = useState("0.00");
   const [minimumOverrideReason, setMinimumOverrideReason] = useState("");
   const [minimumOverrideNote, setMinimumOverrideNote] = useState("");
@@ -683,7 +685,14 @@ export function useEstimateForm({
         old_house_risk: oldHouseRisk,
         coordination_required: coordinationRequired,
         finish_expectation: finishExpectation,
-        travel_surcharge_cents: parseCents(travelSurcharge),
+        // When a travel recommendation will be applied post-create as a separate line,
+        // keep surcharge at 0 here to avoid double-counting before snapshot apply.
+        travel_surcharge_cents:
+          travelRecommendation?.accepted && travelRecommendation.charge_mode === "separate_line"
+            ? 0
+            : travelRecommendation?.accepted && travelRecommendation.charge_mode === "waive"
+              ? 0
+              : parseCents(travelSurcharge),
         risk_adjustment_cents: parseCents(riskAdjustment),
         minimum_service_override_reason: minimumOverrideReason || null,
         minimum_service_override_note: minimumOverrideNote.trim() || null,
@@ -736,6 +745,18 @@ export function useEstimateForm({
       }
 
       const { id } = (await res.json()) as { id: string };
+
+      // Persist full travel snapshot + line item (rates frozen at create time)
+      if (travelRecommendation?.accepted) {
+        const { applyTravelRecommendationToEstimate } = await import(
+          "@/components/travel/TravelRecommendation"
+        );
+        const applied = await applyTravelRecommendationToEstimate(id, travelRecommendation);
+        if (!applied.ok) {
+          // Estimate exists; surface travel failure but still navigate
+          setError(applied.error ?? "Estimate created but travel could not be applied.");
+        }
+      }
 
       if (sendImmediately) {
         await fetch(`/api/v1/estimates/${id}/transition`, {
@@ -798,6 +819,7 @@ export function useEstimateForm({
     coordinationRequired, setCoordinationRequired,
     finishExpectation, setFinishExpectation,
     travelSurcharge, setTravelSurcharge,
+    travelRecommendation, setTravelRecommendation,
     riskAdjustment, setRiskAdjustment,
     minimumOverrideReason, setMinimumOverrideReason,
     minimumOverrideNote, setMinimumOverrideNote,

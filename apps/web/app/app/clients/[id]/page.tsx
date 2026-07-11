@@ -38,6 +38,8 @@ type ClientRow = {
   state: string | null;
   zip: string | null;
   portal_token: string;
+  relationship_type?: string | null;
+  travel_rule?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -354,6 +356,8 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               <div className="p7-detail-row"><dt>Address</dt><dd>{client.address_line1 || "-"}</dd></div>
               <div className="p7-detail-row"><dt>City / State / ZIP</dt><dd>{[client.city, client.state, client.zip].filter(Boolean).join(" ") || "-"}</dd></div>
               <div className="p7-detail-row"><dt>Notes</dt><dd style={{ whiteSpace: "pre-wrap" }}>{client.notes || "No notes"}</dd></div>
+              <div className="p7-detail-row"><dt>Customer type</dt><dd>{client.relationship_type ?? "standard"}</dd></div>
+              <div className="p7-detail-row"><dt>Travel rule</dt><dd>{client.travel_rule ?? "standard_policy"}</dd></div>
             </dl>
           </Card>
 
@@ -373,6 +377,23 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 city: client.city ?? "",
                 state: client.state ?? "",
                 zip: client.zip ?? "",
+                relationship_type: (client.relationship_type as
+                  | "standard"
+                  | "realtor"
+                  | "preferred"
+                  | "referral_partner"
+                  | undefined) ?? "standard",
+                travel_rule: (client.travel_rule as
+                  | "standard_policy"
+                  | "mileage_waived"
+                  | "travel_time_waived"
+                  | "all_travel_waived"
+                  | "custom_included_radius"
+                  | "custom_mileage_rate"
+                  | "custom_travel_time_rate"
+                  | "minimum_project_value_exemption"
+                  | "manual_review_required"
+                  | undefined) ?? "standard_policy",
               }}
             />
           </Disclosure>

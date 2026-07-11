@@ -4,6 +4,7 @@ import { Input, Select, SectionHeader } from "@/components/ui";
 import { InlineClientForm } from "../InlineClientForm";
 import { InlineJobForm } from "../InlineJobForm";
 import { InlinePropertyForm } from "../InlinePropertyForm";
+import { TravelRecommendation } from "@/components/travel/TravelRecommendation";
 import type { Client, Job, Property } from "../hooks/useEstimateForm";
 
 interface Step1Props {
@@ -194,6 +195,19 @@ export function Step1WhoAndWhat({
               onCreated={handlePropertyCreated}
               onCancel={() => setInlineForm(null)}
             />
+          )}
+          {propertyId && (
+            <div style={{ marginTop: "var(--space-2)" }}>
+              <TravelRecommendation
+                variant="banner"
+                propertyId={propertyId}
+                clientId={clientId || null}
+                disabled={pending}
+              />
+              <p style={{ margin: "6px 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                Full travel options (include / waive / custom) are on the Adjustments step.
+              </p>
+            </div>
           )}
         </div>
 

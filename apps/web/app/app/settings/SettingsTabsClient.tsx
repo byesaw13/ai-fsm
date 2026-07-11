@@ -10,6 +10,7 @@ import { ProfileForm } from "./ProfileForm";
 import { SquarePanel, type SquareStatus } from "./SquarePanel";
 import { WorkspaceModeSetting } from "./WorkspaceModeSetting";
 import { LocationDaySettings, type LocationDayValues } from "./LocationDaySettings";
+import { TravelSettingsForm } from "./TravelSettingsForm";
 
 interface Props {
   role: "owner" | "admin" | "tech";
@@ -30,6 +31,7 @@ export function SettingsTabsClient({ role, userId, me, account, users, square, l
     { id: "profile", label: "Your Profile", icon: <ProfileIcon /> },
     ...(isOwner ? [{ id: "workspace", label: "Workspace View", icon: <WorkspaceIcon /> }] : []),
     ...(isAdmin && account ? [{ id: "company", label: "Company", icon: <CompanyIcon /> }] : []),
+    ...(isAdmin && account ? [{ id: "travel", label: "Travel & Mileage", icon: <TravelIcon /> }] : []),
     ...(isAdmin ? [{ id: "team", label: "Team", icon: <TeamIcon /> }] : []),
     ...(isOwner && square ? [{ id: "payments", label: "Payments", icon: <PaymentsIcon /> }] : []),
     ...(isOwner && locationDay ? [{ id: "location-day", label: "Location & Day", icon: <LocationDayIcon /> }] : []),
@@ -86,6 +88,19 @@ export function SettingsTabsClient({ role, userId, me, account, users, square, l
                 By default it follows your device — phones open to Field, tablets and computers open to Office.
               </p>
               <WorkspaceModeSetting />
+            </Card>
+          </section>
+        )}
+
+        {activeTab === "travel" && isAdmin && account && (
+          <section>
+            <h2 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 8px 0" }}>Travel & Mileage</h2>
+            <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: 0, marginBottom: 24 }}>
+              Business origin, included service radius, mileage rates, and travel-time policy.
+              Rates are snapshotted on each estimate — changing them never rewrites history.
+            </p>
+            <Card padding="default">
+              <TravelSettingsForm />
             </Card>
           </section>
         )}
@@ -253,6 +268,15 @@ function CompanyIcon() {
       <line x1="15" y1="16" x2="15" y2="22" />
       <line x1="9" y1="8" x2="15" y2="8" />
       <line x1="9" y1="12" x2="15" y2="12" />
+    </svg>
+  );
+}
+
+function TravelIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
     </svg>
   );
 }

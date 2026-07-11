@@ -79,3 +79,4 @@ export * from "./geo";
 export * from "./visit-matching";
 export * from "./day-review";
 export * from "./mileage";
+export * from "./travel";
