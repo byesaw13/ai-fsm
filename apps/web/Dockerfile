@@ -19,6 +19,12 @@ RUN pnpm --filter @ai-fsm/web build
 FROM node:20-alpine AS run
 WORKDIR /app
 ENV NODE_ENV=production
+# Docker sets HOSTNAME to the container ID by default; Next's standalone
+# server.js binds to that unless overridden, which makes it unreachable via
+# localhost (breaks the healthcheck) even though it's reachable on the
+# container's network IP.
+ENV HOSTNAME="0.0.0.0"
+ENV PORT=3000
 COPY --from=build /app/apps/web/.next/standalone ./
 COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build /app/apps/web/public ./apps/web/public
