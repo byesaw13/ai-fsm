@@ -257,16 +257,41 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
         "map_provider";
 
       if (invoice.job_id && data.billing_mode === "actual" && manualMiles == null) {
-        const logs = await client.query<{ total_miles: string }>(
-          `SELECT COALESCE(SUM(miles), 0)::text AS total_miles
-           FROM mileage_logs
-           WHERE account_id = $1 AND job_id = $2
-             AND (trip_type IS NULL OR trip_type IN ('job', 'mixed'))`,
+        // Prefer vehicle_sessions (source of truth for odometer/mileage capture).
+        // Sessions linked via vehicle_session_activities.entity_type = 'job'.
+        // Fall back to legacy mileage_logs when no session miles exist.
+        const sessions = await client.query<{ total_miles: string }>(
+          `SELECT COALESCE(
+                    SUM(COALESCE(s.miles, (s.end_odometer - s.start_odometer)::numeric)),
+                    0
+                  )::text AS total_miles
+           FROM vehicle_sessions s
+           JOIN vehicle_session_activities a ON a.session_id = s.id
+           WHERE s.account_id = $1
+             AND a.entity_type = 'job'
+             AND a.entity_id = $2
+             AND s.status IS DISTINCT FROM 'voided'
+             AND (
+               s.miles IS NOT NULL
+               OR (s.start_odometer IS NOT NULL AND s.end_odometer IS NOT NULL)
+             )`,
           [session.accountId, invoice.job_id]
         );
-        const total = Number(logs.rows[0]?.total_miles ?? 0);
+        let total = Number(sessions.rows[0]?.total_miles ?? 0);
+
+        if (total <= 0) {
+          const logs = await client.query<{ total_miles: string }>(
+            `SELECT COALESCE(SUM(miles), 0)::text AS total_miles
+             FROM mileage_logs
+             WHERE account_id = $1 AND job_id = $2
+               AND (trip_type IS NULL OR trip_type IN ('job', 'mixed'))`,
+            [session.accountId, invoice.job_id]
+          );
+          total = Number(logs.rows[0]?.total_miles ?? 0);
+        }
+
         if (total > 0) {
-          // logs are typically round-trip totals; convert to one-way for engine
+          // session/log miles are typically full-trip totals; convert to one-way for engine
           manualMiles = total / 2;
           source = "mileage_log";
         }

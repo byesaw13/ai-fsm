@@ -40,6 +40,9 @@ type ClientRow = {
   portal_token: string;
   relationship_type?: string | null;
   travel_rule?: string | null;
+  custom_included_one_way_miles?: number | string | null;
+  custom_mileage_rate_cents?: number | null;
+  custom_travel_time_rate_cents?: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -358,6 +361,24 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               <div className="p7-detail-row"><dt>Notes</dt><dd style={{ whiteSpace: "pre-wrap" }}>{client.notes || "No notes"}</dd></div>
               <div className="p7-detail-row"><dt>Customer type</dt><dd>{client.relationship_type ?? "standard"}</dd></div>
               <div className="p7-detail-row"><dt>Travel rule</dt><dd>{client.travel_rule ?? "standard_policy"}</dd></div>
+              {client.travel_rule === "custom_included_radius" && client.custom_included_one_way_miles != null ? (
+                <div className="p7-detail-row">
+                  <dt>Included one-way miles</dt>
+                  <dd>{client.custom_included_one_way_miles}</dd>
+                </div>
+              ) : null}
+              {client.travel_rule === "custom_mileage_rate" && client.custom_mileage_rate_cents != null ? (
+                <div className="p7-detail-row">
+                  <dt>Custom mileage rate</dt>
+                  <dd>${(Number(client.custom_mileage_rate_cents) / 100).toFixed(2)}/mi</dd>
+                </div>
+              ) : null}
+              {client.travel_rule === "custom_travel_time_rate" && client.custom_travel_time_rate_cents != null ? (
+                <div className="p7-detail-row">
+                  <dt>Custom travel-time rate</dt>
+                  <dd>${(Number(client.custom_travel_time_rate_cents) / 100).toFixed(2)}/hr</dd>
+                </div>
+              ) : null}
             </dl>
           </Card>
 
@@ -394,6 +415,18 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                   | "minimum_project_value_exemption"
                   | "manual_review_required"
                   | undefined) ?? "standard_policy",
+                custom_included_one_way_miles:
+                  client.custom_included_one_way_miles != null
+                    ? String(client.custom_included_one_way_miles)
+                    : "",
+                custom_mileage_rate_dollars:
+                  client.custom_mileage_rate_cents != null
+                    ? (Number(client.custom_mileage_rate_cents) / 100).toFixed(2)
+                    : "",
+                custom_travel_time_rate_dollars:
+                  client.custom_travel_time_rate_cents != null
+                    ? (Number(client.custom_travel_time_rate_cents) / 100).toFixed(2)
+                    : "",
               }}
             />
           </Disclosure>

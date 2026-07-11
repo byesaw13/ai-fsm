@@ -79,8 +79,10 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       job_id: string | null;
       total_cents: number;
       travel_snapshot_id: string | null;
+      presentation_mode: string | null;
     }>(
-      `SELECT id, status, client_id, property_id, job_id, total_cents, travel_snapshot_id
+      `SELECT id, status, client_id, property_id, job_id, total_cents, travel_snapshot_id,
+              presentation_mode
        FROM estimates WHERE id = $1 AND account_id = $2`,
       [estimateId, session.accountId]
     );
@@ -92,6 +94,23 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       );
     }
     const estimate = est.rows[0];
+
+    // Multi-option estimates store priced choices under option_id; applying travel
+    // as a base line / rewriting parent totals would corrupt option pricing.
+    if (estimate.presentation_mode === "multi_option") {
+      await client.query("ROLLBACK");
+      return NextResponse.json(
+        {
+          error: {
+            code: "UNSUPPORTED_PRESENTATION_MODE",
+            message:
+              "Travel charging for multi-option estimates is not supported yet — convert to standard or apply surcharge on the chosen option after approval.",
+            traceId: session.traceId,
+          },
+        },
+        { status: 409 }
+      );
+    }
 
     // Never silently change accepted totals
     if (estimate.status === "approved" || estimate.status === "accepted") {
