@@ -10,7 +10,7 @@ import {
 } from "@ai-fsm/domain";
 import type { VisitStatus, WorkOrderStatus } from "@ai-fsm/domain";
 
-/** Planning statuses that may receive new execution visits. */
+/** Planning statuses that may already receive new execution visits. */
 export const SCHEDULABLE_WORK_ORDER_STATUSES = [
   "ready",
   "scheduled",
@@ -18,7 +18,14 @@ export const SCHEDULABLE_WORK_ORDER_STATUSES = [
   "waiting",
 ] as const;
 
+/** Statuses that may be selected for scheduling (includes draft — promoted on book). */
+export const BOOKABLE_WORK_ORDER_STATUSES = [
+  "draft",
+  ...SCHEDULABLE_WORK_ORDER_STATUSES,
+] as const;
+
 const schedulableList = SCHEDULABLE_WORK_ORDER_STATUSES.map((s) => `'${s}'`).join(", ");
+const bookableList = BOOKABLE_WORK_ORDER_STATUSES.map((s) => `'${s}'`).join(", ");
 
 export async function syncWorkOrderStatus(
   client: PoolClient,
@@ -85,7 +92,29 @@ export async function syncWorkOrdersForJob(
   }
 }
 
-/** Resolve the work order for scheduling when exactly one active WO exists. */
+/**
+ * Promote a draft work order to ready so visits can attach and status can derive.
+ * No-op if not draft. Returns true when a row was updated.
+ */
+export async function promoteDraftWorkOrderToReady(
+  client: PoolClient,
+  workOrderId: string,
+  accountId: string,
+): Promise<boolean> {
+  const r = await client.query(
+    `UPDATE work_orders
+     SET status = 'ready', updated_at = now()
+     WHERE id = $1 AND account_id = $2 AND status = 'draft'`,
+    [workOrderId, accountId],
+  );
+  return (r.rowCount ?? 0) > 0;
+}
+
+/**
+ * Resolve the work order for scheduling.
+ * - Explicit id: must belong to job; draft is accepted and promoted to ready.
+ * - Auto: single bookable WO on the job (including one draft).
+ */
 export async function resolveWorkOrderForVisit(
   client: PoolClient,
   jobId: string,
@@ -93,22 +122,31 @@ export async function resolveWorkOrderForVisit(
   workOrderId?: string | null,
 ): Promise<string | null> {
   if (workOrderId) {
-    const check = await client.query<{ id: string }>(
-      `SELECT id FROM work_orders
+    const check = await client.query<{ id: string; status: string }>(
+      `SELECT id, status FROM work_orders
        WHERE id = $1 AND job_id = $2 AND account_id = $3
-         AND status IN (${schedulableList})`,
+         AND status IN (${bookableList})`,
       [workOrderId, jobId, accountId],
     );
-    return check.rows[0]?.id ?? null;
+    const row = check.rows[0];
+    if (!row) return null;
+    if (row.status === "draft") {
+      await promoteDraftWorkOrderToReady(client, row.id, accountId);
+    }
+    return row.id;
   }
 
-  const rows = await client.query<{ id: string }>(
-    `SELECT id FROM work_orders
+  const rows = await client.query<{ id: string; status: string }>(
+    `SELECT id, status FROM work_orders
      WHERE job_id = $1 AND account_id = $2
-       AND status IN (${schedulableList})
+       AND status IN (${bookableList})
      ORDER BY created_at ASC`,
     [jobId, accountId],
   );
-  if (rows.rows.length === 1) return rows.rows[0].id;
-  return null;
+  if (rows.rows.length !== 1) return null;
+  const row = rows.rows[0];
+  if (row.status === "draft") {
+    await promoteDraftWorkOrderToReady(client, row.id, accountId);
+  }
+  return row.id;
 }

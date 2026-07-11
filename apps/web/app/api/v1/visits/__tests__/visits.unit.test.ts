@@ -133,8 +133,9 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
         .mockResolvedValueOnce({ rows: [] }) // BEGIN
         .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
         .mockResolvedValueOnce({ rows: [{ status: "quoted" }] }) // SELECT job status
-        .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
-        .mockResolvedValueOnce({ rows: [{ id: WORK_ORDER_ID }] }) // resolve work order
+        .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT field-active visits
+        .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT overlapping visits
+        .mockResolvedValueOnce({ rows: [{ id: WORK_ORDER_ID, status: "ready" }] }) // resolve work order
         .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }), // INSERT
     );
 
@@ -155,8 +156,9 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
         .mockResolvedValueOnce({ rows: [] }) // BEGIN
         .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
         .mockResolvedValueOnce({ rows: [{ status: "quoted" }] }) // SELECT job status
-        .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
-        .mockResolvedValueOnce({ rows: [{ id: WORK_ORDER_ID }] }) // resolve work order
+        .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT field-active visits
+        .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT overlapping visits
+        .mockResolvedValueOnce({ rows: [{ id: WORK_ORDER_ID, status: "ready" }] }) // resolve work order
         .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // INSERT visit
         .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }), // UPDATE booking request
     );
@@ -189,8 +191,9 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
       .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
       .mockResolvedValueOnce({ rows: [{ status: "quoted" }] }) // SELECT job status
-      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
-      .mockResolvedValueOnce({ rows: [{ id: WORK_ORDER_ID }] }) // resolve work order
+      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT field-active visits
+      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT overlapping visits
+      .mockResolvedValueOnce({ rows: [{ id: WORK_ORDER_ID, status: "ready" }] }) // resolve work order
       .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // INSERT visit
       .mockResolvedValueOnce({ rows: [] }) // UPDATE booking request missing
       .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
@@ -213,7 +216,8 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
       .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
       .mockResolvedValueOnce({ rows: [{ status: "completed" }] }) // SELECT job status
-      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
+      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT field-active visits
+      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT overlapping visits
       .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
 
     const res = await visitCreate(
@@ -224,7 +228,9 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
     );
 
     expect(res.status).toBe(422);
-    await expect(res.json()).resolves.toEqual({ error: "JOB_NOT_SCHEDULABLE" });
+    const json = await res.json();
+    expect(json.error.code).toBe("JOB_NOT_SCHEDULABLE");
+    expect(json.error.message).toMatch(/not open for new visits/i);
     expect(mockClientQuery.mock.calls.some((call) =>
       String(call[0]).includes("INSERT INTO visits")
     )).toBe(false);
@@ -254,7 +260,8 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
       .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
       .mockResolvedValueOnce({ rows: [{ status: "quoted" }] }) // SELECT job status
-      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
+      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT field-active visits
+      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT overlapping visits
       .mockResolvedValueOnce({ rows: [opVisit] }) // INSERT (no WO resolve/sync)
       .mockResolvedValueOnce({ rows: [] }) // job status advance
       .mockResolvedValueOnce({ rows: [] }); // COMMIT
@@ -283,7 +290,8 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
       .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
       .mockResolvedValueOnce({ rows: [{ status: "quoted" }] }) // SELECT job status
-      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT active visits
+      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT field-active visits
+      .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT overlapping visits
       .mockResolvedValueOnce({ rows: [] }) // resolve work order — none found
       .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
 

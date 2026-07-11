@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { checkSchedulingPreconditions, EXECUTION_VISIT_TYPES, VISIT_TYPES } from "@ai-fsm/domain";
+import {
+  checkSchedulingPreconditions,
+  EXECUTION_VISIT_TYPES,
+  FIELD_ACTIVE_VISIT_STATUSES,
+  VISIT_TYPES,
+} from "@ai-fsm/domain";
 import type { VisitType } from "@ai-fsm/domain";
 import { syncWorkOrderLeadFromVisit } from "../../../../../../lib/work-orders/assign-lead";
 import {
@@ -104,20 +109,41 @@ export const POST = withRole(
         `SELECT status FROM jobs WHERE id = $1 AND account_id = $2 FOR UPDATE`,
         [jobId, session.accountId]
       );
-      const { rows: activeVisitRows } = await client.query<{ count: string }>(
-        `SELECT COUNT(*) FROM visits WHERE job_id = $1 AND status IN (
-           'scheduled','dispatched','traveling','arrived','in_progress','waiting'
-         )`,
-        [jobId]
+      // Only field-active visits block booking — future `scheduled` days must coexist (multi-day).
+      const { rows: fieldActiveRows } = await client.query<{ count: string }>(
+        `SELECT COUNT(*) FROM visits
+         WHERE job_id = $1 AND account_id = $2
+           AND status = ANY($3::text[])`,
+        [jobId, session.accountId, [...FIELD_ACTIVE_VISIT_STATUSES]],
+      );
+      const { rows: overlapRows } = await client.query<{ count: string }>(
+        `SELECT COUNT(*) FROM visits
+         WHERE job_id = $1 AND account_id = $2
+           AND status NOT IN ('cancelled','completed')
+           AND scheduled_start < $4::timestamptz
+           AND scheduled_end > $3::timestamptz`,
+        [jobId, session.accountId, scheduled_start, scheduled_end],
       );
       const guard = checkSchedulingPreconditions({
         jobStatus: jobRows[0]?.status ?? null,
-        activeVisitCount: parseInt(activeVisitRows[0]?.count ?? "0", 10),
+        fieldActiveVisitCount: parseInt(fieldActiveRows[0]?.count ?? "0", 10),
+        overlappingVisitCount: parseInt(overlapRows[0]?.count ?? "0", 10),
       });
 
       if (!guard.ok) {
         await client.query("ROLLBACK");
-        return NextResponse.json({ error: guard.error }, { status: 422 });
+        const message =
+          guard.error === "ACTIVE_VISIT_EXISTS"
+            ? "A visit is already in progress for this project. Finish or cancel it before scheduling another day."
+            : guard.error === "VISIT_OVERLAP"
+              ? "That time overlaps an existing visit on this project. Pick a different day or time."
+              : guard.error === "JOB_NOT_SCHEDULABLE"
+                ? "This project is not open for new visits."
+                : guard.error;
+        return NextResponse.json(
+          { error: { code: guard.error, message, traceId: session.traceId } },
+          { status: 422 },
+        );
       }
 
       let resolvedWorkOrderId: string | null = null;

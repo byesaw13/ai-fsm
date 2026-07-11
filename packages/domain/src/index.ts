@@ -25,7 +25,11 @@ export * from "./assessment-summary";
 export * from "./work-order";
 export * from "./completion-criteria";
 export * from "./work-order-lifecycle";
-export { checkSchedulingPreconditions } from "./scheduling-guard";
+export {
+  checkSchedulingPreconditions,
+  FIELD_ACTIVE_VISIT_STATUSES,
+  SCHEDULABLE_JOB_STATUSES,
+} from "./scheduling-guard";
 export type { SchedulingGuardError, SchedulingGuardResult } from "./scheduling-guard";
 export { scoreSiteVisitProbability } from "./walkthrough-decision";
 export type { WalkthroughDecision, RoutingPath } from "./walkthrough-decision";
