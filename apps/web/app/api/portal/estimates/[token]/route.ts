@@ -149,7 +149,8 @@ export async function POST(
           [ownerId, estimate.account_id]
         );
 
-        // Auto-create job (non-fatal)
+        // Auto-create or link job (non-fatal). CLIENT_RECENT_WORK skips spawn
+        // so approving a loose estimate after T&M work does not fork a second project.
         await dbClient.query("SAVEPOINT before_auto_job");
         try {
           await createJobFromEstimate({
@@ -162,7 +163,15 @@ export async function POST(
         } catch (jobErr) {
           await dbClient.query("ROLLBACK TO SAVEPOINT before_auto_job");
           await dbClient.query("RELEASE SAVEPOINT before_auto_job");
-          logger.error("portal approval: auto-create job failed (non-fatal)", jobErr);
+          const je = jobErr as Error & { code?: string; recentWork?: unknown };
+          if (je.code === "CLIENT_RECENT_WORK") {
+            logger.info("portal approval: skipped job spawn — client recent work", {
+              estimateId: estimate.id,
+              recentWork: je.recentWork,
+            });
+          } else {
+            logger.error("portal approval: auto-create job failed (non-fatal)", jobErr);
+          }
         }
 
         // Create deposit invoice + action item (non-fatal)

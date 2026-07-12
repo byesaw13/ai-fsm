@@ -220,6 +220,10 @@ describe("createJobFromEstimate", () => {
         }],
         rowCount: 1,
       },
+      // findOpenJobToLink — none
+      { rows: [], rowCount: 0 },
+      // findRecentClientWork — none
+      { rows: [], rowCount: 0 },
       // Job INSERT
       { rows: [{ id: "new-job-1" }], rowCount: 1 },
       // Estimate UPDATE (link job_id)
@@ -258,5 +262,126 @@ describe("createJobFromEstimate", () => {
     const args = insertCall![1] as unknown[];
     // booking_request_id is $6 in the INSERT
     expect(args[5]).toBe("br-1");
+  });
+
+  it("links to an open job for the same client instead of spawning a new one", async () => {
+    const { createJobFromEstimate } = await import("../create-job-db");
+
+    const client = makeClient([
+      {
+        rows: [{
+          id: "est-1", status: "approved",
+          client_id: "c1", property_id: "p1", job_id: null,
+          booking_request_id: null, notes: null, total_cents: 10000,
+          client_name: "Bob", property_address: null,
+        }],
+        rowCount: 1,
+      },
+      // findOpenJobToLink
+      { rows: [{ id: "open-job-1" }], rowCount: 1 },
+      // UPDATE estimates.job_id
+      { rows: [], rowCount: 1 },
+      // promoteOrCreateWorkOrderFromEstimate — existing WO
+      { rows: [{ id: "wo-1" }], rowCount: 1 },
+    ]);
+
+    const result = await createJobFromEstimate({
+      client,
+      estimateId: "est-1",
+      accountId: "acct-1",
+      createdBy: "user-1",
+    });
+
+    expect(result.jobId).toBe("open-job-1");
+    expect(result.created).toBe(false);
+    expect(result.linkedExisting).toBe(true);
+    const inserts = (client.query as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("INSERT INTO jobs")
+    );
+    expect(inserts).toHaveLength(0);
+  });
+
+  it("blocks spawn when client has recent completed work with an invoice", async () => {
+    const { createJobFromEstimate } = await import("../create-job-db");
+
+    const client = makeClient([
+      {
+        rows: [{
+          id: "est-1", status: "approved",
+          client_id: "c1", property_id: null, job_id: null,
+          booking_request_id: null, notes: null, total_cents: 19000,
+          client_name: "Norman", property_address: null,
+        }],
+        rowCount: 1,
+      },
+      // findOpenJobToLink — none
+      { rows: [], rowCount: 0 },
+      // findRecentClientWork
+      {
+        rows: [{
+          job_id: "old-job",
+          job_title: "16 E Chamberlain",
+          job_status: "completed",
+          job_completed_at: "2026-07-09",
+          invoice_id: "inv-1",
+          invoice_number: "INV-0022",
+          invoice_status: "sent",
+          invoice_total_cents: 19598,
+        }],
+        rowCount: 1,
+      },
+    ]);
+
+    await expect(
+      createJobFromEstimate({
+        client,
+        estimateId: "est-1",
+        accountId: "acct-1",
+        createdBy: "user-1",
+      })
+    ).rejects.toMatchObject({ code: "CLIENT_RECENT_WORK" });
+  });
+
+  it("allows forceNewProject past the recent-work guard", async () => {
+    const { createJobFromEstimate } = await import("../create-job-db");
+
+    const client = makeClient([
+      {
+        rows: [{
+          id: "est-1", status: "approved",
+          client_id: "c1", property_id: null, job_id: null,
+          booking_request_id: null, notes: "Forced", total_cents: 1000,
+          client_name: "Bob", property_address: null,
+        }],
+        rowCount: 1,
+      },
+      { rows: [], rowCount: 0 }, // open job
+      // force skips recent-work query
+      { rows: [{ id: "forced-job" }], rowCount: 1 }, // INSERT job
+      { rows: [], rowCount: 1 }, // link estimate
+      { rows: [], rowCount: 0 }, // no existing WO
+      {
+        rows: [{
+          id: "est-1", client_id: "c1", property_id: null, notes: "Forced",
+          total_cents: 1000, client_name: "Bob", property_address: null,
+        }],
+        rowCount: 1,
+      },
+      { rows: [], rowCount: 0 },
+      { rows: [], rowCount: 0 },
+      { rows: [], rowCount: 0 },
+      { rows: [{ id: "wo-f" }], rowCount: 1 },
+    ]);
+
+    const result = await createJobFromEstimate({
+      client,
+      estimateId: "est-1",
+      accountId: "acct-1",
+      createdBy: "user-1",
+      forceNewProject: true,
+    });
+
+    expect(result.jobId).toBe("forced-job");
+    expect(result.created).toBe(true);
   });
 });

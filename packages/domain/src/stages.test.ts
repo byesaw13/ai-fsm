@@ -124,6 +124,13 @@ describe("derivePipelineStage — pre-sale vs execution visits", () => {
     })).toBe("estimate_needed");
   });
 
+  it("T&M draft with no estimate → approved_ready (not estimate_needed)", () => {
+    expect(derivePipelineStage({
+      jobStatus: "draft",
+      estimateCount: 0,
+    })).toBe("approved_ready");
+  });
+
   it("falls back to legacy visit counts when execution counts are absent", () => {
     expect(derivePipelineStage({
       jobStatus: "scheduled",

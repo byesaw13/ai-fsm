@@ -119,7 +119,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             [ownerId, account_id]
           );
 
-          // Auto-create job (non-fatal)
+          // Auto-create or link job (non-fatal). CLIENT_RECENT_WORK skips spawn.
           await client.query("SAVEPOINT before_auto_job");
           try {
             await createJobFromEstimate({ client, estimateId: id, accountId: account_id, createdBy: ownerId });
@@ -127,7 +127,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           } catch (jobErr) {
             await client.query("ROLLBACK TO SAVEPOINT before_auto_job");
             await client.query("RELEASE SAVEPOINT before_auto_job");
-            logger.error("email approve: auto-create job failed (non-fatal)", jobErr, { estimateId: id });
+            const je = jobErr as Error & { code?: string; recentWork?: unknown };
+            if (je.code === "CLIENT_RECENT_WORK") {
+              logger.info("email approve: skipped job spawn — client recent work", {
+                estimateId: id,
+                recentWork: je.recentWork,
+              });
+            } else {
+              logger.error("email approve: auto-create job failed (non-fatal)", jobErr, { estimateId: id });
+            }
           }
 
           // Create deposit invoice + action item (non-fatal)
