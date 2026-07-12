@@ -193,8 +193,13 @@ Past-due balances may pause future scheduling until resolved.
 
 /**
  * Dovetails payment terms: due upon completion.
- * Returns an ISO timestamp at UTC midnight for the completion calendar day
- * in the account timezone (default America/New_York).
+ *
+ * Returns the UTC ISO instant for **local midnight** on the completion
+ * calendar day in `timeZone` (default America/New_York). Matches:
+ *   date_trunc('day', ts AT TIME ZONE tz) AT TIME ZONE tz
+ *
+ * Using UTC midnight for the label day is wrong: 2026-07-09T00:00:00Z is still
+ * July 8 evening in Eastern, so `toLocaleDateString()` shows one day early.
  */
 export function dueDateUponCompletion(
   completedAt: Date | string | null | undefined = new Date(),
@@ -204,13 +209,42 @@ export function dueDateUponCompletion(
   if (Number.isNaN(d.getTime())) {
     return dueDateUponCompletion(new Date(), timeZone);
   }
+
   const ymd = new Intl.DateTimeFormat("en-CA", {
     timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
   }).format(d);
-  return `${ymd}T00:00:00.000Z`;
+  const [year, month, day] = ymd.split("-").map(Number);
+
+  // Resolve the UTC instant where wall-clock in `timeZone` is ymd 00:00:00.
+  let utcMs = Date.UTC(year, month - 1, day, 0, 0, 0);
+  for (let i = 0; i < 3; i++) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(new Date(utcMs));
+    const num = (type: Intl.DateTimeFormatPartTypes) =>
+      Number(parts.find((p) => p.type === type)?.value ?? "0");
+    const asUtc = Date.UTC(
+      num("year"),
+      num("month") - 1,
+      num("day"),
+      num("hour"),
+      num("minute"),
+      num("second"),
+    );
+    const offset = asUtc - utcMs;
+    utcMs = Date.UTC(year, month - 1, day, 0, 0, 0) - offset;
+  }
+  return new Date(utcMs).toISOString();
 }
 
 export const ESTIMATE_DOCUMENT_SECTIONS = {

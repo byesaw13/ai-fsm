@@ -1,11 +1,6 @@
--- Payment terms: due upon completion.
--- Allow a one-time fill of due_date when it was never set on a sent invoice
--- (auto-final path used to omit due_date). Once set, due_date stays immutable.
---
--- IMPORTANT: This CREATE OR REPLACE must preserve all prior carveouts from
---   112_invoice_reopen_to_draft.sql (reopen unpaid → draft)
---   146_document_link_carveout.sql (client/job/property link corrections)
--- and only ADD the null→due_date fill. Do not base this body on migration 004.
+-- Repair: migration 149 initially replaced enforce_invoice_immutability from an
+-- older base and dropped reopen-to-draft (112) + document-link (146) carveouts.
+-- Re-apply the full function: 112 + 146 + one-time due_date null fill.
 
 CREATE OR REPLACE FUNCTION enforce_invoice_immutability()
 RETURNS trigger LANGUAGE plpgsql AS $$
@@ -69,7 +64,7 @@ BEGIN
   END IF;
 
   -- in sent / partial / overdue: only paid_cents + status may change,
-  -- plus a one-time due_date fill when old.due_date is null (this migration).
+  -- plus a one-time due_date fill when old.due_date is null (149).
   IF old.status IN ('sent', 'partial', 'overdue') THEN
     IF (
       new.client_id        IS DISTINCT FROM old.client_id        OR
@@ -103,12 +98,3 @@ BEGIN
   RETURN new;
 END;
 $$;
-
--- Backfill open invoices that never got a due date: due upon completion
--- (prefer sent_at calendar day, else created_at) in America/New_York.
-UPDATE invoices
-SET due_date = date_trunc('day', coalesce(sent_at, created_at) AT TIME ZONE 'America/New_York')
-              AT TIME ZONE 'America/New_York',
-    updated_at = now()
-WHERE due_date IS NULL
-  AND status IN ('draft', 'sent', 'partial', 'overdue');
