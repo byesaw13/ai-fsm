@@ -82,7 +82,14 @@ export function NewInvoiceForm({
     initialJobId && jobs.some((j) => j.id === initialJobId) ? initialJobId : ""
   );
   const [propertyId, setPropertyId] = useState("");
-  const [dueDate, setDueDate] = useState("");
+  // Payment terms: due upon completion — default to today.
+  const [dueDate, setDueDate] = useState(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  });
   const [notes, setNotes] = useState("");
   const [lineItems, setLineItems] = useState<LineItemRow[]>(
     prefillLineItems && prefillLineItems.length > 0 ? prefillLineItems : [{ ...EMPTY_ROW }]

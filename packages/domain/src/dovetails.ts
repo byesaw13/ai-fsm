@@ -174,7 +174,8 @@ Any work outside the defined scope will be quoted separately.
 
 export const STANDARD_PAYMENT_TERMS = `
 Deposits are required only when explicitly listed on the estimate.
-Any remaining balance is due according to the accepted estimate terms.
+Any remaining balance is due upon completion of the work unless alternate terms
+are agreed in writing.
 `.trim();
 
 export const STANDARD_DISCLAIMER = `
@@ -185,9 +186,32 @@ and will be communicated before proceeding.
 
 export const STANDARD_INVOICE_TERMS = `
 Invoices show customer-facing service and material costs, not internal labor hours.
-Payment is due by the listed due date unless alternate terms are agreed in writing.
+Payment is due upon completion (the listed due date) unless alternate terms are
+agreed in writing.
 Past-due balances may pause future scheduling until resolved.
 `.trim();
+
+/**
+ * Dovetails payment terms: due upon completion.
+ * Returns an ISO timestamp at UTC midnight for the completion calendar day
+ * in the account timezone (default America/New_York).
+ */
+export function dueDateUponCompletion(
+  completedAt: Date | string | null | undefined = new Date(),
+  timeZone = "America/New_York",
+): string {
+  const d = completedAt != null ? new Date(completedAt) : new Date();
+  if (Number.isNaN(d.getTime())) {
+    return dueDateUponCompletion(new Date(), timeZone);
+  }
+  const ymd = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+  return `${ymd}T00:00:00.000Z`;
+}
 
 export const ESTIMATE_DOCUMENT_SECTIONS = {
   preparation:

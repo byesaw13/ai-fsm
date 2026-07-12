@@ -4,7 +4,7 @@ import { withAuth, withRole } from "@/lib/auth/middleware";
 import { withInvoiceContext, generateInvoiceNumber } from "@/lib/invoices/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
-import { invoiceStatusSchema } from "@ai-fsm/domain";
+import { invoiceStatusSchema, dueDateUponCompletion } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -178,6 +178,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
       const invoiceNumber = await generateInvoiceNumber(client, session.accountId);
 
+      // Payment terms: due upon completion — default to today when not provided.
+      const resolvedDueDate = due_date ?? dueDateUponCompletion();
+
       const result = await client.query<{ id: string }>(
         `INSERT INTO invoices
            (account_id, client_id, job_id, property_id,
@@ -197,7 +200,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           total_cents,
           deposit_cents,
           notes ?? null,
-          due_date ?? null,
+          resolvedDueDate,
           session.userId,
         ]
       );
