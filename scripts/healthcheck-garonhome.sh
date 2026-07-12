@@ -35,15 +35,21 @@ NTFY_URL_BASE="http://${NTFY_BASE}"
 # Check if container is running
 if ! docker inspect --format='{{.State.Running}}' "${WEB_CONTAINER}" 2>/dev/null | grep -q true; then
   echo "${TIMESTAMP} status=container_down response_ms=-1" >> "${LOG_FILE}"
-  curl -s ${NTFY_AUTH:+-H "$NTFY_AUTH"} \
+  _msg="ai-fsm web container is not running on garonhome (${TIMESTAMP})"
+  _primary="${NTFY_URL_BASE:-http://ntfy.sh}/${NTFY_TOPIC}"
+  if ! curl -sS --max-time 10 ${NTFY_AUTH:+-H "$NTFY_AUTH"} \
     -H "Title: ai-fsm DOWN on garonhome" \
     -H "Priority: urgent" \
     -H "Tags: rotating_light" \
-    -d "ai-fsm web container is not running on garonhome (${TIMESTAMP})" \
-    "${NTFY_URL_BASE:-ntfy.sh}/${NTFY_TOPIC}" > /dev/null || true
-  # Last-resort public publish if self-hosted ntfy is also unreachable
-  curl -s -d "ai-fsm web container is not running on garonhome (${TIMESTAMP})" \
-    "ntfy.sh/${NTFY_TOPIC}" > /dev/null || true
+    -d "${_msg}" \
+    "${_primary}" > /dev/null; then
+    # Fallback only when primary failed and was not already public ntfy.sh
+    # (avoids double alerts and leaking to the public topic after a successful local publish).
+    if [[ "${_primary}" != *ntfy.sh* ]]; then
+      curl -sS --max-time 10 -d "${_msg}" \
+        "https://ntfy.sh/${NTFY_TOPIC}" > /dev/null || true
+    fi
+  fi
   exit 0
 fi
 
