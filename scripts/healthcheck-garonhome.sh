@@ -116,7 +116,7 @@ fi
 
 # Time the health check from inside the container
 START_MS=$(date +%s%3N)
-RESPONSE=$(docker exec "${WEB_CONTAINER}" wget -qO- http://localhost:3000/api/health 2>/dev/null || echo '{"status":"unreachable"}')
+RESPONSE=$(docker exec "${WEB_CONTAINER}" wget -qO- http://127.0.0.1:3000/api/health 2>/dev/null || echo '{"status":"unreachable"}')
 END_MS=$(date +%s%3N)
 ELAPSED=$((END_MS - START_MS))
 

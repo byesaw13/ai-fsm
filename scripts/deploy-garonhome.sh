@@ -194,7 +194,7 @@ done
 
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" ps
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T web \
-  wget -qO- http://localhost:3000/api/health
+  wget -qO- http://127.0.0.1:3000/api/health
 
 # -----------------------------------------------------------------------------
 # PWA install origin (best-effort): the app is only installable over a secure

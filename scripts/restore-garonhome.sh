@@ -51,5 +51,5 @@ for i in $(seq 1 30); do
   sleep 2
 done
 
-docker exec "${WEB_CONTAINER}" wget -qO- http://localhost:3000/api/health
+docker exec "${WEB_CONTAINER}" wget -qO- http://127.0.0.1:3000/api/health
 echo ""
