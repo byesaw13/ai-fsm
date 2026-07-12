@@ -51,5 +51,6 @@ for i in $(seq 1 30); do
   sleep 2
 done
 
+# Use 127.0.0.1 — Alpine/BusyBox wget resolves localhost to ::1; Next listens on IPv4 only.
 docker exec "${WEB_CONTAINER}" wget -qO- http://127.0.0.1:3000/api/health
 echo ""

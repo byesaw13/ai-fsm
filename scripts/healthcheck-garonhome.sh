@@ -35,8 +35,15 @@ NTFY_URL_BASE="http://${NTFY_BASE}"
 # Check if container is running
 if ! docker inspect --format='{{.State.Running}}' "${WEB_CONTAINER}" 2>/dev/null | grep -q true; then
   echo "${TIMESTAMP} status=container_down response_ms=-1" >> "${LOG_FILE}"
+  curl -s ${NTFY_AUTH:+-H "$NTFY_AUTH"} \
+    -H "Title: ai-fsm DOWN on garonhome" \
+    -H "Priority: urgent" \
+    -H "Tags: rotating_light" \
+    -d "ai-fsm web container is not running on garonhome (${TIMESTAMP})" \
+    "${NTFY_URL_BASE:-ntfy.sh}/${NTFY_TOPIC}" > /dev/null || true
+  # Last-resort public publish if self-hosted ntfy is also unreachable
   curl -s -d "ai-fsm web container is not running on garonhome (${TIMESTAMP})" \
-    "ntfy.sh/${NTFY_TOPIC}" > /dev/null
+    "ntfy.sh/${NTFY_TOPIC}" > /dev/null || true
   exit 0
 fi
 
@@ -114,7 +121,10 @@ if [[ -n "$LAST_N8N_SMS" ]]; then
   fi
 fi
 
-# Time the health check from inside the container
+# Time the health check from inside the container.
+# Use 127.0.0.1 (not localhost): Alpine/BusyBox wget prefers ::1, and Next
+# only listens on IPv4 0.0.0.0:3000 — localhost → Connection refused → false downs.
+# Matches Docker HEALTHCHECK and deploy-garonhome.sh.
 START_MS=$(date +%s%3N)
 RESPONSE=$(docker exec "${WEB_CONTAINER}" wget -qO- http://127.0.0.1:3000/api/health 2>/dev/null || echo '{"status":"unreachable"}')
 END_MS=$(date +%s%3N)

@@ -193,8 +193,10 @@ until [[ "$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}
 done
 
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" ps
+# Use 127.0.0.1 — Alpine/BusyBox wget resolves localhost to ::1; Next listens on IPv4 only.
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T web \
   wget -qO- http://127.0.0.1:3000/api/health
+echo ""
 
 # -----------------------------------------------------------------------------
 # PWA install origin (best-effort): the app is only installable over a secure
