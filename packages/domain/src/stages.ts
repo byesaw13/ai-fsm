@@ -130,7 +130,8 @@ export const PIPELINE_STAGE_ACTIONS: Record<PipelineStage, string> = {
   new_lead:        "Review request",
   estimate_needed: "Create estimate",
   estimate_sent:   "Follow up",
-  approved_ready:  "Book walkthrough",
+  // Used for both approved-estimate work and T&M jobs with no estimate.
+  approved_ready:  "Schedule work",
   scheduled:       "Prepare work",
   in_progress:     "Do the work",
   waiting:         "Resolve blocker",
@@ -193,6 +194,7 @@ export function derivePipelineStage(facts: PipelineStageFacts): PipelineStage {
 
   if (_count(facts.sentEstimateCount) > 0 || facts.jobStatus === "quoted") return "estimate_sent";
 
+  // Pre-sale site visits still need an estimate before execution.
   if (
     _count(facts.preSaleOpenSiteVisitCount) > 0 &&
     _count(facts.sentEstimateCount) === 0 &&
@@ -215,7 +217,9 @@ export function derivePipelineStage(facts: PipelineStageFacts): PipelineStage {
     return "new_lead";
   }
 
-  return "estimate_needed";
+  // T&M / day jobs: no estimate required. Treat as ready to schedule rather
+  // than "Needs Estimate" so the pipeline is Schedule → Working → Closeout.
+  return "approved_ready";
 }
 
 export function getPipelineNextAction(stage: PipelineStage): string {

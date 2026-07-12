@@ -24,11 +24,12 @@ describe("derivePipelineStage", () => {
     })).toBe("new_lead");
   });
 
-  it("routes manual draft jobs with no estimate to Estimate Needed", () => {
+  it("routes manual draft jobs with no estimate to Ready to Schedule (T&M)", () => {
+    // Not every job needs an estimate — day/T&M work skips estimate_needed.
     expect(derivePipelineStage({
       jobStatus: "draft",
       estimateCount: 0,
-    })).toBe("estimate_needed");
+    })).toBe("approved_ready");
   });
 
   it("routes quoted jobs or sent estimates to Estimate Sent", () => {

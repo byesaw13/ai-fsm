@@ -83,8 +83,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
   }
 
   let createdDepositInvoiceId: string | null = null;
-    let createdJobId: string | null = null;
-    let createdWorkOrderId: string | null = null;
+  let createdJobId: string | null = null;
+  let createdWorkOrderId: string | null = null;
+  let jobSpawnWarning: { code: string; message: string; recentWork?: unknown } | null = null;
 
   try {
     await withEstimateContext(session, async (client) => {
@@ -153,9 +154,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         });
         createdDepositInvoiceId = depositInvoiceId;
 
-        // Auto-create the job so it's immediately visible in the job board.
+        // Auto-create (or link) the job so it's visible on the board.
         // Wrapped in a savepoint so a job-creation failure never rolls back
-        // the estimate approval itself.
+        // the estimate approval itself. CLIENT_RECENT_WORK is intentional:
+        // approve still succeeds; we refuse to silently spawn a second project.
         await client.query("SAVEPOINT before_auto_job");
         try {
           const { jobId, workOrderId } = await createJobFromEstimate({
@@ -170,7 +172,23 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         } catch (jobErr) {
           await client.query("ROLLBACK TO SAVEPOINT before_auto_job");
           await client.query("RELEASE SAVEPOINT before_auto_job");
-          logger.error("estimate transition: auto-create job failed (non-fatal)", jobErr, { traceId: session.traceId });
+          const je = jobErr as Error & { code?: string; recentWork?: unknown };
+          if (je.code === "CLIENT_RECENT_WORK") {
+            jobSpawnWarning = {
+              code: "CLIENT_RECENT_WORK",
+              message: je.message,
+              recentWork: je.recentWork,
+            };
+            logger.info("estimate transition: skipped job spawn — client recent work", {
+              traceId: session.traceId,
+              estimateId: id,
+              recentWork: je.recentWork,
+            });
+          } else {
+            logger.error("estimate transition: auto-create job failed (non-fatal)", jobErr, {
+              traceId: session.traceId,
+            });
+          }
         }
       }
 
@@ -201,6 +219,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     }
     if (createdWorkOrderId) {
       response.work_order_id = createdWorkOrderId;
+    }
+    if (jobSpawnWarning) {
+      response.job_spawn_warning = jobSpawnWarning;
     }
     return NextResponse.json(response);
   } catch (error) {
