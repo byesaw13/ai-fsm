@@ -583,7 +583,7 @@ export async function buildInvoicePdf(d: InvoicePdfData): Promise<Uint8Array> {
 
   const terms =
     d.branding?.invoiceTerms?.trim() ||
-    "Payment is due by the listed due date unless alternate terms are agreed in writing.";
+    "Payment is due upon completion (the listed due date) unless alternate terms are agreed in writing.";
   const footer =
     `Thank you for your business. Please reference ${d.invoiceNumber} with any payment.`;
 

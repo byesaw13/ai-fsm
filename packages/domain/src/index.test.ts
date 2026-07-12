@@ -312,6 +312,7 @@ describe('Dovetails standards', () => {
   it('exposes versioned document standards', () => {
     expect(DOCUMENT_STANDARD_VERSION).toBe('2026.05')
     expect(STANDARD_INVOICE_TERMS).toContain('not internal labor hours')
+    expect(STANDARD_INVOICE_TERMS).toContain('due upon completion')
     expect(Object.keys(ESTIMATE_DOCUMENT_SECTIONS)).toEqual([
       'preparation',
       'repair_install_work',
@@ -320,6 +321,18 @@ describe('Dovetails standards', () => {
       'exclusions',
       'client_responsibilities',
     ])
+  })
+
+  it('dueDateUponCompletion is Eastern midnight as UTC (not UTC midnight)', async () => {
+    const { dueDateUponCompletion } = await import('./dovetails')
+    // 2026-07-09 afternoon UTC → still July 9 Eastern → midnight EDT = 04:00Z
+    expect(dueDateUponCompletion('2026-07-09T15:40:56.000Z')).toBe('2026-07-09T04:00:00.000Z')
+    // 02:00Z July 10 is still July 9 evening Eastern
+    expect(dueDateUponCompletion('2026-07-10T02:00:00.000Z')).toBe('2026-07-09T04:00:00.000Z')
+    // Locale display in America/New_York must show July 9, not July 8
+    const due = new Date(dueDateUponCompletion('2026-07-09T15:40:56.000Z'))
+    const shown = due.toLocaleDateString('en-US', { timeZone: 'America/New_York' })
+    expect(shown).toBe('7/9/2026')
   })
 
   it('scores vault completeness from core category coverage', () => {

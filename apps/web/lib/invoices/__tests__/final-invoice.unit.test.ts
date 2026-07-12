@@ -190,6 +190,8 @@ describe("createDraftFinalInvoiceForJob", () => {
       },
       // Deposit invoices: none
       { rows: [], rowCount: 0 },
+      // Visit completed_at (due upon completion)
+      { rows: [{ completed_at: "2026-07-09T15:00:00.000Z" }], rowCount: 1 },
       // Invoice INSERT
       { rows: [{ id: "parts-inv-id" }], rowCount: 1 },
       // Line items

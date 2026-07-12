@@ -30,7 +30,10 @@ import {
   roundedQuarterHoursFromMinutes,
 } from "@/lib/invoices/line-items";
 import { trackedLaborMinutesFromActivityEntries } from "@/lib/invoices/tracked-labor";
-import { LABOR_CUSTOMER_RATE_CENTS_PER_HOUR } from "@ai-fsm/domain";
+import {
+  LABOR_CUSTOMER_RATE_CENTS_PER_HOUR,
+  dueDateUponCompletion,
+} from "@ai-fsm/domain";
 import { loadTravelSettings } from "@/lib/travel/settings";
 import {
   TRAVEL_LINE_MARKER,
@@ -264,6 +267,19 @@ export async function createDraftFinalInvoiceForJob(
     : job.estimate_notes ?? null;
 
   // ── Create invoice ───────────────────────────────────────────────────────
+  // Payment terms: due upon completion. Prefer visit completed_at when known.
+  let completionAt: Date | string = new Date();
+  if (visitId) {
+    const visitRow = await client.query<{ completed_at: string | null }>(
+      `SELECT completed_at::text FROM visits WHERE id = $1 AND account_id = $2`,
+      [visitId, accountId]
+    );
+    if (visitRow.rows[0]?.completed_at) {
+      completionAt = visitRow.rows[0].completed_at;
+    }
+  }
+  const dueDate = dueDateUponCompletion(completionAt);
+
   const invoiceNumber = await generateInvoiceNumber(client, accountId);
 
   const invoiceRes = await client.query<{ id: string }>(
@@ -271,11 +287,11 @@ export async function createDraftFinalInvoiceForJob(
        (account_id, client_id, job_id, estimate_id, property_id,
         status, invoice_kind, invoice_number,
         subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
-        notes, created_by, travel_snapshot_id, travel_billing_mode)
+        notes, due_date, created_by, travel_snapshot_id, travel_billing_mode)
      VALUES ($1, $2, $3, $4, $5,
              'draft', 'final', $6,
              $7, $8, $9, 0, $10,
-             $11, $12, $13, $14)
+             $11, $12, $13, $14, $15)
      RETURNING id`,
     [
       accountId,
@@ -289,6 +305,7 @@ export async function createDraftFinalInvoiceForJob(
       totalCents,
       depositCreditCents,
       finalNotes,
+      dueDate,
       userId,
       job.travel_snapshot_id,
       job.travel_snapshot_id ? "estimated" : null,

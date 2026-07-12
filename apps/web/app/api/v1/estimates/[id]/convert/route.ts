@@ -9,6 +9,7 @@ import {
   ensureInvoiceTravelLinesFromSnapshot,
   getTravelSnapshot,
 } from "@/lib/travel/snapshots";
+import { dueDateUponCompletion } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -161,11 +162,11 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
            (account_id, client_id, job_id, estimate_id, property_id,
             status, invoice_kind, invoice_number,
             subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
-            notes, created_by, travel_snapshot_id, travel_billing_mode)
+            notes, due_date, created_by, travel_snapshot_id, travel_billing_mode)
          VALUES ($1, $2, $3, $4, $5,
                  'draft', 'final', $6,
                  $7, $8, $9, 0, $10,
-                 $11, $12, $13, $14)
+                 $11, $12, $13, $14, $15)
          RETURNING id`,
         [
           session.accountId,
@@ -179,6 +180,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           estimate.total_cents,
           reconciliation.depositCreditCents,
           finalNotes,
+          dueDateUponCompletion(), // due upon completion
           session.userId,
           estimate.travel_snapshot_id,
           estimate.travel_snapshot_id ? "estimated" : null,

@@ -174,7 +174,8 @@ Any work outside the defined scope will be quoted separately.
 
 export const STANDARD_PAYMENT_TERMS = `
 Deposits are required only when explicitly listed on the estimate.
-Any remaining balance is due according to the accepted estimate terms.
+Any remaining balance is due upon completion of the work unless alternate terms
+are agreed in writing.
 `.trim();
 
 export const STANDARD_DISCLAIMER = `
@@ -185,9 +186,66 @@ and will be communicated before proceeding.
 
 export const STANDARD_INVOICE_TERMS = `
 Invoices show customer-facing service and material costs, not internal labor hours.
-Payment is due by the listed due date unless alternate terms are agreed in writing.
+Payment is due upon completion (the listed due date) unless alternate terms are
+agreed in writing.
 Past-due balances may pause future scheduling until resolved.
 `.trim();
+
+/**
+ * Dovetails payment terms: due upon completion.
+ *
+ * Returns the UTC ISO instant for **local midnight** on the completion
+ * calendar day in `timeZone` (default America/New_York). Matches:
+ *   date_trunc('day', ts AT TIME ZONE tz) AT TIME ZONE tz
+ *
+ * Using UTC midnight for the label day is wrong: 2026-07-09T00:00:00Z is still
+ * July 8 evening in Eastern, so `toLocaleDateString()` shows one day early.
+ */
+export function dueDateUponCompletion(
+  completedAt: Date | string | null | undefined = new Date(),
+  timeZone = "America/New_York",
+): string {
+  const d = completedAt != null ? new Date(completedAt) : new Date();
+  if (Number.isNaN(d.getTime())) {
+    return dueDateUponCompletion(new Date(), timeZone);
+  }
+
+  const ymd = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+  const [year, month, day] = ymd.split("-").map(Number);
+
+  // Resolve the UTC instant where wall-clock in `timeZone` is ymd 00:00:00.
+  let utcMs = Date.UTC(year, month - 1, day, 0, 0, 0);
+  for (let i = 0; i < 3; i++) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(new Date(utcMs));
+    const num = (type: Intl.DateTimeFormatPartTypes) =>
+      Number(parts.find((p) => p.type === type)?.value ?? "0");
+    const asUtc = Date.UTC(
+      num("year"),
+      num("month") - 1,
+      num("day"),
+      num("hour"),
+      num("minute"),
+      num("second"),
+    );
+    const offset = asUtc - utcMs;
+    utcMs = Date.UTC(year, month - 1, day, 0, 0, 0) - offset;
+  }
+  return new Date(utcMs).toISOString();
+}
 
 export const ESTIMATE_DOCUMENT_SECTIONS = {
   preparation:
