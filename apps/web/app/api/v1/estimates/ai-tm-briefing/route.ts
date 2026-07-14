@@ -104,6 +104,8 @@ export const POST = withAuth(async (request: NextRequest, session) => {
       const pool = getPool();
       const client = await pool.connect();
       try {
+        // BEGIN so set_config(..., true) persists across the settings queries
+        await client.query("BEGIN");
         await client.query(
           `SELECT set_config('app.current_account_id', $1, true),
                   set_config('app.current_user_id', $2, true),
@@ -111,6 +113,10 @@ export const POST = withAuth(async (request: NextRequest, session) => {
           [session.accountId, session.userId, session.role]
         );
         pricingSettings = await loadPricingSettings(client, session.accountId);
+        await client.query("COMMIT");
+      } catch (inner) {
+        await client.query("ROLLBACK").catch(() => {});
+        throw inner;
       } finally {
         client.release();
       }

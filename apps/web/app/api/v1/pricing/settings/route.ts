@@ -38,6 +38,7 @@ export const GET = withRole(["owner", "admin", "tech"], async (_req: NextRequest
   const pool = getPool();
   const client = await pool.connect();
   try {
+    await client.query("BEGIN");
     await client.query(
       `SELECT set_config('app.current_user_id', $1, true),
               set_config('app.current_account_id', $2, true),
@@ -45,6 +46,7 @@ export const GET = withRole(["owner", "admin", "tech"], async (_req: NextRequest
       [session.userId, session.accountId, session.role]
     );
     const settings = await loadPricingSettings(client, session.accountId);
+    await client.query("COMMIT");
     const rules = buildPricingRules(settings);
     return NextResponse.json({
       data: {
@@ -65,6 +67,7 @@ export const GET = withRole(["owner", "admin", "tech"], async (_req: NextRequest
       },
     });
   } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
     logger.error("GET /api/v1/pricing/settings", error, { traceId: session.traceId });
     return NextResponse.json(
       {

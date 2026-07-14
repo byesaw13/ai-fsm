@@ -324,11 +324,14 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     );
   }
 
-  // Account labor cost / bill rates drive margin checks
+  // Account labor cost / bill rates drive margin checks.
+  // set_config(..., true) is transaction-local — must run inside BEGIN so RLS
+  // can see business_pricing_settings (FORCE RLS + app_account_id policies).
   const pool = getPool();
   const pricingClient = await pool.connect();
   let pricingRules;
   try {
+    await pricingClient.query("BEGIN");
     await pricingClient.query(
       `SELECT set_config('app.current_account_id', $1, true),
               set_config('app.current_user_id', $2, true),
@@ -336,6 +339,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       [session.accountId, session.userId, session.role]
     );
     pricingRules = (await loadPricingRules(pricingClient, session.accountId)).rules;
+    await pricingClient.query("COMMIT");
+  } catch (err) {
+    await pricingClient.query("ROLLBACK").catch(() => {});
+    throw err;
   } finally {
     pricingClient.release();
   }
@@ -374,18 +381,33 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     }
   } else {
     subtotal_cents = calcTotals(line_items).subtotal_cents;
-    // Itemized / T&M: derive margin from billing vs cost rates
+    // Itemized / T&M: map labor vs materials so margin uses cost rates correctly
     const engine = computeEstimate(
       {
         engineVersion: ENGINE_VERSION,
         type: "general",
-        lineItems: line_items.map((item, i) => ({
-          id: `li-${i}`,
-          description: item.description,
-          quantity: item.quantity,
-          unit: "unit" as const,
-          unitLaborCents: item.unit_price_cents,
-        })),
+        lineItems: line_items.map((item, i) => {
+          const isMaterials =
+            item.line_item_type === "materials" || item.line_item_type === "handling_fee";
+          if (isMaterials) {
+            // Materials: no labor rate conversion — cost = billed materials
+            return {
+              id: `li-${i}`,
+              description: item.description,
+              quantity: 1,
+              unit: "flat" as const,
+              unitLaborCents: 0,
+              materialCents: Math.round(item.quantity * item.unit_price_cents),
+            };
+          }
+          return {
+            id: `li-${i}`,
+            description: item.description,
+            quantity: item.quantity,
+            unit: "unit" as const,
+            unitLaborCents: item.unit_price_cents,
+          };
+        }),
       },
       pricingRules
     );

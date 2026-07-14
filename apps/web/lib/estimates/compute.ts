@@ -35,11 +35,21 @@ export async function computeAndPersist(args: ComputeAndPersistArgs): Promise<Co
     const pool = getPool();
     const client = await pool.connect();
     try {
+      // Transaction-local set_config requires an open transaction
+      await client.query("BEGIN");
       await client.query(
         `SELECT set_config('app.current_account_id', $1, true)`,
         [accountId]
       );
+      // Role needed for owner/admin insert seed path under RLS
+      await client.query(
+        `SELECT set_config('app.current_role', 'owner', true)`
+      );
       rules = (await loadPricingRules(client, accountId)).rules;
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw err;
     } finally {
       client.release();
     }
