@@ -168,7 +168,7 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
     };
   }
 
-  // ── T&M: skip estimate-centric ladder once past intake ─────────────────
+  // ── T&M: optional expectation estimate, then schedule / track time ─────
   if (isTm) {
     if (bookingRequestId && stage === "new_lead") {
       return {
@@ -177,13 +177,27 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
         actionHref: `/app/requests/${bookingRequestId}`,
       };
     }
+    if (estimateCount === 0) {
+      return {
+        message: "Time and materials — set hour expectations from notes, or schedule work",
+        actionLabel: "Estimate from notes (T&M)",
+        actionHref: `/app/estimates/new?mode=tm&job_id=${jobId}${cq}&auto_generate=1`,
+        secondary: {
+          label: "Schedule Visit",
+          href: `/app/jobs/${jobId}/visits/new`,
+        },
+      };
+    }
     return {
       message: "Time and materials — schedule work and track time",
       actionLabel: "Schedule Visit",
       actionHref: `/app/jobs/${jobId}/visits/new`,
       secondary: visitId
         ? { label: "Open latest visit", href: `/app/visits/${visitId}` }
-        : undefined,
+        : {
+            label: "Another T&M estimate",
+            href: `/app/estimates/new?mode=tm&job_id=${jobId}${cq}&auto_generate=1`,
+          },
     };
   }
 
@@ -239,6 +253,10 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
       message: "Create estimate from walkthrough",
       actionLabel: "Create Estimate",
       actionHref: `/app/estimates/new?job_id=${jobId}${cq}&pricing_mode=flat_rate`,
+      secondary: {
+        label: "Or T&M from notes",
+        href: `/app/estimates/new?mode=tm&job_id=${jobId}${cq}&auto_generate=1`,
+      },
     };
   }
 
@@ -247,6 +265,10 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
       message: "Create estimate from work order scope",
       actionLabel: "Create Estimate",
       actionHref: `/app/estimates/new?job_id=${jobId}${cq}&pricing_mode=flat_rate`,
+      secondary: {
+        label: "Or T&M from notes",
+        href: `/app/estimates/new?mode=tm&job_id=${jobId}${cq}&auto_generate=1`,
+      },
     };
   }
 
@@ -290,6 +312,10 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
       message: "Next step: create an estimate",
       actionLabel: "Create Estimate",
       actionHref: `/app/estimates/new?job_id=${jobId}${cq}&pricing_mode=flat_rate`,
+      secondary: {
+        label: "Or T&M from notes",
+        href: `/app/estimates/new?mode=tm&job_id=${jobId}${cq}&auto_generate=1`,
+      },
     };
   }
 

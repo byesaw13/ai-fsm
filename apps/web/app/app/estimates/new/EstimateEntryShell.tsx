@@ -4,8 +4,10 @@ import { useState } from "react";
 import { Card } from "@/components/ui";
 import { EstimateLaunchModal, resolveEntryPricingMode, type EstimateMode } from "./EstimateLaunchModal";
 import { EstimateInterviewFlow } from "./EstimateInterviewFlow";
+import { TmBriefingFlow } from "./TmBriefingFlow";
 import { NewEstimateForm } from "./NewEstimateForm";
 import type { DraftEstimate } from "@/lib/estimates/ai-draft";
+import type { TmEstimateDraft } from "@/lib/estimates/tm-briefing";
 import type { ShoppingList } from "@ai-fsm/domain";
 import type { AssessmentContext } from "@/lib/estimates/assessment-context";
 
@@ -24,6 +26,10 @@ interface EstimateEntryShellProps {
   initialNotes?: string;
   bookingRequestId?: string;
   serverAssessmentContext?: AssessmentContext | null;
+  /** Job notes assembled for T&M paste path */
+  initialTmBriefing?: string;
+  /** Auto-run T&M generate when landing with a briefing (job one-click) */
+  autoGenerateTm?: boolean;
 }
 
 export function EstimateEntryShell({
@@ -40,6 +46,8 @@ export function EstimateEntryShell({
   initialNotes,
   bookingRequestId,
   serverAssessmentContext,
+  initialTmBriefing,
+  autoGenerateTm = false,
 }: EstimateEntryShellProps) {
   const [mode, setMode] = useState<EstimateMode | null>(initialMode ?? null);
   // After interview applies draft: switch to the manual form pre-populated.
@@ -47,6 +55,7 @@ export function EstimateEntryShell({
     draft: DraftEstimate;
     shoppingList: ShoppingList | null;
   } | null>(null);
+  const [appliedTmDraft, setAppliedTmDraft] = useState<TmEstimateDraft | null>(null);
 
   if (!mode) {
     return (
@@ -73,8 +82,27 @@ export function EstimateEntryShell({
     );
   }
 
+  if (mode === "tm" && !appliedTmDraft) {
+    return (
+      <Card style={{ padding: "var(--space-4)" }}>
+        <TmBriefingFlow
+          jobId={initialJobId}
+          clientId={initialClientId}
+          initialBriefing={initialTmBriefing}
+          autoGenerate={autoGenerateTm}
+          onApplyDraft={({ draft }) => {
+            setAppliedTmDraft(draft);
+            setMode("detailed");
+          }}
+          onSwitchToManual={() => setMode("detailed")}
+          onSwitchToAi={() => setMode("ai")}
+        />
+      </Card>
+    );
+  }
+
   // Resolve the form's pricing mode from the entry mode (Quick → flat-rate,
-  // Detailed/AI → itemized). An explicit URL/preset pricing mode still wins.
+  // Detailed/AI/T&M → itemized). An explicit URL/preset pricing mode still wins.
   const resolvedPricingMode = resolveEntryPricingMode(mode, initialPricingMode);
 
   // Manual / post-interview form. When coming from the interview, the form picks
@@ -92,6 +120,7 @@ export function EstimateEntryShell({
         vaultItemContext={vaultItemContext}
         initialPricingMode={resolvedPricingMode}
         initialInterviewDraft={appliedDraft ?? undefined}
+        initialTmDraft={appliedTmDraft ?? undefined}
         initialNotes={initialNotes}
         bookingRequestId={bookingRequestId}
         serverAssessmentContext={serverAssessmentContext}

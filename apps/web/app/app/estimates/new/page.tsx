@@ -6,6 +6,7 @@ import { Card, PageContainer, PageHeader } from "@/components/ui";
 import { EstimateEntryShell } from "./EstimateEntryShell";
 import { buildWalkthroughScopeNotes } from "@/lib/estimates/walkthrough-prefill";
 import { loadAssessmentSummary } from "@/lib/estimates/assessment-summary-loader";
+import { buildJobTmBriefing } from "@/lib/estimates/job-tm-briefing";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,10 @@ interface PageProps {
     vault_item_id?: string;
     from_visit?: string;
     pricing_mode?: "itemized" | "flat_rate" | "multi_option";
+    /** Entry mode shortcut: quick | detailed | ai | tm */
+    mode?: "quick" | "detailed" | "ai" | "tm";
+    /** When "1", T&M path auto-runs generate after loading job notes */
+    auto_generate?: string;
     booking_request_id?: string;
     from_assessment?: string;
     visit_id?: string;
@@ -71,7 +76,19 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
   if (!session) redirect("/login");
   if (!canCreateEstimates(session.role)) redirect("/app/estimates");
 
-  const { client_id, job_id, property_id, vault_item_id, from_visit, pricing_mode, booking_request_id, from_assessment, visit_id } = await searchParams;
+  const {
+    client_id,
+    job_id,
+    property_id,
+    vault_item_id,
+    from_visit,
+    pricing_mode,
+    mode,
+    auto_generate,
+    booking_request_id,
+    from_assessment,
+    visit_id,
+  } = await searchParams;
 
   // TASK-018 slice 2: when opened from an assessment, recover the canonical
   // summary from persistence so a refresh / deep-link (no sessionStorage) still
@@ -172,6 +189,47 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
     });
   }
 
+  // T&M one-click from job: assemble briefing from job + property + latest field notes
+  let initialTmBriefing = "";
+  if (mode === "tm" && job_id) {
+    const tmSource = await queryOne<{
+      title: string;
+      description: string | null;
+      intake_notes: string | null;
+      property_address: string | null;
+      property_city: string | null;
+      property_state: string | null;
+      field_notes: string | null;
+      request_description: string | null;
+      pricing_mode: "flat_rate" | "hourly_internal" | null;
+    }>(
+      `SELECT j.title,
+              j.description,
+              j.intake_notes,
+              p.address AS property_address,
+              p.city AS property_city,
+              p.state AS property_state,
+              (SELECT v.tech_notes FROM visits v
+                WHERE v.job_id = j.id AND v.account_id = j.account_id
+                  AND v.tech_notes IS NOT NULL AND TRIM(v.tech_notes) <> ''
+                ORDER BY v.updated_at DESC NULLS LAST, v.created_at DESC
+                LIMIT 1) AS field_notes,
+              (SELECT br.service_description FROM booking_requests br
+                WHERE br.job_id = j.id AND br.account_id = j.account_id
+                ORDER BY br.created_at DESC LIMIT 1) AS request_description,
+              (SELECT br.pricing_mode FROM booking_requests br
+                WHERE br.job_id = j.id AND br.account_id = j.account_id
+                ORDER BY br.created_at DESC LIMIT 1) AS pricing_mode
+       FROM jobs j
+       LEFT JOIN properties p ON p.id = j.property_id AND p.account_id = j.account_id
+       WHERE j.id = $1 AND j.account_id = $2`,
+      [job_id, session.accountId]
+    );
+    if (tmSource) {
+      initialTmBriefing = buildJobTmBriefing(tmSource);
+    }
+  }
+
   return (
     <PageContainer>
       <PageHeader title="New Estimate" backHref="/app/estimates" backLabel="Estimates" />
@@ -212,10 +270,18 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
         initialVaultItemId={vault_item_id}
         vaultItemContext={vaultItemContext}
         initialPricingMode={pricing_mode}
-        initialMode={walkthroughContext ? "quick" : undefined}
+        initialMode={
+          mode === "quick" || mode === "detailed" || mode === "ai" || mode === "tm"
+            ? mode
+            : walkthroughContext
+              ? "quick"
+              : undefined
+        }
         initialNotes={walkthroughPrefill || undefined}
         bookingRequestId={bookingRequestContext?.id}
         serverAssessmentContext={serverAssessmentContext}
+        initialTmBriefing={initialTmBriefing || undefined}
+        autoGenerateTm={auto_generate === "1" && Boolean(initialTmBriefing)}
       />
     </PageContainer>
   );

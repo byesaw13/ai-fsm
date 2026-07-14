@@ -75,6 +75,8 @@ export interface NewEstimateFormProps {
   initialPricingMode?: "itemized" | "flat_rate" | "multi_option";
   /** When set, the form auto-applies this draft on mount (from AI interview flow) */
   initialInterviewDraft?: { draft: import("@/lib/estimates/ai-draft").DraftEstimate; shoppingList: ShoppingList | null } | null;
+  /** When set, the form auto-applies a T&M briefing draft on mount (paste → hours/range path). */
+  initialTmDraft?: import("@/lib/estimates/tm-briefing").TmEstimateDraft | null;
   /** Seed text for the notes/scope field (e.g. walkthrough findings). Initial value only — never overwrites edits. */
   initialNotes?: string;
   /** Booking request that originated this estimate — stored for chain traceability. */
@@ -99,6 +101,7 @@ export function useEstimateForm({
   vaultItemContext,
   initialPricingMode = "flat_rate",
   initialInterviewDraft,
+  initialTmDraft = null,
   initialNotes,
   bookingRequestId,
   serverAssessmentContext = null,
@@ -201,6 +204,8 @@ export function useEstimateForm({
 
   const [draftShoppingList, setDraftShoppingList] = useState<ShoppingList | null>(null);
   const [draftSpecifiedMaterials, setDraftSpecifiedMaterials] = useState<SpecifiedMaterial[]>([]);
+  /** Internal notes seeded by T&M briefing (or painting engine); submitted with create payload. */
+  const [internalNotes, setInternalNotes] = useState("");
 
   // Room-by-room painting estimator
   const [paintingMode, setPaintingMode] = useState<"quick" | "room_by_room">("quick");
@@ -311,6 +316,52 @@ export function useEstimateForm({
       // Re-use the AI hook's internal builder
       ai.applyPendingDraftFromExternal(draft, shoppingList);
       setStep(3); // Jump to Adjustments step after interview
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Auto-apply T&M briefing draft on mount
+  // ---------------------------------------------------------------------------
+
+  const tmDraftApplied = useRef(false);
+  useEffect(() => {
+    if (initialTmDraft && !tmDraftApplied.current) {
+      tmDraftApplied.current = true;
+      const tm = initialTmDraft;
+      handleModeChange("itemized");
+      setServiceType("generic");
+      setLineItems(
+        tm.line_items.map((li) => ({
+          description: li.description,
+          quantity: String(li.quantity),
+          unit_price: (li.unit_price_cents / 100).toFixed(2),
+        }))
+      );
+      setNotes(tm.notes);
+      setInternalNotes(tm.internal_notes);
+      setLaborHours(String(tm.labor_mid_hours + tm.travel_mid_hours));
+      setTripCount(tm.guardrails.trip_count);
+      setDifficultAccess(tm.guardrails.difficult_access);
+      setOldHouseRisk(tm.guardrails.old_house_risk);
+      setRequiresDryingOrCuring(tm.guardrails.requires_drying_or_curing);
+      setCoordinationRequired(tm.guardrails.coordination_required);
+      setFinishExpectation(tm.guardrails.finish_expectation);
+      setDraftShoppingList(tm.shopping_list);
+      setDraftSpecifiedMaterials(tm.specified_materials);
+      const riskLine =
+        tm.extraction.risks.length > 0
+          ? `Risks: ${tm.extraction.risks.join("; ")}`
+          : "";
+      const scopeLine =
+        tm.extraction.scope_items.length > 0
+          ? `Scope: ${tm.extraction.scope_items.join("; ")}`
+          : tm.extraction.scope_summary;
+      setScopeAssumptions(
+        [scopeLine, riskLine, tm.extraction.materials_policy].filter(Boolean).join("\n")
+      );
+      // Land on Pricing so mid-range lines are visible; fall back to Who & What if no client yet.
+      setStep(clientId ? 2 : 1);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -666,6 +717,10 @@ export function useEstimateForm({
           line_items: allItems,
           ...(scopeMatCents > 0 ? { material_cost_cents: scopeMatCents } : {}),
           ...(scopeSnapshots.length > 0 ? { scope_snapshots: scopeSnapshots } : {}),
+          ...(internalNotes.trim() ? { internal_notes: internalNotes.trim() } : {}),
+          ...(parseFloat(laborHours) > 0
+            ? { labor_hours_estimate: parseFloat(laborHours) }
+            : {}),
         };
       }
 

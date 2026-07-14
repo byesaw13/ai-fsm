@@ -74,6 +74,7 @@ describe("computeWhatNext — pre-sale and close-out branches", () => {
     expect(next.actionHref).toBe(
       `/app/estimates/new?job_id=${JOB_ID}&client_id=${CLIENT_ID}&pricing_mode=flat_rate`,
     );
+    expect(next.secondary?.href).toContain("mode=tm");
   });
 
   it("shows create estimate from work order scope when draft WO has pricing and no estimate", () => {
@@ -209,7 +210,7 @@ describe("computeWhatNext — money, field, T&M", () => {
     expect(next.actionHref).toBe(`/app/invoices/${INVOICE_ID}`);
   });
 
-  it("T&M skips estimate ladder and points at scheduling", () => {
+  it("T&M with no estimate offers notes-based T&M draft first", () => {
     const next = computeWhatNext(
       baseProps({
         jobStatus: "draft",
@@ -220,6 +221,23 @@ describe("computeWhatNext — money, field, T&M", () => {
     );
 
     expect(next.message).toMatch(/Time and materials/i);
+    expect(next.actionLabel).toBe("Estimate from notes (T&M)");
+    expect(next.actionHref).toContain(`mode=tm`);
+    expect(next.actionHref).toContain(`job_id=${JOB_ID}`);
+    expect(next.actionHref).toContain("auto_generate=1");
+    expect(next.secondary?.label).toBe("Schedule Visit");
+  });
+
+  it("T&M after an estimate points at scheduling", () => {
+    const next = computeWhatNext(
+      baseProps({
+        jobStatus: "draft",
+        stage: "estimate_needed",
+        pricingMode: "hourly_internal",
+        estimateCount: 1,
+      }),
+    );
+
     expect(next.actionLabel).toBe("Schedule Visit");
     expect(next.actionHref).toBe(`/app/jobs/${JOB_ID}/visits/new`);
   });
