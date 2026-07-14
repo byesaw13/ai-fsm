@@ -46,6 +46,11 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
   // saving the expense — logged as a completed segment on save (run mode).
   const formOpenedAtRef = useRef<string>(new Date().toISOString());
 
+  // Line items returned by the AI scan, saved after the expense is created.
+  const scannedLineItemsRef = useRef<
+    { name: string; quantity: number; unit_cost_cents: number; sku?: string | null }[]
+  >([]);
+
   async function handleScanReceipt(file: File) {
     setSelectedReceiptFile(file);
     setScanning(true);
@@ -59,7 +64,8 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
         setScanError(data.error?.message ?? "Scan failed — enter the receipt details manually. The photo will still be saved.");
         return;
       }
-      const { vendor_name, amount_cents, expense_date, category: cat, notes: n } = data.data;
+      const { vendor_name, amount_cents, expense_date, category: cat, notes: n, line_items } = data.data;
+      scannedLineItemsRef.current = Array.isArray(line_items) ? line_items : [];
       if (vendor_name) setVendorName(vendor_name);
       if (amount_cents) setAmountStr((amount_cents / 100).toFixed(2));
       if (expense_date) setExpenseDate(expense_date);
@@ -129,6 +135,14 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
           setPending(false);
           return;
         }
+      }
+
+      if (expenseId && scannedLineItemsRef.current.length > 0) {
+        await fetch(`/api/v1/expenses/${expenseId}/line-items`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ line_items: scannedLineItemsRef.current }),
+        }).catch(() => null);
       }
 
       if (isMaterialRun) {
