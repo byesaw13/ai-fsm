@@ -39,7 +39,16 @@ export default async function EstimateDetailPage({
   const detail = await loadEstimateDetail(session, id);
   if (!detail) notFound();
 
-  const { estimate, lineItems, options, jobVisitCount, depositInvoice, finalInvoice, changeOrders } = detail;
+  const {
+    estimate,
+    lineItems,
+    options,
+    jobVisitCount,
+    jobStatus,
+    depositInvoice,
+    finalInvoice,
+    changeOrders,
+  } = detail;
 
   const shoppingListSummary = estimate.shopping_list_json as { sections?: Array<{ section: string }> } | null | undefined;
   const hasMaterialsPlan = !!shoppingListSummary?.sections?.length;
@@ -263,7 +272,14 @@ export default async function EstimateDetailPage({
 
       {/* Approved project handoff — owner/admin only */}
       {canTransition && currentStatus === "approved" && (
-        <ApprovedHandoff estimate={estimate} jobVisitCount={jobVisitCount} hasMaterialsPlan={hasMaterialsPlan} />
+        <ApprovedHandoff
+          estimate={estimate}
+          jobVisitCount={jobVisitCount}
+          hasMaterialsPlan={hasMaterialsPlan}
+          jobStatus={jobStatus}
+          depositInvoice={depositInvoice}
+          finalInvoice={finalInvoice}
+        />
       )}
 
       {/* Change orders — owner/admin only, approved estimates */}

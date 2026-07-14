@@ -122,6 +122,8 @@ export interface EstimateDetail {
   lineItems: LineItemRow[];
   options: OptionWithItems[];
   jobVisitCount: number;
+  /** Linked project status — used to gate final billing until owner completes. */
+  jobStatus: string | null;
   depositInvoice: EstimateInvoiceRow | null;
   finalInvoice: EstimateInvoiceRow | null;
   changeOrders: ChangeOrder[];
@@ -189,17 +191,23 @@ export async function loadEstimateDetail(
 
   const { estimate, lineItems, options } = result;
 
-  // For approved estimates with a linked job, check if any visits are scheduled.
+  // For approved estimates with a linked job, visit count + project status.
   let jobVisitCount = 0;
+  let jobStatus: string | null = null;
   if (estimate.status === "approved" && estimate.job_id) {
     try {
       const pool = getPool();
-      const vcRow = await pool.query<{ count: string }>(
-        `SELECT COUNT(*)::text AS count FROM visits
-         WHERE job_id = $1 AND account_id = $2 AND status != 'cancelled'`,
+      const jobRow = await pool.query<{ status: string; visit_count: string }>(
+        `SELECT j.status,
+                (SELECT COUNT(*)::text FROM visits v
+                 WHERE v.job_id = j.id AND v.account_id = j.account_id
+                   AND v.status != 'cancelled') AS visit_count
+         FROM jobs j
+         WHERE j.id = $1 AND j.account_id = $2`,
         [estimate.job_id, session.accountId]
       );
-      jobVisitCount = parseInt(vcRow.rows[0]?.count ?? "0", 10);
+      jobStatus = jobRow.rows[0]?.status ?? null;
+      jobVisitCount = parseInt(jobRow.rows[0]?.visit_count ?? "0", 10);
     } catch {
       // Non-critical — proceed without count
     }
@@ -254,5 +262,14 @@ export async function loadEstimateDetail(
     // Change orders table may not exist yet
   }
 
-  return { estimate, lineItems, options, jobVisitCount, depositInvoice, finalInvoice, changeOrders };
+  return {
+    estimate,
+    lineItems,
+    options,
+    jobVisitCount,
+    jobStatus,
+    depositInvoice,
+    finalInvoice,
+    changeOrders,
+  };
 }

@@ -35,6 +35,15 @@ export interface ProjectWhatNextProps {
   latestExpiredEstimateId: string | null;
   hasDraftWorkOrderWithPricing: boolean;
   preSaleSiteVisitId: string | null;
+  /**
+   * Field quiet + work orders done, project still open — owner must explicitly
+   * complete the project and review billing. Never set by visit auto-complete.
+   */
+  readyForCloseout?: boolean;
+  /** At least one completed execution visit exists. */
+  hasCompletedExecutionVisit?: boolean;
+  /** Open (non-terminal) work orders remain. */
+  hasOpenWorkOrder?: boolean;
 }
 
 export interface WhatNextContent {
@@ -60,9 +69,10 @@ function clientQ(clientId: string | null): string {
 }
 
 /**
- * Pure handoff logic for a project. Precedence: close-out / money first, then
- * field work, then commercial gates (deposit, estimate), then pre-sale.
- * T&M skips estimate-centric steps.
+ * Pure handoff logic for a project. Precedence:
+ * final/standard money → owner closeout → active field → multi-day schedule →
+ * commercial (deposit/estimate) → pre-sale.
+ * Deposits never count as project billed. Visits never auto-complete projects.
  */
 export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
   const {
@@ -91,14 +101,23 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
     latestExpiredEstimateId,
     hasDraftWorkOrderWithPricing,
     preSaleSiteVisitId,
+    readyForCloseout = false,
+    hasCompletedExecutionVisit = false,
+    hasOpenWorkOrder = false,
   } = props;
 
   const cq = clientQ(clientId);
   const isTm = pricingMode === "hourly_internal";
   const visitId = activeVisitId ?? latestVisitId;
   const days = daysSince(lastEstimateSentAt);
+  const estimateExtras = approvedEstimateId
+    ? [
+        { label: "Approved estimate", href: `/app/estimates/${approvedEstimateId}` },
+        { label: "Materials plan", href: `/app/estimates/${approvedEstimateId}/shopping-list` },
+      ]
+    : undefined;
 
-  // ── Close-out / money ──────────────────────────────────────────────────
+  // ── Close-out / money (final/standard only — caller must exclude deposits) ──
   if (hasPaidInvoice && !hasUnpaidInvoice && jobStatus === "invoiced") {
     return {
       message: "Paid — project complete",
@@ -119,8 +138,7 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
     };
   }
 
-  // Completed always means close-out — even when a deposit or auto-draft final
-  // invoice already exists. Drafts are not counted as hasUnpaidInvoice.
+  // Owner has explicitly completed the project — billing review.
   if (jobStatus === "completed") {
     const estimateParam = approvedEstimateId ? `&approved_estimate_id=${approvedEstimateId}` : "";
     const extras = approvedEstimateId
@@ -130,8 +148,8 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
     if (latestInvoiceId) {
       return {
         message: isTm
-          ? "Work complete — review and send the invoice"
-          : "Work complete — review and send the final invoice",
+          ? "Project closed — review and send the invoice"
+          : "Project closed — review and send the final invoice",
         actionLabel: "Open Invoice",
         actionHref: `/app/invoices/${latestInvoiceId}`,
         secondary: { label: "All invoices", href: `/app/invoices?job_id=${jobId}` },
@@ -141,30 +159,65 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
 
     return {
       message: isTm
-        ? "Work complete — invoice actual time and materials"
-        : "Work complete — send the final invoice",
+        ? "Project closed — invoice actual time and materials"
+        : "Project closed — send the final invoice",
       actionLabel: "Create Invoice",
       actionHref: `/app/invoices/new?job_id=${jobId}${cq}${estimateParam}`,
       extras,
     };
   }
 
-  // ── Field execution ────────────────────────────────────────────────────
-  if (jobStatus === "in_progress" || (jobStatus === "scheduled" && hasActiveVisit) || stage === "waiting") {
-    if (stage === "waiting") {
-      return {
-        message: "Project on hold",
-        detail: "Resolve the blocker, then continue the visit.",
-        actionLabel: visitId ? "Open Visit" : "Schedule Visit",
-        actionHref: visitId ? `/app/visits/${visitId}` : `/app/jobs/${jobId}/visits/new`,
-        secondary: { label: "All visits", href: `/app/visits?job_id=${jobId}` },
-      };
-    }
+  // Field quiet + work packets done — owner must complete project for billing.
+  if (readyForCloseout || stage === "completed") {
     return {
-      message: hasActiveVisit ? "Work in progress" : "Work is scheduled",
+      message: "Ready for closeout — owner must complete project and review billing",
+      detail: "Visits and work orders do not close the project. Mark the project complete when work is truly done.",
+      actionLabel: "Complete Project",
+      actionHref: `/app/jobs/${jobId}#project-status`,
+      secondary: { label: "Schedule another work day", href: `/app/jobs/${jobId}/visits/new` },
+      extras: estimateExtras,
+    };
+  }
+
+  // ── Field execution ────────────────────────────────────────────────────
+  if (stage === "waiting") {
+    return {
+      message: "Project on hold",
+      detail: "Resolve the blocker, then continue the visit.",
       actionLabel: visitId ? "Open Visit" : "Schedule Visit",
       actionHref: visitId ? `/app/visits/${visitId}` : `/app/jobs/${jobId}/visits/new`,
       secondary: { label: "All visits", href: `/app/visits?job_id=${jobId}` },
+    };
+  }
+
+  if (hasActiveVisit) {
+    return {
+      message: "Work in progress",
+      actionLabel: "Open Visit",
+      actionHref: `/app/visits/${activeVisitId ?? visitId}`,
+      secondary: { label: "All visits", href: `/app/visits?job_id=${jobId}` },
+    };
+  }
+
+  // Multi-day / multi-week: completed days with open work still on the project.
+  if (
+    (jobStatus === "in_progress" || jobStatus === "scheduled") &&
+    (hasCompletedExecutionVisit || hasOpenWorkOrder || hasApprovedEstimate)
+  ) {
+    return {
+      message: hasCompletedExecutionVisit
+        ? "Schedule the next work day"
+        : depositPaid
+          ? "Deposit received — schedule the work"
+          : hasApprovedEstimate
+            ? "Estimate approved — schedule the work"
+            : "Schedule work",
+      actionLabel: "Schedule Work Day",
+      actionHref: `/app/jobs/${jobId}/visits/new`,
+      secondary: visitId
+        ? { label: "Latest visit", href: `/app/visits/${visitId}` }
+        : { label: "All visits", href: `/app/visits?job_id=${jobId}` },
+      extras: estimateExtras,
     };
   }
 
@@ -207,12 +260,7 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
       message: "Deposit received — schedule the work",
       actionLabel: "Schedule Visit",
       actionHref: `/app/jobs/${jobId}/visits/new`,
-      extras: approvedEstimateId
-        ? [
-            { label: "Approved estimate", href: `/app/estimates/${approvedEstimateId}` },
-            { label: "Materials plan", href: `/app/estimates/${approvedEstimateId}/shopping-list` },
-          ]
-        : undefined,
+      extras: estimateExtras,
     };
   }
 

@@ -121,7 +121,7 @@ export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
   scheduled:       "Scheduled",
   in_progress:     "Working",
   waiting:         "On Hold",
-  completed: "Closeout",
+  completed: "Ready for Closeout",
   invoiced:  "Invoiced",
   archived:   "Closed",
 };
@@ -135,7 +135,7 @@ export const PIPELINE_STAGE_ACTIONS: Record<PipelineStage, string> = {
   scheduled:       "Prepare work",
   in_progress:     "Do the work",
   waiting:         "Resolve blocker",
-  completed: "Close out project",
+  completed: "Owner: complete project & bill",
   invoiced:        "Collect payment",
   archived:   "Closed",
 };
@@ -156,8 +156,19 @@ export type PipelineStageFacts = {
   completedPreSaleSiteVisit?: boolean;
   expiredEstimateCount?: number;
   completedVisitCount?: number;
+  /**
+   * Final/standard invoices only (never deposits).
+   * paid = final/standard paid; unpaid = final/standard sent|partial|overdue.
+   */
   unpaidInvoiceCount?: number;
   paidInvoiceCount?: number;
+  /**
+   * Field quiet + work packets done, but owner has not explicitly completed
+   * the project yet. Presentation-only — does not set jobs.status.
+   */
+  readyForCloseout?: boolean;
+  /** Open (non-terminal) work orders still on the project. */
+  openWorkOrderCount?: number;
 };
 
 function _count(value: number | undefined): number {
@@ -167,10 +178,13 @@ function _count(value: number | undefined): number {
 export function derivePipelineStage(facts: PipelineStageFacts): PipelineStage {
   if (facts.jobStatus === "cancelled") return "archived";
 
+  // Final/standard billing only — paid deposits must not jump to Invoiced.
   if (facts.jobStatus === "invoiced" || _count(facts.paidInvoiceCount) > 0) return "invoiced";
   if (_count(facts.unpaidInvoiceCount) > 0) return "invoiced";
 
-  if (facts.jobStatus === "completed" || _count(facts.completedVisitCount) > 0) return "completed";
+  // Owner-completed project, or field ready for owner closeout review.
+  // Completing a visit alone never forces this (see readyForCloseout).
+  if (facts.jobStatus === "completed" || facts.readyForCloseout) return "completed";
 
   if (
     facts.subStatus === "waiting_parts" ||
@@ -188,7 +202,20 @@ export function derivePipelineStage(facts: PipelineStageFacts): PipelineStage {
   const executionActive = _count(
     facts.executionActiveVisitCount ?? facts.activeVisitCount
   );
-  if (facts.jobStatus === "scheduled" || executionActive > 0) return "scheduled";
+  if (executionActive > 0) return "scheduled";
+
+  // Multi-day: completed work days (or open WO) while project still open = Working.
+  // Do not force Working for bare in_progress left over from pre-sale noise.
+  if (
+    (facts.jobStatus === "in_progress" || facts.jobStatus === "scheduled") &&
+    (_count(facts.completedVisitCount) > 0 ||
+      _count(facts.openWorkOrderCount) > 0 ||
+      _count(facts.approvedEstimateCount) > 0)
+  ) {
+    return "in_progress";
+  }
+
+  if (facts.jobStatus === "scheduled") return "scheduled";
 
   if (_count(facts.approvedEstimateCount) > 0) return "approved_ready";
 
@@ -220,6 +247,31 @@ export function derivePipelineStage(facts: PipelineStageFacts): PipelineStage {
   // T&M / day jobs: no estimate required. Treat as ready to schedule rather
   // than "Needs Estimate" so the pipeline is Schedule → Working → Closeout.
   return "approved_ready";
+}
+
+/**
+ * Field work is quiet and packets are done — owner should complete + bill.
+ * Pure helper so job page / WhatNext share one definition.
+ */
+export function isReadyForCloseout(facts: {
+  jobStatus: string;
+  executionActiveVisitCount?: number;
+  completedVisitCount?: number;
+  openWorkOrderCount?: number;
+  workOrderCount?: number;
+}): boolean {
+  if (
+    facts.jobStatus === "completed" ||
+    facts.jobStatus === "invoiced" ||
+    facts.jobStatus === "cancelled"
+  ) {
+    return false;
+  }
+  if (_count(facts.executionActiveVisitCount) > 0) return false;
+  if (_count(facts.completedVisitCount) === 0) return false;
+  // All work orders finished (or none exist but execution visits were done).
+  if (_count(facts.openWorkOrderCount) > 0) return false;
+  return true;
 }
 
 export function getPipelineNextAction(stage: PipelineStage): string {

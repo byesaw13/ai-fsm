@@ -8,8 +8,6 @@ import { logger } from "../../../../../../lib/logger";
 import { checkCompletionPacket } from "../../../../../../lib/completion-guard";
 import { visitTransitions, visitStatusSchema } from "@ai-fsm/domain";
 import type { VisitStatus } from "@ai-fsm/domain";
-import { createDraftFinalInvoiceForJob } from "../../../../../../lib/invoices/final-invoice";
-
 interface VisitRow {
   id: string;
   account_id: string;
@@ -283,14 +281,14 @@ export const POST = withAuth(
       });
 
       // -----------------------------------------------------------------------
-      // Job auto-advancement:
+      // Job auto-advancement (operations only — never project closeout):
       //
-      // • When a visit starts (arrived → in_progress), advance the parent job
-      //   from 'scheduled' to 'in_progress' so the job reflects active work.
-      //
-      // • When a visit completes, auto-advance the parent job to 'completed'
-      //   if every sibling visit is now completed or cancelled. This puts the
-      //   job in the "ready to invoice" queue for the admin.
+      // • When an execution visit starts, advance scheduled → in_progress.
+      // • When a visit completes/cancels: keep the project open. Visits and
+      //   work orders never auto-complete the project. Owner must explicitly
+      //   mark the project completed (billing review + final invoice).
+      // • If the only remaining field activity was cancelled and no completed
+      //   execution visits exist, soft-revert in_progress → scheduled.
       // -----------------------------------------------------------------------
       if (updated.job_id) {
         const jobRow = await client.query(
@@ -325,71 +323,69 @@ export const POST = withAuth(
               new_value: { status: "in_progress" },
             });
           } else if (
-            (effectiveStatus === "completed" || effectiveStatus === "cancelled") &&
-            (job.status === "in_progress" || job.status === "scheduled")
+            isExecutionVisit &&
+            effectiveStatus === "completed" &&
+            (job.status === "scheduled" || job.status === "quoted")
           ) {
-            // Visit completed or cancelled — check sibling visits
-            const siblingCounts = await client.query<{
+            // Day of work finished — project is active, not closed
+            await client.query(
+              `UPDATE jobs SET status = 'in_progress', updated_at = now()
+               WHERE id = $1 AND account_id = $2`,
+              [updated.job_id, session.accountId]
+            );
+            await appendAuditLog(client, {
+              account_id: session.accountId,
+              entity_type: "job",
+              entity_id: updated.job_id,
+              action: "update",
+              actor_id: session.userId,
+              trace_id: session.traceId,
+              old_value: { status: job.status },
+              new_value: { status: "in_progress" },
+            });
+          } else if (
+            isExecutionVisit &&
+            effectiveStatus === "cancelled" &&
+            job.status === "in_progress"
+          ) {
+            // Soft revert only when no completed work and nothing still in field
+            const fieldState = await client.query<{
               pending: string;
               completed: string;
+              active: string;
             }>(
               `SELECT
                  COUNT(*) FILTER (WHERE status NOT IN ('completed','cancelled')) AS pending,
-                 COUNT(*) FILTER (WHERE status = 'completed') AS completed
+                 COUNT(*) FILTER (WHERE status = 'completed') AS completed,
+                 COUNT(*) FILTER (
+                   WHERE status IN ('in_progress','arrived','dispatched','traveling','waiting')
+                 ) AS active
                FROM visits
                WHERE job_id = $1 AND account_id = $2
                  AND visit_type IN ('standard','punch_list')`,
               [updated.job_id, session.accountId]
             );
-            const { pending, completed: completedCount } = siblingCounts.rows[0];
-
-            if (parseInt(pending) === 0) {
-              // No active visits remain
-              const newJobStatus = parseInt(completedCount) > 0 ? "completed" : "scheduled";
-              if (job.status !== newJobStatus) {
-                await client.query(
-                  `UPDATE jobs SET status = $1, updated_at = now()
-                   WHERE id = $2 AND account_id = $3`,
-                  [newJobStatus, updated.job_id, session.accountId]
-                );
-                await appendAuditLog(client, {
-                  account_id: session.accountId,
-                  entity_type: "job",
-                  entity_id: updated.job_id,
-                  action: "update",
-                  actor_id: session.userId,
-                  trace_id: session.traceId,
-                  old_value: { status: job.status },
-                  new_value: { status: newJobStatus },
-                });
-              }
-            } else if (effectiveStatus === "cancelled" && job.status === "in_progress") {
-              // Cancelled visit but other visits still active — check if any
-              // are still in_progress; if not, revert job to scheduled
-              const stillActive = await client.query(
-                `SELECT 1 FROM visits
-                 WHERE job_id = $1 AND account_id = $2
-                   AND status IN ('in_progress','arrived','dispatched','traveling','waiting')
-                 LIMIT 1`,
+            const { pending, completed: completedCount, active } = fieldState.rows[0];
+            if (
+              parseInt(pending, 10) === 0 &&
+              parseInt(active, 10) === 0 &&
+              parseInt(completedCount, 10) === 0
+            ) {
+              await client.query(
+                `UPDATE jobs SET status = 'scheduled', updated_at = now()
+                 WHERE id = $1 AND account_id = $2`,
                 [updated.job_id, session.accountId]
               );
-              if (stillActive.rowCount === 0) {
-                await client.query(
-                  `UPDATE jobs SET status = 'scheduled', updated_at = now()
-                   WHERE id = $1 AND account_id = $2`,
-                  [updated.job_id, session.accountId]
-                );
-                await appendAuditLog(client, {
-                  account_id: session.accountId,
-                  entity_type: "job",
-                  entity_id: updated.job_id,
-                  action: "update",
-                  actor_id: session.userId,
-                  trace_id: session.traceId,
-                  old_value: { status: "in_progress" },
-                  new_value: { status: "scheduled" },
-                });
-              }
+              await appendAuditLog(client, {
+                account_id: session.accountId,
+                entity_type: "job",
+                entity_id: updated.job_id,
+                action: "update",
+                actor_id: session.userId,
+                trace_id: session.traceId,
+                old_value: { status: "in_progress" },
+                new_value: { status: "scheduled" },
+              });
             }
           }
         }
@@ -407,26 +403,8 @@ export const POST = withAuth(
         }
       }
 
-      // Auto-create a draft final invoice on visit completion (non-fatal, savepointed).
-      // Logic is shared with job completion via createDraftFinalInvoiceForJob.
-      if (effectiveStatus === "completed" && updated.job_id) {
-        await client.query("SAVEPOINT before_auto_invoice");
-        try {
-          await createDraftFinalInvoiceForJob({
-            client,
-            jobId: updated.job_id,
-            accountId: session.accountId,
-            userId: session.userId,
-            visitId: id,
-            traceId: session.traceId,
-          });
-          await client.query("RELEASE SAVEPOINT before_auto_invoice");
-        } catch (invoiceErr) {
-          await client.query("ROLLBACK TO SAVEPOINT before_auto_invoice");
-          await client.query("RELEASE SAVEPOINT before_auto_invoice");
-          logger.error("visit completion: auto-create invoice draft failed (non-fatal)", invoiceErr, { traceId: session.traceId });
-        }
-      }
+      // Final invoices are created only when the owner explicitly marks the
+      // project completed (jobs transition). Visits never auto-bill.
 
       if (updated.work_order_id) {
         await syncWorkOrderStatus(client, updated.work_order_id, session.accountId);

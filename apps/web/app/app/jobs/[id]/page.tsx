@@ -33,7 +33,7 @@ import { JobMaterialsPanel } from "./JobMaterialsPanel";
 import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { isHomeboxEnabled } from "@/lib/homebox/client";
 import { withAssetContext, listAssetLinks } from "@/lib/homebox/db";
-import { derivePipelineStage } from "@ai-fsm/domain";
+import { derivePipelineStage, isReadyForCloseout } from "@ai-fsm/domain";
 import {
   PageContainer,
   PageHeader,
@@ -265,6 +265,7 @@ export default async function JobDetailPage({
               ORDER BY created_at DESC LIMIT 1) AS invoice_total_cents,
              (SELECT id FROM invoices
               WHERE job_id = $1 AND account_id = $2 AND status != 'void'
+                AND invoice_kind IN ('final', 'standard')
               ORDER BY created_at DESC LIMIT 1) AS latest_invoice_id,
              EXISTS(SELECT 1 FROM estimates WHERE job_id = $1 AND account_id = $2 AND status IN ('sent','approved')) AS has_sent_estimate,
              (SELECT sent_at FROM estimates WHERE job_id = $1 AND account_id = $2 AND status IN ('sent','approved') ORDER BY created_at DESC LIMIT 1) AS last_estimate_sent_at,
@@ -272,8 +273,19 @@ export default async function JobDetailPage({
              (SELECT id FROM estimates WHERE job_id = $1 AND account_id = $2 AND status = 'approved' ORDER BY created_at DESC LIMIT 1) AS approved_estimate_id,
              EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND invoice_kind = 'deposit') AS has_deposit_invoice,
              EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND invoice_kind = 'deposit' AND status IN ('partial','paid')) AS deposit_paid,
-             EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND status IN ('sent','partial','overdue')) AS has_unpaid_invoice,
-             EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND status = 'paid') AS has_paid_invoice,
+             -- Final/standard only: deposits must not drive pipeline "Invoiced"
+             EXISTS(
+               SELECT 1 FROM invoices
+               WHERE job_id = $1 AND account_id = $2
+                 AND invoice_kind IN ('final', 'standard')
+                 AND status IN ('sent','partial','overdue')
+             ) AS has_unpaid_invoice,
+             EXISTS(
+               SELECT 1 FROM invoices
+               WHERE job_id = $1 AND account_id = $2
+                 AND invoice_kind IN ('final', 'standard')
+                 AND status = 'paid'
+             ) AS has_paid_invoice,
              (SELECT id FROM booking_requests
               WHERE job_id = $1 AND account_id = $2
               ORDER BY created_at DESC LIMIT 1) AS booking_request_id,
@@ -351,6 +363,17 @@ export default async function JobDetailPage({
     ? parseInt(commercialCounts.expired_estimate_count, 10)
     : 0;
   const latestVisit = visits[0] ?? null;
+  const completedExecutionVisitCount = executionVisits.filter((v) => v.status === "completed").length;
+  const openWorkOrderCount = workOrders.filter(
+    (wo) => !["completed", "cancelled"].includes(String(wo.status))
+  ).length;
+  const readyForCloseout = isReadyForCloseout({
+    jobStatus: currentStatus,
+    executionActiveVisitCount: activeExecutionVisits.length,
+    completedVisitCount: completedExecutionVisitCount,
+    openWorkOrderCount,
+    workOrderCount: workOrders.length,
+  });
   const pipelineStage = derivePipelineStage({
     jobStatus: currentStatus,
     bookingStatus: commercialCounts?.booking_status ?? null,
@@ -359,13 +382,17 @@ export default async function JobDetailPage({
     sentEstimateCount: commercialCounts?.has_sent_estimate ? 1 : 0,
     approvedEstimateCount: commercialCounts?.has_approved_estimate ? 1 : 0,
     executionActiveVisitCount: activeExecutionVisits.length,
-    executionInProgressCount: executionVisits.filter((v) => v.status === "in_progress").length,
+    executionInProgressCount: executionVisits.filter((v) =>
+      ["in_progress", "arrived", "dispatched", "traveling", "waiting"].includes(v.status)
+    ).length,
     preSaleOpenSiteVisitCount: openPreSaleSiteVisits.length,
     completedPreSaleSiteVisit: preSaleSiteVisits.some((v) => v.status === "completed"),
     expiredEstimateCount,
-    completedVisitCount: executionVisits.filter((v) => v.status === "completed").length,
+    completedVisitCount: completedExecutionVisitCount,
     unpaidInvoiceCount: commercialCounts?.has_unpaid_invoice ? 1 : 0,
     paidInvoiceCount: commercialCounts?.has_paid_invoice ? 1 : 0,
+    readyForCloseout,
+    openWorkOrderCount,
   });
 
   // Profitability (owner/admin only)
@@ -541,6 +568,9 @@ export default async function JobDetailPage({
           hasActiveVisit={activeExecutionVisits.length > 0}
           activeVisitId={activeExecutionVisits[0]?.id ?? null}
           latestVisitId={latestVisit?.id ?? null}
+          readyForCloseout={readyForCloseout}
+          hasCompletedExecutionVisit={completedExecutionVisitCount > 0}
+          hasOpenWorkOrder={openWorkOrderCount > 0}
           hasUnpaidInvoice={commercialCounts.has_unpaid_invoice}
           hasPaidInvoice={commercialCounts.has_paid_invoice}
           latestInvoiceId={commercialCounts.latest_invoice_id}
@@ -648,10 +678,14 @@ export default async function JobDetailPage({
             )}
           </Card>
 
-          {/* Status Transitions — admin/owner only */}
+          {/* Status Transitions — admin/owner only (explicit project completion) */}
           {canTransition && allowedTransitions.length > 0 && (
-            <Card data-testid="job-transition-panel">
+            <Card id="project-status" data-testid="job-transition-panel">
               <SectionHeader title="Close Out Project" />
+              <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                Visits and work orders never close this project. When field work is done, mark the
+                project complete here to create a draft final invoice for billing review.
+              </p>
               <JobTransitionForm
                 jobId={job.id}
                 allowedTransitions={allowedTransitions as JobStatus[]}
