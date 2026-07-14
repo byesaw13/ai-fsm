@@ -7,7 +7,7 @@ import {
   calcTotals,
   lineItemTotal,
 } from "@/lib/estimates/db";
-import { computeEstimate, sqftPaintingToSpec, CURRENT_RULES } from "@ai-fsm/domain";
+import { computeEstimate, sqftPaintingToSpec, ENGINE_VERSION } from "@ai-fsm/domain";
 import {
   estimateAdjustmentTypeSchema,
   estimateFinishExpectationSchema,
@@ -20,6 +20,8 @@ import { reviewEstimateGuardrails, computeConditionTier } from "@/lib/estimates/
 import { computeAndPersist } from "@/lib/estimates/compute";
 import { calculateDepositPolicy, estimateMaterialsDepositBasis } from "@/lib/estimates/deposit-policy";
 import type { EstimateSpec } from "@ai-fsm/domain";
+import { getPool } from "@/lib/db";
+import { loadPricingRules } from "@/lib/pricing/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -322,10 +324,26 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     );
   }
 
+  // Account labor cost / bill rates drive margin checks
+  const pool = getPool();
+  const pricingClient = await pool.connect();
+  let pricingRules;
+  try {
+    await pricingClient.query(
+      `SELECT set_config('app.current_account_id', $1, true),
+              set_config('app.current_user_id', $2, true),
+              set_config('app.current_role', $3, true)`,
+      [session.accountId, session.userId, session.role]
+    );
+    pricingRules = (await loadPricingRules(pricingClient, session.accountId)).rules;
+  } finally {
+    pricingClient.release();
+  }
+
   let subtotal_cents: number;
   let computed_line_items = line_items;
   let internal_labor_cost_cents: number | null = null;
-  let painting_margin_pct: number | null = null;
+  let margin_pct: number | null = null;
 
   if (is_painting) {
     const engine = computeEstimate(
@@ -337,18 +355,42 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         material_cost_cents: material_cost_cents ?? 0,
         labor_hours_estimate,
       }),
-      CURRENT_RULES
+      pricingRules
     );
     subtotal_cents = engine.summary.totalCents;
     internal_labor_cost_cents = engine.internalSummary.estimatedCostCents;
-    painting_margin_pct = engine.internalSummary.grossMarginPct;
+    margin_pct = engine.internalSummary.grossMarginPct;
   } else if (is_multi_option) {
     subtotal_cents = 0;
+  } else if (flat_rate_cents !== undefined) {
+    subtotal_cents = flat_rate_cents;
+    // Flat bid: cost unknown unless labor hours provided
+    if (labor_hours_estimate && labor_hours_estimate > 0) {
+      internal_labor_cost_cents = Math.round(
+        labor_hours_estimate * pricingRules.laborCostCentsPerHour
+      );
+      const gross = flat_rate_cents - internal_labor_cost_cents;
+      margin_pct = flat_rate_cents > 0 ? gross / flat_rate_cents : 0;
+    }
   } else {
-    subtotal_cents =
-      flat_rate_cents !== undefined
-        ? flat_rate_cents
-        : calcTotals(line_items).subtotal_cents;
+    subtotal_cents = calcTotals(line_items).subtotal_cents;
+    // Itemized / T&M: derive margin from billing vs cost rates
+    const engine = computeEstimate(
+      {
+        engineVersion: ENGINE_VERSION,
+        type: "general",
+        lineItems: line_items.map((item, i) => ({
+          id: `li-${i}`,
+          description: item.description,
+          quantity: item.quantity,
+          unit: "unit" as const,
+          unitLaborCents: item.unit_price_cents,
+        })),
+      },
+      pricingRules
+    );
+    internal_labor_cost_cents = engine.internalSummary.estimatedCostCents;
+    margin_pct = engine.internalSummary.grossMarginPct;
   }
   subtotal_cents += travel_surcharge_cents + risk_adjustment_cents;
   const tax_cents = Math.round((subtotal_cents * tax_rate) / 100);
@@ -378,10 +420,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     travel_surcharge_cents,
     risk_adjustment_cents,
     minimum_service_override_reason: minimum_service_override_reason ?? null,
-    margin_pct: painting_margin_pct,
+    margin_pct,
     has_ma_regulated_items: false,
     line_item_count: line_items?.length ?? 0,
-  });
+  }, pricingRules);
   // In flat-rate mode, ignore any line_items that were mistakenly sent
   const itemsToInsert = flat_rate_cents !== undefined ? [] : line_items;
 
@@ -577,6 +619,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           estimateId: estimate,
           accountId: session.accountId,
           spec: engine_spec as unknown as EstimateSpec,
+          rules: pricingRules,
         });
       } catch (engErr) {
         logger.error("Engine compute failed after insert", engErr, { estimateId: estimate });

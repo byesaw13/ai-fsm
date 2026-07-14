@@ -183,10 +183,18 @@ export async function createDraftFinalInvoiceForJob(
     );
     const billableHours = roundedQuarterHoursFromMinutes(trackedMinutes);
     if (billableHours > 0) {
+      let billRate = LABOR_CUSTOMER_RATE_CENTS_PER_HOUR;
+      try {
+        const { loadPricingSettings } = await import("@/lib/pricing/settings");
+        const settings = await loadPricingSettings(client, accountId);
+        billRate = settings.labor_billing_cents_per_hour;
+      } catch {
+        /* pre-migration fallback */
+      }
       lineItems.push({
         description: "Labor",
         quantity: billableHours,
-        unit_price_cents: LABOR_CUSTOMER_RATE_CENTS_PER_HOUR,
+        unit_price_cents: billRate,
         line_item_type: "labor",
         sort_order: 0,
       });

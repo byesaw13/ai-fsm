@@ -49,7 +49,12 @@ export async function trackedLaborMinutesFromActivityEntries(
  * readers apply (quarter-hour rounding × the customer labor rate). Parity at the
  * minute level therefore guarantees parity at the billed-cents level for both
  * the final-invoice path and the manual "pull labor from tracked time" path.
+ *
+ * Pass account billing rate from business_pricing_settings when available.
  */
-export function trackedLaborCents(minutes: number): number {
-  return roundedQuarterHoursFromMinutes(minutes) * LABOR_CUSTOMER_RATE_CENTS_PER_HOUR;
+export function trackedLaborCents(
+  minutes: number,
+  billingRateCentsPerHour: number = LABOR_CUSTOMER_RATE_CENTS_PER_HOUR
+): number {
+  return roundedQuarterHoursFromMinutes(minutes) * billingRateCentsPerHour;
 }

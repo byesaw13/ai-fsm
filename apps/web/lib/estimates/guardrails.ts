@@ -13,6 +13,7 @@ import {
   type ComputedMaterial,
   type EstimateSpec,
   type GuardrailWarning,
+  type PricingRules,
 } from "@ai-fsm/domain";
 
 export { buildClientDocumentFilename } from "@ai-fsm/domain";
@@ -104,7 +105,10 @@ function engineWarningToIssue(warning: GuardrailWarning): EstimateGuardrailIssue
   };
 }
 
-export function reviewEstimateGuardrails(input: EstimateGuardrailInput): EstimateGuardrailReview {
+export function reviewEstimateGuardrails(
+  input: EstimateGuardrailInput,
+  rules: PricingRules = CURRENT_RULES
+): EstimateGuardrailReview {
   const spec = webInputToEngineSpec(input);
   const grossMarginPct = input.margin_pct ?? 1;
   const warnings = evaluateGuardrails(
@@ -112,7 +116,7 @@ export function reviewEstimateGuardrails(input: EstimateGuardrailInput): Estimat
     input.total_cents,
     grossMarginPct,
     input.line_item_count,
-    CURRENT_RULES
+    rules
   );
 
   const blockers = warnings

@@ -142,7 +142,7 @@ describe("computeEstimate — general", () => {
       lineItems: [{ id: "li1", description: "Carpentry", quantity: 4, unit: "hour", unitLaborCents: 11500 }],
     };
     const r = computeEstimate(spec, CURRENT_RULES);
-    // Billing: 4 × $115 = $460; Cost: 4hrs × ($85/$115) × $85 ≈ $296
+    // Billing: 4 × $115 = $460; Cost: 4hrs at laborCostCentsPerHour (default $50)
     expect(r.internalSummary.grossMarginCents).toBeGreaterThan(0);
     expect(r.internalSummary.grossMarginPct).toBeGreaterThan(0);
     expect(r.internalSummary.grossMarginPct).toBeLessThan(1);

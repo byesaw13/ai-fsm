@@ -5,15 +5,18 @@
  * Never import this from the domain package — it has DB access.
  */
 
-import { computeEstimate, CURRENT_RULES, ENGINE_VERSION } from "@ai-fsm/domain";
+import { computeEstimate, CURRENT_RULES, ENGINE_VERSION, type PricingRules } from "@ai-fsm/domain";
 import type { EstimateSpec, EstimateResult } from "@ai-fsm/domain";
-import { query } from "@/lib/db";
+import { getPool, query } from "@/lib/db";
 import { calculateDepositPolicy } from "@/lib/estimates/deposit-policy";
+import { loadPricingRules } from "@/lib/pricing/settings";
 
 export interface ComputeAndPersistArgs {
   estimateId: string;
   accountId: string;
   spec: EstimateSpec;
+  /** When omitted, loads account pricing settings from DB. */
+  rules?: PricingRules;
 }
 
 export interface ComputeAndPersistResult {
@@ -27,7 +30,22 @@ export interface ComputeAndPersistResult {
 export async function computeAndPersist(args: ComputeAndPersistArgs): Promise<ComputeAndPersistResult> {
   const { estimateId, accountId, spec } = args;
 
-  const result = computeEstimate(spec, CURRENT_RULES);
+  let rules = args.rules;
+  if (!rules) {
+    const pool = getPool();
+    const client = await pool.connect();
+    try {
+      await client.query(
+        `SELECT set_config('app.current_account_id', $1, true)`,
+        [accountId]
+      );
+      rules = (await loadPricingRules(client, accountId)).rules;
+    } finally {
+      client.release();
+    }
+  }
+
+  const result = computeEstimate(spec, rules);
 
   const policyRows = await query<{
     deposit_required: boolean;
@@ -68,7 +86,7 @@ export async function computeAndPersist(args: ComputeAndPersistArgs): Promise<Co
     [
       JSON.stringify(spec),
       ENGINE_VERSION,
-      CURRENT_RULES.version,
+      rules.version,
       JSON.stringify(result),
       result.summary.subtotalCents,
       result.summary.totalCents,

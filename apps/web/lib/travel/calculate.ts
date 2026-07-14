@@ -67,7 +67,15 @@ export async function calculateTravelForAccount(
 ): Promise<CalculateTravelResponse> {
   const settings = await loadTravelSettings(client, accountId);
   const mileage = await loadActiveMileageRate(client, accountId, settings);
-  const travelTimeRate = resolveTravelTimeRateCents(settings);
+  // Link standard_labor travel time to Labor & Pricing bill rate when available
+  let laborBillRate: number | undefined;
+  try {
+    const { loadPricingSettings } = await import("@/lib/pricing/settings");
+    laborBillRate = (await loadPricingSettings(client, accountId)).labor_billing_cents_per_hour;
+  } catch {
+    /* pricing table may not exist yet */
+  }
+  const travelTimeRate = resolveTravelTimeRateCents(settings, laborBillRate);
 
   const originAddress = formatOriginAddress(settings);
 

@@ -144,7 +144,23 @@ export async function loadActiveMileageRate(
   };
 }
 
-export function resolveTravelTimeRateCents(settings: TravelSettings): number {
+/**
+ * Resolve travel-time $/hr.
+ * When mode is standard_labor and a laborBillingRateCents is provided (from
+ * business_pricing_settings), that bill rate is used so Travel stays linked to
+ * Labor & Pricing. Custom mode uses the travel-settings field.
+ */
+export function resolveTravelTimeRateCents(
+  settings: TravelSettings,
+  laborBillingRateCents?: number
+): number {
   if (settings.travel_time_rate_mode === "none") return 0;
+  if (
+    settings.travel_time_rate_mode === "standard_labor" &&
+    laborBillingRateCents != null &&
+    laborBillingRateCents > 0
+  ) {
+    return laborBillingRateCents;
+  }
   return settings.default_travel_time_rate_cents;
 }

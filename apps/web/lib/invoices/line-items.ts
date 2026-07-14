@@ -195,10 +195,20 @@ export async function upsertLaborLineFromTrackedTime(
     [invoiceId]
   );
 
+  // Prefer account pricing settings when the table is available
+  let billRate = LABOR_CUSTOMER_RATE_CENTS_PER_HOUR;
+  try {
+    const { loadPricingSettings } = await import("@/lib/pricing/settings");
+    const settings = await loadPricingSettings(client, accountId);
+    billRate = settings.labor_billing_cents_per_hour;
+  } catch {
+    /* table may not exist pre-migration — keep default */
+  }
+
   const input = {
     description: "Labor",
     quantity: billableHours,
-    unit_price_cents: LABOR_CUSTOMER_RATE_CENTS_PER_HOUR,
+    unit_price_cents: billRate,
     line_item_type: "labor" as const,
   };
 
