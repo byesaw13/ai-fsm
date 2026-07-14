@@ -16,7 +16,9 @@ import {
   SectionHeader,
 } from "@/components/ui";
 import { ExpenseEditForm } from "./ExpenseEditForm";
+import { ExpenseLineItemsEditor } from "./ExpenseLineItemsEditor";
 import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
+import { fetchExpenseLineItems } from "@/lib/expenses/line-items";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +49,15 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
   });
 
   if (!expense) notFound();
+
+  const { lineItems, lineItemsBilled } = await withExpenseContext(session, async (client) => {
+    const items = await fetchExpenseLineItems(client, session.accountId, id);
+    const billed = await client.query(
+      `SELECT 1 AS exists FROM invoice_line_items WHERE source_expense_id = $1 LIMIT 1`,
+      [id],
+    );
+    return { lineItems: items, lineItemsBilled: (billed.rowCount ?? 0) > 0 };
+  });
 
   const dateStr =
     typeof expense.expense_date === "string"
@@ -167,6 +178,16 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
                 </dd>
               </div>
             </dl>
+          </Card>
+
+          <Card>
+            <SectionHeader title="Line Items" />
+            <ExpenseLineItemsEditor
+              expenseId={expense.id}
+              initialLineItems={lineItems}
+              billed={lineItemsBilled}
+              canEdit={canManage}
+            />
           </Card>
         </div>
 
