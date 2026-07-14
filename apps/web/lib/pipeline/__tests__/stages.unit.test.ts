@@ -83,14 +83,43 @@ describe("derivePipelineStage", () => {
     })).toBe("in_progress");
   });
 
-  it("routes completed work without an invoice to Closeout", () => {
+  it("routes owner-completed work without a final invoice to Ready for Closeout", () => {
     expect(derivePipelineStage({
       jobStatus: "completed",
       completedVisitCount: 1,
     })).toBe("completed");
   });
 
-  it("routes any invoice (paid or unpaid) to Invoiced", () => {
+  it("does not close out from completed visits alone while project is still open", () => {
+    expect(derivePipelineStage({
+      jobStatus: "in_progress",
+      completedVisitCount: 1,
+      openWorkOrderCount: 1,
+      approvedEstimateCount: 1,
+    })).toBe("in_progress");
+  });
+
+  it("routes readyForCloseout (field quiet, WOs done) to Ready for Closeout", () => {
+    expect(derivePipelineStage({
+      jobStatus: "in_progress",
+      completedVisitCount: 2,
+      readyForCloseout: true,
+      openWorkOrderCount: 0,
+    })).toBe("completed");
+  });
+
+  it("does not treat paid deposits as Invoiced (paidInvoiceCount is final/standard only)", () => {
+    // Callers must not pass deposit paid into paidInvoiceCount.
+    expect(derivePipelineStage({
+      jobStatus: "in_progress",
+      approvedEstimateCount: 1,
+      completedVisitCount: 1,
+      openWorkOrderCount: 1,
+      paidInvoiceCount: 0,
+    })).toBe("in_progress");
+  });
+
+  it("routes final/standard invoice (paid or unpaid) to Invoiced", () => {
     expect(derivePipelineStage({
       jobStatus: "completed",
       unpaidInvoiceCount: 1,
@@ -163,7 +192,7 @@ describe("derivePipelineStage", () => {
 describe("getPipelineNextAction", () => {
   it("returns action labels for each stage", () => {
     expect(getPipelineNextAction("new_lead")).toBe("Review request");
-    expect(getPipelineNextAction("completed")).toBe("Close out project");
+    expect(getPipelineNextAction("completed")).toBe("Owner: complete project & bill");
     expect(getPipelineNextAction("invoiced")).toBe("Collect payment");
     expect(getPipelineNextAction("archived")).toBe("Closed");
   });

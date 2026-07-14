@@ -26,6 +26,35 @@ export function seedCompletionCriteriaFromLineItems(
     .filter((c) => c.label.length > 0);
 }
 
+/**
+ * Normalize criteria stored in JSONB — accepts canonical shape and legacy
+ * `{ done, description }` rows so completion gates cannot vacuously pass.
+ */
+export function normalizeCompletionCriteria(raw: unknown): CompletionCriterion[] {
+  if (!Array.isArray(raw)) return [];
+  const out: CompletionCriterion[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const item = raw[i];
+    if (!item || typeof item !== "object") continue;
+    const rec = item as Record<string, unknown>;
+    const label = String(rec.label ?? rec.description ?? "").trim();
+    if (!label) continue;
+    const completed = Boolean(rec.completed ?? rec.done ?? false);
+    // Legacy rows without `required` are treated as required (fail-closed).
+    const required =
+      rec.required === undefined || rec.required === null
+        ? true
+        : Boolean(rec.required);
+    out.push({
+      id: String(rec.id ?? `norm-${i}`),
+      label,
+      required,
+      completed,
+    });
+  }
+  return out;
+}
+
 export function allRequiredCriteriaMet(criteria: CompletionCriterion[]): boolean {
   const required = criteria.filter((c) => c.required);
   if (required.length === 0) return true;

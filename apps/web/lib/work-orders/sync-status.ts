@@ -5,7 +5,7 @@
 import type { PoolClient } from "pg";
 import {
   deriveWorkOrderStatus,
-  type CompletionCriterion,
+  normalizeCompletionCriteria,
   type WorkOrderVisitSnapshot,
 } from "@ai-fsm/domain";
 import type { VisitStatus, WorkOrderStatus } from "@ai-fsm/domain";
@@ -46,9 +46,7 @@ export async function syncWorkOrderStatus(
     [workOrderId, accountId],
   );
 
-  const criteria = Array.isArray(wo.completion_criteria)
-    ? (wo.completion_criteria as CompletionCriterion[])
-    : [];
+  const criteria = normalizeCompletionCriteria(wo.completion_criteria);
 
   const derived = deriveWorkOrderStatus({
     currentStatus: wo.status,

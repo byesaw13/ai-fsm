@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   allRequiredCriteriaMet,
   completionGateMessage,
+  normalizeCompletionCriteria,
   seedCompletionCriteriaFromLineItems,
 } from "../completion-criteria";
 
@@ -49,5 +50,35 @@ describe("allRequiredCriteriaMet", () => {
         { id: "1", label: "Done", required: true, completed: false },
       ]),
     ).toBe(false);
+  });
+});
+
+describe("normalizeCompletionCriteria", () => {
+  it("maps legacy done/description shape and fails closed (required)", () => {
+    const criteria = normalizeCompletionCriteria([
+      { done: false, description: "Labor budget" },
+      { done: true, description: "Materials allowance" },
+    ]);
+    expect(criteria).toHaveLength(2);
+    expect(criteria[0]).toMatchObject({
+      label: "Labor budget",
+      required: true,
+      completed: false,
+    });
+    expect(criteria[1].completed).toBe(true);
+    expect(allRequiredCriteriaMet(criteria)).toBe(false);
+  });
+
+  it("preserves canonical criteria", () => {
+    const criteria = normalizeCompletionCriteria([
+      { id: "x", label: "Install vanity", required: true, completed: true },
+    ]);
+    expect(criteria[0]).toEqual({
+      id: "x",
+      label: "Install vanity",
+      required: true,
+      completed: true,
+    });
+    expect(allRequiredCriteriaMet(criteria)).toBe(true);
   });
 });

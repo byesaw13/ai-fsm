@@ -116,18 +116,28 @@ export const POST = withRole(
 
       const updated = rows[0];
 
-      // Auto-create a draft final invoice when job is completed using the shared
-      // createDraftFinalInvoiceForJob helper (same logic as visit completion).
+      // Owner explicit project completion → draft final invoice for billing review.
+      // Visits / work orders never complete the project or create this invoice.
       let final_invoice_id: string | null = null;
       if (targetStatus === "completed") {
-        const result = await createDraftFinalInvoiceForJob({
-          client,
-          jobId: id,
-          accountId: session.accountId,
-          userId: session.userId,
-          traceId: session.traceId,
-        });
-        final_invoice_id = result?.invoiceId ?? null;
+        await client.query("SAVEPOINT before_final_invoice");
+        try {
+          const result = await createDraftFinalInvoiceForJob({
+            client,
+            jobId: id,
+            accountId: session.accountId,
+            userId: session.userId,
+            traceId: session.traceId,
+          });
+          final_invoice_id = result?.invoiceId ?? null;
+          await client.query("RELEASE SAVEPOINT before_final_invoice");
+        } catch (invoiceErr) {
+          await client.query("ROLLBACK TO SAVEPOINT before_final_invoice");
+          await client.query("RELEASE SAVEPOINT before_final_invoice");
+          logger.error("job completion: auto-create invoice draft failed (non-fatal)", invoiceErr, {
+            traceId: session.traceId,
+          });
+        }
       }
 
       await appendAuditLog(client, {

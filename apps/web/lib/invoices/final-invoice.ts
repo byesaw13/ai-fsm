@@ -1,13 +1,9 @@
 /**
  * Shared logic for creating a draft final invoice from a completed job.
  *
- * Called from two places:
- *   - Visit transition (visit.completed) — with visitId for parts fallback
- *   - Job transition  (job.completed)   — without visitId
- *
- * Extracted to eliminate the copy-pasted INSERT blocks in each route and
- * to ensure both paths use the same reconcileFinalInvoice deposit-credit
- * logic (the visit transition previously hardcoded deposit_cents instead).
+ * Called only when the owner explicitly transitions the project to
+ * `completed` (jobs transition). Visits and work orders never create
+ * final invoices — they can only make the project ready for closeout.
  *
  * Idempotency:
  *   Returns null (and skips creation) if a final or standard invoice
@@ -18,7 +14,7 @@
  * Caller responsibilities:
  *   - Must be inside an active transaction with RLS context set.
  *   - Should wrap this call in a SAVEPOINT so invoice failures never
- *     roll back the visit/job completion that triggered it.
+ *     roll back the job completion that triggered it.
  */
 
 import type { PoolClient } from "pg";

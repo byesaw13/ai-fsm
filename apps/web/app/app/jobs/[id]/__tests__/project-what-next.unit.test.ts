@@ -147,7 +147,7 @@ describe("computeWhatNext — pre-sale and close-out branches", () => {
 });
 
 describe("computeWhatNext — money, field, T&M", () => {
-  it("shows create invoice when work is complete and no invoices exist", () => {
+  it("shows create invoice when owner completed project and no final invoices exist", () => {
     const next = computeWhatNext(
       baseProps({
         jobStatus: "completed",
@@ -156,13 +156,13 @@ describe("computeWhatNext — money, field, T&M", () => {
       }),
     );
 
-    expect(next.message).toBe("Work complete — send the final invoice");
+    expect(next.message).toBe("Project closed — send the final invoice");
     expect(next.actionLabel).toBe("Create Invoice");
     expect(next.actionHref).toContain(`/app/invoices/new?job_id=${JOB_ID}`);
     expect(next.actionHref).toContain(`approved_estimate_id=${ESTIMATE_ID}`);
   });
 
-  it("opens existing invoice when completed with draft final (or deposit already on file)", () => {
+  it("opens existing final invoice when owner completed with draft final on file", () => {
     const next = computeWhatNext(
       baseProps({
         jobStatus: "completed",
@@ -176,14 +176,14 @@ describe("computeWhatNext — money, field, T&M", () => {
       }),
     );
 
-    expect(next.message).toMatch(/Work complete/);
+    expect(next.message).toMatch(/Project closed/);
     expect(next.actionLabel).toBe("Open Invoice");
     expect(next.actionHref).toBe(`/app/invoices/${INVOICE_ID}`);
     // Must not fall through to "schedule the work"
     expect(next.message).not.toMatch(/schedule/i);
   });
 
-  it("T&M completed copy mentions time and materials", () => {
+  it("T&M owner-completed copy mentions time and materials", () => {
     const next = computeWhatNext(
       baseProps({
         jobStatus: "completed",
@@ -194,6 +194,45 @@ describe("computeWhatNext — money, field, T&M", () => {
 
     expect(next.message).toMatch(/time and materials/i);
     expect(next.actionLabel).toBe("Create Invoice");
+  });
+
+  it("ready for closeout asks owner to complete project — not auto-bill", () => {
+    const next = computeWhatNext(
+      baseProps({
+        jobStatus: "in_progress",
+        stage: "completed",
+        readyForCloseout: true,
+        hasApprovedEstimate: true,
+        approvedEstimateId: ESTIMATE_ID,
+        depositPaid: true,
+        hasCompletedExecutionVisit: true,
+      }),
+    );
+
+    expect(next.message).toMatch(/Ready for closeout/i);
+    expect(next.actionLabel).toBe("Complete Project");
+    expect(next.actionHref).toContain(`#project-status`);
+    expect(next.secondary?.href).toContain("/visits/new");
+  });
+
+  it("multi-day with completed visits + open WO schedules next work day (deposit paid is not closeout)", () => {
+    const next = computeWhatNext(
+      baseProps({
+        jobStatus: "in_progress",
+        stage: "in_progress",
+        hasApprovedEstimate: true,
+        approvedEstimateId: ESTIMATE_ID,
+        depositPaid: true,
+        hasDepositInvoice: true,
+        hasCompletedExecutionVisit: true,
+        hasOpenWorkOrder: true,
+        hasPaidInvoice: false,
+      }),
+    );
+
+    expect(next.message).toBe("Schedule the next work day");
+    expect(next.actionLabel).toBe("Schedule Work Day");
+    expect(next.actionHref).toBe(`/app/jobs/${JOB_ID}/visits/new`);
   });
 
   it("collect payment when unpaid invoice exists", () => {
