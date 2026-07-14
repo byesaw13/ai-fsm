@@ -912,7 +912,6 @@ export default async function JobDetailPage({
                     </div>
                   )}
                   {costCents !== null &&
-                    estimatedLaborCents !== null &&
                     (partsCostCents > 0 || materialsReceiptCostCents > 0) && (
                       <div className="p7-detail-row" style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-1)" }}>
                         <dt>Total Cost</dt>
