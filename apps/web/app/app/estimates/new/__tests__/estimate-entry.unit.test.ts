@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import { resolveEntryPricingMode, type EstimateMode } from "../EstimateLaunchModal";
 
 describe("estimate entry simplification", () => {
-  it("only three entry modes exist (dead Duplicate/Convert paths removed)", () => {
-    const modes: EstimateMode[] = ["quick", "detailed", "ai"];
+  it("entry modes are quick/detailed/ai/tm (dead Duplicate/Convert paths removed)", () => {
+    const modes: EstimateMode[] = ["quick", "detailed", "ai", "tm"];
     // Type-level guarantee plus an explicit runtime list for regression safety.
-    expect(modes).toHaveLength(3);
+    expect(modes).toHaveLength(4);
     expect(modes).not.toContain("duplicate" as unknown as EstimateMode);
     expect(modes).not.toContain("convert" as unknown as EstimateMode);
   });
@@ -20,6 +20,10 @@ describe("estimate entry simplification", () => {
 
   it("AI entry continues in itemized (AI drafts produce line items)", () => {
     expect(resolveEntryPricingMode("ai")).toBe("itemized");
+  });
+
+  it("T&M from notes continues in itemized (hour/range line items)", () => {
+    expect(resolveEntryPricingMode("tm")).toBe("itemized");
   });
 
   it("an explicit pricing override always wins over the entry-mode default", () => {

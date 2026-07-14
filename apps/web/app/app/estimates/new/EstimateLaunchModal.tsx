@@ -8,14 +8,15 @@
 //   quick    → manual form defaulting to flat-rate (the most common Dovetails estimate)
 //   detailed → manual form defaulting to itemized line items + price book
 //   ai       → conversational AI draft, then the manual form pre-populated
-export type EstimateMode = "quick" | "detailed" | "ai";
+//   tm       → paste freeform briefing → T&M hour/range draft (no price-book force)
+export type EstimateMode = "quick" | "detailed" | "ai" | "tm";
 
 type PricingMode = "itemized" | "flat_rate" | "multi_option";
 
 /**
  * Resolve the form's pricing mode from the chosen entry mode.
  * An explicit override (e.g. a ?pricing_mode= URL param) always wins; otherwise
- * Quick → flat-rate (the common default) and Detailed/AI → itemized.
+ * Quick → flat-rate (the common default) and Detailed/AI/T&M → itemized.
  */
 export function resolveEntryPricingMode(
   mode: EstimateMode,
@@ -49,7 +50,13 @@ const OPTIONS: Array<{
   {
     mode: "ai",
     label: "AI Estimate",
-    description: "Describe the job in your own words. The assistant prices it and builds the line items.",
+    description: "Describe the job in your own words. The assistant prices it from the price book.",
+  },
+  {
+    mode: "tm",
+    label: "T&M from notes",
+    description:
+      "Paste a briefing (walkthrough notes or another AI). Builds a time-and-materials estimate with hours, travel, and customer language.",
   },
 ];
 

@@ -10,6 +10,7 @@ import {
   canTransitionJob,
   canCreateVisit,
   canDeleteRecords,
+  canCreateEstimates,
 } from "@/lib/auth/permissions";
 import { jobTransitions, JOB_STATUS_LABELS } from "@ai-fsm/domain";
 import type { Job, Visit, JobStatus, JobAcceptanceCategory, JobIntakeDecision } from "@ai-fsm/domain";
@@ -21,6 +22,8 @@ import { JobIntakePanel } from "./JobIntakePanel";
 import { AssetLinksPanel } from "./AssetLinksPanel";
 import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { ProjectWhatNext } from "./ProjectWhatNext";
+import { UseTmBriefingButton } from "./UseTmBriefingButton";
+import { buildJobTmBriefing } from "@/lib/estimates/job-tm-briefing";
 import { VendorCoordinationCard } from "./VendorCoordinationCard";
 import { JobWorkOrdersPanel, type JobWorkOrderRow } from "./JobWorkOrdersPanel";
 import { LinkForgottenExpensesPanel } from "@/components/invoices/LinkForgottenExpensesPanel";
@@ -144,9 +147,13 @@ export default async function JobDetailPage({
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const job = await queryOneForSession<JobRow>(
+  const job = await queryOneForSession<JobRow & {
+    property_city: string | null;
+    property_state: string | null;
+  }>(
     session,
-    `SELECT j.*, c.name AS client_name, c.phone AS client_phone, p.address AS property_address
+    `SELECT j.*, c.name AS client_name, c.phone AS client_phone,
+            p.address AS property_address, p.city AS property_city, p.state AS property_state
      FROM jobs j
      LEFT JOIN clients c ON c.id = j.client_id
      LEFT JOIN properties p ON p.id = j.property_id
@@ -227,6 +234,7 @@ export default async function JobDetailPage({
           booking_request_id: string | null;
           booking_status: string | null;
           booking_pricing_mode: string | null;
+          booking_service_description: string | null;
           expired_estimate_count: string;
           latest_expired_estimate_id: string | null;
           has_draft_work_order_with_pricing: boolean;
@@ -272,6 +280,9 @@ export default async function JobDetailPage({
              (SELECT pricing_mode FROM booking_requests
               WHERE job_id = $1 AND account_id = $2
               ORDER BY created_at DESC LIMIT 1) AS booking_pricing_mode,
+             (SELECT service_description FROM booking_requests
+              WHERE job_id = $1 AND account_id = $2
+              ORDER BY created_at DESC LIMIT 1) AS booking_service_description,
              (SELECT COUNT(*) FROM estimates
               WHERE job_id = $1 AND account_id = $2 AND status = 'expired') AS expired_estimate_count,
              (SELECT id FROM estimates
@@ -297,9 +308,25 @@ export default async function JobDetailPage({
   const canAddVisit = canCreateVisit(session.role);
   const canDelete = canDeleteRecords(session.role);
   const canLinkExpenses = canManageExpenses(session.role);
+  const canEstimate = canCreateEstimates(session.role);
   const isTech = session.role === "tech";
 
   const estimateCount = commercialCounts ? parseInt(commercialCounts.estimate_count) : 0;
+
+  const latestFieldNotes =
+    visits.find((v) => typeof v.tech_notes === "string" && v.tech_notes.trim())?.tech_notes ?? null;
+  const tmBriefing = buildJobTmBriefing({
+    title: job.title,
+    description: job.description ?? null,
+    intake_notes: job.intake_notes ?? null,
+    property_address: job.property_address ?? null,
+    property_city: job.property_city ?? null,
+    property_state: job.property_state ?? null,
+    field_notes: latestFieldNotes,
+    request_description: commercialCounts?.booking_service_description ?? null,
+    pricing_mode:
+      (commercialCounts?.booking_pricing_mode as "flat_rate" | "hourly_internal" | null) ?? null,
+  });
   const invoiceCount = commercialCounts ? parseInt(commercialCounts.invoice_count) : 0;
   const changeOrderCount = commercialCounts ? parseInt(commercialCounts.change_order_count) : 0;
   const activeVisits = visits.filter((v) => !["completed", "cancelled"].includes(v.status));
@@ -419,6 +446,15 @@ export default async function JobDetailPage({
           <div style={{ padding: "var(--space-4)", border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", fontSize: "var(--text-sm)", whiteSpace: "pre-wrap", color: job.description ? "var(--fg)" : "var(--fg-muted)" }}>
             {job.description || "No scope notes have been added yet."}
           </div>
+          {!isTech && canEstimate && tmBriefing ? (
+            <UseTmBriefingButton
+              jobId={job.id}
+              clientId={job.client_id ?? null}
+              briefing={tmBriefing}
+              variant="primary"
+              label="Use this briefing (T&M) →"
+            />
+          ) : null}
         </section>
 
         <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
@@ -506,6 +542,50 @@ export default async function JobDetailPage({
           hasDraftWorkOrderWithPricing={commercialCounts.has_draft_work_order_with_pricing}
           preSaleSiteVisitId={openPreSaleSiteVisit?.id ?? null}
         />
+      )}
+
+      {!isTech && canEstimate && tmBriefing && (
+        <Card
+          data-testid="job-tm-briefing-card"
+          style={{ marginBottom: "var(--space-4)" }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "var(--space-3)",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div style={{ flex: "1 1 240px", minWidth: 0 }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "var(--text-xs)",
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--fg-muted)",
+                }}
+              >
+                T&amp;M estimate
+              </p>
+              <p style={{ margin: "6px 0 0", fontSize: "var(--text-sm)", color: "var(--fg)" }}>
+                Use this job’s description, intake, and visit notes as a briefing — one click builds
+                a time-and-materials draft with hours and customer language.
+              </p>
+            </div>
+            <UseTmBriefingButton
+              jobId={job.id}
+              clientId={job.client_id ?? null}
+              briefing={tmBriefing}
+              variant="primary"
+              size="sm"
+              label="Use this briefing →"
+            />
+          </div>
+        </Card>
       )}
 
       {/* Detail Hub Layout: two-column on desktop, stacked on mobile */}
