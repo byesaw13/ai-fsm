@@ -180,15 +180,17 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
             </dl>
           </Card>
 
-          <Card>
-            <SectionHeader title="Line Items" />
-            <ExpenseLineItemsEditor
-              expenseId={expense.id}
-              initialLineItems={lineItems}
-              billed={lineItemsBilled}
-              canEdit={canManage}
-            />
-          </Card>
+          {(cat === "materials" || lineItems.length > 0) && (
+            <Card>
+              <SectionHeader title="Line Items" />
+              <ExpenseLineItemsEditor
+                expenseId={expense.id}
+                initialLineItems={lineItems}
+                billed={lineItemsBilled}
+                canEdit={canManage}
+              />
+            </Card>
+          )}
         </div>
 
         {/* Sidebar — edit form + document panel */}

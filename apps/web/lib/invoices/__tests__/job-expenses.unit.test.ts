@@ -6,7 +6,6 @@ import {
   materialExpenseDescription,
   fetchJobMaterialExpenses,
 } from "../job-expenses";
-import type { ExpenseLineItemPreview } from "../material-handling";
 
 describe("job-expenses", () => {
   it("bills materials at cost plus 15% handling (estimate contract)", () => {
