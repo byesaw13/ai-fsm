@@ -8,9 +8,10 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import {
-  LABOR_CUSTOMER_RATE_CENTS_PER_HOUR,
-  MA_LABOR_RATE_DELTA,
+  DEFAULT_PRICING_SETTINGS,
+  billingRateCentsForState,
   buildShoppingList,
+  type BusinessPricingSettings,
   type ShoppingList,
   type SpecifiedMaterial,
 } from "@ai-fsm/domain";
@@ -111,22 +112,28 @@ export function midHours(min: number, max: number): number {
   return Math.round(((lo + hi) / 2) * 4) / 4; // nearest 0.25h
 }
 
-export function resolveLaborRateCents(state: string | null | undefined): {
+export function resolveLaborRateCents(
+  state: string | null | undefined,
+  settings: BusinessPricingSettings = DEFAULT_PRICING_SETTINGS
+): {
   labor_rate_cents: number;
   travel_rate_cents: number;
   is_ma: boolean;
+  cost_rate_cents: number;
 } {
   const st = (state ?? "").trim().toUpperCase();
   const is_ma = st === "MA" || st === "MASSACHUSETTS";
-  const base = LABOR_CUSTOMER_RATE_CENTS_PER_HOUR;
-  const labor_rate_cents = is_ma
-    ? Math.round(base * (1 + MA_LABOR_RATE_DELTA))
-    : base;
+  const labor_rate_cents = billingRateCentsForState(settings, state);
   // T&M briefings bill travel time at the same customer labor rate so the
   // hour band is easy to explain. Dedicated mileage/zone travel still lives
   // on the travel recommendation widget after create.
   const travel_rate_cents = labor_rate_cents;
-  return { labor_rate_cents, travel_rate_cents, is_ma };
+  return {
+    labor_rate_cents,
+    travel_rate_cents,
+    is_ma,
+    cost_rate_cents: settings.labor_cost_cents_per_hour,
+  };
 }
 
 function formatHourRange(min: number, max: number): string {
@@ -322,9 +329,13 @@ export function buildTmShoppingList(materials: TmMaterialLine[]): ShoppingList |
 /**
  * Pure: turn extraction + rates into a full T&M draft ready for the estimate form.
  */
-export function finalizeTmDraft(extraction: TmBriefingExtraction): TmEstimateDraft {
+export function finalizeTmDraft(
+  extraction: TmBriefingExtraction,
+  pricingSettings: BusinessPricingSettings = DEFAULT_PRICING_SETTINGS
+): TmEstimateDraft {
   const { labor_rate_cents, travel_rate_cents, is_ma } = resolveLaborRateCents(
-    extraction.location_state
+    extraction.location_state,
+    pricingSettings
   );
 
   const labor_mid_hours = midHours(extraction.labor_hours_min, extraction.labor_hours_max);
@@ -639,7 +650,8 @@ function getClient(): Anthropic {
 
 export async function extractTmBriefing(
   briefingText: string,
-  jobContext?: string
+  jobContext?: string,
+  pricingSettings: BusinessPricingSettings = DEFAULT_PRICING_SETTINGS
 ): Promise<TmEstimateDraft | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null;
   if (!briefingText.trim()) return null;
@@ -673,5 +685,5 @@ export async function extractTmBriefing(
   if (extraction.labor_hours_max <= 0 && extraction.travel_hours_max <= 0) {
     return null;
   }
-  return finalizeTmDraft(extraction);
+  return finalizeTmDraft(extraction, pricingSettings);
 }

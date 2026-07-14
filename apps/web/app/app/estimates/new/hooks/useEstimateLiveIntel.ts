@@ -2,8 +2,10 @@
 
 import { useMemo } from "react";
 import {
-  LABOR_COST_CENTS_PER_HOUR,
+  DEFAULT_PRICING_SETTINGS,
+  buildPricingRules,
   groupMaterialsBySection,
+  type BusinessPricingSettings,
 } from "@ai-fsm/domain";
 import type { MaterialsBySection } from "@ai-fsm/domain";
 import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
@@ -69,6 +71,8 @@ interface UseEstimateLiveIntelInput {
   travelSurcharge: string;
   riskAdjustment: string;
   minimumOverrideReason: string;
+  /** Account labor cost / margin floor (from Settings → Labor & Pricing). */
+  pricingSettings?: BusinessPricingSettings;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +88,11 @@ export function useEstimateLiveIntel(input: UseEstimateLiveIntelInput): Estimate
       tripCount, requiresDryingOrCuring, difficultAccess, oldHouseRisk,
       coordinationRequired, finishExpectation, travelSurcharge, riskAdjustment,
       minimumOverrideReason,
+      pricingSettings = DEFAULT_PRICING_SETTINGS,
     } = input;
+    const laborCostCents = pricingSettings.labor_cost_cents_per_hour;
+    const marginFloorPct = Math.round(pricingSettings.margin_floor_pct * 100);
+    const pricingRules = buildPricingRules(pricingSettings);
 
     // ── Totals ────────────────────────────────────────────────────────────────
     let totalCents: number;
@@ -144,7 +152,7 @@ export function useEstimateLiveIntel(input: UseEstimateLiveIntelInput): Estimate
         margin_pct: marginPct / 100,
         has_ma_regulated_items: false,
         line_item_count: lineItems.filter((r) => r.description.trim()).length,
-      });
+      }, pricingRules);
 
       const { score: finalScore, reasons: finalReasons } = computeConfidence({
         hasAnyMaterials,
@@ -155,8 +163,8 @@ export function useEstimateLiveIntel(input: UseEstimateLiveIntelInput): Estimate
         totalCents,
       });
 
-      const revenuePerHr = paintingResult.internal_labor_cost_cents > 0
-        ? Math.round(totalCents / (paintingResult.internal_labor_cost_cents / LABOR_COST_CENTS_PER_HOUR))
+      const revenuePerHr = paintingResult.internal_labor_cost_cents > 0 && laborCostCents > 0
+        ? Math.round(totalCents / (paintingResult.internal_labor_cost_cents / laborCostCents))
         : 0;
 
       return {
@@ -191,13 +199,17 @@ export function useEstimateLiveIntel(input: UseEstimateLiveIntelInput): Estimate
     }
     isMarginReliable = estimatedLaborHours > 0;
 
-    const estimatedLaborCostCents = Math.round(estimatedLaborHours * LABOR_COST_CENTS_PER_HOUR);
+    const estimatedLaborCostCents = Math.round(estimatedLaborHours * laborCostCents);
     const estimatedProfitCents = totalCents - materialsTotalCents - estimatedLaborCostCents;
     const grossMarginPct = isMarginReliable && totalCents > 0
       ? Math.max(0, Math.round((estimatedProfitCents / totalCents) * 100))
       : 0;
     const marginStatus: EstimateLiveIntel["marginStatus"] =
-      grossMarginPct >= 30 ? "green" : grossMarginPct >= 15 ? "yellow" : "red";
+      grossMarginPct >= marginFloorPct
+        ? "green"
+        : grossMarginPct >= Math.round(marginFloorPct / 2)
+          ? "yellow"
+          : "red";
     const revenuePerLaborHourCents = isMarginReliable && estimatedLaborHours > 0
       ? Math.round(totalCents / estimatedLaborHours)
       : 0;
@@ -224,7 +236,7 @@ export function useEstimateLiveIntel(input: UseEstimateLiveIntelInput): Estimate
       margin_pct: isMarginReliable ? grossMarginPct / 100 : null,
       has_ma_regulated_items: false,
       line_item_count: lineItemCount,
-    });
+    }, pricingRules);
 
     const realWarnings = guardrailReview.warnings.filter(
       (w) => !(w.field === "pricing" && w.message.includes("Guardrails passed"))
@@ -262,6 +274,7 @@ export function useEstimateLiveIntel(input: UseEstimateLiveIntelInput): Estimate
     input.laborHours, input.tripCount, input.requiresDryingOrCuring, input.difficultAccess,
     input.oldHouseRisk, input.coordinationRequired, input.finishExpectation,
     input.travelSurcharge, input.riskAdjustment, input.minimumOverrideReason,
+    input.pricingSettings,
   ]);
 }
 

@@ -10,10 +10,17 @@
 // Labor
 // ---------------------------------------------------------------------------
 
-/** Internal burdened cost of labor. Never shown on customer-facing output. */
-export const LABOR_COST_CENTS_PER_HOUR = 85_00; // $85.00/hr
+/**
+ * Default internal labor cost clock (owner pay / cost basis).
+ * Never shown on customer-facing output.
+ * Runtime source of truth is business_pricing_settings.labor_cost_cents_per_hour.
+ */
+export const LABOR_COST_CENTS_PER_HOUR = 50_00; // $50.00/hr
 
-/** Customer-facing hourly rate for T&M or add-on labor line items. */
+/**
+ * Default customer-facing hourly rate for T&M or add-on labor line items.
+ * Runtime source of truth is business_pricing_settings.labor_billing_cents_per_hour.
+ */
 export const LABOR_CUSTOMER_RATE_CENTS_PER_HOUR = 115_00; // $115.00/hr
 
 /** Minimum customer-facing service value unless intentionally bundled or credited. */

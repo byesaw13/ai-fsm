@@ -4,6 +4,7 @@ import { withAuth } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { extractTmBriefing } from "@/lib/estimates/tm-briefing";
+import { loadPricingSettings } from "@/lib/pricing/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -97,7 +98,35 @@ export const POST = withAuth(async (request: NextRequest, session) => {
   }
 
   try {
-    const draft = await extractTmBriefing(briefing, jobContext);
+    // Load account labor rates so T&M mid-points and notes use Settings, not hardcoded constants
+    let pricingSettings;
+    try {
+      const pool = getPool();
+      const client = await pool.connect();
+      try {
+        // BEGIN so set_config(..., true) persists across the settings queries
+        await client.query("BEGIN");
+        await client.query(
+          `SELECT set_config('app.current_account_id', $1, true),
+                  set_config('app.current_user_id', $2, true),
+                  set_config('app.current_role', $3, true)`,
+          [session.accountId, session.userId, session.role]
+        );
+        pricingSettings = await loadPricingSettings(client, session.accountId);
+        await client.query("COMMIT");
+      } catch (inner) {
+        await client.query("ROLLBACK").catch(() => {});
+        throw inner;
+      } finally {
+        client.release();
+      }
+    } catch (err) {
+      logger.warn("ai-tm-briefing: pricing settings load failed, using defaults", {
+        error: (err as Error).message,
+      });
+    }
+
+    const draft = await extractTmBriefing(briefing, jobContext, pricingSettings);
     if (!draft) {
       return NextResponse.json(
         {

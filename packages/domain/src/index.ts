@@ -16,6 +16,7 @@ export * from "./integration-schemas";
 export * from "./visits";
 export * from "./pricing";
 export * from "./dovetails";
+export * from "./pricing-settings";
 export * from "./estimate-engine";
 export * from "./job-materials";
 export * from "./stages";

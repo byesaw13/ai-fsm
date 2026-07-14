@@ -11,6 +11,7 @@ import {
 import {
   LABOR_CUSTOMER_RATE_CENTS_PER_HOUR,
   MA_LABOR_RATE_DELTA,
+  DEFAULT_PRICING_SETTINGS,
 } from "@ai-fsm/domain";
 
 function sampleExtraction(overrides: Partial<TmBriefingExtraction> = {}): TmBriefingExtraction {
@@ -79,11 +80,12 @@ describe("tm-briefing pure helpers", () => {
     expect(midHours(5, 5)).toBe(5);
   });
 
-  it("applies MA labor premium", () => {
+  it("applies MA labor premium from pricing settings", () => {
     const nh = resolveLaborRateCents("NH");
     const ma = resolveLaborRateCents("MA");
     expect(nh.is_ma).toBe(false);
     expect(nh.labor_rate_cents).toBe(LABOR_CUSTOMER_RATE_CENTS_PER_HOUR);
+    expect(nh.cost_rate_cents).toBe(DEFAULT_PRICING_SETTINGS.labor_cost_cents_per_hour);
     expect(ma.is_ma).toBe(true);
     expect(ma.labor_rate_cents).toBe(
       Math.round(LABOR_CUSTOMER_RATE_CENTS_PER_HOUR * (1 + MA_LABOR_RATE_DELTA))

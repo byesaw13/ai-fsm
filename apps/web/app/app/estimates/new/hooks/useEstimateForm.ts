@@ -32,6 +32,7 @@ import {
 } from "@/lib/estimates/form-helpers";
 import { useEstimatePricing } from "./useEstimatePricing";
 import { useEstimateLiveIntel } from "./useEstimateLiveIntel";
+import { usePricingSettings } from "./usePricingSettings";
 
 // Re-export shared helpers + types so the component's existing imports keep working
 export {
@@ -427,6 +428,8 @@ export function useEstimateForm({
   // Live intelligence (unified derived state — Block 1)
   // ---------------------------------------------------------------------------
 
+  const { settings: pricingSettings } = usePricingSettings();
+
   const liveIntel = useEstimateLiveIntel({
     serviceType, mode,
     paintingResult: pricing.paintingResult,
@@ -442,6 +445,7 @@ export function useEstimateForm({
     coordinationRequired, finishExpectation,
     travelSurcharge, riskAdjustment,
     minimumOverrideReason,
+    pricingSettings,
   });
 
   // ---------------------------------------------------------------------------
