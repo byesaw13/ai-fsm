@@ -310,6 +310,54 @@ export async function fetchLinkableMaterialExpenses(
   return enriched;
 }
 
+export type JobMaterialExpenseWithLines = {
+  id: string;
+  vendor_name: string;
+  amount_cents: number;
+  notes: string | null;
+  expense_date: string;
+  billed: boolean;
+  line_items: ExpenseLineItemPreview[];
+};
+
+/** All materials-category expenses linked to a job, itemized, with billed status. */
+export async function fetchJobMaterialExpenses(
+  client: PoolClient,
+  accountId: string,
+  jobId: string,
+): Promise<JobMaterialExpenseWithLines[]> {
+  const result = await client.query<{
+    id: string;
+    vendor_name: string;
+    amount_cents: number;
+    notes: string | null;
+    expense_date: string;
+    billed: boolean;
+  }>(
+    `SELECT e.id, e.vendor_name, e.amount_cents, e.notes,
+            e.expense_date::text AS expense_date,
+            EXISTS(
+              SELECT 1 FROM invoice_line_items ili WHERE ili.source_expense_id = e.id
+            ) AS billed
+     FROM expenses e
+     WHERE e.account_id = $1
+       AND e.job_id = $2
+       AND e.category = 'materials'
+     ORDER BY e.expense_date DESC, e.created_at DESC`,
+    [accountId, jobId],
+  );
+
+  const enriched: JobMaterialExpenseWithLines[] = [];
+  for (const expense of result.rows) {
+    const skuLines = await fetchExpenseLineItems(client, accountId, expense.id);
+    enriched.push({
+      ...expense,
+      line_items: skuLines.map(toLineItemPreview),
+    });
+  }
+  return enriched;
+}
+
 export type JobLinkContext = {
   id: string;
   client_id: string;

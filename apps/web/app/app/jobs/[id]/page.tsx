@@ -27,6 +27,9 @@ import { buildJobTmBriefing } from "@/lib/estimates/job-tm-briefing";
 import { VendorCoordinationCard } from "./VendorCoordinationCard";
 import { JobWorkOrdersPanel, type JobWorkOrderRow } from "./JobWorkOrdersPanel";
 import { LinkForgottenExpensesPanel } from "@/components/invoices/LinkForgottenExpensesPanel";
+import { fetchJobMaterialExpenses, type JobMaterialExpenseWithLines } from "@/lib/invoices/job-expenses";
+import { withExpenseContext } from "@/lib/expenses/db";
+import { JobMaterialsPanel } from "./JobMaterialsPanel";
 import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { isHomeboxEnabled } from "@/lib/homebox/client";
 import { withAssetContext, listAssetLinks } from "@/lib/homebox/db";
@@ -175,7 +178,7 @@ export default async function JobDetailPage({
 
   const homeboxEnabled = isHomeboxEnabled();
 
-  const [visits, workOrders, commercialCounts, assetLinks] = await Promise.all([
+  const [visits, workOrders, commercialCounts, assetLinks, jobMaterialExpenses] = await Promise.all([
     session.role === "tech"
       ? queryForSession<VisitRow>(
           session,
@@ -300,6 +303,10 @@ export default async function JobDetailPage({
     withAssetContext(session, (client) =>
       listAssetLinks(client, session.accountId, "job", id)
     ).catch(() => []),
+    session.role !== "tech"
+      ? withExpenseContext(session, (client) => fetchJobMaterialExpenses(client, session.accountId, id))
+          .catch(() => [] as JobMaterialExpenseWithLines[])
+      : Promise.resolve([] as JobMaterialExpenseWithLines[]),
   ]);
 
   const currentStatus = job.status as JobStatus;
@@ -363,12 +370,14 @@ export default async function JobDetailPage({
 
   // Profitability (owner/admin only)
   // actual_cost_cents on jobs is maintained as the parts rollup by visit-parts write paths.
+  // materialsReceiptCostCents is a second, additive cost source from linked receipts.
   const revenueCents = commercialCounts?.invoice_total_cents ?? commercialCounts?.estimated_total_cents ?? null;
   const partsCostCents = commercialCounts?.parts_cost_cents ?? 0;
+  const materialsReceiptCostCents = jobMaterialExpenses.reduce((sum, e) => sum + e.amount_cents, 0);
   const estimatedLaborCents = commercialCounts?.estimated_labor_cost_cents ?? null;
   const costCents =
-    estimatedLaborCents !== null || partsCostCents > 0
-      ? (estimatedLaborCents ?? 0) + partsCostCents
+    estimatedLaborCents !== null || partsCostCents > 0 || materialsReceiptCostCents > 0
+      ? (estimatedLaborCents ?? 0) + partsCostCents + materialsReceiptCostCents
       : null;
   const grossMarginCents = revenueCents !== null && costCents !== null ? revenueCents - costCents : null;
   const grossMarginPct =
@@ -594,6 +603,12 @@ export default async function JobDetailPage({
         <div className="p7-detail-primary">
           {canLinkExpenses && (
             <LinkForgottenExpensesPanel mode="job" jobId={job.id} />
+          )}
+          {!isTech && jobMaterialExpenses.length > 0 && (
+            <Card data-testid="job-materials-panel">
+              <SectionHeader title="Materials" count={jobMaterialExpenses.length} />
+              <JobMaterialsPanel expenses={jobMaterialExpenses} />
+            </Card>
           )}
           {!isTech && workOrders.length > 0 && (
             <Card data-testid="job-work-orders-panel">
@@ -890,12 +905,19 @@ export default async function JobDetailPage({
                       <dd>${(partsCostCents / 100).toFixed(2)}</dd>
                     </div>
                   )}
-                  {costCents !== null && estimatedLaborCents !== null && partsCostCents > 0 && (
-                    <div className="p7-detail-row" style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-1)" }}>
-                      <dt>Total Cost</dt>
-                      <dd>${(costCents / 100).toFixed(2)}</dd>
+                  {materialsReceiptCostCents > 0 && (
+                    <div className="p7-detail-row">
+                      <dt>Materials (receipts)</dt>
+                      <dd>${(materialsReceiptCostCents / 100).toFixed(2)}</dd>
                     </div>
                   )}
+                  {costCents !== null &&
+                    (partsCostCents > 0 || materialsReceiptCostCents > 0) && (
+                      <div className="p7-detail-row" style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-1)" }}>
+                        <dt>Total Cost</dt>
+                        <dd>${(costCents / 100).toFixed(2)}</dd>
+                      </div>
+                    )}
                   {grossMarginCents !== null && (
                     <div className="p7-detail-row">
                       <dt>Gross Margin</dt>
@@ -914,7 +936,7 @@ export default async function JobDetailPage({
                       <dd>{commercialCounts.travel_miles} mi</dd>
                     </div>
                   )}
-                  {estimatedLaborCents === null && !partsCostCents && (
+                  {estimatedLaborCents === null && !partsCostCents && !materialsReceiptCostCents && (
                     <div className="p7-detail-row">
                       <dt></dt>
                       <dd style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>

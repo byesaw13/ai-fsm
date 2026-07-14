@@ -4,6 +4,11 @@ import { withAuth } from "../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../lib/auth/middleware";
 import { canManageExpenses } from "../../../../../lib/auth/permissions";
 import { logger } from "../../../../../lib/logger";
+import {
+  RECEIPT_LINE_ITEMS_PROMPT,
+  normalizeParsedReceiptLineItems,
+  type ParsedReceipt,
+} from "@/lib/expenses/receipt-line-items";
 
 export const dynamic = "force-dynamic";
 
@@ -11,30 +16,6 @@ const EXPENSE_CATEGORIES = [
   "materials", "tools", "fuel", "vehicle", "subcontractors",
   "office", "insurance", "utilities", "marketing", "meals", "travel", "other",
 ] as const;
-
-const RECEIPT_PROMPT = `You are a receipt parser for a small handyman and woodworking business (Dovetails Services LLC).
-
-Extract the following fields from this receipt image and return ONLY valid JSON (no markdown, no explanation):
-
-{
-  "vendor_name": "string — business or store name shown on receipt",
-  "amount_cents": number — total amount charged in cents (integer, no decimals),
-  "expense_date": "string — date in YYYY-MM-DD format",
-  "category": "string — one of: materials, tools, fuel, vehicle, subcontractors, office, insurance, utilities, marketing, meals, travel, other",
-  "notes": "string or null — any useful context like item description, job-related notes, or null if none"
-}
-
-Category guidance:
-- materials: lumber, hardware, paint, fasteners, caulk, pipe, wire, flooring
-- tools: drill bits, sandpaper, saw blades, consumable shop supplies, small hand tools
-- fuel: gas station receipts
-- vehicle: auto parts, car wash, parking, tolls
-- subcontractors: payments to other trades
-- meals: food/coffee during work day
-- office: software, postage, printing, office supplies
-- other: anything that doesn't fit above
-
-If you cannot read a field clearly, use null for notes and make your best guess for required fields.`;
 
 export const POST = withAuth(async (request: NextRequest, session: AuthSession) => {
   if (!canManageExpenses(session.role)) {
@@ -95,13 +76,13 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
     const client = new Anthropic({ apiKey });
     const message = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 512,
+      max_tokens: 2048,
       messages: [
         {
           role: "user",
           content: [
             { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
-            { type: "text", text: RECEIPT_PROMPT },
+            { type: "text", text: RECEIPT_LINE_ITEMS_PROMPT },
           ],
         },
       ],
@@ -115,15 +96,9 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
     // Strip any markdown code fences Claude may have added
     const jsonText = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
 
-    let parsed: {
-      vendor_name?: string;
-      amount_cents?: number;
-      expense_date?: string;
-      category?: string;
-      notes?: string | null;
-    };
+    let parsed: ParsedReceipt;
     try {
-      parsed = JSON.parse(jsonText);
+      parsed = JSON.parse(jsonText) as ParsedReceipt;
     } catch {
       logger.warn("[scan-receipt] Claude returned non-JSON", { raw: rawText, traceId: session.traceId });
       return NextResponse.json(
@@ -146,6 +121,8 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
       expense_date = parsed.expense_date;
     }
 
+    const line_items = normalizeParsedReceiptLineItems(parsed.line_items);
+
     return NextResponse.json({
       data: {
         vendor_name: parsed.vendor_name?.trim() || null,
@@ -153,6 +130,7 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
         expense_date,
         category,
         notes: parsed.notes?.trim() || null,
+        line_items,
       },
     });
   } catch (err) {
