@@ -242,6 +242,19 @@ describe("createDraftFinalInvoiceForJob", () => {
       },
       // Tracked time: 130 minutes rounds to 2.25 hours
       { rows: [{ tracked_minutes: "130" }], rowCount: 1 },
+      // business_pricing_settings (bill rate for labor line)
+      {
+        rows: [{
+          labor_cost_cents_per_hour: 5000,
+          labor_billing_cents_per_hour: 11500,
+          margin_floor_pct: 0.3,
+          ma_labor_rate_delta: 0.15,
+          minimum_service_fee_cents: 18500,
+          half_day_rate_cents: 51500,
+          full_day_rate_cents: 98000,
+        }],
+        rowCount: 1,
+      },
       // Invoice INSERT
       { rows: [{ id: "labor-inv-id" }], rowCount: 1 },
       // Labor line INSERT

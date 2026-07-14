@@ -18,11 +18,24 @@ describe("roundedQuarterHoursFromMinutes", () => {
   });
 });
 
+const pricingSettingsRow = {
+  labor_cost_cents_per_hour: 5000,
+  labor_billing_cents_per_hour: 11500,
+  margin_floor_pct: 0.3,
+  ma_labor_rate_delta: 0.15,
+  minimum_service_fee_cents: 18500,
+  half_day_rate_cents: 51500,
+  full_day_rate_cents: 98000,
+};
+
 describe("upsertLaborLineFromTrackedTime", () => {
   it("updates an existing labor line instead of inserting a duplicate", async () => {
     const client = makeClient([
       { rows: [{ tracked_minutes: "130" }], rowCount: 1 },
+      // existing labor line SELECT (before pricing load)
       { rows: [{ id: "line-1" }], rowCount: 1 },
+      // business_pricing_settings load
+      { rows: [pricingSettingsRow], rowCount: 1 },
       {
         rows: [{
           id: "line-1",
@@ -42,14 +55,17 @@ describe("upsertLaborLineFromTrackedTime", () => {
 
     expect(result.billable_hours).toBe(2.25);
     expect(result.lineItem.id).toBe("line-1");
-    expect(client.query).toHaveBeenCalledTimes(3);
-    expect((client.query as ReturnType<typeof vi.fn>).mock.calls[2][0]).toContain("UPDATE invoice_line_items");
+    expect(client.query).toHaveBeenCalledTimes(4);
+    expect((client.query as ReturnType<typeof vi.fn>).mock.calls[3][0]).toContain("UPDATE invoice_line_items");
   });
 
   it("inserts one labor line when no labor line exists", async () => {
     const client = makeClient([
       { rows: [{ tracked_minutes: "90" }], rowCount: 1 },
+      // no existing labor line
       { rows: [], rowCount: 0 },
+      // business_pricing_settings load
+      { rows: [pricingSettingsRow], rowCount: 1 },
       {
         rows: [{
           id: "line-2",
@@ -69,6 +85,6 @@ describe("upsertLaborLineFromTrackedTime", () => {
 
     expect(result.billable_hours).toBe(1.5);
     expect(result.lineItem.id).toBe("line-2");
-    expect((client.query as ReturnType<typeof vi.fn>).mock.calls[2][0]).toContain("INSERT INTO invoice_line_items");
+    expect((client.query as ReturnType<typeof vi.fn>).mock.calls[3][0]).toContain("INSERT INTO invoice_line_items");
   });
 });
