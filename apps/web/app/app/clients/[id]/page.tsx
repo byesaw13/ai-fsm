@@ -256,13 +256,52 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
   const canCreateJobs = canTransitionJob(session.role);
   const canCreateEstimate = canCreateEstimates(session.role);
-  const currentJob = activeJobs[0] ?? null;
   const outstandingInvoice = invoices.find((i) => ["draft", "sent", "partial", "overdue"].includes(i.status)) ?? null;
-  const upcomingVisitJob = activeJobs.find((j) => j.next_visit_id) ?? null;
   const openEstimate = estimates.find((e) => ["draft", "sent", "approved"].includes(e.status)) ?? null;
   const recentHistory = activityEvents.filter((e) => !["draft", "sent", "scheduled", "arrived", "in_progress", "partial", "overdue"].includes(String(e.status))).slice(0, 3);
   const historicalEstimates = estimates.filter((e) => !["draft", "sent", "approved"].includes(e.status));
   const historicalInvoices = invoices.filter((i) => !["draft", "sent", "partial", "overdue"].includes(i.status));
+
+  const rightNowItems = [
+    ...openAssessments.map((a) => ({
+      key: `a-${a.id}`,
+      href: a.assessment_completed ? `/app/visits/${a.id}` : `/app/visits/${a.id}/assessment`,
+      title: a.assessment_completed ? "Assessment — close visit" : "Assessment — finish form",
+      meta: `${a.job_title ?? "Project"} · ${new Date(a.scheduled_start).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`,
+      status: a.status,
+      priority: 0 as number,
+    })),
+    ...activeJobs.map((j) => ({
+      key: `j-${j.id}`,
+      href: `/app/jobs/${j.id}`,
+      title: j.title,
+      meta: [j.property_address, j.next_visit_start
+        ? `Next: ${new Date(j.next_visit_start).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
+        : null].filter(Boolean).join(" · ") || "Active project",
+      status: j.status,
+      priority: 1 as number,
+    })),
+    ...(openEstimate
+      ? [{
+          key: `e-${openEstimate.id}`,
+          href: `/app/estimates/${openEstimate.id}`,
+          title: `Estimate · ${openEstimate.status}`,
+          meta: `${openEstimate.job_title ?? "Estimate"} · ${dollars(openEstimate.total_cents)}`,
+          status: openEstimate.status,
+          priority: 2 as number,
+        }]
+      : []),
+    ...(outstandingInvoice
+      ? [{
+          key: `i-${outstandingInvoice.id}`,
+          href: `/app/invoices/${outstandingInvoice.id}`,
+          title: outstandingInvoice.status === "overdue" ? "Invoice overdue" : "Invoice open",
+          meta: `${outstandingInvoice.job_title ?? "Invoice"} · ${dollars(outstandingInvoice.balance_cents)} due`,
+          status: outstandingInvoice.status,
+          priority: 2 as number,
+        }]
+      : []),
+  ].sort((a, b) => a.priority - b.priority);
 
   return (
     <PageContainer>
@@ -273,149 +312,191 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         backLabel="Clients"
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
-            <CopyPortalLinkButton url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/${client.portal_token}`} label="Copy portal link" />
-            <LinkButton href={`/app/properties/new?client_id=${client.id}`} variant="secondary" size="sm">+ Property</LinkButton>
-            {canCreateEstimate ? <LinkButton href={`/app/estimates/new?client_id=${client.id}`} variant="secondary" size="sm">+ Estimate</LinkButton> : null}
-            {canCreateJobs ? <LinkButton href={buildJobCreateHref(client.id)} variant="primary" size="sm">+ Project</LinkButton> : null}
+            {client.phone ? (
+              <>
+                <a href={`tel:${client.phone}`} className="p7-btn p7-btn-primary p7-btn-sm" style={{ textDecoration: "none" }}>
+                  Call
+                </a>
+                <a href={`sms:${client.phone}`} className="p7-btn p7-btn-secondary p7-btn-sm" style={{ textDecoration: "none" }}>
+                  Text
+                </a>
+              </>
+            ) : null}
+            {client.email ? (
+              <a href={`mailto:${client.email}`} className="p7-btn p7-btn-secondary p7-btn-sm" style={{ textDecoration: "none" }}>
+                Email
+              </a>
+            ) : null}
+            <CopyPortalLinkButton url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/${client.portal_token}`} label="Portal" />
+            {canCreateJobs ? <LinkButton href={buildJobCreateHref(client.id)} variant="secondary" size="sm">+ Project</LinkButton> : null}
           </div>
         }
       />
 
-      <Card>
-        <SectionHeader title="Operations" />
-        <div style={{ display: "grid", gap: "var(--space-3)", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
-          {currentJob ? (
-            <ItemCard
-              href={`/app/jobs/${currentJob.id}`}
-              title="Current Job"
-              meta={<span>{currentJob.title}</span>}
-              titleBadge={<StatusBadge variant={currentJob.status as StatusVariant}>{currentJob.status.replaceAll("_", " ")}</StatusBadge>}
-            />
-          ) : <EmptyState title="No current job" description="No active job is open for this customer." />}
-          {outstandingInvoice ? (
-            <ItemCard
-              href={`/app/invoices/${outstandingInvoice.id}`}
-              title="Outstanding Invoice"
-              meta={<span>{outstandingInvoice.job_title ?? "Invoice"} · {dollars(outstandingInvoice.balance_cents)} due</span>}
-              overdue={outstandingInvoice.status === "overdue"}
-            />
-          ) : <EmptyState title="No outstanding invoice" description="No active invoice is open for this customer." />}
-          {upcomingVisitJob?.next_visit_id ? (
-            <ItemCard
-              href={`/app/visits/${upcomingVisitJob.next_visit_id}`}
-              title="Upcoming Visit"
-              meta={<span>{upcomingVisitJob.next_visit_start ? new Date(upcomingVisitJob.next_visit_start).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "Scheduled"} · {upcomingVisitJob.title}</span>}
-            />
-          ) : <EmptyState title="No upcoming visit" description="No active visit is scheduled for this customer." />}
-          {openEstimate ? (
-            <ItemCard
-              href={`/app/estimates/${openEstimate.id}`}
-              title="Open Estimate"
-              meta={<span>{openEstimate.job_title ?? "Estimate"} · {dollars(openEstimate.total_cents)}</span>}
-              titleBadge={<StatusBadge variant={openEstimate.status as StatusVariant}>{openEstimate.status}</StatusBadge>}
-            />
-          ) : <EmptyState title="No open estimate" description="No active estimate is open for this customer." />}
-        </div>
-      </Card>
-
-      {openAssessments.length > 0 ? (
-        <Card style={{ marginTop: "var(--space-4)" }} data-testid="client-open-assessments">
-          <SectionHeader title="Open Assessments" count={openAssessments.length} />
+      {/* Right now — only real open items, no empty-state grid noise */}
+      <Card data-testid="client-right-now">
+        <SectionHeader title="Right now" />
+        {rightNowItems.length === 0 ? (
+          <EmptyState
+            title="Nothing open"
+            description="No active projects, assessments, estimates, or invoices for this customer."
+          />
+        ) : (
           <div style={{ display: "grid", gap: "var(--space-2)" }}>
-            {openAssessments.map((a) => (
+            {rightNowItems.map((item) => (
               <ItemCard
-                key={a.id}
-                href={a.assessment_completed ? `/app/visits/${a.id}` : `/app/visits/${a.id}/assessment`}
-                title="Assessment"
-                meta={
-                  <span>
-                    {a.job_title ?? "Project"} ·{" "}
-                    {new Date(a.scheduled_start).toLocaleString([], {
-                      month: "short",
-                      day: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
-                    {a.assessment_completed ? " · form complete — close visit" : " · form incomplete"}
-                  </span>
-                }
+                key={item.key}
+                href={item.href}
+                title={item.title}
+                meta={<span>{item.meta}</span>}
                 titleBadge={
-                  <StatusBadge variant={a.status as StatusVariant}>
-                    {a.status.replaceAll("_", " ")}
+                  <StatusBadge variant={item.status as StatusVariant}>
+                    {item.status.replaceAll("_", " ")}
                   </StatusBadge>
                 }
+                overdue={item.status === "overdue"}
               />
             ))}
           </div>
-        </Card>
-      ) : null}
+        )}
+        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginTop: "var(--space-3)" }}>
+          {canCreateEstimate ? (
+            <LinkButton href={`/app/estimates/new?client_id=${client.id}`} variant="ghost" size="sm">
+              + Estimate
+            </LinkButton>
+          ) : null}
+          <LinkButton href={`/app/properties/new?client_id=${client.id}`} variant="ghost" size="sm">
+            + Property
+          </LinkButton>
+          {canCreateJobs ? (
+            <LinkButton href={buildJobCreateHref(client.id)} variant="ghost" size="sm">
+              + Project
+            </LinkButton>
+          ) : null}
+        </div>
+      </Card>
 
       <div className="p7-detail-layout" style={{ marginTop: "var(--space-4)" }}>
         <div className="p7-detail-primary">
           <Card>
-            <SectionHeader title="Properties" count={properties.length} action={<LinkButton href={`/app/properties/new?client_id=${client.id}`} variant="ghost" size="sm">Add Property</LinkButton>} />
-            {properties.length === 0 ? <EmptyState title="No properties yet" description="Create a property to track service locations for this customer." /> : (
+            <SectionHeader
+              title="Properties"
+              count={properties.length}
+              action={
+                <LinkButton href={`/app/properties/new?client_id=${client.id}`} variant="ghost" size="sm">
+                  Add
+                </LinkButton>
+              }
+            />
+            {properties.length === 0 ? (
+              <EmptyState title="No properties yet" description="Add the service address so visits and estimates land in the right place." />
+            ) : (
               <div>
-                {properties.slice(0, 5).map((property) => (
+                {properties.map((property) => (
                   <ItemCard
                     key={property.id}
                     href={`/app/properties/${property.id}`}
                     title={property.name?.trim() || property.address}
-                    meta={<span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{formatPropertyAddress(property)}{Number(property.open_job_count) > 0 ? ` · ${property.open_job_count} active` : ""}</span>}
+                    meta={
+                      <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                        {formatPropertyAddress(property)}
+                        {Number(property.open_job_count) > 0 ? ` · ${property.open_job_count} active` : ""}
+                        {property.last_service_date
+                          ? ` · last service ${new Date(property.last_service_date).toLocaleDateString()}`
+                          : ""}
+                      </span>
+                    }
                   />
                 ))}
               </div>
             )}
           </Card>
 
-          <Card>
-            <SectionHeader title="Recent History" count={recentHistory.length} />
-            {recentHistory.length === 0 ? <EmptyState title="No recent history" description="Completed work appears here after operations close." /> : <ClientActivityTimeline events={recentHistory} />}
-          </Card>
+          {recentHistory.length > 0 ? (
+            <Card>
+              <SectionHeader title="Recent activity" count={recentHistory.length} />
+              <ClientActivityTimeline events={recentHistory} />
+            </Card>
+          ) : null}
 
-          <Disclosure title="Full History" count={activityEvents.length}>
-            <ClientActivityTimeline events={activityEvents} />
-          </Disclosure>
-
-          <Disclosure title="Vault" count={vaultItems.length}>
-            {vaultItems.length === 0 ? <EmptyState title="Vault is empty" description="Property documents and photos appear here after they are captured." /> : (
-              <div>
-                {vaultItems.map((item) => (
-                  <ItemCard
-                    key={item.id}
-                    href={`/app/properties/${item.property_id}`}
-                    title={item.name}
-                    meta={<span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{VAULT_CATEGORY_LABELS[item.category] ?? item.category} · {item.property_address}{Number(item.photo_count) > 0 ? ` · ${item.photo_count} photos` : ""}</span>}
-                  />
-                ))}
-              </div>
+          <Disclosure title="Full history" count={activityEvents.length}>
+            {activityEvents.length === 0 ? (
+              <EmptyState title="No history yet" description="Visits, estimates, and invoices appear here over time." />
+            ) : (
+              <ClientActivityTimeline events={activityEvents} />
             )}
           </Disclosure>
 
-          <Disclosure title="Historical Estimates" count={historicalEstimates.length}>
-            {historicalEstimates.length === 0 ? <EmptyState title="No historical estimates" description="Declined and expired estimates appear here." /> : (
-              <div>{historicalEstimates.map((estimate) => <ItemCard key={estimate.id} href={`/app/estimates/${estimate.id}`} title={estimate.job_title ?? "Estimate"} meta={<span>{estimate.status} · {dollars(estimate.total_cents)}</span>} />)}</div>
-            )}
-          </Disclosure>
-
-          <Disclosure title="Historical Invoices" count={historicalInvoices.length}>
-            {historicalInvoices.length === 0 ? <EmptyState title="No historical invoices" description="Paid and void invoices appear here." /> : (
-              <div>{historicalInvoices.map((invoice) => <ItemCard key={invoice.id} href={`/app/invoices/${invoice.id}`} title={invoice.job_title ?? "Invoice"} meta={<span>{invoice.status} · {dollars(invoice.total_cents)}</span>} />)}</div>
-            )}
-          </Disclosure>
+          {(vaultItems.length > 0 || historicalEstimates.length > 0 || historicalInvoices.length > 0) && (
+            <>
+              {vaultItems.length > 0 ? (
+                <Disclosure title="Vault" count={vaultItems.length}>
+                  <div>
+                    {vaultItems.map((item) => (
+                      <ItemCard
+                        key={item.id}
+                        href={`/app/properties/${item.property_id}`}
+                        title={item.name}
+                        meta={
+                          <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                            {VAULT_CATEGORY_LABELS[item.category] ?? item.category} · {item.property_address}
+                            {Number(item.photo_count) > 0 ? ` · ${item.photo_count} photos` : ""}
+                          </span>
+                        }
+                      />
+                    ))}
+                  </div>
+                </Disclosure>
+              ) : null}
+              {historicalEstimates.length > 0 ? (
+                <Disclosure title="Closed estimates" count={historicalEstimates.length}>
+                  <div>
+                    {historicalEstimates.map((estimate) => (
+                      <ItemCard
+                        key={estimate.id}
+                        href={`/app/estimates/${estimate.id}`}
+                        title={estimate.job_title ?? "Estimate"}
+                        meta={<span>{estimate.status} · {dollars(estimate.total_cents)}</span>}
+                      />
+                    ))}
+                  </div>
+                </Disclosure>
+              ) : null}
+              {historicalInvoices.length > 0 ? (
+                <Disclosure title="Paid / closed invoices" count={historicalInvoices.length}>
+                  <div>
+                    {historicalInvoices.map((invoice) => (
+                      <ItemCard
+                        key={invoice.id}
+                        href={`/app/invoices/${invoice.id}`}
+                        title={invoice.job_title ?? "Invoice"}
+                        meta={<span>{invoice.status} · {dollars(invoice.total_cents)}</span>}
+                      />
+                    ))}
+                  </div>
+                </Disclosure>
+              ) : null}
+            </>
+          )}
         </div>
 
         <div className="p7-detail-sidebar">
           <Card>
-            <SectionHeader title="Customer Details" />
+            <SectionHeader title="Contact" />
             <dl className="p7-detail-list">
-              <div className="p7-detail-row"><dt>Name</dt><dd>{client.name}</dd></div>
-              <div className="p7-detail-row"><dt>Company</dt><dd>{client.company_name || "-"}</dd></div>
-              <div className="p7-detail-row"><dt>Email</dt><dd>{client.email || "-"}</dd></div>
-              <div className="p7-detail-row"><dt>Phone</dt><dd>{client.phone || "-"}</dd></div>
-              <div className="p7-detail-row"><dt>Address</dt><dd>{client.address_line1 || "-"}</dd></div>
-              <div className="p7-detail-row"><dt>City / State / ZIP</dt><dd>{[client.city, client.state, client.zip].filter(Boolean).join(" ") || "-"}</dd></div>
-              <div className="p7-detail-row"><dt>Notes</dt><dd style={{ whiteSpace: "pre-wrap" }}>{client.notes || "No notes"}</dd></div>
+              <div className="p7-detail-row"><dt>Phone</dt><dd>{client.phone ? <a href={`tel:${client.phone}`}>{client.phone}</a> : "—"}</dd></div>
+              <div className="p7-detail-row"><dt>Email</dt><dd>{client.email ? <a href={`mailto:${client.email}`}>{client.email}</a> : "—"}</dd></div>
+              <div className="p7-detail-row"><dt>Company</dt><dd>{client.company_name || "—"}</dd></div>
+              <div className="p7-detail-row"><dt>Billing address</dt><dd>{client.address_line1 || "—"}</dd></div>
+              <div className="p7-detail-row"><dt>City / State / ZIP</dt><dd>{[client.city, client.state, client.zip].filter(Boolean).join(" ") || "—"}</dd></div>
+              {client.notes ? (
+                <div className="p7-detail-row"><dt>Notes</dt><dd style={{ whiteSpace: "pre-wrap" }}>{client.notes}</dd></div>
+              ) : null}
+            </dl>
+          </Card>
+
+          <Disclosure title="Travel & relationship settings">
+            <dl className="p7-detail-list">
               <div className="p7-detail-row"><dt>Customer type</dt><dd>{client.relationship_type ?? "standard"}</dd></div>
               <div className="p7-detail-row"><dt>Travel rule</dt><dd>{client.travel_rule ?? "standard_policy"}</dd></div>
               {client.travel_rule === "custom_included_radius" && client.custom_included_one_way_miles != null ? (
@@ -437,7 +518,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 </div>
               ) : null}
             </dl>
-          </Card>
+          </Disclosure>
 
           <Disclosure title="Edit Customer">
             <ClientForm
