@@ -46,6 +46,7 @@ import {
   EmptyState,
 } from "@/components/ui";
 import type { TimelineEntryData, StatusVariant } from "@/components/ui";
+import { formatCents } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
@@ -231,8 +232,18 @@ export default async function JobDetailPage({
           last_estimate_sent_at: string | null;
           has_approved_estimate: boolean;
           approved_estimate_id: string | null;
+          latest_estimate_id: string | null;
+          latest_estimate_number: string | null;
+          latest_estimate_status: string | null;
+          latest_estimate_total_cents: number | null;
           has_deposit_invoice: boolean;
           deposit_paid: boolean;
+          deposit_invoice_id: string | null;
+          deposit_invoice_status: string | null;
+          deposit_invoice_total_cents: number | null;
+          deposit_invoice_number: string | null;
+          latest_final_status: string | null;
+          latest_final_number: string | null;
           has_unpaid_invoice: boolean;
           has_paid_invoice: boolean;
           booking_request_id: string | null;
@@ -272,8 +283,18 @@ export default async function JobDetailPage({
              (SELECT sent_at FROM estimates WHERE job_id = $1 AND account_id = $2 AND status IN ('sent','approved') ORDER BY created_at DESC LIMIT 1) AS last_estimate_sent_at,
              EXISTS(SELECT 1 FROM estimates WHERE job_id = $1 AND account_id = $2 AND status = 'approved') AS has_approved_estimate,
              (SELECT id FROM estimates WHERE job_id = $1 AND account_id = $2 AND status = 'approved' ORDER BY created_at DESC LIMIT 1) AS approved_estimate_id,
+             (SELECT id FROM estimates WHERE job_id = $1 AND account_id = $2 ORDER BY created_at DESC LIMIT 1) AS latest_estimate_id,
+             (SELECT estimate_number FROM estimates WHERE job_id = $1 AND account_id = $2 ORDER BY created_at DESC LIMIT 1) AS latest_estimate_number,
+             (SELECT status FROM estimates WHERE job_id = $1 AND account_id = $2 ORDER BY created_at DESC LIMIT 1) AS latest_estimate_status,
+             (SELECT total_cents FROM estimates WHERE job_id = $1 AND account_id = $2 ORDER BY created_at DESC LIMIT 1) AS latest_estimate_total_cents,
              EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND invoice_kind = 'deposit') AS has_deposit_invoice,
              EXISTS(SELECT 1 FROM invoices WHERE job_id = $1 AND account_id = $2 AND invoice_kind = 'deposit' AND status IN ('partial','paid')) AS deposit_paid,
+             (SELECT id FROM invoices WHERE job_id = $1 AND account_id = $2 AND invoice_kind = 'deposit' ORDER BY created_at DESC LIMIT 1) AS deposit_invoice_id,
+             (SELECT status FROM invoices WHERE job_id = $1 AND account_id = $2 AND invoice_kind = 'deposit' ORDER BY created_at DESC LIMIT 1) AS deposit_invoice_status,
+             (SELECT total_cents FROM invoices WHERE job_id = $1 AND account_id = $2 AND invoice_kind = 'deposit' ORDER BY created_at DESC LIMIT 1) AS deposit_invoice_total_cents,
+             (SELECT invoice_number FROM invoices WHERE job_id = $1 AND account_id = $2 AND invoice_kind = 'deposit' ORDER BY created_at DESC LIMIT 1) AS deposit_invoice_number,
+             (SELECT status FROM invoices WHERE job_id = $1 AND account_id = $2 AND invoice_kind IN ('final','standard') AND status != 'void' ORDER BY created_at DESC LIMIT 1) AS latest_final_status,
+             (SELECT invoice_number FROM invoices WHERE job_id = $1 AND account_id = $2 AND invoice_kind IN ('final','standard') AND status != 'void' ORDER BY created_at DESC LIMIT 1) AS latest_final_number,
              -- Final/standard only: deposits must not drive pipeline "Invoiced"
              EXISTS(
                SELECT 1 FROM invoices
@@ -347,6 +368,9 @@ export default async function JobDetailPage({
     pricing_mode:
       (commercialCounts?.booking_pricing_mode as "flat_rate" | "hourly_internal" | null) ?? null,
   });
+  // One-click T&M draft is only useful before any estimate exists on this project.
+  // After draft/sent/approved, What Next + estimates list own the handoff.
+  const showTmBriefingCard = !isTech && canEstimate && !!tmBriefing && estimateCount === 0;
   const invoiceCount = commercialCounts ? parseInt(commercialCounts.invoice_count) : 0;
   const changeOrderCount = commercialCounts ? parseInt(commercialCounts.change_order_count) : 0;
   const activeVisits = visits.filter((v) => !["completed", "cancelled"].includes(v.status));
@@ -515,7 +539,7 @@ export default async function JobDetailPage({
           <div style={{ padding: "var(--space-4)", border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", fontSize: "var(--text-sm)", whiteSpace: "pre-wrap", color: job.description ? "var(--fg)" : "var(--fg-muted)" }}>
             {job.description || "No scope notes have been added yet."}
           </div>
-          {!isTech && canEstimate && tmBriefing ? (
+          {showTmBriefingCard ? (
             <UseTmBriefingButton
               jobId={job.id}
               clientId={job.client_id ?? null}
@@ -566,11 +590,33 @@ export default async function JobDetailPage({
     <PageContainer>
       <PageHeader
         title={job.title}
-        subtitle={[job.job_number, job.client_name].filter(Boolean).join(" · ") || undefined}
+        subtitle={
+          [
+            job.job_number,
+            job.client_name,
+            job.property_address && job.property_address !== "TBD" ? job.property_address : null,
+          ]
+            .filter(Boolean)
+            .join(" · ") || undefined
+        }
         backHref="/app/jobs"
         backLabel="Projects"
         actions={
-          <span data-testid="job-status" style={{ display: "inline-flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+          <span data-testid="job-status" style={{ display: "inline-flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
+            {job.client_phone ? (
+              <a
+                href={`tel:${job.client_phone}`}
+                className="p7-btn p7-btn-secondary p7-btn-sm"
+                style={{ textDecoration: "none" }}
+              >
+                Call
+              </a>
+            ) : null}
+            {job.client_id ? (
+              <LinkButton href={`/app/clients/${job.client_id}`} variant="secondary" size="sm">
+                Customer
+              </LinkButton>
+            ) : null}
             <StatusBadge variant={currentStatus as StatusVariant}>
               {JOB_STATUS_LABELS[currentStatus]}
             </StatusBadge>
@@ -619,7 +665,107 @@ export default async function JobDetailPage({
         />
       )}
 
-      {!isTech && canEstimate && tmBriefing && (
+      {/* At-a-glance: commercial spine (estimate → deposit → final) */}
+      {!isTech && commercialCounts && (
+        <Card data-testid="project-commercial-strip" style={{ marginBottom: "var(--space-4)" }}>
+          <SectionHeader title="Money & scope" />
+          <div
+            style={{
+              display: "grid",
+              gap: "var(--space-3)",
+              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+            }}
+          >
+            <div>
+              <p style={{ margin: 0, fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Estimate
+              </p>
+              {commercialCounts.latest_estimate_id ? (
+                <Link
+                  href={`/app/estimates/${commercialCounts.latest_estimate_id}`}
+                  style={{ display: "block", marginTop: 4, color: "var(--accent)", textDecoration: "none", fontWeight: 700, fontSize: "var(--text-sm)" }}
+                >
+                  {commercialCounts.latest_estimate_number ?? "Estimate"} ·{" "}
+                  {commercialCounts.latest_estimate_status}
+                  {commercialCounts.latest_estimate_total_cents != null
+                    ? ` · ${formatCents(commercialCounts.latest_estimate_total_cents)}`
+                    : ""}{" "}
+                  →
+                </Link>
+              ) : (
+                <p style={{ margin: "4px 0 0", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>None yet</p>
+              )}
+            </div>
+            <div>
+              <p style={{ margin: 0, fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Deposit
+              </p>
+              {commercialCounts.deposit_invoice_id ? (
+                <Link
+                  href={`/app/invoices/${commercialCounts.deposit_invoice_id}`}
+                  style={{ display: "block", marginTop: 4, color: "var(--accent)", textDecoration: "none", fontWeight: 700, fontSize: "var(--text-sm)" }}
+                >
+                  {commercialCounts.deposit_invoice_number ?? "Deposit"} ·{" "}
+                  {commercialCounts.deposit_paid
+                    ? "paid"
+                    : commercialCounts.deposit_invoice_status ?? "—"}
+                  {commercialCounts.deposit_invoice_total_cents != null
+                    ? ` · ${formatCents(commercialCounts.deposit_invoice_total_cents)}`
+                    : ""}{" "}
+                  →
+                </Link>
+              ) : (
+                <p style={{ margin: "4px 0 0", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                  {commercialCounts.has_approved_estimate ? "None required / not created" : "—"}
+                </p>
+              )}
+            </div>
+            <div>
+              <p style={{ margin: 0, fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Final invoice
+              </p>
+              {commercialCounts.latest_invoice_id ? (
+                <Link
+                  href={`/app/invoices/${commercialCounts.latest_invoice_id}`}
+                  style={{ display: "block", marginTop: 4, color: "var(--accent)", textDecoration: "none", fontWeight: 700, fontSize: "var(--text-sm)" }}
+                >
+                  {commercialCounts.latest_final_number ?? "Invoice"} ·{" "}
+                  {commercialCounts.latest_final_status ?? "—"}
+                  {commercialCounts.invoice_total_cents != null
+                    ? ` · ${formatCents(commercialCounts.invoice_total_cents)}`
+                    : ""}{" "}
+                  →
+                </Link>
+              ) : (
+                <p style={{ margin: "4px 0 0", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                  After owner completes project
+                </p>
+              )}
+            </div>
+            <div>
+              <p style={{ margin: 0, fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                Field
+              </p>
+              <p style={{ margin: "4px 0 0", fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                {preSaleSiteVisits.length > 0 ? `${preSaleSiteVisits.length} assessment` : "No assessment"}
+                {" · "}
+                {executionVisits.length} work day{executionVisits.length === 1 ? "" : "s"}
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {job.description ? (
+        <Card style={{ marginBottom: "var(--space-4)" }} data-testid="project-scope">
+          <SectionHeader title="Scope" />
+          <p style={{ margin: 0, fontSize: "var(--text-sm)", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+            {job.description}
+          </p>
+        </Card>
+      ) : null}
+
+      {showTmBriefingCard && (
         <Card
           data-testid="job-tm-briefing-card"
           style={{ marginBottom: "var(--space-4)" }}
@@ -647,8 +793,7 @@ export default async function JobDetailPage({
                 T&amp;M estimate
               </p>
               <p style={{ margin: "6px 0 0", fontSize: "var(--text-sm)", color: "var(--fg)" }}>
-                Use this job’s description, intake, and visit notes as a briefing — one click builds
-                a time-and-materials draft with hours and customer language.
+                No estimate yet — one click builds a time-and-materials draft from this project’s notes.
               </p>
             </div>
             <UseTmBriefingButton
@@ -665,17 +810,29 @@ export default async function JobDetailPage({
 
       {/* Detail Hub Layout: two-column on desktop, stacked on mobile */}
       <div className="p7-detail-layout">
-        {/* LEFT: Work Orders + Visits Timeline + Danger Zone */}
+        {/* LEFT: Field work first */}
         <div className="p7-detail-primary">
-          {canLinkExpenses && (
-            <LinkForgottenExpensesPanel mode="job" jobId={job.id} />
-          )}
-          {!isTech && jobMaterialExpenses.length > 0 && (
-            <Card data-testid="job-materials-panel">
-              <SectionHeader title="Materials" count={jobMaterialExpenses.length} />
-              <JobMaterialsPanel expenses={jobMaterialExpenses} />
-            </Card>
-          )}
+          <Card>
+            <SectionHeader
+              title="Field schedule"
+              count={visits.length}
+              action={scheduleVisitAction}
+            />
+            {visits.length === 0 ? (
+              <EmptyState
+                title="Nothing on the calendar"
+                description={
+                  canAddVisit
+                    ? "Schedule an Assessment (scope) or a Work Day (execution)."
+                    : "No visits have been scheduled for this project."
+                }
+                data-testid="visits-empty"
+              />
+            ) : (
+              <Timeline entries={timelineEntries} />
+            )}
+          </Card>
+
           {!isTech && workOrders.length > 0 && (
             <Card data-testid="job-work-orders-panel">
               <SectionHeader title="Work Orders" count={workOrders.length} />
@@ -693,26 +850,16 @@ export default async function JobDetailPage({
             </Card>
           )}
 
-          <Card>
-            <SectionHeader
-              title="Visits"
-              count={visits.length}
-              action={scheduleVisitAction}
-            />
-            {visits.length === 0 ? (
-              <EmptyState
-                title="No visits scheduled yet"
-                description={
-                  canAddVisit
-                    ? "Use the button above to schedule the first visit."
-                    : "No visits have been scheduled for this job."
-                }
-                data-testid="visits-empty"
-              />
-            ) : (
-              <Timeline entries={timelineEntries} />
-            )}
-          </Card>
+          {!isTech && jobMaterialExpenses.length > 0 && (
+            <Card data-testid="job-materials-panel">
+              <SectionHeader title="Materials receipts" count={jobMaterialExpenses.length} />
+              <JobMaterialsPanel expenses={jobMaterialExpenses} />
+            </Card>
+          )}
+
+          {canLinkExpenses && (
+            <LinkForgottenExpensesPanel mode="job" jobId={job.id} />
+          )}
 
           {/* Status Transitions — admin/owner only (explicit project completion) */}
           {canTransition && allowedTransitions.length > 0 && (
@@ -746,10 +893,43 @@ export default async function JobDetailPage({
         {/* RIGHT: Job details + Commercial panel */}
         {!isTech && (
           <div className="p7-detail-sidebar">
-            {/* Job details */}
-            <Card>
-              <SectionHeader title="Project Details" />
+            {/* Who / where — glanceable */}
+            <Card data-testid="project-who-where">
+              <SectionHeader title="Customer & site" />
               <dl className="p7-detail-list">
+                {job.client_id && (
+                  <div className="p7-detail-row">
+                    <dt>Customer</dt>
+                    <dd>
+                      <Link
+                        href={`/app/clients/${job.client_id}`}
+                        style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}
+                      >
+                        {job.client_name ?? "Customer"} →
+                      </Link>
+                      {job.client_phone ? (
+                        <div style={{ marginTop: 4 }}>
+                          <a href={`tel:${job.client_phone}`} style={{ color: "var(--fg)", fontSize: "var(--text-sm)" }}>
+                            {job.client_phone}
+                          </a>
+                        </div>
+                      ) : null}
+                    </dd>
+                  </div>
+                )}
+                {job.property_id && (
+                  <div className="p7-detail-row">
+                    <dt>Property</dt>
+                    <dd>
+                      <Link
+                        href={`/app/properties/${job.property_id}`}
+                        style={{ color: "var(--accent)", textDecoration: "none", fontSize: "var(--text-sm)", fontWeight: 600 }}
+                      >
+                        {job.property_address ?? "View property"} →
+                      </Link>
+                    </dd>
+                  </div>
+                )}
                 <div className="p7-detail-row">
                   <dt>Status</dt>
                   <dd>
@@ -766,7 +946,7 @@ export default async function JobDetailPage({
                   </dd>
                 </div>
                 <div className="p7-detail-row">
-                  <dt>Exception</dt>
+                  <dt>On hold / exception</dt>
                   <dd>
                     <SubStatusSelect
                       endpoint={`/api/v1/jobs/${job.id}/sub-status`}
@@ -778,25 +958,6 @@ export default async function JobDetailPage({
                     />
                   </dd>
                 </div>
-                {job.description && (
-                  <div className="p7-detail-row">
-                    <dt>Description</dt>
-                    <dd style={{ whiteSpace: "pre-wrap" }}>{job.description}</dd>
-                  </div>
-                )}
-                {job.property_id && (
-                  <div className="p7-detail-row">
-                    <dt>Property</dt>
-                    <dd>
-                      <Link
-                        href={`/app/properties/${job.property_id}`}
-                        style={{ color: "var(--accent)", textDecoration: "none", fontSize: "var(--text-sm)", fontWeight: 600 }}
-                      >
-                        {job.property_address ?? "View property"} →
-                      </Link>
-                    </dd>
-                  </div>
-                )}
               </dl>
             </Card>
 
