@@ -136,6 +136,38 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
     bookingRequestContext = rows[0] ?? null;
   }
 
+  // Soft guard: assessment path without a completed assessment packet
+  let assessmentPathWarning: string | null = null;
+  if (job_id && from_assessment !== "1") {
+    const pathRows = await query<{
+      routing_path: string | null;
+      open_site: string;
+      completed_assessment: string;
+    }>(
+      `SELECT
+         (SELECT br.routing_path FROM booking_requests br
+          WHERE br.job_id = $1 AND br.account_id = $2
+          ORDER BY br.created_at DESC LIMIT 1) AS routing_path,
+         (SELECT COUNT(*)::text FROM visits v
+          WHERE v.job_id = $1 AND v.account_id = $2 AND v.visit_type = 'site_visit'
+            AND v.status NOT IN ('cancelled')) AS open_site,
+         (SELECT COUNT(*)::text FROM visits v
+          JOIN site_visit_assessments sva ON sva.visit_id = v.id
+          WHERE v.job_id = $1 AND v.account_id = $2 AND v.visit_type = 'site_visit'
+            AND sva.completed_at IS NOT NULL) AS completed_assessment`,
+      [job_id, session.accountId],
+    );
+    const row = pathRows[0];
+    if (
+      row &&
+      (row.routing_path === "site_visit" || parseInt(row.open_site || "0", 10) > 0) &&
+      parseInt(row.completed_assessment || "0", 10) === 0
+    ) {
+      assessmentPathWarning =
+        "No completed assessment packet on this project. You can continue, but consider finishing the Assessment form first for better scope and pricing.";
+    }
+  }
+
   let walkthroughContext: WalkthroughContext | null = null;
   if (from_visit) {
     walkthroughContext = await queryOne<WalkthroughContext>(
@@ -167,7 +199,13 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
       parts.push(`Review notes: ${bookingRequestContext.review_notes.trim()}`);
     }
     if (bookingRequestContext.routing_path && bookingRequestContext.routing_path !== "pending") {
-      parts.push(`Routing: ${bookingRequestContext.routing_path === "site_visit" ? "Site visit recommended" : "Remote estimate"}`);
+      const routeLabel =
+        bookingRequestContext.routing_path === "site_visit"
+          ? "Assessment first"
+          : bookingRequestContext.routing_path === "book_work"
+            ? "Book work"
+            : "Remote estimate";
+      parts.push(`Routing: ${routeLabel}`);
     }
     walkthroughPrefill = parts.join("\n\n");
   }
@@ -233,6 +271,28 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
   return (
     <PageContainer>
       <PageHeader title="New Estimate" backHref="/app/estimates" backLabel="Estimates" />
+      {assessmentPathWarning && (
+        <Card
+          style={{
+            marginBottom: "var(--space-4)",
+            borderColor: "var(--warning-border, #fde68a)",
+            background: "var(--warning-bg, #fffbeb)",
+          }}
+          data-testid="assessment-path-warning"
+        >
+          <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 600 }}>Assessment path incomplete</p>
+          <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+            {assessmentPathWarning}
+          </p>
+          {job_id ? (
+            <p style={{ margin: "var(--space-2) 0 0" }}>
+              <a href={`/app/jobs/${job_id}`} style={{ fontSize: "var(--text-sm)", color: "var(--accent)" }}>
+                Open project →
+              </a>
+            </p>
+          ) : null}
+        </Card>
+      )}
       {walkthroughContext && (
         <Card style={{ marginBottom: "var(--space-4)" }} data-testid="walkthrough-estimate-context">
           <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap" }}>

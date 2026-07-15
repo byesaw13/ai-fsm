@@ -4,10 +4,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, LinkButton, Textarea } from "@/components/ui";
 import { getRequestGuidance } from "../request-guidance";
+import {
+  INTAKE_PATH_DETAILS,
+  INTAKE_PATH_LABELS,
+  type IntakeRoutingPath,
+} from "@/lib/visits/labels";
 
 type ReviewStatus = "needs_info" | "duplicate" | "reviewed" | "cancelled";
 type PricingMode = "flat_rate" | "hourly_internal";
 type PricingChoice = PricingMode | null;
+type PathChoice = Exclude<IntakeRoutingPath, "pending">;
 
 const REVIEW_BUTTONS: Record<ReviewStatus, { label: string; variant: "primary" | "secondary" | "ghost" | "danger" }> = {
   reviewed: { label: "Mark Reviewed", variant: "primary" },
@@ -22,9 +28,11 @@ const PRICING_LABELS: Record<PricingMode, string> = {
 };
 
 const PRICING_HELPER: Record<PricingMode, string> = {
-  flat_rate: "Walkthrough first, then estimate, approval, schedule, and materials.",
-  hourly_internal: "Open-ended or small repair work billed from actual time and materials.",
+  flat_rate: "Usually assessment first, then estimate, approval, and schedule work.",
+  hourly_internal: "Open-ended or small repair — assess if unclear, or book work if scope is clear.",
 };
+
+const PATH_OPTIONS: PathChoice[] = ["site_visit", "book_work", "remote_estimate"];
 
 interface Props {
   bookingId: string;
@@ -41,13 +49,29 @@ interface Props {
   preferredTimeSlot: string | null;
 }
 
-export function ReviewActions({ bookingId, currentStatus, initialNotes, initialPricingMode, jobId, clientEmail, clientId, propertyId, visitId, routingPath, preferredDate, preferredTimeSlot }: Props) {
+export function ReviewActions({
+  bookingId,
+  currentStatus,
+  initialNotes,
+  initialPricingMode,
+  jobId,
+  clientEmail,
+  clientId,
+  propertyId,
+  visitId,
+  routingPath: initialRoutingPath,
+  preferredDate,
+  preferredTimeSlot,
+}: Props) {
   const router = useRouter();
   const [notes, setNotes] = useState(initialNotes ?? "");
   const [pricingMode, setPricingMode] = useState<PricingChoice>(initialPricingMode);
+  const [routingPath, setRoutingPath] = useState<IntakeRoutingPath | null>(
+    (initialRoutingPath as IntakeRoutingPath | null) ?? "pending",
+  );
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showWalkthroughForm, setShowWalkthroughForm] = useState(false);
+  const [showAssessmentForm, setShowAssessmentForm] = useState(false);
   const [intakeEmail, setIntakeEmail] = useState(clientEmail ?? "");
   const [intakeSent, setIntakeSent] = useState(false);
   const [intakeError, setIntakeError] = useState<string | null>(null);
@@ -57,13 +81,14 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
   const guidance = getRequestGuidance({
     status: currentStatus,
     pricing_mode: pricingMode,
-    routing_path: routingPath as "site_visit" | "remote_estimate" | "pending" | null,
+    routing_path: routingPath,
     job_id: jobId,
     visit_id: visitId,
     walkthrough_score: null,
   });
 
   const isFinal = currentStatus === "converted" || currentStatus === "cancelled";
+  const pathChosen = routingPath != null && routingPath !== "pending";
 
   async function patchRequest(body: Record<string, unknown>) {
     const res = await fetch(`/api/v1/booking-requests/${bookingId}`, {
@@ -94,6 +119,26 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
     }
   }
 
+  async function handlePathChange(next: PathChoice) {
+    if (next === routingPath) return;
+    setPending(`path-${next}`);
+    setError(null);
+    try {
+      const { res, json } = await patchRequest({ routing_path: next });
+      if (!res.ok) {
+        setError(json.error?.message ?? "Failed to update path");
+        return;
+      }
+      setRoutingPath(next);
+      setShowAssessmentForm(false);
+      router.refresh();
+    } catch {
+      setError("Network error — try again");
+    } finally {
+      setPending(null);
+    }
+  }
+
   async function handleSendIntake() {
     setPending("intake");
     setIntakeError(null);
@@ -105,7 +150,7 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const json = await res.json() as { error?: { message?: string } };
+      const json = (await res.json()) as { error?: { message?: string } };
       if (!res.ok && res.status !== 207) {
         setIntakeError(json.error?.message ?? "Failed to send intake form.");
         return;
@@ -161,7 +206,7 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
     }
   }
 
-  async function handleConvert() {
+  async function handleConvertAssessment() {
     setPending("convert");
     setError(null);
     try {
@@ -176,7 +221,7 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
       });
       const d = await res.json();
       if (!res.ok) {
-        setError(d.error?.message ?? "Failed to convert");
+        setError(d.error?.message ?? "Failed to schedule assessment");
         return;
       }
       if (d.data?.visit_id) {
@@ -210,21 +255,82 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
 
   const primaryAction = (() => {
     switch (guidance.primaryActionKind) {
+      case "choose_path":
+        return (
+          <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+            Select a path above to unlock the next step.
+          </span>
+        );
       case "create_estimate": {
         const params = new URLSearchParams({ pricing_mode: "flat_rate" });
         if (clientId) params.set("client_id", clientId);
         if (propertyId) params.set("property_id", propertyId);
+        if (jobId) params.set("job_id", jobId);
         params.set("booking_request_id", bookingId);
-        return <LinkButton href={`/app/estimates/new?${params.toString()}`} variant="primary" size="sm">Create Estimate →</LinkButton>;
+        return (
+          <LinkButton href={`/app/estimates/new?${params.toString()}`} variant="primary" size="sm">
+            Create Estimate →
+          </LinkButton>
+        );
       }
       case "create_job":
-        return <Button variant="primary" onClick={handleRepair} loading={pending === "repair"} disabled={!!pending} size="sm">Create Project →</Button>;
-      case "schedule_walkthrough":
-        return !showWalkthroughForm
-          ? <Button variant="primary" onClick={() => setShowWalkthroughForm(true)} disabled={!!pending} size="sm">Schedule Walkthrough →</Button>
-          : null;
+        return (
+          <Button
+            variant="primary"
+            onClick={handleRepair}
+            loading={pending === "repair"}
+            disabled={!!pending}
+            size="sm"
+          >
+            Create Project →
+          </Button>
+        );
+      case "schedule_assessment":
+        return !showAssessmentForm ? (
+          <Button
+            variant="primary"
+            onClick={() => setShowAssessmentForm(true)}
+            disabled={!!pending}
+            size="sm"
+          >
+            Schedule Assessment →
+          </Button>
+        ) : null;
+      case "schedule_work":
+        if (!jobId) {
+          return (
+            <Button
+              variant="primary"
+              onClick={handleRepair}
+              loading={pending === "repair"}
+              disabled={!!pending}
+              size="sm"
+            >
+              Create Project →
+            </Button>
+          );
+        }
+        return (
+          <LinkButton
+            href={`/app/jobs/${jobId}/visits/new?visit_type=standard&intent=book_work&bookingRequestId=${bookingId}`}
+            variant="primary"
+            size="sm"
+          >
+            Schedule Work Day →
+          </LinkButton>
+        );
       case "close_request":
-        return <Button variant="danger" onClick={() => handleStatus("cancelled")} loading={pending === "cancelled"} disabled={!!pending || isFinal} size="sm">Close Request →</Button>;
+        return (
+          <Button
+            variant="danger"
+            onClick={() => handleStatus("cancelled")}
+            loading={pending === "cancelled"}
+            disabled={!!pending || isFinal}
+            size="sm"
+          >
+            Close Request →
+          </Button>
+        );
       default:
         return null;
     }
@@ -232,7 +338,11 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
 
   return (
     <div className="p7-form-stack">
-      {error && <div className="p7-card-danger" role="alert">{error}</div>}
+      {error && (
+        <div className="p7-card-danger" role="alert">
+          {error}
+        </div>
+      )}
 
       <Textarea
         id="review_notes"
@@ -246,11 +356,30 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
 
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
         <div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-2)", marginBottom: "var(--space-2)" }}>
-            <p style={{ margin: 0, fontSize: "var(--text-xs)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--fg-muted)" }}>
-              Request Type
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "var(--space-2)",
+              marginBottom: "var(--space-2)",
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                fontSize: "var(--text-xs)",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                color: "var(--fg-muted)",
+              }}
+            >
+              Pricing style
             </p>
-            <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{pricingMode ? PRICING_LABELS[pricingMode] : "Needs Review"}</span>
+            <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+              {pricingMode ? PRICING_LABELS[pricingMode] : "Optional"}
+            </span>
           </div>
           <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
             {(["flat_rate", "hourly_internal"] as const).map((mode) => (
@@ -268,43 +397,162 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
             ))}
           </div>
           <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-            {pricingMode ? PRICING_HELPER[pricingMode] : "Choose Fixed Bid for estimated project work or Time and Materials for open-ended actuals."}
+            {pricingMode
+              ? PRICING_HELPER[pricingMode]
+              : "Optional. Then choose how to proceed below."}
           </p>
         </div>
 
-        <div style={{ padding: "var(--space-3)", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--bg-subtle)" }}>
-          <p style={{ margin: 0, fontSize: "var(--text-xs)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--fg-muted)" }}>
-            Recommended Next Step
+        {/* Required path picker */}
+        {!isFinal && (
+          <div
+            data-testid="intake-path-picker"
+            style={{
+              padding: "var(--space-3)",
+              border: pathChosen ? "1px solid var(--border)" : "2px solid var(--accent, #2563eb)",
+              borderRadius: "var(--radius)",
+              background: "var(--bg-subtle)",
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                fontSize: "var(--text-xs)",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                color: "var(--fg-muted)",
+              }}
+            >
+              How should we proceed?
+            </p>
+            <p style={{ margin: "var(--space-1) 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+              Required. Assessment for unclear scope · Book work when you can show up and work · Remote estimate for notes/photos only.
+            </p>
+            <div style={{ display: "grid", gap: "var(--space-2)" }}>
+              {PATH_OPTIONS.map((path) => {
+                const selected = routingPath === path;
+                return (
+                  <button
+                    key={path}
+                    type="button"
+                    data-testid={`intake-path-${path}`}
+                    onClick={() => handlePathChange(path)}
+                    disabled={!!pending}
+                    style={{
+                      textAlign: "left",
+                      padding: "var(--space-3)",
+                      borderRadius: "var(--radius)",
+                      border: selected ? "2px solid var(--accent, #2563eb)" : "1px solid var(--border)",
+                      background: selected ? "var(--bg-card, #fff)" : "var(--bg)",
+                      cursor: pending ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, fontSize: "var(--text-sm)" }}>
+                      {INTAKE_PATH_LABELS[path]}
+                      {selected ? " ✓" : ""}
+                    </div>
+                    <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 4 }}>
+                      {INTAKE_PATH_DETAILS[path]}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <div
+          style={{
+            padding: "var(--space-3)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            background: "var(--bg-subtle)",
+          }}
+        >
+          <p
+            style={{
+              margin: 0,
+              fontSize: "var(--text-xs)",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              color: "var(--fg-muted)",
+            }}
+          >
+            Recommended next step
           </p>
           <div style={{ marginTop: "var(--space-2)", display: "grid", gap: "var(--space-1)" }}>
             <div style={{ fontSize: "var(--text-sm)", fontWeight: 700 }}>{guidance.currentStateLabel}</div>
             <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>{guidance.currentStateDetail}</div>
             <div style={{ fontSize: "var(--text-sm)" }}>
-              <strong>{guidance.recommendedLabel}</strong> to create the next {guidance.destinationRecord.toLowerCase()}.
+              <strong>{guidance.requestTypeLabel}</strong> — {guidance.requestTypeDetail}
+            </div>
+            <div style={{ fontSize: "var(--text-sm)" }}>
+              <strong>{guidance.recommendedLabel}</strong>
             </div>
             <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{guidance.recommendedDetail}</div>
           </div>
 
-          <div style={{ marginTop: "var(--space-3)", display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
+          <div
+            style={{
+              marginTop: "var(--space-3)",
+              display: "flex",
+              gap: "var(--space-2)",
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
             {primaryAction}
             {!primaryAction && guidance.followUpKind && guidance.followUpHref && (
               <LinkButton href={guidance.followUpHref} variant="primary" size="sm">
-                {guidance.followUpKind === "view_visit" ? "Open Walkthrough →" : "Open Project →"}
+                {guidance.followUpKind === "view_visit" ? "Open Visit →" : "Open Project →"}
               </LinkButton>
             )}
           </div>
 
-          {guidance.primaryActionKind === "schedule_walkthrough" && showWalkthroughForm && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", marginTop: "var(--space-3)", padding: "var(--space-3)", background: "var(--bg)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
-              <strong style={{ fontSize: "var(--text-sm)" }}>Confirm Walkthrough Date</strong>
+          {guidance.primaryActionKind === "schedule_assessment" && showAssessmentForm && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--space-3)",
+                marginTop: "var(--space-3)",
+                padding: "var(--space-3)",
+                background: "var(--bg)",
+                borderRadius: "var(--radius)",
+                border: "1px solid var(--border)",
+              }}
+            >
+              <strong style={{ fontSize: "var(--text-sm)" }}>Confirm assessment date</strong>
+              <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                Creates an <strong>Assessment</strong> visit (site visit) with the assessment form — not a work day.
+              </p>
               <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
                 <div className="form-group" style={{ flex: "1 1 160px", margin: 0 }}>
-                  <label htmlFor="visit-date" style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Date</label>
-                  <input id="visit-date" type="date" value={visitDate} onChange={(e) => setVisitDate(e.target.value)} disabled={!!pending} style={{ width: "100%" }} />
+                  <label htmlFor="visit-date" style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                    Date
+                  </label>
+                  <input
+                    id="visit-date"
+                    type="date"
+                    value={visitDate}
+                    onChange={(e) => setVisitDate(e.target.value)}
+                    disabled={!!pending}
+                    style={{ width: "100%" }}
+                  />
                 </div>
                 <div className="form-group" style={{ flex: "1 1 140px", margin: 0 }}>
-                  <label htmlFor="visit-slot" style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Time</label>
-                  <select id="visit-slot" value={visitSlot} onChange={(e) => setVisitSlot(e.target.value)} disabled={!!pending} style={{ width: "100%" }}>
+                  <label htmlFor="visit-slot" style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                    Time
+                  </label>
+                  <select
+                    id="visit-slot"
+                    value={visitSlot}
+                    onChange={(e) => setVisitSlot(e.target.value)}
+                    disabled={!!pending}
+                    style={{ width: "100%" }}
+                  >
                     <option value="morning">Morning (9am–11am)</option>
                     <option value="afternoon">Afternoon (1pm–3pm)</option>
                     <option value="evening">Evening (4pm–6pm)</option>
@@ -313,10 +561,21 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
                 </div>
               </div>
               <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-                <Button variant="primary" onClick={handleConvert} loading={pending === "convert"} disabled={!!pending || !visitDate} size="sm">
-                  Confirm Walkthrough
+                <Button
+                  variant="primary"
+                  onClick={handleConvertAssessment}
+                  loading={pending === "convert"}
+                  disabled={!!pending || !visitDate}
+                  size="sm"
+                >
+                  Confirm Assessment
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setShowWalkthroughForm(false)} disabled={!!pending}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAssessmentForm(false)}
+                  disabled={!!pending}
+                >
                   Cancel
                 </Button>
               </div>
@@ -354,13 +613,22 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
               {!clientEmail && (
                 <div>
-                  <label style={{ fontSize: "var(--text-xs)", display: "block", marginBottom: 4 }}>Client email (required)</label>
+                  <label style={{ fontSize: "var(--text-xs)", display: "block", marginBottom: 4 }}>
+                    Client email (required)
+                  </label>
                   <input
                     type="email"
                     value={intakeEmail}
                     onChange={(e) => setIntakeEmail(e.target.value)}
                     placeholder="client@email.com"
-                    style={{ width: "100%", padding: "6px 8px", fontSize: "var(--text-xs)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", boxSizing: "border-box" }}
+                    style={{
+                      width: "100%",
+                      padding: "6px 8px",
+                      fontSize: "var(--text-xs)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-sm)",
+                      boxSizing: "border-box",
+                    }}
                   />
                 </div>
               )}
@@ -369,9 +637,17 @@ export function ReviewActions({ bookingId, currentStatus, initialNotes, initialP
                   Will send to: {clientEmail}
                 </p>
               )}
-              {intakeError && <p style={{ fontSize: "var(--text-xs)", color: "#dc2626", margin: 0 }}>{intakeError}</p>}
+              {intakeError && (
+                <p style={{ fontSize: "var(--text-xs)", color: "#dc2626", margin: 0 }}>{intakeError}</p>
+              )}
               <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-                <Button variant="secondary" size="sm" onClick={handleSendIntake} loading={pending === "intake"} disabled={!!pending || (!clientEmail && !intakeEmail)}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleSendIntake}
+                  loading={pending === "intake"}
+                  disabled={!!pending || (!clientEmail && !intakeEmail)}
+                >
                   Send Intake Form
                 </Button>
               </div>

@@ -110,8 +110,8 @@ export const VISIT_TYPES = [
 export type VisitType = typeof VISIT_TYPES[number];
 
 export const VISIT_TYPE_LABELS: Record<VisitType, string> = {
-  standard: "Standard Visit",
-  site_visit: "Site Visit",
+  standard: "Work Day",
+  site_visit: "Assessment",
   realtor_baseline: "Realtor Baseline Inspection",
   membership_health_check: "Membership Health Check",
   punch_list: "Punch List",

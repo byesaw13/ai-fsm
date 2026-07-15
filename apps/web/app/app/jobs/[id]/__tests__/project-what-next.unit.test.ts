@@ -48,17 +48,47 @@ function baseProps(overrides: Partial<ProjectWhatNextProps> = {}): ProjectWhatNe
 }
 
 describe("computeWhatNext — pre-sale and close-out branches", () => {
-  it("shows complete site assessment when a pre-sale walkthrough is open", () => {
+  it("shows open assessment form when assessment packet is incomplete", () => {
     const next = computeWhatNext(
       baseProps({
         hasOpenPreSaleSiteVisit: true,
         preSaleSiteVisitId: VISIT_ID,
+        assessmentFormIncomplete: true,
       }),
     );
 
-    expect(next.message).toBe("Complete site assessment");
+    expect(next.message).toBe("Complete the assessment form");
     expect(next.actionLabel).toBe("Open Assessment");
     expect(next.actionHref).toBe(`/app/visits/${VISIT_ID}/assessment`);
+  });
+
+  it("prefers assessment form over multi-day schedule when assessment is open", () => {
+    const next = computeWhatNext(
+      baseProps({
+        jobStatus: "in_progress",
+        stage: "in_progress",
+        hasOpenPreSaleSiteVisit: true,
+        preSaleSiteVisitId: VISIT_ID,
+        assessmentFormIncomplete: true,
+        hasApprovedEstimate: true,
+        depositPaid: true,
+      }),
+    );
+
+    expect(next.actionHref).toBe(`/app/visits/${VISIT_ID}/assessment`);
+  });
+
+  it("offers estimate or schedule assessment after sales walkthrough only", () => {
+    const next = computeWhatNext(
+      baseProps({
+        hasSalesWalkthroughOnly: true,
+        estimateCount: 0,
+      }),
+    );
+
+    expect(next.message).toMatch(/without assessment packet/i);
+    expect(next.actionLabel).toBe("Create Estimate");
+    expect(next.secondary?.href).toContain("visit_type=site_visit");
   });
 
   it("shows create estimate from walkthrough when pre-sale is complete and no estimate exists", () => {
@@ -121,16 +151,17 @@ describe("computeWhatNext — pre-sale and close-out branches", () => {
     expect(next.actionHref).toBe(`/app/estimates/${EXPIRED_ESTIMATE_ID}`);
   });
 
-  it("prioritizes open pre-sale walkthrough over completed walkthrough CTA", () => {
+  it("prioritizes open pre-sale assessment over completed walkthrough CTA", () => {
     const next = computeWhatNext(
       baseProps({
         hasOpenPreSaleSiteVisit: true,
         hasCompletedPreSaleSiteVisit: true,
         preSaleSiteVisitId: VISIT_ID,
+        assessmentFormIncomplete: true,
       }),
     );
 
-    expect(next.message).toBe("Complete site assessment");
+    expect(next.message).toBe("Complete the assessment form");
   });
 
   it("prioritizes completed walkthrough over draft work order scope CTA", () => {

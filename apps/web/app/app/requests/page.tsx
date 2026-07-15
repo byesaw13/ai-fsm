@@ -75,7 +75,7 @@ function getAction(row: RequestRow): { label: string; href: string; detail: stri
   const guidance = getRequestGuidance({
     status: row.status,
     pricing_mode: row.pricing_mode,
-    routing_path: row.routing_path as "site_visit" | "remote_estimate" | "pending" | null,
+    routing_path: row.routing_path as "site_visit" | "remote_estimate" | "book_work" | "pending" | null,
     job_id: row.job_id,
     visit_id: row.visit_id,
     walkthrough_score: row.walkthrough_score,
@@ -84,7 +84,7 @@ function getAction(row: RequestRow): { label: string; href: string; detail: stri
 
   if (guidance.followUpKind && guidance.followUpHref) {
     return {
-      label: guidance.followUpKind === "view_visit" ? "Open Walkthrough" : "Open Project",
+      label: guidance.followUpKind === "view_visit" ? "Open Visit" : "Open Project",
       href: guidance.followUpHref,
       detail: guidance.recommendedDetail,
     };
@@ -103,16 +103,30 @@ function getAction(row: RequestRow): { label: string; href: string; detail: stri
         href: `/app/requests/${row.id}`,
         detail: guidance.recommendedDetail,
       };
-    case "schedule_walkthrough":
+    case "schedule_assessment":
       return {
-        label: "Schedule Walkthrough",
+        label: "Schedule Assessment",
+        href: `/app/requests/${row.id}`,
+        detail: guidance.recommendedDetail,
+      };
+    case "schedule_work":
+      return {
+        label: "Schedule Work Day",
+        href: row.job_id
+          ? `/app/jobs/${row.job_id}/visits/new?visit_type=standard&intent=book_work`
+          : `/app/requests/${row.id}`,
+        detail: guidance.recommendedDetail,
+      };
+    case "choose_path":
+      return {
+        label: "Choose path",
         href: `/app/requests/${row.id}`,
         detail: guidance.recommendedDetail,
       };
     case "close_request":
     default:
       return {
-        label: "Close Request",
+        label: "Open Request",
         href: `/app/requests/${row.id}`,
         detail: guidance.recommendedDetail,
       };

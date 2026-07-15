@@ -1,11 +1,18 @@
 type RequestStatus = "pending" | "needs_info" | "duplicate" | "reviewed" | "converted" | "cancelled";
-type RequestRoutingPath = "site_visit" | "remote_estimate" | "pending" | null;
+export type RequestRoutingPath =
+  | "site_visit"
+  | "remote_estimate"
+  | "book_work"
+  | "pending"
+  | null;
 type RequestPricingMode = "flat_rate" | "hourly_internal" | null;
 
 export type RequestPrimaryActionKind =
+  | "choose_path"
   | "create_estimate"
   | "create_job"
-  | "schedule_walkthrough"
+  | "schedule_assessment"
+  | "schedule_work"
   | "close_request";
 
 export type RequestFollowUpKind = "view_job" | "view_visit" | null;
@@ -43,29 +50,42 @@ const STATE_LABELS: Record<RequestStatus, string> = {
 };
 
 const STATE_DETAILS: Record<RequestStatus, string> = {
-  pending: "Captured and ready to classify.",
+  pending: "Captured — choose how to proceed before scheduling work.",
   needs_info: "Waiting for missing contact or scope details.",
   duplicate: "Matches another request and should not be converted again.",
-  reviewed: "Classified and ready for the next action.",
-  converted: "Linked to a job or walkthrough.",
+  reviewed: "Classified — continue with the selected path.",
+  converted: "Linked to a project or assessment.",
   cancelled: "Closed and retained in history.",
 };
 
-const OUTCOME_META: Record<RequestPrimaryActionKind, { label: string; detail: string; destination: string }> = {
+const OUTCOME_META: Record<
+  RequestPrimaryActionKind,
+  { label: string; detail: string; destination: string }
+> = {
+  choose_path: {
+    label: "Choose how to proceed",
+    detail: "Assessment, book work, or remote estimate — required before the next step.",
+    destination: "Path",
+  },
   create_estimate: {
     label: "Create Estimate",
-    detail: "Draft the priceable scope from this request.",
+    detail: "Draft the priceable scope from this request (no visit required).",
     destination: "Estimate",
   },
   create_job: {
     label: "Create Project",
-    detail: "Create the work thread first, then continue from the job.",
+    detail: "Create the work thread first, then continue from the project.",
     destination: "Project",
   },
-  schedule_walkthrough: {
-    label: "Schedule Walkthrough",
-    detail: "Book the site visit that will capture measurements and scope.",
-    destination: "Visit",
+  schedule_assessment: {
+    label: "Schedule Assessment",
+    detail: "Book the on-site assessment to capture measurements, photos, and scope.",
+    destination: "Assessment",
+  },
+  schedule_work: {
+    label: "Schedule Work Day",
+    detail: "Scope is clear enough to book a work appointment (no full assessment required).",
+    destination: "Work Day",
   },
   close_request: {
     label: "Close Request",
@@ -75,19 +95,51 @@ const OUTCOME_META: Record<RequestPrimaryActionKind, { label: string; detail: st
 };
 
 function primaryOutcome(input: RequestGuidanceInput): RequestPrimaryActionKind {
-  if (input.routing_path === "site_visit") return input.job_id ? "schedule_walkthrough" : "create_job";
-  if (input.routing_path === "remote_estimate") return "create_estimate";
-  if (input.pricing_mode === "hourly_internal") return "create_job";
-
-  if (input.walkthrough_score !== null) {
-    return input.walkthrough_score >= 60 && input.job_id ? "schedule_walkthrough" : "create_job";
+  if (input.routing_path === "pending" || input.routing_path == null) {
+    return "choose_path";
   }
-
-  return "create_estimate";
+  if (input.routing_path === "site_visit") {
+    return input.job_id ? "schedule_assessment" : "create_job";
+  }
+  if (input.routing_path === "book_work") {
+    return input.job_id ? "schedule_work" : "create_job";
+  }
+  if (input.routing_path === "remote_estimate") {
+    return "create_estimate";
+  }
+  // Fallback for unexpected values
+  return "choose_path";
 }
 
-function destinationFor(actionKind: RequestPrimaryActionKind): string {
-  return OUTCOME_META[actionKind].destination;
+function pathLabels(input: RequestGuidanceInput): { label: string; detail: string } {
+  if (input.routing_path === "site_visit") {
+    return {
+      label: "Assessment first",
+      detail: "Start with an on-site assessment, then estimate and schedule work.",
+    };
+  }
+  if (input.routing_path === "book_work") {
+    return {
+      label: "Book work",
+      detail: "Schedule a work day without a full assessment packet.",
+    };
+  }
+  if (input.routing_path === "remote_estimate") {
+    return {
+      label: "Remote estimate",
+      detail: "Go straight to an estimate from notes or photos.",
+    };
+  }
+  if (input.pricing_mode === "hourly_internal") {
+    return {
+      label: "Time and Materials",
+      detail: "Often book work or assess first — choose a path below.",
+    };
+  }
+  return {
+    label: "Needs path",
+    detail: "Choose assessment, book work, or remote estimate.",
+  };
 }
 
 export function getRequestGuidance(input: RequestGuidanceInput): RequestGuidance {
@@ -115,34 +167,36 @@ export function getRequestGuidance(input: RequestGuidanceInput): RequestGuidance
   }
 
   const meta = primaryActionKind ? OUTCOME_META[primaryActionKind] : null;
-  const requestTypeLabel =
-    input.pricing_mode === "hourly_internal"
-      ? "Time and Materials"
-      : input.routing_path === "site_visit"
-        ? "Walkthrough first"
-        : input.routing_path === "remote_estimate"
-          ? "Fixed Bid"
-          : "Needs review";
+  const path = pathLabels(input);
 
-  const requestTypeDetail =
-    input.pricing_mode === "hourly_internal"
-      ? "Open-ended repair work should become a job first."
-      : input.routing_path === "site_visit"
-        ? "This request should start with a walkthrough."
-        : input.routing_path === "remote_estimate"
-          ? "This request should go straight to an estimate."
-          : "Use the job-fit details to classify the request.";
+  const recommendedLabel =
+    meta?.label ??
+    (followUpKind === "view_visit"
+      ? "Open Assessment / Visit"
+      : followUpKind === "view_job"
+        ? "Open Project"
+        : "Close Request");
+  const recommendedDetail =
+    meta?.detail ??
+    (followUpKind === "view_visit"
+      ? "Continue from the scheduled visit."
+      : followUpKind === "view_job"
+        ? "Continue from the linked project."
+        : "Keep the request closed and review the record in history.");
 
-  const recommendedLabel = meta?.label ?? (followUpKind === "view_visit" ? "Open Walkthrough" : followUpKind === "view_job" ? "Open Project" : "Close Request");
-  const recommendedDetail = meta?.detail ?? (followUpKind === "view_visit" ? "Continue from the scheduled walkthrough." : followUpKind === "view_job" ? "Continue from the linked job." : "Keep the request closed and review the record in history.");
-
-  const destinationRecord = meta?.destination ?? (followUpKind === "view_visit" ? "Visit" : followUpKind === "view_job" ? "Project" : destinationFor("close_request"));
+  const destinationRecord =
+    meta?.destination ??
+    (followUpKind === "view_visit"
+      ? "Visit"
+      : followUpKind === "view_job"
+        ? "Project"
+        : OUTCOME_META.close_request.destination);
 
   return {
     currentStateLabel: STATE_LABELS[status],
     currentStateDetail: STATE_DETAILS[status],
-    requestTypeLabel,
-    requestTypeDetail,
+    requestTypeLabel: path.label,
+    requestTypeDetail: path.detail,
     recommendedLabel,
     recommendedDetail,
     destinationRecord,

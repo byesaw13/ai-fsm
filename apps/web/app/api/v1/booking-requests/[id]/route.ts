@@ -53,6 +53,9 @@ const patchSchema = z.object({
   status: bookingRequestPatchStatusSchema.optional(),
   review_notes: z.string().max(2000).nullable().optional(),
   pricing_mode: z.enum(["flat_rate", "hourly_internal"]).optional(),
+  routing_path: z
+    .enum(["site_visit", "remote_estimate", "book_work", "pending"])
+    .optional(),
 });
 
 export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, session) => {
@@ -69,7 +72,7 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
     return NextResponse.json({ error: { code: "VALIDATION_ERROR", message: "Invalid body", details: parsed.error.issues, traceId: session.traceId } }, { status: 422 });
   }
 
-  const { status, review_notes, pricing_mode } = parsed.data;
+  const { status, review_notes, pricing_mode, routing_path } = parsed.data;
   const pool = getPool();
   const client = await pool.connect();
   try {
@@ -112,6 +115,10 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
     if (pricing_mode !== undefined) {
       setClauses.push(`pricing_mode = $${idx++}`);
       params.push(pricing_mode);
+    }
+    if (routing_path !== undefined) {
+      setClauses.push(`routing_path = $${idx++}`);
+      params.push(routing_path);
     }
 
     const { rows } = await client.query(
