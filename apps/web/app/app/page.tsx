@@ -211,8 +211,15 @@ export default async function AppPage() {
     {
       label: "Order Materials",
       count: materialCount,
-      href: "/app/estimates?status=approved" as Route,
-      detail: "Approved jobs with materials to stage",
+      // Never dump into a bare estimates list — open the shopping list (1 job)
+      // or scroll to the Materials panel (multiple jobs).
+      href: (materialJobs.length === 1
+        ? `/app/estimates/${materialJobs[0].id}/shopping-list`
+        : "/app#materials") as Route,
+      detail:
+        materialJobs.length === 1
+          ? `Shopping list: ${materialJobs[0].title}`
+          : "Open shopping lists for approved active projects",
       tone: "warning",
     },
     {

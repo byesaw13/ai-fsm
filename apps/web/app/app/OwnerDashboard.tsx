@@ -50,7 +50,9 @@ export function OwnerDashboard({
         {/* Left: operations */}
         <div className="owner-dash-col" style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
           <div className="owner-dash-jobs"><JobsToday jobs={todayJobs} readOnly /></div>
-          <div className="owner-dash-materials"><Materials count={materialCount} jobs={materialJobs} /></div>
+          <div className="owner-dash-materials" id="materials">
+            <Materials count={materialCount} jobs={materialJobs} />
+          </div>
 
           <Card className="owner-dash-tomorrow">
             <SectionHeader title="Tomorrow's Plan" count={tomorrowJobs.length} />

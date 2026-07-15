@@ -159,16 +159,57 @@ export function JobsToday({ jobs, readOnly = false }: { jobs: CommandVisit[]; re
 
 export function Materials({ count, jobs }: { count: number; jobs: MaterialJob[] }) {
   return (
-    <Card>
-      <SectionHeader title="Materials" count={count} action={<LinkButton href="/app/expenses/new?mode=run" variant="primary" size="sm">Material Run</LinkButton>} />
-      {jobs.length === 0 ? <EmptyState title="No staged material lists" description="Approved active estimates with materials appear here." /> : (
+    <Card data-testid="dashboard-materials">
+      <SectionHeader
+        title="Materials to order"
+        count={count}
+        action={
+          <LinkButton href="/app/expenses/new?mode=run" variant="primary" size="sm">
+            Material Run
+          </LinkButton>
+        }
+      />
+      {jobs.length === 0 ? (
+        <EmptyState
+          title="Nothing to stage"
+          description="When an estimate is approved on an active project, its shopping list shows up here."
+        />
+      ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           {jobs.map((job) => (
-            <div key={job.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-3)", padding: "var(--space-3)", border: "1px solid var(--border)", borderRadius: "var(--radius)" }}>
-              <span><strong>{job.title}</strong>{job.client_name ? <small style={{ color: "var(--fg-muted)", marginLeft: 8 }}>{job.client_name}</small> : null}</span>
+            <div
+              key={job.id}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "var(--space-3)",
+                padding: "var(--space-3)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius)",
+              }}
+            >
+              <span>
+                <strong>{job.title}</strong>
+                {job.client_name ? (
+                  <small style={{ color: "var(--fg-muted)", marginLeft: 8 }}>{job.client_name}</small>
+                ) : null}
+              </span>
               <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                <LinkButton href={`/app/estimates/${job.id}/shopping-list` as Route} variant="ghost" size="sm">Shopping List</LinkButton>
-                <LinkButton href={`/app/expenses/new?mode=run&job=${job.job_id}` as Route} variant="secondary" size="sm">Run</LinkButton>
+                <LinkButton
+                  href={`/app/estimates/${job.id}/shopping-list` as Route}
+                  variant="primary"
+                  size="sm"
+                >
+                  Shopping List →
+                </LinkButton>
+                <LinkButton
+                  href={`/app/expenses/new?mode=run&job=${job.job_id}` as Route}
+                  variant="secondary"
+                  size="sm"
+                >
+                  Log run
+                </LinkButton>
               </div>
             </div>
           ))}

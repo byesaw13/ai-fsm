@@ -42,6 +42,7 @@ export default async function ActionQueuePage() {
     depositsNeeded,
     jobsNoNextVisit,
     materialsNeeded,
+    materialJobs,
     pendingRequests,
     overdueInvoices,
     exceptionRows,
@@ -100,6 +101,16 @@ export default async function ActionQueuePage() {
          AND e.status = 'approved'
          AND j.status IN ('scheduled','in_progress')`,
       [accountId]),
+    queryForSession<{ id: string; title: string }>(session,
+      `SELECT e.id, j.title
+       FROM estimates e
+       JOIN jobs j ON j.id = e.job_id AND j.account_id = e.account_id
+       WHERE e.account_id = $1
+         AND e.status = 'approved'
+         AND j.status IN ('scheduled','in_progress')
+       ORDER BY e.updated_at DESC
+       LIMIT 5`,
+      [accountId]),
     queryForSession<CountRow>(session,
       `SELECT COUNT(*)::text AS count
        FROM booking_requests
@@ -146,7 +157,18 @@ export default async function ActionQueuePage() {
       tone: "warning",
     },
     { label: "Collect Deposits", count: depositCount, href: "/app/invoices?kind=deposit" as Route, detail: "Deposit invoices not fully collected", tone: "danger" },
-    { label: "Order Materials", count: materialCount, href: "/app/estimates?status=approved" as Route, detail: "Approved jobs with materials to stage", tone: "warning" },
+    {
+      label: "Order Materials",
+      count: materialCount,
+      href: (materialJobs.length === 1
+        ? `/app/estimates/${materialJobs[0].id}/shopping-list`
+        : "/app#materials") as Route,
+      detail:
+        materialJobs.length === 1
+          ? `Shopping list: ${materialJobs[0].title}`
+          : "Open shopping lists for approved active projects",
+      tone: "warning",
+    },
     { label: "Review Requests", count: requestCount, href: "/app/requests" as Route, detail: "Needs routing or follow-up", tone: "warning" },
     { label: "Collect Overdue Invoices", count: overdueCount, href: "/app/invoices?status=overdue" as Route, detail: `${fmt(overdueTotal)} outstanding`, tone: "danger" },
     { label: "Clear Exception Lanes", count: exceptionJobCount + exceptionVisitCount, href: "/app/jobs" as Route, detail: `${exceptionJobCount} job${exceptionJobCount !== 1 ? "s" : ""} / ${exceptionVisitCount} visit${exceptionVisitCount !== 1 ? "s" : ""}`, tone: "warning" },
