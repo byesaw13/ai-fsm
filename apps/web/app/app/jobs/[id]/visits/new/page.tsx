@@ -26,10 +26,16 @@ export default async function NewVisitPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ bookingRequestId?: string; work_order_id?: string; multi?: string }>;
+  searchParams: Promise<{
+    bookingRequestId?: string;
+    work_order_id?: string;
+    multi?: string;
+    visit_type?: string;
+    intent?: string;
+  }>;
 }) {
   const { id } = await params;
-  const { bookingRequestId, work_order_id, multi } = await searchParams;
+  const { bookingRequestId, work_order_id, multi, visit_type, intent } = await searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
   if (!canCreateVisit(session.role)) redirect(`/app/jobs/${id}`);
@@ -66,18 +72,40 @@ export default async function NewVisitPage({
     : `/app/jobs/${id}`;
   const backLabel = initialWorkOrderId ? "Work Order" : (job.title ?? "Project");
 
+  const resolvedIntent =
+    intent === "assessment" || visit_type === "site_visit"
+      ? "assessment"
+      : intent === "book_work" || visit_type === "standard"
+        ? "book_work"
+        : null;
+
+  const pageTitle =
+    multi === "1"
+      ? "Schedule Multiple Days"
+      : resolvedIntent === "assessment"
+        ? "Schedule Assessment"
+        : resolvedIntent === "book_work"
+          ? "Schedule Work Day"
+          : "Schedule Visit";
+
+  const helper =
+    resolvedIntent === "assessment"
+      ? "Creates an Assessment visit (site visit) with the assessment form for scope capture — not a work day."
+      : resolvedIntent === "book_work"
+        ? "Creates a work day under a work order. Scope is assumed clear enough to execute."
+        : "Field days are visits under a work order when type is Work Day. Assessments do not use a work order.";
+
   return (
     <PageContainer>
       <PageHeader
-        title={multi === "1" ? "Schedule Multiple Days" : "Schedule Visit"}
+        title={pageTitle}
         subtitle={job.title ?? undefined}
         backHref={backHref}
         backLabel={backLabel}
       />
       <Card>
         <p className="muted" style={{ marginTop: 0, marginBottom: "var(--space-3)", fontSize: "var(--text-sm)" }}>
-          Field days are <strong>visits</strong> under a work order. The work order holds scope;
-          each visit is one calendar day of work.
+          {helper}
         </p>
         <VisitScheduleForm
           jobId={id}
@@ -88,6 +116,15 @@ export default async function NewVisitPage({
           workOrders={workOrders}
           initialWorkOrderId={initialWorkOrderId}
           initialMultiDay={multi === "1"}
+          initialVisitType={
+            visit_type === "site_visit" ||
+            visit_type === "standard" ||
+            visit_type === "punch_list" ||
+            visit_type === "sales_walkthrough"
+              ? visit_type
+              : null
+          }
+          intent={resolvedIntent}
         />
       </Card>
     </PageContainer>

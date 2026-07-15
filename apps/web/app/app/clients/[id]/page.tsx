@@ -122,7 +122,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   );
   if (!client) notFound();
 
-  const [properties, activeJobs, activityEvents, estimates, invoices, vaultItems] = await Promise.all([
+  const [properties, activeJobs, activityEvents, estimates, invoices, openAssessments, vaultItems] = await Promise.all([
     query<PropertyRow>(
       `SELECT p.id, p.name, p.address, p.city, p.state, p.zip,
               (SELECT COUNT(*) FROM jobs j
@@ -169,7 +169,11 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       `SELECT event_type, id, ts, label, status, link_id, total_cents, property_address FROM (
          SELECT 'visit'::text AS event_type, v.id,
                 COALESCE(v.completed_at, v.scheduled_start) AS ts,
-                COALESCE(j.title, 'Visit') AS label,
+                CASE v.visit_type
+                  WHEN 'site_visit' THEN 'Assessment: ' || COALESCE(j.title, 'Project')
+                  WHEN 'standard' THEN 'Work day: ' || COALESCE(j.title, 'Project')
+                  ELSE COALESCE(j.title, 'Visit')
+                END AS label,
                 v.status, v.id AS link_id, NULL::int AS total_cents,
                 p.address AS property_address
          FROM visits v
@@ -212,6 +216,27 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
        ORDER BY i.created_at DESC
        LIMIT 20`,
       [id, session.accountId]
+    ),
+    query<{
+      id: string;
+      scheduled_start: string;
+      status: string;
+      job_id: string;
+      job_title: string | null;
+      assessment_completed: boolean;
+    }>(
+      `SELECT v.id, v.scheduled_start::text, v.status, v.job_id,
+              j.title AS job_title,
+              (sva.completed_at IS NOT NULL) AS assessment_completed
+       FROM visits v
+       JOIN jobs j ON j.id = v.job_id
+       LEFT JOIN site_visit_assessments sva ON sva.visit_id = v.id AND sva.account_id = v.account_id
+       WHERE j.client_id = $1 AND v.account_id = $2
+         AND v.visit_type = 'site_visit'
+         AND v.status NOT IN ('completed', 'cancelled')
+       ORDER BY v.scheduled_start ASC
+       LIMIT 10`,
+      [id, session.accountId],
     ),
     query<VaultItemRow>(
       `SELECT pvi.id, pvi.name, pvi.category,
@@ -292,6 +317,38 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           ) : <EmptyState title="No open estimate" description="No active estimate is open for this customer." />}
         </div>
       </Card>
+
+      {openAssessments.length > 0 ? (
+        <Card style={{ marginTop: "var(--space-4)" }} data-testid="client-open-assessments">
+          <SectionHeader title="Open Assessments" count={openAssessments.length} />
+          <div style={{ display: "grid", gap: "var(--space-2)" }}>
+            {openAssessments.map((a) => (
+              <ItemCard
+                key={a.id}
+                href={a.assessment_completed ? `/app/visits/${a.id}` : `/app/visits/${a.id}/assessment`}
+                title="Assessment"
+                meta={
+                  <span>
+                    {a.job_title ?? "Project"} ·{" "}
+                    {new Date(a.scheduled_start).toLocaleString([], {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                    {a.assessment_completed ? " · form complete — close visit" : " · form incomplete"}
+                  </span>
+                }
+                titleBadge={
+                  <StatusBadge variant={a.status as StatusVariant}>
+                    {a.status.replaceAll("_", " ")}
+                  </StatusBadge>
+                }
+              />
+            ))}
+          </div>
+        </Card>
+      ) : null}
 
       <div className="p7-detail-layout" style={{ marginTop: "var(--space-4)" }}>
         <div className="p7-detail-primary">

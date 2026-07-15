@@ -91,7 +91,15 @@ Location: ${location}
 Preferred date: ${br.preferred_date}
 ${br.referral_source ? `Referral: ${REFERRAL_LABELS[br.referral_source] ?? br.referral_source}${br.referral_name ? ` (${br.referral_name})` : ""}` : ""}
 ${metadataLines ? `Details:\n${metadataLines}` : ""}
-Routing recommendation: ${br.routing_path === "site_visit" ? "site visit recommended before estimating" : br.routing_path === "remote_estimate" ? "can proceed to remote estimate" : "pending"}
+Routing recommendation: ${
+          br.routing_path === "site_visit"
+            ? "assessment first before estimating"
+            : br.routing_path === "book_work"
+              ? "book work appointment (no full assessment required)"
+              : br.routing_path === "remote_estimate"
+                ? "can proceed to remote estimate"
+                : "pending — choose assessment, book work, or remote estimate"
+        }
 Job fit score: ${fit.score}/100 (${fit.label})${fit.reasons.length ? ` — ${fit.reasons.slice(0, 2).join(", ")}` : ""}
 
 Write the summary now:`;

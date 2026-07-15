@@ -419,7 +419,17 @@ export default async function VisitDetailPage({
         />
       )}
       <PageHeader
-        title={`Visit — ${formatVisitDateLabel(visit.scheduled_start)}`}
+        title={`${
+          visit.visit_type === "site_visit"
+            ? "Assessment"
+            : visit.visit_type === "standard"
+              ? "Work Day"
+              : visit.visit_type === "punch_list"
+                ? "Punch List"
+                : visit.visit_type === "sales_walkthrough"
+                  ? "Sales Walkthrough"
+                  : "Visit"
+        } — ${formatVisitDateLabel(visit.scheduled_start)}`}
         subtitle={`${formatVisitTime(visit.scheduled_start)} – ${formatVisitTime(
           visit.scheduled_end
         )}`}

@@ -152,7 +152,7 @@ export default async function BookingRequestDetailPage({
   const requestGuidance = getRequestGuidance({
     status: br.status,
     pricing_mode: br.pricing_mode as "flat_rate" | "hourly_internal" | null,
-    routing_path: br.routing_path as "site_visit" | "remote_estimate" | "pending" | null,
+    routing_path: br.routing_path as "site_visit" | "remote_estimate" | "book_work" | "pending" | null,
     job_id: br.job_id,
     visit_id: br.visit_id,
     walkthrough_score: br.walkthrough_score,
@@ -302,11 +302,17 @@ export default async function BookingRequestDetailPage({
                 <dt>Pricing</dt>
                 <dd>{br.pricing_mode ? PRICING_MODE_LABELS[br.pricing_mode as keyof typeof PRICING_MODE_LABELS] ?? br.pricing_mode : "Needs Review"}</dd>
               </div>
-              {br.routing_path && br.routing_path !== "pending" && (
+              {br.routing_path && (
                 <div className="p7-detail-row">
-                  <dt>Routing</dt>
+                  <dt>Path</dt>
                   <dd>
-                    {br.routing_path === "site_visit" ? "Site visit recommended" : "Remote estimate"}
+                    {br.routing_path === "site_visit"
+                      ? "Assessment first"
+                      : br.routing_path === "book_work"
+                        ? "Book work appointment"
+                        : br.routing_path === "remote_estimate"
+                          ? "Remote estimate"
+                          : "Not chosen yet"}
                     {br.walkthrough_score != null && (
                       <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginLeft: 6 }}>
                         (score {br.walkthrough_score})

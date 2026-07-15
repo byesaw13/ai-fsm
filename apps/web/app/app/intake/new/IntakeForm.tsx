@@ -92,7 +92,10 @@ export function IntakeForm() {
   const [errors, setErrors] = useState<IntakeErrors>({});
   const [form, setForm] = useState<IntakeFormValues>(initialValues);
   const [submittedBookingId, setSubmittedBookingId] = useState<string | null>(null);
-  const [routingPath, setRoutingPath] = useState<"site_visit" | "remote_estimate" | null>(null);
+  const [submittedJobId, setSubmittedJobId] = useState<string | null>(null);
+  const [routingPath, setRoutingPath] = useState<"site_visit" | "remote_estimate" | "book_work" | "pending" | null>(null);
+  const [pathPending, setPathPending] = useState(false);
+  const [pathError, setPathError] = useState<string | null>(null);
 
   const categoryLabel = useMemo(
     () => SERVICE_CATEGORIES.find((category) => category.value === form.service_category)?.label ?? form.service_category,
@@ -163,39 +166,108 @@ export function IntakeForm() {
       }
       toast.success("Booking request created");
       setSubmittedBookingId(data.id ?? null);
-      setRoutingPath(data.routing_path ?? null);
+      setSubmittedJobId(data.jobId ?? data.job_id ?? null);
+      setRoutingPath(data.routing_path ?? "pending");
       setStep(3);
+      setPending(false);
     } catch {
       setError("Unexpected error creating booking request");
       setPending(false);
     }
   }
 
+  async function choosePath(path: "site_visit" | "book_work" | "remote_estimate") {
+    if (!submittedBookingId) return;
+    setPathPending(true);
+    setPathError(null);
+    try {
+      const res = await fetch(`/api/v1/booking-requests/${submittedBookingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ routing_path: path }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setPathError(data.error?.message ?? "Failed to save path");
+        setPathPending(false);
+        return;
+      }
+      setRoutingPath(path);
+      // Navigate to the right next surface
+      if (path === "remote_estimate") {
+        const params = new URLSearchParams({ pricing_mode: "flat_rate", booking_request_id: submittedBookingId });
+        if (submittedJobId) params.set("job_id", submittedJobId);
+        window.location.href = `/app/estimates/new?${params.toString()}`;
+        return;
+      }
+      if (path === "book_work" && submittedJobId) {
+        window.location.href = `/app/jobs/${submittedJobId}/visits/new?visit_type=standard&intent=book_work&bookingRequestId=${submittedBookingId}`;
+        return;
+      }
+      if (path === "site_visit") {
+        // Stay on request to confirm assessment date, or go to request detail
+        window.location.href = `/app/requests/${submittedBookingId}`;
+        return;
+      }
+      setPathPending(false);
+    } catch {
+      setPathError("Network error");
+      setPathPending(false);
+    }
+  }
+
   if (step === 3) {
-    const isSiteVisit = routingPath === "site_visit";
+    const suggested = routingPath === "site_visit" || routingPath === "remote_estimate" || routingPath === "book_work"
+      ? routingPath
+      : null;
     return (
       <div className="p7-form-stack">
         <Card>
           <SectionHeader title="Request Submitted" />
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-            <div style={{
-              padding: "var(--space-4)",
-              borderRadius: "var(--radius-md)",
-              background: isSiteVisit ? "var(--warning-bg, #fffbeb)" : "var(--success-bg, #f0fdf4)",
-              border: `1px solid ${isSiteVisit ? "var(--warning-border, #fde68a)" : "var(--success-border, #bbf7d0)"}`,
-            }}>
-              <p style={{ margin: "0 0 var(--space-2)", fontWeight: 600, fontSize: "var(--text-sm)" }}>
-                {isSiteVisit ? "Routing: Site Visit Recommended" : "Routing: Remote Estimate"}
-              </p>
-              <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                {isSiteVisit
-                  ? "Based on the description, this project should start with an on-site walkthrough to assess scope before estimating. Let the client know you'll reach out to schedule a visit."
-                  : "Based on the description, this project is straightforward enough to estimate remotely. Let the client know they'll receive an estimate within 1–2 business days."}
-              </p>
-            </div>
             <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
               Booking request created for <strong>{form.name}</strong>.
+              {suggested ? (
+                <> System suggestion: <strong>{suggested === "site_visit" ? "Assessment" : suggested === "book_work" ? "Book work" : "Remote estimate"}</strong>.</>
+              ) : null}
             </p>
+            <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 700 }}>
+              How should we proceed?
+            </p>
+            {pathError ? (
+              <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "#dc2626" }} role="alert">{pathError}</p>
+            ) : null}
+            <div style={{ display: "grid", gap: "var(--space-2)" }}>
+              {(
+                [
+                  { path: "site_visit" as const, title: "Schedule assessment", detail: "On-site measurements, photos, and scope before estimating." },
+                  { path: "book_work" as const, title: "Book work appointment", detail: "Scope is clear — schedule a work day (no full assessment)." },
+                  { path: "remote_estimate" as const, title: "Remote estimate only", detail: "No visit yet — draft estimate from notes or photos." },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.path}
+                  type="button"
+                  data-testid={`intake-success-path-${opt.path}`}
+                  disabled={pathPending}
+                  onClick={() => choosePath(opt.path)}
+                  style={{
+                    textAlign: "left",
+                    padding: "var(--space-3)",
+                    borderRadius: "var(--radius)",
+                    border: suggested === opt.path ? "2px solid var(--accent, #2563eb)" : "1px solid var(--border)",
+                    background: "var(--bg-card, #fff)",
+                    cursor: pathPending ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <div style={{ fontWeight: 700, fontSize: "var(--text-sm)" }}>
+                    {opt.title}
+                    {suggested === opt.path ? " · suggested" : ""}
+                  </div>
+                  <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 4 }}>{opt.detail}</div>
+                </button>
+              ))}
+            </div>
           </div>
         </Card>
 
@@ -205,7 +277,7 @@ export function IntakeForm() {
           </LinkButton>
           {submittedBookingId ? (
             <LinkButton href={`/app/requests/${submittedBookingId}` as never}>
-              View Request →
+              Open Request →
             </LinkButton>
           ) : null}
         </div>

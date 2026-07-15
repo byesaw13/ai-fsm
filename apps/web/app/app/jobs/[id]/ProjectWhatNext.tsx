@@ -44,6 +44,17 @@ export interface ProjectWhatNextProps {
   hasCompletedExecutionVisit?: boolean;
   /** Open (non-terminal) work orders remain. */
   hasOpenWorkOrder?: boolean;
+  /**
+   * Open assessment (site_visit) without completed assessment packet.
+   * Primary pre-sale handoff — always wins over generic schedule.
+   */
+  assessmentFormIncomplete?: boolean;
+  /** site_visit completed (assessment path done enough to estimate). */
+  hasCompletedAssessmentVisit?: boolean;
+  /**
+   * Sales walkthrough completed but no site_visit assessment — gap path.
+   */
+  hasSalesWalkthroughOnly?: boolean;
 }
 
 export interface WhatNextContent {
@@ -104,6 +115,9 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
     readyForCloseout = false,
     hasCompletedExecutionVisit = false,
     hasOpenWorkOrder = false,
+    assessmentFormIncomplete = false,
+    hasCompletedAssessmentVisit = false,
+    hasSalesWalkthroughOnly = false,
   } = props;
 
   const cq = clientQ(clientId);
@@ -168,7 +182,7 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
   }
 
   // Field quiet + work packets done — owner must complete project for billing.
-  if (readyForCloseout || stage === "completed") {
+  if (readyForCloseout || (stage === "completed" && jobStatus !== "completed")) {
     return {
       message: "Ready for closeout — owner must complete project and review billing",
       detail: "Visits and work orders do not close the project. Mark the project complete when work is truly done.",
@@ -176,6 +190,54 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
       actionHref: `/app/jobs/${jobId}#project-status`,
       secondary: { label: "Schedule another work day", href: `/app/jobs/${jobId}/visits/new` },
       extras: estimateExtras,
+    };
+  }
+
+  // ── Assessment-first pre-sale (before generic field schedule) ─────────
+  if (hasOpenPreSaleSiteVisit && preSaleSiteVisitId) {
+    if (assessmentFormIncomplete) {
+      return {
+        message: "Complete the assessment form",
+        detail: "Capture rooms, photos, and scope before estimating.",
+        actionLabel: "Open Assessment",
+        actionHref: `/app/visits/${preSaleSiteVisitId}/assessment`,
+        secondary: { label: "Open visit", href: `/app/visits/${preSaleSiteVisitId}` },
+      };
+    }
+    return {
+      message: "Finish the assessment visit",
+      detail: "Assessment packet is done — close out the visit when you leave the site.",
+      actionLabel: "Open Visit",
+      actionHref: `/app/visits/${preSaleSiteVisitId}`,
+      secondary: {
+        label: "View assessment",
+        href: `/app/visits/${preSaleSiteVisitId}/assessment`,
+      },
+    };
+  }
+
+  if (hasCompletedAssessmentVisit && estimateCount === 0) {
+    return {
+      message: "Create estimate from assessment",
+      actionLabel: "Create Estimate",
+      actionHref: `/app/estimates/new?job_id=${jobId}${cq}&pricing_mode=flat_rate`,
+      secondary: {
+        label: "Or T&M from notes",
+        href: `/app/estimates/new?mode=tm&job_id=${jobId}${cq}&auto_generate=1`,
+      },
+    };
+  }
+
+  if (hasSalesWalkthroughOnly && estimateCount === 0) {
+    return {
+      message: "Pre-sale visit done without assessment packet",
+      detail: "Create an estimate from notes, or schedule a full Assessment if more scope capture is needed.",
+      actionLabel: "Create Estimate",
+      actionHref: `/app/estimates/new?job_id=${jobId}${cq}&pricing_mode=flat_rate`,
+      secondary: {
+        label: "Schedule Assessment",
+        href: `/app/jobs/${jobId}/visits/new?visit_type=site_visit&intent=assessment`,
+      },
     };
   }
 
@@ -287,15 +349,7 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
     };
   }
 
-  // ── Pre-sale ───────────────────────────────────────────────────────────
-  if (hasOpenPreSaleSiteVisit && preSaleSiteVisitId) {
-    return {
-      message: "Complete site assessment",
-      actionLabel: "Open Assessment",
-      actionHref: `/app/visits/${preSaleSiteVisitId}/assessment`,
-    };
-  }
-
+  // ── Pre-sale (fallback — assessment-first handled above) ───────────────
   if (hasCompletedPreSaleSiteVisit && estimateCount === 0) {
     return {
       message: "Create estimate from walkthrough",

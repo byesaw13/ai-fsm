@@ -34,6 +34,7 @@ import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { isHomeboxEnabled } from "@/lib/homebox/client";
 import { withAssetContext, listAssetLinks } from "@/lib/homebox/db";
 import { derivePipelineStage, isReadyForCloseout } from "@ai-fsm/domain";
+import { visitTypeLabel } from "@/lib/visits/labels";
 import {
   PageContainer,
   PageHeader,
@@ -359,10 +360,30 @@ export default async function JobDetailPage({
   );
   const openPreSaleSiteVisit = openPreSaleSiteVisits[0] ?? null;
   const hasCompletedPreSaleSiteVisit = preSaleSiteVisits.some((v) => v.status === "completed");
+  const completedSiteVisits = preSaleSiteVisits.filter((v) => v.status === "completed");
+  const hasCompletedAssessmentVisit = completedSiteVisits.length > 0;
+  const salesWalkthroughs = visits.filter((v) => v.visit_type === "sales_walkthrough");
+  const hasSalesWalkthroughOnly =
+    salesWalkthroughs.some((v) => v.status === "completed") &&
+    preSaleSiteVisits.length === 0 &&
+    !hasCompletedAssessmentVisit;
   const expiredEstimateCount = commercialCounts
     ? parseInt(commercialCounts.expired_estimate_count, 10)
     : 0;
   const latestVisit = visits[0] ?? null;
+
+  let assessmentFormIncomplete = false;
+  if (openPreSaleSiteVisit && session.role !== "tech") {
+    const assessmentRow = await queryOneForSession<{ completed_at: string | null }>(
+      session,
+      `SELECT completed_at FROM site_visit_assessments
+       WHERE visit_id = $1 AND account_id = $2`,
+      [openPreSaleSiteVisit.id, session.accountId],
+    );
+    assessmentFormIncomplete = !assessmentRow?.completed_at;
+  } else if (openPreSaleSiteVisit) {
+    assessmentFormIncomplete = true;
+  }
   const completedExecutionVisitCount = executionVisits.filter((v) => v.status === "completed").length;
   const openWorkOrderCount = workOrders.filter(
     (wo) => !["completed", "cancelled"].includes(String(wo.status))
@@ -412,17 +433,19 @@ export default async function JobDetailPage({
       ? Math.round((grossMarginCents / revenueCents) * 1000) / 10
       : null;
 
-  // Build timeline entries from visits
+  // Build timeline entries from visits — type label first (Assessment / Work Day)
   const timelineEntries: TimelineEntryData[] = visits.map((v) => {
     const overdue = isVisitOverdue(v);
+    const typeLabel = visitTypeLabel(v.visit_type);
+    const day = new Date(v.scheduled_start).toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
     return {
       id: v.id,
       timestamp: v.scheduled_start,
-      title: `${new Date(v.scheduled_start).toLocaleDateString(undefined, {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-      })} · ${formatVisitTime(v.scheduled_start)}`,
+      title: `${typeLabel} · ${day} · ${formatVisitTime(v.scheduled_start)}`,
       subtitle: v.assigned_user_name ? `Tech: ${v.assigned_user_name}` : "Unassigned",
       status: v.status,
       badge: overdue ? (
@@ -436,14 +459,24 @@ export default async function JobDetailPage({
   });
 
   const scheduleVisitAction = canAddVisit ? (
-    <LinkButton
-      href={`/app/jobs/${job.id}/visits/new`}
-      variant="secondary"
-      size="sm"
-      data-testid="add-visit-btn"
-    >
-      + Schedule Visit
-    </LinkButton>
+    <span style={{ display: "inline-flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+      <LinkButton
+        href={`/app/jobs/${job.id}/visits/new?visit_type=site_visit&intent=assessment`}
+        variant="secondary"
+        size="sm"
+        data-testid="add-assessment-btn"
+      >
+        + Assessment
+      </LinkButton>
+      <LinkButton
+        href={`/app/jobs/${job.id}/visits/new?visit_type=standard&intent=book_work`}
+        variant="secondary"
+        size="sm"
+        data-testid="add-visit-btn"
+      >
+        + Work Day
+      </LinkButton>
+    </span>
   ) : undefined;
 
   // Phone layout — rendered alongside the desktop layout and toggled by
@@ -580,6 +613,9 @@ export default async function JobDetailPage({
           latestExpiredEstimateId={commercialCounts.latest_expired_estimate_id}
           hasDraftWorkOrderWithPricing={commercialCounts.has_draft_work_order_with_pricing}
           preSaleSiteVisitId={openPreSaleSiteVisit?.id ?? null}
+          assessmentFormIncomplete={assessmentFormIncomplete}
+          hasCompletedAssessmentVisit={hasCompletedAssessmentVisit}
+          hasSalesWalkthroughOnly={hasSalesWalkthroughOnly}
         />
       )}
 

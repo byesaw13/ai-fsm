@@ -41,6 +41,10 @@ interface VisitScheduleFormProps {
   workOrders?: WorkOrderOption[];
   initialWorkOrderId?: string | null;
   initialMultiDay?: boolean;
+  /** Prefer site_visit (assessment) or standard (work day). */
+  initialVisitType?: VisitType | null;
+  /** assessment | book_work — drives duration defaults and labels. */
+  intent?: "assessment" | "book_work" | null;
 }
 
 function formatDayLabel(dateStr: string, startTime: string, durationMin: number): string {
@@ -56,6 +60,20 @@ function formatDayLabel(dateStr: string, startTime: string, durationMin: number)
   return `${day} · ${t0} – ${t1}`;
 }
 
+function defaultVisitType(
+  jobCategory: string | null | undefined,
+  initialVisitType: VisitType | null | undefined,
+  intent: "assessment" | "book_work" | null | undefined,
+): VisitType {
+  if (initialVisitType && (VISIT_TYPES as readonly string[]).includes(initialVisitType)) {
+    return initialVisitType;
+  }
+  if (intent === "assessment") return "site_visit";
+  if (intent === "book_work") return "standard";
+  if (jobCategory === "realtor_baseline") return "realtor_baseline";
+  return "standard";
+}
+
 export function VisitScheduleForm({
   jobId,
   users,
@@ -65,6 +83,8 @@ export function VisitScheduleForm({
   workOrders = [],
   initialWorkOrderId = null,
   initialMultiDay = false,
+  initialVisitType = null,
+  intent = null,
 }: VisitScheduleFormProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -75,15 +95,21 @@ export function VisitScheduleForm({
   const [extraDates, setExtraDates] = useState<string[]>([]);
   const [extraDateInput, setExtraDateInput] = useState("");
 
+  const resolvedType = defaultVisitType(jobCategory, initialVisitType, intent);
+  const defaultDuration =
+    multiDay || initialMultiDay || resolvedType === "standard" || resolvedType === "punch_list"
+      ? 480
+      : resolvedType === "site_visit"
+        ? 120
+        : 60;
+
   const [schedule, setSchedule] = useState<ScheduleValue>({
     date: "",
-    startTime: "08:00",
-    duration: multiDay || initialMultiDay ? 480 : 60,
+    startTime: resolvedType === "site_visit" ? "09:00" : "08:00",
+    duration: defaultDuration,
   });
   const [assignedUserId, setAssignedUserId] = useState("");
-  const [visitType, setVisitType] = useState<VisitType>(
-    jobCategory === "realtor_baseline" ? "realtor_baseline" : "standard"
-  );
+  const [visitType, setVisitType] = useState<VisitType>(resolvedType);
   const lockedWo = !!initialWorkOrderId;
   const [workOrderId, setWorkOrderId] = useState(
     initialWorkOrderId ?? (workOrders.length === 1 ? workOrders[0].id : ""),
