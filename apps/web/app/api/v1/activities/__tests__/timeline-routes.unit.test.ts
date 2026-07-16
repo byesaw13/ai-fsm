@@ -477,6 +477,73 @@ describe("PATCH /api/v1/activities/segments/[id]", () => {
       action: "delete",
     }));
   });
+
+  const LINK_CLIENT_ID = "77777777-7777-7777-7777-777777777777";
+  const insertedCandidate = () =>
+    mockClientQuery.mock.calls.some((c) => String(c[0]).includes("INSERT INTO visit_candidates"));
+
+  it("set_links creates a manual visit candidate for a stop", async () => {
+    mockClientQuery.mockImplementation((sql: string) => {
+      if (sql.includes("FROM location_segments")) return Promise.resolve({ rows: [PROVISIONAL_SEGMENT] });
+      if (sql.includes("FROM clients")) return Promise.resolve({ rows: [{ id: LINK_CLIENT_ID, name: "Kim Tufts" }] });
+      if (sql.includes("INSERT INTO visit_candidates")) return Promise.resolve({ rows: [{ id: "cand-1" }] });
+      return Promise.resolve({ rows: [] });
+    });
+
+    const res = await patchSegment(req(`/api/v1/activities/segments/${SEGMENT_ID}`, "PATCH", {
+      action: "set_links",
+      client_id: LINK_CLIENT_ID,
+    }));
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.candidate_id).toBe("cand-1");
+    expect(insertedCandidate()).toBe(true);
+  });
+
+  it("set_links rejects a drive segment (only stops become visits)", async () => {
+    mockClientQuery.mockImplementation((sql: string) =>
+      Promise.resolve({ rows: sql.includes("FROM location_segments") ? [DRIVE_SEGMENT] : [] }),
+    );
+
+    const res = await patchSegment(req(`/api/v1/activities/segments/${SEGMENT_ID}`, "PATCH", {
+      action: "set_links",
+      client_id: LINK_CLIENT_ID,
+    }));
+
+    expect(res.status).toBe(400);
+    expect(insertedCandidate()).toBe(false);
+  });
+
+  it("set_links rejects a stop that has not ended yet", async () => {
+    mockClientQuery.mockImplementation((sql: string) =>
+      Promise.resolve({ rows: sql.includes("FROM location_segments") ? [{ ...PROVISIONAL_SEGMENT, ended_at: null }] : [] }),
+    );
+
+    const res = await patchSegment(req(`/api/v1/activities/segments/${SEGMENT_ID}`, "PATCH", {
+      action: "set_links",
+      client_id: LINK_CLIENT_ID,
+    }));
+
+    expect(res.status).toBe(400);
+    expect(insertedCandidate()).toBe(false);
+  });
+
+  it("set_links returns 404 when the client is not in the account", async () => {
+    mockClientQuery.mockImplementation((sql: string) => {
+      if (sql.includes("FROM location_segments")) return Promise.resolve({ rows: [PROVISIONAL_SEGMENT] });
+      if (sql.includes("FROM clients")) return Promise.resolve({ rows: [], rowCount: 0 });
+      return Promise.resolve({ rows: [] });
+    });
+
+    const res = await patchSegment(req(`/api/v1/activities/segments/${SEGMENT_ID}`, "PATCH", {
+      action: "set_links",
+      client_id: LINK_CLIENT_ID,
+    }));
+
+    expect(res.status).toBe(404);
+    expect(insertedCandidate()).toBe(false);
+  });
 });
 
 

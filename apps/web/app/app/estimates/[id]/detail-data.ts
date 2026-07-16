@@ -2,6 +2,11 @@ import { withEstimateContext } from "@/lib/estimates/db";
 import { getPool } from "@/lib/db";
 import type { EstimateStatus } from "@ai-fsm/domain";
 import type { SessionPayload } from "@/lib/auth/session";
+import {
+  documentJoins,
+  documentLocationSelect,
+  type DocumentLocationRow,
+} from "@/lib/documents/service-location";
 
 // ---------------------------------------------------------------------------
 // Row types
@@ -127,6 +132,7 @@ export interface EstimateDetail {
   depositInvoice: EstimateInvoiceRow | null;
   finalInvoice: EstimateInvoiceRow | null;
   changeOrders: ChangeOrder[];
+  location: DocumentLocationRow | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -172,6 +178,15 @@ export async function loadEstimateDetail(
       [id]
     );
 
+    const locationResult = await client.query(
+      `SELECT e.property_id AS document_property_id,
+              ${documentLocationSelect()}
+       FROM estimates e
+       ${documentJoins({ root: "e" })}
+       WHERE e.id = $1 AND e.account_id = $2`,
+      [id, session.accountId]
+    );
+
     const allLineItems = lineItemsResult.rows as LineItemRow[];
     const options = optionsResult.rows as OptionRow[];
 
@@ -184,12 +199,13 @@ export async function loadEstimateDetail(
       estimate: estimateResult.rows[0] as EstimateRow,
       lineItems: allLineItems.filter((li) => !li.option_id),
       options: optionsWithItems,
+      location: locationResult.rows[0] as DocumentLocationRow | undefined,
     };
   });
 
   if (!result) return null;
 
-  const { estimate, lineItems, options } = result;
+  const { estimate, lineItems, options, location } = result;
 
   // For approved estimates with a linked job, visit count + project status.
   let jobVisitCount = 0;
@@ -271,5 +287,6 @@ export async function loadEstimateDetail(
     depositInvoice,
     finalInvoice,
     changeOrders,
+    location,
   };
 }

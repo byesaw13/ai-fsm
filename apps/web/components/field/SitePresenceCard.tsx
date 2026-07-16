@@ -38,7 +38,8 @@ export function SitePresenceCard() {
     visitId: string | null;
     suggestEstimate: boolean;
   } | null>(null);
-  const [tick, setTick] = useState(0);
+  // Re-render trigger only (value unused); the interval below bumps it each minute.
+  const [, setTick] = useState(0);
 
   const refresh = useCallback(async () => {
     try {
@@ -54,13 +55,10 @@ export function SitePresenceCard() {
 
   useEffect(() => {
     void refresh();
+    // Re-render every minute so the active-timer elapsed display stays current.
     const id = setInterval(() => setTick((t) => t + 1), 60_000);
     return () => clearInterval(id);
   }, [refresh]);
-
-  useEffect(() => {
-    if (ctx?.activeSiteSession) setTick((t) => t + 1);
-  }, [ctx?.activeSiteSession, tick]);
 
   async function startTimer() {
     if (!ctx?.likely) {

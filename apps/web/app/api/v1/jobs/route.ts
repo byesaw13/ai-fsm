@@ -25,10 +25,25 @@ export const GET = withAuth(
     const { searchParams } = new URL(request.url);
     const limit = Math.min(parseInt(searchParams.get("limit") ?? "50"), 200);
     const offset = parseInt(searchParams.get("offset") ?? "0");
+    const clientId = searchParams.get("client_id");
+    if (clientId && !z.string().uuid().safeParse(clientId).success) {
+      return NextResponse.json(
+        { error: { code: "VALIDATION_ERROR", message: "Invalid client_id", traceId: session.traceId } },
+        { status: 400 }
+      );
+    }
+
+    const params: unknown[] = [session.accountId];
+    let where = "account_id = $1";
+    if (clientId) {
+      params.push(clientId);
+      where += ` AND client_id = $${params.length}`;
+    }
+    params.push(limit, offset);
 
     const jobs = await query(
-      `SELECT * FROM jobs WHERE account_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
-      [session.accountId, limit, offset]
+      `SELECT * FROM jobs WHERE ${where} ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
     );
 
     return NextResponse.json({ data: jobs, limit, offset });

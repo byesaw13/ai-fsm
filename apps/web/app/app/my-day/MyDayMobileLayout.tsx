@@ -8,6 +8,7 @@ import { NextVisitHero } from "./NextVisitHero";
 import { FieldQuickActions } from "./FieldQuickActions";
 import { ClockBar } from "../ClockBar";
 import { FieldRightNowCard } from "../my-work/FieldRightNowCard";
+import { SitePresenceCard } from "@/components/field/SitePresenceCard";
 import { isDaySetupComplete, type DaySetupState } from "@/lib/my-day/day-setup";
 import type { HeroVisit } from "@/lib/my-day/visit-hero";
 import type { OpenSession, VehicleOption } from "../WorkdayPanel";
@@ -84,6 +85,7 @@ export function MyDayMobileLayout({
           >
             End My Day
           </Link>
+          <SitePresenceCard />
           <div style={{ marginBottom: "var(--space-4)" }}>
             <FieldRightNowCard
               openSession={openSession}

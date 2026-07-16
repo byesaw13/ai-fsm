@@ -3,7 +3,15 @@ import Link from "next/link";
 import type { Route } from "next";
 import { getSession } from "@/lib/auth/session";
 import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
-import { canCreateInvoices, canRecordPayments, canSendInvoices } from "@/lib/auth/permissions";
+import { DocumentClientLocationCard } from "@/components/documents/DocumentClientLocationCard";
+import { canCreateInvoices, canRecordPayments, canSendInvoices, canLinkDocuments } from "@/lib/auth/permissions";
+import {
+  documentJoins,
+  documentLocationSelect,
+  resolveServiceLocation,
+  formatAddressLine,
+  type DocumentLocationRow,
+} from "@/lib/documents/service-location";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import { buildClientDocumentFilename, invoiceTransitions } from "@ai-fsm/domain";
 import type { InvoiceStatus } from "@ai-fsm/domain";
@@ -126,16 +134,35 @@ export default async function InvoiceDetailPage({
       [id]
     );
 
+    const locationResult = await client.query(
+      `SELECT i.property_id AS document_property_id,
+              ${documentLocationSelect({ includeEstimateProperty: true })}
+       FROM invoices i
+       ${documentJoins({ root: "i", includeEstimateProperty: true })}
+       WHERE i.id = $1 AND i.account_id = $2`,
+      [id, session.accountId]
+    );
+
     return {
       invoice: invoiceResult.rows[0] as InvoiceRow,
       lineItems: lineItemsResult.rows as LineItemRow[],
       accountSettings: accountResult.rows[0]?.settings ?? {},
+      location: locationResult.rows[0] as DocumentLocationRow | undefined,
     };
   });
 
   if (!result) notFound();
 
-  const { invoice, lineItems, accountSettings } = result;
+  const { invoice, lineItems, accountSettings, location } = result;
+  const serviceLocation = resolveServiceLocation(location ?? {});
+  const clientBillingAddress = location
+    ? formatAddressLine(
+        location.client_address_line1,
+        location.client_city,
+        location.client_state,
+        location.client_zip,
+      )
+    : null;
   // Preserve explicit 0% overrides (do not use || — 0 is valid).
   const handlingPct = Math.round(
     materialHandlingRateFromSettings(accountSettings) * 100,
@@ -580,6 +607,24 @@ export default async function InvoiceDetailPage({
               </div>
             )}
           </Card>
+
+          <DocumentClientLocationCard
+            entityType="invoice"
+            entityId={invoice.id}
+            canEdit={canLinkDocuments(session.role)}
+            clientId={invoice.client_id}
+            clientName={invoice.client_name}
+            clientEmail={invoice.client_email}
+            jobId={invoice.job_id}
+            jobTitle={invoice.job_title}
+            propertyId={invoice.property_id}
+            documentPropertyId={invoice.property_id}
+            jobPropertyId={location?.job_property_id ?? null}
+            estimatePropertyId={location?.estimate_property_id ?? null}
+            resolvedPropertyId={location?.resolved_property_id ?? null}
+            serviceLocation={serviceLocation}
+            clientBillingAddress={clientBillingAddress}
+          />
 
           <LinkedDocuments session={session} entityType="invoice" entityId={invoice.id} />
         </div>

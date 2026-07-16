@@ -12,6 +12,7 @@ import {
 } from "@/lib/activities/timeline";
 import { formatElapsed } from "@/lib/activities/summary";
 import { segmentConfidenceLevel } from "@/lib/location/segment-confidence";
+import { SegmentLinkModal } from "@/components/field/SegmentLinkModal";
 import type { ActivityEntryDto } from "./ActivityTracker";
 
 type Segment = {
@@ -59,6 +60,7 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
   const [vehicleChoice, setVehicleChoice] = useState<Record<string, string>>({});
   const [milesChoice, setMilesChoice] = useState<Record<string, string>>({});
   const [pending, setPending] = useState<string | null>(null);
+  const [linkSeg, setLinkSeg] = useState<Segment | null>(null);
   const [confirmReplace, setConfirmReplace] = useState<{
     id: string;
     body: Record<string, unknown>;
@@ -329,6 +331,16 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
                   >
                     Dismiss
                   </Button>
+                  {!isDrive ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={isOpen || pending === seg.id}
+                      onClick={() => setLinkSeg(seg)}
+                    >
+                      Link customer
+                    </Button>
+                  ) : null}
                 </div>
                 {isOpen ? (
                   <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", margin: 0 }}>
@@ -383,6 +395,25 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
         onCancel={() => setConfirmReplace(null)}
         loading={pending === confirmReplace?.id}
       />
+      {linkSeg ? (
+        <SegmentLinkModal
+          open
+          onClose={() => setLinkSeg(null)}
+          segmentId={linkSeg.id}
+          segmentKind={linkSeg.kind}
+          placeLabel={linkSeg.place_label}
+          startedAt={linkSeg.started_at}
+          endedAt={linkSeg.ended_at}
+          initial={null}
+          persistMode="api"
+          onSaved={async () => {
+            await load();
+            router.refresh();
+            window.dispatchEvent(new CustomEvent("fsm:segments-changed"));
+            toast.success("Linked to customer");
+          }}
+        />
+      ) : null}
     </section>
   );
 }

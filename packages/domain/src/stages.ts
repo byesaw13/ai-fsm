@@ -126,20 +126,6 @@ export const PIPELINE_STAGE_LABELS: Record<PipelineStage, string> = {
   archived:   "Closed",
 };
 
-export const PIPELINE_STAGE_ACTIONS: Record<PipelineStage, string> = {
-  new_lead:        "Review request",
-  estimate_needed: "Create estimate",
-  estimate_sent:   "Follow up",
-  // Used for both approved-estimate work and T&M jobs with no estimate.
-  approved_ready:  "Schedule work",
-  scheduled:       "Prepare work",
-  in_progress:     "Do the work",
-  waiting:         "Resolve blocker",
-  completed: "Owner: complete project & bill",
-  invoiced:        "Collect payment",
-  archived:   "Closed",
-};
-
 export type PipelineStageFacts = {
   jobStatus: string;
   subStatus?: string | null;
@@ -272,8 +258,4 @@ export function isReadyForCloseout(facts: {
   // All work orders finished (or none exist but execution visits were done).
   if (_count(facts.openWorkOrderCount) > 0) return false;
   return true;
-}
-
-export function getPipelineNextAction(stage: PipelineStage): string {
-  return PIPELINE_STAGE_ACTIONS[stage];
 }

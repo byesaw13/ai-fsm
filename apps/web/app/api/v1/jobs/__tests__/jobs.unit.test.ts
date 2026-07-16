@@ -97,6 +97,22 @@ describe("GET /api/v1/jobs", () => {
     const json = await res.json();
     expect(json.data).toEqual([]);
   });
+
+  it("filters by client_id when a valid one is provided", async () => {
+    mockQuery.mockResolvedValue([SAMPLE_JOB]);
+    const CID = "22222222-2222-2222-2222-222222222222";
+    const res = await jobList(makeRequest("GET", `${BASE}?client_id=${CID}`));
+    expect(res.status).toBe(200);
+    const [sql, params] = mockQuery.mock.calls[0];
+    expect(String(sql)).toContain("client_id = $2");
+    expect(params).toContain(CID);
+  });
+
+  it("returns 400 when client_id is not a UUID (does not fall back to all jobs)", async () => {
+    const res = await jobList(makeRequest("GET", `${BASE}?client_id=not-a-uuid`));
+    expect(res.status).toBe(400);
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
