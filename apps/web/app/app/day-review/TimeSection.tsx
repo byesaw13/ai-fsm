@@ -1,13 +1,28 @@
+import { ACTIVITY_TYPE_META, type ActivityType } from "@ai-fsm/domain";
 import type { DayReviewPayload } from "@/lib/day-review/queries";
 
 type Segment = DayReviewPayload["segments"][number];
 type Gap = DayReviewPayload["gaps"][number];
+type TimeEntry = DayReviewPayload["timeEntries"][number];
 
 function fmt(iso: string) {
   return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
-export function TimeSection({ segments, gaps }: { segments: Segment[]; gaps: Gap[] }) {
+function activityLabel(type: string): { emoji: string; label: string } {
+  const meta = ACTIVITY_TYPE_META[type as ActivityType];
+  return meta ? { emoji: meta.emoji, label: meta.label } : { emoji: "•", label: type };
+}
+
+export function TimeSection({
+  timeEntries,
+  segments,
+  gaps,
+}: {
+  timeEntries: TimeEntry[];
+  segments: Segment[];
+  gaps: Gap[];
+}) {
   const items = [
     ...segments.map((s) => ({ type: "segment" as const, at: s.startedAt, data: s })),
     ...gaps.map((g) => ({ type: "gap" as const, at: g.startsAt, data: g })),
@@ -16,8 +31,37 @@ export function TimeSection({ segments, gaps }: { segments: Segment[]; gaps: Gap
   return (
     <section className="mb-6">
       <h2 className="text-lg font-semibold mb-3">Time</h2>
+
+      {timeEntries.length > 0 && (
+        <div className="space-y-2 mb-4">
+          {timeEntries.map((e) => {
+            const { emoji, label } = activityLabel(e.activityType);
+            return (
+              <div key={e.id} className="border rounded-lg p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium">
+                    {emoji} {label}
+                    {e.entityLabel ? <span className="text-muted-foreground font-normal"> · {e.entityLabel}</span> : null}
+                  </span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {fmt(e.startedAt)} – {fmt(e.endedAt)} · {e.durationMinutes} min
+                  </span>
+                </div>
+                {e.note ? <p className="text-xs text-muted-foreground mt-1">{e.note}</p> : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {timeEntries.length > 0 && (segments.length > 0 || gaps.length > 0) && (
+        <h3 className="text-sm font-semibold text-muted-foreground mb-2">Locations &amp; gaps</h3>
+      )}
+
       {items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No segments captured for this day.</p>
+        timeEntries.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No time tracked for this day.</p>
+        ) : null
       ) : (
         <div className="space-y-2">
           {items.map((item, i) => {
