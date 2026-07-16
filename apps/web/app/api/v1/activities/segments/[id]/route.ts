@@ -13,6 +13,11 @@ import {
 import type { RebalanceAdjustment } from "@/lib/activities/timeline";
 import { confirmDriveTrip, type DriveSegmentRow } from "@/lib/mileage/confirm-trip";
 import { inferTripMilesSource } from "@/lib/mileage/linking";
+import {
+  resolveSegmentLinks,
+  findVisitForJobOnDate,
+  upsertSegmentVisitCandidate,
+} from "@/lib/field/segment-links";
 
 export const dynamic = "force-dynamic";
 
@@ -75,7 +80,16 @@ const logTripSchema = z.object({
   note: z.string().max(500).nullish(),
 });
 
-const bodySchema = z.union([confirmSchema, confirmTripSchema, dismissSchema, logTripSchema]);
+// set_links: manually attach a customer/property/job to a captured stop,
+// creating (or updating) a manual visit_candidate for it. See segment-links.ts.
+const setLinksSchema = z.object({
+  action: z.literal("set_links"),
+  client_id: z.string().uuid(),
+  property_id: z.string().uuid().nullish(),
+  job_id: z.string().uuid().nullish(),
+});
+
+const bodySchema = z.union([confirmSchema, confirmTripSchema, dismissSchema, logTripSchema, setLinksSchema]);
 
 type SegRow = DriveSegmentRow;
 
@@ -171,6 +185,44 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     if (!seg) {
       await client.query("ROLLBACK");
       return err("NOT_FOUND", "Segment not found", 404, session.traceId);
+    }
+
+    if (d.action === "set_links") {
+      if (seg.kind !== "stop") {
+        await client.query("ROLLBACK");
+        return err("VALIDATION_ERROR", "Only stops can be linked to a customer", 400, session.traceId);
+      }
+      if (!seg.ended_at) {
+        await client.query("ROLLBACK");
+        return err("VALIDATION_ERROR", "Wait until the stop ends before linking a customer", 400, session.traceId);
+      }
+      let links;
+      try {
+        links = await resolveSegmentLinks(client, session.accountId, {
+          clientId: d.client_id,
+          propertyId: d.property_id ?? null,
+          jobId: d.job_id ?? null,
+        });
+      } catch (e) {
+        await client.query("ROLLBACK");
+        const code = (e as { code?: string }).code;
+        if (code === "NOT_FOUND") return err("NOT_FOUND", (e as Error).message, 404, session.traceId);
+        if (code === "VALIDATION_ERROR") return err("VALIDATION_ERROR", (e as Error).message, 400, session.traceId);
+        throw e;
+      }
+      const visitId = links.jobId
+        ? await findVisitForJobOnDate(client, session.accountId, links.jobId, seg.segment_date)
+        : null;
+      const candidate = await upsertSegmentVisitCandidate(client, {
+        accountId: session.accountId,
+        segmentId: seg.id,
+        startedAt: seg.started_at,
+        endedAt: seg.ended_at,
+        links,
+        visitId,
+      });
+      await client.query("COMMIT");
+      return NextResponse.json({ data: { id: seg.id, candidate_id: candidate.id, links } });
     }
 
     if (d.action === "confirm_trip") {
