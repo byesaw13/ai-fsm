@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
+import { businessToday } from "@/lib/operations/business-day";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
             EXISTS (
               SELECT 1 FROM vehicle_sessions vs
               WHERE vs.account_id = a.id
-                AND vs.session_date = CURRENT_DATE
+                AND vs.session_date = $1::date
                 AND vs.end_odometer IS NULL
                 AND vs.miles IS NULL
             ) AS has_open_mileage_today
@@ -26,6 +27,7 @@ export async function POST(req: NextRequest) {
      JOIN users u ON u.account_id = a.id
      WHERE u.role = 'owner'
      ORDER BY u.created_at LIMIT 1`,
+    [businessToday()],
   );
 
   if (!row) return NextResponse.json({ signal: "no_action" });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/middleware";
 import { queryForSession } from "@/lib/db";
+import { businessToday } from "@/lib/operations/business-day";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -26,9 +27,9 @@ export const GET = withAuth(async (_request: NextRequest, session) => {
       `SELECT id, activity_type, category, started_at::text, ended_at::text,
               entity_type, entity_id, assignment_kind, labor_bucket, note
        FROM activity_entries
-       WHERE account_id = $1 AND session_date = CURRENT_DATE AND voided_at IS NULL
+       WHERE account_id = $1 AND session_date = $2::date AND voided_at IS NULL
        ORDER BY started_at ASC`,
-      [session.accountId]
+      [session.accountId, businessToday()]
     );
     const active = rows.find((r) => r.ended_at === null) ?? null;
     return NextResponse.json({ data: { entries: rows, active } });

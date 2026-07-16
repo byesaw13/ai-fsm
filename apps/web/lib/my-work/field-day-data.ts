@@ -1,5 +1,6 @@
 import { queryForSession } from "@/lib/db";
 import type { SessionPayload } from "@/lib/auth/session";
+import { businessToday } from "@/lib/operations/business-day";
 import { summarizeDayMileage, type VehicleSessionRow } from "@/lib/mileage/sessions";
 import type { OpenSession, VehicleOption } from "@/app/app/WorkdayPanel";
 import type { ActivityEntryDto } from "@/app/app/ActivityTracker";
@@ -21,6 +22,10 @@ export async function loadFieldDayData(
   isOwner: boolean,
 ): Promise<FieldDayData> {
   const accountId = session.accountId;
+  // "Today" must be the business-timezone day (matches how sessions/business_days
+  // are written), not the Postgres server's UTC CURRENT_DATE — otherwise an
+  // evening-ET request reads tomorrow's row and the just-started session vanishes.
+  const today = businessToday();
 
   const [openSessionRows, fieldVehicles, fieldActivity, todaySessionRows, yesterdayMilesRows, clockRows] =
     await Promise.all([
@@ -29,11 +34,11 @@ export async function loadFieldDayData(
         `SELECT s.id, s.session_date::text, s.vehicle_id, v.nickname AS vehicle_nickname,
                 v.plate AS vehicle_plate, s.start_odometer, s.started_at::text AS started_at
          FROM vehicle_sessions s LEFT JOIN vehicles v ON v.id = s.vehicle_id
-         WHERE s.account_id = $1 AND s.session_date = CURRENT_DATE
+         WHERE s.account_id = $1 AND s.session_date = $2::date
            AND s.status = 'open'
            AND s.end_odometer IS NULL AND s.miles IS NULL
          ORDER BY s.started_at DESC LIMIT 1`,
-        [accountId],
+        [accountId, today],
       ),
       queryForSession<VehicleOption & { last_used_at?: string | null }>(
         session,
@@ -60,27 +65,27 @@ export async function loadFieldDayData(
         `SELECT id, activity_type, category, started_at::text, ended_at::text,
                 entity_type, entity_id, assignment_kind, labor_bucket, note
          FROM activity_entries
-         WHERE account_id = $1 AND (session_date = CURRENT_DATE OR ended_at IS NULL) AND voided_at IS NULL
+         WHERE account_id = $1 AND (session_date = $2::date OR ended_at IS NULL) AND voided_at IS NULL
          ORDER BY started_at ASC`,
-        [accountId],
+        [accountId, today],
       ),
       queryForSession<VehicleSessionRow>(
         session,
         `SELECT s.vehicle_id, v.nickname AS vehicle_nickname, v.plate AS vehicle_plate,
                 s.start_odometer, s.end_odometer, s.miles::float8 AS miles
          FROM vehicle_sessions s LEFT JOIN vehicles v ON v.id = s.vehicle_id
-         WHERE s.account_id = $1 AND s.session_date = CURRENT_DATE
+         WHERE s.account_id = $1 AND s.session_date = $2::date
            AND s.status <> 'voided'
          ORDER BY s.started_at ASC`,
-        [accountId],
+        [accountId, today],
       ),
       queryForSession<{ count: string }>(
         session,
         `SELECT COALESCE(SUM(miles), 0)::text AS count
          FROM vehicle_sessions
-         WHERE account_id = $1 AND session_date = CURRENT_DATE - interval '1 day'
+         WHERE account_id = $1 AND session_date = $2::date - interval '1 day'
            AND status <> 'voided'`,
-        [accountId],
+        [accountId, today],
       ),
       queryForSession<{ status: string }>(
         session,

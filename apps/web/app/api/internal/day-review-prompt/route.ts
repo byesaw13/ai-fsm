@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
+import { businessToday } from "@/lib/operations/business-day";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +23,11 @@ export async function POST(req: NextRequest) {
      JOIN users u ON u.account_id = a.id
      LEFT JOIN business_days bd
        ON bd.account_id = a.id
-       AND bd.business_date = CURRENT_DATE
+       AND bd.business_date = $1::date
        AND bd.status NOT IN ('CLOSED')
      WHERE u.role = 'owner'
      ORDER BY u.created_at LIMIT 1`,
+    [businessToday()],
   );
 
   if (!row?.business_day_id) {
