@@ -18,6 +18,7 @@ import {
   findVisitForJobOnDate,
   upsertSegmentVisitCandidate,
 } from "@/lib/field/segment-links";
+import { ignoreVisitCandidateForSegment } from "@/lib/field/confirm-visit";
 
 export const dynamic = "force-dynamic";
 
@@ -396,6 +397,7 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
          WHERE id = $1 AND account_id = $2 AND status = 'provisional'`,
         [id, session.accountId],
       );
+      await ignoreVisitCandidateForSegment(client, id, session.accountId);
       await client.query("COMMIT");
       return NextResponse.json({ data: { id, status: "dismissed" } });
     }
@@ -468,6 +470,10 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
        WHERE id = $3 AND account_id = $4`,
       [entryId, d.activity_type, id, session.accountId],
     );
+
+    // Segment confirm is the source of truth — drop any pending match for this stop
+    // so Detected visits / inline match chips don't double-count.
+    await ignoreVisitCandidateForSegment(client, id, session.accountId);
 
     await client.query("COMMIT");
     return NextResponse.json({ data: { id, status: "confirmed", activity_entry_id: entryId } });

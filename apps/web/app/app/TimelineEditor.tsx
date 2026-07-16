@@ -97,14 +97,21 @@ export function TimelineEditor({
   date,
   entries,
   needsJobLink,
+  /** When true, hide day prev/next (page owns day navigation). */
+  hideDayNav = false,
+  /** Start collapsed so GPS labeling stays primary. */
+  defaultExpanded = false,
 }: {
   date: string;
   entries: ActivityEntryDto[];
   needsJobLink: NeedsJobLinkRow[];
+  hideDayNav?: boolean;
+  defaultExpanded?: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
   const [pending, setPending] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const [editId, setEditId] = useState<string | null>(null);
   const [splitId, setSplitId] = useState<string | null>(null);
   const [inserting, setInserting] = useState(false);
@@ -265,65 +272,105 @@ export function TimelineEditor({
   const splitRow = sorted.find((e) => e.id === splitId) ?? null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
-      {/* Day navigation */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-        <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" onClick={() => router.push(`/app/timeline?date=${shiftDay(date, -1)}`)}>← Prev</button>
-        <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" onClick={() => router.push(`/app/timeline?date=${new Date().toLocaleDateString("en-CA")}`)}>Today</button>
-        <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" onClick={() => router.push(`/app/timeline?date=${shiftDay(date, 1)}`)}>Next →</button>
-        <div style={{ flex: 1 }} />
-        <button type="button" className="p7-btn p7-btn-primary p7-btn-sm" disabled={pending} onClick={() => setInserting(true)}>+ Add activity</button>
-      </div>
-
-      <DayTimeSummary entries={entries} />
-
-      {needsJobLink.length > 0 ? (
-        <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-3)", background: "var(--bg-card)" }}>
-          <strong>Needs job link</strong>
-          <p style={{ margin: "var(--space-1) 0 var(--space-2)", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-            These confirmed activities affect job costing but are not attached to a job yet.
-          </p>
-          <ul style={{ margin: 0, paddingLeft: "1.25rem", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-            {needsJobLink.map((row) => (
-              <li key={row.id}>
-                {fmtClock(row.started_at)}-{fmtClock(row.ended_at)} {ACTIVITY_TYPE_META[row.activity_type as ActivityType]?.label ?? row.activity_type}
-                {row.note ? ` - ${row.note}` : ""}
-              </li>
-            ))}
-          </ul>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+      {!hideDayNav ? (
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+          <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" onClick={() => router.push(`/app/timeline?date=${shiftDay(date, -1)}`)}>← Prev</button>
+          <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" onClick={() => router.push(`/app/timeline?date=${new Date().toLocaleDateString("en-CA")}`)}>Today</button>
+          <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" onClick={() => router.push(`/app/timeline?date=${shiftDay(date, 1)}`)}>Next →</button>
         </div>
       ) : null}
 
-      {/* Timeline */}
-      {sorted.length === 0 ? (
-        <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>No activities recorded for this day.</p>
-      ) : (
-        <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          {sorted.map((e) => {
-            const meta = ACTIVITY_TYPE_META[e.activity_type as ActivityType];
-            const active = e.ended_at === null;
-            return (
-              <li key={e.id} style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "var(--space-3)", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, borderRadius: "var(--radius)", background: "var(--bg-card)" }}>
-                <span style={{ fontVariantNumeric: "tabular-nums", color: "var(--fg-muted)", fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>
-                  {fmtClock(e.started_at)}{e.ended_at ? `–${fmtClock(e.ended_at)}` : " · active"}
-                </span>
-                <span style={{ fontWeight: 700, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {meta?.emoji} {meta?.label ?? e.activity_type}
-                </span>
-                {e.note && <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.note}</span>}
-                <div style={{ flex: 1 }} />
-                {!active && (
-                  <>
-                    <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" disabled={pending} onClick={() => setEditId(e.id)}>Edit</button>
-                    <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" disabled={pending} onClick={() => setSplitId(e.id)}>Split</button>
-                    <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" disabled={pending} onClick={() => deleteRow(e.id)} style={{ color: "#b91c1c" }}>Delete</button>
-                  </>
-                )}
-              </li>
-            );
-          })}
-        </ol>
-      )}
+      <div
+        style={{
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius-lg)",
+          padding: "var(--space-3)",
+          background: "var(--bg-card)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap", marginBottom: "var(--space-2)" }}>
+          <strong style={{ fontSize: "0.95rem" }}>Logged for this day</strong>
+          <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+            {sorted.length === 0
+              ? "Nothing on the ledger yet — label stops above"
+              : `${sorted.length} block${sorted.length === 1 ? "" : "s"}`}
+          </span>
+          <div style={{ flex: 1 }} />
+          <button
+            type="button"
+            className="p7-btn p7-btn-ghost p7-btn-sm"
+            onClick={() => setExpanded((v) => !v)}
+            aria-expanded={expanded}
+          >
+            {expanded ? "Hide details" : "Edit / details"}
+          </button>
+          <button
+            type="button"
+            className="p7-btn p7-btn-secondary p7-btn-sm"
+            disabled={pending}
+            onClick={() => {
+              setExpanded(true);
+              setInserting(true);
+            }}
+          >
+            + Add missing
+          </button>
+        </div>
+
+        <DayTimeSummary entries={entries} />
+
+        {needsJobLink.length > 0 ? (
+          <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-3)", background: "var(--bg)", marginTop: "var(--space-2)" }}>
+            <strong>Needs job link</strong>
+            <p style={{ margin: "var(--space-1) 0 var(--space-2)", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+              These confirmed activities affect job costing but are not attached to a job yet.
+            </p>
+            <ul style={{ margin: 0, paddingLeft: "1.25rem", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+              {needsJobLink.map((row) => (
+                <li key={row.id}>
+                  {fmtClock(row.started_at)}-{fmtClock(row.ended_at)} {ACTIVITY_TYPE_META[row.activity_type as ActivityType]?.label ?? row.activity_type}
+                  {row.note ? ` - ${row.note}` : ""}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {expanded ? (
+          sorted.length === 0 ? (
+            <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", margin: "var(--space-2) 0 0" }}>
+              No activities on the ledger for this day. Label GPS stops above, or add a missing block.
+            </p>
+          ) : (
+            <ol style={{ listStyle: "none", margin: "var(--space-3) 0 0", padding: 0, display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+              {sorted.map((e) => {
+                const meta = ACTIVITY_TYPE_META[e.activity_type as ActivityType];
+                const active = e.ended_at === null;
+                return (
+                  <li key={e.id} style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "var(--space-3)", border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`, borderRadius: "var(--radius)", background: "var(--surface, var(--bg-card))" }}>
+                    <span style={{ fontVariantNumeric: "tabular-nums", color: "var(--fg-muted)", fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>
+                      {fmtClock(e.started_at)}{e.ended_at ? `–${fmtClock(e.ended_at)}` : " · active"}
+                    </span>
+                    <span style={{ fontWeight: 700, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {meta?.emoji} {meta?.label ?? e.activity_type}
+                    </span>
+                    {e.note && <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.note}</span>}
+                    <div style={{ flex: 1 }} />
+                    {!active && (
+                      <>
+                        <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" disabled={pending} onClick={() => setEditId(e.id)}>Edit</button>
+                        <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" disabled={pending} onClick={() => setSplitId(e.id)}>Split</button>
+                        <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" disabled={pending} onClick={() => deleteRow(e.id)} style={{ color: "#b91c1c" }}>Delete</button>
+                      </>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          )
+        ) : null}
+      </div>
 
       {editRow && (
         <EditSheet

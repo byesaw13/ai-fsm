@@ -196,6 +196,18 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       [classification, entryId, id, session.accountId],
     );
 
+    // Keep captured-locations and visit-review in sync: confirming a match also
+    // labels the stop segment so it leaves the provisional queue.
+    if (cand.location_segment_id) {
+      await client.query(
+        `UPDATE location_segments
+         SET status = 'confirmed', activity_entry_id = $1,
+             suggested_activity_type = $2, updated_at = now()
+         WHERE id = $3 AND account_id = $4 AND status = 'provisional'`,
+        [entryId, activityType, cand.location_segment_id, session.accountId],
+      );
+    }
+
     // Learn-on-confirm: bootstrap the property's geofence center from this stop's
     // coordinates if it doesn't have any yet. Future visits then get distance
     // scoring automatically.
