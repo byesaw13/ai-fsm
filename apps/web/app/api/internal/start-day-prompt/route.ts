@@ -35,7 +35,9 @@ export async function POST(req: NextRequest) {
   // suppress the RAM prompt once today's mileage session is actually open.
   if (row.has_open_mileage_today) return NextResponse.json({ signal: "already_started" });
 
-  const day = new Date().getDay(); // 0=Sun, 6=Sat
+  // Weekday of the business-timezone day (noon-UTC on that date avoids any
+  // rollover ambiguity), not the server's getDay().
+  const day = new Date(businessToday() + "T12:00:00Z").getUTCDay(); // 0=Sun, 6=Sat
   if ((day === 0 || day === 6) && row.suppress_weekend_start_prompt) {
     return NextResponse.json({ signal: "suppress_weekend" });
   }

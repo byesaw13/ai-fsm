@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { businessToday } from "../business-day";
+import { businessToday, businessMinutesNow } from "../business-day";
 
 const TZ = "America/New_York";
 
@@ -35,5 +35,17 @@ describe("businessToday", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-15T17:00:00Z")); // 1pm ET
     expect(businessToday(TZ)).toBe("2026-07-15");
+  });
+});
+
+describe("businessMinutesNow", () => {
+  it("returns business-local minutes-since-midnight, not the server's UTC clock", () => {
+    // 8:30pm ET on 2026-07-15 == 00:30 UTC on 2026-07-16. A UTC getHours() would
+    // give 0 and wrongly report "before" a 17:00 cutoff.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-16T00:30:00Z"));
+    expect(new Date().getUTCHours()).toBe(0); // what the buggy server-tz check saw
+    expect(businessMinutesNow(TZ)).toBe(20 * 60 + 30); // 8:30pm ET
+    expect(businessMinutesNow(TZ)).toBeGreaterThan(17 * 60); // past the cutoff
   });
 });

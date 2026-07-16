@@ -15,6 +15,23 @@ export function businessToday(tz: string = BUSINESS_TIMEZONE): string {
 }
 
 /**
+ * Current wall-clock minutes-since-midnight in the business timezone.
+ * Use for time-of-day gates (e.g. a review cutoff) so they don't compare the
+ * server's UTC hour against a business-local cutoff.
+ */
+export function businessMinutesNow(tz: string = BUSINESS_TIMEZONE): number {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: tz,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+  const hh = Number(parts.find((p) => p.type === "hour")?.value ?? "0") % 24;
+  const mm = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+  return hh * 60 + mm;
+}
+
+/**
  * Business Day persistence helpers (TASK-051, Operations Engine Phase 1).
  *
  * The Business Day is a pure aggregate (see docs/canonical/OPERATIONS.md): these

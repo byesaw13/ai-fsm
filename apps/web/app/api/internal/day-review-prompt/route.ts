@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
-import { businessToday } from "@/lib/operations/business-day";
+import { businessToday, businessMinutesNow } from "@/lib/operations/business-day";
 
 export const dynamic = "force-dynamic";
 
@@ -37,10 +37,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ result: "skipped", reason: "already_prompted" });
   }
 
-  // cutoff_time is "HH:MM:SS" from postgres TIME cast
+  // cutoff_time is "HH:MM:SS" from postgres TIME cast — compare against the
+  // business-timezone clock, not the server's (UTC in prod) getHours().
   const [cutoffHour, cutoffMin] = row.cutoff_time.split(":").map(Number);
-  const now = new Date();
-  if (now.getHours() * 60 + now.getMinutes() < cutoffHour * 60 + cutoffMin) {
+  if (businessMinutesNow() < cutoffHour * 60 + cutoffMin) {
     return NextResponse.json({ result: "skipped", reason: "before_cutoff" });
   }
 
