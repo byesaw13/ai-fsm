@@ -4,10 +4,10 @@ import { queryForSession } from "@/lib/db";
 import { PageContainer, PageHeader } from "@/components/ui";
 import { TimelineEditor } from "../TimelineEditor";
 import { LocationSegmentsPanel } from "../LocationSegmentsPanel";
-import { VisitCandidatesPanel } from "../VisitCandidatesPanel";
 import { ManualSiteVisitButton } from "../ManualSiteVisitButton";
 import { DayMapPanel } from "../DayMapPanel";
 import { LikelySiteBanner } from "@/components/field/LikelySiteBanner";
+import { TimelineDayNav } from "../TimelineDayNav";
 import type { ActivityEntryDto } from "../ActivityTracker";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +15,10 @@ export const dynamic = "force-dynamic";
 // Treat the timeline as a reconstructable record (TASK-019): the owner picks any
 // day and corrects the activity blocks recorded for it. Date comes from
 // ?date=YYYY-MM-DD and defaults to today.
+//
+// Primary surface is GPS captured locations (stops/drives). Customer visit
+// matches fold into those stop cards. The ledger summary sits below as a
+// compact "Logged for this day" view; Day map is supporting context.
 
 function normalizeDate(input: string | undefined): string {
   if (input && /^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
@@ -82,15 +86,24 @@ export default async function TimelinePage({
         actions={<ManualSiteVisitButton />}
       />
       <LikelySiteBanner />
-      <TimelineEditor date={day} entries={entries} needsJobLink={needsJobLink} />
-      <div style={{ marginTop: "var(--space-6)" }}>
-        <VisitCandidatesPanel day={day} entries={entries} />
+      <div style={{ marginBottom: "var(--space-4)" }}>
+        <TimelineDayNav date={day} />
       </div>
+      {/* 1. GPS day reconstruction — primary */}
+      <LocationSegmentsPanel day={day} entries={entries} />
+      {/* 2. Ledger summary — compact, expandable for corrections */}
+      <div style={{ marginTop: "var(--space-6)" }}>
+        <TimelineEditor
+          date={day}
+          entries={entries}
+          needsJobLink={needsJobLink}
+          hideDayNav
+          defaultExpanded={false}
+        />
+      </div>
+      {/* 3. Map — supporting context */}
       <div style={{ marginTop: "var(--space-6)" }}>
         <DayMapPanel day={day} />
-      </div>
-      <div style={{ marginTop: "var(--space-6)" }}>
-        <LocationSegmentsPanel day={day} entries={entries} />
       </div>
     </PageContainer>
   );

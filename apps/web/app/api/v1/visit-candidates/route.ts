@@ -31,6 +31,7 @@ type CandidateRow = {
   client_name: string | null;
   job_id: string | null;
   visit_id: string | null;
+  location_segment_id: string | null;
 };
 
 export const GET = withAuth(async (request: NextRequest, session: AuthSession) => {
@@ -49,7 +50,7 @@ export const GET = withAuth(async (request: NextRequest, session: AuthSession) =
               vc.arrival_time::text, vc.departure_time::text, vc.duration_minutes,
               vc.classification, vc.property_id, p.address AS property_address,
               vc.matched_client_id AS client_id, c.name AS client_name,
-              vc.job_id, vc.visit_id
+              vc.job_id, vc.visit_id, vc.location_segment_id
        FROM visit_candidates vc
        LEFT JOIN properties p ON p.id = vc.property_id
        LEFT JOIN clients c ON c.id = vc.matched_client_id
