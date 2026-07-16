@@ -152,12 +152,12 @@ export async function getDayReview(
               ELSE NULL
             END AS entity_label
      FROM activity_entries ae
-     LEFT JOIN jobs j        ON ae.entity_type = 'job'      AND j.id   = ae.entity_id
-     LEFT JOIN visits vis    ON ae.entity_type = 'visit'    AND vis.id = ae.entity_id
-     LEFT JOIN jobs vjob     ON vjob.id = vis.job_id
-     LEFT JOIN estimates est ON ae.entity_type = 'estimate' AND est.id = ae.entity_id
-     LEFT JOIN invoices inv  ON ae.entity_type = 'invoice'  AND inv.id = ae.entity_id
-     LEFT JOIN clients cli   ON ae.entity_type = 'client'   AND cli.id = ae.entity_id
+     LEFT JOIN jobs j        ON ae.entity_type = 'job'      AND j.id   = ae.entity_id AND j.account_id   = ae.account_id
+     LEFT JOIN visits vis    ON ae.entity_type = 'visit'    AND vis.id = ae.entity_id AND vis.account_id = ae.account_id
+     LEFT JOIN jobs vjob     ON vjob.id = vis.job_id AND vjob.account_id = ae.account_id
+     LEFT JOIN estimates est ON ae.entity_type = 'estimate' AND est.id = ae.entity_id AND est.account_id = ae.account_id
+     LEFT JOIN invoices inv  ON ae.entity_type = 'invoice'  AND inv.id = ae.entity_id AND inv.account_id = ae.account_id
+     LEFT JOIN clients cli   ON ae.entity_type = 'client'   AND cli.id = ae.entity_id AND cli.account_id = ae.account_id
      WHERE ae.account_id = $1 AND ae.session_date = $2::date
        AND ae.voided_at IS NULL AND ae.ended_at IS NOT NULL
      ORDER BY ae.started_at ASC`,
