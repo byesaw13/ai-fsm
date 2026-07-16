@@ -369,10 +369,15 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
 
   const provisional = segments.filter((s) => s.status === "provisional");
   const confirmed = segments.filter((s) => s.status === "confirmed");
-  // Orphan matches (manual / no segment link) — rare; still need a place to act.
-  const orphanMatches = matches.filter(
-    (m) => !m.location_segment_id || !segments.some((s) => s.id === m.location_segment_id),
-  );
+  // Orphan matches: no segment link, missing segment, or linked to a segment that
+  // is no longer provisional (legacy data from before confirm/dismiss cleared
+  // pending candidates). Still need a place to act without the old visits panel.
+  const orphanMatches = matches.filter((m) => {
+    if (!m.location_segment_id) return true;
+    const seg = segments.find((s) => s.id === m.location_segment_id);
+    if (!seg) return true;
+    return seg.status !== "provisional";
+  });
 
   const vehicleOptions = vehicles.map((v) => ({ value: v.id, label: v.nickname }));
   const toLabel = provisional.length;
