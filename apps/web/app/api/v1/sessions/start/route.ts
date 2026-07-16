@@ -10,6 +10,7 @@ import {
   validateStartOdometer,
 } from "@/lib/mileage/sessions";
 import { logger } from "@/lib/logger";
+import { businessToday } from "@/lib/operations/business-day";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,8 @@ const startSessionSchema = z.object({
 });
 
 function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
+  // Business-timezone today, not UTC — an evening start must not open tomorrow's day.
+  return businessToday();
 }
 
 export const POST = withAuth(async (request: NextRequest, session: AuthSession) => {

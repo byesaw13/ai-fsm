@@ -3,6 +3,7 @@ import { withAuth } from "@/lib/auth/middleware";
 import type { AuthSession } from "@/lib/auth/middleware";
 import { queryOneForSession } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { businessToday } from "@/lib/operations/business-day";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,8 @@ type OpenSessionRow = {
 function dateParam(request: NextRequest): string {
   const requested = request.nextUrl.searchParams.get("session_date");
   if (requested && /^\d{4}-\d{2}-\d{2}$/.test(requested)) return requested;
-  return new Date().toISOString().slice(0, 10);
+  // Business-timezone today, not UTC (evening rollover would pick tomorrow).
+  return businessToday();
 }
 
 async function findOpenSession(session: AuthSession, sessionDate: string) {

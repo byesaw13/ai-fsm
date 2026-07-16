@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
+import { businessToday } from "@/lib/operations/business-day";
 import { getDayReview } from "@/lib/day-review/queries";
 import { loadDayCloseStatus } from "@/lib/day-review/close-status";
 import { PageContainer, PageHeader } from "@/components/ui";
@@ -19,7 +20,9 @@ export default async function DayReviewPage({
   if (!session) redirect("/login");
 
   const sp = await searchParams;
-  const date = sp.date ?? new Date().toISOString().slice(0, 10);
+  // Default to today in the business timezone — a UTC date rolls over to
+  // tomorrow during evening hours, so the owner couldn't review the current day.
+  const date = sp.date ?? businessToday();
   const [payload, closeStatus] = await Promise.all([
     getDayReview(session.accountId, date),
     loadDayCloseStatus(session, date),
