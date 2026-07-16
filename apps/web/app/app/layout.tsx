@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { queryForSession } from "@/lib/db";
+import { businessToday } from "@/lib/operations/business-day";
 import { AppShell } from "@/components/AppShell";
 
 export const dynamic = "force-dynamic";
@@ -23,8 +24,8 @@ export default async function AppLayout({
       session,
       `SELECT (review_prompted_at IS NOT NULL AND closed_at IS NULL) AS pending
        FROM business_days
-       WHERE account_id = $1 AND business_date = CURRENT_DATE`,
-      [session.accountId],
+       WHERE account_id = $1 AND business_date = $2::date`,
+      [session.accountId, businessToday()],
     ),
   ]);
   const userName = users[0]?.full_name ?? "";

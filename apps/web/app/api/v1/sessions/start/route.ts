@@ -10,6 +10,7 @@ import {
   validateStartOdometer,
 } from "@/lib/mileage/sessions";
 import { logger } from "@/lib/logger";
+import { businessToday } from "@/lib/operations/business-day";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,10 @@ const startSessionSchema = z.object({
 });
 
 function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
+  // Business-timezone today — matches the field-day-data reads (business_date /
+  // session_date), so an evening start is found by the refresh instead of
+  // landing on tomorrow's UTC date.
+  return businessToday();
 }
 
 export const POST = withAuth(async (request: NextRequest, session: AuthSession) => {
