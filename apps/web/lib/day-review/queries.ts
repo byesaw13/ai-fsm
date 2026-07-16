@@ -30,6 +30,15 @@ export type DayReviewPayload = {
     status: string;
     isLikelyNoise: boolean;
   }[];
+  timeEntries: {
+    id: string;
+    activityType: string;
+    entityLabel: string | null;
+    note: string | null;
+    startedAt: string;
+    endedAt: string;
+    durationMinutes: number;
+  }[];
   gaps: { startsAt: string; endsAt: string; durationMinutes: number }[];
   mileage: {
     vehicleSessionId: string | null;
@@ -122,11 +131,36 @@ export async function getDayReview(
     [accountId, date],
   );
 
-  const entryRows = await query<{ started_at: string; ended_at: string }>(
-    `SELECT started_at::text AS started_at, ended_at::text AS ended_at
-     FROM activity_entries
-     WHERE account_id = $1 AND started_at::date = $2::date
-       AND voided_at IS NULL AND ended_at IS NOT NULL`,
+  const entryRows = await query<{
+    id: string;
+    activity_type: string;
+    entity_label: string | null;
+    note: string | null;
+    started_at: string;
+    ended_at: string;
+    duration_minutes: number;
+  }>(
+    `SELECT ae.id, ae.activity_type, ae.note,
+            ae.started_at::text AS started_at, ae.ended_at::text AS ended_at,
+            ROUND(EXTRACT(EPOCH FROM (ae.ended_at - ae.started_at)) / 60)::int AS duration_minutes,
+            CASE ae.entity_type
+              WHEN 'job'      THEN j.title
+              WHEN 'visit'    THEN vjob.title
+              WHEN 'estimate' THEN 'Estimate ' || COALESCE(est.estimate_number, '')
+              WHEN 'invoice'  THEN 'Invoice ' || COALESCE(inv.invoice_number, '')
+              WHEN 'client'   THEN cli.name
+              ELSE NULL
+            END AS entity_label
+     FROM activity_entries ae
+     LEFT JOIN jobs j        ON ae.entity_type = 'job'      AND j.id   = ae.entity_id
+     LEFT JOIN visits vis    ON ae.entity_type = 'visit'    AND vis.id = ae.entity_id
+     LEFT JOIN jobs vjob     ON vjob.id = vis.job_id
+     LEFT JOIN estimates est ON ae.entity_type = 'estimate' AND est.id = ae.entity_id
+     LEFT JOIN invoices inv  ON ae.entity_type = 'invoice'  AND inv.id = ae.entity_id
+     LEFT JOIN clients cli   ON ae.entity_type = 'client'   AND cli.id = ae.entity_id
+     WHERE ae.account_id = $1 AND ae.session_date = $2::date
+       AND ae.voided_at IS NULL AND ae.ended_at IS NOT NULL
+     ORDER BY ae.started_at ASC`,
     [accountId, date],
   );
 
@@ -185,6 +219,15 @@ export async function getDayReview(
       zone: s.zone,
       status: s.status,
       isLikelyNoise: s.is_likely_noise,
+    })),
+    timeEntries: entryRows.map((e) => ({
+      id: e.id,
+      activityType: e.activity_type,
+      entityLabel: e.entity_label,
+      note: e.note,
+      startedAt: e.started_at,
+      endedAt: e.ended_at,
+      durationMinutes: e.duration_minutes,
     })),
     gaps,
     mileage: {
