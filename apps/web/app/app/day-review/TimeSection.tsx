@@ -1,12 +1,19 @@
 import { ACTIVITY_TYPE_META, type ActivityType } from "@ai-fsm/domain";
+import { BUSINESS_TIMEZONE } from "@/lib/operations/business-day";
 import type { DayReviewPayload } from "@/lib/day-review/queries";
 
 type Segment = DayReviewPayload["segments"][number];
 type Gap = DayReviewPayload["gaps"][number];
 type TimeEntry = DayReviewPayload["timeEntries"][number];
 
+// Server-rendered: format in the business timezone, not the container's UTC,
+// so a 9am-ET entry doesn't display as 1pm.
 function fmt(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: BUSINESS_TIMEZONE,
+  });
 }
 
 function activityLabel(type: string): { emoji: string; label: string } {
