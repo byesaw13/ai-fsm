@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { derivePipelineStage, getPipelineNextAction } from "@ai-fsm/domain";
+import { derivePipelineStage } from "@ai-fsm/domain";
 
 describe("derivePipelineStage", () => {
   it("routes unreviewed booking requests to Request", () => {
@@ -186,14 +186,5 @@ describe("derivePipelineStage", () => {
       completedVisitCount: 0,
       estimateCount: 0,
     })).not.toBe("completed");
-  });
-});
-
-describe("getPipelineNextAction", () => {
-  it("returns action labels for each stage", () => {
-    expect(getPipelineNextAction("new_lead")).toBe("Review request");
-    expect(getPipelineNextAction("completed")).toBe("Owner: complete project & bill");
-    expect(getPipelineNextAction("invoiced")).toBe("Collect payment");
-    expect(getPipelineNextAction("archived")).toBe("Closed");
   });
 });

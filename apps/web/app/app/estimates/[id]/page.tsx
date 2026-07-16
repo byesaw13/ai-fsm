@@ -1,7 +1,9 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
-import { canCreateEstimates, canDeleteRecords } from "@/lib/auth/permissions";
+import { canCreateEstimates, canDeleteRecords, canLinkDocuments } from "@/lib/auth/permissions";
+import { DocumentClientLocationCard } from "@/components/documents/DocumentClientLocationCard";
+import { resolveServiceLocation, formatAddressLine } from "@/lib/documents/service-location";
 import type { EstimateStatus, RoomSpec } from "@ai-fsm/domain";
 import { manualEstimateTransitions } from "@/lib/estimates/transitions";
 import { EstimateTransitionForm } from "./EstimateTransitionForm";
@@ -48,7 +50,18 @@ export default async function EstimateDetailPage({
     depositInvoice,
     finalInvoice,
     changeOrders,
+    location,
   } = detail;
+
+  const serviceLocation = resolveServiceLocation(location ?? {});
+  const clientBillingAddress = location
+    ? formatAddressLine(
+        location.client_address_line1,
+        location.client_city,
+        location.client_state,
+        location.client_zip,
+      )
+    : null;
 
   const shoppingListSummary = estimate.shopping_list_json as { sections?: Array<{ section: string }> } | null | undefined;
   const hasMaterialsPlan = !!shoppingListSummary?.sections?.length;
@@ -286,6 +299,24 @@ export default async function EstimateDetailPage({
       {canTransition && currentStatus === "approved" && (
         <ChangeOrdersClient estimateId={estimate.id} initialChangeOrders={changeOrders} />
       )}
+
+      <DocumentClientLocationCard
+        entityType="estimate"
+        entityId={estimate.id}
+        canEdit={canLinkDocuments(session.role)}
+        clientId={estimate.client_id}
+        clientName={estimate.client_name}
+        clientEmail={estimate.client_email}
+        jobId={estimate.job_id}
+        jobTitle={estimate.job_title}
+        propertyId={estimate.property_id}
+        documentPropertyId={estimate.property_id}
+        jobPropertyId={location?.job_property_id ?? null}
+        estimatePropertyId={null}
+        resolvedPropertyId={location?.resolved_property_id ?? null}
+        serviceLocation={serviceLocation}
+        clientBillingAddress={clientBillingAddress}
+      />
 
       {/* Linked Paperless documents (contracts, signed approvals, reference docs) */}
       <LinkedDocuments session={session} entityType="estimate" entityId={estimate.id} />

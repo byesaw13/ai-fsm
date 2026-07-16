@@ -7,6 +7,7 @@ import { LocationSegmentsPanel } from "../LocationSegmentsPanel";
 import { VisitCandidatesPanel } from "../VisitCandidatesPanel";
 import { ManualSiteVisitButton } from "../ManualSiteVisitButton";
 import { DayMapPanel } from "../DayMapPanel";
+import { LikelySiteBanner } from "@/components/field/LikelySiteBanner";
 import type { ActivityEntryDto } from "../ActivityTracker";
 
 export const dynamic = "force-dynamic";
@@ -80,6 +81,7 @@ export default async function TimelinePage({
         subtitle={label}
         actions={<ManualSiteVisitButton />}
       />
+      <LikelySiteBanner />
       <TimelineEditor date={day} entries={entries} needsJobLink={needsJobLink} />
       <div style={{ marginTop: "var(--space-6)" }}>
         <VisitCandidatesPanel day={day} entries={entries} />

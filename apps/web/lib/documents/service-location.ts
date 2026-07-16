@@ -44,6 +44,28 @@ export function resolveServiceLocation(fields: LocationFields): string {
 }
 
 /**
+ * Row shape returned by a `SELECT i.property_id AS document_property_id,
+ * documentLocationSelect(...)` query — the columns DocumentClientLocationCard needs.
+ */
+export interface DocumentLocationRow {
+  document_property_id: string | null;
+  client_name: string | null;
+  client_email: string | null;
+  client_phone: string | null;
+  client_address_line1: string | null;
+  client_city: string | null;
+  client_state: string | null;
+  client_zip: string | null;
+  job_property_id: string | null;
+  estimate_property_id?: string | null;
+  resolved_property_id: string | null;
+  property_address: string | null;
+  property_city: string | null;
+  property_state: string | null;
+  property_zip: string | null;
+}
+
+/**
  * Client + property columns for document letterhead / print / PDF loaders.
  * Includes resolved property id + job (and optionally estimate) property ids.
  */
