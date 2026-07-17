@@ -321,119 +321,123 @@ export function LinkForgottenExpensesPanel({
     );
   }
 
-  // Job mode — always open, simpler rows, success banner, no explicit refresh
+  // Job mode — collapsed by default under Materials; only renders when there
+  // are unlinked client receipts. Keeps the project page clean.
   return (
-    <div
+    <details
       data-testid="job-link-forgotten-expenses"
       style={{
         marginTop: "var(--space-3)",
-        padding: "var(--space-3)",
-        border: "1px solid var(--border)",
-        borderRadius: "var(--radius)",
-        background: "var(--bg-card)",
+        paddingTop: "var(--space-2)",
+        borderTop: "1px solid var(--border-subtle, var(--border))",
       }}
     >
-      <div
+      <summary
         style={{
-          fontWeight: 700,
+          cursor: "pointer",
+          fontWeight: 600,
           fontSize: "var(--text-sm)",
-          marginBottom: "var(--space-2)",
-        }}
-      >
-        Forgotten receipts
-      </div>
-
-      <p
-        style={{
-          margin: "0 0 var(--space-2)",
-          fontSize: "var(--text-xs)",
           color: "var(--fg-muted)",
-        }}
-      >
-        Unlinked material expenses for this client — attach before invoicing.
-      </p>
-
-      {error && (
-        <div
-          role="alert"
-          style={{
-            padding: "var(--space-2)",
-            marginBottom: "var(--space-2)",
-            fontSize: "var(--text-sm)",
-            color: "var(--color-danger)",
-            background: "var(--color-red-50)",
-            borderRadius: "var(--radius-sm)",
-          }}
-        >
-          {error}
-        </div>
-      )}
-      {success && (
-        <div
-          role="status"
-          style={{
-            padding: "var(--space-2)",
-            marginBottom: "var(--space-2)",
-            fontSize: "var(--text-sm)",
-            color: "var(--color-green-700)",
-            background: "var(--bg-subtle)",
-            borderRadius: "var(--radius-sm)",
-          }}
-        >
-          {success}
-        </div>
-      )}
-
-      <ul
-        style={{
           listStyle: "none",
-          margin: 0,
-          padding: 0,
-          display: "grid",
-          gap: "var(--space-2)",
         }}
       >
-        {expenses.map((expense) => (
-          <li key={expense.id}>
-            <label
-              style={{
-                display: "flex",
-                gap: "var(--space-2)",
-                fontSize: "var(--text-sm)",
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={selected.has(expense.id)}
-                onChange={() => toggle(expense.id)}
-                disabled={pending}
-              />
-              <span>
-                <strong>{expense.vendor_name}</strong>
-                <span style={{ color: "var(--fg-muted)" }}>
-                  {" "}
-                  · {expense.expense_date.slice(0, 10)} · {formatCents(expense.amount_cents)}
-                </span>
-                <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
-                  {materialExpenseDescription(expense)}
-                </div>
-              </span>
-            </label>
-          </li>
-        ))}
-      </ul>
+        Link unassigned receipts
+        <span style={{ marginLeft: 8, fontWeight: 400 }}>
+          ({expenses.length})
+        </span>
+      </summary>
 
-      <div style={{ marginTop: "var(--space-3)" }}>
-        <button
-          type="button"
-          onClick={() => void linkSelected()}
-          disabled={pending || selected.size === 0}
-          className="p7-btn p7-btn-secondary p7-btn-sm"
+      <div style={{ marginTop: "var(--space-2)" }}>
+        <p
+          style={{
+            margin: "0 0 var(--space-2)",
+            fontSize: "var(--text-xs)",
+            color: "var(--fg-muted)",
+          }}
         >
-          {pending ? "Linking…" : `Link to job (${selected.size})`}
-        </button>
+          Material receipts for this client that aren’t on a project yet. Attach
+          here before invoicing.
+        </p>
+
+        {error && (
+          <div
+            role="alert"
+            style={{
+              padding: "var(--space-2)",
+              marginBottom: "var(--space-2)",
+              fontSize: "var(--text-sm)",
+              color: "var(--color-danger)",
+              background: "var(--color-red-50)",
+              borderRadius: "var(--radius-sm)",
+            }}
+          >
+            {error}
+          </div>
+        )}
+        {success && (
+          <div
+            role="status"
+            style={{
+              padding: "var(--space-2)",
+              marginBottom: "var(--space-2)",
+              fontSize: "var(--text-sm)",
+              color: "var(--color-green-700)",
+              background: "var(--bg-subtle)",
+              borderRadius: "var(--radius-sm)",
+            }}
+          >
+            {success}
+          </div>
+        )}
+
+        <ul
+          style={{
+            listStyle: "none",
+            margin: 0,
+            padding: 0,
+            display: "grid",
+            gap: "var(--space-2)",
+          }}
+        >
+          {expenses.map((expense) => (
+            <li key={expense.id}>
+              <label
+                style={{
+                  display: "flex",
+                  gap: "var(--space-2)",
+                  fontSize: "var(--text-sm)",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(expense.id)}
+                  onChange={() => toggle(expense.id)}
+                  disabled={pending}
+                />
+                <span>
+                  <strong>{expense.vendor_name}</strong>
+                  <span style={{ color: "var(--fg-muted)" }}>
+                    {" "}
+                    · {expense.expense_date.slice(0, 10)} · {formatCents(expense.amount_cents)}
+                  </span>
+                </span>
+              </label>
+            </li>
+          ))}
+        </ul>
+
+        <div style={{ marginTop: "var(--space-3)" }}>
+          <button
+            type="button"
+            onClick={() => void linkSelected()}
+            disabled={pending || selected.size === 0}
+            className="p7-btn p7-btn-secondary p7-btn-sm"
+          >
+            {pending ? "Linking…" : `Link to job (${selected.size})`}
+          </button>
+        </div>
       </div>
-    </div>
+    </details>
   );
 }
