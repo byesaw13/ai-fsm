@@ -63,6 +63,80 @@ export interface VisitMatch {
 export const VISIT_CONFIDENCE_FLOOR = 40;
 
 /**
+ * When a confirmed stop is farther than this from the stored property pin,
+ * re-learn the geofence center from the stop (fixes first-confirm poison pins).
+ */
+export const PROPERTY_COORD_RELEARN_METERS = 500;
+
+/** Default min on-site minutes before we auto-create a calendar field day. */
+export const FIELD_DAY_MIN_DURATION_MINUTES = 15;
+
+/** Classifications that mean billable/on-site field work for a job. */
+export const FIELD_DAY_CLASSIFICATIONS = [
+  "job_work",
+  "warranty_callback",
+] as const;
+
+export type FieldDayClassification = (typeof FIELD_DAY_CLASSIFICATIONS)[number];
+
+export function isFieldDayClassification(
+  classification: string,
+): classification is FieldDayClassification {
+  return (FIELD_DAY_CLASSIFICATIONS as readonly string[]).includes(classification);
+}
+
+/**
+ * Decide whether confirming a stop should ensure a calendar field-day visit
+ * on the job (find existing day or auto-create). Short blips and non-field
+ * classifications never create visits.
+ */
+export function shouldEnsureFieldDayVisit(opts: {
+  classification: string;
+  jobId: string | null | undefined;
+  durationMinutes: number;
+  minDurationMinutes?: number;
+}): boolean {
+  if (!opts.jobId) return false;
+  if (!isFieldDayClassification(opts.classification)) return false;
+  const min = opts.minDurationMinutes ?? FIELD_DAY_MIN_DURATION_MINUTES;
+  return opts.durationMinutes >= min;
+}
+
+export type CoordRelearnDecision =
+  | { relearn: true; reason: "missing"; distanceMeters: null }
+  | { relearn: true; reason: "far"; distanceMeters: number }
+  | { relearn: false; reason: "keep"; distanceMeters: number | null }
+  | { relearn: false; reason: "no_stop_coords"; distanceMeters: null };
+
+/**
+ * Pure rule: bootstrap missing property coords, or overwrite when a confirmed
+ * stop is far from the stored pin (poisoned learn-on-confirm).
+ */
+export function shouldRelearnPropertyCoords(opts: {
+  storedLatitude: number | null | undefined;
+  storedLongitude: number | null | undefined;
+  stopLatitude: number | null | undefined;
+  stopLongitude: number | null | undefined;
+  relearnMeters?: number;
+}): CoordRelearnDecision {
+  if (opts.stopLatitude == null || opts.stopLongitude == null) {
+    return { relearn: false, reason: "no_stop_coords", distanceMeters: null };
+  }
+  if (opts.storedLatitude == null || opts.storedLongitude == null) {
+    return { relearn: true, reason: "missing", distanceMeters: null };
+  }
+  const distanceMeters = haversineMeters(
+    { latitude: opts.storedLatitude, longitude: opts.storedLongitude },
+    { latitude: opts.stopLatitude, longitude: opts.stopLongitude },
+  );
+  const threshold = opts.relearnMeters ?? PROPERTY_COORD_RELEARN_METERS;
+  if (distanceMeters > threshold) {
+    return { relearn: true, reason: "far", distanceMeters };
+  }
+  return { relearn: false, reason: "keep", distanceMeters };
+}
+
+/**
  * Score + rank candidate properties for a closed stop. Weights follow the
  * EPIC-007 spec; distance terms only apply when both the stop and the property
  * have coordinates.

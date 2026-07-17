@@ -18,7 +18,11 @@ import {
   findVisitForJobOnDate,
   upsertSegmentVisitCandidate,
 } from "@/lib/field/segment-links";
-import { ignoreVisitCandidateForSegment } from "@/lib/field/confirm-visit";
+import {
+  ensureFieldDayVisit,
+  ignoreVisitCandidateForSegment,
+  learnPropertyCoordsFromSegment,
+} from "@/lib/field/confirm-visit";
 
 export const dynamic = "force-dynamic";
 
@@ -436,6 +440,44 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
         WHERE account_id = $1 AND user_id = $2 AND business_date = $3::date LIMIT 1`,
       [session.accountId, session.userId, seg.segment_date],
     );
+
+    // When confirming job_work against a job (or visit), ensure a calendar field day.
+    let entityType = d.entity_type ?? null;
+    let entityId = d.entity_id ?? null;
+    let fieldDayCreated = false;
+    let fieldDayReason: string | null = null;
+    if (
+      d.activity_type === "job_work" &&
+      (entityType === "job" || entityType === "visit") &&
+      entityId &&
+      seg.ended_at
+    ) {
+      let jobId: string | null = entityType === "job" ? entityId : null;
+      let visitId: string | null = entityType === "visit" ? entityId : null;
+      if (visitId && !jobId) {
+        const vr = await client.query<{ job_id: string }>(
+          `SELECT job_id FROM visits WHERE id = $1 AND account_id = $2`,
+          [visitId, session.accountId],
+        );
+        jobId = vr.rows[0]?.job_id ?? null;
+      }
+      const fieldDay = await ensureFieldDayVisit(client, {
+        accountId: session.accountId,
+        userId: session.userId,
+        jobId,
+        visitId,
+        classification: "job_work",
+        arrivalTime: seg.started_at,
+        departureTime: seg.ended_at,
+      });
+      fieldDayCreated = fieldDay.created;
+      fieldDayReason = fieldDay.reason;
+      if (fieldDay.visitId) {
+        entityType = "visit";
+        entityId = fieldDay.visitId;
+      }
+    }
+
     const { rows: ins } = await client.query<{ id: string }>(
       `INSERT INTO activity_entries
          (account_id, user_id, session_date, activity_type, category,
@@ -450,8 +492,8 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
         category,
         seg.started_at,
         seg.ended_at,
-        d.entity_type ?? null,
-        d.entity_id ?? null,
+        entityType,
+        entityId,
         d.note ?? null,
         dayRes.rows[0]?.id ?? null,
       ],
@@ -475,8 +517,34 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     // so Detected visits / inline match chips don't double-count.
     await ignoreVisitCandidateForSegment(client, id, session.accountId);
 
+    // If the segment was linked to a property via a visit candidate, re-learn coords.
+    // Also try property_id from set_links candidate if present.
+    const { rows: propRows } = await client.query<{ property_id: string }>(
+      `SELECT property_id FROM visit_candidates
+       WHERE location_segment_id = $1 AND account_id = $2 AND property_id IS NOT NULL
+       ORDER BY updated_at DESC LIMIT 1`,
+      [id, session.accountId],
+    );
+    if (propRows[0]?.property_id) {
+      await learnPropertyCoordsFromSegment(
+        client,
+        propRows[0].property_id,
+        session.accountId,
+        id,
+      );
+    }
+
     await client.query("COMMIT");
-    return NextResponse.json({ data: { id, status: "confirmed", activity_entry_id: entryId } });
+    return NextResponse.json({
+      data: {
+        id,
+        status: "confirmed",
+        activity_entry_id: entryId,
+        visit_id: entityType === "visit" ? entityId : null,
+        field_day_created: fieldDayCreated,
+        field_day_reason: fieldDayReason,
+      },
+    });
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});
     logger.error("PATCH /api/v1/activities/segments/[id] error", error, { traceId: session.traceId });
