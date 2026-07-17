@@ -47,6 +47,7 @@ import {
 } from "@/components/ui";
 import type { TimelineEntryData, StatusVariant } from "@/components/ui";
 import { formatCents } from "@/lib/money";
+import { laborCostForMargin } from "@/lib/invoices/tracked-labor";
 
 export const dynamic = "force-dynamic";
 
@@ -225,6 +226,7 @@ export default async function JobDetailPage({
           parts_cost_cents: number | null;
           travel_miles: number | null;
           estimated_labor_cost_cents: number | null;
+          tracked_labor_minutes: string | null;
           estimated_total_cents: number | null;
           invoice_total_cents: number | null;
           latest_invoice_id: string | null;
@@ -269,6 +271,19 @@ export default async function JobDetailPage({
              (SELECT internal_labor_cost_cents FROM estimates
               WHERE job_id = $1 AND account_id = $2 AND status = 'approved'
               ORDER BY created_at DESC LIMIT 1) AS estimated_labor_cost_cents,
+             (SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (ae.ended_at - ae.started_at)) / 60), 0)::numeric
+                FROM activity_entries ae
+               WHERE ae.account_id = $2
+                 AND ae.activity_type = 'job_work'
+                 AND ae.voided_at IS NULL
+                 AND ae.ended_at IS NOT NULL
+                 AND (
+                   (ae.entity_type = 'job' AND ae.entity_id = $1)
+                   OR (ae.entity_type = 'visit' AND ae.entity_id IN (
+                     SELECT v.id FROM visits v WHERE v.job_id = $1 AND v.account_id = $2
+                   ))
+                 )
+             ) AS tracked_labor_minutes,
              (SELECT total_cents FROM estimates
               WHERE job_id = $1 AND account_id = $2 AND status = 'approved'
               ORDER BY created_at DESC LIMIT 1) AS estimated_total_cents,
@@ -441,15 +456,21 @@ export default async function JobDetailPage({
   });
 
   // Profitability (owner/admin only)
-  // actual_cost_cents on jobs is maintained as the parts rollup by visit-parts write paths.
-  // materialsReceiptCostCents is a second, additive cost source from linked receipts.
+  // Labor: prefer actual tracked job_work hours × burdened cost rate; fall back to
+  // estimate internal labor. actual_cost_cents is the parts rollup; materials are receipts.
   const revenueCents = commercialCounts?.invoice_total_cents ?? commercialCounts?.estimated_total_cents ?? null;
   const partsCostCents = commercialCounts?.parts_cost_cents ?? 0;
   const materialsReceiptCostCents = jobMaterialExpenses.reduce((sum, e) => sum + e.amount_cents, 0);
   const estimatedLaborCents = commercialCounts?.estimated_labor_cost_cents ?? null;
+  const trackedMinutes = Number(commercialCounts?.tracked_labor_minutes ?? 0);
+  const laborMargin = laborCostForMargin({
+    trackedMinutes,
+    estimatedLaborCostCents: estimatedLaborCents,
+  });
+  const laborCostCents = laborMargin.laborCostCents;
   const costCents =
-    estimatedLaborCents !== null || partsCostCents > 0 || materialsReceiptCostCents > 0
-      ? (estimatedLaborCents ?? 0) + partsCostCents + materialsReceiptCostCents
+    laborCostCents !== null || partsCostCents > 0 || materialsReceiptCostCents > 0
+      ? (laborCostCents ?? 0) + partsCostCents + materialsReceiptCostCents
       : null;
   const grossMarginCents = revenueCents !== null && costCents !== null ? revenueCents - costCents : null;
   const grossMarginPct =
@@ -1113,8 +1134,8 @@ export default async function JobDetailPage({
               </dl>
             </Card>
 
-            {/* Profitability */}
-            {!isTech && (revenueCents !== null || costCents !== null) && (
+            {/* Profitability — tracked hours feed margin on every job (flat + T&M) */}
+            {!isTech && (revenueCents !== null || costCents !== null || trackedMinutes > 0) && (
               <Card data-testid="profitability-card">
                 <SectionHeader title="Profitability" />
                 <dl className="p7-detail-list">
@@ -1124,10 +1145,42 @@ export default async function JobDetailPage({
                       <dd>${(revenueCents / 100).toFixed(2)}</dd>
                     </div>
                   )}
+                  {trackedMinutes > 0 && (
+                    <div className="p7-detail-row" data-testid="tracked-hours">
+                      <dt>Tracked Hours</dt>
+                      <dd>
+                        {laborMargin.trackedHours.toFixed(2)} hrs
+                        <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginLeft: 6 }}>
+                          (job_work)
+                        </span>
+                      </dd>
+                    </div>
+                  )}
+                  {laborMargin.actualLaborCostCents !== null && (
+                    <div className="p7-detail-row" data-testid="actual-labor-cost">
+                      <dt>Actual Labor Cost</dt>
+                      <dd>{formatCents(laborMargin.actualLaborCostCents)}</dd>
+                    </div>
+                  )}
                   {estimatedLaborCents !== null && (
                     <div className="p7-detail-row">
                       <dt>Est. Labor Cost</dt>
-                      <dd>${(estimatedLaborCents / 100).toFixed(2)}</dd>
+                      <dd>
+                        {formatCents(estimatedLaborCents)}
+                        {laborMargin.source === "tracked" && laborMargin.actualLaborCostCents !== null && (
+                          <span
+                            style={{
+                              color: "var(--fg-muted)",
+                              fontSize: "var(--text-xs)",
+                              marginLeft: 6,
+                            }}
+                            data-testid="labor-variance"
+                          >
+                            {laborMargin.actualLaborCostCents - estimatedLaborCents >= 0 ? "+" : ""}
+                            {formatCents(laborMargin.actualLaborCostCents - estimatedLaborCents)} vs est
+                          </span>
+                        )}
+                      </dd>
                     </div>
                   )}
                   {partsCostCents > 0 && (
@@ -1142,11 +1195,17 @@ export default async function JobDetailPage({
                       <dd>${(materialsReceiptCostCents / 100).toFixed(2)}</dd>
                     </div>
                   )}
-                  {costCents !== null &&
-                    (partsCostCents > 0 || materialsReceiptCostCents > 0) && (
+                  {costCents !== null && (
                       <div className="p7-detail-row" style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-1)" }}>
                         <dt>Total Cost</dt>
-                        <dd>${(costCents / 100).toFixed(2)}</dd>
+                        <dd>
+                          {formatCents(costCents)}
+                          {laborMargin.source === "tracked" && (
+                            <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginLeft: 6 }}>
+                              uses actual labor
+                            </span>
+                          )}
+                        </dd>
                       </div>
                     )}
                   {grossMarginCents !== null && (
@@ -1167,11 +1226,11 @@ export default async function JobDetailPage({
                       <dd>{commercialCounts.travel_miles} mi</dd>
                     </div>
                   )}
-                  {estimatedLaborCents === null && !partsCostCents && !materialsReceiptCostCents && (
+                  {laborMargin.source === "none" && !partsCostCents && !materialsReceiptCostCents && (
                     <div className="p7-detail-row">
                       <dt></dt>
                       <dd style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
-                        No approved estimate or parts logged yet
+                        No tracked time, approved estimate, or parts logged yet
                       </dd>
                     </div>
                   )}
