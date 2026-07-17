@@ -7,6 +7,10 @@ import { appendAuditLog } from "../../../../lib/db/audit";
 import { logger } from "../../../../lib/logger";
 import { JOB_ACCEPTANCE_CATEGORIES } from "@ai-fsm/domain";
 import { createDefaultWorkOrderForJob } from "../../../../lib/work-orders/create-default";
+import {
+  RECEIPT_LINKABLE_JOB_STATUS_SQL,
+  receiptJobOrderSql,
+} from "../../../../lib/expenses/open-jobs";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +30,9 @@ export const GET = withAuth(
     const limit = Math.min(parseInt(searchParams.get("limit") ?? "50"), 200);
     const offset = parseInt(searchParams.get("offset") ?? "0");
     const clientId = searchParams.get("client_id");
+    // open=1 → receipt/expense pickers: only draft/quoted/scheduled/in_progress
+    const openOnly =
+      searchParams.get("open") === "1" || searchParams.get("active") === "1";
     if (clientId && !z.string().uuid().safeParse(clientId).success) {
       return NextResponse.json(
         { error: { code: "VALIDATION_ERROR", message: "Invalid client_id", traceId: session.traceId } },
@@ -39,10 +46,14 @@ export const GET = withAuth(
       params.push(clientId);
       where += ` AND client_id = $${params.length}`;
     }
+    if (openOnly) {
+      where += ` AND status IN (${RECEIPT_LINKABLE_JOB_STATUS_SQL})`;
+    }
     params.push(limit, offset);
 
+    const orderBy = openOnly ? receiptJobOrderSql() : "created_at DESC";
     const jobs = await query(
-      `SELECT * FROM jobs WHERE ${where} ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      `SELECT * FROM jobs WHERE ${where} ORDER BY ${orderBy} LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params
     );
 

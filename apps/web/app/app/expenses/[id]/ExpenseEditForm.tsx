@@ -170,10 +170,11 @@ export function ExpenseEditForm({ expense, jobs, clients, categories }: Props) {
           value={jobId}
           onChange={(e) => setJobId(e.target.value)}
           options={[
-            { value: "", label: "No job" },
+            { value: "", label: "No open project" },
             ...jobs.map((j) => ({ value: j.id, label: j.title })),
           ]}
           disabled={pending}
+          hint="Open projects only (in progress / scheduled / quoted). Closed jobs stay hidden unless already linked."
         />
       )}
 

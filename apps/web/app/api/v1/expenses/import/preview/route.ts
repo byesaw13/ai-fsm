@@ -3,6 +3,10 @@ import { withRole } from "@/lib/auth/middleware";
 import { withExpenseContext } from "@/lib/expenses/db";
 import { logger } from "@/lib/logger";
 import { parseHomeDepotCsv } from "@/lib/expenses/import/homedepot";
+import {
+  RECEIPT_LINKABLE_JOB_STATUS_SQL,
+  receiptJobOrderSql,
+} from "@/lib/expenses/open-jobs";
 
 export const dynamic = "force-dynamic";
 
@@ -74,9 +78,10 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
          FROM jobs j
          LEFT JOIN clients c ON c.id = j.client_id
          LEFT JOIN properties p ON p.id = j.property_id
-         WHERE j.account_id = $1 AND j.status NOT IN ('cancelled')
-         ORDER BY j.created_at DESC
-         LIMIT 500`,
+         WHERE j.account_id = $1
+           AND j.status IN (${RECEIPT_LINKABLE_JOB_STATUS_SQL})
+         ORDER BY ${receiptJobOrderSql("j")}
+         LIMIT 200`,
         [session.accountId]
       );
       return { existingRefs: new Set(refs.rows.map((r) => r.external_ref)), jobs: jobRows.rows };

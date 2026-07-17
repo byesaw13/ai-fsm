@@ -46,7 +46,7 @@ export function ImportExpensesClient() {
       fd.append("file", file);
       const [previewRes, jobsRes] = await Promise.all([
         fetch("/api/v1/expenses/import/preview", { method: "POST", body: fd }),
-        fetch("/api/v1/jobs?limit=500"),
+        fetch("/api/v1/jobs?limit=200&open=1"),
       ]);
       const previewJson = await previewRes.json().catch(() => ({}));
       if (!previewRes.ok) {
