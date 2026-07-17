@@ -131,6 +131,12 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
     await request(`/api/v1/invoices/${invoiceId}/labor-from-time`, { method: "POST" });
   }
 
+  async function materialsFromReceipts() {
+    await request(`/api/v1/invoices/${invoiceId}/materials-from-expenses`, {
+      method: "POST",
+    });
+  }
+
   const subtotal = lineItems.reduce((s, i) => s + i.total_cents, 0);
 
   return (
@@ -149,7 +155,14 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
       )}
 
       {jobId && (
-        <div style={{ marginBottom: "var(--space-3)" }}>
+        <div
+          style={{
+            marginBottom: "var(--space-3)",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "var(--space-2)",
+          }}
+        >
           <button
             type="button"
             onClick={laborFromTime}
@@ -158,6 +171,16 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
             data-testid="invoice-labor-from-time-btn"
           >
             + Pull labor from tracked time
+          </button>
+          <button
+            type="button"
+            onClick={materialsFromReceipts}
+            disabled={pending}
+            className="p7-btn p7-btn-secondary p7-btn-sm"
+            data-testid="invoice-materials-from-expenses-btn"
+            title="Add line items for every unbilled material receipt on this job"
+          >
+            + Pull materials from job receipts
           </button>
         </div>
       )}

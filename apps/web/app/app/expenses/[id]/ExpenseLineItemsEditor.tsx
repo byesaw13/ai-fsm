@@ -101,7 +101,13 @@ export function ExpenseLineItemsEditor({ expenseId, initialLineItems, billed, ca
   }
 
   return (
-    <div>
+    <div data-testid="expense-line-items-editor">
+      {items.length === 0 && canEdit && (
+        <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+          This receipt is a single total. Add line items to itemize it (recommended before
+          invoicing).
+        </p>
+      )}
       <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "grid", gap: "var(--space-2)" }}>
         {items.map((item, i) => (
           <li key={item.id ?? i} style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-end" }}>
@@ -151,10 +157,10 @@ export function ExpenseLineItemsEditor({ expenseId, initialLineItems, billed, ca
 
       {canEdit && (
         <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-3)", alignItems: "center" }}>
-          <Button variant="ghost" size="sm" onClick={addItem} disabled={saving}>
+          <Button variant="ghost" size="sm" onClick={addItem} disabled={saving} data-testid="expense-add-line-btn">
             + Add line
           </Button>
-          <Button variant="secondary" size="sm" onClick={save} loading={saving}>
+          <Button variant="secondary" size="sm" onClick={save} loading={saving} data-testid="expense-save-lines-btn">
             Save line items
           </Button>
           {saved && <span style={{ fontSize: "var(--text-xs)", color: "var(--color-success, green)" }}>Saved</span>}
