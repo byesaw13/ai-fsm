@@ -199,7 +199,7 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
     label: EXPENSE_CATEGORY_LABELS[c],
   }));
   const jobOptions = [
-    { value: "", label: isMaterialRun ? "No job — general stock" : "No job" },
+    { value: "", label: isMaterialRun ? "No job — general stock" : "No open project" },
     ...jobs.map((j) => ({ value: j.id, label: j.title })),
   ];
   const clientOptions = [
@@ -326,6 +326,7 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
           onChange={(e) => setJobId(e.target.value)}
           options={jobOptions}
           disabled={pending}
+          hint="Open projects only — in progress first, then scheduled / quoted. Closed jobs are hidden."
         />
       )}
 

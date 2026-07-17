@@ -19,6 +19,10 @@ import { ExpenseEditForm } from "./ExpenseEditForm";
 import { ExpenseLineItemsEditor } from "./ExpenseLineItemsEditor";
 import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { fetchExpenseLineItems } from "@/lib/expenses/line-items";
+import {
+  RECEIPT_LINKABLE_JOB_STATUS_SQL,
+  receiptJobOrderSql,
+} from "@/lib/expenses/open-jobs";
 
 export const dynamic = "force-dynamic";
 
@@ -66,13 +70,23 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
 
   const cat = expense.category as ExpenseCategory;
 
-  // Fetch jobs and clients for the edit form
+  // Fetch open jobs for the edit form (plus the currently linked job if closed).
   const { jobs, clients } = canManage
     ? await withExpenseContext(session, async (client) => {
         const [jobsResult, clientsResult] = await Promise.all([
           client.query<{ id: string; title: string }>(
-            `SELECT id, title FROM jobs WHERE account_id = $1 AND status NOT IN ('cancelled') ORDER BY created_at DESC LIMIT 100`,
-            [session.accountId]
+            `SELECT id, title FROM jobs
+             WHERE account_id = $1
+               AND (
+                 status IN (${RECEIPT_LINKABLE_JOB_STATUS_SQL})
+                 OR id = $2::uuid
+               )
+             ORDER BY ${receiptJobOrderSql()}
+             LIMIT 100`,
+            [
+              session.accountId,
+              expense.job_id ?? "00000000-0000-0000-0000-000000000000",
+            ],
           ),
           client.query<{ id: string; name: string }>(
             `SELECT id, name FROM clients WHERE account_id = $1 ORDER BY name ASC LIMIT 100`,
