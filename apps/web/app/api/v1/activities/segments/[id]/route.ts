@@ -517,21 +517,33 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     // so Detected visits / inline match chips don't double-count.
     await ignoreVisitCandidateForSegment(client, id, session.accountId);
 
-    // If the segment was linked to a property via a visit candidate, re-learn coords.
-    // Also try property_id from set_links candidate if present.
-    const { rows: propRows } = await client.query<{ property_id: string }>(
-      `SELECT property_id FROM visit_candidates
-       WHERE location_segment_id = $1 AND account_id = $2 AND property_id IS NOT NULL
-       ORDER BY updated_at DESC LIMIT 1`,
-      [id, session.accountId],
-    );
-    if (propRows[0]?.property_id) {
-      await learnPropertyCoordsFromSegment(
-        client,
-        propRows[0].property_id,
-        session.accountId,
-        id,
-      );
+    // Re-learn property coords only from the job/visit entity the user explicitly
+    // labeled — never from a just-ignored false match (would poison geofence).
+    if (d.activity_type === "job_work" && entityId) {
+      let propertyId: string | null = null;
+      if (entityType === "job") {
+        const pr = await client.query<{ property_id: string | null }>(
+          `SELECT property_id FROM jobs WHERE id = $1 AND account_id = $2`,
+          [entityId, session.accountId],
+        );
+        propertyId = pr.rows[0]?.property_id ?? null;
+      } else if (entityType === "visit") {
+        const pr = await client.query<{ property_id: string | null }>(
+          `SELECT j.property_id FROM visits v
+           JOIN jobs j ON j.id = v.job_id
+           WHERE v.id = $1 AND v.account_id = $2`,
+          [entityId, session.accountId],
+        );
+        propertyId = pr.rows[0]?.property_id ?? null;
+      }
+      if (propertyId) {
+        await learnPropertyCoordsFromSegment(
+          client,
+          propertyId,
+          session.accountId,
+          id,
+        );
+      }
     }
 
     await client.query("COMMIT");

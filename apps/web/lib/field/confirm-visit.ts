@@ -153,12 +153,17 @@ export async function ignoreVisitCandidateForSegment(
   );
 }
 
-/** Any non-cancelled visit on this job for the local calendar date of `at`. */
+/**
+ * Any non-cancelled visit on this job for the local calendar date of `at`.
+ * When workOrderId is set, only that work order's visits are considered
+ * (multi-WO jobs must not steal each other's field days).
+ */
 export async function findVisitForJobOnDateIncludingCompleted(
   client: PoolClient,
   accountId: string,
   jobId: string,
   at: string,
+  workOrderId?: string | null,
 ): Promise<string | null> {
   const { rows } = await client.query<{ id: string }>(
     `SELECT v.id
@@ -167,11 +172,12 @@ export async function findVisitForJobOnDateIncludingCompleted(
        AND (v.scheduled_start AT TIME ZONE 'America/New_York')::date
            = ($3::timestamptz AT TIME ZONE 'America/New_York')::date
        AND v.status <> 'cancelled'
+       AND ($4::uuid IS NULL OR v.work_order_id = $4::uuid)
      ORDER BY
        CASE WHEN v.status = 'completed' THEN 1 ELSE 0 END,
        v.scheduled_start ASC
      LIMIT 1`,
-    [jobId, accountId, at],
+    [jobId, accountId, at, workOrderId ?? null],
   );
   return rows[0]?.id ?? null;
 }
@@ -250,15 +256,6 @@ export async function ensureFieldDayVisit(
   }
 
   const jobId = opts.jobId!;
-  const existing = await findVisitForJobOnDateIncludingCompleted(
-    client,
-    opts.accountId,
-    jobId,
-    opts.arrivalTime,
-  );
-  if (existing) {
-    return { visitId: existing, created: false, reason: "existing_day" };
-  }
 
   const { rows: jobRows } = await client.query<{ status: string }>(
     `SELECT status FROM jobs WHERE id = $1 AND account_id = $2`,
@@ -269,9 +266,30 @@ export async function ensureFieldDayVisit(
     return { visitId: null, created: false, reason: "job_not_available" };
   }
 
+  // Resolve WO first so multi-WO jobs don't attach activity to the wrong day.
   const workOrderId = await resolveWorkOrderForFieldDay(client, jobId, opts.accountId);
   if (!workOrderId) {
     return { visitId: null, created: false, reason: "ambiguous_work_order" };
+  }
+
+  // Serialize concurrent confirms for the same job + local day (txn-scoped).
+  await client.query(
+    `SELECT pg_advisory_xact_lock(
+       hashtext($1::text),
+       hashtext(($2::timestamptz AT TIME ZONE 'America/New_York')::date::text)
+     )`,
+    [jobId, opts.arrivalTime],
+  );
+
+  const existing = await findVisitForJobOnDateIncludingCompleted(
+    client,
+    opts.accountId,
+    jobId,
+    opts.arrivalTime,
+    workOrderId,
+  );
+  if (existing) {
+    return { visitId: existing, created: false, reason: "existing_day" };
   }
 
   // Pad scheduled window to at least 1 hour for calendar display.
