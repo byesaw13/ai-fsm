@@ -871,15 +871,18 @@ export default async function JobDetailPage({
             </Card>
           )}
 
-          {!isTech && jobMaterialExpenses.length > 0 && (
+          {/* Materials: linked receipts + collapsed "link unassigned" (not a second card) */}
+          {!isTech && (jobMaterialExpenses.length > 0 || canLinkExpenses) && (
             <Card data-testid="job-materials-panel">
-              <SectionHeader title="Materials receipts" count={jobMaterialExpenses.length} />
+              <SectionHeader
+                title="Materials"
+                count={jobMaterialExpenses.length > 0 ? jobMaterialExpenses.length : undefined}
+              />
               <JobMaterialsPanel expenses={jobMaterialExpenses} />
+              {canLinkExpenses && (
+                <LinkForgottenExpensesPanel mode="job" jobId={job.id} />
+              )}
             </Card>
-          )}
-
-          {canLinkExpenses && (
-            <LinkForgottenExpensesPanel mode="job" jobId={job.id} />
           )}
 
           {/* Status Transitions — admin/owner only (explicit project completion) */}
