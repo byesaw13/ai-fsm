@@ -16,12 +16,19 @@ import {
   activityCategoryFor,
   type VisitClassification,
 } from "@ai-fsm/domain";
+import {
+  entityLinkFromCandidate,
+  ensureFieldDayVisit,
+  learnPropertyCoordsFromSegment,
+  markVisitCandidateConfirmed,
+} from "@/lib/field/confirm-visit";
 
 export const dynamic = "force-dynamic";
 
 // EPIC-007: review a detected visit.
-//   confirm → write an activity_entries ledger row (source auto_detected_location)
-//             and, if the property has no coords yet, learn them from the stop.
+//   confirm → write an activity_entries ledger row (source auto_visit),
+//             ensure a calendar field-day visit for multi-day T&M,
+//             and learn/re-learn property geofence coords from the stop.
 //   ignore  → mark ignored; nothing reaches the ledger.
 
 function idFromPath(request: NextRequest): string | undefined {
@@ -158,16 +165,28 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       );
     }
 
-    const activityType = CLASSIFICATION_TO_ACTIVITY[classification as Exclude<VisitClassification, "ignore">];
+    const fieldClass = classification as Exclude<VisitClassification, "ignore">;
+    const activityType = CLASSIFICATION_TO_ACTIVITY[fieldClass];
     const category = activityCategoryFor(activityType);
-    // Link to the strongest available entity (property isn't a ledger entity type).
-    const [entityType, entityId] = cand.job_id
-      ? ["job", cand.job_id]
-      : cand.visit_id
-        ? ["visit", cand.visit_id]
-        : cand.matched_client_id
-          ? ["client", cand.matched_client_id]
-          : [null, null];
+
+    // Multi-day T&M: ensure a calendar field day on the job for this stop.
+    const fieldDay = await ensureFieldDayVisit(client, {
+      accountId: session.accountId,
+      userId: session.userId,
+      jobId: cand.job_id,
+      visitId: cand.visit_id,
+      classification: fieldClass,
+      arrivalTime: cand.arrival_time,
+      departureTime: cand.departure_time,
+    });
+    const resolvedVisitId = fieldDay.visitId ?? cand.visit_id;
+
+    // Link to the strongest entity — prefer field-day visit over bare job.
+    const [entityType, entityId] = entityLinkFromCandidate({
+      visit_id: resolvedVisitId,
+      job_id: cand.job_id,
+      matched_client_id: cand.matched_client_id,
+    });
 
     const { rows: ins } = await client.query<{ id: string }>(
       `INSERT INTO activity_entries
@@ -175,7 +194,6 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
           started_at, ended_at, entity_type, entity_id, source, note)
        VALUES ($1, $2, $3::date, $4, $5, $6, $7, $8, $9, 'auto_visit', $10)
        RETURNING id`,
-
       [
         session.accountId, session.userId, cand.arrival_time, activityType, category,
         cand.arrival_time, cand.departure_time, entityType, entityId, d.note ?? null,
@@ -189,11 +207,13 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       resolved.rebalance,
     );
 
-    await client.query(
-      `UPDATE visit_candidates
-       SET status = 'confirmed', classification = $1, activity_entry_id = $2, updated_at = now()
-       WHERE id = $3 AND account_id = $4`,
-      [classification, entryId, id, session.accountId],
+    await markVisitCandidateConfirmed(
+      client,
+      id,
+      session.accountId,
+      fieldClass,
+      entryId,
+      resolvedVisitId,
     );
 
     // Keep captured-locations and visit-review in sync: confirming a match also
@@ -208,24 +228,28 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       );
     }
 
-    // Learn-on-confirm: bootstrap the property's geofence center from this stop's
-    // coordinates if it doesn't have any yet. Future visits then get distance
-    // scoring automatically.
-    if (cand.property_id) {
-      await client.query(
-        `UPDATE properties p
-         SET latitude = s.latitude, longitude = s.longitude,
-             coordinate_source = 'confirmed_visit', coordinate_confidence = 'confirmed',
-             coordinate_updated_at = now(), updated_at = now()
-         FROM location_segments s
-         WHERE p.id = $1 AND p.account_id = $2 AND p.latitude IS NULL
-           AND s.id = $3 AND s.latitude IS NOT NULL AND s.longitude IS NOT NULL`,
-        [cand.property_id, session.accountId, cand.location_segment_id],
+    // Learn-on-confirm: bootstrap missing coords, or re-learn when this stop
+    // is far from a poisoned pin (see shouldRelearnPropertyCoords).
+    if (cand.property_id && cand.location_segment_id) {
+      await learnPropertyCoordsFromSegment(
+        client,
+        cand.property_id,
+        session.accountId,
+        cand.location_segment_id,
       );
     }
 
     await client.query("COMMIT");
-    return NextResponse.json({ data: { id, status: "confirmed", activity_entry_id: entryId } });
+    return NextResponse.json({
+      data: {
+        id,
+        status: "confirmed",
+        activity_entry_id: entryId,
+        visit_id: resolvedVisitId,
+        field_day_created: fieldDay.created,
+        field_day_reason: fieldDay.reason,
+      },
+    });
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});
     logger.error("PATCH /api/v1/visit-candidates/[id] error", error, { traceId: session.traceId });

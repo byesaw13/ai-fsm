@@ -369,9 +369,18 @@ async function detectVisitCandidate(
        ORDER BY v.scheduled_start ASC LIMIT 1
      ) tv ON true
      LEFT JOIN LATERAL (
+       -- Include recently completed jobs so a false closeout (or same-week
+       -- multi-day T&M) still matches on-site stops for field-day creation.
        SELECT j.id FROM jobs j
-       WHERE j.property_id = p.id AND j.status IN ('scheduled','in_progress')
-       ORDER BY j.scheduled_start ASC NULLS LAST LIMIT 1
+       WHERE j.property_id = p.id
+         AND (
+           j.status IN ('scheduled','in_progress')
+           OR (j.status IN ('completed','invoiced') AND j.updated_at >= now() - interval '14 days')
+         )
+       ORDER BY
+         CASE WHEN j.status IN ('scheduled','in_progress') THEN 0 ELSE 1 END,
+         j.scheduled_start ASC NULLS LAST
+       LIMIT 1
      ) oj ON true
      WHERE p.account_id = $1
        AND (p.latitude IS NOT NULL OR tv.visit_id IS NOT NULL OR oj.id IS NOT NULL)`,

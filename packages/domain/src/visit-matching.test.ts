@@ -3,6 +3,9 @@ import {
   rankVisitCandidates,
   CLASSIFICATION_TO_ACTIVITY,
   VISIT_CONFIDENCE_FLOOR,
+  shouldEnsureFieldDayVisit,
+  shouldRelearnPropertyCoords,
+  PROPERTY_COORD_RELEARN_METERS,
   type VisitMatchCandidate,
 } from "./visit-matching";
 
@@ -84,5 +87,93 @@ describe("CLASSIFICATION_TO_ACTIVITY", () => {
     expect(CLASSIFICATION_TO_ACTIVITY.walkthrough).toBe("estimate_visit");
     expect(CLASSIFICATION_TO_ACTIVITY.material_drop).toBe("material_run");
     expect(CLASSIFICATION_TO_ACTIVITY.realtor).toBe("follow_up");
+  });
+});
+
+describe("shouldEnsureFieldDayVisit", () => {
+  it("requires a job, field classification, and enough dwell", () => {
+    expect(
+      shouldEnsureFieldDayVisit({
+        classification: "job_work",
+        jobId: "j1",
+        durationMinutes: 60,
+      }),
+    ).toBe(true);
+    expect(
+      shouldEnsureFieldDayVisit({
+        classification: "warranty_callback",
+        jobId: "j1",
+        durationMinutes: 20,
+      }),
+    ).toBe(true);
+    expect(
+      shouldEnsureFieldDayVisit({
+        classification: "job_work",
+        jobId: null,
+        durationMinutes: 60,
+      }),
+    ).toBe(false);
+    expect(
+      shouldEnsureFieldDayVisit({
+        classification: "material_drop",
+        jobId: "j1",
+        durationMinutes: 60,
+      }),
+    ).toBe(false);
+    expect(
+      shouldEnsureFieldDayVisit({
+        classification: "job_work",
+        jobId: "j1",
+        durationMinutes: 5,
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("shouldRelearnPropertyCoords", () => {
+  it("bootstraps when property has no coords", () => {
+    const d = shouldRelearnPropertyCoords({
+      storedLatitude: null,
+      storedLongitude: null,
+      stopLatitude: 42.97,
+      stopLongitude: -71.45,
+    });
+    expect(d).toEqual({ relearn: true, reason: "missing", distanceMeters: null });
+  });
+
+  it("relearns when stop is far from stored pin", () => {
+    // ~15 km — the Joseph poison-pin case
+    const d = shouldRelearnPropertyCoords({
+      storedLatitude: 42.862,
+      storedLongitude: -71.349,
+      stopLatitude: 42.9717,
+      stopLongitude: -71.4566,
+    });
+    expect(d.relearn).toBe(true);
+    expect(d.reason).toBe("far");
+    if (d.reason === "far") {
+      expect(d.distanceMeters).toBeGreaterThan(PROPERTY_COORD_RELEARN_METERS);
+    }
+  });
+
+  it("keeps coords when stop is near the pin", () => {
+    const d = shouldRelearnPropertyCoords({
+      storedLatitude: 42.97173,
+      storedLongitude: -71.45661,
+      stopLatitude: 42.97175,
+      stopLongitude: -71.45660,
+    });
+    expect(d.relearn).toBe(false);
+    expect(d.reason).toBe("keep");
+  });
+
+  it("skips when the stop has no coords", () => {
+    const d = shouldRelearnPropertyCoords({
+      storedLatitude: 42.97,
+      storedLongitude: -71.45,
+      stopLatitude: null,
+      stopLongitude: null,
+    });
+    expect(d).toEqual({ relearn: false, reason: "no_stop_coords", distanceMeters: null });
   });
 });

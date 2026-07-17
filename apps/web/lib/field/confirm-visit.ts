@@ -2,8 +2,14 @@ import type { PoolClient } from "pg";
 import {
   CLASSIFICATION_TO_ACTIVITY,
   activityCategoryFor,
+  shouldEnsureFieldDayVisit,
+  shouldRelearnPropertyCoords,
   type VisitClassification,
 } from "@ai-fsm/domain";
+import {
+  resolveWorkOrderForVisit,
+  syncWorkOrderStatus,
+} from "@/lib/work-orders/sync-status";
 
 export type PendingVisitCandidate = {
   id: string;
@@ -16,31 +22,63 @@ export type PendingVisitCandidate = {
   departure_time: string;
 };
 
+/** Prefer the field-day visit when present so labor attaches to the calendar day. */
 export function entityLinkFromCandidate(
   cand: Pick<PendingVisitCandidate, "job_id" | "visit_id" | "matched_client_id">,
 ): [string | null, string | null] {
-  if (cand.job_id) return ["job", cand.job_id];
   if (cand.visit_id) return ["visit", cand.visit_id];
+  if (cand.job_id) return ["job", cand.job_id];
   if (cand.matched_client_id) return ["client", cand.matched_client_id];
   return [null, null];
 }
 
+/**
+ * Bootstrap missing property coords, or overwrite when a confirmed stop is far
+ * from the stored pin (poisoned first-confirm).
+ */
 export async function learnPropertyCoordsFromSegment(
   client: PoolClient,
   propertyId: string,
   accountId: string,
   segmentId: string,
-): Promise<void> {
+): Promise<{ updated: boolean; reason: string }> {
+  const { rows } = await client.query<{
+    prop_lat: number | null;
+    prop_lng: number | null;
+    stop_lat: number | null;
+    stop_lng: number | null;
+  }>(
+    `SELECT p.latitude AS prop_lat, p.longitude AS prop_lng,
+            s.latitude AS stop_lat, s.longitude AS stop_lng
+     FROM properties p
+     JOIN location_segments s ON s.id = $3 AND s.account_id = $2
+     WHERE p.id = $1 AND p.account_id = $2`,
+    [propertyId, accountId, segmentId],
+  );
+  const row = rows[0];
+  if (!row) return { updated: false, reason: "not_found" };
+
+  const decision = shouldRelearnPropertyCoords({
+    storedLatitude: row.prop_lat,
+    storedLongitude: row.prop_lng,
+    stopLatitude: row.stop_lat,
+    stopLongitude: row.stop_lng,
+  });
+  if (!decision.relearn) {
+    return { updated: false, reason: decision.reason };
+  }
+
   await client.query(
     `UPDATE properties p
      SET latitude = s.latitude, longitude = s.longitude,
          coordinate_source = 'confirmed_visit', coordinate_confidence = 'confirmed',
          coordinate_updated_at = now(), updated_at = now()
      FROM location_segments s
-     WHERE p.id = $1 AND p.account_id = $2 AND p.latitude IS NULL
+     WHERE p.id = $1 AND p.account_id = $2
        AND s.id = $3 AND s.latitude IS NOT NULL AND s.longitude IS NOT NULL`,
     [propertyId, accountId, segmentId],
   );
+  return { updated: true, reason: decision.reason };
 }
 
 export async function insertVisitActivityEntry(
@@ -91,12 +129,14 @@ export async function markVisitCandidateConfirmed(
   accountId: string,
   classification: Exclude<VisitClassification, "ignore">,
   entryId: string,
+  visitId?: string | null,
 ): Promise<void> {
   await client.query(
     `UPDATE visit_candidates
-     SET status = 'confirmed', classification = $1, activity_entry_id = $2, updated_at = now()
+     SET status = 'confirmed', classification = $1, activity_entry_id = $2,
+         visit_id = COALESCE($5, visit_id), updated_at = now()
      WHERE id = $3 AND account_id = $4`,
-    [classification, entryId, candidateId, accountId],
+    [classification, entryId, candidateId, accountId, visitId ?? null],
   );
 }
 
@@ -111,4 +151,186 @@ export async function ignoreVisitCandidateForSegment(
      WHERE location_segment_id = $1 AND account_id = $2 AND status = 'pending'`,
     [segmentId, accountId],
   );
+}
+
+/**
+ * Any non-cancelled visit on this job for the local calendar date of `at`.
+ * When workOrderId is set, only that work order's visits are considered
+ * (multi-WO jobs must not steal each other's field days).
+ */
+export async function findVisitForJobOnDateIncludingCompleted(
+  client: PoolClient,
+  accountId: string,
+  jobId: string,
+  at: string,
+  workOrderId?: string | null,
+): Promise<string | null> {
+  const { rows } = await client.query<{ id: string }>(
+    `SELECT v.id
+     FROM visits v
+     WHERE v.job_id = $1 AND v.account_id = $2
+       AND (v.scheduled_start AT TIME ZONE 'America/New_York')::date
+           = ($3::timestamptz AT TIME ZONE 'America/New_York')::date
+       AND v.status <> 'cancelled'
+       AND ($4::uuid IS NULL OR v.work_order_id = $4::uuid)
+     ORDER BY
+       CASE WHEN v.status = 'completed' THEN 1 ELSE 0 END,
+       v.scheduled_start ASC
+     LIMIT 1`,
+    [jobId, accountId, at, workOrderId ?? null],
+  );
+  return rows[0]?.id ?? null;
+}
+
+/**
+ * Resolve a work order for historical field-day creation:
+ * prefer a single bookable WO; else the sole non-cancelled WO on the job.
+ */
+async function resolveWorkOrderForFieldDay(
+  client: PoolClient,
+  jobId: string,
+  accountId: string,
+): Promise<string | null> {
+  const bookable = await resolveWorkOrderForVisit(client, jobId, accountId, null);
+  if (bookable) return bookable;
+
+  const { rows } = await client.query<{ id: string }>(
+    `SELECT id FROM work_orders
+     WHERE job_id = $1 AND account_id = $2 AND status <> 'cancelled'
+     ORDER BY created_at ASC`,
+    [jobId, accountId],
+  );
+  if (rows.length === 1) return rows[0].id;
+  return null;
+}
+
+export type EnsureFieldDayResult = {
+  visitId: string | null;
+  created: boolean;
+  reason: string;
+};
+
+/**
+ * On confirm of field work for a job: reuse today's visit or auto-create a
+ * completed standard field day under the work order (multi-day T&M).
+ */
+export async function ensureFieldDayVisit(
+  client: PoolClient,
+  opts: {
+    accountId: string;
+    userId: string;
+    jobId: string | null;
+    visitId: string | null;
+    classification: string;
+    arrivalTime: string;
+    departureTime: string;
+  },
+): Promise<EnsureFieldDayResult> {
+  const durationMinutes = Math.max(
+    0,
+    Math.round(
+      (new Date(opts.departureTime).getTime() - new Date(opts.arrivalTime).getTime()) / 60_000,
+    ),
+  );
+
+  if (opts.visitId) {
+    return { visitId: opts.visitId, created: false, reason: "candidate_visit" };
+  }
+
+  if (
+    !shouldEnsureFieldDayVisit({
+      classification: opts.classification,
+      jobId: opts.jobId,
+      durationMinutes,
+    })
+  ) {
+    return {
+      visitId: null,
+      created: false,
+      reason: !opts.jobId
+        ? "no_job"
+        : durationMinutes < 15
+          ? "too_short"
+          : "not_field_classification",
+    };
+  }
+
+  const jobId = opts.jobId!;
+
+  const { rows: jobRows } = await client.query<{ status: string }>(
+    `SELECT status FROM jobs WHERE id = $1 AND account_id = $2`,
+    [jobId, opts.accountId],
+  );
+  const jobStatus = jobRows[0]?.status;
+  if (!jobStatus || jobStatus === "cancelled") {
+    return { visitId: null, created: false, reason: "job_not_available" };
+  }
+
+  // Resolve WO first so multi-WO jobs don't attach activity to the wrong day.
+  const workOrderId = await resolveWorkOrderForFieldDay(client, jobId, opts.accountId);
+  if (!workOrderId) {
+    return { visitId: null, created: false, reason: "ambiguous_work_order" };
+  }
+
+  // Serialize concurrent confirms for the same job + local day (txn-scoped).
+  await client.query(
+    `SELECT pg_advisory_xact_lock(
+       hashtext($1::text),
+       hashtext(($2::timestamptz AT TIME ZONE 'America/New_York')::date::text)
+     )`,
+    [jobId, opts.arrivalTime],
+  );
+
+  const existing = await findVisitForJobOnDateIncludingCompleted(
+    client,
+    opts.accountId,
+    jobId,
+    opts.arrivalTime,
+    workOrderId,
+  );
+  if (existing) {
+    return { visitId: existing, created: false, reason: "existing_day" };
+  }
+
+  // Pad scheduled window to at least 1 hour for calendar display.
+  const startMs = new Date(opts.arrivalTime).getTime();
+  const endMs = Math.max(
+    new Date(opts.departureTime).getTime(),
+    startMs + 60 * 60 * 1000,
+  );
+
+  const { rows } = await client.query<{ id: string }>(
+    `INSERT INTO visits (
+       account_id, job_id, work_order_id, assigned_user_id,
+       visit_type, status,
+       scheduled_start, scheduled_end, arrived_at, completed_at,
+       tech_notes
+     ) VALUES (
+       $1, $2, $3, $4,
+       'standard', 'completed',
+       $5, $6, $5, $7,
+       'Auto-created from confirmed on-site stop'
+     )
+     RETURNING id`,
+    [
+      opts.accountId,
+      jobId,
+      workOrderId,
+      opts.userId,
+      opts.arrivalTime,
+      new Date(endMs).toISOString(),
+      opts.departureTime,
+    ],
+  );
+
+  const visitId = rows[0]?.id ?? null;
+  if (visitId) {
+    await syncWorkOrderStatus(client, workOrderId, opts.accountId);
+  }
+
+  return {
+    visitId,
+    created: visitId != null,
+    reason: visitId ? "created" : "insert_failed",
+  };
 }
