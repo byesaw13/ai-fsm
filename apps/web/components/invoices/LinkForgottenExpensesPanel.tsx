@@ -61,7 +61,11 @@ export function LinkForgottenExpensesPanel({
       }
       const rows = (json.data?.expenses ?? []) as LinkableMaterialExpense[];
       setExpenses(rows);
-      if (isInvoice && rows.length > 0) setExpanded(true);
+      if (isInvoice && rows.length > 0) {
+        setExpanded(true);
+        // Pre-select receipts already on this job (ready to bill); leave orphans unchecked.
+        setSelected(new Set(rows.filter((e) => e.already_on_job).map((e) => e.id)));
+      }
     } catch {
       setError(
         isInvoice ? "Network error loading receipts" : "Could not load unlinked receipts",
@@ -151,10 +155,15 @@ export function LinkForgottenExpensesPanel({
           }}
         >
           <span>
-            Forgotten receipts
+            Material receipts
             {expenses.length > 0 && (
               <span style={{ marginLeft: 8, color: "var(--fg-muted)", fontWeight: 400 }}>
-                ({expenses.length} unlinked for this client)
+                (
+                {expenses.filter((e) => e.already_on_job).length} on job
+                {expenses.some((e) => !e.already_on_job)
+                  ? `, ${expenses.filter((e) => !e.already_on_job).length} unlinked`
+                  : ""}
+                )
               </span>
             )}
           </span>
@@ -170,9 +179,9 @@ export function LinkForgottenExpensesPanel({
                 color: "var(--fg-muted)",
               }}
             >
-              Material runs logged without a project appear here. Select receipts to attach to{" "}
-              <code style={{ fontSize: "11px" }}>{jobId.slice(0, 8)}…</code> and add billable
-              lines.
+              Select past material receipts to add as invoice line items. Job receipts are
+              pre-selected; unlinked client receipts can be attached at the same time. Or use{" "}
+              <strong>Pull materials from job receipts</strong> below for one-click.
             </p>
 
             {error && (
@@ -193,7 +202,7 @@ export function LinkForgottenExpensesPanel({
 
             {expenses.length === 0 ? (
               <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                No unlinked material receipts match this client.
+                No unbilled material receipts for this job or client.
               </p>
             ) : (
               <ul
@@ -235,7 +244,8 @@ export function LinkForgottenExpensesPanel({
                           <strong>{expense.vendor_name}</strong>
                           <span style={{ color: "var(--fg-muted)" }}>
                             {" "}
-                            · {expense.expense_date.slice(0, 10)} · materials{" "}
+                            · {expense.expense_date.slice(0, 10)} ·{" "}
+                            {expense.already_on_job ? "on job" : "unlinked"} · materials{" "}
                             {formatCents(materialCost)}
                             {materialHandlingCents(materialCost, handlingRate) > 0 &&
                               ` + handling ${formatCents(materialHandlingCents(materialCost, handlingRate))}`}{" "}
@@ -291,7 +301,9 @@ export function LinkForgottenExpensesPanel({
                   className="p7-btn p7-btn-primary p7-btn-sm"
                   data-testid="link-forgotten-expenses-btn"
                 >
-                  {pending ? "Linking…" : `Link & add to invoice (${selected.size})`}
+                  {pending
+                    ? "Adding…"
+                    : `Add selected as line items (${selected.size})`}
                 </button>
                 <button
                   type="button"

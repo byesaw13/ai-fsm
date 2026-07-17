@@ -23,6 +23,9 @@ export const GET = withRole(["owner", "admin"], async (request, session) => {
       }
 
       const job = await loadJobLinkContext(client, session.accountId, invoice.job_id);
+      // Include receipts already on this job (ready to bill) AND unlinked client
+      // receipts. Filtering out already_on_job hid the common case: past job
+      // materials with no path onto the invoice.
       const expenses = await fetchLinkableMaterialExpenses(
         client,
         session.accountId,
@@ -30,9 +33,7 @@ export const GET = withRole(["owner", "admin"], async (request, session) => {
         job.client_id,
       );
 
-      return {
-        expenses: expenses.filter((e) => !e.already_on_job),
-      };
+      return { expenses };
     });
 
     return NextResponse.json({ data });
