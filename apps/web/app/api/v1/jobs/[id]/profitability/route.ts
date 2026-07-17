@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { withRole } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import {
+  laborCostForMargin,
+  trackedLaborMinutesFromActivityEntries,
+} from "@/lib/invoices/tracked-labor";
 
 export const dynamic = "force-dynamic";
 
@@ -9,8 +13,8 @@ export const dynamic = "force-dynamic";
  * GET /api/v1/jobs/[id]/profitability
  *
  * Owner/admin only — internal cost data must never reach tech role.
- * Returns estimated vs actual labor cost, revenue from linked invoice,
- * and gross margin.
+ * Returns tracked hours, actual vs estimated labor cost, revenue, and gross margin.
+ * Margin uses actual tracked job_work when present (all jobs, not only T&M).
  */
 export const GET = withRole(["owner", "admin"], async (request: NextRequest, session) => {
   const id = request.url.match(/\/jobs\/([^/]+)\/profitability/)?.[1];
@@ -82,12 +86,19 @@ export const GET = withRole(["owner", "admin"], async (request: NextRequest, ses
     }
 
     const row = jobResult.rows[0];
+    const trackedMinutes = await trackedLaborMinutesFromActivityEntries(
+      client,
+      session.accountId,
+      id,
+    );
+    const labor = laborCostForMargin({
+      trackedMinutes,
+      estimatedLaborCostCents: row.estimated_labor_cost_cents,
+    });
 
     const revenue_cents = row.invoice_total_cents ?? row.estimated_total_cents ?? null;
-    // actual_cost_cents on jobs is maintained as the parts rollup by visit-parts write paths.
-    // estimated_labor_cost_cents comes from the approved estimate.
     const parts_cost_cents = row.parts_cost_cents ?? 0;
-    const labor_cost_cents = row.estimated_labor_cost_cents ?? null;
+    const labor_cost_cents = labor.laborCostCents;
     const cost_cents =
       labor_cost_cents !== null || parts_cost_cents > 0
         ? (labor_cost_cents ?? 0) + parts_cost_cents
@@ -104,8 +115,12 @@ export const GET = withRole(["owner", "admin"], async (request: NextRequest, ses
         job_id: row.id,
         job_title: row.title,
         job_status: row.status,
-        // Cost breakdown
+        // Time + cost breakdown
+        tracked_labor_minutes: Math.round(trackedMinutes),
+        tracked_labor_hours: labor.trackedHours,
+        actual_labor_cost_cents: labor.actualLaborCostCents,
         estimated_labor_cost_cents: row.estimated_labor_cost_cents,
+        labor_cost_source: labor.source,
         parts_cost_cents,
         travel_miles: row.travel_miles,
         // Revenue
@@ -113,7 +128,7 @@ export const GET = withRole(["owner", "admin"], async (request: NextRequest, ses
         invoice_total_cents: row.invoice_total_cents,
         invoice_paid_cents: row.invoice_paid_cents,
         invoice_status: row.invoice_status,
-        // Margin (est. labor + actual parts vs revenue)
+        // Margin (actual labor when tracked, else estimate + parts vs revenue)
         revenue_cents,
         labor_cost_cents,
         cost_cents,
