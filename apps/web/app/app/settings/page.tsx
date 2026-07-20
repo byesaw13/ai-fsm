@@ -15,7 +15,12 @@ export const dynamic = "force-dynamic";
 interface AccountRow extends Record<string, unknown> {
   id: string;
   name: string;
-  settings: { invoice_terms?: string; estimate_expiry_days?: number };
+  settings: {
+    invoice_terms?: string;
+    deposit_percent?: number;
+    deposit_terms?: string;
+    estimate_expiry_days?: number;
+  };
   day_review_cutoff_time: string;
   min_stop_dwell_minutes: number;
   visit_confidence_threshold: number;

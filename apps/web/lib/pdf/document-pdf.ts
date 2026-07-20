@@ -56,6 +56,8 @@ export interface PdfBranding {
   logoPath?: string | null;
   invoiceTerms?: string | null;
   estimateTerms?: string | null;
+  /** Deposits wording with the standard percentage already substituted. */
+  depositTerms?: string | null;
 }
 
 export interface InvoicePdfData {
@@ -201,6 +203,8 @@ interface RenderInput {
   /** Body section (Payment Terms / Estimate Terms) — matches HTML print. */
   terms?: string | null;
   termsTitle?: string;
+  /** Deposits section (standard deposit policy) — rendered after terms. */
+  depositTerms?: string | null;
   footer: string;
   branding?: PdfBranding | null;
   /** When true, draw a red PAID stamp (invoices only). */
@@ -489,6 +493,18 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
     }
   }
 
+  // --- Deposits (standard deposit policy, set in Settings) ------------------
+  if (input.depositTerms && input.depositTerms.trim()) {
+    ctx.y -= 14;
+    ensureSpace(ctx, 60);
+    drawSectionHeader(ctx, "DEPOSITS");
+    for (const ln of wrap(input.depositTerms.trim(), font, 10, CONTENT_W)) {
+      ensureSpace(ctx, 16);
+      text(ln, MARGIN, ctx.y, 10, font, INK);
+      ctx.y -= 14;
+    }
+  }
+
   // --- Footer thanks (bottom of last page) ----------------------------------
   const footerLines = wrap(input.footer, font, 9, CONTENT_W);
   // If content would collide with footer, push to a new page
@@ -613,6 +629,7 @@ export async function buildInvoicePdf(d: InvoicePdfData): Promise<Uint8Array> {
     notes: d.notes,
     terms,
     termsTitle: "PAYMENT TERMS",
+    depositTerms: d.branding?.depositTerms,
     footer,
     branding: d.branding,
     isPaid,
@@ -655,6 +672,9 @@ export async function buildEstimatePdf(d: EstimatePdfData): Promise<Uint8Array> 
     notes: d.notes,
     terms,
     termsTitle: "ESTIMATE TERMS",
+    // Only state the deposit policy when this estimate actually requires a
+    // deposit — otherwise the PDF would demand one the estimate didn't.
+    depositTerms: d.depositCents && d.depositCents > 0 ? d.branding?.depositTerms : null,
     footer,
     branding: d.branding,
   });

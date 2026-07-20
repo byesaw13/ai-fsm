@@ -24,7 +24,7 @@ interface InvoiceRow extends Record<string, unknown> {
   property_state: string | null;
   property_zip: string | null;
   account_name: string;
-  account_settings: { invoice_terms?: string };
+  account_settings: { invoice_terms?: string; deposit_percent?: number; deposit_terms?: string };
 }
 
 interface LineItemRow extends Record<string, unknown> {

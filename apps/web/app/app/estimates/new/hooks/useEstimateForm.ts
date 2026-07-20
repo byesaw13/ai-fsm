@@ -7,6 +7,7 @@ import { formatCents, getStandardEstimateTerms } from "@/lib/estimates/pricing";
 import type { DepositDueTrigger, DepositType } from "@/lib/estimates/deposit-policy";
 import {
   ENGINE_VERSION,
+  STANDARD_DEPOSIT_PERCENT,
   type MaterialSuggestion,
   type EstimateSpec,
 } from "@ai-fsm/domain";
@@ -65,6 +66,8 @@ export interface Property {
 }
 
 export interface NewEstimateFormProps {
+  /** Standard deposit % from Settings — the default for a new estimate. */
+  defaultDepositPercent?: number;
   clients: Client[];
   jobs: Job[];
   properties: Property[];
@@ -106,6 +109,7 @@ export function useEstimateForm({
   initialNotes,
   bookingRequestId,
   serverAssessmentContext = null,
+  defaultDepositPercent,
 }: NewEstimateFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -144,7 +148,9 @@ export function useEstimateForm({
   const [sendImmediately, setSendImmediately] = useState(false);
   const [depositRequired, setDepositRequired] = useState(false);
   const [depositType, setDepositType] = useState<DepositType>("none");
-  const [depositPercentage, setDepositPercentage] = useState("30");
+  const [depositPercentage, setDepositPercentage] = useState(
+    String(defaultDepositPercent ?? STANDARD_DEPOSIT_PERCENT),
+  );
   const [depositFixedDollars, setDepositFixedDollars] = useState("0.00");
   const [depositDueTrigger, setDepositDueTrigger] = useState<DepositDueTrigger>("before_scheduling");
   const [termsScopeAccepted, setTermsScopeAccepted] = useState(false);
