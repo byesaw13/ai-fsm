@@ -108,6 +108,8 @@ export function SendSmsButton({ clientId, clientName, phone, defaultJobId }: Pro
         ) : (
           <form onSubmit={handleSend} style={{ marginTop: 16, display: "grid", gap: 12 }}>
             <Textarea
+              id="send-sms-message"
+              label="Message"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Type your message…"
