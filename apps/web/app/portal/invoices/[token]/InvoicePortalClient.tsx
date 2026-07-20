@@ -320,7 +320,11 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
                 cursor: loadingPayment ? "default" : "pointer"
               }}
             >
-              {loadingPayment ? "Starting secure checkout…" : `Pay ${cents(balance)} by card`}
+              {loadingPayment
+                ? "Starting secure checkout…"
+                : depositDueNow > 0
+                  ? `Pay ${cents(depositDueNow)} deposit by card`
+                  : `Pay ${cents(balance)} by card`}
             </button>
             <div style={{ textAlign: "center", fontSize: 11, color: "#78716c", marginTop: 8 }}>Secure payment powered by Square</div>
             {paymentError && <div style={{ color: "#b91c1c", fontSize: 13, marginTop: 8, textAlign: "center" }}>{paymentError}</div>}

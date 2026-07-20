@@ -124,4 +124,40 @@ describe("POST /api/v1/invoices/[id]/square-link", () => {
     expect(res.status).toBe(201);
     expect(mockCreateLink).toHaveBeenCalledWith(ENABLED_SETTINGS, expect.objectContaining({ amountCents: 30000 }));
   });
+
+  it("charges only the unpaid part of the deposit", async () => {
+    // 30% of $1000 = $300, but $100 already paid → charge $200.
+    const withPolicy = {
+      ...PAYABLE_INVOICE,
+      paid_cents: 10000,
+      deposit_cents: 0,
+      deposit_type: "percentage",
+      deposit_percentage: 30,
+      deposit_fixed_cents: null,
+    };
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [withPolicy], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ id: "PAYROW" }], rowCount: 1 });
+    mockLoad.mockResolvedValue(ENABLED_SETTINGS);
+    mockCreateLink.mockResolvedValue({ url: "https://sq/checkout/PL3", orderId: "ORD3", paymentLinkId: "PL3" });
+
+    const res = await POST(post({ kind: "deposit" }));
+    expect(res.status).toBe(201);
+    expect(mockCreateLink).toHaveBeenCalledWith(ENABLED_SETTINGS, expect.objectContaining({ amountCents: 20000 }));
+  });
+
+  it("400 on a deposit link once the deposit is already covered by payments", async () => {
+    const covered = {
+      ...PAYABLE_INVOICE,
+      paid_cents: 30000, // deposit already paid
+      deposit_cents: 0,
+      deposit_type: "percentage",
+      deposit_percentage: 30,
+      deposit_fixed_cents: null,
+    };
+    mockClientQuery.mockResolvedValueOnce({ rows: [covered], rowCount: 1 });
+    const res = await POST(post({ kind: "deposit" }));
+    expect(res.status).toBe(400);
+  });
 });

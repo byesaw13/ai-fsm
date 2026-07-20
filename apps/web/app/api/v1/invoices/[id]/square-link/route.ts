@@ -103,10 +103,15 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           },
           invoice.total_cents,
         );
-        amount = policyDeposit > 0 ? policyDeposit : invoice.deposit_cents;
+        // First-payment model: only charge the still-unpaid part of the deposit.
+        const policyDepositRemaining = Math.max(0, policyDeposit - invoice.paid_cents);
+        amount = policyDepositRemaining > 0 ? policyDepositRemaining : invoice.deposit_cents;
         paymentType = "deposit";
         if (amount <= 0) {
-          throw Object.assign(new Error("This invoice has no deposit amount"), { code: "VALIDATION_ERROR" });
+          throw Object.assign(
+            new Error("This invoice has no deposit amount due"),
+            { code: "VALIDATION_ERROR" },
+          );
         }
       } else if (kind === "balance") {
         amount = remaining;
