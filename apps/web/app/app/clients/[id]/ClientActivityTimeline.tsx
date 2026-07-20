@@ -33,6 +33,8 @@ export function eventHref(event: ActivityEvent): string | null {
     case "visit":     return event.link_id ? `/app/visits/${event.link_id}` : null;
     case "estimate":  return event.link_id ? `/app/estimates/${event.link_id}` : null;
     case "invoice":   return event.link_id ? `/app/invoices/${event.link_id}` : null;
+    // communication.link_id is job_id when present
+    case "communication": return event.link_id ? `/app/jobs/${event.link_id}` : null;
     default:          return null;
   }
 }

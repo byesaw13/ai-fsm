@@ -187,7 +187,8 @@ export async function POST(req: NextRequest) {
     accountId,
     channel: "sms",
     direction: "inbound",
-    outcome: "replied",
+    // "received" = we ingested the inbound SMS (not that we texted back)
+    outcome: "received",
     clientId,
     jobId: null,
     bodyPreview: message.slice(0, 1000),
