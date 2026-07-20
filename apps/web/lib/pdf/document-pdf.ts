@@ -672,7 +672,9 @@ export async function buildEstimatePdf(d: EstimatePdfData): Promise<Uint8Array> 
     notes: d.notes,
     terms,
     termsTitle: "ESTIMATE TERMS",
-    depositTerms: d.branding?.depositTerms,
+    // Only state the deposit policy when this estimate actually requires a
+    // deposit — otherwise the PDF would demand one the estimate didn't.
+    depositTerms: d.depositCents && d.depositCents > 0 ? d.branding?.depositTerms : null,
     footer,
     branding: d.branding,
   });

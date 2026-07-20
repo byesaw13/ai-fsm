@@ -54,7 +54,19 @@ describe("resolveDepositPolicy", () => {
     ).toBe(STANDARD_DEPOSIT_PERCENT);
   });
 
-  it("accepts 0% as a real setting (no deposit required)", () => {
-    expect(resolveDepositPolicy({ deposit_percent: 0 }).percent).toBe(0);
+  it("treats 0% as 'no deposit' — emits no default copy to render", () => {
+    const { percent, terms } = resolveDepositPolicy({ deposit_percent: 0 });
+    expect(percent).toBe(0);
+    // Documents only render non-empty terms, so this shows no Deposits section
+    // rather than "a deposit of 0% is required".
+    expect(terms).toBe("");
+  });
+
+  it("still honors explicit custom wording at 0%", () => {
+    const { terms } = resolveDepositPolicy({
+      deposit_percent: 0,
+      deposit_terms: "We do not require deposits.",
+    });
+    expect(terms).toBe("We do not require deposits.");
   });
 });

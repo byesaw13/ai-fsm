@@ -237,9 +237,14 @@ export function resolveDepositPolicy(
     typeof raw === "number" && Number.isFinite(raw) && raw >= 0 && raw <= 100
       ? raw
       : STANDARD_DEPOSIT_PERCENT;
+  const custom = settings?.deposit_terms?.trim();
+  // 0% means the business takes no deposit — suppress the default
+  // "a deposit is required" copy so documents don't say "a deposit of 0%".
+  // Explicit custom wording is still honored.
+  if (percent === 0 && !custom) return { percent, terms: "" };
   return {
     percent,
-    terms: renderDepositTerms(settings?.deposit_terms?.trim() || STANDARD_DEPOSIT_TERMS, percent),
+    terms: renderDepositTerms(custom || STANDARD_DEPOSIT_TERMS, percent),
   };
 }
 
