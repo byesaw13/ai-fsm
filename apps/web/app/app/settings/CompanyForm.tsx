@@ -42,7 +42,11 @@ export function CompanyForm({ initialName, initialSettings }: Props) {
           settings: {
             invoice_terms: invoiceTerms || undefined,
             deposit_percent: depositPercent !== "" ? parseFloat(depositPercent) : undefined,
-            deposit_terms: depositTerms || undefined,
+            // Send the raw string (not `|| undefined`): clearing this box must
+            // persist "" so the separate Deposits section is suppressed. The
+            // PATCH merges with `settings || jsonb`, and JSON.stringify drops
+            // undefined keys, so `|| undefined` could never clear it.
+            deposit_terms: depositTerms,
             estimate_expiry_days: expiryDays ? parseInt(expiryDays, 10) : undefined,
           },
         }),
