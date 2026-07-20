@@ -103,4 +103,25 @@ describe("POST /api/v1/invoices/[id]/square-link", () => {
     const res = await POST(post({ kind: "custom", amount_cents: 200000 }));
     expect(res.status).toBe(400);
   });
+
+  it("charges the computed deposit-policy amount, not deposit_cents", async () => {
+    // 30% of the $1000 total = $300, even though deposit_cents is 0.
+    const withPolicy = {
+      ...PAYABLE_INVOICE,
+      deposit_cents: 0,
+      deposit_type: "percentage",
+      deposit_percentage: 30,
+      deposit_fixed_cents: null,
+    };
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [withPolicy], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ id: "PAYROW" }], rowCount: 1 });
+    mockLoad.mockResolvedValue(ENABLED_SETTINGS);
+    mockCreateLink.mockResolvedValue({ url: "https://sq/checkout/PL2", orderId: "ORD2", paymentLinkId: "PL2" });
+
+    const res = await POST(post({ kind: "deposit" }));
+    expect(res.status).toBe(201);
+    expect(mockCreateLink).toHaveBeenCalledWith(ENABLED_SETTINGS, expect.objectContaining({ amountCents: 30000 }));
+  });
 });

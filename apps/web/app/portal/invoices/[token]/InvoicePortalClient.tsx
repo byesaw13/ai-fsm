@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { STANDARD_INVOICE_TERMS, resolveDepositPolicy, renderDepositTerms } from "@ai-fsm/domain";
+import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
 import { PaidStamp } from "@/components/invoices/PaidStamp";
 
 interface LineItem {
@@ -20,6 +21,9 @@ interface Invoice {
   total_cents: number;
   paid_cents: number;
   deposit_cents: number | null;
+  deposit_type: string | null;
+  deposit_percentage: number | null;
+  deposit_fixed_cents: number | null;
   notes: string | null;
   due_date: string | null;
   paid_at: string | null;
@@ -51,6 +55,17 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
   const [paymentError, setPaymentError] = useState("");
 
   const balance = Math.max(0, invoice.total_cents - paidCents);
+  // Requested deposit (first-payment model): how much of the deposit is still owed.
+  const requestedDeposit = requestedDepositCents(
+    {
+      depositType: (invoice.deposit_type ?? "none") as InvoiceDepositType,
+      depositPercentage: invoice.deposit_percentage,
+      depositFixedCents: invoice.deposit_fixed_cents,
+    },
+    invoice.total_cents,
+  );
+  const depositDueNow = Math.max(0, requestedDeposit - paidCents);
+  const remainingAfterDeposit = Math.max(0, invoice.total_cents - requestedDeposit);
   // Match print/PDF: paid status OR fully covered by payments.
   const isPaid =
     status === "paid" ||
@@ -247,6 +262,14 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
               <span>Balance due</span>
               <span style={{ fontFamily: "monospace" }}>{cents(isPaid ? 0 : balance)}</span>
             </div>
+            {!isPaid && !isVoid && depositDueNow > 0 && (
+              <div style={{ marginTop: 6, textAlign: "right", fontSize: 13, color: "#b45309", fontWeight: 700 }}>
+                Deposit due now: <span style={{ fontFamily: "monospace" }}>{cents(depositDueNow)}</span>
+                <div style={{ fontWeight: 500, color: "#78716c" }}>
+                  then {cents(remainingAfterDeposit)} due on completion
+                </div>
+              </div>
+            )}
             {isPaid && (
               <div style={{ fontSize: 13, fontWeight: 700, color: "#166534", marginTop: 2 }}>
                 No balance remaining

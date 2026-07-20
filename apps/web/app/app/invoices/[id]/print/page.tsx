@@ -11,6 +11,7 @@ import {
 import { DocumentPrintBar } from "@/components/documents/DocumentPrintBar";
 import { PaidStamp } from "@/components/invoices/PaidStamp";
 import { formatLineQuantityDisplay } from "@/lib/invoices/quantity";
+import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
 import {
   documentJoins,
   documentLocationSelect,
@@ -28,6 +29,9 @@ interface InvoiceRow {
   total_cents: number;
   paid_cents: number;
   paid_at: string | null;
+  deposit_type: string | null;
+  deposit_percentage: number | null;
+  deposit_fixed_cents: number | null;
   notes: string | null;
   due_date: string | null;
   sent_at: string | null;
@@ -80,6 +84,7 @@ export default async function InvoicePrintPage({
       `SELECT
          i.id, i.status, i.invoice_number,
          i.subtotal_cents, i.tax_cents, i.total_cents, i.paid_cents, i.paid_at,
+         i.deposit_type, i.deposit_percentage, i.deposit_fixed_cents,
          i.notes, i.due_date, i.sent_at, i.created_at,
          j.title AS job_title,
          a.name AS account_name, a.settings AS account_settings,
@@ -117,6 +122,19 @@ export default async function InvoicePrintPage({
   const contactLines = brandingContactLines(branding);
   const hasLogo = !!branding.logoPath;
   const balance = invoice.total_cents - invoice.paid_cents;
+  const invoicePaid =
+    invoice.status === "paid" || (invoice.total_cents > 0 && invoice.paid_cents >= invoice.total_cents);
+  const depositDueNow = Math.max(
+    0,
+    requestedDepositCents(
+      {
+        depositType: (invoice.deposit_type ?? "none") as InvoiceDepositType,
+        depositPercentage: invoice.deposit_percentage,
+        depositFixedCents: invoice.deposit_fixed_cents,
+      },
+      invoice.total_cents,
+    ) - invoice.paid_cents,
+  );
   const issuedDate = fmtDate(invoice.sent_at ?? invoice.created_at);
   const dueDate = fmtDate(invoice.due_date);
   const paymentTerms = branding.invoiceTerms || STANDARD_INVOICE_TERMS;
@@ -292,6 +310,12 @@ export default async function InvoicePrintPage({
                 <td colSpan={3}>Balance Due</td>
                 <td className="amt">{formatCents(balance)}</td>
               </tr>
+              {!invoicePaid && depositDueNow > 0 && (
+              <tr className="total-row">
+                <td colSpan={3}>Deposit Due Now</td>
+                <td className="amt">{formatCents(depositDueNow)}</td>
+              </tr>
+              )}
             </tfoot>
           </table>
         </div>
