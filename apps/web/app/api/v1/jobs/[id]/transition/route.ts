@@ -9,6 +9,7 @@ import { jobTransitions, jobStatusSchema } from "@ai-fsm/domain";
 import type { JobStatus } from "@ai-fsm/domain";
 import { reviewJobIntakeGate } from "../../../../../../lib/jobs/intake-guard";
 import { createDraftFinalInvoiceForJob } from "../../../../../../lib/invoices/final-invoice";
+import { markLinkedBookingRequestConverted } from "../../../../../../lib/booking-requests/fulfill";
 
 export const dynamic = "force-dynamic";
 
@@ -136,6 +137,23 @@ export const POST = withRole(
           await client.query("RELEASE SAVEPOINT before_final_invoice");
           logger.error("job completion: auto-create invoice draft failed (non-fatal)", invoiceErr, {
             traceId: session.traceId,
+          });
+        }
+      }
+
+      // Finish the intake request as converted (not cancelled) when work is done.
+      if (targetStatus === "completed" || targetStatus === "invoiced") {
+        try {
+          await markLinkedBookingRequestConverted(client, {
+            accountId: session.accountId,
+            jobId: id,
+            userId: session.userId,
+            note: `Auto-converted: project moved to ${targetStatus}.`,
+          });
+        } catch (brErr) {
+          logger.error("job transition: mark booking converted failed (non-fatal)", brErr, {
+            traceId: session.traceId,
+            jobId: id,
           });
         }
       }

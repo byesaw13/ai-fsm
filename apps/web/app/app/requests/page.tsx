@@ -139,7 +139,12 @@ export default async function RequestsPage({ searchParams }: PageProps) {
   if (session.role === "tech") redirect("/app");
 
   const { status: statusFilter } = await searchParams;
-  const validStatus = STATUS_ORDER.includes(statusFilter ?? "") ? statusFilter : null;
+  // Default to pending so the queue opens on new work, not the full history dump.
+  // Use ?status=all for the unfiltered list.
+  const rawFilter = statusFilter ?? "pending";
+  const showAll = rawFilter === "all";
+  const validStatus =
+    !showAll && STATUS_ORDER.includes(rawFilter) ? rawFilter : showAll ? null : "pending";
 
   const conditions = ["br.account_id = $1"];
   const params: unknown[] = [session.accountId];
@@ -194,14 +199,14 @@ export default async function RequestsPage({ searchParams }: PageProps) {
 
       <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginBottom: "var(--space-4)" }}>
         <Link
-          href={"/app/requests" as Route}
+          href={"/app/requests?status=all" as Route}
           style={{
             padding: "4px 12px",
             borderRadius: "var(--radius-full)",
             fontSize: "var(--text-sm)",
-            fontWeight: !validStatus ? 600 : 400,
-            background: !validStatus ? "var(--accent)" : "var(--bg-subtle)",
-            color: !validStatus ? "#fff" : "var(--fg)",
+            fontWeight: showAll ? 600 : 400,
+            background: showAll ? "var(--accent)" : "var(--bg-subtle)",
+            color: showAll ? "#fff" : "var(--fg)",
             textDecoration: "none",
           }}
         >
@@ -229,7 +234,11 @@ export default async function RequestsPage({ searchParams }: PageProps) {
       {rows.length === 0 ? (
         <EmptyState
           title="No requests"
-          description={validStatus ? `No ${STATUS_LABELS[validStatus].toLowerCase()} requests.` : "New requests from the booking form, calls, and quick capture will appear here."}
+          description={
+            validStatus
+              ? `No ${STATUS_LABELS[validStatus].toLowerCase()} requests.`
+              : "New requests from the booking form, calls, and quick capture will appear here."
+          }
         />
       ) : (
         <div style={{ display: "grid", gap: "var(--space-3)" }}>
