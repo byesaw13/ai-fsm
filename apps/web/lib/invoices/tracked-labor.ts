@@ -82,6 +82,28 @@ export function laborCostForMargin(opts: {
 }
 
 /**
+ * Shared WHERE for job-linked closed job_work rows.
+ * Params: $1 accountId, $2 jobId.
+ */
+export const TRACKED_LABOR_JOB_WORK_WHERE = `
+   ae.account_id = $1
+   AND ae.activity_type = 'job_work'
+   AND ae.voided_at IS NULL
+   AND ae.started_at IS NOT NULL
+   AND ae.ended_at IS NOT NULL
+   AND (
+     (ae.entity_type = 'job' AND ae.entity_id = $2)
+     OR (
+       ae.entity_type = 'visit'
+       AND ae.entity_id IN (
+         SELECT v.id FROM visits v
+         WHERE v.job_id = $2 AND v.account_id = $1
+       )
+     )
+   )
+`;
+
+/**
  * SQL fragment body that sums job_work minutes for a job.
  * Includes time linked to the job OR to any of its visits (multi-day T&M).
  * Params: $accountId, $jobId — callers bind positionally.
@@ -89,22 +111,73 @@ export function laborCostForMargin(opts: {
 export const TRACKED_LABOR_MINUTES_SQL = `
   SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (ae.ended_at - ae.started_at)) / 60), 0)::numeric AS tracked_minutes
     FROM activity_entries ae
-   WHERE ae.account_id = $1
-     AND ae.activity_type = 'job_work'
-     AND ae.voided_at IS NULL
-     AND ae.started_at IS NOT NULL
-     AND ae.ended_at IS NOT NULL
-     AND (
-       (ae.entity_type = 'job' AND ae.entity_id = $2)
-       OR (
-         ae.entity_type = 'visit'
-         AND ae.entity_id IN (
-           SELECT v.id FROM visits v
-           WHERE v.job_id = $2 AND v.account_id = $1
-         )
-       )
-     )
+   WHERE ${TRACKED_LABOR_JOB_WORK_WHERE}
 `;
+
+/**
+ * One row per work day for transparent job-page display.
+ * Groups by session_date (business day), with first start / last end and total minutes.
+ * Params: $1 accountId, $2 jobId.
+ */
+export const TRACKED_LABOR_DAYS_SQL = `
+  SELECT
+    ae.session_date::text AS work_date,
+    MIN(ae.started_at) AS started_at,
+    MAX(ae.ended_at) AS ended_at,
+    COALESCE(SUM(EXTRACT(EPOCH FROM (ae.ended_at - ae.started_at)) / 60), 0)::numeric AS minutes,
+    COUNT(*)::int AS entry_count
+  FROM activity_entries ae
+  WHERE ${TRACKED_LABOR_JOB_WORK_WHERE}
+  GROUP BY ae.session_date
+  ORDER BY ae.session_date ASC
+`;
+
+export type TrackedLaborDay = {
+  /** Business date YYYY-MM-DD (session_date) */
+  work_date: string;
+  started_at: string | Date;
+  ended_at: string | Date;
+  minutes: number;
+  entry_count: number;
+  hours: number;
+};
+
+/**
+ * Format minutes as "6h 4m" / "45m" / "10h" for transparent day rows.
+ */
+export function formatMinutesAsHoursMinutes(minutes: number): string {
+  const total = Math.max(0, Math.round(minutes));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+/**
+ * Map raw day rows (from TRACKED_LABOR_DAYS_SQL) into display-ready records.
+ */
+export function mapTrackedLaborDayRows(
+  rows: Array<{
+    work_date: string;
+    started_at: string | Date;
+    ended_at: string | Date;
+    minutes: string | number;
+    entry_count: string | number;
+  }>,
+): TrackedLaborDay[] {
+  return rows.map((r) => {
+    const minutes = Number(r.minutes ?? 0);
+    return {
+      work_date: r.work_date,
+      started_at: r.started_at,
+      ended_at: r.ended_at,
+      minutes,
+      entry_count: Number(r.entry_count ?? 0),
+      hours: trackedHoursFromMinutes(minutes),
+    };
+  });
+}
 
 /**
  * Tracked billable labor for a job — source of truth for:
@@ -124,6 +197,24 @@ export async function trackedLaborMinutesFromActivityEntries(
     [accountId, jobId],
   );
   return Number(r.rows[0]?.tracked_minutes ?? 0);
+}
+
+/**
+ * Day-by-day tracked job_work for a job (transparent hours record).
+ */
+export async function trackedLaborDaysFromActivityEntries(
+  client: PoolClient,
+  accountId: string,
+  jobId: string,
+): Promise<TrackedLaborDay[]> {
+  const r = await client.query<{
+    work_date: string;
+    started_at: string | Date;
+    ended_at: string | Date;
+    minutes: string;
+    entry_count: number;
+  }>(TRACKED_LABOR_DAYS_SQL, [accountId, jobId]);
+  return mapTrackedLaborDayRows(r.rows);
 }
 
 /**
