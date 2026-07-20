@@ -8,6 +8,7 @@ import { estimateStatusSchema, estimateTransitions } from "@ai-fsm/domain";
 import type { EstimateStatus } from "@ai-fsm/domain";
 import { createApprovalArtifacts } from "@/lib/estimates/approve";
 import { createJobFromEstimate } from "@/lib/estimates/create-job-db";
+import { advanceBookingRequestForEstimate } from "@/lib/booking-requests/advance-stage";
 
 export const dynamic = "force-dynamic";
 
@@ -190,6 +191,36 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             });
           }
         }
+
+        // Won the lead: mark linked booking request converted
+        await advanceBookingRequestForEstimate(client, {
+          accountId: session.accountId,
+          estimateId: id,
+          target: "converted",
+          actorId: session.userId,
+          note: "Estimate approved",
+        }).catch((err) =>
+          logger.error("estimate transition: booking request convert failed (non-fatal)", err, {
+            traceId: session.traceId,
+            estimateId: id,
+          })
+        );
+      }
+
+      if (targetStatus === "declined") {
+        await advanceBookingRequestForEstimate(client, {
+          accountId: session.accountId,
+          estimateId: id,
+          target: "lost",
+          actorId: session.userId,
+          closedReason: "estimate_declined",
+          note: "Estimate declined",
+        }).catch((err) =>
+          logger.error("estimate transition: booking request lost failed (non-fatal)", err, {
+            traceId: session.traceId,
+            estimateId: id,
+          })
+        );
       }
 
       // Audit log

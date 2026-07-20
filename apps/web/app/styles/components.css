@@ -52,6 +52,15 @@
 .p7-badge-status-arrived     { background: var(--status-arrived-bg);     color: var(--status-arrived-fg); }
 .p7-badge-status-quoted      { background: var(--status-quoted-bg);      color: var(--status-quoted-fg); }
 .p7-badge-status-invoiced    { background: var(--status-invoiced-bg);    color: var(--status-invoiced-fg); }
+/* Booking request funnel */
+.p7-badge-status-pending           { background: var(--color-slate-100);  color: var(--color-slate-700); }
+.p7-badge-status-needs_info        { background: var(--color-amber-100);  color: var(--color-amber-600); }
+.p7-badge-status-duplicate         { background: var(--color-slate-100);  color: var(--color-slate-500); }
+.p7-badge-status-reviewed          { background: var(--color-blue-100);   color: var(--color-blue-600); }
+.p7-badge-status-assessment_booked { background: var(--color-violet-100); color: var(--color-violet-600); }
+.p7-badge-status-estimated         { background: var(--color-blue-100);   color: var(--color-blue-600); }
+.p7-badge-status-converted         { background: var(--color-green-100);  color: var(--color-green-600); }
+.p7-badge-status-lost              { background: var(--color-red-100);    color: var(--color-red-600); }
 
 /* Priority variants */
 .p7-badge-priority-urgent { background: var(--priority-urgent-bg); color: var(--priority-urgent-fg); }

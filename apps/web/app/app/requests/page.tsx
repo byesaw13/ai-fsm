@@ -5,21 +5,26 @@ import { getSession } from "@/lib/auth/session";
 import { query } from "@/lib/db";
 import { Card, EmptyState, LinkButton, PageContainer, PageHeader, StatusBadge } from "@/components/ui";
 import type { StatusVariant } from "@/components/ui";
-import { PRICING_MODE_LABELS } from "@ai-fsm/domain";
+import { BOOKING_REQUEST_OPEN_STATUSES, BOOKING_REQUEST_STATUS_LABELS, PRICING_MODE_LABELS } from "@ai-fsm/domain";
 import { getRequestGuidance } from "./request-guidance";
 
 export const dynamic = "force-dynamic";
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: "Pending",
-  needs_info: "Needs Info",
-  duplicate: "Duplicate",
-  reviewed: "Reviewed",
-  converted: "Converted",
-  cancelled: "Cancelled",
-};
+const STATUS_LABELS: Record<string, string> = { ...BOOKING_REQUEST_STATUS_LABELS };
 
-const STATUS_ORDER = ["pending", "needs_info", "reviewed", "duplicate", "converted", "cancelled"];
+const STATUS_ORDER = [
+  "pending",
+  "needs_info",
+  "reviewed",
+  "assessment_booked",
+  "estimated",
+  "converted",
+  "lost",
+  "duplicate",
+  "cancelled",
+];
+
+const OPEN_STATUSES = new Set<string>(BOOKING_REQUEST_OPEN_STATUSES);
 
 const CATEGORY_LABELS: Record<string, string> = {
   general_repairs: "General Repairs",
@@ -139,18 +144,23 @@ export default async function RequestsPage({ searchParams }: PageProps) {
   if (session.role === "tech") redirect("/app");
 
   const { status: statusFilter } = await searchParams;
-  // Default to pending so the queue opens on new work, not the full history dump.
-  // Use ?status=all for the unfiltered list.
-  const rawFilter = statusFilter ?? "pending";
-  const showAll = rawFilter === "all";
+  // Default = open funnel only (not converted/lost/cancelled/duplicate).
+  // Explicit ?status=… filters one status; ?status=all shows everything.
+  const showAll = statusFilter === "all";
   const validStatus =
-    !showAll && STATUS_ORDER.includes(rawFilter) ? rawFilter : showAll ? null : "pending";
+    !showAll && STATUS_ORDER.includes(statusFilter ?? "") ? statusFilter : null;
+  const defaultOpen = !showAll && !validStatus;
 
   const conditions = ["br.account_id = $1"];
   const params: unknown[] = [session.accountId];
   if (validStatus) {
     conditions.push(`br.status = $${params.length + 1}`);
     params.push(validStatus);
+  } else if (defaultOpen) {
+    conditions.push(
+      `br.status = ANY($${params.length + 1}::text[])`
+    );
+    params.push([...OPEN_STATUSES]);
   }
 
   const rows = await query<RequestRow>(
@@ -168,10 +178,13 @@ export default async function RequestsPage({ searchParams }: PageProps) {
          WHEN 'pending' THEN 0
          WHEN 'needs_info' THEN 1
          WHEN 'reviewed' THEN 2
-         WHEN 'duplicate' THEN 3
-         WHEN 'converted' THEN 4
-         WHEN 'cancelled' THEN 5
-         ELSE 6
+         WHEN 'assessment_booked' THEN 3
+         WHEN 'estimated' THEN 4
+         WHEN 'converted' THEN 5
+         WHEN 'lost' THEN 6
+         WHEN 'duplicate' THEN 7
+         WHEN 'cancelled' THEN 8
+         ELSE 9
        END,
        br.created_at DESC
      LIMIT 100`,
@@ -188,16 +201,31 @@ export default async function RequestsPage({ searchParams }: PageProps) {
   const countMap: Record<string, number> = {};
   for (const r of counts) countMap[r.status] = parseInt(r.count, 10);
   const totalCount = Object.values(countMap).reduce((sum, count) => sum + count, 0);
+  const openCount = [...OPEN_STATUSES].reduce((sum, s) => sum + (countMap[s] ?? 0), 0);
 
   return (
     <PageContainer>
       <PageHeader
         title="Requests"
-        subtitle="One front door for new work, walkthroughs, and estimate decisions."
+        subtitle="Called → assessment → estimated → converted (or lost after 60 days idle)."
         actions={<LinkButton href="/app/intake/new">New Request</LinkButton>}
       />
 
       <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginBottom: "var(--space-4)" }}>
+        <Link
+          href={"/app/requests" as Route}
+          style={{
+            padding: "4px 12px",
+            borderRadius: "var(--radius-full)",
+            fontSize: "var(--text-sm)",
+            fontWeight: defaultOpen ? 600 : 400,
+            background: defaultOpen ? "var(--accent)" : "var(--bg-subtle)",
+            color: defaultOpen ? "#fff" : "var(--fg)",
+            textDecoration: "none",
+          }}
+        >
+          Open ({openCount})
+        </Link>
         <Link
           href={"/app/requests?status=all" as Route}
           style={{
@@ -237,7 +265,9 @@ export default async function RequestsPage({ searchParams }: PageProps) {
           description={
             validStatus
               ? `No ${STATUS_LABELS[validStatus].toLowerCase()} requests.`
-              : "New requests from the booking form, calls, and quick capture will appear here."
+              : defaultOpen
+                ? "No open requests. New calls and booking form submissions appear here."
+                : "New requests from the booking form, calls, and quick capture will appear here."
           }
         />
       ) : (

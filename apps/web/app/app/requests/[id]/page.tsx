@@ -9,17 +9,20 @@ import { ReviewActions } from "./ReviewActions";
 import { IntakeSummary } from "./IntakeSummary";
 import { INTAKE_QUESTIONS, INTAKE_METADATA_LABELS } from "@/lib/intake/questions";
 import { PRICING_MODE_LABELS, scoreJobFit } from "@ai-fsm/domain";
-import { getRequestGuidance } from "../request-guidance";
+import { FUNNEL_STEPS, funnelStepIndex, getRequestGuidance } from "../request-guidance";
 
 export const dynamic = "force-dynamic";
 
 const STATUS_LABELS: Record<string, string> = {
-  pending:    "Pending",
+  pending: "Called",
   needs_info: "Needs Info",
-  duplicate:  "Duplicate",
-  reviewed:   "Reviewed",
-  converted:  "Converted",
-  cancelled:  "Cancelled",
+  duplicate: "Duplicate",
+  reviewed: "Ready",
+  assessment_booked: "Assessment booked",
+  estimated: "Estimated",
+  converted: "Converted",
+  lost: "Lost",
+  cancelled: "Cancelled",
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -175,7 +178,51 @@ export default async function BookingRequestDetailPage({
       {requestGuidance && (
         <Card style={{ marginBottom: "var(--space-3)" }}>
           <SectionHeader title="Request Guidance" />
-          <div style={{ display: "grid", gap: "var(--space-2)" }}>
+          <div style={{ display: "grid", gap: "var(--space-3)" }}>
+            {/* Funnel progress: Called → Assessment → Estimated → Converted */}
+            <div data-testid="request-funnel" style={{ display: "flex", gap: "var(--space-1)", flexWrap: "wrap", alignItems: "center" }}>
+              {FUNNEL_STEPS.map((step, i) => {
+                const current = funnelStepIndex(br.status);
+                const isLost = br.status === "lost";
+                const done = !isLost && current >= i;
+                const active = !isLost && current === i;
+                return (
+                  <div key={step.status} style={{ display: "flex", alignItems: "center", gap: "var(--space-1)" }}>
+                    {i > 0 && (
+                      <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>→</span>
+                    )}
+                    <span
+                      style={{
+                        padding: "2px 10px",
+                        borderRadius: "var(--radius-full)",
+                        fontSize: "var(--text-xs)",
+                        fontWeight: active ? 700 : 500,
+                        background: done ? (active ? "var(--accent)" : "var(--bg-subtle)") : "transparent",
+                        color: active ? "#fff" : done ? "var(--fg)" : "var(--fg-muted)",
+                        border: done ? "none" : "1px dashed var(--border)",
+                      }}
+                    >
+                      {step.label}
+                    </span>
+                  </div>
+                );
+              })}
+              {br.status === "lost" && (
+                <span
+                  style={{
+                    marginLeft: "var(--space-2)",
+                    padding: "2px 10px",
+                    borderRadius: "var(--radius-full)",
+                    fontSize: "var(--text-xs)",
+                    fontWeight: 700,
+                    background: "var(--danger, #b91c1c)",
+                    color: "#fff",
+                  }}
+                >
+                  Lost
+                </span>
+              )}
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "var(--space-3)" }}>
               <div>
                 <div style={{ fontSize: "var(--text-xs)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, color: "var(--fg-muted)" }}>Current State</div>

@@ -58,9 +58,15 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       await client.query("ROLLBACK");
       return NextResponse.json({ error: { code: "CONFLICT", message: "Already converted", traceId: session.traceId } }, { status: 409 });
     }
-    if (br.status === "cancelled") {
+    if (br.status === "cancelled" || br.status === "lost" || br.status === "duplicate") {
       await client.query("ROLLBACK");
-      return NextResponse.json({ error: { code: "CONFLICT", message: "Cannot convert a cancelled request", traceId: session.traceId } }, { status: 409 });
+      return NextResponse.json({
+        error: {
+          code: "CONFLICT",
+          message: `Cannot convert a ${br.status} request`,
+          traceId: session.traceId,
+        },
+      }, { status: 409 });
     }
     if (br.visit_id) {
       await client.query("ROLLBACK");
@@ -136,13 +142,17 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       note: "Site visit created from booking request — assess scope before estimating",
     });
 
-    // Job stays in draft until estimate is created and approved
-
-    // Mark booking request as converted
+    // Job stays in draft until estimate is created and approved.
+    // Funnel: assessment scheduled → assessment_booked (converted only on estimate accept).
     const { rows: updatedRows } = await client.query(
       `UPDATE booking_requests
-       SET status = 'converted', visit_id = $3,
-           reviewed_by = $4, reviewed_at = now(),
+       SET status = CASE
+             WHEN status IN ('converted', 'lost', 'cancelled', 'duplicate', 'estimated') THEN status
+             ELSE 'assessment_booked'
+           END,
+           visit_id = COALESCE(visit_id, $3),
+           reviewed_by = COALESCE(reviewed_by, $4),
+           reviewed_at = COALESCE(reviewed_at, now()),
            review_notes = COALESCE($5, review_notes),
            updated_at = now()
        WHERE id = $1 AND account_id = $2
@@ -150,15 +160,17 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       [id, session.accountId, visitId, session.userId, parsed.data.review_notes ?? null]
     );
 
-    await recordStatusChange(client, {
-      accountId: session.accountId,
-      entityType: "booking_request",
-      entityId: id,
-      fromStatus: br.status,
-      toStatus: "converted",
-      changedBy: session.userId,
-      note: parsed.data.review_notes ?? null,
-    });
+    if (br.status !== "assessment_booked" && updatedRows[0]?.status === "assessment_booked") {
+      await recordStatusChange(client, {
+        accountId: session.accountId,
+        entityType: "booking_request",
+        entityId: id,
+        fromStatus: br.status,
+        toStatus: "assessment_booked",
+        changedBy: session.userId,
+        note: parsed.data.review_notes ?? "Assessment visit scheduled",
+      });
+    }
 
     await client.query("COMMIT");
     return NextResponse.json({ data: { booking_request: updatedRows[0], visit_id: visitId } }, { status: 201 });
