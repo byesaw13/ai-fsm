@@ -74,6 +74,8 @@ export interface InvoicePdfData {
   taxCents?: number | null;
   totalCents: number;
   paidCents: number;
+  /** Deposit still owed as a first payment (0 when none / already covered). */
+  depositDueNowCents?: number | null;
   notes?: string | null;
   lineItems: PdfLineItem[];
   branding?: PdfBranding | null;
@@ -601,6 +603,11 @@ export async function buildInvoicePdf(d: InvoicePdfData): Promise<Uint8Array> {
   totals.push({ label: "Total", value: money(d.totalCents), strong: true });
   if (d.paidCents > 0) totals.push({ label: "Paid", value: `-${money(d.paidCents)}` });
   totals.push({ label: "Balance Due", value: money(balance), strong: true });
+  const isInvoicePaid =
+    d.status === "paid" || (d.totalCents > 0 && d.paidCents >= d.totalCents);
+  if (!isInvoicePaid && d.depositDueNowCents && d.depositDueNowCents > 0) {
+    totals.push({ label: "Deposit Due Now", value: money(d.depositDueNowCents), strong: true });
+  }
 
   const terms =
     d.branding?.invoiceTerms?.trim() ||

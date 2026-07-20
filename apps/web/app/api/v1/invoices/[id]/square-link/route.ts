@@ -7,6 +7,7 @@ import {
   loadSquareSettings,
   createSquarePaymentLink,
 } from "@/lib/integrations/square-payments";
+import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -60,11 +61,16 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         paid_cents: number;
         deposit_cents: number;
         balance_cents: number;
+        deposit_type: InvoiceDepositType;
+        deposit_percentage: number | null;
+        deposit_fixed_cents: number | null;
         client_id: string;
         job_id: string | null;
       }>(
         `SELECT id, status, invoice_number, total_cents, paid_cents,
-                deposit_cents, balance_cents, client_id, job_id
+                deposit_cents, balance_cents,
+                deposit_type, deposit_percentage, deposit_fixed_cents,
+                client_id, job_id
          FROM invoices
          WHERE id = $1 AND account_id = $2
          FOR UPDATE`,
@@ -87,10 +93,25 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       let amount: number;
       let paymentType: "deposit" | "progress";
       if (kind === "deposit") {
-        amount = invoice.deposit_cents;
+        // Requested-deposit policy (computed live from the total). Fall back to
+        // the legacy deposit_cents credit for estimate deposit invoices.
+        const policyDeposit = requestedDepositCents(
+          {
+            depositType: invoice.deposit_type,
+            depositPercentage: invoice.deposit_percentage,
+            depositFixedCents: invoice.deposit_fixed_cents,
+          },
+          invoice.total_cents,
+        );
+        // First-payment model: only charge the still-unpaid part of the deposit.
+        const policyDepositRemaining = Math.max(0, policyDeposit - invoice.paid_cents);
+        amount = policyDepositRemaining > 0 ? policyDepositRemaining : invoice.deposit_cents;
         paymentType = "deposit";
         if (amount <= 0) {
-          throw Object.assign(new Error("This invoice has no deposit amount"), { code: "VALIDATION_ERROR" });
+          throw Object.assign(
+            new Error("This invoice has no deposit amount due"),
+            { code: "VALIDATION_ERROR" },
+          );
         }
       } else if (kind === "balance") {
         amount = remaining;
