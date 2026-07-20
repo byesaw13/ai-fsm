@@ -47,9 +47,40 @@ import {
 } from "@/components/ui";
 import type { TimelineEntryData, StatusVariant } from "@/components/ui";
 import { formatCents } from "@/lib/money";
-import { laborCostForMargin } from "@/lib/invoices/tracked-labor";
+import {
+  formatMinutesAsHoursMinutes,
+  laborCostForMargin,
+  mapTrackedLaborDayRows,
+  type TrackedLaborDay,
+} from "@/lib/invoices/tracked-labor";
+import { BUSINESS_TIMEZONE } from "@/lib/operations/business-day";
 
 export const dynamic = "force-dynamic";
+
+function formatWorkDayLabel(isoDate: string): string {
+  // session_date is a calendar date; parse as noon UTC so the calendar day label
+  // is stable regardless of container TZ (do not shift the work date).
+  const d = new Date(`${isoDate}T12:00:00Z`);
+  return d.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/** Server-rendered times must use business TZ — container is UTC (off by 4h in EDT). */
+function formatClockRange(start: string | Date, end: string | Date): string {
+  const opts: Intl.DateTimeFormatOptions = {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: BUSINESS_TIMEZONE,
+  };
+  const s = new Date(start).toLocaleTimeString("en-US", opts);
+  const e = new Date(end).toLocaleTimeString("en-US", opts);
+  return `${s} – ${e}`;
+}
 
 type JobRow = Job & {
   client_name: string | null;
@@ -181,7 +212,8 @@ export default async function JobDetailPage({
 
   const homeboxEnabled = isHomeboxEnabled();
 
-  const [visits, workOrders, commercialCounts, assetLinks, jobMaterialExpenses] = await Promise.all([
+  const [visits, workOrders, commercialCounts, assetLinks, jobMaterialExpenses, trackedLaborDayRows] =
+    await Promise.all([
     session.role === "tech"
       ? queryForSession<VisitRow>(
           session,
@@ -356,7 +388,43 @@ export default async function JobDetailPage({
       ? withExpenseContext(session, (client) => fetchJobMaterialExpenses(client, session.accountId, id))
           .catch(() => [] as JobMaterialExpenseWithLines[])
       : Promise.resolve([] as JobMaterialExpenseWithLines[]),
+    queryForSession<{
+      work_date: string;
+      started_at: string;
+      ended_at: string;
+      minutes: string;
+      entry_count: number;
+    }>(
+      session,
+      `SELECT
+         ae.session_date::text AS work_date,
+         MIN(ae.started_at) AS started_at,
+         MAX(ae.ended_at) AS ended_at,
+         COALESCE(SUM(EXTRACT(EPOCH FROM (ae.ended_at - ae.started_at)) / 60), 0)::numeric AS minutes,
+         COUNT(*)::int AS entry_count
+       FROM activity_entries ae
+       WHERE ae.account_id = $2
+         AND ae.activity_type = 'job_work'
+         AND ae.voided_at IS NULL
+         AND ae.started_at IS NOT NULL
+         AND ae.ended_at IS NOT NULL
+         AND (
+           (ae.entity_type = 'job' AND ae.entity_id = $1)
+           OR (
+             ae.entity_type = 'visit'
+             AND ae.entity_id IN (
+               SELECT v.id FROM visits v
+               WHERE v.job_id = $1 AND v.account_id = $2
+             )
+           )
+         )
+       GROUP BY ae.session_date
+       ORDER BY ae.session_date ASC`,
+      [id, session.accountId],
+    ).catch(() => []),
   ]);
+
+  const trackedLaborDays: TrackedLaborDay[] = mapTrackedLaborDayRows(trackedLaborDayRows ?? []);
 
   const currentStatus = job.status as JobStatus;
   const allowedTransitions = jobTransitions[currentStatus];
@@ -1137,6 +1205,120 @@ export default async function JobDetailPage({
               </dl>
             </Card>
 
+            {/* Tracked work days — transparent day-by-day job_work record */}
+            {trackedLaborDays.length > 0 && (
+              <Card data-testid="tracked-work-days-card">
+                <SectionHeader title="Tracked work days" />
+                <p
+                  style={{
+                    margin: "0 0 var(--space-3)",
+                    color: "var(--fg-muted)",
+                    fontSize: "var(--text-sm)",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  Closed job_work from the activity log (used for margin). Invoice labor may
+                  differ if you bill estimated or adjusted hours.
+                </p>
+                <div
+                  role="table"
+                  aria-label="Tracked work days"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr auto",
+                    gap: "2px 0",
+                    fontSize: "var(--text-sm)",
+                  }}
+                >
+                  <div
+                    role="row"
+                    style={{
+                      display: "contents",
+                      fontWeight: 600,
+                      color: "var(--fg-muted)",
+                      fontSize: "var(--text-xs)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.03em",
+                    }}
+                  >
+                    <div role="columnheader" style={{ padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
+                      Day
+                    </div>
+                    <div
+                      role="columnheader"
+                      style={{
+                        padding: "6px 0",
+                        borderBottom: "1px solid var(--border)",
+                        textAlign: "right",
+                      }}
+                    >
+                      Hours
+                    </div>
+                  </div>
+                  {trackedLaborDays.map((day) => (
+                    <div
+                      key={day.work_date}
+                      role="row"
+                      data-testid={`tracked-work-day-${day.work_date}`}
+                      style={{ display: "contents" }}
+                    >
+                      <div
+                        role="cell"
+                        style={{
+                          padding: "10px 0",
+                          borderBottom: "1px solid var(--border)",
+                        }}
+                      >
+                        <div style={{ fontWeight: 600 }}>{formatWorkDayLabel(day.work_date)}</div>
+                        <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginTop: 2 }}>
+                          {formatClockRange(day.started_at, day.ended_at)}
+                          {day.entry_count > 1 ? ` · ${day.entry_count} segments` : ""}
+                        </div>
+                      </div>
+                      <div
+                        role="cell"
+                        style={{
+                          padding: "10px 0",
+                          borderBottom: "1px solid var(--border)",
+                          textAlign: "right",
+                          fontVariantNumeric: "tabular-nums",
+                          alignSelf: "center",
+                        }}
+                      >
+                        <div style={{ fontWeight: 600 }}>{day.hours.toFixed(2)} hrs</div>
+                        <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+                          {formatMinutesAsHoursMinutes(day.minutes)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <div
+                    role="row"
+                    data-testid="tracked-work-days-total"
+                    style={{ display: "contents", fontWeight: 600 }}
+                  >
+                    <div role="cell" style={{ padding: "12px 0 4px" }}>
+                      Total tracked
+                      <div style={{ fontWeight: 400, color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+                        {trackedLaborDays.length} day{trackedLaborDays.length === 1 ? "" : "s"}
+                      </div>
+                    </div>
+                    <div
+                      role="cell"
+                      style={{
+                        padding: "12px 0 4px",
+                        textAlign: "right",
+                        fontVariantNumeric: "tabular-nums",
+                        alignSelf: "center",
+                      }}
+                    >
+                      {laborMargin.trackedHours.toFixed(2)} hrs
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
+
             {/* Profitability — tracked hours feed margin on every job (flat + T&M) */}
             {!isTech && (revenueCents !== null || costCents !== null || trackedMinutes > 0) && (
               <Card data-testid="profitability-card">
@@ -1154,7 +1336,8 @@ export default async function JobDetailPage({
                       <dd>
                         {laborMargin.trackedHours.toFixed(2)} hrs
                         <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginLeft: 6 }}>
-                          (job_work)
+                          ({trackedLaborDays.length || "—"} day
+                          {trackedLaborDays.length === 1 ? "" : "s"} · job_work)
                         </span>
                       </dd>
                     </div>

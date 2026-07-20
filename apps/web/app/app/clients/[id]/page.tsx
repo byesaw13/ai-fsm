@@ -19,6 +19,7 @@ import type { StatusVariant } from "@/components/ui";
 import { ClientForm } from "../ClientForm";
 import { ClientActivityTimeline } from "./ClientActivityTimeline";
 import type { ActivityEvent } from "./ClientActivityTimeline";
+import { SendSmsButton } from "./SendSmsButton";
 import { dollars } from "./client360-helpers";
 import { CopyPortalLinkButton } from "@/components/CopyPortalLinkButton";
 import { VAULT_CATEGORY_LABELS } from "@ai-fsm/domain";
@@ -196,6 +197,21 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
          LEFT JOIN jobs j ON j.id = i.job_id
          LEFT JOIN properties p ON p.id = COALESCE(i.property_id, j.property_id)
          WHERE i.client_id = $1 AND i.account_id = $2 AND i.status != 'draft'
+         UNION ALL
+         SELECT 'communication'::text, cl.id, cl.created_at,
+                CASE
+                  WHEN cl.channel = 'sms' AND cl.direction = 'inbound'
+                    THEN 'SMS in: ' || left(coalesce(cl.body_preview, ''), 80)
+                  WHEN cl.channel = 'sms' AND cl.direction = 'outbound'
+                    THEN 'SMS out: ' || left(coalesce(cl.body_preview, ''), 80)
+                  WHEN cl.channel = 'email' AND cl.direction = 'outbound'
+                    THEN 'Email: ' || left(coalesce(cl.body_preview, ''), 80)
+                  ELSE initcap(cl.channel) || ' ' || cl.direction
+                END AS label,
+                cl.outcome, cl.job_id AS link_id, NULL::int AS total_cents,
+                NULL::text AS property_address
+         FROM communications_log cl
+         WHERE cl.client_id = $1 AND cl.account_id = $2
        ) t ORDER BY ts DESC LIMIT 50`,
       [id, session.accountId]
     ),
@@ -320,6 +336,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 <a href={`sms:${client.phone}`} className="p7-btn p7-btn-secondary p7-btn-sm" style={{ textDecoration: "none" }}>
                   Text
                 </a>
+                <SendSmsButton
+                  clientId={client.id}
+                  clientName={client.name}
+                  phone={client.phone}
+                  defaultJobId={activeJobs[0]?.id ?? null}
+                />
               </>
             ) : null}
             {client.email ? (

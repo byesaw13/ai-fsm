@@ -4,7 +4,7 @@ export interface LogCommunicationOpts {
   accountId: string;
   channel: "sms" | "email" | "phone";
   direction: "outbound" | "inbound";
-  outcome: "sent" | "delivered" | "failed" | "no_answer" | "left_voicemail" | "replied";
+  outcome: "sent" | "delivered" | "failed" | "no_answer" | "left_voicemail" | "replied" | "received";
   clientId?: string | null;
   bookingRequestId?: string | null;
   jobId?: string | null;
