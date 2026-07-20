@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { canCreateEstimates } from "@/lib/auth/permissions";
+import { resolveDepositPolicy } from "@ai-fsm/domain";
 import { query, queryOne } from "@/lib/db";
 import { Card, PageContainer, PageHeader } from "@/components/ui";
 import { EstimateEntryShell } from "./EstimateEntryShell";
@@ -98,7 +99,7 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
       ? await loadAssessmentSummary(session, visit_id)
       : null;
 
-  const [clients, jobs, properties] = await Promise.all([
+  const [clients, jobs, properties, accountRow] = await Promise.all([
     query<Client>(
       `SELECT id, name FROM clients WHERE account_id = $1 ORDER BY name ASC`,
       [session.accountId]
@@ -111,7 +112,14 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
       `SELECT id, address, client_id FROM properties WHERE account_id = $1 ORDER BY address ASC`,
       [session.accountId]
     ),
+    queryOne<{ settings: { deposit_percent?: number; deposit_terms?: string } | null }>(
+      `SELECT settings FROM accounts WHERE id = $1`,
+      [session.accountId]
+    ),
   ]);
+
+  // The standard deposit set in Settings is the default for new estimates.
+  const defaultDepositPercent = resolveDepositPolicy(accountRow?.settings).percent;
 
   // Fetch vault item context for pre-populating estimate notes
   let vaultItemContext: { name: string; category: string; location: string | null } | null = null;
@@ -342,6 +350,7 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
         serverAssessmentContext={serverAssessmentContext}
         initialTmBriefing={initialTmBriefing || undefined}
         autoGenerateTm={auto_generate === "1" && Boolean(initialTmBriefing)}
+        defaultDepositPercent={defaultDepositPercent}
       />
     </PageContainer>
   );

@@ -12,6 +12,7 @@ import type { ShoppingList } from "@ai-fsm/domain";
 import type { AssessmentContext } from "@/lib/estimates/assessment-context";
 
 interface EstimateEntryShellProps {
+  defaultDepositPercent?: number;
   // Props passed down to NewEstimateForm
   clients: { id: string; name: string }[];
   jobs: { id: string; title: string; client_id: string }[];
@@ -33,6 +34,7 @@ interface EstimateEntryShellProps {
 }
 
 export function EstimateEntryShell({
+  defaultDepositPercent,
   clients,
   jobs,
   properties,
@@ -110,6 +112,7 @@ export function EstimateEntryShell({
   return (
     <Card>
       <NewEstimateForm
+        defaultDepositPercent={defaultDepositPercent}
         clients={clients}
         jobs={jobs}
         properties={properties}

@@ -14,6 +14,8 @@ const patchAccountBody = z
     settings: z
       .object({
         invoice_terms: z.string().max(2000).optional(),
+        deposit_percent: z.number().min(0).max(100).optional(),
+        deposit_terms: z.string().max(2000).optional(),
         estimate_expiry_days: z.number().int().min(1).max(365).optional(),
         labor_rate_cents: z.number().int().min(0).optional(),
         material_markup_pct: z.number().min(0).max(200).optional(),

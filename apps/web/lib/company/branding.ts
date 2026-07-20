@@ -1,6 +1,10 @@
 import path from "path";
 import fs from "fs";
-import { STANDARD_ESTIMATE_NOTES, STANDARD_INVOICE_TERMS } from "@ai-fsm/domain";
+import {
+  STANDARD_ESTIMATE_NOTES,
+  STANDARD_INVOICE_TERMS,
+  resolveDepositPolicy,
+} from "@ai-fsm/domain";
 
 /** Company profile fields stored in accounts.settings JSONB. */
 export interface CompanyProfileSettings {
@@ -11,6 +15,10 @@ export interface CompanyProfileSettings {
   company_website?: string;
   invoice_terms?: string;
   estimate_terms?: string;
+  /** Standard deposit percentage for the business (0–100). */
+  deposit_percent?: number;
+  /** Deposits wording; may contain {deposit_percent}. */
+  deposit_terms?: string;
   logo_filename?: string;
 }
 
@@ -23,6 +31,10 @@ export interface ResolvedCompanyBranding {
   website: string | null;
   invoiceTerms: string;
   estimateTerms: string;
+  /** Standard deposit percentage for the business. */
+  depositPercent: number;
+  /** Deposits wording with the standard percentage already substituted. */
+  depositTerms: string;
   /** Absolute path on disk when logo exists, else null. */
   logoPath: string | null;
 }
@@ -54,6 +66,7 @@ export function resolveCompanyBranding(
   accountId?: string,
 ): ResolvedCompanyBranding {
   const s = settings ?? {};
+  const deposit = resolveDepositPolicy(s);
   return {
     name: accountName.trim() || "Dovetails Services LLC",
     tagline: s.company_tagline?.trim() || DEFAULT_TAGLINE,
@@ -63,6 +76,8 @@ export function resolveCompanyBranding(
     website: s.company_website?.trim() || DEFAULT_WEBSITE,
     invoiceTerms: s.invoice_terms?.trim() || STANDARD_INVOICE_TERMS,
     estimateTerms: s.estimate_terms?.trim() || STANDARD_ESTIMATE_NOTES,
+    depositPercent: deposit.percent,
+    depositTerms: deposit.terms,
     logoPath: accountId ? resolveLogoPath(accountId, s.logo_filename) : null,
   };
 }

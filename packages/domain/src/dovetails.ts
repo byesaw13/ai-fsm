@@ -198,6 +198,51 @@ agreed in writing.
 Past-due balances may pause future scheduling until resolved.
 `.trim();
 
+// ---------------------------------------------------------------------------
+// Deposit policy (one standard percentage for the business, set in Settings)
+// ---------------------------------------------------------------------------
+
+/** Standard deposit percentage when the account has not set one. */
+export const STANDARD_DEPOSIT_PERCENT = 30;
+
+/**
+ * Default Deposits wording. `{deposit_percent}` is replaced with the account's
+ * standard deposit percentage at render time (see renderDepositTerms).
+ */
+export const STANDARD_DEPOSIT_TERMS = `
+For projects requiring materials or special-order items, a deposit of {deposit_percent} is required before work is scheduled. Deposits are applied toward the final invoice.
+`.trim();
+
+/** Format a deposit percentage for display (30 → "30%", 33.5 → "33.5%"). */
+export function formatDepositPercent(percent: number): string {
+  // Number#toString drops trailing zeros, so 33.50 renders as "33.5".
+  return `${Math.round(percent * 100) / 100}%`;
+}
+
+/** Substitute the standard deposit percentage into the Deposits wording. */
+export function renderDepositTerms(terms: string, percent: number): string {
+  return terms.replace(/\{deposit_percent\}/g, formatDepositPercent(percent));
+}
+
+/**
+ * Resolve the account's deposit policy from its settings — the single source of
+ * truth for "the standard deposit". Pure, so both server branding and
+ * client-side surfaces (customer portal) use the same result.
+ */
+export function resolveDepositPolicy(
+  settings?: { deposit_percent?: number; deposit_terms?: string } | null,
+): { percent: number; terms: string } {
+  const raw = settings?.deposit_percent;
+  const percent =
+    typeof raw === "number" && Number.isFinite(raw) && raw >= 0 && raw <= 100
+      ? raw
+      : STANDARD_DEPOSIT_PERCENT;
+  return {
+    percent,
+    terms: renderDepositTerms(settings?.deposit_terms?.trim() || STANDARD_DEPOSIT_TERMS, percent),
+  };
+}
+
 /**
  * Dovetails payment terms: due upon completion.
  *

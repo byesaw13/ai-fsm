@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { STANDARD_INVOICE_TERMS } from "@ai-fsm/domain";
+import { STANDARD_INVOICE_TERMS, resolveDepositPolicy } from "@ai-fsm/domain";
 import { PaidStamp } from "@/components/invoices/PaidStamp";
 
 interface LineItem {
@@ -29,7 +29,7 @@ interface Invoice {
   property_state: string | null;
   property_zip: string | null;
   account_name: string;
-  account_settings: { invoice_terms?: string };
+  account_settings: { invoice_terms?: string; deposit_percent?: number; deposit_terms?: string };
 }
 
 interface Props {
@@ -85,6 +85,7 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
   const propertyLine = [invoice.property_address, invoice.property_city, invoice.property_state, invoice.property_zip]
     .filter(Boolean).join(", ");
   const invoiceTerms = invoice.account_settings?.invoice_terms ?? STANDARD_INVOICE_TERMS;
+  const depositTerms = resolveDepositPolicy(invoice.account_settings).terms;
   const paidDateLabel = invoice.paid_at
     ? new Date(invoice.paid_at).toLocaleDateString("en-US", {
         year: "numeric",
@@ -262,6 +263,14 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
         {invoiceTerms && (
           <div style={{ fontSize: 12, color: "#78716c", lineHeight: 1.45, marginBottom: 24, padding: "0 4px" }}>
             {invoiceTerms}
+          </div>
+        )}
+
+        {/* Deposits — standard deposit policy from Settings */}
+        {depositTerms && (
+          <div style={{ fontSize: 12, color: "#78716c", lineHeight: 1.45, marginBottom: 24, padding: "0 4px" }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#78716c", marginBottom: 4 }}>DEPOSITS</div>
+            {depositTerms}
           </div>
         )}
 

@@ -308,6 +308,13 @@ export default async function InvoicePrintPage({
           <p className="terms">{paymentTerms}</p>
         </div>
 
+        {branding.depositTerms && (
+          <div className="section-block">
+            <h2>Deposits</h2>
+            <p className="terms">{branding.depositTerms}</p>
+          </div>
+        )}
+
         <p className="footer-thanks">
           Thank you for your business. Please reference {invoice.invoice_number} with any payment.
         </p>

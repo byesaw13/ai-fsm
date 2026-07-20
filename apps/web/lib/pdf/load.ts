@@ -62,6 +62,7 @@ function brandingFromAccount(
     logoPath: b.logoPath,
     invoiceTerms: b.invoiceTerms,
     estimateTerms: b.estimateTerms,
+    depositTerms: b.depositTerms,
   };
 }
 
