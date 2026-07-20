@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   actualLaborCostCents,
+  formatMinutesAsHoursMinutes,
   laborCostForMargin,
+  mapTrackedLaborDayRows,
   roundedQuarterHoursFromMinutes,
   trackedHoursFromMinutes,
   trackedLaborCents,
@@ -67,5 +69,41 @@ describe("billing vs cost transforms", () => {
     expect(trackedLaborCents(68)).toBe(1.25 * 115_00);
     // cost uses actual 68/60 * $50
     expect(actualLaborCostCents(68)).toBe(Math.round((68 / 60) * 5000));
+  });
+});
+
+describe("formatMinutesAsHoursMinutes", () => {
+  it("formats whole hours, minutes only, and mixed", () => {
+    expect(formatMinutesAsHoursMinutes(0)).toBe("0m");
+    expect(formatMinutesAsHoursMinutes(45)).toBe("45m");
+    expect(formatMinutesAsHoursMinutes(120)).toBe("2h");
+    expect(formatMinutesAsHoursMinutes(364)).toBe("6h 4m");
+  });
+});
+
+describe("mapTrackedLaborDayRows", () => {
+  it("maps SQL rows into display hours per day", () => {
+    const days = mapTrackedLaborDayRows([
+      {
+        work_date: "2026-07-17",
+        started_at: "2026-07-17T12:10:01.000Z",
+        ended_at: "2026-07-17T18:14:01.000Z",
+        minutes: "364",
+        entry_count: 1,
+      },
+      {
+        work_date: "2026-07-18",
+        started_at: "2026-07-18T12:07:43.000Z",
+        ended_at: "2026-07-18T22:31:09.000Z",
+        minutes: 623.43,
+        entry_count: "1",
+      },
+    ]);
+    expect(days).toHaveLength(2);
+    expect(days[0].work_date).toBe("2026-07-17");
+    expect(days[0].hours).toBe(6.07);
+    expect(days[0].minutes).toBe(364);
+    expect(days[1].hours).toBe(10.39);
+    expect(days[1].entry_count).toBe(1);
   });
 });
