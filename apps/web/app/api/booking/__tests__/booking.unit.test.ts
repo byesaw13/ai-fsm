@@ -113,7 +113,7 @@ describe("POST /api/booking", () => {
     expect(jobInsert?.[1]?.[6]).toBe(OWNER_USER_ID);
 
     const duplicateSelect = mockClientQuery.mock.calls.find((c) =>
-      String(c[0]).includes("status NOT IN ('cancelled','converted')")
+      String(c[0]).includes("status NOT IN ('cancelled','converted','lost','duplicate')")
     );
     expect(duplicateSelect?.[1]).toEqual([
       ACCOUNT_ID,

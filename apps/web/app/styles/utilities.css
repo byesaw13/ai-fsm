@@ -114,3 +114,42 @@
 .z-modal   { z-index: 500; }
 .z-toast   { z-index: 1000; }
 .z-sidebar { z-index: 100; }
+
+/* -------------------------------------------------------------------------
+   Print — hide app chrome so document pages (invoices, estimates, visits)
+   don't stamp the mobile bottom nav / sidebar / FAB onto every printed page.
+   ---------------------------------------------------------------------- */
+@media print {
+  .no-print,
+  .p7-sidebar,
+  .p7-bottom-nav,
+  .p7-fab-wrap,
+  .p7-more-sheet,
+  .p7-more-overlay,
+  .doc-print-bar {
+    display: none !important;
+  }
+
+  .p7-layout {
+    display: block !important;
+    min-height: 0 !important;
+    background: #fff !important;
+  }
+
+  .p7-main {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+    overflow: visible !important;
+  }
+
+  .p7-page-container {
+    max-width: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  body {
+    background: #fff !important;
+  }
+}
