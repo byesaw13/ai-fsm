@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne, query, getPool } from "@/lib/db";
 import { loadSquareSettings, createSquarePaymentLink } from "@/lib/integrations/square-payments";
+import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,9 @@ interface InvoiceRow extends Record<string, unknown> {
   total_cents: number;
   paid_cents: number;
   deposit_cents: number | null;
+  deposit_type: string | null;
+  deposit_percentage: number | null;
+  deposit_fixed_cents: number | null;
   notes: string | null;
   due_date: string | null;
   sent_at: string | null;
@@ -92,6 +96,7 @@ export async function POST(
   const invoice = await queryOne<InvoiceRow>(
     `SELECT i.id, i.account_id, i.status, i.invoice_number, i.total_cents,
             i.paid_cents, i.job_id, i.client_id, i.created_by,
+            i.deposit_type, i.deposit_percentage, i.deposit_fixed_cents,
             i.square_payment_link_url
      FROM invoices i
      WHERE i.share_token = $1`,
@@ -107,6 +112,24 @@ export async function POST(
   if (balance <= 0) {
     return NextResponse.json({ error: "Nothing left to pay" }, { status: 422 });
   }
+
+  // First-payment model: while a deposit is still owed, the online payment
+  // charges the deposit-due-now, not the full balance. Once the deposit is
+  // covered, it charges the remaining balance.
+  const depositDueNow = Math.max(
+    0,
+    requestedDepositCents(
+      {
+        depositType: (invoice.deposit_type ?? "none") as InvoiceDepositType,
+        depositPercentage: invoice.deposit_percentage,
+        depositFixedCents: invoice.deposit_fixed_cents,
+      },
+      invoice.total_cents,
+    ) - invoice.paid_cents,
+  );
+  const chargeCents = depositDueNow > 0 ? depositDueNow : balance;
+  const chargeKind: "deposit" | "progress" = depositDueNow > 0 ? "deposit" : "progress";
+  const chargeLabel = depositDueNow > 0 ? "Deposit" : "Balance";
 
   // Reuse an existing link (owner may have already created one).
   if (invoice.square_payment_link_url) {
@@ -130,9 +153,9 @@ export async function POST(
     }
 
     const link = await createSquarePaymentLink(settings, {
-      name: `${invoice.invoice_number} — Balance`,
-      amountCents: balance,
-      idempotencyKey: `portal:${invoice.id}:${balance}`,
+      name: `${invoice.invoice_number} — ${chargeLabel}`,
+      amountCents: chargeCents,
+      idempotencyKey: `portal:${invoice.id}:${chargeKind}:${chargeCents}`,
     });
 
     await client.query("BEGIN");
@@ -146,13 +169,14 @@ export async function POST(
       `INSERT INTO payments
          (account_id, invoice_id, job_id, customer_id, amount_cents, method,
           payment_type, status, external_provider, external_checkout_url, created_by)
-       VALUES ($1, $2, $3, $4, $5, 'square', 'progress', 'pending', 'square', $6, $7)`,
+       VALUES ($1, $2, $3, $4, $5, 'square', $6, 'pending', 'square', $7, $8)`,
       [
         invoice.account_id,
         invoice.id,
         invoice.job_id,
         invoice.client_id,
-        balance,
+        chargeCents,
+        chargeKind,
         link.url,
         invoice.created_by,
       ]

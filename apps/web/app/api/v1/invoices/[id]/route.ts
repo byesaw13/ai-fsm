@@ -6,6 +6,7 @@ import { logger } from "@/lib/logger";
 import { getPathId } from "@/lib/route-utils";
 import { upsertMaterialHandlingFeeLine } from "@/lib/invoices/job-expenses";
 import { recalculateInvoiceTotals } from "@/lib/invoices/line-items";
+import { INVOICE_DEPOSIT_TYPES } from "@/lib/invoices/deposit";
 
 export const dynamic = "force-dynamic";
 
@@ -147,6 +148,33 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         }
       }
 
+      // Deposit policy — settable on any non-terminal invoice (editable until
+      // paid). Sets the three columns coherently so only the active value is kept.
+      if ("deposit_type" in body) {
+        const dType = body.deposit_type;
+        if (!(INVOICE_DEPOSIT_TYPES as readonly string[]).includes(dType as string)) {
+          throw Object.assign(new Error("Invalid deposit_type"), { code: "VALIDATION_ERROR" });
+        }
+        let pct: number | null = null;
+        let fixed: number | null = null;
+        if (dType === "percentage") {
+          const p = Number(body.deposit_percentage);
+          if (!Number.isFinite(p) || p < 0 || p > 100) {
+            throw Object.assign(new Error("deposit_percentage must be between 0 and 100"), { code: "VALIDATION_ERROR" });
+          }
+          pct = p;
+        } else if (dType === "fixed") {
+          const f = Number(body.deposit_fixed_cents);
+          if (!Number.isInteger(f) || f < 0) {
+            throw Object.assign(new Error("deposit_fixed_cents must be a non-negative integer"), { code: "VALIDATION_ERROR" });
+          }
+          fixed = f;
+        }
+        setClauses.push(`deposit_type = $${idx++}`); params.push(dType);
+        setClauses.push(`deposit_percentage = $${idx++}`); params.push(pct);
+        setClauses.push(`deposit_fixed_cents = $${idx++}`); params.push(fixed);
+      }
+
       if (setClauses.length > 0) {
         setClauses.push(`updated_at = now()`);
         params.push(id);
@@ -199,6 +227,12 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
           },
         },
         { status: 422 }
+      );
+    }
+    if (err.code === "VALIDATION_ERROR") {
+      return NextResponse.json(
+        { error: { code: "VALIDATION_ERROR", message: err.message, traceId: session.traceId } },
+        { status: 400 }
       );
     }
     logger.error("PATCH /api/v1/invoices/[id] error", error, { traceId: session.traceId });

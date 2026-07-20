@@ -22,6 +22,9 @@ import { loadSquareSettings } from "@/lib/integrations/square-payments";
 import { PaymentHistory } from "./PaymentHistory";
 import { InvoiceEditForm } from "./InvoiceEditForm";
 import { MarkDepositReceivedButton } from "./MarkDepositReceivedButton";
+import { InvoiceDepositForm } from "./InvoiceDepositForm";
+import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
+import { resolveDepositPolicy } from "@ai-fsm/domain";
 import { SendInvoiceButton } from "./SendInvoiceButton";
 import { InvoiceLineItemsEditor } from "./InvoiceLineItemsEditor";
 import { LinkForgottenExpensesPanel } from "@/components/invoices/LinkForgottenExpensesPanel";
@@ -60,6 +63,9 @@ interface InvoiceRow {
   balance_cents: number;
   square_payment_link_url: string | null;
   deposit_paid_at: string | null;
+  deposit_type: InvoiceDepositType;
+  deposit_percentage: number | null;
+  deposit_fixed_cents: number | null;
   notes: string | null;
   due_date: string | null;
   sent_at: string | null;
@@ -183,6 +189,18 @@ export default async function InvoiceDetailPage({
   const amountDue = Math.max(0, invoice.total_cents - invoice.paid_cents);
   const depositPending = invoice.deposit_cents > 0 && !invoice.deposit_paid_at;
   const canMarkDeposit = canTransition && !["paid", "void"].includes(currentStatus);
+  // Requested-deposit policy (first-payment model) — computed live from the total.
+  const requestedDeposit = requestedDepositCents(
+    {
+      depositType: invoice.deposit_type,
+      depositPercentage: invoice.deposit_percentage,
+      depositFixedCents: invoice.deposit_fixed_cents,
+    },
+    invoice.total_cents,
+  );
+  const standardDepositPercent = resolveDepositPolicy(accountSettings).percent;
+  // A deposit can be collected when a policy amount is set OR a legacy deposit exists.
+  const hasCollectibleDeposit = requestedDeposit > 0 || invoice.deposit_cents > 0;
   const canRecordPaymentAction = canRecordPayments(session.role) && ["sent", "partial", "overdue"].includes(currentStatus) && amountDue > 0;
 
   // Square link actions: owner/admin only, on payable invoices, when Square is
@@ -524,13 +542,28 @@ export default async function InvoiceDetailPage({
               </Card>
             )}
 
+          {/* Deposit policy — owner/admin, editable until the invoice is paid */}
+          {canMarkDeposit && (
+            <Card>
+              <SectionHeader title="Deposit" />
+              <InvoiceDepositForm
+                invoiceId={invoice.id}
+                totalCents={invoice.total_cents}
+                initialType={invoice.deposit_type}
+                initialPercentage={invoice.deposit_percentage}
+                initialFixedCents={invoice.deposit_fixed_cents}
+                standardPercent={standardDepositPercent}
+              />
+            </Card>
+          )}
+
           {/* Square online pay link */}
           {squareEnabled && (
             <Card>
               <SectionHeader title="Online Payment" />
               <SquareLinkActions
                 invoiceId={invoice.id}
-                hasDeposit={invoice.deposit_cents > 0}
+                hasDeposit={hasCollectibleDeposit}
                 remainingCents={amountDue}
                 existingLinkUrl={invoice.square_payment_link_url}
               />
