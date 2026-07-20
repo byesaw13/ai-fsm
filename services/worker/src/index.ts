@@ -1,6 +1,7 @@
 import { Client } from "pg";
 import { runAllDueAutomations } from "./automations/runner.js";
 import { expireEstimates } from "./expire-estimates.js";
+import { closeStaleBookingRequests } from "./stale-booking-requests.js";
 import { pruneLocationEvents } from "./prune-location-events.js";
 import { processWorkflowEvents } from "./workflow-events.js";
 import { dispatchNotificationQueue } from "./notification/dispatch.js";
@@ -43,6 +44,12 @@ async function runPollIteration(client: Client): Promise<void> {
     const expireResult = await expireEstimates(client);
     if (expireResult.expired > 0) {
       logger.info("expire-estimates complete", { expired: expireResult.expired });
+    }
+
+    // Close idle open booking requests after 60 days
+    const staleBrResult = await closeStaleBookingRequests(client);
+    if (staleBrResult.closed > 0) {
+      logger.info("stale-booking-requests complete", { closed: staleBrResult.closed });
     }
 
     const pruneResult = await pruneLocationEvents(client);

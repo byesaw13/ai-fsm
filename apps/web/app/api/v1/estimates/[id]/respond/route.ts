@@ -6,6 +6,7 @@ import { getEnv } from "@/lib/env";
 import { writeWorkflowEvent } from "@/lib/workflow-events";
 import { createJobFromEstimate, getAccountOwnerUserId } from "@/lib/estimates/create-job-db";
 import { createApprovalArtifacts } from "@/lib/estimates/approve";
+import { advanceBookingRequestForEstimate } from "@/lib/booking-requests/advance-stage";
 
 export const dynamic = "force-dynamic";
 
@@ -148,7 +149,28 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             await client.query("RELEASE SAVEPOINT before_artifacts");
             logger.error("email approve: auto-create artifacts failed (non-fatal)", artifactErr, { estimateId: id });
           }
+
+          // Won: convert linked booking request
+          await advanceBookingRequestForEstimate(client, {
+            accountId: account_id,
+            estimateId: id,
+            target: "converted",
+            actorId: ownerId,
+            note: "Estimate approved via email link",
+          }).catch((err) =>
+            logger.error("email approve: booking request convert failed (non-fatal)", err, { estimateId: id })
+          );
         }
+      } else if (action === "decline") {
+        await advanceBookingRequestForEstimate(client, {
+          accountId: account_id,
+          estimateId: id,
+          target: "lost",
+          closedReason: "estimate_declined",
+          note: "Estimate declined via email link",
+        }).catch((err) =>
+          logger.error("email decline: booking request lost failed (non-fatal)", err, { estimateId: id })
+        );
       }
     }
 

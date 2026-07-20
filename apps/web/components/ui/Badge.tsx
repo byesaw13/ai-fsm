@@ -8,7 +8,10 @@ export type StatusVariant =
   | "draft" | "sent" | "approved" | "declined" | "expired"
   | "paid" | "overdue" | "partial" | "void" | "in_progress"
   | "scheduled" | "completed" | "cancelled" | "arrived"
-  | "quoted" | "invoiced";
+  | "quoted" | "invoiced"
+  // booking request funnel
+  | "pending" | "needs_info" | "duplicate" | "reviewed"
+  | "assessment_booked" | "estimated" | "converted" | "lost";
 
 export type PriorityVariant = "urgent" | "high" | "medium" | "low";
 export type RoleVariant = "owner" | "admin" | "tech";

@@ -10,7 +10,7 @@ import {
   type IntakeRoutingPath,
 } from "@/lib/visits/labels";
 
-type ReviewStatus = "needs_info" | "duplicate" | "reviewed" | "cancelled";
+type ReviewStatus = "needs_info" | "duplicate" | "reviewed" | "cancelled" | "lost";
 type PricingMode = "flat_rate" | "hourly_internal";
 type PricingChoice = PricingMode | null;
 type PathChoice = Exclude<IntakeRoutingPath, "pending">;
@@ -19,7 +19,8 @@ const REVIEW_BUTTONS: Record<ReviewStatus, { label: string; variant: "primary" |
   reviewed: { label: "Mark Reviewed", variant: "primary" },
   needs_info: { label: "Needs Info", variant: "secondary" },
   duplicate: { label: "Duplicate", variant: "ghost" },
-  cancelled: { label: "Close Request", variant: "danger" },
+  lost: { label: "Mark Lost", variant: "danger" },
+  cancelled: { label: "Spam / Not a lead", variant: "ghost" },
 };
 
 const PRICING_LABELS: Record<PricingMode, string> = {
@@ -87,7 +88,11 @@ export function ReviewActions({
     walkthrough_score: null,
   });
 
-  const isFinal = currentStatus === "converted" || currentStatus === "cancelled";
+  const isFinal =
+    currentStatus === "converted" ||
+    currentStatus === "cancelled" ||
+    currentStatus === "lost" ||
+    currentStatus === "duplicate";
   const pathChosen = routingPath != null && routingPath !== "pending";
 
   async function patchRequest(body: Record<string, unknown>) {
@@ -98,6 +103,27 @@ export function ReviewActions({
     });
     const json = await res.json().catch(() => ({}));
     return { res, json };
+  }
+
+  async function handleMarkLost(reason: "customer_declined" | "other" = "customer_declined") {
+    setPending("lost");
+    setError(null);
+    try {
+      const { res, json } = await patchRequest({
+        status: "lost",
+        closed_reason: reason,
+        review_notes: notes || null,
+      });
+      if (!res.ok) {
+        setError(json.error?.message ?? "Failed to mark lost");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Network error — try again");
+    } finally {
+      setPending(null);
+    }
   }
 
   async function handlePricingModeChange(nextMode: PricingMode) {
@@ -168,7 +194,10 @@ export function ReviewActions({
     setPending(status);
     setError(null);
     try {
-      const { res, json } = await patchRequest({ status, review_notes: notes || null });
+      const body: Record<string, unknown> = { status, review_notes: notes || null };
+      if (status === "lost") body.closed_reason = "customer_declined";
+      if (status === "cancelled") body.closed_reason = "spam";
+      const { res, json } = await patchRequest(body);
       if (!res.ok) {
         setError(json.error?.message ?? "Failed to update");
         return;
@@ -328,8 +357,25 @@ export function ReviewActions({
             disabled={!!pending || isFinal}
             size="sm"
           >
-            Close Request →
+            Spam / Not a lead →
           </Button>
+        );
+      case "mark_lost":
+        return (
+          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+              Waiting on client — or close if they passed:
+            </span>
+            <Button
+              variant="danger"
+              onClick={() => handleMarkLost("customer_declined")}
+              loading={pending === "lost"}
+              disabled={!!pending || isFinal}
+              size="sm"
+            >
+              Mark Lost →
+            </Button>
+          </div>
         );
       default:
         return null;
@@ -585,7 +631,7 @@ export function ReviewActions({
 
         {!isFinal && (
           <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-            {(["reviewed", "needs_info", "duplicate", "cancelled"] as ReviewStatus[]).map((s) => (
+            {(["reviewed", "needs_info", "duplicate", "lost", "cancelled"] as ReviewStatus[]).map((s) => (
               <Button
                 key={s}
                 variant={REVIEW_BUTTONS[s].variant}

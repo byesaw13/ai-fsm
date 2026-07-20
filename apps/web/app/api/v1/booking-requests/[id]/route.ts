@@ -4,7 +4,10 @@ import { withRole } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { recordStatusChange } from "../../../../../lib/status-history";
-import { bookingRequestPatchStatusSchema } from "@ai-fsm/domain";
+import {
+  bookingRequestClosedReasonSchema,
+  bookingRequestPatchStatusSchema,
+} from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +59,7 @@ const patchSchema = z.object({
   routing_path: z
     .enum(["site_visit", "remote_estimate", "book_work", "pending"])
     .optional(),
+  closed_reason: bookingRequestClosedReasonSchema.optional().nullable(),
 });
 
 export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, session) => {
@@ -72,7 +76,7 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
     return NextResponse.json({ error: { code: "VALIDATION_ERROR", message: "Invalid body", details: parsed.error.issues, traceId: session.traceId } }, { status: 422 });
   }
 
-  const { status, review_notes, pricing_mode, routing_path } = parsed.data;
+  const { status, review_notes, pricing_mode, routing_path, closed_reason } = parsed.data;
   const pool = getPool();
   const client = await pool.connect();
   try {
@@ -92,9 +96,19 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
       await client.query("ROLLBACK");
       return NextResponse.json({ error: { code: "NOT_FOUND", message: "Booking request not found", traceId: session.traceId } }, { status: 404 });
     }
-    if (existing[0].status === "converted") {
+    if (
+      existing[0].status === "converted" ||
+      existing[0].status === "lost" ||
+      existing[0].status === "cancelled"
+    ) {
       await client.query("ROLLBACK");
-      return NextResponse.json({ error: { code: "CONFLICT", message: "Cannot update a converted booking request", traceId: session.traceId } }, { status: 409 });
+      return NextResponse.json({
+        error: {
+          code: "CONFLICT",
+          message: `Cannot update a ${existing[0].status} booking request`,
+          traceId: session.traceId,
+        },
+      }, { status: 409 });
     }
 
     const setClauses: string[] = ["updated_at = now()"];
@@ -107,6 +121,15 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
       setClauses.push(`reviewed_by = $${idx++}`);
       params.push(session.userId);
       setClauses.push(`reviewed_at = now()`);
+
+      if (status === "lost" || status === "cancelled") {
+        setClauses.push(`closed_at = now()`);
+        const reason =
+          closed_reason ??
+          (status === "lost" ? "customer_declined" : "spam");
+        setClauses.push(`closed_reason = $${idx++}`);
+        params.push(reason);
+      }
     }
     if (review_notes !== undefined) {
       setClauses.push(`review_notes = $${idx++}`);
@@ -136,7 +159,7 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
         fromStatus: existing[0].status,
         toStatus: status,
         changedBy: session.userId,
-        note: review_notes ?? null,
+        note: review_notes ?? closed_reason ?? null,
       });
     }
 

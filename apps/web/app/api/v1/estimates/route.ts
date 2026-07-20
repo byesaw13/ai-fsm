@@ -22,6 +22,7 @@ import { calculateDepositPolicy, estimateMaterialsDepositBasis } from "@/lib/est
 import type { EstimateSpec } from "@ai-fsm/domain";
 import { getPool } from "@/lib/db";
 import { loadPricingRules } from "@/lib/pricing/settings";
+import { advanceBookingRequestStage } from "@/lib/booking-requests/advance-stage";
 
 export const dynamic = "force-dynamic";
 
@@ -629,6 +630,17 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         trace_id: session.traceId,
         new_value: { client_id, status: "draft", total_cents, presentation_mode },
       });
+
+      // Funnel: estimate on the table → request stage "estimated"
+      if (booking_request_id) {
+        await advanceBookingRequestStage(client, {
+          accountId: session.accountId,
+          requestId: booking_request_id,
+          target: "estimated",
+          actorId: session.userId,
+          note: "Estimate created",
+        });
+      }
 
       return estimateId;
     });

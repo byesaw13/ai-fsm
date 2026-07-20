@@ -17,6 +17,7 @@ import type { AuthSession } from "../../../../../../lib/auth/middleware";
 import { query, getPool } from "../../../../../../lib/db";
 import { appendAuditLog } from "../../../../../../lib/db/audit";
 import { logger } from "../../../../../../lib/logger";
+import { advanceBookingRequestStage } from "../../../../../../lib/booking-requests/advance-stage";
 
 export const dynamic = "force-dynamic";
 
@@ -190,35 +191,46 @@ export const POST = withRole(
       const visit = rows[0];
 
       if (booking_request_id) {
-        const bookingRequest = await client.query(
-          `UPDATE booking_requests
-           SET status = 'converted',
-               reviewed_by = COALESCE(reviewed_by, $3),
-               reviewed_at = COALESCE(reviewed_at, now()),
-               job_id = COALESCE(job_id, $4),
-               visit_id = COALESCE(visit_id, $5),
-               updated_at = now()
-           WHERE id = $1
-             AND account_id = $2
-             AND job_id = $4
-             AND status IN ('pending', 'reviewed')
-           RETURNING *`,
-          [booking_request_id, session.accountId, session.userId, jobId, visit.id]
+        // Must belong to this job (or have no job yet).
+        const brCheck = await client.query<{ id: string; job_id: string | null; status: string }>(
+          `SELECT id, job_id, status FROM booking_requests
+           WHERE id = $1 AND account_id = $2
+           FOR UPDATE`,
+          [booking_request_id, session.accountId]
         );
-
-        if (!bookingRequest.rows[0]) {
+        const br = brCheck.rows[0];
+        if (!br || (br.job_id != null && br.job_id !== jobId)) {
           await client.query("ROLLBACK");
           return NextResponse.json(
             {
               error: {
                 code: "PRECONDITION_FAILED",
-                message: "The booking request could not be converted for this visit.",
+                message: "The booking request could not be linked for this visit.",
                 traceId: session.traceId,
               },
             },
             { status: 422 }
           );
         }
+
+        // Assessment / walkthrough → assessment_booked; work day → converted (book-work path).
+        const isAssessment =
+          visit_type === "site_visit" ||
+          visit_type === "sales_walkthrough" ||
+          visit_type === "realtor_baseline";
+        const targetStage = isAssessment ? "assessment_booked" : "converted";
+
+        await advanceBookingRequestStage(client, {
+          accountId: session.accountId,
+          requestId: booking_request_id,
+          target: targetStage,
+          actorId: session.userId,
+          visitId: visit.id,
+          jobId,
+          note: isAssessment
+            ? `Assessment visit scheduled (${visit_type})`
+            : `Work visit scheduled (${visit_type})`,
+        });
       }
 
       await appendAuditLog(client, {

@@ -150,7 +150,7 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
     expect(json.data.id).toBe(VISIT_ID);
   });
 
-  it("converts a booking request atomically when booking_request_id is provided", async () => {
+  it("advances booking request when booking_request_id is provided (work day → converted)", async () => {
     appendPostInsertSyncMocks(
       mockClientQuery
         .mockResolvedValueOnce({ rows: [] }) // BEGIN
@@ -160,7 +160,10 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
         .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT overlapping visits
         .mockResolvedValueOnce({ rows: [{ id: WORK_ORDER_ID, status: "ready" }] }) // resolve work order
         .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // INSERT visit
-        .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }), // UPDATE booking request
+        .mockResolvedValueOnce({ rows: [{ id: BOOKING_REQUEST_ID, job_id: JOB_ID, status: "pending" }] }) // br check
+        .mockResolvedValueOnce({ rows: [{ id: BOOKING_REQUEST_ID, status: "pending" }] }) // advance SELECT FOR UPDATE
+        .mockResolvedValueOnce({ rows: [] }) // advance UPDATE
+        .mockResolvedValueOnce({ rows: [] }), // status_history insert
     );
 
     const res = await visitCreate(
@@ -168,6 +171,7 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
         scheduled_start: NOW,
         scheduled_end: NOW,
         booking_request_id: BOOKING_REQUEST_ID,
+        visit_type: "standard",
       })
     );
 
@@ -175,15 +179,6 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
     expect(mockClientQuery.mock.calls.some((call) =>
       String(call[0]).includes("UPDATE booking_requests")
     )).toBe(true);
-    expect(mockClientQuery.mock.calls.find((call) =>
-      String(call[0]).includes("UPDATE booking_requests")
-    )?.[1]).toEqual([
-      BOOKING_REQUEST_ID,
-      mockSession.accountId,
-      mockSession.userId,
-      JOB_ID,
-      VISIT_ID,
-    ]);
   });
 
   it("returns 422 when booking_request_id does not match the job", async () => {
@@ -195,7 +190,7 @@ describe("POST /api/v1/jobs/[jobId]/visits", () => {
       .mockResolvedValueOnce({ rows: [{ count: "0" }] }) // SELECT overlapping visits
       .mockResolvedValueOnce({ rows: [{ id: WORK_ORDER_ID, status: "ready" }] }) // resolve work order
       .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // INSERT visit
-      .mockResolvedValueOnce({ rows: [] }) // UPDATE booking request missing
+      .mockResolvedValueOnce({ rows: [{ id: BOOKING_REQUEST_ID, job_id: "other-job", status: "pending" }] }) // br mismatch
       .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
 
     const res = await visitCreate(

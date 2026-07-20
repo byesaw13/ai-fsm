@@ -158,25 +158,69 @@ export const WORK_ORDER_STATUS_LABELS: Record<WorkOrderStatus, string> = {
 };
 
 // === Booking Request ===
+// Funnel: pending (called) → assessment_booked → estimated → converted
+// Side lanes: needs_info, reviewed, duplicate
+// Terminal loss: lost (declined / no-go / stale). cancelled = spam / not a lead.
 
 export const bookingRequestStatusSchema = z.enum([
   "pending",
   "needs_info",
   "duplicate",
   "reviewed",
+  "assessment_booked",
+  "estimated",
   "converted",
+  "lost",
   "cancelled",
 ]);
 export type BookingRequestStatus = z.infer<typeof bookingRequestStatusSchema>;
 
-// "converted" is terminal and set only by /convert endpoint
+/** Staff-settable statuses via PATCH (system advances funnel stages). */
 export const bookingRequestPatchStatusSchema = z.enum([
   "pending",
   "needs_info",
   "duplicate",
   "reviewed",
+  "lost",
   "cancelled",
 ]);
+
+export const bookingRequestClosedReasonSchema = z.enum([
+  "estimate_declined",
+  "customer_declined",
+  "stale",
+  "other",
+  "spam",
+]);
+export type BookingRequestClosedReason = z.infer<typeof bookingRequestClosedReasonSchema>;
+
+/** Open funnel statuses (default Requests list). */
+export const BOOKING_REQUEST_OPEN_STATUSES = [
+  "pending",
+  "needs_info",
+  "reviewed",
+  "assessment_booked",
+  "estimated",
+] as const satisfies readonly BookingRequestStatus[];
+
+export const BOOKING_REQUEST_TERMINAL_STATUSES = [
+  "converted",
+  "lost",
+  "cancelled",
+  "duplicate",
+] as const satisfies readonly BookingRequestStatus[];
+
+export const BOOKING_REQUEST_STATUS_LABELS: Record<BookingRequestStatus, string> = {
+  pending: "Called",
+  needs_info: "Needs Info",
+  duplicate: "Duplicate",
+  reviewed: "Ready",
+  assessment_booked: "Assessment booked",
+  estimated: "Estimated",
+  converted: "Converted",
+  lost: "Lost",
+  cancelled: "Cancelled",
+};
 
 // === Estimate ===
 

@@ -225,7 +225,9 @@ export function derivePipelineStage(facts: PipelineStageFacts): PipelineStage {
     (facts.bookingStatus === "pending" ||
       facts.bookingStatus === "needs_info" ||
       facts.bookingStatus === "duplicate" ||
-      facts.bookingStatus === "reviewed")
+      facts.bookingStatus === "reviewed" ||
+      facts.bookingStatus === "assessment_booked" ||
+      facts.bookingStatus === "estimated")
   ) {
     return "new_lead";
   }

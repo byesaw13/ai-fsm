@@ -210,7 +210,7 @@ async function updateDuplicateCandidates(
     `SELECT id FROM booking_requests
      WHERE account_id = $1
        AND id != $2
-       AND status NOT IN ('cancelled','converted')
+       AND status NOT IN ('cancelled','converted','lost','duplicate')
        AND created_at > NOW() - INTERVAL '90 days'
        AND (
          (email IS NOT NULL AND email = $3) OR

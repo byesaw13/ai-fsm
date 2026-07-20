@@ -1,4 +1,13 @@
-type RequestStatus = "pending" | "needs_info" | "duplicate" | "reviewed" | "converted" | "cancelled";
+type RequestStatus =
+  | "pending"
+  | "needs_info"
+  | "duplicate"
+  | "reviewed"
+  | "assessment_booked"
+  | "estimated"
+  | "converted"
+  | "lost"
+  | "cancelled";
 export type RequestRoutingPath =
   | "site_visit"
   | "remote_estimate"
@@ -13,7 +22,8 @@ export type RequestPrimaryActionKind =
   | "create_job"
   | "schedule_assessment"
   | "schedule_work"
-  | "close_request";
+  | "close_request"
+  | "mark_lost";
 
 export type RequestFollowUpKind = "view_job" | "view_visit" | null;
 
@@ -41,22 +51,53 @@ export type RequestGuidanceInput = {
 };
 
 const STATE_LABELS: Record<RequestStatus, string> = {
-  pending: "New request",
+  pending: "Called",
   needs_info: "Waiting for information",
   duplicate: "Duplicate request",
   reviewed: "Ready to route",
+  assessment_booked: "Assessment booked",
+  estimated: "Estimated",
   converted: "Converted",
+  lost: "Lost",
   cancelled: "Closed request",
 };
 
 const STATE_DETAILS: Record<RequestStatus, string> = {
-  pending: "Captured — choose how to proceed before scheduling work.",
+  pending: "First contact captured — choose how to proceed.",
   needs_info: "Waiting for missing contact or scope details.",
   duplicate: "Matches another request and should not be converted again.",
   reviewed: "Classified — continue with the selected path.",
-  converted: "Linked to a project or assessment.",
-  cancelled: "Closed and retained in history.",
+  assessment_booked: "Site visit is on the calendar — measure, then estimate.",
+  estimated: "Estimate is out — waiting for client accept or decline.",
+  converted: "Won — linked to a project (estimate accepted or work booked).",
+  lost: "Did not convert — declined, chose elsewhere, or went idle.",
+  cancelled: "Closed by staff (spam / not a lead) and retained in history.",
 };
+
+/** Ordered funnel steps for the progress strip (terminal lost is separate). */
+export const FUNNEL_STEPS = [
+  { status: "pending", label: "Called" },
+  { status: "assessment_booked", label: "Assessment" },
+  { status: "estimated", label: "Estimated" },
+  { status: "converted", label: "Converted" },
+] as const;
+
+export function funnelStepIndex(status: string): number {
+  switch (status) {
+    case "pending":
+    case "needs_info":
+    case "reviewed":
+      return 0;
+    case "assessment_booked":
+      return 1;
+    case "estimated":
+      return 2;
+    case "converted":
+      return 3;
+    default:
+      return -1;
+  }
+}
 
 const OUTCOME_META: Record<
   RequestPrimaryActionKind,
@@ -88,13 +129,24 @@ const OUTCOME_META: Record<
     destination: "Work Day",
   },
   close_request: {
-    label: "Close Request",
-    detail: "Mark the request closed and keep it in history.",
-    destination: "Closed request",
+    label: "Close as spam / not a lead",
+    detail: "Remove from the open list without counting as a lost sale.",
+    destination: "Cancelled",
+  },
+  mark_lost: {
+    label: "Mark lost",
+    detail: "Customer declined or chose someone else — close the funnel as lost.",
+    destination: "Lost",
   },
 };
 
 function primaryOutcome(input: RequestGuidanceInput): RequestPrimaryActionKind {
+  if (input.status === "estimated") {
+    return "mark_lost";
+  }
+  if (input.status === "assessment_booked") {
+    return "create_estimate";
+  }
   if (input.routing_path === "pending" || input.routing_path == null) {
     return "choose_path";
   }
@@ -107,7 +159,6 @@ function primaryOutcome(input: RequestGuidanceInput): RequestPrimaryActionKind {
   if (input.routing_path === "remote_estimate") {
     return "create_estimate";
   }
-  // Fallback for unexpected values
   return "choose_path";
 }
 
@@ -160,7 +211,9 @@ export function getRequestGuidance(input: RequestGuidanceInput): RequestGuidance
     } else {
       primaryActionKind = "close_request";
     }
-  } else if (status === "duplicate" || status === "cancelled" || status === "needs_info") {
+  } else if (status === "lost" || status === "cancelled" || status === "duplicate") {
+    primaryActionKind = null;
+  } else if (status === "needs_info") {
     primaryActionKind = "close_request";
   } else {
     primaryActionKind = primaryOutcome(input);
@@ -175,14 +228,16 @@ export function getRequestGuidance(input: RequestGuidanceInput): RequestGuidance
       ? "Open Assessment / Visit"
       : followUpKind === "view_job"
         ? "Open Project"
-        : "Close Request");
+        : status === "lost"
+          ? "Lost lead"
+          : "Closed");
   const recommendedDetail =
     meta?.detail ??
     (followUpKind === "view_visit"
       ? "Continue from the scheduled visit."
       : followUpKind === "view_job"
         ? "Continue from the linked project."
-        : "Keep the request closed and review the record in history.");
+        : STATE_DETAILS[status]);
 
   const destinationRecord =
     meta?.destination ??
@@ -190,7 +245,7 @@ export function getRequestGuidance(input: RequestGuidanceInput): RequestGuidance
       ? "Visit"
       : followUpKind === "view_job"
         ? "Project"
-        : OUTCOME_META.close_request.destination);
+        : STATE_LABELS[status]);
 
   return {
     currentStateLabel: STATE_LABELS[status],
