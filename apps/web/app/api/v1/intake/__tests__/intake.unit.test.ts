@@ -148,7 +148,7 @@ describe("POST /api/v1/intake", () => {
     ]);
 
     const duplicateSelect = mockClientQuery.mock.calls.find((call) =>
-      String(call[0]).includes("status NOT IN ('cancelled','converted')")
+      String(call[0]).includes("status NOT IN ('cancelled','converted','lost','duplicate')")
     );
     expect(duplicateSelect?.[1]).toEqual([
       OWNER_SESSION.accountId,

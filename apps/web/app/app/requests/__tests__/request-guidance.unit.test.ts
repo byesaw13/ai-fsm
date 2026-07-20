@@ -77,7 +77,7 @@ describe("getRequestGuidance", () => {
     expect(guidance.primaryActionKind).toBe("create_job");
   });
 
-  it("treats a closed request as Close Request", () => {
+  it("treats a cancelled request as already closed (no primary action)", () => {
     const guidance = getRequestGuidance({
       status: "cancelled",
       pricing_mode: null,
@@ -87,7 +87,22 @@ describe("getRequestGuidance", () => {
       walkthrough_score: null,
     });
 
+    // Terminal statuses (cancelled/lost/duplicate) are done — no "Close Request" CTA.
+    expect(guidance.primaryActionKind).toBeNull();
+    expect(guidance.recommendedLabel).toBe("Closed");
+  });
+
+  it("treats needs_info as Close Request", () => {
+    const guidance = getRequestGuidance({
+      status: "needs_info",
+      pricing_mode: null,
+      routing_path: null,
+      job_id: null,
+      visit_id: null,
+      walkthrough_score: null,
+    });
+
     expect(guidance.primaryActionKind).toBe("close_request");
-    expect(guidance.recommendedLabel).toBe("Close Request");
+    expect(guidance.recommendedLabel).toBe("Close as spam / not a lead");
   });
 });
