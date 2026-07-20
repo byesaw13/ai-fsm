@@ -1,10 +1,49 @@
 import { describe, it, expect } from "vitest";
+import { inflateSync } from "node:zlib";
 import { buildInvoicePdf, buildEstimatePdf } from "../document-pdf";
 
 /** A valid PDF byte stream begins with the "%PDF-" magic header. */
 function isPdf(bytes: Uint8Array): boolean {
   const header = Buffer.from(bytes.slice(0, 5)).toString("latin1");
   return header === "%PDF-";
+}
+
+/**
+ * pdf-lib Flate-compresses content streams and encodes drawn text as hex
+ * strings (`<48656C6C6F> Tj`). Inflate + decode so tests can assert on labels.
+ */
+function pdfDrawnText(bytes: Uint8Array): string {
+  const raw = Buffer.from(bytes);
+  const streams: string[] = [];
+  const marker = Buffer.from("stream\n");
+  const endMarker = Buffer.from("\nendstream");
+  let from = 0;
+  while (from < raw.length) {
+    const start = raw.indexOf(marker, from);
+    if (start < 0) break;
+    const dataStart = start + marker.length;
+    const end = raw.indexOf(endMarker, dataStart);
+    if (end < 0) break;
+    const chunk = raw.subarray(dataStart, end);
+    try {
+      streams.push(inflateSync(chunk).toString("latin1"));
+    } catch {
+      /* not a flate stream (e.g. binary image / xref) */
+    }
+    from = end + endMarker.length;
+  }
+  const joined = streams.join("\n");
+  const decoded: string[] = [];
+  for (const m of joined.matchAll(/<([0-9A-Fa-f]+)>/g)) {
+    const hex = m[1];
+    if (hex.length % 2 !== 0) continue;
+    let s = "";
+    for (let i = 0; i < hex.length; i += 2) {
+      s += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16));
+    }
+    decoded.push(s);
+  }
+  return decoded.join("\n");
 }
 
 describe("buildInvoicePdf", () => {
@@ -29,6 +68,30 @@ describe("buildInvoicePdf", () => {
     });
     expect(isPdf(bytes)).toBe(true);
     expect(bytes.length).toBeGreaterThan(1000);
+  });
+
+  it("does not put internal workflow status on the customer-facing PDF", async () => {
+    const bytes = await buildInvoicePdf({
+      invoiceNumber: "DHS-STATUS-1",
+      status: "sent",
+      clientName: "Status Check Client",
+      issueDate: "2026-04-11",
+      dueDate: "2026-05-11",
+      subtotalCents: 10000,
+      totalCents: 10000,
+      paidCents: 0,
+      lineItems: [
+        { description: "Labor", quantity: 1, unitPriceCents: 10000, totalCents: 10000 },
+      ],
+    });
+    const text = pdfDrawnText(bytes);
+    // Invoice number still present for the customer.
+    expect(text).toContain("DHS-STATUS-1");
+    // Workflow labels must not appear (previously rendered as uppercase status).
+    expect(text.split("\n")).not.toContain("SENT");
+    expect(text.split("\n")).not.toContain("DRAFT");
+    expect(text.split("\n")).not.toContain("PARTIAL");
+    expect(text.split("\n")).not.toContain("OVERDUE");
   });
 
   it("handles zero payments, no notes, and empty line items", async () => {

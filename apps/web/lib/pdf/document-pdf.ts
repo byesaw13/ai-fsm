@@ -180,7 +180,12 @@ function ensureSpace(ctx: Ctx, needed: number): void {
 interface RenderInput {
   docType: "Invoice" | "Estimate";
   ref: string;
-  status: string;
+  /**
+   * Internal workflow status (draft/sent/partial/etc). Not shown on the
+   * customer-facing document — payment state is conveyed via totals + PAID stamp.
+   * Kept on the input only so loaders can still pass it for isPaid derivation.
+   */
+  status?: string;
   clientName: string | null;
   clientEmail?: string | null;
   jobTitle?: string | null;
@@ -288,8 +293,8 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
     rightText(`${input.dateLabel2}: ${input.dateValue2}`, rightX, metaY, 9, font, MUTED);
     metaY -= 13;
   }
-  rightText(input.status.toUpperCase(), rightX, metaY, 9, bold, ACCENT);
-  metaY -= 4;
+  // Do not render workflow status (SENT / DRAFT / PARTIAL) on customer PDFs.
+  // Paid is communicated by the PAID stamp + zero balance due.
 
   ctx.y = Math.min(headerY, metaY, logoBottom) - 14;
   // Accent rule under letterhead (matches print-page .header-row border)

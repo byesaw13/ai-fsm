@@ -184,7 +184,6 @@ export default async function InvoicePrintPage({
         .letterhead { display: flex; gap: 16px; align-items: flex-start; }
         .company-name { font-size: 20px; font-weight: 700; color: #166534; }
         .meta-label { color: #57534e; font-size: 12px; }
-        .meta-status { color: #166534; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
         .company-logo { max-height: 56px; max-width: 160px; object-fit: contain; }
         .bill-row { display: flex; gap: 48px; margin-top: 28px; }
         .footer-thanks { margin-top: 44px; font-size: 12px; color: #78716c; }
@@ -219,7 +218,6 @@ export default async function InvoicePrintPage({
             <p className="meta-label">Document standard: {DOCUMENT_STANDARD_VERSION}</p>
             <p className="meta-label">Issued: {issuedDate}</p>
             {invoice.due_date && <p className="meta-label">Due: {dueDate}</p>}
-            <p className="meta-label meta-status">{invoice.status}</p>
           </div>
         </div>
 
