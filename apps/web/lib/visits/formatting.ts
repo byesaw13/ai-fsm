@@ -1,4 +1,5 @@
 import type { VisitStatus } from "@ai-fsm/domain";
+import { BUSINESS_TIMEZONE } from "@/lib/operations/business-day";
 
 export interface VisitLikeForUi {
   scheduled_start: string;
@@ -6,23 +7,35 @@ export interface VisitLikeForUi {
   status: VisitStatus | string;
 }
 
+/**
+ * Format clock time in the business timezone. Pages are often server-rendered
+ * inside a UTC container; without an explicit timeZone, Eastern times show 4h off (EDT).
+ */
 export function formatVisitTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], {
-    hour: "2-digit",
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric",
     minute: "2-digit",
+    timeZone: BUSINESS_TIMEZONE,
   });
 }
 
 export function formatVisitDateTime(iso: string): string {
   const d = new Date(iso);
-  return `${d.toLocaleDateString()} ${formatVisitTime(iso)}`;
+  const date = d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: BUSINESS_TIMEZONE,
+  });
+  return `${date} ${formatVisitTime(iso)}`;
 }
 
 export function formatVisitDateLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
+  return new Date(iso).toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
+    timeZone: BUSINESS_TIMEZONE,
   });
 }
 

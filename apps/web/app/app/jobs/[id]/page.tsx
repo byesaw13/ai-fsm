@@ -53,24 +53,32 @@ import {
   mapTrackedLaborDayRows,
   type TrackedLaborDay,
 } from "@/lib/invoices/tracked-labor";
+import { BUSINESS_TIMEZONE } from "@/lib/operations/business-day";
 
 export const dynamic = "force-dynamic";
 
 function formatWorkDayLabel(isoDate: string): string {
-  // session_date is a calendar date; parse as local noon to avoid TZ day-shift
-  const d = new Date(`${isoDate}T12:00:00`);
-  return d.toLocaleDateString(undefined, {
+  // session_date is a calendar date; parse as noon UTC so the calendar day label
+  // is stable regardless of container TZ (do not shift the work date).
+  const d = new Date(`${isoDate}T12:00:00Z`);
+  return d.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
     year: "numeric",
+    timeZone: "UTC",
   });
 }
 
+/** Server-rendered times must use business TZ — container is UTC (off by 4h in EDT). */
 function formatClockRange(start: string | Date, end: string | Date): string {
-  const opts: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit" };
-  const s = new Date(start).toLocaleTimeString(undefined, opts);
-  const e = new Date(end).toLocaleTimeString(undefined, opts);
+  const opts: Intl.DateTimeFormatOptions = {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: BUSINESS_TIMEZONE,
+  };
+  const s = new Date(start).toLocaleTimeString("en-US", opts);
+  const e = new Date(end).toLocaleTimeString("en-US", opts);
   return `${s} – ${e}`;
 }
 

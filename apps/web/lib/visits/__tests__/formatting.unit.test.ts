@@ -12,21 +12,24 @@ describe("visits/formatting UI helpers", () => {
   const base = "2026-02-23T15:00:00.000Z";
   const nowMs = new Date("2026-02-23T16:30:00.000Z").getTime();
 
-  it("formats visit time with hour and minute", () => {
+  it("formats visit time in America/New_York (not container UTC)", () => {
+    // 15:00 UTC on a winter date = 10:00 AM Eastern
     const out = formatVisitTime(base);
-    expect(out.length).toBeGreaterThan(0);
-    expect(out).toMatch(/:/);
+    expect(out).toMatch(/10:00/);
+    expect(out).toMatch(/AM/i);
   });
 
-  it("formats visit date+time", () => {
+  it("formats visit date+time in business timezone", () => {
     const out = formatVisitDateTime(base);
-    expect(out).toContain("/");
-    expect(out).toMatch(/:/);
+    expect(out).toMatch(/Feb/);
+    expect(out).toMatch(/23/);
+    expect(out).toMatch(/10:00/);
   });
 
   it("formats short visit date label", () => {
     const out = formatVisitDateLabel(base);
-    expect(out.length).toBeGreaterThan(4);
+    expect(out).toMatch(/Feb/);
+    expect(out).toMatch(/23/);
   });
 
   it("detects overdue scheduled visits", () => {
