@@ -62,6 +62,12 @@ describe("resolveDepositPolicy", () => {
     expect(terms).toBe("");
   });
 
+  it("renders no section when wording is explicitly cleared (deposit line lives in the terms doc)", () => {
+    const { percent, terms } = resolveDepositPolicy({ deposit_percent: 30, deposit_terms: "" });
+    expect(percent).toBe(30);
+    expect(terms).toBe("");
+  });
+
   it("still honors explicit custom wording at 0%", () => {
     const { terms } = resolveDepositPolicy({
       deposit_percent: 0,

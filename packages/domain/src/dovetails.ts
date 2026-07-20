@@ -210,7 +210,7 @@ export const STANDARD_DEPOSIT_PERCENT = 30;
  * standard deposit percentage at render time (see renderDepositTerms).
  */
 export const STANDARD_DEPOSIT_TERMS = `
-For projects requiring materials or special-order items, a deposit of {deposit_percent} is required before work is scheduled. Deposits are applied toward the final invoice.
+A deposit of {deposit_percent} is required before work is scheduled. Deposits are applied toward the final invoice.
 `.trim();
 
 /** Format a deposit percentage for display (30 → "30%", 33.5 → "33.5%"). */
@@ -237,7 +237,11 @@ export function resolveDepositPolicy(
     typeof raw === "number" && Number.isFinite(raw) && raw >= 0 && raw <= 100
       ? raw
       : STANDARD_DEPOSIT_PERCENT;
-  const custom = settings?.deposit_terms?.trim();
+  const rawTerms = settings?.deposit_terms;
+  const custom = rawTerms?.trim();
+  // Explicitly cleared wording means "don't render a separate Deposits section"
+  // — used when the deposit sentence already lives inside the terms document.
+  if (rawTerms !== undefined && custom === "") return { percent, terms: "" };
   // 0% means the business takes no deposit — suppress the default
   // "a deposit is required" copy so documents don't say "a deposit of 0%".
   // Explicit custom wording is still honored.

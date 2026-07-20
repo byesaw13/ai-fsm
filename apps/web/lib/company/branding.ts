@@ -4,6 +4,7 @@ import {
   STANDARD_ESTIMATE_NOTES,
   STANDARD_INVOICE_TERMS,
   resolveDepositPolicy,
+  renderDepositTerms,
 } from "@ai-fsm/domain";
 
 /** Company profile fields stored in accounts.settings JSONB. */
@@ -74,8 +75,16 @@ export function resolveCompanyBranding(
     phone: s.company_phone?.trim() || null,
     email: s.company_email?.trim() || null,
     website: s.company_website?.trim() || DEFAULT_WEBSITE,
-    invoiceTerms: s.invoice_terms?.trim() || STANDARD_INVOICE_TERMS,
-    estimateTerms: s.estimate_terms?.trim() || STANDARD_ESTIMATE_NOTES,
+    // {deposit_percent} is honored inside the terms document too, so the
+    // deposit sentence can live there instead of in a separate section.
+    invoiceTerms: renderDepositTerms(
+      s.invoice_terms?.trim() || STANDARD_INVOICE_TERMS,
+      deposit.percent,
+    ),
+    estimateTerms: renderDepositTerms(
+      s.estimate_terms?.trim() || STANDARD_ESTIMATE_NOTES,
+      deposit.percent,
+    ),
     depositPercent: deposit.percent,
     depositTerms: deposit.terms,
     logoPath: accountId ? resolveLogoPath(accountId, s.logo_filename) : null,

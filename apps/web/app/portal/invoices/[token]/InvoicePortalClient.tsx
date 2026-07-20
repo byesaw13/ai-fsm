@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { STANDARD_INVOICE_TERMS, resolveDepositPolicy } from "@ai-fsm/domain";
+import { STANDARD_INVOICE_TERMS, resolveDepositPolicy, renderDepositTerms } from "@ai-fsm/domain";
 import { PaidStamp } from "@/components/invoices/PaidStamp";
 
 interface LineItem {
@@ -84,8 +84,12 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
 
   const propertyLine = [invoice.property_address, invoice.property_city, invoice.property_state, invoice.property_zip]
     .filter(Boolean).join(", ");
-  const invoiceTerms = invoice.account_settings?.invoice_terms ?? STANDARD_INVOICE_TERMS;
-  const depositTerms = resolveDepositPolicy(invoice.account_settings).terms;
+  const depositPolicy = resolveDepositPolicy(invoice.account_settings);
+  const invoiceTerms = renderDepositTerms(
+    invoice.account_settings?.invoice_terms ?? STANDARD_INVOICE_TERMS,
+    depositPolicy.percent,
+  );
+  const depositTerms = depositPolicy.terms;
   const paidDateLabel = invoice.paid_at
     ? new Date(invoice.paid_at).toLocaleDateString("en-US", {
         year: "numeric",
