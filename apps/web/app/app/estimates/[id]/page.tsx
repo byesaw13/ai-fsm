@@ -18,6 +18,7 @@ import { isEmailConfigured } from "@/lib/email/mailer";
 import { CopyPortalLinkButton } from "@/components/CopyPortalLinkButton";
 import { buildClientDocumentFilename } from "@/lib/estimates/guardrails";
 import { ChangeOrdersClient } from "./ChangeOrdersClient";
+import { DecomposeWorkPanel } from "./DecomposeWorkPanel";
 import { loadEstimateDetail } from "./detail-data";
 import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { STATUS_LABELS } from "./format";
@@ -293,6 +294,10 @@ export default async function EstimateDetailPage({
           depositInvoice={depositInvoice}
           finalInvoice={finalInvoice}
         />
+      )}
+
+      {canTransition && currentStatus === "approved" && (
+        <DecomposeWorkPanel estimateId={estimate.id} />
       )}
 
       {/* Change orders — owner/admin only, approved estimates */}

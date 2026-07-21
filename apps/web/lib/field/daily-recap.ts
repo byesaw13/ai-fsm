@@ -72,10 +72,10 @@ const SYSTEM_PROMPT = `You interpret a residential handyman's end-of-day recap i
 You are given: the candidate tasks that were possible today (each with an id and label), the clocked day length in minutes when known, and the date. The worker narrates, in plain language, what they did, how long things took, and any problems.
 
 Rules:
-- Attribute time to a candidate task by its id whenever the narration clearly refers to it. Echo the task's label in "label".
+- Attribute time to a candidate task by its id whenever the narration clearly refers to it — including travel or materials time when a matching candidate task exists (e.g. a "travel" or "materials" task). Echo the task's label in "label".
 - status: "done" if finished, "partial" if worked but not finished, "blocked" if stopped by a problem (wrong material, waiting on parts). Put the reason in "note".
 - Do NOT invent tasks. Only use task_id=null with a new "label" for clearly-new unplanned work the worker describes that isn't in the candidate list.
-- Non-task time — material runs, driving, paperwork — goes in other_time with the closest activity_type (material_run, travel, admin), not as a task. On-site waiting is a blocked task, not a bucket.
+- Only use other_time buckets (material_run, travel, admin) for work with NO matching candidate task — a supply run, drive, or paperwork that isn't itself one of the listed tasks. On-site waiting is a blocked task, not a bucket.
 - Estimate minutes from the narration ("a couple hours" ≈ 120, "an hour" ≈ 60, "rest of the day" = remaining clocked time). If a clocked day length is given, try to make the attributed total land near it, but honor explicit times the worker states even if they don't sum perfectly.
 - reconciliation_note: one short sentence comparing the attributed total to the clocked day (e.g. "Attributed ~8h matches the clocked day." or "Attributed 6h but clocked 8h — 2h unaccounted."). Never silently pad.
 - A task the worker did not mention gets no entry (leave it untouched).`;
