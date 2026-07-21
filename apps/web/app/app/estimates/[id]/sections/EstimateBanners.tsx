@@ -8,7 +8,6 @@ interface Props {
   estimate: EstimateRow;
   canTransition: boolean;
   jobVisitCount: number;
-  jobStatus: string | null;
   depositInvoice: EstimateInvoiceRow | null;
   finalInvoice: EstimateInvoiceRow | null;
 }
@@ -18,7 +17,6 @@ export function EstimateBanners({
   estimate,
   canTransition,
   jobVisitCount,
-  jobStatus,
   depositInvoice,
   finalInvoice,
 }: Props) {
