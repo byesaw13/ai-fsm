@@ -77,29 +77,34 @@ export function ApprovedHandoff({
           <p className="muted" style={{ minHeight: 42 }}>
             {finalInvoice
               ? "Final invoice draft exists — review and send when ready."
-              : projectClosed
-                ? "Project is complete — create or open the final invoice for billing review."
-                : "Final invoice is created when you mark the project complete (not when a visit ends)."}
+              : !estimate.job_id
+                ? "No project linked — convert this approved estimate to a draft invoice when you are ready to bill."
+                : projectClosed
+                  ? "Project is complete — create or open the final invoice for billing review."
+                  : "Final invoice is created when you mark the project complete (not when a visit ends)."}
           </p>
           {finalInvoice ? (
             <Link href={`/app/invoices/${finalInvoice.id}`} className="p7-btn p7-btn-primary p7-btn-sm">
               Open Final Invoice →
             </Link>
-          ) : projectClosed && estimate.job_id ? (
+          ) : !estimate.job_id || projectClosed ? (
+            // Convert is available when there is no project (standalone bill) or
+            // the project is closed. Open projects keep the closeout gate so
+            // field work cannot silently flip to "invoiced" via this button.
             <EstimateConvertButton estimateId={estimate.id} />
-          ) : estimate.job_id ? (
+          ) : (
             <Link href={`/app/jobs/${estimate.job_id}#project-status`} className="p7-btn p7-btn-secondary p7-btn-sm">
               Complete project first →
             </Link>
-          ) : (
-            <span className="muted" style={{ fontSize: "var(--text-sm)" }}>
-              Link a project first.
-            </span>
           )}
           {depositInvoice && (
             <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
               Deposit:{" "}
-              <Link href={`/app/invoices/${depositInvoice.id}`} style={{ color: "var(--accent)" }}>
+              <Link
+                href={`/app/invoices/${depositInvoice.id}`}
+                style={{ color: "var(--accent)" }}
+                data-testid="deposit-invoice-link"
+              >
                 {depositInvoice.invoice_number}
               </Link>{" "}
               · {depositPaid ? "paid" : depositInvoice.status}
