@@ -60,7 +60,7 @@ export const ACTIVITY_CATEGORY_LABELS: Record<ActivityCategory, string> = {
 };
 
 /** Entity kinds an activity entry may link to (at most one per entry). */
-export const ACTIVITY_ENTITY_TYPES = ["job", "visit", "estimate", "invoice", "client", "expense"] as const;
+export const ACTIVITY_ENTITY_TYPES = ["job", "visit", "estimate", "invoice", "client", "expense", "work_order"] as const;
 export type ActivityEntityType = (typeof ACTIVITY_ENTITY_TYPES)[number];
 
 export function activityCategoryFor(type: ActivityType): ActivityCategory {
