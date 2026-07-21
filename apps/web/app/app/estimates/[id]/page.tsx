@@ -148,6 +148,7 @@ export default async function EstimateDetailPage({
         estimate={estimate}
         canTransition={canTransition}
         jobVisitCount={jobVisitCount}
+        jobStatus={jobStatus}
         depositInvoice={depositInvoice}
         finalInvoice={finalInvoice}
       />

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CreateJobFromEstimateButton } from "../CreateJobFromEstimateButton";
+import { EstimateConvertButton } from "../EstimateConvertButton";
 import { formatDollars } from "../format";
 import type { EstimateRow, EstimateInvoiceRow } from "../detail-data";
 
@@ -7,13 +8,27 @@ interface Props {
   estimate: EstimateRow;
   canTransition: boolean;
   jobVisitCount: number;
+  jobStatus: string | null;
   depositInvoice: EstimateInvoiceRow | null;
   finalInvoice: EstimateInvoiceRow | null;
 }
 
 /** Approved next-steps banner (with billing summary) and expired recovery banner. */
-export function EstimateBanners({ estimate, canTransition, jobVisitCount, depositInvoice, finalInvoice }: Props) {
+export function EstimateBanners({
+  estimate,
+  canTransition,
+  jobVisitCount,
+  jobStatus,
+  depositInvoice,
+  finalInvoice,
+}: Props) {
   const currentStatus = estimate.status;
+  const projectClosed =
+    jobStatus === "completed" || jobStatus === "invoiced";
+  // Convert to final invoice: always when no project, or after project closeout.
+  // Open projects use closeout as the primary path (also creates a draft final).
+  const canConvertToFinal =
+    !finalInvoice && (!estimate.job_id || projectClosed);
 
   return (
     <>
@@ -27,7 +42,10 @@ export function EstimateBanners({ estimate, canTransition, jobVisitCount, deposi
           <p style={{ margin: 0, fontWeight: 600, color: "#065f46" }}>
             Estimate approved — ready to schedule work or invoice.
           </p>
-          <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-3)", flexWrap: "wrap", alignItems: "center" }}>
+          <div
+            style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-3)", flexWrap: "wrap", alignItems: "center" }}
+            data-testid="convert-panel-wrapper"
+          >
             {estimate.job_id && jobVisitCount === 0 && (
               <Link
                 href={`/app/jobs/${estimate.job_id}/visits/new`}
@@ -47,6 +65,16 @@ export function EstimateBanners({ estimate, canTransition, jobVisitCount, deposi
               </Link>
             )}
             {!estimate.job_id && <CreateJobFromEstimateButton estimateId={estimate.id} />}
+            {canConvertToFinal && <EstimateConvertButton estimateId={estimate.id} />}
+            {finalInvoice && (
+              <Link
+                href={`/app/invoices/${finalInvoice.id}`}
+                className="p7-btn p7-btn-primary p7-btn-sm"
+                data-testid="final-invoice-link"
+              >
+                Open Final Invoice →
+              </Link>
+            )}
             <a href="#materials-plan-handoff" style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}>
               Project handoff ↓
             </a>
