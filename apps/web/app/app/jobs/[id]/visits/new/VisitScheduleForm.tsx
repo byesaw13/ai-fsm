@@ -45,6 +45,14 @@ interface VisitScheduleFormProps {
   initialVisitType?: VisitType | null;
   /** assessment | book_work — drives duration defaults and labels. */
   intent?: "assessment" | "book_work" | null;
+  /** Prefill from job page "Add a day" (YYYY-MM-DD). */
+  initialDate?: string | null;
+  /** Prefill start time HH:MM. */
+  initialStartTime?: string | null;
+  /** Prefill duration minutes. */
+  initialDuration?: number | null;
+  /** Prefill assignee. */
+  initialAssignedUserId?: string | null;
 }
 
 function formatDayLabel(dateStr: string, startTime: string, durationMin: number): string {
@@ -85,6 +93,10 @@ export function VisitScheduleForm({
   initialMultiDay = false,
   initialVisitType = null,
   intent = null,
+  initialDate = null,
+  initialStartTime = null,
+  initialDuration = null,
+  initialAssignedUserId = null,
 }: VisitScheduleFormProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -97,18 +109,22 @@ export function VisitScheduleForm({
 
   const resolvedType = defaultVisitType(jobCategory, initialVisitType, intent);
   const defaultDuration =
-    multiDay || initialMultiDay || resolvedType === "standard" || resolvedType === "punch_list"
-      ? 480
-      : resolvedType === "site_visit"
-        ? 120
-        : 60;
+    initialDuration && initialDuration > 0
+      ? initialDuration
+      : multiDay || initialMultiDay || resolvedType === "standard" || resolvedType === "punch_list"
+        ? 480
+        : resolvedType === "site_visit"
+          ? 120
+          : 60;
 
   const [schedule, setSchedule] = useState<ScheduleValue>({
-    date: "",
-    startTime: resolvedType === "site_visit" ? "09:00" : "08:00",
+    date: initialDate ?? "",
+    startTime:
+      initialStartTime ??
+      (resolvedType === "site_visit" ? "09:00" : "08:00"),
     duration: defaultDuration,
   });
-  const [assignedUserId, setAssignedUserId] = useState("");
+  const [assignedUserId, setAssignedUserId] = useState(initialAssignedUserId ?? "");
   const [visitType, setVisitType] = useState<VisitType>(resolvedType);
   const lockedWo = !!initialWorkOrderId;
   const [workOrderId, setWorkOrderId] = useState(
@@ -470,7 +486,9 @@ export function VisitScheduleForm({
             ? "Scheduling…"
             : multiDay
               ? `Schedule ${Math.max(allDates.length, 1)} Day${allDates.length === 1 ? "" : "s"}`
-              : "Schedule Visit"}
+              : intent === "book_work" || visitType === "standard"
+                ? "Add Day to Schedule"
+                : "Schedule Visit"}
         </Button>
       </div>
     </form>
