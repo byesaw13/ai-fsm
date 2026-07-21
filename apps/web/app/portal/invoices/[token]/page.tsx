@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { queryOne, query, getPool } from "@/lib/db";
 import { loadSquareSettings } from "@/lib/integrations/square-payments";
+import { recordInvoicePortalView } from "@/lib/invoices/client-view";
 import { InvoicePortalClient } from "./InvoicePortalClient";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +65,21 @@ export default async function InvoicePortalPage({
   );
 
   if (!invoice) notFound();
+
+  // Best-effort: stamp client open so owners see Unread vs Viewed.
+  // Never block the portal render if the stamp fails.
+  try {
+    await recordInvoicePortalView(
+      async (sql, params) => {
+        const pool = getPool();
+        const r = await pool.query(sql, params);
+        return { rowCount: r.rowCount };
+      },
+      token,
+    );
+  } catch {
+    // ignore — view tracking is advisory
+  }
 
   const lineItems = await query<LineItemRow>(
     `SELECT id, description, quantity, unit_price_cents, total_cents, sort_order
