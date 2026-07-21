@@ -43,11 +43,12 @@ export function EstimateConvertButton({ estimateId }: Props) {
 
   return (
     <div data-testid="convert-panel">
-      {error && <p className="error-inline">{error}</p>}
+      {error && <p className="error-inline" style={{ margin: "0 0 8px" }}>{error}</p>}
       <button
-        onClick={handleConvert}
+        type="button"
+        onClick={() => void handleConvert()}
         disabled={loading}
-        className="btn btn-primary"
+        className="p7-btn p7-btn-primary p7-btn-sm"
         data-testid="convert-estimate-btn"
       >
         {loading ? "Converting…" : "→ Convert to Invoice"}

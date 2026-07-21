@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import type { Route } from "next";
 import { getSession } from "@/lib/auth/session";
+import { canCreateInvoices } from "@/lib/auth/permissions";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import type { InvoiceStatus } from "@ai-fsm/domain";
 import {
@@ -11,7 +12,6 @@ import {
   EmptyState,
   MetricGrid,
   Card,
-  SectionHeader,
   LinkButton,
 } from "@/components/ui";
 import type { MetricCardData } from "@/components/ui";
@@ -80,6 +80,7 @@ export default async function InvoicesPage() {
   const session = await getSession();
   if (!session) redirect("/login");
   if (session.role === "tech") redirect("/app/my-work"); // EPIC-006: techs have no invoice access
+  const canCreate = canCreateInvoices(session.role);
 
   const invoices = await withInvoiceContext(session, async (client) => {
     const r = await client.query(
@@ -157,6 +158,17 @@ export default async function InvoicesPage() {
       <PageHeader
         title="Invoices"
         subtitle={`${invoices.length} total`}
+        actions={
+          canCreate ? (
+            <LinkButton
+              href="/app/invoices/new"
+              variant="primary"
+              data-testid="create-invoice-btn"
+            >
+              + Create Invoice
+            </LinkButton>
+          ) : undefined
+        }
       />
 
       {invoices.length > 0 && <MetricGrid metrics={metrics} />}
@@ -181,7 +193,18 @@ export default async function InvoicesPage() {
       {invoices.length === 0 ? (
         <EmptyState
           title="No invoices yet"
-          description="Convert an approved estimate to create an invoice."
+          description="Create a draft invoice for any client — add line items, hours, and materials. Or convert an approved estimate when you have one."
+          action={
+            canCreate ? (
+              <LinkButton
+                href="/app/invoices/new"
+                variant="primary"
+                data-testid="create-invoice-empty-btn"
+              >
+                Create Invoice
+              </LinkButton>
+            ) : undefined
+          }
           data-testid="invoices-empty"
         />
       ) : (
