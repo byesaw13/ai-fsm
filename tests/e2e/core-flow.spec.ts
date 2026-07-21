@@ -153,8 +153,12 @@ test.describe("Required release smoke — admin core flow", () => {
     await login(page);
 
     await page.goto(`${BASE}/app/estimates/${estimateId}`);
-    await expect(page.locator('[data-testid="convert-estimate-btn"]')).toBeVisible();
-    await page.click('[data-testid="convert-estimate-btn"]');
+    await expect(page.locator('[data-testid="estimate-status"]')).toContainText("Approved");
+    // Convert lives on the green approved banner (and handoff card).
+    await expect(page.locator('[data-testid="approved-banner"]')).toBeVisible({ timeout: 10000 });
+    const convertBtn = page.locator('[data-testid="convert-estimate-btn"]');
+    await expect(convertBtn).toBeVisible({ timeout: 10000 });
+    await convertBtn.click();
 
     await page.waitForURL(/\/app\/invoices\/[0-9a-f-]+/);
     const match = page.url().match(/\/app\/invoices\/([0-9a-f-]+)/);
