@@ -54,6 +54,7 @@ import {
   type TrackedLaborDay,
 } from "@/lib/invoices/tracked-labor";
 import { BUSINESS_TIMEZONE } from "@/lib/operations/business-day";
+import { buildAddDayHref } from "@/lib/jobs/next-schedule-day";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +102,7 @@ type JobRow = Job & {
 type VisitRow = Visit & {
   assigned_user_name: string | null;
   visit_type: string;
+  work_order_id?: string | null;
 };
 
 function isExecutionVisit(visit: VisitRow): boolean {
@@ -571,8 +573,28 @@ export default async function JobDetailPage({
     };
   });
 
+  const addDayHref = buildAddDayHref(
+    job.id,
+    visits.map((v) => ({
+      scheduled_start: v.scheduled_start,
+      scheduled_end: v.scheduled_end,
+      assigned_user_id: v.assigned_user_id,
+      work_order_id: v.work_order_id ?? null,
+      visit_type: v.visit_type,
+      status: v.status,
+    })),
+  ) as Route;
+
   const scheduleVisitAction = canAddVisit ? (
     <span style={{ display: "inline-flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+      <LinkButton
+        href={addDayHref}
+        variant="primary"
+        size="sm"
+        data-testid="add-visit-btn"
+      >
+        + Add a day
+      </LinkButton>
       <LinkButton
         href={`/app/jobs/${job.id}/visits/new?visit_type=site_visit&intent=assessment`}
         variant="secondary"
@@ -582,12 +604,12 @@ export default async function JobDetailPage({
         + Assessment
       </LinkButton>
       <LinkButton
-        href={`/app/jobs/${job.id}/visits/new?visit_type=standard&intent=book_work`}
+        href={`/app/jobs/${job.id}/visits/new?multi=1&visit_type=standard&intent=book_work`}
         variant="secondary"
         size="sm"
-        data-testid="add-visit-btn"
+        data-testid="add-multi-day-btn"
       >
-        + Work Day
+        Multiple days
       </LinkButton>
     </span>
   ) : undefined;
@@ -653,9 +675,14 @@ export default async function JobDetailPage({
               No visit is scheduled for this job yet.
             </div>
           )}
-          {canAddVisit && !visitHref ? (
-            <Link href={`/app/jobs/${job.id}/visits/new` as Route} className="p7-btn p7-btn-primary p7-btn-sm" style={{ justifyContent: "center" }}>
-              Schedule Visit
+          {canAddVisit ? (
+            <Link
+              href={addDayHref}
+              className="p7-btn p7-btn-primary p7-btn-sm"
+              style={{ justifyContent: "center" }}
+              data-testid="add-visit-btn-mobile"
+            >
+              {visits.length > 0 ? "Add a day to schedule" : "Schedule a day"}
             </Link>
           ) : null}
         </section>
@@ -912,13 +939,38 @@ export default async function JobDetailPage({
                 title="Nothing on the calendar"
                 description={
                   canAddVisit
-                    ? "Schedule an Assessment (scope) or a Work Day (execution)."
+                    ? "Add a work day to put this project on the schedule, or book an Assessment for scope capture."
                     : "No visits have been scheduled for this project."
                 }
                 data-testid="visits-empty"
               />
             ) : (
-              <Timeline entries={timelineEntries} />
+              <>
+                <Timeline entries={timelineEntries} />
+                {canAddVisit ? (
+                  <div
+                    style={{
+                      marginTop: "var(--space-3)",
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "var(--space-2)",
+                      alignItems: "center",
+                    }}
+                  >
+                    <LinkButton
+                      href={addDayHref}
+                      variant="primary"
+                      size="sm"
+                      data-testid="add-day-below-timeline"
+                    >
+                      + Add a day to the schedule
+                    </LinkButton>
+                    <span className="muted" style={{ fontSize: "var(--text-xs)" }}>
+                      Prefills next day from the last work day
+                    </span>
+                  </div>
+                ) : null}
+              </>
             )}
           </Card>
 
