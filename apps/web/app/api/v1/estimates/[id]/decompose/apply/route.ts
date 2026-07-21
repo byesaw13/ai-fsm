@@ -46,15 +46,37 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       [session.userId, session.accountId, session.role],
     );
 
-    const est = await client.query<{ client_id: string; job_id: string | null; property_id: string | null }>(
-      `SELECT client_id, job_id, property_id FROM estimates WHERE id = $1 AND account_id = $2`,
+    const est = await client.query<{ status: string; client_id: string; job_id: string | null; property_id: string | null }>(
+      `SELECT status, client_id, job_id, property_id FROM estimates WHERE id = $1 AND account_id = $2`,
       [estimateId, session.accountId],
     );
     if (est.rowCount === 0) {
       await client.query("ROLLBACK");
       return NextResponse.json({ error: { code: "NOT_FOUND", message: "Estimate not found", traceId: session.traceId } }, { status: 404 });
     }
-    const { client_id, job_id, property_id } = est.rows[0];
+    const { status, client_id, job_id, property_id } = est.rows[0];
+    // Workflow invariant: only an accepted estimate becomes production work.
+    if (status !== "approved") {
+      await client.query("ROLLBACK");
+      return NextResponse.json(
+        { error: { code: "INVALID_TRANSITION", message: "Only an approved estimate can be broken down into work orders", traceId: session.traceId } },
+        { status: 409 },
+      );
+    }
+
+    // Approval already seeded a coarse default work order for this estimate
+    // (createJobFromEstimate). Replace any untouched estimate-derived work orders
+    // (no visits, no logged time) so the decomposition doesn't duplicate scope.
+    // Tasks cascade with the work order.
+    await client.query(
+      `DELETE FROM work_orders wo
+        WHERE wo.account_id = $1 AND wo.source_estimate_id = $2
+          AND wo.status IN ('draft','ready')
+          AND NOT EXISTS (SELECT 1 FROM visits v WHERE v.work_order_id = wo.id)
+          AND NOT EXISTS (SELECT 1 FROM activity_entries a WHERE a.entity_type = 'work_order' AND a.entity_id = wo.id)`,
+      [session.accountId, estimateId],
+    );
+
     const created: string[] = [];
 
     for (const wo of parsed.data.work_orders) {
