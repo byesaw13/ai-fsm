@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatCents } from "@ai-fsm/money";
 import {
@@ -10,6 +10,7 @@ import {
   type LinkableMaterialExpense,
 } from "@/lib/invoices/material-handling";
 import { formatLineQuantityDisplay } from "@/lib/invoices/quantity";
+import { extractReceiptPo, receiptMatchesPoQuery } from "@/lib/invoices/receipt-po";
 
 type Mode = "invoice" | "job";
 
@@ -20,6 +21,75 @@ interface Props {
   invoiceId?: string;
   /** Invoice only; default 15 */
   handlingPct?: number;
+}
+
+function PoTag({ notes }: { notes: string | null }) {
+  const po = extractReceiptPo(notes);
+  if (!po) return null;
+  return (
+    <span
+      data-testid="receipt-po-tag"
+      title={`PO / job tag: ${po}`}
+      style={{
+        display: "inline-block",
+        marginLeft: 6,
+        padding: "1px 6px",
+        borderRadius: 4,
+        fontSize: "var(--text-xs)",
+        fontWeight: 700,
+        letterSpacing: "0.02em",
+        color: "var(--accent, #166534)",
+        background: "var(--bg-subtle, #f0fdf4)",
+        border: "1px solid var(--border)",
+        verticalAlign: "middle",
+      }}
+    >
+      PO {po}
+    </span>
+  );
+}
+
+function ReceiptSearch({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <label
+      style={{
+        display: "grid",
+        gap: 4,
+        marginBottom: "var(--space-2)",
+        fontSize: "var(--text-xs)",
+        fontWeight: 600,
+        color: "var(--fg-muted)",
+      }}
+    >
+      <span>Filter by PO, vendor, or notes</span>
+      <input
+        type="search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        placeholder="e.g. SWIFT LANE, PO 12345, Home Depot"
+        data-testid="receipt-po-filter"
+        style={{
+          width: "100%",
+          padding: "8px 10px",
+          borderRadius: 6,
+          border: "1px solid var(--border)",
+          fontSize: "var(--text-sm)",
+          fontWeight: 400,
+          color: "var(--fg)",
+          background: "var(--bg-card, #fff)",
+        }}
+      />
+    </label>
+  );
 }
 
 export function LinkForgottenExpensesPanel({
@@ -38,6 +108,7 @@ export function LinkForgottenExpensesPanel({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [expanded, setExpanded] = useState(!isInvoice);
+  const [poFilter, setPoFilter] = useState("");
 
   const listUrl = isInvoice
     ? `/api/v1/invoices/${invoiceId}/linkable-expenses`
@@ -45,6 +116,11 @@ export function LinkForgottenExpensesPanel({
   const linkUrl = isInvoice
     ? `/api/v1/invoices/${invoiceId}/link-expenses`
     : `/api/v1/jobs/${jobId}/link-expenses`;
+
+  const filteredExpenses = useMemo(
+    () => expenses.filter((e) => receiptMatchesPoQuery(e, poFilter)),
+    [expenses, poFilter],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -180,7 +256,8 @@ export function LinkForgottenExpensesPanel({
               }}
             >
               Select past material receipts to add as invoice line items. Job receipts are
-              pre-selected; unlinked client receipts can be attached at the same time. Or use{" "}
+              pre-selected; unlinked client receipts can be attached at the same time. Filter by
+              PO / Home Depot job tag when notes include one. Or use{" "}
               <strong>Pull materials from job receipts</strong> below for one-click.
             </p>
 
@@ -205,84 +282,101 @@ export function LinkForgottenExpensesPanel({
                 No unbilled material receipts for this job or client.
               </p>
             ) : (
-              <ul
-                style={{
-                  listStyle: "none",
-                  margin: 0,
-                  padding: 0,
-                  display: "grid",
-                  gap: "var(--space-2)",
-                }}
-              >
-                {expenses.map((expense) => {
-                  const skuLines = expense.line_items ?? [];
-                  const materialCost =
-                    skuLines.length > 0
-                      ? skuLines.reduce((s, li) => s + li.line_total_cents, 0)
-                      : expense.amount_cents;
-                  const billCents = materialInvoiceTotalCents(materialCost, handlingRate);
-                  const label = materialExpenseDescription(expense);
-                  return (
-                    <li key={expense.id}>
-                      <label
-                        style={{
-                          display: "flex",
-                          gap: "var(--space-2)",
-                          alignItems: "flex-start",
-                          fontSize: "var(--text-sm)",
-                          cursor: pending ? "not-allowed" : "pointer",
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selected.has(expense.id)}
-                          onChange={() => toggle(expense.id)}
-                          disabled={pending}
-                          style={{ marginTop: 3 }}
-                        />
-                        <span style={{ flex: 1 }}>
-                          <strong>{expense.vendor_name}</strong>
-                          <span style={{ color: "var(--fg-muted)" }}>
-                            {" "}
-                            · {expense.expense_date.slice(0, 10)} ·{" "}
-                            {expense.already_on_job ? "on job" : "unlinked"} · materials{" "}
-                            {formatCents(materialCost)}
-                            {materialHandlingCents(materialCost, handlingRate) > 0 &&
-                              ` + handling ${formatCents(materialHandlingCents(materialCost, handlingRate))}`}{" "}
-                            = {formatCents(billCents)}
-                          </span>
-                          {skuLines.length > 0 ? (
-                            <ul
-                              style={{
-                                margin: "4px 0 0",
-                                paddingLeft: "1rem",
-                                color: "var(--fg-muted)",
-                                fontSize: "var(--text-xs)",
-                              }}
-                            >
-                              {skuLines.map((li) => (
-                                <li key={li.id}>
-                                  {li.name} · {formatLineQuantityDisplay(li.quantity)} ×{" "}
-                                  {formatCents(li.unit_cost_cents)} ={" "}
-                                  {formatCents(li.line_total_cents)}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            label !== `Materials — ${expense.vendor_name}` && (
-                              <div
-                                style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}
-                              >
-                                {label}
-                              </div>
-                            )
-                          )}
-                        </span>
-                      </label>
-                    </li>
-                  );
-                })}
-              </ul>
+              <>
+                <ReceiptSearch
+                  value={poFilter}
+                  onChange={setPoFilter}
+                  disabled={pending}
+                />
+                {filteredExpenses.length === 0 ? (
+                  <p
+                    style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}
+                    data-testid="receipt-po-filter-empty"
+                  >
+                    No receipts match “{poFilter.trim()}”.
+                  </p>
+                ) : (
+                  <ul
+                    style={{
+                      listStyle: "none",
+                      margin: 0,
+                      padding: 0,
+                      display: "grid",
+                      gap: "var(--space-2)",
+                    }}
+                  >
+                    {filteredExpenses.map((expense) => {
+                      const skuLines = expense.line_items ?? [];
+                      const materialCost =
+                        skuLines.length > 0
+                          ? skuLines.reduce((s, li) => s + li.line_total_cents, 0)
+                          : expense.amount_cents;
+                      const billCents = materialInvoiceTotalCents(materialCost, handlingRate);
+                      const label = materialExpenseDescription(expense);
+                      return (
+                        <li key={expense.id}>
+                          <label
+                            style={{
+                              display: "flex",
+                              gap: "var(--space-2)",
+                              alignItems: "flex-start",
+                              fontSize: "var(--text-sm)",
+                              cursor: pending ? "not-allowed" : "pointer",
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selected.has(expense.id)}
+                              onChange={() => toggle(expense.id)}
+                              disabled={pending}
+                              style={{ marginTop: 3 }}
+                            />
+                            <span style={{ flex: 1 }}>
+                              <strong>{expense.vendor_name}</strong>
+                              <PoTag notes={expense.notes} />
+                              <span style={{ color: "var(--fg-muted)" }}>
+                                {" "}
+                                · {expense.expense_date.slice(0, 10)} ·{" "}
+                                {expense.already_on_job ? "on job" : "unlinked"} · materials{" "}
+                                {formatCents(materialCost)}
+                                {materialHandlingCents(materialCost, handlingRate) > 0 &&
+                                  ` + handling ${formatCents(materialHandlingCents(materialCost, handlingRate))}`}{" "}
+                                = {formatCents(billCents)}
+                              </span>
+                              {skuLines.length > 0 ? (
+                                <ul
+                                  style={{
+                                    margin: "4px 0 0",
+                                    paddingLeft: "1rem",
+                                    color: "var(--fg-muted)",
+                                    fontSize: "var(--text-xs)",
+                                  }}
+                                >
+                                  {skuLines.map((li) => (
+                                    <li key={li.id}>
+                                      {li.name} · {formatLineQuantityDisplay(li.quantity)} ×{" "}
+                                      {formatCents(li.unit_cost_cents)} ={" "}
+                                      {formatCents(li.line_total_cents)}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                label !== `Materials — ${expense.vendor_name}` && (
+                                  <div
+                                    style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}
+                                  >
+                                    {label}
+                                  </div>
+                                )
+                              )}
+                            </span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </>
             )}
 
             {expenses.length > 0 && (
@@ -356,7 +450,7 @@ export function LinkForgottenExpensesPanel({
           }}
         >
           Material receipts for this client that aren’t on a project yet. Attach
-          here before invoicing.
+          here before invoicing. Search by PO or Home Depot job tag when present.
         </p>
 
         {error && (
@@ -390,42 +484,56 @@ export function LinkForgottenExpensesPanel({
           </div>
         )}
 
-        <ul
-          style={{
-            listStyle: "none",
-            margin: 0,
-            padding: 0,
-            display: "grid",
-            gap: "var(--space-2)",
-          }}
-        >
-          {expenses.map((expense) => (
-            <li key={expense.id}>
-              <label
-                style={{
-                  display: "flex",
-                  gap: "var(--space-2)",
-                  fontSize: "var(--text-sm)",
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={selected.has(expense.id)}
-                  onChange={() => toggle(expense.id)}
-                  disabled={pending}
-                />
-                <span>
-                  <strong>{expense.vendor_name}</strong>
-                  <span style={{ color: "var(--fg-muted)" }}>
-                    {" "}
-                    · {expense.expense_date.slice(0, 10)} · {formatCents(expense.amount_cents)}
+        {expenses.length > 0 && (
+          <ReceiptSearch value={poFilter} onChange={setPoFilter} disabled={pending} />
+        )}
+
+        {filteredExpenses.length === 0 && expenses.length > 0 ? (
+          <p
+            style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}
+            data-testid="receipt-po-filter-empty"
+          >
+            No receipts match “{poFilter.trim()}”.
+          </p>
+        ) : (
+          <ul
+            style={{
+              listStyle: "none",
+              margin: 0,
+              padding: 0,
+              display: "grid",
+              gap: "var(--space-2)",
+            }}
+          >
+            {filteredExpenses.map((expense) => (
+              <li key={expense.id}>
+                <label
+                  style={{
+                    display: "flex",
+                    gap: "var(--space-2)",
+                    fontSize: "var(--text-sm)",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.has(expense.id)}
+                    onChange={() => toggle(expense.id)}
+                    disabled={pending}
+                  />
+                  <span>
+                    <strong>{expense.vendor_name}</strong>
+                    <PoTag notes={expense.notes} />
+                    <span style={{ color: "var(--fg-muted)" }}>
+                      {" "}
+                      · {expense.expense_date.slice(0, 10)} · {formatCents(expense.amount_cents)}
+                    </span>
                   </span>
-                </span>
-              </label>
-            </li>
-          ))}
-        </ul>
+                </label>
+              </li>
+            ))}
+          </ul>
+        )}
 
         <div style={{ marginTop: "var(--space-3)" }}>
           <button
