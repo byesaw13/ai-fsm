@@ -43,6 +43,7 @@ import type { StatusVariant } from "@/components/ui";
 import { isEmailConfigured } from "@/lib/email/mailer";
 import { CopyPortalLinkButton } from "@/components/CopyPortalLinkButton";
 import { TravelPanel } from "@/components/travel/TravelPanel";
+import { formatInvoiceViewLabel } from "@/lib/invoices/client-view";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,9 @@ interface InvoiceRow {
   due_date: string | null;
   sent_at: string | null;
   paid_at: string | null;
+  first_viewed_at: string | null;
+  last_viewed_at: string | null;
+  view_count: number;
   share_token: string;
   created_by: string;
   created_at: string;
@@ -259,6 +263,39 @@ export default async function InvoiceDetailPage({
                 {STATUS_LABELS[currentStatus]}
               </StatusBadge>
             </span>
+            {(() => {
+              const view = formatInvoiceViewLabel({
+                status: currentStatus,
+                first_viewed_at: invoice.first_viewed_at,
+                last_viewed_at: invoice.last_viewed_at,
+                view_count: invoice.view_count,
+              });
+              if (view.kind === "none") return null;
+              return (
+                <span
+                  data-testid="invoice-view-status"
+                  title={view.title}
+                  style={{
+                    fontSize: "var(--text-xs)",
+                    fontWeight: 700,
+                    padding: "3px 8px",
+                    borderRadius: 999,
+                    border: "1px solid var(--border)",
+                    background:
+                      view.kind === "unread"
+                        ? "color-mix(in srgb, var(--color-warning, #f59e0b) 12%, transparent)"
+                        : "color-mix(in srgb, var(--color-success, #16a34a) 12%, transparent)",
+                    color:
+                      view.kind === "unread"
+                        ? "var(--color-warning, #b45309)"
+                        : "var(--color-success, #166534)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {view.kind === "unread" ? "Not opened" : view.label}
+                </span>
+              );
+            })()}
           </div>
         }
       />

@@ -15,6 +15,7 @@ import {
   LinkButton,
 } from "@/components/ui";
 import type { MetricCardData } from "@/components/ui";
+import { formatInvoiceViewLabel, isInvoiceUnread } from "@/lib/invoices/client-view";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,10 @@ interface InvoiceRow {
   paid_cents: number;
   due_date: string | null;
   created_at: string;
+  sent_at: string | null;
+  first_viewed_at: string | null;
+  last_viewed_at: string | null;
+  view_count: number;
   client_name: string | null;
   [key: string]: unknown;
 }
@@ -86,7 +91,8 @@ export default async function InvoicesPage() {
     const r = await client.query(
       `SELECT i.id, i.status, i.invoice_number,
               i.subtotal_cents, i.tax_cents, i.total_cents, i.paid_cents,
-              i.due_date, i.created_at,
+              i.due_date, i.created_at, i.sent_at,
+              i.first_viewed_at, i.last_viewed_at, i.view_count,
               c.name AS client_name
        FROM invoices i
        LEFT JOIN clients c ON c.id = i.client_id
@@ -232,6 +238,17 @@ export default async function InvoicesPage() {
                       : inv.due_date
                         ? aging || `Due ${new Date(inv.due_date).toLocaleDateString()}`
                         : null;
+                const unread = isInvoiceUnread({
+                  status: inv.status,
+                  sent_at: inv.sent_at,
+                  first_viewed_at: inv.first_viewed_at,
+                });
+                const view = formatInvoiceViewLabel({
+                  status: inv.status,
+                  first_viewed_at: inv.first_viewed_at,
+                  last_viewed_at: inv.last_viewed_at,
+                  view_count: inv.view_count,
+                });
 
                 return (
                   <ItemCard
@@ -239,9 +256,40 @@ export default async function InvoicesPage() {
                     href={`/app/invoices/${inv.id}`}
                     title={inv.invoice_number}
                     titleBadge={
-                      inv.client_name ? (
-                        <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>· {inv.client_name}</span>
-                      ) : null
+                      <span style={{ display: "inline-flex", gap: "var(--space-2)", alignItems: "center" }}>
+                        {inv.client_name ? (
+                          <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>· {inv.client_name}</span>
+                        ) : null}
+                        {unread && (
+                          <span
+                            data-testid="invoice-unread-badge"
+                            style={{
+                              fontSize: "var(--text-xs)",
+                              fontWeight: 700,
+                              color: "var(--color-warning, #b45309)",
+                              background: "color-mix(in srgb, var(--color-warning, #f59e0b) 14%, transparent)",
+                              border: "1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 35%, transparent)",
+                              borderRadius: 999,
+                              padding: "1px 7px",
+                            }}
+                          >
+                            Not opened
+                          </span>
+                        )}
+                        {view.kind === "viewed" && (
+                          <span
+                            data-testid="invoice-viewed-badge"
+                            title={view.title}
+                            style={{
+                              fontSize: "var(--text-xs)",
+                              fontWeight: 600,
+                              color: "var(--fg-muted)",
+                            }}
+                          >
+                            · {view.label}
+                          </span>
+                        )}
+                      </span>
                     }
                     meta={
                       <span style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", fontSize: "var(--text-sm)" }}>
