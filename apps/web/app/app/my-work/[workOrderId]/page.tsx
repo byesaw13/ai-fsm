@@ -140,7 +140,7 @@ export default async function MyWorkOrderPage({
         />
       </Card>
 
-      <DailyRecapPanel jobId={wo.job_id} />
+      <DailyRecapPanel jobId={wo.job_id} workOrderId={workOrderId} />
 
       <Card>
         <SectionHeader title="Timeline" count={timeline.length} />

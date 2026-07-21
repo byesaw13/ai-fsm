@@ -9,6 +9,7 @@ import {
   enforceDraftOnlyFromAssessment,
   validateWorkOrderForeignKeys,
 } from "@/lib/work-orders/validate";
+import { seedWorkOrderTasksFromCriteria } from "@/lib/work-orders/task-time";
 
 export const dynamic = "force-dynamic";
 
@@ -162,6 +163,13 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
       ],
     );
     const workOrderId = woRows[0].id;
+
+    await seedWorkOrderTasksFromCriteria(client, {
+      accountId: session.accountId,
+      workOrderId,
+      criteria: d.completion_criteria ?? [],
+      source: "manual",
+    });
 
     for (let i = 0; i < materials.length; i++) {
       const m = materials[i];

@@ -11,6 +11,7 @@ import {
   validateWorkOrderCompletion,
   validateWorkOrderForeignKeys,
 } from "@/lib/work-orders/validate";
+import { seedWorkOrderTasksFromCriteria } from "@/lib/work-orders/task-time";
 
 export const dynamic = "force-dynamic";
 
@@ -202,6 +203,15 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
         d.completion_criteria ? JSON.stringify(d.completion_criteria) : null,
       ],
     );
+
+    if (d.completion_criteria !== undefined) {
+      await seedWorkOrderTasksFromCriteria(client, {
+        accountId: session.accountId,
+        workOrderId: id,
+        criteria: d.completion_criteria,
+        source: "manual",
+      });
+    }
 
     // Materials, when provided, replace the set and recompute total.
     if (d.materials !== undefined) {

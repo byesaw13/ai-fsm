@@ -1,3 +1,4 @@
+import type { PoolClient } from "pg";
 import type { CompletionCriterion } from "@ai-fsm/domain";
 
 /**
@@ -13,6 +14,71 @@ export interface WorkOrderTask {
   status: "open" | "done" | "blocked";
   note: string | null;
   sort_order: number;
+}
+
+/** Loose shape from completion_criteria JSONB (canonical + legacy). */
+export type CriteriaJsonItem = {
+  label?: string;
+  description?: string;
+  required?: boolean;
+  completed?: boolean;
+  done?: boolean;
+};
+
+/**
+ * Normalize completion_criteria JSON into seedable task rows.
+ * Shared by WO create/update paths so post-migration work orders still get tasks.
+ */
+export function criteriaItemsToTaskSeeds(
+  criteria: unknown,
+): Array<{ label: string; required: boolean; completed: boolean; sort_order: number }> {
+  if (!Array.isArray(criteria)) return [];
+  const out: Array<{ label: string; required: boolean; completed: boolean; sort_order: number }> = [];
+  for (let i = 0; i < criteria.length; i++) {
+    const c = criteria[i] as CriteriaJsonItem;
+    if (!c || typeof c !== "object") continue;
+    const label = String(c.label ?? c.description ?? "").trim();
+    if (!label) continue;
+    const completed = Boolean(c.completed ?? c.done ?? false);
+    out.push({
+      label,
+      required: c.required !== false,
+      completed,
+      sort_order: i,
+    });
+  }
+  return out;
+}
+
+/**
+ * Insert first-class tasks from completion_criteria. No-op if the WO already
+ * has tasks (idempotent for promote/retry). Call after INSERT/UPDATE of criteria.
+ */
+export async function seedWorkOrderTasksFromCriteria(
+  client: PoolClient,
+  opts: { accountId: string; workOrderId: string; criteria: unknown; source?: "estimate" | "manual" },
+): Promise<number> {
+  const seeds = criteriaItemsToTaskSeeds(opts.criteria);
+  if (seeds.length === 0) return 0;
+
+  const existing = await client.query<{ n: string }>(
+    `SELECT COUNT(*)::text AS n FROM work_order_tasks WHERE work_order_id = $1 AND account_id = $2`,
+    [opts.workOrderId, opts.accountId],
+  );
+  if (parseInt(existing.rows[0]?.n ?? "0", 10) > 0) return 0;
+
+  const source = opts.source ?? "manual";
+  let inserted = 0;
+  for (const s of seeds) {
+    await client.query(
+      `INSERT INTO work_order_tasks
+         (account_id, work_order_id, label, required, completed, completed_at, status, sort_order, source)
+       VALUES ($1, $2, $3, $4, $5, CASE WHEN $5 THEN now() END, CASE WHEN $5 THEN 'done' ELSE 'open' END, $6, $7)`,
+      [opts.accountId, opts.workOrderId, s.label, s.required, s.completed, s.sort_order, source],
+    );
+    inserted++;
+  }
+  return inserted;
 }
 
 /** A captured time entry attributed to a task. */

@@ -12,7 +12,14 @@ type Draft = { task_time: TaskRow[]; other_time: OtherRow[]; summary: string; re
  * End-of-day recap: narrate the day, AI proposes a per-task time breakdown,
  * review/edit, confirm. Nothing is written until Confirm.
  */
-export function DailyRecapPanel({ jobId }: { jobId: string }) {
+export function DailyRecapPanel({
+  jobId,
+  workOrderId,
+}: {
+  jobId: string;
+  /** Scope candidates/commits to this assignment (my-work). */
+  workOrderId?: string;
+}) {
   const router = useRouter();
   const { success, error } = useToast();
   const [narration, setNarration] = useState("");
@@ -28,7 +35,11 @@ export function DailyRecapPanel({ jobId }: { jobId: string }) {
       const res = await fetch("/api/v1/field/daily-recap", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ job_id: jobId, narration }),
+        body: JSON.stringify({
+          job_id: jobId,
+          work_order_id: workOrderId,
+          narration,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error?.message ?? "Could not interpret the recap");
@@ -52,7 +63,13 @@ export function DailyRecapPanel({ jobId }: { jobId: string }) {
       const res = await fetch("/api/v1/field/daily-recap/commit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ job_id: jobId, date, task_entries: draft.task_time, other_entries: draft.other_time }),
+        body: JSON.stringify({
+          job_id: jobId,
+          work_order_id: workOrderId,
+          date,
+          task_entries: draft.task_time,
+          other_entries: draft.other_time,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error?.message ?? "Could not save the recap");

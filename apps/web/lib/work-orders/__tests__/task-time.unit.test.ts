@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { allRequiredCriteriaMet } from "@ai-fsm/domain";
-import { minutesByTask, tasksToCriteria, type WorkOrderTask } from "../task-time";
+import {
+  criteriaItemsToTaskSeeds,
+  minutesByTask,
+  tasksToCriteria,
+  type WorkOrderTask,
+} from "../task-time";
 
 function task(p: Partial<WorkOrderTask> & { id: string }): WorkOrderTask {
   return {
@@ -26,6 +31,25 @@ describe("minutesByTask", () => {
     expect(m.get("faucet")).toBe(120);
     expect(m.get("lights")).toBe(60);
     expect(m.has("material")).toBe(false);
+  });
+});
+
+describe("criteriaItemsToTaskSeeds", () => {
+  it("maps canonical and legacy shapes", () => {
+    const seeds = criteriaItemsToTaskSeeds([
+      { label: "Faucet", required: true, completed: false },
+      { description: "Lights", done: true },
+      { label: "  ", required: true },
+    ]);
+    expect(seeds).toEqual([
+      { label: "Faucet", required: true, completed: false, sort_order: 0 },
+      { label: "Lights", required: true, completed: true, sort_order: 1 },
+    ]);
+  });
+
+  it("returns empty for non-arrays", () => {
+    expect(criteriaItemsToTaskSeeds(null)).toEqual([]);
+    expect(criteriaItemsToTaskSeeds({})).toEqual([]);
   });
 });
 

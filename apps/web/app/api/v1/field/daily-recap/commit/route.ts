@@ -21,6 +21,8 @@ const otherEntry = z.object({
 });
 const bodySchema = z.object({
   job_id: z.string().uuid(),
+  /** When set, tasks must belong to this work order (my-work assignment scope). */
+  work_order_id: z.string().uuid().optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   task_entries: z.array(taskEntry),
   other_entries: z.array(otherEntry),
@@ -40,7 +42,7 @@ export const POST = withAuth(async (request: NextRequest, session) => {
       { status: 400 },
     );
   }
-  const { job_id, date, task_entries, other_entries } = parsed.data;
+  const { job_id, work_order_id, date, task_entries, other_entries } = parsed.data;
 
   const client = await getPool().connect();
   try {
@@ -50,16 +52,68 @@ export const POST = withAuth(async (request: NextRequest, session) => {
       [session.userId, session.accountId, session.role],
     );
 
-    // Resolve task_id → work_order_id, scoped to this job + account (a task from
-    // another job/account is rejected).
+    // Job must exist in this account before any job-level activity inserts.
+    const jobCheck = await client.query<{ id: string }>(
+      `SELECT id FROM jobs WHERE id = $1 AND account_id = $2`,
+      [job_id, session.accountId],
+    );
+    if (jobCheck.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return NextResponse.json(
+        { error: { code: "NOT_FOUND", message: "Project not found", traceId: session.traceId } },
+        { status: 404 },
+      );
+    }
+
+    // Optional work-order scope: must belong to this job (+ assigned lead for tech).
+    if (work_order_id) {
+      const woCheck = await client.query<{ id: string }>(
+        `SELECT id FROM work_orders
+          WHERE id = $1 AND account_id = $2 AND job_id = $3
+            AND (
+              $4::text IN ('owner','admin')
+              OR assigned_user_id = $5
+            )`,
+        [work_order_id, session.accountId, job_id, session.role, session.userId],
+      );
+      if (woCheck.rowCount === 0) {
+        await client.query("ROLLBACK");
+        return NextResponse.json(
+          {
+            error: {
+              code: "FORBIDDEN",
+              message: "Work order not found or not assigned to you",
+              traceId: session.traceId,
+            },
+          },
+          { status: 403 },
+        );
+      }
+    }
+
+    // Resolve task_id → work_order_id, scoped to this job (+ optional WO).
     const taskIds = task_entries.map((t) => t.task_id).filter((x): x is string => !!x);
     const woByTask = new Map<string, string>();
     if (taskIds.length) {
       const { rows } = await client.query<{ id: string; work_order_id: string }>(
-        `SELECT t.id, t.work_order_id
-           FROM work_order_tasks t JOIN work_orders wo ON wo.id = t.work_order_id
-          WHERE t.account_id = $1 AND wo.job_id = $2 AND t.id = ANY($3::uuid[])`,
-        [session.accountId, job_id, taskIds],
+        work_order_id
+          ? `SELECT t.id, t.work_order_id
+               FROM work_order_tasks t JOIN work_orders wo ON wo.id = t.work_order_id
+              WHERE t.account_id = $1 AND wo.job_id = $2 AND wo.id = $3 AND t.id = ANY($4::uuid[])
+                AND (
+                  $5::text IN ('owner','admin')
+                  OR wo.assigned_user_id = $6
+                )`
+          : `SELECT t.id, t.work_order_id
+               FROM work_order_tasks t JOIN work_orders wo ON wo.id = t.work_order_id
+              WHERE t.account_id = $1 AND wo.job_id = $2 AND t.id = ANY($3::uuid[])
+                AND (
+                  $4::text IN ('owner','admin')
+                  OR wo.assigned_user_id = $5
+                )`,
+        work_order_id
+          ? [session.accountId, job_id, work_order_id, taskIds, session.role, session.userId]
+          : [session.accountId, job_id, taskIds, session.role, session.userId],
       );
       for (const r of rows) woByTask.set(r.id, r.work_order_id);
     }
@@ -102,7 +156,15 @@ export const POST = withAuth(async (request: NextRequest, session) => {
         if (!woId) {
           await client.query("ROLLBACK");
           return NextResponse.json(
-            { error: { code: "VALIDATION_ERROR", message: "A task does not belong to this job", traceId: session.traceId } },
+            {
+              error: {
+                code: "VALIDATION_ERROR",
+                message: work_order_id
+                  ? "A task does not belong to this work order"
+                  : "A task does not belong to this job",
+                traceId: session.traceId,
+              },
+            },
             { status: 400 },
           );
         }

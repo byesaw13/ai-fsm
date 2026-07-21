@@ -35,6 +35,9 @@ function post(body: unknown): NextRequest {
 beforeEach(() => {
   vi.clearAllMocks();
   mockQuery.mockImplementation((sql: string) => {
+    if (/SELECT id FROM jobs WHERE id/.test(sql)) {
+      return Promise.resolve({ rows: [{ id: JOB }], rowCount: 1 });
+    }
     if (/FROM work_order_tasks t JOIN work_orders/.test(sql)) {
       return Promise.resolve({ rows: [{ id: TASK, work_order_id: WO }], rowCount: 1 });
     }
@@ -70,7 +73,12 @@ describe("POST /api/v1/field/daily-recap/commit", () => {
 
   it("rejects a task that does not belong to the job", async () => {
     mockQuery.mockImplementation((sql: string) => {
-      if (/FROM work_order_tasks t JOIN work_orders/.test(sql)) return Promise.resolve({ rows: [], rowCount: 0 });
+      if (/SELECT id FROM jobs WHERE id/.test(sql)) {
+        return Promise.resolve({ rows: [{ id: JOB }], rowCount: 1 });
+      }
+      if (/FROM work_order_tasks t JOIN work_orders/.test(sql)) {
+        return Promise.resolve({ rows: [], rowCount: 0 });
+      }
       return Promise.resolve({ rows: [], rowCount: 0 });
     });
     const res = await POST(
@@ -83,5 +91,23 @@ describe("POST /api/v1/field/daily-recap/commit", () => {
     );
     expect(res.status).toBe(400);
     expect(mockQuery.mock.calls.some((c) => String(c[0]) === "ROLLBACK")).toBe(true);
+  });
+
+  it("rejects when job_id is not in the account", async () => {
+    mockQuery.mockImplementation((sql: string) => {
+      if (/SELECT id FROM jobs WHERE id/.test(sql)) {
+        return Promise.resolve({ rows: [], rowCount: 0 });
+      }
+      return Promise.resolve({ rows: [], rowCount: 0 });
+    });
+    const res = await POST(
+      post({
+        job_id: JOB,
+        date: "2026-07-20",
+        task_entries: [{ task_id: null, label: "misc", minutes: 30, status: "done", note: "" }],
+        other_entries: [],
+      }),
+    );
+    expect(res.status).toBe(404);
   });
 });

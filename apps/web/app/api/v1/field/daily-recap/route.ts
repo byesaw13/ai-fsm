@@ -10,6 +10,8 @@ export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
   job_id: z.string().uuid(),
+  /** When set (my-work page), only tasks on this work order are candidates. */
+  work_order_id: z.string().uuid().optional(),
   narration: z.string().min(1).max(4000),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
@@ -27,21 +29,42 @@ export const POST = withAuth(async (request: NextRequest, session) => {
       { status: 400 },
     );
   }
-  const { job_id, narration } = parsed.data;
+  const { job_id, work_order_id, narration } = parsed.data;
   const date = parsed.data.date ?? businessToday();
 
   try {
-    // Candidate tasks = open tasks on this job's non-terminal work orders.
-    const tasks = await queryForSession<RecapCandidateTask>(
-      session,
-      `SELECT t.id, t.label, wo.title AS work_order_title
-         FROM work_order_tasks t
-         JOIN work_orders wo ON wo.id = t.work_order_id
-        WHERE t.account_id = $1 AND wo.job_id = $2 AND t.completed = false
-          AND wo.status NOT IN ('completed','cancelled','closed')
-        ORDER BY wo.created_at ASC, t.sort_order ASC`,
-      [session.accountId, job_id],
-    );
+    // Candidate tasks: open tasks on this job. Prefer a single work order when
+    // the field page is scoped to one assignment (tech my-work).
+    const tasks = work_order_id
+      ? await queryForSession<RecapCandidateTask>(
+          session,
+          `SELECT t.id, t.label, wo.title AS work_order_title
+             FROM work_order_tasks t
+             JOIN work_orders wo ON wo.id = t.work_order_id
+            WHERE t.account_id = $1 AND wo.job_id = $2 AND wo.id = $3
+              AND t.completed = false
+              AND wo.status NOT IN ('completed','cancelled','closed')
+              AND (
+                $4::text IN ('owner','admin')
+                OR wo.assigned_user_id = $5
+              )
+            ORDER BY t.sort_order ASC`,
+          [session.accountId, job_id, work_order_id, session.role, session.userId],
+        )
+      : await queryForSession<RecapCandidateTask>(
+          session,
+          `SELECT t.id, t.label, wo.title AS work_order_title
+             FROM work_order_tasks t
+             JOIN work_orders wo ON wo.id = t.work_order_id
+            WHERE t.account_id = $1 AND wo.job_id = $2 AND t.completed = false
+              AND wo.status NOT IN ('completed','cancelled','closed')
+              AND (
+                $3::text IN ('owner','admin')
+                OR wo.assigned_user_id = $4
+              )
+            ORDER BY wo.created_at ASC, t.sort_order ASC`,
+          [session.accountId, job_id, session.role, session.userId],
+        );
 
     const draft = await interpretDailyRecap({
       narration,
