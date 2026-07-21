@@ -15,14 +15,16 @@ COMMENT ON COLUMN invoices.last_viewed_at IS
 COMMENT ON COLUMN invoices.view_count IS
   'Number of times the portal invoice page was loaded (best-effort).';
 
--- Allow view stamps on any non-void invoice, including paid (receipt re-open).
--- Money immutability from migration 150 is preserved.
+-- View stamps only touch first/last_viewed_at + view_count. Allow that on
+-- open invoices (sent/partial/overdue). Paid/void remain fully immutable so
+-- terminal money state cannot be written through a portal open.
 CREATE OR REPLACE FUNCTION enforce_invoice_immutability()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   -- View-only updates never touch money or lifecycle fields.
   IF (
-    new.status              IS NOT DISTINCT FROM old.status
+    old.status IN ('sent', 'partial', 'overdue')
+    AND new.status              IS NOT DISTINCT FROM old.status
     AND new.client_id       IS NOT DISTINCT FROM old.client_id
     AND new.job_id          IS NOT DISTINCT FROM old.job_id
     AND new.estimate_id     IS NOT DISTINCT FROM old.estimate_id
@@ -38,6 +40,7 @@ BEGIN
     AND new.sent_at         IS NOT DISTINCT FROM old.sent_at
     AND new.paid_at         IS NOT DISTINCT FROM old.paid_at
     AND new.created_by      IS NOT DISTINCT FROM old.created_by
+    AND new.updated_at      IS NOT DISTINCT FROM old.updated_at
     AND (
       new.first_viewed_at IS DISTINCT FROM old.first_viewed_at
       OR new.last_viewed_at IS DISTINCT FROM old.last_viewed_at

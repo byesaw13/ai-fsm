@@ -57,15 +57,15 @@ export async function recordInvoicePortalView(
   queryFn: (sql: string, params: unknown[]) => Promise<{ rowCount: number | null }>,
   shareToken: string,
 ): Promise<boolean> {
+  // Only stamp open client-facing invoices. Draft never left the shop; paid/void
+  // stay fully money-immutable (view carve-out still exists for edge retries).
   const result = await queryFn(
     `UPDATE invoices
      SET first_viewed_at = COALESCE(first_viewed_at, now()),
          last_viewed_at = now(),
-         view_count = view_count + 1,
-         updated_at = now()
+         view_count = view_count + 1
      WHERE share_token = $1
-       AND status <> 'void'
-       AND status <> 'draft'`,
+       AND status IN ('sent', 'partial', 'overdue')`,
     [shareToken],
   );
   return (result.rowCount ?? 0) > 0;

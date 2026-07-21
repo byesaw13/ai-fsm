@@ -55,6 +55,7 @@ describe("recordInvoicePortalView", () => {
     expect(queryFn).toHaveBeenCalledOnce();
     const [sql, params] = queryFn.mock.calls[0];
     expect(sql).toMatch(/first_viewed_at = COALESCE/);
+    expect(sql).toMatch(/status IN \('sent', 'partial', 'overdue'\)/);
     expect(params).toEqual(["token-uuid"]);
   });
 });
