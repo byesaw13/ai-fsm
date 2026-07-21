@@ -6,6 +6,7 @@
 import type { PoolClient } from "pg";
 import { seedCompletionCriteriaFromLineItems } from "@ai-fsm/domain";
 import { deriveJobTitle, deriveJobDescription } from "../estimates/job-from-estimate";
+import { seedWorkOrderTasksFromCriteria } from "./task-time";
 
 export interface PromoteWorkOrderResult {
   workOrderId: string;
@@ -153,6 +154,17 @@ export async function promoteOrCreateWorkOrderFromEstimate({
        WHERE id = $1 AND account_id = $2`,
       [woId, accountId, jobId, est.property_id, estimateId, JSON.stringify(completionCriteria)],
     );
+    // Prefer criteria already on the draft; fall back to estimate-derived list.
+    const { rows: critRows } = await client.query<{ completion_criteria: unknown }>(
+      `SELECT completion_criteria FROM work_orders WHERE id = $1`,
+      [woId],
+    );
+    await seedWorkOrderTasksFromCriteria(client, {
+      accountId,
+      workOrderId: woId,
+      criteria: critRows[0]?.completion_criteria ?? completionCriteria,
+      source: "estimate",
+    });
     return { workOrderId: woId, created: false, promoted: true };
   }
 
@@ -189,6 +201,13 @@ export async function promoteOrCreateWorkOrderFromEstimate({
     ],
   );
   const workOrderId = insertRes.rows[0].id;
+
+  await seedWorkOrderTasksFromCriteria(client, {
+    accountId,
+    workOrderId,
+    criteria: completionCriteria,
+    source: "estimate",
+  });
 
   for (let i = 0; i < lineItemsRes.rows.length; i++) {
     const li = lineItemsRes.rows[i];

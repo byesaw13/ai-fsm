@@ -4,6 +4,7 @@ import { withAuth, type AuthSession } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { canCreateEstimates } from "@/lib/auth/permissions";
 import { logger } from "@/lib/logger";
+import { seedWorkOrderTasksFromCriteria } from "@/lib/work-orders/task-time";
 
 export const dynamic = "force-dynamic";
 
@@ -117,6 +118,13 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
       ],
     );
     const newId = insert.rows[0].id;
+
+    await seedWorkOrderTasksFromCriteria(client, {
+      accountId: session.accountId,
+      workOrderId: newId,
+      criteria: source.completion_criteria ?? [],
+      source: "manual",
+    });
 
     const mats = await client.query<{
       description: string;
