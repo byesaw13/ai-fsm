@@ -34,6 +34,8 @@ export type DayReviewPayload = {
     id: string;
     activityType: string;
     entityLabel: string | null;
+    /** Task label when activity_entries.task_id is set (Daily Recap). */
+    taskLabel: string | null;
     note: string | null;
     startedAt: string;
     endedAt: string;
@@ -135,6 +137,7 @@ export async function getDayReview(
     id: string;
     activity_type: string;
     entity_label: string | null;
+    task_label: string | null;
     note: string | null;
     started_at: string;
     ended_at: string;
@@ -144,17 +147,21 @@ export async function getDayReview(
             ae.started_at::text AS started_at, ae.ended_at::text AS ended_at,
             ROUND(EXTRACT(EPOCH FROM (ae.ended_at - ae.started_at)) / 60)::int AS duration_minutes,
             CASE ae.entity_type
-              WHEN 'job'      THEN j.title
-              WHEN 'visit'    THEN vjob.title
-              WHEN 'estimate' THEN 'Estimate ' || COALESCE(est.estimate_number, '')
-              WHEN 'invoice'  THEN 'Invoice ' || COALESCE(inv.invoice_number, '')
-              WHEN 'client'   THEN cli.name
+              WHEN 'job'        THEN j.title
+              WHEN 'visit'      THEN COALESCE(vjob.title, 'Field day')
+              WHEN 'work_order' THEN COALESCE(wo.title, 'Work order')
+              WHEN 'estimate'   THEN 'Estimate ' || COALESCE(est.estimate_number, '')
+              WHEN 'invoice'    THEN 'Invoice ' || COALESCE(inv.invoice_number, '')
+              WHEN 'client'     THEN cli.name
               ELSE NULL
-            END AS entity_label
+            END AS entity_label,
+            t.label AS task_label
      FROM activity_entries ae
-     LEFT JOIN jobs j        ON ae.entity_type = 'job'      AND j.id   = ae.entity_id AND j.account_id   = ae.account_id
-     LEFT JOIN visits vis    ON ae.entity_type = 'visit'    AND vis.id = ae.entity_id AND vis.account_id = ae.account_id
+     LEFT JOIN jobs j        ON ae.entity_type = 'job'        AND j.id   = ae.entity_id AND j.account_id   = ae.account_id
+     LEFT JOIN visits vis    ON ae.entity_type = 'visit'      AND vis.id = ae.entity_id AND vis.account_id = ae.account_id
      LEFT JOIN jobs vjob     ON vjob.id = vis.job_id AND vjob.account_id = ae.account_id
+     LEFT JOIN work_orders wo ON ae.entity_type = 'work_order' AND wo.id = ae.entity_id AND wo.account_id = ae.account_id
+     LEFT JOIN work_order_tasks t ON t.id = ae.task_id AND t.account_id = ae.account_id
      LEFT JOIN estimates est ON ae.entity_type = 'estimate' AND est.id = ae.entity_id AND est.account_id = ae.account_id
      LEFT JOIN invoices inv  ON ae.entity_type = 'invoice'  AND inv.id = ae.entity_id AND inv.account_id = ae.account_id
      LEFT JOIN clients cli   ON ae.entity_type = 'client'   AND cli.id = ae.entity_id AND cli.account_id = ae.account_id
@@ -224,6 +231,7 @@ export async function getDayReview(
       id: e.id,
       activityType: e.activity_type,
       entityLabel: e.entity_label,
+      taskLabel: e.task_label,
       note: e.note,
       startedAt: e.started_at,
       endedAt: e.ended_at,

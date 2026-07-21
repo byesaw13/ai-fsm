@@ -419,6 +419,13 @@ export default async function JobDetailPage({
                WHERE v.job_id = $1 AND v.account_id = $2
              )
            )
+           OR (
+             ae.entity_type = 'work_order'
+             AND ae.entity_id IN (
+               SELECT wo.id FROM work_orders wo
+               WHERE wo.job_id = $1 AND wo.account_id = $2
+             )
+           )
          )
        GROUP BY ae.session_date
        ORDER BY ae.session_date ASC`,

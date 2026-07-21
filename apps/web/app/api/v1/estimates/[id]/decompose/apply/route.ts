@@ -24,9 +24,50 @@ function idFromPath(req: NextRequest): string | undefined {
 }
 
 /**
- * POST /api/v1/estimates/[id]/decompose/apply — create the reviewed work orders
- * and their first-class tasks. Each work order also stores the checklist as
- * completion_criteria (parity with the manual checklist). Transactional.
+ * Flatten AI area groups into one task list.
+ * When the model still returns multiple groups, prefix task labels with the
+ * group title so baselines stay readable without minting many work orders.
+ */
+export function flattenDecompositionTasks(
+  groups: Array<{ title: string; scope: string; tasks: Array<{ label: string; required: boolean }> }>,
+): {
+  title: string;
+  scope: string;
+  tasks: Array<{ label: string; required: boolean }>;
+} {
+  if (groups.length === 1) {
+    return {
+      title: groups[0].title,
+      scope: groups[0].scope,
+      tasks: groups[0].tasks,
+    };
+  }
+  const tasks = groups.flatMap((g) =>
+    g.tasks.map((t) => ({
+      label: t.label.toLowerCase().startsWith(g.title.toLowerCase())
+        ? t.label
+        : `${g.title} — ${t.label}`,
+      required: t.required,
+    })),
+  );
+  const scope = groups
+    .map((g) => g.scope || g.title)
+    .filter(Boolean)
+    .join("; ");
+  return {
+    title: groups[0].title.includes(" / ")
+      ? groups[0].title
+      : groups.map((g) => g.title).join(" / ").slice(0, 200),
+    scope: scope.slice(0, 2000),
+    tasks,
+  };
+}
+
+/**
+ * POST /api/v1/estimates/[id]/decompose/apply — replace the estimate's default
+ * work order with a single operational packet and first-class tasks.
+ * Area groupings from the AI are flattened onto that one work order (product
+ * default: one WO per project). Transactional.
  */
 export const POST = withRole(["owner", "admin"], async (request: NextRequest, session: AuthSession) => {
   const estimateId = idFromPath(request);
@@ -46,15 +87,23 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       [session.userId, session.accountId, session.role],
     );
 
-    const est = await client.query<{ status: string; client_id: string; job_id: string | null; property_id: string | null }>(
-      `SELECT status, client_id, job_id, property_id FROM estimates WHERE id = $1 AND account_id = $2`,
+    const est = await client.query<{
+      status: string;
+      client_id: string;
+      job_id: string | null;
+      property_id: string | null;
+      job_title: string | null;
+    }>(
+      `SELECT e.status, e.client_id, e.job_id, e.property_id, j.title AS job_title
+         FROM estimates e LEFT JOIN jobs j ON j.id = e.job_id AND j.account_id = e.account_id
+        WHERE e.id = $1 AND e.account_id = $2`,
       [estimateId, session.accountId],
     );
     if (est.rowCount === 0) {
       await client.query("ROLLBACK");
       return NextResponse.json({ error: { code: "NOT_FOUND", message: "Estimate not found", traceId: session.traceId } }, { status: 404 });
     }
-    const { status, client_id, job_id, property_id } = est.rows[0];
+    const { status, client_id, job_id, property_id, job_title } = est.rows[0];
     // Workflow invariant: only an accepted estimate becomes production work.
     if (status !== "approved") {
       await client.query("ROLLBACK");
@@ -64,10 +113,15 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       );
     }
 
+    const flat = flattenDecompositionTasks(parsed.data.work_orders);
+    const title = (job_title?.trim() || flat.title).slice(0, 200);
+    const scope = flat.scope || null;
+    // Linked job → ready (shows on project + My Work). No job yet → draft.
+    const woStatus = job_id ? "ready" : "draft";
+
     // Approval already seeded a coarse default work order for this estimate
     // (createJobFromEstimate). Replace any untouched estimate-derived work orders
-    // (no visits, no logged time) so the decomposition doesn't duplicate scope.
-    // Tasks cascade with the work order.
+    // (no visits, no logged time) so the breakdown doesn't leave a second packet.
     await client.query(
       `DELETE FROM work_orders wo
         WHERE wo.account_id = $1 AND wo.source_estimate_id = $2
@@ -77,24 +131,50 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       [session.accountId, estimateId],
     );
 
-    const created: string[] = [];
+    const criteria = flat.tasks.map((t, i) => ({
+      id: `t-${i}`,
+      label: t.label,
+      required: t.required,
+      completed: false,
+    }));
 
-    for (const wo of parsed.data.work_orders) {
-      const criteria = wo.tasks.map((t, i) => ({ id: `t-${i}`, label: t.label, required: t.required, completed: false }));
-      const ins = await client.query<{ id: string }>(
-        `INSERT INTO work_orders
-           (account_id, client_id, job_id, property_id, title, scope, status, completion_criteria, source_estimate_id, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,'draft',$7::jsonb,$8,$9)
-         RETURNING id`,
-        [session.accountId, client_id, job_id, property_id, wo.title, wo.scope || null, JSON.stringify(criteria), estimateId, session.userId],
-      );
-      const workOrderId = ins.rows[0].id;
-      await seedWorkOrderTasksFromCriteria(client, { accountId: session.accountId, workOrderId, criteria, source: "ai" });
-      created.push(workOrderId);
-    }
+    const ins = await client.query<{ id: string }>(
+      `INSERT INTO work_orders
+         (account_id, client_id, job_id, property_id, title, scope, status, completion_criteria, source_estimate_id, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10)
+       RETURNING id`,
+      [
+        session.accountId,
+        client_id,
+        job_id,
+        property_id,
+        title,
+        scope,
+        woStatus,
+        JSON.stringify(criteria),
+        estimateId,
+        session.userId,
+      ],
+    );
+    const workOrderId = ins.rows[0].id;
+    await seedWorkOrderTasksFromCriteria(client, {
+      accountId: session.accountId,
+      workOrderId,
+      criteria,
+      source: "ai",
+    });
 
     await client.query("COMMIT");
-    return NextResponse.json({ data: { created_work_order_ids: created, count: created.length } }, { status: 201 });
+    return NextResponse.json(
+      {
+        data: {
+          created_work_order_ids: [workOrderId],
+          count: 1,
+          task_count: flat.tasks.length,
+        },
+      },
+      { status: 201 },
+    );
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});
     logger.error("POST /api/v1/estimates/[id]/decompose/apply error", error, { traceId: session.traceId });

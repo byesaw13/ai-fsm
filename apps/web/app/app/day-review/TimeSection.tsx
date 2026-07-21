@@ -48,12 +48,19 @@ export function TimeSection({
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-sm font-medium">
                     {emoji} {label}
-                    {e.entityLabel ? <span className="text-muted-foreground font-normal"> · {e.entityLabel}</span> : null}
+                    {e.taskLabel ? (
+                      <span className="text-muted-foreground font-normal"> · {e.taskLabel}</span>
+                    ) : e.entityLabel ? (
+                      <span className="text-muted-foreground font-normal"> · {e.entityLabel}</span>
+                    ) : null}
                   </span>
                   <span className="text-xs text-muted-foreground whitespace-nowrap">
                     {fmt(e.startedAt)} – {fmt(e.endedAt)} · {e.durationMinutes} min
                   </span>
                 </div>
+                {e.taskLabel && e.entityLabel ? (
+                  <p className="text-xs text-muted-foreground mt-1">{e.entityLabel}</p>
+                ) : null}
                 {e.note ? <p className="text-xs text-muted-foreground mt-1">{e.note}</p> : null}
               </div>
             );

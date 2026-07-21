@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withAuth } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { activityCategoryFor, type ActivityType } from "@ai-fsm/domain";
+import { ensureFieldDayVisit } from "@/lib/field/confirm-visit";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,11 @@ const bodySchema = z.object({
  * ledger: per-task time (activity_entries.task_id) plus non-task buckets, and
  * toggle task done/blocked. Transactional. This is the only path that writes
  * the recap — the AI output is never auto-committed.
+ *
+ * Field-day spine: when possible, ensure a completed standard visit for the
+ * local day under each work order that received task time, and hang job_work
+ * rows on that visit (keep task_id). Falls back to entity_type=work_order when
+ * a visit cannot be resolved (ambiguous multi-WO, cancelled job, etc.).
  */
 export const POST = withAuth(async (request: NextRequest, session) => {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
@@ -118,9 +124,59 @@ export const POST = withAuth(async (request: NextRequest, session) => {
       for (const r of rows) woByTask.set(r.id, r.work_order_id);
     }
 
-    // Synthesize sequential timestamps within the business day (durations are
-    // what baselines use; session_date is set explicitly to the business day).
-    let cursorMs = new Date(`${date}T13:00:00.000Z`).getTime();
+    // Optional business day for the operator on this local date.
+    const bd = await client.query<{ id: string }>(
+      `SELECT id FROM business_days
+        WHERE account_id = $1 AND user_id = $2 AND business_date = $3::date
+        LIMIT 1`,
+      [session.accountId, session.userId, date],
+    );
+    const businessDayId = bd.rows[0]?.id ?? null;
+
+    // Minutes per work order (for field-day window + ensureFieldDayVisit gate).
+    const minutesByWo = new Map<string, number>();
+    for (const t of task_entries) {
+      if (!t.task_id || t.minutes <= 0) continue;
+      const woId = woByTask.get(t.task_id);
+      if (!woId) continue;
+      minutesByWo.set(woId, (minutesByWo.get(woId) ?? 0) + t.minutes);
+    }
+    // When scoped to a WO with only unplanned/other time, still try that WO's day.
+    if (work_order_id && !minutesByWo.has(work_order_id)) {
+      const totalOther =
+        other_entries.reduce((s, o) => s + o.minutes, 0) +
+        task_entries.filter((t) => !t.task_id).reduce((s, t) => s + t.minutes, 0);
+      if (totalOther > 0) minutesByWo.set(work_order_id, totalOther);
+    }
+
+    // Midday UTC anchor on the business date; durations are what baselines use.
+    const dayAnchorMs = new Date(`${date}T13:00:00.000Z`).getTime();
+    const visitIdByWo = new Map<string, string>();
+
+    for (const [woId, minutes] of minutesByWo) {
+      const windowMin = Math.max(minutes, 15);
+      const arrival = new Date(dayAnchorMs).toISOString();
+      const departure = new Date(dayAnchorMs + windowMin * 60_000).toISOString();
+      const fieldDay = await ensureFieldDayVisit(client, {
+        accountId: session.accountId,
+        userId: session.userId,
+        jobId: job_id,
+        visitId: null,
+        classification: "job_work",
+        arrivalTime: arrival,
+        departureTime: departure,
+        workOrderId: woId,
+        techNotes: "Auto-created from Daily Recap",
+      });
+      if (fieldDay.visitId) visitIdByWo.set(woId, fieldDay.visitId);
+    }
+
+    // Prefer a single visit for job-level (unplanned/other) rows when one WO day exists.
+    const primaryVisitId =
+      (work_order_id && visitIdByWo.get(work_order_id)) ||
+      (visitIdByWo.size === 1 ? [...visitIdByWo.values()][0] : null);
+
+    let cursorMs = dayAnchorMs;
     const nextRange = (minutes: number) => {
       const started = new Date(cursorMs).toISOString();
       cursorMs += minutes * 60_000;
@@ -140,11 +196,21 @@ export const POST = withAuth(async (request: NextRequest, session) => {
       await client.query(
         `INSERT INTO activity_entries
            (account_id, user_id, session_date, activity_type, category,
-            started_at, ended_at, entity_type, entity_id, task_id, source, note)
-         VALUES ($1,$2,$3::date,$4,$5,$6::timestamptz,$7::timestamptz,$8,$9,$10,'manual',$11)`,
+            started_at, ended_at, entity_type, entity_id, task_id, source, note, business_day_id)
+         VALUES ($1,$2,$3::date,$4,$5,$6::timestamptz,$7::timestamptz,$8,$9,$10,'manual',$11,$12)`,
         [
-          session.accountId, session.userId, date, activityType, activityCategoryFor(activityType as ActivityType),
-          started, ended, entityType, entityId, taskId, note,
+          session.accountId,
+          session.userId,
+          date,
+          activityType,
+          activityCategoryFor(activityType as ActivityType),
+          started,
+          ended,
+          entityType,
+          entityId,
+          taskId,
+          note,
+          businessDayId,
         ],
       );
     };
@@ -168,7 +234,13 @@ export const POST = withAuth(async (request: NextRequest, session) => {
             { status: 400 },
           );
         }
-        await insertActivity("job_work", t.minutes, "work_order", woId, t.task_id, t.note || null);
+        const visitId = visitIdByWo.get(woId);
+        if (visitId) {
+          await insertActivity("job_work", t.minutes, "visit", visitId, t.task_id, t.note || null);
+        } else {
+          // Fallback when field day cannot be created (multi-WO ambiguity, etc.).
+          await insertActivity("job_work", t.minutes, "work_order", woId, t.task_id, t.note || null);
+        }
         // "I did this" — toggle the task per its status.
         if (t.status === "done") {
           await client.query(
@@ -190,15 +262,23 @@ export const POST = withAuth(async (request: NextRequest, session) => {
           );
         }
       } else {
-        // Unplanned work not in the task list — log against the job with the label.
+        // Unplanned work not in the task list — prefer field-day visit, else job.
         const note = [t.label, t.note].filter(Boolean).join(" — ") || null;
-        await insertActivity("job_work", t.minutes, "job", job_id, null, note);
+        if (primaryVisitId) {
+          await insertActivity("job_work", t.minutes, "visit", primaryVisitId, null, note);
+        } else {
+          await insertActivity("job_work", t.minutes, "job", job_id, null, note);
+        }
       }
       recorded += t.minutes;
     }
 
     for (const o of other_entries) {
-      await insertActivity(o.activity_type, o.minutes, "job", job_id, null, o.note || null);
+      if (primaryVisitId) {
+        await insertActivity(o.activity_type, o.minutes, "visit", primaryVisitId, null, o.note || null);
+      } else {
+        await insertActivity(o.activity_type, o.minutes, "job", job_id, null, o.note || null);
+      }
       recorded += o.minutes;
     }
 
