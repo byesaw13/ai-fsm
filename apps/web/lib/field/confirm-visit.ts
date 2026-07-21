@@ -270,16 +270,18 @@ export async function ensureFieldDayVisit(
     return { visitId: null, created: false, reason: "job_not_available" };
   }
 
-  // Prefer an explicit WO (Daily Recap); else resolve so multi-WO jobs don't mis-attach.
-  let workOrderId = opts.workOrderId ?? null;
-  if (workOrderId) {
-    const { rowCount } = await client.query(
-      `SELECT 1 FROM work_orders
-        WHERE id = $1 AND account_id = $2 AND job_id = $3 AND status <> 'cancelled'`,
-      [workOrderId, opts.accountId, jobId],
+  // Prefer an explicit WO (Daily Recap); must be bookable (draft→ready, not completed).
+  // Else resolve so multi-WO jobs don't mis-attach.
+  let workOrderId: string | null = null;
+  if (opts.workOrderId) {
+    workOrderId = await resolveWorkOrderForVisit(
+      client,
+      jobId,
+      opts.accountId,
+      opts.workOrderId,
     );
-    if (!rowCount) {
-      return { visitId: null, created: false, reason: "work_order_not_on_job" };
+    if (!workOrderId) {
+      return { visitId: null, created: false, reason: "work_order_not_bookable" };
     }
   } else {
     workOrderId = await resolveWorkOrderForFieldDay(client, jobId, opts.accountId);
