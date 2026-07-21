@@ -23,11 +23,11 @@ export class DailyRecapError extends Error {
 }
 
 /** A candidate task the worker could have touched today (for AI grounding). */
-export interface RecapCandidateTask {
+export type RecapCandidateTask = {
   id: string;
   label: string;
   work_order_title: string | null;
-}
+};
 
 export interface DailyRecapInput {
   narration: string;
@@ -37,7 +37,9 @@ export interface DailyRecapInput {
   date: string; // YYYY-MM-DD
 }
 
-const NON_TASK_ACTIVITY = ["material_run", "travel", "admin", "waiting"] as const;
+// Must be valid activity_types (activity_entries.activity_type CHECK). On-site
+// waiting is better captured as a blocked task, so it is not a bucket here.
+const NON_TASK_ACTIVITY = ["material_run", "travel", "admin"] as const;
 export type NonTaskActivity = (typeof NON_TASK_ACTIVITY)[number];
 
 export const recapTaskSchema = z.object({
@@ -73,7 +75,7 @@ Rules:
 - Attribute time to a candidate task by its id whenever the narration clearly refers to it. Echo the task's label in "label".
 - status: "done" if finished, "partial" if worked but not finished, "blocked" if stopped by a problem (wrong material, waiting on parts). Put the reason in "note".
 - Do NOT invent tasks. Only use task_id=null with a new "label" for clearly-new unplanned work the worker describes that isn't in the candidate list.
-- Non-task time — material runs, driving, paperwork, waiting — goes in other_time with the closest activity_type (material_run, travel, admin, waiting), not as a task.
+- Non-task time — material runs, driving, paperwork — goes in other_time with the closest activity_type (material_run, travel, admin), not as a task. On-site waiting is a blocked task, not a bucket.
 - Estimate minutes from the narration ("a couple hours" ≈ 120, "an hour" ≈ 60, "rest of the day" = remaining clocked time). If a clocked day length is given, try to make the attributed total land near it, but honor explicit times the worker states even if they don't sum perfectly.
 - reconciliation_note: one short sentence comparing the attributed total to the clocked day (e.g. "Attributed ~8h matches the clocked day." or "Attributed 6h but clocked 8h — 2h unaccounted."). Never silently pad.
 - A task the worker did not mention gets no entry (leave it untouched).`;

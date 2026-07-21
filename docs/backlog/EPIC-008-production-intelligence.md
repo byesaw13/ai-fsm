@@ -154,6 +154,47 @@ The last link in the chain — built only after the Operations Engine ledgers
 (EPIC-001) and Site Presence (TASK-057) are trustworthy in real use. Moved here
 from EPIC-001: it consumes the engine's output rather than being part of it.
 
+# TASK-072: Per-task time capture via AI Daily Recap (baselines foundation)
+
+Status:
+In Progress
+
+Phase:
+3
+
+Problem:
+There are no per-task actuals to baseline against — the checklist items on a
+work order are free-text JSONB, and `activity_entries` attach to job/visit, never
+to a task. So "installing a faucet took X hours" cannot be established.
+
+Business Value:
+Actual time accumulates per task with almost no logging friction — at day's end
+the tech/owner narrates the day and AI turns it into structured per-task time,
+building the baselines that later drive costing and pricing.
+
+Scope (Slice 1 — done):
+- `work_order_tasks` (first-class checklist items, migration 155, backfilled from
+  `completion_criteria`); `activity_entries.task_id` + `work_order` entity type
+  (migration 156).
+- AI Daily Recap: narration + candidate tasks → reviewable per-task time/status +
+  non-task buckets; owner confirms; commit writes `activity_entries.task_id` and
+  toggles task done/blocked. Design:
+  `docs/superpowers/specs/` (approved plan lively-puzzling-perlis).
+
+Out of Scope (Slice 1):
+- **Unifying the completion checklist onto tasks** — the existing JSONB checklist
+  + completion gate are untouched; tasks are an additive time/baseline layer.
+  Next step (Slice 1b): make the field checklist read/write tasks so there is one
+  source of truth for "I did this."
+- AI *decomposition* of the task list (Slice 2); baseline analytics (Slice 3).
+
+Acceptance Criteria:
+- [x] Time can be attributed to a task; the recap parses the owner's worked
+      example into per-task time (unit-tested).
+- [ ] Owner reviews and confirms before anything is written; confirmed recap
+      records per-task `activity_entries` and marks tasks done (needs live check).
+- [ ] Follow-up: one checklist source of truth (Slice 1b).
+
 ## Completed
 
 _None yet._
