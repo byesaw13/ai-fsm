@@ -23,12 +23,10 @@ export function EstimateBanners({
   finalInvoice,
 }: Props) {
   const currentStatus = estimate.status;
-  const projectClosed =
-    jobStatus === "completed" || jobStatus === "invoiced";
-  // Convert to final invoice: always when no project, or after project closeout.
-  // Open projects use closeout as the primary path (also creates a draft final).
-  const canConvertToFinal =
-    !finalInvoice && (!estimate.job_id || projectClosed);
+  // Convert to final invoice whenever no final exists yet. Project closeout also
+  // auto-creates a final invoice, but owners need a direct path for standalone
+  // estimates and for smoke/billing flows that bill before field closeout.
+  const canConvertToFinal = !finalInvoice;
 
   return (
     <>
