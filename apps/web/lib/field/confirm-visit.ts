@@ -224,6 +224,10 @@ export async function ensureFieldDayVisit(
     classification: string;
     arrivalTime: string;
     departureTime: string;
+    /** When known (e.g. Daily Recap scoped to a WO), skip multi-WO ambiguity. */
+    workOrderId?: string | null;
+    /** Note stored on auto-created visits (default: GPS confirm copy). */
+    techNotes?: string | null;
   },
 ): Promise<EnsureFieldDayResult> {
   const durationMinutes = Math.max(
@@ -266,8 +270,22 @@ export async function ensureFieldDayVisit(
     return { visitId: null, created: false, reason: "job_not_available" };
   }
 
-  // Resolve WO first so multi-WO jobs don't attach activity to the wrong day.
-  const workOrderId = await resolveWorkOrderForFieldDay(client, jobId, opts.accountId);
+  // Prefer an explicit WO (Daily Recap); must be bookable (draft→ready, not completed).
+  // Else resolve so multi-WO jobs don't mis-attach.
+  let workOrderId: string | null = null;
+  if (opts.workOrderId) {
+    workOrderId = await resolveWorkOrderForVisit(
+      client,
+      jobId,
+      opts.accountId,
+      opts.workOrderId,
+    );
+    if (!workOrderId) {
+      return { visitId: null, created: false, reason: "work_order_not_bookable" };
+    }
+  } else {
+    workOrderId = await resolveWorkOrderForFieldDay(client, jobId, opts.accountId);
+  }
   if (!workOrderId) {
     return { visitId: null, created: false, reason: "ambiguous_work_order" };
   }
@@ -299,6 +317,7 @@ export async function ensureFieldDayVisit(
     startMs + 60 * 60 * 1000,
   );
 
+  const techNotes = opts.techNotes ?? "Auto-created from confirmed on-site stop";
   const { rows } = await client.query<{ id: string }>(
     `INSERT INTO visits (
        account_id, job_id, work_order_id, assigned_user_id,
@@ -309,7 +328,7 @@ export async function ensureFieldDayVisit(
        $1, $2, $3, $4,
        'standard', 'completed',
        $5, $6, $5, $7,
-       'Auto-created from confirmed on-site stop'
+       $8
      )
      RETURNING id`,
     [
@@ -320,6 +339,7 @@ export async function ensureFieldDayVisit(
       opts.arrivalTime,
       new Date(endMs).toISOString(),
       opts.departureTime,
+      techNotes,
     ],
   );
 

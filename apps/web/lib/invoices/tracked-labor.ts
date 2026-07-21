@@ -84,6 +84,11 @@ export function laborCostForMargin(opts: {
 /**
  * Shared WHERE for job-linked closed job_work rows.
  * Params: $1 accountId, $2 jobId.
+ *
+ * Includes:
+ *   - job entity (unplanned / legacy)
+ *   - visit entity (GPS confirm + field-day spine)
+ *   - work_order entity (Daily Recap commits when no visit yet, or direct WO time)
  */
 export const TRACKED_LABOR_JOB_WORK_WHERE = `
    ae.account_id = $1
@@ -100,12 +105,19 @@ export const TRACKED_LABOR_JOB_WORK_WHERE = `
          WHERE v.job_id = $2 AND v.account_id = $1
        )
      )
+     OR (
+       ae.entity_type = 'work_order'
+       AND ae.entity_id IN (
+         SELECT wo.id FROM work_orders wo
+         WHERE wo.job_id = $2 AND wo.account_id = $1
+       )
+     )
    )
 `;
 
 /**
  * SQL fragment body that sums job_work minutes for a job.
- * Includes time linked to the job OR to any of its visits (multi-day T&M).
+ * Includes time linked to the job, its visits, or its work orders.
  * Params: $accountId, $jobId — callers bind positionally.
  */
 export const TRACKED_LABOR_MINUTES_SQL = `
@@ -184,7 +196,7 @@ export function mapTrackedLaborDayRows(
  *   1) T&M invoice labor pull (customer rate × quarter hours)
  *   2) Job profit margin (internal cost rate × actual hours)
  *
- * Counts all closed job_work on the job itself or any of its visits.
+ * Counts all closed job_work on the job itself, its visits, or its work orders.
  * Deliberately NO labor_bucket filter.
  */
 export async function trackedLaborMinutesFromActivityEntries(

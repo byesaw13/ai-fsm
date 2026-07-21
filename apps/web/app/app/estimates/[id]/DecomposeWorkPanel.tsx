@@ -8,14 +8,17 @@ type Task = { label: string; required: boolean };
 type WO = { title: string; scope: string; tasks: Task[] };
 
 /**
- * AI task decomposition: propose work orders + task checklists from the
- * estimate, review, then create them. Nothing is created until "Create".
+ * AI task decomposition: propose a task checklist from the estimate (optionally
+ * grouped by area for review). Apply creates one work order with all tasks —
+ * product default is one schedulable packet per project.
  */
 export function DecomposeWorkPanel({ estimateId }: { estimateId: string }) {
   const router = useRouter();
   const { success, error } = useToast();
   const [draft, setDraft] = useState<WO[] | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const taskCount = draft?.reduce((n, wo) => n + wo.tasks.length, 0) ?? 0;
 
   async function propose() {
     setBusy(true);
@@ -41,12 +44,13 @@ export function DecomposeWorkPanel({ estimateId }: { estimateId: string }) {
         body: JSON.stringify({ work_orders: draft }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message ?? "Could not create the work orders");
-      success(`Created ${data.data.count} work order${data.data.count !== 1 ? "s" : ""} with tasks`);
+      if (!res.ok) throw new Error(data.error?.message ?? "Could not create the work order");
+      const tasks = data.data.task_count ?? taskCount;
+      success(`Created 1 work order with ${tasks} task${tasks !== 1 ? "s" : ""}`);
       setDraft(null);
       router.refresh();
     } catch (e) {
-      error(e instanceof Error ? e.message : "Could not create the work orders");
+      error(e instanceof Error ? e.message : "Could not create the work order");
     } finally {
       setBusy(false);
     }
@@ -58,7 +62,8 @@ export function DecomposeWorkPanel({ estimateId }: { estimateId: string }) {
       {!draft ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-            Propose work orders and discrete task checklists from this estimate — the units captured time baselines against. Review before creating.
+            Propose a discrete task checklist from this estimate — the units time baselines capture against.
+            Creates <strong>one work order</strong> on the project (areas are tasks, not extra work orders). Review before creating.
           </p>
           <div>
             <Button onClick={propose} loading={busy}>Propose breakdown</Button>
@@ -77,8 +82,15 @@ export function DecomposeWorkPanel({ estimateId }: { estimateId: string }) {
               </ul>
             </div>
           ))}
+          {draft.length > 1 ? (
+            <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+              These groups will be merged into <strong>one work order</strong> with {taskCount} tasks (area names prefixed on labels).
+            </p>
+          ) : null}
           <div style={{ display: "flex", gap: "var(--space-2)" }}>
-            <Button onClick={apply} loading={busy}>Create {draft.length} work order{draft.length !== 1 ? "s" : ""}</Button>
+            <Button onClick={apply} loading={busy}>
+              Create work order ({taskCount} task{taskCount !== 1 ? "s" : ""})
+            </Button>
             <Button variant="ghost" onClick={() => setDraft(null)} disabled={busy}>Discard</Button>
           </div>
         </div>

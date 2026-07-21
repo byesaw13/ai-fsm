@@ -5,6 +5,7 @@ import {
   laborCostForMargin,
   mapTrackedLaborDayRows,
   roundedQuarterHoursFromMinutes,
+  TRACKED_LABOR_JOB_WORK_WHERE,
   trackedHoursFromMinutes,
   trackedLaborCents,
 } from "../tracked-labor";
@@ -69,6 +70,15 @@ describe("billing vs cost transforms", () => {
     expect(trackedLaborCents(68)).toBe(1.25 * 115_00);
     // cost uses actual 68/60 * $50
     expect(actualLaborCostCents(68)).toBe(Math.round((68 / 60) * 5000));
+  });
+});
+
+describe("TRACKED_LABOR_JOB_WORK_WHERE", () => {
+  it("includes job, visit, and work_order entity links", () => {
+    expect(TRACKED_LABOR_JOB_WORK_WHERE).toContain("entity_type = 'job'");
+    expect(TRACKED_LABOR_JOB_WORK_WHERE).toContain("entity_type = 'visit'");
+    expect(TRACKED_LABOR_JOB_WORK_WHERE).toContain("entity_type = 'work_order'");
+    expect(TRACKED_LABOR_JOB_WORK_WHERE).toContain("work_orders wo");
   });
 });
 

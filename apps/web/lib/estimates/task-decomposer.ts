@@ -4,11 +4,12 @@ import { z } from "zod";
 /**
  * AI task decomposition (EPIC-008 Slice 2).
  *
- * Reads a job's scope (estimate scope + rooms + labor lines) and proposes the
- * work it divides into: a set of work orders (areas), each with a checklist of
- * discrete tasks ("replace faucet", "hang cabinet"). The owner reviews and
- * applies; the AI only proposes. This feeds the per-task time baselines
- * (Slice 1) with granular tasks instead of coarse T&M allowance lines.
+ * Reads a job's scope (estimate scope + rooms + labor lines) and proposes a
+ * checklist of discrete deliverable tasks ("replace faucet", "hang cabinet"),
+ * optionally grouped by area for review. The product default is **one work
+ * order per project**; areas are review groupings, not separate schedulable
+ * packets. Apply flattens groups onto a single work order. The AI only
+ * proposes. This feeds per-task time baselines (Slice 1).
  */
 
 export class TaskDecompositionError extends Error {
@@ -42,22 +43,23 @@ export const decompositionSchema = z.object({
 });
 export type TaskDecomposition = z.infer<typeof decompositionSchema>;
 
-const SYSTEM_PROMPT = `You decompose a residential handyman/remodel job into structured work.
+const SYSTEM_PROMPT = `You decompose a residential handyman/remodel job into a task checklist for field time baselines.
 
-Given the job scope, the rooms/areas involved, and the labor lines, propose:
-- One work order per distinct AREA or logical grouping of work (e.g. "Master bath", "Kitchen", "Exterior trim"). Do not create one giant work order; do not create one per tiny task.
-- Within each work order, a checklist of DELIVERABLE tasks.
+DEFAULT GRAIN (critical):
+- Prefer **ONE work order** for the whole job. Put all deliverable tasks under that single work order.
+- Use additional work_orders ONLY when the job is clearly multi-phase with separate crews or long pauses (e.g. "Demo", then weeks later "Finish carpentry"). Multi-room on the same continuous job is NOT multi-phase — keep one work order and list tasks for every room.
+- Areas/rooms become TASKS (or task labels), not separate work orders. Example: one WO titled from the job, tasks "Replace master bath faucet", "Paint living room accent wall".
 
 CRITICAL — task granularity. A task is ONE complete unit of work you'd estimate and later time as a whole — the level "how long did that take?" is a useful question. It is NOT an individual physical step.
 - RIGHT: "Replace faucet", "Replace p-trap", "Install 3 recessed LED lights", "Paint accent wall".
 - WRONG (too fine — never do this): "Shut off supply valves", "Remove old faucet", "Reconnect supply lines", "Test for leaks", "Clean up". Those are steps inside "Replace faucet", not tasks.
-Aim for roughly 1–6 tasks per work order. If you're tempted to write a verb like "remove", "shut off", "test", or "verify" as its own task, fold it into the deliverable it belongs to.
+Aim for roughly 2–12 tasks total for a typical job. If you're tempted to write a verb like "remove", "shut off", "test", or "verify" as its own task, fold it into the deliverable it belongs to.
 
 Rules:
 - required=true for tasks that must be done to finish the job; required=false for optional/contingent items.
-- Keep labels short, specific, and REUSABLE across jobs (so "Replace faucet" reads identically next time — that is what makes time baselines work).
-- Do not invent scope not implied by the inputs. If the job is small (one area), one work order is fine.
-- Each work order's "scope" is a one-line summary of that area's work.`;
+- Keep labels short, specific, and REUSABLE across jobs (so "Replace faucet" reads identically next time — that is what makes time baselines work). Include the room/area in the label when the job has multiple rooms ("Master bath — replace faucet").
+- Do not invent scope not implied by the inputs.
+- Each work order's "scope" is a one-line summary of that packet's work.`;
 
 const DECOMPOSE_TOOL: Anthropic.Tool = {
   name: "propose_work_breakdown",
