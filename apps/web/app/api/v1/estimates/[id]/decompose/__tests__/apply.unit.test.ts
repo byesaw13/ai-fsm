@@ -10,7 +10,8 @@ const mockRelease = vi.fn();
 vi.mock("@/lib/db", () => ({ getPool: () => ({ connect: () => Promise.resolve({ query: mockQuery, release: mockRelease }) }) }));
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn() } }));
 
-import { POST, flattenDecompositionTasks } from "../apply/route";
+import { POST } from "../apply/route";
+import { flattenDecompositionTasks } from "@/lib/estimates/flatten-decomposition";
 
 const EST = "00000000-0000-0000-0000-0000000000ee";
 function post(body: unknown): NextRequest {
