@@ -22,25 +22,38 @@ CREATE OR REPLACE FUNCTION enforce_invoice_immutability()
 RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   -- View-only updates never touch money or lifecycle fields.
+  -- Open invoices only (paid/void stay terminal-immutable). Allow-list freezes
+  -- every non-view column we care about so a view stamp cannot smuggle money,
+  -- deposit-policy, Square link, or identity changes through the early return.
   IF (
     old.status IN ('sent', 'partial', 'overdue')
-    AND new.status              IS NOT DISTINCT FROM old.status
-    AND new.client_id       IS NOT DISTINCT FROM old.client_id
-    AND new.job_id          IS NOT DISTINCT FROM old.job_id
-    AND new.estimate_id     IS NOT DISTINCT FROM old.estimate_id
-    AND new.property_id     IS NOT DISTINCT FROM old.property_id
-    AND new.invoice_number  IS NOT DISTINCT FROM old.invoice_number
-    AND new.subtotal_cents  IS NOT DISTINCT FROM old.subtotal_cents
-    AND new.tax_cents       IS NOT DISTINCT FROM old.tax_cents
-    AND new.total_cents     IS NOT DISTINCT FROM old.total_cents
-    AND new.paid_cents      IS NOT DISTINCT FROM old.paid_cents
-    AND new.deposit_cents   IS NOT DISTINCT FROM old.deposit_cents
-    AND new.notes           IS NOT DISTINCT FROM old.notes
-    AND new.due_date        IS NOT DISTINCT FROM old.due_date
-    AND new.sent_at         IS NOT DISTINCT FROM old.sent_at
-    AND new.paid_at         IS NOT DISTINCT FROM old.paid_at
-    AND new.created_by      IS NOT DISTINCT FROM old.created_by
-    AND new.updated_at      IS NOT DISTINCT FROM old.updated_at
+    AND new.status                 IS NOT DISTINCT FROM old.status
+    AND new.client_id              IS NOT DISTINCT FROM old.client_id
+    AND new.job_id                 IS NOT DISTINCT FROM old.job_id
+    AND new.estimate_id            IS NOT DISTINCT FROM old.estimate_id
+    AND new.property_id            IS NOT DISTINCT FROM old.property_id
+    AND new.invoice_number         IS NOT DISTINCT FROM old.invoice_number
+    AND new.invoice_kind           IS NOT DISTINCT FROM old.invoice_kind
+    AND new.subtotal_cents         IS NOT DISTINCT FROM old.subtotal_cents
+    AND new.tax_cents              IS NOT DISTINCT FROM old.tax_cents
+    AND new.total_cents            IS NOT DISTINCT FROM old.total_cents
+    AND new.paid_cents             IS NOT DISTINCT FROM old.paid_cents
+    AND new.deposit_cents          IS NOT DISTINCT FROM old.deposit_cents
+    AND new.balance_cents          IS NOT DISTINCT FROM old.balance_cents
+    AND new.deposit_type           IS NOT DISTINCT FROM old.deposit_type
+    AND new.deposit_percentage     IS NOT DISTINCT FROM old.deposit_percentage
+    AND new.deposit_fixed_cents    IS NOT DISTINCT FROM old.deposit_fixed_cents
+    AND new.deposit_paid_at        IS NOT DISTINCT FROM old.deposit_paid_at
+    AND new.square_order_id        IS NOT DISTINCT FROM old.square_order_id
+    AND new.square_checkout_id     IS NOT DISTINCT FROM old.square_checkout_id
+    AND new.square_payment_link_url IS NOT DISTINCT FROM old.square_payment_link_url
+    AND new.notes                  IS NOT DISTINCT FROM old.notes
+    AND new.due_date               IS NOT DISTINCT FROM old.due_date
+    AND new.sent_at                IS NOT DISTINCT FROM old.sent_at
+    AND new.paid_at                IS NOT DISTINCT FROM old.paid_at
+    AND new.share_token            IS NOT DISTINCT FROM old.share_token
+    AND new.created_by             IS NOT DISTINCT FROM old.created_by
+    AND new.updated_at             IS NOT DISTINCT FROM old.updated_at
     AND (
       new.first_viewed_at IS DISTINCT FROM old.first_viewed_at
       OR new.last_viewed_at IS DISTINCT FROM old.last_viewed_at
