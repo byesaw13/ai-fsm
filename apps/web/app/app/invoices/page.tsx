@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import type { Route } from "next";
 import { getSession } from "@/lib/auth/session";
+import { canCreateInvoices } from "@/lib/auth/permissions";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import type { InvoiceStatus } from "@ai-fsm/domain";
 import {
@@ -11,7 +12,6 @@ import {
   EmptyState,
   MetricGrid,
   Card,
-  SectionHeader,
   LinkButton,
 } from "@/components/ui";
 import type { MetricCardData } from "@/components/ui";
@@ -80,6 +80,7 @@ export default async function InvoicesPage() {
   const session = await getSession();
   if (!session) redirect("/login");
   if (session.role === "tech") redirect("/app/my-work"); // EPIC-006: techs have no invoice access
+  const canCreate = canCreateInvoices(session.role);
 
   const invoices = await withInvoiceContext(session, async (client) => {
     const r = await client.query(
