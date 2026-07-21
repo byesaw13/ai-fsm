@@ -56,7 +56,7 @@ export function criteriaItemsToTaskSeeds(
  */
 export async function seedWorkOrderTasksFromCriteria(
   client: PoolClient,
-  opts: { accountId: string; workOrderId: string; criteria: unknown; source?: "estimate" | "manual" },
+  opts: { accountId: string; workOrderId: string; criteria: unknown; source?: "estimate" | "manual" | "ai" },
 ): Promise<number> {
   const seeds = criteriaItemsToTaskSeeds(opts.criteria);
   if (seeds.length === 0) return 0;

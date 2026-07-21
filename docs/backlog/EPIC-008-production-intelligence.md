@@ -195,6 +195,42 @@ Acceptance Criteria:
       records per-task `activity_entries` and marks tasks done (needs live check).
 - [ ] Follow-up: one checklist source of truth (Slice 1b).
 
+# TASK-073: AI task decomposition (Slice 2)
+
+Status:
+In Progress
+
+Phase:
+3
+
+Problem:
+Work-order tasks (TASK-072) exist but are seeded only from estimate labor lines,
+which are coarse ("Labor — T&M budget 90 hrs"). Baselines need discrete,
+reusable tasks ("Replace faucet") — the owner's "use AI to divide and sub-divide
+the tasks."
+
+Business Value:
+AI reads a job's estimate scope + rooms and proposes the work orders (areas) and
+their task checklists, which the owner reviews and applies — turning a job into
+baselineable units without hand-listing every task.
+
+Scope (Slice 2 — done):
+- `lib/estimates/task-decomposer.ts`: AI → { work_orders: [{ title, scope,
+  tasks[] }] }, behind the ANTHROPIC_API_KEY guard. Unit-tested.
+- POST /api/v1/estimates/[id]/decompose (draft, read-only) and .../apply (creates
+  work_orders + first-class tasks, transactional; reuses seedWorkOrderTasksFromCriteria).
+- Improves the daily-recap prompt to prefer a matching candidate task over a
+  non-task bucket (from the live shakedown finding).
+
+Out of Scope:
+- Decomposition from a free-form job description (estimate-driven for now).
+- Baseline analytics (Slice 3).
+
+Acceptance Criteria:
+- [x] AI proposes work orders + discrete task checklists from an estimate (tested).
+- [ ] Owner reviews and applies; applied work orders carry first-class tasks
+      (needs live check).
+
 ## Completed
 
 _None yet._
