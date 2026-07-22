@@ -227,7 +227,10 @@ export async function syncWorkOrderTasksFromCriteriaList(
     source?: "estimate" | "manual" | "ai";
   },
 ): Promise<CompletionCriterion[]> {
-  const items = Array.isArray(opts.criteria) ? (opts.criteria as CriteriaJsonItem & { id?: string }[]) : [];
+  type CriteriaRow = CriteriaJsonItem & { id?: string };
+  const items: CriteriaRow[] = Array.isArray(opts.criteria)
+    ? (opts.criteria as CriteriaRow[])
+    : [];
   const existing = await loadWorkOrderTasks(client, opts.workOrderId, opts.accountId);
   const byId = new Map(existing.map((t) => [t.id, t]));
   const kept = new Set<string>();
