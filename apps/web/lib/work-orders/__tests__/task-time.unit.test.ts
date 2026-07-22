@@ -79,3 +79,16 @@ describe("tasksToCriteria + completion gate", () => {
     expect(criteria[0]).toMatchObject({ id: "uuid-1", label: "Replace faucet", completed: false });
   });
 });
+
+describe("criteriaItemsToTaskSeeds preserves labels for form sync", () => {
+  it("keeps completed flags from the office form payload", () => {
+    const seeds = criteriaItemsToTaskSeeds([
+      { id: "c-1", label: "Replace faucet", required: true, completed: true },
+      { id: "c-2", label: "Paint wall", required: false, completed: false },
+    ]);
+    expect(seeds).toEqual([
+      { label: "Replace faucet", required: true, completed: true, sort_order: 0 },
+      { label: "Paint wall", required: false, completed: false, sort_order: 1 },
+    ]);
+  });
+});

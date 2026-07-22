@@ -12,7 +12,7 @@ import {
 } from "@/lib/work-orders/validate";
 import {
   loadWorkOrderCompletionCriteria,
-  seedWorkOrderTasksFromCriteria,
+  syncWorkOrderTasksFromCriteriaList,
 } from "@/lib/work-orders/task-time";
 
 export const dynamic = "force-dynamic";
@@ -211,7 +211,8 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     );
 
     if (d.completion_criteria !== undefined) {
-      await seedWorkOrderTasksFromCriteria(client, {
+      // Slice 1b: form checklist writes through first-class tasks (not seed-only).
+      await syncWorkOrderTasksFromCriteriaList(client, {
         accountId: session.accountId,
         workOrderId: id,
         criteria: d.completion_criteria,

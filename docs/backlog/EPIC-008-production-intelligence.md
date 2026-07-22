@@ -157,7 +157,7 @@ from EPIC-001: it consumes the engine's output rather than being part of it.
 # TASK-072: Per-task time capture via AI Daily Recap (baselines foundation)
 
 Status:
-In Progress
+Done
 
 Phase:
 3
@@ -192,14 +192,14 @@ Slice 1b (shipped):
 Acceptance Criteria:
 - [x] Time can be attributed to a task; the recap parses the owner's worked
       example into per-task time (unit-tested).
-- [ ] Owner reviews and confirms before anything is written; confirmed recap
-      records per-task `activity_entries` and marks tasks done (needs live check).
-- [x] One checklist source of truth (Slice 1b).
+- [x] Owner reviews and confirms before anything is written; confirmed recap
+      records per-task `activity_entries` and marks tasks done (merged + deployed).
+- [x] One checklist source of truth (Slice 1b, office + field + complete gate).
 
 # TASK-073: AI task decomposition (Slice 2)
 
 Status:
-In Progress
+Done
 
 Phase:
 3
@@ -219,7 +219,7 @@ Scope (Slice 2 — done):
 - `lib/estimates/task-decomposer.ts`: AI → { work_orders: [{ title, scope,
   tasks[] }] }, behind the ANTHROPIC_API_KEY guard. Unit-tested.
 - POST /api/v1/estimates/[id]/decompose (draft, read-only) and .../apply (creates
-  work_orders + first-class tasks, transactional; reuses seedWorkOrderTasksFromCriteria).
+  **one** work order + first-class tasks; flattens multi-area AI proposals).
 - Improves the daily-recap prompt to prefer a matching candidate task over a
   non-task bucket (from the live shakedown finding).
 
@@ -229,9 +229,9 @@ Out of Scope:
 
 Acceptance Criteria:
 - [x] AI proposes work orders + discrete task checklists from an estimate (tested).
-- [ ] Owner reviews and applies; applied work orders carry first-class tasks
-      (needs live check).
+- [x] Owner reviews and applies; applied work orders carry first-class tasks
+      (one WO per project by default; merged + deployed).
 
 ## Completed
 
-_None yet._
+- TASK-072 (incl. Slice 1b) and TASK-073 — 2026-07-22 on main / garonhome.

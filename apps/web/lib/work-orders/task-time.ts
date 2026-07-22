@@ -207,3 +207,81 @@ export async function applyTaskCompletionToggles(
   }
   return mirrorTasksToCompletionCriteria(client, opts.workOrderId, opts.accountId);
 }
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Full checklist replace from the office form (labels + required + completed).
+ * - Existing task UUIDs are updated in place (preserves activity_entries.task_id).
+ * - Client-temp ids (`c-…`) or unknown ids become new task rows.
+ * - Tasks removed from the list are deleted only when they have no timed activity.
+ * Always mirrors into completion_criteria.
+ */
+export async function syncWorkOrderTasksFromCriteriaList(
+  client: PoolClient,
+  opts: {
+    workOrderId: string;
+    accountId: string;
+    criteria: unknown;
+    source?: "estimate" | "manual" | "ai";
+  },
+): Promise<CompletionCriterion[]> {
+  type CriteriaRow = CriteriaJsonItem & { id?: string };
+  const items: CriteriaRow[] = Array.isArray(opts.criteria)
+    ? (opts.criteria as CriteriaRow[])
+    : [];
+  const existing = await loadWorkOrderTasks(client, opts.workOrderId, opts.accountId);
+  const byId = new Map(existing.map((t) => [t.id, t]));
+  const kept = new Set<string>();
+  const source = opts.source ?? "manual";
+  let sort = 0;
+
+  for (const raw of items) {
+    if (!raw || typeof raw !== "object") continue;
+    const label = String(raw.label ?? raw.description ?? "").trim();
+    if (!label) continue;
+    const required = raw.required !== false;
+    const completed = Boolean(raw.completed ?? raw.done ?? false);
+    const id = typeof raw.id === "string" ? raw.id : "";
+    const isUuid = UUID_RE.test(id);
+
+    if (isUuid && byId.has(id)) {
+      await client.query(
+        `UPDATE work_order_tasks
+            SET label = $3, required = $4, completed = $5,
+                completed_at = CASE WHEN $5 THEN COALESCE(completed_at, now()) ELSE NULL END,
+                status = CASE WHEN $5 THEN 'done' ELSE 'open' END,
+                sort_order = $6, updated_at = now()
+          WHERE id = $1 AND work_order_id = $2 AND account_id = $7`,
+        [id, opts.workOrderId, label, required, completed, sort, opts.accountId],
+      );
+      kept.add(id);
+    } else {
+      const ins = await client.query<{ id: string }>(
+        `INSERT INTO work_order_tasks
+           (account_id, work_order_id, label, required, completed, completed_at, status, sort_order, source)
+         VALUES ($1,$2,$3,$4,$5, CASE WHEN $5 THEN now() END, CASE WHEN $5 THEN 'done' ELSE 'open' END, $6, $7)
+         RETURNING id`,
+        [opts.accountId, opts.workOrderId, label, required, completed, sort, source],
+      );
+      kept.add(ins.rows[0].id);
+    }
+    sort += 1;
+  }
+
+  for (const t of existing) {
+    if (kept.has(t.id)) continue;
+    const timed = await client.query(
+      `SELECT 1 FROM activity_entries WHERE task_id = $1 AND account_id = $2 LIMIT 1`,
+      [t.id, opts.accountId],
+    );
+    if ((timed.rowCount ?? 0) > 0) continue; // keep historical baseline rows
+    await client.query(
+      `DELETE FROM work_order_tasks WHERE id = $1 AND account_id = $2`,
+      [t.id, opts.accountId],
+    );
+  }
+
+  return mirrorTasksToCompletionCriteria(client, opts.workOrderId, opts.accountId);
+}
