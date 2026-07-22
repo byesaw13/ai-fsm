@@ -4,6 +4,7 @@ import { withAuth } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import { activityCategoryFor, type ActivityType } from "@ai-fsm/domain";
 import { ensureFieldDayVisit } from "@/lib/field/confirm-visit";
+import { mirrorTasksToCompletionCriteria } from "@/lib/work-orders/task-time";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -280,6 +281,11 @@ export const POST = withAuth(async (request: NextRequest, session) => {
         await insertActivity(o.activity_type, o.minutes, "job", job_id, null, o.note || null);
       }
       recorded += o.minutes;
+    }
+
+    // Slice 1b: keep JSONB checklist in sync with task done/blocked from recap.
+    for (const woId of new Set(woByTask.values())) {
+      await mirrorTasksToCompletionCriteria(client, woId, session.accountId);
     }
 
     await client.query("COMMIT");

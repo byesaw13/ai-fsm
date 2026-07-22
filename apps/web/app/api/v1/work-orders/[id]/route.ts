@@ -5,13 +5,15 @@ import { getPool, queryForSession } from "@/lib/db";
 import { canCreateEstimates } from "@/lib/auth/permissions";
 import { logger } from "@/lib/logger";
 import { WORK_ORDER_STATUSES } from "@/lib/work-orders/constants";
-import type { CompletionCriterion } from "@ai-fsm/domain";
 import {
   enforceDraftOnlyFromAssessment,
   validateWorkOrderCompletion,
   validateWorkOrderForeignKeys,
 } from "@/lib/work-orders/validate";
-import { seedWorkOrderTasksFromCriteria } from "@/lib/work-orders/task-time";
+import {
+  loadWorkOrderCompletionCriteria,
+  seedWorkOrderTasksFromCriteria,
+} from "@/lib/work-orders/task-time";
 
 export const dynamic = "force-dynamic";
 
@@ -153,10 +155,14 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     }
 
     if (nextStatus === "completed" && wo.status !== "completed") {
-      const criteria: CompletionCriterion[] = d.completion_criteria
-        ?? (Array.isArray(wo.completion_criteria)
-          ? (wo.completion_criteria as CompletionCriterion[])
-          : []);
+      const criteria =
+        d.completion_criteria ??
+        (await loadWorkOrderCompletionCriteria(
+          client,
+          id,
+          session.accountId,
+          wo.completion_criteria,
+        ));
       const completionErr = await validateWorkOrderCompletion(
         client,
         id,

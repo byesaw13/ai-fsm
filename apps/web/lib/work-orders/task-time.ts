@@ -115,3 +115,95 @@ export function minutesByTask(entries: TaskTimeEntry[]): Map<string, number> {
   }
   return out;
 }
+
+/** Load first-class tasks for a work order (sort_order). */
+export async function loadWorkOrderTasks(
+  client: PoolClient,
+  workOrderId: string,
+  accountId: string,
+): Promise<WorkOrderTask[]> {
+  const { rows } = await client.query<WorkOrderTask>(
+    `SELECT id, work_order_id, label, required, completed, status, note, sort_order
+       FROM work_order_tasks
+      WHERE work_order_id = $1 AND account_id = $2
+      ORDER BY sort_order ASC, created_at ASC`,
+    [workOrderId, accountId],
+  );
+  return rows;
+}
+
+/**
+ * Completion criteria for gates/UI — **tasks are the source of truth**.
+ * Seeds tasks from JSONB once when none exist (legacy WOs), then returns tasks
+ * as CompletionCriterion. Falls back to JSONB only if still empty.
+ */
+export async function loadWorkOrderCompletionCriteria(
+  client: PoolClient,
+  workOrderId: string,
+  accountId: string,
+  fallbackJson?: unknown,
+): Promise<CompletionCriterion[]> {
+  let tasks = await loadWorkOrderTasks(client, workOrderId, accountId);
+  if (tasks.length === 0 && fallbackJson != null) {
+    await seedWorkOrderTasksFromCriteria(client, {
+      accountId,
+      workOrderId,
+      criteria: fallbackJson,
+      source: "manual",
+    });
+    tasks = await loadWorkOrderTasks(client, workOrderId, accountId);
+  }
+  if (tasks.length > 0) return tasksToCriteria(tasks);
+
+  if (Array.isArray(fallbackJson)) {
+    return (fallbackJson as CompletionCriterion[]).filter(
+      (c) => c && typeof c === "object" && typeof c.label === "string",
+    );
+  }
+  return [];
+}
+
+/**
+ * Mirror first-class tasks into work_orders.completion_criteria so legacy
+ * readers and the dual-write era stay consistent.
+ */
+export async function mirrorTasksToCompletionCriteria(
+  client: PoolClient,
+  workOrderId: string,
+  accountId: string,
+): Promise<CompletionCriterion[]> {
+  const tasks = await loadWorkOrderTasks(client, workOrderId, accountId);
+  const criteria = tasksToCriteria(tasks);
+  await client.query(
+    `UPDATE work_orders SET completion_criteria = $3::jsonb, updated_at = now()
+      WHERE id = $1 AND account_id = $2`,
+    [workOrderId, accountId, JSON.stringify(criteria)],
+  );
+  return criteria;
+}
+
+/**
+ * Apply checklist toggles to first-class tasks (by id). Unknown ids ignored.
+ * Mirrors the result into completion_criteria JSONB.
+ */
+export async function applyTaskCompletionToggles(
+  client: PoolClient,
+  opts: {
+    workOrderId: string;
+    accountId: string;
+    toggles: Array<{ id: string; completed: boolean }>;
+  },
+): Promise<CompletionCriterion[]> {
+  for (const t of opts.toggles) {
+    await client.query(
+      `UPDATE work_order_tasks
+          SET completed = $3,
+              completed_at = CASE WHEN $3 THEN COALESCE(completed_at, now()) ELSE NULL END,
+              status = CASE WHEN $3 THEN 'done' ELSE 'open' END,
+              updated_at = now()
+        WHERE id = $1 AND work_order_id = $2 AND account_id = $4`,
+      [t.id, opts.workOrderId, t.completed, opts.accountId],
+    );
+  }
+  return mirrorTasksToCompletionCriteria(client, opts.workOrderId, opts.accountId);
+}
