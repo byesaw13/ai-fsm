@@ -5,10 +5,10 @@
 import type { PoolClient } from "pg";
 import {
   deriveWorkOrderStatus,
-  normalizeCompletionCriteria,
   type WorkOrderVisitSnapshot,
 } from "@ai-fsm/domain";
 import type { VisitStatus, WorkOrderStatus } from "@ai-fsm/domain";
+import { loadWorkOrderCompletionCriteria } from "@/lib/work-orders/task-time";
 
 /** Planning statuses that may already receive new execution visits. */
 export const SCHEDULABLE_WORK_ORDER_STATUSES = [
@@ -46,7 +46,13 @@ export async function syncWorkOrderStatus(
     [workOrderId, accountId],
   );
 
-  const criteria = normalizeCompletionCriteria(wo.completion_criteria);
+  // Slice 1b: tasks are the completion checklist source of truth.
+  const criteria = await loadWorkOrderCompletionCriteria(
+    client,
+    workOrderId,
+    accountId,
+    wo.completion_criteria,
+  );
 
   const derived = deriveWorkOrderStatus({
     currentStatus: wo.status,

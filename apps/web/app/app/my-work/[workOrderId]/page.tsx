@@ -5,11 +5,12 @@ import { queryForSession } from "@/lib/db";
 import {
   WORK_ORDER_STATUS_LABELS,
   allRequiredCriteriaMet,
-  type CompletionCriterion,
   type WorkOrderStatus,
 } from "@ai-fsm/domain";
 import { PageContainer, PageHeader, Card, SectionHeader, LinkButton, Timeline } from "@/components/ui";
 import { fetchWorkOrderTimeline } from "@/lib/work-orders/timeline";
+import { getPool } from "@/lib/db";
+import { loadWorkOrderCompletionCriteria } from "@/lib/work-orders/task-time";
 import { FieldWorkActions } from "../FieldWorkActions";
 import { FieldCloseout } from "../FieldCloseout";
 import { DailyRecapPanel } from "../../field/DailyRecapPanel";
@@ -52,7 +53,25 @@ export default async function MyWorkOrderPage({
   const wo = rows[0];
   if (!wo) notFound();
 
-  const [activeVisit, nextVisit, timeline, criteria] = await Promise.all([
+  const pool = getPool();
+  const client = await pool.connect();
+  let criteria;
+  try {
+    await client.query(
+      `SELECT set_config('app.current_user_id',$1,true), set_config('app.current_account_id',$2,true), set_config('app.current_role',$3,true)`,
+      [session.userId, session.accountId, session.role],
+    );
+    criteria = await loadWorkOrderCompletionCriteria(
+      client,
+      workOrderId,
+      session.accountId,
+      wo.completion_criteria,
+    );
+  } finally {
+    client.release();
+  }
+
+  const [activeVisit, nextVisit, timeline] = await Promise.all([
     queryForSession<{ id: string }>(
       session,
       `SELECT id FROM visits
@@ -70,11 +89,6 @@ export default async function MyWorkOrderPage({
       [workOrderId, session.accountId],
     ),
     fetchWorkOrderTimeline(session, workOrderId),
-    Promise.resolve(
-      Array.isArray(wo.completion_criteria)
-        ? (wo.completion_criteria as CompletionCriterion[])
-        : [],
-    ),
   ]);
 
   const outstanding = criteria.filter((c) => c.required && !c.completed).length;

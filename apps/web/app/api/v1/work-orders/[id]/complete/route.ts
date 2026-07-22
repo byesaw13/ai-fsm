@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "../../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../../lib/auth/middleware";
-import type { CompletionCriterion } from "@ai-fsm/domain";
 import { assertAssignedLead, withLeadWorkOrderContext } from "../../../../../../lib/work-orders/lead-access";
 import { validateWorkOrderCompletion } from "../../../../../../lib/work-orders/validate";
+import { loadWorkOrderCompletionCriteria } from "../../../../../../lib/work-orders/task-time";
 import { logger } from "../../../../../../lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -40,9 +40,12 @@ export const POST = withAuth(
           return { kind: "active_visit" as const };
         }
 
-        const criteria = Array.isArray(wo.completion_criteria)
-          ? (wo.completion_criteria as CompletionCriterion[])
-          : [];
+        const criteria = await loadWorkOrderCompletionCriteria(
+          client,
+          id,
+          session.accountId,
+          wo.completion_criteria,
+        );
         const gateErr = await validateWorkOrderCompletion(client, id, session.accountId, criteria);
         if (gateErr) {
           return { kind: "gate" as const, message: gateErr };

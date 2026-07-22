@@ -71,4 +71,11 @@ describe("tasksToCriteria + completion gate", () => {
     ];
     expect(allRequiredCriteriaMet(tasksToCriteria(tasks))).toBe(true);
   });
+
+  it("maps task ids through so FieldCloseout toggles hit work_order_tasks", () => {
+    const criteria = tasksToCriteria([
+      task({ id: "uuid-1", label: "Replace faucet", completed: false }),
+    ]);
+    expect(criteria[0]).toMatchObject({ id: "uuid-1", label: "Replace faucet", completed: false });
+  });
 });

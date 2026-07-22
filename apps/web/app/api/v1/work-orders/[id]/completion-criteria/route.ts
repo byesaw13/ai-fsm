@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth } from "../../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../../lib/auth/middleware";
-import type { CompletionCriterion } from "@ai-fsm/domain";
 import {
   assertAssignedLead,
-  mergeCompletionCriteriaToggles,
   withLeadWorkOrderContext,
 } from "../../../../../../lib/work-orders/lead-access";
+import {
+  applyTaskCompletionToggles,
+  loadWorkOrderCompletionCriteria,
+} from "../../../../../../lib/work-orders/task-time";
 import { logger } from "../../../../../../lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -49,20 +51,21 @@ export const PATCH = withAuth(
           return { kind: "closed" as const };
         }
 
-        const existing = Array.isArray(wo.completion_criteria)
-          ? (wo.completion_criteria as CompletionCriterion[])
-          : [];
-        const merged = mergeCompletionCriteriaToggles(existing, parsed.data.completion_criteria);
-        if ("error" in merged) {
-          return { kind: "validation" as const, message: merged.error };
-        }
-
-        await client.query(
-          `UPDATE work_orders SET completion_criteria = $3::jsonb, updated_at = now()
-           WHERE id = $1 AND account_id = $2`,
-          [id, session.accountId, JSON.stringify(merged)],
+        // Slice 1b: first-class tasks are the checklist source of truth.
+        // Seed from JSONB when a legacy WO has no tasks yet, then apply toggles.
+        await loadWorkOrderCompletionCriteria(
+          client,
+          id,
+          session.accountId,
+          wo.completion_criteria,
         );
-        return { kind: "ok" as const, completion_criteria: merged };
+
+        const criteria = await applyTaskCompletionToggles(client, {
+          workOrderId: id,
+          accountId: session.accountId,
+          toggles: parsed.data.completion_criteria,
+        });
+        return { kind: "ok" as const, completion_criteria: criteria };
       });
 
       if (result.kind === "forbidden") {
@@ -74,12 +77,6 @@ export const PATCH = withAuth(
       if (result.kind === "closed") {
         return NextResponse.json(
           { error: { code: "PRECONDITION_FAILED", message: "Work order is closed", traceId: session.traceId } },
-          { status: 422 },
-        );
-      }
-      if (result.kind === "validation") {
-        return NextResponse.json(
-          { error: { code: "VALIDATION_ERROR", message: result.message, traceId: session.traceId } },
           { status: 422 },
         );
       }

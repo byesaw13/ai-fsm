@@ -182,18 +182,19 @@ Scope (Slice 1 — done):
   `docs/superpowers/specs/` (approved plan lively-puzzling-perlis).
 
 Out of Scope (Slice 1):
-- **Unifying the completion checklist onto tasks** — the existing JSONB checklist
-  + completion gate are untouched; tasks are an additive time/baseline layer.
-  Next step (Slice 1b): make the field checklist read/write tasks so there is one
-  source of truth for "I did this."
 - AI *decomposition* of the task list (Slice 2); baseline analytics (Slice 3).
+
+Slice 1b (shipped):
+- Field checklist + complete gate + status sync load **`work_order_tasks`** as
+  the source of truth (`loadWorkOrderCompletionCriteria`); seed from JSONB once
+  for legacy WOs. Toggles + Daily Recap mirror back into `completion_criteria`.
 
 Acceptance Criteria:
 - [x] Time can be attributed to a task; the recap parses the owner's worked
       example into per-task time (unit-tested).
 - [ ] Owner reviews and confirms before anything is written; confirmed recap
       records per-task `activity_entries` and marks tasks done (needs live check).
-- [ ] Follow-up: one checklist source of truth (Slice 1b).
+- [x] One checklist source of truth (Slice 1b).
 
 # TASK-073: AI task decomposition (Slice 2)
 
