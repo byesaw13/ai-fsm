@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -130,8 +130,50 @@ export function VisitScheduleForm({
   const [workOrderId, setWorkOrderId] = useState(
     initialWorkOrderId ?? (workOrders.length === 1 ? workOrders[0].id : ""),
   );
+  const [openTasks, setOpenTasks] = useState<Array<{ id: string; label: string; required: boolean }>>(
+    [],
+  );
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
   const needsWorkOrder =
     visitType === "standard" || visitType === "punch_list";
+
+  useEffect(() => {
+    if (!workOrderId || !needsWorkOrder) {
+      setOpenTasks([]);
+      setSelectedTaskIds([]);
+      return;
+    }
+    let cancelled = false;
+    setTasksLoading(true);
+    fetch(`/api/v1/work-orders/${workOrderId}/open-tasks`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (cancelled) return;
+        const list = (j.data?.tasks ?? []) as Array<{ id: string; label: string; required: boolean }>;
+        setOpenTasks(list);
+        // Default: select all open required tasks for the day plan.
+        setSelectedTaskIds(list.filter((t) => t.required).map((t) => t.id));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setOpenTasks([]);
+          setSelectedTaskIds([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setTasksLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workOrderId, needsWorkOrder]);
+
+  function toggleTask(id: string) {
+    setSelectedTaskIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
 
   const allDates = useMemo(() => {
     const set = new Set<string>();
@@ -205,6 +247,7 @@ export function VisitScheduleForm({
             assigned_user_id: assignedUserId || undefined,
             visit_type: visitType,
             ...(needsWorkOrder && workOrderId ? { work_order_id: workOrderId } : {}),
+            ...(selectedTaskIds.length ? { task_ids: selectedTaskIds } : {}),
             days,
           }),
         });
@@ -231,6 +274,7 @@ export function VisitScheduleForm({
         booking_request_id: bookingRequestId,
         visit_type: visitType,
         ...(needsWorkOrder && workOrderId ? { work_order_id: workOrderId } : {}),
+        ...(selectedTaskIds.length ? { task_ids: selectedTaskIds } : {}),
       };
 
       const res = await fetch(`/api/v1/jobs/${jobId}/visits`, {
@@ -447,6 +491,53 @@ export function VisitScheduleForm({
             </p>
           </Card>
         )
+      )}
+
+      {needsWorkOrder && workOrderId && (
+        <div data-testid="day-tasks-picker">
+          <p style={{ margin: "0 0 6px", fontWeight: 600, fontSize: "var(--text-sm)" }}>
+            Tasks for this day
+          </p>
+          <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+            Pick what you plan to finish today. Completing them marks progress on the project.
+          </p>
+          {tasksLoading ? (
+            <p className="muted" style={{ fontSize: "var(--text-sm)" }}>Loading tasks…</p>
+          ) : openTasks.length === 0 ? (
+            <p className="muted" style={{ fontSize: "var(--text-sm)" }}>
+              No open tasks on this work order. Break down the estimate first, or add tasks on the work order.
+            </p>
+          ) : (
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              {openTasks.map((t) => (
+                <li key={t.id} style={{ padding: "4px 0" }}>
+                  <label
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      alignItems: "flex-start",
+                      cursor: "pointer",
+                      fontSize: "var(--text-sm)",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedTaskIds.includes(t.id)}
+                      onChange={() => toggleTask(t.id)}
+                      disabled={pending}
+                    />
+                    <span>
+                      {t.label}
+                      {!t.required && (
+                        <span style={{ color: "var(--fg-muted)" }}> (optional)</span>
+                      )}
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       {canAssign && (

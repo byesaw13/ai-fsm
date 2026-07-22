@@ -43,7 +43,16 @@ export const PATCH = withAuth(
 
     try {
       const result = await withLeadWorkOrderContext(session, async (client) => {
-        const wo = await assertAssignedLead(client, id, session.accountId, session.userId);
+        // Assigned lead, or owner/admin managing the project hub.
+        let wo = await assertAssignedLead(client, id, session.accountId, session.userId);
+        if (!wo && (session.role === "owner" || session.role === "admin")) {
+          const r = await client.query<{ id: string; status: string; completion_criteria: unknown }>(
+            `SELECT id, status, completion_criteria FROM work_orders
+              WHERE id = $1 AND account_id = $2 FOR UPDATE`,
+            [id, session.accountId],
+          );
+          wo = r.rows[0] ?? null;
+        }
         if (!wo) {
           return { kind: "forbidden" as const };
         }
