@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth } from "../../../../../../lib/auth/middleware";
 import type { AuthSession } from "../../../../../../lib/auth/middleware";
-import type { CompletionCriterion } from "@ai-fsm/domain";
 import {
   assertAssignedLead,
   withLeadWorkOrderContext,
