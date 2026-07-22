@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import { isFieldDeliverableTaskLabel } from "@ai-fsm/domain";
 import type { WorkOrderTask } from "./task-time";
-import { tasksToCriteria } from "./task-time";
+import { mirrorTasksToCompletionCriteria, tasksToCriteria } from "./task-time";
 
 export type JobTaskRow = WorkOrderTask & {
   work_order_title: string | null;
@@ -66,17 +66,62 @@ export async function loadJobTaskProgress(
   return computeTaskProgress(tasks);
 }
 
-/** Open (incomplete) tasks on a work order — for day planning multi-select. */
+/**
+ * Tasks eligible for day planning multi-select.
+ * Done tasks are never selectable. Partial/open/blocked can still be planned.
+ */
 export async function loadOpenTasksForWorkOrder(
   client: PoolClient,
   workOrderId: string,
   accountId: string,
-): Promise<Array<{ id: string; label: string; required: boolean }>> {
-  const { rows } = await client.query<{ id: string; label: string; required: boolean }>(
-    `SELECT id, label, required FROM work_order_tasks
-      WHERE work_order_id = $1 AND account_id = $2 AND completed = false
+): Promise<Array<{ id: string; label: string; required: boolean; status: string }>> {
+  const { rows } = await client.query<{
+    id: string;
+    label: string;
+    required: boolean;
+    status: string;
+  }>(
+    `SELECT id, label, required, status FROM work_order_tasks
+      WHERE work_order_id = $1 AND account_id = $2
+        AND completed = false
+        AND status <> 'done'
       ORDER BY sort_order ASC, created_at ASC`,
     [workOrderId, accountId],
+  );
+  return rows;
+}
+
+/** All incomplete tasks on a job (for visit-day planner when WO is known or not). */
+export async function loadSelectableTasksForJob(
+  client: PoolClient,
+  jobId: string,
+  accountId: string,
+  workOrderId?: string | null,
+): Promise<Array<{ id: string; label: string; required: boolean; status: string; work_order_id: string; work_order_title: string | null }>> {
+  const { rows } = await client.query<{
+    id: string;
+    label: string;
+    required: boolean;
+    status: string;
+    work_order_id: string;
+    work_order_title: string | null;
+  }>(
+    workOrderId
+      ? `SELECT t.id, t.label, t.required, t.status, t.work_order_id, wo.title AS work_order_title
+           FROM work_order_tasks t
+           JOIN work_orders wo ON wo.id = t.work_order_id
+          WHERE t.account_id = $1 AND wo.job_id = $2 AND wo.id = $3
+            AND t.completed = false AND t.status <> 'done'
+            AND wo.status <> 'cancelled'
+          ORDER BY t.sort_order ASC, t.created_at ASC`
+      : `SELECT t.id, t.label, t.required, t.status, t.work_order_id, wo.title AS work_order_title
+           FROM work_order_tasks t
+           JOIN work_orders wo ON wo.id = t.work_order_id
+          WHERE t.account_id = $1 AND wo.job_id = $2
+            AND t.completed = false AND t.status <> 'done'
+            AND wo.status <> 'cancelled'
+          ORDER BY wo.created_at ASC, t.sort_order ASC`,
+    workOrderId ? [accountId, jobId, workOrderId] : [accountId, jobId],
   );
   return rows;
 }
@@ -98,22 +143,25 @@ export async function setVisitPlannedTasks(
   const unique = [...new Set(opts.taskIds.filter(Boolean))];
 
   if (unique.length > 0) {
+    // Only incomplete tasks may be planned on a day; done is unselectable.
     const { rows: valid } = await client.query<{ id: string }>(
       opts.workOrderId
         ? `SELECT t.id FROM work_order_tasks t
              JOIN work_orders wo ON wo.id = t.work_order_id
             WHERE t.account_id = $1 AND wo.job_id = $2 AND wo.id = $3
-              AND t.id = ANY($4::uuid[])`
+              AND t.id = ANY($4::uuid[])
+              AND t.completed = false AND t.status <> 'done'`
         : `SELECT t.id FROM work_order_tasks t
              JOIN work_orders wo ON wo.id = t.work_order_id
             WHERE t.account_id = $1 AND wo.job_id = $2
-              AND t.id = ANY($3::uuid[])`,
+              AND t.id = ANY($3::uuid[])
+              AND t.completed = false AND t.status <> 'done'`,
       opts.workOrderId
         ? [opts.accountId, opts.jobId, opts.workOrderId, unique]
         : [opts.accountId, opts.jobId, unique],
     );
     if (valid.length !== unique.length) {
-      throw new Error("One or more tasks are not on this project/work order");
+      throw new Error("Only open or started (not finished) tasks can be planned on a day — done tasks are locked");
     }
   }
 
@@ -172,9 +220,75 @@ export function visitTasksAsCriteria(tasks: VisitTaskRow[]) {
       label: t.label,
       required: t.required,
       completed: t.completed,
-      status: (t.status as "open" | "done" | "blocked") || "open",
+      status: (t.status as "open" | "done" | "blocked" | "partial") || "open",
       note: null,
       sort_order: 0,
     })),
   );
+}
+
+/**
+ * Mark a task as started-but-not-finished and create a new remainder task
+ * ("what is left to do"). The remainder is open and required.
+ */
+export async function markTaskPartialWithRemainder(
+  client: PoolClient,
+  opts: {
+    accountId: string;
+    workOrderId: string;
+    taskId: string;
+    remainderLabel: string;
+    note?: string | null;
+  },
+): Promise<{ originalId: string; remainderId: string }> {
+  const remainder = opts.remainderLabel.trim();
+  if (remainder.length < 2) {
+    throw new Error("Describe what is left to do on this task");
+  }
+
+  const { rows: existing } = await client.query<{
+    id: string;
+    completed: boolean;
+    status: string;
+    sort_order: number;
+  }>(
+    `SELECT id, completed, status, sort_order FROM work_order_tasks
+      WHERE id = $1 AND work_order_id = $2 AND account_id = $3 FOR UPDATE`,
+    [opts.taskId, opts.workOrderId, opts.accountId],
+  );
+  const cur = existing[0];
+  if (!cur) throw new Error("Task not found");
+  if (cur.completed || cur.status === "done") {
+    throw new Error("Done tasks cannot be reopened as partial — they are locked");
+  }
+
+  await client.query(
+    `UPDATE work_order_tasks
+        SET status = 'partial',
+            completed = false,
+            completed_at = NULL,
+            note = COALESCE(NULLIF($3, ''), note),
+            updated_at = now()
+      WHERE id = $1 AND account_id = $2`,
+    [opts.taskId, opts.accountId, opts.note ?? null],
+  );
+
+  const { rows: ins } = await client.query<{ id: string }>(
+    `INSERT INTO work_order_tasks
+       (account_id, work_order_id, label, required, completed, status, sort_order, source, parent_task_id, note)
+     VALUES ($1, $2, $3, true, false, 'open', $4, 'manual', $5, $6)
+     RETURNING id`,
+    [
+      opts.accountId,
+      opts.workOrderId,
+      remainder.slice(0, 300),
+      (cur.sort_order ?? 0) + 1,
+      opts.taskId,
+      `Remainder of started task`,
+    ],
+  );
+
+  await mirrorTasksToCompletionCriteria(client, opts.workOrderId, opts.accountId);
+
+  return { originalId: opts.taskId, remainderId: ins[0].id };
 }

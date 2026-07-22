@@ -11,7 +11,7 @@ export interface WorkOrderTask {
   label: string;
   required: boolean;
   completed: boolean;
-  status: "open" | "done" | "blocked";
+  status: "open" | "done" | "blocked" | "partial";
   note: string | null;
   sort_order: number;
 }
@@ -195,14 +195,28 @@ export async function applyTaskCompletionToggles(
   },
 ): Promise<CompletionCriterion[]> {
   for (const t of opts.toggles) {
+    // Never reopen a done task via toggle (locked).
+    if (!t.completed) {
+      await client.query(
+        `UPDATE work_order_tasks
+            SET completed = false,
+                completed_at = NULL,
+                status = CASE WHEN status = 'done' THEN 'done' ELSE 'open' END,
+                updated_at = now()
+          WHERE id = $1 AND work_order_id = $2 AND account_id = $3
+            AND status <> 'done' AND completed = false`,
+        [t.id, opts.workOrderId, opts.accountId],
+      );
+      continue;
+    }
     await client.query(
       `UPDATE work_order_tasks
-          SET completed = $3,
-              completed_at = CASE WHEN $3 THEN COALESCE(completed_at, now()) ELSE NULL END,
-              status = CASE WHEN $3 THEN 'done' ELSE 'open' END,
+          SET completed = true,
+              completed_at = COALESCE(completed_at, now()),
+              status = 'done',
               updated_at = now()
-        WHERE id = $1 AND work_order_id = $2 AND account_id = $4`,
-      [t.id, opts.workOrderId, t.completed, opts.accountId],
+        WHERE id = $1 AND work_order_id = $2 AND account_id = $3`,
+      [t.id, opts.workOrderId, opts.accountId],
     );
   }
   return mirrorTasksToCompletionCriteria(client, opts.workOrderId, opts.accountId);

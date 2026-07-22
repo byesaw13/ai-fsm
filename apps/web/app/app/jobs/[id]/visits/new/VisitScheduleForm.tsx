@@ -130,9 +130,9 @@ export function VisitScheduleForm({
   const [workOrderId, setWorkOrderId] = useState(
     initialWorkOrderId ?? (workOrders.length === 1 ? workOrders[0].id : ""),
   );
-  const [openTasks, setOpenTasks] = useState<Array<{ id: string; label: string; required: boolean }>>(
-    [],
-  );
+  const [openTasks, setOpenTasks] = useState<
+    Array<{ id: string; label: string; required: boolean; status?: string }>
+  >([]);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const needsWorkOrder =
@@ -150,10 +150,17 @@ export function VisitScheduleForm({
       .then((r) => r.json())
       .then((j) => {
         if (cancelled) return;
-        const list = (j.data?.tasks ?? []) as Array<{ id: string; label: string; required: boolean }>;
-        setOpenTasks(list);
-        // Default: select all open required tasks for the day plan.
-        setSelectedTaskIds(list.filter((t) => t.required).map((t) => t.id));
+        const list = (j.data?.tasks ?? []) as Array<{
+          id: string;
+          label: string;
+          required: boolean;
+          status?: string;
+        }>;
+        // Done tasks are never returned by the API; keep client guard anyway.
+        const selectable = list.filter((t) => t.status !== "done");
+        setOpenTasks(selectable);
+        // Default: select required open tasks (not already partial-only if preferred).
+        setSelectedTaskIds(selectable.filter((t) => t.required).map((t) => t.id));
       })
       .catch(() => {
         if (!cancelled) {
@@ -530,6 +537,9 @@ export function VisitScheduleForm({
                       {t.label}
                       {!t.required && (
                         <span style={{ color: "var(--fg-muted)" }}> (optional)</span>
+                      )}
+                      {t.status === "partial" && (
+                        <span style={{ color: "var(--warning, #b45309)" }}> — started</span>
                       )}
                     </span>
                   </label>
