@@ -1,4 +1,5 @@
 import type { PoolClient } from "pg";
+import { isFieldDeliverableTaskLabel } from "@ai-fsm/domain";
 import type { WorkOrderTask } from "./task-time";
 import { tasksToCriteria } from "./task-time";
 
@@ -38,16 +39,22 @@ export async function loadJobTasks(
   return rows;
 }
 
+/** Drop pricing/planning rows that were wrongly seeded as checklist tasks. */
+export function filterDeliverableTasks(tasks: JobTaskRow[]): JobTaskRow[] {
+  return tasks.filter((t) => isFieldDeliverableTaskLabel(t.label));
+}
+
 export function computeTaskProgress(tasks: JobTaskRow[]): JobTaskProgress {
-  const total = tasks.length;
-  const required = tasks.filter((t) => t.required);
+  const deliverable = filterDeliverableTasks(tasks);
+  const total = deliverable.length;
+  const required = deliverable.filter((t) => t.required);
   const required_total = required.length;
-  const done = tasks.filter((t) => t.completed).length;
+  const done = deliverable.filter((t) => t.completed).length;
   const required_done = required.filter((t) => t.completed).length;
   const denom = required_total > 0 ? required_total : total;
   const numer = required_total > 0 ? required_done : done;
   const percent = denom === 0 ? 0 : Math.round((numer / denom) * 100);
-  return { total, required_total, done, required_done, percent, tasks };
+  return { total, required_total, done, required_done, percent, tasks: deliverable };
 }
 
 export async function loadJobTaskProgress(

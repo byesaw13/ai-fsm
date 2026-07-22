@@ -28,8 +28,9 @@ export function JobTasksPanel({ jobId: _jobId, progress, tasks, canToggle }: Job
   if (tasks.length === 0) {
     return (
       <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-        No tasks yet. On an approved estimate, use <strong>Break down the work (AI)</strong> or add
-        completion criteria on the work order.
+        No field tasks yet. Estimate line items (T&M budgets, materials allowances) are pricing — not
+        progress. On an approved estimate, use <strong>Break down the work (AI)</strong> or add real
+        deliverable tasks on the work order (e.g. “Replace faucet”).
       </p>
     );
   }

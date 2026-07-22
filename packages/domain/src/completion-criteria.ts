@@ -11,7 +11,30 @@ export interface LineItemForCriteria {
   line_item_type?: string;
 }
 
-/** Build completion criteria from estimate line items (labor → required checklist). */
+/**
+ * Estimate labor lines that are commercial/planning language — not field
+ * deliverables. These must never become Tasks & progress checklist items.
+ *
+ * Examples that fail: "Labor — T&M estimated budget (90 hours @ $115/hr)…",
+ * "Materials allowance — …", "Lift access allowance — …".
+ */
+const PRICING_OR_PLANNING_LINE =
+  /\b(t\s*&\s*m|time[\s-]?and[\s-]?materials|allowance|budget|hours?\s*@|\/\s*hr|billed\s+on\s+actual|maximum\s+authorized|lift\s+(rental|access)|materials?\s+allowance|labor\s*[—–\-:]\s*t|estimated\s+(on-site\s+)?labor|estimated\s+travel|rental\s+fees)\b/i;
+
+/** True when a label is a real unit of field work, not pricing prose. */
+export function isFieldDeliverableTaskLabel(label: string): boolean {
+  const t = label.trim();
+  if (t.length < 3) return false;
+  // Long commercial blurbs almost always include pricing language.
+  if (PRICING_OR_PLANNING_LINE.test(t)) return false;
+  return true;
+}
+
+/**
+ * Build completion criteria from estimate line items (labor → required checklist).
+ * Skips materials and pricing/planning labor lines (T&M budgets, allowances).
+ * Prefer AI task decompose or manual tasks for real checklists.
+ */
 export function seedCompletionCriteriaFromLineItems(
   lineItems: LineItemForCriteria[],
 ): CompletionCriterion[] {
@@ -23,7 +46,7 @@ export function seedCompletionCriteriaFromLineItems(
       required: true,
       completed: false,
     }))
-    .filter((c) => c.label.length > 0);
+    .filter((c) => c.label.length > 0 && isFieldDeliverableTaskLabel(c.label));
 }
 
 /**

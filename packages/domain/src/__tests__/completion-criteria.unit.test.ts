@@ -17,6 +17,28 @@ describe("seedCompletionCriteriaFromLineItems", () => {
     expect(criteria[0].required).toBe(true);
     expect(criteria[0].completed).toBe(false);
   });
+
+  it("skips T&M budgets, materials/lift allowances, and other pricing prose", () => {
+    const criteria = seedCompletionCriteriaFromLineItems([
+      {
+        description:
+          "Labor — T&M estimated budget (90 hours @ $115/hr). Maximum authorized: 110 hours without prior written owner approval. Billed on actual hours worked.",
+        line_item_type: "labor",
+      },
+      {
+        description:
+          "Materials allowance — drywall, joint compound, lumber/framing, insulation, trim…",
+        line_item_type: "labor",
+      },
+      {
+        description:
+          "Lift access allowance — lift rental, delivery, pickup, and associated rental fees.",
+        line_item_type: "labor",
+      },
+      { description: "Replace exterior light fixtures", line_item_type: "labor" },
+    ]);
+    expect(criteria.map((c) => c.label)).toEqual(["Replace exterior light fixtures"]);
+  });
 });
 
 describe("completionGateMessage", () => {
