@@ -17,6 +17,10 @@ export type JobTasksPanelProps = {
   canToggle: boolean;
 };
 
+function isDone(t: { completed: boolean; status: string }) {
+  return t.completed || t.status === "done";
+}
+
 /**
  * Project-level task checklist + progress bar so multi-day jobs show
  * "where we stand" without opening each work order.
@@ -35,7 +39,7 @@ export function JobTasksPanel({ jobId: _jobId, progress, tasks, canToggle }: Job
     );
   }
 
-  async function toggle(taskId: string, workOrderId: string, completed: boolean) {
+  async function markDone(taskId: string, workOrderId: string) {
     if (!canToggle) return;
     setBusyId(taskId);
     try {
@@ -43,7 +47,7 @@ export function JobTasksPanel({ jobId: _jobId, progress, tasks, canToggle }: Job
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          completion_criteria: [{ id: taskId, completed: !completed }],
+          completion_criteria: [{ id: taskId, completed: true }],
         }),
       });
       if (!res.ok) {
@@ -104,7 +108,9 @@ export function JobTasksPanel({ jobId: _jobId, progress, tasks, canToggle }: Job
       </div>
 
       <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-        {tasks.map((t) => (
+        {tasks.map((t) => {
+          const done = isDone(t);
+          return (
           <li
             key={t.id}
             style={{
@@ -113,22 +119,25 @@ export function JobTasksPanel({ jobId: _jobId, progress, tasks, canToggle }: Job
               alignItems: "flex-start",
               padding: "6px 0",
               borderBottom: "1px solid var(--border)",
-              opacity: t.completed ? 0.75 : 1,
+              opacity: done ? 0.75 : 1,
             }}
           >
             <input
               type="checkbox"
-              checked={t.completed}
-              disabled={!canToggle || busyId === t.id}
-              onChange={() => toggle(t.id, t.work_order_id, t.completed)}
-              aria-label={t.label}
+              checked={done}
+              disabled={!canToggle || busyId === t.id || done}
+              onChange={() => {
+                if (!done) markDone(t.id, t.work_order_id);
+              }}
+              aria-label={done ? `${t.label} (done, locked)` : t.label}
+              title={done ? "Done — locked" : "Mark done"}
               style={{ marginTop: 3 }}
             />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div
                 style={{
                   fontSize: "var(--text-sm)",
-                  textDecoration: t.completed ? "line-through" : undefined,
+                  textDecoration: done ? "line-through" : undefined,
                   fontWeight: t.required ? 500 : 400,
                 }}
               >
@@ -139,6 +148,11 @@ export function JobTasksPanel({ jobId: _jobId, progress, tasks, canToggle }: Job
                     (optional)
                   </span>
                 )}
+                {t.status === "partial" && !done && (
+                  <span style={{ marginLeft: 6, fontSize: "var(--text-xs)", color: "var(--warning, #b45309)" }}>
+                    Started
+                  </span>
+                )}
               </div>
               {t.work_order_title && (
                 <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
@@ -147,7 +161,8 @@ export function JobTasksPanel({ jobId: _jobId, progress, tasks, canToggle }: Job
               )}
             </div>
           </li>
-        ))}
+          );
+        })}
       </ul>
     </div>
   );

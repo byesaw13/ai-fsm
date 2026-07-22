@@ -548,12 +548,19 @@ export default async function VisitDetailPage({
             <Timeline entries={timelineEntries} />
           </Card>
 
-          {(dayTasks.length > 0 || visit.work_order_id) && (
+          {(dayTasks.length > 0 || visit.work_order_id || visit.job_id) && (
             <Card id="visit-day-tasks" data-testid="visit-day-tasks-card">
               <SectionHeader title="Tasks for this day" count={dayTasks.length || undefined} />
               <VisitDayTasks
                 visitId={visit.id}
-                initialTasks={dayTasks}
+                initialTasks={dayTasks.map((t) => ({
+                  id: t.id,
+                  label: t.label,
+                  required: t.required,
+                  completed: t.completed,
+                  status: t.status,
+                  work_order_title: t.work_order_title,
+                }))}
                 canToggle={
                   canUpdateChecklist(session.role) ||
                   session.role === "owner" ||
