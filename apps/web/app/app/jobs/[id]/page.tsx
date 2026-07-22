@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth/session";
-import { queryForSession, queryOneForSession } from "@/lib/db";
+import { getPool, queryForSession, queryOneForSession } from "@/lib/db";
 import { formatVisitTime, isVisitOverdue } from "@/lib/visits/formatting";
 import {
   canManageExpenses,
@@ -26,6 +26,8 @@ import { UseTmBriefingButton } from "./UseTmBriefingButton";
 import { buildJobTmBriefing } from "@/lib/estimates/job-tm-briefing";
 import { VendorCoordinationCard } from "./VendorCoordinationCard";
 import { JobWorkOrdersPanel, type JobWorkOrderRow } from "./JobWorkOrdersPanel";
+import { JobTasksPanel } from "./JobTasksPanel";
+import { loadJobTaskProgress } from "@/lib/work-orders/job-tasks";
 import { LinkForgottenExpensesPanel } from "@/components/invoices/LinkForgottenExpensesPanel";
 import { fetchJobMaterialExpenses, type JobMaterialExpenseWithLines } from "@/lib/invoices/job-expenses";
 import { withExpenseContext } from "@/lib/expenses/db";
@@ -210,6 +212,29 @@ export default async function JobDetailPage({
       [id, session.accountId, session.userId]
     );
     if (!assigned) notFound();
+  }
+
+  // Task progress for multi-day jobs (project hub).
+  let taskProgress = {
+    total: 0,
+    required_total: 0,
+    done: 0,
+    required_done: 0,
+    percent: 0,
+    tasks: [] as Awaited<ReturnType<typeof loadJobTaskProgress>>["tasks"],
+  };
+  {
+    const pool = getPool();
+    const client = await pool.connect();
+    try {
+      await client.query(
+        `SELECT set_config('app.current_user_id',$1,true), set_config('app.current_account_id',$2,true), set_config('app.current_role',$3,true)`,
+        [session.userId, session.accountId, session.role],
+      );
+      taskProgress = await loadJobTaskProgress(client, id, session.accountId);
+    } finally {
+      client.release();
+    }
   }
 
   const homeboxEnabled = isHomeboxEnabled();
@@ -980,6 +1005,21 @@ export default async function JobDetailPage({
               </>
             )}
           </Card>
+
+          {taskProgress.total > 0 || !isTech ? (
+            <Card data-testid="job-tasks-card">
+              <SectionHeader
+                title="Tasks & progress"
+                count={taskProgress.total > 0 ? taskProgress.total : undefined}
+              />
+              <JobTasksPanel
+                jobId={job.id}
+                progress={taskProgress}
+                tasks={taskProgress.tasks}
+                canToggle={session.role === "owner" || session.role === "admin"}
+              />
+            </Card>
+          ) : null}
 
           {!isTech && workOrders.length > 0 && (
             <Card data-testid="job-work-orders-panel">

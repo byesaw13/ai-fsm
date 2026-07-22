@@ -18,6 +18,7 @@ import { query, getPool } from "../../../../../../lib/db";
 import { appendAuditLog } from "../../../../../../lib/db/audit";
 import { logger } from "../../../../../../lib/logger";
 import { advanceBookingRequestStage } from "../../../../../../lib/booking-requests/advance-stage";
+import { setVisitPlannedTasks } from "../../../../../../lib/work-orders/job-tasks";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,8 @@ const createVisitBody = z.object({
   booking_request_id: z.string().uuid().optional(),
   work_order_id: z.string().uuid().optional(),
   visit_type: z.enum([...VISIT_TYPES] as [VisitType, ...VisitType[]]).default("standard"),
+  /** Tasks planned for this field day (work_order_tasks ids). */
+  task_ids: z.array(z.string().uuid()).max(100).optional(),
 });
 
 export const GET = withAuth(
@@ -94,6 +97,7 @@ export const POST = withRole(
       booking_request_id,
       work_order_id,
       visit_type,
+      task_ids,
     } = parsed.data;
 
     const pool = getPool();
@@ -189,6 +193,30 @@ export const POST = withRole(
       );
 
       const visit = rows[0];
+
+      if (task_ids && task_ids.length > 0) {
+        try {
+          await setVisitPlannedTasks(client, {
+            accountId: session.accountId,
+            visitId: visit.id,
+            jobId,
+            workOrderId: resolvedWorkOrderId,
+            taskIds: task_ids,
+          });
+        } catch (e) {
+          await client.query("ROLLBACK");
+          return NextResponse.json(
+            {
+              error: {
+                code: "VALIDATION_ERROR",
+                message: e instanceof Error ? e.message : "Invalid tasks for this day",
+                traceId: session.traceId,
+              },
+            },
+            { status: 422 },
+          );
+        }
+      }
 
       if (booking_request_id) {
         // Must belong to this job (or have no job yet).

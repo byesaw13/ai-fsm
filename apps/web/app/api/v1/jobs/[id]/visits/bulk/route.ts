@@ -21,6 +21,7 @@ import {
   resolveWorkOrderForVisit,
   syncWorkOrderStatus,
 } from "@/lib/work-orders/sync-status";
+import { setVisitPlannedTasks } from "@/lib/work-orders/job-tasks";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,8 @@ const bulkBody = z.object({
   visit_type: z.enum([...VISIT_TYPES] as [VisitType, ...VisitType[]]).default("standard"),
   tech_notes: z.string().optional(),
   days: z.array(daySchema).min(1).max(31),
+  /** Same planned tasks applied to every day in the batch. */
+  task_ids: z.array(z.string().uuid()).max(100).optional(),
 });
 
 export const POST = withRole(
@@ -69,7 +72,7 @@ export const POST = withRole(
       );
     }
 
-    const { assigned_user_id, work_order_id, visit_type, tech_notes, days } = parsed.data;
+    const { assigned_user_id, work_order_id, visit_type, tech_notes, days, task_ids } = parsed.data;
 
     // Sort days and reject internal overlaps in the batch
     const sorted = [...days].sort(
@@ -196,6 +199,15 @@ export const POST = withRole(
         );
         const visit = rows[0];
         created.push(visit);
+        if (task_ids && task_ids.length > 0) {
+          await setVisitPlannedTasks(client, {
+            accountId: session.accountId,
+            visitId: visit.id,
+            jobId,
+            workOrderId: resolvedWorkOrderId,
+            taskIds: task_ids,
+          });
+        }
         await appendAuditLog(client, {
           account_id: session.accountId,
           entity_type: "visit",

@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
-import { queryForSession, queryOneForSession } from "@/lib/db";
+import { getPool, queryForSession, queryOneForSession } from "@/lib/db";
 import {
   canTransitionVisit,
   canAssignVisit,
@@ -38,6 +38,8 @@ import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { MembershipVisitPanel } from "./MembershipVisitPanel";
 import { VisitSnapshotPanel } from "./VisitSnapshotPanel";
 import { VisitCommandBanner } from "./VisitCommandBanner";
+import { VisitDayTasks } from "./VisitDayTasks";
+import { loadVisitPlannedTasks } from "@/lib/work-orders/job-tasks";
 import { VisitPropertyContext } from "./VisitPropertyContext";
 import type { PropertyIssueContextRow, PropertyNoteContextRow, LastServiceRow } from "./VisitPropertyContext";
 import { VisitRecommendationPanel } from "./VisitRecommendationPanel";
@@ -111,6 +113,7 @@ type VisitRow = Visit & {
   sub_status: string | null;
   visit_type: string | null;
   property_address: string | null;
+  work_order_id?: string | null;
 };
 
 type CountRow = { membership_visit_number: number | string };
@@ -273,6 +276,22 @@ export default async function VisitDetailPage({
         recordedCategories: propertyVaultRows.map((row) => row.category),
       })
     : null;
+
+  // Planned tasks for this field day (progress on the project).
+  let dayTasks: Awaited<ReturnType<typeof loadVisitPlannedTasks>> = [];
+  {
+    const pool = getPool();
+    const client = await pool.connect();
+    try {
+      await client.query(
+        `SELECT set_config('app.current_user_id',$1,true), set_config('app.current_account_id',$2,true), set_config('app.current_role',$3,true)`,
+        [session.userId, session.accountId, session.role],
+      );
+      dayTasks = await loadVisitPlannedTasks(client, id, session.accountId);
+    } finally {
+      client.release();
+    }
+  }
 
   // Load checklist (lazy-seeded on first access) unless visit is cancelled
   const checklistItems =
@@ -528,6 +547,22 @@ export default async function VisitDetailPage({
             <SectionHeader title="Visit Timeline" />
             <Timeline entries={timelineEntries} />
           </Card>
+
+          {(dayTasks.length > 0 || visit.work_order_id) && (
+            <Card id="visit-day-tasks" data-testid="visit-day-tasks-card">
+              <SectionHeader title="Tasks for this day" count={dayTasks.length || undefined} />
+              <VisitDayTasks
+                visitId={visit.id}
+                initialTasks={dayTasks}
+                canToggle={
+                  canUpdateChecklist(session.role) ||
+                  session.role === "owner" ||
+                  session.role === "admin" ||
+                  session.role === "tech"
+                }
+              />
+            </Card>
+          )}
 
           {/* ── Property context — shown for active visits with a property ── */}
           {shouldShowPropertyContext(currentStatus) && visit.job_property_id && (
