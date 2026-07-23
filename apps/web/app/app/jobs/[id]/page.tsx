@@ -22,6 +22,9 @@ import { JobIntakePanel } from "./JobIntakePanel";
 import { AssetLinksPanel } from "./AssetLinksPanel";
 import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { ProjectWhatNext } from "./ProjectWhatNext";
+import { ProjectOverview } from "./ProjectOverview";
+import { ProjectUnplannedTasks } from "./ProjectUnplannedTasks";
+import { DailyRecapPanel } from "@/app/app/field/DailyRecapPanel";
 import { UseTmBriefingButton } from "./UseTmBriefingButton";
 import { buildJobTmBriefing } from "@/lib/estimates/job-tm-briefing";
 import { VendorCoordinationCard } from "./VendorCoordinationCard";
@@ -57,6 +60,18 @@ import {
 } from "@/lib/invoices/tracked-labor";
 import { BUSINESS_TIMEZONE } from "@/lib/operations/business-day";
 import { buildAddDayHref } from "@/lib/jobs/next-schedule-day";
+import {
+  detectTaskScheduleMismatch,
+  pickAssessmentVisitId,
+  pickNextExecutionVisit,
+  type WorkOrderBoardRow,
+} from "@/lib/jobs/project-launch";
+import {
+  findUnplannedOpenTasks,
+  groupPlannedTasksByVisit,
+  truncateTaskChipLabel,
+  type VisitPlanDay,
+} from "@/lib/jobs/project-board";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +135,8 @@ type DbWorkOrderRow = {
   status: string;
   visit_count: string;
   active_visit_count: string;
+  task_total: string;
+  task_open: string;
   [key: string]: unknown;
 };
 
@@ -239,7 +256,7 @@ export default async function JobDetailPage({
 
   const homeboxEnabled = isHomeboxEnabled();
 
-  const [visits, workOrders, commercialCounts, assetLinks, jobMaterialExpenses, trackedLaborDayRows] =
+  const [visits, workOrders, commercialCounts, assetLinks, jobMaterialExpenses, trackedLaborDayRows, visitTaskRows] =
     await Promise.all([
     session.role === "tech"
       ? queryForSession<VisitRow>(
@@ -267,7 +284,16 @@ export default async function JobDetailPage({
                   COUNT(v.id)::text AS visit_count,
                   COUNT(v.id) FILTER (
                     WHERE v.status NOT IN ('completed','cancelled')
-                  )::text AS active_visit_count
+                  )::text AS active_visit_count,
+                  (
+                    SELECT COUNT(*)::text FROM work_order_tasks t
+                    WHERE t.work_order_id = w.id AND t.account_id = w.account_id
+                  ) AS task_total,
+                  (
+                    SELECT COUNT(*)::text FROM work_order_tasks t
+                    WHERE t.work_order_id = w.id AND t.account_id = w.account_id
+                      AND t.completed = false AND t.status <> 'done'
+                  ) AS task_open
            FROM work_orders w
            LEFT JOIN visits v ON v.work_order_id = w.id
            WHERE w.job_id = $1 AND w.account_id = $2 AND w.status <> 'draft'
@@ -456,6 +482,22 @@ export default async function JobDetailPage({
        ORDER BY ae.session_date ASC`,
       [id, session.accountId],
     ).catch(() => []),
+    queryForSession<{
+      visit_id: string;
+      task_id: string;
+      label: string;
+      completed: boolean;
+      status: string;
+    }>(
+      session,
+      `SELECT vt.visit_id, t.id AS task_id, t.label, t.completed, t.status
+         FROM visit_tasks vt
+         JOIN work_order_tasks t ON t.id = vt.task_id AND t.account_id = vt.account_id
+         JOIN visits v ON v.id = vt.visit_id AND v.account_id = vt.account_id
+        WHERE v.job_id = $1 AND vt.account_id = $2
+        ORDER BY t.sort_order ASC, t.created_at ASC`,
+      [id, session.accountId],
+    ).catch(() => []),
   ]);
 
   const trackedLaborDays: TrackedLaborDay[] = mapTrackedLaborDayRows(trackedLaborDayRows ?? []);
@@ -513,7 +555,9 @@ export default async function JobDetailPage({
     : 0;
   const latestVisit = visits[0] ?? null;
 
+  const assessmentVisitId = pickAssessmentVisitId(visits);
   let assessmentFormIncomplete = false;
+  let assessmentPacketDone: boolean | null = null;
   if (openPreSaleSiteVisit && session.role !== "tech") {
     const assessmentRow = await queryOneForSession<{ completed_at: string | null }>(
       session,
@@ -522,9 +566,31 @@ export default async function JobDetailPage({
       [openPreSaleSiteVisit.id, session.accountId],
     );
     assessmentFormIncomplete = !assessmentRow?.completed_at;
+    assessmentPacketDone = !!assessmentRow?.completed_at;
   } else if (openPreSaleSiteVisit) {
     assessmentFormIncomplete = true;
+    assessmentPacketDone = false;
+  } else if (assessmentVisitId && session.role !== "tech") {
+    const assessmentRow = await queryOneForSession<{ completed_at: string | null }>(
+      session,
+      `SELECT completed_at FROM site_visit_assessments
+       WHERE visit_id = $1 AND account_id = $2`,
+      [assessmentVisitId, session.accountId],
+    );
+    assessmentPacketDone = assessmentRow ? !!assessmentRow.completed_at : null;
   }
+
+  const workOrderBoard: WorkOrderBoardRow[] = workOrders.map((wo) => ({
+    id: wo.id,
+    title: wo.title,
+    status: wo.status,
+    visit_count: parseInt(wo.visit_count, 10) || 0,
+    active_visit_count: parseInt(wo.active_visit_count, 10) || 0,
+    task_total: parseInt(wo.task_total, 10) || 0,
+    task_open: parseInt(wo.task_open, 10) || 0,
+  }));
+  const woMismatch = !isTech ? detectTaskScheduleMismatch(workOrderBoard) : null;
+  const nextExecution = pickNextExecutionVisit(visits);
   const completedExecutionVisitCount = executionVisits.filter((v) => v.status === "completed").length;
   const openWorkOrderCount = workOrders.filter(
     (wo) => !["completed", "cancelled"].includes(String(wo.status))
@@ -580,6 +646,48 @@ export default async function JobDetailPage({
       ? Math.round((grossMarginCents / revenueCents) * 1000) / 10
       : null;
 
+  const plannedByVisit = groupPlannedTasksByVisit(visitTaskRows ?? []);
+  const allPlannedTaskIds = (visitTaskRows ?? []).map((r) => r.task_id);
+  const openDeliverableTasks = taskProgress.tasks.filter(
+    (t) => !t.completed && t.status !== "done",
+  );
+  const unplannedTasks = findUnplannedOpenTasks(
+    openDeliverableTasks.map((t) => ({
+      id: t.id,
+      label: t.label,
+      required: t.required,
+      status: t.status,
+      work_order_id: t.work_order_id,
+      work_order_title: t.work_order_title,
+    })),
+    allPlannedTaskIds,
+  );
+
+  const planDays: VisitPlanDay[] = executionVisits
+    .filter((v) => v.status !== "cancelled")
+    .map((v) => {
+      const day = new Date(v.scheduled_start).toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        timeZone: "UTC",
+      });
+      const chips = plannedByVisit.get(v.id) ?? [];
+      return {
+        visitId: v.id,
+        label: day,
+        status: v.status,
+        plannedTaskIds: chips.map((c) => c.id),
+      };
+    })
+    // Prefer open days first in the plan picker, then reverse chrono for completed
+    .sort((a, b) => {
+      const aOpen = !["completed", "cancelled"].includes(a.status) ? 0 : 1;
+      const bOpen = !["completed", "cancelled"].includes(b.status) ? 0 : 1;
+      if (aOpen !== bOpen) return aOpen - bOpen;
+      return 0;
+    });
+
   // Build timeline entries from visits — type label first (Assessment / Work Day)
   const timelineEntries: TimelineEntryData[] = visits.map((v) => {
     const overdue = isVisitOverdue(v);
@@ -589,11 +697,61 @@ export default async function JobDetailPage({
       month: "short",
       day: "numeric",
     });
+    const dayTasks = plannedByVisit.get(v.id) ?? [];
+    const techLine = v.assigned_user_name ? `Tech: ${v.assigned_user_name}` : "Unassigned";
+    const taskSummary =
+      dayTasks.length === 0
+        ? isExecutionVisit(v)
+          ? "No tasks planned"
+          : null
+        : `${dayTasks.filter((t) => t.completed).length}/${dayTasks.length} tasks`;
+
     return {
       id: v.id,
       timestamp: v.scheduled_start,
       title: `${typeLabel} · ${day} · ${formatVisitTime(v.scheduled_start)}`,
-      subtitle: v.assigned_user_name ? `Tech: ${v.assigned_user_name}` : "Unassigned",
+      subtitle: (
+        <div data-testid={`visit-day-plan-${v.id}`}>
+          <div>
+            {techLine}
+            {taskSummary ? ` · ${taskSummary}` : ""}
+          </div>
+          {dayTasks.length > 0 ? (
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 4,
+                marginTop: 6,
+              }}
+            >
+              {dayTasks.map((t) => (
+                <span
+                  key={t.id}
+                  title={t.label}
+                  style={{
+                    display: "inline-block",
+                    fontSize: "var(--text-xs)",
+                    fontWeight: 600,
+                    padding: "2px 8px",
+                    borderRadius: 999,
+                    border: "1px solid var(--border)",
+                    background: t.completed ? "var(--bg-muted, #f3f4f6)" : "var(--bg-card)",
+                    color: t.completed ? "var(--fg-muted)" : "var(--fg)",
+                    textDecoration: t.completed ? "line-through" : undefined,
+                    maxWidth: 200,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {truncateTaskChipLabel(t.label)}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ),
       status: v.status,
       badge: overdue ? (
         <span className="p7-badge p7-badge-status-overdue" style={{ fontSize: "var(--text-xs)" }}>
@@ -725,8 +883,70 @@ export default async function JobDetailPage({
             {job.property_address && <div className="p7-detail-row"><dt>Property</dt><dd>{job.property_address}</dd></div>}
             <div className="p7-detail-row"><dt>Status</dt><dd>{JOB_STATUS_LABELS[currentStatus]}</dd></div>
             <div className="p7-detail-row"><dt>Visits</dt><dd>{visits.length}</dd></div>
-            {!isTech && <div className="p7-detail-row"><dt>Estimates</dt><dd>{estimateCount}</dd></div>}
-            {!isTech && <div className="p7-detail-row"><dt>Invoices</dt><dd>{invoiceCount}</dd></div>}
+            {!isTech && assessmentVisitId ? (
+              <div className="p7-detail-row">
+                <dt>Assessment</dt>
+                <dd>
+                  <Link
+                    href={`/app/visits/${assessmentVisitId}/assessment` as Route}
+                    style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}
+                  >
+                    Open assessment →
+                  </Link>
+                </dd>
+              </div>
+            ) : null}
+            {!isTech && commercialCounts?.latest_estimate_id ? (
+              <div className="p7-detail-row">
+                <dt>Estimate</dt>
+                <dd>
+                  <Link
+                    href={`/app/estimates/${commercialCounts.latest_estimate_id}` as Route}
+                    style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}
+                  >
+                    {commercialCounts.latest_estimate_number ?? "Estimate"} →
+                  </Link>
+                </dd>
+              </div>
+            ) : !isTech ? (
+              <div className="p7-detail-row"><dt>Estimates</dt><dd>{estimateCount}</dd></div>
+            ) : null}
+            {!isTech && commercialCounts?.latest_invoice_id ? (
+              <div className="p7-detail-row">
+                <dt>Invoice</dt>
+                <dd>
+                  <Link
+                    href={`/app/invoices/${commercialCounts.latest_invoice_id}` as Route}
+                    style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}
+                  >
+                    Open invoice →
+                  </Link>
+                </dd>
+              </div>
+            ) : !isTech ? (
+              <div className="p7-detail-row"><dt>Invoices</dt><dd>{invoiceCount}</dd></div>
+            ) : null}
+            {!isTech && taskProgress.total > 0 ? (
+              <div className="p7-detail-row">
+                <dt>Tasks</dt>
+                <dd>
+                  {taskProgress.done}/{taskProgress.total} done ({taskProgress.percent}%)
+                </dd>
+              </div>
+            ) : null}
+            {!isTech && nextExecution ? (
+              <div className="p7-detail-row">
+                <dt>Field day</dt>
+                <dd>
+                  <Link
+                    href={`/app/visits/${nextExecution.id}` as Route}
+                    style={{ color: "var(--accent)", fontWeight: 600, textDecoration: "none" }}
+                  >
+                    {nextExecution.label} →
+                  </Link>
+                </dd>
+              </div>
+            ) : null}
           </dl>
         </AdvancedDetails>
 
@@ -813,95 +1033,59 @@ export default async function JobDetailPage({
         />
       )}
 
-      {/* At-a-glance: commercial spine (estimate → deposit → final) */}
+      {/* The control-panel board: every project artifact indexed exactly once */}
       {!isTech && commercialCounts && (
-        <Card data-testid="project-commercial-strip" style={{ marginBottom: "var(--space-4)" }}>
-          <SectionHeader title="Money & scope" />
-          <div
-            style={{
-              display: "grid",
-              gap: "var(--space-3)",
-              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-            }}
-          >
-            <div>
-              <p style={{ margin: 0, fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                Estimate
-              </p>
-              {commercialCounts.latest_estimate_id ? (
-                <Link
-                  href={`/app/estimates/${commercialCounts.latest_estimate_id}`}
-                  style={{ display: "block", marginTop: 4, color: "var(--accent)", textDecoration: "none", fontWeight: 700, fontSize: "var(--text-sm)" }}
-                >
-                  {commercialCounts.latest_estimate_number ?? "Estimate"} ·{" "}
-                  {commercialCounts.latest_estimate_status}
-                  {commercialCounts.latest_estimate_total_cents != null
-                    ? ` · ${formatCents(commercialCounts.latest_estimate_total_cents)}`
-                    : ""}{" "}
-                  →
-                </Link>
-              ) : (
-                <p style={{ margin: "4px 0 0", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>None yet</p>
-              )}
-            </div>
-            <div>
-              <p style={{ margin: 0, fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                Deposit
-              </p>
-              {commercialCounts.deposit_invoice_id ? (
-                <Link
-                  href={`/app/invoices/${commercialCounts.deposit_invoice_id}`}
-                  style={{ display: "block", marginTop: 4, color: "var(--accent)", textDecoration: "none", fontWeight: 700, fontSize: "var(--text-sm)" }}
-                >
-                  {commercialCounts.deposit_invoice_number ?? "Deposit"} ·{" "}
-                  {commercialCounts.deposit_paid
-                    ? "paid"
-                    : commercialCounts.deposit_invoice_status ?? "—"}
-                  {commercialCounts.deposit_invoice_total_cents != null
-                    ? ` · ${formatCents(commercialCounts.deposit_invoice_total_cents)}`
-                    : ""}{" "}
-                  →
-                </Link>
-              ) : (
-                <p style={{ margin: "4px 0 0", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                  {commercialCounts.has_approved_estimate ? "None required / not created" : "—"}
-                </p>
-              )}
-            </div>
-            <div>
-              <p style={{ margin: 0, fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                Final invoice
-              </p>
-              {commercialCounts.latest_invoice_id ? (
-                <Link
-                  href={`/app/invoices/${commercialCounts.latest_invoice_id}`}
-                  style={{ display: "block", marginTop: 4, color: "var(--accent)", textDecoration: "none", fontWeight: 700, fontSize: "var(--text-sm)" }}
-                >
-                  {commercialCounts.latest_final_number ?? "Invoice"} ·{" "}
-                  {commercialCounts.latest_final_status ?? "—"}
-                  {commercialCounts.invoice_total_cents != null
-                    ? ` · ${formatCents(commercialCounts.invoice_total_cents)}`
-                    : ""}{" "}
-                  →
-                </Link>
-              ) : (
-                <p style={{ margin: "4px 0 0", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                  After owner completes project
-                </p>
-              )}
-            </div>
-            <div>
-              <p style={{ margin: 0, fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--fg-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                Field
-              </p>
-              <p style={{ margin: "4px 0 0", fontSize: "var(--text-sm)", fontWeight: 600 }}>
-                {preSaleSiteVisits.length > 0 ? `${preSaleSiteVisits.length} assessment` : "No assessment"}
-                {" · "}
-                {executionVisits.length} work day{executionVisits.length === 1 ? "" : "s"}
-              </p>
-            </div>
-          </div>
-        </Card>
+        <ProjectOverview
+          jobId={job.id}
+          mismatch={woMismatch}
+          estimate={
+            commercialCounts.latest_estimate_id
+              ? {
+                  id: commercialCounts.latest_estimate_id,
+                  number: commercialCounts.latest_estimate_number,
+                  status: commercialCounts.latest_estimate_status,
+                  totalCents: commercialCounts.latest_estimate_total_cents,
+                }
+              : null
+          }
+          approvedEstimateId={commercialCounts.approved_estimate_id}
+          deposit={
+            commercialCounts.deposit_invoice_id
+              ? {
+                  id: commercialCounts.deposit_invoice_id,
+                  number: commercialCounts.deposit_invoice_number,
+                  status: commercialCounts.deposit_invoice_status,
+                  paid: commercialCounts.deposit_paid,
+                  totalCents: commercialCounts.deposit_invoice_total_cents,
+                }
+              : null
+          }
+          hasApprovedEstimate={commercialCounts.has_approved_estimate}
+          invoice={
+            commercialCounts.latest_invoice_id
+              ? {
+                  id: commercialCounts.latest_invoice_id,
+                  number: commercialCounts.latest_final_number,
+                  status: commercialCounts.latest_final_status,
+                  totalCents: commercialCounts.invoice_total_cents,
+                }
+              : null
+          }
+          assessment={
+            assessmentVisitId ? { visitId: assessmentVisitId, done: assessmentPacketDone } : null
+          }
+          workDayCount={executionVisits.length}
+          nextDay={
+            nextExecution ? { visitId: nextExecution.id, label: nextExecution.label } : null
+          }
+          tasks={{
+            total: taskProgress.total,
+            done: taskProgress.done,
+            percent: taskProgress.percent,
+            unplanned: unplannedTasks.length,
+          }}
+          workOrderCount={workOrderBoard.length}
+        />
       )}
 
       {job.description ? (
@@ -1007,7 +1191,7 @@ export default async function JobDetailPage({
           </Card>
 
           {taskProgress.total > 0 || !isTech ? (
-            <Card data-testid="job-tasks-card">
+            <Card id="job-tasks" data-testid="job-tasks-card">
               <SectionHeader
                 title="Tasks & progress"
                 count={taskProgress.total > 0 ? taskProgress.total : undefined}
@@ -1021,17 +1205,41 @@ export default async function JobDetailPage({
             </Card>
           ) : null}
 
+          {/* Log a day: narrate what got done, AI attributes per-task time to that date */}
+          {!isTech && taskProgress.total > 0 ? <DailyRecapPanel jobId={job.id} /> : null}
+
+          {!isTech && (taskProgress.total > 0 || unplannedTasks.length > 0) ? (
+            <Card id="job-unplanned" data-testid="job-unplanned-card">
+              <SectionHeader
+                title="Unplanned work"
+                count={unplannedTasks.length > 0 ? unplannedTasks.length : undefined}
+              />
+              <ProjectUnplannedTasks
+                tasks={unplannedTasks}
+                planDays={planDays}
+                canPlan={
+                  canAddVisit ||
+                  session.role === "owner" ||
+                  session.role === "admin" ||
+                  session.role === "tech"
+                }
+              />
+            </Card>
+          ) : null}
+
           {!isTech && workOrders.length > 0 && (
-            <Card data-testid="job-work-orders-panel">
+            <Card id="job-work-orders" data-testid="job-work-orders-panel">
               <SectionHeader title="Work Orders" count={workOrders.length} />
               <JobWorkOrdersPanel
                 jobId={job.id}
-                workOrders={workOrders.map((wo): JobWorkOrderRow => ({
+                workOrders={workOrderBoard.map((wo): JobWorkOrderRow => ({
                   id: wo.id,
                   title: wo.title,
                   status: wo.status,
-                  visit_count: parseInt(wo.visit_count, 10) || 0,
-                  active_visit_count: parseInt(wo.active_visit_count, 10) || 0,
+                  visit_count: wo.visit_count,
+                  active_visit_count: wo.active_visit_count,
+                  task_total: wo.task_total,
+                  task_open: wo.task_open,
                 }))}
                 canManage={canAddVisit}
               />
@@ -1188,63 +1396,7 @@ export default async function JobDetailPage({
               />
             )}
 
-            {commercialCounts?.approved_estimate_id && (
-              <Card>
-                <SectionHeader
-                  title="Materials & Change Orders"
-                  action={
-                    <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-                      <LinkButton
-                        href={`/app/estimates/${commercialCounts.approved_estimate_id}/shopping-list`}
-                        variant="secondary"
-                        size="sm"
-                      >
-                        Materials Plan
-                      </LinkButton>
-                      <LinkButton
-                        href={`/app/estimates/${commercialCounts.approved_estimate_id}#change-orders`}
-                        variant="secondary"
-                        size="sm"
-                      >
-                        Change Orders
-                      </LinkButton>
-                    </div>
-                  }
-                />
-                <dl className="p7-detail-list">
-                  <div className="p7-detail-row">
-                    <dt>Materials</dt>
-                    <dd>
-                      <Link
-                        href={`/app/estimates/${commercialCounts.approved_estimate_id}/shopping-list`}
-                        style={{ color: "var(--accent)", textDecoration: "none", fontSize: "var(--text-sm)" }}
-                      >
-                        Open approved materials plan →
-                      </Link>
-                    </dd>
-                  </div>
-                  <div className="p7-detail-row">
-                    <dt>Change orders</dt>
-                    <dd>
-                      {changeOrderCount > 0 ? (
-                        <Link
-                          href={`/app/estimates/${commercialCounts.approved_estimate_id}#change-orders`}
-                          style={{ color: "var(--accent)", textDecoration: "none", fontSize: "var(--text-sm)" }}
-                        >
-                          {changeOrderCount} change order{changeOrderCount !== 1 ? "s" : ""} →
-                        </Link>
-                      ) : (
-                        <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-                          No change orders yet
-                        </span>
-                      )}
-                    </dd>
-                  </div>
-                </dl>
-              </Card>
-            )}
-
-            {/* Commercial links */}
+            {/* Commercial links — estimates, invoices, materials plan, change orders */}
             <Card>
               <SectionHeader
                 title="Commercial"
@@ -1301,6 +1453,38 @@ export default async function JobDetailPage({
                     )}
                   </dd>
                 </div>
+                {commercialCounts?.approved_estimate_id && (
+                  <>
+                    <div className="p7-detail-row">
+                      <dt>Materials</dt>
+                      <dd>
+                        <Link
+                          href={`/app/estimates/${commercialCounts.approved_estimate_id}/shopping-list`}
+                          style={{ color: "var(--accent)", textDecoration: "none", fontSize: "var(--text-sm)" }}
+                        >
+                          Approved materials plan →
+                        </Link>
+                      </dd>
+                    </div>
+                    <div className="p7-detail-row">
+                      <dt>Change orders</dt>
+                      <dd>
+                        {changeOrderCount > 0 ? (
+                          <Link
+                            href={`/app/estimates/${commercialCounts.approved_estimate_id}#change-orders`}
+                            style={{ color: "var(--accent)", textDecoration: "none", fontSize: "var(--text-sm)" }}
+                          >
+                            {changeOrderCount} change order{changeOrderCount !== 1 ? "s" : ""} →
+                          </Link>
+                        ) : (
+                          <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+                            No change orders yet
+                          </span>
+                        )}
+                      </dd>
+                    </div>
+                  </>
+                )}
               </dl>
             </Card>
 

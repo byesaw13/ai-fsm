@@ -143,22 +143,35 @@ export async function setVisitPlannedTasks(
   const unique = [...new Set(opts.taskIds.filter(Boolean))];
 
   if (unique.length > 0) {
-    // Only incomplete tasks may be planned on a day; done is unselectable.
+    // Open/partial may be newly planned. Done tasks may stay on the day if already
+    // planned (locked in the UI) so re-saving a plan does not drop completed work.
     const { rows: valid } = await client.query<{ id: string }>(
       opts.workOrderId
         ? `SELECT t.id FROM work_order_tasks t
              JOIN work_orders wo ON wo.id = t.work_order_id
             WHERE t.account_id = $1 AND wo.job_id = $2 AND wo.id = $3
               AND t.id = ANY($4::uuid[])
-              AND t.completed = false AND t.status <> 'done'`
+              AND (
+                (t.completed = false AND t.status <> 'done')
+                OR EXISTS (
+                  SELECT 1 FROM visit_tasks vt
+                  WHERE vt.visit_id = $5 AND vt.task_id = t.id AND vt.account_id = $1
+                )
+              )`
         : `SELECT t.id FROM work_order_tasks t
              JOIN work_orders wo ON wo.id = t.work_order_id
             WHERE t.account_id = $1 AND wo.job_id = $2
               AND t.id = ANY($3::uuid[])
-              AND t.completed = false AND t.status <> 'done'`,
+              AND (
+                (t.completed = false AND t.status <> 'done')
+                OR EXISTS (
+                  SELECT 1 FROM visit_tasks vt
+                  WHERE vt.visit_id = $4 AND vt.task_id = t.id AND vt.account_id = $1
+                )
+              )`,
       opts.workOrderId
-        ? [opts.accountId, opts.jobId, opts.workOrderId, unique]
-        : [opts.accountId, opts.jobId, unique],
+        ? [opts.accountId, opts.jobId, opts.workOrderId, unique, opts.visitId]
+        : [opts.accountId, opts.jobId, unique, opts.visitId],
     );
     if (valid.length !== unique.length) {
       throw new Error("Only open or started (not finished) tasks can be planned on a day — done tasks are locked");
