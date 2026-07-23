@@ -11,7 +11,7 @@ import {
   type DaySetupStep,
 } from "@/lib/my-day/day-setup";
 import { pickStartVehicle } from "@/lib/mileage/start-day";
-import type { VehicleOption } from "../WorkdayPanel";
+import type { VehicleOption } from "@/lib/my-work/field-day-types";
 
 const STEPS: { key: DaySetupStep; label: string }[] = [
   { key: "clock", label: "Clock in" },

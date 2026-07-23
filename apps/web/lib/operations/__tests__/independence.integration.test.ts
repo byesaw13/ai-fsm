@@ -11,9 +11,32 @@
  *   TEST_DATABASE_URL=postgresql://... TEST_BASE_URL=http://localhost:3000 pnpm test
  */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { Client } from "pg";
 
 const RUN_INTEGRATION = !!process.env.TEST_DATABASE_URL && !!process.env.TEST_BASE_URL;
 const BASE_URL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
+
+// Seed account/owner (002_seed_dev.sql, owner@test.com) — needed to satisfy the
+// forced-RLS policies on business_days & the ledgers when the direct DB client
+// runs under the app role instead of a superuser.
+const SEED_ACCOUNT = "11111111-1111-1111-1111-111111111111";
+const SEED_OWNER = "11111111-1111-1111-1111-aaaaaaaaaaaa";
+
+async function withDirectDb<T>(run: (client: Client) => Promise<T>): Promise<T> {
+  const client = new Client({ connectionString: process.env.TEST_DATABASE_URL });
+  await client.connect();
+  try {
+    await client.query(
+      `SELECT set_config('app.current_account_id',$1,false),
+              set_config('app.current_user_id',$2,false),
+              set_config('app.current_role','owner',false)`,
+      [SEED_ACCOUNT, SEED_OWNER],
+    );
+    return await run(client);
+  } finally {
+    await client.end();
+  }
+}
 
 describe.skipIf(!RUN_INTEGRATION)("Operations Engine — lifecycle independence", () => {
   let cookie: string;
@@ -30,7 +53,18 @@ describe.skipIf(!RUN_INTEGRATION)("Operations Engine — lifecycle independence"
 
   const isClockedIn = async () => !!(await api("GET", "/api/v1/time-clock/current")).json.data;
   const activeActivity = async () => (await api("GET", "/api/v1/activities/today")).json.data?.active ?? null;
-  const currentDay = async () => (await api("GET", "/api/v1/business-day/current")).json.data ?? null;
+  // Direct DB read — the business-day read route was deleted (no UI consumer);
+  // the transition endpoint under test is exercised via HTTP as before.
+  const currentDay = async (): Promise<{ id: string; status: string } | null> =>
+    withDirectDb(async (client) => {
+      const { rows } = await client.query(
+        `SELECT bd.id, bd.status FROM business_days bd
+         WHERE bd.user_id = $1
+         ORDER BY bd.business_date DESC, bd.created_at DESC LIMIT 1`,
+        [SEED_OWNER],
+      );
+      return rows[0] ?? null;
+    });
 
   beforeAll(async () => {
     const res = await fetch(`${BASE_URL}/api/v1/auth/login`, {
@@ -80,17 +114,42 @@ describe.skipIf(!RUN_INTEGRATION)("Operations Engine — lifecycle independence"
     expect((await currentDay())?.status).not.toBe("CLOSED"); // day still open
   });
 
-  it("closing the business day does NOT stop payroll or activity", async () => {
+  it("day close blocks on open concerns, then closes without mutating the ledgers", async () => {
+    // TASK-054 changed the semantics the original test asserted: the day can no
+    // longer close WHILE payroll/activity run (hard-blocker gate). The
+    // independence invariant that remains is: Day Close changes day status
+    // only — it never ends, voids, or edits the payroll/activity ledger rows.
     await api("POST", "/api/v1/time-clock/clock-in"); // opens the day
     await api("POST", "/api/v1/activities/switch", { activity_type: "admin" });
 
     const day = await currentDay();
     await api("POST", "/api/v1/business-day/transition", { id: day.id, to: "READY_TO_CLOSE" });
+
+    // Gate: refuses to close while clocked in / activity running.
+    const blocked = await api("POST", "/api/v1/business-day/transition", { id: day.id, to: "CLOSED" });
+    expect(blocked.status).toBe(409);
+
+    // Close the concerns first (the ritual), then the day closes.
+    await api("POST", "/api/v1/activities/stop");
+    await api("POST", "/api/v1/time-clock/clock-out");
     const closed = await api("POST", "/api/v1/business-day/transition", { id: day.id, to: "CLOSED" });
     expect(closed.status).toBeLessThan(300);
 
-    expect(await isClockedIn()).toBe(true); // payroll keeps running
-    expect((await activeActivity())?.activity_type).toBe("admin"); // activity keeps running
+    // Independence: the ledgers were closed by their own lifecycles, not the
+    // day close — rows exist, ended, and are NOT voided.
+    await withDirectDb(async (client) => {
+      const { rows } = await client.query(
+        `SELECT
+           (SELECT COUNT(*) FROM time_clock_sessions tc
+            WHERE tc.user_id = $1 AND tc.status = 'closed' AND tc.voided_at IS NULL) AS closed_clocks,
+           (SELECT COUNT(*) FROM activity_entries ae
+            WHERE ae.user_id = $1 AND ae.activity_type = 'admin'
+              AND ae.ended_at IS NOT NULL AND ae.voided_at IS NULL) AS ended_activities`,
+        [SEED_OWNER],
+      );
+      expect(Number(rows[0].closed_clocks)).toBeGreaterThan(0);
+      expect(Number(rows[0].ended_activities)).toBeGreaterThan(0);
+    });
   });
 
   it("switching activity does NOT affect the payroll clock", async () => {

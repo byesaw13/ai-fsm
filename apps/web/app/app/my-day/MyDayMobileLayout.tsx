@@ -11,8 +11,8 @@ import { FieldRightNowCard } from "../my-work/FieldRightNowCard";
 import { SitePresenceCard } from "@/components/field/SitePresenceCard";
 import { isDaySetupComplete, type DaySetupState } from "@/lib/my-day/day-setup";
 import type { HeroVisit } from "@/lib/my-day/visit-hero";
-import type { OpenSession, VehicleOption } from "../WorkdayPanel";
-import type { ActivityEntryDto } from "../ActivityTracker";
+import type { OpenSession, VehicleOption } from "@/lib/my-work/field-day-types";
+import type { ActivityEntryDto } from "@/lib/my-work/field-day-types";
 import type { DayMileageSummary } from "@/lib/mileage/sessions";
 
 export function MyDayMobileLayout({

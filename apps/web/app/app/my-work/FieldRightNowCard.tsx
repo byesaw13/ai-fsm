@@ -1,7 +1,8 @@
 "use client";
 
-import { NowBar, type ActivityEntryDto } from "../ActivityTracker";
-import type { OpenSession, VehicleOption } from "../WorkdayPanel";
+import { NowBar } from "../ActivityTracker";
+import type { ActivityEntryDto } from "@/lib/my-work/field-day-types";
+import type { OpenSession, VehicleOption } from "@/lib/my-work/field-day-types";
 import { VehicleRow } from "./VehicleRow";
 
 export function FieldRightNowCard({

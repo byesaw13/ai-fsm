@@ -8,7 +8,7 @@ import { ManualSiteVisitButton } from "../ManualSiteVisitButton";
 import { DayMapPanel } from "../DayMapPanel";
 import { LikelySiteBanner } from "@/components/field/LikelySiteBanner";
 import { TimelineDayNav } from "../TimelineDayNav";
-import type { ActivityEntryDto } from "../ActivityTracker";
+import type { ActivityEntryDto } from "@/lib/my-work/field-day-types";
 
 export const dynamic = "force-dynamic";
 

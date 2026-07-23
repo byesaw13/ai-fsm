@@ -60,7 +60,7 @@ export function ClockBar() {
   }
 
   // Load on mount, and whenever any Today-header action fires the shared signal
-  // (e.g. Clock In opens the business day → BusinessDayBar must refresh too).
+  // (e.g. Clock In opens the business day → other ops widgets must refresh too).
   useEffect(() => {
     void load();
     const onRefresh = () => void load();
@@ -85,7 +85,7 @@ export function ClockBar() {
         throw new Error(json.error?.message ?? "That didn't work — try again.");
       }
       // Refresh the whole Today header — clock-in also opened the business day,
-      // so BusinessDayBar must re-read, not just this component.
+      // so listening ops widgets must re-read, not just this component.
       window.dispatchEvent(new Event("ops:refresh"));
       // Prompt for the current activity right after clocking in (not on out).
       setPromptActivity(path === "clock-in");
