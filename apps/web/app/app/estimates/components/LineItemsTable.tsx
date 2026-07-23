@@ -27,7 +27,25 @@ export function LineItemsTable({
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--space-2)" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          gap: "var(--space-3)",
+          marginBottom: "var(--space-2)",
+        }}
+      >
+        {/* New tab so the in-progress estimate form is not lost */}
+        <a
+          href="/app/price-book"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-testid={`${p}price-book-link`}
+          style={{ color: "var(--accent)", fontWeight: 600, fontSize: "var(--text-sm)", textDecoration: "none" }}
+        >
+          Price Book ↗
+        </a>
         <Button
           type="button"
           variant="secondary"
