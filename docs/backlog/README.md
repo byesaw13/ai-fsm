@@ -168,8 +168,8 @@ Next available ID: **TASK-076**.
 | TASK-068 | Payment Provider Model & Enriched Recorder | 004 | In Progress |
 | TASK-069 | Square Card Payments | 004 | Proposed |
 | TASK-071 | Set a deposit on any invoice (Square-style single invoice) | 004 | In Progress |
-| TASK-072 | Per-task time capture via AI Daily Recap | 008 | In Progress |
-| TASK-073 | AI task decomposition | 008 | In Progress |
+| TASK-072 | Per-task time capture via AI Daily Recap | 008 | Done |
+| TASK-073 | AI task decomposition | 008 | Done |
 | TASK-074 | My Work — "Next action" + stale-state prompts | 006 | Proposed |
 | TASK-075 | Field workflow — fewer taps job → materials → invoice → closeout | 006 | Proposed |
 

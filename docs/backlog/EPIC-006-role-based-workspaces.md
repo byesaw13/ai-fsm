@@ -290,21 +290,29 @@ records, less re-work at the desk later.
 
 Scope:
 - From the active visit/work context on My Work, inline the next steps — log a
-  material, mark tasks/visit done, hand off to an invoice draft — as one-tap
-  actions in the same flow instead of separate destinations.
-- Reuse existing routes and actions (materials capture, visit completion, the
-  visit-completion → invoice-draft bridge). This is navigation/affordance
-  consolidation, not new backend.
+  material, mark tasks/visit done — as one-tap actions in the same flow instead
+  of separate destinations.
+- Reuse existing routes and actions (materials capture, visit completion). This
+  is navigation/affordance consolidation, not new backend.
+- **Invoice handoff is project completion, not visit completion.** By design a
+  visit completing keeps the project open and never drafts an invoice; the draft
+  *final* invoice is created only by the owner's explicit project completion
+  (`apps/web/app/api/v1/jobs/[id]/transition/route.ts` → `createDraftFinalInvoiceForJob`).
+  So when the last visit of a job is done, surface the **project-completion**
+  action (which drafts the final invoice for billing review) — reusing that
+  route — rather than implying a visit drafts an invoice.
 
 Out of Scope:
 - New billing logic or the estimate side.
+- Changing when a final invoice is created (project completion stays the trigger).
 - Anything needing a new table or route (scope freeze — reuse existing surfaces).
 
 Acceptance Criteria:
 - [ ] From an in-progress visit on My Work, a field user logs a material and
       completes the visit without navigating to a separate page.
-- [ ] The closeout → invoice-draft handoff is reachable in one tap from the visit.
-- [ ] No new tables or routes.
+- [ ] When a job's last visit is complete, the owner's project-completion action
+      (which drafts the final invoice) is reachable in one tap from that context.
+- [ ] No new tables or routes; the final-invoice trigger is unchanged.
 
 Notes:
 Phase 2 (after Phases 0–1 are boringly reliable; respects the scope freeze by
