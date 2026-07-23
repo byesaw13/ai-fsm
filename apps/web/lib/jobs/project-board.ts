@@ -78,6 +78,36 @@ export function findUnplannedOpenTasks(
     }));
 }
 
+/**
+ * Task ids that count as "planned" — only those on a usable field day (the
+ * same visit set as the day picker). A task planned on a cancelled or
+ * assessment visit must fall back to Unplanned so it can be reassigned.
+ */
+export function plannedTaskIdsOnDays(
+  rows: Array<{ visit_id: string; task_id: string }>,
+  fieldDayVisitIds: Iterable<string>,
+): string[] {
+  const allowed = new Set(fieldDayVisitIds);
+  return rows.filter((r) => allowed.has(r.visit_id)).map((r) => r.task_id);
+}
+
+/**
+ * Deliverable task counts per work order. Callers pass tasks already filtered
+ * to deliverables (taskProgress.tasks) so pricing/allowance rows never count.
+ */
+export function deliverableCountsByWorkOrder(
+  tasks: Array<{ work_order_id: string; completed: boolean; status: string }>,
+): Map<string, { total: number; open: number }> {
+  const map = new Map<string, { total: number; open: number }>();
+  for (const t of tasks) {
+    const agg = map.get(t.work_order_id) ?? { total: 0, open: 0 };
+    agg.total += 1;
+    if (!t.completed && t.status !== "done") agg.open += 1;
+    map.set(t.work_order_id, agg);
+  }
+  return map;
+}
+
 /** Short chip label for timeline (avoid wrapping walls of text). */
 export function truncateTaskChipLabel(label: string, max = 42): string {
   const t = label.trim();

@@ -67,8 +67,10 @@ import {
   type WorkOrderBoardRow,
 } from "@/lib/jobs/project-launch";
 import {
+  deliverableCountsByWorkOrder,
   findUnplannedOpenTasks,
   groupPlannedTasksByVisit,
+  plannedTaskIdsOnDays,
   truncateTaskChipLabel,
   type VisitPlanDay,
 } from "@/lib/jobs/project-board";
@@ -135,8 +137,6 @@ type DbWorkOrderRow = {
   status: string;
   visit_count: string;
   active_visit_count: string;
-  task_total: string;
-  task_open: string;
   [key: string]: unknown;
 };
 
@@ -284,16 +284,7 @@ export default async function JobDetailPage({
                   COUNT(v.id)::text AS visit_count,
                   COUNT(v.id) FILTER (
                     WHERE v.status NOT IN ('completed','cancelled')
-                  )::text AS active_visit_count,
-                  (
-                    SELECT COUNT(*)::text FROM work_order_tasks t
-                    WHERE t.work_order_id = w.id AND t.account_id = w.account_id
-                  ) AS task_total,
-                  (
-                    SELECT COUNT(*)::text FROM work_order_tasks t
-                    WHERE t.work_order_id = w.id AND t.account_id = w.account_id
-                      AND t.completed = false AND t.status <> 'done'
-                  ) AS task_open
+                  )::text AS active_visit_count
            FROM work_orders w
            LEFT JOIN visits v ON v.work_order_id = w.id
            WHERE w.job_id = $1 AND w.account_id = $2 AND w.status <> 'draft'
@@ -580,14 +571,17 @@ export default async function JobDetailPage({
     assessmentPacketDone = assessmentRow ? !!assessmentRow.completed_at : null;
   }
 
+  // Deliverable-only counts (pricing/allowance rows never count as tasks) so
+  // the mismatch warning and per-WO progress match the task panel.
+  const woTaskCounts = deliverableCountsByWorkOrder(taskProgress.tasks);
   const workOrderBoard: WorkOrderBoardRow[] = workOrders.map((wo) => ({
     id: wo.id,
     title: wo.title,
     status: wo.status,
     visit_count: parseInt(wo.visit_count, 10) || 0,
     active_visit_count: parseInt(wo.active_visit_count, 10) || 0,
-    task_total: parseInt(wo.task_total, 10) || 0,
-    task_open: parseInt(wo.task_open, 10) || 0,
+    task_total: woTaskCounts.get(wo.id)?.total ?? 0,
+    task_open: woTaskCounts.get(wo.id)?.open ?? 0,
   }));
   const woMismatch = !isTech ? detectTaskScheduleMismatch(workOrderBoard) : null;
   const nextExecution = pickNextExecutionVisit(visits);
@@ -647,7 +641,10 @@ export default async function JobDetailPage({
       : null;
 
   const plannedByVisit = groupPlannedTasksByVisit(visitTaskRows ?? []);
-  const allPlannedTaskIds = (visitTaskRows ?? []).map((r) => r.task_id);
+  const fieldDayVisitIds = executionVisits
+    .filter((v) => v.status !== "cancelled")
+    .map((v) => v.id);
+  const allPlannedTaskIds = plannedTaskIdsOnDays(visitTaskRows ?? [], fieldDayVisitIds);
   const openDeliverableTasks = taskProgress.tasks.filter(
     (t) => !t.completed && t.status !== "done",
   );

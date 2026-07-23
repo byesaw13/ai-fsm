@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  deliverableCountsByWorkOrder,
   findUnplannedOpenTasks,
   groupPlannedTasksByVisit,
   mergeTaskOntoDayPlan,
+  plannedTaskIdsOnDays,
   truncateTaskChipLabel,
 } from "../project-board";
 
@@ -69,6 +71,36 @@ describe("findUnplannedOpenTasks", () => {
       ["a"],
     );
     expect(unplanned.map((t) => t.id)).toEqual(["b", "c"]);
+  });
+});
+
+describe("plannedTaskIdsOnDays", () => {
+  it("only counts tasks planned on usable field days", () => {
+    const ids = plannedTaskIdsOnDays(
+      [
+        { visit_id: "day-open", task_id: "a" },
+        { visit_id: "day-cancelled", task_id: "b" },
+        { visit_id: "assessment", task_id: "c" },
+      ],
+      ["day-open"],
+    );
+    // b and c fall back to Unplanned so they can be reassigned
+    expect(ids).toEqual(["a"]);
+  });
+});
+
+describe("deliverableCountsByWorkOrder", () => {
+  it("aggregates total/open per work order", () => {
+    const map = deliverableCountsByWorkOrder([
+      { work_order_id: "wo1", completed: true, status: "done" },
+      { work_order_id: "wo1", completed: false, status: "open" },
+      { work_order_id: "wo2", completed: false, status: "partial" },
+    ]);
+    expect(map.get("wo1")).toEqual({ total: 2, open: 1 });
+    expect(map.get("wo2")).toEqual({ total: 1, open: 1 });
+    // A WO absent from the (deliverable-filtered) task list has no counts —
+    // pricing/allowance rows never make task_open positive.
+    expect(map.get("wo3")).toBeUndefined();
   });
 });
 
