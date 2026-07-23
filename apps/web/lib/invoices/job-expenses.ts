@@ -515,48 +515,6 @@ export async function appendMaterialsFromJobExpenses(
   return { lineItems, skipped: 0 };
 }
 
-/** Replace all job-sourced material + handling lines on a draft invoice. */
-export async function refreshJobMaterialsOnInvoice(
-  client: PoolClient,
-  invoiceId: string,
-  accountId: string,
-  jobId: string,
-): Promise<{ lineItems: InvoiceLineItemRow[] }> {
-  await client.query(
-    `DELETE FROM invoice_line_items
-     WHERE invoice_id = $1
-       AND (
-         source_expense_id IS NOT NULL
-         OR (
-           line_item_type = 'handling_fee'
-           AND description LIKE 'Material handling (%'
-         )
-       )`,
-    [invoiceId],
-  );
-
-  const expenses = await fetchUninvoicedJobMaterialExpenses(client, accountId, jobId);
-
-  const lineItems: InvoiceLineItemRow[] = [];
-  let sortOrder = await client.query<{ next: number }>(
-    `SELECT COALESCE(MAX(sort_order), -1) + 1 AS next
-     FROM invoice_line_items WHERE invoice_id = $1`,
-    [invoiceId],
-  );
-  let order = sortOrder.rows[0]?.next ?? 0;
-
-  for (const expense of expenses) {
-    const added = await appendExpenseMaterialLines(client, invoiceId, accountId, expense, order);
-    lineItems.push(...added.lineItems);
-    order = added.nextOrder;
-  }
-
-  const handling = await upsertMaterialHandlingFeeLine(client, invoiceId, accountId);
-  if (handling) lineItems.push(handling);
-
-  return { lineItems };
-}
-
 export async function materialLineItemsFromJobExpenses(
   client: PoolClient,
   accountId: string,
