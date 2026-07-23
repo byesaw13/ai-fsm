@@ -95,7 +95,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-070**.
+Next available ID: **TASK-076**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -167,6 +167,11 @@ Next available ID: **TASK-070**.
 | TASK-067 | Visit Timeline | 007 | Proposed |
 | TASK-068 | Payment Provider Model & Enriched Recorder | 004 | In Progress |
 | TASK-069 | Square Card Payments | 004 | Proposed |
+| TASK-071 | Set a deposit on any invoice (Square-style single invoice) | 004 | In Progress |
+| TASK-072 | Per-task time capture via AI Daily Recap | 008 | Done |
+| TASK-073 | AI task decomposition | 008 | Done |
+| TASK-074 | My Work — "Next action" + stale-state prompts | 006 | Proposed |
+| TASK-075 | Field workflow — fewer taps job → materials → invoice → closeout | 006 | Proposed |
 
 ## Status legend
 
