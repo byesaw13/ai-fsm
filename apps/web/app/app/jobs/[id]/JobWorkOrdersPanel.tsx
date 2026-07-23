@@ -16,6 +16,9 @@ export interface JobWorkOrderRow {
   status: string;
   visit_count: number;
   active_visit_count: number;
+  /** Deliverable tasks on this WO (optional for older callers) */
+  task_total?: number;
+  task_open?: number;
 }
 
 interface JobWorkOrdersPanelProps {
@@ -60,9 +63,15 @@ export function JobWorkOrdersPanel({ jobId, workOrders, canManage }: JobWorkOrde
           wo.active_visit_count > 0 && wo.status !== "dispatched" && wo.status !== "completed"
             ? " · In Progress"
             : "";
+        const taskTotal = wo.task_total ?? 0;
+        const taskOpen = wo.task_open ?? 0;
+        const taskDone = Math.max(0, taskTotal - taskOpen);
+        const emptyCalendar =
+          wo.visit_count > 0 && taskOpen === 0 && taskTotal === 0;
         return (
           <div
             key={wo.id}
+            data-testid={`job-work-order-row-${wo.id}`}
             style={{
               display: "flex",
               justifyContent: "space-between",
@@ -82,7 +91,14 @@ export function JobWorkOrdersPanel({ jobId, workOrders, canManage }: JobWorkOrde
               <p style={{ margin: "2px 0 0", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
                 {statusLabel}
                 {derived}
-                {wo.visit_count > 0 ? ` · ${wo.visit_count} visit${wo.visit_count !== 1 ? "s" : ""}` : ""}
+                {wo.visit_count > 0
+                  ? ` · ${wo.visit_count} visit${wo.visit_count !== 1 ? "s" : ""}`
+                  : ""}
+                {taskTotal > 0
+                  ? ` · ${taskDone}/${taskTotal} tasks (${taskOpen} open)`
+                  : emptyCalendar
+                    ? " · no tasks"
+                    : ""}
               </p>
             </div>
             {canManage && wo.status !== "draft" && (
