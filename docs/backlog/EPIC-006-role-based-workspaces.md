@@ -78,6 +78,15 @@ toggle). Rename the owner "Today" nav label to "Dashboard".
 
 ## Tasks
 
+> **Superseded plan (2026-07):** TASK-028–032 below were built around extracting
+> a shared `WorkdayPanel` as the field-workday home. That architecture never
+> mounted — the field home became **My Work** (`apps/web/app/app/my-work/`) via
+> TASK-058/059 and TASK-038 (Done), and the never-rendered `WorkdayPanel.tsx` +
+> `BusinessDayBar.tsx` were removed in the discoverability pass (PR #533). Treat
+> TASK-028–032 as historical: the *goal* (field UI out of the owner dashboard,
+> owner can act-as-tech) shipped through My Work, not the panel. New field-cockpit
+> work lives in TASK-074/075 below. TASK-028–032 need reconciliation (mark Done or
+> rewrite against My Work) — tracked as doc hygiene, not new build.
 
 # TASK-028: Phase 0 — Extract WorkdayPanel (pure refactor)
 
@@ -207,6 +216,100 @@ Acceptance Criteria:
 Notes:
 Refines the owner-dashboard-centric assumption in TASK-030/031/032: the owner's
 daily home is now My Day, not `/app`. Evidence basis for the broader cleanup is the June 2026 recovery fact-check retained in git history.
+
+# TASK-074: My Work — "Next action" + stale-state prompts
+
+Status:
+Proposed
+
+Phase:
+1
+
+Problem:
+My Work shows the field user's *current* state (clock, running activity, vehicle)
+via `FieldRightNowCard` / `ClockBar` / `VehicleRow`, but never tells them what to
+do next, and never flags when the state looks wrong. The two costly field mistakes
+go uncaught: a time-clock left running after the last visit (inflated payroll) and
+a stretch of worked time with no activity attached (lost billable). "What now?" is
+reconstructed in the user's head every time.
+
+Business Value:
+One glance answers "what's the next tap," and the app catches the clock-left-running
+and untracked-time mistakes before they reach payroll or an invoice. This is the
+field-surface realization of TASK-056's "power proactive prompts" — put on the
+screen where the field user actually is.
+
+Scope:
+- Consume the Current Operations State read model (`lib/operations/state.ts`:
+  `getCurrentOperationsState` + `deriveValidTransitions`) on My Work.
+- Render a single **"Next: <action>"** affordance from the legal transitions the
+  read model already returns (surface, don't auto-execute).
+- Render a calm, non-nagging **stale hint** past a tunable threshold: clocked-in
+  with no activity change for N minutes; an activity running with no assignment.
+  One constant, easy to tune from real field use.
+- Prefer the server-load path (My Work is server-rendered — call the lib directly).
+  Only reinstate an HTTP read route if a live client-side poll is proven necessary
+  (the unused `/api/v1/operations/state` wrapper was removed in PR #533 and can be
+  re-added thin).
+
+Out of Scope:
+- Auto-executing any transition (surface only).
+- The operational inbox UI (TASK-049); presence signals (TASK-057); persisting
+  state history.
+
+Acceptance Criteria:
+- [ ] My Work shows the next legal action derived from the live ops state.
+- [ ] A stale-clock / stale-activity hint appears past a tunable threshold and
+      clears when the user resolves it.
+- [ ] The next-action + stale derivation is a pure, unit-tested rule.
+- [ ] Nothing auto-mutates; every prompt is a one-tap the user confirms.
+
+Notes:
+Phase 1 consumer of TASK-056 (EPIC-001). The read model and `deriveValidTransitions`
+unit tests already exist; this task is the field-surface wiring TASK-056 calls for.
+Field home is My Work, not the removed `WorkdayPanel` (see superseded note above).
+
+# TASK-075: Field workflow — fewer taps from job → materials → invoice → closeout
+
+Status:
+Proposed
+
+Phase:
+2
+
+Problem:
+Finishing work from My Work still means hopping between separate screens: log the
+materials on one page, find the job, open the invoice, then close the visit out.
+Every hop is taps and navigation done one-handed in the field, and each is a place
+a step gets dropped (materials never logged, a visit left un-closed).
+
+Business Value:
+Compresses the end-of-work path so the field user records materials and moves toward
+invoice/closeout without leaving the work context — fewer dropped steps, cleaner
+records, less re-work at the desk later.
+
+Scope:
+- From the active visit/work context on My Work, inline the next steps — log a
+  material, mark tasks/visit done, hand off to an invoice draft — as one-tap
+  actions in the same flow instead of separate destinations.
+- Reuse existing routes and actions (materials capture, visit completion, the
+  visit-completion → invoice-draft bridge). This is navigation/affordance
+  consolidation, not new backend.
+
+Out of Scope:
+- New billing logic or the estimate side.
+- Anything needing a new table or route (scope freeze — reuse existing surfaces).
+
+Acceptance Criteria:
+- [ ] From an in-progress visit on My Work, a field user logs a material and
+      completes the visit without navigating to a separate page.
+- [ ] The closeout → invoice-draft handoff is reachable in one tap from the visit.
+- [ ] No new tables or routes.
+
+Notes:
+Phase 2 (after Phases 0–1 are boringly reliable; respects the scope freeze by
+reusing existing surfaces). Field home is My Work (`apps/web/app/app/my-work/`,
+`MyDayMobileLayout`).
 
 ## Completed
 
