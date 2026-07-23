@@ -2,8 +2,8 @@ import { queryForSession } from "@/lib/db";
 import type { SessionPayload } from "@/lib/auth/session";
 import { businessToday } from "@/lib/operations/business-day";
 import { summarizeDayMileage, type VehicleSessionRow } from "@/lib/mileage/sessions";
-import type { OpenSession, VehicleOption } from "@/app/app/WorkdayPanel";
-import type { ActivityEntryDto } from "@/app/app/ActivityTracker";
+import type { OpenSession, VehicleOption } from "@/lib/my-work/field-day-types";
+import type { ActivityEntryDto } from "@/lib/my-work/field-day-types";
 
 export type FieldDayData = {
   todayLabel: string;

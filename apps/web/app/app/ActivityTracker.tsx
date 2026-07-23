@@ -13,16 +13,10 @@ import {
   type ActivityCategory,
   type AssignmentKind,
 } from "@ai-fsm/domain";
-import { summarizeDay, formatMinutes, formatElapsed, type DayEntry } from "@/lib/activities/summary";
+import { summarizeDay, formatMinutes, formatElapsed } from "@/lib/activities/summary";
+import type { ActivityEntryDto } from "@/lib/my-work/field-day-types";
 
-export type ActivityEntryDto = DayEntry & {
-  id: string;
-  entity_type: string | null;
-  entity_id: string | null;
-  assignment_kind: string | null;
-  labor_bucket: string | null;
-  note: string | null;
-};
+
 
 function assignmentLabel(entry: ActivityEntryDto | null): string | null {
   if (!entry) return null;

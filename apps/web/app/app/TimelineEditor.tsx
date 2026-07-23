@@ -8,7 +8,8 @@ import {
   ACTIVITY_TYPE_META,
   type ActivityType,
 } from "@ai-fsm/domain";
-import { DayTimeSummary, type ActivityEntryDto } from "./ActivityTracker";
+import { DayTimeSummary } from "./ActivityTracker";
+import type { ActivityEntryDto } from "@/lib/my-work/field-day-types";
 import {
   asTimelineEntry,
   proposeRebalance,

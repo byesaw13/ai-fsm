@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui";
 import { SUSPICIOUS_SESSION_MILES } from "@/lib/mileage/sessions";
-import type { OpenSession, VehicleOption } from "../WorkdayPanel";
+import type { OpenSession, VehicleOption } from "@/lib/my-work/field-day-types";
 
 function fmtOdo(n: number | null | undefined): string {
   return n == null ? "—" : n.toLocaleString();

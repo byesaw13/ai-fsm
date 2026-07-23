@@ -19,7 +19,7 @@ import {
 import { formatElapsed } from "@/lib/activities/summary";
 import { segmentConfidenceLevel } from "@/lib/location/segment-confidence";
 import { SegmentLinkModal } from "@/components/field/SegmentLinkModal";
-import type { ActivityEntryDto } from "./ActivityTracker";
+import type { ActivityEntryDto } from "@/lib/my-work/field-day-types";
 
 type Segment = {
   id: string;

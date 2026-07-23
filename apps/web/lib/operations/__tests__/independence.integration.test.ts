@@ -11,6 +11,7 @@
  *   TEST_DATABASE_URL=postgresql://... TEST_BASE_URL=http://localhost:3000 pnpm test
  */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { Client } from "pg";
 
 const RUN_INTEGRATION = !!process.env.TEST_DATABASE_URL && !!process.env.TEST_BASE_URL;
 const BASE_URL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
@@ -30,7 +31,22 @@ describe.skipIf(!RUN_INTEGRATION)("Operations Engine — lifecycle independence"
 
   const isClockedIn = async () => !!(await api("GET", "/api/v1/time-clock/current")).json.data;
   const activeActivity = async () => (await api("GET", "/api/v1/activities/today")).json.data?.active ?? null;
-  const currentDay = async () => (await api("GET", "/api/v1/business-day/current")).json.data ?? null;
+  // Direct DB read — the business-day read route was deleted (no UI consumer);
+  // the transition endpoint under test is exercised via HTTP as before.
+  const currentDay = async (): Promise<{ id: string; status: string } | null> => {
+    const client = new Client({ connectionString: process.env.TEST_DATABASE_URL });
+    await client.connect();
+    try {
+      const { rows } = await client.query(
+        `SELECT bd.id, bd.status FROM business_days bd
+         JOIN users u ON u.id = bd.user_id AND u.email = 'owner@test.com'
+         ORDER BY bd.business_date DESC, bd.created_at DESC LIMIT 1`,
+      );
+      return rows[0] ?? null;
+    } finally {
+      await client.end();
+    }
+  };
 
   beforeAll(async () => {
     const res = await fetch(`${BASE_URL}/api/v1/auth/login`, {
