@@ -77,8 +77,8 @@ describe.skipIf(!RUN)("invoice labor bridge — activity_entries source of truth
 
   async function mkVisit(jobId: string): Promise<string> {
     const r = await client.query<{ id: string }>(
-      `INSERT INTO visits (account_id, job_id, scheduled_start, scheduled_end)
-       VALUES ($1,$2, now(), now() + interval '1 hour') RETURNING id`,
+      `INSERT INTO visits (account_id, job_id, scheduled_start, scheduled_end, visit_type)
+       VALUES ($1,$2, now(), now() + interval '1 hour', 'site_visit') RETURNING id`,
       [ACCOUNT, jobId],
     );
     return r.rows[0].id;
@@ -152,10 +152,14 @@ describe.skipIf(!RUN)("invoice labor bridge — activity_entries source of truth
     // Job B: a separate segment (200 min) — proves job scoping in the bridge.
     await jobWorkOnVisit(visitB, "2026-03-11T08:00:00Z", 200);
 
+    // Job A also has direct job-linked job_work (70 min) — the ledger
+    // unification made job/visit/work_order attribution equally billable,
+    // so this COUNTS (job A total: 125 visit-linked + 70 job-linked = 195).
+    await noiseActivity({ activity_type: "job_work", entity_type: "job", entity_id: jobA, startISO: "2026-03-10T16:00:00Z", min: 70 });
+
     // Noise on Job A's visit that the bridge MUST exclude:
     await noiseActivity({ activity_type: "travel", entity_type: "visit", entity_id: visitA, startISO: "2026-03-10T10:40:00Z", min: 60 }); // wrong verb
     await noiseActivity({ activity_type: "job_work", entity_type: "visit", entity_id: visitA, startISO: "2026-03-10T15:00:00Z", min: 45, voided: true }); // voided
-    await noiseActivity({ activity_type: "job_work", entity_type: "job", entity_id: jobA, startISO: "2026-03-10T16:00:00Z", min: 70 }); // job-linked, not visit-linked
   });
 
   afterAll(async () => {
@@ -166,9 +170,9 @@ describe.skipIf(!RUN)("invoice labor bridge — activity_entries source of truth
 
   const cc = () => client as unknown as PoolClient;
 
-  it("job A: sums only its job_work-on-visit time (noise excluded)", async () => {
+  it("job A: sums its job_work time across attributions (noise excluded)", async () => {
     const minutes = await trackedLaborMinutesFromActivityEntries(cc(), ACCOUNT, jobA);
-    expect(minutes).toBe(125); // travel / voided / job-linked all excluded
+    expect(minutes).toBe(195); // 125 visit-linked + 70 job-linked; travel + voided excluded
   });
 
   it("job A: billed labor cents derive from the bridge minutes", async () => {
@@ -182,10 +186,10 @@ describe.skipIf(!RUN)("invoice labor bridge — activity_entries source of truth
     // that altered billed labor would change these numbers and fail here.
     const { lineItem, tracked_minutes, billable_hours } =
       await upsertLaborLineFromTrackedTime(cc(), invoiceA, ACCOUNT, jobA);
-    expect(tracked_minutes).toBe(125);
-    expect(billable_hours).toBe(roundedQuarterHoursFromMinutes(125));
+    expect(tracked_minutes).toBe(195);
+    expect(billable_hours).toBe(roundedQuarterHoursFromMinutes(195));
     expect(lineItem.line_item_type).toBe("labor");
-    expect(lineItem.total_cents).toBe(trackedLaborCents(125));
+    expect(lineItem.total_cents).toBe(trackedLaborCents(195));
   });
 
   it("job B: scoping holds — the bridge counts only its own job's time", async () => {

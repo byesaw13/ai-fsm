@@ -129,22 +129,40 @@ describe.skipIf(!RUN)("completeAssessmentCascade (integration)", () => {
   });
 
   it("completes a scheduled site visit (Joseph Legerstee pattern)", async () => {
+    // The visits transition trigger forbids rewinding completed → scheduled,
+    // so this pattern gets its own fresh scheduled visit.
+    const fresh = await client.query<{ id: string }>(
+      `INSERT INTO visits (account_id, job_id, scheduled_start, scheduled_end, visit_type, status)
+       VALUES ($1,$2, now(), now() + interval '1 hour', 'site_visit', 'scheduled')
+       RETURNING id`,
+      [ACCOUNT, jobId],
+    );
+    const scheduledVisitId = fresh.rows[0].id;
     await client.query(
-      `UPDATE visits SET status = 'scheduled', completed_at = NULL WHERE id = $1`,
-      [visitId],
+      `INSERT INTO site_visit_assessments (visit_id, account_id, rooms, scope_notes, created_by)
+       VALUES ($1, $2, $3, 'Joseph pattern scope', $4)`,
+      [
+        scheduledVisitId,
+        ACCOUNT,
+        JSON.stringify([{ id: "room-1", name: "Living Room", length_ft: 12, width_ft: 14 }]),
+        OWNER,
+      ],
     );
 
     await completeAssessmentCascade(poolClient(), {
-      visitId,
+      visitId: scheduledVisitId,
       accountId: ACCOUNT,
       userId: OWNER,
       traceId: "aaaaaaaa-bbbb-cccc-dddd-111111111111",
       assessmentCompletedAt: assessmentCompletedAt,
     });
 
-    const visit = await visitStatus();
-    expect(visit.status).toBe("completed");
-    expect(new Date(visit.completed_at!).toISOString()).toBe(assessmentCompletedAt);
+    const r = await client.query<{ status: string; completed_at: Date | null }>(
+      `SELECT status, completed_at FROM visits WHERE id = $1`,
+      [scheduledVisitId],
+    );
+    expect(r.rows[0].status).toBe("completed");
+    expect(new Date(r.rows[0].completed_at!).toISOString()).toBe(assessmentCompletedAt);
     expect(await jobStatus()).toBe("draft");
   });
 
