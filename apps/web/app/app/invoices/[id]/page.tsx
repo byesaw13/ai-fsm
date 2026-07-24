@@ -217,6 +217,8 @@ export default async function InvoiceDetailPage({
     squareEnabled = !!sq?.enabled && !!sq?.config.locationId && !!sq?.secrets.accessToken;
   }
   const canEditLineItems = canTransition && currentStatus === "draft";
+  // Travel charges are line items carrying the <!--travel-charge--> marker.
+  const hasTravelCharge = lineItems.some((li) => li.description.includes("<!--travel-charge-->"));
   const documentFilename = buildClientDocumentFilename({
     date: invoice.sent_at ?? invoice.created_at,
     clientName: invoice.client_name,
@@ -317,7 +319,7 @@ export default async function InvoiceDetailPage({
           </div>
         </div>
 
-        <div style={{ flex: 1, minWidth: 160 }}>
+        <div style={{ minWidth: 140 }}>
           <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 600, letterSpacing: "0.04em" }}>BALANCE DUE</div>
           <div
             style={{
@@ -391,7 +393,9 @@ export default async function InvoiceDetailPage({
               />
             )}
 
-            {canCreateInvoices(session.role) && (
+            {/* Show Travel when it can be edited (draft) or a travel charge exists.
+                Hides the empty "locked, no travel" card on finalized invoices. */}
+            {canCreateInvoices(session.role) && (canEditLineItems || hasTravelCharge) && (
               <TravelPanel
                 entityType="invoice"
                 entityId={invoice.id}
