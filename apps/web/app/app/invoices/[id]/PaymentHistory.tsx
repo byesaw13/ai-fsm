@@ -126,7 +126,9 @@ export function PaymentHistory({ invoiceId, invoiceStatus, role }: Props) {
 
   return (
     <>
-      <table className="line-items-table" data-testid="payment-history-table">
+      {/* Scroll wrapper: 8 columns overflow the card on phones — scroll, don't clip. */}
+      <div className="p7-table-wrapper">
+        <table className="line-items-table" data-testid="payment-history-table">
         <thead>
           <tr>
             <th>Date</th>
@@ -168,7 +170,8 @@ export function PaymentHistory({ invoiceId, invoiceStatus, role }: Props) {
             );
           })}
         </tbody>
-      </table>
+        </table>
+      </div>
 
       <ConfirmDialog
         open={confirmPaymentId !== null}
