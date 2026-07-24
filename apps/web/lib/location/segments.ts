@@ -28,10 +28,12 @@ import {
 } from "@ai-fsm/domain";
 
 /**
- * TASK-076: once a stop has a fix, a GPS ping within this radius is treated as
- * the same place — jitter no longer rewrites the pin or flips the label. A
- * genuine relocation arrives as a zone/activity transition, not a drifting
- * location_update. Tunable in one place.
+ * TASK-076: once a stop has a fix, a GPS ping within this radius is the same
+ * place — jitter no longer walks the stop's pin around. The label/zone still
+ * settle (the HA automation sends a delayed same-coords update to correct a
+ * stale drive-time address after parking); only the coordinate drift is
+ * suppressed. A genuine relocation arrives as a zone/activity transition or a
+ * fix beyond this radius. Tunable in one place.
  */
 export const STOP_ANCHOR_RADIUS_M = 40;
 
@@ -249,10 +251,11 @@ export function reduceLocationEvent(
           : NO_OP;
       }
       if (open.kind !== "stop") return NO_OP;
-      const nextLabel = stopLabel(ev);
-      // Anchor hysteresis (TASK-076): a ping within STOP_ANCHOR_RADIUS_M of the
-      // stop's existing fix is the same place — suppress coord/label drift, but
-      // still fill a label the stop doesn't have yet (first-fix enrichment).
+      // Anchor hysteresis (TASK-076): once a stop has a fix, a ping within
+      // STOP_ANCHOR_RADIUS_M is the same place — don't let jitter walk the pin.
+      // Label/zone still settle here (the HA automation sends a delayed
+      // same-coords update to correct a stale drive-time address after parking);
+      // only the coordinate drift is suppressed.
       const nearAnchor =
         open.latitude != null &&
         open.longitude != null &&
@@ -262,16 +265,18 @@ export function reduceLocationEvent(
           { latitude: open.latitude, longitude: open.longitude },
           { latitude: ev.latitude, longitude: ev.longitude },
         ) <= STOP_ANCHOR_RADIUS_M;
-      if (nearAnchor) {
-        return !open.placeLabel && nextLabel ? { updateOpen: { placeLabel: nextLabel } } : NO_OP;
-      }
       const patch: UpdateOpenSpec = {};
+      const nextLabel = stopLabel(ev);
       if (shouldRefreshStopLabel(open, nextLabel)) {
         patch.placeLabel = nextLabel;
       }
       if (!open.zone && ev.zone) patch.zone = ev.zone;
-      if ((open.latitude == null || !open.zone) && ev.latitude != null) patch.latitude = ev.latitude;
-      if ((open.longitude == null || !open.zone) && ev.longitude != null) patch.longitude = ev.longitude;
+      // Coords: fill when missing, refine a zone-less pin only on a real move
+      // (beyond the anchor radius). Within the radius the pin stays put.
+      if (!nearAnchor) {
+        if ((open.latitude == null || !open.zone) && ev.latitude != null) patch.latitude = ev.latitude;
+        if ((open.longitude == null || !open.zone) && ev.longitude != null) patch.longitude = ev.longitude;
+      }
       return Object.keys(patch).length > 0 ? { updateOpen: patch } : NO_OP;
     }
 

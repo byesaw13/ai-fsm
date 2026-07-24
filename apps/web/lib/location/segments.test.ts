@@ -140,12 +140,21 @@ describe("reduceLocationEvent — location_update", () => {
 
   // TASK-076: anchor hysteresis — a ping within STOP_ANCHOR_RADIUS_M (40m) of the
   // stop's fix is the same place. 0.0002° lat ≈ 22m (within); 0.001° ≈ 111m (beyond).
-  it("ignores jitter within the anchor radius (no pin/label drift)", () => {
+  it("anchors the pin: jitter within the radius does not move coords", () => {
+    const out = reduceLocationEvent(
+      stop({ placeLabel: "14 Oak St", latitude: 42.0, longitude: -71.0 }),
+      ev({ kind: "location_update", geocodedAddress: "14 Oak St", latitude: 42.0002, longitude: -71.0 }),
+    );
+    expect(out).toEqual({}); // same label, jitter coords suppressed
+  });
+
+  it("lets the label settle within the radius without moving the pin", () => {
+    // HA sends a delayed same-spot update to correct a stale drive-time address.
     const out = reduceLocationEvent(
       stop({ placeLabel: "14 Oak St", latitude: 42.0, longitude: -71.0 }),
       ev({ kind: "location_update", geocodedAddress: "16 Oak St", latitude: 42.0002, longitude: -71.0 }),
     );
-    expect(out).toEqual({});
+    expect(out.updateOpen).toEqual({ placeLabel: "16 Oak St" }); // label settles, pin stays
   });
 
   it("still updates when the stop genuinely moves beyond the anchor radius", () => {
