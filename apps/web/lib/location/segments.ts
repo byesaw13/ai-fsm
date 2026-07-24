@@ -19,12 +19,21 @@
  */
 
 import {
+  haversineMeters,
   suggestActivityForSegment,
   type ActivityType,
   type DetectedActivity,
   type LocationEventKind,
   type SegmentKind,
 } from "@ai-fsm/domain";
+
+/**
+ * TASK-076: once a stop has a fix, a GPS ping within this radius is treated as
+ * the same place — jitter no longer rewrites the pin or flips the label. A
+ * genuine relocation arrives as a zone/activity transition, not a drifting
+ * location_update. Tunable in one place.
+ */
+export const STOP_ANCHOR_RADIUS_M = 40;
 
 /** The currently-open segment, as the reducer needs to see it. */
 export interface OpenSegment {
@@ -240,8 +249,23 @@ export function reduceLocationEvent(
           : NO_OP;
       }
       if (open.kind !== "stop") return NO_OP;
-      const patch: UpdateOpenSpec = {};
       const nextLabel = stopLabel(ev);
+      // Anchor hysteresis (TASK-076): a ping within STOP_ANCHOR_RADIUS_M of the
+      // stop's existing fix is the same place — suppress coord/label drift, but
+      // still fill a label the stop doesn't have yet (first-fix enrichment).
+      const nearAnchor =
+        open.latitude != null &&
+        open.longitude != null &&
+        ev.latitude != null &&
+        ev.longitude != null &&
+        haversineMeters(
+          { latitude: open.latitude, longitude: open.longitude },
+          { latitude: ev.latitude, longitude: ev.longitude },
+        ) <= STOP_ANCHOR_RADIUS_M;
+      if (nearAnchor) {
+        return !open.placeLabel && nextLabel ? { updateOpen: { placeLabel: nextLabel } } : NO_OP;
+      }
+      const patch: UpdateOpenSpec = {};
       if (shouldRefreshStopLabel(open, nextLabel)) {
         patch.placeLabel = nextLabel;
       }

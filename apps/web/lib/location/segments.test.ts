@@ -137,6 +137,32 @@ describe("reduceLocationEvent — location_update", () => {
     const out = reduceLocationEvent(drive(), ev({ kind: "location_update", geocodedAddress: "14 Oak St" }));
     expect(out).toEqual({});
   });
+
+  // TASK-076: anchor hysteresis — a ping within STOP_ANCHOR_RADIUS_M (40m) of the
+  // stop's fix is the same place. 0.0002° lat ≈ 22m (within); 0.001° ≈ 111m (beyond).
+  it("ignores jitter within the anchor radius (no pin/label drift)", () => {
+    const out = reduceLocationEvent(
+      stop({ placeLabel: "14 Oak St", latitude: 42.0, longitude: -71.0 }),
+      ev({ kind: "location_update", geocodedAddress: "16 Oak St", latitude: 42.0002, longitude: -71.0 }),
+    );
+    expect(out).toEqual({});
+  });
+
+  it("still updates when the stop genuinely moves beyond the anchor radius", () => {
+    const out = reduceLocationEvent(
+      stop({ placeLabel: "14 Oak St", latitude: 42.0, longitude: -71.0 }),
+      ev({ kind: "location_update", geocodedAddress: "50 Elm St", latitude: 42.001, longitude: -71.0 }),
+    );
+    expect(out.updateOpen).toEqual({ placeLabel: "50 Elm St", latitude: 42.001, longitude: -71.0 });
+  });
+
+  it("still fills a missing label for an anchored stop even within the radius", () => {
+    const out = reduceLocationEvent(
+      stop({ placeLabel: null, latitude: 42.0, longitude: -71.0 }),
+      ev({ kind: "location_update", geocodedAddress: "14 Oak St", latitude: 42.0002, longitude: -71.0 }),
+    );
+    expect(out.updateOpen).toEqual({ placeLabel: "14 Oak St" });
+  });
 });
 
 describe("reduceLocationEvent — vehicle Bluetooth", () => {
