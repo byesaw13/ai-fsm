@@ -28,6 +28,10 @@ build-from-scratch.
 
 ## Architecture
 
+> **Historical (2026-06):** the `WorkdayPanel`/`DailyCommandCenter` design below was
+> superseded — the field home became My Work. See the reconciled TASK-028–032 (Done)
+> in Tasks for what actually shipped. Kept for context, not as current intent.
+
 - **Owner Dashboard** (`/app`) → business only: revenue, ops action-queue,
   management nav. (Keeps the existing action-queue + metrics from `page.tsx`.)
 - **My Day** (`/app/my-day`) → field only: workday actions, assigned work,
@@ -78,97 +82,76 @@ toggle). Rename the owner "Today" nav label to "Dashboard".
 
 ## Tasks
 
-> **Superseded plan (2026-07):** TASK-028–032 below were built around extracting
-> a shared `WorkdayPanel` as the field-workday home. That architecture never
-> mounted — the field home became **My Work** (`apps/web/app/app/my-work/`) via
-> TASK-058/059 and TASK-038 (Done), and the never-rendered `WorkdayPanel.tsx` +
-> `BusinessDayBar.tsx` were removed in the discoverability pass (PR #533). Treat
-> TASK-028–032 as historical: the *goal* (field UI out of the owner dashboard,
-> owner can act-as-tech) shipped through My Work, not the panel. New field-cockpit
-> work lives in TASK-074/075 below. TASK-028–032 need reconciliation (mark Done or
-> rewrite against My Work) — tracked as doc hygiene, not new build.
+> **TASK-028–032 reconciliation (2026-07).** These five tasks were a
+> `WorkdayPanel`-based decomposition of the owner↔field split. That plan was
+> overtaken: the field home became **My Work** (`apps/web/app/app/my-work/`,
+> `MyDayMobileLayout`) via TASK-038/058/059, `DailyCommandCenter.tsx` was removed,
+> and the never-mounted `WorkdayPanel.tsx` / `BusinessDayBar.tsx` were deleted as
+> dead code in PR #533. Each task's **outcome shipped** through My Work rather than
+> a shared panel — recorded per ID below (all Done, verified in code). No further
+> build here; new field-cockpit work is TASK-074/075.
 
-# TASK-028: Phase 0 — Extract WorkdayPanel (pure refactor)
+# TASK-028: Extract the field UI into a reusable surface
 
 Status:
-Proposed
+Done
 
 Phase:
 0
 
-Extract the field-workday UI (`start_day`/`work_day`/`end_day` tabs, vehicle +
-odometer, Start/End Day, switch/correct/discard, `NowBar`, mileage summary) from
-`DailyCommandCenter.tsx` into a new shared `WorkdayPanel.tsx`. The owner dashboard
-still renders it (no behavior change). Verify Start Day → drive → End Day
-end-to-end. No data-layer change.
+Done via My Work (reconciled — see note above). The field-workday UI (`ClockBar`,
+`FieldRightNowCard`, `StartMyDayWizard`, `VehicleRow`) lives in the My Work
+components, not duplicated in the owner dashboard. The literal
+`DailyCommandCenter → WorkdayPanel` extraction this task named is moot — both are
+gone (`WorkdayPanel` deleted in PR #533).
 
-Acceptance:
-- [ ] `WorkdayPanel` renders identically to today's field tabs.
-- [ ] No behavior/visual change on `/app`.
-- [ ] Start/End Day, vehicle switch, and Discard still work.
-
-# TASK-029: Phase 1 — My Day becomes the field home
+# TASK-029: Field home gains workday actions; owner can reach it
 
 Status:
-Proposed
+Done
 
 Phase:
 0
 
-Mount `WorkdayPanel` + activity + mileage in `MyDayView`; move the field queries
-(`openSession`, `vehicles`, `activityEntries`, mileage) into `my-day/page.tsx`;
-remove the `non-tech → /app` redirect; add "My Day" to owner/admin nav.
+Done via My Work. `/app/my-work` hosts start/end-day, activity, and vehicle; techs
+land there (`app/app/page.tsx` redirects `tech → /app/my-work`); owners reach it
+via the "My Day" nav item (`components/AppShell.tsx`, `NAV_MY_DAY`).
 
-Acceptance:
-- [ ] Owner can open `/app/my-day` and Start/End Day there.
-- [ ] Tech My Day gains the workday actions above the assigned-visits list.
-
-# TASK-030: Phase 2 — Slim the Owner Dashboard
+# TASK-030: Slim the owner dashboard to business-only
 
 Status:
-Proposed
+Done
 
 Phase:
 0
 
-Remove `WorkdayPanel`/activity/mileage from `/app`; keep action-queue + revenue +
-material widgets; drop the field queries from `/app/page.tsx`; restyle as the
-management dashboard.
+Done. `OwnerDashboard.tsx` renders only Tomorrow's Plan, Financial Snapshot, and
+Quick Actions — no field widgets or field queries.
 
-Acceptance:
-- [ ] `/app` shows only business widgets; no field actions.
-- [ ] `/app/page.tsx` no longer fetches field data.
-
-# TASK-031: Phase 3 — Role routing & hardening
+# TASK-031: Role landing + tech URL guards
 
 Status:
-Proposed
+Done
 
 Phase:
 0
 
-Generalize landing (`owner/admin → /app`, `tech → /app/my-day`); add the header
-Dashboard ↔ My Day switch; close URL-level guards so techs can't reach business
-routes.
+Done. Landing routes by role; techs are redirected off business routes
+(`estimates`, `invoices`, `price-book` → `/app/my-work`; `reports` gated by
+`canViewReports`; `settings` shows techs only their profile) — the guards cite
+EPIC-006 in-code.
 
-Acceptance:
-- [ ] Each role lands on the correct default page.
-- [ ] A tech hitting a business URL is redirected to My Day.
-
-# TASK-032: Phase 4 — Owner widgets & polish
+# TASK-032: Owner widgets + role-aware mobile nav
 
 Status:
-Proposed
+Done
 
 Phase:
 0
 
-Owner widgets (invoice aging, technician productivity, open decisions), mobile
-bottom-bar updates per role, tests.
-
-Acceptance:
-- [ ] Owner dashboard has the management widgets.
-- [ ] Mobile bottom bar matches role.
+Done. Invoice aging and technician productivity are consolidated into Reports
+(`app/app/reports/sections/InvoiceAgingSection.tsx`, `TechnicianSection`) per
+TASK-038; `AppShell` renders a role-filtered nav plus a mobile bottom-bar subset.
 
 # TASK-038: Surface consolidation — one daily home, fewer overlapping dashboards
 
