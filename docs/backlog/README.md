@@ -95,7 +95,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-076**.
+Next available ID: **TASK-078**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -172,6 +172,8 @@ Next available ID: **TASK-076**.
 | TASK-073 | AI task decomposition | 008 | Done |
 | TASK-074 | My Work — "Next action" + stale-state prompts | 006 | Proposed |
 | TASK-075 | Field workflow — fewer taps job → materials → invoice → closeout | 006 | Proposed |
+| TASK-076 | Stop anchor stability — radius hysteresis on capture | 007 | Proposed |
+| TASK-077 | Auto-start the job on arrival at a scheduled customer (opt-in) | 007 | Proposed |
 
 ## Status legend
 
