@@ -476,10 +476,10 @@ unit-testable.
 # TASK-077: Auto-start the job on arrival at a scheduled customer (opt-in)
 
 Status:
-Proposed
+Deferred
 
 Phase:
-2
+1
 
 Problem:
 Arrival at a matched customer only ever creates a *pending* `visit_candidate`
@@ -523,12 +523,15 @@ Acceptance Criteria:
       `job_work` entry is already open.
 
 Notes:
-Phase 2 (deferred): this crosses the operations "surface, don't act" default
-(`docs/canonical/OPERATIONS.md`), so it waits until the confidence signal is trusted
-in real use — property coords are learned from confirmations (TASK-041), so early
+Phase 1 (field execution, per the ROADMAP phase→epic mapping) but **Deferred**:
+EPIC-007 is maintain-only under the Phase-1 scope freeze, and this is new
+automation that crosses the operations "surface, don't act" default
+(`docs/canonical/OPERATIONS.md`). Held until the confidence signal is trusted in
+real use — property coords are learned from confirmations (TASK-041), so early
 matches are schedule-only — and the operations engine (EPIC-001) is boring. The
-automatic form of TASK-045; gated + opt-in + reversible by design so a false
-auto-start never silently dirties payroll/billable.
+`Deferred` status, not the phase, is what says "not yet." The automatic form of
+TASK-045; gated + opt-in + reversible by design so a false auto-start never
+silently dirties payroll/billable.
 
 ## Completed
 
