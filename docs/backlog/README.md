@@ -126,11 +126,11 @@ Next available ID: **TASK-076**.
 | TASK-025 | Bluetooth-Triggered Vehicle-Aware Auto-Mileage | 007 | Done |
 | TASK-026 | Day Map (stops + drive routes) | 007 | Done |
 | TASK-027 | Hybrid Tracking (manual mileage, auto time) | 007 | Done |
-| TASK-028 | Phase 0 — Extract WorkdayPanel | 006 | Proposed |
-| TASK-029 | Phase 1 — My Day becomes the field home | 006 | Proposed |
-| TASK-030 | Phase 2 — Slim the Owner Dashboard | 006 | Proposed |
-| TASK-031 | Phase 3 — Role routing & hardening | 006 | Proposed |
-| TASK-032 | Phase 4 — Owner widgets & polish | 006 | Proposed |
+| TASK-028 | Owner ↔ field role split (reconciled) | 006 | Done |
+| TASK-029 | Owner ↔ field role split (reconciled) | 006 | Done |
+| TASK-030 | Owner ↔ field role split (reconciled) | 006 | Done |
+| TASK-031 | Owner ↔ field role split (reconciled) | 006 | Done |
+| TASK-032 | Owner ↔ field role split (reconciled) | 006 | Done |
 | TASK-033 | Read-Only Business MCP Server | 005 | Done |
 | TASK-034 | MCP Non-Superuser RLS Verification | 005 | Proposed |
 | TASK-035 | MCP Write Tools v1 (operations writes) | 001 | Proposed |
