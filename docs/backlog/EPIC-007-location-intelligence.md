@@ -423,6 +423,116 @@ Notes:
 Builds on TASK-066. Becomes more valuable as production history accumulates —
 feeds the Production Intelligence learning loop (EPIC-008) later.
 
+# TASK-076: Stop anchor stability — radius hysteresis on capture
+
+Status:
+Proposed
+
+Phase:
+1
+
+Problem:
+The segmentation reducer (`reduceLocationEvent`, `apps/web/lib/location/segments.ts`)
+has no radius hysteresis — it reacts only to discrete event kinds. For a zone-less
+GPS stop, every `location_update` overwrites the stop's `latitude`/`longitude` and
+can re-flip `place_label` (the `location_update` case, ~L245–251). So GPS jitter
+while parked walks the stop's pin around and flickers the geocoded address
+("123 Main St" ↔ "125 Main St"). Minor location noise is recorded as movement.
+
+Business Value:
+A parked stop stays anchored to where you actually parked; the pin and address
+stop drifting. That means less review noise and — because a property's coordinates
+are *learned from confirmed stops* (TASK-041) — more trustworthy coords feeding the
+customer-matching engine.
+
+Scope:
+- In the `location_update` case, when the open stop already has anchor coords,
+  compute `haversineMeters(anchor, incoming)` (helper already in `packages/domain`)
+  and treat anything within a small radius (`STOP_ANCHOR_RADIUS_M`, ~40 m; one
+  tunable constant) as no movement → `NO_OP`, skipping the coord/label rewrite.
+- Keep first-fix enrichment: a stop still missing coords/label is still filled by
+  the first usable update; the debounce only applies once anchored.
+- Optional: the same displacement guard before an `activity_change: still →
+  in_vehicle` opens a drive, so a parked activity flicker doesn't spawn a churn
+  drive (`classifyDrive` dismisses that noise post-hoc; this prevents the row).
+
+Out of Scope:
+- A stop that genuinely relocates (a block over) — that still becomes a new stop
+  via a zone/activity transition, unchanged.
+- Drive distance math (`pathDistanceMeters`/`haversineMeters` on drive close).
+
+Acceptance Criteria:
+- [ ] Repeated `location_update` pings within the radius of an anchored stop do
+      not change its lat/long or `place_label`.
+- [ ] A stop still missing coords/label is still enriched by the first usable update.
+- [ ] The radius is a single tunable constant; the guard is unit-tested in
+      `segments.test.ts` (jitter within radius = `NO_OP`; a real move = update).
+
+Notes:
+Phase 1 maintenance of TASK-024 capture (the freeze permits maintenance, not scope
+expansion). Reuses `haversineMeters`; no migration. Pure-reducer change, so fully
+unit-testable.
+
+# TASK-077: Auto-start the job on arrival at a scheduled customer (opt-in)
+
+Status:
+Deferred
+
+Phase:
+1
+
+Problem:
+Arrival at a matched customer only ever creates a *pending* `visit_candidate`
+(`detectVisitCandidate` in `app/api/internal/location/route.ts`) — nothing starts a
+job clock. If the owner forgets to tap "I'm at customer site" (TASK-045) or start
+the visit, no `job_work` time is captured for the on-site stretch; it's
+reconstructed later from the review card.
+
+Business Value:
+The clock starts itself when you arrive at a scheduled customer, so forgetting to
+tap doesn't lose billable/payroll time. The automatic sibling of TASK-045's manual
+override.
+
+Scope:
+- When `detectVisitCandidate` produces a top match that is (a) tied to a visit
+  scheduled today or an open job at that property, (b) above a **high** auto-start
+  confidence threshold (stricter than `VISIT_CONFIDENCE_FLOOR`, distance-proven),
+  and (c) a workday is active with no `job_work` activity currently open, insert a
+  `job_work` `activity_entry` bound to `top.jobId`/`visitId` and flip the visit →
+  `arrived`. Reuse the existing activity-entry write path.
+- Behind an account setting, **default OFF**: "Auto-start the job when I arrive at
+  a scheduled customer."
+- Fully reversible: the existing candidate-review / activity-correction flow can
+  void or reassign an auto-started entry; the write carries an audit reason
+  ("auto-started from arrival").
+
+Out of Scope:
+- Auto-start on schedule-only matches (no distance proof) or unscheduled drive-bys
+  — too risky; those stay pending candidates.
+- Auto-*closing* the job on departure (departure already closes the stop; closing
+  the clock is its own decision).
+- Auto-mileage (TASK-027).
+
+Acceptance Criteria:
+- [ ] With the setting on, arriving at a scheduled customer (high-confidence,
+      distance-proven) starts a `job_work` entry on that job with no tap; the visit
+      shows `arrived`.
+- [ ] With the setting off (default), behavior is unchanged (pending candidate only).
+- [ ] An auto-started entry is reversible and carries an audit reason.
+- [ ] Never auto-starts on a schedule-only or low-confidence match, or when a
+      `job_work` entry is already open.
+
+Notes:
+Phase 1 (field execution, per the ROADMAP phase→epic mapping) but **Deferred**:
+EPIC-007 is maintain-only under the Phase-1 scope freeze, and this is new
+automation that crosses the operations "surface, don't act" default
+(`docs/canonical/OPERATIONS.md`). Held until the confidence signal is trusted in
+real use — property coords are learned from confirmations (TASK-041), so early
+matches are schedule-only — and the operations engine (EPIC-001) is boring. The
+`Deferred` status, not the phase, is what says "not yet." The automatic form of
+TASK-045; gated + opt-in + reversible by design so a false auto-start never
+silently dirties payroll/billable.
+
 ## Completed
 
 - [TASK-024: Passive location-based activity capture](../archive/backlog-done/TASK-024-passive-location-capture.md)
