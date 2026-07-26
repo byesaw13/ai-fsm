@@ -48,14 +48,36 @@ export function preSelectCandidates<T extends ScoredCandidate>(
 export type MileageDeltaResult = {
   deltaPercent: number | null;
   flagged: boolean;
+  /**
+   * "diverged" — GPS and odometer both have data and disagree (worth a look).
+   * "no_gps_coverage" — GPS captured too little to cross-check; the odometer
+   * stands, and this is informational, not an alarm.
+   * "ok" — they agree. null — no odometer to compare.
+   */
+  reason: "diverged" | "no_gps_coverage" | "ok" | null;
 };
 
-/** Compares GPS-estimated miles to odometer miles; flags if delta > 20%. */
+/**
+ * TASK-080: below this many GPS miles, GPS is treated as "didn't capture the
+ * trip" — not a disagreement with the odometer. Sparse drive points (short local
+ * hops with no GPS trail) produce ~0 GPS miles, which must not read as "100% off".
+ */
+export const GPS_MIN_COVERAGE_MILES = 1;
+
+/**
+ * Compare GPS-estimated miles to odometer miles. Flags a real divergence (>20%),
+ * but treats "GPS captured essentially nothing" as no-coverage, not a mismatch —
+ * the odometer is the source of truth (hybrid tracking, TASK-027).
+ */
 export function checkMileageDelta(
   odometerMiles: number | null,
   gpsMiles: number,
 ): MileageDeltaResult {
-  if (odometerMiles == null) return { deltaPercent: null, flagged: false };
+  if (odometerMiles == null) return { deltaPercent: null, flagged: false, reason: null };
+  if (odometerMiles >= GPS_MIN_COVERAGE_MILES && gpsMiles < GPS_MIN_COVERAGE_MILES) {
+    return { deltaPercent: null, flagged: false, reason: "no_gps_coverage" };
+  }
   const deltaPercent = Math.round(Math.abs((gpsMiles - odometerMiles) / odometerMiles) * 100);
-  return { deltaPercent, flagged: deltaPercent > 20 };
+  const flagged = deltaPercent > 20;
+  return { deltaPercent, flagged, reason: flagged ? "diverged" : "ok" };
 }

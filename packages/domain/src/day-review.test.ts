@@ -77,4 +77,17 @@ describe("checkMileageDelta", () => {
     expect(result.flagged).toBe(false);
     expect(result.deltaPercent).toBeNull();
   });
+
+  // TASK-080: GPS captured nothing (~0 mi) is not a disagreement with the odometer.
+  it("treats near-zero GPS against a real odometer as no-coverage, not a mismatch", () => {
+    const result = checkMileageDelta(26, 0);
+    expect(result.flagged).toBe(false);
+    expect(result.reason).toBe("no_gps_coverage");
+    expect(result.deltaPercent).toBeNull();
+  });
+
+  it("tags a real divergence and an agreement with a reason", () => {
+    expect(checkMileageDelta(100, 130).reason).toBe("diverged");
+    expect(checkMileageDelta(100, 105).reason).toBe("ok");
+  });
 });
