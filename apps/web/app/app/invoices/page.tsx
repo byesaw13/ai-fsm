@@ -151,10 +151,13 @@ export default async function InvoicesPage() {
 
   const totalPaid = grouped.paid.reduce((sum, i) => sum + i.paid_cents, 0);
   const priorityInvoice = grouped.overdue[0] ?? grouped.partial[0] ?? grouped.sent[0] ?? null;
-  const priorityLabel = priorityInvoice
-    ? priorityInvoice.status === "overdue"
+  // Use the effective status so a due-on-completion invoice never drives an
+  // "overdue" call-to-action.
+  const priorityStatus = priorityInvoice ? effectiveInvoiceStatus(priorityInvoice) : null;
+  const priorityLabel = priorityStatus
+    ? priorityStatus === "overdue"
       ? "Collect overdue payment"
-      : priorityInvoice.status === "partial"
+      : priorityStatus === "partial"
         ? "Finish partial payment"
         : "Follow up on sent invoice"
     : null;

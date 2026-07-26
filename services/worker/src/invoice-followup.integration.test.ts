@@ -81,6 +81,7 @@ describe.skipIf(!shouldRun)("invoice-followup integration", () => {
       await client.query(`DELETE FROM audit_log WHERE account_id = $1`, [accountId]);
       await client.query(`DELETE FROM automations WHERE account_id = $1`, [accountId]);
       await client.query(`DELETE FROM invoices WHERE account_id = $1`, [accountId]);
+      await client.query(`DELETE FROM jobs WHERE account_id = $1`, [accountId]);
       await client.query(`DELETE FROM clients WHERE account_id = $1`, [accountId]);
       await client.query(`DELETE FROM users WHERE account_id = $1`, [accountId]);
       await client.query(`DELETE FROM accounts WHERE id = $1`, [accountId]);
@@ -110,6 +111,46 @@ describe.skipIf(!shouldRun)("invoice-followup integration", () => {
     expect(found).toBeDefined();
     expect(found!.invoice_number).toBe("INV-FU-001");
     expect(found!.client_name).toBe("Follow-Up Test Client");
+  });
+
+  it("TASK-078: skips a standard invoice on an OPEN job but keeps its deposit", async () => {
+    // An in-progress (open) job: the whole-job balance is "due on completion", so
+    // a standard/final invoice must NOT be dunned — but a deposit is due now and
+    // MUST stay eligible even on the same open job.
+    const jobRes = await client.query(
+      `INSERT INTO jobs (account_id, client_id, title, status, job_type, created_by)
+       VALUES ($1, $2, 'Open job', 'in_progress', 'custom', $3) RETURNING id`,
+      [accountId, clientEntityId, userId],
+    );
+    const openJobId = jobRes.rows[0].id;
+
+    const stdRes = await client.query(
+      `INSERT INTO invoices (account_id, client_id, job_id, invoice_number, invoice_kind, status,
+                             total_cents, paid_cents, due_date, created_by)
+       VALUES ($1, $2, $3, 'INV-FU-STD', 'standard', 'overdue', 50000, 0, now() - interval '10 days', $4)
+       RETURNING id`,
+      [accountId, clientEntityId, openJobId, userId],
+    );
+    const depRes = await client.query(
+      `INSERT INTO invoices (account_id, client_id, job_id, invoice_number, invoice_kind, status,
+                             total_cents, paid_cents, due_date, created_by)
+       VALUES ($1, $2, $3, 'INV-FU-DEP', 'deposit', 'overdue', 15000, 0, now() - interval '10 days', $4)
+       RETURNING id`,
+      [accountId, clientEntityId, openJobId, userId],
+    );
+
+    const automation: AutomationRow = {
+      id: automationId,
+      account_id: accountId,
+      type: "invoice_followup",
+      config: { days_overdue: [7, 14, 30] },
+      enabled: true,
+      next_run_at: new Date().toISOString(),
+    };
+    const invoices = await findOverdueInvoices(client, automation);
+    const ids = invoices.map((i) => i.id);
+    expect(ids).not.toContain(stdRes.rows[0].id); // whole-job balance: due on completion
+    expect(ids).toContain(depRes.rows[0].id); // deposit: due now, still dunned
   });
 
   it("emitInvoiceFollowup creates an audit_log entry", async () => {
