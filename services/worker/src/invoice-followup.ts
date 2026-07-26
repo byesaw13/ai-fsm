@@ -90,9 +90,14 @@ export async function findOverdueInvoices(
        AND i.status IN ('overdue', 'sent', 'partial')
        AND i.due_date IS NOT NULL
        AND i.due_date < now()
-       -- TASK-078: never dun while the job is still open — the balance is "due on
-       -- completion", so the client is not late even if a stamped due date passed.
-       AND (i.job_id IS NULL OR j.status NOT IN ('draft', 'quoted', 'scheduled', 'in_progress'))
+       -- TASK-078: never dun a whole-job (standard/final) invoice while the job is
+       -- still open — that balance is "due on completion". Deposit invoices ARE due
+       -- immediately, so they stay eligible even on an open job.
+       AND (
+         i.job_id IS NULL
+         OR i.invoice_kind = 'deposit'
+         OR j.status NOT IN ('draft', 'quoted', 'scheduled', 'in_progress')
+       )
      ORDER BY i.due_date ASC`,
     [automation.account_id]
   );
