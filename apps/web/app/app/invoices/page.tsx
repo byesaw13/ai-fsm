@@ -84,6 +84,21 @@ function isOpenBalance(status: InvoiceStatus): boolean {
   return status === "sent" || status === "partial" || status === "overdue" || status === "draft";
 }
 
+/**
+ * TASK-078: the status to group / count / prioritize by. A due-on-completion
+ * invoice is never "overdue" — its balance isn't due while the job is open — so
+ * an `overdue` row on an open job is reclassified to its underlying open state.
+ */
+function effectiveInvoiceStatus(inv: InvoiceRow): InvoiceStatus {
+  if (
+    inv.status === "overdue" &&
+    invoiceDueOnCompletion({ invoiceKind: inv.invoice_kind, jobStatus: inv.job_status })
+  ) {
+    return inv.paid_cents > 0 ? "partial" : "sent";
+  }
+  return inv.status;
+}
+
 export default async function InvoicesPage() {
   const session = await getSession();
   if (!session) redirect("/login");
@@ -121,12 +136,12 @@ export default async function InvoicesPage() {
     {}
   );
   for (const inv of invoices) {
-    grouped[inv.status]?.push(inv);
+    grouped[effectiveInvoiceStatus(inv)]?.push(inv);
   }
   const activeStatuses = STATUS_ORDER.filter((s) => grouped[s].length > 0);
 
   const totalOutstanding = invoices
-    .filter((i) => i.status === "sent" || i.status === "partial" || i.status === "overdue")
+    .filter((i) => ["sent", "partial", "overdue"].includes(effectiveInvoiceStatus(i)))
     .reduce((sum, i) => sum + (i.total_cents - i.paid_cents), 0);
 
   const totalOverdue = grouped.overdue.reduce(
