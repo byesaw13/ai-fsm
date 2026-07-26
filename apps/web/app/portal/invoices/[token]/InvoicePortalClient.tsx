@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { STANDARD_INVOICE_TERMS, resolveDepositPolicy, renderDepositTerms } from "@ai-fsm/domain";
+import { STANDARD_INVOICE_TERMS, resolveDepositPolicy, renderDepositTerms, invoiceDueOnCompletion } from "@ai-fsm/domain";
 import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
 import { PaidStamp } from "@/components/invoices/PaidStamp";
 
@@ -34,6 +34,8 @@ interface Invoice {
   property_zip: string | null;
   account_name: string;
   account_settings: { invoice_terms?: string; deposit_percent?: number; deposit_terms?: string };
+  invoice_kind: string;
+  job_status: string | null;
 }
 
 interface Props {
@@ -71,7 +73,14 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
     status === "paid" ||
     (invoice.total_cents > 0 && paidCents >= invoice.total_cents);
   const isVoid = status === "void";
-  const isOverdue = invoice.due_date && new Date(invoice.due_date) < new Date() && !isPaid && !isVoid;
+  // TASK-078: while the job is still open the balance is "due on completion" — the
+  // client is not overdue even if a stamped due date has passed.
+  const dueOnCompletion = invoiceDueOnCompletion({
+    invoiceKind: invoice.invoice_kind,
+    jobStatus: invoice.job_status,
+  });
+  const isOverdue =
+    !dueOnCompletion && invoice.due_date && new Date(invoice.due_date) < new Date() && !isPaid && !isVoid;
 
   // Redirect to the Square-hosted checkout page for the balance. On return, the
   // Square webhook updates the invoice; the client sees it reflected on reload.
@@ -132,6 +141,8 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
               <div style={{ marginTop: 2, color: "#166534", fontWeight: 700 }}>
                 Paid in full{paidDateLabel ? ` — ${paidDateLabel}` : ""}
               </div>
+            ) : dueOnCompletion ? (
+              <div style={{ marginTop: 2, color: "#57534e" }}>Due on completion</div>
             ) : invoice.due_date ? (
               <div style={{ marginTop: 2, color: isOverdue ? "#b91c1c" : "#57534e", fontWeight: isOverdue ? 600 : 400 }}>
                 Due {new Date(invoice.due_date).toLocaleDateString()} {isOverdue ? "— OVERDUE" : ""}

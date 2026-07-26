@@ -5,7 +5,7 @@ import type { AuthSession } from "../../../../../../lib/auth/middleware";
 import { getPool } from "../../../../../../lib/db";
 import { appendAuditLog } from "../../../../../../lib/db/audit";
 import { logger } from "../../../../../../lib/logger";
-import { jobTransitions, jobStatusSchema } from "@ai-fsm/domain";
+import { jobTransitions, jobStatusSchema, dueDateUponCompletion } from "@ai-fsm/domain";
 import type { JobStatus } from "@ai-fsm/domain";
 import { reviewJobIntakeGate } from "../../../../../../lib/jobs/intake-guard";
 import { createDraftFinalInvoiceForJob } from "../../../../../../lib/invoices/final-invoice";
@@ -139,6 +139,20 @@ export const POST = withRole(
             traceId: session.traceId,
           });
         }
+
+        // TASK-078: "due upon completion" — now that the job is complete, fill the
+        // due date on its standard/final invoices that were left open (NULL) while
+        // the work was in progress. The one-time NULL→value fill is allowed by the
+        // immutability trigger (migration 149). Deposits are excluded (due now).
+        await client.query(
+          `UPDATE invoices
+             SET due_date = $3::timestamptz, updated_at = now()
+           WHERE job_id = $1 AND account_id = $2
+             AND due_date IS NULL
+             AND invoice_kind IN ('standard', 'final')
+             AND status <> 'void'`,
+          [id, session.accountId, dueDateUponCompletion()],
+        );
       }
 
       // Finish the intake request as converted (not cancelled) when work is done.

@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import { canCreateInvoices } from "@/lib/auth/permissions";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import type { InvoiceStatus } from "@ai-fsm/domain";
+import { invoiceDueOnCompletion } from "@ai-fsm/domain";
 import {
   PageContainer,
   PageHeader,
@@ -34,6 +35,8 @@ interface InvoiceRow {
   last_viewed_at: string | null;
   view_count: number;
   client_name: string | null;
+  invoice_kind: string;
+  job_status: string | null;
   [key: string]: unknown;
 }
 
@@ -93,9 +96,11 @@ export default async function InvoicesPage() {
               i.subtotal_cents, i.tax_cents, i.total_cents, i.paid_cents,
               i.due_date, i.created_at, i.sent_at,
               i.first_viewed_at, i.last_viewed_at, i.view_count,
+              i.invoice_kind, j.status AS job_status,
               c.name AS client_name
        FROM invoices i
        LEFT JOIN clients c ON c.id = i.client_id
+       LEFT JOIN jobs j ON j.id = i.job_id
        WHERE i.account_id = $1
        ORDER BY 
          CASE i.status 
@@ -224,7 +229,13 @@ export default async function InvoicesPage() {
               {grouped[status].map((inv) => {
                 const amountDue = inv.total_cents - inv.paid_cents;
                 const open = isOpenBalance(inv.status);
-                const daysUntilDue = open ? getDaysUntilDue(inv.due_date) : null;
+                // TASK-078: an open job's balance is "due on completion" — never
+                // aging/overdue while the work is unfinished, even if a due date passed.
+                const dueOnCompletion = invoiceDueOnCompletion({
+                  invoiceKind: inv.invoice_kind,
+                  jobStatus: inv.job_status,
+                });
+                const daysUntilDue = open && !dueOnCompletion ? getDaysUntilDue(inv.due_date) : null;
                 const aging = formatAging(daysUntilDue);
                 // Past due_date alone must not mark paid/void invoices overdue
                 // (e.g. Gina INV-0019 paid same day but due_date still in the past).
@@ -235,9 +246,11 @@ export default async function InvoicesPage() {
                     ? "Paid"
                     : inv.status === "void"
                       ? "Void"
-                      : inv.due_date
-                        ? aging || `Due ${new Date(inv.due_date).toLocaleDateString()}`
-                        : null;
+                      : dueOnCompletion
+                        ? "Due on completion"
+                        : inv.due_date
+                          ? aging || `Due ${new Date(inv.due_date).toLocaleDateString()}`
+                          : null;
                 const unread = isInvoiceUnread({
                   status: inv.status,
                   sent_at: inv.sent_at,
