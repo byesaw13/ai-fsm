@@ -48,14 +48,42 @@ export function preSelectCandidates<T extends ScoredCandidate>(
 export type MileageDeltaResult = {
   deltaPercent: number | null;
   flagged: boolean;
+  /**
+   * "diverged" — GPS and odometer both have data and disagree (worth a look).
+   * "no_gps_coverage" — GPS captured too little to cross-check; the odometer
+   * stands, and this is informational, not an alarm.
+   * "ok" — they agree. null — no odometer to compare.
+   */
+  reason: "diverged" | "no_gps_coverage" | "ok" | null;
 };
 
-/** Compares GPS-estimated miles to odometer miles; flags if delta > 20%. */
+/**
+ * TASK-080: when GPS captured less than this fraction of the odometer distance,
+ * GPS "didn't really track the trip" (sparse drive points) — informational, not a
+ * disagreement. Relative (not a fixed mile floor) so it holds for a sub-mile trip
+ * too: odometer 0.5 mi + GPS 0 is still no-coverage, not "100% off".
+ */
+export const GPS_COVERAGE_FRACTION = 0.5;
+
+/**
+ * Compare GPS-estimated miles to odometer miles. Flags a real divergence (>20%),
+ * but treats "GPS captured essentially nothing" as no-coverage, not a mismatch —
+ * the odometer is the source of truth (hybrid tracking, TASK-027).
+ */
 export function checkMileageDelta(
   odometerMiles: number | null,
   gpsMiles: number,
 ): MileageDeltaResult {
-  if (odometerMiles == null) return { deltaPercent: null, flagged: false };
+  // No trip logged (null or zero odometer) → nothing to cross-check.
+  if (odometerMiles == null || odometerMiles <= 0) {
+    return { deltaPercent: null, flagged: false, reason: null };
+  }
+  // GPS captured well under the odometer distance → no usable cross-check; the
+  // odometer stands. Not a disagreement.
+  if (gpsMiles < GPS_COVERAGE_FRACTION * odometerMiles) {
+    return { deltaPercent: null, flagged: false, reason: "no_gps_coverage" };
+  }
   const deltaPercent = Math.round(Math.abs((gpsMiles - odometerMiles) / odometerMiles) * 100);
-  return { deltaPercent, flagged: deltaPercent > 20 };
+  const flagged = deltaPercent > 20;
+  return { deltaPercent, flagged, reason: flagged ? "diverged" : "ok" };
 }

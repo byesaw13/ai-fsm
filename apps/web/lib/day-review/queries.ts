@@ -50,6 +50,7 @@ export type DayReviewPayload = {
     gpsMiles: number;
     deltaPercent: number | null;
     flagged: boolean;
+    reason: "diverged" | "no_gps_coverage" | "ok" | null;
   };
 };
 
@@ -248,6 +249,7 @@ export async function getDayReview(
       gpsMiles: Math.round(gpsMiles * 10) / 10,
       deltaPercent: delta.deltaPercent,
       flagged: delta.flagged,
+      reason: delta.reason,
     },
   };
 }

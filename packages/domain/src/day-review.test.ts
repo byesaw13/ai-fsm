@@ -77,4 +77,34 @@ describe("checkMileageDelta", () => {
     expect(result.flagged).toBe(false);
     expect(result.deltaPercent).toBeNull();
   });
+
+  // TASK-080: GPS captured nothing (~0 mi) is not a disagreement with the odometer.
+  it("treats near-zero GPS against a real odometer as no-coverage, not a mismatch", () => {
+    const result = checkMileageDelta(26, 0);
+    expect(result.flagged).toBe(false);
+    expect(result.reason).toBe("no_gps_coverage");
+    expect(result.deltaPercent).toBeNull();
+  });
+
+  it("scales to sub-mile trips (relative coverage, not a fixed floor)", () => {
+    // odometer 0.5 mi + GPS 0 → still no-coverage (would be 100% off with a floor).
+    expect(checkMileageDelta(0.5, 0).reason).toBe("no_gps_coverage");
+    // GPS captured most of a sub-mile trip → a real comparison, agrees.
+    expect(checkMileageDelta(0.5, 0.45).reason).toBe("ok");
+  });
+
+  it("still flags when GPS has coverage but diverges", () => {
+    // GPS well above half the odometer, but 30% higher → real divergence.
+    expect(checkMileageDelta(10, 13).reason).toBe("diverged");
+    expect(checkMileageDelta(10, 13).flagged).toBe(true);
+  });
+
+  it("tags an agreement with reason ok", () => {
+    expect(checkMileageDelta(100, 105).reason).toBe("ok");
+  });
+
+  it("no trip (zero/null odometer) is not a cross-check", () => {
+    expect(checkMileageDelta(0, 0).reason).toBeNull();
+    expect(checkMileageDelta(null, 5).reason).toBeNull();
+  });
 });

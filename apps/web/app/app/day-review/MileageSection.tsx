@@ -23,11 +23,15 @@ export function MileageSection({ mileage }: { mileage: Mileage }) {
               <span className="text-sm text-muted-foreground">GPS estimate</span>
               <span className="text-sm font-medium">{mileage.gpsMiles} mi</span>
             </div>
-            {mileage.flagged && (
+            {mileage.reason === "no_gps_coverage" ? (
+              <p className="text-xs text-muted-foreground mt-3">
+                GPS didn&apos;t track this drive — using the odometer.
+              </p>
+            ) : mileage.flagged ? (
               <p className="text-xs text-yellow-600 mt-3">
                 GPS and odometer differ by {mileage.deltaPercent}% — worth a double-check.
               </p>
-            )}
+            ) : null}
           </>
         ) : (
           <p className="text-sm text-muted-foreground">No vehicle session recorded for this day.</p>
