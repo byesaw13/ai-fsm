@@ -308,6 +308,48 @@ export function dueDateUponCompletion(
   return new Date(utcMs).toISOString();
 }
 
+/**
+ * Job statuses whose work is not finished yet. An invoice tied to a job in one
+ * of these is "due on completion" — no due date until the job is marked complete.
+ * (Mirrors ACTIVE_JOB_STATUSES; kept as a literal here to avoid a module cycle.)
+ */
+const OPEN_JOB_STATUSES_FOR_BILLING = ["draft", "quoted", "scheduled", "in_progress"] as const;
+
+/**
+ * Under Dovetails' "due upon completion" terms, an invoice for the whole job is
+ * NOT due until the work is finished. True while the invoice is a standard/final
+ * invoice tied to a still-open job. Deposit invoices and jobless (ad-hoc) invoices
+ * are due now, so they are never "due on completion".
+ */
+export function invoiceDueOnCompletion(input: {
+  invoiceKind: string; // 'standard' | 'deposit' | 'final'
+  jobStatus: string | null | undefined;
+}): boolean {
+  if (input.invoiceKind === "deposit") return false;
+  return (
+    input.jobStatus != null &&
+    (OPEN_JOB_STATUSES_FOR_BILLING as readonly string[]).includes(input.jobStatus)
+  );
+}
+
+/**
+ * The due date to store when an invoice is issued. Null when it is "due on
+ * completion" (filled later when the job completes); otherwise the completion
+ * day (today). An explicit owner-provided due date always wins.
+ */
+export function resolveIssueDueDate(input: {
+  providedDueDate?: string | null;
+  invoiceKind: string;
+  jobStatus: string | null | undefined;
+  now?: Date | string | null;
+}): string | null {
+  if (input.providedDueDate) return input.providedDueDate;
+  if (invoiceDueOnCompletion({ invoiceKind: input.invoiceKind, jobStatus: input.jobStatus })) {
+    return null;
+  }
+  return dueDateUponCompletion(input.now ?? new Date());
+}
+
 export const ESTIMATE_DOCUMENT_SECTIONS = {
   preparation:
     "Preparation includes site protection, access setup, surface or work-area readiness, and confirming conditions before work begins.",

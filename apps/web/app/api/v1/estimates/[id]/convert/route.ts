@@ -9,7 +9,7 @@ import {
   ensureInvoiceTravelLinesFromSnapshot,
   getTravelSnapshot,
 } from "@/lib/travel/snapshots";
-import { dueDateUponCompletion } from "@ai-fsm/domain";
+import { resolveIssueDueDate } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -157,6 +157,18 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         ? `${estimate.notes ? `${estimate.notes}\n\n` : ""}${reconciliation.reconciliationNote}`
         : estimate.notes;
 
+      // TASK-078: due upon completion — a final invoice tied to an open job has no
+      // due date yet (filled when the job is marked complete).
+      const jobStatus = estimate.job_id
+        ? (
+            await client.query<{ status: string }>(
+              `SELECT status FROM jobs WHERE id = $1 AND account_id = $2`,
+              [estimate.job_id, session.accountId],
+            )
+          ).rows[0]?.status ?? null
+        : null;
+      const finalDueDate = resolveIssueDueDate({ invoiceKind: "final", jobStatus });
+
       const invoiceResult = await client.query<{ id: string }>(
         `INSERT INTO invoices
            (account_id, client_id, job_id, estimate_id, property_id,
@@ -180,7 +192,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           estimate.total_cents,
           reconciliation.depositCreditCents,
           finalNotes,
-          dueDateUponCompletion(), // due upon completion
+          finalDueDate, // TASK-078: null until job completes
           session.userId,
           estimate.travel_snapshot_id,
           estimate.travel_snapshot_id ? "estimated" : null,

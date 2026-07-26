@@ -85,10 +85,14 @@ export async function findOverdueInvoices(
             i.due_date::text, c.name AS client_name, c.email AS client_email
      FROM invoices i
      JOIN clients c ON c.id = i.client_id
+     LEFT JOIN jobs j ON j.id = i.job_id
      WHERE i.account_id = $1
        AND i.status IN ('overdue', 'sent', 'partial')
        AND i.due_date IS NOT NULL
        AND i.due_date < now()
+       -- TASK-078: never dun while the job is still open — the balance is "due on
+       -- completion", so the client is not late even if a stamped due date passed.
+       AND (i.job_id IS NULL OR j.status NOT IN ('draft', 'quoted', 'scheduled', 'in_progress'))
      ORDER BY i.due_date ASC`,
     [automation.account_id]
   );

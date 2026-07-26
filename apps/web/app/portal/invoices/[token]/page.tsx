@@ -29,6 +29,8 @@ interface InvoiceRow extends Record<string, unknown> {
   property_zip: string | null;
   account_name: string;
   account_settings: { invoice_terms?: string; deposit_percent?: number; deposit_terms?: string };
+  invoice_kind: string;
+  job_status: string | null;
 }
 
 interface LineItemRow extends Record<string, unknown> {
@@ -52,6 +54,7 @@ export default async function InvoicePortalPage({
        i.id, i.account_id, i.status, i.invoice_number, i.subtotal_cents, i.tax_cents,
        i.total_cents, i.paid_cents, i.deposit_cents, i.notes, i.due_date,
        i.paid_at, i.deposit_type, i.deposit_percentage, i.deposit_fixed_cents,
+       i.invoice_kind, j.status AS job_status,
        c.name AS client_name,
        p.address AS property_address, p.city AS property_city,
        p.state AS property_state, p.zip AS property_zip,
@@ -59,6 +62,7 @@ export default async function InvoicePortalPage({
      FROM invoices i
      JOIN clients c ON c.id = i.client_id
      JOIN accounts a ON a.id = i.account_id
+     LEFT JOIN jobs j ON j.id = i.job_id
      LEFT JOIN properties p ON p.id = i.property_id
      WHERE i.share_token = $1`,
     [token]

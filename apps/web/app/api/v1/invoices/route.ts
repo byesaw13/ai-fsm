@@ -4,7 +4,7 @@ import { withAuth, withRole } from "@/lib/auth/middleware";
 import { withInvoiceContext, generateInvoiceNumber } from "@/lib/invoices/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
-import { invoiceStatusSchema, dueDateUponCompletion } from "@ai-fsm/domain";
+import { invoiceStatusSchema, resolveIssueDueDate } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -178,8 +178,21 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
       const invoiceNumber = await generateInvoiceNumber(client, session.accountId);
 
-      // Payment terms: due upon completion — default to today when not provided.
-      const resolvedDueDate = due_date ?? dueDateUponCompletion();
+      // Payment terms: due upon completion (TASK-078). A standard invoice tied to
+      // an open job has no due date yet — it's filled when the job completes.
+      const jobStatus = job_id
+        ? (
+            await client.query<{ status: string }>(
+              `SELECT status FROM jobs WHERE id = $1 AND account_id = $2`,
+              [job_id, session.accountId],
+            )
+          ).rows[0]?.status ?? null
+        : null;
+      const resolvedDueDate = resolveIssueDueDate({
+        providedDueDate: due_date,
+        invoiceKind: "standard",
+        jobStatus,
+      });
 
       const result = await client.query<{ id: string }>(
         `INSERT INTO invoices

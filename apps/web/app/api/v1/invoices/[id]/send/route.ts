@@ -7,7 +7,7 @@ import { sendEmail, appUrl, isEmailConfigured } from "@/lib/email/mailer";
 import { invoiceEmailHtml, invoiceEmailText } from "@ai-fsm/email-templates";
 import { logCommunication } from "@/lib/communications-log";
 import { loadInvoicePdf } from "@/lib/pdf/load";
-import { dueDateUponCompletion } from "@ai-fsm/domain";
+import { dueDateUponCompletion, invoiceDueOnCompletion } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +19,11 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       const { rows, rowCount } = await client.query(
         `SELECT i.id, i.status, i.invoice_number, i.total_cents, i.balance_cents,
                 i.deposit_cents, i.due_date, i.notes, i.sent_at, i.paid_at, i.share_token,
+                i.invoice_kind, j.status AS job_status,
                 c.id AS client_id, c.name AS client_name, c.email AS client_email
          FROM invoices i
          JOIN clients c ON c.id = i.client_id
+         LEFT JOIN jobs j ON j.id = i.job_id
          WHERE i.id = $1 AND i.account_id = $2`,
         [id, session.accountId]
       );
@@ -33,6 +35,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         total_cents: number; balance_cents: number; deposit_cents: number;
         due_date: string | null; notes: string | null; sent_at: string | null;
         paid_at: string | null; share_token: string;
+        invoice_kind: string; job_status: string | null;
         client_id: string; client_name: string; client_email: string | null;
       };
 
@@ -137,10 +140,16 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       // the invoice has left draft (sent/partial/overdue/paid), so a re-send
       // or paid receipt must not touch it — the send is recorded via the
       // communications + audit log.
-      // Payment terms: due upon completion. Fill due_date if still missing
-      // (legacy auto-finals / manual creates that skipped it).
+      // Payment terms: due upon completion (TASK-078). A standard/final invoice
+      // tied to an open job stays due_date=NULL on send — it's "due on completion"
+      // and is filled when the job is marked complete. Deposits / jobless invoices
+      // are due now, so send fills their due_date if it was missing.
+      const dueOnCompletion = invoiceDueOnCompletion({
+        invoiceKind: inv.invoice_kind,
+        jobStatus: inv.job_status,
+      });
       if (inv.status === "draft") {
-        const dueDate = inv.due_date ?? dueDateUponCompletion();
+        const dueDate = dueOnCompletion ? null : inv.due_date ?? dueDateUponCompletion();
         await client.query(
           `UPDATE invoices
            SET status = 'sent', sent_at = now(), updated_at = now(),
@@ -148,8 +157,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
            WHERE id = $1`,
           [id, dueDate]
         );
-      } else if (!inv.due_date && ["sent", "partial", "overdue"].includes(inv.status)) {
-        // One-time fill when due_date was never set (allowed by migration 152).
+      } else if (!dueOnCompletion && !inv.due_date && ["sent", "partial", "overdue"].includes(inv.status)) {
+        // One-time fill when due_date was never set (allowed by migration 149).
         // Uses sent_at as completion day so aging matches payment terms.
         await client.query(
           `UPDATE invoices

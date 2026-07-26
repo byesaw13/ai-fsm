@@ -13,7 +13,7 @@ import {
   type DocumentLocationRow,
 } from "@/lib/documents/service-location";
 import { withInvoiceContext } from "@/lib/invoices/db";
-import { buildClientDocumentFilename, invoiceTransitions } from "@ai-fsm/domain";
+import { buildClientDocumentFilename, invoiceTransitions, invoiceDueOnCompletion } from "@ai-fsm/domain";
 import type { InvoiceStatus } from "@ai-fsm/domain";
 import { InvoiceTransitionForm } from "./InvoiceTransitionForm";
 import { RecordPaymentForm } from "./RecordPaymentForm";
@@ -81,6 +81,8 @@ interface InvoiceRow {
   client_name: string | null;
   client_email: string | null;
   job_title: string | null;
+  invoice_kind: string;
+  job_status: string | null;
 }
 
 interface LineItemRow {
@@ -120,7 +122,7 @@ export default async function InvoiceDetailPage({
 
   const result = await withInvoiceContext(session, async (client) => {
     const invoiceResult = await client.query(
-      `SELECT i.*, c.name AS client_name, c.email AS client_email, j.title AS job_title
+      `SELECT i.*, c.name AS client_name, c.email AS client_email, j.title AS job_title, j.status AS job_status
        FROM invoices i
        LEFT JOIN clients c ON c.id = i.client_id
        LEFT JOIN jobs j ON j.id = i.job_id
@@ -191,6 +193,12 @@ export default async function InvoiceDetailPage({
   // TODO: when payment logic migrates to balance_cents, switch this back
   // and update the callers.
   const amountDue = Math.max(0, invoice.total_cents - invoice.paid_cents);
+  // TASK-078: while the job is still open, the balance is "due on completion" —
+  // not past-due, not "owes now" — regardless of any stamped due_date.
+  const dueOnCompletion = invoiceDueOnCompletion({
+    invoiceKind: invoice.invoice_kind,
+    jobStatus: invoice.job_status,
+  });
   const depositPending = invoice.deposit_cents > 0 && !invoice.deposit_paid_at;
   const canMarkDeposit = canTransition && !["paid", "void"].includes(currentStatus);
   // Requested-deposit policy (first-payment model) — computed live from the total.
@@ -334,7 +342,11 @@ export default async function InvoiceDetailPage({
             {formatDollars(amountDue)}
           </div>
           {amountDue > 0 && currentStatus !== "draft" && (
-            <div style={{ fontSize: "var(--text-xs)", color: "var(--color-danger)", marginTop: 2 }}>Client owes this now</div>
+            dueOnCompletion ? (
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>Due on completion</div>
+            ) : (
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--color-danger)", marginTop: 2 }}>Client owes this now</div>
+            )
           )}
         </div>
 
@@ -627,12 +639,17 @@ export default async function InvoiceDetailPage({
           <Card>
             <SectionHeader title="Details" />
             <dl className="p7-detail-list" style={{ fontSize: "var(--text-sm)" }}>
-              {invoice.due_date && (
+              {dueOnCompletion ? (
+                <div className="p7-detail-row">
+                  <dt>Due</dt>
+                  <dd>On completion</dd>
+                </div>
+              ) : invoice.due_date ? (
                 <div className="p7-detail-row">
                   <dt>Due</dt>
                   <dd>{new Date(invoice.due_date).toLocaleDateString()}</dd>
                 </div>
-              )}
+              ) : null}
               {invoice.sent_at && (
                 <div className="p7-detail-row">
                   <dt>Sent</dt>
