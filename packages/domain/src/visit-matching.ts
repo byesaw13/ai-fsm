@@ -63,6 +63,27 @@ export interface VisitMatch {
 export const VISIT_CONFIDENCE_FLOOR = 40;
 
 /**
+ * TASK-079: minimum on-site dwell before a stop becomes a visit candidate. Below
+ * this, a stop is GPS jitter / a pass-through, not a visit — unless a visit is
+ * scheduled there today (then even a brief arrival counts).
+ */
+export const VISIT_CANDIDATE_MIN_DWELL_MINUTES = 3;
+
+/**
+ * Should a closed stop become a pending visit candidate? Pure gate used by the
+ * capture hook: enough confidence AND (real dwell OR a scheduled visit today).
+ */
+export function shouldCreateVisitCandidate(input: {
+  score: number;
+  durationMinutes: number;
+  hasScheduledVisit: boolean;
+}): boolean {
+  if (input.score < VISIT_CONFIDENCE_FLOOR) return false;
+  if (input.hasScheduledVisit) return true;
+  return input.durationMinutes >= VISIT_CANDIDATE_MIN_DWELL_MINUTES;
+}
+
+/**
  * When a confirmed stop is farther than this from the stored property pin,
  * re-learn the geofence center from the stop (fixes first-confirm poison pins).
  */

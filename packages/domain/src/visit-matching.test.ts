@@ -3,6 +3,8 @@ import {
   rankVisitCandidates,
   CLASSIFICATION_TO_ACTIVITY,
   VISIT_CONFIDENCE_FLOOR,
+  shouldCreateVisitCandidate,
+  VISIT_CANDIDATE_MIN_DWELL_MINUTES,
   shouldEnsureFieldDayVisit,
   shouldRelearnPropertyCoords,
   PROPERTY_COORD_RELEARN_METERS,
@@ -175,5 +177,22 @@ describe("shouldRelearnPropertyCoords", () => {
       stopLongitude: null,
     });
     expect(d).toEqual({ relearn: false, reason: "no_stop_coords", distanceMeters: null });
+  });
+});
+
+
+describe("shouldCreateVisitCandidate (TASK-079 dwell floor)", () => {
+  it("rejects a below-floor confidence", () => {
+    expect(shouldCreateVisitCandidate({ score: VISIT_CONFIDENCE_FLOOR - 1, durationMinutes: 30, hasScheduledVisit: false })).toBe(false);
+  });
+  it("rejects a sub-dwell stop with no scheduled visit (jitter)", () => {
+    expect(shouldCreateVisitCandidate({ score: 90, durationMinutes: VISIT_CANDIDATE_MIN_DWELL_MINUTES - 1, hasScheduledVisit: false })).toBe(false);
+    expect(shouldCreateVisitCandidate({ score: 90, durationMinutes: 0, hasScheduledVisit: false })).toBe(false);
+  });
+  it("keeps a real-dwell stop", () => {
+    expect(shouldCreateVisitCandidate({ score: 90, durationMinutes: VISIT_CANDIDATE_MIN_DWELL_MINUTES, hasScheduledVisit: false })).toBe(true);
+  });
+  it("keeps even a brief stop when a visit is scheduled there today", () => {
+    expect(shouldCreateVisitCandidate({ score: 90, durationMinutes: 0, hasScheduledVisit: true })).toBe(true);
   });
 });

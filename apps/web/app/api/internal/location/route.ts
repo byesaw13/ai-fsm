@@ -3,7 +3,7 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { getPool, queryOne } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { DETECTED_ACTIVITIES, LOCATION_EVENT_KINDS, classifyDrive, haversineMeters, pathDistanceMeters, rankVisitCandidates, VISIT_CONFIDENCE_FLOOR } from "@ai-fsm/domain";
+import { DETECTED_ACTIVITIES, LOCATION_EVENT_KINDS, classifyDrive, haversineMeters, pathDistanceMeters, rankVisitCandidates, shouldCreateVisitCandidate } from "@ai-fsm/domain";
 import type { PoolClient } from "pg";
 import { reduceLocationEvent, type OpenSegment } from "@/lib/location/segments";
 
@@ -405,7 +405,18 @@ async function detectVisitCandidate(
   });
 
   const top = ranked[0];
-  if (!top || top.score < VISIT_CONFIDENCE_FLOOR) return;
+  // TASK-079: dwell floor — a sub-3-min stop with no scheduled visit is jitter, not
+  // a visit. Keeps the day-review from filling with 0/1/2-min candidate cards.
+  if (
+    !top ||
+    !shouldCreateVisitCandidate({
+      score: top.score,
+      durationMinutes,
+      hasScheduledVisit: top.visitId != null,
+    })
+  ) {
+    return;
+  }
 
   await client.query(
     `INSERT INTO visit_candidates

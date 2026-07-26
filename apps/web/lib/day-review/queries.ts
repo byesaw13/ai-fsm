@@ -9,6 +9,7 @@ export type DayReviewPayload = {
   closedAt: string | null;
   visits: {
     id: string;
+    propertyId: string | null;
     propertyName: string;
     clientName: string;
     arrivalTime: string;
@@ -83,11 +84,12 @@ export async function getDayReview(
     departure_time: string;
     duration_minutes: number;
     confidence_score: number;
+    property_id: string | null;
     job_id: string | null;
     classification: string | null;
     status: string;
   }>(
-    `SELECT vc.id, p.address AS property_name, c.name AS client_name,
+    `SELECT vc.id, vc.property_id, p.address AS property_name, c.name AS client_name,
             vc.arrival_time::text, vc.departure_time::text,
             vc.duration_minutes, vc.confidence_score,
             vc.job_id, vc.classification, vc.status
@@ -104,6 +106,7 @@ export async function getDayReview(
   const scored = candidateRows.map((r) => ({
     id: r.id,
     confidenceScore: r.confidence_score,
+    propertyId: r.property_id,
     propertyName: r.property_name,
     clientName: r.client_name,
     arrivalTime: r.arrival_time,

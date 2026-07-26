@@ -30,8 +30,14 @@ export function TimeSection({
   segments: Segment[];
   gaps: Gap[];
 }) {
+  // TASK-079: auto-flagged noise (jitter micro-drives) is collapsed out of the
+  // main timeline so it stops being a wall. Owner-confirmed segments stay visible.
+  const isNoise = (s: Segment) => s.isLikelyNoise && s.status !== "confirmed";
+  const signalSegments = segments.filter((s) => !isNoise(s));
+  const noiseSegments = segments.filter(isNoise);
+
   const items = [
-    ...segments.map((s) => ({ type: "segment" as const, at: s.startedAt, data: s })),
+    ...signalSegments.map((s) => ({ type: "segment" as const, at: s.startedAt, data: s })),
     ...gaps.map((g) => ({ type: "gap" as const, at: g.startsAt, data: g })),
   ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 
@@ -110,6 +116,29 @@ export function TimeSection({
             );
           })}
         </div>
+      )}
+
+      {noiseSegments.length > 0 && (
+        <details className="mt-2">
+          <summary className="text-xs text-muted-foreground cursor-pointer">
+            {noiseSegments.length} low-signal segment{noiseSegments.length === 1 ? "" : "s"} hidden (GPS noise)
+          </summary>
+          <div className="space-y-2 mt-2">
+            {noiseSegments.map((s) => (
+              <div key={s.id} className="border border-yellow-300 rounded-lg p-3 opacity-70">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium capitalize">
+                    {s.kind} · {s.placeLabel ?? s.zone ?? "Unknown"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {fmt(s.startedAt)} – {fmt(s.endedAt)}
+                  </span>
+                </div>
+                <p className="text-xs text-yellow-600 mt-1">Likely noise</p>
+              </div>
+            ))}
+          </div>
+        </details>
       )}
     </section>
   );
