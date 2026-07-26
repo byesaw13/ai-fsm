@@ -58,11 +58,12 @@ export type MileageDeltaResult = {
 };
 
 /**
- * TASK-080: below this many GPS miles, GPS is treated as "didn't capture the
- * trip" — not a disagreement with the odometer. Sparse drive points (short local
- * hops with no GPS trail) produce ~0 GPS miles, which must not read as "100% off".
+ * TASK-080: when GPS captured less than this fraction of the odometer distance,
+ * GPS "didn't really track the trip" (sparse drive points) — informational, not a
+ * disagreement. Relative (not a fixed mile floor) so it holds for a sub-mile trip
+ * too: odometer 0.5 mi + GPS 0 is still no-coverage, not "100% off".
  */
-export const GPS_MIN_COVERAGE_MILES = 1;
+export const GPS_COVERAGE_FRACTION = 0.5;
 
 /**
  * Compare GPS-estimated miles to odometer miles. Flags a real divergence (>20%),
@@ -73,8 +74,13 @@ export function checkMileageDelta(
   odometerMiles: number | null,
   gpsMiles: number,
 ): MileageDeltaResult {
-  if (odometerMiles == null) return { deltaPercent: null, flagged: false, reason: null };
-  if (odometerMiles >= GPS_MIN_COVERAGE_MILES && gpsMiles < GPS_MIN_COVERAGE_MILES) {
+  // No trip logged (null or zero odometer) → nothing to cross-check.
+  if (odometerMiles == null || odometerMiles <= 0) {
+    return { deltaPercent: null, flagged: false, reason: null };
+  }
+  // GPS captured well under the odometer distance → no usable cross-check; the
+  // odometer stands. Not a disagreement.
+  if (gpsMiles < GPS_COVERAGE_FRACTION * odometerMiles) {
     return { deltaPercent: null, flagged: false, reason: "no_gps_coverage" };
   }
   const deltaPercent = Math.round(Math.abs((gpsMiles - odometerMiles) / odometerMiles) * 100);
