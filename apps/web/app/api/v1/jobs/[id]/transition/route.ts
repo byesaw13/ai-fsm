@@ -150,7 +150,9 @@ export const POST = withRole(
            WHERE job_id = $1 AND account_id = $2
              AND due_date IS NULL
              AND invoice_kind IN ('standard', 'final')
-             AND status <> 'void'`,
+             -- Only non-terminal invoices: the immutability trigger (149) rejects
+             -- any update to a paid/void invoice, so filling one would 500.
+             AND status IN ('draft', 'sent', 'partial', 'overdue')`,
           [id, session.accountId, dueDateUponCompletion()],
         );
       }
