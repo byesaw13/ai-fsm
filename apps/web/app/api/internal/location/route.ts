@@ -6,6 +6,7 @@ import { logger } from "@/lib/logger";
 import { DETECTED_ACTIVITIES, LOCATION_EVENT_KINDS, classifyDrive, haversineMeters, pathDistanceMeters, rankVisitCandidates, shouldCreateVisitCandidate } from "@ai-fsm/domain";
 import type { PoolClient } from "pg";
 import { reduceLocationEvent, type OpenSegment } from "@/lib/location/segments";
+import { autoRecordScheduledVisitPresence } from "@/lib/field/confirm-visit";
 
 export const dynamic = "force-dynamic";
 
@@ -353,20 +354,27 @@ async function detectVisitCandidate(
 ): Promise<void> {
   const durationMinutes = (new Date(endedAt).getTime() - new Date(stop.startedAt).getTime()) / 60000;
 
-  const { rows } = await client.query<CandidateRow>(
+  const { rows } = await client.query<CandidateRow & { today_visit_type: string | null; today_assigned: string | null }>(
     `SELECT p.id AS property_id, p.client_id, p.latitude, p.longitude,
             tv.visit_id AS today_visit_id, tv.job_id AS today_job_id,
+            tv.visit_type AS today_visit_type, tv.assigned_user_id AS today_assigned,
             oj.id AS open_job_id,
             EXISTS (SELECT 1 FROM jobs j WHERE j.client_id = p.client_id
                       AND j.created_at >= now() - interval '30 days') AS recent_client,
             (SELECT count(*) FROM jobs j WHERE j.client_id = p.client_id) AS job_count
      FROM properties p
      LEFT JOIN LATERAL (
-       SELECT v.id AS visit_id, v.job_id
+       -- Match any non-cancelled visit for the local business day, including
+       -- in_progress/completed so multi-stop days keep attaching time.
+       SELECT v.id AS visit_id, v.job_id, v.visit_type, v.assigned_user_id
        FROM visits v JOIN jobs j ON j.id = v.job_id
-       WHERE j.property_id = p.id AND v.status IN ('scheduled','arrived')
-         AND v.scheduled_start::date = ($2::timestamptz)::date
-       ORDER BY v.scheduled_start ASC LIMIT 1
+       WHERE j.property_id = p.id AND v.status <> 'cancelled'
+         AND (v.scheduled_start AT TIME ZONE 'America/New_York')::date
+             = ($2::timestamptz AT TIME ZONE 'America/New_York')::date
+       ORDER BY
+         CASE WHEN v.status = 'completed' THEN 1 ELSE 0 END,
+         v.scheduled_start ASC
+       LIMIT 1
      ) tv ON true
      LEFT JOIN LATERAL (
        -- Include recently completed jobs so a false closeout (or same-week
@@ -418,15 +426,61 @@ async function detectVisitCandidate(
     return;
   }
 
-  await client.query(
+  const { rows: inserted } = await client.query<{ id: string }>(
     `INSERT INTO visit_candidates
        (account_id, location_segment_id, property_id, matched_client_id, job_id, visit_id,
         distance_meters, confidence_score, arrival_time, departure_time, duration_minutes)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-     ON CONFLICT (location_segment_id) DO NOTHING`,
+     ON CONFLICT (location_segment_id) DO NOTHING
+     RETURNING id`,
     [
       accountId, stop.id, top.propertyId, top.clientId, top.jobId, top.visitId,
       top.distanceMeters, top.score, stop.startedAt, endedAt, Math.round(durationMinutes),
     ],
   );
+  const candidateId = inserted[0]?.id;
+  if (!candidateId || !top.visitId) return;
+
+  // Matched a calendar visit for today → auto-record presence + job time so
+  // the visit shows "I was there" without waiting on day-review confirm.
+  const matchRow = rows.find((r) => r.today_visit_id === top.visitId);
+  let userId = matchRow?.today_assigned ?? null;
+  if (!userId) {
+    const { rows: owners } = await client.query<{ id: string }>(
+      `SELECT id FROM users
+       WHERE account_id = $1 AND role = 'owner'
+       ORDER BY created_at ASC LIMIT 1`,
+      [accountId],
+    );
+    userId = owners[0]?.id ?? null;
+  }
+  if (!userId) return;
+
+  // activity_entries insert needs a user role context for RLS with-check.
+  await client.query(
+    `SELECT set_config('app.current_user_id', $1, true)`,
+    [userId],
+  );
+
+  const recorded = await autoRecordScheduledVisitPresence(client, {
+    accountId,
+    userId,
+    candidateId,
+    visitId: top.visitId,
+    jobId: top.jobId,
+    arrivalTime: stop.startedAt,
+    departureTime: endedAt,
+    durationMinutes: Math.round(durationMinutes),
+    visitType: matchRow?.today_visit_type ?? null,
+  });
+
+  if (recorded.activityEntryId) {
+    await client.query(
+      `UPDATE location_segments
+       SET status = 'confirmed', activity_entry_id = $1,
+           suggested_activity_type = 'job_work', updated_at = now()
+       WHERE id = $2 AND account_id = $3 AND status = 'provisional'`,
+      [recorded.activityEntryId, stop.id, accountId],
+    );
+  }
 }

@@ -1,7 +1,9 @@
 import type { PoolClient } from "pg";
 import {
   CLASSIFICATION_TO_ACTIVITY,
+  FIELD_DAY_MIN_DURATION_MINUTES,
   activityCategoryFor,
+  isFieldDayClassification,
   shouldEnsureFieldDayVisit,
   shouldRelearnPropertyCoords,
   type VisitClassification,
@@ -210,6 +212,228 @@ export type EnsureFieldDayResult = {
   reason: string;
 };
 
+export type ApplyGpsPresenceResult = {
+  updated: boolean;
+  status: string | null;
+  reason: string;
+};
+
+/**
+ * Whether a confirmed/auto presence stop should flip the calendar visit to
+ * completed (vs just arrived/in_progress). Field-day classifications with
+ * real dwell complete; short blips only record that we showed up.
+ */
+export function shouldCompleteVisitFromPresence(opts: {
+  classification: string;
+  durationMinutes: number;
+  minDurationMinutes?: number;
+}): boolean {
+  const min = opts.minDurationMinutes ?? FIELD_DAY_MIN_DURATION_MINUTES;
+  if (opts.durationMinutes < min) return false;
+  if (isFieldDayClassification(opts.classification)) return true;
+  // Pre-sale site time also closes the calendar visit when substantial.
+  return opts.classification === "estimate_visit"
+    || opts.classification === "walkthrough";
+}
+
+/**
+ * Walk a calendar visit through legal status transitions so GPS presence
+ * shows as "I was there", and stamp arrived_at / completed_at from the stop.
+ *
+ * The DB trigger enforces scheduled→arrived→in_progress→completed and
+ * overwrites times with now() on transition — so we walk first, then patch
+ * GPS times in a status-unchanged UPDATE.
+ */
+export async function applyGpsPresenceToVisit(
+  client: PoolClient,
+  opts: {
+    accountId: string;
+    userId: string;
+    visitId: string;
+    arrivalTime: string;
+    departureTime: string;
+    /** When true, walk all the way to completed. When false, stop at in_progress. */
+    complete: boolean;
+  },
+): Promise<ApplyGpsPresenceResult> {
+  const { rows } = await client.query<{
+    id: string;
+    status: string;
+    assigned_user_id: string | null;
+    work_order_id: string | null;
+  }>(
+    `SELECT id, status, assigned_user_id, work_order_id
+     FROM visits
+     WHERE id = $1 AND account_id = $2
+     FOR UPDATE`,
+    [opts.visitId, opts.accountId],
+  );
+  const visit = rows[0];
+  if (!visit) return { updated: false, status: null, reason: "not_found" };
+  if (visit.status === "cancelled") {
+    return { updated: false, status: visit.status, reason: "cancelled" };
+  }
+
+  // Arrived/in_progress require an assigned tech (DB trigger).
+  if (!visit.assigned_user_id) {
+    await client.query(
+      `UPDATE visits SET assigned_user_id = $1, updated_at = now()
+       WHERE id = $2 AND account_id = $3`,
+      [opts.userId, opts.visitId, opts.accountId],
+    );
+  }
+
+  let status = visit.status;
+
+  async function step(to: string): Promise<void> {
+    await client.query(
+      `UPDATE visits SET status = $1, updated_at = now()
+       WHERE id = $2 AND account_id = $3`,
+      [to, opts.visitId, opts.accountId],
+    );
+    status = to;
+  }
+
+  // Legal walks only (matches validate_visit_transition).
+  if (status === "scheduled" || status === "dispatched" || status === "traveling") {
+    await step("arrived");
+  }
+  if (status === "arrived") {
+    await step("in_progress");
+  }
+  if (status === "waiting" && opts.complete) {
+    await step("in_progress");
+  }
+  if (opts.complete && status === "in_progress") {
+    await step("completed");
+  }
+
+  // Stamp GPS window without changing status (trigger leaves times alone).
+  await client.query(
+    `UPDATE visits SET
+       arrived_at = LEAST(COALESCE(arrived_at, $1::timestamptz), $1::timestamptz),
+       completed_at = CASE
+         WHEN status = 'completed'
+           THEN GREATEST(COALESCE(completed_at, $2::timestamptz), $2::timestamptz)
+         ELSE completed_at
+       END,
+       updated_at = now()
+     WHERE id = $3 AND account_id = $4`,
+    [opts.arrivalTime, opts.departureTime, opts.visitId, opts.accountId],
+  );
+
+  if (visit.work_order_id) {
+    await syncWorkOrderStatus(client, visit.work_order_id, opts.accountId);
+  }
+
+  return {
+    updated: true,
+    status,
+    reason: opts.complete && status === "completed" ? "completed" : "on_site",
+  };
+}
+
+/**
+ * Auto-log a closed GPS stop against a scheduled/matched calendar visit:
+ * activity_entries (job time) + candidate confirmed + visit status/times.
+ * Skips when the time window already has ledger rows (avoid double-count).
+ */
+export async function autoRecordScheduledVisitPresence(
+  client: PoolClient,
+  opts: {
+    accountId: string;
+    userId: string;
+    candidateId: string;
+    visitId: string;
+    jobId: string | null;
+    arrivalTime: string;
+    departureTime: string;
+    durationMinutes: number;
+    visitType?: string | null;
+  },
+): Promise<{ recorded: boolean; reason: string; activityEntryId?: string }> {
+  // Sub-3-min blips: still mark arrived so the visit shows "I showed up",
+  // but don't invent billable/activity time.
+  const logTime = opts.durationMinutes >= 3;
+
+  // Classification from visit type (standard work vs pre-sale).
+  const classification: Exclude<VisitClassification, "ignore"> =
+    opts.visitType === "site_visit"
+    || opts.visitType === "sales_walkthrough"
+    || opts.visitType === "realtor_baseline"
+      ? "estimate_visit"
+      : "job_work";
+
+  if (logTime) {
+    const { rows: overlap } = await client.query<{ id: string }>(
+      `SELECT id FROM activity_entries
+       WHERE account_id = $1 AND voided_at IS NULL
+         AND started_at < $3::timestamptz
+         AND COALESCE(ended_at, 'infinity'::timestamptz) > $2::timestamptz
+       LIMIT 1`,
+      [opts.accountId, opts.arrivalTime, opts.departureTime],
+    );
+    if (overlap[0]) {
+      // Still stamp visit presence so the calendar reflects the day.
+      await applyGpsPresenceToVisit(client, {
+        accountId: opts.accountId,
+        userId: opts.userId,
+        visitId: opts.visitId,
+        arrivalTime: opts.arrivalTime,
+        departureTime: opts.departureTime,
+        complete: shouldCompleteVisitFromPresence({
+          classification,
+          durationMinutes: opts.durationMinutes,
+        }),
+      });
+      return { recorded: false, reason: "activity_overlap" };
+    }
+  }
+
+  await applyGpsPresenceToVisit(client, {
+    accountId: opts.accountId,
+    userId: opts.userId,
+    visitId: opts.visitId,
+    arrivalTime: opts.arrivalTime,
+    departureTime: opts.departureTime,
+    complete: shouldCompleteVisitFromPresence({
+      classification,
+      durationMinutes: opts.durationMinutes,
+    }),
+  });
+
+  let entryId: string | undefined;
+  if (logTime) {
+    entryId = await insertVisitActivityEntry(client, {
+      accountId: opts.accountId,
+      userId: opts.userId,
+      sessionDate: opts.arrivalTime,
+      classification,
+      startedAt: opts.arrivalTime,
+      endedAt: opts.departureTime,
+      entityType: "visit",
+      entityId: opts.visitId,
+      note: "Auto-logged from GPS stop at scheduled visit",
+      businessDayId: null,
+      source: "auto_visit",
+    });
+    await markVisitCandidateConfirmed(
+      client,
+      opts.candidateId,
+      opts.accountId,
+      classification,
+      entryId,
+      opts.visitId,
+    );
+  }
+
+  return {
+    recorded: true,
+    reason: logTime ? "logged" : "presence_only",
+    activityEntryId: entryId,
+  };
+}
+
 /**
  * On confirm of field work for a job: reuse today's visit or auto-create a
  * completed standard field day under the work order (multi-day T&M).
@@ -238,6 +462,19 @@ export async function ensureFieldDayVisit(
   );
 
   if (opts.visitId) {
+    // Existing calendar visit: mark that we were on site and stamp GPS times.
+    // (Previously we returned early and left the visit stuck on "scheduled".)
+    await applyGpsPresenceToVisit(client, {
+      accountId: opts.accountId,
+      userId: opts.userId,
+      visitId: opts.visitId,
+      arrivalTime: opts.arrivalTime,
+      departureTime: opts.departureTime,
+      complete: shouldCompleteVisitFromPresence({
+        classification: opts.classification,
+        durationMinutes,
+      }),
+    });
     return { visitId: opts.visitId, created: false, reason: "candidate_visit" };
   }
 
@@ -307,6 +544,17 @@ export async function ensureFieldDayVisit(
     workOrderId,
   );
   if (existing) {
+    await applyGpsPresenceToVisit(client, {
+      accountId: opts.accountId,
+      userId: opts.userId,
+      visitId: existing,
+      arrivalTime: opts.arrivalTime,
+      departureTime: opts.departureTime,
+      complete: shouldCompleteVisitFromPresence({
+        classification: opts.classification,
+        durationMinutes,
+      }),
+    });
     return { visitId: existing, created: false, reason: "existing_day" };
   }
 

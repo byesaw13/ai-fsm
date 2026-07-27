@@ -139,11 +139,11 @@ export function OverdueVisitModal({ visitId, scheduledStart, scheduledEnd, jobTi
           }}
         >
           <p style={{ margin: 0, fontWeight: 600, color: "#92400e" }}>
-            This visit is overdue by {overdueAge}.
+            This visit is still open from {overdueAge} ago.
           </p>
           <p style={{ margin: "var(--space-1) 0 0", fontSize: "var(--text-sm)", color: "#92400e" }}>
             {jobTitle ? `"${jobTitle}" was ` : "Originally "}scheduled for {originalDate}.
-            Pick a new date so the customer isn&apos;t forgotten.
+            Same-day late starts are fine — reschedule only if you need a new day so the customer isn&apos;t forgotten.
           </p>
         </div>
 

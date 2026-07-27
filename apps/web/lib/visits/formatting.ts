@@ -39,18 +39,42 @@ export function formatVisitDateLabel(iso: string): string {
   });
 }
 
+/** YYYY-MM-DD in the business timezone (for day-boundary comparisons). */
+function businessCalendarDate(isoOrMs: string | number): string {
+  return new Date(isoOrMs).toLocaleDateString("en-CA", {
+    timeZone: BUSINESS_TIMEZONE,
+  });
+}
+
+/**
+ * How long past scheduled_end an in-progress visit may run before we call it
+ * overdue (finishing a job a bit late is normal).
+ */
+export const IN_PROGRESS_OVERDUE_GRACE_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+/**
+ * Whether a visit needs attention as *overdue* (reschedule / forgotten).
+ *
+ * Being a little late on the scheduled day does **not** count — field work
+ * often starts after the nominal start time. We only flag scheduled/arrived
+ * visits once their **business calendar day** is fully in the past.
+ *
+ * In-progress visits use scheduled_end (+ 2h grace) so a long day isn't
+ * "overdue" the moment the window ends.
+ */
 export function isVisitOverdue(
   visit: VisitLikeForUi,
   nowMs = Date.now()
 ): boolean {
   if (visit.status === "scheduled" || visit.status === "arrived") {
-    return new Date(visit.scheduled_start).getTime() < nowMs;
+    // Same day (or future day): not overdue for reschedule — just start the visit.
+    return businessCalendarDate(visit.scheduled_start) < businessCalendarDate(nowMs);
   }
   if (visit.status === "in_progress") {
     const endTime = visit.scheduled_end
       ? new Date(visit.scheduled_end).getTime()
-      : new Date(visit.scheduled_start).getTime() + 4 * 60 * 60 * 1000;
-    return endTime < nowMs;
+      : new Date(visit.scheduled_start).getTime() + 8 * 60 * 60 * 1000;
+    return endTime + IN_PROGRESS_OVERDUE_GRACE_MS < nowMs;
   }
   return false;
 }

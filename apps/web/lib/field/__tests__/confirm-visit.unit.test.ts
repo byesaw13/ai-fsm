@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { entityLinkFromCandidate } from "../confirm-visit";
+import {
+  entityLinkFromCandidate,
+  shouldCompleteVisitFromPresence,
+} from "../confirm-visit";
 import {
   shouldEnsureFieldDayVisit,
   shouldRelearnPropertyCoords,
@@ -68,5 +71,43 @@ describe("field-day + coord rules (domain, used by confirm-visit)", () => {
     });
     expect(d.relearn).toBe(true);
     expect(d.reason).toBe("far");
+  });
+});
+
+describe("shouldCompleteVisitFromPresence", () => {
+  it("completes substantial job_work stops", () => {
+    expect(
+      shouldCompleteVisitFromPresence({
+        classification: "job_work",
+        durationMinutes: 45,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not complete short blips", () => {
+    expect(
+      shouldCompleteVisitFromPresence({
+        classification: "job_work",
+        durationMinutes: 5,
+      }),
+    ).toBe(false);
+  });
+
+  it("completes substantial estimate visits", () => {
+    expect(
+      shouldCompleteVisitFromPresence({
+        classification: "estimate_visit",
+        durationMinutes: 30,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not complete material drops as field days", () => {
+    expect(
+      shouldCompleteVisitFromPresence({
+        classification: "material_drop",
+        durationMinutes: 60,
+      }),
+    ).toBe(false);
   });
 });
