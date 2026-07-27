@@ -32,15 +32,30 @@ describe("visits/formatting UI helpers", () => {
     expect(out).toMatch(/23/);
   });
 
-  it("detects overdue scheduled visits", () => {
+  it("does not treat same-day late scheduled visits as overdue", () => {
+    // Start was 10:00 AM ET; "now" is 11:30 AM ET same day — late, not overdue.
     expect(
       isVisitOverdue({ scheduled_start: base, status: "scheduled" }, nowMs)
+    ).toBe(false);
+  });
+
+  it("does not treat same-day late arrived visits as overdue", () => {
+    expect(
+      isVisitOverdue({ scheduled_start: base, status: "arrived" }, nowMs)
+    ).toBe(false);
+  });
+
+  it("flags scheduled visits from a prior business day as overdue", () => {
+    const nextDay = new Date("2026-02-24T16:30:00.000Z").getTime(); // Feb 24 ET afternoon
+    expect(
+      isVisitOverdue({ scheduled_start: base, status: "scheduled" }, nextDay)
     ).toBe(true);
   });
 
-  it("detects overdue arrived visits", () => {
+  it("flags arrived visits from a prior business day as overdue", () => {
+    const nextDay = new Date("2026-02-24T16:30:00.000Z").getTime();
     expect(
-      isVisitOverdue({ scheduled_start: base, status: "arrived" }, nowMs)
+      isVisitOverdue({ scheduled_start: base, status: "arrived" }, nextDay)
     ).toBe(true);
   });
 
@@ -57,6 +72,24 @@ describe("visits/formatting UI helpers", () => {
         nowMs
       )
     ).toBe(false);
+  });
+
+  it("gives in-progress visits a grace window past scheduled_end", () => {
+    const end = "2026-02-23T20:00:00.000Z"; // 3:00 PM ET
+    const justPastEnd = new Date("2026-02-23T20:30:00.000Z").getTime();
+    const wellPastEnd = new Date("2026-02-23T23:00:00.000Z").getTime(); // +3h
+    expect(
+      isVisitOverdue(
+        { scheduled_start: base, scheduled_end: end, status: "in_progress" },
+        justPastEnd
+      )
+    ).toBe(false);
+    expect(
+      isVisitOverdue(
+        { scheduled_start: base, scheduled_end: end, status: "in_progress" },
+        wellPastEnd
+      )
+    ).toBe(true);
   });
 
   it("detects same calendar day", () => {

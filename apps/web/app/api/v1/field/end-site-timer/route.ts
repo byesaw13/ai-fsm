@@ -39,8 +39,9 @@ export const POST = withAuth(async (_request, session) => {
          (ae.entity_type = 'job' AND j.id = ae.entity_id)
          OR (ae.entity_type = 'visit' AND j.id = v.job_id)
        )
-       LEFT JOIN clients c ON c.id = COALESCE(j.client_id, v.client_id)
-       LEFT JOIN properties p ON p.id = COALESCE(j.property_id, v.property_id)
+       -- client/property live on jobs only (visits have no client_id/property_id)
+       LEFT JOIN clients c ON c.id = j.client_id
+       LEFT JOIN properties p ON p.id = j.property_id
        WHERE ae.account_id = $1 AND ae.user_id = $2
          AND ae.ended_at IS NULL AND ae.voided_at IS NULL
          AND ae.activity_type = ANY($3::text[])
