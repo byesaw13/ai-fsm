@@ -83,6 +83,47 @@ describe("rankVisitCandidates", () => {
     expect(m.rawScore).toBeGreaterThan(100);
     expect(m.score).toBe(100);
   });
+
+  it("hard-rejects a far stop even with open job + long dwell (Floss-at-home bug)", () => {
+    // Brian Floss pin (Maynard) vs home (Derry) ~50 km
+    const [m] = rankVisitCandidates({
+      stop: { latitude: 42.8748, longitude: -71.3114, durationMinutes: 900 },
+      candidates: [
+        prop({
+          propertyId: "floss",
+          clientId: "c-floss",
+          latitude: 42.4385168,
+          longitude: -71.4349672,
+          openJob: true,
+          recentClient: true,
+          jobId: "j-floss",
+        }),
+      ],
+    });
+    expect(m.score).toBe(0);
+    expect(m.rawScore).toBe(0);
+    expect(m.reasons).toEqual(["too_far"]);
+    expect(m.distanceMeters).toBeGreaterThan(40_000);
+  });
+
+  it("still matches when near the property with open job", () => {
+    const [m] = rankVisitCandidates({
+      stop: { latitude: 42.43852, longitude: -71.43497, durationMinutes: 60 },
+      candidates: [
+        prop({
+          propertyId: "floss",
+          clientId: "c-floss",
+          latitude: 42.4385168,
+          longitude: -71.4349672,
+          openJob: true,
+          jobId: "j-floss",
+        }),
+      ],
+    });
+    expect(m.score).toBeGreaterThanOrEqual(VISIT_CONFIDENCE_FLOOR);
+    expect(m.reasons).toContain("open_job");
+    expect(m.reasons).not.toContain("too_far");
+  });
 });
 
 describe("CLASSIFICATION_TO_ACTIVITY", () => {
@@ -198,6 +239,16 @@ describe("shouldCreateVisitCandidate (TASK-079 dwell floor)", () => {
   });
   it("keeps even a brief stop when a visit is scheduled there today", () => {
     expect(shouldCreateVisitCandidate({ score: 90, durationMinutes: 0, hasScheduledVisit: true })).toBe(true);
+  });
+  it("rejects known-far matches even when scheduled today", () => {
+    expect(
+      shouldCreateVisitCandidate({
+        score: 100,
+        durationMinutes: 60,
+        hasScheduledVisit: true,
+        distanceMeters: 50_000,
+      }),
+    ).toBe(false);
   });
 });
 

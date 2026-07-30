@@ -15,6 +15,14 @@ const WITHIN_NEAR_FEET = 150;
 const WITHIN_FAR_FEET = 250;
 const POOR_GPS_METERS = 75;
 
+/**
+ * Hard distance ceiling when property coords are known. Beyond this, a stop is
+ * never a visit at that property — open-job / recent-client points must not
+ * "teleport" a home stop onto a customer 50 km away (Brian Floss false positives).
+ * ~800 m ≈ 0.5 mi: large rural lots + GPS drift OK; Derry↔Maynard is not.
+ */
+export const MAX_MATCH_DISTANCE_METERS = 800;
+
 /** A candidate property (+ its job/visit/client signals) to score a stop against. */
 export interface VisitMatchCandidate {
   propertyId: string;
@@ -72,12 +80,22 @@ export const VISIT_CANDIDATE_MIN_DWELL_MINUTES = 3;
 /**
  * Should a closed stop become a pending visit candidate? Pure gate used by the
  * capture hook: enough confidence AND (real dwell OR a scheduled visit today).
+ * When distance to the matched property is known and beyond the hard ceiling,
+ * never create a candidate (schedule alone cannot invent on-site presence 50 km away).
  */
 export function shouldCreateVisitCandidate(input: {
   score: number;
   durationMinutes: number;
   hasScheduledVisit: boolean;
+  /** Distance to matched property when both have coords; omit if unknown. */
+  distanceMeters?: number | null;
 }): boolean {
+  if (
+    input.distanceMeters != null &&
+    input.distanceMeters > MAX_MATCH_DISTANCE_METERS
+  ) {
+    return false;
+  }
   if (input.score < VISIT_CONFIDENCE_FLOOR) return false;
   if (input.hasScheduledVisit) return true;
   return input.durationMinutes >= VISIT_CANDIDATE_MIN_DWELL_MINUTES;
@@ -175,27 +193,74 @@ export function rankVisitCandidates(input: VisitMatchInput): VisitMatch[] {
     let raw = 0;
     const reasons: string[] = [];
 
-    if (c.scheduledToday) { raw += 100; reasons.push("scheduled_today"); }
-
     let distanceMeters: number | null = null;
-    const canCheckDistance = stop.latitude != null && stop.longitude != null && c.latitude != null && c.longitude != null;
-    if (canCheckDistance) {
-      if (c.openJob) { raw += 75; reasons.push("open_job"); }
-      if (c.recentClient) { raw += 40; reasons.push("recent_client"); }
-      if (c.repeatClient) { raw += 30; reasons.push("repeat_client"); }
+    const canCheckDistance =
+      stop.latitude != null &&
+      stop.longitude != null &&
+      c.latitude != null &&
+      c.longitude != null;
 
+    if (canCheckDistance) {
       distanceMeters = haversineMeters(
         { latitude: stop.latitude!, longitude: stop.longitude! },
         { latitude: c.latitude!, longitude: c.longitude! },
       );
-      if (distanceMeters <= WITHIN_NEAR_FEET * FEET_TO_METERS) { raw += 40; reasons.push("within_150ft"); }
-      else if (distanceMeters <= WITHIN_FAR_FEET * FEET_TO_METERS) { raw += 25; reasons.push("within_250ft"); }
+      // Hard reject far stops — open-job points must not invent presence.
+      if (distanceMeters > MAX_MATCH_DISTANCE_METERS) {
+        return {
+          propertyId: c.propertyId,
+          clientId: c.clientId,
+          jobId: c.jobId ?? null,
+          visitId: c.visitId ?? null,
+          distanceMeters,
+          score: 0,
+          rawScore: 0,
+          reasons: ["too_far"],
+        };
+      }
+    }
 
-      if (dwell) { raw += dwell.pts; reasons.push(dwell.reason); }
-      if (c.supplierZone) { raw += 25; reasons.push("supplier_zone"); }
-      if (poorGps) { raw -= 25; reasons.push("poor_gps"); }
+    if (c.scheduledToday) {
+      raw += 100;
+      reasons.push("scheduled_today");
+    }
+
+    if (canCheckDistance) {
+      if (c.openJob) {
+        raw += 75;
+        reasons.push("open_job");
+      }
+      if (c.recentClient) {
+        raw += 40;
+        reasons.push("recent_client");
+      }
+      if (c.repeatClient) {
+        raw += 30;
+        reasons.push("repeat_client");
+      }
+
+      if (distanceMeters! <= WITHIN_NEAR_FEET * FEET_TO_METERS) {
+        raw += 40;
+        reasons.push("within_150ft");
+      } else if (distanceMeters! <= WITHIN_FAR_FEET * FEET_TO_METERS) {
+        raw += 25;
+        reasons.push("within_250ft");
+      }
+
+      if (dwell) {
+        raw += dwell.pts;
+        reasons.push(dwell.reason);
+      }
+      if (c.supplierZone) {
+        raw += 25;
+        reasons.push("supplier_zone");
+      }
+      if (poorGps) {
+        raw -= 25;
+        reasons.push("poor_gps");
+      }
     } else if (c.scheduledToday && dwell) {
-      // ponytail: scheduled visit can match without learned coords; unscheduled jobs need distance proof.
+      // Scheduled visit can match without learned coords; unscheduled jobs need distance proof.
       raw += dwell.pts;
       reasons.push(dwell.reason);
     }
