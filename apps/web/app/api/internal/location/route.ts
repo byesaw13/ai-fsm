@@ -399,14 +399,18 @@ async function detectVisitCandidate(
        LIMIT 1
      ) tv ON true
      LEFT JOIN LATERAL (
-       -- Open / active jobs only. Do NOT treat recently invoiced jobs as open —
-       -- that + long dwell at home scored Brian Floss at 100% from 50 km away.
-       -- Completed/invoiced jobs still match via schedule-today or pure distance
-       -- once the property pin is learned.
+       -- Active jobs + recently *completed* (false closeout / multi-day T&M).
+       -- Exclude *invoiced*: that kept Brian Floss scoring at home for 14 days
+       -- after the job was billed. Distance hard-gate still applies separately.
        SELECT j.id FROM jobs j
        WHERE j.property_id = p.id
-         AND j.status IN ('scheduled','in_progress')
-       ORDER BY j.scheduled_start ASC NULLS LAST
+         AND (
+           j.status IN ('scheduled','in_progress')
+           OR (j.status = 'completed' AND j.updated_at >= now() - interval '14 days')
+         )
+       ORDER BY
+         CASE WHEN j.status IN ('scheduled','in_progress') THEN 0 ELSE 1 END,
+         j.scheduled_start ASC NULLS LAST
        LIMIT 1
      ) oj ON true
      WHERE p.account_id = $1
