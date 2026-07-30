@@ -1,7 +1,7 @@
 # Arrival → Assignment Protocol — Design Spec
 
 **Date:** 2026-07-30  
-**Status:** Ready for user review  
+**Status:** Implemented (feat/arrival-assignment-protocol)  
 **Approach:** Arrival → Assignment Protocol (brainstorming session)  
 **Related:** EPIC-007 (Field Execution / Location Intelligence), TASK-041–045, TASK-079, TASK-077 (remains Deferred), `docs/canonical/OPERATIONS.md`, work-order-centric field model  
 

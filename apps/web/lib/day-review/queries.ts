@@ -13,14 +13,22 @@ export type DayReviewPayload = {
     propertyName: string;
     clientName: string;
     arrivalTime: string;
-    departureTime: string;
+    departureTime: string | null;
     durationMinutes: number;
     confidenceScore: number;
     preSelected: boolean;
     linkedJobId: string | null;
+    workOrderId: string | null;
+    workOrderTitle: string | null;
+    woResolution: string;
     classification: string | null;
     status: string;
   }[];
+  /** Open WOs per property id for Day Review picker. */
+  openWorkOrdersByProperty: Record<
+    string,
+    { id: string; title: string; scheduledToday: boolean }[]
+  >;
   segments: {
     id: string;
     kind: "stop" | "drive";
@@ -82,23 +90,28 @@ export async function getDayReview(
     property_name: string;
     client_name: string;
     arrival_time: string;
-    departure_time: string;
-    duration_minutes: number;
+    departure_time: string | null;
+    duration_minutes: number | null;
     confidence_score: number;
     property_id: string | null;
     job_id: string | null;
+    work_order_id: string | null;
+    work_order_title: string | null;
+    wo_resolution: string;
     classification: string | null;
     status: string;
   }>(
     `SELECT vc.id, vc.property_id, p.address AS property_name, c.name AS client_name,
             vc.arrival_time::text, vc.departure_time::text,
             vc.duration_minutes, vc.confidence_score,
-            vc.job_id, vc.classification, vc.status
+            vc.job_id, vc.work_order_id, w.title AS work_order_title,
+            vc.wo_resolution, vc.classification, vc.status
      FROM visit_candidates vc
      JOIN properties p ON p.id = vc.property_id
      JOIN clients c ON c.id = vc.matched_client_id
+     LEFT JOIN work_orders w ON w.id = vc.work_order_id
      WHERE vc.account_id = $1
-       AND vc.arrival_time::date = $2::date
+       AND (vc.arrival_time AT TIME ZONE 'America/New_York')::date = $2::date
        AND vc.status = 'pending'
      ORDER BY vc.arrival_time ASC`,
     [accountId, date],
@@ -112,12 +125,51 @@ export async function getDayReview(
     clientName: r.client_name,
     arrivalTime: r.arrival_time,
     departureTime: r.departure_time,
-    durationMinutes: r.duration_minutes,
+    durationMinutes: r.duration_minutes ?? 0,
     linkedJobId: r.job_id,
+    workOrderId: r.work_order_id,
+    workOrderTitle: r.work_order_title,
+    woResolution: r.wo_resolution ?? "unknown",
     classification: r.classification,
     status: r.status,
   }));
   const preSelectedIds = new Set(preSelectCandidates(scored, day.confidence_threshold).map((c) => c.id));
+
+  const propertyIds = [
+    ...new Set(scored.map((v) => v.propertyId).filter((id): id is string => !!id)),
+  ];
+  const openWorkOrdersByProperty: DayReviewPayload["openWorkOrdersByProperty"] = {};
+  if (propertyIds.length > 0) {
+    const woRows = await query<{
+      property_id: string;
+      id: string;
+      title: string;
+      scheduled_today: boolean;
+    }>(
+      `SELECT j.property_id::text AS property_id, w.id, w.title,
+              EXISTS (
+                SELECT 1 FROM visits v
+                WHERE v.work_order_id = w.id AND v.status <> 'cancelled'
+                  AND (v.scheduled_start AT TIME ZONE 'America/New_York')::date = $2::date
+              ) AS scheduled_today
+       FROM work_orders w
+       JOIN jobs j ON j.id = w.job_id
+       WHERE w.account_id = $1
+         AND j.property_id = ANY($3::uuid[])
+         AND w.status IN ('draft','ready','scheduled','dispatched','waiting')
+       ORDER BY w.created_at ASC`,
+      [accountId, date, propertyIds],
+    );
+    for (const row of woRows) {
+      const list = openWorkOrdersByProperty[row.property_id] ?? [];
+      list.push({
+        id: row.id,
+        title: row.title,
+        scheduledToday: row.scheduled_today,
+      });
+      openWorkOrdersByProperty[row.property_id] = list;
+    }
+  }
 
   const segmentRows = await query<{
     id: string;
@@ -221,6 +273,7 @@ export async function getDayReview(
     reviewPromptedAt: day.review_prompted_at,
     closedAt: day.closed_at,
     visits: scored.map((c) => ({ ...c, preSelected: preSelectedIds.has(c.id) })),
+    openWorkOrdersByProperty,
     segments: reportableSegments.map((s) => ({
       id: s.id,
       kind: s.kind,

@@ -9,7 +9,18 @@ import {
 } from "@ai-fsm/domain";
 
 describe("entityLinkFromCandidate", () => {
-  it("prefers visit over job so labor attaches to the field day", () => {
+  it("prefers work_order over visit for billable assignment", () => {
+    expect(
+      entityLinkFromCandidate({
+        work_order_id: "wo1",
+        visit_id: "v1",
+        job_id: "j1",
+        matched_client_id: "c1",
+      }),
+    ).toEqual(["work_order", "wo1"]);
+  });
+
+  it("prefers visit over job when no work order", () => {
     expect(
       entityLinkFromCandidate({
         visit_id: "v1",

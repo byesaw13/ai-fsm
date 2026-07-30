@@ -6,9 +6,15 @@ import { queryForSession } from "@/lib/db";
 import { isSameCalendarDay } from "@/lib/visits/formatting";
 import { pickHeroVisit, type HeroVisit } from "@/lib/my-day/visit-hero";
 import { loadFieldDayData } from "@/lib/my-work/field-day-data";
+import {
+  loadPendingArrivalProposals,
+  loadOpenWorkOrdersForProperties,
+} from "@/lib/field/load-arrival-proposals";
 import { MyDayMobileLayout } from "../my-day/MyDayMobileLayout";
 import { ManualSiteVisitButton } from "../ManualSiteVisitButton";
 import { LocationCaptureControl } from "../LocationCaptureControl";
+import { ArrivalProposalBanner } from "@/components/field/ArrivalProposalBanner";
+import { Suspense } from "react";
 import {
   OPERATIONAL_VISIT_TYPES,
   WORK_ORDER_STATUS_LABELS,
@@ -49,7 +55,7 @@ export default async function MyWorkPage() {
   const opTypes = [...OPERATIONAL_VISIT_TYPES];
   const now = new Date();
 
-  const [fieldDay, workOrders, assessments, heroVisits] = await Promise.all([
+  const [fieldDay, workOrders, assessments, heroVisits, proposals] = await Promise.all([
     loadFieldDayData(session, isOwner),
     queryForSession<WoCard>(
       session,
@@ -101,7 +107,18 @@ export default async function MyWorkPage() {
        LIMIT 100`,
       [session.accountId, session.userId],
     ),
+    loadPendingArrivalProposals(session),
   ]);
+
+  const propIds = [
+    ...new Set(
+      proposals.map((p) => p.propertyId).filter((id): id is string => !!id),
+    ),
+  ];
+  const openWorkOrdersByProperty = await loadOpenWorkOrdersForProperties(
+    session,
+    propIds,
+  );
 
   const todayVisits = heroVisits.filter((v) => isSameCalendarDay(v.scheduled_start));
   const heroVisit = pickHeroVisit(todayVisits, now.getTime());
@@ -140,6 +157,15 @@ export default async function MyWorkPage() {
           )
         }
       />
+
+      {proposals.length > 0 && (
+        <Suspense fallback={null}>
+          <ArrivalProposalBanner
+            proposals={proposals}
+            openWorkOrdersByProperty={openWorkOrdersByProperty}
+          />
+        </Suspense>
+      )}
 
       {fieldDay.locationSettings && (
         <div style={{ marginBottom: "var(--space-4)" }}>

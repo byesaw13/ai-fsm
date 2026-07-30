@@ -14,6 +14,7 @@ import {
   VISIT_CLASSIFICATIONS,
   CLASSIFICATION_TO_ACTIVITY,
   activityCategoryFor,
+  resolveWorkOrderForProperty,
   type VisitClassification,
 } from "@ai-fsm/domain";
 import {
@@ -22,13 +23,13 @@ import {
   learnPropertyCoordsFromSegment,
   markVisitCandidateConfirmed,
 } from "@/lib/field/confirm-visit";
+import { listOpenWorkOrdersAtProperty } from "@/lib/field/open-work-orders";
 
 export const dynamic = "force-dynamic";
 
-// EPIC-007: review a detected visit.
-//   confirm → write an activity_entries ledger row (source auto_visit),
-//             ensure a calendar field-day visit for multi-day T&M,
-//             and learn/re-learn property geofence coords from the stop.
+// EPIC-007 + Arrival Assignment Protocol: review a detected visit.
+//   confirm → activity_entries (source auto_visit) on work_order when known,
+//             ensure calendar field-day visit, learn property coords.
 //   ignore  → mark ignored; nothing reaches the ledger.
 
 function idFromPath(request: NextRequest): string | undefined {
@@ -54,23 +55,28 @@ const bodySchema = z.object({
   action: z.enum(["confirm", "ignore"]),
   classification: z.enum(VISIT_CLASSIFICATIONS).optional(),
   note: z.string().max(500).nullish(),
+  work_order_id: z.string().uuid().nullish(),
+  visit_id: z.string().uuid().nullish(),
   rebalance: rebalanceSchema,
+  /** End any open activity before writing (one-open invariant). */
+  switch_activity: z.boolean().optional(),
 });
 
 type CandidateRow = {
   id: string;
   status: string;
-  location_segment_id: string;
+  location_segment_id: string | null;
   property_id: string | null;
   matched_client_id: string | null;
   job_id: string | null;
   visit_id: string | null;
+  work_order_id: string | null;
+  wo_resolution: string;
   arrival_time: string;
-  departure_time: string;
+  departure_time: string | null;
 };
 
 export const PATCH = withAuth(async (request: NextRequest, session: AuthSession) => {
-  // Owner/admin only — these are account-wide records (matches the list GET).
   if (!canViewReports(session.role)) {
     return err("FORBIDDEN", "Not permitted", 403, session.traceId);
   }
@@ -84,7 +90,6 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     });
   }
   const d = parsed.data;
-  // Confirm needs a classification; "ignore" the classification can be the body action.
   const classification: VisitClassification | null =
     d.action === "ignore" ? "ignore" : (d.classification ?? null);
   if (d.action === "confirm" && (!classification || classification === "ignore")) {
@@ -103,7 +108,8 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
 
     const { rows } = await client.query<CandidateRow>(
       `SELECT id, status, location_segment_id, property_id, matched_client_id,
-              job_id, visit_id, arrival_time::text, departure_time::text
+              job_id, visit_id, work_order_id, wo_resolution,
+              arrival_time::text, departure_time::text
        FROM visit_candidates
        WHERE id = $1 AND account_id = $2
        FOR UPDATE`,
@@ -129,23 +135,106 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       return NextResponse.json({ data: { id, status: "ignored" } });
     }
 
-    // confirm — refuse to double-count time already in the ledger.
+    const fieldClass = classification as Exclude<VisitClassification, "ignore">;
+    const activityType = CLASSIFICATION_TO_ACTIVITY[fieldClass];
+    const category = activityCategoryFor(activityType);
+
+    // Resolve work order (product: multi-WO always needs explicit choice).
+    let workOrderId = d.work_order_id ?? cand.work_order_id ?? null;
+    if (cand.property_id) {
+      const openWos = await listOpenWorkOrdersAtProperty(
+        client,
+        session.accountId,
+        cand.property_id,
+        cand.arrival_time,
+      );
+      const resolution = resolveWorkOrderForProperty({
+        openWorkOrders: openWos,
+        overrideWorkOrderId: d.work_order_id ?? workOrderId,
+      });
+      if (resolution.status === "ambiguous") {
+        await client.query("ROLLBACK");
+        return NextResponse.json(
+          {
+            error: {
+              code: "ambiguous_work_order",
+              message: "Choose a work order",
+              options: resolution.options,
+              traceId: session.traceId,
+            },
+          },
+          { status: 409 },
+        );
+      }
+      if (resolution.status === "clear") {
+        workOrderId = resolution.workOrderId;
+        if (!d.visit_id && resolution.visitId) {
+          // use resolved visit when candidate lacks one
+          cand.visit_id = cand.visit_id ?? resolution.visitId;
+        }
+      }
+    }
+
+    const departureTime = cand.departure_time;
+
+    // Switch open activity if requested (one open activity per account).
+    const { rows: openActs } = await client.query<{ id: string }>(
+      `SELECT id FROM activity_entries
+       WHERE account_id = $1 AND voided_at IS NULL AND ended_at IS NULL
+       FOR UPDATE`,
+      [session.accountId],
+    );
+    if (openActs[0] && d.switch_activity) {
+      await client.query(
+        `UPDATE activity_entries
+         SET ended_at = $1::timestamptz, updated_at = now()
+         WHERE id = $2 AND account_id = $3 AND ended_at IS NULL`,
+        [cand.arrival_time, openActs[0].id, session.accountId],
+      );
+    } else if (openActs[0] && !departureTime) {
+      // Opening a new open activity while one is running without switch.
+      await client.query("ROLLBACK");
+      return NextResponse.json(
+        {
+          error: {
+            code: "activity_open",
+            message: "An activity is already open; confirm with switch_activity to replace it",
+            open_activity_id: openActs[0].id,
+            traceId: session.traceId,
+          },
+        },
+        { status: 409 },
+      );
+    }
+
+    // Overlap guard for closed windows (open-ended uses infinity).
     const { rows: overlap } = await client.query<OverlapRow & { activity_type: string }>(
       `SELECT id, activity_type, started_at::text, ended_at::text FROM activity_entries
        WHERE account_id = $1 AND voided_at IS NULL
-         AND started_at < $3 AND COALESCE(ended_at, 'infinity'::timestamptz) > $2
+         AND started_at < $3::timestamptz
+         AND COALESCE(ended_at, 'infinity'::timestamptz) > $2::timestamptz
        FOR UPDATE`,
-      [session.accountId, cand.arrival_time, cand.departure_time],
+      [
+        session.accountId,
+        cand.arrival_time,
+        departureTime ?? new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString(),
+      ],
     );
+    // Filter out the activity we just closed via switch (if any).
+    const overlapFiltered = openActs[0] && d.switch_activity
+      ? overlap.filter((r) => r.id !== openActs[0].id)
+      : overlap;
+
+    const changeEnd = departureTime ?? new Date().toISOString();
     const resolved = resolveOverlapRebalance({
-      overlaps: overlap,
-      entriesForProposal: overlap.map((r) => ({
+      overlaps: overlapFiltered,
+      entriesForProposal: overlapFiltered.map((r) => ({
         id: r.id,
         activity_type: r.activity_type,
         started_at: r.started_at,
         ended_at: r.ended_at,
       })),
-      change: { started_at: cand.arrival_time, ended_at: cand.departure_time },
+      change: { started_at: cand.arrival_time, ended_at: changeEnd },
       clientRebalance: d.rebalance as RebalanceAdjustment[] | undefined,
     });
     if (!resolved.ok) {
@@ -153,7 +242,7 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       return NextResponse.json(
         {
           error: {
-            code: resolved.code,
+            code: "activity_overlap",
             message: resolved.message,
             proposed_rebalance: resolved.proposed_rebalance,
             overlaps: resolved.overlaps,
@@ -165,24 +254,40 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       );
     }
 
-    const fieldClass = classification as Exclude<VisitClassification, "ignore">;
-    const activityType = CLASSIFICATION_TO_ACTIVITY[fieldClass];
-    const category = activityCategoryFor(activityType);
+    const visitOverride = d.visit_id ?? cand.visit_id;
+    // Multi-day T&M: ensure a calendar field day. Still-on-site uses arrival as
+    // departure so duration stays 0 (presence/arrived only, no auto-complete).
+    const departureForFieldDay = departureTime ?? cand.arrival_time;
 
-    // Multi-day T&M: ensure a calendar field day on the job for this stop.
     const fieldDay = await ensureFieldDayVisit(client, {
       accountId: session.accountId,
       userId: session.userId,
       jobId: cand.job_id,
-      visitId: cand.visit_id,
+      visitId: visitOverride,
       classification: fieldClass,
       arrivalTime: cand.arrival_time,
-      departureTime: cand.departure_time,
+      departureTime: departureForFieldDay,
+      workOrderId,
     });
-    const resolvedVisitId = fieldDay.visitId ?? cand.visit_id;
 
-    // Link to the strongest entity — prefer field-day visit over bare job.
+    if (fieldDay.reason === "ambiguous_work_order") {
+      await client.query("ROLLBACK");
+      return NextResponse.json(
+        {
+          error: {
+            code: "ambiguous_work_order",
+            message: "Choose a work order",
+            traceId: session.traceId,
+          },
+        },
+        { status: 409 },
+      );
+    }
+
+    const resolvedVisitId = fieldDay.visitId ?? visitOverride;
+
     const [entityType, entityId] = entityLinkFromCandidate({
+      work_order_id: workOrderId,
       visit_id: resolvedVisitId,
       job_id: cand.job_id,
       matched_client_id: cand.matched_client_id,
@@ -195,8 +300,16 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
        VALUES ($1, $2, $3::date, $4, $5, $6, $7, $8, $9, 'auto_visit', $10)
        RETURNING id`,
       [
-        session.accountId, session.userId, cand.arrival_time, activityType, category,
-        cand.arrival_time, cand.departure_time, entityType, entityId, d.note ?? null,
+        session.accountId,
+        session.userId,
+        cand.arrival_time,
+        activityType,
+        category,
+        cand.arrival_time,
+        departureTime, // null when still on site
+        entityType,
+        entityId,
+        d.note ?? null,
       ],
     );
     const entryId = ins[0].id;
@@ -214,10 +327,10 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       fieldClass,
       entryId,
       resolvedVisitId,
+      workOrderId,
+      cand.job_id,
     );
 
-    // Keep captured-locations and visit-review in sync: confirming a match also
-    // labels the stop segment so it leaves the provisional queue.
     if (cand.location_segment_id) {
       await client.query(
         `UPDATE location_segments
@@ -228,8 +341,6 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       );
     }
 
-    // Learn-on-confirm: bootstrap missing coords, or re-learn when this stop
-    // is far from a poisoned pin (see shouldRelearnPropertyCoords).
     if (cand.property_id && cand.location_segment_id) {
       await learnPropertyCoordsFromSegment(
         client,
@@ -246,6 +357,7 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
         status: "confirmed",
         activity_entry_id: entryId,
         visit_id: resolvedVisitId,
+        work_order_id: workOrderId,
         field_day_created: fieldDay.created,
         field_day_reason: fieldDay.reason,
       },
