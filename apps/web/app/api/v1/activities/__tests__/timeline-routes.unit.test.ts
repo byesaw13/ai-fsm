@@ -556,8 +556,10 @@ const PENDING_CANDIDATE = {
   location_segment_id: SEGMENT_ID,
   property_id: "77777777-7777-7777-7777-777777777777",
   matched_client_id: "88888888-8888-8888-8888-888888888888",
-  job_id: null,
+  job_id: null as string | null,
   visit_id: VISIT_ID,
+  work_order_id: null as string | null,
+  wo_resolution: "none",
   arrival_time: "2026-06-11T12:00:00.000Z",
   departure_time: "2026-06-11T13:00:00.000Z",
 };
@@ -566,8 +568,29 @@ describe("PATCH /api/v1/visit-candidates/[id]", () => {
   it("confirms an overlapping visit candidate when rebalance is accepted", async () => {
     mockClientQuery.mockImplementation((sql: string) => {
       if (sql.includes("FROM visit_candidates")) return Promise.resolve({ rows: [PENDING_CANDIDATE] });
+      // Open WOs at property (none → resolution none)
+      if (sql.includes("FROM work_orders w") && sql.includes("JOIN jobs j")) {
+        return Promise.resolve({ rows: [] });
+      }
+      // Validate visit_id
+      if (sql.includes("FROM visits") && sql.includes("work_order_id")) {
+        return Promise.resolve({
+          rows: [{ id: VISIT_ID, job_id: "job-from-visit", work_order_id: null }],
+        });
+      }
+      // Open activity (none for closed session)
+      if (sql.includes("FROM activity_entries") && sql.includes("ended_at IS NULL")) {
+        return Promise.resolve({ rows: [] });
+      }
       if (sql.includes("FROM activity_entries") && sql.includes("FOR UPDATE")) {
-        return Promise.resolve({ rows: [{ id: MANUAL_ID, started_at: "2026-06-11T11:00:00.000Z", ended_at: "2026-06-11T12:00:00.000Z" }] });
+        return Promise.resolve({
+          rows: [{
+            id: MANUAL_ID,
+            activity_type: "admin",
+            started_at: "2026-06-11T11:00:00.000Z",
+            ended_at: "2026-06-11T12:00:00.000Z",
+          }],
+        });
       }
       if (sql.startsWith("INSERT INTO activity_entries")) return Promise.resolve({ rows: [{ id: "new-visit-entry" }] });
       if (sql.startsWith("DELETE FROM activity_entries")) return Promise.resolve({ rows: [{ ...EXISTING, id: MANUAL_ID }] });
