@@ -15,19 +15,28 @@ import {
 
 export type PendingVisitCandidate = {
   id: string;
-  location_segment_id: string;
+  location_segment_id: string | null;
   property_id: string | null;
   matched_client_id: string | null;
   job_id: string | null;
   visit_id: string | null;
+  work_order_id?: string | null;
+  wo_resolution?: string | null;
   arrival_time: string;
-  departure_time: string;
+  departure_time: string | null;
+  duration_minutes?: number | null;
 };
 
-/** Prefer the field-day visit when present so labor attaches to the calendar day. */
+/**
+ * Prefer work_order for billable assignment (arrival protocol);
+ * fall back to visit → job → client.
+ */
 export function entityLinkFromCandidate(
-  cand: Pick<PendingVisitCandidate, "job_id" | "visit_id" | "matched_client_id">,
+  cand: Pick<PendingVisitCandidate, "job_id" | "visit_id" | "matched_client_id"> & {
+    work_order_id?: string | null;
+  },
 ): [string | null, string | null] {
+  if (cand.work_order_id) return ["work_order", cand.work_order_id];
   if (cand.visit_id) return ["visit", cand.visit_id];
   if (cand.job_id) return ["job", cand.job_id];
   if (cand.matched_client_id) return ["client", cand.matched_client_id];
@@ -91,7 +100,7 @@ export async function insertVisitActivityEntry(
     sessionDate: string;
     classification: Exclude<VisitClassification, "ignore">;
     startedAt: string;
-    endedAt: string;
+    endedAt: string | null;
     entityType: string | null;
     entityId: string | null;
     note: string | null;
@@ -132,13 +141,28 @@ export async function markVisitCandidateConfirmed(
   classification: Exclude<VisitClassification, "ignore">,
   entryId: string,
   visitId?: string | null,
+  workOrderId?: string | null,
+  jobId?: string | null,
 ): Promise<void> {
   await client.query(
     `UPDATE visit_candidates
      SET status = 'confirmed', classification = $1, activity_entry_id = $2,
-         visit_id = COALESCE($5, visit_id), updated_at = now()
+         visit_id = COALESCE($5, visit_id),
+         work_order_id = COALESCE($6, work_order_id),
+         job_id = COALESCE($7, job_id),
+         wo_resolution = 'resolved',
+         confirmed_at = now(),
+         updated_at = now()
      WHERE id = $3 AND account_id = $4`,
-    [classification, entryId, candidateId, accountId, visitId ?? null],
+    [
+      classification,
+      entryId,
+      candidateId,
+      accountId,
+      visitId ?? null,
+      workOrderId ?? null,
+      jobId ?? null,
+    ],
   );
 }
 
@@ -334,9 +358,9 @@ export async function applyGpsPresenceToVisit(
 }
 
 /**
- * Auto-log a closed GPS stop against a scheduled/matched calendar visit:
- * activity_entries (job time) + candidate confirmed + visit status/times.
- * Skips when the time window already has ledger rows (avoid double-count).
+ * Stamp GPS presence on a scheduled calendar visit when a stop matches.
+ * Arrival → Assignment Protocol: does **not** write billable activity_entries
+ * and does **not** mark the visit_candidate confirmed — human confirm owns labor.
  */
 export async function autoRecordScheduledVisitPresence(
   client: PoolClient,
@@ -352,43 +376,13 @@ export async function autoRecordScheduledVisitPresence(
     visitType?: string | null;
   },
 ): Promise<{ recorded: boolean; reason: string; activityEntryId?: string }> {
-  // Sub-3-min blips: still mark arrived so the visit shows "I showed up",
-  // but don't invent billable/activity time.
-  const logTime = opts.durationMinutes >= 3;
-
-  // Classification from visit type (standard work vs pre-sale).
+  // Classification from visit type (standard work vs pre-sale) — for presence walk only.
   const classification: Exclude<VisitClassification, "ignore"> =
     opts.visitType === "site_visit"
     || opts.visitType === "sales_walkthrough"
     || opts.visitType === "realtor_baseline"
       ? "estimate_visit"
       : "job_work";
-
-  if (logTime) {
-    const { rows: overlap } = await client.query<{ id: string }>(
-      `SELECT id FROM activity_entries
-       WHERE account_id = $1 AND voided_at IS NULL
-         AND started_at < $3::timestamptz
-         AND COALESCE(ended_at, 'infinity'::timestamptz) > $2::timestamptz
-       LIMIT 1`,
-      [opts.accountId, opts.arrivalTime, opts.departureTime],
-    );
-    if (overlap[0]) {
-      // Still stamp visit presence so the calendar reflects the day.
-      await applyGpsPresenceToVisit(client, {
-        accountId: opts.accountId,
-        userId: opts.userId,
-        visitId: opts.visitId,
-        arrivalTime: opts.arrivalTime,
-        departureTime: opts.departureTime,
-        complete: shouldCompleteVisitFromPresence({
-          classification,
-          durationMinutes: opts.durationMinutes,
-        }),
-      });
-      return { recorded: false, reason: "activity_overlap" };
-    }
-  }
 
   await applyGpsPresenceToVisit(client, {
     accountId: opts.accountId,
@@ -402,35 +396,13 @@ export async function autoRecordScheduledVisitPresence(
     }),
   });
 
-  let entryId: string | undefined;
-  if (logTime) {
-    entryId = await insertVisitActivityEntry(client, {
-      accountId: opts.accountId,
-      userId: opts.userId,
-      sessionDate: opts.arrivalTime,
-      classification,
-      startedAt: opts.arrivalTime,
-      endedAt: opts.departureTime,
-      entityType: "visit",
-      entityId: opts.visitId,
-      note: "Auto-logged from GPS stop at scheduled visit",
-      businessDayId: null,
-      source: "auto_visit",
-    });
-    await markVisitCandidateConfirmed(
-      client,
-      opts.candidateId,
-      opts.accountId,
-      classification,
-      entryId,
-      opts.visitId,
-    );
-  }
+  // candidateId reserved for future audit linkage; intentionally not confirmed.
+  void opts.candidateId;
+  void opts.jobId;
 
   return {
     recorded: true,
-    reason: logTime ? "logged" : "presence_only",
-    activityEntryId: entryId,
+    reason: "presence_only",
   };
 }
 

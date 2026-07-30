@@ -57,7 +57,10 @@ export default async function DayReviewPage({
       />
       <details className="mb-8">
         <summary className="cursor-pointer font-semibold mb-4">Today&apos;s details</summary>
-        <VisitsSection visits={payload.visits} />
+        <VisitsSection
+          visits={payload.visits}
+          openWorkOrdersByProperty={payload.openWorkOrdersByProperty}
+        />
         <TimeSection timeEntries={payload.timeEntries} segments={payload.segments} gaps={payload.gaps} />
         <MileageSection mileage={payload.mileage} />
       </details>

@@ -5,6 +5,7 @@ type Visit = DayReviewPayload["visits"][number];
 export type VisitGroup = {
   /** Stable key for React + selection. */
   key: string;
+  propertyId: string | null;
   clientName: string;
   propertyName: string;
   /** Every candidate id in this property/day group. */
@@ -15,6 +16,9 @@ export type VisitGroup = {
   preSelected: boolean;
   /** Classification to use for a one-tap "confirm all in group". */
   preSelectedClassification: string;
+  workOrderId: string | null;
+  workOrderTitle: string | null;
+  woResolution: string;
 };
 
 /**
@@ -36,9 +40,15 @@ export function groupVisitsByProperty(visits: Visit[]): VisitGroup[] {
       g.maxConfidence = Math.max(g.maxConfidence, v.confidenceScore);
       g.preSelected = g.preSelected || v.preSelected;
       if (v.preSelected && v.classification) g.preSelectedClassification = v.classification;
+      if (v.woResolution === "ambiguous") g.woResolution = "ambiguous";
+      if (!g.workOrderId && v.workOrderId) {
+        g.workOrderId = v.workOrderId;
+        g.workOrderTitle = v.workOrderTitle;
+      }
     } else {
       groups.set(key, {
         key,
+        propertyId: v.propertyId,
         clientName: v.clientName,
         propertyName: v.propertyName,
         ids: [v.id],
@@ -47,6 +57,9 @@ export function groupVisitsByProperty(visits: Visit[]): VisitGroup[] {
         maxConfidence: v.confidenceScore,
         preSelected: v.preSelected,
         preSelectedClassification: v.classification ?? "job_work",
+        workOrderId: v.workOrderId,
+        workOrderTitle: v.workOrderTitle,
+        woResolution: v.woResolution,
       });
     }
   }

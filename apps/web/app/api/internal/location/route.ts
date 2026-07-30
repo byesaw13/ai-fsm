@@ -3,10 +3,21 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { getPool, queryOne } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { DETECTED_ACTIVITIES, LOCATION_EVENT_KINDS, classifyDrive, haversineMeters, pathDistanceMeters, rankVisitCandidates, shouldCreateVisitCandidate } from "@ai-fsm/domain";
+import {
+  DETECTED_ACTIVITIES,
+  LOCATION_EVENT_KINDS,
+  classifyDrive,
+  haversineMeters,
+  pathDistanceMeters,
+  rankVisitCandidates,
+  shouldCreateVisitCandidate,
+  resolveWorkOrderForProperty,
+  isLivePromptEligible,
+} from "@ai-fsm/domain";
 import type { PoolClient } from "pg";
 import { reduceLocationEvent, type OpenSegment } from "@/lib/location/segments";
 import { autoRecordScheduledVisitPresence } from "@/lib/field/confirm-visit";
+import { listOpenWorkOrdersAtProperty } from "@/lib/field/open-work-orders";
 
 export const dynamic = "force-dynamic";
 
@@ -134,6 +145,7 @@ export async function POST(req: NextRequest) {
   let mutOpenKind: string | null = null;
   let mutClosed = false;
   let segmentId: string | null = null;
+  let arrivalPrompt: ArrivalPromptPayload | null = null;
   try {
     await client.query("BEGIN");
     await client.query(
@@ -266,7 +278,7 @@ export async function POST(req: NextRequest) {
       // the account's properties (schedule + open-job signals now, distance once
       // coords are learned) and persist the top match as a pending candidate.
       if (open.kind === "stop") {
-        await detectVisitCandidate(client, accountId, open, mut.closeOpen.endedAt);
+        arrivalPrompt = await detectVisitCandidate(client, accountId, open, mut.closeOpen.endedAt);
       }
     }
     if (mut.updateOpen && open) {
@@ -318,8 +330,18 @@ export async function POST(req: NextRequest) {
     current_segment_id: segmentId,
     opened: mutOpenKind,
     closed: mutClosed,
+    ...(arrivalPrompt ? { arrival_prompt: arrivalPrompt } : {}),
   });
 }
+
+type ArrivalPromptPayload = {
+  candidate_id: string;
+  property_label: string | null;
+  wo_title: string | null;
+  wo_resolution: string;
+  deep_link: string;
+  confidence: number;
+};
 
 interface ClosedStop {
   id: string;
@@ -351,7 +373,7 @@ async function detectVisitCandidate(
   accountId: string,
   stop: ClosedStop,
   endedAt: string,
-): Promise<void> {
+): Promise<ArrivalPromptPayload | null> {
   const durationMinutes = (new Date(endedAt).getTime() - new Date(stop.startedAt).getTime()) / 60000;
 
   const { rows } = await client.query<CandidateRow & { today_visit_type: string | null; today_assigned: string | null }>(
@@ -394,7 +416,7 @@ async function detectVisitCandidate(
        AND (p.latitude IS NOT NULL OR tv.visit_id IS NOT NULL OR oj.id IS NOT NULL)`,
     [accountId, stop.startedAt],
   );
-  if (rows.length === 0) return;
+  if (rows.length === 0) return null;
 
   const ranked = rankVisitCandidates({
     stop: { latitude: stop.latitude, longitude: stop.longitude, durationMinutes },
@@ -423,64 +445,146 @@ async function detectVisitCandidate(
       hasScheduledVisit: top.visitId != null,
     })
   ) {
-    return;
+    return null;
+  }
+
+  const openWos = await listOpenWorkOrdersAtProperty(
+    client,
+    accountId,
+    top.propertyId,
+    stop.startedAt,
+  );
+  const resolution = resolveWorkOrderForProperty({
+    openWorkOrders: openWos,
+    overrideWorkOrderId: null,
+  });
+
+  // ~150 ft near band (matches domain WITHIN_NEAR_FEET)
+  const distanceProven =
+    top.distanceMeters != null && top.distanceMeters <= 150 * 0.3048;
+
+  const { rows: bd } = await client.query<{ id: string }>(
+    `SELECT id FROM business_days
+     WHERE account_id = $1 AND closed_at IS NULL
+       AND business_date = ($2::timestamptz AT TIME ZONE 'America/New_York')::date
+     LIMIT 1`,
+    [accountId, stop.startedAt],
+  );
+
+  const liveEligible = isLivePromptEligible({
+    workdayOpen: bd.length > 0,
+    confidenceScore: top.score,
+    distanceProven,
+    scheduledToday: top.visitId != null,
+    alreadyPrompted: false,
+    status: "pending",
+  });
+
+  // Prefer assignment from the resolved work order so job/visit/WO stay consistent.
+  let jobIdForInsert = top.jobId;
+  let visitIdForInsert = resolution.visitId ?? top.visitId;
+  if (resolution.workOrderId) {
+    const { rows: woRows } = await client.query<{ job_id: string }>(
+      `SELECT job_id FROM work_orders WHERE id = $1 AND account_id = $2`,
+      [resolution.workOrderId, accountId],
+    );
+    if (woRows[0]) jobIdForInsert = woRows[0].job_id;
+    visitIdForInsert = resolution.visitId ?? null;
+    // If resolution has no visit, keep top.visitId only when it is on the same WO/job.
+    if (!visitIdForInsert && top.visitId) {
+      const { rows: vRows } = await client.query<{ work_order_id: string | null; job_id: string }>(
+        `SELECT work_order_id, job_id FROM visits WHERE id = $1 AND account_id = $2`,
+        [top.visitId, accountId],
+      );
+      const v = vRows[0];
+      if (
+        v &&
+        (v.work_order_id === resolution.workOrderId || v.job_id === jobIdForInsert)
+      ) {
+        visitIdForInsert = top.visitId;
+      }
+    }
   }
 
   const { rows: inserted } = await client.query<{ id: string }>(
     `INSERT INTO visit_candidates
        (account_id, location_segment_id, property_id, matched_client_id, job_id, visit_id,
+        work_order_id, wo_resolution, live_eligible,
         distance_meters, confidence_score, arrival_time, departure_time, duration_minutes)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
      ON CONFLICT (location_segment_id) DO NOTHING
      RETURNING id`,
     [
-      accountId, stop.id, top.propertyId, top.clientId, top.jobId, top.visitId,
-      top.distanceMeters, top.score, stop.startedAt, endedAt, Math.round(durationMinutes),
+      accountId,
+      stop.id,
+      top.propertyId,
+      top.clientId,
+      jobIdForInsert,
+      visitIdForInsert,
+      resolution.workOrderId,
+      resolution.status,
+      liveEligible,
+      top.distanceMeters,
+      top.score,
+      stop.startedAt,
+      endedAt,
+      Math.round(durationMinutes),
     ],
   );
   const candidateId = inserted[0]?.id;
-  if (!candidateId || !top.visitId) return;
+  if (!candidateId) return null;
 
-  // Matched a calendar visit for today → auto-record presence + job time so
-  // the visit shows "I was there" without waiting on day-review confirm.
-  const matchRow = rows.find((r) => r.today_visit_id === top.visitId);
-  let userId = matchRow?.today_assigned ?? null;
-  if (!userId) {
-    const { rows: owners } = await client.query<{ id: string }>(
-      `SELECT id FROM users
-       WHERE account_id = $1 AND role = 'owner'
-       ORDER BY created_at ASC LIMIT 1`,
-      [accountId],
-    );
-    userId = owners[0]?.id ?? null;
+  // Presence-only on scheduled visit linked to this assignment.
+  if (visitIdForInsert) {
+    const matchRow = rows.find((r) => r.today_visit_id === visitIdForInsert);
+    let userId = matchRow?.today_assigned ?? null;
+    if (!userId) {
+      const { rows: owners } = await client.query<{ id: string }>(
+        `SELECT id FROM users
+         WHERE account_id = $1 AND role = 'owner'
+         ORDER BY created_at ASC LIMIT 1`,
+        [accountId],
+      );
+      userId = owners[0]?.id ?? null;
+    }
+    if (userId) {
+      await client.query(
+        `SELECT set_config('app.current_user_id', $1, true)`,
+        [userId],
+      );
+      await autoRecordScheduledVisitPresence(client, {
+        accountId,
+        userId,
+        candidateId,
+        visitId: visitIdForInsert,
+        jobId: jobIdForInsert,
+        arrivalTime: stop.startedAt,
+        departureTime: endedAt,
+        durationMinutes: Math.round(durationMinutes),
+        visitType: matchRow?.today_visit_type ?? null,
+      });
+    }
   }
-  if (!userId) return;
 
-  // activity_entries insert needs a user role context for RLS with-check.
-  await client.query(
-    `SELECT set_config('app.current_user_id', $1, true)`,
-    [userId],
+  if (!liveEligible) return null;
+
+  const woTitle =
+    resolution.options.find((o) => o.id === resolution.workOrderId)?.title ?? null;
+  const { rows: propRows } = await client.query<{ address: string | null; client_name: string | null }>(
+    `SELECT p.address, c.name AS client_name
+     FROM properties p
+     LEFT JOIN clients c ON c.id = p.client_id
+     WHERE p.id = $1 AND p.account_id = $2`,
+    [top.propertyId, accountId],
   );
+  const propertyLabel = propRows[0]?.address ?? propRows[0]?.client_name ?? null;
 
-  const recorded = await autoRecordScheduledVisitPresence(client, {
-    accountId,
-    userId,
-    candidateId,
-    visitId: top.visitId,
-    jobId: top.jobId,
-    arrivalTime: stop.startedAt,
-    departureTime: endedAt,
-    durationMinutes: Math.round(durationMinutes),
-    visitType: matchRow?.today_visit_type ?? null,
-  });
-
-  if (recorded.activityEntryId) {
-    await client.query(
-      `UPDATE location_segments
-       SET status = 'confirmed', activity_entry_id = $1,
-           suggested_activity_type = 'job_work', updated_at = now()
-       WHERE id = $2 AND account_id = $3 AND status = 'provisional'`,
-      [recorded.activityEntryId, stop.id, accountId],
-    );
-  }
+  return {
+    candidate_id: candidateId,
+    property_label: propertyLabel,
+    wo_title: woTitle,
+    wo_resolution: resolution.status,
+    deep_link: `/app/my-work?proposal=${candidateId}`,
+    confidence: top.score,
+  };
 }

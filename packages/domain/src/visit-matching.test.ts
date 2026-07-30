@@ -8,7 +8,11 @@ import {
   shouldEnsureFieldDayVisit,
   shouldRelearnPropertyCoords,
   PROPERTY_COORD_RELEARN_METERS,
+  resolveWorkOrderForProperty,
+  isLivePromptEligible,
+  LIVE_PROMPT_CONFIDENCE_FLOOR,
   type VisitMatchCandidate,
+  type OpenWorkOrderOption,
 } from "./visit-matching";
 
 const prop = (over: Partial<VisitMatchCandidate> & { propertyId: string; clientId: string }): VisitMatchCandidate => ({
@@ -194,5 +198,98 @@ describe("shouldCreateVisitCandidate (TASK-079 dwell floor)", () => {
   });
   it("keeps even a brief stop when a visit is scheduled there today", () => {
     expect(shouldCreateVisitCandidate({ score: 90, durationMinutes: 0, hasScheduledVisit: true })).toBe(true);
+  });
+});
+
+const wo = (id: string, extra: Partial<OpenWorkOrderOption> = {}): OpenWorkOrderOption => ({
+  id,
+  title: `WO ${id}`,
+  status: "scheduled",
+  scheduledToday: false,
+  ...extra,
+});
+
+describe("resolveWorkOrderForProperty", () => {
+  it("returns clear when exactly one open WO", () => {
+    const r = resolveWorkOrderForProperty({ openWorkOrders: [wo("a")], overrideWorkOrderId: null });
+    expect(r).toEqual({
+      status: "clear",
+      workOrderId: "a",
+      visitId: null,
+      options: [expect.objectContaining({ id: "a" })],
+    });
+  });
+
+  it("returns ambiguous when multiple open WOs even if one is scheduled today", () => {
+    const r = resolveWorkOrderForProperty({
+      openWorkOrders: [wo("a", { scheduledToday: true, visitId: "v1" }), wo("b")],
+      overrideWorkOrderId: null,
+    });
+    expect(r.status).toBe("ambiguous");
+    expect(r.workOrderId).toBeNull();
+    expect(r.options).toHaveLength(2);
+  });
+
+  it("returns none when no open WOs", () => {
+    const r = resolveWorkOrderForProperty({ openWorkOrders: [], overrideWorkOrderId: null });
+    expect(r.status).toBe("none");
+    expect(r.workOrderId).toBeNull();
+  });
+
+  it("honors override when it matches an open WO", () => {
+    const r = resolveWorkOrderForProperty({
+      openWorkOrders: [wo("a"), wo("b", { visitId: "v2", scheduledToday: true })],
+      overrideWorkOrderId: "b",
+    });
+    expect(r).toEqual({
+      status: "clear",
+      workOrderId: "b",
+      visitId: "v2",
+      options: expect.any(Array),
+    });
+  });
+
+  it("ignores override that is not in the open list", () => {
+    const r = resolveWorkOrderForProperty({
+      openWorkOrders: [wo("a"), wo("b")],
+      overrideWorkOrderId: "zzz",
+    });
+    expect(r.status).toBe("ambiguous");
+  });
+});
+
+describe("isLivePromptEligible", () => {
+  const base = {
+    workdayOpen: true,
+    confidenceScore: 90,
+    distanceProven: true,
+    scheduledToday: true,
+    alreadyPrompted: false,
+    status: "pending" as const,
+  };
+
+  it("true when all high bars pass", () => {
+    expect(isLivePromptEligible(base)).toBe(true);
+  });
+
+  it("false when workday closed", () => {
+    expect(isLivePromptEligible({ ...base, workdayOpen: false })).toBe(false);
+  });
+
+  it("false when confidence below floor", () => {
+    expect(isLivePromptEligible({ ...base, confidenceScore: LIVE_PROMPT_CONFIDENCE_FLOOR - 1 })).toBe(false);
+  });
+
+  it("false when not distance-proven", () => {
+    expect(isLivePromptEligible({ ...base, distanceProven: false })).toBe(false);
+  });
+
+  it("false when not scheduled today", () => {
+    expect(isLivePromptEligible({ ...base, scheduledToday: false })).toBe(false);
+  });
+
+  it("false when already prompted or not pending", () => {
+    expect(isLivePromptEligible({ ...base, alreadyPrompted: true })).toBe(false);
+    expect(isLivePromptEligible({ ...base, status: "confirmed" })).toBe(false);
   });
 });

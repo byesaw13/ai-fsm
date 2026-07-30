@@ -245,3 +245,78 @@ export const CLASSIFICATION_TO_ACTIVITY: Record<Exclude<VisitClassification, "ig
   material_drop: "material_run",
   realtor: "follow_up",
 };
+
+// ---------------------------------------------------------------------------
+// Arrival → Assignment Protocol (WO resolution + live prompt)
+// ---------------------------------------------------------------------------
+
+/** High bar for interrupting the tech with a live push/banner (stricter than VISIT_CONFIDENCE_FLOOR). */
+export const LIVE_PROMPT_CONFIDENCE_FLOOR = 70;
+
+export type OpenWorkOrderOption = {
+  id: string;
+  title: string;
+  status: string;
+  /** True if this WO has a non-cancelled visit scheduled for the stop's local day. */
+  scheduledToday: boolean;
+  visitId?: string | null;
+};
+
+export type WorkOrderResolution = {
+  status: "clear" | "ambiguous" | "none";
+  workOrderId: string | null;
+  visitId: string | null;
+  options: OpenWorkOrderOption[];
+};
+
+/**
+ * Product rule: multiple open WOs → always ambiguous unless override picks one.
+ * Single open WO → clear. Zero → none.
+ */
+export function resolveWorkOrderForProperty(input: {
+  openWorkOrders: OpenWorkOrderOption[];
+  overrideWorkOrderId?: string | null;
+}): WorkOrderResolution {
+  const options = input.openWorkOrders;
+  if (input.overrideWorkOrderId) {
+    const hit = options.find((o) => o.id === input.overrideWorkOrderId);
+    if (hit) {
+      return {
+        status: "clear",
+        workOrderId: hit.id,
+        visitId: hit.visitId ?? null,
+        options,
+      };
+    }
+  }
+  if (options.length === 0) {
+    return { status: "none", workOrderId: null, visitId: null, options };
+  }
+  if (options.length === 1) {
+    const only = options[0];
+    return {
+      status: "clear",
+      workOrderId: only.id,
+      visitId: only.visitId ?? null,
+      options,
+    };
+  }
+  return { status: "ambiguous", workOrderId: null, visitId: null, options };
+}
+
+export function isLivePromptEligible(input: {
+  workdayOpen: boolean;
+  confidenceScore: number;
+  distanceProven: boolean;
+  scheduledToday: boolean;
+  alreadyPrompted: boolean;
+  status: "pending" | "confirmed" | "ignored" | string;
+}): boolean {
+  if (input.status !== "pending") return false;
+  if (input.alreadyPrompted) return false;
+  if (!input.workdayOpen) return false;
+  if (!input.scheduledToday) return false;
+  if (!input.distanceProven) return false;
+  if (input.confidenceScore < LIVE_PROMPT_CONFIDENCE_FLOOR) return false;
+  return true;
+}

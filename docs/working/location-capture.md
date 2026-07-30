@@ -39,7 +39,34 @@ HA Companion app (zones + background GPS + detected-activity)
   | `detected_activity` | enum | `still` \| `walking` \| `running` \| `in_vehicle` \| `cycling` \| `unknown` |
   | `external_id` | string | optional idempotency key (HA retries are de-duped) |
 
-- Response: `{ ok, current_segment_id, opened, closed }` (or `{ duplicate: true }`).
+- Response: `{ ok, current_segment_id, opened, closed, arrival_prompt? }` (or `{ duplicate: true }`).
+
+### arrival_prompt (optional)
+
+When a closed stop creates a **live-eligible** pending `visit_candidate`, the
+response may include:
+
+```json
+{
+  "arrival_prompt": {
+    "candidate_id": "uuid",
+    "property_label": "68 Claremont",
+    "wo_title": "Kitchen refresh",
+    "wo_resolution": "clear",
+    "deep_link": "/app/my-work?proposal=uuid",
+    "confidence": 92
+  }
+}
+```
+
+HA automation: if `arrival_prompt` is present, send a Companion notification
+with that deep link, then ack:
+
+`POST /api/internal/arrival-prompt`  
+Header: `x-api-key: $LOCATION_INTERNAL_KEY`  
+Body: `{ "candidate_id": "uuid", "action": "prompted" }`
+
+This stamps `visit_candidates.live_prompted_at` so the tech is only interrupted once.
 
 ### Example payloads
 
