@@ -49,7 +49,8 @@ export function VisitsSection({
             classification:
               classification === "ignore" ? undefined : toApiClassification(classification),
             work_order_id: workOrderId || undefined,
-            switch_activity: true,
+            // Day Review is usually closed sessions — do not force-switch/backdate open activities.
+            switch_activity: false,
           }),
         });
         if (!res.ok) {

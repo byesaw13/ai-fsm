@@ -480,8 +480,31 @@ async function detectVisitCandidate(
     status: "pending",
   });
 
-  const visitIdForInsert = resolution.visitId ?? top.visitId;
-  const jobIdForInsert = top.jobId;
+  // Prefer assignment from the resolved work order so job/visit/WO stay consistent.
+  let jobIdForInsert = top.jobId;
+  let visitIdForInsert = resolution.visitId ?? top.visitId;
+  if (resolution.workOrderId) {
+    const { rows: woRows } = await client.query<{ job_id: string }>(
+      `SELECT job_id FROM work_orders WHERE id = $1 AND account_id = $2`,
+      [resolution.workOrderId, accountId],
+    );
+    if (woRows[0]) jobIdForInsert = woRows[0].job_id;
+    visitIdForInsert = resolution.visitId ?? null;
+    // If resolution has no visit, keep top.visitId only when it is on the same WO/job.
+    if (!visitIdForInsert && top.visitId) {
+      const { rows: vRows } = await client.query<{ work_order_id: string | null; job_id: string }>(
+        `SELECT work_order_id, job_id FROM visits WHERE id = $1 AND account_id = $2`,
+        [top.visitId, accountId],
+      );
+      const v = vRows[0];
+      if (
+        v &&
+        (v.work_order_id === resolution.workOrderId || v.job_id === jobIdForInsert)
+      ) {
+        visitIdForInsert = top.visitId;
+      }
+    }
+  }
 
   const { rows: inserted } = await client.query<{ id: string }>(
     `INSERT INTO visit_candidates
@@ -511,10 +534,9 @@ async function detectVisitCandidate(
   const candidateId = inserted[0]?.id;
   if (!candidateId) return null;
 
-  // Presence-only on scheduled visit: stamp calendar visit, leave candidate pending
-  // for human confirm of billable activity (arrival assignment protocol).
-  if (top.visitId) {
-    const matchRow = rows.find((r) => r.today_visit_id === top.visitId);
+  // Presence-only on scheduled visit linked to this assignment.
+  if (visitIdForInsert) {
+    const matchRow = rows.find((r) => r.today_visit_id === visitIdForInsert);
     let userId = matchRow?.today_assigned ?? null;
     if (!userId) {
       const { rows: owners } = await client.query<{ id: string }>(
@@ -534,8 +556,8 @@ async function detectVisitCandidate(
         accountId,
         userId,
         candidateId,
-        visitId: top.visitId,
-        jobId: top.jobId,
+        visitId: visitIdForInsert,
+        jobId: jobIdForInsert,
         arrivalTime: stop.startedAt,
         departureTime: endedAt,
         durationMinutes: Math.round(durationMinutes),

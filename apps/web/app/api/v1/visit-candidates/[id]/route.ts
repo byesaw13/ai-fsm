@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth, type AuthSession } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
-import { canViewReports } from "@/lib/auth/permissions";
+import { canTransitionVisit } from "@/lib/auth/permissions";
 import { logger } from "@/lib/logger";
 import {
   applyRebalance,
@@ -77,7 +77,8 @@ type CandidateRow = {
 };
 
 export const PATCH = withAuth(async (request: NextRequest, session: AuthSession) => {
-  if (!canViewReports(session.role)) {
+  // Field techs confirm on-site arrivals; owner/admin too (canTransitionVisit).
+  if (!canTransitionVisit(session.role)) {
     return err("FORBIDDEN", "Not permitted", 403, session.traceId);
   }
   const id = idFromPath(request);
@@ -177,22 +178,40 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
 
     const departureTime = cand.departure_time;
 
-    // Switch open activity if requested (one open activity per account).
-    const { rows: openActs } = await client.query<{ id: string }>(
-      `SELECT id FROM activity_entries
+    // Switch open activity only when confirming an open (still-on-site) proposal
+    // that needs to replace the active entry. Never backdate close to a past
+    // candidate arrival for closed historical sessions.
+    const stillOnSite = departureTime == null;
+    const { rows: openActs } = await client.query<{ id: string; started_at: string }>(
+      `SELECT id, started_at::text FROM activity_entries
        WHERE account_id = $1 AND voided_at IS NULL AND ended_at IS NULL
        FOR UPDATE`,
       [session.accountId],
     );
-    if (openActs[0] && d.switch_activity) {
+    if (openActs[0] && stillOnSite && d.switch_activity !== false) {
+      const closeAt = new Date().toISOString();
+      const openStart = new Date(openActs[0].started_at).getTime();
+      if (new Date(closeAt).getTime() <= openStart) {
+        await client.query("ROLLBACK");
+        return NextResponse.json(
+          {
+            error: {
+              code: "activity_open",
+              message: "Cannot switch activity with invalid time boundary",
+              open_activity_id: openActs[0].id,
+              traceId: session.traceId,
+            },
+          },
+          { status: 409 },
+        );
+      }
       await client.query(
         `UPDATE activity_entries
          SET ended_at = $1::timestamptz, updated_at = now()
          WHERE id = $2 AND account_id = $3 AND ended_at IS NULL`,
-        [cand.arrival_time, openActs[0].id, session.accountId],
+        [closeAt, openActs[0].id, session.accountId],
       );
-    } else if (openActs[0] && !departureTime) {
-      // Opening a new open activity while one is running without switch.
+    } else if (openActs[0] && stillOnSite) {
       await client.query("ROLLBACK");
       return NextResponse.json(
         {
@@ -221,7 +240,8 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       ],
     );
     // Filter out the activity we just closed via switch (if any).
-    const overlapFiltered = openActs[0] && d.switch_activity
+    const switchedOpen = openActs[0] && stillOnSite && d.switch_activity !== false;
+    const overlapFiltered = switchedOpen
       ? overlap.filter((r) => r.id !== openActs[0].id)
       : overlap;
 
@@ -254,7 +274,46 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
       );
     }
 
-    const visitOverride = d.visit_id ?? cand.visit_id;
+    let visitOverride = d.visit_id ?? cand.visit_id;
+    // Validate visit override belongs to this account and (when known) WO/job.
+    if (visitOverride) {
+      const { rows: visitCheck } = await client.query<{
+        id: string;
+        job_id: string;
+        work_order_id: string | null;
+      }>(
+        `SELECT id, job_id, work_order_id FROM visits
+         WHERE id = $1 AND account_id = $2`,
+        [visitOverride, session.accountId],
+      );
+      const v = visitCheck[0];
+      if (!v) {
+        await client.query("ROLLBACK");
+        return err("VALIDATION_ERROR", "visit_id not found", 422, session.traceId);
+      }
+      if (workOrderId && v.work_order_id && v.work_order_id !== workOrderId) {
+        await client.query("ROLLBACK");
+        return err("VALIDATION_ERROR", "visit_id does not match work order", 422, session.traceId);
+      }
+      if (cand.job_id && v.job_id !== cand.job_id && !workOrderId) {
+        await client.query("ROLLBACK");
+        return err("VALIDATION_ERROR", "visit_id does not match job", 422, session.traceId);
+      }
+      // Prefer job from the visit when WO-linked.
+      if (workOrderId && v.work_order_id === workOrderId) {
+        cand.job_id = v.job_id;
+      }
+    }
+
+    // When WO is resolved, derive job_id from that WO for consistent assignment.
+    if (workOrderId) {
+      const { rows: woJob } = await client.query<{ job_id: string }>(
+        `SELECT job_id FROM work_orders WHERE id = $1 AND account_id = $2`,
+        [workOrderId, session.accountId],
+      );
+      if (woJob[0]) cand.job_id = woJob[0].job_id;
+    }
+
     // Multi-day T&M: ensure a calendar field day. Still-on-site uses arrival as
     // departure so duration stays 0 (presence/arrived only, no auto-complete).
     const departureForFieldDay = departureTime ?? cand.arrival_time;

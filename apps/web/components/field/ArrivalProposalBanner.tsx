@@ -48,7 +48,8 @@ export function ArrivalProposalBanner({
           action,
           classification: action === "confirm" ? "job_work" : undefined,
           work_order_id: action === "confirm" ? woId ?? undefined : undefined,
-          switch_activity: true,
+          // Only switch when confirming still-on-site (open proposal).
+          switch_activity: action === "confirm" && !top.departureTime,
         }),
       });
       if (!res.ok) {
