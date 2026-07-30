@@ -399,13 +399,14 @@ async function detectVisitCandidate(
        LIMIT 1
      ) tv ON true
      LEFT JOIN LATERAL (
-       -- Include recently completed jobs so a false closeout (or same-week
-       -- multi-day T&M) still matches on-site stops for field-day creation.
+       -- Active jobs + recently *completed* (false closeout / multi-day T&M).
+       -- Exclude *invoiced*: that kept Brian Floss scoring at home for 14 days
+       -- after the job was billed. Distance hard-gate still applies separately.
        SELECT j.id FROM jobs j
        WHERE j.property_id = p.id
          AND (
            j.status IN ('scheduled','in_progress')
-           OR (j.status IN ('completed','invoiced') AND j.updated_at >= now() - interval '14 days')
+           OR (j.status = 'completed' AND j.updated_at >= now() - interval '14 days')
          )
        ORDER BY
          CASE WHEN j.status IN ('scheduled','in_progress') THEN 0 ELSE 1 END,
@@ -443,6 +444,7 @@ async function detectVisitCandidate(
       score: top.score,
       durationMinutes,
       hasScheduledVisit: top.visitId != null,
+      distanceMeters: top.distanceMeters,
     })
   ) {
     return null;
