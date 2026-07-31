@@ -238,6 +238,7 @@ No new migration — `due_date` is already nullable.
 
 # TASK-081: Job Ledger — estimate vs actual on the project page
 
+
 Status:
 In Progress
 
@@ -279,6 +280,133 @@ Acceptance Criteria:
 Notes:
 Spec: `docs/superpowers/specs/2026-07-30-job-ledger-design.md`.
 PR: feat/job-ledger.
+
+# TASK-085: Materials catalog schema (avg, count, SKU unique)
+
+Status:
+In Progress
+
+Phase:
+3
+
+Problem:
+`materials_price_book` stores a single unit cost and optional SKU, but cannot
+represent last-paid vs average paid, has no purchase count, and has no unique
+index on SKU — so barcode identity is weak.
+
+Business Value:
+A durable materials price identity so the same SKU does not fork into many
+name-based rows and pricing decisions use real paid history.
+
+Scope:
+- Additive migration: `avg_paid_cents`, `purchase_count`, partial unique index
+  on `(account_id, lower(btrim(sku)))` for active rows with non-empty SKU.
+- Expose new fields on materials API GET/POST/PATCH responses.
+- Spec: `docs/superpowers/specs/2026-07-31-materials-catalog-receipt-learning-design.md`.
+
+Out of Scope:
+- Full purchase observation history table.
+- Estimate auto-fill from catalog.
+
+Acceptance Criteria:
+- [ ] Migration is additive and reversible in comments.
+- [ ] Active rows cannot share the same SKU within an account.
+- [ ] API returns `avg_paid_cents` and `purchase_count`.
+
+# TASK-086: Learn materials catalog from receipt line items
+
+Status:
+In Progress
+
+Phase:
+3
+
+Problem:
+Itemized receipt lines (with SKU and unit cost) never update
+`materials_price_book`, so the catalog stays empty unless filled by hand.
+
+Business Value:
+Every materials receipt automatically improves the price catalog used for
+future estimates and job costing judgment.
+
+Scope:
+- `learnMaterialsFromLineItems` helper: match SKU first, else name+unit;
+  update last paid (`unit_cost_cents`), rolling average, purchase_count,
+  last_purchased_at, supplier.
+- Call after successful materials line-items save (non-fatal on error).
+- Unit tests for average math and match order.
+
+Out of Scope:
+- Learning non-`materials` categories.
+- Blocking expense save if learn fails.
+
+Acceptance Criteria:
+- [ ] Saving materials line items upserts catalog rows by SKU when present.
+- [ ] Second purchase of the same SKU updates last paid and average correctly.
+- [ ] Learn failure does not fail the line-items API response.
+
+# TASK-087: Materials catalog UI + SKU search
+
+Status:
+In Progress
+
+Phase:
+3
+
+Problem:
+There is no product UI for browsing or editing the materials price catalog
+(the service Price Book is a different catalog).
+
+Business Value:
+Owner can look up last/avg paid by name or barcode when pricing a job or
+checking spend patterns.
+
+Scope:
+- Page `/app/materials` with search (name/SKU), category/supplier filters,
+  last/avg/count display, edit/deactivate.
+- Settings link next to Price Book / Expenses.
+- GET `/api/v1/materials` search includes SKU.
+
+Out of Scope:
+- Field tech primary nav entry.
+- Estimate material picker integration.
+
+Acceptance Criteria:
+- [ ] Owner/admin can open Materials Catalog, search by SKU, edit a row.
+- [ ] Settings exposes the link.
+- [ ] Empty state points at receipt upload and import.
+
+# TASK-088: Home Depot purchase history import
+
+Status:
+In Progress
+
+Phase:
+3
+
+Problem:
+Years of HD purchase history already exist as CSV in-repo but are not in the
+catalog.
+
+Business Value:
+Seed thousands of real SKU/prices immediately so the catalog is useful before
+the next receipt is scanned.
+
+Scope:
+- Owner-only `POST /api/v1/materials/import` accepting HD-style CSV (or text).
+- Map SKU Number, SKU Description, Net Unit Price, Date, Department → catalog
+  learn path; skip invalid/negative rows with a summary response.
+- Optional script wrapping the same parser for ops.
+
+Out of Scope:
+- Continuous sync with HD accounts.
+- Multi-format vendor adapters beyond HD export columns.
+
+Acceptance Criteria:
+- [ ] Importing the in-repo HD CSV produces catalog rows keyed by SKU.
+- [ ] Response reports imported / skipped / sample errors.
+- [ ] Re-import updates last/avg rather than creating duplicates for same SKU.
+
 
 ## Completed
 

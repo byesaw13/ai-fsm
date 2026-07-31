@@ -44,12 +44,23 @@ export const GET = withAuth(async (request: NextRequest, session: AuthSession) =
     params.push(category);
   }
   if (search) {
-    conditions.push(`lower(name) LIKE $${idx++}`);
+    conditions.push(
+      `(lower(name) LIKE $${idx} OR lower(coalesce(sku, '')) LIKE $${idx} OR lower(coalesce(supplier, '')) LIKE $${idx})`,
+    );
     params.push(`%${search.toLowerCase()}%`);
+    idx++;
+  }
+
+  const supplier = searchParams.get("supplier");
+  if (supplier) {
+    conditions.push(`lower(coalesce(supplier, '')) = lower($${idx++})`);
+    params.push(supplier);
   }
 
   const rows = await query(
-    `SELECT id, name, brand, category, unit, unit_cost_cents, supplier, sku, last_purchased_at, notes, updated_at
+    `SELECT id, name, brand, category, unit, unit_cost_cents, supplier, sku,
+            last_purchased_at, notes, updated_at,
+            avg_paid_cents, purchase_count
      FROM materials_price_book
      WHERE ${conditions.join(" AND ")}
      ORDER BY category, name`,
@@ -58,6 +69,7 @@ export const GET = withAuth(async (request: NextRequest, session: AuthSession) =
 
   return NextResponse.json({ data: rows });
 });
+
 
 export const POST = withAuth(async (request: NextRequest, session: AuthSession) => {
   let body: unknown = {};
@@ -95,8 +107,9 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
     for (const item of items) {
       const { rows } = await client.query(
         `INSERT INTO materials_price_book
-           (account_id, name, brand, category, unit, unit_cost_cents, supplier, sku, last_purchased_at, notes, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           (account_id, name, brand, category, unit, unit_cost_cents, supplier, sku,
+            last_purchased_at, notes, created_by, avg_paid_cents, purchase_count)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $6, 1)
          ON CONFLICT (account_id, lower(name), unit) DO UPDATE SET
            unit_cost_cents   = EXCLUDED.unit_cost_cents,
            brand             = COALESCE(EXCLUDED.brand, materials_price_book.brand),
@@ -104,6 +117,16 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
            sku               = COALESCE(EXCLUDED.sku, materials_price_book.sku),
            last_purchased_at = COALESCE(EXCLUDED.last_purchased_at, materials_price_book.last_purchased_at),
            notes             = COALESCE(EXCLUDED.notes, materials_price_book.notes),
+           avg_paid_cents    = CASE
+             WHEN materials_price_book.purchase_count <= 0 THEN EXCLUDED.unit_cost_cents
+             ELSE ROUND(
+               (COALESCE(materials_price_book.avg_paid_cents, materials_price_book.unit_cost_cents)
+                 * materials_price_book.purchase_count
+                 + EXCLUDED.unit_cost_cents)::numeric
+               / (materials_price_book.purchase_count + 1)
+             )::int
+           END,
+           purchase_count    = materials_price_book.purchase_count + 1,
            updated_at        = now()
          RETURNING *`,
         [
