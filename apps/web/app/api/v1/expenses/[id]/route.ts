@@ -4,7 +4,7 @@ import { withAuth, withRole } from "@/lib/auth/middleware";
 import { withExpenseContext } from "@/lib/expenses/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
-import { expenseCategorySchema } from "@ai-fsm/domain";
+import { expenseCategorySchema, EXPENSE_COMMERCIAL_TAGS } from "@ai-fsm/domain";
 import { getPathId } from "@/lib/route-utils";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +64,8 @@ export const GET = withAuth(async (request, session) => {
 
 // === Update Expense (PATCH /api/v1/expenses/[id]) ===
 
+const commercialTagSchema = z.enum(EXPENSE_COMMERCIAL_TAGS);
+
 const updateExpenseSchema = z.object({
   vendor_name: z.string().min(1).max(200).optional(),
   category: expenseCategorySchema.optional(),
@@ -75,6 +77,7 @@ const updateExpenseSchema = z.object({
   job_id: z.string().uuid().nullable().optional(),
   client_id: z.string().uuid().nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
+  commercial_tag: commercialTagSchema.nullable().optional(),
 });
 
 export const PATCH = withRole(["owner", "admin"], async (request, session) => {
@@ -150,6 +153,7 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         "job_id",
         "client_id",
         "notes",
+        "commercial_tag",
       ] as const;
 
       for (const key of allowed) {

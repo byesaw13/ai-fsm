@@ -35,6 +35,8 @@ import { LinkForgottenExpensesPanel } from "@/components/invoices/LinkForgottenE
 import { fetchJobMaterialExpenses, type JobMaterialExpenseWithLines } from "@/lib/invoices/job-expenses";
 import { withExpenseContext } from "@/lib/expenses/db";
 import { JobMaterialsPanel } from "./JobMaterialsPanel";
+import { JobLedgerCard } from "./JobLedgerCard";
+import { loadJobLedger } from "@/lib/jobs/job-ledger";
 import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { isHomeboxEnabled } from "@/lib/homebox/client";
 import { withAssetContext, listAssetLinks } from "@/lib/homebox/db";
@@ -625,6 +627,45 @@ export default async function JobDetailPage({
   const materialsReceiptCostCents = jobMaterialExpenses.reduce((sum, e) => sum + e.amount_cents, 0);
   const estimatedLaborCents = commercialCounts?.estimated_labor_cost_cents ?? null;
   const trackedMinutes = Number(commercialCounts?.tracked_labor_minutes ?? 0);
+
+  // Non-materials job expenses (lift/tools/other) so equipment actuals are not dropped
+  // when materials preload is supplied.
+  const otherJobExpenses =
+    !isTech
+      ? await queryForSession<{
+          amount_cents: number;
+          commercial_tag: string | null;
+          category: string;
+          notes: string | null;
+          vendor_name: string;
+        }>(
+          session,
+          `SELECT amount_cents, commercial_tag, category, notes, vendor_name
+           FROM expenses
+           WHERE account_id = $2 AND job_id = $1 AND category <> 'materials'`,
+          [id, session.accountId],
+        ).catch(() => [])
+      : [];
+
+  const jobLedger =
+    !isTech
+      ? await loadJobLedger(session, id, {
+          trackedLaborMinutes: trackedMinutes,
+          materialsExpenses: jobMaterialExpenses.map((e) => ({
+            amount_cents: e.amount_cents,
+            commercial_tag: e.commercial_tag,
+            notes: e.notes,
+            vendor_name: e.vendor_name,
+          })),
+          otherExpenses: otherJobExpenses.map((e) => ({
+            amount_cents: e.amount_cents,
+            commercial_tag: e.commercial_tag,
+            category: e.category,
+            notes: e.notes,
+            vendor_name: e.vendor_name,
+          })),
+        }).catch(() => null)
+      : null;
   const laborMargin = laborCostForMargin({
     trackedMinutes,
     estimatedLaborCostCents: estimatedLaborCents,
@@ -1245,11 +1286,35 @@ export default async function JobDetailPage({
 
           {/* Materials: linked receipts + collapsed "link unassigned" (not a second card) */}
           {!isTech && (jobMaterialExpenses.length > 0 || canLinkExpenses) && (
-            <Card data-testid="job-materials-panel">
+            <Card id="job-materials" data-testid="job-materials-panel">
               <SectionHeader
                 title="Materials"
                 count={jobMaterialExpenses.length > 0 ? jobMaterialExpenses.length : undefined}
               />
+              {jobLedger?.rows.find((r) => r.bucket === "materials")?.estimateCents != null ? (
+                <p
+                  style={{
+                    margin: "0 0 var(--space-2)",
+                    fontSize: "var(--text-sm)",
+                    color: "var(--fg-muted)",
+                  }}
+                  data-testid="materials-allowance-remaining"
+                >
+                  Allowance{" "}
+                  {formatCents(jobLedger.rows.find((r) => r.bucket === "materials")!.estimateCents!)}
+                  {" · "}
+                  Spent{" "}
+                  {formatCents(jobLedger.rows.find((r) => r.bucket === "materials")!.actualCents)}
+                  {" · "}
+                  {(() => {
+                    const m = jobLedger.rows.find((r) => r.bucket === "materials")!;
+                    const v = (m.estimateCents ?? 0) - m.actualCents;
+                    return v >= 0
+                      ? `${formatCents(v)} remaining`
+                      : `${formatCents(-v)} over`;
+                  })()}
+                </p>
+              ) : null}
               <JobMaterialsPanel expenses={jobMaterialExpenses} />
               {canLinkExpenses && (
                 <LinkForgottenExpensesPanel mode="job" jobId={job.id} />
@@ -1393,21 +1458,21 @@ export default async function JobDetailPage({
               />
             )}
 
-            {/* Commercial links — estimates, invoices, materials plan, change orders */}
-            <Card>
-              <SectionHeader
-                title="Commercial"
-                action={
-                  commercialCounts?.booking_pricing_mode === "hourly_internal" ? (
-                    <LinkButton
-                      href={`/app/invoices/new?job_id=${job.id}${job.client_id ? `&client_id=${job.client_id}` : ""}`}
-                      variant="secondary"
-                      size="sm"
-                      data-testid="new-invoice-btn"
-                    >
-                      + Invoice Draft
-                    </LinkButton>
-                  ) : (
+            {/* Job Ledger — customer commercial spine (estimate vs actual) */}
+            {jobLedger ? (
+              <JobLedgerCard
+                ledger={jobLedger}
+                jobId={job.id}
+                clientId={job.client_id ?? null}
+                estimateCount={estimateCount}
+                invoiceCount={invoiceCount}
+                canCreateInvoice={canTransition || canEstimate}
+              />
+            ) : (
+              <Card>
+                <SectionHeader
+                  title="Commercial"
+                  action={
                     <LinkButton
                       href={`/app/estimates/new?job_id=${job.id}&client_id=${job.client_id ?? ""}&pricing_mode=flat_rate`}
                       variant="secondary"
@@ -1416,78 +1481,19 @@ export default async function JobDetailPage({
                     >
                       + New Estimate
                     </LinkButton>
-                  )
-                }
-              />
-              <dl className="p7-detail-list">
-                <div className="p7-detail-row">
-                  <dt>Estimates</dt>
-                  <dd>
-                    {estimateCount > 0 ? (
-                      <Link
-                        href={`/app/estimates?job_id=${job.id}`}
-                        style={{ color: "var(--accent)", textDecoration: "none", fontSize: "var(--text-sm)" }}
-                      >
-                        {estimateCount} estimate{estimateCount !== 1 ? "s" : ""} →
-                      </Link>
-                    ) : (
-                      <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>None</span>
-                    )}
-                  </dd>
-                </div>
-                <div className="p7-detail-row">
-                  <dt>Invoices</dt>
-                  <dd>
-                    {invoiceCount > 0 ? (
-                      <Link
-                        href={`/app/invoices?job_id=${job.id}`}
-                        style={{ color: "var(--accent)", textDecoration: "none", fontSize: "var(--text-sm)" }}
-                      >
-                        {invoiceCount} invoice{invoiceCount !== 1 ? "s" : ""} →
-                      </Link>
-                    ) : (
-                      <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>None</span>
-                    )}
-                  </dd>
-                </div>
-                {commercialCounts?.approved_estimate_id && (
-                  <>
-                    <div className="p7-detail-row">
-                      <dt>Materials</dt>
-                      <dd>
-                        <Link
-                          href={`/app/estimates/${commercialCounts.approved_estimate_id}/shopping-list`}
-                          style={{ color: "var(--accent)", textDecoration: "none", fontSize: "var(--text-sm)" }}
-                        >
-                          Approved materials plan →
-                        </Link>
-                      </dd>
-                    </div>
-                    <div className="p7-detail-row">
-                      <dt>Change orders</dt>
-                      <dd>
-                        {changeOrderCount > 0 ? (
-                          <Link
-                            href={`/app/estimates/${commercialCounts.approved_estimate_id}#change-orders`}
-                            style={{ color: "var(--accent)", textDecoration: "none", fontSize: "var(--text-sm)" }}
-                          >
-                            {changeOrderCount} change order{changeOrderCount !== 1 ? "s" : ""} →
-                          </Link>
-                        ) : (
-                          <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-                            No change orders yet
-                          </span>
-                        )}
-                      </dd>
-                    </div>
-                  </>
-                )}
-              </dl>
-            </Card>
+                  }
+                />
+                <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+                  {estimateCount} estimate{estimateCount !== 1 ? "s" : ""} · {invoiceCount} invoice
+                  {invoiceCount !== 1 ? "s" : ""}
+                  {changeOrderCount > 0 ? ` · ${changeOrderCount} change order${changeOrderCount !== 1 ? "s" : ""}` : ""}
+                </p>
+              </Card>
+            )}
 
             {/* Tracked work days — transparent day-by-day job_work record */}
             {trackedLaborDays.length > 0 && (
-              <Card data-testid="tracked-work-days-card">
+              <Card id="tracked-work-days" data-testid="tracked-work-days-card">
                 <SectionHeader title="Tracked work days" />
                 <p
                   style={{
@@ -1599,10 +1605,10 @@ export default async function JobDetailPage({
               </Card>
             )}
 
-            {/* Profitability — tracked hours feed margin on every job (flat + T&M) */}
+            {/* Internal P&L — burdened cost margin (not customer bill rates) */}
             {!isTech && (revenueCents !== null || costCents !== null || trackedMinutes > 0) && (
               <Card data-testid="profitability-card">
-                <SectionHeader title="Profitability" />
+                <SectionHeader title="Internal P&L" />
                 <dl className="p7-detail-list">
                   {revenueCents !== null && (
                     <div className="p7-detail-row">

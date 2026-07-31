@@ -317,6 +317,7 @@ export type JobMaterialExpenseWithLines = {
   notes: string | null;
   expense_date: string;
   billed: boolean;
+  commercial_tag: string | null;
   line_items: ExpenseLineItemPreview[];
 };
 
@@ -333,9 +334,11 @@ export async function fetchJobMaterialExpenses(
     notes: string | null;
     expense_date: string;
     billed: boolean;
+    commercial_tag: string | null;
   }>(
     `SELECT e.id, e.vendor_name, e.amount_cents, e.notes,
             e.expense_date::text AS expense_date,
+            e.commercial_tag,
             EXISTS(
               SELECT 1 FROM invoice_line_items ili WHERE ili.source_expense_id = e.id
             ) AS billed

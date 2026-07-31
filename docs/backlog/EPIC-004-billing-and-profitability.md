@@ -236,6 +236,50 @@ Phase 3 (Estimate & Billing Closure). Builds on `dueDateUponCompletion`
 (`packages/domain/src/dovetails.ts`) and the immutability trigger (migration 149).
 No new migration — `due_date` is already nullable.
 
+# TASK-081: Job Ledger — estimate vs actual on the project page
+
+Status:
+In Progress
+
+Phase:
+3
+
+Problem:
+T&M commercial truth (estimate allowances, billable hours, materials receipts,
+lift, deposits, change orders) is scattered across estimate, materials, tracked
+days, and profitability. Owners need AI or spreadsheets to answer "what do we
+bill / CO?" for jobs like Claremont.
+
+Business Value:
+One Job Ledger on the project page makes estimate vs actual, balance, and draft
+change orders navigable without leaving the job — honest money, one place to look.
+
+Scope:
+- Job Ledger card on `/app/jobs/[id]` (customer rates, not internal cost).
+- Domain `buildJobLedger` composition of estimate lines, job_work hours,
+  materials receipts, equipment, COs, paid invoices.
+- Draft CO from variance (draft only; COs remain estimate-scoped).
+- Expense `commercial_tag` for Schedule A/B / equipment.
+- Internal P&L remains separate (cost margin).
+
+Out of Scope:
+- Client portal ledger; auto-send CO/invoice; SKU plan↔receipt matching;
+  dedicated `/money` page (v2 if needed).
+
+Acceptance Criteria:
+- [x] Opening a T&M project shows Sold / Actual / Paid / Balance and bucket
+      variance without chat.
+- [x] Labor actual uses tracked hours × customer rate from estimate.
+- [x] Materials actual vs allowance; Draft CO when over and estimate approved.
+- [x] Open draft CO or approved coverage suppresses duplicate draft button.
+- [x] Flat-rate balance stays sold − paid even when materials receipts exist.
+- [x] Multi-option estimate lines with `option_id` are excluded from budgets.
+- [x] Techs do not see the ledger.
+
+Notes:
+Spec: `docs/superpowers/specs/2026-07-30-job-ledger-design.md`.
+PR: feat/job-ledger.
+
 ## Completed
 
 - [TASK-014: Invoice Generation from Visits](../archive/backlog-done/TASK-014-invoice-generation-from-visits.md) — Done
