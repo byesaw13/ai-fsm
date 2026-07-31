@@ -46,6 +46,19 @@ export function JobMaterialsPanel({ expenses }: Props) {
               <span style={{ color: expense.billed ? "var(--color-success, #16a34a)" : "var(--fg-muted)" }}>
                 {expense.billed ? "Billed" : "Not yet billed"}
               </span>
+              {expense.commercial_tag ? (
+                <span style={{ marginLeft: 6, fontWeight: 600 }}>
+                  · {expense.commercial_tag === "in_allowance"
+                    ? "Schedule A"
+                    : expense.commercial_tag === "supply_gap"
+                      ? "Schedule B"
+                      : expense.commercial_tag === "equipment"
+                        ? "Equipment"
+                        : expense.commercial_tag === "scope_add"
+                          ? "Scope add"
+                          : expense.commercial_tag}
+                </span>
+              ) : null}
             </div>
             {expense.line_items.length > 0 ? (
               <ul style={{ margin: "6px 0 0", paddingLeft: "1rem", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
