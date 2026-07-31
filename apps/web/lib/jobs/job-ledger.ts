@@ -30,6 +30,7 @@ type ChangeOrderRow = {
   title: string;
   status: string;
   total_cents: number;
+  subtotal_cents: number;
 };
 
 /** Optional preloaded facts so the job page can avoid duplicate queries. */
@@ -82,7 +83,14 @@ export async function loadJobLedger(
        (SELECT pricing_mode FROM booking_requests
         WHERE job_id = $1 AND account_id = $2
         ORDER BY created_at DESC LIMIT 1) AS booking_pricing_mode,
-       (SELECT COALESCE(SUM(paid_cents), 0)::text FROM invoices
+       -- Pretax-allocated paid: when invoice has tax, scale paid by subtotal/total
+       (SELECT COALESCE(SUM(
+          CASE
+            WHEN total_cents > 0 AND tax_cents > 0
+              THEN ROUND(paid_cents::numeric * subtotal_cents / total_cents)
+            ELSE paid_cents
+          END
+        ), 0)::text FROM invoices
         WHERE job_id = $1 AND account_id = $2 AND status != 'void') AS paid_cents
     `,
     [jobId, session.accountId],
@@ -97,6 +105,8 @@ export async function loadJobLedger(
     number: string | null;
     status: string;
     total_cents: number;
+    subtotal_cents?: number | null;
+    tax_cents?: number | null;
     line_items: {
       description: string;
       quantity: number;
@@ -114,20 +124,24 @@ export async function loadJobLedger(
       estimate_number: string | null;
       status: string;
       total_cents: number;
+      subtotal_cents: number | null;
+      tax_cents: number | null;
       pricing_mode: string | null;
     }>(
       session,
-      `SELECT id, estimate_number, status, total_cents, pricing_mode
+      `SELECT id, estimate_number, status, total_cents, subtotal_cents, tax_cents, pricing_mode
        FROM estimates WHERE id = $1 AND account_id = $2`,
       [estimateId, session.accountId],
     );
     if (est) {
       pricingModeFromEstimate = est.pricing_mode ?? pricingModeFromEstimate;
+      // option_id IS NULL — exclude competing Good/Better/Best option rows
+      // (same rule as final-invoice / travel loaders).
       const lines = await queryForSession<EstimateLineRow>(
         session,
         `SELECT description, quantity, unit_price_cents, total_cents, line_item_type
          FROM estimate_line_items
-         WHERE estimate_id = $1
+         WHERE estimate_id = $1 AND option_id IS NULL
          ORDER BY sort_order ASC, created_at ASC`,
         [estimateId],
       );
@@ -136,6 +150,8 @@ export async function loadJobLedger(
         number: est.estimate_number,
         status: est.status,
         total_cents: est.total_cents,
+        subtotal_cents: est.subtotal_cents,
+        tax_cents: est.tax_cents,
         line_items: lines.map((l) => ({
           description: l.description,
           quantity: Number(l.quantity),
@@ -150,7 +166,7 @@ export async function loadJobLedger(
   const changeOrders = estimateId
     ? await queryForSession<ChangeOrderRow>(
         session,
-        `SELECT id, title, status, total_cents
+        `SELECT id, title, status, total_cents, subtotal_cents
          FROM change_orders
          WHERE estimate_id = $1 AND account_id = $2
          ORDER BY created_at DESC`,

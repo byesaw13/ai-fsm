@@ -3,6 +3,7 @@
 **Date:** 2026-07-30  
 **Status:** Approved (Approach A — ledger on project page)  
 **Roadmap:** Phase 3 — Estimate & Billing Closure (EPIC-004 billing)  
+**Backlog:** [TASK-081: Job Ledger](../../backlog/EPIC-004-billing-and-profitability.md)  
 **Related:** Claremont T&M reconciliation (EST-2026-0016 / CO-001 draft),  
 `docs/superpowers/specs/2026-07-14-job-materials-receipt-review-design.md`,  
 `docs/superpowers/specs/2026-07-20-invoice-deposit-policy-design.md`,  

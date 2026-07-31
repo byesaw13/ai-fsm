@@ -198,7 +198,7 @@ describe("buildJobLedger — Claremont-shaped T&M", () => {
     expect(ledger.suggestedCoLines.length).toBeGreaterThan(0);
   });
 
-  it("flat rate hides billable labor actual from customer total", () => {
+  it("flat rate hides billable labor actual and balances on sold", () => {
     const ledger = buildJobLedger({
       jobId: "job-1",
       pricingMode: "flat_rate",
@@ -207,6 +207,7 @@ describe("buildJobLedger — Claremont-shaped T&M", () => {
         number: "EST-1",
         status: "approved",
         total_cents: 500000,
+        subtotal_cents: 500000,
         line_items: [
           {
             description: "Install cabinets",
@@ -218,12 +219,68 @@ describe("buildJobLedger — Claremont-shaped T&M", () => {
         ],
       },
       trackedLaborMinutes: 10 * 60,
-      materialsExpenses: [{ amount_cents: 20000 }],
+      materialsExpenses: [{ amount_cents: 200000 }],
       changeOrders: [],
       paidCents: 100000,
     });
     const labor = ledger.rows.find((r) => r.bucket === "labor");
     expect(labor?.actualCents).toBe(0);
-    expect(ledger.balanceCents).toBe(ledger.actualCents - 100000);
+    // Receipts do not redefine flat-rate balance
+    expect(ledger.balanceCents).toBe(500000 - 100000);
+  });
+
+  it("suppresses CO draft when open draft exists or approved CO covers variance", () => {
+    const withDraft = buildJobLedger({
+      jobId: "job-1",
+      pricingMode: "hourly_internal",
+      estimate: {
+        id: "est-1",
+        number: "EST-1",
+        status: "approved",
+        total_cents: 150000,
+        line_items: [
+          {
+            description: "Materials allowance",
+            quantity: 1,
+            unit_price_cents: 150000,
+            total_cents: 150000,
+          },
+        ],
+      },
+      trackedLaborMinutes: 0,
+      materialsExpenses: [{ amount_cents: 340677 }],
+      changeOrders: [
+        { id: "co-d", title: "draft", status: "draft", total_cents: 190677, subtotal_cents: 190677 },
+      ],
+      paidCents: 0,
+    });
+    expect(withDraft.canDraftCo).toBe(false);
+
+    const covered = buildJobLedger({
+      jobId: "job-1",
+      pricingMode: "hourly_internal",
+      estimate: {
+        id: "est-1",
+        number: "EST-1",
+        status: "approved",
+        total_cents: 150000,
+        line_items: [
+          {
+            description: "Materials allowance",
+            quantity: 1,
+            unit_price_cents: 150000,
+            total_cents: 150000,
+          },
+        ],
+      },
+      trackedLaborMinutes: 0,
+      materialsExpenses: [{ amount_cents: 340677 }],
+      changeOrders: [
+        { id: "co-a", title: "CO-001", status: "approved", total_cents: 190677, subtotal_cents: 190677 },
+      ],
+      paidCents: 0,
+    });
+    expect(covered.suggestedCoCents).toBe(0);
+    expect(covered.canDraftCo).toBe(false);
   });
 });

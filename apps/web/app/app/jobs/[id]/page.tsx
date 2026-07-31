@@ -628,6 +628,25 @@ export default async function JobDetailPage({
   const estimatedLaborCents = commercialCounts?.estimated_labor_cost_cents ?? null;
   const trackedMinutes = Number(commercialCounts?.tracked_labor_minutes ?? 0);
 
+  // Non-materials job expenses (lift/tools/other) so equipment actuals are not dropped
+  // when materials preload is supplied.
+  const otherJobExpenses =
+    !isTech
+      ? await queryForSession<{
+          amount_cents: number;
+          commercial_tag: string | null;
+          category: string;
+          notes: string | null;
+          vendor_name: string;
+        }>(
+          session,
+          `SELECT amount_cents, commercial_tag, category, notes, vendor_name
+           FROM expenses
+           WHERE account_id = $2 AND job_id = $1 AND category <> 'materials'`,
+          [id, session.accountId],
+        ).catch(() => [])
+      : [];
+
   const jobLedger =
     !isTech
       ? await loadJobLedger(session, id, {
@@ -635,6 +654,13 @@ export default async function JobDetailPage({
           materialsExpenses: jobMaterialExpenses.map((e) => ({
             amount_cents: e.amount_cents,
             commercial_tag: e.commercial_tag,
+            notes: e.notes,
+            vendor_name: e.vendor_name,
+          })),
+          otherExpenses: otherJobExpenses.map((e) => ({
+            amount_cents: e.amount_cents,
+            commercial_tag: e.commercial_tag,
+            category: e.category,
             notes: e.notes,
             vendor_name: e.vendor_name,
           })),

@@ -37,6 +37,8 @@ export type JobLedgerChangeOrderInput = {
   title: string;
   status: string;
   total_cents: number;
+  /** Prefer pretax subtotal when present so sold/actual stay consistent. */
+  subtotal_cents?: number;
 };
 
 export type JobLedgerInput = {
@@ -46,7 +48,10 @@ export type JobLedgerInput = {
     id: string;
     number: string | null;
     status: string;
+    /** Prefer pretax commercial total (subtotal); falls back to total_cents. */
     total_cents: number;
+    subtotal_cents?: number | null;
+    tax_cents?: number | null;
     line_items: JobLedgerLineInput[];
   } | null;
   /** Closed job_work minutes (actual, not quarter-rounded). */
@@ -55,7 +60,10 @@ export type JobLedgerInput = {
   /** Non-materials expenses that may contribute to equipment (optional). */
   otherExpenses?: JobLedgerExpenseInput[];
   changeOrders: JobLedgerChangeOrderInput[];
-  /** Sum of invoice paid_cents on the job (deposits + progress + final). */
+  /**
+   * Cash collected on the job. Prefer pretax-allocated paid amounts when tax is
+   * nonzero so balance stays on a pretax basis with actuals.
+   */
   paidCents: number;
   /** Override customer labor rate; default domain constant. */
   customerLaborRateCentsPerHour?: number;
@@ -251,13 +259,26 @@ export function buildJobLedger(input: JobLedgerInput): JobLedgerSummary {
   const equipmentActualCents = equipmentFromMaterials + equipmentFromOther;
   const materialsActualForRow = materialsOnlyCents;
 
-  const approvedCoTotal = input.changeOrders
-    .filter((co) => co.status === "approved")
-    .reduce((s, co) => s + co.total_cents, 0);
+  const approvedCos = input.changeOrders.filter((co) => co.status === "approved");
+  const draftCos = input.changeOrders.filter((co) => co.status === "draft");
+  const approvedCoTotal = approvedCos.reduce(
+    (s, co) => s + (co.subtotal_cents ?? co.total_cents),
+    0,
+  );
 
-  const estimateBase = input.estimate?.total_cents ?? null;
+  // Prefer pretax commercial base so actuals (rates × hours, receipts) align.
+  const estimateBase =
+    input.estimate == null
+      ? null
+      : input.estimate.subtotal_cents != null && input.estimate.subtotal_cents > 0
+        ? input.estimate.subtotal_cents
+        : input.estimate.total_cents;
   const soldCents =
-    estimateBase != null ? estimateBase + approvedCoTotal : approvedCoTotal > 0 ? approvedCoTotal : null;
+    estimateBase != null
+      ? estimateBase + approvedCoTotal
+      : approvedCoTotal > 0
+        ? approvedCoTotal
+        : null;
 
   const showLaborOnLedger = input.pricingMode !== "flat_rate";
 
@@ -331,12 +352,15 @@ export function buildJobLedger(input: JobLedgerInput): JobLedgerSummary {
 
   const actualCents = rows.reduce((s, r) => s + r.actualCents, 0);
   const paidCents = Math.max(0, input.paidCents);
-  // T&M: balance from actual; flat with no actuals: sold − paid
+  // Flat rate: always contract sold − paid (receipts do not redefine the balance).
+  // T&M: live actual − paid.
   const balanceBase =
-    input.pricingMode === "flat_rate" && actualCents === 0 && soldCents != null
-      ? soldCents
-      : actualCents;
+    input.pricingMode === "flat_rate" && soldCents != null ? soldCents : actualCents;
   const balanceCents = balanceBase - paidCents;
+
+  // Variance already covered by approved COs (pretax) should not re-suggest.
+  // Draft COs block another draft so we don't mint duplicates for the same actuals.
+  let remainingVarianceCover = approvedCoTotal;
 
   const suggestedCoLines: JobLedgerSummary["suggestedCoLines"] = [];
   const materialsRow = rows.find((r) => r.bucket === "materials");
@@ -344,13 +368,18 @@ export function buildJobLedger(input: JobLedgerInput): JobLedgerSummary {
     materialsRow?.estimateCents != null &&
     materialsRow.actualCents > materialsRow.estimateCents
   ) {
-    const over = materialsRow.actualCents - materialsRow.estimateCents;
-    suggestedCoLines.push({
-      description:
-        "Materials over allowance — actual materials purchased to complete scope",
-      quantity: 1,
-      unit_price_cents: over,
-    });
+    let over = materialsRow.actualCents - materialsRow.estimateCents;
+    const covered = Math.min(over, remainingVarianceCover);
+    over -= covered;
+    remainingVarianceCover -= covered;
+    if (over > 0) {
+      suggestedCoLines.push({
+        description:
+          "Materials over allowance — actual materials purchased to complete scope",
+        quantity: 1,
+        unit_price_cents: over,
+      });
+    }
   }
   const laborRow = rows.find((r) => r.bucket === "labor");
   if (
@@ -358,13 +387,17 @@ export function buildJobLedger(input: JobLedgerInput): JobLedgerSummary {
     laborRow?.estimateCents != null &&
     laborRow.actualCents > laborRow.estimateCents
   ) {
-    // Optional labor overage line — included when over budget (still under cap is ok)
-    const over = laborRow.actualCents - laborRow.estimateCents;
-    suggestedCoLines.push({
-      description: `Labor over T&M budget (${laborRow.actualHours ?? 0} hrs actual vs budget)`,
-      quantity: 1,
-      unit_price_cents: over,
-    });
+    let over = laborRow.actualCents - laborRow.estimateCents;
+    const covered = Math.min(over, remainingVarianceCover);
+    over -= covered;
+    remainingVarianceCover -= covered;
+    if (over > 0) {
+      suggestedCoLines.push({
+        description: `Labor over T&M budget (${laborRow.actualHours ?? 0} hrs actual vs budget)`,
+        quantity: 1,
+        unit_price_cents: over,
+      });
+    }
   }
 
   const suggestedCoCents = suggestedCoLines.reduce(
@@ -375,7 +408,8 @@ export function buildJobLedger(input: JobLedgerInput): JobLedgerSummary {
   const canDraftCo =
     input.estimate?.status === "approved" &&
     suggestedCoLines.length > 0 &&
-    suggestedCoCents > 0;
+    suggestedCoCents > 0 &&
+    draftCos.length === 0;
 
   return {
     jobId: input.jobId,
