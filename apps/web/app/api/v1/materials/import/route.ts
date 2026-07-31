@@ -87,9 +87,11 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       [session.userId, session.accountId, session.role],
     );
 
-    // Process in small batches by purchase date + category to keep transactions light.
+    // Per-row savepoints so one bad row does not abort the whole import txn.
     for (const line of parsed.lines) {
+      const sp = `import_row_${line.rawIndex}`;
       try {
+        await client.query(`SAVEPOINT ${sp}`);
         const { learned } = await learnMaterialsFromLineItems(
           client,
           {
@@ -109,7 +111,14 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
           ],
         );
         imported += learned;
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
       } catch (err) {
+        try {
+          await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+          await client.query(`RELEASE SAVEPOINT ${sp}`);
+        } catch {
+          /* outer catch will roll back the whole txn */
+        }
         errors.push({
           row: line.rawIndex,
           reason: err instanceof Error ? err.message : "import failed",

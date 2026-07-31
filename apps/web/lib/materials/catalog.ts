@@ -51,6 +51,22 @@ export function computeRunningAverage(
   return { avg_paid_cents: avg, purchase_count: nextCount };
 }
 
+/**
+ * Whether an incoming observation should overwrite "last paid" fields.
+ * null incoming date always updates (treat as latest observation).
+ * Otherwise update only when at least as recent as the stored last purchase.
+ */
+export function shouldUpdateLastPaid(
+  existingLastPurchasedAt: string | null | undefined,
+  incomingPurchasedAt: string | null | undefined,
+): boolean {
+  if (!incomingPurchasedAt) return true;
+  if (!existingLastPurchasedAt) return true;
+  const existing = existingLastPurchasedAt.slice(0, 10);
+  const incoming = incomingPurchasedAt.slice(0, 10);
+  return incoming >= existing;
+}
+
 function normalizeSku(sku: string | null | undefined): string | null {
   const s = sku?.trim() ?? "";
   return s.length > 0 ? s : null;
@@ -136,6 +152,11 @@ export async function upsertMaterialFromPurchase(
       existing.purchase_count,
       unitCost,
     );
+    const updateLast = shouldUpdateLastPaid(existing.last_purchased_at, purchasedAt);
+    const nextUnitCost = updateLast ? unitCost : existing.unit_cost_cents;
+    const nextLastPurchased = updateLast
+      ? purchasedAt ?? existing.last_purchased_at
+      : existing.last_purchased_at;
     const updated = await client.query<MaterialsPriceBookRow>(
       `UPDATE materials_price_book SET
          unit_cost_cents   = $2,
@@ -143,7 +164,7 @@ export async function upsertMaterialFromPurchase(
          purchase_count    = $4,
          sku               = COALESCE(NULLIF(btrim($5), ''), sku),
          supplier          = COALESCE($6, supplier),
-         last_purchased_at = COALESCE($7::date, last_purchased_at),
+         last_purchased_at = $7::date,
          name              = CASE
                                WHEN length(btrim($8)) > length(btrim(name)) THEN btrim($8)
                                ELSE name
@@ -155,12 +176,12 @@ export async function upsertMaterialFromPurchase(
                  avg_paid_cents, purchase_count`,
       [
         existing.id,
-        unitCost,
+        nextUnitCost,
         avg_paid_cents,
         purchase_count,
         sku,
         supplier,
-        purchasedAt,
+        nextLastPurchased,
         name,
         ctx.accountId,
       ],

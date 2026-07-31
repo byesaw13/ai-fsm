@@ -91,27 +91,40 @@ export const PUT = withRole(["owner", "admin"], async (request, session) => {
       );
 
       // Non-fatal: materials receipts teach the SKU/price catalog.
+      // Use a savepoint so a PG error does not abort the outer expense transaction.
       let catalog_learned = 0;
       if (exp.category === "materials" && saved.length > 0) {
         try {
-          const { learned } = await learnMaterialsFromLineItems(
-            client,
-            {
-              accountId: session.accountId,
-              supplier: exp.vendor_name,
-              purchasedAt: exp.expense_date?.slice(0, 10) ?? null,
-            },
-            saved.map((li) => ({
-              name: li.name,
-              unit_cost_cents: li.unit_cost_cents,
-              sku: li.sku,
-              quantity: li.quantity,
-            })),
-          );
-          catalog_learned = learned;
-        } catch (learnErr) {
-          logger.warn("materials catalog learn failed (non-fatal)", {
-            error: learnErr,
+          await client.query("SAVEPOINT materials_catalog_learn");
+          try {
+            const { learned } = await learnMaterialsFromLineItems(
+              client,
+              {
+                accountId: session.accountId,
+                supplier: exp.vendor_name,
+                purchasedAt: exp.expense_date?.slice(0, 10) ?? null,
+              },
+              saved.map((li) => ({
+                name: li.name,
+                unit_cost_cents: li.unit_cost_cents,
+                sku: li.sku,
+                quantity: li.quantity,
+              })),
+            );
+            catalog_learned = learned;
+            await client.query("RELEASE SAVEPOINT materials_catalog_learn");
+          } catch (learnErr) {
+            await client.query("ROLLBACK TO SAVEPOINT materials_catalog_learn");
+            await client.query("RELEASE SAVEPOINT materials_catalog_learn");
+            logger.warn("materials catalog learn failed (non-fatal)", {
+              error: learnErr instanceof Error ? learnErr.message : String(learnErr),
+              expenseId,
+              traceId: session.traceId,
+            });
+          }
+        } catch (spErr) {
+          logger.warn("materials catalog learn savepoint failed (non-fatal)", {
+            error: spErr instanceof Error ? spErr.message : String(spErr),
             expenseId,
             traceId: session.traceId,
           });

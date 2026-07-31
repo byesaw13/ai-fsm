@@ -3,6 +3,7 @@ import type { PoolClient } from "pg";
 import {
   computeRunningAverage,
   learnMaterialsFromLineItems,
+  shouldUpdateLastPaid,
   upsertMaterialFromPurchase,
 } from "../catalog";
 
@@ -40,6 +41,19 @@ function makeClient(handlers: Array<(sql: string, params: unknown[]) => { rows: 
     }),
   } as unknown as PoolClient;
 }
+
+describe("shouldUpdateLastPaid", () => {
+  it("updates when incoming has no date or existing has none", () => {
+    expect(shouldUpdateLastPaid("2026-01-01", null)).toBe(true);
+    expect(shouldUpdateLastPaid(null, "2026-01-01")).toBe(true);
+  });
+
+  it("updates only when incoming is at least as recent", () => {
+    expect(shouldUpdateLastPaid("2026-06-01", "2026-07-01")).toBe(true);
+    expect(shouldUpdateLastPaid("2026-07-01", "2026-07-01")).toBe(true);
+    expect(shouldUpdateLastPaid("2026-07-01", "2026-06-01")).toBe(false);
+  });
+});
 
 describe("upsertMaterialFromPurchase", () => {
   it("matches by SKU before name and updates avg", async () => {
