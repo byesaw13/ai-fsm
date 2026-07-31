@@ -221,7 +221,8 @@ export function SettingsTabsClient({ role, userId, me, account, users, square, l
                   { href: "/app/schedule",              label: "Schedule",             desc: "Week / month / year calendar views" },
                   { href: "/app/requests",              label: "Requests",             desc: "Intake queue and request management" },
                   { href: "/app/reports",               label: "Reports",              desc: "Revenue, pricing health, schedule utilization, and performance" },
-                  { href: "/app/price-book",            label: "Price Book",           desc: "Materials and labor pricing catalog" },
+                  { href: "/app/price-book",            label: "Price Book",           desc: "Service / labor pricing catalog" },
+                  { href: "/app/materials",             label: "Materials Catalog",    desc: "SKU barcodes and last/avg material prices from receipts" },
                   { href: "/app/expenses",              label: "Expenses",             desc: "Job and business expense tracking" },
                   { href: "/app/automations",           label: "Automations",          desc: "Workflow automation rules" },
                 ].map(({ href, label, desc }) => (
