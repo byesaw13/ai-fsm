@@ -11,6 +11,7 @@ import {
   EmptyState,
   ItemCard,
   LinkButton,
+  Breadcrumbs,
   PageContainer,
   PageHeader,
   SectionHeader,
@@ -405,6 +406,21 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
 
   return (
     <PageContainer>
+      <Breadcrumbs
+        items={[
+          { href: "/app/clients", label: "Clients" },
+          {
+            href: `/app/clients/${property.client_id}`,
+            label: property.client_name ?? "Client",
+          },
+          {
+            label:
+              property.name?.trim() ||
+              formatPropertyAddress(property) ||
+              "Property",
+          },
+        ]}
+      />
       <PageHeader
         title={property.name?.trim() || "Property"}
         subtitle={formatPropertyAddress(property)}

@@ -21,8 +21,10 @@ import {
   EmptyState,
   Timeline,
   SectionHeader,
+  HubSubnav,
 } from "@/components/ui";
 import type { TimelineEntryData } from "@/components/ui";
+import { WORK_HUB_LINKS } from "@/lib/navigation/hubs";
 
 export const dynamic = "force-dynamic";
 
@@ -114,6 +116,7 @@ export default async function VisitsPage() {
             : `${visits.length} total`
         }
       />
+      {isAdmin && <HubSubnav hub="Work" links={WORK_HUB_LINKS} pathname="/app/visits" />}
 
       {/* Owner/admin: the shared triage (also powers Schedule → List). */}
       {isAdmin && <VisitTriage visits={visits} />}

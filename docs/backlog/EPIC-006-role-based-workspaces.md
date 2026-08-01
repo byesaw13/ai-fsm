@@ -339,7 +339,8 @@ Acceptance Criteria:
 - [x] P0: role/workspace home rules preserved (owner field My Day, admin Overview).
 - [x] P0: Breadcrumbs + WhatNext primitives exported; job detail uses breadcrumbs.
 - [x] P1: My Day + Overview field-hero / what-needs-you chrome; start-day sheet + arrival confirm.
-- [ ] P2–P4: lists, nest details, money editors, ops boards per the design doc.
+- [x] P2: Work/People hub subnav on lists; breadcrumbs on client/property/visit/estimate (+ job).
+- [ ] P3–P4: money editors, ops boards + polish per the design doc.
 
 Notes:
 Spec: `docs/superpowers/specs/2026-08-01-nested-hubs-ux-design.md`  

@@ -3,9 +3,10 @@ import { redirect } from "next/navigation";
 import type { Route } from "next";
 import { getSession } from "@/lib/auth/session";
 import { query } from "@/lib/db";
-import { Card, EmptyState, LinkButton, PageContainer, PageHeader, StatusBadge } from "@/components/ui";
+import { Card, EmptyState, LinkButton, PageContainer, PageHeader, StatusBadge, HubSubnav } from "@/components/ui";
 import type { StatusVariant } from "@/components/ui";
 import { BOOKING_REQUEST_OPEN_STATUSES, BOOKING_REQUEST_STATUS_LABELS, PRICING_MODE_LABELS } from "@ai-fsm/domain";
+import { WORK_HUB_LINKS } from "@/lib/navigation/hubs";
 import { getRequestGuidance } from "./request-guidance";
 
 export const dynamic = "force-dynamic";
@@ -210,6 +211,7 @@ export default async function RequestsPage({ searchParams }: PageProps) {
         subtitle="Called → assessment → estimated → converted (or lost after 60 days idle)."
         actions={<LinkButton href="/app/intake/new">New Request</LinkButton>}
       />
+      <HubSubnav hub="Work" links={WORK_HUB_LINKS} pathname="/app/requests" />
 
       <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginBottom: "var(--space-4)" }}>
         <Link

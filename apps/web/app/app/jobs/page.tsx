@@ -17,10 +17,12 @@ import {
   StatusBadge,
   PriorityBadge,
   LinkButton,
+  HubSubnav,
   priorityNumToVariant,
   priorityLabel,
 } from "@/components/ui";
 import type { FilterDef, StatusVariant, PriorityVariant } from "@/components/ui";
+import { WORK_HUB_LINKS } from "@/lib/navigation/hubs";
 import { JobBoard } from "./JobBoard";
 
 export const dynamic = "force-dynamic";
@@ -242,6 +244,7 @@ export default async function JobsPage({ searchParams }: PageProps) {
           </div>
         }
       />
+      {isAdmin && <HubSubnav hub="Work" links={WORK_HUB_LINKS} pathname="/app/jobs" />}
 
       {/* Tier tabs — quick filter by workflow stage */}
       <TierTabs active={activeTier} baseHref="/app/jobs" preserve={{ q, priority, view }} />

@@ -630,6 +630,67 @@
   gap: var(--space-2);
 }
 
+/* T1 hub subnav chips (Work / People / Money list pages) */
+.p7-hub-subnav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.p7-hub-subnav__label {
+  font-size: 10px;
+  font-weight: var(--font-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+  margin-right: var(--space-1);
+}
+
+.p7-hub-subnav__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.p7-hub-subnav__chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--fg-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.p7-hub-subnav__chip:hover {
+  text-decoration: none;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.p7-hub-subnav__chip--active {
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-card));
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+@media (min-width: 768px) {
+  .p7-hub-subnav__chip {
+    min-height: 32px;
+  }
+}
+
 /* Nested-hubs breadcrumbs (T2) */
 .p7-breadcrumbs {
   margin-bottom: var(--space-2);

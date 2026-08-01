@@ -11,9 +11,11 @@ import {
   StatusSection,
   EmptyState,
   StatusBadge,
+  HubSubnav,
 } from "@/components/ui";
 import type { StatusVariant } from "@/components/ui";
 import { WORK_ORDER_UI_STATUSES, WORK_ORDER_STATUS_LABELS } from "@ai-fsm/domain";
+import { WORK_HUB_LINKS } from "@/lib/navigation/hubs";
 import { WorkOrderBoard } from "./WorkOrderBoard";
 
 export const dynamic = "force-dynamic";
@@ -91,6 +93,7 @@ export default async function WorkOrdersPage({ searchParams }: PageProps) {
         title="Work Orders"
         subtitle={showClosed ? `${rows.length} total` : `${rows.length} open`}
       />
+      <HubSubnav hub="Work" links={WORK_HUB_LINKS} pathname="/app/work-orders" />
 
       <div
         style={{

@@ -50,6 +50,7 @@ import {
   shouldShowCompletionRecord,
 } from "./visit-execution-helpers";
 import {
+  Breadcrumbs,
   Card,
   EmptyState,
   LinkButton,
@@ -437,6 +438,41 @@ export default async function VisitDetailPage({
           jobTitle={visit.job_title}
         />
       )}
+      <Breadcrumbs
+        items={
+          session.role === "tech"
+            ? [
+                { href: "/app/visits", label: "Visits" },
+                {
+                  label:
+                    visit.visit_type === "site_visit"
+                      ? "Assessment"
+                      : visit.visit_type === "standard"
+                        ? "Work Day"
+                        : "Visit",
+                },
+              ]
+            : [
+                ...(visit.job_id
+                  ? [
+                      { href: "/app/jobs", label: "Projects" },
+                      {
+                        href: `/app/jobs/${visit.job_id}`,
+                        label: visit.job_title ?? "Project",
+                      },
+                    ]
+                  : [{ href: "/app/visits", label: "Visits" }]),
+                {
+                  label:
+                    visit.visit_type === "site_visit"
+                      ? "Assessment"
+                      : visit.visit_type === "standard"
+                        ? "Work Day"
+                        : "Visit",
+                },
+              ]
+        }
+      />
       <PageHeader
         title={`${
           visit.visit_type === "site_visit"
