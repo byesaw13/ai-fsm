@@ -164,22 +164,32 @@ export function StartMyDayWizard({
   return (
     <>
       <div
+        className="p7-field-sheet-overlay"
         aria-hidden
         onClick={onClose}
-        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 500 }}
       />
       <div
         role="dialog"
         aria-label="Start my day"
+        aria-modal="true"
         data-testid="start-my-day-wizard"
-        style={{
-          position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 501,
-          background: "var(--bg-card)", borderTopLeftRadius: "var(--radius-lg)",
-          borderTopRightRadius: "var(--radius-lg)", padding: "var(--space-4)",
-          maxHeight: "85vh", overflowY: "auto",
-        }}
+        className="p7-field-sheet"
       >
-        <h2 style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-lg)", fontWeight: 700 }}>Start My Day</h2>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)" }}>
+          <h2 style={{ margin: 0, fontSize: "var(--text-xl)", fontWeight: 800 }}>Start My Day</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p7-btn p7-btn-secondary"
+            style={{ minHeight: 44, minWidth: 44 }}
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+        <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+          Confirm each step — no extra typing when defaults look right.
+        </p>
         <ol style={{ listStyle: "none", padding: 0, margin: "0 0 var(--space-4)", display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           {STEPS.map((step) => {
             const done =

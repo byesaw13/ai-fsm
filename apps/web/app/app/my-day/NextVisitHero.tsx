@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
-import { Card, useToast } from "@/components/ui";
+import { useToast } from "@/components/ui";
 import {
   buildMapsUrl,
   buildTelUrl,
@@ -35,6 +35,10 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
   const mapsUrl = buildMapsUrl(visit.property_address);
   const telUrl = buildTelUrl(visit.client_phone);
   const action = heroPrimaryAction(visit.status);
+  const activeOnSite = visit.status === "arrived" || visit.status === "in_progress";
+  const kicker = activeOnSite ? "Right now" : "Next visit";
+  const primaryLabel =
+    action === "start" ? "I'm here" : action === "complete" ? "Complete visit" : null;
 
   async function handlePrimary() {
     if (!action) return;
@@ -46,85 +50,66 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
       toast.error(err);
       return;
     }
-    toast.success(action === "start" ? "Job started — on site" : "Visit completed");
+    toast.success(action === "start" ? "Arrived on site" : "Visit completed");
     router.refresh();
   }
 
-  const btnStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "var(--space-3)",
-    borderRadius: "var(--radius-md)",
-    fontSize: "var(--text-sm)",
-    fontWeight: 700,
-    textDecoration: "none",
-    minHeight: 44,
-    border: "1px solid var(--border)",
-    background: "var(--bg-card)",
-    color: "var(--fg)",
-    cursor: "pointer",
-  };
-
   return (
-    <Card padding="sm" data-testid="next-visit-hero">
-      <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
-        Next visit · {formatTime(visit.scheduled_start)}
+    <div className="p7-field-hero" data-testid="next-visit-hero">
+      <div className="p7-field-hero__kicker">
+        {kicker} · {formatTime(visit.scheduled_start)}
       </div>
-      <div style={{ fontWeight: 700, fontSize: "var(--text-lg)", overflowWrap: "anywhere" }}>
-        {visit.job_title ?? "Untitled job"}
-      </div>
-      {visit.client_name && (
-        <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>{visit.client_name}</div>
-      )}
-      {visit.property_address && (
-        <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-secondary)", overflowWrap: "anywhere", marginTop: 4 }}>
-          {visit.property_address}
-        </div>
-      )}
-      <div className="my-day-action-row" style={{ marginTop: "var(--space-3)" }}>
-        {mapsUrl ? (
-          <a href={mapsUrl} target="_blank" rel="noopener noreferrer" style={btnStyle} data-testid="hero-navigate">
-            Navigate
-          </a>
-        ) : (
-          <button type="button" disabled style={{ ...btnStyle, opacity: 0.5 }} title="No address on file">
-            Navigate
-          </button>
-        )}
-        {telUrl ? (
-          <a href={telUrl} style={btnStyle} data-testid="hero-call">
-            Call
-          </a>
-        ) : (
-          <button type="button" disabled style={{ ...btnStyle, opacity: 0.5 }} title="No phone on file">
-            Call
-          </button>
-        )}
-        {action ? (
+      <div className="p7-field-hero__title">{visit.job_title ?? "Untitled job"}</div>
+      {visit.client_name ? (
+        <div className="p7-field-hero__meta">{visit.client_name}</div>
+      ) : null}
+      {visit.property_address ? (
+        <div className="p7-field-hero__meta">{visit.property_address}</div>
+      ) : null}
+
+      <div className="p7-field-hero__actions">
+        {primaryLabel ? (
           <button
             type="button"
             onClick={handlePrimary}
             disabled={pending}
             data-testid="hero-start-job"
-            style={{
-              ...btnStyle,
-              background: "var(--accent)",
-              color: "#fff",
-              border: "none",
-            }}
+            className="p7-field-hero__primary"
           >
-            {pending ? "…" : action === "start" ? "Start Job" : "Complete Job"}
+            {pending ? "…" : primaryLabel}
           </button>
-        ) : (
-          <button type="button" disabled style={{ ...btnStyle, opacity: 0.5 }}>
-            —
-          </button>
-        )}
+        ) : null}
+
+        <div className="p7-field-hero__row">
+          {mapsUrl ? (
+            <a
+              href={mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p7-field-hero__secondary"
+              data-testid="hero-navigate"
+            >
+              Navigate
+            </a>
+          ) : (
+            <button type="button" disabled className="p7-field-hero__secondary" title="No address on file">
+              Navigate
+            </button>
+          )}
+          {telUrl ? (
+            <a href={telUrl} className="p7-field-hero__secondary" data-testid="hero-call">
+              Call
+            </a>
+          ) : (
+            <button type="button" disabled className="p7-field-hero__secondary" title="No phone on file">
+              Call
+            </button>
+          )}
+        </div>
       </div>
 
-      {(visit.status === "arrived" || visit.status === "in_progress") && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
+      {activeOnSite && (
+        <div className="p7-field-hero__tools">
           {[
             { label: "Photos", icon: "📸" },
             { label: "Checklist", icon: "✅" },
@@ -134,21 +119,7 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
             <Link
               key={tool.label}
               href={`/app/visits/${visit.id}` as Route}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 4,
-                padding: "var(--space-3) var(--space-1)",
-                background: "var(--color-surface-raised)",
-                border: "1px solid var(--color-border)",
-                borderRadius: "var(--radius-sm)",
-                fontSize: "var(--text-xs)",
-                fontWeight: 500,
-                color: "var(--fg-primary)",
-                textDecoration: "none",
-                minHeight: 44,
-              }}
+              className="p7-field-hero__tool"
             >
               <span style={{ fontSize: "var(--text-lg)" }}>{tool.icon}</span>
               {tool.label}
@@ -159,10 +130,17 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
 
       <Link
         href={`/app/visits/${visit.id}` as Route}
-        style={{ display: "block", marginTop: "var(--space-3)", fontSize: "var(--text-sm)", fontWeight: 600, color: "var(--accent)", textDecoration: "none" }}
+        className="p7-field-hero__meta"
+        style={{
+          display: "block",
+          marginTop: "var(--space-1)",
+          fontWeight: 600,
+          color: "var(--color-forest-100, #dcfce7)",
+          textDecoration: "none",
+        }}
       >
         Open visit →
       </Link>
-    </Card>
+    </div>
   );
 }

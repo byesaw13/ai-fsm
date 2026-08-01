@@ -65,7 +65,7 @@ test.describe("My Day mobile", () => {
 
   test("no dashboard button on mobile", async ({ page }) => {
     await page.goto(`${BASE}/app/my-work`);
-    await expect(page.getByRole("link", { name: "← Dashboard" })).not.toBeVisible();
+    await expect(page.getByRole("link", { name: "← Overview" })).not.toBeVisible();
   });
 
   test("FAB hidden on my day", async ({ page }) => {

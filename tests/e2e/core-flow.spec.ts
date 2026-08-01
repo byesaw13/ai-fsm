@@ -48,7 +48,7 @@ test.describe("Required release smoke — admin core flow", () => {
 
   test("1. Admin login lands on the Overview dashboard", async ({ page }) => {
     await login(page);
-    await expect(page.locator("h1")).toContainText("Dashboard");
+    await expect(page.locator("h1")).toContainText("Overview");
   });
 
   test("2. Admin can create a launch client", async ({ page }) => {

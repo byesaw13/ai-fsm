@@ -64,42 +64,41 @@ export function ArrivalProposalBanner({
   }
 
   return (
-    <div
-      className="border rounded-xl p-4 mb-4 bg-card"
-      data-testid="arrival-proposal-banner"
-    >
-      <div className="text-xs uppercase text-muted-foreground mb-1">On site</div>
-      <div className="font-semibold">{top.clientName}</div>
-      <div className="text-sm text-muted-foreground mb-3">
+    <div className="p7-field-hero" data-testid="arrival-proposal-banner" style={{ marginBottom: "var(--space-4)" }}>
+      <div className="p7-field-hero__kicker">Proposal · on site</div>
+      <div className="p7-field-hero__title">{top.clientName ?? "Customer"}</div>
+      <div className="p7-field-hero__meta">
         {top.propertyName}
         {top.workOrderTitle ? ` · ${top.workOrderTitle}` : ""}
         {" · "}
-        {top.confidenceScore}%
+        {top.confidenceScore}% match
       </div>
       {ambiguous && options.length > 0 && (
-        <WorkOrderPicker options={options} value={woId} onChange={setWoId} />
+        <div style={{ marginTop: "var(--space-2)" }}>
+          <WorkOrderPicker options={options} value={woId} onChange={setWoId} />
+        </div>
       )}
       {error && (
-        <p className="text-sm text-destructive mb-2" role="alert">
+        <p role="alert" style={{ margin: 0, color: "#fca5a5", fontSize: "var(--text-sm)" }}>
           {error}
         </p>
       )}
-      <div className="flex flex-wrap gap-2">
+      <div className="p7-field-hero__actions">
         <button
           type="button"
-          className="p7-btn p7-btn-primary"
+          className="p7-field-hero__primary"
           disabled={busy || (ambiguous && !woId)}
           onClick={() => act("confirm")}
         >
-          Confirm job work
+          {busy ? "…" : "Confirm"}
         </button>
         <button
           type="button"
-          className="p7-btn"
+          className="p7-field-hero__secondary"
           disabled={busy}
           onClick={() => act("ignore")}
         >
-          Not this
+          Not this job
         </button>
       </div>
     </div>
