@@ -6,6 +6,7 @@ import { canCreateEstimates, canManageClients, canTransitionJob } from "@/lib/au
 import { query, queryOne } from "@/lib/db";
 import { buildJobCreateHref, formatClientContact, formatPropertyAddress } from "@/lib/crm/normalization";
 import {
+  Breadcrumbs,
   Card,
   EmptyState,
   ItemCard,
@@ -321,6 +322,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
   return (
     <PageContainer>
+      <Breadcrumbs
+        items={[
+          { href: "/app/clients", label: "Clients" },
+          { label: client.name },
+        ]}
+      />
       <PageHeader
         title={client.name}
         subtitle={formatClientContact(client)}

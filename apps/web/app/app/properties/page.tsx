@@ -14,8 +14,10 @@ import {
   LinkButton,
   PageContainer,
   PageHeader,
+  HubSubnav,
 } from "@/components/ui";
 import type { DataTableColumn, FilterDef } from "@/components/ui";
+import { PEOPLE_HUB_LINKS } from "@/lib/navigation/hubs";
 
 export const dynamic = "force-dynamic";
 
@@ -140,6 +142,7 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
           </div>
         }
       />
+      <HubSubnav hub="People" links={PEOPLE_HUB_LINKS} pathname="/app/properties" />
 
       <FilterBar filters={filters} baseHref="/app/properties" currentValues={currentValues} />
 

@@ -12,7 +12,7 @@ import { DeleteEstimateButton } from "./DeleteEstimateButton";
 import { EstimateEditForm } from "./EstimateEditForm";
 import { EstimateReviewPanel } from "./EstimateReviewPanel";
 import { SendEstimateButton } from "./SendEstimateButton";
-import { PageContainer, PageHeader, StatusBadge, StatusStepper } from "@/components/ui";
+import { Breadcrumbs, PageContainer, PageHeader, StatusBadge, StatusStepper } from "@/components/ui";
 import type { StatusVariant } from "@/components/ui";
 import { isEmailConfigured } from "@/lib/email/mailer";
 import { CopyPortalLinkButton } from "@/components/CopyPortalLinkButton";
@@ -83,6 +83,32 @@ export default async function EstimateDetailPage({
 
   return (
     <PageContainer>
+      <Breadcrumbs
+        items={[
+          { href: "/app/estimates", label: "Estimates" },
+          ...(estimate.client_id
+            ? [
+                {
+                  href: `/app/clients/${estimate.client_id}`,
+                  label: estimate.client_name ?? "Client",
+                },
+              ]
+            : []),
+          ...(estimate.job_id
+            ? [
+                {
+                  href: `/app/jobs/${estimate.job_id}`,
+                  label: estimate.job_title ?? "Project",
+                },
+              ]
+            : []),
+          {
+            label: estimate.estimate_number
+              ? estimate.estimate_number
+              : "Estimate",
+          },
+        ]}
+      />
       <PageHeader
         backHref="/app/estimates"
         backLabel="Estimates"

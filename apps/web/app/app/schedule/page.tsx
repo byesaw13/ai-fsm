@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { query } from "@/lib/db";
-import { PageContainer, PageHeader } from "@/components/ui";
+import { PageContainer, PageHeader, HubSubnav } from "@/components/ui";
 import { getTriageVisits } from "@/lib/visits/queries";
+import { WORK_HUB_LINKS } from "@/lib/navigation/hubs";
 import { ScheduleCalendar } from "./ScheduleCalendar";
 import type { VisitRow, ViewMode } from "./ScheduleCalendar";
 import { ScheduleViewToggle } from "./ScheduleViewToggle";
@@ -72,6 +73,7 @@ export default async function SchedulePage({ searchParams }: PageProps) {
     return (
       <PageContainer>
         <PageHeader title="Schedule" />
+        {isAdmin && <HubSubnav hub="Work" links={WORK_HUB_LINKS} pathname="/app/schedule" />}
         <div style={{ marginBottom: "var(--space-4)" }}>
           <ScheduleViewToggle
             current="list"
@@ -125,6 +127,7 @@ export default async function SchedulePage({ searchParams }: PageProps) {
   return (
     <PageContainer>
       <PageHeader title="Schedule" />
+      {isAdmin && <HubSubnav hub="Work" links={WORK_HUB_LINKS} pathname="/app/schedule" />}
       <ScheduleCalendar
         visits={visits}
         view={view}

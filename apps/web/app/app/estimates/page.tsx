@@ -15,9 +15,11 @@ import {
   EmptyState,
   LinkButton,
   MetricGrid,
+  HubSubnav,
 } from "@/components/ui";
 import { formatCents } from "@/lib/money";
 import type { FilterDef, StatusVariant, MetricCardData } from "@/components/ui";
+import { WORK_HUB_LINKS } from "@/lib/navigation/hubs";
 import { EstimateBoard } from "./EstimateBoard";
 
 export const dynamic = "force-dynamic";
@@ -215,6 +217,7 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
           ) : undefined
         }
       />
+      <HubSubnav hub="Work" links={WORK_HUB_LINKS} pathname="/app/estimates" />
 
       {estimates.length > 0 && (
         <MetricGrid metrics={metrics} />
