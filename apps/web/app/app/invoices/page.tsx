@@ -12,11 +12,13 @@ import {
   StatusSection,
   EmptyState,
   MetricGrid,
-  Card,
   LinkButton,
+  HubSubnav,
+  WhatNext,
 } from "@/components/ui";
 import type { MetricCardData } from "@/components/ui";
 import { formatInvoiceViewLabel, isInvoiceUnread } from "@/lib/invoices/client-view";
+import { MONEY_HUB_LINKS } from "@/lib/navigation/hubs";
 
 export const dynamic = "force-dynamic";
 
@@ -199,24 +201,19 @@ export default async function InvoicesPage() {
           ) : undefined
         }
       />
+      <HubSubnav hub="Money" links={MONEY_HUB_LINKS} pathname="/app/invoices" />
 
       {invoices.length > 0 && <MetricGrid metrics={metrics} />}
 
       {priorityInvoice && (
-        <Card style={{ marginBottom: "var(--space-4)", background: "var(--color-red-50)", borderColor: "var(--color-danger)" }} data-testid="billing-queue-card">
-          <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap", alignItems: "center" }}>
-            <div>
-              <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, color: "var(--color-danger)", letterSpacing: "0.04em" }}>BILLING QUEUE — ACTION NEEDED</div>
-              <div style={{ fontSize: "var(--text-lg)", fontWeight: 700, marginTop: 2 }}>{priorityLabel}</div>
-              <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: 2 }}>
-                {priorityInvoice.invoice_number} · {priorityInvoice.client_name ?? "Client"} · {priorityInvoice.due_date ? new Date(priorityInvoice.due_date).toLocaleDateString() : "No due date"}
-              </div>
-            </div>
-            <LinkButton href={(`/app/invoices/${priorityInvoice.id}`) as Route} variant="primary" size="sm">
-              Open &amp; Collect →
-            </LinkButton>
-          </div>
-        </Card>
+        <div data-testid="billing-queue-card">
+          <WhatNext
+            title={priorityLabel ?? "Follow up on invoice"}
+            description={`${priorityInvoice.invoice_number} · ${priorityInvoice.client_name ?? "Client"} · ${priorityInvoice.due_date ? new Date(priorityInvoice.due_date).toLocaleDateString() : "No due date"}`}
+            href={`/app/invoices/${priorityInvoice.id}`}
+            actionLabel="Open & collect"
+          />
+        </div>
       )}
 
       {invoices.length === 0 ? (

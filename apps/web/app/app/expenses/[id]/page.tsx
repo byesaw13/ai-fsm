@@ -9,6 +9,7 @@ import { categoryLabel, formatExpenseDate } from "@/lib/expenses/ui";
 import type { ExpenseCategory } from "@ai-fsm/domain";
 import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS } from "@ai-fsm/domain";
 import {
+  Breadcrumbs,
   PageContainer,
   PageHeader,
   LinkButton,
@@ -99,6 +100,28 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
 
   return (
     <PageContainer>
+      <Breadcrumbs
+        items={[
+          { href: "/app/expenses", label: "Expenses" },
+          ...(expense.client_id
+            ? [
+                {
+                  href: `/app/clients/${expense.client_id}`,
+                  label: (expense.client_name as string | null) ?? "Client",
+                },
+              ]
+            : []),
+          ...(expense.job_id
+            ? [
+                {
+                  href: `/app/jobs/${expense.job_id}`,
+                  label: (expense.job_title as string | null) ?? "Project",
+                },
+              ]
+            : []),
+          { label: expense.vendor_name as string },
+        ]}
+      />
       <PageHeader
         title={expense.vendor_name}
         subtitle={`${EXPENSE_CATEGORY_LABELS[cat] ?? cat} · ${formatExpenseDate(dateStr)}`}

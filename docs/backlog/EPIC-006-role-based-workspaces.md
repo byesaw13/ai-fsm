@@ -340,7 +340,8 @@ Acceptance Criteria:
 - [x] P0: Breadcrumbs + WhatNext primitives exported; job detail uses breadcrumbs.
 - [x] P1: My Day + Overview field-hero / what-needs-you chrome; start-day sheet + arrival confirm.
 - [x] P2: Work/People hub subnav on lists; breadcrumbs on client/property/visit/estimate (+ job).
-- [ ] P3–P4: money editors, ops boards + polish per the design doc.
+- [x] P3: Money hub chips; invoice/expense breadcrumbs; WhatNext billing queue; T4 new-form guidance.
+- [ ] P4: ops boards polish + a11y/field sweep.
 
 Notes:
 Spec: `docs/superpowers/specs/2026-08-01-nested-hubs-ux-design.md`  

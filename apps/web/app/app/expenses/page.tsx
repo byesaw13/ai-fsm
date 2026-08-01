@@ -22,8 +22,10 @@ import {
   EmptyState,
   LinkButton,
   MetricGrid,
+  HubSubnav,
 } from "@/components/ui";
 import type { FilterDef, MetricCardData } from "@/components/ui";
+import { MONEY_HUB_LINKS } from "@/lib/navigation/hubs";
 
 export const dynamic = "force-dynamic";
 
@@ -192,6 +194,7 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
           ) : undefined
         }
       />
+      <HubSubnav hub="Money" links={MONEY_HUB_LINKS} pathname="/app/expenses" />
 
       {metrics.length > 0 && <MetricGrid metrics={metrics} />}
 
