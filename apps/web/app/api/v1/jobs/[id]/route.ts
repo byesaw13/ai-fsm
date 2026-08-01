@@ -197,13 +197,22 @@ export const DELETE = withRole(
           {
             error: {
               code: "CONFLICT",
-              message: `Only draft jobs can be deleted (current status: ${job.status})`,
+              message: `Only draft projects can be deleted (current status: ${job.status}). Cancel or complete active projects instead.`,
               traceId: session.traceId,
             },
           },
           { status: 409 }
         );
       }
+
+      // Detach SMS/comms history so draft delete is not blocked by
+      // communications_log_job_id_fkey (NO ACTION before migration 163).
+      await client.query(
+        `UPDATE communications_log
+         SET job_id = NULL
+         WHERE job_id = $1 AND account_id = $2`,
+        [id, session.accountId],
+      );
 
       await client.query(`DELETE FROM jobs WHERE id = $1 AND account_id = $2`, [id, session.accountId]);
 

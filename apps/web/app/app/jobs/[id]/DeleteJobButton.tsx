@@ -20,13 +20,21 @@ export function DeleteJobButton({ jobId }: Props) {
     try {
       const res = await fetch(`/api/v1/jobs/${jobId}`, { method: "DELETE" });
       if (!res.ok) {
-        const data = await res.json();
-        setError(data.error?.message ?? "Delete failed");
+        const data = await res.json().catch(() => ({}));
+        const msg =
+          data?.error?.message ??
+          (res.status === 409
+            ? "Only draft projects can be deleted."
+            : res.status === 403
+              ? "You do not have permission to delete this project."
+              : "Failed to delete project. Try again or contact support.");
+        setError(msg);
       } else {
         router.push("/app/jobs");
+        router.refresh();
       }
     } catch {
-      setError("Unexpected error");
+      setError("Network error — check connection and try again.");
     } finally {
       setLoading(false);
     }
