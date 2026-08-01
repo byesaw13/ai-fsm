@@ -99,6 +99,24 @@
   user-select: none;
 }
 
+/* Field phone: larger primary touch targets (PRODUCT.md ≥44px) */
+@media (max-width: 767px) {
+  .p7-btn:not(.p7-btn-sm) {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .p7-btn,
+  .p7-hub-subnav__chip,
+  .p7-schedule-toggle__btn,
+  .p7-settings-tab-btn,
+  .p7-bottom-nav-item,
+  .p7-nav-item {
+    transition: none !important;
+  }
+}
+
 .p7-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;

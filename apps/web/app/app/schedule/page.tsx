@@ -72,9 +72,12 @@ export default async function SchedulePage({ searchParams }: PageProps) {
     const visits = await getTriageVisits(session.accountId);
     return (
       <PageContainer>
-        <PageHeader title="Schedule" />
+        <PageHeader
+          title="Schedule"
+          subtitle="List view — triage every open visit"
+        />
         {isAdmin && <HubSubnav hub="Work" links={WORK_HUB_LINKS} pathname="/app/schedule" />}
-        <div style={{ marginBottom: "var(--space-4)" }}>
+        <div className="p7-schedule-toolbar">
           <ScheduleViewToggle
             current="list"
             isAdmin={isAdmin}
@@ -124,9 +127,15 @@ export default async function SchedulePage({ searchParams }: PageProps) {
         [session.accountId, session.userId, rangeStart.toISOString(), rangeEnd.toISOString()]
       );
 
+  const viewLabel =
+    view === "week" ? "Week" : view === "month" ? "Month" : view === "year" ? "Year" : "Calendar";
+
   return (
     <PageContainer>
-      <PageHeader title="Schedule" />
+      <PageHeader
+        title="Schedule"
+        subtitle={`${viewLabel} · ${visits.length} visit${visits.length === 1 ? "" : "s"} in range`}
+      />
       {isAdmin && <HubSubnav hub="Work" links={WORK_HUB_LINKS} pathname="/app/schedule" />}
       <ScheduleCalendar
         visits={visits}

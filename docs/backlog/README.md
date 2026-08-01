@@ -177,7 +177,7 @@ Next available ID: **TASK-081**.
 | TASK-078 | Invoices tied to an open job are due on completion | 004 | In Progress |
 | TASK-079 | Visit-candidate consolidation + Day Review de-noise | 007 | In Progress |
 | TASK-080 | Real GPS mileage — dense drive trail + honest cross-check | 007 | In Progress |
-| TASK-081 | Nested hubs UX system (Home / Work / People / Money) | 006 | In Progress |
+| TASK-081 | Nested hubs UX system (Home / Work / People / Money) | 006 | Done |
 
 ## Status legend
 

@@ -451,9 +451,20 @@
   font-weight: var(--font-medium);
   transition: color var(--transition-fast);
   padding: var(--space-1);
+  min-height: 48px;
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
 }
 
 .p7-bottom-nav-item:hover { text-decoration: none; color: var(--fg); }
+
+.p7-bottom-nav-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  color: var(--accent);
+}
 
 .p7-bottom-nav-item.p7-nav-active { color: var(--accent); }
 
@@ -661,8 +672,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
-  padding: 6px 12px;
+  min-height: 44px; /* field touch target — PRODUCT.md */
+  padding: 8px 14px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--bg-card);
@@ -679,6 +690,11 @@
   color: var(--accent);
 }
 
+.p7-hub-subnav__chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .p7-hub-subnav__chip--active {
   background: color-mix(in srgb, var(--accent) 12%, var(--bg-card));
   border-color: var(--accent);
@@ -687,7 +703,59 @@
 
 @media (min-width: 768px) {
   .p7-hub-subnav__chip {
-    min-height: 32px;
+    min-height: 36px;
+    padding: 6px 12px;
+  }
+}
+
+/* Schedule view toggle (T5) */
+.p7-schedule-toolbar {
+  margin-bottom: var(--space-4);
+}
+
+.p7-schedule-toggle {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  background: var(--bg-muted, var(--color-slate-100));
+  padding: 3px;
+  border-radius: var(--radius-md);
+}
+
+.p7-schedule-toggle__btn {
+  min-height: 44px;
+  min-width: 56px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: none;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  background: transparent;
+  color: var(--fg-muted);
+  transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.p7-schedule-toggle__btn:hover {
+  color: var(--fg);
+}
+
+.p7-schedule-toggle__btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.p7-schedule-toggle__btn--active {
+  background: var(--bg-card, #fff);
+  color: var(--fg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+@media (min-width: 768px) {
+  .p7-schedule-toggle__btn {
+    min-height: 36px;
+    min-width: 48px;
+    padding: 6px 12px;
   }
 }
 
@@ -1335,6 +1403,7 @@ main { max-width: 980px; margin: 0 auto; padding: 24px; }
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  min-height: 44px;
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
   background: transparent;
@@ -1345,6 +1414,11 @@ main { max-width: 980px; margin: 0 auto; padding: 24px; }
   cursor: pointer;
   text-align: left;
   transition: all var(--transition-base);
+}
+
+.p7-settings-tab-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .p7-settings-tab-btn svg {

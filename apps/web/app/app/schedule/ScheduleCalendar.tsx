@@ -695,11 +695,11 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
         />
 
         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-          <button type="button" className="p7-btn p7-btn-secondary" style={{ minHeight: 38, padding: "0 var(--space-3)" }} onClick={() => router.push(prevUrl as Route)}>←</button>
+          <button type="button" className="p7-btn p7-btn-secondary" style={{ padding: "0 var(--space-3)" }} onClick={() => router.push(prevUrl as Route)} aria-label="Previous period">←</button>
           <span style={{ fontWeight: 600, color: "var(--fg)", minWidth: view === "year" ? 54 : view === "month" ? 130 : 180, textAlign: "center", fontSize: "var(--text-sm)" }}>{rangeLabel}</span>
-          <button type="button" className="p7-btn p7-btn-secondary" style={{ minHeight: 38, padding: "0 var(--space-3)" }} onClick={() => router.push(nextUrl as Route)}>→</button>
+          <button type="button" className="p7-btn p7-btn-secondary" style={{ padding: "0 var(--space-3)" }} onClick={() => router.push(nextUrl as Route)} aria-label="Next period">→</button>
           {!isCurrent && (
-            <button type="button" className="p7-btn p7-btn-ghost" style={{ minHeight: 38, color: "var(--accent)" }} onClick={() => router.push(todayUrl as Route)}>Today</button>
+            <button type="button" className="p7-btn p7-btn-ghost" style={{ color: "var(--accent)" }} onClick={() => router.push(todayUrl as Route)}>Today</button>
           )}
         </div>
       </div>

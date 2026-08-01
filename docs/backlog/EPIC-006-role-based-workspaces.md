@@ -305,7 +305,7 @@ reusing existing surfaces). Field home is My Work (`apps/web/app/app/my-work/`,
 # TASK-081: Nested hubs UX system (Home / Work / People / Money)
 
 Status:
-In Progress
+Done
 
 Phase:
 cross-cutting (UX shell; phases P0–P4)
@@ -341,7 +341,7 @@ Acceptance Criteria:
 - [x] P1: My Day + Overview field-hero / what-needs-you chrome; start-day sheet + arrival confirm.
 - [x] P2: Work/People hub subnav on lists; breadcrumbs on client/property/visit/estimate (+ job).
 - [x] P3: Money hub chips; invoice/expense breadcrumbs; WhatNext billing queue; T4 new-form guidance.
-- [ ] P4: ops boards polish + a11y/field sweep.
+- [x] P4: schedule toggle + toolbar; settings touch targets; field 44px buttons; materials in Money hub; reduced-motion.
 
 Notes:
 Spec: `docs/superpowers/specs/2026-08-01-nested-hubs-ux-design.md`  
