@@ -4,12 +4,13 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { Input, Select, Textarea, Button } from "@/components/ui";
-import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS } from "@ai-fsm/domain";
+import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS, formatJobPickerLabel } from "@ai-fsm/domain";
 import { parseDollarsToCents } from "@/lib/expenses/math";
 import { currentMonthKey } from "@/lib/expenses/ui";
+import { buildPoMatchText, suggestJobFromPoText } from "@/lib/expenses/match-job-po";
 
 interface Props {
-  jobs: { id: string; title: string }[];
+  jobs: { id: string; title: string; job_number?: string | null; client_id?: string | null }[];
   clients: { id: string; name: string }[];
   defaultJobId?: string;
   defaultClientId?: string;
@@ -51,10 +52,14 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
     { name: string; quantity: number; unit_cost_cents: number; sku?: string | null }[]
   >([]);
 
+  /** Banner after OCR matched a Supply PO to an open project. */
+  const [poMatchLabel, setPoMatchLabel] = useState<string | null>(null);
+
   async function handleScanReceipt(file: File) {
     setSelectedReceiptFile(file);
     setScanning(true);
     setScanError(null);
+    setPoMatchLabel(null);
     try {
       const formData = new FormData();
       formData.append("receipt", file);
@@ -64,13 +69,48 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
         setScanError(data.error?.message ?? "Scan failed — enter the receipt details manually. The photo will still be saved.");
         return;
       }
-      const { vendor_name, amount_cents, expense_date, category: cat, notes: n, line_items } = data.data;
+      const {
+        vendor_name,
+        amount_cents,
+        expense_date,
+        category: cat,
+        notes: n,
+        line_items,
+        po_number,
+      } = data.data;
       scannedLineItemsRef.current = Array.isArray(line_items) ? line_items : [];
       if (vendor_name) setVendorName(vendor_name);
       if (amount_cents) setAmountStr((amount_cents / 100).toFixed(2));
       if (expense_date) setExpenseDate(expense_date);
       if (cat && !isMaterialRun) setCategory(cat);
-      if (n) setNotes(n);
+      let nextNotes = typeof n === "string" ? n : "";
+      if (po_number && typeof po_number === "string" && po_number.trim()) {
+        const poTag = po_number.trim();
+        if (!nextNotes.toUpperCase().includes(poTag.toUpperCase())) {
+          nextNotes = nextNotes ? `${nextNotes}\nPO ${poTag}` : `PO ${poTag}`;
+        }
+      }
+      if (nextNotes) setNotes(nextNotes);
+
+      // Pre-select open job when Supply PO uniquely matches — never override an
+      // existing choice (deep-link defaultJobId or user pick before scan).
+      const haystack = buildPoMatchText({
+        po_number: typeof po_number === "string" ? po_number : null,
+        notes: nextNotes,
+        vendor_name: typeof vendor_name === "string" ? vendor_name : null,
+      });
+      const match = suggestJobFromPoText(haystack, jobs);
+      if (match) {
+        const job = jobs.find((j) => j.id === match.jobId);
+        const label = `Matched Supply PO ${match.supplyPo} → ${job?.title ?? match.jobNumber}`;
+        if (!jobId) {
+          setJobId(match.jobId);
+          if (job?.client_id) setClientId(job.client_id);
+          setPoMatchLabel(label);
+        } else if (jobId === match.jobId) {
+          setPoMatchLabel(label);
+        }
+      }
     } catch {
       setScanError("Network error — enter the receipt details manually. The photo will still be saved.");
     } finally {
@@ -200,7 +240,10 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
   }));
   const jobOptions = [
     { value: "", label: isMaterialRun ? "No job — general stock" : "No open project" },
-    ...jobs.map((j) => ({ value: j.id, label: j.title })),
+    ...jobs.map((j) => ({
+      value: j.id,
+      label: formatJobPickerLabel(j.title, j.job_number),
+    })),
   ];
   const clientOptions = [
     { value: "", label: "No client" },
@@ -318,15 +361,36 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
         hint={`Expenses outside ${currentMonth} will not appear in this month's summary.`}
       />
 
+      {poMatchLabel && (
+        <p
+          data-testid="supply-po-match-banner"
+          role="status"
+          style={{
+            margin: 0,
+            padding: "var(--space-3)",
+            borderRadius: "var(--radius)",
+            border: "1px solid var(--color-success, #16a34a)",
+            background: "var(--success-bg, #f0fdf4)",
+            fontSize: "var(--text-sm)",
+            fontWeight: 600,
+          }}
+        >
+          {poMatchLabel}
+        </p>
+      )}
+
       {(jobs.length > 0 || isMaterialRun) && (
         <Select
           id="job_id"
           label={isMaterialRun ? "Project" : "Link to Project (optional)"}
           value={jobId}
-          onChange={(e) => setJobId(e.target.value)}
+          onChange={(e) => {
+            setJobId(e.target.value);
+            setPoMatchLabel(null);
+          }}
           options={jobOptions}
           disabled={pending}
-          hint="Open projects only — in progress first, then scheduled / quoted. Closed jobs are hidden."
+          hint="Open projects only — in progress first, then scheduled / quoted. Use Supply PO (J260029) at the store for auto-match. Closed jobs are hidden."
         />
       )}
 

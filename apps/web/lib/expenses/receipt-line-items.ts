@@ -23,6 +23,7 @@ Return ONLY valid JSON (no markdown fences):
   "category": "materials|tools|fuel|vehicle|meals|other|... or null",
   "notes": "string or null — short trip summary",
   "tax_cents": number or null — tax line in cents if shown,
+  "po_number": "string or null — job / supply PO if written or printed (e.g. J260029, J-2026-0029, PO J260029). Do NOT invent.",
   "line_items": [
     {
       "name": "string — product description (prefer full description, not just SKU abbreviation)",
@@ -45,6 +46,7 @@ Return ONLY valid JSON (no markdown fences):
 7. Prefer the most complete product description on the line (not only the short POS code if a longer description exists).
 8. Sum of line_total_cents should be close to pre-tax merchandise total when tax is separate; if only a grand total is visible, still extract lines accurately.
 9. category: materials for lumber, hardware, paint, fasteners, drywall, trim, etc.; tools for tools; fuel for gas.
+10. po_number: only when a job/PO reference is clearly present (handwritten or printed). Prefer the short form when both appear (J260029). Never invent a PO.
 
 ## Store-specific hints
 - Home Depot: often shows SKU, short name, qty @ unit, then line total. Internet SKU may appear.
@@ -70,6 +72,8 @@ export type ParsedReceipt = {
   category?: string | null;
   notes?: string | null;
   tax_cents?: number | null;
+  /** Supply PO / job number if OCR found one (J260029, J-2026-0029, …). */
+  po_number?: string | null;
   line_items?: ParsedReceiptLineItem[];
 };
 

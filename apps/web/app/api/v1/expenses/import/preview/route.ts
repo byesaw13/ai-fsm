@@ -7,6 +7,8 @@ import {
   RECEIPT_LINKABLE_JOB_STATUS_SQL,
   receiptJobOrderSql,
 } from "@/lib/expenses/open-jobs";
+import { buildPoMatchText, suggestJobFromPoText } from "@/lib/expenses/match-job-po";
+import { formatJobPickerLabel } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -17,17 +19,42 @@ function norm(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-type JobRow = { id: string; title: string; client_id: string | null; client_name: string | null; address: string | null };
+type JobRow = {
+  id: string;
+  title: string;
+  job_number: string | null;
+  client_id: string | null;
+  client_name: string | null;
+  address: string | null;
+};
 
-/** Best-effort match of an HD job tag to an app job, by job title / client / address. */
-function suggestJob(jobName: string | null, jobs: JobRow[]): { job_id: string; client_id: string | null; label: string } | null {
+/**
+ * Prefer exact Supply PO match on the HD job tag, then soft title/client/address.
+ */
+function suggestJob(
+  jobName: string | null,
+  jobs: JobRow[],
+): { job_id: string; client_id: string | null; label: string } | null {
+  const poHit = suggestJobFromPoText(buildPoMatchText({ job_name: jobName, notes: jobName }), jobs);
+  if (poHit) {
+    const j = jobs.find((row) => row.id === poHit.jobId);
+    return {
+      job_id: poHit.jobId,
+      client_id: j?.client_id ?? null,
+      label: formatJobPickerLabel(j?.title ?? poHit.jobNumber, j?.job_number ?? poHit.jobNumber),
+    };
+  }
   if (!jobName) return null;
   const n = norm(jobName);
   if (!n) return null;
   for (const j of jobs) {
     const hay = [norm(j.title), norm(j.client_name ?? ""), norm(j.address ?? "")];
     if (hay.some((h) => h && (h.includes(n) || n.includes(h)))) {
-      return { job_id: j.id, client_id: j.client_id, label: j.title };
+      return {
+        job_id: j.id,
+        client_id: j.client_id,
+        label: formatJobPickerLabel(j.title, j.job_number),
+      };
     }
   }
   return null;
@@ -74,7 +101,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
         [session.accountId, SOURCE]
       );
       const jobRows = await client.query<JobRow>(
-        `SELECT j.id, j.title, j.client_id, c.name AS client_name, p.address
+        `SELECT j.id, j.title, j.job_number, j.client_id, c.name AS client_name, p.address
          FROM jobs j
          LEFT JOIN clients c ON c.id = j.client_id
          LEFT JOIN properties p ON p.id = j.property_id
