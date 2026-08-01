@@ -19,6 +19,8 @@ type Txn = {
   suggestion: { job_id: string; client_id: string | null; label: string } | null;
 };
 type Summary = {
+  source?: string;
+  vendor_label?: string;
   total_transactions: number; new_importable: number; duplicates: number;
   returns_skipped: number; total_cents: number; material_lines: number;
 };
@@ -79,8 +81,10 @@ export function ImportExpensesClient() {
     }
     setImporting(true);
     try {
+      const vendorLabel = summary?.vendor_label ?? importable[0]?.vendor ?? "Store";
+      const source = summary?.source === "lowes_csv" ? "lowes_csv" : "home_depot_csv";
       const payload = {
-        source: "home_depot_csv",
+        source,
         transactions: importable.map((t) => {
           const job_id = jobChoice[t.external_ref] || null;
           const job = jobs.find((j) => j.id === job_id);
@@ -92,7 +96,7 @@ export function ImportExpensesClient() {
             expense_category: t.expense_category,
             job_id,
             client_id: job_id ? (t.suggestion?.job_id === job_id ? t.suggestion?.client_id ?? null : null) : null,
-            notes: `Home Depot${t.job_name ? ` · ${t.job_name}` : ""}${job ? ` → ${job.title}` : ""}`,
+            notes: `${vendorLabel}${t.job_name ? ` · ${t.job_name}` : ""}${job ? ` → ${job.title}` : ""}`,
             line_items: t.line_items,
           };
         }),
@@ -123,8 +127,9 @@ export function ImportExpensesClient() {
       {/* Upload */}
       <Card>
         <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-          In Home Depot Pro Xtra → Purchase Tracking → export to CSV, then upload it here. Each store trip becomes one
-          expense (tagged to the job when we can match it), and every SKU updates your material price book.
+          Upload a <strong>Home Depot</strong> Pro Xtra purchase export <em>or</em> a <strong>Lowe&apos;s</strong>{" "}
+          purchase-history CSV. We auto-detect the store. Each trip/invoice becomes one expense (job-matched when
+          possible), and SKUs update your materials catalog.
         </p>
         <input
           ref={fileRef}
@@ -140,6 +145,11 @@ export function ImportExpensesClient() {
 
       {summary && (
         <Card>
+          {summary.vendor_label ? (
+            <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", fontWeight: 600 }} data-testid="import-vendor-label">
+              Detected: {summary.vendor_label}
+            </p>
+          ) : null}
           <div style={{ display: "flex", gap: "var(--space-6)", flexWrap: "wrap", fontSize: "var(--text-sm)" }}>
             <Stat label="New to import" value={String(summary.new_importable)} accent="var(--accent)" />
             <Stat label="Total" value={formatCents(summary.total_cents)} />
@@ -161,7 +171,7 @@ export function ImportExpensesClient() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)", textAlign: "left" }}>
-                  {["Date", "HD job tag", "Items", "Amount", "Category", "Assign to job", "Status"].map((h) => (
+                  {["Date", "PO / job tag", "Items", "Amount", "Category", "Assign to job", "Status"].map((h) => (
                     <th key={h} style={{ padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
