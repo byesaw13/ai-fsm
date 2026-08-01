@@ -30,4 +30,14 @@ describe("hubs navigation", () => {
     );
     expect(activeHubHref("/app/my-work", WORK_HUB_LINKS)).toBeNull();
   });
+
+  it("Money hub matches invoices, expenses, reports", () => {
+    expect(activeHubHref("/app/invoices/abc", MONEY_HUB_LINKS)).toBe(
+      "/app/invoices",
+    );
+    expect(activeHubHref("/app/expenses/new", MONEY_HUB_LINKS)).toBe(
+      "/app/expenses",
+    );
+    expect(activeHubHref("/app/reports", MONEY_HUB_LINKS)).toBe("/app/reports");
+  });
 });

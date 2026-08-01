@@ -9,8 +9,10 @@ import {
   MetricGrid,
   PageContainer,
   PageHeader,
+  HubSubnav,
 } from "@/components/ui";
 import type { FilterDef } from "@/components/ui";
+import { MONEY_HUB_LINKS } from "@/lib/navigation/hubs";
 import { formatCents } from "./format";
 import { loadReportData, loadInvoiceAging } from "./queries";
 import { FinancialSection } from "./sections/FinancialSection";
@@ -68,6 +70,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           </>
         }
       />
+      <HubSubnav hub="Money" links={MONEY_HUB_LINKS} pathname="/app/reports" />
 
       {/* Month filter */}
       <div style={{ marginBottom: "var(--space-4)" }}>

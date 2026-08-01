@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { canCreateInvoices } from "@/lib/auth/permissions";
 import { query } from "@/lib/db";
-import { Card, PageContainer, PageHeader } from "@/components/ui";
+import { Breadcrumbs, Card, PageContainer, PageHeader, HubSubnav } from "@/components/ui";
+import { MONEY_HUB_LINKS } from "@/lib/navigation/hubs";
 import { NewInvoiceForm } from "./NewInvoiceForm";
 
 export const dynamic = "force-dynamic";
@@ -86,7 +87,17 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
 
   return (
     <PageContainer>
+      <Breadcrumbs
+        items={[
+          { href: "/app/invoices", label: "Invoices" },
+          { label: "New invoice" },
+        ]}
+      />
       <PageHeader title="New Invoice" backHref="/app/invoices" backLabel="Invoices" />
+      <HubSubnav hub="Money" links={MONEY_HUB_LINKS} pathname="/app/invoices" />
+      <p style={{ margin: "0 0 var(--space-4)", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+        Prefill from a project when you can — line items and client stay editable.
+      </p>
       <Card>
         <NewInvoiceForm
           clients={clients}

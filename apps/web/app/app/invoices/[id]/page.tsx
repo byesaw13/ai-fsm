@@ -30,6 +30,7 @@ import { InvoiceLineItemsEditor } from "./InvoiceLineItemsEditor";
 import { LinkForgottenExpensesPanel } from "@/components/invoices/LinkForgottenExpensesPanel";
 import { materialHandlingRateFromSettings } from "@/lib/invoices/material-handling";
 import {
+  Breadcrumbs,
   PageContainer,
   PageHeader,
   StatusBadge,
@@ -237,6 +238,28 @@ export default async function InvoiceDetailPage({
 
   return (
     <PageContainer>
+      <Breadcrumbs
+        items={[
+          { href: "/app/invoices", label: "Invoices" },
+          ...(invoice.client_id
+            ? [
+                {
+                  href: `/app/clients/${invoice.client_id}`,
+                  label: invoice.client_name ?? "Client",
+                },
+              ]
+            : []),
+          ...(invoice.job_id
+            ? [
+                {
+                  href: `/app/jobs/${invoice.job_id}`,
+                  label: invoice.job_title ?? "Project",
+                },
+              ]
+            : []),
+          { label: invoice.invoice_number },
+        ]}
+      />
       <PageHeader
         title={invoice.invoice_number}
         subtitle={invoice.client_name ?? undefined}

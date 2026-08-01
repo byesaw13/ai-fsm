@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { canManageExpenses } from "@/lib/auth/permissions";
 import { query } from "@/lib/db";
-import { PageContainer, PageHeader, LinkButton } from "@/components/ui";
+import { Breadcrumbs, PageContainer, PageHeader, LinkButton, HubSubnav } from "@/components/ui";
+import { MONEY_HUB_LINKS } from "@/lib/navigation/hubs";
 import { ExpenseForm } from "./ExpenseForm";
 import {
   RECEIPT_LINKABLE_JOB_STATUS_SQL,
@@ -66,6 +67,12 @@ export default async function NewExpensePage({
 
   return (
     <PageContainer>
+      <Breadcrumbs
+        items={[
+          { href: "/app/expenses", label: "Expenses" },
+          { label: isMaterialRun ? "Material run" : "New expense" },
+        ]}
+      />
       <PageHeader
         title={isMaterialRun ? "Material Run" : "New Expense"}
         subtitle={isMaterialRun ? "Capture the receipt first, then save the supplier run" : "Record an expense for this account"}
@@ -75,6 +82,7 @@ export default async function NewExpensePage({
           </LinkButton>
         }
       />
+      <HubSubnav hub="Money" links={MONEY_HUB_LINKS} pathname="/app/expenses" />
       <ExpenseForm
         jobs={jobs}
         clients={clients}

@@ -3,7 +3,8 @@ import { getSession } from "@/lib/auth/session";
 import { canCreateEstimates } from "@/lib/auth/permissions";
 import { resolveDepositPolicy } from "@ai-fsm/domain";
 import { query, queryOne } from "@/lib/db";
-import { Card, PageContainer, PageHeader } from "@/components/ui";
+import { Breadcrumbs, Card, PageContainer, PageHeader, HubSubnav } from "@/components/ui";
+import { WORK_HUB_LINKS } from "@/lib/navigation/hubs";
 import { EstimateEntryShell } from "./EstimateEntryShell";
 import { buildWalkthroughScopeNotes } from "@/lib/estimates/walkthrough-prefill";
 import { loadAssessmentSummary } from "@/lib/estimates/assessment-summary-loader";
@@ -278,7 +279,17 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
 
   return (
     <PageContainer>
+      <Breadcrumbs
+        items={[
+          { href: "/app/estimates", label: "Estimates" },
+          { label: "New estimate" },
+        ]}
+      />
       <PageHeader title="New Estimate" backHref="/app/estimates" backLabel="Estimates" />
+      <HubSubnav hub="Work" links={WORK_HUB_LINKS} pathname="/app/estimates" />
+      <p style={{ margin: "0 0 var(--space-4)", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+        Short steps — defaults from the client, property, and price book when available. Save draft anytime.
+      </p>
       {assessmentPathWarning && (
         <Card
           style={{
