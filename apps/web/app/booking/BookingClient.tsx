@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import type { Route } from "next";
 import { INTAKE_QUESTIONS } from "@/lib/intake/questions";
+import { SmsConsentLabel } from "@/components/sms/SmsConsentLabel";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -18,9 +20,6 @@ interface ServiceCategory {
 interface BookingClientProps {
   serviceCategories: ServiceCategory[];
 }
-
-const SMS_CONSENT_TEXT =
-  "By checking this box you consent to receive text messages from Dovetails Services LLC about your service requests. Message & data rates may apply. Reply STOP to opt out.";
 
 const NEXT_STEPS_SITE_VISIT = [
   { title: "We review your request", body: "We look at every submission within 1 business day." },
@@ -415,11 +414,10 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                     type="checkbox"
                     checked={smsConsent}
                     onChange={(e) => setSmsConsent(e.target.checked)}
-                    style={{ marginTop: 3 }}
+                    style={{ marginTop: 3, flexShrink: 0 }}
+                    required
                   />
-                  <span style={{ fontSize: 13, color: "#374151", lineHeight: 1.45 }}>
-                    {SMS_CONSENT_TEXT}
-                  </span>
+                  <SmsConsentLabel />
                 </label>
               )}
             </div>
@@ -623,6 +621,28 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
           </div>
         )}
 
+        <footer
+          style={{
+            marginTop: 28,
+            paddingTop: 16,
+            borderTop: "1px solid #e5e7eb",
+            textAlign: "center",
+            fontSize: 12,
+            color: "#6b7280",
+            lineHeight: 1.5,
+          }}
+        >
+          <p style={{ margin: "0 0 6px" }}>Dovetails Services LLC</p>
+          <p style={{ margin: 0 }}>
+            <Link href={"/privacy" as Route} style={{ color: "#2563eb" }}>
+              Privacy Policy
+            </Link>
+            {" · "}
+            <Link href={"/terms" as Route} style={{ color: "#2563eb" }}>
+              Terms of Service
+            </Link>
+          </p>
+        </footer>
       </div>
     </div>
   );
