@@ -7,6 +7,10 @@ import { normalizePhone } from "@/lib/phone";
 import { getClientContext } from "@/lib/sms/context";
 import { classifySms, type SmsClassification } from "@/lib/sms/classify";
 import { logCommunication } from "@/lib/communications-log";
+import { detectSmsKeyword, replyForSmsKeyword, type SmsKeyword } from "@/lib/sms/keywords";
+import { SMS_CONSENT_TEXT } from "@/lib/sms/consent";
+import { isSmsGatewayConfigured, sendSmsViaGateway } from "@/lib/sms/gateway";
+import { logOutboundSms } from "@/lib/sms/outbound";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +38,164 @@ async function getOwnerContext(): Promise<{ accountId: string; userId: string }>
   _accountId = row.account_id;
   _userId = row.user_id;
   return { accountId: _accountId, userId: _userId };
+}
+
+/** Match all client rows for a phone (E.164 or last-10 national). */
+function phoneMatchParams(phone: string): { phone: string; digits: string; last10: string } {
+  const digits = phone.replace(/\D/g, "");
+  const last10 = digits.length >= 10 ? digits.slice(-10) : digits;
+  return { phone, digits, last10 };
+}
+
+/**
+ * Carrier-required STOP / HELP / START — handled before AI classification.
+ * Claims external_id first, updates consent on all phone matches, auto-replies.
+ */
+async function handleSmsKeyword(opts: {
+  accountId: string;
+  phone: string;
+  message: string;
+  keyword: SmsKeyword;
+  externalId?: string;
+  existing: { id: string; name: string; sms_consent: boolean } | null;
+  traceId: string;
+}): Promise<NextResponse> {
+  const { accountId, phone, message, keyword, externalId, existing, traceId } = opts;
+  const reply = replyForSmsKeyword(keyword);
+
+  let clientId: string | null = existing?.id ?? null;
+  let clientName = existing?.name ?? phone;
+  let isNewClient = false;
+
+  // STOP/START need a client row to persist consent; create a minimal lead if new.
+  if (!clientId && (keyword === "stop" || keyword === "start")) {
+    const [created] = await query<{ id: string }>(
+      `INSERT INTO clients (account_id, name, phone, notes)
+       VALUES ($1, $2, $3, $4) RETURNING id`,
+      [
+        accountId,
+        `SMS Lead (${phone})`,
+        phone,
+        `Created from SMS keyword (${keyword}).\nFirst message: "${message}"`,
+      ]
+    );
+    clientId = created.id;
+    clientName = `SMS Lead (${phone})`;
+    isNewClient = true;
+  }
+
+  // Claim idempotency BEFORE consent updates / auto-reply (same pattern as normal path).
+  const claimId = await logCommunication({
+    accountId,
+    channel: "sms",
+    direction: "inbound",
+    outcome: "received",
+    clientId,
+    jobId: null,
+    bodyPreview: message.slice(0, 1000),
+    externalId: externalId ?? null,
+  });
+  if (externalId && claimId === null) {
+    logger.info("SMS keyword duplicate ignored (claim)", { traceId, externalId, keyword });
+    return NextResponse.json({ duplicate: true });
+  }
+
+  const { last10 } = phoneMatchParams(phone);
+  if (keyword === "stop") {
+    // Opt out every client row that shares this phone number.
+    await query(
+      `UPDATE clients
+       SET sms_consent = false,
+           sms_consent_at = NOW(),
+           sms_consent_source = 'sms_stop',
+           preferred_contact = CASE WHEN preferred_contact = 'sms' THEN 'email' ELSE preferred_contact END
+       WHERE account_id = $1
+         AND (
+           phone = $2
+           OR phone = $3
+           OR right(regexp_replace(coalesce(phone, ''), '\\D', '', 'g'), 10) = $4
+         )`,
+      [accountId, phone, `+${phone.replace(/\D/g, "")}`, last10]
+    );
+  } else if (keyword === "start") {
+    await query(
+      `UPDATE clients
+       SET sms_consent = true,
+           sms_consent_at = NOW(),
+           sms_consent_source = 'sms_start',
+           sms_consent_text = $5,
+           preferred_contact = 'sms'
+       WHERE account_id = $1
+         AND (
+           phone = $2
+           OR phone = $3
+           OR right(regexp_replace(coalesce(phone, ''), '\\D', '', 'g'), 10) = $4
+         )`,
+      [accountId, phone, `+${phone.replace(/\D/g, "")}`, last10, SMS_CONSENT_TEXT]
+    );
+  }
+
+  let autoReplied = false;
+  if (isSmsGatewayConfigured()) {
+    const sendResult = await sendSmsViaGateway({ phone, message: reply });
+    autoReplied = sendResult.ok;
+    if (sendResult.ok) {
+      await logOutboundSms({
+        accountId,
+        clientId,
+        bodyPreview: reply.slice(0, 1000),
+        outcome: "sent",
+        externalId: sendResult.messageId,
+      });
+    } else {
+      logger.warn("SMS keyword auto-reply failed", {
+        traceId,
+        keyword,
+        error: sendResult.error,
+      });
+    }
+  }
+
+  logger.info("SMS keyword handled", {
+    traceId,
+    keyword,
+    phone,
+    clientId,
+    autoReplied,
+  });
+
+  const emoji = keyword === "stop" ? "🛑" : keyword === "help" ? "ℹ️" : "✅";
+  const label =
+    keyword === "stop"
+      ? "SMS opt-out (STOP)"
+      : keyword === "help"
+        ? "SMS help request"
+        : "SMS re-subscribe (START)";
+
+  return NextResponse.json({
+    keyword,
+    client_id: clientId,
+    job_id: null,
+    message_type: "keyword",
+    confidence: "high",
+    is_new_client: isNewClient,
+    client_name: clientName,
+    estimate_to_confirm: null,
+    needs_review: false,
+    auto_replied: autoReplied,
+    // n8n: if auto_replied, do not send reply again
+    notification: {
+      title: `${emoji} ${label}: ${clientName}`,
+      body: [
+        `📞 ${phone}`,
+        `Keyword: ${keyword.toUpperCase()}`,
+        autoReplied ? "✅ Auto-reply sent" : "⚠️ Auto-reply queued for n8n (gateway not configured or send failed)",
+        "",
+        `💬 Reply: "${reply}"`,
+      ].join("\n"),
+    },
+    reply,
+  });
 }
 
 async function createDraftJob(
@@ -140,10 +302,90 @@ export async function POST(req: NextRequest) {
   }
 
   // Existing client (don't create until we know it's business)
-  const existing = await queryOne<{ id: string; name: string }>(
-    `SELECT id, name FROM clients WHERE account_id = $1 AND phone = $2 LIMIT 1`,
-    [accountId, phone]
+  const { last10 } = phoneMatchParams(phone);
+  const existing = await queryOne<{
+    id: string;
+    name: string;
+    sms_consent: boolean;
+    sms_consent_at: string | null;
+  }>(
+    `SELECT id, name, sms_consent, sms_consent_at FROM clients
+     WHERE account_id = $1
+       AND (
+         phone = $2
+         OR phone = $3
+         OR right(regexp_replace(coalesce(phone, ''), '\\D', '', 'g'), 10) = $4
+       )
+     ORDER BY
+       CASE WHEN phone = $2 THEN 0 WHEN phone = $3 THEN 1 ELSE 2 END,
+       CASE WHEN sms_consent THEN 0 ELSE 1 END,
+       created_at DESC
+     LIMIT 1`,
+    [accountId, phone, `+${phone.replace(/\D/g, "")}`, last10]
   );
+
+  // CTIA keywords — handle before Claude; never create draft jobs for STOP/HELP/START
+  const keyword = detectSmsKeyword(message);
+  if (keyword) {
+    return handleSmsKeyword({
+      accountId,
+      phone,
+      message,
+      keyword,
+      externalId: external_id,
+      existing: existing
+        ? { id: existing.id, name: existing.name, sms_consent: existing.sms_consent }
+        : null,
+      traceId,
+    });
+  }
+
+  // After explicit opt-out (STOP / portal), suppress program auto-replies until START.
+  // Clients who never consented (sms_consent_at IS NULL) may still text the line —
+  // those remain conversational and are not treated as STOP.
+  // Still log the inbound and notify the owner so human follow-up is possible.
+  if (existing && existing.sms_consent === false && existing.sms_consent_at != null) {
+    const claimId = await logCommunication({
+      accountId,
+      channel: "sms",
+      direction: "inbound",
+      outcome: "received",
+      clientId: existing.id,
+      jobId: null,
+      bodyPreview: message.slice(0, 1000),
+      externalId: external_id ?? null,
+    });
+    if (external_id && claimId === null) {
+      return NextResponse.json({ duplicate: true });
+    }
+    logger.info("SMS from opted-out number — no auto-reply", {
+      traceId,
+      phone,
+      clientId: existing.id,
+    });
+    return NextResponse.json({
+      client_id: existing.id,
+      job_id: null,
+      message_type: "opted_out",
+      confidence: "high",
+      is_new_client: false,
+      client_name: existing.name,
+      estimate_to_confirm: null,
+      needs_review: true,
+      opted_out: true,
+      notification: {
+        title: `📵 Opted-out SMS: ${existing.name}`,
+        body: [
+          `Existing client: ${existing.name}`,
+          `📞 ${phone}`,
+          `💬 ${message.slice(0, 200)}`,
+          "⚠️ Number is opted out — no auto-reply sent. Reply START to re-subscribe, or contact by phone/email.",
+        ].join("\n"),
+      },
+      // Empty reply so n8n does not text them
+      reply: "",
+    });
+  }
 
   const context = existing
     ? await getClientContext(accountId, existing.id)

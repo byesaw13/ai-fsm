@@ -3,9 +3,7 @@
 import { useMemo, useState } from "react";
 import { Button, Card, Input, LinkButton, Select, SectionHeader, Textarea, useToast } from "@/components/ui";
 import { INTAKE_QUESTIONS, INTAKE_METADATA_LABELS } from "@/lib/intake/questions";
-
-const SMS_CONSENT_TEXT =
-  "By checking this box you consent to receive text messages from Dovetails Services LLC about your service requests. Message & data rates may apply. Reply STOP to opt out.";
+import { SmsConsentLabel } from "@/components/sms/SmsConsentLabel";
 
 const SERVICE_CATEGORIES = [
   { value: "painting_finishes", label: "Painting & Finishes" },
@@ -506,11 +504,9 @@ export function IntakeForm() {
             checked={form.sms_consent}
             disabled={form.preferred_contact !== "sms"}
             onChange={(e) => update("sms_consent", e.target.checked)}
-            style={{ marginTop: 3 }}
+            style={{ marginTop: 3, flexShrink: 0 }}
           />
-          <span style={{ fontSize: "var(--text-sm)", color: form.preferred_contact === "sms" ? "var(--fg)" : "var(--fg-muted)" }}>
-            {SMS_CONSENT_TEXT}
-          </span>
+          <SmsConsentLabel muted={form.preferred_contact !== "sms"} />
         </label>
         {errors.sms_consent ? <span className="p7-field-error" role="alert">{errors.sms_consent}</span> : null}
       </Card>

@@ -72,14 +72,32 @@ export const POST = withRole(
       );
     }
 
-    const client = await queryOne<{ id: string; name: string; phone: string | null }>(
-      `SELECT id, name, phone FROM clients WHERE id = $1 AND account_id = $2`,
+    const client = await queryOne<{
+      id: string;
+      name: string;
+      phone: string | null;
+      sms_consent: boolean;
+    }>(
+      `SELECT id, name, phone, sms_consent FROM clients WHERE id = $1 AND account_id = $2`,
       [clientId, session.accountId]
     );
     if (!client) {
       return NextResponse.json(
         { error: { code: "NOT_FOUND", message: "Client not found", traceId: session.traceId } },
         { status: 404 }
+      );
+    }
+    if (!client.sms_consent) {
+      return NextResponse.json(
+        {
+          error: {
+            code: "SMS_OPTED_OUT",
+            message:
+              "This client has not consented to SMS (or opted out via STOP). Use phone/email, or ask them to reply START / re-opt in on booking.",
+            traceId: session.traceId,
+          },
+        },
+        { status: 403 }
       );
     }
     if (!client.phone) {

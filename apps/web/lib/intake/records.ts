@@ -1,8 +1,8 @@
 import type { PoolClient } from "pg";
 import { normalizePhone } from "../phone";
+import { SMS_CONSENT_TEXT } from "../sms/consent";
 
-export const SMS_CONSENT_TEXT =
-  "By checking this box you consent to receive text messages from Dovetails Services LLC about your service requests. Message & data rates may apply. Reply STOP to opt out.";
+export { SMS_CONSENT_TEXT };
 
 type PreferredContact = "sms" | "email" | "phone";
 
