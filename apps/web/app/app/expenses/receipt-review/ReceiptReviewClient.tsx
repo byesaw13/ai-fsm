@@ -249,7 +249,8 @@ export function ReceiptReviewClient() {
                       void assign(
                         item.id,
                         chosen,
-                        chosenJob?.client_id ?? item.suggestion?.client_id ?? null,
+                        // Only the chosen job's client — never fall back to a discarded suggestion.
+                        chosenJob?.client_id ?? null,
                       )
                     }
                     data-testid="receipt-review-accept"
