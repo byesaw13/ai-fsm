@@ -45,15 +45,27 @@ export function MyDayMobileLayout({
   return (
     <>
       {!complete ? (
-        <button
-          type="button"
-          data-testid="start-my-day-button"
-          className="p7-btn p7-btn-primary"
-          style={{ width: "100%", minHeight: 48, marginBottom: "var(--space-4)", fontWeight: 700 }}
-          onClick={() => setWizardOpen(true)}
-        >
-          {partial ? "Continue My Day" : "Start My Day"}
-        </button>
+        <div className="p7-field-hero" style={{ marginBottom: "var(--space-4)" }}>
+          <div className="p7-field-hero__kicker">Home · My Day</div>
+          <div className="p7-field-hero__title">
+            {partial ? "Finish starting your day" : "Start your day"}
+          </div>
+          <p className="p7-field-hero__meta" style={{ margin: 0 }}>
+            {partial
+              ? "Clock, vehicle, and mileage — confirm what’s left."
+              : "One flow: clock in, pick the truck, start mileage."}
+          </p>
+          <div className="p7-field-hero__actions">
+            <button
+              type="button"
+              data-testid="start-my-day-button"
+              className="p7-field-hero__primary"
+              onClick={() => setWizardOpen(true)}
+            >
+              {partial ? "Continue My Day" : "Start My Day"}
+            </button>
+          </div>
+        </div>
       ) : (
         <div style={{ marginBottom: "var(--space-4)" }}>
           <DayStatusPill

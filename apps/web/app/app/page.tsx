@@ -2,7 +2,7 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { queryForSession } from "@/lib/db";
-import { LinkButton, PageContainer, PageHeader } from "@/components/ui";
+import { LinkButton, PageContainer, PageHeader, WhatNext } from "@/components/ui";
 import { OwnerDashboard } from "./OwnerDashboard";
 import type { CommandVisit, CountAction, MaterialJob } from "./DashboardWidgets";
 
@@ -233,10 +233,12 @@ export default async function AppPage() {
     .filter((item) => item.count > 0)
     .sort((a, b) => ({ danger: 0, warning: 1, default: 2 })[a.tone] - ({ danger: 0, warning: 1, default: 2 })[b.tone]);
 
+  const topAction = actionQueue[0] ?? null;
+
   return (
     <PageContainer>
       <PageHeader
-        title="Dashboard"
+        title="Overview"
         subtitle={todayLabel}
         actions={
           <>
@@ -245,6 +247,14 @@ export default async function AppPage() {
           </>
         }
       />
+      {topAction ? (
+        <WhatNext
+          title={topAction.label}
+          description={`${topAction.count} · ${topAction.detail}`}
+          href={topAction.href}
+          actionLabel="Handle now"
+        />
+      ) : null}
       <OwnerDashboard
         actionQueue={actionQueue}
         todayJobs={todayJobs}

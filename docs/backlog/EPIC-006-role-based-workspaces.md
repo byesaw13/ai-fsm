@@ -338,7 +338,8 @@ Acceptance Criteria:
 - [x] P0: labeled hubs in sidebar + More sheet; bottom tabs map to four hubs.
 - [x] P0: role/workspace home rules preserved (owner field My Day, admin Overview).
 - [x] P0: Breadcrumbs + WhatNext primitives exported; job detail uses breadcrumbs.
-- [ ] P1–P4: phased follow-up PRs per the design doc.
+- [x] P1: My Day + Overview field-hero / what-needs-you chrome; start-day sheet + arrival confirm.
+- [ ] P2–P4: lists, nest details, money editors, ops boards per the design doc.
 
 Notes:
 Spec: `docs/superpowers/specs/2026-08-01-nested-hubs-ux-design.md`  

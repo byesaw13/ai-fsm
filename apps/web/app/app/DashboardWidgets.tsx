@@ -47,21 +47,68 @@ function accentForTone(tone: CountAction["tone"]): string {
 
 export function ActionQueue({ items }: { items: CountAction[] }) {
   return (
-    <Card>
+    <Card data-testid="what-needs-you">
       <SectionHeader title="What needs you" count={items.length} />
       {items.length === 0 ? (
         <EmptyState title="Nothing is waiting" description="Follow-ups, deposits, and invoices show up here when they need action." />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          {items.map((item) => {
+          {items.map((item, index) => {
             const accent = accentForTone(item.tone);
+            const primary = index === 0;
             return (
-              <Link key={item.label} href={item.href} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)", padding: "var(--space-3)", borderRadius: "var(--radius)", border: `1px solid ${accent}`, textDecoration: "none", color: "inherit", background: "var(--bg-card)" }}>
-                <span style={{ display: "flex", flexDirection: "column" }}>
+              <Link
+                key={item.label}
+                href={item.href}
+                data-testid={primary ? "what-needs-you-primary" : undefined}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "var(--space-3)",
+                  padding: "var(--space-3)",
+                  minHeight: 52,
+                  borderRadius: "var(--radius)",
+                  border: `1px solid ${accent}`,
+                  textDecoration: "none",
+                  color: "inherit",
+                  background: primary
+                    ? `color-mix(in srgb, ${accent} 8%, var(--bg-card))`
+                    : "var(--bg-card)",
+                }}
+              >
+                <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  {primary ? (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.06em",
+                        color: accent,
+                      }}
+                    >
+                      Start here
+                    </span>
+                  ) : null}
                   <strong>{item.label}</strong>
                   <small style={{ color: "var(--fg-muted)" }}>{item.detail}</small>
                 </span>
-                <b style={{ minWidth: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "0 8px", borderRadius: 99, background: `color-mix(in srgb, ${accent} 14%, transparent)`, color: accent }}>{item.count}</b>
+                <b
+                  style={{
+                    minWidth: 32,
+                    minHeight: 32,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "0 10px",
+                    borderRadius: 99,
+                    background: `color-mix(in srgb, ${accent} 14%, transparent)`,
+                    color: accent,
+                  }}
+                >
+                  {item.count}
+                </b>
               </Link>
             );
           })}

@@ -150,7 +150,7 @@ export default async function MyWorkPage() {
               <ManualSiteVisitButton />
               <span className="p7-only-desktop">
                 <LinkButton href="/app" variant="secondary" size="sm">
-                  ← Dashboard
+                  ← Overview
                 </LinkButton>
               </span>
             </span>
