@@ -46,6 +46,7 @@ import { visitTypeLabel } from "@/lib/visits/labels";
 import {
   PageContainer,
   PageHeader,
+  Breadcrumbs,
   StatusBadge,
   LinkButton,
   Timeline,
@@ -851,12 +852,27 @@ export default async function JobDetailPage({
   // (and the browser as fallback). maps.apple.com only deep-links cleanly on iOS.
   const mapHref = job.property_address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.property_address)}` : null;
 
+  const jobCrumbs = [
+    { href: "/app/clients", label: "Clients" },
+    ...(job.client_id
+      ? [{ href: `/app/clients/${job.client_id}`, label: job.client_name ?? "Client" }]
+      : []),
+    ...(job.property_id
+      ? [{
+          href: `/app/properties/${job.property_id}`,
+          label:
+            job.property_address && job.property_address !== "TBD"
+              ? job.property_address
+              : "Property",
+        }]
+      : []),
+    { label: job.title },
+  ];
+
   const mobileView = (
       <div style={{ padding: "var(--space-4) var(--space-4) var(--space-12)", display: "flex", flexDirection: "column", gap: "var(--space-5)", maxWidth: 760 }}>
         <header style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          <Link href="/app/jobs" style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", textDecoration: "none", fontWeight: 700 }}>
-            Projects
-          </Link>
+          <Breadcrumbs items={jobCrumbs} />
           <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)", alignItems: "flex-start" }}>
             <div>
               <h1 style={{ margin: 0, fontSize: "var(--text-2xl)", fontWeight: 800 }}>{job.title}</h1>
@@ -1004,6 +1020,7 @@ export default async function JobDetailPage({
 
   const desktopView = (
     <PageContainer>
+      <Breadcrumbs items={jobCrumbs} />
       <PageHeader
         title={job.title}
         subtitle={
@@ -1016,7 +1033,7 @@ export default async function JobDetailPage({
             .join(" · ") || undefined
         }
         backHref="/app/jobs"
-        backLabel="Projects"
+        backLabel="Jobs"
         actions={
           <span data-testid="job-status" style={{ display: "inline-flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
             {toSupplyPo(job.job_number) ? (

@@ -49,6 +49,8 @@ interface NavItem {
   label: string;
   Icon: IconComponent;
   adminOnly?: boolean;
+  /** Extra path prefixes that mark this item active (mobile hub tabs). */
+  activePrefixes?: string[];
 }
 
 interface NavSection {
@@ -57,11 +59,11 @@ interface NavSection {
 }
 
 // ---------------------------------------------------------------------------
-// Navigation definitions — ONE model. The sidebar (≥768px) and the More sheet
-// (<768px) render the same list; the bottom bar is a shortcut subset of it.
+// Navigation definitions — ONE model. Nested hubs (Home / Work / People / Money).
+// Sidebar (≥768px) and More sheet (<768px) render the same sections; the bottom
+// bar is a 4-hub shortcut subset (+ More button in AppShell).
 // ---------------------------------------------------------------------------
 
-// Named constants for items referenced outside the array (mobile bottom bar)
 // The office overview/dashboard. Labelled "Overview" (not "Today") so it reads
 // as the numbers screen and doesn't compete with the My Day field surface.
 const NAV_TODAY:      NavItem = { href: "/app",              label: "Overview",   Icon: IconDashboard };
@@ -70,33 +72,29 @@ const NAV_TODAY:      NavItem = { href: "/app",              label: "Overview", 
 const NAV_MY_DAY:     NavItem = { href: "/app/my-work",      label: "My Day",     Icon: IconMyDay };
 const NAV_DAY_REVIEW: NavItem = { href: "/app/day-review",   label: "Day Review", Icon: IconDayReview };
 const NAV_REQUESTS:   NavItem = { href: "/app/requests",     label: "Requests",   Icon: IconInbox };
-const NAV_PROPS:    NavItem = { href: "/app/properties", label: "Properties", Icon: IconProperties, adminOnly: true };
-const NAV_JOBS:     NavItem = { href: "/app/jobs",       label: "Jobs",       Icon: IconJobs,       adminOnly: true };
-const NAV_INVOICES: NavItem = { href: "/app/invoices",   label: "Invoices",   Icon: IconInvoices,   adminOnly: true };
-const NAV_REPORTS:  NavItem = { href: "/app/reports",    label: "Reports",    Icon: IconReports,    adminOnly: true };
-const NAV_SETTINGS: NavItem = { href: "/app/settings",   label: "Settings",   Icon: IconSettings,   adminOnly: true };
+const NAV_CLIENTS:    NavItem = { href: "/app/clients",      label: "Clients",    Icon: IconClients,   adminOnly: true };
+const NAV_PROPS:      NavItem = { href: "/app/properties",   label: "Properties", Icon: IconProperties, adminOnly: true };
+const NAV_ESTIMATES:  NavItem = { href: "/app/estimates",    label: "Estimates",  Icon: IconEstimates, adminOnly: true };
+const NAV_JOBS:       NavItem = { href: "/app/jobs",         label: "Jobs",       Icon: IconJobs,       adminOnly: true };
+const NAV_WORK_ORDERS: NavItem = { href: "/app/work-orders", label: "Work Orders", Icon: IconQueue,     adminOnly: true };
+const NAV_SCHEDULE:   NavItem = { href: "/app/schedule",     label: "Schedule",   Icon: IconSchedule,  adminOnly: true };
+const NAV_INVOICES:   NavItem = { href: "/app/invoices",     label: "Invoices",   Icon: IconInvoices,  adminOnly: true };
+const NAV_REPORTS:    NavItem = { href: "/app/reports",      label: "Reports",    Icon: IconReports,   adminOnly: true };
+const NAV_SETTINGS:   NavItem = { href: "/app/settings",     label: "Settings",   Icon: IconSettings,  adminOnly: true };
 
-// Layer 1 — Daily Driver nav only. Advanced routes are accessible from Today or Settings — not in the sidebar.
-const ADMIN_NAV_SECTIONS: NavSection[] = [
-  {
-    label: "",
-    items: [
-      NAV_TODAY,
-      NAV_MY_DAY,
-      NAV_DAY_REVIEW,
-      NAV_REQUESTS,
-      { href: "/app/clients",   label: "Clients",    Icon: IconClients,   adminOnly: true },
-      NAV_PROPS,
-      { href: "/app/estimates", label: "Estimates",  Icon: IconEstimates, adminOnly: true },
-      NAV_JOBS,
-      { href: "/app/work-orders", label: "Work Orders", Icon: IconQueue, adminOnly: true },
-      { href: "/app/schedule",  label: "Schedule",   Icon: IconSchedule,  adminOnly: true },
-      NAV_INVOICES,
-      NAV_REPORTS,
-      NAV_SETTINGS,
-    ],
-  },
-];
+/** Nested hub IA — Home / Work / People / Money (+ Settings). Home item is injected per role/view. */
+function buildHubSections(home: NavItem): NavSection[] {
+  return [
+    { label: "Home", items: [home, NAV_DAY_REVIEW] },
+    {
+      label: "Work",
+      items: [NAV_REQUESTS, NAV_ESTIMATES, NAV_JOBS, NAV_WORK_ORDERS, NAV_SCHEDULE],
+    },
+    { label: "People", items: [NAV_CLIENTS, NAV_PROPS] },
+    { label: "Money", items: [NAV_INVOICES, NAV_REPORTS] },
+    { label: "", items: [NAV_SETTINGS] },
+  ];
+}
 
 // ---------------------------------------------------------------------------
 // Pure functions
@@ -110,31 +108,20 @@ export function getNavSections(role: Role, view: "office" | "field" = "field"): 
     return [{ label: "", items: [myDay, visits, NAV_DAY_REVIEW] }];
   }
 
-  // EPIC-006 Phase 5: only the owner does field work, so only the owner gets the
-  // My Day switch. Pure admins run the business and never see the field surface.
+  // EPIC-006 Phase 5: pure admins never see the field home.
   if (role === "admin") {
-    return ADMIN_NAV_SECTIONS.map((s) => ({
-      ...s,
-      items: s.items.filter((i) => i.href !== NAV_MY_DAY.href),
-    }));
+    return buildHubSections(NAV_TODAY);
   }
 
-  // Owner = the all-rounder, but the sidebar reflects the ACTIVE workspace so the
-  // two "homes" never sit side-by-side (TASK-058 follow-up): My Day leads in
-  // Field, Overview leads in Office; the other home is reached from Settings →
-  // Workspace. The shared business destinations appear in both.
-  const base = ADMIN_NAV_SECTIONS[0].items.filter(
-    (i) => i.href !== NAV_MY_DAY.href && i.href !== NAV_TODAY.href,
-  );
+  // Owner: sidebar reflects the ACTIVE workspace so the two homes never sit
+  // side-by-side (TASK-058 follow-up). Shared business destinations stay in both.
   const home = view === "office" ? NAV_TODAY : NAV_MY_DAY;
-  return [{ label: "", items: [home, ...base] }];
+  return buildHubSections(home);
 }
 
 /**
- * Returns the link items for the mobile bottom tab bar. For owner/admin this
- * is a 3-item shortcut subset — the bar's 4th slot is the More button (added
- * by AppShell), which opens the full nav so every destination stays reachable
- * on a phone.
+ * Mobile bottom tab shortcuts. Owner/admin: 4 hubs (Home / Work / People / Money);
+ * AppShell adds the More button as the 5th slot. Tech: My Day + Visits.
  */
 export function getBottomNavItems(role: Role): NavItem[] {
   if (role === "tech") {
@@ -143,16 +130,64 @@ export function getBottomNavItems(role: Role): NavItem[] {
     return [myDay, visits];
   }
 
-  // Owner leads with My Day; pure admins keep the Overview dashboard up front.
-  if (role === "owner") {
-    return [NAV_MY_DAY, NAV_REQUESTS, NAV_JOBS];
-  }
+  const home: NavItem =
+    role === "owner"
+      ? {
+          href: "/app/my-work",
+          label: "Home",
+          Icon: IconMyDay,
+          activePrefixes: ["/app/my-work", "/app/my-day"],
+        }
+      : {
+          href: "/app",
+          label: "Home",
+          Icon: IconDashboard,
+        };
 
-  return [NAV_TODAY, NAV_REQUESTS, NAV_JOBS];
+  const work: NavItem = {
+    href: "/app/jobs",
+    label: "Work",
+    Icon: IconJobs,
+    activePrefixes: [
+      "/app/jobs",
+      "/app/requests",
+      "/app/estimates",
+      "/app/work-orders",
+      "/app/schedule",
+      "/app/visits",
+    ],
+  };
+  const people: NavItem = {
+    href: "/app/clients",
+    label: "People",
+    Icon: IconClients,
+    activePrefixes: ["/app/clients", "/app/properties"],
+  };
+  const money: NavItem = {
+    href: "/app/invoices",
+    label: "Money",
+    Icon: IconInvoices,
+    activePrefixes: ["/app/invoices", "/app/reports", "/app/expenses"],
+  };
+
+  return [home, work, people, money];
 }
 
-/** Returns true if href is the active route for the current pathname */
-export function isNavActive(pathname: string, href: string): boolean {
+/** Returns true if href (and optional hub prefixes) match the current pathname */
+export function isNavActive(
+  pathname: string,
+  href: string,
+  activePrefixes?: string[],
+): boolean {
+  if (activePrefixes?.length) {
+    for (const prefix of activePrefixes) {
+      if (prefix === "/app") {
+        if (pathname === "/app") return true;
+        continue;
+      }
+      if (pathname === prefix || pathname.startsWith(prefix + "/")) return true;
+    }
+  }
   if (href === "/app") return pathname === "/app";
   return pathname === href || pathname.startsWith(href + "/");
 }
@@ -261,7 +296,7 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
               <div key={sectionIdx}>
                 {section.label && <div className="p7-nav-section">{section.label}</div>}
                 {section.items.map((item) => {
-                  const active = isNavActive(pathname, item.href);
+                  const active = isNavActive(pathname, item.href, item.activePrefixes);
                   return (
                     <Link
                       key={item.href}
@@ -327,10 +362,10 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
         <nav className="p7-bottom-nav" aria-label="Mobile navigation">
           <div className="p7-bottom-nav-inner">
             {bottomItems.map((item) => {
-              const active = isNavActive(pathname, item.href);
+              const active = isNavActive(pathname, item.href, item.activePrefixes);
               return (
                 <Link
-                  key={item.href}
+                  key={`${item.label}-${item.href}`}
                   href={item.href as Route}
                   className={`p7-bottom-nav-item ${active && !showMore ? "p7-nav-active" : ""}`}
                   aria-current={active ? "page" : undefined}
@@ -374,27 +409,36 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
               onClick={() => setShowMore(false)}
             />
             <div id="p7-more-sheet" className="p7-more-sheet" role="dialog" aria-label="All destinations">
-              <div className="p7-more-grid">
-                {sections.flatMap((s) => s.items).map((item) => {
-                  const active = isNavActive(pathname, item.href);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href as Route}
-                      className={`p7-more-item ${active ? "p7-nav-active" : ""}`}
-                      aria-current={active ? "page" : undefined}
-                      onClick={() => setShowMore(false)}
-                    >
-                      <span className="p7-nav-icon" aria-hidden="true" style={{ position: "relative" }}>
-                        <item.Icon size={20} />
-                        {item.href === NAV_DAY_REVIEW.href && reviewPending && (
-                          <span style={{ position: "absolute", top: -3, right: -3, width: 8, height: 8, borderRadius: "50%", background: "#ef4444", border: "1.5px solid var(--bg)" }} />
-                        )}
-                      </span>
-                      <span>{item.label}</span>
-                    </Link>
-                  );
-                })}
+              <div className="p7-more-sections">
+                {sections.map((section, sectionIdx) => (
+                  <div key={sectionIdx} className="p7-more-section">
+                    {section.label ? (
+                      <div className="p7-more-section-label">{section.label}</div>
+                    ) : null}
+                    <div className="p7-more-grid">
+                      {section.items.map((item) => {
+                        const active = isNavActive(pathname, item.href, item.activePrefixes);
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href as Route}
+                            className={`p7-more-item ${active ? "p7-nav-active" : ""}`}
+                            aria-current={active ? "page" : undefined}
+                            onClick={() => setShowMore(false)}
+                          >
+                            <span className="p7-nav-icon" aria-hidden="true" style={{ position: "relative" }}>
+                              <item.Icon size={20} />
+                              {item.href === NAV_DAY_REVIEW.href && reviewPending && (
+                                <span style={{ position: "absolute", top: -3, right: -3, width: 8, height: 8, borderRadius: "50%", background: "#ef4444", border: "1.5px solid var(--bg)" }} />
+                              )}
+                            </span>
+                            <span>{item.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
               <div className="p7-more-footer">
                 <div className="p7-user-chip">

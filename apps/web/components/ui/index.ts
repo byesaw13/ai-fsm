@@ -15,6 +15,8 @@ export * from "./Misc";
 export * from "./Modal";
 export * from "./PageContainer";
 export * from "./PageHeader";
+export * from "./Breadcrumbs";
+export * from "./WhatNext";
 export * from "./SectionHeader";
 export * from "./ScheduleFields";
 export * from "./Select";
