@@ -179,6 +179,9 @@ export default async function ExpensesPage({ searchParams }: PageProps) {
               <LinkButton href="/app/mileage" variant="ghost" size="sm">
                 Mileage →
               </LinkButton>
+              <LinkButton href="/app/expenses/receipt-review" variant="ghost" size="sm">
+                Review unlinked
+              </LinkButton>
               <LinkButton href="/app/expenses/import" variant="secondary" size="sm">
                 Import CSV
               </LinkButton>

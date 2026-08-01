@@ -12,9 +12,10 @@ import {
   canDeleteRecords,
   canCreateEstimates,
 } from "@/lib/auth/permissions";
-import { jobTransitions, JOB_STATUS_LABELS } from "@ai-fsm/domain";
+import { jobTransitions, JOB_STATUS_LABELS, toSupplyPo } from "@ai-fsm/domain";
 import type { Job, Visit, JobStatus, JobAcceptanceCategory, JobIntakeDecision } from "@ai-fsm/domain";
 import { JOB_SUB_STATUSES, SUB_STATUS_LABELS } from "@ai-fsm/domain";
+import { CopySupplyPoButton } from "@/components/jobs/CopySupplyPoButton";
 import { JobTransitionForm } from "./JobTransitionForm";
 import { DeleteJobButton } from "./DeleteJobButton";
 import { JobEditForm } from "./JobEditFormWrapper";
@@ -862,6 +863,15 @@ export default async function JobDetailPage({
               <p style={{ margin: "var(--space-1) 0 0", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
                 {job.job_number ? `${job.job_number} · ` : ""}{job.client_name ?? "Current job"}{job.property_address ? ` / ${job.property_address}` : ""}
               </p>
+              {toSupplyPo(job.job_number) ? (
+                <div style={{ marginTop: "var(--space-2)" }}>
+                  <CopySupplyPoButton
+                    supplyPo={toSupplyPo(job.job_number)!}
+                    jobNumber={job.job_number}
+                    size="sm"
+                  />
+                </div>
+              ) : null}
             </div>
             <StatusBadge variant={currentStatus as StatusVariant}>{JOB_STATUS_LABELS[currentStatus]}</StatusBadge>
           </div>
@@ -1009,6 +1019,13 @@ export default async function JobDetailPage({
         backLabel="Projects"
         actions={
           <span data-testid="job-status" style={{ display: "inline-flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
+            {toSupplyPo(job.job_number) ? (
+              <CopySupplyPoButton
+                supplyPo={toSupplyPo(job.job_number)!}
+                jobNumber={job.job_number}
+                size="sm"
+              />
+            ) : null}
             {job.client_phone ? (
               <a
                 href={`tel:${job.client_phone}`}

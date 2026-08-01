@@ -28,9 +28,9 @@ export default async function NewExpensePage({
   // Open / in-progress jobs only — closed jobs clutter receipt entry.
   // Always include defaultJobId when deep-linked from a job page.
   const [jobs, clients] = await Promise.all([
-    query<{ id: string; title: string }>(
+    query<{ id: string; title: string; job_number: string | null; client_id: string | null }>(
       isMaterialRun
-        ? `SELECT j.id, j.title
+        ? `SELECT j.id, j.title, j.job_number, j.client_id
            FROM jobs j
            WHERE j.account_id = $1
              AND (
@@ -48,7 +48,7 @@ export default async function NewExpensePage({
              )
            ORDER BY ${receiptJobOrderSql("j")}
            LIMIT 100`
-        : `SELECT id, title FROM jobs
+        : `SELECT id, title, job_number, client_id FROM jobs
            WHERE account_id = $1
              AND (
                status IN (${RECEIPT_LINKABLE_JOB_STATUS_SQL})

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { Input, Select, Textarea, Button } from "@/components/ui";
 import type { ExpenseCategory } from "@ai-fsm/domain";
+import { formatJobPickerLabel } from "@ai-fsm/domain";
 import { parseDollarsToCents, formatCentsToDollars } from "@/lib/expenses/math";
 
 interface Expense {
@@ -20,7 +21,7 @@ interface Expense {
 
 interface Props {
   expense: Expense;
-  jobs: { id: string; title: string }[];
+  jobs: { id: string; title: string; job_number?: string | null }[];
   clients: { id: string; name: string }[];
   categories: { value: string; label: string }[];
 }
@@ -171,7 +172,10 @@ export function ExpenseEditForm({ expense, jobs, clients, categories }: Props) {
           onChange={(e) => setJobId(e.target.value)}
           options={[
             { value: "", label: "No open project" },
-            ...jobs.map((j) => ({ value: j.id, label: j.title })),
+            ...jobs.map((j) => ({
+              value: j.id,
+              label: formatJobPickerLabel(j.title, j.job_number),
+            })),
           ]}
           disabled={pending}
           hint="Open projects only (in progress / scheduled / quoted). Closed jobs stay hidden unless already linked."

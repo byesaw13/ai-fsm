@@ -74,8 +74,8 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
   const { jobs, clients } = canManage
     ? await withExpenseContext(session, async (client) => {
         const [jobsResult, clientsResult] = await Promise.all([
-          client.query<{ id: string; title: string }>(
-            `SELECT id, title FROM jobs
+          client.query<{ id: string; title: string; job_number: string | null }>(
+            `SELECT id, title, job_number FROM jobs
              WHERE account_id = $1
                AND (
                  status IN (${RECEIPT_LINKABLE_JOB_STATUS_SQL})

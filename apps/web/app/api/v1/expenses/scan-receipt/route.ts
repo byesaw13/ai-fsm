@@ -141,6 +141,11 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
       });
     }
 
+    const po_number =
+      typeof parsed.po_number === "string" && parsed.po_number.trim()
+        ? parsed.po_number.trim()
+        : null;
+
     return NextResponse.json({
       data: {
         vendor_name: parsed.vendor_name?.trim() || null,
@@ -149,6 +154,7 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
         expense_date,
         category,
         notes: parsed.notes?.trim() || null,
+        po_number,
         line_items,
         reconciliation,
         parse_model: model,
