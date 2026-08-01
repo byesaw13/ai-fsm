@@ -139,11 +139,16 @@ function flattenSections(sections: ReturnType<typeof getNavSections>) {
   return sections.flatMap((s) => s.items);
 }
 
-describe("getNavSections (role filtering)", () => {
-  it("returns 1 section (Layer 1 daily driver) for admin role", () => {
+describe("getNavSections (nested hubs)", () => {
+  const HUB_LABELS = ["Home", "Work", "People", "Money"];
+
+  it("returns labeled hub sections for admin role", () => {
     const sections = getNavSections("admin");
-    expect(sections).toHaveLength(1);
-    expect(sections[0].label).toBe("");
+    const labels = sections.map((s) => s.label).filter(Boolean);
+    expect(labels).toEqual(HUB_LABELS);
+    // Settings sits in a trailing unlabeled section
+    expect(sections[sections.length - 1].label).toBe("");
+    expect(sections[sections.length - 1].items.some((i) => i.href === "/app/settings")).toBe(true);
   });
 
   it("Owner nav has the active home + all shared business destinations", () => {
@@ -162,7 +167,7 @@ describe("getNavSections (role filtering)", () => {
       "/app/settings",
     ];
     for (const view of ["field", "office"] as const) {
-      const hrefs = getNavSections("owner", view)[0].items.map((i) => i.href);
+      const hrefs = flattenSections(getNavSections("owner", view)).map((i) => i.href);
       for (const href of shared) expect(hrefs).toContain(href);
       expect(hrefs).toContain(view === "field" ? "/app/my-work" : "/app");
       expect(hrefs).not.toContain("/app/mileage");
@@ -171,8 +176,7 @@ describe("getNavSections (role filtering)", () => {
   });
 
   it("Admin nav drops My Day (pure admins don't do field work) — 12 items", () => {
-    const sections = getNavSections("admin");
-    const hrefs = sections[0].items.map((i) => i.href);
+    const hrefs = flattenSections(getNavSections("admin")).map((i) => i.href);
     expect(hrefs).not.toContain("/app/my-work"); // EPIC-006 P5
     expect(hrefs).toContain("/app");
     expect(hrefs).toContain("/app/settings");
@@ -191,10 +195,10 @@ describe("getNavSections (role filtering)", () => {
     expect(hrefs).not.toContain("/app/booking-requests");
   });
 
-  it("owner nav is one section of 12 items with a single home per workspace", () => {
+  it("owner nav is hub sections totaling 12 items with a single home per workspace", () => {
     for (const view of ["field", "office"] as const) {
       const sections = getNavSections("owner", view);
-      expect(sections).toHaveLength(1);
+      expect(sections.map((s) => s.label).filter(Boolean)).toEqual(HUB_LABELS);
       const hrefs = flattenSections(sections).map((i) => i.href);
       expect(hrefs).toHaveLength(12);
       if (view === "field") {
@@ -229,7 +233,7 @@ describe("getNavSections (role filtering)", () => {
       expect(items[0].href).toBe("/app/my-work");
     }
 
-    const adminFirst = getNavSections("admin")[0].items[0];
+    const adminFirst = flattenSections(getNavSections("admin"))[0];
     expect(adminFirst.href).toBe("/app");
     expect(adminFirst.label).toBe("Overview");
   });
@@ -251,20 +255,32 @@ describe("getNavSections (role filtering)", () => {
       expect(office).toContain(href);
     }
   });
+
+  it("Work hub lists requests through schedule in order", () => {
+    const work = getNavSections("admin").find((s) => s.label === "Work");
+    expect(work?.items.map((i) => i.href)).toEqual([
+      "/app/requests",
+      "/app/estimates",
+      "/app/jobs",
+      "/app/work-orders",
+      "/app/schedule",
+    ]);
+  });
 });
 
-describe("getBottomNavItems (mobile)", () => {
-  it("returns 3 link items for admin role (Today, Requests, Projects) — the 4th slot is the More button", () => {
+describe("getBottomNavItems (mobile hubs)", () => {
+  it("returns 4 hub tabs for admin (Home Work People Money) — More is the 5th slot", () => {
     const items = getBottomNavItems("admin");
-    expect(items).toHaveLength(3);
+    expect(items).toHaveLength(4);
+    expect(items.map((i) => i.label)).toEqual(["Home", "Work", "People", "Money"]);
     expect(items.map((i) => i.href)).toEqual([
       "/app",
-      "/app/requests",
       "/app/jobs",
+      "/app/clients",
+      "/app/invoices",
     ]);
     const hrefs = items.map((i) => i.href);
     expect(hrefs).not.toContain("/app/booking-requests");
-    expect(hrefs).not.toContain("/app/estimates");
   });
 
   it("returns 2 items for tech role with My Day and Visits", () => {
@@ -277,13 +293,23 @@ describe("getBottomNavItems (mobile)", () => {
     expect(hrefs).not.toContain("/app/jobs");
   });
 
-  it("returns 3 link items for owner role leading with My Day", () => {
+  it("returns 4 hub tabs for owner leading with Home (My Day)", () => {
     const items = getBottomNavItems("owner");
+    expect(items.map((i) => i.label)).toEqual(["Home", "Work", "People", "Money"]);
     expect(items.map((i) => i.href)).toEqual([
       "/app/my-work",
-      "/app/requests",
       "/app/jobs",
+      "/app/clients",
+      "/app/invoices",
     ]);
+  });
+
+  it("Work hub tab stays active on estimates and schedule", () => {
+    const work = getBottomNavItems("owner").find((i) => i.label === "Work");
+    expect(work).toBeDefined();
+    expect(isNavActive("/app/estimates/new", work!.href, work!.activePrefixes)).toBe(true);
+    expect(isNavActive("/app/schedule", work!.href, work!.activePrefixes)).toBe(true);
+    expect(isNavActive("/app/clients", work!.href, work!.activePrefixes)).toBe(false);
   });
 });
 
