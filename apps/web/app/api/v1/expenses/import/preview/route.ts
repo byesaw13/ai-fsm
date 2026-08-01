@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withRole } from "@/lib/auth/middleware";
 import { withExpenseContext } from "@/lib/expenses/db";
 import { logger } from "@/lib/logger";
-import { parseHomeDepotCsv } from "@/lib/expenses/import/homedepot";
+import { parsePurchaseCsv } from "@/lib/expenses/import/detect";
 import {
   RECEIPT_LINKABLE_JOB_STATUS_SQL,
   receiptJobOrderSql,
@@ -12,7 +12,6 @@ import { formatJobPickerLabel } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
-const SOURCE = "home_depot_csv";
 const MAX_SIZE = 5 * 1024 * 1024;
 
 function norm(s: string): string {
@@ -86,7 +85,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
 
   let parsed;
   try {
-    parsed = parseHomeDepotCsv(await file.text());
+    parsed = parsePurchaseCsv(await file.text());
   } catch (err) {
     return NextResponse.json(
       { error: { code: "VALIDATION_ERROR", message: (err as Error).message, traceId: session.traceId } },
@@ -94,11 +93,13 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     );
   }
 
+  const source = parsed.source;
+
   try {
     const { existingRefs, jobs } = await withExpenseContext(session, async (client) => {
       const refs = await client.query<{ external_ref: string }>(
         `SELECT external_ref FROM expenses WHERE account_id = $1 AND source = $2`,
-        [session.accountId, SOURCE]
+        [session.accountId, source]
       );
       const jobRows = await client.query<JobRow>(
         `SELECT j.id, j.title, j.job_number, j.client_id, c.name AS client_name, p.address
@@ -122,7 +123,8 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
 
     const importable = transactions.filter((t) => !t.already_imported && !t.is_return);
     const summary = {
-      source: SOURCE,
+      source,
+      vendor_label: parsed.vendor_label,
       total_transactions: transactions.length,
       new_importable: importable.length,
       duplicates: transactions.filter((t) => t.already_imported).length,

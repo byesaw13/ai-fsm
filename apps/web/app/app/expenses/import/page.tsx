@@ -14,7 +14,7 @@ export default async function ImportExpensesPage() {
     <PageContainer>
       <PageHeader
         title="Import store purchases"
-        subtitle="Upload a Home Depot purchase export → one expense per trip, plus updated material prices for estimates"
+        subtitle="Home Depot or Lowe's purchase CSV → one expense per trip/invoice, plus materials catalog prices"
         backHref="/app/expenses"
       />
       <ImportExpensesClient />

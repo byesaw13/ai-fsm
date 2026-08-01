@@ -39,7 +39,7 @@ const txnSchema = z.object({
 });
 
 const bodySchema = z.object({
-  source: z.string().default("home_depot_csv"),
+  source: z.enum(["home_depot_csv", "lowes_csv"]).default("home_depot_csv"),
   transactions: z.array(txnSchema).min(1).max(2000),
   update_prices: z.boolean().default(true),
 });
@@ -62,7 +62,12 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       let materials = 0;
 
       for (const t of transactions) {
-        const notes = t.notes ?? (t.line_items.length ? `${t.line_items.length} item(s) · imported from Home Depot` : "Imported from Home Depot");
+        const vendorLabel = source === "lowes_csv" ? "Lowe's" : "Home Depot";
+        const notes =
+          t.notes ??
+          (t.line_items.length
+            ? `${t.line_items.length} item(s) · imported from ${vendorLabel}`
+            : `Imported from ${vendorLabel}`);
         const ins = await client.query<{ id: string }>(
           `INSERT INTO expenses
              (account_id, job_id, client_id, vendor_name, category, amount_cents,
