@@ -167,7 +167,7 @@ export function getBottomNavItems(role: Role): NavItem[] {
     href: "/app/invoices",
     label: "Money",
     Icon: IconInvoices,
-    activePrefixes: ["/app/invoices", "/app/reports", "/app/expenses"],
+    activePrefixes: ["/app/invoices", "/app/reports", "/app/expenses", "/app/materials"],
   };
 
   return [home, work, people, money];

@@ -10,7 +10,9 @@ import {
   PageHeader,
   SectionHeader,
   LinkButton,
+  HubSubnav,
 } from "@/components/ui";
+import { MONEY_HUB_LINKS } from "@/lib/navigation/hubs";
 import { formatCents } from "@/lib/money";
 import type { MaterialCatalogRow } from "./page";
 
@@ -181,6 +183,7 @@ export default function MaterialsCatalogClient({ materials: initial, canManage }
           </div>
         }
       />
+      <HubSubnav hub="Money" links={MONEY_HUB_LINKS} pathname="/app/materials" />
 
       <Card padding="default" style={{ marginBottom: "var(--space-4)" }}>
         <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>

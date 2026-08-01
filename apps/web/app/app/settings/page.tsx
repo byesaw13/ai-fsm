@@ -113,7 +113,14 @@ export default async function SettingsPage() {
 
   return (
     <PageContainer>
-      <PageHeader title="Settings" />
+      <PageHeader
+        title="Settings"
+        subtitle={
+          isAdmin
+            ? "Profile, company, team, and tools"
+            : "Your profile and account"
+        }
+      />
       <SettingsTabsClient
         role={session.role}
         userId={session.userId}
