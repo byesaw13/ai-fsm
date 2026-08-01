@@ -5,9 +5,12 @@ import { withExpenseContext } from "@/lib/expenses/db";
 import { replaceExpenseLineItems } from "@/lib/expenses/line-items";
 import {
   RECEIPT_LINE_ITEMS_PROMPT,
+  getReceiptParseModel,
   normalizeParsedReceiptLineItems,
+  reconcileReceiptParse,
   type ParsedReceipt,
 } from "@/lib/expenses/receipt-line-items";
+import { learnMaterialsFromLineItems } from "@/lib/materials/catalog";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@ai-fsm/log/web";
 import fs from "fs";
@@ -34,8 +37,15 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
   try {
     const data = await withExpenseContext(session, async (client) => {
-      const expense = await client.query<{ id: string; receipt_url: string | null; vendor_name: string }>(
-        `SELECT id, receipt_url, vendor_name FROM expenses WHERE id = $1 AND account_id = $2`,
+      const expense = await client.query<{
+        id: string;
+        receipt_url: string | null;
+        vendor_name: string;
+        category: string;
+        expense_date: string;
+      }>(
+        `SELECT id, receipt_url, vendor_name, category, expense_date::text AS expense_date
+         FROM expenses WHERE id = $1 AND account_id = $2`,
         [expenseId, session.accountId],
       );
       if ((expense.rowCount ?? 0) === 0) {
@@ -64,10 +74,12 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
               ? "image/gif"
               : "image/jpeg";
 
+      const model = getReceiptParseModel();
       const anthropic = new Anthropic({ apiKey });
       const message = await anthropic.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 2048,
+        model,
+        max_tokens: 8192,
+        temperature: 0,
         messages: [
           {
             role: "user",
@@ -108,6 +120,24 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         });
       }
 
+      const amountCents =
+        typeof parsed.amount_cents === "number" && parsed.amount_cents > 0
+          ? Math.round(parsed.amount_cents)
+          : null;
+      const taxCents =
+        typeof parsed.tax_cents === "number" && parsed.tax_cents > 0
+          ? Math.round(parsed.tax_cents)
+          : null;
+      const reconciliation = reconcileReceiptParse(lineItems, amountCents, taxCents);
+      if (reconciliation.balanced === false) {
+        logger.warn("parse-line-items: line totals vs receipt total unbalanced", {
+          expenseId,
+          model,
+          ...reconciliation,
+          traceId: session.traceId,
+        });
+      }
+
       const saved = await replaceExpenseLineItems(
         client,
         session.accountId,
@@ -121,6 +151,42 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         })),
       );
 
+      // Non-fatal catalog learn (same path as line-items PUT)
+      let catalog_learned = 0;
+      if (row.category === "materials" && saved.length > 0) {
+        try {
+          await client.query("SAVEPOINT materials_catalog_learn");
+          try {
+            const { learned } = await learnMaterialsFromLineItems(
+              client,
+              {
+                accountId: session.accountId,
+                supplier: row.vendor_name,
+                purchasedAt: row.expense_date?.slice(0, 10) ?? null,
+              },
+              saved.map((li) => ({
+                name: li.name,
+                unit_cost_cents: li.unit_cost_cents,
+                sku: li.sku,
+                quantity: li.quantity,
+              })),
+            );
+            catalog_learned = learned;
+            await client.query("RELEASE SAVEPOINT materials_catalog_learn");
+          } catch (learnErr) {
+            await client.query("ROLLBACK TO SAVEPOINT materials_catalog_learn");
+            await client.query("RELEASE SAVEPOINT materials_catalog_learn");
+            logger.warn("materials catalog learn failed after parse (non-fatal)", {
+              error: learnErr instanceof Error ? learnErr.message : String(learnErr),
+              expenseId,
+              traceId: session.traceId,
+            });
+          }
+        } catch {
+          /* outer savepoint create failed — ignore */
+        }
+      }
+
       await appendAuditLog(client, {
         account_id: session.accountId,
         entity_type: "expense",
@@ -128,10 +194,21 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         action: "update",
         actor_id: session.userId,
         trace_id: session.traceId,
-        new_value: { action: "parse_line_items", count: saved.length },
+        new_value: {
+          action: "parse_line_items",
+          count: saved.length,
+          catalog_learned,
+          reconciliation,
+          parse_model: model,
+        },
       });
 
-      return { line_items: saved };
+      return {
+        line_items: saved,
+        catalog_learned,
+        reconciliation,
+        parse_model: model,
+      };
     });
 
     return NextResponse.json({ data });
