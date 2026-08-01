@@ -28,6 +28,11 @@ describe("looksLikeLowesCsv", () => {
     const header = LOWES_PRO_SAMPLE.trim().split("\n")[0].split(",");
     expect(looksLikeLowesCsv(header)).toBe(true);
   });
+
+  it("rejects generic bank/expense CSVs", () => {
+    expect(looksLikeLowesCsv(["Date", "Description", "Amount"])).toBe(false);
+    expect(looksLikeLowesCsv(["Date", "Memo", "Debit", "Credit"])).toBe(false);
+  });
 });
 
 describe("parseLowesCsv", () => {

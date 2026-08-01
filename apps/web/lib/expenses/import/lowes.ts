@@ -106,10 +106,11 @@ export function looksLikeLowesCsv(header: string[]): boolean {
   const txn = findCol(header, TXN_ALIASES);
   const unit = findCol(header, UNIT_ALIASES);
   const ext = findCol(header, EXT_ALIASES);
+  const sku = findCol(header, SKU_ALIASES);
   if (date < 0 || desc < 0) return false;
-  if (txn < 0 && unit < 0 && ext < 0) return false;
-  // HD has very specific "SKU Description" + "Transaction ID" + "Net Unit Price"
-  // If those exact labels exist, prefer HD (handled by caller).
+  if (unit < 0 && ext < 0) return false;
+
+  // HD has very specific columns — never claim those as Lowe's.
   const exact = header.map((h) => h.trim());
   if (
     exact.includes("Transaction ID") &&
@@ -118,14 +119,15 @@ export function looksLikeLowesCsv(header: string[]): boolean {
   ) {
     return false;
   }
-  // Positive Lowe's signal: item number / invoice / order wording
-  const sku = findCol(header, SKU_ALIASES);
-  const lowesish =
+
+  // Require a Lowe's-specific signal so bank/generic expense CSVs are rejected.
+  // (Invoice/order id, item number, or an explicit Lowe's column label.)
+  const lowesSignal =
     txn >= 0 ||
     sku >= 0 ||
     exact.some((h) => /lowe/i.test(h)) ||
-    findCol(header, ["invoice number", "order number", "item number"]) >= 0;
-  return lowesish || (unit >= 0 || ext >= 0);
+    findCol(header, ["invoice number", "order number", "item number", "po number"]) >= 0;
+  return lowesSignal;
 }
 
 function findHeaderRow(rows: string[][]): number {
@@ -180,9 +182,11 @@ export function parseLowesCsv(text: string): ParseResult {
 
     let txnId = (ix.txn >= 0 ? r[ix.txn] : "")?.trim() ?? "";
     if (!txnId) {
-      // Fall back: one synthetic trip key per day+store+first line (better than dropping)
+      // Stable trip key without row index (re-import safe). Prefer store when present.
+      // Prefer rejecting ambiguous exports: require at least date + store, else date-only day bucket.
       const store = ix.store >= 0 ? (r[ix.store] ?? "").trim() : "";
-      txnId = `LOWES-${date}${store ? `-${store}` : ""}-${i}`;
+      const job = ix.job >= 0 ? (r[ix.job] ?? "").trim() : "";
+      txnId = `LOWES-${date}${store ? `-S${store}` : ""}${job ? `-J${job}` : ""}`;
     }
 
     totalRows++;
