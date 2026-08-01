@@ -246,3 +246,86 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     client.release();
   }
 });
+
+/**
+ * Delete an unused work order (draft or cancelled, no visits).
+ * Visits.work_order_id is RESTRICT — never delete WOs that still own field days.
+ */
+export const DELETE = withAuth(async (request: NextRequest, session: AuthSession) => {
+  if (!canCreateEstimates(session.role)) {
+    return err("FORBIDDEN", "Not permitted", 403, session.traceId);
+  }
+  const id = idFromPath(request);
+  if (!id) return err("NOT_FOUND", "Work order not found", 404, session.traceId);
+
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `SELECT set_config('app.current_user_id', $1, true),
+              set_config('app.current_account_id', $2, true),
+              set_config('app.current_role', $3, true)`,
+      [session.userId, session.accountId, session.role],
+    );
+
+    const existing = await client.query<{
+      id: string;
+      status: string;
+      visit_count: string;
+    }>(
+      `SELECT w.id, w.status,
+              (SELECT COUNT(*)::text FROM visits v WHERE v.work_order_id = w.id) AS visit_count
+       FROM work_orders w
+       WHERE w.id = $1 AND w.account_id = $2
+       FOR UPDATE`,
+      [id, session.accountId],
+    );
+    const wo = existing.rows[0];
+    if (!wo) {
+      await client.query("ROLLBACK");
+      return err("NOT_FOUND", "Work order not found", 404, session.traceId);
+    }
+
+    const visits = Number(wo.visit_count) || 0;
+    if (visits > 0) {
+      await client.query("ROLLBACK");
+      return err(
+        "CONFLICT",
+        `Cannot delete a work order that has ${visits} visit${visits === 1 ? "" : "s"}. Move or cancel those field days first.`,
+        409,
+        session.traceId,
+      );
+    }
+
+    if (wo.status !== "draft" && wo.status !== "cancelled") {
+      await client.query("ROLLBACK");
+      return err(
+        "CONFLICT",
+        `Only draft or cancelled work orders can be deleted (current: ${wo.status}). Cancel it first if unused.`,
+        409,
+        session.traceId,
+      );
+    }
+
+    // Null visit_candidates first (SET NULL FK exists, but be explicit).
+    await client.query(
+      `UPDATE visit_candidates SET work_order_id = NULL WHERE work_order_id = $1 AND account_id = $2`,
+      [id, session.accountId],
+    );
+
+    await client.query(
+      `DELETE FROM work_orders WHERE id = $1 AND account_id = $2`,
+      [id, session.accountId],
+    );
+
+    await client.query("COMMIT");
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    logger.error("DELETE /api/v1/work-orders/[id] error", error, { traceId: session.traceId });
+    return err("INTERNAL_ERROR", "Failed to delete work order", 500, session.traceId);
+  } finally {
+    client.release();
+  }
+});

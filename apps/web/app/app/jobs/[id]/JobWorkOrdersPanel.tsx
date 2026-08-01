@@ -9,6 +9,7 @@ import {
   type WorkOrderUiStatus,
 } from "@ai-fsm/domain";
 import { Button, LinkButton, useToast } from "@/components/ui";
+import { canDeleteUnusedWorkOrder } from "@/lib/work-orders/can-delete-unused";
 
 export interface JobWorkOrderRow {
   id: string;
@@ -31,6 +32,7 @@ export function JobWorkOrdersPanel({ jobId, workOrders, canManage }: JobWorkOrde
   const router = useRouter();
   const toast = useToast();
   const [splittingId, setSplittingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function splitWorkOrder(woId: string, title: string) {
     const newTitle = window.prompt("Title for the new work order:", `${title} (split)`);
@@ -54,6 +56,29 @@ export function JobWorkOrdersPanel({ jobId, workOrders, canManage }: JobWorkOrde
     }
   }
 
+  async function deleteWorkOrder(woId: string, title: string) {
+    if (
+      !window.confirm(
+        `Delete work order “${title}”? Only unused draft/cancelled packets with no field days can be removed.`,
+      )
+    ) {
+      return;
+    }
+    setDeletingId(woId);
+    try {
+      const res = await fetch(`/api/v1/work-orders/${woId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        toast.error(json.error?.message ?? "Could not delete work order");
+        return;
+      }
+      toast.success("Work order deleted");
+      router.refresh();
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
       {workOrders.map((wo) => {
@@ -68,6 +93,8 @@ export function JobWorkOrdersPanel({ jobId, workOrders, canManage }: JobWorkOrde
         const taskDone = Math.max(0, taskTotal - taskOpen);
         const emptyCalendar =
           wo.visit_count > 0 && taskOpen === 0 && taskTotal === 0;
+        const showDelete = canManage && canDeleteUnusedWorkOrder(wo);
+        const showScheduleSplit = canManage && wo.status !== "draft" && wo.status !== "cancelled";
         return (
           <div
             key={wo.id}
@@ -79,6 +106,7 @@ export function JobWorkOrdersPanel({ jobId, workOrders, canManage }: JobWorkOrde
               gap: "var(--space-2)",
               padding: "var(--space-2) 0",
               borderBottom: "1px solid var(--border)",
+              opacity: wo.status === "cancelled" ? 0.75 : 1,
             }}
           >
             <div>
@@ -93,7 +121,7 @@ export function JobWorkOrdersPanel({ jobId, workOrders, canManage }: JobWorkOrde
                 {derived}
                 {wo.visit_count > 0
                   ? ` · ${wo.visit_count} visit${wo.visit_count !== 1 ? "s" : ""}`
-                  : ""}
+                  : " · no field days"}
                 {taskTotal > 0
                   ? ` · ${taskDone}/${taskTotal} tasks (${taskOpen} open)`
                   : emptyCalendar
@@ -101,23 +129,38 @@ export function JobWorkOrdersPanel({ jobId, workOrders, canManage }: JobWorkOrde
                     : ""}
               </p>
             </div>
-            {canManage && wo.status !== "draft" && (
+            {(showScheduleSplit || showDelete) && (
               <div style={{ display: "flex", gap: "var(--space-1)", flexShrink: 0 }}>
-                <LinkButton
-                  href={`/app/jobs/${jobId}/visits/new?work_order_id=${wo.id}` as Route}
-                  variant="ghost"
-                  size="sm"
-                >
-                  Schedule
-                </LinkButton>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  loading={splittingId === wo.id}
-                  onClick={() => splitWorkOrder(wo.id, wo.title)}
-                >
-                  Split
-                </Button>
+                {showScheduleSplit && (
+                  <>
+                    <LinkButton
+                      href={`/app/jobs/${jobId}/visits/new?work_order_id=${wo.id}` as Route}
+                      variant="ghost"
+                      size="sm"
+                    >
+                      Schedule
+                    </LinkButton>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      loading={splittingId === wo.id}
+                      onClick={() => splitWorkOrder(wo.id, wo.title)}
+                    >
+                      Split
+                    </Button>
+                  </>
+                )}
+                {showDelete && (
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    loading={deletingId === wo.id}
+                    data-testid={`delete-work-order-${wo.id}`}
+                    onClick={() => deleteWorkOrder(wo.id, wo.title)}
+                  >
+                    Delete
+                  </Button>
+                )}
               </div>
             )}
           </div>
