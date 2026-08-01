@@ -447,14 +447,16 @@
   gap: 3px;
   text-decoration: none;
   color: var(--fg-muted);
+  /* font shorthand first, then size/weight so labels stay 10px in the 60px bar */
+  font: inherit;
   font-size: 10px;
   font-weight: var(--font-medium);
+  font-family: var(--font-sans, inherit);
   transition: color var(--transition-fast);
   padding: var(--space-1);
   min-height: 48px;
   background: none;
   border: none;
-  font: inherit;
   cursor: pointer;
 }
 

@@ -35,15 +35,14 @@ export function ScheduleViewToggle({
   if (isAdmin) tabs.push({ key: "list", label: "List", url: listUrl });
 
   return (
-    <div className="p7-schedule-toggle" role="tablist" aria-label="Schedule view">
+    <div className="p7-schedule-toggle" role="group" aria-label="Schedule view">
       {tabs.map((t) => {
         const active = current === t.key;
         return (
           <button
             key={t.key}
             type="button"
-            role="tab"
-            aria-selected={active}
+            aria-pressed={active}
             className={`p7-schedule-toggle__btn${active ? " p7-schedule-toggle__btn--active" : ""}`}
             onClick={() => router.push(t.url as Route)}
           >
