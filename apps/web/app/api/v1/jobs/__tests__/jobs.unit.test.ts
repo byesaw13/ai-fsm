@@ -184,12 +184,29 @@ describe("DELETE /api/v1/jobs/[id]", () => {
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
       .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
       .mockResolvedValueOnce({ rows: [{ ...SAMPLE_JOB, status: "draft" }] }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] }) // detach communications_log
       .mockResolvedValueOnce({ rows: [] }) // DELETE
       .mockResolvedValueOnce({ rows: [] }) // appendAuditLog
       .mockResolvedValueOnce({ rows: [] }); // COMMIT
 
     const res = await jobDelete(makeRequest("DELETE", `${BASE}/${JOB_ID}`));
     expect(res.status).toBe(204);
+  });
+
+  it("detaches communications_log before deleting draft job", async () => {
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
+      .mockResolvedValueOnce({ rows: [{ ...SAMPLE_JOB, status: "draft" }] }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] }) // detach communications_log
+      .mockResolvedValueOnce({ rows: [] }) // DELETE
+      .mockResolvedValueOnce({ rows: [] }) // appendAuditLog
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    await jobDelete(makeRequest("DELETE", `${BASE}/${JOB_ID}`));
+    const sqlCalls = mockClientQuery.mock.calls.map((c: unknown[]) => String(c[0]));
+    expect(sqlCalls.some((s: string) => s.includes("UPDATE communications_log"))).toBe(true);
+    expect(sqlCalls.some((s: string) => s.includes("DELETE FROM jobs"))).toBe(true);
   });
 
   it("returns 409 when deleting a non-draft job", async () => {

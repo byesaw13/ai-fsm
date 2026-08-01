@@ -1386,7 +1386,8 @@ export default async function JobDetailPage({
             <AdvancedDetails title="Danger Zone">
               <Card className="p7-card-danger" data-testid="danger-zone">
                 <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginBottom: "var(--space-3)" }}>
-                  Delete this job permanently. Only available for draft jobs.
+                  Permanently delete this draft project. SMS history stays on the client; only the
+                  empty draft is removed. Non-draft projects must be cancelled instead.
                 </p>
                 <DeleteJobButton jobId={job.id} />
               </Card>
