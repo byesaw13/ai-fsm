@@ -32,6 +32,26 @@ Date,Store Number,Transaction ID,Register Number,Job Name,SKU Number,SKU Descrip
     expect(skipped.some((s) => s.reason.includes("return"))).toBe(true);
   });
 
+  it("coerces net unit when HD copies line total into net unit for multi-qty", () => {
+    // qty 3, net=$30, extended=$30 → true unit is $10
+    const multi = `Date,SKU Number,SKU Description,Quantity,Department Name,Extended Retail (before discount),Net Unit Price
+2026-06-09,999,Three Pack Widget,3,HARDWARE,$30.00,$30.00
+`;
+    const { lines } = parseHomeDepotPurchaseCsv(multi);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].quantity).toBe(3);
+    expect(lines[0].unit_cost_cents).toBe(1000);
+  });
+
+  it("keeps correct multi-qty unit when extended = qty × net", () => {
+    const multi = `Date,SKU Number,SKU Description,Quantity,Department Name,Extended Retail (before discount),Net Unit Price
+2026-06-09,999,Three Pack Widget,3,HARDWARE,$30.00,$10.00
+`;
+    const { lines } = parseHomeDepotPurchaseCsv(multi);
+    expect(lines[0].unit_cost_cents).toBe(1000);
+    expect(lines[0].quantity).toBe(3);
+  });
+
   it("reports missing header", () => {
     const { lines, skipped } = parseHomeDepotPurchaseCsv("not a real csv\n1,2,3\n");
     expect(lines).toHaveLength(0);
