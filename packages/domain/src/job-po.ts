@@ -79,17 +79,18 @@ export function extractSupplyPoCandidates(text: string | null | undefined): stri
   const found = new Set<string>();
   const upper = text.toUpperCase();
 
-  // PO-marked: PO J260029, P.O. #J-2026-0029, PO:  J260029
+  // PO-marked: PO J260029, P.O. #J-2026-0029, PO: J 26 0029
   const poMarked =
-    /\bP\.?\s*O\.?\s*[#:]?\s*(J-?\d{2,4}-?\d{3,6}|J\d{6})\b/gi;
+    /\bP\.?\s*O\.?\s*[#:]?\s*(J[\s-]?\d{2,4}[\s-]?\d{3,6}|J\s?\d{6})\b/gi;
   let m: RegExpExecArray | null;
   while ((m = poMarked.exec(upper)) !== null) {
     const parsed = parseJobNumber(m[1]);
     if (parsed) found.add(parsed.supplyPo);
   }
 
-  // Bare job numbers / supply POs (require leading J)
-  const bare = /\bJ-?\d{4}-\d{1,6}\b|\bJ\d{6}\b|\bJ-?\d{2}-?\d{4}\b/gi;
+  // Bare job numbers / supply POs (require leading J; allow spoken "J 26 0029")
+  const bare =
+    /\bJ-?\d{4}-\d{1,6}\b|\bJ\s?\d{6}\b|\bJ[\s-]?\d{2}[\s-]?\d{4}\b/gi;
   while ((m = bare.exec(upper)) !== null) {
     const parsed = parseJobNumber(m[0]);
     if (parsed) found.add(parsed.supplyPo);

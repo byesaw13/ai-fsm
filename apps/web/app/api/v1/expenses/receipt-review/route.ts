@@ -206,12 +206,17 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
           ? client_id
           : expense.rows[0].client_id ?? job.rows[0].client_id ?? null;
 
-      await client.query(
+      const updated = await client.query(
         `UPDATE expenses
          SET job_id = $1, client_id = $2, updated_at = now()
-         WHERE id = $3 AND account_id = $4`,
+         WHERE id = $3 AND account_id = $4 AND job_id IS NULL`,
         [job_id, nextClientId, expense_id, session.accountId],
       );
+      if ((updated.rowCount ?? 0) === 0) {
+        throw Object.assign(new Error("Expense already linked to a project"), {
+          code: "CONFLICT",
+        });
+      }
 
       await appendAuditLog(client, {
         account_id: session.accountId,

@@ -53,6 +53,11 @@ describe("extractSupplyPoCandidates", () => {
     expect(extractSupplyPoCandidates("ref J260042")).toEqual(["J260042"]);
   });
 
+  it("finds spoken whitespace form J 26 0029", () => {
+    expect(extractSupplyPoCandidates("PO J 26 0029 lumber")).toEqual(["J260029"]);
+    expect(extractSupplyPoCandidates("ref J 26 0029")).toEqual(["J260029"]);
+  });
+
   it("dedupes equivalent forms", () => {
     expect(extractSupplyPoCandidates("PO J260029 and J-2026-0029")).toEqual(["J260029"]);
   });

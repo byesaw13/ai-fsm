@@ -95,7 +95,11 @@ export function ReceiptReviewClient() {
   }
 
   function dismiss(expenseId: string) {
-    setItems((prev) => prev.filter((i) => i.id !== expenseId));
+    setItems((prev) => {
+      const row = prev.find((i) => i.id === expenseId);
+      if (row?.suggestion) setSuggestedCount((c) => Math.max(0, c - 1));
+      return prev.filter((i) => i.id !== expenseId);
+    });
   }
 
   if (loading) {

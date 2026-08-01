@@ -92,7 +92,8 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
       }
       if (nextNotes) setNotes(nextNotes);
 
-      // Pre-select open job when Supply PO uniquely matches (do not override deep-link default unless empty)
+      // Pre-select open job when Supply PO uniquely matches — never override an
+      // existing choice (deep-link defaultJobId or user pick before scan).
       const haystack = buildPoMatchText({
         po_number: typeof po_number === "string" ? po_number : null,
         notes: nextNotes,
@@ -101,11 +102,14 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
       const match = suggestJobFromPoText(haystack, jobs);
       if (match) {
         const job = jobs.find((j) => j.id === match.jobId);
-        setJobId(match.jobId);
-        if (job?.client_id) setClientId(job.client_id);
-        setPoMatchLabel(
-          `Matched Supply PO ${match.supplyPo} → ${job?.title ?? match.jobNumber}`,
-        );
+        const label = `Matched Supply PO ${match.supplyPo} → ${job?.title ?? match.jobNumber}`;
+        if (!jobId) {
+          setJobId(match.jobId);
+          if (job?.client_id) setClientId(job.client_id);
+          setPoMatchLabel(label);
+        } else if (jobId === match.jobId) {
+          setPoMatchLabel(label);
+        }
       }
     } catch {
       setScanError("Network error — enter the receipt details manually. The photo will still be saved.");
