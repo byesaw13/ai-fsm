@@ -156,7 +156,11 @@ export function ClientImportForm() {
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
-  const [result, setResult] = useState<{ imported: number; skipped: number } | null>(null);
+  const [result, setResult] = useState<{
+    imported: number;
+    updated?: number;
+    skipped: number;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -206,8 +210,18 @@ export function ClientImportForm() {
             Import complete
           </p>
           <p style={{ fontSize: "var(--text-base)", color: "var(--fg-muted)", marginBottom: "var(--space-6)" }}>
-            <strong>{result.imported}</strong> client{result.imported !== 1 ? "s" : ""} imported
-            {result.skipped > 0 && <>, <strong>{result.skipped}</strong> skipped (already existed)</>}.
+            <strong>{result.imported}</strong> new client{result.imported !== 1 ? "s" : ""}
+            {(result.updated ?? 0) > 0 && (
+              <>
+                , <strong>{result.updated}</strong> updated with Square history
+              </>
+            )}
+            {result.skipped > 0 && (
+              <>
+                , <strong>{result.skipped}</strong> skipped
+              </>
+            )}
+            .
           </p>
           <div style={{ display: "flex", gap: "var(--space-3)", justifyContent: "center" }}>
             <LinkButton href="/app/clients" variant="primary">View Clients</LinkButton>
@@ -299,7 +313,7 @@ export function ClientImportForm() {
         </ol>
         <p style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", marginTop: "var(--space-3)" }}>
           Any CSV works as long as it has columns for name (or first name + last name), email, and/or phone.
-          Duplicates (same name + email) are automatically skipped.
+          Matching Square customer IDs refresh lifetime spend and transaction counts.
         </p>
       </Card>
 

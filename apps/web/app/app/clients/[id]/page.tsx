@@ -22,6 +22,7 @@ import { ClientActivityTimeline } from "./ClientActivityTimeline";
 import type { ActivityEvent } from "./ClientActivityTimeline";
 import { SendSmsButton } from "./SendSmsButton";
 import { dollars } from "./client360-helpers";
+import { formatCents } from "@/lib/money";
 import { CopyPortalLinkButton } from "@/components/CopyPortalLinkButton";
 import { VAULT_CATEGORY_LABELS } from "@ai-fsm/domain";
 import type { VaultCategory } from "@ai-fsm/domain";
@@ -47,6 +48,11 @@ type ClientRow = {
   custom_travel_time_rate_cents?: number | null;
   created_at: string;
   updated_at: string;
+  square_customer_id?: string | null;
+  first_visit_at?: string | null;
+  last_visit_at?: string | null;
+  transaction_count?: number | string | null;
+  lifetime_spend_cents?: number | string | null;
 };
 
 type PropertyRow = {
@@ -124,7 +130,16 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   );
   if (!client) notFound();
 
-  const [properties, activeJobs, activityEvents, estimates, invoices, openAssessments, vaultItems] = await Promise.all([
+  const squareTxnCount = Number(client.transaction_count) || 0;
+  const squareSpendCents = Number(client.lifetime_spend_cents) || 0;
+  const hasSquareHistory =
+    squareTxnCount > 0 ||
+    squareSpendCents > 0 ||
+    !!client.first_visit_at ||
+    !!client.last_visit_at ||
+    !!client.square_customer_id;
+
+  const [properties, activeJobs, allJobCountRows, activityEvents, estimates, invoices, openAssessments, vaultItems] = await Promise.all([
     query<PropertyRow>(
       `SELECT p.id, p.name, p.address, p.city, p.state, p.zip,
               (SELECT COUNT(*) FROM jobs j
@@ -166,6 +181,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
        END, j.created_at DESC
        LIMIT 5`,
       [id, session.accountId]
+    ),
+    queryOne<{ job_count: string }>(
+      `SELECT COUNT(*)::text AS job_count
+       FROM jobs
+       WHERE client_id = $1 AND account_id = $2`,
+      [id, session.accountId],
     ),
     query<ActivityEvent>(
       `SELECT event_type, id, ts, label, status, link_id, total_cents, property_address FROM (
@@ -404,6 +425,73 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           ) : null}
         </div>
       </Card>
+
+      {(hasSquareHistory || Number(allJobCountRows?.job_count ?? 0) > 0) && (
+        <Card data-testid="client-history-summary" style={{ marginTop: "var(--space-4)" }}>
+          <SectionHeader title="History summary" />
+          <dl className="p7-detail-list" style={{ margin: 0 }}>
+            <div className="p7-detail-row">
+              <dt>Projects in app</dt>
+              <dd>
+                {Number(allJobCountRows?.job_count ?? 0)}{" "}
+                <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+                  (all statuses, including invoiced)
+                </span>
+              </dd>
+            </div>
+            {squareTxnCount > 0 ? (
+              <div className="p7-detail-row">
+                <dt>Square payments</dt>
+                <dd>
+                  {squareTxnCount}{" "}
+                  <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+                    from Square customer export — not full job records
+                  </span>
+                </dd>
+              </div>
+            ) : null}
+            {squareSpendCents > 0 ? (
+              <div className="p7-detail-row">
+                <dt>Square lifetime spend</dt>
+                <dd>{formatCents(squareSpendCents)}</dd>
+              </div>
+            ) : null}
+            {client.first_visit_at ? (
+              <div className="p7-detail-row">
+                <dt>First Square visit</dt>
+                <dd>{String(client.first_visit_at).slice(0, 10)}</dd>
+              </div>
+            ) : null}
+            {client.last_visit_at ? (
+              <div className="p7-detail-row">
+                <dt>Last Square visit</dt>
+                <dd>{String(client.last_visit_at).slice(0, 10)}</dd>
+              </div>
+            ) : null}
+            {client.square_customer_id ? (
+              <div className="p7-detail-row">
+                <dt>Square customer id</dt>
+                <dd style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-xs)" }}>
+                  {client.square_customer_id}
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+          {squareTxnCount > Number(allJobCountRows?.job_count ?? 0) ? (
+            <p
+              style={{
+                margin: "var(--space-3) 0 0",
+                fontSize: "var(--text-sm)",
+                color: "var(--fg-muted)",
+              }}
+            >
+              Square shows more historical payments than projects in this app. Re-import the Square
+              Customers CSV (People → Import Square CSV) to refresh counts. Full job history would
+              need a Square Orders/Payments import — customer export only carries totals.
+            </p>
+          ) : null}
+        </Card>
+      )}
 
       <div className="p7-detail-layout" style={{ marginTop: "var(--space-4)" }}>
         <div className="p7-detail-primary">
