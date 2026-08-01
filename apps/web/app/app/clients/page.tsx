@@ -5,6 +5,7 @@ import { getSession } from "@/lib/auth/session";
 import { canManageClients } from "@/lib/auth/permissions";
 import { query } from "@/lib/db";
 import { formatClientContact } from "@/lib/crm/normalization";
+import { formatCents } from "@/lib/money";
 import {
   Card,
   DataTable,
@@ -30,8 +31,28 @@ type ClientRow = {
   company_name: string | null;
   created_at: string;
   property_count: number | string;
+  /** All FSM projects for this client, including invoiced/completed. */
   job_count: number | string;
+  /** Square customer directory: historical payment count (not FSM jobs). */
+  transaction_count: number | string | null;
+  lifetime_spend_cents: number | string | null;
+  last_visit_at: string | null;
+  square_customer_id: string | null;
 };
+
+function formatClientHistoryMeta(row: ClientRow): string {
+  const jobs = Number(row.job_count) || 0;
+  const props = Number(row.property_count) || 0;
+  const sq = Number(row.transaction_count) || 0;
+  const spend = Number(row.lifetime_spend_cents) || 0;
+  const parts = [
+    `${props} propert${props === 1 ? "y" : "ies"}`,
+    `${jobs} project${jobs === 1 ? "" : "s"}`,
+  ];
+  if (sq > 0) parts.push(`${sq} Square txn${sq === 1 ? "" : "s"}`);
+  if (spend > 0) parts.push(formatCents(spend));
+  return parts.join(" · ");
+}
 
 const CLIENT_FILTERS: FilterDef[] = [
   { name: "q", type: "text", label: "Search", placeholder: "Name, email, phone…" },
@@ -105,7 +126,42 @@ export default async function ClientsPage({ searchParams }: PageProps) {
       key: "jobs",
       label: "Projects",
       align: "right",
+      // Includes draft through invoiced — every FSM job row for this client.
       render: (row) => Number(row.job_count),
+      width: "90px",
+    },
+    {
+      key: "square",
+      label: "Square",
+      align: "right",
+      render: (row) => {
+        const n = Number(row.transaction_count) || 0;
+        if (n <= 0) {
+          return <span style={{ color: "var(--fg-muted)" }}>—</span>;
+        }
+        return (
+          <span title="Historical payments from Square customer export (not FSM projects)">
+            {n}
+          </span>
+        );
+      },
+      width: "80px",
+    },
+    {
+      key: "lifetime",
+      label: "Lifetime $",
+      align: "right",
+      render: (row) => {
+        const cents = Number(row.lifetime_spend_cents) || 0;
+        if (cents <= 0) {
+          return <span style={{ color: "var(--fg-muted)" }}>—</span>;
+        }
+        return (
+          <span title="Lifetime spend from Square customer export">
+            {formatCents(cents)}
+          </span>
+        );
+      },
       width: "100px",
     },
     {
@@ -130,11 +186,11 @@ export default async function ClientsPage({ searchParams }: PageProps) {
     <PageContainer>
       <PageHeader
         title="Clients"
-        subtitle={`${clients.length} client${clients.length === 1 ? "" : "s"}`}
+        subtitle={`${clients.length} client${clients.length === 1 ? "" : "s"} · Projects = work in this app (includes invoiced). Square = historical payments from Square export.`}
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)" }}>
             <LinkButton href="/app/clients/import" variant="secondary">
-              Import CSV
+              Import Square CSV
             </LinkButton>
             <LinkButton href="/app/clients/new" variant="primary" data-testid="create-client-btn">
               + New Client
@@ -168,7 +224,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                   <>
                     {row.company_name && <div style={{ fontStyle: "italic" }}>{row.company_name}</div>}
                     <div>{formatClientContact(row)}</div>
-                    <div>{Number(row.property_count)} properties • {Number(row.job_count)} jobs</div>
+                    <div>{formatClientHistoryMeta(row)}</div>
                   </>
                 }
                 data-testid="client-card"

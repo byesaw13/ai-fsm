@@ -78,6 +78,7 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
   const pool = getPool();
   const client = await pool.connect();
   let imported = 0;
+  let updated = 0;
   let skipped = 0;
 
   try {
@@ -93,16 +94,66 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
       // Dedupe: prefer the Square customer id (stable, and many rows have no
       // email); otherwise fall back to exact name+email.
       const exists = row.square_customer_id
-        ? await client.query(
+        ? await client.query<{ id: string }>(
             `SELECT id FROM clients WHERE account_id = $1 AND square_customer_id = $2`,
             [session.accountId, row.square_customer_id]
           )
-        : await client.query(
+        : await client.query<{ id: string }>(
             `SELECT id FROM clients WHERE account_id = $1 AND LOWER(name) = LOWER($2) AND LOWER(COALESCE(email,'')) = LOWER(COALESCE($3,''))`,
             [session.accountId, row.name, row.email ?? ""]
           );
       if (exists.rows.length > 0) {
-        skipped++;
+        // Refresh Square history fields on match — CSV re-import is the way to
+        // pull lifetime spend / transaction counts onto existing clients.
+        const existingId = exists.rows[0].id;
+        await client.query(
+          `UPDATE clients SET
+             nickname = COALESCE($2, nickname),
+             email = COALESCE($3, email),
+             phone = COALESCE($4, phone),
+             company_name = COALESCE($5, company_name),
+             address_line1 = COALESCE($6, address_line1),
+             address_line2 = COALESCE($7, address_line2),
+             city = COALESCE($8, city),
+             state = COALESCE($9, state),
+             zip = COALESCE($10, zip),
+             notes = COALESCE($11, notes),
+             birthday = COALESCE($12::date, birthday),
+             square_customer_id = COALESCE($13, square_customer_id),
+             creation_source = COALESCE($14, creation_source),
+             first_visit_at = COALESCE($15::date, first_visit_at),
+             last_visit_at = COALESCE($16::date, last_visit_at),
+             transaction_count = GREATEST(COALESCE($17, 0), COALESCE(transaction_count, 0)),
+             lifetime_spend_cents = GREATEST(COALESCE($18, 0), COALESCE(lifetime_spend_cents, 0)),
+             email_subscription_status = COALESCE($19, email_subscription_status),
+             instant_profile = COALESCE($20, instant_profile),
+             updated_at = now()
+           WHERE id = $1 AND account_id = $21`,
+          [
+            existingId,
+            row.nickname,
+            row.email,
+            row.phone,
+            row.company_name,
+            row.address_line1,
+            row.address_line2,
+            row.city,
+            row.state,
+            row.zip,
+            row.notes,
+            row.birthday,
+            row.square_customer_id,
+            row.creation_source,
+            row.first_visit_at,
+            row.last_visit_at,
+            row.transaction_count,
+            row.lifetime_spend_cents,
+            row.email_subscription_status,
+            row.instant_profile,
+            session.accountId,
+          ],
+        );
+        updated++;
         continue;
       }
 
@@ -124,7 +175,7 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
     }
 
     await client.query("COMMIT");
-    return NextResponse.json({ data: { imported, skipped } });
+    return NextResponse.json({ data: { imported, updated, skipped } });
   } catch (err) {
     await client.query("ROLLBACK");
     logger.error("[clients/import]", err);
