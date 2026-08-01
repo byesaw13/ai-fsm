@@ -6,7 +6,9 @@ import { canManageExpenses } from "../../../../../lib/auth/permissions";
 import { logger } from "../../../../../lib/logger";
 import {
   RECEIPT_LINE_ITEMS_PROMPT,
+  getReceiptParseModel,
   normalizeParsedReceiptLineItems,
+  reconcileReceiptParse,
   type ParsedReceipt,
 } from "@/lib/expenses/receipt-line-items";
 
@@ -73,10 +75,12 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
   }
 
   try {
+    const model = getReceiptParseModel();
     const client = new Anthropic({ apiKey });
     const message = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 2048,
+      model,
+      max_tokens: 8192,
+      temperature: 0,
       messages: [
         {
           role: "user",
@@ -116,21 +120,38 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
       ? Math.round(parsed.amount_cents)
       : null;
 
+    const tax_cents =
+      typeof parsed.tax_cents === "number" && parsed.tax_cents > 0
+        ? Math.round(parsed.tax_cents)
+        : null;
+
     let expense_date: string | null = null;
     if (parsed.expense_date && /^\d{4}-\d{2}-\d{2}$/.test(parsed.expense_date)) {
       expense_date = parsed.expense_date;
     }
 
     const line_items = normalizeParsedReceiptLineItems(parsed.line_items);
+    const reconciliation = reconcileReceiptParse(line_items, amount_cents, tax_cents);
+
+    if (reconciliation.balanced === false) {
+      logger.warn("[scan-receipt] line totals vs receipt total unbalanced", {
+        traceId: session.traceId,
+        model,
+        ...reconciliation,
+      });
+    }
 
     return NextResponse.json({
       data: {
         vendor_name: parsed.vendor_name?.trim() || null,
         amount_cents,
+        tax_cents,
         expense_date,
         category,
         notes: parsed.notes?.trim() || null,
         line_items,
+        reconciliation,
+        parse_model: model,
       },
     });
   } catch (err) {

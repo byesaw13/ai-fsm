@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   coerceUnitCostCents,
   normalizeParsedReceiptLineItems,
+  reconcileReceiptParse,
+  getReceiptParseModel,
+  DEFAULT_RECEIPT_PARSE_MODEL,
 } from "../receipt-line-items";
 
 describe("coerceUnitCostCents", () => {
@@ -96,5 +99,62 @@ describe("normalizeParsedReceiptLineItems", () => {
         { name: "Ok", quantity: 1, unit_cost_cents: 0 },
       ]),
     ).toEqual([]);
+  });
+
+  it("strips money-looking SKUs", () => {
+    const rows = normalizeParsedReceiptLineItems([
+      { name: "Nail", quantity: 1, unit_cost_cents: 500, sku: "$5.00" },
+    ]);
+    expect(rows[0].sku).toBeNull();
+  });
+});
+
+describe("reconcileReceiptParse", () => {
+  it("marks balanced when lines sum near total", () => {
+    const r = reconcileReceiptParse(
+      [
+        { name: "a", quantity: 2, unit_cost_cents: 1000, line_total_cents: 2000 },
+        { name: "b", quantity: 1, unit_cost_cents: 500, line_total_cents: 500 },
+      ],
+      2500,
+    );
+    expect(r.line_items_subtotal_cents).toBe(2500);
+    expect(r.balanced).toBe(true);
+    expect(r.delta_cents).toBe(0);
+  });
+
+  it("uses pre-tax target when tax is provided", () => {
+    const r = reconcileReceiptParse(
+      [{ name: "a", quantity: 1, unit_cost_cents: 1000, line_total_cents: 1000 }],
+      1080,
+      80,
+    );
+    expect(r.balanced).toBe(true);
+    expect(r.delta_cents).toBe(0);
+  });
+
+  it("flags unbalanced when gap is large", () => {
+    const r = reconcileReceiptParse(
+      [{ name: "a", quantity: 1, unit_cost_cents: 1000, line_total_cents: 1000 }],
+      5000,
+    );
+    expect(r.balanced).toBe(false);
+  });
+});
+
+describe("getReceiptParseModel", () => {
+  it("defaults to Sonnet for precision", () => {
+    const prev = process.env.RECEIPT_PARSE_MODEL;
+    delete process.env.RECEIPT_PARSE_MODEL;
+    expect(getReceiptParseModel()).toBe(DEFAULT_RECEIPT_PARSE_MODEL);
+    if (prev !== undefined) process.env.RECEIPT_PARSE_MODEL = prev;
+  });
+
+  it("honors RECEIPT_PARSE_MODEL override", () => {
+    const prev = process.env.RECEIPT_PARSE_MODEL;
+    process.env.RECEIPT_PARSE_MODEL = "claude-haiku-4-5-20251001";
+    expect(getReceiptParseModel()).toBe("claude-haiku-4-5-20251001");
+    if (prev !== undefined) process.env.RECEIPT_PARSE_MODEL = prev;
+    else delete process.env.RECEIPT_PARSE_MODEL;
   });
 });
