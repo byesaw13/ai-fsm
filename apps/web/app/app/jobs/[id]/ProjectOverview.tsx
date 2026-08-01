@@ -177,6 +177,7 @@ export function ProjectOverview(props: ProjectOverviewProps) {
               href={`/app/visits/${props.assessment.visitId}/assessment` as Route}
               data-testid="project-field-assessment-link"
               style={cellLinkStyle}
+              title="Open assessment form + original project/estimate notes"
             >
               Assessment
               {props.assessment.done === true ? " · done" : props.assessment.done === false ? " · open" : ""}{" "}
