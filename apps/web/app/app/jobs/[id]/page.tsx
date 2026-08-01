@@ -852,22 +852,31 @@ export default async function JobDetailPage({
   // (and the browser as fallback). maps.apple.com only deep-links cleanly on iOS.
   const mapHref = job.property_address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.property_address)}` : null;
 
-  const jobCrumbs = [
-    { href: "/app/clients", label: "Clients" },
-    ...(job.client_id
-      ? [{ href: `/app/clients/${job.client_id}`, label: job.client_name ?? "Client" }]
-      : []),
-    ...(job.property_id
-      ? [{
-          href: `/app/properties/${job.property_id}`,
-          label:
-            job.property_address && job.property_address !== "TBD"
-              ? job.property_address
-              : "Property",
-        }]
-      : []),
-    { label: job.title },
-  ];
+  // Techs can't open Clients/Properties (redirect to /app) — show labels only.
+  const jobCrumbs = isTech
+    ? [
+        ...(job.client_name ? [{ label: job.client_name }] : []),
+        ...(job.property_address && job.property_address !== "TBD"
+          ? [{ label: job.property_address }]
+          : []),
+        { label: job.title },
+      ]
+    : [
+        { href: "/app/clients", label: "Clients" },
+        ...(job.client_id
+          ? [{ href: `/app/clients/${job.client_id}`, label: job.client_name ?? "Client" }]
+          : []),
+        ...(job.property_id
+          ? [{
+              href: `/app/properties/${job.property_id}`,
+              label:
+                job.property_address && job.property_address !== "TBD"
+                  ? job.property_address
+                  : "Property",
+            }]
+          : []),
+        { label: job.title },
+      ];
 
   const mobileView = (
       <div style={{ padding: "var(--space-4) var(--space-4) var(--space-12)", display: "flex", flexDirection: "column", gap: "var(--space-5)", maxWidth: 760 }}>
@@ -1033,7 +1042,7 @@ export default async function JobDetailPage({
             .join(" · ") || undefined
         }
         backHref="/app/jobs"
-        backLabel="Jobs"
+        backLabel="Projects"
         actions={
           <span data-testid="job-status" style={{ display: "inline-flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
             {toSupplyPo(job.job_number) ? (

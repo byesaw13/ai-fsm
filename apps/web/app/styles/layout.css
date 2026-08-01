@@ -650,7 +650,7 @@
 .p7-breadcrumbs-item {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
+  min-height: 44px; /* field touch target — PRODUCT.md */
 }
 
 .p7-breadcrumbs-sep {
@@ -663,6 +663,10 @@
   color: var(--fg-secondary);
   text-decoration: none;
   font-weight: var(--font-medium);
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 2px;
 }
 
 .p7-breadcrumbs-link:hover {
