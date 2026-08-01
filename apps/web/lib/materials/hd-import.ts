@@ -2,6 +2,7 @@
  * Parse Home Depot "Purchase Tracking" CSV exports into catalog learn lines.
  */
 import type { CatalogLineInput } from "./catalog";
+import { coerceUnitCostCents } from "@/lib/expenses/receipt-line-items";
 
 export type HdImportLine = CatalogLineInput & {
   purchasedAt: string | null;
@@ -128,6 +129,9 @@ export function parseHomeDepotPurchaseCsv(csvText: string): HdParseResult {
     headers.indexOf("net unit price") >= 0
       ? headers.indexOf("net unit price")
       : headers.indexOf("unit price");
+  const iExtended = headers.findIndex(
+    (h) => h.includes("extended retail") || h === "extended" || h.includes("line total"),
+  );
   const iDept = col("department name");
   const iQty = col("quantity");
 
@@ -137,26 +141,50 @@ export function parseHomeDepotPurchaseCsv(csvText: string): HdParseResult {
 
     const name = get(iDesc);
     const sku = get(iSku);
-    const cents = parseMoneyToCents(get(iNet));
+    const netCents = parseMoneyToCents(get(iNet));
+    const extendedCents = iExtended >= 0 ? parseMoneyToCents(get(iExtended)) : null;
     const dateRaw = get(iDate);
     const dept = get(iDept) || null;
     const qtyRaw = get(iQty);
-    const qty = qtyRaw ? Number(qtyRaw) : 1;
+    const qty = qtyRaw && Number(qtyRaw) > 0 ? Number(qtyRaw) : 1;
 
     if (!name && !sku) {
       skipped.push({ row: r + 1, reason: "empty row" });
       continue;
     }
-    if (cents == null) {
+    // Prefer net unit; fall back to extended as a line total when unit missing
+    if (netCents == null && (extendedCents == null || extendedCents === 0)) {
       skipped.push({ row: r + 1, reason: "missing unit price" });
       continue;
     }
-    if (cents < 0) {
+    const signed = netCents ?? extendedCents!;
+    if (signed < 0 || (extendedCents != null && extendedCents < 0)) {
       skipped.push({ row: r + 1, reason: "return/credit (negative price)" });
       continue;
     }
     if (!name) {
       skipped.push({ row: r + 1, reason: "missing description" });
+      continue;
+    }
+
+    // When Extended Retail is present, use it as line_total so we can detect
+    // HD exports that copy the line total into "Net Unit Price" (qty>1, net≈extended).
+    // Never invent line_total from net alone — that would corrupt correct multi-qty unit prices.
+    const rawUnit =
+      netCents != null && netCents > 0
+        ? netCents
+        : extendedCents != null && extendedCents > 0
+          ? Math.max(1, Math.round(extendedCents / qty))
+          : 0;
+    const unit_cost_cents = coerceUnitCostCents({
+      quantity: qty,
+      unit_cost_cents: rawUnit,
+      line_total_cents:
+        extendedCents != null && extendedCents > 0 ? extendedCents : null,
+    });
+
+    if (unit_cost_cents <= 0) {
+      skipped.push({ row: r + 1, reason: "missing unit price" });
       continue;
     }
 
@@ -172,8 +200,8 @@ export function parseHomeDepotPurchaseCsv(csvText: string): HdParseResult {
     lines.push({
       name,
       sku: sku || null,
-      unit_cost_cents: cents,
-      quantity: Number.isFinite(qty) && qty > 0 ? qty : 1,
+      unit_cost_cents,
+      quantity: qty,
       unit: "each",
       purchasedAt,
       supplier: HD_SUPPLIER,

@@ -71,10 +71,59 @@ describe("POST /api/v1/expenses/scan-receipt", () => {
     const json = await res.json();
     expect(json.data.vendor_name).toBe("Home Depot");
     expect(json.data.line_items).toEqual([
-      { name: "2x4 lumber", quantity: 10, unit_cost_cents: 400, sku: "12345" },
-      { name: "Deck screws", quantity: 1, unit_cost_cents: 400, sku: null },
+      {
+        name: "2x4 lumber",
+        quantity: 10,
+        unit_cost_cents: 400,
+        line_total_cents: 4000,
+        sku: "12345",
+      },
+      {
+        name: "Deck screws",
+        quantity: 1,
+        unit_cost_cents: 400,
+        line_total_cents: 400,
+        sku: null,
+      },
     ]);
   });
+
+  it("corrects unit price when the model puts the line total in unit_cost_cents", async () => {
+    mockCreate.mockResolvedValue({
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            vendor_name: "Home Depot",
+            amount_cents: 3000,
+            expense_date: "2026-07-10",
+            category: "materials",
+            line_items: [
+              // Classic bug: 3 @ $10 stored as unit=$30
+              {
+                name: "Widget",
+                quantity: 3,
+                unit_cost_cents: 3000,
+                line_total_cents: 3000,
+                sku: "W1",
+              },
+            ],
+          }),
+        },
+      ],
+    });
+
+    const file = new File(["fake"], "receipt.jpg", { type: "image/jpeg" });
+    const res = await POST(requestWithFile(file));
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.line_items[0]).toMatchObject({
+      quantity: 3,
+      unit_cost_cents: 1000,
+      line_total_cents: 3000,
+    });
+  });
+
 
   it("returns an empty line_items array when the AI omits them, without failing the scan", async () => {
     mockCreate.mockResolvedValue({
