@@ -59,7 +59,7 @@ site_visit + assessment
 
 ## Daily Operating Loop
 
-The Daily Command Center at `/app` is an orchestration layer over existing workflow objects, not a new workflow system. It guides the day in order: Start Day, What needs you, Today's Projects, Materials, and End Day. Each section reads from and writes to the existing modules: vehicle sessions, visits, expenses, estimates, invoices, projects, and booking requests.
+The Daily Command Center at `/app` is an orchestration layer over existing workflow objects, not a new workflow system. It is a single screen that merges the field workday with the business view: a greeting header, a Daily Workflow stepper, a Start-Your-Day summary (the full start/end wizard still lives on `/app/my-work`), Today's Schedule, Tasks & Follow Ups, Expenses & Receipts, Mileage, Materials, and a right rail (Today's Workflow checklist, Quick Actions, At a Glance). Each section reads from and writes to the existing modules: vehicle sessions, visits, expenses, estimates, invoices, projects, and booking requests.
 
 The only stored addition for this loop is open vehicle-session state: a session may start with a start odometer and close later with an end odometer and computed miles. Receipts, material runs, follow-ups, tomorrow preview, and end-of-day warnings remain derived from existing records.
 
