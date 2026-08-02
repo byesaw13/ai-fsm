@@ -1,11 +1,13 @@
 ---
 name: Dovetails FSM
-description: A sturdy, field-first operating system for a residential handyman business — Forest & Cedar.
+description: A sturdy, field-first operating system for a residential handyman business — Cedar & Clay (burnt-orange), matched to the Dovetails marketing site.
 colors:
-  forest-800: "#166534"
-  forest-700: "#15803d"
-  forest-900: "#14532d"
-  forest-50: "#e9f6ee"
+  # Brand ramp is burnt-orange, matched to mydovetails-site (--brand: oklch(0.62 0.17 42)).
+  # Token names stay `forest-*` for consumer compatibility; values are burnt-orange.
+  forest-800: "oklch(0.56 0.16 41)"  # accent
+  forest-700: "oklch(0.49 0.15 40)"  # accent hover / ring
+  forest-900: "oklch(0.40 0.12 40)"  # darkest
+  forest-50: "oklch(0.965 0.018 60)"
   stone-950: "#0c0a09"
   stone-900: "#1c1917"
   stone-600: "#57534e"

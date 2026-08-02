@@ -6,16 +6,21 @@
 :root {
   /* -------------------------------------------------------------------------
      Color — Primitives
-     "Forest & Cedar" identity: deep forest-green accent with warm stone
-     neutrals. Built for Dovetails — a trade brand, not a generic SaaS.
+     "Cedar & Clay" identity: burnt-orange accent with warm stone neutrals —
+     matched to the Dovetails marketing site (mydovetails-site global.css
+     --brand: oklch(0.62 0.17 42)). A trade brand, not a generic SaaS.
+     NOTE: the primitive names below stay `forest-*` for compatibility with
+     existing consumers (badges, sidebar gradient, role pills). Treat the name
+     as "brand ramp"; the values are burnt-orange. Any hardcoded green hex
+     fallbacks in consumers are dead — the var is always defined here.
      ---------------------------------------------------------------------- */
-  --color-forest-900: #14532d;
-  --color-forest-800: #166534;
-  --color-forest-700: #15803d;
-  --color-forest-100: #dcfce7;
-  --color-forest-50:  #e9f6ee;
+  --color-forest-900: oklch(0.40 0.12 40);   /* darkest burnt-orange */
+  --color-forest-800: oklch(0.56 0.16 41);   /* ACCENT — burnt-orange, white label ≥3:1 */
+  --color-forest-700: oklch(0.49 0.15 40);   /* accent hover (deeper) + focus ring */
+  --color-forest-100: oklch(0.92 0.045 55);  /* light clay tint (badge/hero bg) */
+  --color-forest-50:  oklch(0.965 0.018 60); /* barely-clay subtle surface */
 
-  /* Legacy indigo primitives — remapped to the forest ramp so any straggling
+  /* Legacy indigo primitives — remapped to the brand ramp so any straggling
      consumer picks up the new identity. Do not use in new code. */
   --color-indigo-700: var(--color-forest-900);
   --color-indigo-600: var(--color-forest-800);
@@ -137,7 +142,7 @@
   /* -------------------------------------------------------------------------
      Typography
      ---------------------------------------------------------------------- */
-  --font-sans:      -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  --font-sans:      var(--font-archivo), -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
   --font-mono:      'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', monospace;
   --text-xs:        0.75rem;    /* 12px */
   --text-sm:        0.8125rem;  /* 13px */
