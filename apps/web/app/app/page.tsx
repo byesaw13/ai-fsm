@@ -5,6 +5,7 @@ import { queryForSession } from "@/lib/db";
 import { LinkButton, PageContainer, PageHeader, WhatNext } from "@/components/ui";
 import { OwnerDashboard } from "./OwnerDashboard";
 import type { CommandVisit, CountAction, MaterialJob } from "./DashboardWidgets";
+import { loadFieldDayData } from "@/lib/my-work/field-day-data";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,8 @@ export default async function AppPage() {
     pendingDepositsCentsRows,
     paidThisMonthCentsRows,
     pendingSegmentRows,
+    expenseRows,
+    fieldDay,
   ] = await Promise.all([
     queryForSession<CommandVisit>(session,
       `SELECT DISTINCT ON (j.id)
@@ -168,7 +171,29 @@ export default async function AppPage() {
          AND LOWER(COALESCE(zone, '')) NOT IN ('home', 'private')
          AND LOWER(COALESCE(place_label, '')) NOT IN ('home', 'private')`,
       [accountId]),
+
+    // Expenses summary for the dashboard Expenses & Receipts card.
+    queryForSession<{ today: string; month: string; missing: string }>(session,
+      `SELECT
+         COALESCE(SUM(amount_cents) FILTER (WHERE expense_date = CURRENT_DATE), 0)::text AS today,
+         COALESCE(SUM(amount_cents) FILTER (WHERE expense_date >= DATE_TRUNC('month', CURRENT_DATE)), 0)::text AS month,
+         COUNT(*) FILTER (WHERE receipt_url IS NULL AND expense_date >= DATE_TRUNC('month', CURRENT_DATE))::text AS missing
+       FROM expenses WHERE account_id = $1`,
+      [accountId]),
+
+    // Field workday (vehicle session, starting mileage, day mileage) — merges
+    // the My Day surface into the dashboard so it's one screen.
+    loadFieldDayData(session, true),
   ]);
+
+  const exp = expenseRows[0];
+  const todayExpensesCents = parseInt(exp?.today ?? "0", 10);
+  const monthExpensesCents = parseInt(exp?.month ?? "0", 10);
+  const receiptsMissing = parseInt(exp?.missing ?? "0", 10);
+
+  const nowHour = new Date().getHours();
+  const greeting =
+    nowHour < 12 ? "Good morning" : nowHour < 17 ? "Good afternoon" : "Good evening";
 
   const draftInvoices = parseN(draftInvoiceCountRows[0]);
   const deposits = parseN(depositCountRows[0]);
@@ -238,10 +263,11 @@ export default async function AppPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Overview"
-        subtitle={todayLabel}
+        title={`${greeting} 👋`}
+        subtitle="Here's your game plan for today."
         actions={
           <>
+            <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", alignSelf: "center", marginRight: "var(--space-2)" }}>{todayLabel}</span>
             <LinkButton href="/app/my-work" variant="secondary" size="sm">My Day</LinkButton>
             <LinkButton href="/app/intake/new" variant="primary" size="sm">+ New Request</LinkButton>
           </>
@@ -264,6 +290,14 @@ export default async function AppPage() {
         outstandingInvoicesCents={outstandingInvoicesCents}
         pendingDepositsCents={pendingDepositsCents}
         paidThisMonthCents={paidThisMonthCents}
+        openSession={fieldDay.openSession}
+        vehicles={fieldDay.vehicles}
+        dayMileage={fieldDay.dayMileage}
+        yesterdayMiles={fieldDay.yesterdayMiles}
+        pendingSegments={pendingSegments}
+        todayExpensesCents={todayExpensesCents}
+        monthExpensesCents={monthExpensesCents}
+        receiptsMissing={receiptsMissing}
       />
     </PageContainer>
   );

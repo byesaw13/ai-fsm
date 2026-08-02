@@ -571,6 +571,23 @@
    surface the financial column first so the owner's key glance is up top.
    ========================================================================== */
 
+/* Paired cards inside the left column (Schedule|Tasks, Expenses|Mileage). */
+.owner-dash-row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+/* Quick Actions tile grid in the right rail. */
+.owner-dash-qa-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+@media (max-width: 767px) {
+  .owner-dash-row2 { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 767px) {
   .owner-dashboard-grid {
     grid-template-columns: 1fr !important;
