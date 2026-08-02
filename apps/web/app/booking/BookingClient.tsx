@@ -29,24 +29,20 @@ const NEXT_STEPS_SITE_VISIT = [
 
 const NEXT_STEPS_REMOTE = [
   { title: "We review your request", body: "We look at every submission within 1 business day." },
-  { title: "We send you an estimate", body: "Based on what you've described we can put together a quote — expect it within 1–2 business days." },
-  { title: "We schedule your visit", body: "Once you approve the estimate we'll book a time that works for you." },
+  { title: "We confirm the scope", body: "We'll follow up to go over the details — sometimes a few photos do it, sometimes we'll set up a quick look at the space." },
+  { title: "You get a written estimate", body: "Once we understand the full scope, we send a detailed estimate before any work begins." },
 ];
 
 function BookingLogo() {
   return (
     <div style={{ display: "inline-flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
-      <div style={{
-        width: 40, height: 40, borderRadius: 10,
-        background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.18)",
-      }}>
-        <span style={{ color: "#fff", fontWeight: 800, fontSize: 16, letterSpacing: "-0.5px" }}>DV</span>
-      </div>
-      <div style={{ textAlign: "left" }}>
-        <div style={{ fontWeight: 800, fontSize: 18, color: "#111827", lineHeight: 1.1 }}>Dovetails</div>
-        <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.1 }}>Services LLC</div>
+      <svg width={30} height={30} viewBox="0 0 32 32" aria-hidden="true" style={{ color: "#c1540f", flex: "none" }}>
+        <path d="M7 5 L25 5 L19 16 L25 27 L7 27 L13 16 Z" fill="currentColor" />
+      </svg>
+      <div style={{ textAlign: "left", lineHeight: 1.05 }}>
+        <div style={{ fontWeight: 800, fontSize: 18, color: "#26221c", letterSpacing: "-0.02em" }}>
+          Dovetails <span style={{ color: "#9a3f12", fontWeight: 700 }}>Home Services</span>
+        </div>
       </div>
     </div>
   );
@@ -132,23 +128,23 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
 
   if (submitted) {
     return (
-      <div style={{ minHeight: "100vh", background: "#f9fafb", padding: "32px 16px" }}>
+      <div style={{ minHeight: "100vh", background: "#f7f5f2", padding: "32px 16px" }}>
         {/* Brand header */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <BookingLogo />
         </div>
 
-        <div style={{ maxWidth: 560, margin: "0 auto", background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: 40, textAlign: "center" }}>
+        <div style={{ maxWidth: 560, margin: "0 auto", background: "#fff", borderRadius: 12, border: "1px solid #e7e3dc", padding: 40, textAlign: "center" }}>
           <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#dcfce7", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", fontSize: 28 }}>✓</div>
           <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>Request Received!</h1>
-          <p style={{ color: "#6b7280", marginBottom: 24 }}>
+          <p style={{ color: "#6c6860", marginBottom: 24 }}>
             {routingPath === "site_visit"
               ? <>Thanks, {name}! Based on your project description, we&apos;ll reach out to schedule a quick walkthrough before sending an estimate.</>
-              : <>Thanks, {name}! We&apos;ll review your request and send you an estimate within 1–2 business days.</>}
+              : <>Thanks, {name}! We&apos;ll review your request and follow up to confirm the details and next steps.</>}
           </p>
 
           {/* Request summary */}
-          <div style={{ background: "#f9fafb", borderRadius: 8, padding: 16, textAlign: "left", marginBottom: 28 }}>
+          <div style={{ background: "#f7f5f2", borderRadius: 8, padding: 16, textAlign: "left", marginBottom: 28 }}>
             <p style={{ margin: "0 0 8px", fontSize: 14 }}><strong>Service:</strong> {serviceCategories.find((c) => c.id === serviceCategory)?.label}</p>
             <p style={{ margin: "0 0 8px", fontSize: 14 }}><strong>Preferred Date:</strong> {new Date(preferredDate + "T00:00:00").toLocaleDateString()}</p>
             <p style={{ margin: 0, fontSize: 14 }}><strong>Time:</strong> {preferredTimeSlot === "morning" ? "Morning (9 AM – 11 AM)" : preferredTimeSlot === "afternoon" ? "Afternoon (1 PM – 3 PM)" : "Evening (4 PM – 6 PM)"}</p>
@@ -160,12 +156,12 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {(routingPath === "site_visit" ? NEXT_STEPS_SITE_VISIT : NEXT_STEPS_REMOTE).map((step, i) => (
                 <div key={i} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-                  <div style={{ minWidth: 28, height: 28, borderRadius: "50%", background: "#eff6ff", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#2563eb" }}>
+                  <div style={{ minWidth: 28, height: 28, borderRadius: "50%", background: "#fbeee4", border: "1px solid #ecc9ad", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, color: "#c1540f" }}>
                     {i + 1}
                   </div>
                   <div>
                     <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>{step.title}</p>
-                    <p style={{ margin: "2px 0 0", fontSize: 13, color: "#6b7280" }}>{step.body}</p>
+                    <p style={{ margin: "2px 0 0", fontSize: 13, color: "#6c6860" }}>{step.body}</p>
                   </div>
                 </div>
               ))}
@@ -174,7 +170,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
 
           <Link
             href="/"
-            style={{ display: "inline-block", padding: "10px 24px", background: "#2563eb", color: "#fff", borderRadius: 8, textDecoration: "none", fontWeight: 600 }}
+            style={{ display: "inline-block", padding: "10px 24px", background: "#c1540f", color: "#fff", borderRadius: 8, textDecoration: "none", fontWeight: 600 }}
           >
             Back to Home
           </Link>
@@ -191,7 +187,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
   const canProceedStep3 = address.trim() !== "" && preferredDate !== "";
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f9fafb", padding: "32px 16px" }}>
+    <div style={{ minHeight: "100vh", background: "#f7f5f2", padding: "32px 16px" }}>
       <div style={{ maxWidth: 640, margin: "0 auto" }}>
 
         {/* Brand header */}
@@ -202,14 +198,14 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
         {/* Page title */}
         <div style={{ textAlign: "center", marginBottom: 16 }}>
           <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 4 }}>Request Service</h1>
-          <p style={{ color: "#6b7280", fontSize: 15, margin: 0 }}>Tell us what you need and we&apos;ll confirm the details before scheduling.</p>
+          <p style={{ color: "#6c6860", fontSize: 15, margin: 0 }}>Tell us what you need and we&apos;ll confirm the details before scheduling.</p>
         </div>
 
         {/* How it works — collapsed blurb */}
-        <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "12px 16px", marginBottom: 24, display: "flex", gap: 16, flexWrap: "wrap", justifyContent: "center" }}>
+        <div style={{ background: "#fbeee4", border: "1px solid #ecc9ad", borderRadius: 10, padding: "12px 16px", marginBottom: 24, display: "flex", gap: 16, flexWrap: "wrap", justifyContent: "center" }}>
           {NEXT_STEPS_REMOTE.map((step, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#1d4ed8" }}>
-              <span style={{ fontWeight: 700, background: "#2563eb", color: "#fff", borderRadius: "50%", width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#a1440b" }}>
+              <span style={{ fontWeight: 700, background: "#c1540f", color: "#fff", borderRadius: "50%", width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</span>
               <span>{step.title}</span>
             </div>
           ))}
@@ -222,7 +218,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
               key={s}
               style={{
                 width: 32, height: 4, borderRadius: 2,
-                background: s <= step ? "#2563eb" : "#e5e7eb",
+                background: s <= step ? "#c1540f" : "#e7e3dc",
                 transition: "background 0.2s",
               }}
             />
@@ -238,7 +234,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
 
         {/* Step 1: Service */}
         {step === 1 && (
-          <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: 32 }}>
+          <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e7e3dc", padding: 32 }}>
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>What do you need help with?</h2>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
@@ -249,9 +245,9 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                   onClick={() => { setServiceCategory(cat.id); setIntakeMetadata({}); }}
                   style={{
                     padding: "12px 16px",
-                    border: serviceCategory === cat.id ? "2px solid #2563eb" : "1px solid #e5e7eb",
+                    border: serviceCategory === cat.id ? "2px solid #c1540f" : "1px solid #e7e3dc",
                     borderRadius: 8,
-                    background: serviceCategory === cat.id ? "#eff6ff" : "#fff",
+                    background: serviceCategory === cat.id ? "#fbeee4" : "#fff",
                     cursor: "pointer",
                     textAlign: "left",
                     transition: "all 0.15s",
@@ -259,7 +255,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                 >
                   <div style={{ fontSize: 24, marginBottom: 4 }}>{cat.icon}</div>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{cat.label}</div>
-                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{cat.description}</div>
+                  <div style={{ fontSize: 12, color: "#6c6860", marginTop: 2 }}>{cat.description}</div>
                 </button>
               ))}
             </div>
@@ -272,11 +268,11 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                 placeholder="e.g. Paint the living room and hallway, patch two small holes in the drywall first"
                 rows={4}
                 style={{
-                  width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8,
+                  width: "100%", padding: "10px 12px", border: "1px solid #d8d3ca", borderRadius: 8,
                   fontSize: 15, resize: "vertical", boxSizing: "border-box", fontFamily: "inherit",
                 }}
               />
-              <span style={{ fontSize: 12, color: serviceDescription.length >= 10 ? "#6b7280" : "#dc2626" }}>
+              <span style={{ fontSize: 12, color: serviceDescription.length >= 10 ? "#6c6860" : "#dc2626" }}>
                 {serviceDescription.length}/2000 characters (min 10)
               </span>
             </label>
@@ -293,10 +289,10 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                       onClick={() => setIntakeMetadata((prev) => ({ ...prev, [q.key]: opt.value }))}
                       style={{
                         padding: "7px 14px",
-                        border: intakeMetadata[q.key] === opt.value ? "2px solid #2563eb" : "1px solid #d1d5db",
+                        border: intakeMetadata[q.key] === opt.value ? "2px solid #c1540f" : "1px solid #d8d3ca",
                         borderRadius: 20,
-                        background: intakeMetadata[q.key] === opt.value ? "#eff6ff" : "#fff",
-                        color: intakeMetadata[q.key] === opt.value ? "#2563eb" : "#374151",
+                        background: intakeMetadata[q.key] === opt.value ? "#fbeee4" : "#fff",
+                        color: intakeMetadata[q.key] === opt.value ? "#c1540f" : "#3a352d",
                         fontWeight: intakeMetadata[q.key] === opt.value ? 600 : 400,
                         fontSize: 13,
                         cursor: "pointer",
@@ -315,8 +311,8 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                 disabled={!canProceedStep1}
                 onClick={() => setStep(2)}
                 style={{
-                  padding: "10px 24px", background: canProceedStep1 ? "#2563eb" : "#e5e7eb",
-                  color: canProceedStep1 ? "#fff" : "#9ca3af", border: "none", borderRadius: 8,
+                  padding: "10px 24px", background: canProceedStep1 ? "#c1540f" : "#e7e3dc",
+                  color: canProceedStep1 ? "#fff" : "#a8a296", border: "none", borderRadius: 8,
                   fontSize: 15, fontWeight: 600, cursor: canProceedStep1 ? "pointer" : "default",
                 }}
               >
@@ -328,7 +324,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
 
         {/* Step 2: Contact Info */}
         {step === 2 && (
-          <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: 32 }}>
+          <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e7e3dc", padding: 32 }}>
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>Your Contact Info</h2>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -339,7 +335,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="John Smith"
-                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d8d3ca", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
                 />
               </label>
 
@@ -350,7 +346,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="john@example.com"
-                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d8d3ca", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
                 />
               </label>
 
@@ -361,11 +357,11 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="(555) 123-4567"
-                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d8d3ca", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
                 />
               </label>
 
-              <p style={{ fontSize: 12, color: "#6b7280", margin: 0 }}>
+              <p style={{ fontSize: 12, color: "#6c6860", margin: 0 }}>
                 We need at least one way to reach you (email or phone).
               </p>
 
@@ -384,9 +380,9 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                         alignItems: "center",
                         gap: 8,
                         padding: "8px 12px",
-                        border: preferredContact === value ? "2px solid #2563eb" : "1px solid #d1d5db",
+                        border: preferredContact === value ? "2px solid #c1540f" : "1px solid #d8d3ca",
                         borderRadius: 8,
-                        background: preferredContact === value ? "#eff6ff" : "#fff",
+                        background: preferredContact === value ? "#fbeee4" : "#fff",
                         cursor: "pointer",
                         fontSize: 14,
                         fontWeight: preferredContact === value ? 600 : 400,
@@ -409,7 +405,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
               </fieldset>
 
               {preferredContact === "sms" && (
-                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: 12, border: "1px solid #d1d5db", borderRadius: 8, background: "#f9fafb" }}>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: 12, border: "1px solid #d8d3ca", borderRadius: 8, background: "#f7f5f2" }}>
                   <input
                     type="checkbox"
                     checked={smsConsent}
@@ -424,7 +420,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
 
             {/* Referral source — optional */}
             <div style={{ marginTop: 8 }}>
-              <p style={{ fontSize: 14, fontWeight: 600, margin: "0 0 10px" }}>How did you hear about us? <span style={{ fontWeight: 400, color: "#6b7280" }}>(optional)</span></p>
+              <p style={{ fontSize: 14, fontWeight: 600, margin: "0 0 10px" }}>How did you hear about us? <span style={{ fontWeight: 400, color: "#6c6860" }}>(optional)</span></p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
                 {([
                   ["online", "Found us online"],
@@ -439,10 +435,10 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                     onClick={() => setReferralSource(referralSource === value ? "" : value)}
                     style={{
                       padding: "7px 14px",
-                      border: referralSource === value ? "2px solid #2563eb" : "1px solid #d1d5db",
+                      border: referralSource === value ? "2px solid #c1540f" : "1px solid #d8d3ca",
                       borderRadius: 20,
-                      background: referralSource === value ? "#eff6ff" : "#fff",
-                      color: referralSource === value ? "#2563eb" : "#374151",
+                      background: referralSource === value ? "#fbeee4" : "#fff",
+                      color: referralSource === value ? "#c1540f" : "#3a352d",
                       fontWeight: referralSource === value ? 600 : 400,
                       fontSize: 13,
                       cursor: "pointer",
@@ -458,7 +454,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                   value={referralName}
                   onChange={(e) => setReferralName(e.target.value)}
                   placeholder="Realtor name or company"
-                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d8d3ca", borderRadius: 8, fontSize: 14, boxSizing: "border-box" }}
                 />
               )}
             </div>
@@ -467,7 +463,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                style={{ padding: "10px 20px", background: "none", border: "1px solid #d1d5db", borderRadius: 8, cursor: "pointer", fontSize: 15 }}
+                style={{ padding: "10px 20px", background: "none", border: "1px solid #d8d3ca", borderRadius: 8, cursor: "pointer", fontSize: 15 }}
               >
                 Back
               </button>
@@ -476,8 +472,8 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                 disabled={!canProceedStep2}
                 onClick={() => setStep(3)}
                 style={{
-                  padding: "10px 24px", background: canProceedStep2 ? "#2563eb" : "#e5e7eb",
-                  color: canProceedStep2 ? "#fff" : "#9ca3af", border: "none", borderRadius: 8,
+                  padding: "10px 24px", background: canProceedStep2 ? "#c1540f" : "#e7e3dc",
+                  color: canProceedStep2 ? "#fff" : "#a8a296", border: "none", borderRadius: 8,
                   fontSize: 15, fontWeight: 600, cursor: canProceedStep2 ? "pointer" : "default",
                 }}
               >
@@ -489,7 +485,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
 
         {/* Step 3: Location & preferred timing */}
         {step === 3 && (
-          <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: 32 }}>
+          <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e7e3dc", padding: 32 }}>
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>Location & Preferred Timing</h2>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 24 }}>
@@ -500,7 +496,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder="123 Main St"
-                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d8d3ca", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
                 />
               </label>
 
@@ -512,7 +508,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
                     placeholder="City"
-                    style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
+                    style={{ width: "100%", padding: "10px 12px", border: "1px solid #d8d3ca", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
                   />
                 </label>
                 <label style={{ display: "block" }}>
@@ -523,7 +519,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                     onChange={(e) => setState(e.target.value)}
                     placeholder="ST"
                     maxLength={2}
-                    style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
+                    style={{ width: "100%", padding: "10px 12px", border: "1px solid #d8d3ca", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
                   />
                 </label>
                 <label style={{ display: "block" }}>
@@ -534,7 +530,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                     onChange={(e) => setZip(e.target.value)}
                     placeholder="12345"
                     maxLength={10}
-                    style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
+                    style={{ width: "100%", padding: "10px 12px", border: "1px solid #d8d3ca", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
                   />
                 </label>
               </div>
@@ -546,7 +542,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                   value={preferredDate}
                   onChange={(e) => setPreferredDate(e.target.value)}
                   min={today}
-                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d8d3ca", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
                 />
               </label>
 
@@ -559,10 +555,10 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                       type="button"
                       onClick={() => setPreferredTimeSlot(slot)}
                       style={{
-                        flex: 1, padding: "8px 12px", border: preferredTimeSlot === slot ? "2px solid #2563eb" : "1px solid #d1d5db",
-                        borderRadius: 6, background: preferredTimeSlot === slot ? "#eff6ff" : "#fff",
+                        flex: 1, padding: "8px 12px", border: preferredTimeSlot === slot ? "2px solid #c1540f" : "1px solid #d8d3ca",
+                        borderRadius: 6, background: preferredTimeSlot === slot ? "#fbeee4" : "#fff",
                         cursor: "pointer", fontSize: 13, fontWeight: preferredTimeSlot === slot ? 600 : 400,
-                        color: preferredTimeSlot === slot ? "#2563eb" : "#374151",
+                        color: preferredTimeSlot === slot ? "#c1540f" : "#3a352d",
                       }}
                     >
                       {slot === "morning" ? "🌅 Morning" : slot === "afternoon" ? "☀️ Afternoon" : "🌆 Evening"}
@@ -578,21 +574,21 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                   value={accessNotes}
                   onChange={(e) => setAccessNotes(e.target.value)}
                   placeholder="Gate code, parking instructions, pet info..."
-                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
+                  style={{ width: "100%", padding: "10px 12px", border: "1px solid #d8d3ca", borderRadius: 8, fontSize: 15, boxSizing: "border-box" }}
                 />
               </label>
             </div>
 
             {/* Summary */}
-            <div style={{ background: "#f9fafb", borderRadius: 8, padding: 16, marginBottom: 24 }}>
+            <div style={{ background: "#f7f5f2", borderRadius: 8, padding: 16, marginBottom: 24 }}>
               <p style={{ fontSize: 13, fontWeight: 600, margin: "0 0 8px" }}>Summary</p>
-              <p style={{ fontSize: 13, margin: "0 0 4px", color: "#374151" }}>
+              <p style={{ fontSize: 13, margin: "0 0 4px", color: "#3a352d" }}>
                 <strong>Service:</strong> {serviceCategories.find((c) => c.id === serviceCategory)?.label}
               </p>
-              <p style={{ fontSize: 13, margin: 0, color: "#374151" }}>
+              <p style={{ fontSize: 13, margin: 0, color: "#3a352d" }}>
                 <strong>Contact:</strong> {name} — {email || phone || "none"}
               </p>
-              <p style={{ fontSize: 13, margin: "4px 0 0", color: "#374151" }}>
+              <p style={{ fontSize: 13, margin: "4px 0 0", color: "#3a352d" }}>
                 <strong>Preferred contact:</strong> {preferredContact.toUpperCase()}
               </p>
             </div>
@@ -601,7 +597,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
               <button
                 type="button"
                 onClick={() => setStep(2)}
-                style={{ padding: "10px 20px", background: "none", border: "1px solid #d1d5db", borderRadius: 8, cursor: "pointer", fontSize: 15 }}
+                style={{ padding: "10px 20px", background: "none", border: "1px solid #d8d3ca", borderRadius: 8, cursor: "pointer", fontSize: 15 }}
               >
                 Back
               </button>
@@ -610,8 +606,8 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
                 disabled={!canProceedStep3 || submitting}
                 onClick={handleSubmit}
                 style={{
-                  padding: "10px 32px", background: canProceedStep3 && !submitting ? "#2563eb" : "#e5e7eb",
-                  color: canProceedStep3 && !submitting ? "#fff" : "#9ca3af", border: "none", borderRadius: 8,
+                  padding: "10px 32px", background: canProceedStep3 && !submitting ? "#c1540f" : "#e7e3dc",
+                  color: canProceedStep3 && !submitting ? "#fff" : "#a8a296", border: "none", borderRadius: 8,
                   fontSize: 15, fontWeight: 600, cursor: canProceedStep3 && !submitting ? "pointer" : "default",
                 }}
               >
@@ -625,20 +621,20 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
           style={{
             marginTop: 28,
             paddingTop: 16,
-            borderTop: "1px solid #e5e7eb",
+            borderTop: "1px solid #e7e3dc",
             textAlign: "center",
             fontSize: 12,
-            color: "#6b7280",
+            color: "#6c6860",
             lineHeight: 1.5,
           }}
         >
           <p style={{ margin: "0 0 6px" }}>Dovetails Services LLC</p>
           <p style={{ margin: 0 }}>
-            <Link href={"/privacy" as Route} style={{ color: "#2563eb" }}>
+            <Link href={"/privacy" as Route} style={{ color: "#c1540f" }}>
               Privacy Policy
             </Link>
             {" · "}
-            <Link href={"/terms" as Route} style={{ color: "#2563eb" }}>
+            <Link href={"/terms" as Route} style={{ color: "#c1540f" }}>
               Terms of Service
             </Link>
           </p>
