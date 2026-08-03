@@ -23,7 +23,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#111827",
+  // Browser chrome / PWA status bar — burnt-orange brand, not legacy slate.
+  themeColor: "#c1540f",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
