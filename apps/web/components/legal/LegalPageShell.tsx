@@ -49,7 +49,7 @@ export function LegalPageShell({
                 width: 36,
                 height: 36,
                 borderRadius: 9,
-                background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+                background: "linear-gradient(135deg, #c1540f 0%, #9a3f0a 100%)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",

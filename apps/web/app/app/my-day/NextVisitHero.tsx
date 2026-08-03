@@ -135,7 +135,7 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
           display: "block",
           marginTop: "var(--space-1)",
           fontWeight: 600,
-          color: "var(--color-forest-100, #dcfce7)",
+          color: "var(--color-forest-100, #fbeee4)",
           textDecoration: "none",
         }}
       >
