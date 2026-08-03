@@ -124,7 +124,7 @@ export function SettingsTabsClient({ role, userId, me, account, users, square, l
           <section>
             <h2 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 8px 0" }}>Company Profile</h2>
             <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: 0, marginBottom: 24 }}>
-              Manage your business name, payment terms, and defaults.
+              Business name, estimate terms, invoice terms, deposits, and defaults.
             </p>
             <Card padding="default">
               <CompanyForm

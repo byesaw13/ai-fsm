@@ -17,6 +17,7 @@ interface AccountRow extends Record<string, unknown> {
   name: string;
   settings: {
     invoice_terms?: string;
+    estimate_terms?: string;
     deposit_percent?: number;
     deposit_terms?: string;
     estimate_expiry_days?: number;

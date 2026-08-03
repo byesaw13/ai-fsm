@@ -236,6 +236,36 @@ Phase 3 (Estimate & Billing Closure). Builds on `dueDateUponCompletion`
 (`packages/domain/src/dovetails.ts`) and the immutability trigger (migration 149).
 No new migration — `due_date` is already nullable.
 
+# TASK-083: Separate estimate vs invoice document terms in Settings
+
+Status:
+Done
+
+Phase:
+3
+
+Problem:
+Estimate and invoice documents shared weak default terms, and Settings only
+exposed a single invoice_terms field. Pre-job language (deposit before schedule,
+change orders, access) and post-job collection language (late fees, payment
+methods, deposit applied) need different editable copy.
+
+Business Value:
+Accurate legal/commercial language on each document moment; owner can edit both
+without a code change.
+
+Scope:
+- Settings Company form: Estimate terms + Invoice terms (+ deposit wording).
+- Domain defaults `STANDARD_ESTIMATE_TERMS` / `STANDARD_INVOICE_TERMS`.
+- Branding + estimate print + PDF + portal fall back when fields blank.
+- Document standard version bump when defaults change.
+
+Acceptance Criteria:
+- [x] Settings can edit estimate_terms and invoice_terms independently.
+- [x] Blank fields use domain defaults on PDF/print/portal.
+- [x] Estimate print uses branding.estimateTerms.
+- [x] DOCUMENT_STANDARD_VERSION reflects the terms revision.
+
 # TASK-082: T&M final invoice from actuals + mobile deliver
 
 Status:

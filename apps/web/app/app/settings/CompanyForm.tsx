@@ -1,11 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { STANDARD_DEPOSIT_PERCENT, STANDARD_DEPOSIT_TERMS } from "@ai-fsm/domain";
+import {
+  STANDARD_DEPOSIT_PERCENT,
+  STANDARD_DEPOSIT_TERMS,
+  STANDARD_ESTIMATE_TERMS,
+  STANDARD_INVOICE_TERMS,
+} from "@ai-fsm/domain";
 import { useToast } from "@/components/ui/Toast";
 
 interface AccountSettings {
   invoice_terms?: string;
+  estimate_terms?: string;
   deposit_percent?: number;
   deposit_terms?: string;
   estimate_expiry_days?: number;
@@ -20,7 +26,9 @@ interface Props {
 export function CompanyForm({ initialName, initialSettings }: Props) {
   const { success, error } = useToast();
   const [name, setName] = useState(initialName);
+  // Empty = use domain default at render time; show default as placeholder.
   const [invoiceTerms, setInvoiceTerms] = useState(initialSettings.invoice_terms ?? "");
+  const [estimateTerms, setEstimateTerms] = useState(initialSettings.estimate_terms ?? "");
   const [depositPercent, setDepositPercent] = useState(
     String(initialSettings.deposit_percent ?? STANDARD_DEPOSIT_PERCENT),
   );
@@ -40,19 +48,23 @@ export function CompanyForm({ initialName, initialSettings }: Props) {
         body: JSON.stringify({
           name,
           settings: {
-            invoice_terms: invoiceTerms || undefined,
+            // Persist raw strings so clearing a box reverts to domain defaults
+            // (branding falls back when empty/undefined).
+            invoice_terms: invoiceTerms,
+            estimate_terms: estimateTerms,
             deposit_percent: depositPercent !== "" ? parseFloat(depositPercent) : undefined,
             // Send the raw string (not `|| undefined`): clearing this box must
-            // persist "" so the separate Deposits section is suppressed. The
-            // PATCH merges with `settings || jsonb`, and JSON.stringify drops
-            // undefined keys, so `|| undefined` could never clear it.
+            // persist "" so the separate Deposits section is suppressed.
             deposit_terms: depositTerms,
             estimate_expiry_days: expiryDays ? parseInt(expiryDays, 10) : undefined,
           },
         }),
       });
       const data = await res.json();
-      if (!res.ok) { error(data.error?.message ?? "Save failed"); return; }
+      if (!res.ok) {
+        error(data.error?.message ?? "Save failed");
+        return;
+      }
       success("Company settings saved");
     } finally {
       setSaving(false);
@@ -72,17 +84,43 @@ export function CompanyForm({ initialName, initialSettings }: Props) {
           maxLength={255}
         />
       </div>
+
       <div className="form-group">
-        <label htmlFor="invoice-terms">Invoice payment terms</label>
+        <label htmlFor="estimate-terms">Estimate terms</label>
+        <textarea
+          id="estimate-terms"
+          value={estimateTerms}
+          onChange={(e) => setEstimateTerms(e.target.value)}
+          rows={14}
+          maxLength={8000}
+          placeholder={STANDARD_ESTIMATE_TERMS}
+          data-testid="estimate-terms"
+        />
+        <small style={{ color: "var(--fg-muted)" }}>
+          Shown on estimate PDFs and print. Leave blank to use the built-in default
+          (price validity, deposit before schedule, change orders, access, warranty).
+          Use <code>{"{deposit_percent}"}</code> where the standard deposit % should appear.
+        </small>
+      </div>
+
+      <div className="form-group">
+        <label htmlFor="invoice-terms">Invoice terms</label>
         <textarea
           id="invoice-terms"
           value={invoiceTerms}
           onChange={(e) => setInvoiceTerms(e.target.value)}
-          rows={3}
-          maxLength={2000}
-          placeholder="e.g. Payment due within 30 days of invoice date."
+          rows={14}
+          maxLength={8000}
+          placeholder={STANDARD_INVOICE_TERMS}
+          data-testid="invoice-terms"
         />
+        <small style={{ color: "var(--fg-muted)" }}>
+          Shown on invoice PDFs, print, and the client portal. Leave blank to use the
+          built-in default (due upon completion, late fees, payment methods, deposit applied,
+          warranty). Use <code>{"{deposit_percent}"}</code> if needed.
+        </small>
       </div>
+
       <div className="form-group">
         <label htmlFor="deposit-percent">Standard deposit (%)</label>
         <input
@@ -100,7 +138,7 @@ export function CompanyForm({ initialName, initialSettings }: Props) {
         </small>
       </div>
       <div className="form-group">
-        <label htmlFor="deposit-terms">Deposits wording</label>
+        <label htmlFor="deposit-terms">Deposits section wording</label>
         <textarea
           id="deposit-terms"
           value={depositTerms}
@@ -109,7 +147,9 @@ export function CompanyForm({ initialName, initialSettings }: Props) {
           maxLength={2000}
         />
         <small style={{ color: "var(--fg-muted)" }}>
-          Use <code>{"{deposit_percent}"}</code> where the percentage should appear.
+          Separate short “Deposits” block on documents. Use{" "}
+          <code>{"{deposit_percent}"}</code> where the percentage should appear. Clear this
+          box if the deposit sentence already lives inside Estimate/Invoice terms above.
         </small>
       </div>
       <div className="form-group">

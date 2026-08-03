@@ -38,6 +38,7 @@ import {
   DOCUMENT_STANDARD_VERSION,
   ESTIMATE_DOCUMENT_SECTIONS,
   STANDARD_INVOICE_TERMS,
+  STANDARD_ESTIMATE_TERMS,
   VAULT_COMPLETENESS_TARGET_CATEGORIES,
   getVaultCollectionStep,
   computeVaultCompleteness,
@@ -310,9 +311,14 @@ describe('Dovetails standards', () => {
   })
 
   it('exposes versioned document standards', () => {
-    expect(DOCUMENT_STANDARD_VERSION).toBe('2026.05')
-    expect(STANDARD_INVOICE_TERMS).toContain('not internal labor hours')
+    expect(DOCUMENT_STANDARD_VERSION).toBe('2026.08')
     expect(STANDARD_INVOICE_TERMS).toContain('due upon completion')
+    expect(STANDARD_INVOICE_TERMS).toContain('Accepted Payment Methods')
+    expect(STANDARD_INVOICE_TERMS).toContain('@mydovetails')
+    expect(STANDARD_INVOICE_TERMS).toContain('Warranty')
+    expect(STANDARD_ESTIMATE_TERMS).toContain('Price Validity')
+    expect(STANDARD_ESTIMATE_TERMS).toContain('{deposit_percent}')
+    expect(STANDARD_ESTIMATE_TERMS).toContain('Change Orders')
     expect(Object.keys(ESTIMATE_DOCUMENT_SECTIONS)).toEqual([
       'preparation',
       'repair_install_work',
