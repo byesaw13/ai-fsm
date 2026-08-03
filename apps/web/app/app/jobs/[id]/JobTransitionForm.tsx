@@ -8,10 +8,10 @@ import { Button, ConfirmDialog } from "@/components/ui";
 const DANGER_TRANSITIONS: JobStatus[] = ["cancelled"];
 
 const ACTION_LABELS: Partial<Record<JobStatus, string>> = {
-  completed:  "Mark Job Complete",
-  invoiced:   "Mark as Invoiced",
-  cancelled:  "Cancel Job",
-  scheduled:  "Mark as Scheduled",
+  completed: "Complete & Invoice",
+  invoiced: "Mark as Invoiced",
+  cancelled: "Cancel Job",
+  scheduled: "Mark as Scheduled",
   in_progress: "Mark In Progress",
 };
 
@@ -19,9 +19,18 @@ interface Props {
   jobId: string;
   allowedTransitions: JobStatus[];
   statusLabels: Record<JobStatus, string>;
+  /** When completing, open create-invoice if no draft was produced. */
+  clientId?: string | null;
+  approvedEstimateId?: string | null;
 }
 
-export function JobTransitionForm({ jobId, allowedTransitions, statusLabels }: Props) {
+export function JobTransitionForm({
+  jobId,
+  allowedTransitions,
+  statusLabels,
+  clientId,
+  approvedEstimateId,
+}: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -54,14 +63,35 @@ export function JobTransitionForm({ jobId, allowedTransitions, statusLabels }: P
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: targetStatus }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as {
+        error?: { message?: string };
+        warning?: string;
+        final_invoice_id?: string | null;
+      };
       if (!res.ok) {
         setError(data.error?.message ?? "Transition failed");
-      } else {
-        if (data.warning) setWarning(data.warning);
-        setSuccess(`Status updated to ${statusLabels[targetStatus]}`);
-        router.refresh();
+        return;
       }
+
+      if (data.warning) setWarning(data.warning);
+
+      // Complete & Invoice: land on the draft (or existing) invoice ready to deliver.
+      if (targetStatus === "completed") {
+        if (data.final_invoice_id) {
+          router.push(`/app/invoices/${data.final_invoice_id}?deliver=1`);
+          return;
+        }
+        // No invoice yet (no billable actuals) — open create form for the project.
+        const cq = clientId ? `&client_id=${clientId}` : "";
+        const eq = approvedEstimateId
+          ? `&approved_estimate_id=${approvedEstimateId}`
+          : "";
+        router.push(`/app/invoices/new?job_id=${jobId}${cq}${eq}`);
+        return;
+      }
+
+      setSuccess(`Status updated to ${statusLabels[targetStatus]}`);
+      router.refresh();
     } catch {
       setError("Unexpected error");
     } finally {
@@ -80,11 +110,19 @@ export function JobTransitionForm({ jobId, allowedTransitions, statusLabels }: P
             key={status}
             onClick={() => handleTransition(status)}
             disabled={loading}
-            variant={DANGER_TRANSITIONS.includes(status) ? "danger" : status === "completed" ? "primary" : "secondary"}
+            variant={
+              DANGER_TRANSITIONS.includes(status)
+                ? "danger"
+                : status === "completed"
+                  ? "primary"
+                  : "secondary"
+            }
             size="sm"
             data-testid={`transition-btn-${status}`}
           >
-            {loading ? "Updating…" : ACTION_LABELS[status] ?? `→ ${statusLabels[status]}`}
+            {loading
+              ? "Updating…"
+              : (ACTION_LABELS[status] ?? `→ ${statusLabels[status]}`)}
           </Button>
         ))}
       </div>

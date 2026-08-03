@@ -203,7 +203,7 @@ export function NewInvoiceForm({
           }}
           data-testid="prefill-notice"
         >
-          Line items pre-filled from the approved estimate — review and adjust before submitting.
+          Line items pre-filled from the project (tracked time & materials on T&M, or the approved estimate) — review and adjust before submitting.
         </div>
       )}
       {error && (

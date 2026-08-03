@@ -19,6 +19,27 @@ vi.mock("@/lib/db/audit", () => ({
   appendAuditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
+const materialLineItemsFromJobExpenses = vi.fn().mockResolvedValue([]);
+const appendMaterialsFromJobExpenses = vi.fn().mockResolvedValue({
+  lineItems: [],
+  skipped: 0,
+});
+const equipmentLineItemsFromJobExpenses = vi.fn().mockResolvedValue([]);
+const appendEquipmentFromJobExpenses = vi.fn().mockResolvedValue({
+  lineItems: [],
+});
+
+vi.mock("@/lib/invoices/job-expenses", () => ({
+  materialLineItemsFromJobExpenses: (...args: unknown[]) =>
+    materialLineItemsFromJobExpenses(...args),
+  appendMaterialsFromJobExpenses: (...args: unknown[]) =>
+    appendMaterialsFromJobExpenses(...args),
+  equipmentLineItemsFromJobExpenses: (...args: unknown[]) =>
+    equipmentLineItemsFromJobExpenses(...args),
+  appendEquipmentFromJobExpenses: (...args: unknown[]) =>
+    appendEquipmentFromJobExpenses(...args),
+}));
+
 // ── Shared mock client factory ─────────────────────────────────────────────
 
 function makeClient(queryResults: unknown[]): PoolClient {
@@ -36,6 +57,10 @@ function makeClient(queryResults: unknown[]): PoolClient {
 describe("createDraftFinalInvoiceForJob", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    materialLineItemsFromJobExpenses.mockResolvedValue([]);
+    appendMaterialsFromJobExpenses.mockResolvedValue({ lineItems: [], skipped: 0 });
+    equipmentLineItemsFromJobExpenses.mockResolvedValue([]);
+    appendEquipmentFromJobExpenses.mockResolvedValue({ lineItems: [] });
   });
 
   it("returns null if a final invoice already exists for the job", async () => {
@@ -70,17 +95,23 @@ describe("createDraftFinalInvoiceForJob", () => {
           property_id: null,
           estimate_id: "est-1",
           presentation_mode: "standard",
+          pricing_mode: "flat_rate",
+          booking_pricing_mode: null,
           subtotal_cents: 25000,
           tax_cents: 0,
           total_cents: 25000,
           estimate_notes: null,
           deposit_cents: 0,
+          travel_snapshot_id: null,
         }],
         rowCount: 1,
       },
       // Estimate line items: none
       { rows: [], rowCount: 0 },
-      // No visitId so no parts fallback
+      // Tracked time: none
+      { rows: [{ tracked_minutes: "0" }], rowCount: 1 },
+      // Visit parts (job-level): none
+      { rows: [], rowCount: 0 },
     ]);
 
     const result = await createDraftFinalInvoiceForJob({
@@ -106,11 +137,14 @@ describe("createDraftFinalInvoiceForJob", () => {
           property_id: "prop-1",
           estimate_id: "est-1",
           presentation_mode: "standard",
+          pricing_mode: "flat_rate",
+          booking_pricing_mode: null,
           subtotal_cents: 50000,
           tax_cents: 0,
           total_cents: 50000,
           estimate_notes: "Replace faucet",
           deposit_cents: 15000,
+          travel_snapshot_id: null,
         }],
         rowCount: 1,
       },
@@ -170,11 +204,14 @@ describe("createDraftFinalInvoiceForJob", () => {
           property_id: null,
           estimate_id: "est-1",
           presentation_mode: "multi_option",
+          pricing_mode: "flat_rate",
+          booking_pricing_mode: null,
           subtotal_cents: 30000,
           tax_cents: 0,
           total_cents: 30000,
           estimate_notes: null,
           deposit_cents: 0,
+          travel_snapshot_id: null,
         }],
         rowCount: 1,
       },
@@ -218,7 +255,6 @@ describe("createDraftFinalInvoiceForJob", () => {
     expect(estimateItemCalls).toHaveLength(0);
   });
 
-
   it("creates a labor-only invoice from completed visit time when there are no estimate items or parts", async () => {
     const { createDraftFinalInvoiceForJob } = await import("../final-invoice");
 
@@ -232,11 +268,14 @@ describe("createDraftFinalInvoiceForJob", () => {
           property_id: null,
           estimate_id: null,
           presentation_mode: null,
+          pricing_mode: null,
+          booking_pricing_mode: null,
           subtotal_cents: null,
           tax_cents: null,
           total_cents: null,
           estimate_notes: null,
           deposit_cents: null,
+          travel_snapshot_id: null,
         }],
         rowCount: 1,
       },
@@ -255,6 +294,8 @@ describe("createDraftFinalInvoiceForJob", () => {
         }],
         rowCount: 1,
       },
+      // Visit parts (job-level): none
+      { rows: [], rowCount: 0 },
       // Invoice INSERT
       { rows: [{ id: "labor-inv-id" }], rowCount: 1 },
       // Labor line INSERT
@@ -305,11 +346,14 @@ describe("createDraftFinalInvoiceForJob", () => {
           property_id: null,
           estimate_id: "est-1",
           presentation_mode: "standard",
+          pricing_mode: "flat_rate",
+          booking_pricing_mode: null,
           subtotal_cents: 40000,
           tax_cents: 0,
           total_cents: 40000,
           estimate_notes: null,
           deposit_cents: 10000,
+          travel_snapshot_id: null,
         }],
         rowCount: 1,
       },
@@ -348,4 +392,167 @@ describe("createDraftFinalInvoiceForJob", () => {
     const args = insertCall![1] as unknown[];
     expect(args[9]).toBe(5000); // deposit_cents = only the live deposit
   });
+
+  it("T&M: bills tracked hours at estimate labor rate, not estimate budget lines", async () => {
+    const { createDraftFinalInvoiceForJob } = await import("../final-invoice");
+
+    // Budget on estimate is large; only 10 hours tracked → bill 10h @ $115 + materials
+    materialLineItemsFromJobExpenses.mockResolvedValue([
+      {
+        description: "Materials — Home Depot",
+        quantity: 1,
+        unit_price_cents: 34000,
+        line_item_type: "materials" as const,
+        sort_order: 1,
+        source_expense_id: "exp-1",
+      },
+    ]);
+    appendMaterialsFromJobExpenses.mockResolvedValue({
+      lineItems: [
+        {
+          id: "mat-line",
+          invoice_id: "tm-inv",
+          description: "Materials — Home Depot",
+          quantity: 1,
+          unit_price_cents: 34000,
+          total_cents: 34000,
+          line_item_type: "materials" as const,
+          sort_order: 1,
+        },
+      ],
+      skipped: 0,
+    });
+    equipmentLineItemsFromJobExpenses.mockResolvedValue([
+      {
+        description: "Lift rental",
+        quantity: 1,
+        unit_price_cents: 175600,
+        line_item_type: "materials" as const,
+        sort_order: 2,
+        source_expense_id: "exp-lift",
+      },
+    ]);
+    appendEquipmentFromJobExpenses.mockResolvedValue({
+      lineItems: [
+        {
+          id: "eq-line",
+          invoice_id: "tm-inv",
+          description: "Lift rental",
+          quantity: 1,
+          unit_price_cents: 175600,
+          total_cents: 175600,
+          line_item_type: "materials" as const,
+          sort_order: 2,
+        },
+      ],
+    });
+
+    // 10h × $115 + $340 materials + $1,756 lift = $3,246
+    const actualTotal = 115000 + 34000 + 175600;
+
+    const client = makeClient([
+      { rows: [], rowCount: 0 }, // guard
+      {
+        rows: [{
+          client_id: "client-1",
+          property_id: "prop-1",
+          estimate_id: "est-tm",
+          presentation_mode: "standard",
+          pricing_mode: "hourly_internal",
+          booking_pricing_mode: null,
+          // Estimate budget — must NOT become the invoice total
+          subtotal_cents: 1_035_000,
+          tax_cents: 0,
+          total_cents: 1_035_000,
+          estimate_notes: "T&M budget",
+          deposit_cents: 50000,
+          travel_snapshot_id: null,
+        }],
+        rowCount: 1,
+      },
+      // Tracked time: 10 hours exact
+      { rows: [{ tracked_minutes: "600" }], rowCount: 1 },
+      // Labor rate from estimate labor line ($115/hr)
+      { rows: [{ unit_price_cents: 11500 }], rowCount: 1 },
+      // Deposit invoices ($500 already billed)
+      {
+        rows: [{ invoice_number: "DEP-TM", total_cents: 50000, status: "paid" }],
+        rowCount: 1,
+      },
+      // Invoice INSERT
+      { rows: [{ id: "tm-inv" }], rowCount: 1 },
+      // Labor line INSERT
+      { rows: [{ id: "labor-line" }], rowCount: 1 },
+      // recalculateInvoiceTotals: SUM line items
+      { rows: [{ subtotal_cents: String(actualTotal) }], rowCount: 1 },
+      // recalculateInvoiceTotals: UPDATE invoices
+      {
+        rows: [{
+          subtotal_cents: actualTotal,
+          tax_cents: 0,
+          total_cents: actualTotal,
+          paid_cents: 0,
+          balance_cents: actualTotal - 50000,
+        }],
+        rowCount: 1,
+      },
+      // Re-query deposits after materials/equipment append
+      {
+        rows: [{ invoice_number: "DEP-TM", total_cents: 50000, status: "paid" }],
+        rowCount: 1,
+      },
+      // Update deposit_cents / notes after materials
+      { rows: [], rowCount: 1 },
+    ]);
+
+    const result = await createDraftFinalInvoiceForJob({
+      client,
+      jobId: "job-tm",
+      accountId: "acct-1",
+      userId: "user-1",
+    });
+
+    expect(result?.invoiceId).toBe("tm-inv");
+    // Labor + materials + equipment from append
+    expect(result?.lineItemCount).toBe(3);
+    expect(appendMaterialsFromJobExpenses).toHaveBeenCalled();
+    expect(appendEquipmentFromJobExpenses).toHaveBeenCalled();
+
+    // Actuals include lift — not the $10,350 estimate
+    const insertCall = (client.query as ReturnType<typeof vi.fn>).mock.calls.find(
+      (call: unknown[]) => typeof call[0] === "string" && (call[0] as string).includes("INSERT INTO invoices")
+    );
+    const args = insertCall![1] as unknown[];
+    expect(args[6]).toBe(actualTotal); // subtotal
+    expect(args[8]).toBe(actualTotal); // total
+    expect(args[9]).toBe(50000); // deposit credit
+
+    // Labor line uses tracked hours at estimate rate, not budget quantity 90
+    const laborInsert = (client.query as ReturnType<typeof vi.fn>).mock.calls.find(
+      (call: unknown[]) =>
+        typeof call[0] === "string" &&
+        (call[0] as string).includes("INSERT INTO invoice_line_items") &&
+        Array.isArray(call[1]) &&
+        (call[1] as unknown[])[1] === "Labor"
+    );
+    expect(laborInsert?.[1]).toEqual([
+      "tm-inv",
+      "Labor",
+      10,
+      11500,
+      115000,
+      "labor",
+      0,
+    ]);
+
+    // Customer-visible estimate budget lines must not be loaded as invoice lines
+    const estimateLineLoads = (client.query as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (call: unknown[]) =>
+        typeof call[0] === "string" &&
+        (call[0] as string).includes("FROM estimate_line_items") &&
+        (call[0] as string).includes("visible_to_customer")
+    );
+    expect(estimateLineLoads).toHaveLength(0);
+  });
 });
+

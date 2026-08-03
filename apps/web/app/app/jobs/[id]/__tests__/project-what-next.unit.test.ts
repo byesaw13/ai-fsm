@@ -241,7 +241,7 @@ describe("computeWhatNext — money, field, T&M", () => {
     );
 
     expect(next.message).toMatch(/Ready for closeout/i);
-    expect(next.actionLabel).toBe("Complete Project");
+    expect(next.actionLabel).toBe("Complete & Invoice");
     expect(next.actionHref).toContain(`#project-status`);
     expect(next.secondary?.href).toContain("/visits/new");
   });

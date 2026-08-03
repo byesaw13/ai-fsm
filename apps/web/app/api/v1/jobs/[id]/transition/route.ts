@@ -140,6 +140,24 @@ export const POST = withRole(
           });
         }
 
+        // If a final/standard invoice already existed (or create returned null for
+        // empty line items), still surface the latest one so Complete & Invoice
+        // can land the owner on it.
+        if (!final_invoice_id) {
+          const existingInv = await client.query<{ id: string }>(
+            `SELECT id FROM invoices
+             WHERE job_id = $1 AND account_id = $2
+               AND invoice_kind IN ('final', 'standard')
+               AND status NOT IN ('cancelled', 'void')
+             ORDER BY
+               CASE status WHEN 'draft' THEN 0 ELSE 1 END,
+               created_at DESC
+             LIMIT 1`,
+            [id, session.accountId]
+          );
+          final_invoice_id = existingInv.rows[0]?.id ?? null;
+        }
+
         // TASK-078: "due upon completion" — now that the job is complete, fill the
         // due date on its standard/final invoices that were left open (NULL) while
         // the work was in progress. The one-time NULL→value fill is allowed by the

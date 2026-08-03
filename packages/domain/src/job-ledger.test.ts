@@ -76,6 +76,19 @@ describe("assignAllowanceTags", () => {
   });
 });
 
+describe("isEquipmentExpense", () => {
+  it("tags commercial_tag equipment and lift notes", async () => {
+    const { isEquipmentExpense } = await import("./job-ledger");
+    expect(isEquipmentExpense({ amount_cents: 1, commercial_tag: "equipment" })).toBe(true);
+    expect(
+      isEquipmentExpense({ amount_cents: 1, notes: "Boom lift rental for weekend" }),
+    ).toBe(true);
+    expect(
+      isEquipmentExpense({ amount_cents: 1, vendor_name: "Home Depot", notes: "Paint" }),
+    ).toBe(false);
+  });
+});
+
 describe("buildJobLedger — Claremont-shaped T&M", () => {
   it("shows estimate vs actual, deposits, materials overage CO suggestion", () => {
     const ledger = buildJobLedger({

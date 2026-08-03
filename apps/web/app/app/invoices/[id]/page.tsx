@@ -26,6 +26,7 @@ import { InvoiceDepositForm } from "./InvoiceDepositForm";
 import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
 import { resolveDepositPolicy } from "@ai-fsm/domain";
 import { SendInvoiceButton } from "./SendInvoiceButton";
+import { InvoiceMobileDeliverBar } from "./InvoiceMobileDeliverBar";
 import { InvoiceLineItemsEditor } from "./InvoiceLineItemsEditor";
 import { LinkForgottenExpensesPanel } from "@/components/invoices/LinkForgottenExpensesPanel";
 import { materialHandlingRateFromSettings } from "@/lib/invoices/material-handling";
@@ -114,10 +115,14 @@ function formatDollars(cents: number): string {
 
 export default async function InvoiceDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ deliver?: string }>;
 }) {
   const { id } = await params;
+  const sp = searchParams ? await searchParams : {};
+  const deliverFocus = sp.deliver === "1" || sp.deliver === "true";
   const session = await getSession();
   if (!session) redirect("/login");
 
@@ -405,6 +410,21 @@ export default async function InvoiceDetailPage({
             data-testid="invoice-status-stepper"
           />
         </Card>
+      )}
+
+      {/* Owner deliver: sticky on mobile; full strip after Complete & Invoice (?deliver=1) */}
+      {canSendInvoices(session.role) && (
+        <InvoiceMobileDeliverBar
+          invoiceId={invoice.id}
+          invoiceNumber={invoice.invoice_number}
+          clientEmail={invoice.client_email}
+          portalUrl={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/invoices/${invoice.share_token}`}
+          pdfUrl={`/api/v1/invoices/${invoice.id}/pdf`}
+          status={currentStatus}
+          emailConfigured={isEmailConfigured()}
+          canSend={canSendInvoices(session.role)}
+          deliverFocus={deliverFocus}
+        />
       )}
 
       {/* Two-column detail */}

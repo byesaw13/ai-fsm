@@ -5,6 +5,10 @@ import { query } from "@/lib/db";
 import { Breadcrumbs, Card, PageContainer, PageHeader, HubSubnav } from "@/components/ui";
 import { MONEY_HUB_LINKS } from "@/lib/navigation/hubs";
 import { NewInvoiceForm } from "./NewInvoiceForm";
+import {
+  prefillLineItemsFromTmActuals,
+  resolveJobPricingMode,
+} from "@/lib/invoices/prefill-from-job";
 
 export const dynamic = "force-dynamic";
 
@@ -62,9 +66,23 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
     ),
   ]);
 
-  // Pre-populate line items from approved estimate if requested
+  // Prefer T&M actuals (tracked time + materials) when the project is time-and-materials.
+  // Otherwise prefill from the approved estimate budget lines.
   let prefillLineItems: Array<{ description: string; quantity: string; unit_price: string }> | undefined;
-  if (approved_estimate_id) {
+  let prefillSource: "tm_actuals" | "estimate" | null = null;
+
+  if (job_id) {
+    const pricingMode = await resolveJobPricingMode(session.accountId, job_id);
+    if (pricingMode === "hourly_internal") {
+      const actuals = await prefillLineItemsFromTmActuals(session.accountId, job_id);
+      if (actuals.length > 0) {
+        prefillLineItems = actuals;
+        prefillSource = "tm_actuals";
+      }
+    }
+  }
+
+  if (!prefillLineItems && approved_estimate_id) {
     const estimateItems = await query<EstimateLineItem>(
       `SELECT eli.description, eli.quantity, eli.unit_price_cents, eli.sort_order
        FROM estimate_line_items eli
@@ -82,6 +100,7 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
         quantity: String(li.quantity),
         unit_price: (li.unit_price_cents / 100).toFixed(2),
       }));
+      prefillSource = "estimate";
     }
   }
 
@@ -96,7 +115,9 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
       <PageHeader title="New Invoice" backHref="/app/invoices" backLabel="Invoices" />
       <HubSubnav hub="Money" links={MONEY_HUB_LINKS} pathname="/app/invoices" />
       <p style={{ margin: "0 0 var(--space-4)", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-        Prefill from a project when you can — line items and client stay editable.
+        {prefillSource === "tm_actuals"
+          ? "Prefilling from tracked time and materials on this T&M project — edit before sending."
+          : "Prefill from a project when you can — line items and client stay editable."}
       </p>
       <Card>
         <NewInvoiceForm

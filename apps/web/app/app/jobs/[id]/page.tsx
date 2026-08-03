@@ -1370,13 +1370,16 @@ export default async function JobDetailPage({
             <Card id="project-status" data-testid="job-transition-panel">
               <SectionHeader title="Close Out Project" />
               <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                Visits and work orders never close this project. When field work is done, mark the
-                project complete here to create a draft final invoice for billing review.
+                Visits and work orders never close this project. When field work is done, use
+                Complete &amp; Invoice — that drafts the final invoice from actuals (T&amp;M time,
+                materials, and lift/equipment) and opens it so you can send or share the link.
               </p>
               <JobTransitionForm
                 jobId={job.id}
                 allowedTransitions={allowedTransitions as JobStatus[]}
                 statusLabels={JOB_STATUS_LABELS}
+                clientId={job.client_id}
+                approvedEstimateId={commercialCounts?.approved_estimate_id ?? null}
               />
             </Card>
           )}
