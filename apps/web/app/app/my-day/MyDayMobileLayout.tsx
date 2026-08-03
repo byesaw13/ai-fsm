@@ -44,6 +44,14 @@ export function MyDayMobileLayout({
 
   return (
     <>
+      {/* Next visit first when present so Navigate / Call / Open stay above the
+          fixed bottom nav without scrolling (QA ISSUE-005). */}
+      {heroVisit && (
+        <div style={{ marginBottom: "var(--space-4)" }}>
+          <NextVisitHero visit={heroVisit} />
+        </div>
+      )}
+
       {!complete ? (
         <div className="p7-field-hero" style={{ marginBottom: "var(--space-4)" }}>
           <div className="p7-field-hero__kicker">Home · My Day</div>
@@ -117,12 +125,6 @@ export function MyDayMobileLayout({
         initialState={setup}
         vehicles={vehicles}
       />
-
-      {heroVisit && (
-        <div style={{ marginBottom: "var(--space-4)" }}>
-          <NextVisitHero visit={heroVisit} />
-        </div>
-      )}
 
       <div style={{ marginBottom: "var(--space-6)" }}>
         <FieldQuickActions />
