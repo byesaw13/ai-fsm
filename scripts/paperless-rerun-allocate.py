@@ -319,10 +319,9 @@ def best_job_match(hints: list[str], jobs: list[Job], ocr_text: str = "") -> tup
     if not ranked:
         return None, []
     top = ranked[0]
-    # Unique strong match, or sole candidate at >= 0.9
+    # Only auto-link unique strong matches. Tied address scores (multiple jobs
+    # at one property) must stay ambiguous — never pick sort-order winners.
     if top.score >= 0.9 and (len(ranked) == 1 or top.score - ranked[1].score >= 0.05):
-        return top, ranked[:3]
-    if top.score >= 0.92:
         return top, ranked[:3]
     return None, ranked[:3]
 
@@ -580,8 +579,11 @@ def main() -> int:
         auto, ranked = best_job_match(hints, jobs, ocr_text=title + "\n" + content)
         vkey = vendor_from_title(title)
 
-        # Find expense same day + similar vendor, prefer unlinked paperless
+        # Find expense same day + similar vendor, prefer unlinked paperless.
+        # Never auto-pick when top candidates are tied (same score) — that would
+        # attach receipts to an arbitrary expense under --apply.
         candidates_exp = []
+        known_vendor_keys = {"home depot", "lowe", "benson", "derry", "fuel", "harbor"}
         for e in expenses:
             ed = (e.get("expense_date") or "")[:10]
             if created and ed and ed != created:
@@ -599,10 +601,21 @@ def main() -> int:
                 continue
             if vkey == "harbor" and "harbor" not in ev:
                 continue
+            # Unsupported / short vendor keys (e.g. "ace"): require a vendor substring
+            # match so we do not link every same-day expense.
+            if vkey and vkey not in known_vendor_keys:
+                tokens = [t for t in vkey.split() if len(t) >= 3]
+                if not tokens or not any(t in ev for t in tokens):
+                    continue
             score = 1.0 if not e.get("paperless_doc_id") else 0.5
             candidates_exp.append((score, e))
         candidates_exp.sort(key=lambda x: -x[0])
-        match_exp = candidates_exp[0][1] if candidates_exp else None
+        match_exp = None
+        if len(candidates_exp) == 1:
+            match_exp = candidates_exp[0][1]
+        elif len(candidates_exp) >= 2 and candidates_exp[0][0] > candidates_exp[1][0]:
+            match_exp = candidates_exp[0][1]
+        # else: empty or tied top scores → leave unmatched (report only)
 
         entry = {
             "paperless_doc_id": did,

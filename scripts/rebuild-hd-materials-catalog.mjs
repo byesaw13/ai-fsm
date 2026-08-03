@@ -69,6 +69,9 @@ function resolveHdUnitCents(qty, netCents, extendedCents) {
     if (Math.abs(net - ext) <= CENTS_TOLERANCE) {
       return Math.max(1, Math.round(net / q));
     }
+    // Discounted multi-qty: Net Unit Price is what was paid per unit; Extended
+    // Retail can be list/pre-discount. Prefer net so we do not store list/qty.
+    return net;
   }
   if (net != null && ext == null) {
     // alone, prefer treating net as unit (cannot safely assume line total)
@@ -503,4 +506,4 @@ const isMain =
 
 if (isMain) main();
 
-export { parseHdCsv, aggregate, buildSql, coerceUnitCostCents };
+export { parseHdCsv, aggregate, buildSql, coerceUnitCostCents, resolveHdUnitCents };
