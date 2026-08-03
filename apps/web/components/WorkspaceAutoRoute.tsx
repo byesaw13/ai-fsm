@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import type { Route } from "next";
 import { usePathname, useRouter } from "next/navigation";
 import { resolvePostLoginHref } from "@/lib/auth/post-login-destination";
@@ -17,15 +17,12 @@ const FIELD_ROOT = "/app/my-work";
 export function WorkspaceAutoRoute() {
   const pathname = usePathname();
   const router = useRouter();
-  // One steer per pathname visit — avoid replace thrash if effect re-runs.
-  const steeredFor = useRef<string | null>(null);
 
   useEffect(() => {
     // Only act on the two workspace roots. Other pages are left alone.
     const onOffice = pathname === OFFICE_ROOT;
     const onField = pathname === FIELD_ROOT;
     if (!onOffice && !onField) return;
-    if (steeredFor.current === pathname) return;
 
     const isPhone =
       typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
@@ -34,8 +31,9 @@ export function WorkspaceAutoRoute() {
       isPhone,
     });
 
+    // Replace only when wrong — re-runs are no-ops once on the preferred root,
+    // so logo/nav can still re-enter the other root and get steered again.
     if (target !== pathname) {
-      steeredFor.current = pathname;
       router.replace(target as Route);
     }
   }, [pathname, router]);
