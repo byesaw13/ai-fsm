@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { resolvePostLoginHref } from "@/lib/auth/post-login-destination";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -31,9 +32,18 @@ export default function LoginPage() {
       }
 
       // Full page navigation so the session cookie is included in the next request.
-      // Everyone lands on My Work (the daily field home); desktop owners in office
-      // mode are steered to /app by WorkspaceAutoRoute.
-      window.location.href = "/app/my-work";
+      // Land on the correct workspace immediately — do NOT always go to /app/my-work
+      // and rely on WorkspaceAutoRoute to bounce owners to /app (that double hop
+      // feels like a login loop).
+      const role = data.user?.role ?? "owner";
+      const isPhone =
+        typeof window !== "undefined" &&
+        window.matchMedia("(max-width: 767px)").matches;
+      const dest = resolvePostLoginHref(role, {
+        cookieHeader: typeof document !== "undefined" ? document.cookie : null,
+        isPhone,
+      });
+      window.location.replace(dest);
     } catch {
       setError("An unexpected error occurred");
       setLoading(false);
