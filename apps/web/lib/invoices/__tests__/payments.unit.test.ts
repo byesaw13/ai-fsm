@@ -89,6 +89,11 @@ describe("isInvoiceFullyPaid", () => {
     expect(isInvoiceFullyPaid(10000, 5000, 5000)).toBe(true);
     expect(isInvoiceFullyPaid(10000, 0, 10000)).toBe(true);
   });
+
+  it("never treats zero-total invoices as paid", () => {
+    expect(isInvoiceFullyPaid(0, 0, 0)).toBe(false);
+    expect(isInvoiceFullyPaid(0, 0, 100)).toBe(false);
+  });
 });
 
 describe("validatePaymentAmount", () => {

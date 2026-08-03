@@ -136,14 +136,37 @@ export async function POST(
   const chargeKind: "deposit" | "progress" = depositDueNow > 0 ? "deposit" : "progress";
   const chargeLabel = depositDueNow > 0 ? "Deposit" : "Balance";
 
-  // Reuse an existing link (owner may have already created one).
-  if (invoice.square_payment_link_url) {
-    return NextResponse.json({ url: invoice.square_payment_link_url });
-  }
-
   const pool = getPool();
   const client = await pool.connect();
   try {
+    // Reuse a pending Square link only when its amount matches the current
+    // collectible balance. Stale links (created before deposit-credit math)
+    // would charge the uncredited total.
+    if (invoice.square_payment_link_url) {
+      const pending = await client.query<{ amount_cents: number }>(
+        `SELECT amount_cents FROM payments
+         WHERE invoice_id = $1 AND status = 'pending' AND method = 'square'
+         ORDER BY created_at DESC LIMIT 1`,
+        [invoice.id],
+      );
+      const pendingAmount = pending.rows[0]?.amount_cents;
+      if (pendingAmount === chargeCents) {
+        return NextResponse.json({ url: invoice.square_payment_link_url });
+      }
+      // Drop mismatched pending row + link so we recreate below.
+      await client.query(
+        `DELETE FROM payments
+         WHERE invoice_id = $1 AND status = 'pending' AND method = 'square'`,
+        [invoice.id],
+      );
+      await client.query(
+        `UPDATE invoices
+         SET square_order_id = NULL, square_checkout_id = NULL, square_payment_link_url = NULL
+         WHERE id = $1`,
+        [invoice.id],
+      );
+    }
+
     const settings = await loadSquareSettings(client, invoice.account_id as string);
     if (
       !settings ||

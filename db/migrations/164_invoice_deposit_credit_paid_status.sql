@@ -57,5 +57,17 @@ BEGIN
 END;
 $function$;
 
+-- Backfill: invoices whose remaining balance was already collected under the
+-- old trigger (paid_cents + deposit_cents >= total) but status stayed partial.
+UPDATE invoices
+SET
+  status = 'paid',
+  paid_at = COALESCE(paid_at, now()),
+  updated_at = now()
+WHERE status IN ('sent', 'partial', 'overdue')
+  AND total_cents > 0
+  AND paid_cents + GREATEST(COALESCE(deposit_cents, 0), 0) >= total_cents;
+
 -- Rollback:
 -- Restore body from migration 117 (compare new_paid >= inv.total_cents only).
+-- No automatic reverse of the status backfill.

@@ -29,13 +29,20 @@ export function amountDueCents(
 /**
  * True when this invoice's obligation is fully covered by payments on this
  * invoice plus any deposit credit already applied.
+ *
+ * Zero-total invoices are never treated as paid here — callers should use
+ * status === "paid" for those edge cases (avoids PAID stamp on empty drafts).
+ *
+ * `depositCreditCents` is the credit model field (`invoices.deposit_cents`):
+ * money already billed on a separate deposit invoice, not a first-payment
+ * still due on this document (that uses `deposit_type` instead).
  */
 export function isInvoiceFullyPaid(
   totalCents: number,
   paidCents: number,
   depositCreditCents = 0,
 ): boolean {
-  if (totalCents <= 0) return paidCents >= 0;
+  if (totalCents <= 0) return false;
   return paidCents + Math.max(0, depositCreditCents) >= totalCents;
 }
 
