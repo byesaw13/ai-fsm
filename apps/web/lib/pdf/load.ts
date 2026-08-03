@@ -83,7 +83,7 @@ export async function loadInvoicePdf(
   // Same location joins/select as the HTML print page so service address matches.
   const { rows, rowCount } = await client.query(
     `SELECT i.id, i.invoice_number, i.status, i.subtotal_cents, i.tax_cents,
-            i.total_cents, i.paid_cents, i.paid_at, i.due_date, i.notes,
+            i.total_cents, i.paid_cents, i.deposit_cents, i.paid_at, i.due_date, i.notes,
             i.deposit_type, i.deposit_percentage, i.deposit_fixed_cents,
             i.sent_at, i.created_at, i.client_id,
             j.title AS job_title,
@@ -138,6 +138,7 @@ export async function loadInvoicePdf(
     taxCents: Number(inv.tax_cents ?? 0),
     totalCents: Number(inv.total_cents ?? 0),
     paidCents: Number(inv.paid_cents ?? 0),
+    depositCreditCents: Number(inv.deposit_cents ?? 0),
     depositDueNowCents: Math.max(
       0,
       requestedDepositCents(

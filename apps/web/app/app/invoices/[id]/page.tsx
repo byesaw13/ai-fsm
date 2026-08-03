@@ -24,6 +24,7 @@ import { InvoiceEditForm } from "./InvoiceEditForm";
 import { MarkDepositReceivedButton } from "./MarkDepositReceivedButton";
 import { InvoiceDepositForm } from "./InvoiceDepositForm";
 import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
+import { amountDueCents } from "@/lib/invoices/payments";
 import { resolveDepositPolicy } from "@ai-fsm/domain";
 import { SendInvoiceButton } from "./SendInvoiceButton";
 import { InvoiceMobileDeliverBar } from "./InvoiceMobileDeliverBar";
@@ -191,21 +192,21 @@ export default async function InvoiceDetailPage({
     (s) => s !== "paid" && s !== "partial" && (s !== "draft" || invoice.paid_cents === 0)
   );
   const canTransition = canCreateInvoices(session.role);
-  // Keep amountDue aligned with the payment/status logic (which currently
-  // compares paid_cents against total_cents in validatePaymentAmount,
-  // deriveInvoiceStatus, and trg_payment_sync_invoice). Using balance_cents
-  // here can produce amountDue===0 (or negative) while the invoice is still
-  // treated as "partial" by the backend, hiding the record-payment UI.
-  // TODO: when payment logic migrates to balance_cents, switch this back
-  // and update the callers.
-  const amountDue = Math.max(0, invoice.total_cents - invoice.paid_cents);
+  // Deposit credit (separate deposit invoice model) + payments on this invoice.
+  // balance_cents is generated as total - deposit only (excludes paid_cents).
+  const amountDue = amountDueCents(
+    invoice.total_cents,
+    invoice.paid_cents,
+    invoice.deposit_cents,
+  );
   // TASK-078: while the job is still open, the balance is "due on completion" —
   // not past-due, not "owes now" — regardless of any stamped due_date.
   const dueOnCompletion = invoiceDueOnCompletion({
     invoiceKind: invoice.invoice_kind,
     jobStatus: invoice.job_status,
   });
-  const depositPending = invoice.deposit_cents > 0 && !invoice.deposit_paid_at;
+  const depositCredit = Math.max(0, invoice.deposit_cents);
+  const depositPending = depositCredit > 0 && !invoice.deposit_paid_at;
   const canMarkDeposit = canTransition && !["paid", "void"].includes(currentStatus);
   // Requested-deposit policy (first-payment model) — computed live from the total.
   const requestedDeposit = requestedDepositCents(
@@ -217,8 +218,9 @@ export default async function InvoiceDetailPage({
     invoice.total_cents,
   );
   const standardDepositPercent = resolveDepositPolicy(accountSettings).percent;
-  // A deposit can be collected when a policy amount is set OR a legacy deposit exists.
-  const hasCollectibleDeposit = requestedDeposit > 0 || invoice.deposit_cents > 0;
+  // First-payment deposit only. deposit_cents is a credit from a separate deposit
+  // invoice — not an amount still to collect on this document.
+  const hasCollectibleDeposit = requestedDeposit > 0;
   const canRecordPaymentAction = canRecordPayments(session.role) && ["sent", "partial", "overdue"].includes(currentStatus) && amountDue > 0;
 
   // Square link actions: owner/admin only, on payable invoices, when Square is
@@ -379,18 +381,23 @@ export default async function InvoiceDetailPage({
         </div>
 
         <div>
-          <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 600, letterSpacing: "0.04em" }}>PAID</div>
+          <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 600, letterSpacing: "0.04em" }}>PAID ON THIS INVOICE</div>
           <div style={{ fontSize: "clamp(1rem, 4vw, 1.5rem)", fontWeight: 600, fontFamily: "var(--font-mono)" }} data-testid="invoice-paid">
             {formatDollars(invoice.paid_cents)}
           </div>
         </div>
 
-        {invoice.deposit_cents > 0 && (
-          <div style={{ marginLeft: "auto", textAlign: "right" }}>
-            <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Deposit</div>
-            <div style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}>
-              {formatDollars(invoice.deposit_cents)}
-              {invoice.deposit_paid_at ? " ✓" : " (pending)"}
+        {depositCredit > 0 && (
+          <div style={{ marginLeft: "auto", textAlign: "right" }} data-testid="invoice-deposit-credit">
+            <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 600, letterSpacing: "0.04em" }}>
+              DEPOSIT CREDIT
+            </div>
+            <div style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color: "var(--color-success)" }}>
+              −{formatDollars(depositCredit)}
+              {invoice.deposit_paid_at ? " ✓" : ""}
+            </div>
+            <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
+              {invoice.deposit_paid_at ? "Applied from deposit invoice" : "Credited (deposit invoice)"}
             </div>
           </div>
         )}
@@ -557,9 +564,20 @@ export default async function InvoiceDetailPage({
                 <span style={{ fontFamily: "var(--font-mono)" }}>{formatDollars(invoice.total_cents)}</span>
               </div>
 
+              {depositCredit > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", paddingTop: "var(--space-1)" }} data-testid="invoice-financials-deposit-credit">
+                  <span>Deposit credit</span>
+                  <span style={{ fontFamily: "var(--font-mono)", color: "var(--color-success)" }}>
+                    −{formatDollars(depositCredit)}
+                  </span>
+                </div>
+              )}
+
               <div style={{ display: "flex", justifyContent: "space-between", paddingTop: "var(--space-1)" }}>
-                <span>Paid to date</span>
-                <span style={{ fontFamily: "var(--font-mono)", color: "var(--color-success)" }}>-{formatDollars(invoice.paid_cents)}</span>
+                <span>Paid on this invoice</span>
+                <span style={{ fontFamily: "var(--font-mono)", color: "var(--color-success)" }}>
+                  −{formatDollars(invoice.paid_cents)}
+                </span>
               </div>
 
               <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: "var(--text-base)", color: amountDue > 0 ? "var(--color-danger)" : "var(--fg)" }}>

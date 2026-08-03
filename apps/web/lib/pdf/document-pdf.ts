@@ -74,6 +74,11 @@ export interface InvoicePdfData {
   taxCents?: number | null;
   totalCents: number;
   paidCents: number;
+  /**
+   * Deposit already billed on a separate deposit invoice and credited here
+   * (final-invoice credit model). Reduces balance due.
+   */
+  depositCreditCents?: number | null;
   /** Deposit still owed as a first payment (0 when none / already covered). */
   depositDueNowCents?: number | null;
   notes?: string | null;
@@ -595,16 +600,21 @@ function drawPaidStamp(ctx: Ctx, paidAt?: string | Date | null): void {
 }
 
 export async function buildInvoicePdf(d: InvoicePdfData): Promise<Uint8Array> {
-  const balance = d.totalCents - d.paidCents;
+  const depositCredit = Math.max(0, d.depositCreditCents ?? 0);
+  const balance = Math.max(0, d.totalCents - depositCredit - d.paidCents);
   const totals: RenderInput["totals"] = [
     { label: "Subtotal", value: money(d.subtotalCents) },
   ];
   if (d.taxCents && d.taxCents > 0) totals.push({ label: "Tax", value: money(d.taxCents) });
   totals.push({ label: "Total", value: money(d.totalCents), strong: true });
+  if (depositCredit > 0) {
+    totals.push({ label: "Deposit credit", value: `-${money(depositCredit)}` });
+  }
   if (d.paidCents > 0) totals.push({ label: "Paid", value: `-${money(d.paidCents)}` });
   totals.push({ label: "Balance Due", value: money(balance), strong: true });
+  const covered = d.paidCents + depositCredit;
   const isInvoicePaid =
-    d.status === "paid" || (d.totalCents > 0 && d.paidCents >= d.totalCents);
+    d.status === "paid" || (d.totalCents > 0 && covered >= d.totalCents);
   if (!isInvoicePaid && d.depositDueNowCents && d.depositDueNowCents > 0) {
     totals.push({ label: "Deposit Due Now", value: money(d.depositDueNowCents), strong: true });
   }
@@ -615,9 +625,7 @@ export async function buildInvoicePdf(d: InvoicePdfData): Promise<Uint8Array> {
   const footer =
     `Thank you for your business. Please reference ${d.invoiceNumber} with any payment.`;
 
-  const isPaid =
-    d.status === "paid" ||
-    (d.totalCents > 0 && d.paidCents >= d.totalCents);
+  const isPaid = isInvoicePaid;
 
   return renderDocument({
     docType: "Invoice",

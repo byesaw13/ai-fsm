@@ -94,6 +94,29 @@ describe("buildInvoicePdf", () => {
     expect(text.split("\n")).not.toContain("OVERDUE");
   });
 
+  it("shows deposit credit and reduces balance due", async () => {
+    const bytes = await buildInvoicePdf({
+      invoiceNumber: "INV-0029",
+      status: "draft",
+      clientName: "Joseph Legerstee",
+      issueDate: "2026-08-03",
+      subtotalCents: 1_552_600,
+      totalCents: 1_552_600,
+      paidCents: 0,
+      depositCreditCents: 150_000,
+      lineItems: [
+        { description: "Labor", quantity: 1, unitPriceCents: 1_552_600, totalCents: 1_552_600 },
+      ],
+    });
+    expect(isPdf(bytes)).toBe(true);
+    const text = pdfDrawnText(bytes);
+    expect(text).toContain("Deposit credit");
+    expect(text).toContain("Balance Due");
+    // Balance should be $14,026.00 not the full $15,526.00
+    expect(text).toContain("$14,026.00");
+    expect(text).toContain("$1,500.00");
+  });
+
   it("handles zero payments, no notes, and empty line items", async () => {
     const bytes = await buildInvoicePdf({
       invoiceNumber: "X-1",
