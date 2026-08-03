@@ -194,7 +194,8 @@ function sumExpenses(
   return expenses.reduce((sum, e) => (predicate(e) ? sum + e.amount_cents : sum), 0);
 }
 
-function isEquipmentExpense(e: JobLedgerExpenseInput): boolean {
+/** True when an expense is lift/equipment (tag or description heuristic). Shared by ledger + T&M invoice. */
+export function isEquipmentExpense(e: JobLedgerExpenseInput): boolean {
   if (e.commercial_tag === "equipment") return true;
   const blob = `${e.notes ?? ""} ${e.vendor_name ?? ""} ${e.category ?? ""}`;
   return LIFT_OR_EQUIPMENT.test(blob);

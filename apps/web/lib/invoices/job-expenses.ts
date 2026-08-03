@@ -14,13 +14,18 @@ import {
   type ExpenseLineItemPreview,
 } from "./material-handling";
 import { parseLineQuantity } from "./quantity";
+import { isEquipmentExpense } from "@ai-fsm/domain";
 
 export type JobMaterialExpenseRow = {
   id: string;
   vendor_name: string;
   amount_cents: number;
   notes: string | null;
+  commercial_tag?: string | null;
+  category?: string | null;
 };
+
+export type JobEquipmentExpenseRow = JobMaterialExpenseRow;
 
 export type LinkableMaterialExpenseRow = LinkableMaterialExpense;
 
@@ -229,14 +234,15 @@ async function appendExpenseMaterialLines(
   return { lineItems, nextOrder: order };
 }
 
-/** Job material expenses not yet billed on any invoice. */
+/** Job material expenses not yet billed on any invoice (excludes lift/equipment). */
 export async function fetchUninvoicedJobMaterialExpenses(
   client: PoolClient,
   accountId: string,
   jobId: string,
 ): Promise<JobMaterialExpenseRow[]> {
   const result = await client.query<JobMaterialExpenseRow>(
-    `SELECT e.id, e.vendor_name, e.amount_cents, e.notes
+    `SELECT e.id, e.vendor_name, e.amount_cents, e.notes,
+            e.commercial_tag, e.category
      FROM expenses e
      WHERE e.account_id = $1
        AND e.job_id = $2
@@ -248,7 +254,41 @@ export async function fetchUninvoicedJobMaterialExpenses(
      ORDER BY e.expense_date ASC, e.created_at ASC`,
     [accountId, jobId],
   );
-  return result.rows;
+  return result.rows.filter((e) => !isEquipmentExpense(e));
+}
+
+/**
+ * Lift / equipment expenses not yet billed — materials tagged equipment, or
+ * non-materials receipts that match the ledger lift/equipment heuristic.
+ */
+export async function fetchUninvoicedJobEquipmentExpenses(
+  client: PoolClient,
+  accountId: string,
+  jobId: string,
+): Promise<JobEquipmentExpenseRow[]> {
+  const result = await client.query<JobEquipmentExpenseRow>(
+    `SELECT e.id, e.vendor_name, e.amount_cents, e.notes,
+            e.commercial_tag, e.category
+     FROM expenses e
+     WHERE e.account_id = $1
+       AND e.job_id = $2
+       AND NOT EXISTS (
+         SELECT 1 FROM invoice_line_items ili
+         WHERE ili.source_expense_id = e.id
+       )
+     ORDER BY e.expense_date ASC, e.created_at ASC`,
+    [accountId, jobId],
+  );
+  return result.rows.filter((e) => isEquipmentExpense(e));
+}
+
+export function equipmentExpenseDescription(expense: {
+  vendor_name: string;
+  notes: string | null;
+}): string {
+  const detail = expense.notes?.trim();
+  if (detail) return detail.length > 120 ? `${detail.slice(0, 117)}…` : detail;
+  return `Lift / equipment — ${expense.vendor_name}`;
 }
 
 function toLineItemPreview(line: ExpenseLineItemRow): ExpenseLineItemPreview {
@@ -535,7 +575,7 @@ export async function materialLineItemsFromJobExpenses(
   }>
 > {
   const result = await client.query<JobMaterialExpenseRow>(
-    `SELECT id, vendor_name, amount_cents, notes
+    `SELECT id, vendor_name, amount_cents, notes, commercial_tag, category
      FROM expenses
      WHERE account_id = $1 AND job_id = $2 AND category = 'materials'
      ORDER BY expense_date ASC, created_at ASC`,
@@ -556,6 +596,7 @@ export async function materialLineItemsFromJobExpenses(
   let materialCost = 0;
 
   for (const expense of result.rows) {
+    if (isEquipmentExpense(expense)) continue;
     const drafts = await buildMaterialLineDraftsForExpense(client, accountId, expense);
     for (const draft of drafts) {
       lines.push({
@@ -589,4 +630,79 @@ export async function materialLineItemsFromJobExpenses(
   }
 
   return lines;
+}
+
+/**
+ * Preview lift/equipment invoice lines (no handling fee — billed at cost).
+ * Used for T&M final-invoice totals before insert.
+ */
+export async function equipmentLineItemsFromJobExpenses(
+  client: PoolClient,
+  accountId: string,
+  jobId: string,
+  sortStart: number,
+): Promise<
+  Array<{
+    description: string;
+    quantity: number;
+    unit_price_cents: number;
+    line_item_type: "materials";
+    sort_order: number;
+    source_expense_id: string;
+  }>
+> {
+  const expenses = await fetchUninvoicedJobEquipmentExpenses(client, accountId, jobId);
+  const lines: Array<{
+    description: string;
+    quantity: number;
+    unit_price_cents: number;
+    line_item_type: "materials";
+    sort_order: number;
+    source_expense_id: string;
+  }> = [];
+  let order = sortStart;
+  for (const expense of expenses) {
+    lines.push({
+      description: equipmentExpenseDescription(expense),
+      quantity: 1,
+      unit_price_cents: expense.amount_cents,
+      line_item_type: "materials",
+      sort_order: order,
+      source_expense_id: expense.id,
+    });
+    order += 1;
+  }
+  return lines;
+}
+
+/** Append uninvoiced lift/equipment expenses onto a draft invoice. */
+export async function appendEquipmentFromJobExpenses(
+  client: PoolClient,
+  invoiceId: string,
+  accountId: string,
+  jobId: string,
+): Promise<{ lineItems: InvoiceLineItemRow[] }> {
+  const expenses = await fetchUninvoicedJobEquipmentExpenses(client, accountId, jobId);
+  const lineItems: InvoiceLineItemRow[] = [];
+  let sortOrder = await client.query<{ next: number }>(
+    `SELECT COALESCE(MAX(sort_order), -1) + 1 AS next
+     FROM invoice_line_items WHERE invoice_id = $1`,
+    [invoiceId],
+  );
+  let order = sortOrder.rows[0]?.next ?? 0;
+
+  for (const expense of expenses) {
+    const draft: MaterialLineDraft = {
+      description: equipmentExpenseDescription(expense),
+      quantity: 1,
+      unit_price_cents: expense.amount_cents,
+      line_item_type: "materials",
+      source_expense_id: expense.id,
+      source_expense_line_item_id: null,
+    };
+    lineItems.push(await insertMaterialLine(client, invoiceId, draft, order));
+    order += 1;
+  }
+
+  return { lineItems };
 }

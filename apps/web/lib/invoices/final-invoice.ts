@@ -23,9 +23,16 @@ import { reconcileFinalInvoice } from "@/lib/invoices/billing";
 import { appendAuditLog } from "@/lib/db/audit";
 import {
   createInvoiceLineItem,
+  recalculateInvoiceTotals,
   roundedQuarterHoursFromMinutes,
 } from "@/lib/invoices/line-items";
 import { trackedLaborMinutesFromActivityEntries } from "@/lib/invoices/tracked-labor";
+import {
+  appendEquipmentFromJobExpenses,
+  appendMaterialsFromJobExpenses,
+  equipmentLineItemsFromJobExpenses,
+  materialLineItemsFromJobExpenses,
+} from "@/lib/invoices/job-expenses";
 import {
   LABOR_CUSTOMER_RATE_CENTS_PER_HOUR,
   dueDateUponCompletion,
@@ -85,6 +92,8 @@ export async function createDraftFinalInvoiceForJob(
     property_id: string | null;
     estimate_id: string | null;
     presentation_mode: string | null;
+    pricing_mode: string | null;
+    booking_pricing_mode: string | null;
     subtotal_cents: number | null;
     tax_cents: number | null;
     total_cents: number | null;
@@ -95,15 +104,23 @@ export async function createDraftFinalInvoiceForJob(
     `SELECT j.client_id, j.property_id,
             e.id           AS estimate_id,
             e.presentation_mode,
+            e.pricing_mode,
             e.subtotal_cents,
             e.tax_cents,
             e.total_cents,
             e.notes        AS estimate_notes,
             e.deposit_cents,
-            e.travel_snapshot_id
+            e.travel_snapshot_id,
+            (
+              SELECT br.pricing_mode
+              FROM booking_requests br
+              WHERE br.job_id = j.id AND br.account_id = j.account_id
+              ORDER BY br.created_at DESC
+              LIMIT 1
+            ) AS booking_pricing_mode
      FROM jobs j
      LEFT JOIN LATERAL (
-       SELECT id, presentation_mode, subtotal_cents, tax_cents, total_cents,
+       SELECT id, presentation_mode, pricing_mode, subtotal_cents, tax_cents, total_cents,
               notes, deposit_cents, travel_snapshot_id
        FROM estimates
        WHERE job_id = j.id AND account_id = j.account_id AND status = 'approved'
@@ -117,6 +134,11 @@ export async function createDraftFinalInvoiceForJob(
   if ((jobRow.rowCount ?? 0) === 0) return null;
   const job = jobRow.rows[0];
 
+  // T&M (hourly_internal): estimate lines are budget/allowance only.
+  // Final invoice must bill actual tracked labor + materials, not the estimate.
+  const pricingMode = job.pricing_mode ?? job.booking_pricing_mode ?? null;
+  const isTm = pricingMode === "hourly_internal";
+
   // ── Collect line items ──────────────────────────────────────────────────
   const lineItems: Array<{
     description: string;
@@ -126,9 +148,19 @@ export async function createDraftFinalInvoiceForJob(
     sort_order: number;
   }> = [];
   let shouldUseEstimateTotals = false;
+  /** When true, materials are appended after insert (source_expense_id tracking). */
+  let appendTmMaterialsAfterCreate = false;
+  /** When true, lift/equipment expenses are appended after insert. */
+  let appendTmEquipmentAfterCreate = false;
+  /** Material + handling + equipment preview used only for totals before insert. */
+  let materialPreviewSubtotal = 0;
 
-  if (job.estimate_id && job.presentation_mode !== "multi_option") {
-    // Standard estimate: pull customer-visible items at the root level
+  if (
+    !isTm &&
+    job.estimate_id &&
+    job.presentation_mode !== "multi_option"
+  ) {
+    // Flat-rate / fixed estimate: pull customer-visible items at the root level
     // (option_id IS NULL excludes items that belong to competing options).
     const estItems = await client.query<{
       description: string;
@@ -168,10 +200,15 @@ export async function createDraftFinalInvoiceForJob(
     shouldUseEstimateTotals = lineItems.length > 0;
   }
 
-  // Fallback: tracked labor plus billable visit parts for T&M jobs with no
-  // estimate line items. Labor is sourced from the time truth (activity_entries
-  // job_work on the visit), not parts. See lib/invoices/tracked-labor.ts.
-  if (lineItems.length === 0) {
+  // Actuals path: T&M jobs always, or flat jobs with no estimate line items.
+  // Labor is sourced from the time truth (activity_entries job_work).
+  // Materials come from job expenses (receipts logged in the app).
+  if (isTm || lineItems.length === 0) {
+    if (isTm) {
+      lineItems.length = 0;
+      shouldUseEstimateTotals = false;
+    }
+
     const trackedMinutes = await trackedLaborMinutesFromActivityEntries(
       client,
       accountId,
@@ -180,12 +217,41 @@ export async function createDraftFinalInvoiceForJob(
     const billableHours = roundedQuarterHoursFromMinutes(trackedMinutes);
     if (billableHours > 0) {
       let billRate = LABOR_CUSTOMER_RATE_CENTS_PER_HOUR;
-      try {
-        const { loadPricingSettings } = await import("@/lib/pricing/settings");
-        const settings = await loadPricingSettings(client, accountId);
-        billRate = settings.labor_billing_cents_per_hour;
-      } catch {
-        /* pre-migration fallback */
+      // Prefer the customer labor rate from the approved estimate (T&M budget line).
+      if (job.estimate_id) {
+        const rateRow = await client.query<{ unit_price_cents: number }>(
+          `SELECT unit_price_cents
+           FROM estimate_line_items
+           WHERE estimate_id = $1
+             AND option_id IS NULL
+             AND unit_price_cents > 0
+             AND (
+               line_item_type = 'labor'
+               OR lower(description) LIKE '%labor%'
+             )
+           ORDER BY sort_order ASC
+           LIMIT 1`,
+          [job.estimate_id]
+        );
+        if (rateRow.rows[0]?.unit_price_cents) {
+          billRate = rateRow.rows[0].unit_price_cents;
+        } else {
+          try {
+            const { loadPricingSettings } = await import("@/lib/pricing/settings");
+            const settings = await loadPricingSettings(client, accountId);
+            billRate = settings.labor_billing_cents_per_hour;
+          } catch {
+            /* pre-migration fallback */
+          }
+        }
+      } else {
+        try {
+          const { loadPricingSettings } = await import("@/lib/pricing/settings");
+          const settings = await loadPricingSettings(client, accountId);
+          billRate = settings.labor_billing_cents_per_hour;
+        } catch {
+          /* pre-migration fallback */
+        }
       }
       lineItems.push({
         description: "Labor",
@@ -195,21 +261,70 @@ export async function createDraftFinalInvoiceForJob(
         sort_order: 0,
       });
     }
+
+    // Job materials receipts → invoice lines (with handling fee when configured).
+    // Preview for totals; insert happens after invoice create so source_expense_id is set.
+    const materialPreview = await materialLineItemsFromJobExpenses(
+      client,
+      accountId,
+      jobId,
+      lineItems.length
+    );
+    if (materialPreview.length > 0) {
+      appendTmMaterialsAfterCreate = true;
+      materialPreviewSubtotal += materialPreview.reduce(
+        (s, m) => s + Math.round(m.quantity * m.unit_price_cents),
+        0
+      );
+    }
+
+    // Lift / equipment (tag or lift heuristic) — billed at cost, no handling fee.
+    const equipmentPreview = await equipmentLineItemsFromJobExpenses(
+      client,
+      accountId,
+      jobId,
+      lineItems.length + materialPreview.length
+    );
+    if (equipmentPreview.length > 0) {
+      appendTmEquipmentAfterCreate = true;
+      materialPreviewSubtotal += equipmentPreview.reduce(
+        (s, m) => s + Math.round(m.quantity * m.unit_price_cents),
+        0
+      );
+    }
   }
 
-  // Fallback: billable visit parts (only when no estimate items available)
-  if (visitId && (job.estimate_id == null || !shouldUseEstimateTotals)) {
-    const parts = await client.query<{
-      name: string;
-      quantity: string;
-      customer_price_cents: number;
-    }>(
-      `SELECT name, quantity, customer_price_cents
-       FROM visit_parts
-       WHERE visit_id = $1 AND account_id = $2 AND customer_price_cents > 0
-       ORDER BY created_at`,
-      [visitId, accountId]
-    );
+  // Fallback: billable visit parts when still no materials/equipment from expenses.
+  // Scope: single visit when provided, else all visits on the job (T&M multi-day).
+  if (
+    !appendTmMaterialsAfterCreate &&
+    !appendTmEquipmentAfterCreate &&
+    (isTm || job.estimate_id == null || !shouldUseEstimateTotals)
+  ) {
+    const parts = visitId
+      ? await client.query<{
+          name: string;
+          quantity: string;
+          customer_price_cents: number;
+        }>(
+          `SELECT name, quantity, customer_price_cents
+           FROM visit_parts
+           WHERE visit_id = $1 AND account_id = $2 AND customer_price_cents > 0
+           ORDER BY created_at`,
+          [visitId, accountId]
+        )
+      : await client.query<{
+          name: string;
+          quantity: string;
+          customer_price_cents: number;
+        }>(
+          `SELECT vp.name, vp.quantity, vp.customer_price_cents
+           FROM visit_parts vp
+           JOIN visits v ON v.id = vp.visit_id AND v.account_id = vp.account_id
+           WHERE v.job_id = $1 AND vp.account_id = $2 AND vp.customer_price_cents > 0
+           ORDER BY vp.created_at`,
+          [jobId, accountId]
+        );
     const partSortStart = lineItems.length;
     for (let i = 0; i < parts.rows.length; i++) {
       const p = parts.rows[i];
@@ -223,16 +338,17 @@ export async function createDraftFinalInvoiceForJob(
     }
   }
 
-  // Nothing to invoice yet (no estimate items, no billable parts)
-  if (lineItems.length === 0) return null;
+  // Nothing to invoice yet (no estimate items, no actuals, no billable parts)
+  if (lineItems.length === 0 && materialPreviewSubtotal === 0) return null;
 
   // ── Totals ───────────────────────────────────────────────────────────────
-  // Prefer estimate subtotal/tax when available (more accurate for painting
-  // and complex jobs). Fall back to summing line items.
-  const calculatedSubtotal = lineItems.reduce(
-    (s, li) => s + Math.round(li.quantity * li.unit_price_cents),
-    0
-  );
+  // Flat-rate: prefer estimate subtotal/tax when available.
+  // T&M: always sum actual line items (estimate is budget only).
+  const calculatedSubtotal =
+    lineItems.reduce(
+      (s, li) => s + Math.round(li.quantity * li.unit_price_cents),
+      0
+    ) + materialPreviewSubtotal;
   const subtotal = shouldUseEstimateTotals && job.subtotal_cents != null
     ? job.subtotal_cents
     : calculatedSubtotal;
@@ -329,6 +445,65 @@ export async function createDraftFinalInvoiceForJob(
     });
   }
 
+  // T&M materials + equipment: link expenses with source_expense_id, then
+  // re-sum totals so the draft matches what the job ledger showed as actuals.
+  let materialLineCount = 0;
+  if (appendTmMaterialsAfterCreate || appendTmEquipmentAfterCreate) {
+    if (appendTmMaterialsAfterCreate) {
+      const { lineItems: materialLines } = await appendMaterialsFromJobExpenses(
+        client,
+        invoiceId,
+        accountId,
+        jobId
+      );
+      materialLineCount += materialLines.length;
+    }
+    if (appendTmEquipmentAfterCreate) {
+      const { lineItems: equipmentLines } = await appendEquipmentFromJobExpenses(
+        client,
+        invoiceId,
+        accountId,
+        jobId
+      );
+      materialLineCount += equipmentLines.length;
+    }
+    const totals = await recalculateInvoiceTotals(client, invoiceId, accountId);
+    // Re-apply deposit credit against the post-actuals total.
+    if (job.estimate_id && depositCreditCents > 0) {
+      const rec = reconcileFinalInvoice({
+        invoiceTotalCents: totals.total_cents,
+        depositInvoices: (
+          await client.query<{
+            invoice_number: string;
+            total_cents: number;
+            status: string;
+          }>(
+            `SELECT invoice_number, total_cents, status
+             FROM invoices
+             WHERE estimate_id = $1 AND account_id = $2 AND invoice_kind = 'deposit'`,
+            [job.estimate_id, accountId]
+          )
+        ).rows,
+      });
+      await client.query(
+        `UPDATE invoices
+         SET deposit_cents = $1,
+             notes = $2,
+             updated_at = now()
+         WHERE id = $3 AND account_id = $4`,
+        [
+          rec.depositCreditCents,
+          rec.reconciliationNote
+            ? `${job.estimate_notes ? `${job.estimate_notes}\n\n` : ""}${rec.reconciliationNote}`
+            : job.estimate_notes ?? null,
+          invoiceId,
+          accountId,
+        ]
+      );
+      depositCreditCents = rec.depositCreditCents;
+    }
+  }
+
   // Itemized travel (mileage + travel time) so customer-facing invoices list them
   let travelLineCount = 0;
   if (job.travel_snapshot_id) {
@@ -348,8 +523,12 @@ export async function createDraftFinalInvoiceForJob(
          WHERE id = $2 AND account_id = $3 AND invoice_id IS NULL`,
         [invoiceId, job.travel_snapshot_id, accountId]
       );
+      // Travel lines change the total — re-sum after attach.
+      await recalculateInvoiceTotals(client, invoiceId, accountId);
     }
   }
+
+  const lineItemCount = lineItems.length + materialLineCount + travelLineCount;
 
   // ── Audit log ────────────────────────────────────────────────────────────
   await appendAuditLog(client, {
@@ -364,12 +543,15 @@ export async function createDraftFinalInvoiceForJob(
       job_id: jobId,
       visit_id: visitId ?? null,
       estimate_id: job.estimate_id,
+      pricing_mode: pricingMode,
+      billed_from_actuals: isTm,
       total_cents: totalCents,
       deposit_credit_cents: depositCreditCents,
-      line_item_count: lineItems.length + travelLineCount,
+      line_item_count: lineItemCount,
       travel_line_count: travelLineCount,
+      material_line_count: materialLineCount,
     },
   });
 
-  return { invoiceId, lineItemCount: lineItems.length + travelLineCount };
+  return { invoiceId, lineItemCount };
 }

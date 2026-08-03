@@ -895,6 +895,29 @@
   background: linear-gradient(to top, var(--bg) 70%, transparent);
 }
 
+/* Invoice deliver bar: flex row on mobile (pairs with .p7-only-mobile) */
+@media (max-width: 767px) {
+  .p7-invoice-mobile-deliver {
+    display: flex !important;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    margin-top: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+}
+
+/* Complete & Invoice handoff: always visible deliver strip */
+.p7-invoice-deliver-focus {
+  display: flex !important;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  border: 1px solid var(--color-forest-200, #bbf7d0);
+  border-radius: var(--radius-lg);
+  background: var(--color-forest-50, #f0fdf4);
+}
+
 /* T3 field focus hero — dark, one job, huge primary (My Day / arrival) */
 .p7-field-hero {
   background: var(--color-slate-900, #1c1917);

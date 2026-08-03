@@ -184,9 +184,9 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
   // Field quiet + work packets done — owner must complete project for billing.
   if (readyForCloseout || (stage === "completed" && jobStatus !== "completed")) {
     return {
-      message: "Ready for closeout — owner must complete project and review billing",
-      detail: "Visits and work orders do not close the project. Mark the project complete when work is truly done.",
-      actionLabel: "Complete Project",
+      message: "Ready for closeout — complete & invoice when work is truly done",
+      detail: "Visits and work orders do not close the project. Complete & Invoice drafts the bill from actuals and opens it to send.",
+      actionLabel: "Complete & Invoice",
       actionHref: `/app/jobs/${jobId}#project-status`,
       secondary: { label: "Schedule another work day", href: `/app/jobs/${jobId}/visits/new` },
       extras: estimateExtras,
