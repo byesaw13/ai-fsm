@@ -1,7 +1,7 @@
 import path from "path";
 import fs from "fs";
 import {
-  STANDARD_ESTIMATE_NOTES,
+  STANDARD_ESTIMATE_TERMS,
   STANDARD_INVOICE_TERMS,
   resolveDepositPolicy,
   renderDepositTerms,
@@ -82,7 +82,7 @@ export function resolveCompanyBranding(
       deposit.percent,
     ),
     estimateTerms: renderDepositTerms(
-      s.estimate_terms?.trim() || STANDARD_ESTIMATE_NOTES,
+      s.estimate_terms?.trim() || STANDARD_ESTIMATE_TERMS,
       deposit.percent,
     ),
     depositPercent: deposit.percent,

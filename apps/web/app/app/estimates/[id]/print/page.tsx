@@ -4,6 +4,7 @@ import { withEstimateContext } from "@/lib/estimates/db";
 import { getStandardEstimateTerms, formatCents } from "@/lib/estimates/pricing";
 import {
   PAYMENT_OPTIONS,
+  DOCUMENT_STANDARD_VERSION,
   computeEstimate,
   roomSpecsToEstimateSpec,
   buildShoppingListFromEstimateResult,
@@ -12,6 +13,7 @@ import {
 import type { EstimateStatus, RoomSpec } from "@ai-fsm/domain";
 import { PrintButton } from "./PrintButton";
 import { buildClientDocumentFilename } from "@/lib/estimates/guardrails";
+import { resolveCompanyBranding, type CompanyProfileSettings } from "@/lib/company/branding";
 
 export const dynamic = "force-dynamic";
 
@@ -119,16 +121,28 @@ export default async function EstimatePrintPage({
       [id]
     );
 
+    const accountResult = await client.query<{ name: string; settings: CompanyProfileSettings }>(
+      `SELECT name, settings FROM accounts WHERE id = $1`,
+      [session.accountId],
+    );
+
     return {
       estimate: estResult.rows[0] as EstimateRow,
       lineItems: liResult.rows as LineItemRow[],
+      account: accountResult.rows[0] ?? null,
     };
   });
 
   if (!result) notFound();
 
-  const { estimate, lineItems } = result;
-  const terms = getStandardEstimateTerms();
+  const { estimate, lineItems, account } = result;
+  const legacyTerms = getStandardEstimateTerms();
+  const branding = resolveCompanyBranding(
+    account?.name ?? "Dovetails Services LLC",
+    account?.settings,
+    session.accountId,
+  );
+  const estimateTermsBody = branding.estimateTerms;
 
   // Only show customer-visible line items
   const customerItems = lineItems.filter((i) => i.visible_to_customer);
@@ -191,14 +205,14 @@ export default async function EstimatePrintPage({
         {/* Header */}
         <div className="header-row">
           <div>
-            <div className="company-name">Dovetails Services LLC</div>
-            <p style={{ color: "#666", fontSize: 13 }}>Licensed &amp; Insured</p>
+            <div className="company-name">{branding.name}</div>
+            <p style={{ color: "#666", fontSize: 13 }}>{branding.tagline ?? "Licensed & Insured"}</p>
           </div>
           <div style={{ textAlign: "right" }}>
             <h1>Estimate</h1>
             <p className="meta-label">{estimateNumber}</p>
             <p className="meta-label no-print">{documentFilename}</p>
-            <p className="meta-label">Document standard: {terms.version}</p>
+            <p className="meta-label">Document standard: {DOCUMENT_STANDARD_VERSION}</p>
             <p className="meta-label">Issued: {issuedDate}</p>
             {estimate.expires_at && (
               <p className="meta-label">Valid through: {expiryDate}</p>
@@ -299,27 +313,27 @@ export default async function EstimatePrintPage({
           <div className="standard-grid">
             <div>
               <h3>Preparation</h3>
-              <p>{terms.sections.preparation}</p>
+              <p>{legacyTerms.sections.preparation}</p>
             </div>
             <div>
               <h3>Repair / Install Work</h3>
-              <p>{terms.sections.repair_install_work}</p>
+              <p>{legacyTerms.sections.repair_install_work}</p>
             </div>
             <div>
               <h3>Finish Work</h3>
-              <p>{terms.sections.finish_work}</p>
+              <p>{legacyTerms.sections.finish_work}</p>
             </div>
             <div>
               <h3>Materials</h3>
-              <p>{terms.sections.materials}</p>
+              <p>{legacyTerms.sections.materials}</p>
             </div>
             <div>
               <h3>Exclusions</h3>
-              <p>{terms.sections.exclusions}</p>
+              <p>{legacyTerms.sections.exclusions}</p>
             </div>
             <div>
               <h3>Client Responsibilities</h3>
-              <p>{terms.sections.client_responsibilities}</p>
+              <p>{legacyTerms.sections.client_responsibilities}</p>
             </div>
           </div>
         </div>
@@ -417,25 +431,26 @@ export default async function EstimatePrintPage({
           </div>
         )}
 
-        {/* Standard Terms */}
+        {/* Estimate terms (Settings → Estimate terms; falls back to domain default) */}
         <div className="section-block">
           <h2>Estimate Terms</h2>
-          <p className="terms">{terms.notes}</p>
+          <p className="terms">{estimateTermsBody}</p>
         </div>
 
+        {branding.depositTerms && estimate.deposit_cents > 0 && (
+          <div className="section-block">
+            <h2>Deposits</h2>
+            <p className="terms">{branding.depositTerms}</p>
+          </div>
+        )}
+
         <div className="section-block">
-          <h2>Payment Terms</h2>
-          <p className="terms">{terms.payment_terms}</p>
-          <div style={{ marginTop: 12 }}>
+          <h2>Payment options</h2>
+          <div>
             {PAYMENT_OPTIONS.map((opt) => (
               <p key={opt} style={{ fontSize: 13, color: "#444" }}>• {opt}</p>
             ))}
           </div>
-        </div>
-
-        <div className="section-block">
-          <h2>Disclaimer</h2>
-          <p className="terms">{terms.disclaimer}</p>
         </div>
 
         {/* Signature line */}

@@ -163,22 +163,24 @@ export const BALANCE_RATE = 0.70;
 
 export const PAYMENT_OPTIONS = [
   "Check payable to Dovetails Services LLC",
-  "Venmo @DovetailsServices",
-  "Square (card on file)",
+  "Venmo @mydovetails",
+  "Cash, ACH, or major credit/debit cards via Square",
 ] as const;
 
 // ---------------------------------------------------------------------------
-// Standard estimate terms (auto-included on all estimates)
+// Standard estimate / invoice terms (document footers; overridable in Settings)
 // ---------------------------------------------------------------------------
 
 export const DOCUMENT_STANDARD_VERSION = "2026.05";
 
+/** Short notes block auto-filled on new estimates (not the full legal terms). */
 export const STANDARD_ESTIMATE_NOTES = `
 All work performed by licensed and insured professionals.
 Price is valid for 30 days from estimate date.
 Any work outside the defined scope will be quoted separately.
 `.trim();
 
+/** Short payment blurb used by legacy estimate print sections. */
 export const STANDARD_PAYMENT_TERMS = `
 Deposits are required only when explicitly listed on the estimate.
 Any remaining balance is due upon completion of the work unless alternate terms
@@ -191,11 +193,68 @@ Unforeseen conditions (e.g., hidden damage, additional prep) may affect final co
 and will be communicated before proceeding.
 `.trim();
 
+/**
+ * Default **estimate** document terms (Settings → Estimate terms).
+ * Pre-job: validity, deposit before schedule, change orders, access, warranty.
+ */
+export const STANDARD_ESTIMATE_TERMS = `
+Thank you for choosing Dovetails Services LLC.
+
+Price Validity
+This estimate is valid for 30 days from the estimate date unless otherwise noted.
+
+Deposits
+A deposit of {deposit_percent} may be required before work is scheduled when materials or special-order items are needed. Deposits are applied toward the final invoice.
+
+Change Orders
+Any additional work requested after the original scope has been approved may require a revised estimate or change order and may increase the total project cost.
+
+Customer-Supplied Materials
+Dovetails Services LLC is not responsible for delays, defects, shortages, incorrect sizing, or warranty issues related to materials supplied by the customer.
+
+Access to Property
+The customer is responsible for providing safe access to the work area. Delays caused by restricted access, pets, occupants, or unforeseen site conditions may result in additional charges.
+
+Payment
+Any remaining balance is due upon completion of the work unless alternate terms are agreed in writing. We accept cash, check, ACH, Venmo (@mydovetails), and major credit/debit cards through Square.
+
+Warranty
+Labor is warranted for one (1) year from the date of completion against defects in workmanship under normal use. This warranty does not cover normal wear and tear, abuse, misuse, accidents, structural movement, moisture intrusion, manufacturer defects, customer-supplied materials, or work performed by others after project completion.
+
+Limitation of Liability
+Dovetails Services LLC shall not be responsible for concealed conditions or pre-existing issues that could not reasonably be discovered prior to beginning work.
+
+Photography
+Photos of completed work may be taken for documentation, warranty records, and marketing purposes. No personally identifiable information or customer addresses will be published without permission.
+`.trim();
+
+/**
+ * Default **invoice** document terms (Settings → Invoice terms).
+ * Post-job: due upon completion, late fees, payment methods, deposit applied, warranty.
+ */
 export const STANDARD_INVOICE_TERMS = `
-Invoices show customer-facing service and material costs, not internal labor hours.
-Payment is due upon completion (the listed due date) unless alternate terms are
-agreed in writing.
-Past-due balances may pause future scheduling until resolved.
+Thank you for choosing Dovetails Services LLC.
+
+Payment Due
+Payment is due upon completion of work unless other arrangements have been made in writing. Invoices not paid by the due date may be subject to a late fee of 1.5% per month (18% annually) or the maximum amount permitted by law.
+
+Accepted Payment Methods
+We accept cash, check, ACH, Venmo (@mydovetails), and all major credit/debit cards through Square. Returned checks are subject to a $35 returned check fee.
+
+Deposits
+Any deposit already paid has been applied to this invoice. Balance is due upon completion unless other arrangements were made in writing.
+
+Change Orders
+Any additional work performed after the original scope was approved is reflected on this invoice or on a separate change order.
+
+Warranty
+Labor is warranted for one (1) year from the date of completion against defects in workmanship under normal use. This warranty does not cover normal wear and tear, abuse, misuse, accidents, structural movement, moisture intrusion, manufacturer defects, customer-supplied materials, or work performed by others after project completion.
+
+Limitation of Liability
+Dovetails Services LLC shall not be responsible for concealed conditions or pre-existing issues that could not reasonably be discovered prior to beginning work.
+
+Photography
+Photos of completed work may be taken for documentation, warranty records, and marketing purposes. No personally identifiable information or customer addresses will be published without permission.
 `.trim();
 
 // ---------------------------------------------------------------------------
