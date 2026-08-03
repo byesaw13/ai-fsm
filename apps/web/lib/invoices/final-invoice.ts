@@ -523,8 +523,45 @@ export async function createDraftFinalInvoiceForJob(
          WHERE id = $2 AND account_id = $3 AND invoice_id IS NULL`,
         [invoiceId, job.travel_snapshot_id, accountId]
       );
-      // Travel lines change the total — re-sum after attach.
-      await recalculateInvoiceTotals(client, invoiceId, accountId);
+      // T&M only: re-sum from line items (tax stays 0 on actuals).
+      // Flat-rate keeps approved estimate totals/tax — travel is already in the
+      // estimate commercial total; lines are display-only re-materialization.
+      if (!shouldUseEstimateTotals) {
+        const totals = await recalculateInvoiceTotals(client, invoiceId, accountId);
+        if (job.estimate_id) {
+          const rec = reconcileFinalInvoice({
+            invoiceTotalCents: totals.total_cents,
+            depositInvoices: (
+              await client.query<{
+                invoice_number: string;
+                total_cents: number;
+                status: string;
+              }>(
+                `SELECT invoice_number, total_cents, status
+                 FROM invoices
+                 WHERE estimate_id = $1 AND account_id = $2 AND invoice_kind = 'deposit'`,
+                [job.estimate_id, accountId]
+              )
+            ).rows,
+          });
+          await client.query(
+            `UPDATE invoices
+             SET deposit_cents = $1,
+                 notes = $2,
+                 updated_at = now()
+             WHERE id = $3 AND account_id = $4`,
+            [
+              rec.depositCreditCents,
+              rec.reconciliationNote
+                ? `${job.estimate_notes ? `${job.estimate_notes}\n\n` : ""}${rec.reconciliationNote}`
+                : job.estimate_notes ?? null,
+              invoiceId,
+              accountId,
+            ]
+          );
+          depositCreditCents = rec.depositCreditCents;
+        }
+      }
     }
   }
 

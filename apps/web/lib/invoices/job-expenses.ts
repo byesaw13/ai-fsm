@@ -558,6 +558,11 @@ export async function appendMaterialsFromJobExpenses(
   return { lineItems, skipped: 0 };
 }
 
+/**
+ * Preview uninvoiced material lines (+ handling). Already-billed receipts
+ * (source_expense_id on any invoice) are excluded so prefills and T&M drafts
+ * never re-charge the client.
+ */
 export async function materialLineItemsFromJobExpenses(
   client: PoolClient,
   accountId: string,
@@ -574,13 +579,7 @@ export async function materialLineItemsFromJobExpenses(
     source_expense_line_item_id?: string | null;
   }>
 > {
-  const result = await client.query<JobMaterialExpenseRow>(
-    `SELECT id, vendor_name, amount_cents, notes, commercial_tag, category
-     FROM expenses
-     WHERE account_id = $1 AND job_id = $2 AND category = 'materials'
-     ORDER BY expense_date ASC, created_at ASC`,
-    [accountId, jobId],
-  );
+  const expenses = await fetchUninvoicedJobMaterialExpenses(client, accountId, jobId);
 
   const lines: Array<{
     description: string;
@@ -595,8 +594,7 @@ export async function materialLineItemsFromJobExpenses(
   let order = sortStart;
   let materialCost = 0;
 
-  for (const expense of result.rows) {
-    if (isEquipmentExpense(expense)) continue;
+  for (const expense of expenses) {
     const drafts = await buildMaterialLineDraftsForExpense(client, accountId, expense);
     for (const draft of drafts) {
       lines.push({
