@@ -311,7 +311,7 @@ describe('Dovetails standards', () => {
   })
 
   it('exposes versioned document standards', () => {
-    expect(DOCUMENT_STANDARD_VERSION).toBe('2026.05')
+    expect(DOCUMENT_STANDARD_VERSION).toBe('2026.08')
     expect(STANDARD_INVOICE_TERMS).toContain('due upon completion')
     expect(STANDARD_INVOICE_TERMS).toContain('Accepted Payment Methods')
     expect(STANDARD_INVOICE_TERMS).toContain('@mydovetails')

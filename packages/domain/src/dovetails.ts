@@ -171,7 +171,7 @@ export const PAYMENT_OPTIONS = [
 // Standard estimate / invoice terms (document footers; overridable in Settings)
 // ---------------------------------------------------------------------------
 
-export const DOCUMENT_STANDARD_VERSION = "2026.05";
+export const DOCUMENT_STANDARD_VERSION = "2026.08";
 
 /** Short notes block auto-filled on new estimates (not the full legal terms). */
 export const STANDARD_ESTIMATE_NOTES = `

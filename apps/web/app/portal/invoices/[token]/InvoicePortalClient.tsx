@@ -110,7 +110,8 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
     .filter(Boolean).join(", ");
   const depositPolicy = resolveDepositPolicy(invoice.account_settings);
   const invoiceTerms = renderDepositTerms(
-    invoice.account_settings?.invoice_terms ?? STANDARD_INVOICE_TERMS,
+    // Empty string must fall back (same as branding.resolveCompanyBranding)
+    invoice.account_settings?.invoice_terms?.trim() || STANDARD_INVOICE_TERMS,
     depositPolicy.percent,
   );
   const depositTerms = depositPolicy.terms;
