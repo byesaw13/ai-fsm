@@ -36,6 +36,10 @@ Full engineering doctrine: `docs/working/execution-doctrine.md`.
 
 ### Phase 0 — Field Ops Reliability (complete)
 
+Shipped on main (2026-08):
+
+- Dashboard single-screen merge + burnt-orange rebrand — `/app` Overview now combines the field workday (Start Day, vehicle, mileage) with business widgets on one screen; app rebranded from Forest & Cedar green to burnt-orange to match the marketing site; Archivo web font (#561)
+
 Shipped on main (2026-07):
 
 - My Work field tools — `FieldRightNowCard`, odometer checkpoints, decluttered layout (#463)
