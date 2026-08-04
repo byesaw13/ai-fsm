@@ -82,13 +82,20 @@ export function laborCostForMargin(opts: {
 }
 
 /**
- * Shared WHERE for job-linked closed job_work rows.
+ * Shared WHERE for job-linked closed job_work rows that count as customer-billable.
  * Params: $1 accountId, $2 jobId.
  *
  * Includes:
  *   - job entity (unplanned / legacy)
- *   - visit entity (GPS confirm + field-day spine)
+ *   - visit entity (GPS confirm + field-day spine) — not site_visit assessments
  *   - work_order entity (Daily Recap commits when no visit yet, or direct WO time)
+ *
+ * Excludes:
+ *   - voided / open rows
+ *   - labor_bucket overhead / personal / warranty (assessments, shop, etc.)
+ *   - site_visit visits (estimate/assessment — not production billable time)
+ *
+ * NULL labor_bucket is treated as billable for pre-bucket legacy rows.
  */
 export const TRACKED_LABOR_JOB_WORK_WHERE = `
    ae.account_id = $1
@@ -96,6 +103,7 @@ export const TRACKED_LABOR_JOB_WORK_WHERE = `
    AND ae.voided_at IS NULL
    AND ae.started_at IS NOT NULL
    AND ae.ended_at IS NOT NULL
+   AND (ae.labor_bucket IS NULL OR ae.labor_bucket = 'billable')
    AND (
      (ae.entity_type = 'job' AND ae.entity_id = $2)
      OR (
@@ -103,6 +111,7 @@ export const TRACKED_LABOR_JOB_WORK_WHERE = `
        AND ae.entity_id IN (
          SELECT v.id FROM visits v
          WHERE v.job_id = $2 AND v.account_id = $1
+           AND v.visit_type IS DISTINCT FROM 'site_visit'
        )
      )
      OR (
@@ -196,8 +205,8 @@ export function mapTrackedLaborDayRows(
  *   1) T&M invoice labor pull (customer rate × quarter hours)
  *   2) Job profit margin (internal cost rate × actual hours)
  *
- * Counts all closed job_work on the job itself, its visits, or its work orders.
- * Deliberately NO labor_bucket filter.
+ * Counts closed billable job_work on the job, its production visits, or its
+ * work orders. Assessment (site_visit) time and non-billable buckets are out.
  */
 export async function trackedLaborMinutesFromActivityEntries(
   client: PoolClient,
