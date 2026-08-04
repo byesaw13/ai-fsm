@@ -312,6 +312,19 @@ export async function createIntakeRecords(
 
   await updateDuplicateCandidates(client, input, bookingId);
 
+  // Owner attention: new request in the queue (non-fatal if emit fails).
+  const { emitAttentionEvent } = await import("@/lib/attention");
+  await emitAttentionEvent(client, {
+    accountId: input.accountId,
+    type: "booking_request.created",
+    entityType: "booking_request",
+    entityId: bookingId,
+    title: "New request",
+    summary: `${input.name}${input.address ? ` · ${input.address}` : ""}`,
+    href: `/app/requests/${bookingId}`,
+    dedupeKey: `booking_request.created:${bookingId}`,
+  });
+
   return {
     bookingId,
     clientId,

@@ -162,6 +162,10 @@ export default async function InvoiceDetailPage({
       [id, session.accountId]
     );
 
+    // Opening the record clears related attention events (hybrid clear rules).
+    const { markEntityAttentionRead } = await import("@/lib/attention");
+    await markEntityAttentionRead(client, session.accountId, "invoice", id);
+
     return {
       invoice: invoiceResult.rows[0] as InvoiceRow,
       lineItems: lineItemsResult.rows as LineItemRow[],

@@ -6,6 +6,7 @@ import { LinkButton, PageContainer, PageHeader, WhatNext } from "@/components/ui
 import { OwnerDashboard } from "./OwnerDashboard";
 import type { CommandVisit, CountAction, MaterialJob } from "./DashboardWidgets";
 import { loadFieldDayData } from "@/lib/my-work/field-day-data";
+import { AttentionCard } from "./AttentionCard";
 
 export const dynamic = "force-dynamic";
 
@@ -273,6 +274,7 @@ export default async function AppPage() {
           </>
         }
       />
+      <AttentionCard session={session} />
       {topAction ? (
         <WhatNext
           title={topAction.label}

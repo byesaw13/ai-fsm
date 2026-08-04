@@ -52,11 +52,44 @@ export function formatInvoiceViewLabel(input: {
 /**
  * Stamp a portal open. Uses the app DB role (bypasses RLS) via a raw pool client
  * or any client that can UPDATE invoices by share_token.
+ *
+ * Returns whether the row was updated, and whether this open set first_viewed_at
+ * for the first time (for attention events).
  */
 export async function recordInvoicePortalView(
-  queryFn: (sql: string, params: unknown[]) => Promise<{ rowCount: number | null }>,
+  queryFn: (
+    sql: string,
+    params: unknown[],
+  ) => Promise<{ rowCount: number | null; rows?: Array<Record<string, unknown>> }>,
   shareToken: string,
-): Promise<boolean> {
+): Promise<{ updated: boolean; firstOpen: boolean; invoice?: {
+  id: string;
+  account_id: string;
+  invoice_number: string;
+  client_name: string | null;
+} }> {
+  // Capture prior first_viewed_at so we only emit attention on first open.
+  const before = await queryFn(
+    `SELECT i.id, i.account_id, i.invoice_number, i.first_viewed_at, c.name AS client_name
+     FROM invoices i
+     LEFT JOIN clients c ON c.id = i.client_id
+     WHERE i.share_token = $1
+       AND i.status IN ('sent', 'partial', 'overdue')`,
+    [shareToken],
+  );
+  const row = before.rows?.[0] as
+    | {
+        id: string;
+        account_id: string;
+        invoice_number: string;
+        first_viewed_at: string | null;
+        client_name: string | null;
+      }
+    | undefined;
+  if (!row) return { updated: false, firstOpen: false };
+
+  const wasFirst = !row.first_viewed_at;
+
   // Only stamp open client-facing invoices. Draft never left the shop; paid/void
   // stay fully money-immutable (view carve-out still exists for edge retries).
   const result = await queryFn(
@@ -68,5 +101,15 @@ export async function recordInvoicePortalView(
        AND status IN ('sent', 'partial', 'overdue')`,
     [shareToken],
   );
-  return (result.rowCount ?? 0) > 0;
+  const updated = (result.rowCount ?? 0) > 0;
+  return {
+    updated,
+    firstOpen: updated && wasFirst,
+    invoice: {
+      id: row.id,
+      account_id: row.account_id,
+      invoice_number: row.invoice_number,
+      client_name: row.client_name,
+    },
+  };
 }
