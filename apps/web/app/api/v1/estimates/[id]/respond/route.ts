@@ -106,6 +106,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         }),
       ]).catch((err) => logger.error("estimate respond: audit/event writes failed", err, { estimateId: id }));
 
+      const { emitAttentionEvent } = await import("@/lib/attention");
+      await emitAttentionEvent(client, {
+        accountId: account_id,
+        type: action === "approve" ? "estimate.approved" : "estimate.declined",
+        entityType: "estimate",
+        entityId: id,
+        title: action === "approve" ? "Estimate approved" : "Estimate declined",
+        href: `/app/estimates/${id}`,
+        dedupeKey: `estimate.${newStatus}:${id}`,
+      });
+
       // On approval: auto-create job + deposit invoice, matching portal and
       // admin paths. Uses savepoints so artifact failures never block the
       // customer's approval confirmation.

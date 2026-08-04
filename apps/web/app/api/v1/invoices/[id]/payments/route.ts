@@ -253,10 +253,33 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         status: string;
         paid_cents: number;
         total_cents: number;
+        invoice_number: string;
       }>(
-        `SELECT status, paid_cents, total_cents FROM invoices WHERE id = $1`,
+        `SELECT status, paid_cents, total_cents, invoice_number FROM invoices WHERE id = $1`,
         [invoiceId]
       );
+
+      const invAfter = updatedInvoice.rows[0];
+      if (
+        !isRefund &&
+        invAfter &&
+        (invAfter.status === "paid" || invAfter.status === "partial")
+      ) {
+        const { emitAttentionEvent } = await import("@/lib/attention");
+        await emitAttentionEvent(client, {
+          accountId: session.accountId,
+          type: invAfter.status === "paid" ? "invoice.paid" : "invoice.partial",
+          entityType: "invoice",
+          entityId: invoiceId,
+          title: invAfter.status === "paid" ? "Invoice paid" : "Partial payment",
+          summary: invAfter.invoice_number,
+          href: `/app/invoices/${invoiceId}`,
+          dedupeKey:
+            invAfter.status === "paid"
+              ? `invoice.paid:${invoiceId}`
+              : `invoice.partial:${invoiceId}:${paymentId}`,
+        });
+      }
 
       // Audit log for payment creation
       await appendAuditLog(client, {

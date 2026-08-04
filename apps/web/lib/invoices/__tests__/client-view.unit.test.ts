@@ -48,14 +48,53 @@ describe("formatInvoiceViewLabel", () => {
 });
 
 describe("recordInvoicePortalView", () => {
-  it("runs the stamp update by share token", async () => {
-    const queryFn = vi.fn().mockResolvedValue({ rowCount: 1 });
-    const ok = await recordInvoicePortalView(queryFn, "token-uuid");
-    expect(ok).toBe(true);
-    expect(queryFn).toHaveBeenCalledOnce();
-    const [sql, params] = queryFn.mock.calls[0];
+  it("detects first open and stamps the invoice", async () => {
+    const queryFn = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [
+          {
+            id: "inv-1",
+            account_id: "acc-1",
+            invoice_number: "INV-0001",
+            first_viewed_at: null,
+            client_name: "Pat",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] });
+
+    const result = await recordInvoicePortalView(queryFn, "token-uuid");
+    expect(result.updated).toBe(true);
+    expect(result.firstOpen).toBe(true);
+    expect(result.invoice?.invoice_number).toBe("INV-0001");
+    expect(queryFn).toHaveBeenCalledTimes(2);
+    const [sql, params] = queryFn.mock.calls[1];
     expect(sql).toMatch(/first_viewed_at = COALESCE/);
     expect(sql).toMatch(/status IN \('sent', 'partial', 'overdue'\)/);
     expect(params).toEqual(["token-uuid"]);
+  });
+
+  it("does not treat re-open as first open", async () => {
+    const queryFn = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [
+          {
+            id: "inv-1",
+            account_id: "acc-1",
+            invoice_number: "INV-0001",
+            first_viewed_at: "2026-07-01T00:00:00Z",
+            client_name: "Pat",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] });
+
+    const result = await recordInvoicePortalView(queryFn, "token-uuid");
+    expect(result.firstOpen).toBe(false);
+    expect(result.updated).toBe(true);
   });
 });

@@ -25,6 +25,11 @@ import {
   IconQueue,
   IconDayReview,
 } from "./NavIcons";
+import {
+  AttentionBell,
+  NavCountBadge,
+  useAttentionSummary,
+} from "./attention/AttentionBell";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
 
@@ -231,10 +236,13 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
   // for pure admins (who get bounced there from My Day anyway).
   const homeHref = role === "admin" ? "/app" : "/app/my-work";
 
-  // Close the More sheet whenever navigation happens.
+  const { summary: attention, refresh: refreshAttention } = useAttentionSummary(isAdminOrOwner);
+
+  // Close the More sheet whenever navigation happens; refresh attention counts.
   useEffect(() => {
     setShowMore(false);
-  }, [pathname]);
+    if (isAdminOrOwner) void refreshAttention();
+  }, [pathname, isAdminOrOwner, refreshAttention]);
 
   const avatarLetter = userName ? userName[0].toUpperCase() : role[0].toUpperCase();
   const displayName = userName || "Account";
@@ -252,6 +260,11 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
               </div>
               <span className="p7-brand-name">Dovetails</span>
             </Link>
+            {isAdminOrOwner && !collapsed && (
+              <div style={{ position: "absolute", top: 10, right: 40, zIndex: 2 }}>
+                <AttentionBell summary={attention} onChanged={() => void refreshAttention()} />
+              </div>
+            )}
             <button
               type="button"
               onClick={toggleCollapse}
@@ -297,6 +310,12 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
                 {section.label && <div className="p7-nav-section">{section.label}</div>}
                 {section.items.map((item) => {
                   const active = isNavActive(pathname, item.href, item.activePrefixes);
+                  const count =
+                    item.href === NAV_REQUESTS.href
+                      ? attention.requestsCount
+                      : item.href === NAV_INVOICES.href
+                        ? attention.invoicesCount
+                        : 0;
                   return (
                     <Link
                       key={item.href}
@@ -304,6 +323,7 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
                       className={`p7-nav-item ${active ? "p7-nav-active" : ""}`}
                       aria-current={active ? "page" : undefined}
                       title={item.label}
+                      style={{ display: "flex", alignItems: "center", gap: 8 }}
                     >
                       <span className="p7-nav-icon" aria-hidden="true" style={{ position: "relative" }}>
                         <item.Icon size={18} />
@@ -312,6 +332,7 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
                         )}
                       </span>
                       <span className="p7-nav-label">{item.label}</span>
+                      {isAdminOrOwner && <NavCountBadge count={count} />}
                     </Link>
                   );
                 })}
@@ -409,6 +430,11 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
               onClick={() => setShowMore(false)}
             />
             <div id="p7-more-sheet" className="p7-more-sheet" role="dialog" aria-label="All destinations">
+              {isAdminOrOwner && (
+                <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 12px 0" }}>
+                  <AttentionBell summary={attention} onChanged={() => void refreshAttention()} />
+                </div>
+              )}
               <div className="p7-more-sections">
                 {sections.map((section, sectionIdx) => (
                   <div key={sectionIdx} className="p7-more-section">
@@ -418,6 +444,12 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
                     <div className="p7-more-grid">
                       {section.items.map((item) => {
                         const active = isNavActive(pathname, item.href, item.activePrefixes);
+                        const count =
+                          item.href === NAV_REQUESTS.href
+                            ? attention.requestsCount
+                            : item.href === NAV_INVOICES.href
+                              ? attention.invoicesCount
+                              : 0;
                         return (
                           <Link
                             key={item.href}
@@ -430,6 +462,28 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
                               <item.Icon size={20} />
                               {item.href === NAV_DAY_REVIEW.href && reviewPending && (
                                 <span style={{ position: "absolute", top: -3, right: -3, width: 8, height: 8, borderRadius: "50%", background: "#ef4444", border: "1.5px solid var(--bg)" }} />
+                              )}
+                              {isAdminOrOwner && count > 0 && (
+                                <span
+                                  style={{
+                                    position: "absolute",
+                                    top: -6,
+                                    right: -8,
+                                    minWidth: 16,
+                                    height: 16,
+                                    padding: "0 4px",
+                                    borderRadius: 999,
+                                    background: "#dc2626",
+                                    color: "#fff",
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  {count > 99 ? "99+" : count}
+                                </span>
                               )}
                             </span>
                             <span>{item.label}</span>

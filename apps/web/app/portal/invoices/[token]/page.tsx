@@ -70,17 +70,40 @@ export default async function InvoicePortalPage({
 
   if (!invoice) notFound();
 
-  // Best-effort: stamp client open so owners see Unread vs Viewed.
+  // Best-effort: stamp client open so owners see Unread vs Viewed + attention feed.
   // Never block the portal render if the stamp fails.
   try {
-    await recordInvoicePortalView(
+    const pool = getPool();
+    const view = await recordInvoicePortalView(
       async (sql, params) => {
-        const pool = getPool();
         const r = await pool.query(sql, params);
-        return { rowCount: r.rowCount };
+        return { rowCount: r.rowCount, rows: r.rows };
       },
       token,
     );
+    if (view.firstOpen && view.invoice) {
+      const { emitAttentionEvent } = await import("@/lib/attention");
+      const client = await pool.connect();
+      try {
+        await emitAttentionEvent(client, {
+          accountId: view.invoice.account_id,
+          type: "invoice.opened",
+          entityType: "invoice",
+          entityId: view.invoice.id,
+          title: "Invoice opened",
+          summary: [
+            view.invoice.invoice_number,
+            view.invoice.client_name,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          href: `/app/invoices/${view.invoice.id}`,
+          dedupeKey: `invoice.opened:${view.invoice.id}`,
+        });
+      } finally {
+        client.release();
+      }
+    }
   } catch {
     // ignore — view tracking is advisory
   }

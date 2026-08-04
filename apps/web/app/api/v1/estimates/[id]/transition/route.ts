@@ -223,6 +223,20 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         );
       }
 
+      if (targetStatus === "approved" || targetStatus === "declined") {
+        const { emitAttentionEvent } = await import("@/lib/attention");
+        await emitAttentionEvent(client, {
+          accountId: session.accountId,
+          type: targetStatus === "approved" ? "estimate.approved" : "estimate.declined",
+          entityType: "estimate",
+          entityId: id,
+          title: targetStatus === "approved" ? "Estimate approved" : "Estimate declined",
+          summary: null,
+          href: `/app/estimates/${id}`,
+          dedupeKey: `estimate.${targetStatus}:${id}`,
+        });
+      }
+
       // Audit log
       await appendAuditLog(client, {
         account_id: session.accountId,
