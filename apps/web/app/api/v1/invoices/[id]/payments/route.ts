@@ -126,10 +126,11 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         status: string;
         total_cents: number;
         paid_cents: number;
+        deposit_cents: number;
         client_id: string;
         job_id: string | null;
       }>(
-        `SELECT id, status, total_cents, paid_cents, client_id, job_id
+        `SELECT id, status, total_cents, paid_cents, deposit_cents, client_id, job_id
          FROM invoices
          WHERE id = $1 AND account_id = $2
          FOR UPDATE`,
@@ -161,11 +162,12 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           );
         }
 
-        // Validate amount
+        // Validate amount (deposit credit reduces collectible remaining)
         const amountError = validatePaymentAmount(
           amount_cents,
           invoice.total_cents,
-          invoice.paid_cents
+          invoice.paid_cents,
+          invoice.deposit_cents,
         );
         if (amountError) {
           throw Object.assign(new Error(amountError), {

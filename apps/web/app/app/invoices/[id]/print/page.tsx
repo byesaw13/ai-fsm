@@ -12,6 +12,7 @@ import { DocumentPrintBar } from "@/components/documents/DocumentPrintBar";
 import { PaidStamp } from "@/components/invoices/PaidStamp";
 import { formatLineQuantityDisplay } from "@/lib/invoices/quantity";
 import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
+import { amountDueCents, isInvoiceFullyPaid } from "@/lib/invoices/payments";
 import {
   documentJoins,
   documentLocationSelect,
@@ -28,6 +29,7 @@ interface InvoiceRow {
   tax_cents: number;
   total_cents: number;
   paid_cents: number;
+  deposit_cents: number;
   paid_at: string | null;
   deposit_type: string | null;
   deposit_percentage: number | null;
@@ -83,7 +85,7 @@ export default async function InvoicePrintPage({
     const invResult = await client.query(
       `SELECT
          i.id, i.status, i.invoice_number,
-         i.subtotal_cents, i.tax_cents, i.total_cents, i.paid_cents, i.paid_at,
+         i.subtotal_cents, i.tax_cents, i.total_cents, i.paid_cents, i.deposit_cents, i.paid_at,
          i.deposit_type, i.deposit_percentage, i.deposit_fixed_cents,
          i.notes, i.due_date, i.sent_at, i.created_at,
          j.title AS job_title,
@@ -121,9 +123,11 @@ export default async function InvoicePrintPage({
   );
   const contactLines = brandingContactLines(branding);
   const hasLogo = !!branding.logoPath;
-  const balance = invoice.total_cents - invoice.paid_cents;
+  const depositCredit = Math.max(0, invoice.deposit_cents ?? 0);
+  const balance = amountDueCents(invoice.total_cents, invoice.paid_cents, depositCredit);
   const invoicePaid =
-    invoice.status === "paid" || (invoice.total_cents > 0 && invoice.paid_cents >= invoice.total_cents);
+    invoice.status === "paid" ||
+    isInvoiceFullyPaid(invoice.total_cents, invoice.paid_cents, depositCredit);
   const depositDueNow = Math.max(
     0,
     requestedDepositCents(
@@ -148,9 +152,7 @@ export default async function InvoicePrintPage({
     client_state: invoice.client_state,
     client_zip: invoice.client_zip,
   });
-  const isPaid =
-    invoice.status === "paid" ||
-    (invoice.total_cents > 0 && invoice.paid_cents >= invoice.total_cents);
+  const isPaid = invoicePaid;
 
   const fileStatus =
     invoice.status === "void"
@@ -300,6 +302,12 @@ export default async function InvoicePrintPage({
                 <td colSpan={3}>Total</td>
                 <td className="amt">{formatCents(invoice.total_cents)}</td>
               </tr>
+              {depositCredit > 0 && (
+                <tr>
+                  <td colSpan={3}>Deposit credit</td>
+                  <td className="amt">−{formatCents(depositCredit)}</td>
+                </tr>
+              )}
               {invoice.paid_cents > 0 && (
                 <tr>
                   <td colSpan={3}>Paid</td>

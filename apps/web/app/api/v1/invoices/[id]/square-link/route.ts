@@ -8,6 +8,7 @@ import {
   createSquarePaymentLink,
 } from "@/lib/integrations/square-payments";
 import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
+import { amountDueCents } from "@/lib/invoices/payments";
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
@@ -89,12 +90,19 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       }
 
       // Resolve amount + payment type from the requested kind.
-      const remaining = Math.max(0, invoice.total_cents - invoice.paid_cents);
+      // deposit_cents on a final invoice is a credit (already billed elsewhere),
+      // not a first-payment due on this document.
+      const remaining = amountDueCents(
+        invoice.total_cents,
+        invoice.paid_cents,
+        invoice.deposit_cents,
+      );
       let amount: number;
       let paymentType: "deposit" | "progress";
       if (kind === "deposit") {
-        // Requested-deposit policy (computed live from the total). Fall back to
-        // the legacy deposit_cents credit for estimate deposit invoices.
+        // First-payment model only (deposit_type percentage/fixed).
+        // Do not fall back to deposit_cents credit — that would charge a deposit
+        // that was already billed on a separate deposit invoice.
         const policyDeposit = requestedDepositCents(
           {
             depositType: invoice.deposit_type,
@@ -103,9 +111,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           },
           invoice.total_cents,
         );
-        // First-payment model: only charge the still-unpaid part of the deposit.
         const policyDepositRemaining = Math.max(0, policyDeposit - invoice.paid_cents);
-        amount = policyDepositRemaining > 0 ? policyDepositRemaining : invoice.deposit_cents;
+        amount = policyDepositRemaining;
         paymentType = "deposit";
         if (amount <= 0) {
           throw Object.assign(

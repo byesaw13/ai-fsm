@@ -4,6 +4,7 @@ import { withInvoiceContext } from "@/lib/invoices/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
 import { getPathId } from "@/lib/route-utils";
+import { deriveInvoiceStatus } from "@/lib/invoices/payments";
 
 export const dynamic = "force-dynamic";
 
@@ -42,8 +43,9 @@ export const DELETE = withRole(["owner"], async (request, session) => {
         status: string;
         paid_cents: number;
         total_cents: number;
+        deposit_cents: number;
       }>(
-        `SELECT status, paid_cents, total_cents
+        `SELECT status, paid_cents, total_cents, deposit_cents
          FROM invoices WHERE id = $1 FOR UPDATE`,
         [payment.invoice_id]
       );
@@ -80,13 +82,13 @@ export const DELETE = withRole(["owner"], async (request, session) => {
 
       const newPaidCents = parseInt(sumResult.rows[0].total_paid, 10);
 
-      // Derive new status
-      let newStatus: string;
-      if (newPaidCents >= invBefore.total_cents) {
-        newStatus = "paid";
-      } else if (newPaidCents > 0) {
-        newStatus = "partial";
-      } else {
+      // Deposit credit counts toward paid (mirrors sync_invoice_on_payment / 164)
+      let newStatus: string = deriveInvoiceStatus(
+        invBefore.total_cents,
+        newPaidCents,
+        invBefore.deposit_cents,
+      );
+      if (newPaidCents === 0 && newStatus !== "paid") {
         // No payments remaining — revert to sent (the pre-payment state)
         newStatus = "sent";
       }

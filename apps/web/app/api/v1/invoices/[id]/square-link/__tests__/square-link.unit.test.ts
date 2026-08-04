@@ -160,4 +160,44 @@ describe("POST /api/v1/invoices/[id]/square-link", () => {
     const res = await POST(post({ kind: "deposit" }));
     expect(res.status).toBe(400);
   });
+
+  it("balance link subtracts deposit credit (final-invoice model)", async () => {
+    // $1552.60 total, $150 deposit credit → charge $1402.60 remaining
+    const withCredit = {
+      ...PAYABLE_INVOICE,
+      total_cents: 1_552_600,
+      paid_cents: 0,
+      deposit_cents: 150_000,
+      balance_cents: 1_402_600,
+      deposit_type: "none",
+      deposit_percentage: null,
+      deposit_fixed_cents: null,
+    };
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [withCredit], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ id: "PAYROW" }], rowCount: 1 });
+    mockLoad.mockResolvedValue(ENABLED_SETTINGS);
+    mockCreateLink.mockResolvedValue({ url: "https://sq/checkout/PL4", orderId: "ORD4", paymentLinkId: "PL4" });
+
+    const res = await POST(post({ kind: "balance" }));
+    expect(res.status).toBe(201);
+    expect(mockCreateLink).toHaveBeenCalledWith(
+      ENABLED_SETTINGS,
+      expect.objectContaining({ amountCents: 1_402_600 }),
+    );
+  });
+
+  it("400 when requesting deposit link on credit-only invoice (no first-payment policy)", async () => {
+    const creditOnly = {
+      ...PAYABLE_INVOICE,
+      deposit_cents: 150_000,
+      deposit_type: "none",
+      deposit_percentage: null,
+      deposit_fixed_cents: null,
+    };
+    mockClientQuery.mockResolvedValueOnce({ rows: [creditOnly], rowCount: 1 });
+    const res = await POST(post({ kind: "deposit" }));
+    expect(res.status).toBe(400);
+  });
 });

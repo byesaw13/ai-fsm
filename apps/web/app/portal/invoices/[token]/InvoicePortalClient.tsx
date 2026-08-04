@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { STANDARD_INVOICE_TERMS, resolveDepositPolicy, renderDepositTerms, invoiceDueOnCompletion } from "@ai-fsm/domain";
 import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
+import { amountDueCents, isInvoiceFullyPaid } from "@/lib/invoices/payments";
 import { PaidStamp } from "@/components/invoices/PaidStamp";
 
 interface LineItem {
@@ -56,7 +57,8 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
   const [loadingPayment, setLoadingPayment] = useState(false);
   const [paymentError, setPaymentError] = useState("");
 
-  const balance = Math.max(0, invoice.total_cents - paidCents);
+  const depositCredit = Math.max(0, invoice.deposit_cents ?? 0);
+  const balance = amountDueCents(invoice.total_cents, paidCents, depositCredit);
   // Requested deposit (first-payment model): how much of the deposit is still owed.
   const requestedDeposit = requestedDepositCents(
     {
@@ -67,11 +69,11 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
     invoice.total_cents,
   );
   const depositDueNow = Math.max(0, requestedDeposit - paidCents);
-  const remainingAfterDeposit = Math.max(0, invoice.total_cents - requestedDeposit);
-  // Match print/PDF: paid status OR fully covered by payments.
+  const remainingAfterDeposit = Math.max(0, invoice.total_cents - depositCredit - requestedDeposit);
+  // Match print/PDF: paid status OR fully covered by payments + deposit credit.
   const isPaid =
     status === "paid" ||
-    (invoice.total_cents > 0 && paidCents >= invoice.total_cents);
+    isInvoiceFullyPaid(invoice.total_cents, paidCents, depositCredit);
   const isVoid = status === "void";
   // TASK-078: while the job is still open the balance is "due on completion" — the
   // client is not overdue even if a stamped due date has passed.
@@ -254,6 +256,12 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
             <div style={{ display: "flex", gap: 36, fontWeight: 700, color: "#166534" }}>
               <span>Total</span><span style={{ fontFamily: "monospace" }}>{cents(invoice.total_cents)}</span>
             </div>
+            {depositCredit > 0 && (
+              <div style={{ display: "flex", gap: 36, color: "#15803d", fontWeight: 600 }}>
+                <span>Deposit credit</span>
+                <span style={{ fontFamily: "monospace" }}>−{cents(depositCredit)}</span>
+              </div>
+            )}
             {paidCents > 0 && (
               <div style={{ display: "flex", gap: 36, color: "#15803d", fontWeight: 600 }}>
                 <span>Paid</span><span style={{ fontFamily: "monospace" }}>−{cents(paidCents)}</span>

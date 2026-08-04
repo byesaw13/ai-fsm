@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { queryOne, query, getPool } from "@/lib/db";
 import { loadSquareSettings, createSquarePaymentLink } from "@/lib/integrations/square-payments";
 import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
+import { amountDueCents } from "@/lib/invoices/payments";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -95,7 +96,7 @@ export async function POST(
 
   const invoice = await queryOne<InvoiceRow>(
     `SELECT i.id, i.account_id, i.status, i.invoice_number, i.total_cents,
-            i.paid_cents, i.job_id, i.client_id, i.created_by,
+            i.paid_cents, i.deposit_cents, i.job_id, i.client_id, i.created_by,
             i.deposit_type, i.deposit_percentage, i.deposit_fixed_cents,
             i.square_payment_link_url
      FROM invoices i
@@ -108,14 +109,18 @@ export async function POST(
     return NextResponse.json({ error: "Invoice is not payable" }, { status: 422 });
   }
 
-  const balance = invoice.total_cents - invoice.paid_cents;
+  const balance = amountDueCents(
+    invoice.total_cents,
+    invoice.paid_cents,
+    invoice.deposit_cents ?? 0,
+  );
   if (balance <= 0) {
     return NextResponse.json({ error: "Nothing left to pay" }, { status: 422 });
   }
 
   // First-payment model: while a deposit is still owed, the online payment
   // charges the deposit-due-now, not the full balance. Once the deposit is
-  // covered, it charges the remaining balance.
+  // covered, it charges the remaining balance (after deposit credit).
   const depositDueNow = Math.max(
     0,
     requestedDepositCents(
@@ -131,14 +136,37 @@ export async function POST(
   const chargeKind: "deposit" | "progress" = depositDueNow > 0 ? "deposit" : "progress";
   const chargeLabel = depositDueNow > 0 ? "Deposit" : "Balance";
 
-  // Reuse an existing link (owner may have already created one).
-  if (invoice.square_payment_link_url) {
-    return NextResponse.json({ url: invoice.square_payment_link_url });
-  }
-
   const pool = getPool();
   const client = await pool.connect();
   try {
+    // Reuse a pending Square link only when its amount matches the current
+    // collectible balance. Stale links (created before deposit-credit math)
+    // would charge the uncredited total.
+    if (invoice.square_payment_link_url) {
+      const pending = await client.query<{ amount_cents: number }>(
+        `SELECT amount_cents FROM payments
+         WHERE invoice_id = $1 AND status = 'pending' AND method = 'square'
+         ORDER BY created_at DESC LIMIT 1`,
+        [invoice.id],
+      );
+      const pendingAmount = pending.rows[0]?.amount_cents;
+      if (pendingAmount === chargeCents) {
+        return NextResponse.json({ url: invoice.square_payment_link_url });
+      }
+      // Drop mismatched pending row + link so we recreate below.
+      await client.query(
+        `DELETE FROM payments
+         WHERE invoice_id = $1 AND status = 'pending' AND method = 'square'`,
+        [invoice.id],
+      );
+      await client.query(
+        `UPDATE invoices
+         SET square_order_id = NULL, square_checkout_id = NULL, square_payment_link_url = NULL
+         WHERE id = $1`,
+        [invoice.id],
+      );
+    }
+
     const settings = await loadSquareSettings(client, invoice.account_id as string);
     if (
       !settings ||

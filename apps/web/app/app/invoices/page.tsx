@@ -18,6 +18,7 @@ import {
 } from "@/components/ui";
 import type { MetricCardData } from "@/components/ui";
 import { formatInvoiceViewLabel, isInvoiceUnread } from "@/lib/invoices/client-view";
+import { amountDueCents } from "@/lib/invoices/payments";
 import { MONEY_HUB_LINKS } from "@/lib/navigation/hubs";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ interface InvoiceRow {
   tax_cents: number;
   total_cents: number;
   paid_cents: number;
+  deposit_cents: number;
   due_date: string | null;
   created_at: string;
   sent_at: string | null;
@@ -110,7 +112,7 @@ export default async function InvoicesPage() {
   const invoices = await withInvoiceContext(session, async (client) => {
     const r = await client.query(
       `SELECT i.id, i.status, i.invoice_number,
-              i.subtotal_cents, i.tax_cents, i.total_cents, i.paid_cents,
+              i.subtotal_cents, i.tax_cents, i.total_cents, i.paid_cents, i.deposit_cents,
               i.due_date, i.created_at, i.sent_at,
               i.first_viewed_at, i.last_viewed_at, i.view_count,
               i.invoice_kind, j.status AS job_status,
@@ -144,11 +146,14 @@ export default async function InvoicesPage() {
 
   const totalOutstanding = invoices
     .filter((i) => ["sent", "partial", "overdue"].includes(effectiveInvoiceStatus(i)))
-    .reduce((sum, i) => sum + (i.total_cents - i.paid_cents), 0);
+    .reduce(
+      (sum, i) => sum + amountDueCents(i.total_cents, i.paid_cents, i.deposit_cents ?? 0),
+      0,
+    );
 
   const totalOverdue = grouped.overdue.reduce(
-    (sum, i) => sum + (i.total_cents - i.paid_cents),
-    0
+    (sum, i) => sum + amountDueCents(i.total_cents, i.paid_cents, i.deposit_cents ?? 0),
+    0,
   );
 
   const totalPaid = grouped.paid.reduce((sum, i) => sum + i.paid_cents, 0);
@@ -242,7 +247,11 @@ export default async function InvoicesPage() {
               count={grouped[status].length}
             >
               {grouped[status].map((inv) => {
-                const amountDue = inv.total_cents - inv.paid_cents;
+                const amountDue = amountDueCents(
+                  inv.total_cents,
+                  inv.paid_cents,
+                  inv.deposit_cents ?? 0,
+                );
                 const open = isOpenBalance(inv.status);
                 // TASK-078: an open job's balance is "due on completion" — never
                 // aging/overdue while the work is unfinished, even if a due date passed.
