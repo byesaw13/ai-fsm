@@ -20,6 +20,7 @@ import {
 import { formatCents } from "@/lib/money";
 import type { FilterDef, StatusVariant, MetricCardData } from "@/components/ui";
 import { WORK_HUB_LINKS } from "@/lib/navigation/hubs";
+import { estimateAttentionPredicate } from "@/lib/attention/counts";
 import { EstimateBoard } from "./EstimateBoard";
 
 export const dynamic = "force-dynamic";
@@ -77,29 +78,42 @@ const ESTIMATE_FILTERS: FilterDef[] = [
 ];
 
 interface PageProps {
-  searchParams: Promise<{ q?: string; status?: string; tier?: string; view?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    status?: string;
+    tier?: string;
+    view?: string;
+    attention?: string;
+  }>;
 }
 
 
 export default async function EstimatesPage({ searchParams }: PageProps) {
-  const { q, status, tier, view } = await searchParams;
+  const { q, status, tier, view, attention } = await searchParams;
   const session = await getSession();
   if (!session) redirect("/login");
   if (session.role === "tech") redirect("/app/my-work"); // EPIC-006: techs have no estimate access
 
   const canCreate = canCreateEstimates(session.role);
-  const isBoardView = view !== "list"; // default to Kanban Board view!
+  const attentionMode = attention === "1" || attention === "true";
+  // Attention deep-link: list of sent (non-expired) estimates matching badge count.
+  const isBoardView = !attentionMode && view !== "list";
 
   const searchPattern = q ? `%${q.toLowerCase()}%` : null;
-  const activeTier = (tier && tier in ESTIMATE_TIER_STATUSES) ? tier as EstimateTier : null;
+  const activeTier =
+    !attentionMode && tier && tier in ESTIMATE_TIER_STATUSES ? (tier as EstimateTier) : null;
   const statusFilter =
-    status && (STATUS_ORDER as string[]).includes(status) ? status : null;
+    !attentionMode && status && (STATUS_ORDER as string[]).includes(status) ? status : null;
   const tierStatuses = activeTier && !statusFilter ? ESTIMATE_TIER_STATUSES[activeTier] : null;
 
   const estimates = await withEstimateContext(session, async (client) => {
     const conditions: string[] = ["e.account_id = $1"];
     const params: unknown[] = [session.accountId];
     let idx = 2;
+
+    if (attentionMode) {
+      conditions.push(estimateAttentionPredicate("e"));
+    }
 
     if (searchPattern) {
       conditions.push(
@@ -134,7 +148,7 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
     return r.rows as EstimateRow[];
   });
 
-  const hasFilter = !!(q || statusFilter || activeTier);
+  const hasFilter = !!(q || statusFilter || activeTier || attentionMode);
   const currentValues: Record<string, string> = {};
   if (q) currentValues.q = q;
   if (status) currentValues.status = status;
@@ -218,6 +232,26 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
         }
       />
       <HubSubnav hub="Work" links={WORK_HUB_LINKS} pathname="/app/estimates" />
+
+      {attentionMode && (
+        <p
+          data-testid="attention-filter-banner"
+          style={{
+            margin: "0 0 var(--space-3)",
+            padding: "10px 14px",
+            borderRadius: 8,
+            background: "color-mix(in srgb, var(--color-success, #16a34a) 12%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--color-success, #16a34a) 35%, transparent)",
+            fontSize: "var(--text-sm)",
+            color: "var(--fg)",
+          }}
+        >
+          Showing sent estimates awaiting client response.{" "}
+          <Link href={"/app/estimates" as Route} style={{ fontWeight: 600 }}>
+            Clear filter
+          </Link>
+        </p>
+      )}
 
       {estimates.length > 0 && (
         <MetricGrid metrics={metrics} />

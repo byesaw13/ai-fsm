@@ -39,8 +39,19 @@ export interface AttentionEventRow {
 export interface AttentionSummary {
   requestsCount: number;
   invoicesCount: number;
+  estimatesCount: number;
   unreadEventCount: number;
 }
+
+/** Types that trigger owner email via notification_queue (not partial). */
+export const ATTENTION_EMAIL_TYPES = [
+  "invoice.opened",
+  "invoice.paid",
+  "estimate.approved",
+  "estimate.declined",
+] as const;
+
+export type AttentionEmailType = (typeof ATTENTION_EMAIL_TYPES)[number];
 
 export interface EmitAttentionEventInput {
   accountId: string;

@@ -224,8 +224,8 @@ async function handleCompletedPayment(
         JSON.stringify({ invoiceId, amountCents, method: "square", source: "square_webhook" }),
       ]
     );
-    const inv = await client.query<{ status: string }>(
-      `SELECT status FROM invoices WHERE id = $1`,
+    const inv = await client.query<{ status: string; invoice_number: string }>(
+      `SELECT status, invoice_number FROM invoices WHERE id = $1`,
       [invoiceId]
     );
     if (inv.rows[0]?.status === "paid") {
@@ -234,6 +234,21 @@ async function handleCompletedPayment(
          VALUES ($1, 'invoice.paid', 'invoice', $2, $3)`,
         [accountId, invoiceId, JSON.stringify({ amountCents, method: "square" })]
       );
+    }
+    // Owner attention (in-app + optional email via queue)
+    if (inv.rows[0] && (inv.rows[0].status === "paid" || inv.rows[0].status === "partial")) {
+      try {
+        const { emitInvoicePaymentAttention } = await import("@/lib/attention");
+        await emitInvoicePaymentAttention(client, {
+          accountId,
+          invoiceId,
+          invoiceNumber: inv.rows[0].invoice_number,
+          status: inv.rows[0].status,
+          paymentId: paymentRowId,
+        });
+      } catch (attErr) {
+        logger.error("Square webhook: attention emit failed (non-fatal)", attErr);
+      }
     }
 
     await client.query("COMMIT");

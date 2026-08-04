@@ -3,6 +3,7 @@ import { runAllDueAutomations } from "./automations/runner.js";
 import { expireEstimates } from "./expire-estimates.js";
 import { closeStaleBookingRequests } from "./stale-booking-requests.js";
 import { pruneLocationEvents } from "./prune-location-events.js";
+import { pruneAttentionEvents } from "./prune-attention-events.js";
 import { processWorkflowEvents } from "./workflow-events.js";
 import { dispatchNotificationQueue } from "./notification/dispatch.js";
 import { logger } from "./logger.js";
@@ -55,6 +56,11 @@ async function runPollIteration(client: Client): Promise<void> {
     const pruneResult = await pruneLocationEvents(client);
     if (pruneResult.deleted > 0) {
       logger.info("prune-location-events complete", { deleted: pruneResult.deleted });
+    }
+
+    const attentionPrune = await pruneAttentionEvents(client);
+    if (attentionPrune.deleted > 0) {
+      logger.info("prune-attention-events complete", { deleted: attentionPrune.deleted });
     }
   } catch (error) {
     logger.error("worker poll failed", error);

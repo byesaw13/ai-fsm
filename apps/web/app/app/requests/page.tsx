@@ -65,7 +65,7 @@ type RequestRow = {
 };
 
 interface PageProps {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; attention?: string }>;
 }
 
 function formatDate(value: string): string {
@@ -144,13 +144,18 @@ export default async function RequestsPage({ searchParams }: PageProps) {
   if (!session) redirect("/login");
   if (session.role === "tech") redirect("/app");
 
-  const { status: statusFilter } = await searchParams;
+  const { status: statusFilter, attention } = await searchParams;
+  // Nav badge deep-link: same open funnel as default, with a clear banner.
+  const attentionMode = attention === "1" || attention === "true";
   // Default = open funnel only (not converted/lost/cancelled/duplicate).
   // Explicit ?status=… filters one status; ?status=all shows everything.
-  const showAll = statusFilter === "all";
+  // ?attention=1 always uses the open funnel (matches requestsCount badge).
+  const showAll = !attentionMode && statusFilter === "all";
   const validStatus =
-    !showAll && STATUS_ORDER.includes(statusFilter ?? "") ? statusFilter : null;
-  const defaultOpen = !showAll && !validStatus;
+    !attentionMode && !showAll && STATUS_ORDER.includes(statusFilter ?? "")
+      ? statusFilter
+      : null;
+  const defaultOpen = attentionMode || (!showAll && !validStatus);
 
   const conditions = ["br.account_id = $1"];
   const params: unknown[] = [session.accountId];
@@ -213,6 +218,26 @@ export default async function RequestsPage({ searchParams }: PageProps) {
       />
       <HubSubnav hub="Work" links={WORK_HUB_LINKS} pathname="/app/requests" />
 
+      {attentionMode && (
+        <p
+          data-testid="attention-filter-banner"
+          style={{
+            margin: "0 0 var(--space-3)",
+            padding: "10px 14px",
+            borderRadius: 8,
+            background: "color-mix(in srgb, var(--color-success, #16a34a) 12%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--color-success, #16a34a) 35%, transparent)",
+            fontSize: "var(--text-sm)",
+            color: "var(--fg)",
+          }}
+        >
+          Showing open requests that need attention.{" "}
+          <Link href={"/app/requests" as Route} style={{ fontWeight: 600 }}>
+            Clear filter
+          </Link>
+        </p>
+      )}
+
       <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginBottom: "var(--space-4)" }}>
         <Link
           href={"/app/requests" as Route}
@@ -220,9 +245,9 @@ export default async function RequestsPage({ searchParams }: PageProps) {
             padding: "4px 12px",
             borderRadius: "var(--radius-full)",
             fontSize: "var(--text-sm)",
-            fontWeight: defaultOpen ? 600 : 400,
-            background: defaultOpen ? "var(--accent)" : "var(--bg-subtle)",
-            color: defaultOpen ? "#fff" : "var(--fg)",
+            fontWeight: defaultOpen && !attentionMode ? 600 : 400,
+            background: defaultOpen && !attentionMode ? "var(--accent)" : "var(--bg-subtle)",
+            color: defaultOpen && !attentionMode ? "#fff" : "var(--fg)",
             textDecoration: "none",
           }}
         >

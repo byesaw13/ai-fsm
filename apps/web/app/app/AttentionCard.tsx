@@ -31,6 +31,11 @@ export async function AttentionCard({ session }: { session: SessionPayload }) {
       `${summary.requestsCount} open request${summary.requestsCount === 1 ? "" : "s"}`,
     );
   }
+  if (summary.estimatesCount > 0) {
+    parts.push(
+      `${summary.estimatesCount} sent estimate${summary.estimatesCount === 1 ? "" : "s"} awaiting response`,
+    );
+  }
   if (summary.invoicesCount > 0) {
     parts.push(
       `${summary.invoicesCount} invoice${summary.invoicesCount === 1 ? "" : "s"} need attention`,
@@ -47,7 +52,7 @@ export async function AttentionCard({ session }: { session: SessionPayload }) {
       <Card data-testid="attention-card" style={{ marginBottom: "var(--space-4)" }}>
         <SectionHeader title="Attention" />
         <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-          All caught up — no open request/invoice queues and nothing new in the last 90 days.
+          All caught up — no open request/estimate/invoice queues and nothing new in the last 90 days.
         </p>
       </Card>
     );
@@ -59,11 +64,13 @@ export async function AttentionCard({ session }: { session: SessionPayload }) {
       {parts.length > 0 && (
         <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
           {parts.join(" · ")}{" "}
-          <Link href={"/app/requests" as Route} style={{ marginLeft: 8 }}>
+          <Link href={"/app/requests?attention=1" as Route} style={{ marginLeft: 8 }}>
             Requests
           </Link>
           {" · "}
-          <Link href={"/app/invoices" as Route}>Invoices</Link>
+          <Link href={"/app/estimates?attention=1" as Route}>Estimates</Link>
+          {" · "}
+          <Link href={"/app/invoices?attention=1" as Route}>Invoices</Link>
         </p>
       )}
       <div style={{ display: "grid", gap: "var(--space-2)" }}>

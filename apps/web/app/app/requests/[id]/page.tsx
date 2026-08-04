@@ -117,6 +117,17 @@ export default async function BookingRequestDetailPage({
 
   if (!br) notFound();
 
+  // Opening the record clears related attention events.
+  try {
+    const { withDbSession } = await import("@/lib/db");
+    const { markEntityAttentionRead } = await import("@/lib/attention");
+    await withDbSession(session, (client) =>
+      markEntityAttentionRead(client, session.accountId, "booking_request", id),
+    );
+  } catch {
+    // non-fatal
+  }
+
   const duplicateIds = br.duplicate_candidate_ids ?? [];
   const duplicateRows = duplicateIds.length > 0
     ? await query<DuplicateBookingRow>(

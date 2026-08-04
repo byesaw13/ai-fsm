@@ -42,6 +42,16 @@ export default async function EstimateDetailPage({
   const detail = await loadEstimateDetail(session, id);
   if (!detail) notFound();
 
+  try {
+    const { withDbSession } = await import("@/lib/db");
+    const { markEntityAttentionRead } = await import("@/lib/attention");
+    await withDbSession(session, (client) =>
+      markEntityAttentionRead(client, session.accountId, "estimate", id),
+    );
+  } catch {
+    // non-fatal
+  }
+
   const {
     estimate,
     lineItems,
