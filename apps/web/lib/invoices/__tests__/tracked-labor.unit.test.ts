@@ -80,6 +80,11 @@ describe("TRACKED_LABOR_JOB_WORK_WHERE", () => {
     expect(TRACKED_LABOR_JOB_WORK_WHERE).toContain("entity_type = 'work_order'");
     expect(TRACKED_LABOR_JOB_WORK_WHERE).toContain("work_orders wo");
   });
+
+  it("counts only billable labor and excludes site_visit assessments", () => {
+    expect(TRACKED_LABOR_JOB_WORK_WHERE).toContain("labor_bucket = 'billable'");
+    expect(TRACKED_LABOR_JOB_WORK_WHERE).toContain("site_visit");
+  });
 });
 
 describe("formatMinutesAsHoursMinutes", () => {
