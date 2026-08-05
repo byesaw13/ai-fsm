@@ -244,11 +244,11 @@ export function Materials({ count, jobs }: { count: number; jobs: MaterialJob[] 
               </span>
               <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", justifyContent: "flex-end" }}>
                 <LinkButton
-                  href={`/app/estimates/${job.id}/shopping-list` as Route}
+                  href={`/app/jobs/${job.job_id}/materials?tab=buy` as Route}
                   variant="primary"
                   size="sm"
                 >
-                  Shopping List →
+                  Buy list →
                 </LinkButton>
                 <LinkButton
                   href={`/app/expenses/new?mode=run&job=${job.job_id}` as Route}

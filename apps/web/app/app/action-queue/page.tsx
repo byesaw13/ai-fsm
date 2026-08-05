@@ -101,8 +101,8 @@ export default async function ActionQueuePage() {
          AND e.status = 'approved'
          AND j.status IN ('scheduled','in_progress')`,
       [accountId]),
-    queryForSession<{ id: string; title: string }>(session,
-      `SELECT e.id, j.title
+    queryForSession<{ id: string; job_id: string; title: string }>(session,
+      `SELECT e.id, j.id AS job_id, j.title
        FROM estimates e
        JOIN jobs j ON j.id = e.job_id AND j.account_id = e.account_id
        WHERE e.account_id = $1
@@ -161,12 +161,12 @@ export default async function ActionQueuePage() {
       label: "Order Materials",
       count: materialCount,
       href: (materialJobs.length === 1
-        ? `/app/estimates/${materialJobs[0].id}/shopping-list`
+        ? `/app/jobs/${materialJobs[0].job_id}/materials?tab=buy`
         : "/app#materials") as Route,
       detail:
         materialJobs.length === 1
-          ? `Shopping list: ${materialJobs[0].title}`
-          : "Open shopping lists for approved active projects",
+          ? `Buy list: ${materialJobs[0].title}`
+          : "Open buy lists for approved active projects",
       tone: "warning",
     },
     { label: "Review Requests", count: requestCount, href: "/app/requests" as Route, detail: "Needs routing or follow-up", tone: "warning" },
