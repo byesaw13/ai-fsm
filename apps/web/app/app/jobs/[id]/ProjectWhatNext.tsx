@@ -127,7 +127,7 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
   const estimateExtras = approvedEstimateId
     ? [
         { label: "Approved estimate", href: `/app/estimates/${approvedEstimateId}` },
-        { label: "Materials plan", href: `/app/estimates/${approvedEstimateId}/shopping-list` },
+        { label: "Materials plan", href: `/app/jobs/${jobId}/materials?tab=buy` },
       ]
     : undefined;
 
@@ -343,7 +343,7 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
       extras: approvedEstimateId
         ? [
             { label: "Approved estimate", href: `/app/estimates/${approvedEstimateId}` },
-            { label: "Materials plan", href: `/app/estimates/${approvedEstimateId}/shopping-list` },
+            { label: "Materials plan", href: `/app/jobs/${jobId}/materials?tab=buy` },
           ]
         : undefined,
     };

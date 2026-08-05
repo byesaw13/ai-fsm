@@ -265,19 +265,17 @@ export function JobLedgerCard({
             )}
           </dd>
         </div>
-        {ledger.estimateId ? (
-          <div className="p7-detail-row">
-            <dt>Materials plan</dt>
-            <dd>
-              <Link
-                href={`/app/estimates/${ledger.estimateId}/shopping-list` as Route}
-                style={{ color: "var(--accent)", textDecoration: "none" }}
-              >
-                Approved materials plan →
-              </Link>
-            </dd>
-          </div>
-        ) : null}
+        <div className="p7-detail-row">
+          <dt>Materials buy list</dt>
+          <dd>
+            <Link
+              href={`/app/jobs/${jobId}/materials?tab=buy` as Route}
+              style={{ color: "var(--accent)", textDecoration: "none" }}
+            >
+              Open buy list →
+            </Link>
+          </dd>
+        </div>
       </dl>
 
       <p style={{ margin: "var(--space-3) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)", lineHeight: 1.45 }}>
