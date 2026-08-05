@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth, type AuthSession } from "@/lib/auth/middleware";
-import { getPool } from "@/lib/db";
+import { withDbSession } from "@/lib/db";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +21,30 @@ function idsFromUrl(url: string): { jobId: string; lineId: string } | null {
   const m = url.match(/\/jobs\/([^/]+)\/materials\/([^/?#]+)/);
   if (!m) return null;
   return { jobId: m[1], lineId: m[2] };
+}
+
+async function assertJobAccess(
+  client: { query: (q: string, p?: unknown[]) => Promise<{ rowCount: number | null }> },
+  jobId: string,
+  accountId: string,
+  role: string,
+  userId: string,
+): Promise<"ok" | "not_found" | "forbidden"> {
+  const job = await client.query(`SELECT id FROM jobs WHERE id = $1 AND account_id = $2`, [
+    jobId,
+    accountId,
+  ]);
+  if ((job.rowCount ?? 0) === 0) return "not_found";
+  if (role === "tech") {
+    const assigned = await client.query(
+      `SELECT id FROM visits
+       WHERE job_id = $1 AND account_id = $2 AND assigned_user_id = $3
+       LIMIT 1`,
+      [jobId, accountId, userId],
+    );
+    if ((assigned.rowCount ?? 0) === 0) return "forbidden";
+  }
+  return "ok";
 }
 
 /** PATCH — update line; tech may only change status */
@@ -65,50 +89,64 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
     }
   }
 
-  const client = await getPool().connect();
   try {
-    await client.query(
-      `SELECT set_config('app.current_user_id',$1,true), set_config('app.current_account_id',$2,true), set_config('app.current_role',$3,true)`,
-      [session.userId, session.accountId, session.role],
-    );
+    return await withDbSession(session, async (client) => {
+      const access = await assertJobAccess(
+        client,
+        ids.jobId,
+        session.accountId,
+        session.role,
+        session.userId,
+      );
+      if (access === "not_found") {
+        return NextResponse.json(
+          { error: { code: "NOT_FOUND", message: "Job not found", traceId: session.traceId } },
+          { status: 404 },
+        );
+      }
+      if (access === "forbidden") {
+        return NextResponse.json(
+          { error: { code: "FORBIDDEN", message: "Not assigned to this job", traceId: session.traceId } },
+          { status: 403 },
+        );
+      }
 
-    const sets: string[] = [];
-    const params: unknown[] = [];
-    let i = 1;
-    for (const [key, val] of Object.entries(parsed.data)) {
-      if (val === undefined) continue;
-      sets.push(`${key} = $${i++}`);
-      params.push(key === "name" && typeof val === "string" ? val.trim() : val);
-    }
-    if (sets.length === 0) {
-      return NextResponse.json(
-        { error: { code: "VALIDATION_ERROR", message: "No fields to update", traceId: session.traceId } },
-        { status: 422 },
+      const sets: string[] = [];
+      const params: unknown[] = [];
+      let i = 1;
+      for (const [key, val] of Object.entries(parsed.data)) {
+        if (val === undefined) continue;
+        sets.push(`${key} = $${i++}`);
+        params.push(key === "name" && typeof val === "string" ? val.trim() : val);
+      }
+      if (sets.length === 0) {
+        return NextResponse.json(
+          { error: { code: "VALIDATION_ERROR", message: "No fields to update", traceId: session.traceId } },
+          { status: 422 },
+        );
+      }
+      params.push(ids.lineId, ids.jobId, session.accountId);
+      const r = await client.query(
+        `UPDATE job_material_lines
+         SET ${sets.join(", ")}
+         WHERE id = $${i} AND job_id = $${i + 1} AND account_id = $${i + 2}
+         RETURNING *`,
+        params,
       );
-    }
-    params.push(ids.lineId, ids.jobId, session.accountId);
-    const r = await client.query(
-      `UPDATE job_material_lines
-       SET ${sets.join(", ")}
-       WHERE id = $${i} AND job_id = $${i + 1} AND account_id = $${i + 2}
-       RETURNING *`,
-      params,
-    );
-    if (r.rowCount === 0) {
-      return NextResponse.json(
-        { error: { code: "NOT_FOUND", message: "Line not found", traceId: session.traceId } },
-        { status: 404 },
-      );
-    }
-    return NextResponse.json({ data: r.rows[0] });
+      if (r.rowCount === 0) {
+        return NextResponse.json(
+          { error: { code: "NOT_FOUND", message: "Line not found", traceId: session.traceId } },
+          { status: 404 },
+        );
+      }
+      return NextResponse.json({ data: r.rows[0] });
+    });
   } catch (err) {
     logger.error("PATCH /api/v1/jobs/[id]/materials/[lineId]", err, { traceId: session.traceId });
     return NextResponse.json(
       { error: { code: "INTERNAL_ERROR", message: "Could not update line", traceId: session.traceId } },
       { status: 500 },
     );
-  } finally {
-    client.release();
   }
 });
 
@@ -128,32 +166,47 @@ export const DELETE = withAuth(async (request: NextRequest, session: AuthSession
     );
   }
 
-  const client = await getPool().connect();
   try {
-    await client.query(
-      `SELECT set_config('app.current_user_id',$1,true), set_config('app.current_account_id',$2,true), set_config('app.current_role',$3,true)`,
-      [session.userId, session.accountId, session.role],
-    );
-    const r = await client.query(
-      `DELETE FROM job_material_lines
-       WHERE id = $1 AND job_id = $2 AND account_id = $3
-       RETURNING id`,
-      [ids.lineId, ids.jobId, session.accountId],
-    );
-    if (r.rowCount === 0) {
-      return NextResponse.json(
-        { error: { code: "NOT_FOUND", message: "Line not found", traceId: session.traceId } },
-        { status: 404 },
+    return await withDbSession(session, async (client) => {
+      const access = await assertJobAccess(
+        client,
+        ids.jobId,
+        session.accountId,
+        session.role,
+        session.userId,
       );
-    }
-    return NextResponse.json({ data: { id: ids.lineId } });
+      if (access === "not_found") {
+        return NextResponse.json(
+          { error: { code: "NOT_FOUND", message: "Job not found", traceId: session.traceId } },
+          { status: 404 },
+        );
+      }
+      if (access === "forbidden") {
+        return NextResponse.json(
+          { error: { code: "FORBIDDEN", message: "Not assigned to this job", traceId: session.traceId } },
+          { status: 403 },
+        );
+      }
+
+      const r = await client.query(
+        `DELETE FROM job_material_lines
+         WHERE id = $1 AND job_id = $2 AND account_id = $3
+         RETURNING id`,
+        [ids.lineId, ids.jobId, session.accountId],
+      );
+      if (r.rowCount === 0) {
+        return NextResponse.json(
+          { error: { code: "NOT_FOUND", message: "Line not found", traceId: session.traceId } },
+          { status: 404 },
+        );
+      }
+      return NextResponse.json({ data: { id: ids.lineId } });
+    });
   } catch (err) {
     logger.error("DELETE /api/v1/jobs/[id]/materials/[lineId]", err, { traceId: session.traceId });
     return NextResponse.json(
       { error: { code: "INTERNAL_ERROR", message: "Could not delete line", traceId: session.traceId } },
       { status: 500 },
     );
-  } finally {
-    client.release();
   }
 });

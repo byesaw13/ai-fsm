@@ -112,14 +112,23 @@ async function recomputeShoppingLines(
     sort_order: m.sort_order,
   }));
 
-  const allComputed: ReturnType<typeof computeMaterials> = [];
+  // Merge duplicate material.id across snapshots (same as shopping-list path).
+  const byId = new Map<string, ReturnType<typeof computeMaterials>[number]>();
   for (const snap of snapshots.rows) {
     const mats = serviceMaterials.filter((m) => m.category === snap.category);
-    allComputed.push(
-      ...computeMaterials(mats, snap.components ?? {}, snap.complexity ?? {}),
-    );
+    for (const item of computeMaterials(mats, snap.components ?? {}, snap.complexity ?? {})) {
+      const existing = byId.get(item.material.id);
+      if (existing) {
+        existing.quantity += item.quantity;
+        existing.total_cost_cents = Math.round(
+          existing.quantity * existing.material.unit_cost_cents,
+        );
+      } else {
+        byId.set(item.material.id, { ...item });
+      }
+    }
   }
-  const grouped = groupMaterialsBySection(allComputed);
+  const grouped = groupMaterialsBySection(Array.from(byId.values()));
   return mapRecomputedSectionsToLines(grouped);
 }
 

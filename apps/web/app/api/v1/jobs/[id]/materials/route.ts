@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withAuth, type AuthSession } from "@/lib/auth/middleware";
-import { getPool } from "@/lib/db";
+import { withDbSession } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { seedJobBuyList } from "@/lib/jobs/buy-list-seed";
 
 export const dynamic = "force-dynamic";
 
 const STATUSES = ["needed", "purchased", "on_truck", "not_needed"] as const;
-const SOURCES = ["estimate", "kit", "ai", "manual"] as const;
 
 const createBody = z.object({
   name: z.string().min(1).max(500),
@@ -19,26 +18,33 @@ const createBody = z.object({
   notes: z.string().max(2000).nullable().optional(),
 });
 
-const seedBody = z.object({
-  reseed: z.boolean().optional().default(false),
-});
-
 function jobIdFromUrl(url: string): string | null {
-  // /api/v1/jobs/<id>/materials
   const m = url.match(/\/jobs\/([^/]+)\/materials/);
   return m?.[1] ?? null;
 }
 
-async function assertJob(
-  client: { query: (q: string, p?: unknown[]) => Promise<{ rowCount: number | null; rows: unknown[] }> },
+async function assertJobAccess(
+  client: { query: (q: string, p?: unknown[]) => Promise<{ rowCount: number | null; rows: { id: string }[] }> },
   jobId: string,
   accountId: string,
-): Promise<boolean> {
-  const r = await client.query(`SELECT id FROM jobs WHERE id = $1 AND account_id = $2`, [
+  role: string,
+  userId: string,
+): Promise<"ok" | "not_found" | "forbidden"> {
+  const job = await client.query(`SELECT id FROM jobs WHERE id = $1 AND account_id = $2`, [
     jobId,
     accountId,
   ]);
-  return (r.rowCount ?? 0) > 0;
+  if ((job.rowCount ?? 0) === 0) return "not_found";
+  if (role === "tech") {
+    const assigned = await client.query(
+      `SELECT id FROM visits
+       WHERE job_id = $1 AND account_id = $2 AND assigned_user_id = $3
+       LIMIT 1`,
+      [jobId, accountId, userId],
+    );
+    if ((assigned.rowCount ?? 0) === 0) return "forbidden";
+  }
+  return "ok";
 }
 
 /** GET — list buy list lines for job */
@@ -51,52 +57,64 @@ export const GET = withAuth(async (request: NextRequest, session: AuthSession) =
     );
   }
 
-  const client = await getPool().connect();
   try {
-    await client.query(
-      `SELECT set_config('app.current_user_id',$1,true), set_config('app.current_account_id',$2,true), set_config('app.current_role',$3,true)`,
-      [session.userId, session.accountId, session.role],
-    );
-    if (!(await assertJob(client, jobId, session.accountId))) {
+    const result = await withDbSession(session, async (client) => {
+      const access = await assertJobAccess(
+        client,
+        jobId,
+        session.accountId,
+        session.role,
+        session.userId,
+      );
+      if (access !== "ok") return { access };
+
+      const meta = await client.query<{
+        materials_plan_seeded_at: string | null;
+        materials_plan_seed_estimate_id: string | null;
+      }>(
+        `SELECT materials_plan_seeded_at, materials_plan_seed_estimate_id
+         FROM jobs WHERE id = $1 AND account_id = $2`,
+        [jobId, session.accountId],
+      );
+
+      const lines = await client.query(
+        `SELECT id, name, quantity, unit_label, store_section, status, source,
+                catalog_material_id, sku, notes, sort_order, created_at, updated_at
+         FROM job_material_lines
+         WHERE job_id = $1 AND account_id = $2
+         ORDER BY sort_order ASC, created_at ASC`,
+        [jobId, session.accountId],
+      );
+
+      return {
+        access: "ok" as const,
+        data: {
+          lines: lines.rows,
+          seeded_at: meta.rows[0]?.materials_plan_seeded_at ?? null,
+          seed_estimate_id: meta.rows[0]?.materials_plan_seed_estimate_id ?? null,
+        },
+      };
+    });
+
+    if (result.access === "not_found") {
       return NextResponse.json(
         { error: { code: "NOT_FOUND", message: "Job not found", traceId: session.traceId } },
         { status: 404 },
       );
     }
-
-    const meta = await client.query<{
-      materials_plan_seeded_at: string | null;
-      materials_plan_seed_estimate_id: string | null;
-    }>(
-      `SELECT materials_plan_seeded_at, materials_plan_seed_estimate_id
-       FROM jobs WHERE id = $1 AND account_id = $2`,
-      [jobId, session.accountId],
-    );
-
-    const lines = await client.query(
-      `SELECT id, name, quantity, unit_label, store_section, status, source,
-              catalog_material_id, sku, notes, sort_order, created_at, updated_at
-       FROM job_material_lines
-       WHERE job_id = $1 AND account_id = $2
-       ORDER BY sort_order ASC, created_at ASC`,
-      [jobId, session.accountId],
-    );
-
-    return NextResponse.json({
-      data: {
-        lines: lines.rows,
-        seeded_at: meta.rows[0]?.materials_plan_seeded_at ?? null,
-        seed_estimate_id: meta.rows[0]?.materials_plan_seed_estimate_id ?? null,
-      },
-    });
+    if (result.access === "forbidden") {
+      return NextResponse.json(
+        { error: { code: "FORBIDDEN", message: "Not assigned to this job", traceId: session.traceId } },
+        { status: 403 },
+      );
+    }
+    return NextResponse.json({ data: result.data });
   } catch (err) {
     logger.error("GET /api/v1/jobs/[id]/materials", err, { traceId: session.traceId });
     return NextResponse.json(
       { error: { code: "INTERNAL_ERROR", message: "Could not load buy list", traceId: session.traceId } },
       { status: 500 },
     );
-  } finally {
-    client.release();
   }
 });
 
@@ -113,100 +131,105 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
   const body = await request.json().catch(() => ({}));
   const action = typeof body?.action === "string" ? body.action : "create";
 
-  const client = await getPool().connect();
   try {
-    await client.query(
-      `SELECT set_config('app.current_user_id',$1,true), set_config('app.current_account_id',$2,true), set_config('app.current_role',$3,true)`,
-      [session.userId, session.accountId, session.role],
-    );
-    if (!(await assertJob(client, jobId, session.accountId))) {
-      return NextResponse.json(
-        { error: { code: "NOT_FOUND", message: "Job not found", traceId: session.traceId } },
-        { status: 404 },
+    return await withDbSession(session, async (client) => {
+      const access = await assertJobAccess(
+        client,
+        jobId,
+        session.accountId,
+        session.role,
+        session.userId,
       );
-    }
-
-    if (action === "seed" || action === "reseed") {
-      if (session.role === "tech") {
+      if (access === "not_found") {
         return NextResponse.json(
-          { error: { code: "FORBIDDEN", message: "Techs cannot seed buy lists", traceId: session.traceId } },
+          { error: { code: "NOT_FOUND", message: "Job not found", traceId: session.traceId } },
+          { status: 404 },
+        );
+      }
+      if (access === "forbidden") {
+        return NextResponse.json(
+          { error: { code: "FORBIDDEN", message: "Not assigned to this job", traceId: session.traceId } },
           { status: 403 },
         );
       }
-      const parsed = seedBody.safeParse({ reseed: action === "reseed" || body.reseed === true });
-      const result = await seedJobBuyList(client, {
-        accountId: session.accountId,
-        jobId,
-        reseed: parsed.success ? parsed.data.reseed || action === "reseed" : action === "reseed",
-      });
-      if (!result.ok && result.code === "NO_ESTIMATE") {
+
+      if (action === "seed" || action === "reseed") {
+        if (session.role === "tech") {
+          return NextResponse.json(
+            { error: { code: "FORBIDDEN", message: "Techs cannot seed buy lists", traceId: session.traceId } },
+            { status: 403 },
+          );
+        }
+        const result = await seedJobBuyList(client, {
+          accountId: session.accountId,
+          jobId,
+          reseed: action === "reseed" || body.reseed === true,
+        });
+        if (!result.ok && result.code === "NO_ESTIMATE") {
+          return NextResponse.json(
+            {
+              error: { code: "NO_ESTIMATE", message: result.message, traceId: session.traceId },
+              data: result,
+            },
+            { status: 422 },
+          );
+        }
+        return NextResponse.json({ data: result });
+      }
+
+      if (session.role === "tech") {
         return NextResponse.json(
-          { error: { code: "NO_ESTIMATE", message: result.message, traceId: session.traceId }, data: result },
+          { error: { code: "FORBIDDEN", message: "Techs can only update status", traceId: session.traceId } },
+          { status: 403 },
+        );
+      }
+
+      const parsed = createBody.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json(
+          {
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "Invalid body",
+              details: parsed.error.flatten().fieldErrors,
+              traceId: session.traceId,
+            },
+          },
           { status: 422 },
         );
       }
-      // NO_LINES still returns 200 with data so UI can show message after timestamp set
-      return NextResponse.json({ data: result });
-    }
 
-    // create line — tech cannot add
-    if (session.role === "tech") {
-      return NextResponse.json(
-        { error: { code: "FORBIDDEN", message: "Techs can only update status", traceId: session.traceId } },
-        { status: 403 },
+      const maxSort = await client.query<{ m: string | null }>(
+        `SELECT MAX(sort_order)::text AS m FROM job_material_lines WHERE job_id = $1 AND account_id = $2`,
+        [jobId, session.accountId],
       );
-    }
+      const sortOrder = (parseInt(maxSort.rows[0]?.m ?? "-1", 10) || -1) + 1;
 
-    const parsed = createBody.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          error: {
-            code: "VALIDATION_ERROR",
-            message: "Invalid body",
-            details: parsed.error.flatten().fieldErrors,
-            traceId: session.traceId,
-          },
-        },
-        { status: 422 },
+      const ins = await client.query(
+        `INSERT INTO job_material_lines
+           (account_id, job_id, name, quantity, unit_label, store_section, status, source, notes, sort_order)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'manual',$8,$9)
+         RETURNING *`,
+        [
+          session.accountId,
+          jobId,
+          parsed.data.name.trim(),
+          parsed.data.quantity,
+          parsed.data.unit_label ?? null,
+          parsed.data.store_section ?? null,
+          parsed.data.status,
+          parsed.data.notes ?? null,
+          sortOrder,
+        ],
       );
-    }
 
-    const maxSort = await client.query<{ m: string | null }>(
-      `SELECT MAX(sort_order)::text AS m FROM job_material_lines WHERE job_id = $1 AND account_id = $2`,
-      [jobId, session.accountId],
-    );
-    const sortOrder = (parseInt(maxSort.rows[0]?.m ?? "-1", 10) || -1) + 1;
-
-    const ins = await client.query(
-      `INSERT INTO job_material_lines
-         (account_id, job_id, name, quantity, unit_label, store_section, status, source, notes, sort_order)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'manual',$8,$9)
-       RETURNING *`,
-      [
-        session.accountId,
-        jobId,
-        parsed.data.name.trim(),
-        parsed.data.quantity,
-        parsed.data.unit_label ?? null,
-        parsed.data.store_section ?? null,
-        parsed.data.status,
-        parsed.data.notes ?? null,
-        sortOrder,
-      ],
-    );
-
-    return NextResponse.json({ data: ins.rows[0] }, { status: 201 });
+      return NextResponse.json({ data: ins.rows[0] }, { status: 201 });
+    });
   } catch (err) {
     logger.error("POST /api/v1/jobs/[id]/materials", err, { traceId: session.traceId });
     return NextResponse.json(
       { error: { code: "INTERNAL_ERROR", message: "Could not update buy list", traceId: session.traceId } },
       { status: 500 },
     );
-  } finally {
-    client.release();
   }
 });
-
-// silence unused SOURCES for now (source set server-side)
-void SOURCES;

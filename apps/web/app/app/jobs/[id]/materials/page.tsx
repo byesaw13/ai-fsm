@@ -48,6 +48,18 @@ export default async function JobMaterialsPage({ params, searchParams }: PagePro
   );
   if (!job) notFound();
 
+  // Techs: only jobs with an assigned visit (match project detail page).
+  if (session.role === "tech") {
+    const assigned = await queryOneForSession(
+      session,
+      `SELECT id FROM visits
+       WHERE job_id = $1 AND account_id = $2 AND assigned_user_id = $3
+       LIMIT 1`,
+      [jobId, session.accountId, session.userId],
+    );
+    if (!assigned) notFound();
+  }
+
   const lines = await queryForSession<BuyListLine>(
     session,
     `SELECT id, name, quantity, unit_label, store_section, status, source, notes
