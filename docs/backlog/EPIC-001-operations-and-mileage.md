@@ -309,40 +309,6 @@ Acceptance Criteria:
 Notes:
 Phase 2.
 
-# TASK-053: Activity + Assignment model
-
-Status:
-In Progress
-
-Phase:
-1
-
-Problem:
-Activity today conflates the verb (driving, working) with the business object
-(Job #241), so "same job, switched task" can't be expressed cleanly.
-
-Business Value:
-Clean job-costing: Activity = verb, Assignment = object; labor_bucket derives.
-
-Scope:
-- Extend `activity_entries` (migration 129, additive): `business_day_id`,
-  `time_clock_session_id`, `labor_bucket (billable|overhead|personal|warranty)`,
-  non-entity `assignment_kind (office|shop|inventory|training|none)`.
-- Reuse `entity_type/entity_id` as the assignment link; extend the activity-verb
-  enum + labels in `packages/domain/src/activities.ts`; map activity+assignment →
-  labor_bucket. Reuse `/api/v1/activities/switch` for Change Activity/Assignment.
-
-Out of Scope:
-- Current Operations State (TASK-056); presence (TASK-057).
-
-Acceptance Criteria:
-- [ ] Activity verb and Assignment object are independently settable.
-- [ ] labor_bucket mapping is a unit-tested pure rule.
-- [ ] Switching keeps payroll running; one-active invariant preserved.
-
-Notes:
-Phase 3.
-
 # TASK-056: Current Operations State (live state machine)
 
 Status:
@@ -528,6 +494,8 @@ tasks if the build proves large. Do **not** start until TASK-033 has been in
 real daily use and TASK-034 (non-superuser RLS verification) is considered.
 
 ## Completed
+
+- [TASK-053: Activity + Assignment model](../archive/backlog-done/TASK-053-activity-assignment-model.md) — Done (Wave 0a 2026-08-05)
 
 - [TASK-059: My Day start-surface consolidation](../archive/backlog-done/TASK-059-my-day-start-surface.md) — Done
 

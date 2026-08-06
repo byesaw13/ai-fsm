@@ -254,31 +254,6 @@ Scope:
 Acceptance Criteria:
 - [ ] The owner can record a site visit manually when detection misses.
 
-# TASK-046: Workday & privacy controls
-
-Status:
-In Progress
-
-Phase:
-1
-
-Problem:
-Passive tracking needs guardrails.
-
-Scope:
-- Tracking active only during the workday; a pause-tracking control; hide
-  private/home locations from reports; raw GPS retention window (30–90 days);
-  confirmed ledger entries kept permanently.
-
-Acceptance Criteria:
-- [x] Tracking can be paused and is bounded to the workday. (slice 1, PR #373)
-- [x] Home/private locations don't surface in reports; raw GPS ages out on
-      schedule while confirmed entries persist. (slice 2, Phase 1)
-
-Notes:
-Slice 1 (PR #373): master enable/disable + pause + Start-Day workday gating.
-Slice 2: `isPrivateLocation` report filtering, worker retention prune, settings UI.
-
 # TASK-049: Operational Inbox (single review surface)
 
 Status:
@@ -640,6 +615,8 @@ Phase 1 maintenance of TASK-025/027 capture. The HA edit is homelab infra (reloa
 automations to apply); the app change ships via the normal deploy. No migration.
 
 ## Completed
+
+- [TASK-046: Workday & privacy controls](../archive/backlog-done/TASK-046-workday-privacy-controls.md) — Done (Wave 0a 2026-08-05)
 
 - [TASK-024: Passive location-based activity capture](../archive/backlog-done/TASK-024-passive-location-capture.md)
 - [TASK-025: Bluetooth-triggered, vehicle-aware auto-mileage](../archive/backlog-done/TASK-025-bluetooth-auto-mileage.md)
