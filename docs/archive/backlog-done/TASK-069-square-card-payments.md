@@ -46,3 +46,8 @@ production Square into the real Square account and settled correctly in Dovetail
 OS. Code evidence: `lib/integrations/square-payments.ts`,
 `api/v1/integrations/square`, `api/v1/invoices/[id]/square-link`,
 `api/webhooks/square`, Settings SquarePanel, portal pay-by-card.
+
+**Known residual (follow-up, not reopen):** Multiple live Square links on one
+invoice can overwrite `square_order_id` and match the wrong pending row on
+webhook. Single-link prod path is verified. Track separately if multi-link
+deposit+balance races appear in the field.

@@ -53,3 +53,9 @@ Notes (archive 2026-08-06 code audit):
 `STOP_ANCHOR_RADIUS_M = 40` in apps/web/lib/location/segments.ts;
 haversine near-anchor freezes coords; unit tests in segments.test.ts.
 Optional still→in_vehicle drive guard not required for Done.
+
+**Product nuance (accepted):** Within radius, **pin coords freeze**; geocoded
+`place_label` may still refine when a delayed reverse-geocode returns. That is
+deliberate first-fix/settle behavior for address accuracy, not reopening pin
+walk. If address flicker remains annoying, suppress label rewrites when
+`nearAnchor` as a micro-follow-up.

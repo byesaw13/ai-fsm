@@ -30,3 +30,8 @@ Notes (archive 2026-08-06 code audit):
 Implemented: DayCloseChecklist, close-status hard gates (open clock/activity/mileage),
 business-day transition + day-review close, reopen with reason, domain tests + e2e.
 Residual soft rows (inbox/expenses/notes) intentionally deferred.
+
+**Known residual (follow-up):** Open vehicle-session gate is account/date scoped,
+not per-user — multi-tech same day can block each other's close. Prefer scoping
+by session owner (`created_by` / user_id) in a small fix PR, not reopening this
+task's core close+reopen AC.
