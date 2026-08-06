@@ -59,15 +59,16 @@ import {
   PageHeader,
   SectionHeader,
   StatusBadge,
-  Timeline,
 } from "@/components/ui";
-import type { TimelineEntryData, StatusVariant } from "@/components/ui";
+import type { StatusVariant } from "@/components/ui";
 import {
   formatVisitDateLabel,
   formatVisitTime,
   isVisitOverdue,
 } from "@/lib/visits/formatting";
 import { withChecklistContext, getOrSeedChecklist } from "@/lib/visits/checklist";
+import { loadVisitTimeline } from "@/lib/visits/load-visit-timeline";
+import { VisitTimelinePanel } from "@/components/visits/VisitTimelinePanel";
 import { VISIT_STATUS_LABELS } from "@/lib/visits/triage";
 
 export const dynamic = "force-dynamic";
@@ -390,43 +391,8 @@ export default async function VisitDetailPage({
     ? toISO(siteVisitAssessment.completed_at)
     : null;
 
-  const timelineEntries: TimelineEntryData[] = [
-    {
-      id: "scheduled",
-      timestamp: toISO(visit.scheduled_start),
-      title: `Scheduled · ${formatVisitDateLabel(visit.scheduled_start)}`,
-      subtitle: `${formatVisitTime(visit.scheduled_start)}–${formatVisitTime(visit.scheduled_end)}`,
-      status: "scheduled",
-      badge: overdue ? (
-        <span className="p7-badge p7-badge-status-overdue">Overdue</span>
-      ) : undefined,
-      isCompleted: true,
-    },
-    ...(visit.arrived_at
-      ? [
-          {
-            id: "arrived",
-            timestamp: toISO(visit.arrived_at),
-            title: "Arrived on site",
-            subtitle: <LocalTime iso={toISO(visit.arrived_at)} />,
-            status: "arrived",
-            isCompleted: true,
-          } satisfies TimelineEntryData,
-        ]
-      : []),
-    ...(visit.completed_at
-      ? [
-          {
-            id: "completed",
-            timestamp: toISO(visit.completed_at),
-            title: "Visit completed",
-            subtitle: <LocalTime iso={toISO(visit.completed_at)} />,
-            status: "completed",
-            isCompleted: true,
-          } satisfies TimelineEntryData,
-        ]
-      : []),
-  ];
+  // TASK-067: production sequence from lifecycle + visit-linked activities
+  const productionTimeline = await loadVisitTimeline(session.accountId, id);
 
   return (
     <PageContainer>
@@ -579,9 +545,9 @@ export default async function VisitDetailPage({
             </Card>
           )}
 
-          <Card id="visit-timeline">
-            <SectionHeader title="Visit Timeline" />
-            <Timeline entries={timelineEntries} />
+          <Card id="visit-timeline" data-testid="visit-production-timeline">
+            <SectionHeader title="Production story" />
+            <VisitTimelinePanel events={productionTimeline} />
           </Card>
 
           {(dayTasks.length > 0 || visit.work_order_id || visit.job_id) && (

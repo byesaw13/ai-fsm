@@ -174,7 +174,7 @@ truth-pass also archived TASK-023 and TASK-050 (epic already Done, README lagged
 | TASK-064 | Remove visit_time_logs writer | 001 | Done |
 | TASK-065 | Retire visit_time_logs table | 001 | Done |
 | TASK-066 | Visit Production Rollup (Visit Summary page) | 007 | Proposed |
-| TASK-067 | Visit Timeline | 007 | Proposed |
+| TASK-067 | Visit Timeline | 007 | Done |
 | TASK-068 | Payment Provider Model & Enriched Recorder | 004 | Done |
 | TASK-069 | Square Card Payments | 004 | Proposed |
 | TASK-071 | Set a deposit on any invoice (Square-style single invoice) | 004 | Done |
