@@ -122,11 +122,14 @@ export function consumeAssessmentContext(
 }
 
 /**
- * Resolve the assessment context for an estimate-form mount, recovering from the
- * persisted summary when the sessionStorage hand-off is missing (TASK-018 slice
- * 2). sessionStorage wins when present (it reflects the live form); otherwise we
- * fall back to the server-loaded summary so a refresh / deep-link / navigation
- * still recovers the assessment. Storage is always cleared, like consume.
+ * Resolve the assessment context for an estimate-form mount (TASK-018).
+ *
+ * **Persistence is the durable source of truth** (server-loaded summary from
+ * site_visit_assessments). sessionStorage is only a same-tab accelerator for
+ * the live form just before navigation — when both exist, prefer server so a
+ * mid-flight save on another tab or a partial hand-off cannot hide persistence.
+ * Same-tab navigations without a server summary still use sessionStorage.
+ * Storage is always cleared so it cannot leak into later estimates.
  *
  * Only applies when the estimate was opened from an assessment (`fromAssessment`).
  */
@@ -141,7 +144,8 @@ export function resolveAssessmentContext(
   const stored = deps.read();
   deps.clear();
   if (!fromAssessment) return null;
-  return stored ?? serverContext ?? null;
+  // Persistence-primary: server wins when present; sessionStorage only fills gaps.
+  return serverContext ?? stored ?? null;
 }
 
 /**

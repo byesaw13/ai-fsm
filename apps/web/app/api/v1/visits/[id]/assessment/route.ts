@@ -25,6 +25,15 @@ const roomSchema = z.object({
   notes: z.string().max(500).optional(),
 });
 
+const tradeNotesSchema = z
+  .object({
+    painting: z.string().max(2000).optional(),
+    drywall: z.string().max(2000).optional(),
+    trim: z.string().max(2000).optional(),
+    flooring: z.string().max(2000).optional(),
+  })
+  .optional();
+
 const assessmentSchema = z.object({
   rooms: z.array(roomSchema).default([]),
   scope_notes: z.string().max(5000).nullable().optional(),
@@ -35,6 +44,11 @@ const assessmentSchema = z.object({
   lead_paint_risk: z.boolean().optional(),
   total_sqft: z.number().min(0).nullable().optional(),
   completed_at: z.string().datetime().nullable().optional(),
+  // TASK-018 residual structured scope
+  work_items: z.array(z.string().max(300)).max(50).optional(),
+  prep_notes: z.string().max(3000).nullable().optional(),
+  trade_notes: tradeNotesSchema,
+  customer_supplied_materials: z.string().max(3000).nullable().optional(),
 });
 
 export const GET = withAuth(async (request: NextRequest, session: AuthSession) => {
@@ -172,12 +186,16 @@ export const PUT = withAuth(async (request: NextRequest, session: AuthSession) =
     const assessmentJustCompleted =
       d.completed_at != null && previousCompletedAt == null;
 
+    const workItems = (d.work_items ?? []).map((s) => s.trim()).filter(Boolean);
+    const tradeNotes = d.trade_notes ?? {};
+
     const { rows } = await client.query(
       `INSERT INTO site_visit_assessments
          (visit_id, account_id, rooms, scope_notes, access_notes,
           has_pets, difficult_access, asbestos_risk, lead_paint_risk,
-          total_sqft, completed_at, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          total_sqft, completed_at, created_by,
+          work_items, prep_notes, trade_notes, customer_supplied_materials)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        ON CONFLICT (visit_id) DO UPDATE SET
          rooms           = EXCLUDED.rooms,
          scope_notes     = EXCLUDED.scope_notes,
@@ -188,6 +206,10 @@ export const PUT = withAuth(async (request: NextRequest, session: AuthSession) =
          lead_paint_risk = EXCLUDED.lead_paint_risk,
          total_sqft      = EXCLUDED.total_sqft,
          completed_at    = EXCLUDED.completed_at,
+         work_items      = EXCLUDED.work_items,
+         prep_notes      = EXCLUDED.prep_notes,
+         trade_notes     = EXCLUDED.trade_notes,
+         customer_supplied_materials = EXCLUDED.customer_supplied_materials,
          updated_at      = now()
        RETURNING *`,
       [
@@ -203,6 +225,10 @@ export const PUT = withAuth(async (request: NextRequest, session: AuthSession) =
         d.total_sqft ?? null,
         d.completed_at ?? null,
         session.userId,
+        JSON.stringify(workItems),
+        d.prep_notes ?? null,
+        JSON.stringify(tradeNotes),
+        d.customer_supplied_materials ?? null,
       ]
     );
 

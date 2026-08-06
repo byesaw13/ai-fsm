@@ -24,6 +24,10 @@ export type SiteVisitAssessmentRow = {
   lead_paint_risk: boolean;
   total_sqft: number | string | null;
   photo_count?: number | string | null;
+  work_items?: unknown;
+  prep_notes?: string | null;
+  trade_notes?: unknown;
+  customer_supplied_materials?: string | null;
 };
 
 function toRooms(value: unknown): AssessmentRoom[] {
@@ -45,6 +49,23 @@ function toRooms(value: unknown): AssessmentRoom[] {
   });
 }
 
+function toWorkItems(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((v) => (typeof v === "string" ? v.trim() : ""))
+    .filter(Boolean);
+}
+
+function toTradeNotes(value: unknown): Partial<Record<"painting" | "drywall" | "trim" | "flooring", string>> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const out: Partial<Record<"painting" | "drywall" | "trim" | "flooring", string>> = {};
+  for (const key of ["painting", "drywall", "trim", "flooring"] as const) {
+    const v = (value as Record<string, unknown>)[key];
+    if (typeof v === "string" && v.trim()) out[key] = v.trim();
+  }
+  return out;
+}
+
 /** Pure: map a persisted assessment row into the canonical summary. */
 export function mapRowToAssessmentSummary(row: SiteVisitAssessmentRow): AssessmentSummary {
   const sqft = row.total_sqft == null ? null : Number(row.total_sqft);
@@ -61,12 +82,17 @@ export function mapRowToAssessmentSummary(row: SiteVisitAssessmentRow): Assessme
     leadPaintRisk: row.lead_paint_risk,
     totalSqft: Number.isFinite(sqft as number) ? (sqft as number) : null,
     photoCount: Number.isFinite(photoCount) ? photoCount : 0,
+    workItems: toWorkItems(row.work_items),
+    prepNotes: row.prep_notes ?? null,
+    tradeNotes: toTradeNotes(row.trade_notes),
+    customerSuppliedMaterials: row.customer_supplied_materials ?? null,
   });
 }
 
 const ASSESSMENT_SELECT = `SELECT a.id, a.visit_id, a.rooms, a.scope_notes, a.access_notes,
             a.has_pets, a.difficult_access, a.asbestos_risk, a.lead_paint_risk,
-            a.total_sqft,
+            a.total_sqft, a.work_items, a.prep_notes, a.trade_notes,
+            a.customer_supplied_materials,
             (SELECT COUNT(*) FROM visit_media m
               WHERE m.visit_id = a.visit_id AND m.category = 'assessment') AS photo_count
      FROM site_visit_assessments a`;

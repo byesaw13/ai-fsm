@@ -54,4 +54,20 @@ describe("mapRowToAssessmentSummary", () => {
     });
     expect(s.rooms[0]).toEqual({ id: "r2", name: "Bath", length_ft: 5, width_ft: 8, height_ft: null, notes: "" });
   });
+
+  it("maps structured scope fields (TASK-018 residual)", () => {
+    const s = mapRowToAssessmentSummary({
+      ...baseRow,
+      work_items: ["Paint ceiling", "  ", "Install baseboard"],
+      prep_notes: "Mask floors",
+      trade_notes: { painting: "2 coats eggshell", drywall: "" },
+      customer_supplied_materials: "Customer paint",
+    });
+    expect(s.workItems).toEqual(["Paint ceiling", "Install baseboard"]);
+    expect(s.prepNotes).toBe("Mask floors");
+    expect(s.tradeNotes).toEqual({ painting: "2 coats eggshell" });
+    expect(s.customerSuppliedMaterials).toBe("Customer paint");
+    expect(s.generatedJobDescription).toContain("Paint ceiling");
+    expect(s.generatedJobDescription).toContain("Mask floors");
+  });
 });

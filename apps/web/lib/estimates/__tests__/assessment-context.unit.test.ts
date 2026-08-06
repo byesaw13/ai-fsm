@@ -24,11 +24,19 @@ const ctx = (desc: string): AssessmentContext => ({
   assessmentId: "a1",
 });
 
-describe("resolveAssessmentContext (persisted recovery — TASK-018 slice 2)", () => {
-  it("uses the sessionStorage context when present (server fallback ignored)", () => {
+describe("resolveAssessmentContext (persisted recovery — TASK-018 residual)", () => {
+  it("prefers server/persistence over sessionStorage when both present", () => {
     const read = vi.fn(() => ctx("from-storage"));
     const clear = vi.fn();
     const out = resolveAssessmentContext(true, ctx("from-server"), { read, clear });
+    expect(out?.generatedJobDescription).toBe("from-server");
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it("uses sessionStorage when server context is missing (same-tab accelerator)", () => {
+    const read = vi.fn(() => ctx("from-storage"));
+    const clear = vi.fn();
+    const out = resolveAssessmentContext(true, null, { read, clear });
     expect(out?.generatedJobDescription).toBe("from-storage");
     expect(clear).toHaveBeenCalledOnce();
   });
