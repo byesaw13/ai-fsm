@@ -5,62 +5,11 @@ of what each job actually earned.
 
 ## Active tasks
 
-# TASK-069: Square Card Payments
-
-Status:
-Proposed
-
-Phase:
-3
-
-Problem:
-Customers want to pay by card online, but Dovetails OS has no way to create a
-hosted payment link or to learn when an online payment completes.
-
-Business Value:
-Faster collection on deposits and balances via a shareable Square checkout link,
-while Dovetails OS stays the source of truth for the invoice and payment record.
-
-Scope:
-- Owner-only Square settings (environment, location/application IDs, access
-  token, webhook signature key) stored encrypted server-side, with a connection
-  test and connected/disconnected status.
-- Invoice action to create a Square payment link for deposit / balance / custom
-  amount; save the link + external IDs; mark the payment `pending`.
-- `POST /api/webhooks/square` handling `payment.created` / `payment.updated`
-  with signature verification and idempotent processing; match to the local
-  payment/invoice and mark paid.
-- Provider abstraction so Stripe / PayPal can be added later.
-
-Out of Scope:
-- Stripe.
-- Replacing Square invoices.
-
-Acceptance Criteria:
-- [ ] Square secrets are stored server-side only, owner-only, and testable.
-- [ ] A payment link can be created for deposit, balance, or custom amount.
-- [ ] The webhook verifies signatures and ignores duplicate events.
-- [ ] A completed Square payment marks the invoice partially/fully paid.
-- [ ] Square can be disabled without breaking manual recording.
-
-Notes:
-Square is the chosen card processor. The pre-existing Stripe integration (portal
-PaymentElement flow, `/api/webhooks/stripe`, `lib/stripe.ts`, stripe-cli
-forwarder, Stripe env vars) was **archived/removed** in favour of Square; the
-client portal "Pay online" button now redirects to a Square-hosted checkout
-link. The `invoices.stripe_payment_intent_id` column is left in place as inert
-historical data. Stripe can be reintroduced later via the `lib/integrations`
-provider abstraction if needed.
-
-Follow-ups landed: the webhook now also handles Square-initiated refunds
-(`refund.created`/`refund.updated` → ledger-only `refunded` rows); unit tests
-cover the provider module, settings route (secrets never leak), webhook
-(payment completion, idempotency, refunds), and payment-link route; setup
-runbook at `docs/working/square-payments-runbook.md`. The acceptance boxes
-remain unchecked pending live sandbox/production verification with real Square
-credentials.
+_(none — Square card payments closed after live prod verification 2026-08-06)_
 
 ## Completed
+
+- [TASK-069: Square Card Payments](../archive/backlog-done/TASK-069-square-card-payments.md) — Done (live prod payment verified 2026-08-06)
 
 - [TASK-017: Lead Source / Referral ROI](../archive/backlog-done/TASK-017-lead-source-referral-roi.md) — Done (Wave 4 2026-08-05)
 
