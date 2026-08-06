@@ -468,10 +468,10 @@ describe("POST /api/v1/visits/[id]/transition", () => {
     // (the legacy visit_time_logs close was removed in TASK-064).
     const closeActivityCall = mockClientQuery.mock.calls.find((call) =>
       String(call[0]).includes("UPDATE activity_entries") &&
-      String(call[0]).includes("entity_type = 'visit' AND entity_id = $2")
+      String(call[0]).includes("entity_type = 'visit' AND entity_id = $3")
     );
     expect(closeActivityCall).toBeTruthy();
-    expect(closeActivityCall?.[1]).toEqual([mockSession.accountId, VISIT_ID]);
+    expect(closeActivityCall?.[1]).toEqual([mockSession.accountId, mockSession.userId, VISIT_ID]);
   });
 
   it("in_progress → completed without a completion packet → 422 MISSING_PHOTO", async () => {
