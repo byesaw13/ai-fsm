@@ -35,3 +35,9 @@ Notes (Wave 1 ship 2026-08-05):
 - Multi-user scope: activity_entries.user_id + vehicle_sessions.created_by
 - ActivityTracker NowBar fetches ops state (display: payroll clock on/off + data-ops-* attrs)
 - Unit tests: state.unit.test.ts multi-user; route.unit.test.ts 200/500
+
+Follow-up in same PR (Codex P1/P2):
+- Migration 168: one open activity per (account_id, user_id)
+- switch/stop + visit auto-activity scoped by user_id
+- deriveValidTransitions: switch_activity always; stop_activity when active
+- ActivityTracker listens for ops:refresh

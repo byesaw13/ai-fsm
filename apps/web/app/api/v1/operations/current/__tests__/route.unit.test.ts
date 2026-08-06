@@ -18,7 +18,7 @@ const mockState = {
   clock: null,
   activity: null,
   vehicle_session: null,
-  valid_transitions: ["open_business_day", "clock_in", "start_mileage_session"],
+  valid_transitions: ["open_business_day", "clock_in", "switch_activity", "start_mileage_session"],
 };
 
 const mockGetCurrentOperationsState = vi.fn(async () => mockState);
@@ -50,7 +50,7 @@ describe("GET /api/v1/operations/current (TASK-056)", () => {
     expect(json.data).toMatchObject({
       business_day: null,
       clocked_in: false,
-      valid_transitions: expect.arrayContaining(["open_business_day", "clock_in"]),
+      valid_transitions: expect.arrayContaining(["open_business_day", "clock_in", "switch_activity"]),
     });
     expect(mockGetCurrentOperationsState).toHaveBeenCalledWith(
       expect.anything(),

@@ -55,7 +55,7 @@ export function NowBar({
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    async function loadOps() {
       try {
         const res = await fetch("/api/v1/operations/current");
         if (!res.ok || cancelled) return;
@@ -70,9 +70,13 @@ export function NowBar({
       } catch {
         // Non-blocking: switch still works via existing POST
       }
-    })();
+    }
+    void loadOps();
+    // ClockBar / mileage / day-close fire ops:refresh without changing activity props.
+    window.addEventListener("ops:refresh", loadOps);
     return () => {
       cancelled = true;
+      window.removeEventListener("ops:refresh", loadOps);
     };
   }, [active?.id, active?.activity_type]);
 

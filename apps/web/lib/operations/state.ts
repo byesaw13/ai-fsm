@@ -16,6 +16,7 @@ export type OpsTransition =
   | "clock_in"
   | "clock_out"
   | "switch_activity"
+  | "stop_activity"
   | "start_mileage_session"
   | "close_mileage_session"
   | "close_business_day"
@@ -60,7 +61,13 @@ export function deriveValidTransitions(state: Omit<CurrentOperationsState, "vali
   if (!state.clocked_in) {
     out.push("clock_in");
   } else {
-    out.push("clock_out", "switch_activity");
+    out.push("clock_out");
+  }
+
+  // Activity is independent of the payroll clock (switch route does not require clock-in).
+  out.push("switch_activity");
+  if (state.activity) {
+    out.push("stop_activity");
   }
 
   if (!state.vehicle_session) {

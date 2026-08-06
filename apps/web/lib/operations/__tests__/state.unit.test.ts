@@ -11,10 +11,11 @@ const base = {
 } as const;
 
 describe("deriveValidTransitions", () => {
-  it("offers open day, clock in, and start mileage when nothing is open", () => {
+  it("offers open day, clock in, switch activity, and start mileage when nothing is open", () => {
     expect(deriveValidTransitions(base)).toEqual([
       "open_business_day",
       "clock_in",
+      "switch_activity",
       "start_mileage_session",
     ]);
   });
@@ -32,10 +33,15 @@ describe("deriveValidTransitions", () => {
         ...base,
         business_day: { id: "d1", status: "CLOSED" },
       }),
-    ).toEqual(["reopen_business_day", "clock_in", "start_mileage_session"]);
+    ).toEqual([
+      "reopen_business_day",
+      "clock_in",
+      "switch_activity",
+      "start_mileage_session",
+    ]);
   });
 
-  it("offers clock out and switch activity when clocked in", () => {
+  it("offers clock out when clocked in; switch is always available", () => {
     const t = deriveValidTransitions({
       ...base,
       business_day: { id: "d1", status: "ACTIVE" },
@@ -45,6 +51,27 @@ describe("deriveValidTransitions", () => {
     expect(t).toContain("clock_out");
     expect(t).toContain("switch_activity");
     expect(t).not.toContain("clock_in");
+    expect(t).not.toContain("stop_activity");
+  });
+
+  it("offers stop_activity when an activity is open (even if clocked out)", () => {
+    const t = deriveValidTransitions({
+      ...base,
+      business_day: { id: "d1", status: "ACTIVE" },
+      clocked_in: false,
+      activity: {
+        id: "a1",
+        activity_type: "job_work",
+        entity_type: null,
+        entity_id: null,
+        assignment_kind: null,
+        labor_bucket: "billable",
+        started_at: "2026-08-05T12:00:00Z",
+      },
+    });
+    expect(t).toContain("switch_activity");
+    expect(t).toContain("stop_activity");
+    expect(t).toContain("clock_in");
   });
 
   it("offers close mileage when a vehicle session is open", () => {
