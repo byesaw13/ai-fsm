@@ -309,32 +309,9 @@ Acceptance Criteria:
 Notes:
 Phase 2.
 
-# TASK-054: Day Close checklist + Reopen
+Code audit 2026-08-06: **PARTIAL** — clock in/out, migration 129,
+ClockBar, day-close gate shipped. Residual: void/correct clock UI; pay policy fields.
 
-Status:
-Proposed
-
-Phase:
-1
-
-Problem:
-The blunt End Day button closes everything at once with no review.
-
-Business Value:
-A deliberate close after review; Reopen is normal, not an error.
-
-Scope:
-- Checklist gating `business_days → CLOSED` (payroll, activities, mileage,
-  materials/expenses, inbox cleared/deferred, notes). Reopen with reason → ACTIVE.
-
-Out of Scope:
-- Locking historical records on close.
-
-Acceptance Criteria:
-- [ ] Close requires the checklist; Reopen records a reason and returns to ACTIVE.
-
-Notes:
-Phase 7.
 
 # TASK-035: MCP Write Tools v1 (low-risk operations writes)
 
@@ -393,6 +370,9 @@ tasks if the build proves large. Do **not** start until TASK-033 has been in
 real daily use and TASK-034 (non-superuser RLS verification) is considered.
 
 ## Completed
+
+- [TASK-054: Day Close checklist + Reopen](../archive/backlog-done/TASK-054-day-close-checklist-reopen.md) — Done (code audit 2026-08-06)
+
 
 - [TASK-050: Link mileage ↔ travel-time + capture-method](../archive/backlog-done/TASK-050-mileage-travel-link.md) — Done (truth-pass archive 2026-08-05)
 
