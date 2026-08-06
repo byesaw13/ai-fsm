@@ -95,7 +95,15 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-084**.
+Next available ID: **TASK-091**.
+
+Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
+Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
+closed shipped work (buy list, attention, job ledger, materials catalog, T&M
+invoice, document terms, nested hubs), and wrote TASK-018 residual checklist.
+Renumbered collisions: Job Ledger → **084**, T&M final invoice → **089**,
+estimate/invoice terms → **090**. Original 081–083 keep hubs / buy list /
+attention.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -150,7 +158,7 @@ Next available ID: **TASK-084**.
 | TASK-050 | Link mileage ↔ travel-time + capture-method | 001 | Proposed |
 | TASK-051 | Business Day aggregate (decouple day close) | 001 | Done |
 | TASK-052 | Payroll clock + payroll policies | 001 | Proposed |
-| TASK-053 | Activity + Assignment model | 001 | In Progress |
+| TASK-053 | Activity + Assignment model | 001 | Done |
 | TASK-054 | Day Close checklist + Reopen | 001 | Proposed |
 | TASK-055 | Operational Intelligence (profitability→automation) | 008 | Proposed |
 | TASK-056 | Current Operations State (live state machine) | 001 | In Progress |
@@ -165,21 +173,28 @@ Next available ID: **TASK-084**.
 | TASK-065 | Retire visit_time_logs table | 001 | Done |
 | TASK-066 | Visit Production Rollup (Visit Summary page) | 007 | Proposed |
 | TASK-067 | Visit Timeline | 007 | Proposed |
-| TASK-068 | Payment Provider Model & Enriched Recorder | 004 | In Progress |
+| TASK-068 | Payment Provider Model & Enriched Recorder | 004 | Done |
 | TASK-069 | Square Card Payments | 004 | Proposed |
-| TASK-071 | Set a deposit on any invoice (Square-style single invoice) | 004 | In Progress |
+| TASK-071 | Set a deposit on any invoice (Square-style single invoice) | 004 | Done |
 | TASK-072 | Per-task time capture via AI Daily Recap | 008 | Done |
 | TASK-073 | AI task decomposition | 008 | Done |
 | TASK-074 | My Work — "Next action" + stale-state prompts | 006 | Proposed |
 | TASK-075 | Field workflow — fewer taps job → materials → invoice → closeout | 006 | Proposed |
 | TASK-076 | Stop anchor stability — radius hysteresis on capture | 007 | Proposed |
 | TASK-077 | Auto-start the job on arrival at a scheduled customer (opt-in) | 007 | Deferred |
-| TASK-078 | Invoices tied to an open job are due on completion | 004 | In Progress |
-| TASK-079 | Visit-candidate consolidation + Day Review de-noise | 007 | In Progress |
-| TASK-080 | Real GPS mileage — dense drive trail + honest cross-check | 007 | In Progress |
+| TASK-078 | Invoices tied to an open job are due on completion | 004 | Done |
+| TASK-079 | Visit-candidate consolidation + Day Review de-noise | 007 | Done |
+| TASK-080 | Real GPS mileage — dense drive trail + honest cross-check | 007 | Done |
 | TASK-081 | Nested hubs UX system (Home / Work / People / Money) | 006 | Done |
-| TASK-082 | Job-owned materials buy list (estimate seed) | 002 | In Progress |
-| TASK-083 | Attention Phase 2 — estimates badge, email, prune, filters | 005 | In Progress |
+| TASK-082 | Job-owned materials buy list (estimate seed) | 002 | Done |
+| TASK-083 | Attention Phase 2 — estimates badge, email, prune, filters | 005 | Done |
+| TASK-084 | Job Ledger — estimate vs actual on the project page | 004 | Done |
+| TASK-085 | Materials catalog schema (avg, count, SKU unique) | 004 | Done |
+| TASK-086 | Learn materials catalog from receipt line items | 004 | Done |
+| TASK-087 | Materials catalog UI + SKU search | 004 | Done |
+| TASK-088 | Store purchase history import (Home Depot + Lowe's) | 004 | Done |
+| TASK-089 | T&M final invoice from actuals + mobile deliver | 004 | Done |
+| TASK-090 | Separate estimate vs invoice document terms in Settings | 004 | Done |
 
 ## Status legend
 

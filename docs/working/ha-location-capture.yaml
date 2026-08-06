@@ -84,15 +84,15 @@ automation:
     mode: queued
     max: 10
 
-  - id: fsm_location_activity_change
-    alias: FSM - detected activity change
-    description: Post driving/stopped transitions to the FSM location ingest.
+  # TASK-080: split still vs in_vehicle so red-light "still" flickers are debounced
+  # (for: 90s) while vehicle entry still posts immediately.
+  - id: fsm_location_activity_in_vehicle
+    alias: FSM - detected activity → in_vehicle
+    description: Post driving transitions to the FSM location ingest (no debounce).
     triggers:
       - trigger: state
         entity_id: sensor.nick_s_s25_ultra_detected_activity
-        to:
-          - in_vehicle
-          - still
+        to: in_vehicle
     conditions:
       - condition: template
         value_template: "{{ trigger.from_state.state != trigger.to_state.state }}"
@@ -100,7 +100,31 @@ automation:
       - action: rest_command.fsm_location_event
         data:
           kind: activity_change
-          activity: "{{ trigger.to_state.state }}"
+          activity: "in_vehicle"
+          address: "{{ states('sensor.nick_s_s25_ultra_geocoded_location') }}"
+          latitude: "{{ state_attr('device_tracker.nick_s_s25','latitude') | default('') }}"
+          longitude: "{{ state_attr('device_tracker.nick_s_s25','longitude') | default('') }}"
+          external_id: "ha-act-{{ trigger.to_state.last_changed.timestamp() | int }}"
+    mode: queued
+    max: 10
+
+  - id: fsm_location_activity_still
+    alias: FSM - detected activity → still (debounced)
+    description: Post stopped transitions after 90s so red lights don't fragment drives (TASK-080).
+    triggers:
+      - trigger: state
+        entity_id: sensor.nick_s_s25_ultra_detected_activity
+        to: still
+        for:
+          seconds: 90
+    conditions:
+      - condition: template
+        value_template: "{{ trigger.from_state.state != 'still' }}"
+    actions:
+      - action: rest_command.fsm_location_event
+        data:
+          kind: activity_change
+          activity: "still"
           address: "{{ states('sensor.nick_s_s25_ultra_geocoded_location') }}"
           latitude: "{{ state_attr('device_tracker.nick_s_s25','latitude') | default('') }}"
           longitude: "{{ state_attr('device_tracker.nick_s_s25','longitude') | default('') }}"
@@ -223,16 +247,17 @@ automation:
     mode: queued
     max: 10
 
-  # Periodic GPS during a drive (TASK-025 slice 2): post the phone's location
-  # whenever the geocoded location changes AND the phone is in a vehicle. This
-  # feeds intermediate points so the trip distance accumulates instead of being
-  # a single straight line. Enable the "High accuracy mode" / a sensor-update
-  # interval on the Companion app while in_vehicle for denser points.
+  # Periodic GPS during a drive (TASK-025 + TASK-080): post while in_vehicle on
+  # geocode change OR every 1 min (time_pattern) so local hops get a dense trail,
+  # not only a point when the street label changes. Companion "High accuracy" /
+  # while-in-vehicle interval still improves source density.
   - id: fsm_location_drive_point
     alias: FSM - drive GPS point
     triggers:
       - trigger: state
         entity_id: sensor.nick_s_s25_ultra_geocoded_location
+      - trigger: time_pattern
+        minutes: "/1"
     conditions:
       - condition: state
         entity_id: sensor.nick_s_s25_ultra_detected_activity
