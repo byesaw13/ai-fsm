@@ -360,43 +360,6 @@ Depends on the time truth being clean (TASK-061…065) and Site Presence
 (TASK-057). The daily workspace for multi-day production. This is the screen the
 owner will actually use day-to-day.
 
-# TASK-067: Visit Timeline
-
-Status:
-Proposed
-
-Phase:
-1
-
-Problem:
-The Visit Production Rollup (TASK-066) shows totals, but not the *sequence* of a
-visit — when the clock started, the arrival, the demo / material-run / install
-segments, the departure. The chronological story is what makes a visit legible
-after the fact.
-
-Business Value:
-A scannable timeline of a production session (Clock In → Arrived → Demo →
-Material Run → Install → Leave → Summary). High value for reconstructing
-multi-day jobs, settling disputes, and later production learning.
-
-Scope:
-- Render a chronological timeline for one visit from the separated ledgers:
-  payroll clock events, activity segments (verb + assignment), mileage trips, and
-  arrival/departure (Site Presence), keyed off `started_at` / `ended_at`.
-- Reference-only, same discipline as TASK-066 — derived from the sources of
-  truth, no new timeline table.
-
-Out of Scope:
-- Editing events from the timeline (each source owns its own correction path).
-
-Acceptance Criteria:
-- [ ] A visit renders an ordered timeline of its clock / activity / mileage /
-      presence events with timestamps.
-- [ ] The timeline derives purely from existing ledgers (no duplicated storage).
-
-Notes:
-Builds on TASK-066. Becomes more valuable as production history accumulates —
-feeds the Production Intelligence learning loop (EPIC-008) later.
 
 # TASK-076: Stop anchor stability — radius hysteresis on capture
 
@@ -509,6 +472,9 @@ TASK-045; gated + opt-in + reversible by design so a false auto-start never
 silently dirties payroll/billable.
 
 ## Completed
+
+- [TASK-067: Visit Timeline](../archive/backlog-done/TASK-067-visit-timeline.md) — Done (thin day-first 2026-08-06)
+
 
 - [TASK-080: Real GPS mileage — dense trail + honest cross-check](../archive/backlog-done/TASK-080-real-gps-mileage.md) — Done (Wave 0b 2026-08-05; HA reload on homelab)
 
