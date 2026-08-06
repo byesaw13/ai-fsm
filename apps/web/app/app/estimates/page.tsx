@@ -240,8 +240,8 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
             margin: "0 0 var(--space-3)",
             padding: "10px 14px",
             borderRadius: 8,
-            background: "color-mix(in srgb, var(--color-success, #16a34a) 12%, transparent)",
-            border: "1px solid color-mix(in srgb, var(--color-success, #16a34a) 35%, transparent)",
+            background: "color-mix(in srgb, var(--accent, #166534) 10%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--accent, #166534) 28%, transparent)",
             fontSize: "var(--text-sm)",
             color: "var(--fg)",
           }}

@@ -1,5 +1,6 @@
 import type { PoolClient } from "pg";
 import { logger } from "@/lib/logger";
+import { appUrl } from "@/lib/email/mailer";
 import {
   ATTENTION_EMAIL_TYPES,
   type AttentionEmailType,
@@ -63,11 +64,8 @@ export async function enqueueAttentionOwnerEmail(
       return "duplicate";
     }
 
-    const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://app.mydovetails.com").replace(
-      /\/$/,
-      "",
-    );
-    const link = `${appUrl}${opts.href.startsWith("/") ? opts.href : `/${opts.href}`}`;
+    const base = appUrl();
+    const link = `${base}${opts.href.startsWith("/") ? opts.href : `/${opts.href}`}`;
     const subject = `[Dovetails] ${opts.title}`;
     const summaryLine = opts.summary
       ? `<p style="color:#57534e;margin:8px 0">${escapeHtml(opts.summary)}</p>`

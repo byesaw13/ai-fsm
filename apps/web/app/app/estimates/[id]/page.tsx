@@ -27,6 +27,7 @@ import { EstimateSummaryCard } from "./sections/EstimateSummaryCard";
 import { EstimateLineItems } from "./sections/EstimateLineItems";
 import { ApprovedHandoff } from "./sections/ApprovedHandoff";
 import { TravelPanel } from "@/components/travel/TravelPanel";
+import { MarkEntityAttentionRead } from "@/components/attention/MarkEntityAttentionRead";
 
 export const dynamic = "force-dynamic";
 
@@ -41,16 +42,6 @@ export default async function EstimateDetailPage({
 
   const detail = await loadEstimateDetail(session, id);
   if (!detail) notFound();
-
-  try {
-    const { withDbSession } = await import("@/lib/db");
-    const { markEntityAttentionRead } = await import("@/lib/attention");
-    await withDbSession(session, (client) =>
-      markEntityAttentionRead(client, session.accountId, "estimate", id),
-    );
-  } catch {
-    // non-fatal
-  }
 
   const {
     estimate,
@@ -93,6 +84,9 @@ export default async function EstimateDetailPage({
 
   return (
     <PageContainer>
+      {(session.role === "owner" || session.role === "admin") && (
+        <MarkEntityAttentionRead entityType="estimate" entityId={id} />
+      )}
       <Breadcrumbs
         items={[
           { href: "/app/estimates", label: "Estimates" },
