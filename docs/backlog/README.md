@@ -95,7 +95,14 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-084**.
+Next available ID: **TASK-091**.
+
+Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
+closed shipped work (buy list, attention, job ledger, materials catalog, T&M
+invoice, document terms, nested hubs), and wrote TASK-018 residual checklist.
+Renumbered collisions: Job Ledger → **084**, T&M final invoice → **089**,
+estimate/invoice terms → **090**. Original 081–083 keep hubs / buy list /
+attention.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -178,8 +185,15 @@ Next available ID: **TASK-084**.
 | TASK-079 | Visit-candidate consolidation + Day Review de-noise | 007 | In Progress |
 | TASK-080 | Real GPS mileage — dense drive trail + honest cross-check | 007 | In Progress |
 | TASK-081 | Nested hubs UX system (Home / Work / People / Money) | 006 | Done |
-| TASK-082 | Job-owned materials buy list (estimate seed) | 002 | In Progress |
-| TASK-083 | Attention Phase 2 — estimates badge, email, prune, filters | 005 | In Progress |
+| TASK-082 | Job-owned materials buy list (estimate seed) | 002 | Done |
+| TASK-083 | Attention Phase 2 — estimates badge, email, prune, filters | 005 | Done |
+| TASK-084 | Job Ledger — estimate vs actual on the project page | 004 | Done |
+| TASK-085 | Materials catalog schema (avg, count, SKU unique) | 004 | Done |
+| TASK-086 | Learn materials catalog from receipt line items | 004 | Done |
+| TASK-087 | Materials catalog UI + SKU search | 004 | Done |
+| TASK-088 | Store purchase history import (Home Depot + Lowe's) | 004 | Done |
+| TASK-089 | T&M final invoice from actuals + mobile deliver | 004 | Done |
+| TASK-090 | Separate estimate vs invoice document terms in Settings | 004 | Done |
 
 ## Status legend
 
