@@ -309,41 +309,6 @@ Acceptance Criteria:
 Notes:
 Phase 2.
 
-# TASK-050: Link mileage ↔ travel-time + capture-method + reconcile
-
-Status:
-Done
-
-Phase:
-1
-
-Problem:
-`vehicle_sessions` has no link to travel-time, no record of how a mileage number
-was captured, and a drive can be logged twice (manual odometer + auto GPS).
-
-Business Value:
-Trustworthy mileage: one tap yields linked mileage + travel-time, every number
-shows its capture method, duplicates reconcile.
-
-Scope:
-- Extend `vehicle_sessions` (migration 130, additive): `business_day_id`,
-  `activity_entry_id` FK, `miles_source (odometer|manual_miles|gps_estimate|
-  bt_gps_estimate)`, `status (open|closed|voided)`.
-- One hybrid "Confirm trip" in `activities/segments/[id]`: atomic travel entry +
-  linked session + segment stamp; segment is the dedup key. Odometer-vs-GPS
-  reconcile (odometer wins, void never delete). Reuse `lib/mileage/sessions.ts`.
-
-Out of Scope:
-- BT pre-fill UI (rides this via TASK-025).
-
-Acceptance Criteria:
-- [x] Confirming a drive yields one travel entry + one linked session; idempotent.
-- [x] Enclosing odometer close offers reconcile and voids GPS estimates.
-- [x] Capture method recorded and shown.
-
-Notes:
-Phase 5. Advances TASK-027; closes TASK-025's confirm UI.
-
 # TASK-054: Day Close checklist + Reopen
 
 Status:
@@ -370,40 +335,6 @@ Acceptance Criteria:
 
 Notes:
 Phase 7.
-
-# TASK-023: Daily Command Center UX Modernization
-
-Status:
-Completed
-
-Phase:
-0
-
-Goal:
-Redesign the Daily Command Center so it feels like the supplied mockups: clean, mobile-first, visually polished, fast to use, and organized around the technician's real workday.
-
-Scope:
-- State-driven dashboard UI (Before Day Starts, Active Day, End of Day).
-- Mobile-first responsive layout matching mockup aesthetics.
-- Quick activity chips for single-tap switching on the NowBar.
-- Inline checklist wizard for End of Day closing.
-
-Out of Scope:
-- Business Ledger.
-- New database tables.
-- Core business logic changes.
-
-Acceptance Criteria:
-- [x] Dashboard has a clear state-driven layout.
-- [x] Start Day is visually dominant before the day starts.
-- [x] Active NowBar is visually dominant during the workday.
-- [x] Quick activity chips support one-tap switching.
-- [x] End Day checklist is visually dominant when closing the day.
-- [x] Mobile layout resembles the clarity and polish of the supplied mockups.
-- [x] Desktop layout uses sidebar + clean card grid.
-- [x] Existing mileage/session/activity functionality still works.
-- [x] No new untracked feature work is introduced.
-- [x] pnpm gate:fast passes.
 
 # TASK-035: MCP Write Tools v1 (low-risk operations writes)
 
@@ -462,6 +393,10 @@ tasks if the build proves large. Do **not** start until TASK-033 has been in
 real daily use and TASK-034 (non-superuser RLS verification) is considered.
 
 ## Completed
+
+- [TASK-050: Link mileage ↔ travel-time + capture-method](../archive/backlog-done/TASK-050-mileage-travel-link.md) — Done (truth-pass archive 2026-08-05)
+
+- [TASK-023: Daily Command Center UX Modernization](../archive/backlog-done/TASK-023-daily-command-center-ux.md) — Done (truth-pass archive 2026-08-05)
 
 - [TASK-056: Current Operations State](../archive/backlog-done/TASK-056-current-operations-state.md) — Done (Wave 1 2026-08-05)
 
