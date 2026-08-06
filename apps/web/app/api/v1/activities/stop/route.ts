@@ -12,9 +12,10 @@ export const POST = withAuth(async (_request: NextRequest, session) => {
       session,
       `UPDATE activity_entries
        SET ended_at = now()
-       WHERE account_id = $1 AND ended_at IS NULL AND voided_at IS NULL
+       WHERE account_id = $1 AND user_id = $2
+         AND ended_at IS NULL AND voided_at IS NULL
        RETURNING id`,
-      [session.accountId]
+      [session.accountId, session.userId]
     );
     return NextResponse.json({ data: { stopped: rows.length > 0, id: rows[0]?.id ?? null } });
   } catch (error) {

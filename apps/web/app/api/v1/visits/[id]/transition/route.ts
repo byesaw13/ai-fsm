@@ -242,9 +242,10 @@ export const POST = withAuth(
         // active, start job_work linked to this visit.
         await client.query(
           `UPDATE activity_entries SET ended_at = now()
-           WHERE account_id = $1 AND ended_at IS NULL AND voided_at IS NULL
-             AND NOT (activity_type = 'job_work' AND entity_type = 'visit' AND entity_id = $2)`,
-          [session.accountId, id]
+           WHERE account_id = $1 AND user_id = $2
+             AND ended_at IS NULL AND voided_at IS NULL
+             AND NOT (activity_type = 'job_work' AND entity_type = 'visit' AND entity_id = $3)`,
+          [session.accountId, session.userId, id]
         );
         await client.query(
           `INSERT INTO activity_entries
@@ -252,7 +253,8 @@ export const POST = withAuth(
            SELECT $1, $2, CURRENT_DATE, 'job_work', 'revenue', 'visit', $3, 'auto_visit'
            WHERE NOT EXISTS (
              SELECT 1 FROM activity_entries
-             WHERE account_id = $1 AND ended_at IS NULL AND voided_at IS NULL
+             WHERE account_id = $1 AND user_id = $2
+               AND ended_at IS NULL AND voided_at IS NULL
            )`,
           [session.accountId, session.userId, id]
         );
@@ -263,9 +265,10 @@ export const POST = withAuth(
         // (The legacy visit_time_logs close was removed in TASK-064.)
         await client.query(
           `UPDATE activity_entries SET ended_at = now()
-           WHERE account_id = $1 AND ended_at IS NULL AND voided_at IS NULL
-             AND entity_type = 'visit' AND entity_id = $2`,
-          [session.accountId, id]
+           WHERE account_id = $1 AND user_id = $2
+             AND ended_at IS NULL AND voided_at IS NULL
+             AND entity_type = 'visit' AND entity_id = $3`,
+          [session.accountId, session.userId, id]
         );
       }
 

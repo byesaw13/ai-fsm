@@ -16,6 +16,7 @@ export type OpsTransition =
   | "clock_in"
   | "clock_out"
   | "switch_activity"
+  | "stop_activity"
   | "start_mileage_session"
   | "close_mileage_session"
   | "close_business_day"
@@ -60,7 +61,13 @@ export function deriveValidTransitions(state: Omit<CurrentOperationsState, "vali
   if (!state.clocked_in) {
     out.push("clock_in");
   } else {
-    out.push("clock_out", "switch_activity");
+    out.push("clock_out");
+  }
+
+  // Activity is independent of the payroll clock (switch route does not require clock-in).
+  out.push("switch_activity");
+  if (state.activity) {
+    out.push("stop_activity");
   }
 
   if (!state.vehicle_session) {
@@ -89,23 +96,27 @@ export async function getCurrentOperationsState(
   );
   const clock = clockRes.rows[0] ?? null;
 
+  // Scope open activity + vehicle to this user (multi-tech accounts).
+  // activity_entries.user_id; vehicle_sessions uses created_by (no user_id column).
   const activityRes = await client.query<NonNullable<CurrentOperationsState["activity"]>>(
     `SELECT id, activity_type, entity_type, entity_id, assignment_kind, labor_bucket,
             started_at::text AS started_at
        FROM activity_entries
-      WHERE account_id = $1 AND ended_at IS NULL AND voided_at IS NULL
+      WHERE account_id = $1 AND user_id = $2
+        AND ended_at IS NULL AND voided_at IS NULL
       LIMIT 1`,
-    [accountId],
+    [accountId, userId],
   );
 
   const vehicleRes = await client.query<NonNullable<CurrentOperationsState["vehicle_session"]>>(
     `SELECT id, vehicle_id, started_at::text AS started_at
        FROM vehicle_sessions
-      WHERE account_id = $1 AND status = 'open'
+      WHERE account_id = $1 AND created_by = $2
+        AND status = 'open'
         AND end_odometer IS NULL AND miles IS NULL
       ORDER BY started_at DESC NULLS LAST
       LIMIT 1`,
-    [accountId],
+    [accountId, userId],
   );
 
   const snapshot = {

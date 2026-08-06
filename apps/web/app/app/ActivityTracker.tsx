@@ -46,6 +46,39 @@ export function NowBar({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  // TASK-056: live consumer of GET /api/v1/operations/current (display-only; switch
+  // stays available via existing POST — activity is independent of the payroll clock).
+  const [opsSummary, setOpsSummary] = useState<{
+    clockedIn: boolean;
+    transitions: string[];
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadOps() {
+      try {
+        const res = await fetch("/api/v1/operations/current");
+        if (!res.ok || cancelled) return;
+        const json = (await res.json()) as {
+          data?: { valid_transitions?: string[]; clocked_in?: boolean };
+        };
+        if (cancelled || !json.data) return;
+        setOpsSummary({
+          clockedIn: !!json.data.clocked_in,
+          transitions: json.data.valid_transitions ?? [],
+        });
+      } catch {
+        // Non-blocking: switch still works via existing POST
+      }
+    }
+    void loadOps();
+    // ClockBar / mileage / day-close fire ops:refresh without changing activity props.
+    window.addEventListener("ops:refresh", loadOps);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("ops:refresh", loadOps);
+    };
+  }, [active?.id, active?.activity_type]);
 
   // Optimistic switch: reflect the tapped activity immediately (perceived
   // <500ms) instead of waiting on the network round-trip + refresh. Cleared
@@ -131,7 +164,23 @@ export function NowBar({
           transition: "all var(--transition-base)"
         }}
         data-testid="now-bar"
+        data-ops-clocked-in={opsSummary ? String(opsSummary.clockedIn) : undefined}
+        data-ops-transitions={opsSummary ? opsSummary.transitions.join(",") : undefined}
       >
+        {opsSummary && (
+          <span
+            data-testid="ops-state-hint"
+            style={{
+              fontSize: "var(--text-xs)",
+              fontWeight: 600,
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+              color: hasActive ? "rgba(255,255,255,0.65)" : "var(--fg-muted)",
+            }}
+          >
+            {opsSummary.clockedIn ? "Payroll clock on" : "Payroll clock off"}
+          </span>
+        )}
         {hasActive && meta && displayStartedAt ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
             <span style={{ fontSize: "var(--text-xs)", textTransform: "uppercase", letterSpacing: "0.06em", color: "rgba(255, 255, 255, 0.7)", fontWeight: 700 }}>

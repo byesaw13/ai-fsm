@@ -66,9 +66,10 @@ export const POST = withAuth(async (request: NextRequest, session) => {
     const active = await client.query<{ id: string; activity_type: string; entity_id: string | null; entity_type: string | null; assignment_kind: string | null }>(
       `SELECT id, activity_type, entity_type, entity_id, assignment_kind
        FROM activity_entries
-       WHERE account_id = $1 AND ended_at IS NULL AND voided_at IS NULL
+       WHERE account_id = $1 AND user_id = $2
+         AND ended_at IS NULL AND voided_at IS NULL
        FOR UPDATE`,
-      [session.accountId]
+      [session.accountId, session.userId]
     );
 
     const current = active.rows[0];
