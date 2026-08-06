@@ -134,14 +134,12 @@ export function ProjectOverview(props: ProjectOverviewProps) {
               <Link href={`/app/estimates/${props.estimate.id}` as Route} style={cellLinkStyle}>
                 {moneyLine(props.estimate, "Estimate")}
               </Link>
-              {props.approvedEstimateId ? (
-                <Link
-                  href={`/app/estimates/${props.approvedEstimateId}/shopping-list` as Route}
-                  style={cellSubLinkStyle}
-                >
-                  Materials plan →
-                </Link>
-              ) : null}
+              <Link
+                href={`/app/jobs/${props.jobId}/materials?tab=buy` as Route}
+                style={cellSubLinkStyle}
+              >
+                Buy list →
+              </Link>
             </>
           ) : (
             <CellEmpty>None yet</CellEmpty>

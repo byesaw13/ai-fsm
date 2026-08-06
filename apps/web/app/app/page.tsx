@@ -240,12 +240,12 @@ export default async function AppPage() {
       // Never dump into a bare estimates list — open the shopping list (1 job)
       // or scroll to the Materials panel (multiple jobs).
       href: (materialJobs.length === 1
-        ? `/app/estimates/${materialJobs[0].id}/shopping-list`
+        ? `/app/jobs/${materialJobs[0].job_id}/materials?tab=buy`
         : "/app#materials") as Route,
       detail:
         materialJobs.length === 1
-          ? `Shopping list: ${materialJobs[0].title}`
-          : "Open shopping lists for approved active projects",
+          ? `Buy list: ${materialJobs[0].title}`
+          : "Open buy lists for approved active projects",
       tone: "warning",
     },
     {

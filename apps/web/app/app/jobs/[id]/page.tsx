@@ -1327,12 +1327,22 @@ export default async function JobDetailPage({
             </Card>
           )}
 
-          {/* Materials: linked receipts + collapsed "link unassigned" (not a second card) */}
-          {!isTech && (jobMaterialExpenses.length > 0 || canLinkExpenses) && (
+          {/* Materials: buy list link + receipts + link unassigned */}
+          {!isTech && (
             <Card id="job-materials" data-testid="job-materials-panel">
               <SectionHeader
                 title="Materials"
                 count={jobMaterialExpenses.length > 0 ? jobMaterialExpenses.length : undefined}
+                action={
+                  <LinkButton
+                    href={`/app/jobs/${job.id}/materials?tab=buy` as Route}
+                    variant="secondary"
+                    size="sm"
+                    data-testid="open-buy-list"
+                  >
+                    Buy list →
+                  </LinkButton>
+                }
               />
               {jobLedger?.rows.find((r) => r.bucket === "materials")?.estimateCents != null ? (
                 <p
@@ -1358,9 +1368,17 @@ export default async function JobDetailPage({
                   })()}
                 </p>
               ) : null}
-              <JobMaterialsPanel expenses={jobMaterialExpenses} />
-              {canLinkExpenses && (
-                <LinkForgottenExpensesPanel mode="job" jobId={job.id} />
+              {(jobMaterialExpenses.length > 0 || canLinkExpenses) ? (
+                <>
+                  <JobMaterialsPanel expenses={jobMaterialExpenses} />
+                  {canLinkExpenses && (
+                    <LinkForgottenExpensesPanel mode="job" jobId={job.id} />
+                  )}
+                </>
+              ) : (
+                <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                  Open the buy list to plan what to purchase. Receipts show here after you log a material run.
+                </p>
               )}
             </Card>
           )}
