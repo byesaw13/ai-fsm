@@ -5,36 +5,6 @@ of what each job actually earned.
 
 ## Active tasks
 
-# TASK-017: Lead Source / Referral ROI
-
-Status:
-In Progress
-
-Phase:
-3
-
-Problem:
-It is hard to tell which lead sources and referrals actually produce profitable
-work.
-
-Business Value:
-Directs marketing/referral effort toward what pays off.
-
-Scope:
-- Attribute jobs/revenue to lead source and referral.
-- Report ROI by source.
-
-Out of Scope:
-- Paid-ad platform integrations.
-
-Acceptance Criteria:
-- [ ] Revenue can be grouped by lead source / referrer.
-- [ ] A report shows ROI per source.
-
-Notes:
-Partial: `apps/web/app/api/v1/reports/referrals/route.ts` exists; the full ROI
-rollup is not complete.
-
 # TASK-069: Square Card Payments
 
 Status:
@@ -91,6 +61,8 @@ remain unchecked pending live sandbox/production verification with real Square
 credentials.
 
 ## Completed
+
+- [TASK-017: Lead Source / Referral ROI](../archive/backlog-done/TASK-017-lead-source-referral-roi.md) — Done (Wave 4 2026-08-05)
 
 - [TASK-078: Due on completion (open job)](../archive/backlog-done/TASK-078-due-on-completion.md) — Done (Wave 0a 2026-08-05)
 
