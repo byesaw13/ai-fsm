@@ -4,11 +4,17 @@ import { useState, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
-import { buildAssessmentJobDescription } from "@ai-fsm/domain";
+import {
+  ASSESSMENT_TRADE_LABELS,
+  buildAssessmentJobDescription,
+  type AssessmentTradeKey,
+} from "@ai-fsm/domain";
 import { useToast } from "@/components/ui";
 import { writeAssessmentContext } from "@/lib/estimates/assessment-context";
 import { MaterialsGenerator } from "@/app/app/estimates/components/MaterialsGenerator";
 import type { MaterialItem } from "@/app/app/estimates/components/MaterialsGenerator";
+
+const TRADE_KEYS = Object.keys(ASSESSMENT_TRADE_LABELS) as AssessmentTradeKey[];
 
 export interface Room {
   id: string;
@@ -36,6 +42,10 @@ export interface Assessment {
   lead_paint_risk: boolean;
   total_sqft: number | null;
   completed_at: string | null;
+  work_items?: string[] | null;
+  prep_notes?: string | null;
+  trade_notes?: Partial<Record<AssessmentTradeKey, string>> | null;
+  customer_supplied_materials?: string | null;
 }
 
 interface Props {
@@ -72,6 +82,17 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
   const [difficultAccess, setDifficultAccess] = useState(initialAssessment?.difficult_access ?? false);
   const [asbestosRisk, setAsbestosRisk] = useState(initialAssessment?.asbestos_risk ?? false);
   const [leadPaintRisk, setLeadPaintRisk] = useState(initialAssessment?.lead_paint_risk ?? false);
+  // TASK-018 residual: structured scope the materials generator already consumes
+  const [workItemsText, setWorkItemsText] = useState(
+    (initialAssessment?.work_items ?? []).filter(Boolean).join("\n"),
+  );
+  const [prepNotes, setPrepNotes] = useState(initialAssessment?.prep_notes ?? "");
+  const [tradeNotes, setTradeNotes] = useState<Partial<Record<AssessmentTradeKey, string>>>(
+    () => initialAssessment?.trade_notes ?? {},
+  );
+  const [customerSupplied, setCustomerSupplied] = useState(
+    initialAssessment?.customer_supplied_materials ?? "",
+  );
   const [photos, setPhotos] = useState<PhotoMeta[]>(initialPhotos);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
@@ -96,6 +117,15 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
     setRooms((prev) => prev.filter((_, i) => i !== idx));
   }
 
+  const workItemsList = useMemo(
+    () =>
+      workItemsText
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean),
+    [workItemsText],
+  );
+
   const buildPayload = useCallback(() => ({
     rooms: rooms.map((r) => ({
       id: r.id,
@@ -112,7 +142,16 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
     asbestos_risk: asbestosRisk,
     lead_paint_risk: leadPaintRisk,
     total_sqft: totalSqft > 0 ? totalSqft : null,
-  }), [rooms, scopeNotes, accessNotes, hasPets, difficultAccess, asbestosRisk, leadPaintRisk, totalSqft]);
+    work_items: workItemsList,
+    prep_notes: prepNotes || null,
+    trade_notes: Object.fromEntries(
+      TRADE_KEYS.map((k) => [k, (tradeNotes[k] ?? "").trim()]).filter(([, v]) => v),
+    ),
+    customer_supplied_materials: customerSupplied || null,
+  }), [
+    rooms, scopeNotes, accessNotes, hasPets, difficultAccess, asbestosRisk, leadPaintRisk,
+    totalSqft, workItemsList, prepNotes, tradeNotes, customerSupplied,
+  ]);
 
   async function save(completedAt?: string | null) {
     setError(null);
@@ -220,8 +259,15 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
         lead_paint_risk: leadPaintRisk,
         total_sqft: totalSqft > 0 ? totalSqft : null,
         photo_count: photos.length,
+        work_items: workItemsList,
+        prep_notes: prepNotes || null,
+        trade_notes: tradeNotes,
+        customer_supplied_materials: customerSupplied || null,
       }),
-    [rooms, scopeNotes, accessNotes, hasPets, difficultAccess, asbestosRisk, leadPaintRisk, totalSqft, photos.length]
+    [
+      rooms, scopeNotes, accessNotes, hasPets, difficultAccess, asbestosRisk, leadPaintRisk,
+      totalSqft, photos.length, workItemsList, prepNotes, tradeNotes, customerSupplied,
+    ],
   );
 
   return (
@@ -381,6 +427,86 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
           onChange={(e) => setScopeNotes(e.target.value)}
           placeholder="Describe what needs to be done, materials needed, special considerations…"
           disabled={disabled}
+          style={{ width: "100%", fontFamily: "inherit", fontSize: "var(--text-sm)" }}
+        />
+      </section>
+
+      {/* Work items (TASK-018 residual) */}
+      <section>
+        <label htmlFor="work_items" style={{ display: "block", fontSize: "var(--text-sm)", fontWeight: 600, marginBottom: "var(--space-1)" }}>
+          Work items <span style={{ fontWeight: 400, color: "var(--fg-muted)" }}>(one per line)</span>
+        </label>
+        <textarea
+          id="work_items"
+          rows={4}
+          value={workItemsText}
+          onChange={(e) => setWorkItemsText(e.target.value)}
+          placeholder={"Paint ceiling\nInstall baseboard\nPatch drywall"}
+          disabled={disabled}
+          data-testid="assessment-work-items"
+          style={{ width: "100%", fontFamily: "inherit", fontSize: "var(--text-sm)" }}
+        />
+      </section>
+
+      {/* Prep notes */}
+      <section>
+        <label htmlFor="prep_notes" style={{ display: "block", fontSize: "var(--text-sm)", fontWeight: 600, marginBottom: "var(--space-1)" }}>
+          Prep notes
+        </label>
+        <textarea
+          id="prep_notes"
+          rows={3}
+          value={prepNotes}
+          onChange={(e) => setPrepNotes(e.target.value)}
+          placeholder="Mask floors, move furniture, prime raw drywall…"
+          disabled={disabled}
+          data-testid="assessment-prep-notes"
+          style={{ width: "100%", fontFamily: "inherit", fontSize: "var(--text-sm)" }}
+        />
+      </section>
+
+      {/* Trade notes */}
+      <section>
+        <h3 style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)", fontWeight: 600 }}>
+          Trade notes
+        </h3>
+        <div style={{ display: "grid", gap: "var(--space-2)" }}>
+          {TRADE_KEYS.map((key) => (
+            <div key={key}>
+              <label
+                htmlFor={`trade_${key}`}
+                style={{ display: "block", fontSize: "var(--text-xs)", fontWeight: 600, marginBottom: 2, color: "var(--fg-muted)" }}
+              >
+                {ASSESSMENT_TRADE_LABELS[key]}
+              </label>
+              <input
+                id={`trade_${key}`}
+                type="text"
+                value={tradeNotes[key] ?? ""}
+                onChange={(e) => setTradeNotes((prev) => ({ ...prev, [key]: e.target.value }))}
+                placeholder={`${ASSESSMENT_TRADE_LABELS[key]} notes…`}
+                disabled={disabled}
+                data-testid={`assessment-trade-${key}`}
+                style={{ width: "100%", fontFamily: "inherit", fontSize: "var(--text-sm)" }}
+              />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Customer-supplied materials */}
+      <section>
+        <label htmlFor="customer_supplied" style={{ display: "block", fontSize: "var(--text-sm)", fontWeight: 600, marginBottom: "var(--space-1)" }}>
+          Customer-supplied materials
+        </label>
+        <textarea
+          id="customer_supplied"
+          rows={2}
+          value={customerSupplied}
+          onChange={(e) => setCustomerSupplied(e.target.value)}
+          placeholder="Customer providing paint, vanity, fixtures…"
+          disabled={disabled}
+          data-testid="assessment-customer-supplied"
           style={{ width: "100%", fontFamily: "inherit", fontSize: "var(--text-sm)" }}
         />
       </section>
