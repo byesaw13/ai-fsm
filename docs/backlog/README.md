@@ -97,7 +97,7 @@ tasks in `docs/archive/backlog-done/`.
 
 Next available ID: **TASK-091**.
 
-Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
+Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
 closed shipped work (buy list, attention, job ledger, materials catalog, T&M
 invoice, document terms, nested hubs), and wrote TASK-018 residual checklist.
@@ -183,8 +183,8 @@ attention.
 | TASK-076 | Stop anchor stability — radius hysteresis on capture | 007 | Proposed |
 | TASK-077 | Auto-start the job on arrival at a scheduled customer (opt-in) | 007 | Deferred |
 | TASK-078 | Invoices tied to an open job are due on completion | 004 | Done |
-| TASK-079 | Visit-candidate consolidation + Day Review de-noise | 007 | In Progress |
-| TASK-080 | Real GPS mileage — dense drive trail + honest cross-check | 007 | In Progress |
+| TASK-079 | Visit-candidate consolidation + Day Review de-noise | 007 | Done |
+| TASK-080 | Real GPS mileage — dense drive trail + honest cross-check | 007 | Done |
 | TASK-081 | Nested hubs UX system (Home / Work / People / Money) | 006 | Done |
 | TASK-082 | Job-owned materials buy list (estimate seed) | 002 | Done |
 | TASK-083 | Attention Phase 2 — estimates badge, email, prune, filters | 005 | Done |
