@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { Route } from "next";
 import { getSession } from "@/lib/auth/session";
@@ -20,6 +21,7 @@ import type { MetricCardData } from "@/components/ui";
 import { formatInvoiceViewLabel, isInvoiceUnread } from "@/lib/invoices/client-view";
 import { amountDueCents } from "@/lib/invoices/payments";
 import { MONEY_HUB_LINKS } from "@/lib/navigation/hubs";
+import { invoiceAttentionPredicate } from "@/lib/attention/counts";
 
 export const dynamic = "force-dynamic";
 
@@ -103,11 +105,19 @@ function effectiveInvoiceStatus(inv: InvoiceRow): InvoiceStatus {
   return inv.status;
 }
 
-export default async function InvoicesPage() {
+interface PageProps {
+  searchParams: Promise<{ attention?: string }>;
+}
+
+export default async function InvoicesPage({ searchParams }: PageProps) {
   const session = await getSession();
   if (!session) redirect("/login");
   if (session.role === "tech") redirect("/app/my-work"); // EPIC-006: techs have no invoice access
   const canCreate = canCreateInvoices(session.role);
+
+  const { attention } = await searchParams;
+  const attentionMode = attention === "1" || attention === "true";
+  const attentionPred = attentionMode ? `AND ${invoiceAttentionPredicate("i")}` : "";
 
   const invoices = await withInvoiceContext(session, async (client) => {
     const r = await client.query(
@@ -121,6 +131,7 @@ export default async function InvoicesPage() {
        LEFT JOIN clients c ON c.id = i.client_id
        LEFT JOIN jobs j ON j.id = i.job_id
        WHERE i.account_id = $1
+       ${attentionPred}
        ORDER BY 
          CASE i.status 
            WHEN 'overdue' THEN 1 
@@ -208,6 +219,26 @@ export default async function InvoicesPage() {
       />
       <HubSubnav hub="Money" links={MONEY_HUB_LINKS} pathname="/app/invoices" />
 
+      {attentionMode && (
+        <p
+          data-testid="attention-filter-banner"
+          style={{
+            margin: "0 0 var(--space-3)",
+            padding: "10px 14px",
+            borderRadius: 8,
+            background: "color-mix(in srgb, var(--accent, #166534) 10%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--accent, #166534) 28%, transparent)",
+            fontSize: "var(--text-sm)",
+            color: "var(--fg)",
+          }}
+        >
+          Showing invoices that need attention (draft finals, unopened sent/partial, overdue).{" "}
+          <Link href={"/app/invoices" as Route} style={{ fontWeight: 600 }}>
+            Clear filter
+          </Link>
+        </p>
+      )}
+
       {invoices.length > 0 && <MetricGrid metrics={metrics} />}
 
       {priorityInvoice && (
@@ -223,10 +254,14 @@ export default async function InvoicesPage() {
 
       {invoices.length === 0 ? (
         <EmptyState
-          title="No invoices yet"
-          description="Create a draft invoice for any client — add line items, hours, and materials. Or convert an approved estimate when you have one."
+          title={attentionMode ? "Nothing needs attention" : "No invoices yet"}
+          description={
+            attentionMode
+              ? "No draft finals, unopened sent invoices, or overdue balances right now."
+              : "Create a draft invoice for any client — add line items, hours, and materials. Or convert an approved estimate when you have one."
+          }
           action={
-            canCreate ? (
+            !attentionMode && canCreate ? (
               <LinkButton
                 href="/app/invoices/new"
                 variant="primary"

@@ -260,24 +260,14 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       );
 
       const invAfter = updatedInvoice.rows[0];
-      if (
-        !isRefund &&
-        invAfter &&
-        (invAfter.status === "paid" || invAfter.status === "partial")
-      ) {
-        const { emitAttentionEvent } = await import("@/lib/attention");
-        await emitAttentionEvent(client, {
+      if (!isRefund && invAfter) {
+        const { emitInvoicePaymentAttention } = await import("@/lib/attention");
+        await emitInvoicePaymentAttention(client, {
           accountId: session.accountId,
-          type: invAfter.status === "paid" ? "invoice.paid" : "invoice.partial",
-          entityType: "invoice",
-          entityId: invoiceId,
-          title: invAfter.status === "paid" ? "Invoice paid" : "Partial payment",
-          summary: invAfter.invoice_number,
-          href: `/app/invoices/${invoiceId}`,
-          dedupeKey:
-            invAfter.status === "paid"
-              ? `invoice.paid:${invoiceId}`
-              : `invoice.partial:${invoiceId}:${paymentId}`,
+          invoiceId,
+          invoiceNumber: invAfter.invoice_number,
+          status: invAfter.status,
+          paymentId,
         });
       }
 

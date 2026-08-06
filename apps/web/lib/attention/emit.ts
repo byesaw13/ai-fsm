@@ -1,10 +1,12 @@
 import type { PoolClient } from "pg";
 import { logger } from "@/lib/logger";
 import type { EmitAttentionEventInput } from "./types";
+import { enqueueAttentionOwnerEmail } from "./email";
 
 /**
  * Insert an attention event. Never throws to callers — primary flows must not fail.
  * Returns event id when inserted, null when deduped or on error.
+ * On new insert, may enqueue owner email for high-signal types.
  */
 export async function emitAttentionEvent(
   client: PoolClient,
@@ -22,6 +24,8 @@ export async function emitAttentionEvent(
       input.dedupeKey ?? null,
     ];
 
+    let insertedId: string | null = null;
+
     if (input.dedupeKey) {
       const r = await client.query<{ id: string }>(
         `INSERT INTO attention_events
@@ -32,17 +36,48 @@ export async function emitAttentionEvent(
          RETURNING id`,
         params,
       );
-      return r.rows[0]?.id ?? null;
+      insertedId = r.rows[0]?.id ?? null;
+    } else {
+      const r = await client.query<{ id: string }>(
+        `INSERT INTO attention_events
+           (account_id, type, entity_type, entity_id, title, summary, href, dedupe_key)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING id`,
+        params,
+      );
+      insertedId = r.rows[0]?.id ?? null;
     }
 
-    const r = await client.query<{ id: string }>(
-      `INSERT INTO attention_events
-         (account_id, type, entity_type, entity_id, title, summary, href, dedupe_key)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id`,
-      params,
-    );
-    return r.rows[0]?.id ?? null;
+    // Only email on newly inserted rows (not deduped no-ops).
+    // SAVEPOINT so a failed queue insert cannot abort the caller's transaction
+    // (e.g. Square payment COMMIT must not roll back after a non-fatal email error).
+    if (insertedId) {
+      try {
+        await client.query("SAVEPOINT attention_email");
+        await enqueueAttentionOwnerEmail(client, {
+          accountId: input.accountId,
+          type: input.type,
+          entityType: input.entityType,
+          entityId: input.entityId,
+          title: input.title,
+          summary: input.summary,
+          href: input.href,
+        });
+        await client.query("RELEASE SAVEPOINT attention_email");
+      } catch (emailErr) {
+        try {
+          await client.query("ROLLBACK TO SAVEPOINT attention_email");
+        } catch {
+          // ignore nested rollback errors
+        }
+        logger.error("attention owner email failed (non-fatal)", emailErr, {
+          type: input.type,
+          entityId: input.entityId,
+        });
+      }
+    }
+
+    return insertedId;
   } catch (err) {
     logger.error("emitAttentionEvent failed (non-fatal)", err, {
       type: input.type,

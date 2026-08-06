@@ -315,11 +315,20 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
                       ? attention.requestsCount
                       : item.href === NAV_INVOICES.href
                         ? attention.invoicesCount
-                        : 0;
+                        : item.href === NAV_ESTIMATES.href
+                          ? attention.estimatesCount
+                          : 0;
+                  const href =
+                    count > 0 &&
+                    (item.href === NAV_REQUESTS.href ||
+                      item.href === NAV_INVOICES.href ||
+                      item.href === NAV_ESTIMATES.href)
+                      ? (`${item.href}?attention=1` as Route)
+                      : (item.href as Route);
                   return (
                     <Link
                       key={item.href}
-                      href={item.href as Route}
+                      href={href}
                       className={`p7-nav-item ${active ? "p7-nav-active" : ""}`}
                       aria-current={active ? "page" : undefined}
                       title={item.label}
@@ -449,11 +458,20 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
                             ? attention.requestsCount
                             : item.href === NAV_INVOICES.href
                               ? attention.invoicesCount
-                              : 0;
+                              : item.href === NAV_ESTIMATES.href
+                                ? attention.estimatesCount
+                                : 0;
+                        const href =
+                          count > 0 &&
+                          (item.href === NAV_REQUESTS.href ||
+                            item.href === NAV_INVOICES.href ||
+                            item.href === NAV_ESTIMATES.href)
+                            ? (`${item.href}?attention=1` as Route)
+                            : (item.href as Route);
                         return (
                           <Link
                             key={item.href}
-                            href={item.href as Route}
+                            href={href}
                             className={`p7-more-item ${active ? "p7-nav-active" : ""}`}
                             aria-current={active ? "page" : undefined}
                             onClick={() => setShowMore(false)}

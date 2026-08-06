@@ -5,11 +5,46 @@ import { ATTENTION_RETENTION_DAYS, type AttentionSummary } from "./types";
 export const REQUEST_QUEUE_STATUSES_SQL = `('pending', 'needs_info', 'reviewed', 'assessment_booked', 'estimated')`;
 
 /**
- * Distinct invoices needing owner attention:
- * - draft final/standard (finish/send)
- * - overdue (any kind)
- * - sent/partial never opened in portal
+ * Invoice attention predicate (no account filter).
+ * `alias` e.g. "i" → `i.status`; empty → bare columns.
  */
+export function invoiceAttentionPredicate(alias = ""): string {
+  const p = alias ? `${alias}.` : "";
+  return `
+  ${p}status != 'void'
+  AND (
+    (${p}status = 'draft' AND ${p}invoice_kind IN ('final', 'standard'))
+    OR ${p}status = 'overdue'
+    OR (
+      ${p}status IN ('sent', 'partial')
+      AND ${p}first_viewed_at IS NULL
+    )
+  )`;
+}
+
+/**
+ * Estimate attention predicate (no account filter).
+ * Sent, not past expiry.
+ */
+export function estimateAttentionPredicate(alias = ""): string {
+  const p = alias ? `${alias}.` : "";
+  return `
+  ${p}status = 'sent'
+  AND (${p}expires_at IS NULL OR ${p}expires_at >= CURRENT_DATE)`;
+}
+
+/** Full WHERE for invoice attention counts. Params: account_id as $1. */
+export const INVOICE_ATTENTION_WHERE = `
+  account_id = $1
+  AND ${invoiceAttentionPredicate()}
+`;
+
+/** Full WHERE for estimate attention counts. Params: account_id as $1. */
+export const ESTIMATE_ATTENTION_WHERE = `
+  account_id = $1
+  AND ${estimateAttentionPredicate()}
+`;
+
 export async function countRequestQueue(
   client: PoolClient,
   accountId: string,
@@ -31,16 +66,20 @@ export async function countInvoiceAttention(
   const r = await client.query<{ count: string }>(
     `SELECT COUNT(*)::text AS count
      FROM invoices
-     WHERE account_id = $1
-       AND status != 'void'
-       AND (
-         (status = 'draft' AND invoice_kind IN ('final', 'standard'))
-         OR status = 'overdue'
-         OR (
-           status IN ('sent', 'partial')
-           AND first_viewed_at IS NULL
-         )
-       )`,
+     WHERE ${INVOICE_ATTENTION_WHERE}`,
+    [accountId],
+  );
+  return parseInt(r.rows[0]?.count ?? "0", 10);
+}
+
+export async function countEstimateAttention(
+  client: PoolClient,
+  accountId: string,
+): Promise<number> {
+  const r = await client.query<{ count: string }>(
+    `SELECT COUNT(*)::text AS count
+     FROM estimates
+     WHERE ${ESTIMATE_ATTENTION_WHERE}`,
     [accountId],
   );
   return parseInt(r.rows[0]?.count ?? "0", 10);
@@ -65,12 +104,14 @@ export async function loadAttentionSummary(
   client: PoolClient,
   accountId: string,
 ): Promise<AttentionSummary> {
-  const [requestsCount, invoicesCount, unreadEventCount] = await Promise.all([
-    countRequestQueue(client, accountId),
-    countInvoiceAttention(client, accountId),
-    countUnreadAttentionEvents(client, accountId),
-  ]);
-  return { requestsCount, invoicesCount, unreadEventCount };
+  const [requestsCount, invoicesCount, estimatesCount, unreadEventCount] =
+    await Promise.all([
+      countRequestQueue(client, accountId),
+      countInvoiceAttention(client, accountId),
+      countEstimateAttention(client, accountId),
+      countUnreadAttentionEvents(client, accountId),
+    ]);
+  return { requestsCount, invoicesCount, estimatesCount, unreadEventCount };
 }
 
 /** Display helper: 0 → null (hide), 100+ → "99+". */

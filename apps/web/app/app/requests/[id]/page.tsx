@@ -10,6 +10,7 @@ import { IntakeSummary } from "./IntakeSummary";
 import { INTAKE_QUESTIONS, INTAKE_METADATA_LABELS } from "@/lib/intake/questions";
 import { PRICING_MODE_LABELS, scoreJobFit } from "@ai-fsm/domain";
 import { FUNNEL_STEPS, funnelStepIndex, getRequestGuidance } from "../request-guidance";
+import { MarkEntityAttentionRead } from "@/components/attention/MarkEntityAttentionRead";
 
 export const dynamic = "force-dynamic";
 
@@ -164,6 +165,9 @@ export default async function BookingRequestDetailPage({
 
   return (
     <PageContainer>
+      {(session.role === "owner" || session.role === "admin") && (
+        <MarkEntityAttentionRead entityType="booking_request" entityId={id} />
+      )}
       <PageHeader
         title={`Request — ${br.name}`}
         subtitle={received}

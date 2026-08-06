@@ -31,6 +31,7 @@ import { InvoiceMobileDeliverBar } from "./InvoiceMobileDeliverBar";
 import { InvoiceLineItemsEditor } from "./InvoiceLineItemsEditor";
 import { LinkForgottenExpensesPanel } from "@/components/invoices/LinkForgottenExpensesPanel";
 import { materialHandlingRateFromSettings } from "@/lib/invoices/material-handling";
+import { MarkEntityAttentionRead } from "@/components/attention/MarkEntityAttentionRead";
 import {
   Breadcrumbs,
   PageContainer,
@@ -162,10 +163,6 @@ export default async function InvoiceDetailPage({
       [id, session.accountId]
     );
 
-    // Opening the record clears related attention events (hybrid clear rules).
-    const { markEntityAttentionRead } = await import("@/lib/attention");
-    await markEntityAttentionRead(client, session.accountId, "invoice", id);
-
     return {
       invoice: invoiceResult.rows[0] as InvoiceRow,
       lineItems: lineItemsResult.rows as LineItemRow[],
@@ -249,6 +246,9 @@ export default async function InvoiceDetailPage({
 
   return (
     <PageContainer>
+      {(session.role === "owner" || session.role === "admin") && (
+        <MarkEntityAttentionRead entityType="invoice" entityId={id} />
+      )}
       <Breadcrumbs
         items={[
           { href: "/app/invoices", label: "Invoices" },

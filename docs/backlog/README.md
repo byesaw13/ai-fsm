@@ -95,7 +95,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-083**.
+Next available ID: **TASK-084**.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -179,6 +179,7 @@ Next available ID: **TASK-083**.
 | TASK-080 | Real GPS mileage — dense drive trail + honest cross-check | 007 | In Progress |
 | TASK-081 | Nested hubs UX system (Home / Work / People / Money) | 006 | Done |
 | TASK-082 | Job-owned materials buy list (estimate seed) | 002 | In Progress |
+| TASK-083 | Attention Phase 2 — estimates badge, email, prune, filters | 005 | In Progress |
 
 ## Status legend
 

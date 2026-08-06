@@ -8,6 +8,7 @@ import { formatBadgeCount } from "@/lib/attention/counts";
 export type AttentionSummary = {
   requestsCount: number;
   invoicesCount: number;
+  estimatesCount: number;
   unreadEventCount: number;
 };
 
@@ -36,6 +37,7 @@ export function useAttentionSummary(enabled: boolean) {
   const [summary, setSummary] = useState<AttentionSummary>({
     requestsCount: 0,
     invoicesCount: 0,
+    estimatesCount: 0,
     unreadEventCount: 0,
   });
 
