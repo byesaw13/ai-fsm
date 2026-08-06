@@ -104,6 +104,8 @@ invoice, document terms, nested hubs), and wrote TASK-018 residual checklist.
 Renumbered collisions: Job Ledger → **084**, T&M final invoice → **089**,
 estimate/invoice terms → **090**. Original 081–083 keep hubs / buy list /
 attention.
+Wave finish 2026-08-05: In Progress emptied — TASK-056, TASK-018, TASK-017 shipped;
+truth-pass also archived TASK-023 and TASK-050 (epic already Done, README lagged).
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -129,7 +131,7 @@ attention.
 | TASK-020 | PWA Installability | 005 | Done |
 | TASK-021 | Quick Activity Switching | 001 | Done |
 | TASK-022 | Smart Start Day | 001 | Done |
-| TASK-023 | End of Day Checklist Wizard | 001 | Proposed |
+| TASK-023 | Daily Command Center UX Modernization | 001 | Done |
 | TASK-024 | Passive Location-Based Activity Capture | 007 | Done |
 | TASK-025 | Bluetooth-Triggered Vehicle-Aware Auto-Mileage | 007 | Done |
 | TASK-026 | Day Map (stops + drive routes) | 007 | Done |
@@ -155,7 +157,7 @@ attention.
 | TASK-047 | Work Item Library (PI-002) | 008 | Deferred |
 | TASK-048 | Confidence Engine (PI-006) | 008 | Deferred |
 | TASK-049 | Operational Inbox (single review surface) | 007 | Proposed |
-| TASK-050 | Link mileage ↔ travel-time + capture-method | 001 | Proposed |
+| TASK-050 | Link mileage ↔ travel-time + capture-method | 001 | Done |
 | TASK-051 | Business Day aggregate (decouple day close) | 001 | Done |
 | TASK-052 | Payroll clock + payroll policies | 001 | Proposed |
 | TASK-053 | Activity + Assignment model | 001 | Done |
