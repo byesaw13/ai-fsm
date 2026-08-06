@@ -161,7 +161,7 @@ attention.
 | TASK-053 | Activity + Assignment model | 001 | Done |
 | TASK-054 | Day Close checklist + Reopen | 001 | Proposed |
 | TASK-055 | Operational Intelligence (profitability→automation) | 008 | Proposed |
-| TASK-056 | Current Operations State (live state machine) | 001 | In Progress |
+| TASK-056 | Current Operations State (live state machine) | 001 | Done |
 | TASK-057 | Site Presence | 007 | Proposed |
 | TASK-058 | Workspace mode auto-by-device + Settings override | 006 | Done |
 | TASK-059 | My Day start-surface consolidation | 001 | Done |

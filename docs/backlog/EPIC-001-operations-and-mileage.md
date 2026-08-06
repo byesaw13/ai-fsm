@@ -309,38 +309,6 @@ Acceptance Criteria:
 Notes:
 Phase 2.
 
-# TASK-056: Current Operations State (live state machine)
-
-Status:
-In Progress
-
-Phase:
-1
-
-Problem:
-Nothing describes the user's current operational state, so automation has to
-search/reconstruct context every time.
-
-Business Value:
-The app always knows NOW (clocked-in? · activity · assignment · vehicle ·
-presence · pending question), making one-tap automation cheap.
-
-Scope:
-- A derived read-model (one API) computed from the open rows (clock session,
-  activity entry, vehicle session, latest presence) — derive-first, no
-  sync-prone cache table unless proven necessary.
-- Expose current state + valid transitions; power proactive prompts.
-
-Out of Scope:
-- The inbox UI (TASK-049); persisting state history.
-
-Acceptance Criteria:
-- [ ] One endpoint returns the live state from open records.
-- [ ] State transitions are documented and unit-tested.
-
-Notes:
-Phase 3. Pairs with TASK-053.
-
 # TASK-050: Link mileage ↔ travel-time + capture-method + reconcile
 
 Status:
@@ -494,6 +462,8 @@ tasks if the build proves large. Do **not** start until TASK-033 has been in
 real daily use and TASK-034 (non-superuser RLS verification) is considered.
 
 ## Completed
+
+- [TASK-056: Current Operations State](../archive/backlog-done/TASK-056-current-operations-state.md) — Done (Wave 1 2026-08-05)
 
 - [TASK-053: Activity + Assignment model](../archive/backlog-done/TASK-053-activity-assignment-model.md) — Done (Wave 0a 2026-08-05)
 
