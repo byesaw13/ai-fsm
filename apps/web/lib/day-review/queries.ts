@@ -1,5 +1,11 @@
 import { query, queryOne } from "@/lib/db";
-import { detectGaps, preSelectCandidates, checkMileageDelta, isPrivateLocation } from "@ai-fsm/domain";
+import {
+  detectGaps,
+  preSelectCandidates,
+  isPrivateLocation,
+  type MilesSource,
+} from "@ai-fsm/domain";
+import { loadHybridMileageForDay } from "@/lib/mileage/hybrid-day";
 
 export type DayReviewPayload = {
   businessDayId: string;
@@ -54,7 +60,10 @@ export type DayReviewPayload = {
   mileage: {
     vehicleSessionId: string | null;
     vehicleName: string | null;
+    startOdometer: number | null;
+    endOdometer: number | null;
     odometerMiles: number | null;
+    primarySource: MilesSource | null;
     gpsMiles: number;
     deltaPercent: number | null;
     flagged: boolean;
@@ -235,36 +244,7 @@ export async function getDayReview(
     day.min_dwell,
   );
 
-  const mileageRow = await queryOne<{
-    vehicle_session_id: string | null;
-    vehicle_name: string | null;
-    odometer_miles: number | null;
-    gps_meters: string | null;
-  }>(
-    `SELECT vs.id AS vehicle_session_id,
-            v.nickname AS vehicle_name,
-            COALESCE(
-              vs.miles,
-              (vs.end_odometer - vs.start_odometer)::numeric
-            )::float8 AS odometer_miles,
-            SUM(ls.distance_meters)::text AS gps_meters
-     FROM vehicle_sessions vs
-     LEFT JOIN vehicles v ON v.id = vs.vehicle_id
-     LEFT JOIN location_segments ls
-       ON ls.account_id = vs.account_id
-       AND ls.segment_date = vs.session_date
-       AND ls.kind = 'drive'
-       AND ls.status = 'confirmed'
-     WHERE vs.account_id = $1 AND vs.session_date = $2::date
-       AND vs.status <> 'voided'
-     GROUP BY vs.id, v.nickname, vs.miles, vs.start_odometer, vs.end_odometer
-     ORDER BY vs.started_at DESC NULLS LAST
-     LIMIT 1`,
-    [accountId, date],
-  );
-
-  const gpsMiles = mileageRow?.gps_meters ? Number(mileageRow.gps_meters) / 1609.34 : 0;
-  const delta = checkMileageDelta(mileageRow?.odometer_miles ?? null, gpsMiles);
+  const hybrid = await loadHybridMileageForDay(accountId, date);
 
   return {
     businessDayId: day.id,
@@ -296,13 +276,16 @@ export async function getDayReview(
     })),
     gaps,
     mileage: {
-      vehicleSessionId: mileageRow?.vehicle_session_id ?? null,
-      vehicleName: mileageRow?.vehicle_name ?? null,
-      odometerMiles: mileageRow?.odometer_miles ?? null,
-      gpsMiles: Math.round(gpsMiles * 10) / 10,
-      deltaPercent: delta.deltaPercent,
-      flagged: delta.flagged,
-      reason: delta.reason,
+      vehicleSessionId: hybrid.vehicleSessionId,
+      vehicleName: hybrid.vehicleName,
+      startOdometer: hybrid.startOdometer,
+      endOdometer: hybrid.endOdometer,
+      odometerMiles: hybrid.primaryMiles,
+      primarySource: hybrid.primarySource,
+      gpsMiles: hybrid.gpsMiles,
+      deltaPercent: hybrid.deltaPercent,
+      flagged: hybrid.flagged,
+      reason: hybrid.reason,
     },
   };
 }

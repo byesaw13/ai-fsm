@@ -1,42 +1,31 @@
 import type { DayReviewPayload } from "@/lib/day-review/queries";
+import { HybridMileageStrip } from "@/components/mileage/HybridMileageStrip";
 
 type Mileage = DayReviewPayload["mileage"];
 
-export function MileageSection({ mileage }: { mileage: Mileage }) {
+export function MileageSection({
+  mileage,
+  date,
+}: {
+  mileage: Mileage;
+  date: string;
+}) {
   return (
-    <section className="mb-6">
-      <h2 className="text-lg font-semibold mb-3">Mileage</h2>
-      <div className="border rounded-lg p-4">
-        {mileage.vehicleName ? (
-          <>
-            <div className="flex justify-between mb-2">
-              <span className="text-sm text-muted-foreground">Vehicle</span>
-              <span className="text-sm font-medium">{mileage.vehicleName}</span>
-            </div>
-            <div className="flex justify-between mb-2">
-              <span className="text-sm text-muted-foreground">Odometer</span>
-              <span className="text-sm font-medium">
-                {mileage.odometerMiles != null ? `${mileage.odometerMiles} mi` : "—"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">GPS estimate</span>
-              <span className="text-sm font-medium">{mileage.gpsMiles} mi</span>
-            </div>
-            {mileage.reason === "no_gps_coverage" ? (
-              <p className="text-xs text-muted-foreground mt-3">
-                GPS didn&apos;t track this drive — using the odometer.
-              </p>
-            ) : mileage.flagged ? (
-              <p className="text-xs text-yellow-600 mt-3">
-                GPS and odometer differ by {mileage.deltaPercent}% — worth a double-check.
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground">No vehicle session recorded for this day.</p>
-        )}
-      </div>
-    </section>
+    <HybridMileageStrip
+      title="Hybrid mileage (tax dual path)"
+      exportHref={`/api/v1/reports/mileage-export?from=${encodeURIComponent(date)}&to=${encodeURIComponent(date)}`}
+      mileage={{
+        vehicleSessionId: mileage.vehicleSessionId,
+        vehicleName: mileage.vehicleName,
+        startOdometer: mileage.startOdometer,
+        endOdometer: mileage.endOdometer,
+        primaryMiles: mileage.odometerMiles,
+        primarySource: mileage.primarySource,
+        gpsMiles: mileage.gpsMiles,
+        deltaPercent: mileage.deltaPercent,
+        flagged: mileage.flagged,
+        reason: mileage.reason,
+      }}
+    />
   );
 }
