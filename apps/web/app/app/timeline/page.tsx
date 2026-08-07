@@ -9,6 +9,8 @@ import { DayMapPanel } from "../DayMapPanel";
 import { LikelySiteBanner } from "@/components/field/LikelySiteBanner";
 import { TimelineDayNav } from "../TimelineDayNav";
 import type { ActivityEntryDto } from "@/lib/my-work/field-day-types";
+import { loadHybridMileageForSessionDay } from "@/lib/mileage/hybrid-day";
+import { HybridMileageStrip } from "@/components/mileage/HybridMileageStrip";
 
 export const dynamic = "force-dynamic";
 
@@ -40,15 +42,18 @@ export default async function TimelinePage({
   const { date } = await searchParams;
   const day = normalizeDate(date);
 
-  const entries = await queryForSession<ActivityEntryDto>(
-    session,
-    `SELECT id, activity_type, category, started_at::text, ended_at::text,
-            entity_type, entity_id, assignment_kind, labor_bucket, note
-     FROM activity_entries
-     WHERE account_id = $1 AND session_date = $2::date AND voided_at IS NULL
-     ORDER BY started_at ASC`,
-    [session.accountId, day]
-  );
+  const [entries, hybridMileage] = await Promise.all([
+    queryForSession<ActivityEntryDto>(
+      session,
+      `SELECT id, activity_type, category, started_at::text, ended_at::text,
+              entity_type, entity_id, assignment_kind, labor_bucket, note
+       FROM activity_entries
+       WHERE account_id = $1 AND session_date = $2::date AND voided_at IS NULL
+       ORDER BY started_at ASC`,
+      [session.accountId, day],
+    ),
+    loadHybridMileageForSessionDay(session, day),
+  ]);
 
 
   const needsJobLink = await queryForSession<{
@@ -89,6 +94,11 @@ export default async function TimelinePage({
       <div style={{ marginBottom: "var(--space-4)" }}>
         <TimelineDayNav date={day} />
       </div>
+      <HybridMileageStrip
+        title="Hybrid mileage (odometer + GPS)"
+        mileage={hybridMileage}
+        exportHref={`/api/v1/reports/mileage-export?from=${encodeURIComponent(day)}&to=${encodeURIComponent(day)}`}
+      />
       {/* 1. GPS day reconstruction — primary */}
       <LocationSegmentsPanel day={day} entries={entries} />
       {/* 2. Ledger summary — compact, expandable for corrections */}

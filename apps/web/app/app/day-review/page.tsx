@@ -66,7 +66,7 @@ export default async function DayReviewPage({
           openWorkOrdersByProperty={payload.openWorkOrdersByProperty}
         />
         <TimeSection timeEntries={payload.timeEntries} segments={payload.segments} gaps={payload.gaps} />
-        <MileageSection mileage={payload.mileage} />
+        <MileageSection mileage={payload.mileage} date={date} />
       </details>
     </PageContainer>
   );
