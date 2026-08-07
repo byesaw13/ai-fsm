@@ -384,16 +384,17 @@ export async function autoRecordScheduledVisitPresence(
       ? "estimate_visit"
       : "job_work";
 
+  // Presence-only (E4 harden): never auto-complete from ingest. Human confirm
+  // still uses shouldCompleteVisitFromPresence via ensureFieldDayVisit.
+  void classification;
+  void opts.durationMinutes;
   await applyGpsPresenceToVisit(client, {
     accountId: opts.accountId,
     userId: opts.userId,
     visitId: opts.visitId,
     arrivalTime: opts.arrivalTime,
     departureTime: opts.departureTime,
-    complete: shouldCompleteVisitFromPresence({
-      classification,
-      durationMinutes: opts.durationMinutes,
-    }),
+    complete: false,
   });
 
   // candidateId reserved for future audit linkage; intentionally not confirmed.

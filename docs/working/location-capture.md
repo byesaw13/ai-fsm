@@ -38,8 +38,29 @@ HA Companion app (zones + background GPS + detected-activity)
   | `geocoded_address` | string | optional; reverse-geocoded address of a stop |
   | `detected_activity` | enum | `still` \| `walking` \| `running` \| `in_vehicle` \| `cycling` \| `unknown` |
   | `external_id` | string | optional idempotency key (HA retries are de-duped) |
+  | `person` | string | optional HA person entity (e.g. `person.nick`) for multi-tech stamp |
+  | `device_id` | string | optional device label; same map as `person` |
 
 - Response: `{ ok, current_segment_id, opened, closed, arrival_prompt? }` (or `{ duplicate: true }`).
+
+### Multi-tech person map (thin)
+
+Env `LOCATION_PERSON_MAP` = JSON object mapping lowercase person/device keys to
+`users.id` UUIDs, e.g. `{"person.nick":"<uuid>","nick":"<uuid>"}`.
+
+Used only to choose **who** auto-stamps visit presence. Does **not** re-partition
+segments per user (that is a later platform change).
+
+Resolution order for auto stamp user: mapped person/device → visit
+`assigned_user_id` → **skip stamp** (no first-owner fallback).
+
+### Auto presence stamp (E4)
+
+When a stop creates a candidate linked to a same-day scheduled visit, ingest may
+walk the visit to arrived/in_progress and stamp `arrived_at` **only if**
+`shouldAutoStampPresence` passes (workday open, confidence ≥ 70, distance
+proven, scheduled today, resolved userId). **Never** auto-completes the visit
+and **never** writes billable activity — human confirm owns labor.
 
 ### arrival_prompt (optional)
 
@@ -58,6 +79,16 @@ response may include:
   }
 }
 ```
+
+**HA Companion checklist (field day):**
+
+1. Automation triggers on successful FSM location POST when body has `arrival_prompt`.
+2. Notification title/body use `property_label` / `wo_title`.
+3. Action opens `deep_link` (My Work with `?proposal=`).
+4. After notify, call `POST /api/internal/arrival-prompt` with
+   `{ "candidate_id", "action": "prompted" }` so `live_prompted_at` is set once.
+5. Optionally send `person` (or `device_id`) on every location event so multi-tech
+   stamp identity works with `LOCATION_PERSON_MAP`.
 
 HA automation: if `arrival_prompt` is present, send a Companion notification
 with that deep link, then ack:

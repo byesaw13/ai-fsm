@@ -27,6 +27,8 @@ export async function loadPendingArrivalProposals(
   session: SessionPayload,
 ): Promise<ArrivalProposalDto[]> {
   const today = businessToday();
+  // Prefer candidates tied to this user's visits/WOs (multi-tech); still show
+  // unassigned live-eligible stops so HA deep links work for solo accounts.
   return queryForSession<ArrivalProposalDto>(
     session,
     `SELECT vc.id,
@@ -44,11 +46,18 @@ export async function loadPendingArrivalProposals(
      LEFT JOIN properties p ON p.id = vc.property_id
      LEFT JOIN clients c ON c.id = vc.matched_client_id
      LEFT JOIN work_orders w ON w.id = vc.work_order_id
+     LEFT JOIN visits v ON v.id = vc.visit_id
      WHERE vc.account_id = $1 AND vc.status = 'pending'
        AND (vc.arrival_time AT TIME ZONE 'America/New_York')::date = $2::date
+       AND (
+         v.assigned_user_id = $3
+         OR w.assigned_user_id = $3
+         OR (vc.visit_id IS NULL AND vc.work_order_id IS NULL)
+         OR vc.live_eligible = true
+       )
      ORDER BY vc.live_eligible DESC, vc.arrival_time DESC
      LIMIT 10`,
-    [session.accountId, today],
+    [session.accountId, today, session.userId],
   );
 }
 

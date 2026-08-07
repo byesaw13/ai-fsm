@@ -10,6 +10,9 @@ import {
   PROPERTY_COORD_RELEARN_METERS,
   resolveWorkOrderForProperty,
   isLivePromptEligible,
+  shouldAutoStampPresence,
+  selectArrivalNextAction,
+  resolveLocationPersonUserId,
   LIVE_PROMPT_CONFIDENCE_FLOOR,
   type VisitMatchCandidate,
   type OpenWorkOrderOption,
@@ -342,5 +345,100 @@ describe("isLivePromptEligible", () => {
   it("false when already prompted or not pending", () => {
     expect(isLivePromptEligible({ ...base, alreadyPrompted: true })).toBe(false);
     expect(isLivePromptEligible({ ...base, status: "confirmed" })).toBe(false);
+  });
+});
+
+describe("shouldAutoStampPresence", () => {
+  const base = {
+    workdayOpen: true,
+    confidenceScore: 90,
+    distanceProven: true,
+    scheduledToday: true,
+    hasUserId: true,
+  };
+
+  it("true at live-prompt bar with user", () => {
+    expect(shouldAutoStampPresence(base)).toBe(true);
+  });
+
+  it("false without user id", () => {
+    expect(shouldAutoStampPresence({ ...base, hasUserId: false })).toBe(false);
+  });
+
+  it("false below confidence floor", () => {
+    expect(
+      shouldAutoStampPresence({
+        ...base,
+        confidenceScore: LIVE_PROMPT_CONFIDENCE_FLOOR - 1,
+      }),
+    ).toBe(false);
+  });
+
+  it("false when not distance-proven or not scheduled or workday closed", () => {
+    expect(shouldAutoStampPresence({ ...base, distanceProven: false })).toBe(false);
+    expect(shouldAutoStampPresence({ ...base, scheduledToday: false })).toBe(false);
+    expect(shouldAutoStampPresence({ ...base, workdayOpen: false })).toBe(false);
+  });
+});
+
+describe("selectArrivalNextAction", () => {
+  it("suppresses when already on site work", () => {
+    const r = selectArrivalNextAction({
+      hasProposal: true,
+      confidenceScore: 90,
+      liveEligible: true,
+      activityType: "job_work",
+      alreadyOnSiteWork: true,
+    });
+    expect(r.show).toBe(false);
+    expect(r.suppressReason).toBe("already_on_site_work");
+  });
+
+  it("offers Start job work when traveling / idle", () => {
+    const r = selectArrivalNextAction({
+      hasProposal: true,
+      confidenceScore: 90,
+      liveEligible: true,
+      activityType: "travel",
+      alreadyOnSiteWork: false,
+    });
+    expect(r.show).toBe(true);
+    expect(r.primaryLabel).toBe("Start job work");
+  });
+
+  it("offers Confirm arrival when mid other activity", () => {
+    const r = selectArrivalNextAction({
+      hasProposal: true,
+      confidenceScore: 90,
+      liveEligible: true,
+      activityType: "material_run",
+      alreadyOnSiteWork: false,
+    });
+    expect(r.primaryLabel).toBe("Confirm arrival");
+  });
+
+  it("hides with no proposal", () => {
+    expect(
+      selectArrivalNextAction({
+        hasProposal: false,
+        confidenceScore: 0,
+        liveEligible: false,
+        activityType: null,
+        alreadyOnSiteWork: false,
+      }).show,
+    ).toBe(false);
+  });
+});
+
+describe("resolveLocationPersonUserId", () => {
+  it("maps person case-insensitively", () => {
+    expect(
+      resolveLocationPersonUserId("Nick", { nick: "user-1" }),
+    ).toBe("user-1");
+  });
+
+  it("returns null when unmapped", () => {
+    expect(resolveLocationPersonUserId("other", { nick: "user-1" })).toBe(null);
+    expect(resolveLocationPersonUserId(null, { nick: "user-1" })).toBe(null);
   });
 });

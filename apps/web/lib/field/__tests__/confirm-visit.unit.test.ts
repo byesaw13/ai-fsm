@@ -122,3 +122,15 @@ describe("shouldCompleteVisitFromPresence", () => {
     ).toBe(false);
   });
 });
+
+describe("auto presence path policy (E4)", () => {
+  it("documents that ingest auto-stamp must not use shouldCompleteVisitFromPresence for complete flag", () => {
+    // Long job_work would complete if used — auto path must pass complete:false always.
+    expect(
+      shouldCompleteVisitFromPresence({
+        classification: "job_work",
+        durationMinutes: 90,
+      }),
+    ).toBe(true);
+  });
+});

@@ -385,3 +385,85 @@ export function isLivePromptEligible(input: {
   if (input.confidenceScore < LIVE_PROMPT_CONFIDENCE_FLOOR) return false;
   return true;
 }
+
+/**
+ * When may ingest auto-stamp GPS presence on a scheduled visit (status walk +
+ * arrived_at) without completing the visit or writing labor?
+ * Same trust bar as live prompt, minus "already prompted" / candidate status
+ * (those apply to notify; stamp is about match quality).
+ */
+export function shouldAutoStampPresence(input: {
+  workdayOpen: boolean;
+  confidenceScore: number;
+  distanceProven: boolean;
+  scheduledToday: boolean;
+  /** Resolved tech for the stamp (person map or visit.assigned_user_id). */
+  hasUserId: boolean;
+}): boolean {
+  if (!input.hasUserId) return false;
+  if (!input.workdayOpen) return false;
+  if (!input.scheduledToday) return false;
+  if (!input.distanceProven) return false;
+  if (input.confidenceScore < LIVE_PROMPT_CONFIDENCE_FLOOR) return false;
+  return true;
+}
+
+/**
+ * My Work arrival next-action (E1). Pure: which primary CTA to show for a
+ * pending high-trust proposal given current activity.
+ */
+export type ArrivalNextAction = {
+  show: boolean;
+  primaryLabel: string;
+  suppressReason: string | null;
+};
+
+export function selectArrivalNextAction(input: {
+  hasProposal: boolean;
+  confidenceScore: number;
+  liveEligible: boolean;
+  /** Current open activity_type, if any. */
+  activityType: string | null;
+  /** True when open activity is already job_work (or similar) on this proposal's visit/WO. */
+  alreadyOnSiteWork: boolean;
+}): ArrivalNextAction {
+  if (!input.hasProposal) {
+    return { show: false, primaryLabel: "", suppressReason: "no_proposal" };
+  }
+  if (input.alreadyOnSiteWork) {
+    return {
+      show: false,
+      primaryLabel: "",
+      suppressReason: "already_on_site_work",
+    };
+  }
+  if (input.confidenceScore < LIVE_PROMPT_CONFIDENCE_FLOOR && !input.liveEligible) {
+    return {
+      show: true,
+      primaryLabel: "Confirm",
+      suppressReason: null,
+    };
+  }
+  const startingJob =
+    !input.activityType ||
+    input.activityType === "travel" ||
+    input.activityType === "driving" ||
+    input.activityType === "personal" ||
+    input.activityType === "admin";
+  return {
+    show: true,
+    primaryLabel: startingJob ? "Start job work" : "Confirm arrival",
+    suppressReason: null,
+  };
+}
+
+/** Resolve ingest person/device string via a simple map (env or settings JSON). */
+export function resolveLocationPersonUserId(
+  person: string | null | undefined,
+  map: Record<string, string>,
+): string | null {
+  if (!person) return null;
+  const key = person.trim().toLowerCase();
+  if (!key) return null;
+  return map[key] ?? map[person.trim()] ?? null;
+}
