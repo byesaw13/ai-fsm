@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Card, PageContainer, PageHeader, SectionHeader } from "@/components/ui";
 
 interface Vehicle {
@@ -232,7 +233,9 @@ export default function VehiclesPage() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-3)" }}>
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: 700, fontSize: "var(--text-base)" }}>{v.nickname}</span>
+                      <span style={{ fontWeight: 700, fontSize: "var(--text-base)" }}>
+                        <Link href={`/app/mileage/vehicles/${v.id}`}>{v.nickname}</Link>
+                      </span>
                       {v.plate && (
                         <span style={{ fontFamily: "monospace", fontSize: "var(--text-xs)", letterSpacing: 1, padding: "2px 6px", background: "var(--surface-raised)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)" }}>
                           {v.plate}

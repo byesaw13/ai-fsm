@@ -6,6 +6,7 @@ import { pruneLocationEvents } from "./prune-location-events.js";
 import { pruneAttentionEvents } from "./prune-attention-events.js";
 import { processWorkflowEvents } from "./workflow-events.js";
 import { dispatchNotificationQueue } from "./notification/dispatch.js";
+import { runVehicleMaintenanceReminders } from "./vehicle-maintenance-reminder.js";
 import { logger } from "./logger.js";
 
 const pollMs = Number(process.env.WORKER_POLL_MS ?? "30000");
@@ -62,6 +63,9 @@ async function runPollIteration(client: Client): Promise<void> {
     if (attentionPrune.deleted > 0) {
       logger.info("prune-attention-events complete", { deleted: attentionPrune.deleted });
     }
+
+    // TASK-093: vehicle service/renewal attention + monthly loan payment expenses
+    await runVehicleMaintenanceReminders(client);
   } catch (error) {
     logger.error("worker poll failed", error);
     const msg = (error as Error)?.message ?? "";

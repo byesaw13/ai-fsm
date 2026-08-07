@@ -85,6 +85,8 @@ export * from "./visit-matching";
 export * from "./day-review";
 export * from "./mileage";
 export * from "./hybrid-mileage";
+export * from "./vehicle-mpg";
+export * from "./vehicle-next-due";
 export * from "./travel";
 export * from "./job-ledger";
 export * from "./job-po";
