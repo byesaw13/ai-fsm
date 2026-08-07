@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import type { Route } from "next";
 import { useParams } from "next/navigation";
 import { PageContainer, PageHeader, Card, LinkButton } from "@/components/ui";
 
@@ -16,6 +17,42 @@ type Vehicle = {
   current_odometer: number | null;
 };
 
+type OverviewData = {
+  vehicle: Vehicle & { vin?: string | null };
+  next_service_dues: Array<{
+    serviceType: string;
+    status: string;
+    milesRemaining: number | null;
+    daysRemaining: number | null;
+    dueOdometer: number | null;
+    dueDate: string | null;
+  }>;
+  next_renewals: Array<{
+    id: string;
+    renewal_type: string;
+    provider: string | null;
+    current_due_date: string;
+    days_remaining: number;
+    status: string;
+  }>;
+  cost_last_90_days: {
+    total_cents: number;
+    by_category: Array<{ category: string; total_cents: number; expense_count: number }>;
+  };
+  loan: {
+    lender: string;
+    monthly_payment_cents: number;
+    current_balance_cents: number | null;
+  } | null;
+  recent_fuel: Array<{ id: string; filled_at: string; gallons: number; odometer: number | null }>;
+  recent_service: Array<{
+    id: string;
+    serviced_at: string;
+    service_types: string[];
+    vendor_name: string | null;
+  }>;
+};
+
 const SERVICE_TYPES = [
   "oil_change",
   "tire_rotation",
@@ -26,40 +63,61 @@ const SERVICE_TYPES = [
   "other",
 ];
 
+function dollars(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
 export default function VehicleDetailPage() {
   const params = useParams();
   const id = String(params.id ?? "");
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [overview, setOverview] = useState<OverviewData | null>(null);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"overview" | "fuel" | "service">("overview");
   const [pending, setPending] = useState(false);
   const [toast, setToast] = useState("");
 
-  // Fuel form
   const [odo, setOdo] = useState("");
   const [gallons, setGallons] = useState("");
-  const [dollars, setDollars] = useState("");
+  const [dollarsIn, setDollarsIn] = useState("");
   const [fullTank, setFullTank] = useState(true);
 
-  // Service form
   const [svcTypes, setSvcTypes] = useState<string[]>(["oil_change"]);
   const [svcOdo, setSvcOdo] = useState("");
   const [svcDollars, setSvcDollars] = useState("");
   const [svcVendor, setSvcVendor] = useState("");
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/v1/vehicles").catch(() => null);
-    if (!res?.ok) {
+    const [listRes, ovRes] = await Promise.all([
+      fetch("/api/v1/vehicles").catch(() => null),
+      fetch(`/api/v1/vehicles/${id}/overview`).catch(() => null),
+    ]);
+
+    if (listRes?.ok) {
+      const data = await listRes.json();
+      const list = (data.data ?? []) as Vehicle[];
+      const v = list.find((x) => x.id === id) ?? null;
+      setVehicle(v);
+      if (v?.current_odometer != null) {
+        setOdo(String(v.current_odometer));
+        setSvcOdo(String(v.current_odometer));
+      }
+    } else if (!ovRes?.ok) {
       setError("Failed to load vehicle");
       return;
     }
-    const data = await res.json();
-    const list = (data.data ?? []) as Vehicle[];
-    const v = list.find((x) => x.id === id) ?? null;
-    setVehicle(v);
-    if (v?.current_odometer != null) {
-      setOdo(String(v.current_odometer));
-      setSvcOdo(String(v.current_odometer));
+
+    if (ovRes?.ok) {
+      const body = await ovRes.json();
+      const ov = body.data as OverviewData;
+      setOverview(ov);
+      if (ov?.vehicle) {
+        setVehicle((prev) => prev ?? ov.vehicle);
+        if (ov.vehicle.current_odometer != null) {
+          setOdo(String(ov.vehicle.current_odometer));
+          setSvcOdo(String(ov.vehicle.current_odometer));
+        }
+      }
     }
   }, [id]);
 
@@ -73,7 +131,7 @@ export default function VehicleDetailPage() {
     e.preventDefault();
     setPending(true);
     setError("");
-    const amountCents = Math.round(parseFloat(dollars) * 100);
+    const amountCents = Math.round(parseFloat(dollarsIn) * 100);
     const res = await fetch(`/api/v1/vehicles/${id}/fuel`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -97,7 +155,7 @@ export default function VehicleDetailPage() {
       }`,
     );
     setGallons("");
-    setDollars("");
+    setDollarsIn("");
     load();
   }
 
@@ -123,7 +181,9 @@ export default function VehicleDetailPage() {
       setError(body?.error?.message ?? "Failed to log service");
       return;
     }
-    setToast(`Service logged · ${vehicle?.nickname ?? "vehicle"} · $${(amountCents / 100).toFixed(2)}`);
+    setToast(
+      `Service logged · ${vehicle?.nickname ?? "vehicle"} · $${(amountCents / 100).toFixed(2)}`,
+    );
     setSvcDollars("");
     load();
   }
@@ -140,7 +200,7 @@ export default function VehicleDetailPage() {
     return (
       <PageContainer>
         <p>{error || "Vehicle not found"}</p>
-        <Link href="/app/mileage/vehicles">← Vehicles</Link>
+        <Link href={"/app/mileage/vehicles" as Route}>← Vehicles</Link>
       </PageContainer>
     );
   }
@@ -148,6 +208,9 @@ export default function VehicleDetailPage() {
   const tabs = isTrailer
     ? (["overview", "service"] as const)
     : (["overview", "fuel", "service"] as const);
+
+  const dues = overview?.next_service_dues?.filter((d) => d.status !== "ok") ?? [];
+  const renewals = overview?.next_renewals ?? [];
 
   return (
     <PageContainer>
@@ -157,7 +220,7 @@ export default function VehicleDetailPage() {
           .filter(Boolean)
           .join(" · ")}
         actions={
-          <LinkButton href="/app/mileage/vehicles" variant="secondary" size="sm">
+          <LinkButton href={"/app/mileage/vehicles" as Route} variant="secondary" size="sm">
             ← Fleet
           </LinkButton>
         }
@@ -178,6 +241,11 @@ export default function VehicleDetailPage() {
         {vehicle.current_odometer != null && (
           <span style={{ fontSize: 13, color: "var(--fg-muted)" }}>
             Odo {vehicle.current_odometer.toLocaleString()} mi
+          </span>
+        )}
+        {overview?.cost_last_90_days && overview.cost_last_90_days.total_cents > 0 && (
+          <span style={{ fontSize: 13, color: "var(--fg-muted)" }}>
+            90d cost {dollars(overview.cost_last_90_days.total_cents)}
           </span>
         )}
       </div>
@@ -216,16 +284,96 @@ export default function VehicleDetailPage() {
       )}
 
       {tab === "overview" && (
-        <Card>
-          <p style={{ margin: 0 }}>
-            Log fuel and service from the tabs. Each save creates an expense on this vehicle
-            automatically (tax dual path with mileage).
-          </p>
-          <p style={{ marginTop: 12, color: "var(--fg-muted)", fontSize: 14 }}>
-            Cost/mo, MPG, and next-due fill in as you log fills and services. Export vehicle
-            expenses via month-end / expense reports with vehicle attribution.
-          </p>
-        </Card>
+        <div style={{ display: "grid", gap: 12 }}>
+          <Card>
+            <h2 style={{ marginTop: 0, fontSize: 16 }}>Cost (last 90 days)</h2>
+            {overview?.cost_last_90_days ? (
+              <>
+                <p style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
+                  {dollars(overview.cost_last_90_days.total_cents)}
+                </p>
+                {overview.cost_last_90_days.by_category.length > 0 && (
+                  <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 14 }}>
+                    {overview.cost_last_90_days.by_category.map((c) => (
+                      <li key={c.category}>
+                        {c.category.replace(/_/g, " ")}: {dollars(c.total_cents)}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: 14 }}>
+                Log fuel and service to build cost history. Each save creates an expense on this
+                vehicle.
+              </p>
+            )}
+          </Card>
+
+          <Card>
+            <h2 style={{ marginTop: 0, fontSize: 16 }}>Next due</h2>
+            {dues.length === 0 && renewals.length === 0 ? (
+              <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: 14 }}>
+                No upcoming service or renewals. Owner can set schedules and renewal dates.
+              </p>
+            ) : (
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14 }}>
+                {dues.map((d) => (
+                  <li key={d.serviceType}>
+                    <strong>{d.serviceType.replace(/_/g, " ")}</strong> — {d.status}
+                    {d.milesRemaining != null && ` · ${d.milesRemaining} mi`}
+                    {d.dueDate && ` · ${d.dueDate}`}
+                  </li>
+                ))}
+                {renewals.map((r) => (
+                  <li key={r.id}>
+                    <strong>{r.renewal_type}</strong> — {r.status} · due {r.current_due_date}
+                    {r.provider ? ` · ${r.provider}` : ""}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          {overview?.loan && (
+            <Card>
+              <h2 style={{ marginTop: 0, fontSize: 16 }}>Loan</h2>
+              <p style={{ margin: 0, fontSize: 14 }}>
+                {overview.loan.lender} · {dollars(overview.loan.monthly_payment_cents)}/mo
+                {overview.loan.current_balance_cents != null &&
+                  ` · balance ${dollars(overview.loan.current_balance_cents)}`}
+              </p>
+            </Card>
+          )}
+
+          {!isTrailer && overview?.recent_fuel && overview.recent_fuel.length > 0 && (
+            <Card>
+              <h2 style={{ marginTop: 0, fontSize: 16 }}>Recent fuel</h2>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14 }}>
+                {overview.recent_fuel.map((f) => (
+                  <li key={f.id}>
+                    {f.filled_at.slice(0, 10)} · {Number(f.gallons)} gal
+                    {f.odometer != null ? ` · ${f.odometer.toLocaleString()} mi` : ""}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          {overview?.recent_service && overview.recent_service.length > 0 && (
+            <Card>
+              <h2 style={{ marginTop: 0, fontSize: 16 }}>Recent service</h2>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14 }}>
+                {overview.recent_service.map((s) => (
+                  <li key={s.id}>
+                    {s.serviced_at.slice(0, 10)} · {(s.service_types ?? []).join(", ")}
+                    {s.vendor_name ? ` · ${s.vendor_name}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+        </div>
       )}
 
       {tab === "fuel" && !isTrailer && (
@@ -256,8 +404,8 @@ export default function VehicleDetailPage() {
               <input
                 required
                 inputMode="decimal"
-                value={dollars}
-                onChange={(e) => setDollars(e.target.value)}
+                value={dollarsIn}
+                onChange={(e) => setDollarsIn(e.target.value)}
                 style={{ display: "block", width: "100%", minHeight: 44, marginTop: 4 }}
               />
             </label>

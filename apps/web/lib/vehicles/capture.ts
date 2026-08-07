@@ -182,3 +182,122 @@ export async function createServiceRecordWithExpense(
 
   return { serviceRecordId: rows[0].id, expenseId, odometerSuspect };
 }
+
+/** Map renewal_type → expenses.category (tax buckets). */
+export function renewalExpenseCategory(
+  renewalType: string,
+): "vehicle_registration" | "vehicle_insurance" | "vehicle_maintenance" {
+  switch (renewalType) {
+    case "registration":
+    case "inspection":
+    case "emissions":
+      return "vehicle_registration";
+    case "insurance":
+      return "vehicle_insurance";
+    default:
+      return "vehicle_maintenance";
+  }
+}
+
+function addMonthsIso(isoDate: string, months: number): string {
+  const d = new Date(`${isoDate.slice(0, 10)}T12:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Complete a renewal: expense + renewal_record + advance schedule due date.
+ * Requires amount_cents > 0 (every event creates an expense).
+ */
+export async function createRenewalRecordWithExpense(
+  client: PoolClient,
+  opts: {
+    accountId: string;
+    userId: string;
+    vehicleId: string;
+    renewalType: string;
+    renewedAt: string; // YYYY-MM-DD
+    amountCents: number;
+    vendorName?: string | null;
+    notes?: string | null;
+    /** Explicit next due; if omitted, advance from schedule interval_months. */
+    nextDueDate?: string | null;
+  },
+): Promise<{
+  renewalRecordId: string;
+  expenseId: string;
+  nextDueDate: string | null;
+  renewalId: string | null;
+}> {
+  if (opts.amountCents <= 0) throw new Error("AMOUNT_REQUIRED");
+
+  const vehicle = await assertVehicleInAccount(client, opts.accountId, opts.vehicleId);
+  if (!vehicle) throw new Error("VEHICLE_NOT_FOUND");
+
+  const renewedAt = opts.renewedAt.slice(0, 10);
+  const category = renewalExpenseCategory(opts.renewalType);
+
+  const expenseId = await insertVehicleExpense(client, {
+    accountId: opts.accountId,
+    userId: opts.userId,
+    vehicleId: opts.vehicleId,
+    category,
+    amountCents: opts.amountCents,
+    expenseDate: renewedAt,
+    vendorName: opts.vendorName?.trim() || opts.renewalType,
+    notes: opts.notes ?? `${opts.renewalType} renewal · ${vehicle.nickname}`,
+  });
+
+  const { rows: recordRows } = await client.query<{ id: string }>(
+    `INSERT INTO vehicle_renewal_records (
+       account_id, vehicle_id, renewal_type, renewed_at, expense_id, created_by
+     ) VALUES ($1, $2, $3, $4::date, $5, $6)
+     RETURNING id`,
+    [
+      opts.accountId,
+      opts.vehicleId,
+      opts.renewalType,
+      renewedAt,
+      expenseId,
+      opts.userId,
+    ],
+  );
+
+  // Advance matching active schedule (if any).
+  const { rows: scheduleRows } = await client.query<{
+    id: string;
+    interval_months: number;
+  }>(
+    `SELECT id, interval_months FROM vehicle_renewals
+     WHERE account_id = $1 AND vehicle_id = $2
+       AND renewal_type = $3 AND is_active = true
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [opts.accountId, opts.vehicleId, opts.renewalType],
+  );
+
+  let nextDueDate: string | null = opts.nextDueDate?.slice(0, 10) ?? null;
+  let renewalId: string | null = null;
+
+  if (scheduleRows[0]) {
+    renewalId = scheduleRows[0].id;
+    if (!nextDueDate) {
+      nextDueDate = addMonthsIso(renewedAt, scheduleRows[0].interval_months);
+    }
+    await client.query(
+      `UPDATE vehicle_renewals
+       SET current_due_date = $1::date, updated_at = now()
+       WHERE id = $2 AND account_id = $3`,
+      [nextDueDate, renewalId, opts.accountId],
+    );
+  } else if (nextDueDate) {
+    // No schedule row — nothing to update; still return computed next if provided.
+  }
+
+  return {
+    renewalRecordId: recordRows[0].id,
+    expenseId,
+    nextDueDate,
+    renewalId,
+  };
+}
