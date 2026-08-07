@@ -158,14 +158,31 @@ export default async function MyWorkPage() {
         }
       />
 
-      {proposals.length > 0 && (
-        <Suspense fallback={null}>
-          <ArrivalProposalBanner
-            proposals={proposals}
-            openWorkOrdersByProperty={openWorkOrdersByProperty}
-          />
-        </Suspense>
-      )}
+      {proposals.length > 0 && (() => {
+        const active = fieldDay.activityEntries?.find((e) => e.ended_at === null) ?? null;
+        const top = proposals[0];
+        const alreadyOnSiteWork =
+          !!active &&
+          (active.activity_type === "job_work" || active.activity_type === "estimate_visit") &&
+          !!(
+            (top?.workOrderId &&
+              active.entity_type === "work_order" &&
+              active.entity_id === top.workOrderId) ||
+            (top?.visitId &&
+              active.entity_type === "visit" &&
+              active.entity_id === top.visitId)
+          );
+        return (
+          <Suspense fallback={null}>
+            <ArrivalProposalBanner
+              proposals={proposals}
+              openWorkOrdersByProperty={openWorkOrdersByProperty}
+              activityType={active?.activity_type ?? null}
+              alreadyOnSiteWork={alreadyOnSiteWork}
+            />
+          </Suspense>
+        );
+      })()}
 
       {fieldDay.locationSettings && (
         <div style={{ marginBottom: "var(--space-4)" }}>

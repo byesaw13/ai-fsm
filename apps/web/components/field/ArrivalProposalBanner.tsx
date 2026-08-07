@@ -2,18 +2,25 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
+import { selectArrivalNextAction } from "@ai-fsm/domain";
 import type { ArrivalProposalDto } from "@/lib/field/load-arrival-proposals";
 import { WorkOrderPicker } from "./WorkOrderPicker";
 
 export function ArrivalProposalBanner({
   proposals,
   openWorkOrdersByProperty,
+  activityType = null,
+  alreadyOnSiteWork = false,
 }: {
   proposals: ArrivalProposalDto[];
   openWorkOrdersByProperty: Record<
     string,
     { id: string; title: string; scheduledToday?: boolean }[]
   >;
+  /** Current open activity_type from field day (E1 next-action). */
+  activityType?: string | null;
+  /** True when already job_work (etc.) on this proposal's visit/WO. */
+  alreadyOnSiteWork?: boolean;
 }) {
   const params = useSearchParams();
   const focus = params.get("proposal");
@@ -29,7 +36,28 @@ export function ArrivalProposalBanner({
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  if (!top) return null;
+  const nextAction = useMemo(() => {
+    if (!top) {
+      return selectArrivalNextAction({
+        hasProposal: false,
+        confidenceScore: 0,
+        liveEligible: false,
+        activityType: null,
+        alreadyOnSiteWork: false,
+      });
+    }
+    return selectArrivalNextAction({
+      hasProposal: true,
+      confidenceScore: top.confidenceScore,
+      liveEligible: top.liveEligible,
+      activityType,
+      alreadyOnSiteWork,
+      // Closed stops (ingest) have departureTime — confirm is historical only.
+      stillOnSite: !top.departureTime,
+    });
+  }, [top, activityType, alreadyOnSiteWork]);
+
+  if (!top || !nextAction.show) return null;
 
   const options = top.propertyId
     ? openWorkOrdersByProperty[top.propertyId] ?? []
@@ -65,7 +93,7 @@ export function ArrivalProposalBanner({
 
   return (
     <div className="p7-field-hero" data-testid="arrival-proposal-banner" style={{ marginBottom: "var(--space-4)" }}>
-      <div className="p7-field-hero__kicker">Proposal · on site</div>
+      <div className="p7-field-hero__kicker">Next · on site</div>
       <div className="p7-field-hero__title">{top.clientName ?? "Customer"}</div>
       <div className="p7-field-hero__meta">
         {top.propertyName}
@@ -90,7 +118,7 @@ export function ArrivalProposalBanner({
           disabled={busy || (ambiguous && !woId)}
           onClick={() => act("confirm")}
         >
-          {busy ? "…" : "Confirm"}
+          {busy ? "…" : nextAction.primaryLabel}
         </button>
         <button
           type="button"

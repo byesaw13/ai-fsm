@@ -13,6 +13,8 @@ import {
   shouldCreateVisitCandidate,
   resolveWorkOrderForProperty,
   isLivePromptEligible,
+  shouldAutoStampPresence,
+  resolveLocationPersonUserId,
 } from "@ai-fsm/domain";
 import type { PoolClient } from "pg";
 import { reduceLocationEvent, type OpenSegment } from "@/lib/location/segments";
@@ -26,6 +28,21 @@ export const dynamic = "force-dynamic";
 // key — the PWA itself cannot produce background location, so this is the feed.
 const LOCATION_KEY = process.env.LOCATION_INTERNAL_KEY;
 
+/** JSON map of HA person/device id → users.id (thin multi-tech stamp identity). */
+function loadLocationPersonMap(): Record<string, string> {
+  const raw = process.env.LOCATION_PERSON_MAP;
+  if (!raw?.trim()) return {};
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, string>;
+    }
+  } catch {
+    // ignore invalid env
+  }
+  return {};
+}
+
 const bodySchema = z.object({
   kind: z.enum(LOCATION_EVENT_KINDS),
   occurred_at: z.string().datetime().optional(),
@@ -37,6 +54,9 @@ const bodySchema = z.object({
   external_id: z.string().max(255).optional(),
   // TASK-025: car-stereo BT id (MAC) on vehicle_connect → resolves the vehicle.
   vehicle_bluetooth: z.string().max(120).nullish(),
+  // Thin multi-tech: HA person entity or device label → LOCATION_PERSON_MAP.
+  person: z.string().max(120).nullish(),
+  device_id: z.string().max(120).nullish(),
 });
 
 // ── owner account discovery (cached; single-owner model, mirrors SMS ingest) ──
@@ -278,7 +298,13 @@ export async function POST(req: NextRequest) {
       // the account's properties (schedule + open-job signals now, distance once
       // coords are learned) and persist the top match as a pending candidate.
       if (open.kind === "stop") {
-        arrivalPrompt = await detectVisitCandidate(client, accountId, open, mut.closeOpen.endedAt);
+        arrivalPrompt = await detectVisitCandidate(
+          client,
+          accountId,
+          open,
+          mut.closeOpen.endedAt,
+          data.person ?? data.device_id ?? null,
+        );
       }
     }
     if (mut.updateOpen && open) {
@@ -373,6 +399,7 @@ async function detectVisitCandidate(
   accountId: string,
   stop: ClosedStop,
   endedAt: string,
+  personOrDevice: string | null = null,
 ): Promise<ArrivalPromptPayload | null> {
   const durationMinutes = (new Date(endedAt).getTime() - new Date(stop.startedAt).getTime()) / 60000;
 
@@ -465,23 +492,6 @@ async function detectVisitCandidate(
   const distanceProven =
     top.distanceMeters != null && top.distanceMeters <= 150 * 0.3048;
 
-  const { rows: bd } = await client.query<{ id: string }>(
-    `SELECT id FROM business_days
-     WHERE account_id = $1 AND closed_at IS NULL
-       AND business_date = ($2::timestamptz AT TIME ZONE 'America/New_York')::date
-     LIMIT 1`,
-    [accountId, stop.startedAt],
-  );
-
-  const liveEligible = isLivePromptEligible({
-    workdayOpen: bd.length > 0,
-    confidenceScore: top.score,
-    distanceProven,
-    scheduledToday: top.visitId != null,
-    alreadyPrompted: false,
-    status: "pending",
-  });
-
   // Prefer assignment from the resolved work order so job/visit/WO stay consistent.
   let jobIdForInsert = top.jobId;
   let visitIdForInsert = resolution.visitId ?? top.visitId;
@@ -507,6 +517,47 @@ async function detectVisitCandidate(
       }
     }
   }
+
+  // Resolve tech before workday gate (multi-user: only that user's open day counts).
+  const matchRowForUser = visitIdForInsert
+    ? rows.find((r) => r.today_visit_id === visitIdForInsert)
+    : null;
+  const mappedUserId = resolveLocationPersonUserId(
+    personOrDevice,
+    loadLocationPersonMap(),
+  );
+  const stampUserId = mappedUserId ?? matchRowForUser?.today_assigned ?? null;
+
+  let workdayOpen = false;
+  if (stampUserId) {
+    const { rows: bd } = await client.query<{ id: string }>(
+      `SELECT id FROM business_days
+       WHERE account_id = $1 AND user_id = $2 AND closed_at IS NULL
+         AND business_date = ($3::timestamptz AT TIME ZONE 'America/New_York')::date
+       LIMIT 1`,
+      [accountId, stampUserId, stop.startedAt],
+    );
+    workdayOpen = bd.length > 0;
+  } else {
+    // Live prompt / candidate without a resolved tech: any open day (solo path).
+    const { rows: bd } = await client.query<{ id: string }>(
+      `SELECT id FROM business_days
+       WHERE account_id = $1 AND closed_at IS NULL
+         AND business_date = ($2::timestamptz AT TIME ZONE 'America/New_York')::date
+       LIMIT 1`,
+      [accountId, stop.startedAt],
+    );
+    workdayOpen = bd.length > 0;
+  }
+
+  const liveEligible = isLivePromptEligible({
+    workdayOpen,
+    confidenceScore: top.score,
+    distanceProven,
+    scheduledToday: top.visitId != null,
+    alreadyPrompted: false,
+    status: "pending",
+  });
 
   const { rows: inserted } = await client.query<{ id: string }>(
     `INSERT INTO visit_candidates
@@ -536,34 +587,31 @@ async function detectVisitCandidate(
   const candidateId = inserted[0]?.id;
   if (!candidateId) return null;
 
-  // Presence-only on scheduled visit linked to this assignment.
-  if (visitIdForInsert) {
-    const matchRow = rows.find((r) => r.today_visit_id === visitIdForInsert);
-    let userId = matchRow?.today_assigned ?? null;
-    if (!userId) {
-      const { rows: owners } = await client.query<{ id: string }>(
-        `SELECT id FROM users
-         WHERE account_id = $1 AND role = 'owner'
-         ORDER BY created_at ASC LIMIT 1`,
-        [accountId],
-      );
-      userId = owners[0]?.id ?? null;
-    }
-    if (userId) {
+  // Presence-only on scheduled visit: high-trust bar only (E4 harden). Never
+  // owner-fallback; person map or assigned tech required.
+  if (visitIdForInsert && stampUserId) {
+    const mayStamp = shouldAutoStampPresence({
+      workdayOpen,
+      confidenceScore: top.score,
+      distanceProven,
+      scheduledToday: top.visitId != null,
+      hasUserId: true,
+    });
+    if (mayStamp) {
       await client.query(
         `SELECT set_config('app.current_user_id', $1, true)`,
-        [userId],
+        [stampUserId],
       );
       await autoRecordScheduledVisitPresence(client, {
         accountId,
-        userId,
+        userId: stampUserId,
         candidateId,
         visitId: visitIdForInsert,
         jobId: jobIdForInsert,
         arrivalTime: stop.startedAt,
         departureTime: endedAt,
         durationMinutes: Math.round(durationMinutes),
-        visitType: matchRow?.today_visit_type ?? null,
+        visitType: matchRowForUser?.today_visit_type ?? null,
       });
     }
   }
