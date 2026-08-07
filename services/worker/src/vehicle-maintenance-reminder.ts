@@ -73,7 +73,7 @@ export async function runVehicleMaintenanceReminders(client: Client): Promise<{
   for (const s of schedules) {
     let overdue = false;
     let dueSoon = false;
-    let title = `${s.vehicle_nickname}: ${s.service_type.replace(/_/g, " ")}`;
+    const title = `${s.vehicle_nickname}: ${s.service_type.replace(/_/g, " ")}`;
     let summary = "";
 
     if (s.interval_miles != null && s.last_odometer != null && s.current_odometer != null) {
@@ -103,8 +103,8 @@ export async function runVehicleMaintenanceReminders(client: Client): Promise<{
 
     if (!overdue && !dueSoon) continue;
 
-    const window = overdue ? "overdue" : "soon";
-    const dedupeKey = `vehicle_service_due:${s.vehicle_id}:${s.service_type}:${window}`;
+    const dueWindow = overdue ? "overdue" : "soon";
+    const dedupeKey = `vehicle_service_due:${s.vehicle_id}:${s.service_type}:${dueWindow}`;
     const exists = await client.query(
       `SELECT 1 FROM attention_events WHERE account_id = $1 AND dedupe_key = $2 LIMIT 1`,
       [s.account_id, dedupeKey],
@@ -139,7 +139,6 @@ export async function runVehicleMaintenanceReminders(client: Client): Promise<{
 
   for (const r of renewals) {
     const days = daysUntil(r.current_due_date, today);
-    const window = days < 0 ? "overdue" : "soon";
     const dedupeKey = `vehicle_renewal_due:${r.vehicle_id}:${r.renewal_type}:${r.current_due_date}`;
     const exists = await client.query(
       `SELECT 1 FROM attention_events WHERE account_id = $1 AND dedupe_key = $2 LIMIT 1`,
