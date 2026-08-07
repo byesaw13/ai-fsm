@@ -12,6 +12,7 @@ const createSchema = z.object({
   model:    z.string().max(80).optional(),
   year:     z.number().int().min(1900).max(2100).optional(),
   plate:    z.string().max(20).optional(),
+  kind:     z.enum(["truck", "van", "trailer", "other"]).optional(),
 });
 
 type VehicleRow = {
@@ -21,6 +22,7 @@ type VehicleRow = {
   model: string | null;
   year: number | null;
   plate: string | null;
+  kind: string;
   is_active: boolean;
   is_default: boolean;
   bluetooth_id: string | null;
@@ -30,10 +32,12 @@ type VehicleRow = {
   total_miles: string | null;        // lifetime miles rolled up across this vehicle's sessions
 };
 
-export const GET = withRole(["owner", "admin", "tech"], async (_req: NextRequest, session) => {
+export const GET = withRole(["owner", "admin", "tech"], async (req: NextRequest, session) => {
   try {
+    // mileage_only=1 excludes trailers (TASK-093) from drive/session pickers
+    const mileageOnly = req.nextUrl.searchParams.get("mileage_only") === "1";
     const rows = await query<VehicleRow>(
-      `SELECT v.id, v.nickname, v.make, v.model, v.year, v.plate, v.is_active, v.is_default, v.bluetooth_id, v.created_at::text,
+      `SELECT v.id, v.nickname, v.make, v.model, v.year, v.plate, v.kind, v.is_active, v.is_default, v.bluetooth_id, v.created_at::text,
               last_s.end_odometer   AS current_odometer,
               last_s.session_date::text AS last_session_date,
               roll.total_miles::text AS total_miles
@@ -52,6 +56,7 @@ export const GET = withRole(["owner", "admin", "tech"], async (_req: NextRequest
            AND (miles IS NOT NULL OR end_odometer IS NOT NULL)
        ) roll ON true
        WHERE v.account_id = $1
+         ${mileageOnly ? "AND v.kind <> 'trailer'" : ""}
        ORDER BY v.is_active DESC, v.nickname ASC`,
       [session.accountId]
     );
@@ -68,13 +73,21 @@ export const POST = withRole(["owner", "admin"], async (req: NextRequest, sessio
   if (!parsed.success) {
     return NextResponse.json({ error: { message: "Invalid input", details: parsed.error.issues } }, { status: 400 });
   }
-  const { nickname, make, model, year, plate } = parsed.data;
+  const { nickname, make, model, year, plate, kind } = parsed.data;
   try {
     const row = await queryOne<VehicleRow>(
-      `INSERT INTO vehicles (account_id, nickname, make, model, year, plate)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, nickname, make, model, year, plate, is_active, created_at::text`,
-      [session.accountId, nickname, make ?? null, model ?? null, year ?? null, plate ?? null]
+      `INSERT INTO vehicles (account_id, nickname, make, model, year, plate, kind)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, nickname, make, model, year, plate, kind, is_active, created_at::text`,
+      [
+        session.accountId,
+        nickname,
+        make ?? null,
+        model ?? null,
+        year ?? null,
+        plate ?? null,
+        kind ?? "truck",
+      ]
     );
     return NextResponse.json({ data: row }, { status: 201 });
   } catch (err) {
