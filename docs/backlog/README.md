@@ -199,7 +199,7 @@ truth-pass also archived TASK-023 and TASK-050 (epic already Done, README lagged
 | TASK-088 | Store purchase history import (Home Depot + Lowe's) | 004 | Done |
 | TASK-089 | T&M final invoice from actuals + mobile deliver | 004 | Done |
 | TASK-090 | Separate estimate vs invoice document terms in Settings | 004 | Done |
-| TASK-091 | Hybrid mileage verification pack (odo + GPS + export) | 001 | In Progress |
+| TASK-091 | Hybrid mileage verification pack (odo + GPS + export) | 001 | Done |
 
 ## Status legend
 
