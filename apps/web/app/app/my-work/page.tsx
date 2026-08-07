@@ -165,8 +165,12 @@ export default async function MyWorkPage() {
           !!active &&
           (active.activity_type === "job_work" || active.activity_type === "estimate_visit") &&
           !!(
-            (top?.workOrderId && active.entity_id === top.workOrderId) ||
-            (active.entity_type === "visit" && top)
+            (top?.workOrderId &&
+              active.entity_type === "work_order" &&
+              active.entity_id === top.workOrderId) ||
+            (top?.visitId &&
+              active.entity_type === "visit" &&
+              active.entity_id === top.visitId)
           );
         return (
           <Suspense fallback={null}>

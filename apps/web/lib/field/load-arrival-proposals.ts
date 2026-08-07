@@ -9,6 +9,7 @@ export type ArrivalProposalDto = {
   clientName: string;
   workOrderId: string | null;
   workOrderTitle: string | null;
+  visitId: string | null;
   woResolution: string;
   confidenceScore: number;
   arrivalTime: string;
@@ -37,6 +38,7 @@ export async function loadPendingArrivalProposals(
             COALESCE(c.name, 'Client') AS "clientName",
             vc.work_order_id AS "workOrderId",
             w.title AS "workOrderTitle",
+            vc.visit_id AS "visitId",
             vc.wo_resolution AS "woResolution",
             vc.confidence_score AS "confidenceScore",
             vc.arrival_time::text AS "arrivalTime",

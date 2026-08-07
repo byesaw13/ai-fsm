@@ -426,6 +426,11 @@ export function selectArrivalNextAction(input: {
   activityType: string | null;
   /** True when open activity is already job_work (or similar) on this proposal's visit/WO. */
   alreadyOnSiteWork: boolean;
+  /**
+   * Still on site (open stop / null departure). When false, confirm is historical
+   * labeling only — do not promise "Start job work" (switch_activity stays off).
+   */
+  stillOnSite?: boolean;
 }): ArrivalNextAction {
   if (!input.hasProposal) {
     return { show: false, primaryLabel: "", suppressReason: "no_proposal" };
@@ -444,12 +449,14 @@ export function selectArrivalNextAction(input: {
       suppressReason: null,
     };
   }
+  const stillOnSite = input.stillOnSite !== false;
   const startingJob =
-    !input.activityType ||
-    input.activityType === "travel" ||
-    input.activityType === "driving" ||
-    input.activityType === "personal" ||
-    input.activityType === "admin";
+    stillOnSite &&
+    (!input.activityType ||
+      input.activityType === "travel" ||
+      input.activityType === "driving" ||
+      input.activityType === "personal" ||
+      input.activityType === "admin");
   return {
     show: true,
     primaryLabel: startingJob ? "Start job work" : "Confirm arrival",

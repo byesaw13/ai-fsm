@@ -52,6 +52,8 @@ export function ArrivalProposalBanner({
       liveEligible: top.liveEligible,
       activityType,
       alreadyOnSiteWork,
+      // Closed stops (ingest) have departureTime — confirm is historical only.
+      stillOnSite: !top.departureTime,
     });
   }, [top, activityType, alreadyOnSiteWork]);
 

@@ -492,23 +492,6 @@ async function detectVisitCandidate(
   const distanceProven =
     top.distanceMeters != null && top.distanceMeters <= 150 * 0.3048;
 
-  const { rows: bd } = await client.query<{ id: string }>(
-    `SELECT id FROM business_days
-     WHERE account_id = $1 AND closed_at IS NULL
-       AND business_date = ($2::timestamptz AT TIME ZONE 'America/New_York')::date
-     LIMIT 1`,
-    [accountId, stop.startedAt],
-  );
-
-  const liveEligible = isLivePromptEligible({
-    workdayOpen: bd.length > 0,
-    confidenceScore: top.score,
-    distanceProven,
-    scheduledToday: top.visitId != null,
-    alreadyPrompted: false,
-    status: "pending",
-  });
-
   // Prefer assignment from the resolved work order so job/visit/WO stay consistent.
   let jobIdForInsert = top.jobId;
   let visitIdForInsert = resolution.visitId ?? top.visitId;
@@ -534,6 +517,47 @@ async function detectVisitCandidate(
       }
     }
   }
+
+  // Resolve tech before workday gate (multi-user: only that user's open day counts).
+  const matchRowForUser = visitIdForInsert
+    ? rows.find((r) => r.today_visit_id === visitIdForInsert)
+    : null;
+  const mappedUserId = resolveLocationPersonUserId(
+    personOrDevice,
+    loadLocationPersonMap(),
+  );
+  const stampUserId = mappedUserId ?? matchRowForUser?.today_assigned ?? null;
+
+  let workdayOpen = false;
+  if (stampUserId) {
+    const { rows: bd } = await client.query<{ id: string }>(
+      `SELECT id FROM business_days
+       WHERE account_id = $1 AND user_id = $2 AND closed_at IS NULL
+         AND business_date = ($3::timestamptz AT TIME ZONE 'America/New_York')::date
+       LIMIT 1`,
+      [accountId, stampUserId, stop.startedAt],
+    );
+    workdayOpen = bd.length > 0;
+  } else {
+    // Live prompt / candidate without a resolved tech: any open day (solo path).
+    const { rows: bd } = await client.query<{ id: string }>(
+      `SELECT id FROM business_days
+       WHERE account_id = $1 AND closed_at IS NULL
+         AND business_date = ($2::timestamptz AT TIME ZONE 'America/New_York')::date
+       LIMIT 1`,
+      [accountId, stop.startedAt],
+    );
+    workdayOpen = bd.length > 0;
+  }
+
+  const liveEligible = isLivePromptEligible({
+    workdayOpen,
+    confidenceScore: top.score,
+    distanceProven,
+    scheduledToday: top.visitId != null,
+    alreadyPrompted: false,
+    status: "pending",
+  });
 
   const { rows: inserted } = await client.query<{ id: string }>(
     `INSERT INTO visit_candidates
@@ -565,35 +589,29 @@ async function detectVisitCandidate(
 
   // Presence-only on scheduled visit: high-trust bar only (E4 harden). Never
   // owner-fallback; person map or assigned tech required.
-  if (visitIdForInsert) {
-    const matchRow = rows.find((r) => r.today_visit_id === visitIdForInsert);
-    const mappedUserId = resolveLocationPersonUserId(
-      personOrDevice,
-      loadLocationPersonMap(),
-    );
-    const userId = mappedUserId ?? matchRow?.today_assigned ?? null;
+  if (visitIdForInsert && stampUserId) {
     const mayStamp = shouldAutoStampPresence({
-      workdayOpen: bd.length > 0,
+      workdayOpen,
       confidenceScore: top.score,
       distanceProven,
       scheduledToday: top.visitId != null,
-      hasUserId: userId != null,
+      hasUserId: true,
     });
-    if (mayStamp && userId) {
+    if (mayStamp) {
       await client.query(
         `SELECT set_config('app.current_user_id', $1, true)`,
-        [userId],
+        [stampUserId],
       );
       await autoRecordScheduledVisitPresence(client, {
         accountId,
-        userId,
+        userId: stampUserId,
         candidateId,
         visitId: visitIdForInsert,
         jobId: jobIdForInsert,
         arrivalTime: stop.startedAt,
         departureTime: endedAt,
         durationMinutes: Math.round(durationMinutes),
-        visitType: matchRow?.today_visit_type ?? null,
+        visitType: matchRowForUser?.today_visit_type ?? null,
       });
     }
   }

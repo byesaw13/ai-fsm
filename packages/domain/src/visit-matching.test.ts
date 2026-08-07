@@ -394,16 +394,29 @@ describe("selectArrivalNextAction", () => {
     expect(r.suppressReason).toBe("already_on_site_work");
   });
 
-  it("offers Start job work when traveling / idle", () => {
+  it("offers Start job work when traveling / idle and still on site", () => {
     const r = selectArrivalNextAction({
       hasProposal: true,
       confidenceScore: 90,
       liveEligible: true,
       activityType: "travel",
       alreadyOnSiteWork: false,
+      stillOnSite: true,
     });
     expect(r.show).toBe(true);
     expect(r.primaryLabel).toBe("Start job work");
+  });
+
+  it("does not promise Start job work for closed (departed) proposals", () => {
+    const r = selectArrivalNextAction({
+      hasProposal: true,
+      confidenceScore: 90,
+      liveEligible: true,
+      activityType: "travel",
+      alreadyOnSiteWork: false,
+      stillOnSite: false,
+    });
+    expect(r.primaryLabel).toBe("Confirm arrival");
   });
 
   it("offers Confirm arrival when mid other activity", () => {
@@ -413,6 +426,7 @@ describe("selectArrivalNextAction", () => {
       liveEligible: true,
       activityType: "material_run",
       alreadyOnSiteWork: false,
+      stillOnSite: true,
     });
     expect(r.primaryLabel).toBe("Confirm arrival");
   });
