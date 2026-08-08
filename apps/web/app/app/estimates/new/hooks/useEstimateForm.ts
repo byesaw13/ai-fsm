@@ -34,6 +34,12 @@ import {
 import { useEstimatePricing } from "./useEstimatePricing";
 import { useEstimateLiveIntel } from "./useEstimateLiveIntel";
 import { usePricingSettings } from "./usePricingSettings";
+import {
+  withAiMaterialsDelta,
+  type AiMaterialsDeltaItem,
+} from "@/lib/estimates/materials-delta";
+
+export { type AiMaterialsDeltaItem } from "@/lib/estimates/materials-delta";
 
 // Re-export shared helpers + types so the component's existing imports keep working
 export {
@@ -211,6 +217,12 @@ export function useEstimateForm({
 
   const [draftShoppingList, setDraftShoppingList] = useState<ShoppingList | null>(null);
   const [draftSpecifiedMaterials, setDraftSpecifiedMaterials] = useState<SpecifiedMaterial[]>([]);
+  // AI-proposed vs. founder-edited materials delta (TASK T1, materials trust
+  // calibration) — populated by Step2Pricing when materials from the AI
+  // generator are added to the estimate, merged into shopping_list_json at
+  // submit time. Accumulates across multiple "Add to Estimate" batches in one
+  // session rather than replacing, so an earlier batch is never dropped.
+  const [aiMaterialsDelta, setAiMaterialsDelta] = useState<AiMaterialsDeltaItem[]>([]);
   /** Internal notes seeded by T&M briefing (or painting engine); submitted with create payload. */
   const [internalNotes, setInternalNotes] = useState("");
 
@@ -591,7 +603,8 @@ export function useEstimateForm({
           // 3. Scope builder fallback (buildManualShoppingList) — for mixed flows
           ...((() => {
             const sl = draftShoppingList ?? roomShoppingList ?? buildManualShoppingList(priceBookItems, scopeResults);
-            return sl ? { shopping_list_json: sl } : {};
+            const merged = withAiMaterialsDelta(sl, aiMaterialsDelta);
+            return merged ? { shopping_list_json: merged } : {};
           })()),
         };
       } else if (mode === "flat_rate") {
@@ -740,7 +753,8 @@ export function useEstimateForm({
         // Persist shopping list: AI draft takes priority; fall back to scope-derived list for manual estimates
         ...((() => {
           const sl = draftShoppingList ?? buildManualShoppingList(priceBookItems, scopeResults);
-          return sl ? { shopping_list_json: sl } : {};
+          const merged = withAiMaterialsDelta(sl, aiMaterialsDelta);
+          return merged ? { shopping_list_json: merged } : {};
         })()),
         ...(draftSpecifiedMaterials.length > 0 ? { specified_materials_json: draftSpecifiedMaterials } : {}),
         ...(paintingMode === "room_by_room" && roomSpecs.length > 0 ? { room_specs: roomSpecs } : {}),
@@ -895,6 +909,7 @@ export function useEstimateForm({
     pendingDraftScope,
     draftShoppingList,
     draftSpecifiedMaterials,
+    aiMaterialsDelta, setAiMaterialsDelta,
     roomShoppingList,
     liveIntel,
     paintingMode, setPaintingMode,

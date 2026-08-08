@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import { Button, Card, Input, SectionHeader, Textarea } from "@/components/ui";
 import { MaterialsGenerator } from "../../components/MaterialsGenerator";
 import type { AssessmentContext } from "@/lib/estimates/assessment-context";
+import { buildAiMaterialsDelta, type AiMaterialsDeltaItem } from "@/lib/estimates/materials-delta";
 import { PriceBookSelector } from "@/components/PriceBookSelector";
 import { ScopeBuilder } from "@/components/ScopeBuilder";
 import { getMaterialsByCategory, type MaterialSuggestion } from "@ai-fsm/domain";
@@ -104,6 +105,7 @@ interface Step2Props {
   addBulkLineItems: (items: LineItemRow[]) => void;
   removeLineItem: (index: number) => void;
   updateLineItem: (index: number, field: keyof LineItemRow, value: string) => void;
+  setAiMaterialsDelta: Dispatch<SetStateAction<AiMaterialsDeltaItem[]>>;
   // Totals
   scopeMaterialsTotalCents: number;
   materialHandlingCents: number;
@@ -139,6 +141,7 @@ export function Step2Pricing({
   handleAddSuggestion, handleSkipSuggestion,
   resolvedJobType, addedMaterials, handleAddMaterial,
   lineItems, addLineItem, addBulkLineItems, removeLineItem, updateLineItem,
+  setAiMaterialsDelta,
   scopeMaterialsTotalCents, materialHandlingCents,
   genericSubtotalCents, guardrailAdjustmentCents, genericTaxCents, genericTotalCents,
   depositCents, balanceDueCents,
@@ -778,6 +781,15 @@ export function Step2Pricing({
                             unit_price: (m.total_cost_cents / 100).toFixed(2),
                           }))
                         );
+                        // Capture the AI-proposed vs. founder-edited delta for
+                        // items that came from the generator (have an AI
+                        // snapshot) — manually-added price-book items are not
+                        // in scope. Accumulate so an earlier "Add to
+                        // Estimate" batch in this session isn't dropped.
+                        const delta = buildAiMaterialsDelta(matItems);
+                        if (delta.length > 0) {
+                          setAiMaterialsDelta((prev) => [...prev, ...delta]);
+                        }
                         setShowMaterialsGen(false);
                       }}
                       onClose={() => setShowMaterialsGen(false)}

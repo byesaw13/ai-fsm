@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { AssessmentRoom } from "@ai-fsm/domain";
 import { preserveScope } from "@/lib/estimates/assessment-context";
+import { attachAiSnapshot } from "@/lib/estimates/materials-delta";
 import { MaterialsMetadata } from "./MaterialsMetadata";
 
 const JOB_TYPES = [
@@ -47,6 +48,16 @@ export interface MaterialItem {
   confidence: "calculated" | "estimated";
   notes: string;
   price_book_id: string | null;
+  /**
+   * Immutable snapshot of the AI-proposed quantity/price, set once from
+   * `quantity`/`unit_cost_cents` the moment the API response is received —
+   * before any founder edits happen. `updateItem` must never touch these
+   * (TASK T1, materials trust calibration — persists the AI-proposed vs.
+   * founder-edited delta so a future feature can tell whether the AI's
+   * numbers can be trusted).
+   */
+  ai_quantity?: number;
+  ai_unit_cost_cents?: number;
 }
 
 // One canonical room shape across assessment-derived flows (TASK-018).
@@ -125,7 +136,9 @@ export function MaterialsGenerator({
         return;
       }
       setResult(data.data);
-      setEditedItems(data.data.items);
+      // Snapshot the AI-proposed quantity/price onto each item, once, before
+      // any edits happen — travels with the item through edits/removals.
+      setEditedItems(attachAiSnapshot(data.data.items as MaterialItem[]));
     } catch {
       setError("Network error — try again");
     } finally {
