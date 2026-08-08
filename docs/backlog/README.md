@@ -201,7 +201,9 @@ truth-pass also archived TASK-023 and TASK-050 (epic already Done, README lagged
 | TASK-090 | Separate estimate vs invoice document terms in Settings | 004 | Done |
 | TASK-091 | Hybrid mileage verification pack (odo + GPS + export) | 001 | Done |
 | TASK-093 | Vehicle & Trailer Cost-of-Ownership | 001 | Done |
-| TASK-094 | Materials Estimate Trust & Calibration (Approach D) | 002 | In Progress |
+| TASK-094 | Materials Estimate Trust & Calibration (Approach D) | 002 | Done |
+| TASK-095 | Estimate vs Actual Benchmark & Calibration Runner | 008 | Done |
+| TASK-096 | Financial Truth Card & Actionable Advisory Guardrails | 002 | In Progress |
 
 ## Status legend
 

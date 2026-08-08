@@ -141,6 +141,34 @@ Acceptance Criteria:
 Notes:
 No implementation found in repo.
 
+# TASK-096: Financial Truth Card, T&M vs Fixed Comparison & Actionable Advisory Guardrails
+
+Status:
+In Progress
+
+Phase:
+3
+
+Problem:
+Estimators feel blind because financial truth (burdened costs, profit $, gross margin %, effective hours) is hidden in the background. Additionally, pricing warnings lack actionable suggestions on how to reach minimums or improve profitability, and hard blocks restrict owner flexibility.
+
+Business Value:
+Surfaces live financial truth, side-by-side Fixed Rate vs T&M pricing mode comparison, and soft advisory warnings with one-tap suggestions for profitability improvements.
+
+Scope:
+- Render Internal Financial Truth Card on estimate detail/edit screens (Internal Cost, Profit $, Gross Margin %, Effective Hours).
+- Render Side-by-Side Pricing Mode Comparison Card (Fixed Rate vs T&M).
+- Replace hard blocks with non-blocking advisory warnings accompanied by actionable suggestions (e.g. add trip fee to meet $185 minimum, add material handling to fix margin, suggest bundle rate for over-estimated jobs).
+
+Out of Scope:
+- Blocking estimate delivery or forcing hard errors.
+
+Acceptance Criteria:
+- [ ] Estimate detail screen displays Internal Financial Truth Card.
+- [ ] Estimate detail screen displays T&M vs. Fixed Rate Comparison Card.
+- [ ] Pricing warnings are non-blocking and include one-tap actionable suggestions to fix profitability or meet minimums.
+- [ ] Tests cover advisory suggestions generation.
+
 ## Completed
 
 - [TASK-018: Assessment Summary Engine](../archive/backlog-done/TASK-018-assessment-summary-engine.md) — Done (Wave 3 2026-08-05)

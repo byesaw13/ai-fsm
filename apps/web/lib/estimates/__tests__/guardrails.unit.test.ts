@@ -20,14 +20,11 @@ const baseInput = {
 };
 
 describe("reviewEstimateGuardrails", () => {
-  it("blocks estimates below the minimum service value without a structured override", () => {
+  it("warns on estimates below the minimum service value without a structured override", () => {
     const review = reviewEstimateGuardrails({ ...baseInput, total_cents: 12500 });
 
-    expect(review.status).toBe("blocked");
-    expect(review.blockers).toContainEqual({
-      field: "minimum_service_override_reason",
-      message: "Total ($125.00) is below the $185.00 minimum service fee. Add a structured override to proceed.",
-    });
+    expect(review.status).toBe("passed");
+    expect(review.warnings.some((w) => w.field === "minimum_service_override_reason")).toBe(true);
   });
 
   it("passes a below-minimum estimate when a structured override is recorded", () => {
@@ -38,7 +35,7 @@ describe("reviewEstimateGuardrails", () => {
     });
 
     expect(review.status).toBe("passed");
-    expect(review.blockers).toHaveLength(0);
+    expect(review.warnings.some((w) => w.field === "minimum_service_override_reason")).toBe(false);
   });
 
   it("warns when risk flags are set without a risk adjustment", () => {
@@ -54,15 +51,15 @@ describe("reviewEstimateGuardrails", () => {
     expect(review.warnings.some((w) => w.field === "risk_adjustment_cents" && w.message.includes("surcharge"))).toBe(true);
   });
 
-  it("blocks estimates below 30% gross margin", () => {
+  it("warns when gross margin is below 30%", () => {
     const review = reviewEstimateGuardrails({
       ...baseInput,
       total_cents: 25000,
       margin_pct: 0.22,
     });
 
-    expect(review.status).toBe("blocked");
-    expect(review.blockers.some((b) => b.field === "margin_pct")).toBe(true);
+    expect(review.status).toBe("passed");
+    expect(review.warnings.some((w) => w.field === "margin_pct")).toBe(true);
   });
 
   it("warns when MA-regulated items are present", () => {

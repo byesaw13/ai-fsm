@@ -179,13 +179,13 @@ describe("computeEstimate — adjustments", () => {
 // ── Guardrails ────────────────────────────────────────────────────────────────
 
 describe("computeEstimate — guardrails", () => {
-  it("blocks when total is below minimum and no override", () => {
+  it("warns when total is below minimum and no override", () => {
     const spec: EstimateSpec = {
       engineVersion: ENGINE_VERSION, type: "general",
       lineItems: [{ id: "li1", description: "Small job", quantity: 1, unit: "flat", unitLaborCents: 5000 }],
     };
     const r = computeEstimate(spec, CURRENT_RULES);
-    expect(r.warnings.some((w) => w.code === "BELOW_MINIMUM" && w.severity === "block")).toBe(true);
+    expect(r.warnings.some((w) => w.code === "BELOW_MINIMUM" && w.severity === "warn")).toBe(true);
   });
 
   it("does not block when override is present", () => {

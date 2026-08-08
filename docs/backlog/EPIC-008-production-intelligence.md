@@ -232,6 +232,36 @@ Acceptance Criteria:
 - [x] Owner reviews and applies; applied work orders carry first-class tasks
       (one WO per project by default; merged + deployed).
 
+# TASK-095: Estimate vs. Actual Benchmark Runner & Production Rate Calibration Script (PI-011)
+
+Status:
+In Progress
+
+Phase:
+3
+
+Problem:
+There is no automated script to run completed jobs through computeEstimate(), compare estimated costs/hours against actual invoiced/logged values, and calculate systematic labor and material bias across the business.
+
+Business Value:
+Executes the 30-job benchmark protocol, producing empirical labor ratios, material ratios, signed percentage errors, and rate calibration recommendations using the safe shrinkage formula.
+
+Scope:
+- Create `scripts/run-estimate-benchmark.ts` to query completed/invoiced jobs from PostgreSQL.
+- Compare estimate totals/subtotals vs invoiced totals, logged activity labor hours (`activity_entries`), and actual material costs (`job_material_lines`).
+- Compute per-job and aggregate metrics: Labor Ratio ($Actual / Estimated$), Material Ratio ($Actual / Estimated$), Cost Variance ($Actual - Estimated$), Signed Percent Error.
+- Output clean terminal report and JSON/markdown summary.
+
+Out of Scope:
+- Auto-writing suggested rate changes directly to database without owner review.
+
+Acceptance Criteria:
+- [ ] `scripts/run-estimate-benchmark.ts` can be executed via `npx tsx scripts/run-estimate-benchmark.ts`.
+- [ ] Script successfully queries database jobs, estimates, invoices, and activity actuals.
+- [ ] Script outputs formatted benchmark report with variance ratios and shrinkage rate calibration recommendations.
+- [ ] Unit or execution test verifies benchmark math calculation.
+
 ## Completed
 
 - TASK-072 (incl. Slice 1b) and TASK-073 — 2026-07-22 on main / garonhome.
+

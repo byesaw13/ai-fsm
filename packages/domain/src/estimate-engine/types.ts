@@ -168,6 +168,8 @@ export interface GuardrailWarning {
   severity: "block" | "warn";
   message: string;
   overridable: boolean;
+  suggestion?: string;
+  actionCode?: string;
 }
 
 export interface ClientLineItem {
