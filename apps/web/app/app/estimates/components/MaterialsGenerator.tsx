@@ -181,6 +181,10 @@ export function MaterialsGenerator({
                 category: i.category,
                 unit: i.unit,
                 unit_cost_cents: i.unit_cost_cents,
+                // Unverified AI guess, not a real purchase — must not
+                // pollute avg_paid_cents/purchase_count (see materials
+                // price-book contamination fix).
+                is_ai_estimate: true,
               })),
             }),
           });
