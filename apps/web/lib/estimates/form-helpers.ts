@@ -12,6 +12,13 @@ export interface LineItemRow {
   quantity: string;
   unit_price: string;
   price_book_id?: string;
+  /**
+   * Links this flattened row back to its AiMaterialsDeltaItem (by `key`),
+   * when it came from the AI materials generator. Lets submit-time
+   * reconciliation detect if the founder edited/removed the row after
+   * "Add to Estimate" (TASK T1, materials trust calibration).
+   */
+  ai_delta_key?: string;
 }
 
 export interface OptionTier {

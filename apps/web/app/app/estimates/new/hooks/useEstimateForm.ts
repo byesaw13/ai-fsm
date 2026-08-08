@@ -36,6 +36,7 @@ import { useEstimateLiveIntel } from "./useEstimateLiveIntel";
 import { usePricingSettings } from "./usePricingSettings";
 import {
   withAiMaterialsDelta,
+  reconcileAiMaterialsDelta,
   type AiMaterialsDeltaItem,
 } from "@/lib/estimates/materials-delta";
 
@@ -222,7 +223,22 @@ export function useEstimateForm({
   // generator are added to the estimate, merged into shopping_list_json at
   // submit time. Accumulates across multiple "Add to Estimate" batches in one
   // session rather than replacing, so an earlier batch is never dropped.
-  const [aiMaterialsDelta, setAiMaterialsDelta] = useState<AiMaterialsDeltaItem[]>([]);
+  // Also hydrated from the assessment hand-off (estimate_prefill_materials_delta)
+  // — a second, separate entry point into this form that bypasses Step2Pricing
+  // entirely, so it must carry its own delta through sessionStorage the same
+  // way estimate_prefill_materials carries the flattened line items.
+  const [aiMaterialsDelta, setAiMaterialsDelta] = useState<AiMaterialsDeltaItem[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.sessionStorage.getItem("estimate_prefill_materials_delta");
+      if (raw) {
+        window.sessionStorage.removeItem("estimate_prefill_materials_delta");
+        const parsed = JSON.parse(raw) as AiMaterialsDeltaItem[];
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch { /* ignore parse errors */ }
+    return [];
+  });
   /** Internal notes seeded by T&M briefing (or painting engine); submitted with create payload. */
   const [internalNotes, setInternalNotes] = useState("");
 
@@ -559,6 +575,22 @@ export function useEstimateForm({
       let payload: Record<string, unknown>;
       let baseEngineSpec: EstimateSpec | null = null;
 
+      // Reconcile the accumulated AI-materials delta against the FINAL line
+      // items right before submit — the founder can edit or remove a
+      // materials-sourced line directly in LineItemsTable after "Add to
+      // Estimate" (a separate state array with no other link back to the
+      // delta), and submitting the stale add-time delta would claim
+      // founder-approval for a value no longer on the estimate.
+      const lineItemsByAiDeltaKey = new Map(
+        lineItems
+          .filter((row): row is typeof row & { ai_delta_key: string } => Boolean(row.ai_delta_key))
+          .map((row) => [row.ai_delta_key, { unit_price: row.unit_price }])
+      );
+      const reconciledAiMaterialsDelta = reconcileAiMaterialsDelta(
+        aiMaterialsDelta,
+        lineItemsByAiDeltaKey
+      );
+
       if (serviceType === "painting") {
         if (!paintingResult) {
           setError("Enter the square footage to create a painting estimate.");
@@ -603,7 +635,7 @@ export function useEstimateForm({
           // 3. Scope builder fallback (buildManualShoppingList) — for mixed flows
           ...((() => {
             const sl = draftShoppingList ?? roomShoppingList ?? buildManualShoppingList(priceBookItems, scopeResults);
-            const merged = withAiMaterialsDelta(sl, aiMaterialsDelta);
+            const merged = withAiMaterialsDelta(sl, reconciledAiMaterialsDelta);
             return merged ? { shopping_list_json: merged } : {};
           })()),
         };
@@ -753,7 +785,7 @@ export function useEstimateForm({
         // Persist shopping list: AI draft takes priority; fall back to scope-derived list for manual estimates
         ...((() => {
           const sl = draftShoppingList ?? buildManualShoppingList(priceBookItems, scopeResults);
-          const merged = withAiMaterialsDelta(sl, aiMaterialsDelta);
+          const merged = withAiMaterialsDelta(sl, reconciledAiMaterialsDelta);
           return merged ? { shopping_list_json: merged } : {};
         })()),
         ...(draftSpecifiedMaterials.length > 0 ? { specified_materials_json: draftSpecifiedMaterials } : {}),

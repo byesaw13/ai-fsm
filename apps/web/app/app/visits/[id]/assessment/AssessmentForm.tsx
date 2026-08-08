@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui";
 import { writeAssessmentContext } from "@/lib/estimates/assessment-context";
 import { MaterialsGenerator } from "@/app/app/estimates/components/MaterialsGenerator";
 import type { MaterialItem } from "@/app/app/estimates/components/MaterialsGenerator";
+import { buildAiMaterialsDelta } from "@/lib/estimates/materials-delta";
 
 const TRADE_KEYS = Object.keys(ASSESSMENT_TRADE_LABELS) as AssessmentTradeKey[];
 
@@ -639,13 +640,23 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
               // Carry the source visit so the estimate page can recover the
               // assessment summary from persistence if sessionStorage is gone.
               params.set("visit_id", visitId);
-              // Store generated materials in sessionStorage for the estimate form to pick up
-              const lineItems = matItems.map((m) => ({
+              // Store generated materials in sessionStorage for the estimate form to pick up.
+              // Same delta-capture pattern as Step2Pricing.tsx's onAddToEstimate — this is a
+              // SEPARATE entry point into the estimate form (sessionStorage hand-off, not the
+              // in-page MaterialsGenerator flow), so it must carry the AI-proposed vs.
+              // founder-edited delta through independently (TASK T1, materials trust calibration).
+              const keys = matItems.map(() => crypto.randomUUID());
+              const lineItems = matItems.map((m, i) => ({
                 description: `${m.name}${m.brand ? ` (${m.brand})` : ""} — ${m.quantity} ${m.unit}`,
                 quantity: "1",
                 unit_price: (m.total_cost_cents / 100).toFixed(2),
+                ai_delta_key: m.ai_quantity !== undefined ? keys[i] : undefined,
               }));
               sessionStorage.setItem("estimate_prefill_materials", JSON.stringify(lineItems));
+              const delta = buildAiMaterialsDelta(matItems, keys);
+              if (delta.length > 0) {
+                sessionStorage.setItem("estimate_prefill_materials_delta", JSON.stringify(delta));
+              }
               // Carry the assessment context so the estimate-page materials
               // generator keeps the generated description + room measurements.
               writeAssessmentContext({
