@@ -58,8 +58,17 @@ Acceptance Criteria:
   tested).
 - [ ] Merged to main.
 - [ ] Real usage over a few weeks shows whether there's a genuine systematic
-  pattern (e.g. "decking is consistently under") worth building calibration
-  against — the actual deliverable of this task, not a specific event firing.
+  **edit-rate** pattern (e.g. "decking quantity consistently gets increased by
+  founders") worth building calibration against — the actual deliverable of
+  this task, not a specific event firing.
+
+Explicitly: this delta measures **pre-job founder judgment** (did the founder
+change what the AI proposed before the job even started), not **completed-job
+outcome accuracy** (did the approved quantity turn out to be enough on site).
+An accepted-but-wrong AI quantity, or an incorrect founder edit, produces no
+signal here — that requires a real usage/actuals source (`job_material_lines`
+vs. `visit_parts`, unresolved — see Out of Scope) and is explicitly a later
+step, not something this task's acceptance criteria claim to deliver.
 
 Notes:
 Went through `/office-hours` → `/plan-ceo-review` → `/plan-eng-review`, each
