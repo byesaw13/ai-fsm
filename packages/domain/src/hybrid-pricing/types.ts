@@ -48,6 +48,14 @@ export interface HybridLineItemResult {
   layer3LocalCalibrationFactor: number;
   finalLineTotalCents: number;
   breakdownSummary: string;
+  /**
+   * True when no Layer 1 catalog entry matched the requested item and this
+   * line fell back to a generic labor-hour estimate — never silent (see
+   * UnmatchedBenchmarkError in standards-catalog.ts). The estimate UI must
+   * surface this so the founder verifies the line manually rather than
+   * trusting an unrelated trade's benchmark.
+   */
+  layer1Unmatched?: boolean;
 }
 
 export interface HybridEstimateCalculation {

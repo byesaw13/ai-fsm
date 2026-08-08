@@ -69,6 +69,20 @@ export const LAYER1_STANDARDS_CATALOG: Layer1StandardBenchmark[] = [
   },
 ];
 
+/**
+ * Thrown when no Layer 1 catalog entry matches. Named so callers can
+ * distinguish "nothing matched" from any other failure and decide how to
+ * degrade (never silently substitute an unrelated trade's benchmark —
+ * that previously happened by falling back to catalog[0] regardless of
+ * trade, producing wrong customer-facing prices with no signal it happened).
+ */
+export class UnmatchedBenchmarkError extends Error {
+  constructor(readonly query: string) {
+    super(`No Layer 1 standards-catalog entry matches "${query}"`);
+    this.name = "UnmatchedBenchmarkError";
+  }
+}
+
 export function findLayer1Benchmark(codeOrKeyword: string): Layer1StandardBenchmark {
   const query = codeOrKeyword.toLowerCase();
   const match = LAYER1_STANDARDS_CATALOG.find(
@@ -77,5 +91,6 @@ export function findLayer1Benchmark(codeOrKeyword: string): Layer1StandardBenchm
       b.description.toLowerCase().includes(query) ||
       query.includes(b.tradeCategory)
   );
-  return match ?? LAYER1_STANDARDS_CATALOG[0]!;
+  if (!match) throw new UnmatchedBenchmarkError(codeOrKeyword);
+  return match;
 }

@@ -4,19 +4,42 @@ import type {
   HybridPricingItemRequest,
   Layer3HistoricalActualsCalibration,
 } from "./types";
-import { findLayer1Benchmark } from "./standards-catalog";
+import { findLayer1Benchmark, UnmatchedBenchmarkError } from "./standards-catalog";
 import { getLayer2MaterialCost } from "./distributor-catalog";
+import type { Layer1StandardBenchmark } from "./types";
 
+// Generic, deliberately conservative placeholder used ONLY when nothing in
+// the catalog matches — never presented as a real trade benchmark. Flagged
+// via HybridLineItemResult.layer1Unmatched so the UI warns the founder to
+// verify the line manually instead of trusting it silently.
+const GENERIC_UNMATCHED_BENCHMARK: Layer1StandardBenchmark = {
+  tradeCategory: "carpentry",
+  csiCode: "00 00 00.00",
+  itemCode: "UNMATCHED.GENERIC",
+  description: "Unmatched item — generic estimate, verify manually",
+  unit: "each",
+  standardLaborHoursPerUnit: 1.0,
+  setupLaborHours: 0.5,
+  heightModifier16to20ft: 1.25,
+  oldHouseRiskModifier: 1.20,
+};
+
+// Neutral by design (CEO review, PR #589): the TASK-095 benchmark report
+// this was originally seeded from ("Clean Samples: 1" for labor) does not
+// support trade-specific multipliers or a 92% confidence claim — one job
+// is not a calibration. Multipliers stay at 1.00 (no adjustment) and
+// confidence reflects the real sample size until run-estimate-benchmark.ts
+// accumulates enough clean samples per trade to justify a real number.
 export const DOVETAILS_DEFAULT_CALIBRATION: Layer3HistoricalActualsCalibration = {
-  overallSignedBiasPct: -0.9, // From TASK-095 postgresql benchmark run
+  overallSignedBiasPct: 0,
   tradeCalibrationMultipliers: {
-    carpentry: 1.02,
-    electrical: 0.98,
+    carpentry: 1.00,
+    electrical: 1.00,
     painting: 1.00,
     plumbing: 1.00,
     drywall: 1.00,
   },
-  confidenceScorePct: 92,
+  confidenceScorePct: 0, // no real calibration data yet — see TASK-095
 };
 
 export function computeHybridEstimateItem(
@@ -24,7 +47,15 @@ export function computeHybridEstimateItem(
   calibration: Layer3HistoricalActualsCalibration = DOVETAILS_DEFAULT_CALIBRATION,
   burdenedRateCents: number = 8500 // $85/hr Dovetails burdened labor rate
 ): HybridLineItemResult {
-  const benchmark = findLayer1Benchmark(req.codeOrDescription);
+  let benchmark: Layer1StandardBenchmark;
+  let layer1Unmatched = false;
+  try {
+    benchmark = findLayer1Benchmark(req.codeOrDescription);
+  } catch (err) {
+    if (!(err instanceof UnmatchedBenchmarkError)) throw err;
+    benchmark = GENERIC_UNMATCHED_BENCHMARK;
+    layer1Unmatched = true;
+  }
   const rawHours = benchmark.setupLaborHours + req.quantity * benchmark.standardLaborHoursPerUnit;
 
   let heightMult = 1.0;
@@ -53,10 +84,12 @@ export function computeHybridEstimateItem(
   const finalLineTotalCents = laborCostCents + materialCents + consumablesCents;
 
   const skuList = matchedItems.map((m) => m.sku).join(", ");
-  const breakdownSummary = `Layer 1: ${calibratedHours} hrs (${benchmark.csiCode} benchmark) | Layer 2: $${(
-    (materialCents + consumablesCents) /
-    100
-  ).toFixed(2)} materials (${skuList || "catalog"}) | Layer 3: ${(tradeMult * 100).toFixed(0)}% historical actuals factor`;
+  const breakdownSummary =
+    (layer1Unmatched ? "⚠ UNMATCHED — no catalog benchmark found, generic estimate, verify manually | " : "") +
+    `Layer 1: ${calibratedHours} hrs (${benchmark.csiCode} benchmark) | Layer 2: $${(
+      (materialCents + consumablesCents) /
+      100
+    ).toFixed(2)} materials (${skuList || "catalog"}) | Layer 3: ${(tradeMult * 100).toFixed(0)}% historical actuals factor`;
 
   return {
     description: benchmark.description,
@@ -70,6 +103,7 @@ export function computeHybridEstimateItem(
     layer3LocalCalibrationFactor: tradeMult,
     finalLineTotalCents,
     breakdownSummary,
+    ...(layer1Unmatched ? { layer1Unmatched: true } : {}),
   };
 }
 
@@ -100,7 +134,7 @@ export function compute3LayerHybridEstimate(
     totalLaborCostCents,
     totalMaterialCostCents,
     totalConsumablesCostCents,
-    localCalibrationMultiplier: calibration.tradeCalibrationMultipliers.carpentry ?? 1.02,
+    localCalibrationMultiplier: calibration.tradeCalibrationMultipliers.carpentry ?? 1.00,
     subtotalCents,
     grandTotalCents,
     transparencyNotes,

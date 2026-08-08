@@ -224,6 +224,46 @@ Acceptance Criteria:
 - [ ] Estimate engine computes combined quote with trade labor hours, live/catalog material prices, and local actuals adjustment factor.
 - [ ] Unit tests verify 3-layer pricing calculations.
 
+# TASK-099: Reconcile Materials Delta Capture (TASK-094) with Estimate Benchmark Calibration (TASK-098)
+
+Status:
+Proposed
+
+Phase:
+3
+
+Problem:
+TASK-094 (materials trust calibration) and TASK-098 (3-layer hybrid estimating
+engine, Layer 3) are independently building toward the same goal — calibrating
+future estimates against real outcomes — with no connection between them.
+TASK-094 captures AI-proposed-vs-founder-edited deltas at estimate time;
+TASK-098's benchmark script compares estimate-vs-actual at job completion.
+Left unreconciled, this risks two parallel, drifting "trust the numbers"
+mechanisms instead of one coherent calibration source of truth.
+
+Business Value:
+A single calibration system is more trustworthy and maintainable than two
+independent ones computing related but different signals.
+
+Scope:
+- Once both have accumulated meaningful data, evaluate whether TASK-094's
+  delta signal and TASK-098's benchmark output should feed one shared
+  calibration model, or remain deliberately separate (pre-job judgment vs.
+  post-job outcome are genuinely different signals — may be correct to keep
+  distinct).
+
+Out of Scope:
+- Any implementation now — both sources are still evidence-gathering stage
+  (TASK-094 has zero real data yet; TASK-098's benchmark run found N=1 clean
+  sample). Premature to reconcile before either has enough data to reconcile.
+
+Acceptance Criteria:
+- [ ] Revisit once TASK-094 or TASK-098 has enough real data to make the
+  reconciliation question concrete rather than speculative.
+
+Notes:
+Surfaced during CEO review of PR #589 (hybrid estimating engine).
+
 ## Completed
 
 - [TASK-018: Assessment Summary Engine](../archive/backlog-done/TASK-018-assessment-summary-engine.md) — Done (Wave 3 2026-08-05)
