@@ -125,6 +125,45 @@ describe("POST /api/v1/materials", () => {
     expect(insertCall[1][insertCall[1].length - 1]).toBe(false);
   });
 
+  it("an AI-guessed save on an EXISTING item does not overwrite the real last-paid price (unit_cost_cents)", async () => {
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // set_config
+      .mockResolvedValueOnce({
+        // Real last-paid price was 1200; the AI guessed 1500 on this save.
+        // unit_cost_cents ("last paid", migration 162) must be preserved at
+        // 1200, not overwritten with the AI's guess.
+        rows: [
+          {
+            id: "m2",
+            name: "Deck Screws",
+            unit_cost_cents: 1200,
+            avg_paid_cents: 1200,
+            purchase_count: 1,
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await POST(
+      makeRequest({
+        name: "Deck Screws",
+        unit: "box",
+        unit_cost_cents: 1500,
+        is_ai_estimate: true,
+      })
+    );
+
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data[0].unit_cost_cents).toBe(1200);
+    expect(json.data[0].avg_paid_cents).toBe(1200);
+    expect(json.data[0].purchase_count).toBe(1);
+
+    const insertCall = mockClientQuery.mock.calls[2];
+    expect(insertCall[0]).toMatch(/WHEN \$12 THEN materials_price_book\.unit_cost_cents/);
+  });
+
   it("second real purchase of the same item updates the rolling average", async () => {
     mockClientQuery
       .mockResolvedValueOnce({ rows: [] }) // BEGIN

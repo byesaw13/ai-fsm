@@ -119,7 +119,13 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
                  CASE WHEN $12 THEN NULL ELSE $6 END,
                  CASE WHEN $12 THEN 0 ELSE 1 END)
          ON CONFLICT (account_id, lower(name), unit) DO UPDATE SET
-           unit_cost_cents   = EXCLUDED.unit_cost_cents,
+           -- unit_cost_cents is "last paid" (migration 162) and rendered as
+           -- such in MaterialsCatalogClient — an AI guess must not silently
+           -- overwrite a genuine last-paid price on conflict.
+           unit_cost_cents   = CASE
+             WHEN $12 THEN materials_price_book.unit_cost_cents
+             ELSE EXCLUDED.unit_cost_cents
+           END,
            brand             = COALESCE(EXCLUDED.brand, materials_price_book.brand),
            supplier          = COALESCE(EXCLUDED.supplier, materials_price_book.supplier),
            sku               = COALESCE(EXCLUDED.sku, materials_price_book.sku),
