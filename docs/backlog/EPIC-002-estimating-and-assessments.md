@@ -200,7 +200,7 @@ Acceptance Criteria:
 # TASK-098: 3-Layer Hybrid Estimating Engine (Standard Benchmarks + Distributor Catalogs + Local Actuals Calibration)
 
 Status:
-In Progress
+Scaffolded, not wired
 
 Phase:
 3
@@ -211,6 +211,8 @@ Single-source estimating fails because generic AI lacks trade labor standards, s
 Business Value:
 Creates a unified 3-layer pricing model: Layer 1 (CSI/RSMeans labor-hour standards), Layer 2 (Home Depot / Lowe's / distributor material catalogs & fastener kits), Layer 3 (Dovetails local historical actuals & Bayesian calibration).
 
+**Status note (CEO review, PR #589):** the domain module (`packages/domain/src/hybrid-pricing/`) is built, tested (7 unit tests), and exported — but verified via `grep` that nothing in `apps/web` or `services/` calls it. It delivers zero user-facing value today. Two known bugs must be fixed before this is safe to wire in (see Acceptance Criteria) — do not call this from the app until both are resolved.
+
 Scope:
 - Create domain module `packages/domain/src/hybrid-pricing/` implementing Layer 1 (RSMeans-style trade labor standards), Layer 2 (Distributor catalog mapping & hardware kits), and Layer 3 (Historical actuals calibration blending).
 - Update price book entries and AI estimate generator to combine all three layers seamlessly.
@@ -220,7 +222,10 @@ Out of Scope:
 - Scraping restricted paid APIs without consent.
 
 Acceptance Criteria:
-- [ ] `packages/domain/src/hybrid-pricing/` created with Layer 1, Layer 2, and Layer 3 engines.
+- [x] `packages/domain/src/hybrid-pricing/` created with Layer 1, Layer 2, and Layer 3 engines.
+- [ ] **Blocking:** fix `findLayer1Benchmark`'s same-trade wrong-match risk — `query.includes(b.tradeCategory)` matches the FIRST catalog entry for that trade on any query containing the trade name, even when it's the wrong item (verified: "electrical panel upgrade" silently matches the chandelier-hang benchmark, no `layer1Unmatched` flag, confident-looking wrong output). The zero-match case is already fixed (throws `UnmatchedBenchmarkError`); this is the milder same-trade sibling of that bug, still live.
+- [ ] **Blocking:** Layer 2 (`getLayer2MaterialCost`) only meaningfully covers PVC trim and chandelier fixtures — plumbing, painting, and drywall (all present in Layer 1) fall through to a generic $3.50/unit + $15 placeholder with no warning surfaced to the user, unlike `layer1Unmatched`.
+- [ ] **Blocking:** wire an actual call site in `apps/web` (currently none) before marking this "In Progress" again.
 - [ ] Estimate engine computes combined quote with trade labor hours, live/catalog material prices, and local actuals adjustment factor.
 - [ ] Unit tests verify 3-layer pricing calculations.
 
@@ -263,6 +268,48 @@ Acceptance Criteria:
 
 Notes:
 Surfaced during CEO review of PR #589 (hybrid estimating engine).
+
+# TASK-100: Fix T&M vs Fixed-Rate Comparison Card (Hours-Overrun Modeling)
+
+Status:
+Proposed
+
+Phase:
+3
+
+Problem:
+`EstimateSummaryCard.tsx`'s T&M vs. Fixed-Rate comparison (TASK-096) derives
+T&M estimated hours from the same `effectiveHours` value used for the fixed
+quote, so the comparison structurally can never model an hours-overrun
+scenario — the actual reason T&M exists as a pricing option. The
+"Recommendation: Fixed yields $X more" line is close to tautological given
+how it's computed. Separately, the $85/hr burdened rate is hardcoded
+independently in both `EstimateSummaryCard.tsx` and
+`hybrid-pricing/engine.ts` with no shared constant — a landmine if the two
+diverge later.
+
+Business Value:
+A T&M-vs-Fixed comparison that can actually inform the pricing decision,
+instead of one that's rigged toward Fixed by construction.
+
+Scope:
+- Model T&M hours independently of the fixed quote's hour estimate — e.g. a
+  founder-adjustable "expected overrun %" input, or (once TASK-095/098 have
+  real data) a historical variance-based estimate.
+- Extract the burdened labor rate into one shared constant both files import.
+
+Out of Scope:
+- Automated overrun prediction from historical data — depends on TASK-095
+  accumulating enough real samples first.
+
+Acceptance Criteria:
+- [ ] T&M estimated hours can diverge from the fixed quote's hours in the UI.
+- [ ] Burdened rate defined once, imported by both `EstimateSummaryCard.tsx`
+  and `hybrid-pricing/engine.ts`.
+
+Notes:
+Surfaced during CEO review of PR #589. Priority P2 — the card's Fixed-price
+math is currently correct, only the comparison framing is misleading.
 
 ## Completed
 
