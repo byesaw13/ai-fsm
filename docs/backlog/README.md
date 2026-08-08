@@ -95,7 +95,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-094**.
+Next available ID: **TASK-095**.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -201,6 +201,7 @@ truth-pass also archived TASK-023 and TASK-050 (epic already Done, README lagged
 | TASK-090 | Separate estimate vs invoice document terms in Settings | 004 | Done |
 | TASK-091 | Hybrid mileage verification pack (odo + GPS + export) | 001 | Done |
 | TASK-093 | Vehicle & Trailer Cost-of-Ownership | 001 | Done |
+| TASK-094 | Materials Estimate Trust & Calibration (Approach D) | 002 | In Progress |
 
 ## Status legend
 
