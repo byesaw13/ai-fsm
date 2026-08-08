@@ -144,7 +144,7 @@ No implementation found in repo.
 # TASK-096: Financial Truth Card, T&M vs Fixed Comparison & Actionable Advisory Guardrails
 
 Status:
-In Progress
+Done
 
 Phase:
 3
@@ -164,10 +164,38 @@ Out of Scope:
 - Blocking estimate delivery or forcing hard errors.
 
 Acceptance Criteria:
-- [ ] Estimate detail screen displays Internal Financial Truth Card.
-- [ ] Estimate detail screen displays T&M vs. Fixed Rate Comparison Card.
-- [ ] Pricing warnings are non-blocking and include one-tap actionable suggestions to fix profitability or meet minimums.
-- [ ] Tests cover advisory suggestions generation.
+- [x] Estimate detail screen displays Internal Financial Truth Card.
+- [x] Estimate detail screen displays T&M vs. Fixed Rate Comparison Card.
+- [x] Pricing warnings are non-blocking and include one-tap actionable suggestions to fix profitability or meet minimums.
+- [x] Tests cover advisory suggestions generation.
+
+# TASK-097: Trade Construction Knowledge Engine (Building Science & Concealed Condition Intelligence)
+
+Status:
+In Progress
+
+Phase:
+3
+
+Problem:
+Generic AI estimators generate naive scope drafts that miss critical trade execution steps, concealed-condition risks (rot under trim, unbraced electrical boxes), building code requirements (NEC 314.27 chandelier limits), and hidden consumables (OSI Quad caulk, Cortex screws, Z-flashing).
+
+Business Value:
+Embeds deep building science and trade execution rules into the estimate engine so every draft automatically accounts for substrate inspection, prep, weatherproofing, hardware, high-access setup, and change-order disclaimers.
+
+Scope:
+- Create domain module `packages/domain/src/construction-profiles/` defining trade execution steps, concealed risk rules, and required hardware/fasteners.
+- Update AI scope decomposer and materials generator to inject trade construction profiles into AI prompts and tool calls.
+- Append field risk disclaimers and change-order trigger alerts to generated proposals.
+
+Out of Scope:
+- Automated building permit filing.
+
+Acceptance Criteria:
+- [ ] `packages/domain/src/construction-profiles/` contains trade profiles for Carpentry, Painting, Electrical, Plumbing, and Drywall.
+- [ ] AI scope generator includes sub-task checklists, substrate inspection steps, and concealed risk disclaimers.
+- [ ] AI materials generator automatically includes trade fasteners, sealants, and weatherproofing hardware.
+- [ ] Unit tests verify construction profile generation and prompt injection.
 
 ## Completed
 
