@@ -18,7 +18,7 @@ export interface ConcealedRiskRule {
 
 export interface RequiredHardwareRule {
   triggerKeywords: string[];
-  category: "fasteners" | "sealants" | "flashing" | "electrical" | "protection" | "hardware";
+  category: "fasteners" | "sealants" | "flashing" | "electrical" | "protection" | "hardware" | "sheet_goods" | "paint" | "lumber" | "trim" | "flooring" | "other";
   productName: string;
   unit: string;
   reasoning: string;
