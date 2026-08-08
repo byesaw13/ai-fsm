@@ -1,5 +1,6 @@
 import { PREP_LEVEL_MULTIPLIERS, computeRoomMeasurements } from "@ai-fsm/domain";
 import type { RoomSpec, Role } from "@ai-fsm/domain";
+import type { AiMaterialsDeltaItem as AiMaterialsDeltaEntry } from "@/lib/estimates/materials-delta";
 import { formatDollars } from "../format";
 import type { EstimateRow } from "../detail-data";
 
@@ -197,6 +198,33 @@ export function EstimateSummaryCard({ estimate, role, documentFilename }: Props)
                   </div>
                 ))}
               </div>
+            ))}
+          </div>
+        );
+      })()}
+
+      {/* AI materials delta — owner/admin only. Evidence-gathering only
+          (TASK T1): shows what the AI proposed vs. what the founder actually
+          approved, for items that were edited. No outcome capture. */}
+      {isOwnerAdmin && (() => {
+        const root = estimate.shopping_list_json as
+          | { ai_materials_delta?: AiMaterialsDeltaEntry[] }
+          | null
+          | undefined;
+        const delta = Array.isArray(root?.ai_materials_delta) ? root!.ai_materials_delta! : [];
+        const changed = delta.filter(
+          (d) => d.ai_quantity !== d.quantity || d.ai_unit_cost_cents !== d.unit_cost_cents
+        );
+        if (changed.length === 0) return null;
+        return (
+          <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-3)", borderTop: "1px dashed var(--border)" }}>
+            <p style={{ fontWeight: 600, marginBottom: "var(--space-2)", color: "var(--fg-muted)" }}>
+              AI Materials — Founder Edits
+            </p>
+            {changed.map((d, i) => (
+              <p key={i} style={{ fontSize: "var(--text-sm)", color: "var(--fg-secondary)", margin: "2px 0" }}>
+                <strong>{d.name}:</strong> AI proposed {d.ai_quantity} {d.unit} @ {formatDollars(d.ai_unit_cost_cents)} — you changed it to {d.quantity} {d.unit} @ {formatDollars(d.unit_cost_cents)}
+              </p>
             ))}
           </div>
         );

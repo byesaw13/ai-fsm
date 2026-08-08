@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import { Button, Card, Input, SectionHeader, Textarea } from "@/components/ui";
 import { MaterialsGenerator } from "../../components/MaterialsGenerator";
 import type { AssessmentContext } from "@/lib/estimates/assessment-context";
+import { buildAiMaterialsDelta, type AiMaterialsDeltaItem } from "@/lib/estimates/materials-delta";
 import { PriceBookSelector } from "@/components/PriceBookSelector";
 import { ScopeBuilder } from "@/components/ScopeBuilder";
 import { getMaterialsByCategory, type MaterialSuggestion } from "@ai-fsm/domain";
@@ -104,6 +105,7 @@ interface Step2Props {
   addBulkLineItems: (items: LineItemRow[]) => void;
   removeLineItem: (index: number) => void;
   updateLineItem: (index: number, field: keyof LineItemRow, value: string) => void;
+  setAiMaterialsDelta: Dispatch<SetStateAction<AiMaterialsDeltaItem[]>>;
   // Totals
   scopeMaterialsTotalCents: number;
   materialHandlingCents: number;
@@ -139,6 +141,7 @@ export function Step2Pricing({
   handleAddSuggestion, handleSkipSuggestion,
   resolvedJobType, addedMaterials, handleAddMaterial,
   lineItems, addLineItem, addBulkLineItems, removeLineItem, updateLineItem,
+  setAiMaterialsDelta,
   scopeMaterialsTotalCents, materialHandlingCents,
   genericSubtotalCents, guardrailAdjustmentCents, genericTaxCents, genericTotalCents,
   depositCents, balanceDueCents,
@@ -771,13 +774,29 @@ export function Step2Pricing({
                       initialScope={assessmentContext?.generatedJobDescription ?? ""}
                       rooms={assessmentContext?.rooms ?? []}
                       onAddToEstimate={(matItems) => {
+                        // One stable key per item, shared between the
+                        // flattened LineItemRow and its delta entry, so a
+                        // later edit/removal of the line item (via
+                        // LineItemsTable, a completely separate state array)
+                        // can be reconciled against the delta at submit time.
+                        const keys = matItems.map(() => crypto.randomUUID());
                         addBulkLineItems(
-                          matItems.map((m) => ({
+                          matItems.map((m, i) => ({
                             description: `${m.name}${m.brand ? ` (${m.brand})` : ""} — ${m.quantity} ${m.unit}`,
                             quantity: "1",
                             unit_price: (m.total_cost_cents / 100).toFixed(2),
+                            ai_delta_key: m.ai_quantity !== undefined ? keys[i] : undefined,
                           }))
                         );
+                        // Capture the AI-proposed vs. founder-edited delta for
+                        // items that came from the generator (have an AI
+                        // snapshot) — manually-added price-book items are not
+                        // in scope. Accumulate so an earlier "Add to
+                        // Estimate" batch in this session isn't dropped.
+                        const delta = buildAiMaterialsDelta(matItems, keys);
+                        if (delta.length > 0) {
+                          setAiMaterialsDelta((prev) => [...prev, ...delta]);
+                        }
                         setShowMaterialsGen(false);
                       }}
                       onClose={() => setShowMaterialsGen(false)}

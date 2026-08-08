@@ -53,6 +53,14 @@ export interface MaterialItem {
   confidence: "calculated" | "estimated";
   notes: string;              // e.g. "15% waste for end cuts"
   price_book_id: string | null; // non-null if matched from user's saved prices
+  /**
+   * Immutable AI-proposed snapshot, attached client-side (MaterialsGenerator.tsx)
+   * once the response is received — never set by this generator itself.
+   * Kept here only for type parity with the duplicated client-side MaterialItem
+   * (TASK T1, materials trust calibration).
+   */
+  ai_quantity?: number;
+  ai_unit_cost_cents?: number;
 }
 
 export interface MaterialsResult {

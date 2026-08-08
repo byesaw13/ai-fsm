@@ -86,6 +86,45 @@ describe("mapShoppingListJsonToLines", () => {
       sku: "WR-1",
     });
   });
+
+  // TASK T1 (materials trust calibration): ai_materials_delta is a new
+  // top-level key added to shopping_list_json alongside `sections`, used to
+  // persist the AI-proposed vs. founder-edited materials delta. This mapper
+  // must ignore it — it only ever reads root.sections — so the job-buy-list
+  // seeding consumer of this column can't be silently corrupted by it.
+  it("ignores a sibling ai_materials_delta key — buy-list output is unaffected", () => {
+    const base = {
+      sections: [
+        {
+          section: "Plumbing",
+          computed_items: [
+            {
+              quantity: 2,
+              material: { id: "mat-1", material_name: "Shutoff Valve", unit: "ea" },
+            },
+          ],
+          specified_items: [],
+        },
+      ],
+    };
+    const withoutDelta = mapShoppingListJsonToLines(base);
+    const withDelta = mapShoppingListJsonToLines({
+      ...base,
+      ai_materials_delta: [
+        {
+          name: "5/4x6x12 PT decking",
+          category: "lumber",
+          unit: "board",
+          ai_quantity: 8,
+          quantity: 10,
+          ai_unit_cost_cents: 1500,
+          unit_cost_cents: 1300,
+        },
+      ],
+    });
+    expect(withDelta).toEqual(withoutDelta);
+    expect(withDelta.some((l) => l.name.includes("decking"))).toBe(false);
+  });
 });
 
 describe("mapRecomputedSectionsToLines", () => {
@@ -109,6 +148,24 @@ describe("mapRecomputedSectionsToLines", () => {
     expect(lines).toHaveLength(1);
     expect(lines[0].name).toBe("Primer");
     expect(lines[0].quantity).toBe(3);
+  });
+
+  // mapRecomputedSectionsToLines takes a typed `sections` array directly
+  // (never the wrapping shopping_list_json object), so an ai_materials_delta
+  // key can't reach it structurally — this pins that invariant regardless.
+  it("ignores an ai_materials_delta property tacked onto the sections array", () => {
+    const sections = [
+      {
+        section: "Paint & Supplies",
+        items: [
+          { quantity: 1, material: { id: "p1", material_name: "Primer", unit: "gal" } },
+        ],
+      },
+    ];
+    (sections as unknown as Record<string, unknown>).ai_materials_delta = [{ name: "should not appear" }];
+    const lines = mapRecomputedSectionsToLines(sections);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].name).toBe("Primer");
   });
 });
 

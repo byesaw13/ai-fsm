@@ -94,6 +94,7 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
     handleSkipSuggestion,
     handleModeChange,
     addLineItem, addBulkLineItems, removeLineItem, updateLineItem,
+    setAiMaterialsDelta,
     updateTier, addTierLineItem, removeTierLineItem, updateTierLineItem,
     tierSubtotalCents,
     handleAddMaterial,
@@ -235,6 +236,7 @@ export function NewEstimateForm(props: NewEstimateFormProps) {
           addBulkLineItems={addBulkLineItems}
           removeLineItem={removeLineItem}
           updateLineItem={updateLineItem}
+          setAiMaterialsDelta={setAiMaterialsDelta}
           scopeMaterialsTotalCents={scopeMaterialsTotalCents}
           materialHandlingCents={materialHandlingCents}
           genericSubtotalCents={genericSubtotalCents}
