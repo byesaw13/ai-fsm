@@ -24,6 +24,7 @@ export * from "./operational-visibility";
 export * from "./scope";
 export * from "./assessment-summary";
 export * from "./construction-profiles";
+export * from "./hybrid-pricing";
 export * from "./work-order";
 export * from "./completion-criteria";
 export * from "./work-order-lifecycle";

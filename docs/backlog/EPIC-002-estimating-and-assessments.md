@@ -172,7 +172,7 @@ Acceptance Criteria:
 # TASK-097: Trade Construction Knowledge Engine (Building Science & Concealed Condition Intelligence)
 
 Status:
-In Progress
+Done
 
 Phase:
 3
@@ -192,10 +192,37 @@ Out of Scope:
 - Automated building permit filing.
 
 Acceptance Criteria:
-- [ ] `packages/domain/src/construction-profiles/` contains trade profiles for Carpentry, Painting, Electrical, Plumbing, and Drywall.
-- [ ] AI scope generator includes sub-task checklists, substrate inspection steps, and concealed risk disclaimers.
-- [ ] AI materials generator automatically includes trade fasteners, sealants, and weatherproofing hardware.
-- [ ] Unit tests verify construction profile generation and prompt injection.
+- [x] `packages/domain/src/construction-profiles/` contains trade profiles for Carpentry, Painting, Electrical, Plumbing, and Drywall.
+- [x] AI scope generator includes sub-task checklists, substrate inspection steps, and concealed risk disclaimers.
+- [x] AI materials generator automatically includes trade fasteners, sealants, and weatherproofing hardware.
+- [x] Unit tests verify construction profile generation and prompt injection.
+
+# TASK-098: 3-Layer Hybrid Estimating Engine (Standard Benchmarks + Distributor Catalogs + Local Actuals Calibration)
+
+Status:
+In Progress
+
+Phase:
+3
+
+Problem:
+Single-source estimating fails because generic AI lacks trade labor standards, supplier catalog pricing is disconnected from scope drafts, and national benchmark averages don't reflect Dovetails' actual past job performance.
+
+Business Value:
+Creates a unified 3-layer pricing model: Layer 1 (CSI/RSMeans labor-hour standards), Layer 2 (Home Depot / Lowe's / distributor material catalogs & fastener kits), Layer 3 (Dovetails local historical actuals & Bayesian calibration).
+
+Scope:
+- Create domain module `packages/domain/src/hybrid-pricing/` implementing Layer 1 (RSMeans-style trade labor standards), Layer 2 (Distributor catalog mapping & hardware kits), and Layer 3 (Historical actuals calibration blending).
+- Update price book entries and AI estimate generator to combine all three layers seamlessly.
+- Expose 3-Layer pricing breakdown on the estimate creation/edit UI.
+
+Out of Scope:
+- Scraping restricted paid APIs without consent.
+
+Acceptance Criteria:
+- [ ] `packages/domain/src/hybrid-pricing/` created with Layer 1, Layer 2, and Layer 3 engines.
+- [ ] Estimate engine computes combined quote with trade labor hours, live/catalog material prices, and local actuals adjustment factor.
+- [ ] Unit tests verify 3-layer pricing calculations.
 
 ## Completed
 
