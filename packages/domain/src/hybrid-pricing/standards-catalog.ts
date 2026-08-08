@@ -69,12 +69,13 @@ export const LAYER1_STANDARDS_CATALOG: Layer1StandardBenchmark[] = [
   },
 ];
 
-export function findLayer1Benchmark(codeOrKeyword: string): Layer1StandardBenchmark | undefined {
+export function findLayer1Benchmark(codeOrKeyword: string): Layer1StandardBenchmark {
   const query = codeOrKeyword.toLowerCase();
-  return LAYER1_STANDARDS_CATALOG.find(
+  const match = LAYER1_STANDARDS_CATALOG.find(
     (b) =>
       b.itemCode.toLowerCase() === query ||
       b.description.toLowerCase().includes(query) ||
       query.includes(b.tradeCategory)
-  ) ?? LAYER1_STANDARDS_CATALOG[0];
+  );
+  return match ?? LAYER1_STANDARDS_CATALOG[0]!;
 }
