@@ -1,4 +1,4 @@
-import { PREP_LEVEL_MULTIPLIERS, computeRoomMeasurements } from "@ai-fsm/domain";
+import { PREP_LEVEL_MULTIPLIERS, calculateFinancialComparison, computeRoomMeasurements } from "@ai-fsm/domain";
 import type { RoomSpec, Role } from "@ai-fsm/domain";
 import type { AiMaterialsDeltaItem as AiMaterialsDeltaEntry } from "@/lib/estimates/materials-delta";
 import { formatDollars } from "../format";
@@ -8,6 +8,8 @@ interface Props {
   estimate: EstimateRow;
   role: Role;
   documentFilename: string;
+  laborCostRateCents: number;
+  laborBillingRateCents: number;
 }
 
 /**
@@ -15,27 +17,20 @@ interface Props {
  * scope, room-by-room breakdown, internal margin, internal notes, materials
  * plan, and pricing guardrails. Owner/admin-only blocks are gated by role.
  */
-export function EstimateSummaryCard({ estimate, role, documentFilename }: Props) {
+export function EstimateSummaryCard({ estimate, role, documentFilename, laborCostRateCents, laborBillingRateCents }: Props) {
   const isOwnerAdmin = role === "owner" || role === "admin";
 
-  // Financial calculations
+  const totalQuoteCents = estimate.total_cents;
+  const financials = calculateFinancialComparison({
+    laborCostCents: estimate.internal_labor_cost_cents,
+    materialCostCents: estimate.internal_material_cost_cents,
+    totalQuoteCents: estimate.total_cents,
+    laborCostRateCents,
+    laborBillingRateCents,
+  });
+  const { materialHandlingCents = 0, totalDirectCostCents = 0, grossProfitCents = 0, grossMarginPct = 0, effectiveHours = 0, tmEstimatedLaborHrs = 0, tmTotalQuoteCents = 0, tmGrossProfitCents = 0, tmGrossMarginPct = 0 } = financials ?? {};
   const laborCostCents = estimate.internal_labor_cost_cents ?? 0;
   const materialCostCents = estimate.internal_material_cost_cents ?? 0;
-  const materialHandlingCents = Math.round(materialCostCents * 0.15);
-  const totalDirectCostCents = laborCostCents + materialCostCents;
-
-  const totalQuoteCents = estimate.total_cents;
-  const grossProfitCents = totalQuoteCents - totalDirectCostCents;
-  const grossMarginPct = totalQuoteCents > 0 ? Math.round((grossProfitCents / totalQuoteCents) * 100 * 10) / 10 : 0;
-  const effectiveHours = laborCostCents > 0 ? Math.round((laborCostCents / 8500) * 10) / 10 : 0;
-
-  // T&M Comparison derived values
-  const tmEstimatedLaborHrs = effectiveHours > 0 ? effectiveHours : 3.0;
-  const tmLaborRevenueCents = Math.round(tmEstimatedLaborHrs * 11500);
-  const tmMaterialRevenueCents = materialCostCents + materialHandlingCents;
-  const tmTotalQuoteCents = tmLaborRevenueCents + tmMaterialRevenueCents;
-  const tmGrossProfitCents = tmTotalQuoteCents - totalDirectCostCents;
-  const tmGrossMarginPct = tmTotalQuoteCents > 0 ? Math.round((tmGrossProfitCents / tmTotalQuoteCents) * 100 * 10) / 10 : 0;
 
   return (
     <div className="card detail-card">
@@ -65,8 +60,15 @@ export function EstimateSummaryCard({ estimate, role, documentFilename }: Props)
         </p>
       )}
 
+      {isOwnerAdmin && !financials && (
+        <div style={{ marginTop: "var(--space-3)", padding: "var(--space-3)", borderRadius: 8, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+          <strong>Financial truth unavailable</strong>
+          <p style={{ margin: "var(--space-1) 0 0", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>Labor and material cost bases are required before profit or T&amp;M comparisons can be calculated.</p>
+        </div>
+      )}
+
       {/* OWNER/ADMIN FINANCIAL TRUTH CARD */}
-      {isOwnerAdmin && (
+      {isOwnerAdmin && financials && (
         <div style={{ marginTop: "var(--space-3)", padding: "var(--space-3)", borderRadius: 8, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
             <span style={{ fontWeight: 700, fontSize: "var(--text-xs)", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--accent)" }}>
@@ -81,7 +83,7 @@ export function EstimateSummaryCard({ estimate, role, documentFilename }: Props)
             <div>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Direct Labor Cost</span>
               <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)" }}>{formatDollars(laborCostCents)}</p>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{effectiveHours} hrs @ $85/hr</span>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{effectiveHours} hrs @ {formatDollars(laborCostRateCents)}/hr</span>
             </div>
             <div>
               <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Material Cost Basis</span>
@@ -105,7 +107,7 @@ export function EstimateSummaryCard({ estimate, role, documentFilename }: Props)
       )}
 
       {/* SIDE-BY-SIDE PRICING MODE COMPARISON (FIXED vs T&M) */}
-      {isOwnerAdmin && (
+      {isOwnerAdmin && financials && (
         <div style={{ marginTop: "var(--space-3)", padding: "var(--space-3)", borderRadius: 8, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
           <p style={{ fontWeight: 700, fontSize: "var(--text-xs)", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--fg-muted)", margin: "0 0 var(--space-2)" }}>
             ⚖️ Pricing Strategy Comparison: Fixed Rate vs. T&amp;M

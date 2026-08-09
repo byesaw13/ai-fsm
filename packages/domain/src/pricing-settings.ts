@@ -66,3 +66,23 @@ export function buildPricingRules(
     marginFloor: settings.margin_floor_pct,
   };
 }
+
+export function calculateFinancialComparison(opts: {
+  laborCostCents: number | null;
+  materialCostCents: number | null;
+  totalQuoteCents: number;
+  laborCostRateCents: number;
+  laborBillingRateCents: number;
+}) {
+  if (opts.laborCostCents === null || opts.materialCostCents === null) return null;
+  const materialHandlingCents = Math.round(opts.materialCostCents * 0.15);
+  const totalDirectCostCents = opts.laborCostCents + opts.materialCostCents;
+  const grossProfitCents = opts.totalQuoteCents - totalDirectCostCents;
+  const grossMarginPct = opts.totalQuoteCents > 0 ? Math.round((grossProfitCents / opts.totalQuoteCents) * 1000) / 10 : 0;
+  const effectiveHours = opts.laborCostRateCents > 0 ? Math.round((opts.laborCostCents / opts.laborCostRateCents) * 10) / 10 : 0;
+  const tmEstimatedLaborHrs = effectiveHours > 0 ? effectiveHours : 3;
+  const tmTotalQuoteCents = Math.round(tmEstimatedLaborHrs * opts.laborBillingRateCents) + opts.materialCostCents + materialHandlingCents;
+  const tmGrossProfitCents = tmTotalQuoteCents - totalDirectCostCents;
+  const tmGrossMarginPct = tmTotalQuoteCents > 0 ? Math.round((tmGrossProfitCents / tmTotalQuoteCents) * 1000) / 10 : 0;
+  return { materialHandlingCents, totalDirectCostCents, grossProfitCents, grossMarginPct, effectiveHours, tmEstimatedLaborHrs, tmTotalQuoteCents, tmGrossProfitCents, tmGrossMarginPct };
+}

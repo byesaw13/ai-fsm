@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth/session";
 import { canCreateEstimates, canDeleteRecords, canLinkDocuments } from "@/lib/auth/permissions";
 import { DocumentClientLocationCard } from "@/components/documents/DocumentClientLocationCard";
 import { resolveServiceLocation, formatAddressLine } from "@/lib/documents/service-location";
-import type { EstimateStatus, RoomSpec } from "@ai-fsm/domain";
+import { billingRateCentsForState, type EstimateStatus, type RoomSpec } from "@ai-fsm/domain";
 import { manualEstimateTransitions } from "@/lib/estimates/transitions";
 import { EstimateTransitionForm } from "./EstimateTransitionForm";
 import { EstimateInternalNotesForm } from "./EstimateInternalNotesForm";
@@ -53,6 +53,7 @@ export default async function EstimateDetailPage({
     finalInvoice,
     changeOrders,
     location,
+    pricingSettings,
   } = detail;
 
   const serviceLocation = resolveServiceLocation(location ?? {});
@@ -202,6 +203,11 @@ export default async function EstimateDetailPage({
         estimate={estimate}
         role={session.role}
         documentFilename={documentFilename}
+        laborCostRateCents={pricingSettings.labor_cost_cents_per_hour}
+        laborBillingRateCents={billingRateCentsForState(
+          pricingSettings,
+          location?.property_state ?? location?.client_state,
+        )}
       />
 
       <EstimateLineItems

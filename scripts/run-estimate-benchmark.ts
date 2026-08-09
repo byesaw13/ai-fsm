@@ -92,7 +92,11 @@ async function runBenchmark() {
       ) inv ON inv.job_id = j.id
       LEFT JOIN (
         SELECT 
-          COALESCE(ae.entity_id, v.job_id, wt.job_id) as resolved_job_id,
+          CASE ae.entity_type
+            WHEN 'job' THEN ae.entity_id
+            WHEN 'visit' THEN v.job_id
+            WHEN 'work_order' THEN wt.job_id
+          END as resolved_job_id,
           SUM(
             CASE 
               WHEN ae.ended_at IS NOT NULL AND ae.started_at IS NOT NULL 
@@ -103,15 +107,24 @@ async function runBenchmark() {
         FROM activity_entries ae
         LEFT JOIN visits v ON ae.entity_type = 'visit' AND ae.entity_id = v.id
         LEFT JOIN work_orders wt ON ae.entity_type = 'work_order' AND ae.entity_id = wt.id
-        WHERE ae.voided_at IS NULL
-        GROUP BY COALESCE(ae.entity_id, v.job_id, wt.job_id)
+        WHERE ae.activity_type = 'job_work'
+          AND ae.voided_at IS NULL
+          AND ae.started_at IS NOT NULL
+          AND ae.ended_at IS NOT NULL
+          AND (ae.labor_bucket IS NULL OR ae.labor_bucket = 'billable')
+          AND (ae.entity_type != 'visit' OR v.visit_type IS DISTINCT FROM 'site_visit')
+        GROUP BY CASE ae.entity_type
+          WHEN 'job' THEN ae.entity_id
+          WHEN 'visit' THEN v.job_id
+          WHEN 'work_order' THEN wt.job_id
+        END
       ) act ON act.resolved_job_id = j.id
       LEFT JOIN (
         SELECT 
           job_id, 
           SUM(amount_cents) as total_mat_cost_cents
         FROM expenses
-        WHERE category IN ('materials', 'supplies', 'parts') OR job_id IS NOT NULL
+        WHERE category IN ('materials', 'supplies', 'parts')
         GROUP BY job_id
       ) mat ON mat.job_id = j.id
       WHERE j.status IN ('invoiced', 'completed', 'in_progress', 'scheduled', 'quoted')
@@ -139,7 +152,7 @@ async function runBenchmark() {
     console.log(`✓ Fetched ${rows.length} benchmark jobs from database.\n`);
 
     const metrics: BenchmarkMetrics[] = rows.map((r) => {
-      const estimatedTotal = r.estimated_total_cents > 0 ? r.estimated_total_cents : r.invoiced_total_cents;
+      const estimatedTotal = r.estimated_total_cents;
       const invoicedTotal = r.invoiced_total_cents;
 
       const laborRatio =
@@ -153,7 +166,9 @@ async function runBenchmark() {
 
       const totalVariance = invoicedTotal - estimatedTotal;
       const signedErr =
-        invoicedTotal > 0 ? ((estimatedTotal - invoicedTotal) / invoicedTotal) * 100.0 : null;
+        estimatedTotal > 0 && invoicedTotal > 0
+          ? ((estimatedTotal - invoicedTotal) / invoicedTotal) * 100.0
+          : null;
       const absErr = signedErr !== null ? Math.abs(signedErr) : null;
 
       return {
