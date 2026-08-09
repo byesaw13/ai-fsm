@@ -17,6 +17,9 @@ export interface BuyListLineInput {
   sku: string | null;
   notes: string | null;
   sort_order: number;
+  supplier?: string | null;
+  aisle?: string | null;
+  bay?: string | null;
 }
 
 export interface StoreRunLine {

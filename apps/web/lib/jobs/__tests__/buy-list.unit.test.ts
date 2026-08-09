@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildStoreRunStops,
   filterStoreRunLines,
@@ -9,8 +9,23 @@ import {
   mergeMissingLines,
   normalizeQuantity,
   summarizeStoreRun,
+  type BuyListLineInput,
   type StoreRunLine,
 } from "../buy-list";
+import { hydrateBuyListLocations } from "../buy-list-seed";
+
+const baseBuyListLine: BuyListLineInput = {
+  name: "Deck screws",
+  quantity: 1,
+  unit_label: "box",
+  store_section: "Fasteners",
+  status: "needed",
+  source: "estimate",
+  catalog_material_id: null,
+  sku: null,
+  notes: null,
+  sort_order: 0,
+};
 
 const line = (overrides: Partial<StoreRunLine>): StoreRunLine => ({
   id: crypto.randomUUID(),
@@ -25,6 +40,34 @@ const line = (overrides: Partial<StoreRunLine>): StoreRunLine => ({
   catalog_material_id: null,
   unit_cost_cents: null,
   ...overrides,
+});
+
+describe("hydrateBuyListLocations", () => {
+  it("copies saved catalog purchasing data without inventing free-text locations", async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [{
+        id: "catalog-1",
+        supplier: "Home Depot",
+        aisle: "12",
+        bay: "4",
+      }],
+    });
+    const lines: BuyListLineInput[] = [
+      { ...baseBuyListLine, name: "Screws", catalog_material_id: "catalog-1" },
+      { ...baseBuyListLine, name: "Custom trim", catalog_material_id: null },
+    ];
+
+    await expect(
+      hydrateBuyListLocations({ query } as never, "account-1", lines),
+    ).resolves.toMatchObject([
+      { supplier: "Home Depot", aisle: "12", bay: "4" },
+      { supplier: null, aisle: null, bay: null },
+    ]);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("account_id = $1"),
+      ["account-1", ["catalog-1"]],
+    );
+  });
 });
 
 describe("matchKey", () => {

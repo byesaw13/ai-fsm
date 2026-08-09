@@ -142,6 +142,43 @@ export async function buildSeedLinesFromEstimate(
   return recomputeShoppingLines(client, estimate.id);
 }
 
+export async function hydrateBuyListLocations(
+  client: PoolClient,
+  accountId: string,
+  lines: BuyListLineInput[],
+): Promise<BuyListLineInput[]> {
+  const ids = [...new Set(
+    lines.flatMap((line) => line.catalog_material_id ? [line.catalog_material_id] : []),
+  )];
+  if (ids.length === 0) {
+    return lines.map((line) => ({ ...line, supplier: null, aisle: null, bay: null }));
+  }
+
+  const result = await client.query<{
+    id: string;
+    supplier: string | null;
+    aisle: string | null;
+    bay: string | null;
+  }>(
+    `SELECT id, supplier, aisle, bay
+     FROM materials_price_book
+     WHERE account_id = $1 AND id = ANY($2::uuid[])`,
+    [accountId, ids],
+  );
+  const locations = new Map(result.rows.map((row) => [row.id, row]));
+  return lines.map((line) => {
+    const location = line.catalog_material_id
+      ? locations.get(line.catalog_material_id)
+      : undefined;
+    return {
+      ...line,
+      supplier: location?.supplier ?? null,
+      aisle: location?.aisle ?? null,
+      bay: location?.bay ?? null,
+    };
+  });
+}
+
 export async function insertBuyListLines(
   client: PoolClient,
   accountId: string,
@@ -153,8 +190,9 @@ export async function insertBuyListLines(
     await client.query(
       `INSERT INTO job_material_lines
          (account_id, job_id, name, quantity, unit_label, store_section,
-          status, source, catalog_material_id, sku, notes, sort_order)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          status, source, catalog_material_id, sku, notes, sort_order,
+          supplier, aisle, bay)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
       [
         accountId,
         jobId,
@@ -168,6 +206,9 @@ export async function insertBuyListLines(
         line.sku,
         line.notes,
         line.sort_order,
+        line.supplier ?? null,
+        line.aisle ?? null,
+        line.bay ?? null,
       ],
     );
     n++;
@@ -227,7 +268,8 @@ export async function seedJobBuyList(
     };
   }
 
-  const candidates = await buildSeedLinesFromEstimate(client, estimate);
+  const candidateLines = await buildSeedLinesFromEstimate(client, estimate);
+  const candidates = await hydrateBuyListLocations(client, opts.accountId, candidateLines);
 
   if (opts.reseed || alreadySeeded) {
     const existing = await client.query<{ name: string; unit_label: string | null }>(
