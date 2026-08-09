@@ -19,6 +19,101 @@ export interface BuyListLineInput {
   sort_order: number;
 }
 
+export interface StoreRunLine {
+  id: string;
+  name: string;
+  quantity: number;
+  unit_label: string | null;
+  store_section: string | null;
+  status: BuyListStatus;
+  supplier: string | null;
+  aisle: string | null;
+  bay: string | null;
+  catalog_material_id: string | null;
+  unit_cost_cents: number | null;
+}
+
+export interface StoreRunStop {
+  key: string;
+  department: string;
+  aisleNumber: number | null;
+  aisleLabel: string | null;
+  lines: StoreRunLine[];
+}
+
+const normalized = (value: string | null | undefined) =>
+  value?.trim().toLowerCase() ?? "";
+
+const leadingAisleNumber = (aisle: string | null): number | null => {
+  const match = aisle?.match(/\d+/);
+  return match ? Number(match[0]) : null;
+};
+
+export function filterStoreRunLines<T extends StoreRunLine>(
+  lines: T[],
+  supplier: string,
+): T[] {
+  const wanted = normalized(supplier);
+  return lines.filter(
+    (item) =>
+      item.status === "needed" &&
+      (!normalized(item.supplier) || normalized(item.supplier) === wanted),
+  );
+}
+
+export function buildStoreRunStops(lines: StoreRunLine[]): StoreRunStop[] {
+  const groups = new Map<string, StoreRunStop>();
+  for (const item of lines) {
+    const aisleNumber = leadingAisleNumber(item.aisle);
+    const hasDepartment = Boolean(item.store_section?.trim());
+    const department = hasDepartment
+      ? item.store_section!.trim()
+      : "Unknown Location";
+    const suffix = aisleNumber !== null
+      ? String(aisleNumber)
+      : hasDepartment && !item.aisle?.trim()
+        ? "department"
+        : "unknown";
+    const key = `${department}::${suffix}`;
+    const stop = groups.get(key) ?? {
+      key,
+      department,
+      aisleNumber,
+      aisleLabel: item.aisle?.trim() || null,
+      lines: [],
+    };
+    stop.lines.push(item);
+    groups.set(key, stop);
+  }
+  return [...groups.values()].sort((a, b) => {
+    const rank = (stop: StoreRunStop) =>
+      stop.aisleNumber !== null ? 0 : stop.key.endsWith("::department") ? 1 : 2;
+    return rank(a) - rank(b) ||
+      (a.aisleNumber ?? 0) - (b.aisleNumber ?? 0) ||
+      a.department.localeCompare(b.department);
+  });
+}
+
+export function summarizeStoreRun(
+  lines: StoreRunLine[],
+  purchasedIds: ReadonlySet<string>,
+) {
+  const purchased = lines.filter((line) => purchasedIds.has(line.id));
+  const complete = purchased.every((line) => line.unit_cost_cents !== null);
+  return {
+    purchasedCount: purchased.length,
+    stillNeededCount: lines.filter(
+      (line) => line.status === "needed" && !purchasedIds.has(line.id),
+    ).length,
+    estimatedPurchasedTotalCents: complete
+      ? purchased.reduce(
+          (sum, line) => sum + Math.round(line.quantity * line.unit_cost_cents!),
+          0,
+        )
+      : null,
+  };
+}
+
 export function matchKey(name: string, unitLabel: string | null | undefined): string {
   const n = name.trim().toLowerCase();
   const u = (unitLabel ?? "").trim().toLowerCase();

@@ -1,12 +1,31 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildStoreRunStops,
+  filterStoreRunLines,
   groupByStoreSection,
   mapRecomputedSectionsToLines,
   mapShoppingListJsonToLines,
   matchKey,
   mergeMissingLines,
   normalizeQuantity,
+  summarizeStoreRun,
+  type StoreRunLine,
 } from "../buy-list";
+
+const line = (overrides: Partial<StoreRunLine>): StoreRunLine => ({
+  id: crypto.randomUUID(),
+  name: "Deck screws",
+  quantity: 1,
+  unit_label: "box",
+  store_section: "Fasteners",
+  status: "needed",
+  supplier: "Home Depot",
+  aisle: null,
+  bay: null,
+  catalog_material_id: null,
+  unit_cost_cents: null,
+  ...overrides,
+});
 
 describe("matchKey", () => {
   it("is case-insensitive on name and unit", () => {
@@ -213,5 +232,53 @@ describe("groupByStoreSection", () => {
     ]);
     expect(groups.find((g) => g.section === "Plumbing")?.lines).toHaveLength(2);
     expect(groups.find((g) => g.section === "Other")?.lines).toHaveLength(1);
+  });
+});
+
+describe("Store Run helpers", () => {
+  it("includes only selected-supplier and unassigned needed lines", () => {
+    const selected = filterStoreRunLines(
+      [
+        line({ id: "hd", supplier: " Home Depot " }),
+        line({ id: "none", supplier: null }),
+        line({ id: "lowes", supplier: "Lowe's" }),
+        line({ id: "truck", supplier: "Home Depot", status: "on_truck" }),
+        line({ id: "done", supplier: "Home Depot", status: "purchased" }),
+      ],
+      "home depot",
+    );
+    expect(selected.map(({ id }) => id)).toEqual(["hd", "none"]);
+  });
+
+  it("orders numeric aisles first, then department-only, then unknown", () => {
+    const stops = buildStoreRunStops([
+      line({ id: "a13", store_section: "Fasteners", aisle: "Aisle 13" }),
+      line({ id: "a4", store_section: "Lumber", aisle: "4", bay: "7" }),
+      line({ id: "paint", store_section: "Paint", aisle: null }),
+      line({ id: "unknown", store_section: null, aisle: "Rear wall" }),
+    ]);
+    expect(stops.map(({ key }) => key)).toEqual([
+      "Lumber::4",
+      "Fasteners::13",
+      "Paint::department",
+      "Unknown Location::unknown",
+    ]);
+    expect(stops[0].lines.map(({ id }) => id)).toEqual(["a4"]);
+  });
+
+  it("returns a total only when every session purchase has a catalog cost", () => {
+    const lines = [
+      line({ id: "known", quantity: 2, unit_cost_cents: 399 }),
+      line({ id: "unknown", quantity: 1.5, unit_cost_cents: null }),
+    ];
+    expect(summarizeStoreRun(lines, new Set(["known"]))).toMatchObject({
+      purchasedCount: 1,
+      stillNeededCount: 1,
+      estimatedPurchasedTotalCents: 798,
+    });
+    expect(
+      summarizeStoreRun(lines, new Set(["known", "unknown"]))
+        .estimatedPurchasedTotalCents,
+    ).toBeNull();
   });
 });
