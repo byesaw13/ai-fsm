@@ -1,4 +1,5 @@
 import type { TradeConstructionProfile } from "./types";
+import { OSI_QUAD_MAX_SEALANT_CENTS, CORTEX_PVC_FASTENER_KIT_CENTS } from "../shared-hardware-prices";
 
 export const CARPENTRY_CONSTRUCTION_PROFILE: TradeConstructionProfile = {
   tradeKey: "carpentry",
@@ -63,7 +64,7 @@ export const CARPENTRY_CONSTRUCTION_PROFILE: TradeConstructionProfile = {
       productName: "OSI Quad Max Exterior Polyurethane Sealant",
       unit: "tube",
       reasoning: "High-flexibility exterior polyurethane caulk required to seal PVC-to-siding and brickmould joints against water intrusion.",
-      estUnitCostCents: 1150,
+      estUnitCostCents: OSI_QUAD_MAX_SEALANT_CENTS,
     },
     {
       triggerKeywords: ["pvc", "vinyl", "azek", "exterior trim", "garage trim"],
@@ -71,7 +72,7 @@ export const CARPENTRY_CONSTRUCTION_PROFILE: TradeConstructionProfile = {
       productName: "Cortex PVC Hidden Fastening Screws + Plugs (100 pack)",
       unit: "box",
       reasoning: "Stainless steel hidden screws with matching PVC plugs to prevent rust bleeding and maintain seamless finish.",
-      estUnitCostCents: 3850,
+      estUnitCostCents: CORTEX_PVC_FASTENER_KIT_CENTS,
     },
     {
       triggerKeywords: ["garage trim", "exterior door trim", "window trim"],

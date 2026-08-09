@@ -172,7 +172,7 @@ Acceptance Criteria:
 # TASK-097: Trade Construction Knowledge Engine (Building Science & Concealed Condition Intelligence)
 
 Status:
-Done
+Done (with a known partial-wiring gap — see status note)
 
 Phase:
 3
@@ -182,6 +182,8 @@ Generic AI estimators generate naive scope drafts that miss critical trade execu
 
 Business Value:
 Embeds deep building science and trade execution rules into the estimate engine so every draft automatically accounts for substrate inspection, prep, weatherproofing, hardware, high-access setup, and change-order disclaimers.
+
+**Status note (Eng review, PR #589, outside-voice pass):** `detectTradeProfiles`/`getConcealedRiskDisclaimers` are genuinely wired into `task-decomposer.ts`. `getRequiredHardwareRules` (the third exported function, built with the same hardware cost/reasoning data) has zero callers anywhere in `apps/web`/`services/`. The 4th AC below ("materials generator includes hardware") is still true in effect, but only because `materials-generator.ts`'s prompt independently hardcodes the same OSI Quad Max / Cortex screw facts as inline text — a duplicate of `carpentry.ts`'s `requiredHardware` data, not a call to it. Same "shipped but unused" pattern as TASK-098, smaller scale.
 
 Scope:
 - Create domain module `packages/domain/src/construction-profiles/` defining trade execution steps, concealed risk rules, and required hardware/fasteners.
@@ -194,8 +196,9 @@ Out of Scope:
 Acceptance Criteria:
 - [x] `packages/domain/src/construction-profiles/` contains trade profiles for Carpentry, Painting, Electrical, Plumbing, and Drywall.
 - [x] AI scope generator includes sub-task checklists, substrate inspection steps, and concealed risk disclaimers.
-- [x] AI materials generator automatically includes trade fasteners, sealants, and weatherproofing hardware.
+- [x] AI materials generator automatically includes trade fasteners, sealants, and weatherproofing hardware (via hardcoded prompt text, not via `getRequiredHardwareRules` — see status note).
 - [x] Unit tests verify construction profile generation and prompt injection.
+- [ ] Wire `getRequiredHardwareRules` into an actual caller (materials generator or task decomposer), replacing the hardcoded duplicate prompt text — or remove the unused function if the hardcoded-prompt approach is preferred.
 
 # TASK-098: 3-Layer Hybrid Estimating Engine (Standard Benchmarks + Distributor Catalogs + Local Actuals Calibration)
 
@@ -211,7 +214,9 @@ Single-source estimating fails because generic AI lacks trade labor standards, s
 Business Value:
 Creates a unified 3-layer pricing model: Layer 1 (CSI/RSMeans labor-hour standards), Layer 2 (Home Depot / Lowe's / distributor material catalogs & fastener kits), Layer 3 (Dovetails local historical actuals & Bayesian calibration).
 
-**Status note (CEO review, PR #589):** the domain module (`packages/domain/src/hybrid-pricing/`) is built, tested (7 unit tests), and exported — but verified via `grep` that nothing in `apps/web` or `services/` calls it. It delivers zero user-facing value today. Two known bugs must be fixed before this is safe to wire in (see Acceptance Criteria) — do not call this from the app until both are resolved.
+**Status note (CEO review, PR #589):** the domain module (`packages/domain/src/hybrid-pricing/`) is built, tested (7 unit tests), and exported — but verified via `grep` that nothing in `apps/web` or `services/` calls it. It delivers zero user-facing value today. Four known bugs must be fixed before this is safe to wire in (see Acceptance Criteria) — do not call this from the app until all are resolved.
+
+**Status note (Eng review, PR #589, outside-voice pass):** the `layer1Unmatched` fix (commit 9b65b47) only annotates the summary text — it does not exclude `GENERIC_UNMATCHED_BENCHMARK`'s fabricated hours from `finalLineTotalCents`/`grandTotalCents`. See new blocking AC below.
 
 Scope:
 - Create domain module `packages/domain/src/hybrid-pricing/` implementing Layer 1 (RSMeans-style trade labor standards), Layer 2 (Distributor catalog mapping & hardware kits), and Layer 3 (Historical actuals calibration blending).
@@ -224,7 +229,8 @@ Out of Scope:
 Acceptance Criteria:
 - [x] `packages/domain/src/hybrid-pricing/` created with Layer 1, Layer 2, and Layer 3 engines.
 - [ ] **Blocking:** fix `findLayer1Benchmark`'s same-trade wrong-match risk — `query.includes(b.tradeCategory)` matches the FIRST catalog entry for that trade on any query containing the trade name, even when it's the wrong item (verified: "electrical panel upgrade" silently matches the chandelier-hang benchmark, no `layer1Unmatched` flag, confident-looking wrong output). The zero-match case is already fixed (throws `UnmatchedBenchmarkError`); this is the milder same-trade sibling of that bug, still live.
-- [ ] **Blocking:** Layer 2 (`getLayer2MaterialCost`) only meaningfully covers PVC trim and chandelier fixtures — plumbing, painting, and drywall (all present in Layer 1) fall through to a generic $3.50/unit + $15 placeholder with no warning surfaced to the user, unlike `layer1Unmatched`.
+- [ ] **Blocking:** Layer 2 (`getLayer2MaterialCost`) only meaningfully covers PVC trim and chandelier fixtures — plumbing, painting, and drywall (all present in Layer 1) fall through to a generic $3.50/unit + $15 placeholder with no warning surfaced to the user, unlike `layer1Unmatched`. When fixing, mirror the `UnmatchedBenchmarkError`/`layer1Unmatched` pattern already built for Layer 1 in `standards-catalog.ts`/`engine.ts` rather than re-deriving a new approach.
+- [ ] **Blocking:** `computeHybridEstimateItem`'s `layer1Unmatched` flag is display-only — it doesn't gate the number. On an unmatched item it still runs `GENERIC_UNMATCHED_BENCHMARK` (flat `standardLaborHoursPerUnit: 1.0`, hardcoded `unit: "each"` regardless of the request's real unit) through the normal cost math and rolls the result into `finalLineTotalCents`/`grandTotalCents` — a fabricated number with a warning stapled on, not excluded from the total. Fix: exclude the unmatched line from the computed total (e.g. return $0/force manual entry) instead of estimating a fake one.
 - [ ] **Blocking:** wire an actual call site in `apps/web` (currently none) before marking this "In Progress" again.
 - [ ] Estimate engine computes combined quote with trade labor hours, live/catalog material prices, and local actuals adjustment factor.
 - [ ] Unit tests verify 3-layer pricing calculations.

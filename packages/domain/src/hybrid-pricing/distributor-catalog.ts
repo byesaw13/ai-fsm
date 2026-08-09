@@ -1,4 +1,5 @@
 import type { Layer2DistributorCatalogItem } from "./types";
+import { OSI_QUAD_MAX_SEALANT_CENTS, CORTEX_PVC_FASTENER_KIT_CENTS } from "../shared-hardware-prices";
 
 export const LAYER2_DISTRIBUTOR_CATALOG: Layer2DistributorCatalogItem[] = [
   {
@@ -16,7 +17,7 @@ export const LAYER2_DISTRIBUTOR_CATALOG: Layer2DistributorCatalogItem[] = [
     brand: "OSI",
     name: "OSI Quad Max 9.5 oz. Exterior Polyurethane Sealant White",
     category: "sealants",
-    unitCostCents: 1150, // $11.50
+    unitCostCents: OSI_QUAD_MAX_SEALANT_CENTS,
     packQuantity: 1,
     unitOfMeasure: "tube",
     supplier: "Home Depot",
@@ -27,7 +28,7 @@ export const LAYER2_DISTRIBUTOR_CATALOG: Layer2DistributorCatalogItem[] = [
     brand: "FastenMaster",
     name: "Cortex Hidden Fastening System for PVC Trim (100 Screws + Plugs)",
     category: "fasteners",
-    unitCostCents: 3850, // $38.50
+    unitCostCents: CORTEX_PVC_FASTENER_KIT_CENTS,
     packQuantity: 100,
     unitOfMeasure: "box",
     supplier: "Home Depot",
