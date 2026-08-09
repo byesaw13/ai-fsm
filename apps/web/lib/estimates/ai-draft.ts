@@ -176,12 +176,19 @@ Service 5012 (Interior room painting) already includes trim/baseboard pricing wi
 - Use the exact key names shown in the Scope Templates section
 ${scopeValueRules}
 - When measurements are not given, estimate from these heuristics and record every estimate in confidence_notes:
+  - Single-stall garage door opening (8'x7' or 9'x7') → 22–24 LF trim (1 header 8', 2 jambs 7' each)
+  - Double-stall garage door opening (16'x7') → 30–32 LF trim (1 header 16', 2 jambs 7' each)
+  - Standard interior/exterior door (3'x6'8") → ~18 LF casing per side
+  - Standard window casing (3'x5' window) → ~17 LF trim per window
   - Bedroom → ~250 sqft walls (~180 sqft floor)
   - Master bedroom → ~320 sqft walls (~220 sqft floor)
   - Living room / family room → ~450 sqft walls (~280 sqft floor)
   - Bathroom (standard) → ~120 sqft walls (~50 sqft floor)
   - Kitchen → ~180 sqft walls (~120 sqft floor)
   - Hallway → ~80 sqft walls per 10 linear feet
+  - Foyer / High Ceiling (16ft–20ft height) → Flag difficult_access: true, apply high-ceiling labor factor (1.35x), floor protection, tall A-frame ladder / safety setup
+  - Cellular PVC / Vinyl trim → Price 1x6 PVC board + PVC brickmould, OSI Quad Max caulk, stainless screws; exclude painting PVC unless explicitly requested
+  - Customer-supplied chandelier/fixture → Exclude fixture purchase cost; include assembly, hanging, and disposal labor; note heavy-duty box check
   - "Two coats" is implied unless client says "one coat" or "touch-up"
 - Only set numeric scope values — do not include null or empty values
 - For select-type components (e.g. paint_finish), use the most common default: "eggshell" for walls, "semi_gloss" for trim

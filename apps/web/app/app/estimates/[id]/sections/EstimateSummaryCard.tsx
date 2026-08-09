@@ -1,4 +1,4 @@
-import { PREP_LEVEL_MULTIPLIERS, computeRoomMeasurements } from "@ai-fsm/domain";
+import { PREP_LEVEL_MULTIPLIERS, calculateFinancialComparison, computeRoomMeasurements } from "@ai-fsm/domain";
 import type { RoomSpec, Role } from "@ai-fsm/domain";
 import type { AiMaterialsDeltaItem as AiMaterialsDeltaEntry } from "@/lib/estimates/materials-delta";
 import { formatDollars } from "../format";
@@ -8,6 +8,8 @@ interface Props {
   estimate: EstimateRow;
   role: Role;
   documentFilename: string;
+  laborCostRateCents: number;
+  laborBillingRateCents: number;
 }
 
 /**
@@ -15,14 +17,26 @@ interface Props {
  * scope, room-by-room breakdown, internal margin, internal notes, materials
  * plan, and pricing guardrails. Owner/admin-only blocks are gated by role.
  */
-export function EstimateSummaryCard({ estimate, role, documentFilename }: Props) {
+export function EstimateSummaryCard({ estimate, role, documentFilename, laborCostRateCents, laborBillingRateCents }: Props) {
   const isOwnerAdmin = role === "owner" || role === "admin";
+
+  const totalQuoteCents = estimate.total_cents;
+  const financials = calculateFinancialComparison({
+    laborCostCents: estimate.internal_labor_cost_cents,
+    materialCostCents: estimate.internal_material_cost_cents,
+    totalQuoteCents: estimate.total_cents,
+    laborCostRateCents,
+    laborBillingRateCents,
+  });
+  const { materialHandlingCents = 0, totalDirectCostCents = 0, grossProfitCents = 0, grossMarginPct = 0, effectiveHours = 0, tmEstimatedLaborHrs = 0, tmTotalQuoteCents = 0, tmGrossProfitCents = 0, tmGrossMarginPct = 0 } = financials ?? {};
+  const laborCostCents = estimate.internal_labor_cost_cents ?? 0;
+  const materialCostCents = estimate.internal_material_cost_cents ?? 0;
 
   return (
     <div className="card detail-card">
-      <h2>Summary</h2>
+      <h2>Estimate Summary &amp; Financial Truth</h2>
 
-      {/* Money anchor: the total leads, deposit/balance read as chips beside it */}
+      {/* Money anchor: total quote */}
       <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-3)", flexWrap: "wrap", margin: "var(--space-2) 0 var(--space-1)" }}>
         <span data-testid="estimate-total" style={{ fontSize: "var(--text-3xl, 1.875rem)", fontWeight: 800, letterSpacing: "-0.02em" }}>
           {formatDollars(estimate.total_cents)}
@@ -45,8 +59,84 @@ export function EstimateSummaryCard({ estimate, role, documentFilename }: Props)
           {estimate.expires_at && <>Expires {new Date(estimate.expires_at).toLocaleDateString()}</>}
         </p>
       )}
+
+      {isOwnerAdmin && !financials && (
+        <div style={{ marginTop: "var(--space-3)", padding: "var(--space-3)", borderRadius: 8, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+          <strong>Financial truth unavailable</strong>
+          <p style={{ margin: "var(--space-1) 0 0", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>Labor and material cost bases are required before profit or T&amp;M comparisons can be calculated.</p>
+        </div>
+      )}
+
+      {/* OWNER/ADMIN FINANCIAL TRUTH CARD */}
+      {isOwnerAdmin && financials && (
+        <div style={{ marginTop: "var(--space-3)", padding: "var(--space-3)", borderRadius: 8, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
+            <span style={{ fontWeight: 700, fontSize: "var(--text-xs)", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--accent)" }}>
+              📊 Financial Truth &amp; Profitability (Owner View)
+            </span>
+            <span style={{ fontSize: "var(--text-xs)", padding: "2px 8px", borderRadius: 12, fontWeight: 700, background: grossMarginPct >= 35 ? "color-mix(in srgb, var(--status-success) 12%, transparent)" : grossMarginPct >= 20 ? "color-mix(in srgb, var(--status-warning) 12%, transparent)" : "color-mix(in srgb, var(--status-error) 12%, transparent)", color: grossMarginPct >= 35 ? "var(--status-success)" : grossMarginPct >= 20 ? "var(--status-warning)" : "var(--status-error)" }}>
+              {grossMarginPct}% Gross Margin
+            </span>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "var(--space-2)" }}>
+            <div>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Direct Labor Cost</span>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)" }}>{formatDollars(laborCostCents)}</p>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{effectiveHours} hrs @ {formatDollars(laborCostRateCents)}/hr</span>
+            </div>
+            <div>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Material Cost Basis</span>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)" }}>{formatDollars(materialCostCents)}</p>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>+15% handling ({formatDollars(materialHandlingCents)})</span>
+            </div>
+            <div>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Total Direct Job Cost</span>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)" }}>{formatDollars(totalDirectCostCents)}</p>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Labor + Materials</span>
+            </div>
+            <div>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Gross Profit ($)</span>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: "var(--text-base)", color: grossProfitCents > 0 ? "var(--status-success)" : "var(--status-error)" }}>
+                {formatDollars(grossProfitCents)}
+              </p>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{grossMarginPct}% of Quote</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SIDE-BY-SIDE PRICING MODE COMPARISON (FIXED vs T&M) */}
+      {isOwnerAdmin && financials && (
+        <div style={{ marginTop: "var(--space-3)", padding: "var(--space-3)", borderRadius: 8, background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+          <p style={{ fontWeight: 700, fontSize: "var(--text-xs)", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--fg-muted)", margin: "0 0 var(--space-2)" }}>
+            ⚖️ Pricing Strategy Comparison: Fixed Rate vs. T&amp;M
+          </p>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+            {/* Fixed Rate Column */}
+            <div style={{ padding: "var(--space-2)", borderRadius: 6, border: "1px solid var(--accent)", background: "color-mix(in srgb, var(--accent) 4%, transparent)" }}>
+              <span style={{ fontWeight: 700, fontSize: "var(--text-xs)", color: "var(--accent)" }}>📌 FIXED RATE (Current Quote)</span>
+              <p style={{ margin: "4px 0 0", fontSize: "var(--text-lg)", fontWeight: 800 }}>{formatDollars(totalQuoteCents)}</p>
+              <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Profit: <strong>{formatDollars(grossProfitCents)}</strong> ({grossMarginPct}% margin)</p>
+            </div>
+
+            {/* T&M Column */}
+            <div style={{ padding: "var(--space-2)", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg)" }}>
+              <span style={{ fontWeight: 700, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>⏱️ T&amp;M ESTIMATE (Est {tmEstimatedLaborHrs} hrs)</span>
+              <p style={{ margin: "4px 0 0", fontSize: "var(--text-lg)", fontWeight: 800 }}>{formatDollars(tmTotalQuoteCents)}</p>
+              <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Profit: <strong>{formatDollars(tmGrossProfitCents)}</strong> ({tmGrossMarginPct}% margin)</p>
+            </div>
+          </div>
+
+          <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-secondary)" }}>
+            💡 <strong>Recommendation:</strong> Fixed Rate yields {formatDollars(grossProfitCents - tmGrossProfitCents)} additional margin while giving the client an exact guaranteed price.
+          </p>
+        </div>
+      )}
+
       {estimate.notes && (
-        <p><strong>Notes:</strong> {estimate.notes}</p>
+        <p style={{ marginTop: "var(--space-3)" }}><strong>Notes:</strong> {estimate.notes}</p>
       )}
 
       {estimate.scope_assumptions && (
@@ -109,128 +199,11 @@ export function EstimateSummaryCard({ estimate, role, documentFilename }: Props)
         );
       })()}
 
-      {/* Internal margin — owner/admin only */}
-      {isOwnerAdmin && estimate.internal_labor_cost_cents !== null && estimate.internal_labor_cost_cents > 0 && (
-        <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
-          <p style={{ fontWeight: 600, marginBottom: "var(--space-1)", color: "var(--fg-muted)" }}>Internal Margin</p>
-          {(() => {
-            const laborRevenue = estimate.subtotal_cents - (estimate.internal_material_cost_cents ?? 0) - Math.round((estimate.internal_material_cost_cents ?? 0) * 0.15);
-            const internalCost = estimate.internal_labor_cost_cents!;
-            const marginCents = laborRevenue - internalCost;
-            const marginPct = laborRevenue > 0 ? Math.round((marginCents / laborRevenue) * 100 * 10) / 10 : 0;
-            const marginColor = marginPct >= 30 ? "var(--color-success)" : marginPct >= 15 ? "var(--color-warning)" : "var(--color-danger)";
-            return (
-              <>
-                <p><strong>Internal labor cost:</strong> {formatDollars(estimate.internal_labor_cost_cents!)}</p>
-                <p><strong>Labor revenue:</strong> {formatDollars(laborRevenue)}</p>
-                <p>
-                  <strong>Gross margin:</strong>{" "}
-                  <span style={{ color: marginColor, fontWeight: 700 }}>
-                    {marginPct}% ({formatDollars(marginCents)})
-                  </span>
-                </p>
-              </>
-            );
-          })()}
-        </div>
-      )}
-
       {estimate.internal_notes && role !== "tech" && (
-        <p><strong>Internal Notes:</strong> {estimate.internal_notes}</p>
+        <p style={{ marginTop: "var(--space-2)" }}><strong>Internal Notes:</strong> {estimate.internal_notes}</p>
       )}
 
-      {/* Shopping list — owner/admin only */}
-      {isOwnerAdmin && (() => {
-        const shoppingList = estimate.shopping_list_json as {
-          sections?: Array<{
-            section: string;
-            computed_items: Array<{ material: { material_name: string; unit: string; id: string }; quantity: number; total_cost_cents: number }>;
-            specified_items: Array<{ name: string; units_to_order: number; unit_label: string; unit_cost_cents: number | null; notes: string | null }>;
-            section_total_cents: number;
-          }>;
-          total_catalog_cost_cents?: number;
-          total_specified_cost_cents?: number;
-        } | null | undefined;
-        if (!shoppingList?.sections?.length) {
-          // Fallback for old estimates created before Block 3 — link to the recomputed view
-          return (
-            <div id="materials-plan" style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
-              <a href={`/app/estimates/${estimate.id}/shopping-list`} style={{ fontSize: "var(--text-sm)", color: "var(--accent)", textDecoration: "none" }}>
-                Open Materials Plan →
-              </a>
-              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginLeft: 8 }}>
-                (computed from scope snapshots)
-              </span>
-            </div>
-          );
-        }
-        const grandTotal = (shoppingList.total_catalog_cost_cents ?? 0) + (shoppingList.total_specified_cost_cents ?? 0);
-        return (
-          <div id="materials-plan" style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-3)", borderTop: "1px dashed var(--border)" }}>
-            <p style={{ fontWeight: 600, marginBottom: "var(--space-2)", color: "var(--fg-muted)" }}>
-              Materials Plan
-              {grandTotal > 0 && (
-                <span style={{ fontWeight: 400, marginLeft: 8, fontSize: "var(--text-sm)" }}>
-                  est. {formatDollars(grandTotal)}
-                </span>
-              )}
-            </p>
-            {shoppingList.sections.map((sec) => (
-              <div key={sec.section} style={{ marginBottom: "var(--space-2)" }}>
-                <p style={{ fontWeight: 600, fontSize: "var(--text-xs)", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--fg-muted)", margin: "0 0 4px" }}>
-                  {sec.section}
-                </p>
-                {sec.computed_items.map((m) => (
-                  <div key={m.material.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)", padding: "2px 0" }}>
-                    <span>{m.material.material_name}</span>
-                    <span style={{ color: "var(--fg-muted)" }}>
-                      {m.quantity} {m.material.unit} — {formatDollars(m.total_cost_cents)}
-                    </span>
-                  </div>
-                ))}
-                {sec.specified_items.map((m, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)", padding: "2px 0", fontStyle: "italic" }}>
-                    <span>{m.name} <span style={{ color: "#0284c7", fontSize: "var(--text-xs)" }}>(specified)</span></span>
-                    <span style={{ color: "var(--fg-muted)" }}>
-                      {m.units_to_order} {m.unit_label}
-                      {m.unit_cost_cents ? ` — ${formatDollars(m.units_to_order * m.unit_cost_cents)}` : ""}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        );
-      })()}
-
-      {/* AI materials delta — owner/admin only. Evidence-gathering only
-          (TASK T1): shows what the AI proposed vs. what the founder actually
-          approved, for items that were edited. No outcome capture. */}
-      {isOwnerAdmin && (() => {
-        const root = estimate.shopping_list_json as
-          | { ai_materials_delta?: AiMaterialsDeltaEntry[] }
-          | null
-          | undefined;
-        const delta = Array.isArray(root?.ai_materials_delta) ? root!.ai_materials_delta! : [];
-        const changed = delta.filter(
-          (d) => d.ai_quantity !== d.quantity || d.ai_unit_cost_cents !== d.unit_cost_cents
-        );
-        if (changed.length === 0) return null;
-        return (
-          <div style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-3)", borderTop: "1px dashed var(--border)" }}>
-            <p style={{ fontWeight: 600, marginBottom: "var(--space-2)", color: "var(--fg-muted)" }}>
-              AI Materials — Founder Edits
-            </p>
-            {changed.map((d, i) => (
-              <p key={i} style={{ fontSize: "var(--text-sm)", color: "var(--fg-secondary)", margin: "2px 0" }}>
-                <strong>{d.name}:</strong> AI proposed {d.ai_quantity} {d.unit} @ {formatDollars(d.ai_unit_cost_cents)} — you changed it to {d.quantity} {d.unit} @ {formatDollars(d.unit_cost_cents)}
-              </p>
-            ))}
-          </div>
-        );
-      })()}
-
-      {/* Internal details — collapsed by default so client-facing info leads */}
+      {/* Internal details */}
       {isOwnerAdmin && (
         <details style={{ marginTop: "var(--space-3)", paddingTop: "var(--space-2)", borderTop: "1px dashed var(--border)" }}>
           <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>

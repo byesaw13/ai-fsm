@@ -91,6 +91,8 @@ const DECOMPOSE_TOOL: Anthropic.Tool = {
   },
 };
 
+import { detectTradeProfiles, getConcealedRiskDisclaimers } from "@ai-fsm/domain";
+
 function buildUserMessage(input: DecomposeInput): string {
   const rooms = input.rooms.length
     ? input.rooms.map((r) => `- ${r.name}${r.notes ? `: ${r.notes}` : ""}`).join("\n")
@@ -98,6 +100,15 @@ function buildUserMessage(input: DecomposeInput): string {
   const labor = input.laborLines.length
     ? input.laborLines.map((l) => `- ${l}`).join("\n")
     : "(no labor lines)";
+
+  const profiles = detectTradeProfiles(input.scope);
+  const risks = getConcealedRiskDisclaimers(input.scope);
+
+  const profileSummary = profiles.map((p) => `- ${p.displayName}: ${p.standardSteps.map((s) => s.name).join(" → ")}`).join("\n");
+  const riskSummary = risks.length
+    ? risks.map((r) => `- [CONCEALED RISK] ${r.riskName}: ${r.changeOrderDisclaimer}`).join("\n")
+    : "(none detected)";
+
   return `Job scope:
 ${input.scope.trim() || "(none provided)"}
 
@@ -105,7 +116,13 @@ Rooms / areas:
 ${rooms}
 
 Labor lines from the estimate:
-${labor}`;
+${labor}
+
+Building science trade execution profiles:
+${profileSummary}
+
+Concealed risk change order triggers:
+${riskSummary}`;
 }
 
 /** Propose a work breakdown. Throws TaskDecompositionError on failure. */

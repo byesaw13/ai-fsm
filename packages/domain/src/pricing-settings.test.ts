@@ -3,6 +3,7 @@ import {
   DEFAULT_PRICING_SETTINGS,
   billingRateCentsForState,
   buildPricingRules,
+  calculateFinancialComparison,
 } from "./pricing-settings";
 
 describe("pricing-settings", () => {
@@ -37,5 +38,10 @@ describe("pricing-settings", () => {
     expect(rules.laborCostCentsPerHour).toBe(45_00);
     expect(rules.laborBillingCentsPerHour).toBe(120_00);
     expect(rules.marginFloor).toBe(0.25);
+  });
+
+  it("preserves unknown costs and uses configured rates", () => {
+    expect(calculateFinancialComparison({ laborCostCents: null, materialCostCents: 10_000, totalQuoteCents: 100_000, laborCostRateCents: 5_000, laborBillingRateCents: 12_000 })).toBeNull();
+    expect(calculateFinancialComparison({ laborCostCents: 10_000, materialCostCents: 10_000, totalQuoteCents: 100_000, laborCostRateCents: 5_000, laborBillingRateCents: 12_000 })).toMatchObject({ effectiveHours: 2, tmTotalQuoteCents: 35_500 });
   });
 });

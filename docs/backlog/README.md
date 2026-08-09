@@ -95,7 +95,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-095**.
+Next available ID: **TASK-101**.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -202,6 +202,12 @@ truth-pass also archived TASK-023 and TASK-050 (epic already Done, README lagged
 | TASK-091 | Hybrid mileage verification pack (odo + GPS + export) | 001 | Done |
 | TASK-093 | Vehicle & Trailer Cost-of-Ownership | 001 | Done |
 | TASK-094 | Materials Estimate Trust & Calibration (Approach D) | 002 | In Progress |
+| TASK-095 | Estimate vs Actual Benchmark & Calibration Runner (PI-011) | 008 | In Progress |
+| TASK-096 | Financial Truth Card & Actionable Advisory Guardrails | 002 | Done |
+| TASK-097 | Trade Construction Knowledge Engine | 002 | Done |
+| TASK-098 | 3-Layer Hybrid Estimating Engine | 002 | Scaffolded, not wired |
+| TASK-099 | Reconcile TASK-094 delta capture with TASK-098 benchmark calibration | 002 | Proposed |
+| TASK-100 | Fix T&M vs Fixed comparison card (hours-overrun modeling, shared rate constant) | 002 | Proposed |
 
 ## Status legend
 

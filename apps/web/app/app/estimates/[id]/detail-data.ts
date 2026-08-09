@@ -7,6 +7,7 @@ import {
   documentLocationSelect,
   type DocumentLocationRow,
 } from "@/lib/documents/service-location";
+import { loadPricingSettings, type BusinessPricingSettings } from "@/lib/pricing/settings";
 
 // ---------------------------------------------------------------------------
 // Row types
@@ -133,6 +134,7 @@ export interface EstimateDetail {
   finalInvoice: EstimateInvoiceRow | null;
   changeOrders: ChangeOrder[];
   location: DocumentLocationRow | undefined;
+  pricingSettings: BusinessPricingSettings;
 }
 
 // ---------------------------------------------------------------------------
@@ -186,6 +188,7 @@ export async function loadEstimateDetail(
        WHERE e.id = $1 AND e.account_id = $2`,
       [id, session.accountId]
     );
+    const pricingSettings = await loadPricingSettings(client, session.accountId);
 
     const allLineItems = lineItemsResult.rows as LineItemRow[];
     const options = optionsResult.rows as OptionRow[];
@@ -200,12 +203,13 @@ export async function loadEstimateDetail(
       lineItems: allLineItems.filter((li) => !li.option_id),
       options: optionsWithItems,
       location: locationResult.rows[0] as DocumentLocationRow | undefined,
+      pricingSettings,
     };
   });
 
   if (!result) return null;
 
-  const { estimate, lineItems, options, location } = result;
+  const { estimate, lineItems, options, location, pricingSettings } = result;
 
   // For approved estimates with a linked job, visit count + project status.
   let jobVisitCount = 0;
@@ -288,5 +292,6 @@ export async function loadEstimateDetail(
     finalInvoice,
     changeOrders,
     location,
+    pricingSettings,
   };
 }
