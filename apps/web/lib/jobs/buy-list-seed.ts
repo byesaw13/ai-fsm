@@ -142,6 +142,82 @@ export async function buildSeedLinesFromEstimate(
   return recomputeShoppingLines(client, estimate.id);
 }
 
+export async function hydrateBuyListLocations(
+  client: PoolClient,
+  accountId: string,
+  lines: BuyListLineInput[],
+): Promise<BuyListLineInput[]> {
+  // Seeded estimate lines often store service_materials.id in catalog_material_id.
+  // Location memory lives on account materials_price_book — resolve by id when it
+  // is a real price-book row, otherwise by name+unit so aisle/supplier still copy.
+  const ids = [...new Set(
+    lines.flatMap((line) => (line.catalog_material_id ? [line.catalog_material_id] : [])),
+  )];
+  const nameUnitPairs = [
+    ...new Map(
+      lines.map((line) => {
+        const name = line.name.trim().toLowerCase();
+        const unit = (line.unit_label ?? "").trim().toLowerCase() || "each";
+        return [`${name}||${unit}`, { name, unit }] as const;
+      }),
+    ).values(),
+  ];
+
+  if (ids.length === 0 && nameUnitPairs.length === 0) {
+    return lines.map((line) => ({ ...line, supplier: null, aisle: null, bay: null }));
+  }
+
+  const result = await client.query<{
+    id: string;
+    name: string;
+    unit: string;
+    supplier: string | null;
+    aisle: string | null;
+    bay: string | null;
+  }>(
+    `SELECT id, name, unit, supplier, aisle, bay
+     FROM materials_price_book
+     WHERE account_id = $1
+       AND is_active = true
+       AND (
+         (cardinality($2::uuid[]) > 0 AND id = ANY($2::uuid[]))
+         OR (
+           cardinality($3::text[]) > 0
+           AND lower(name) = ANY($3::text[])
+         )
+       )`,
+    [
+      accountId,
+      ids,
+      nameUnitPairs.map((pair) => pair.name),
+    ],
+  );
+
+  const byId = new Map(result.rows.map((row) => [row.id, row]));
+  const byNameUnit = new Map<string, (typeof result.rows)[number]>();
+  for (const row of result.rows) {
+    const name = (row.name ?? "").trim().toLowerCase();
+    const unit = (row.unit ?? "each").trim().toLowerCase() || "each";
+    byNameUnit.set(`${name}||${unit}`, row);
+  }
+
+  return lines.map((line) => {
+    const unitKey = (line.unit_label ?? "").trim().toLowerCase() || "each";
+    const nameKey = `${line.name.trim().toLowerCase()}||${unitKey}`;
+    const location =
+      (line.catalog_material_id ? byId.get(line.catalog_material_id) : undefined) ??
+      byNameUnit.get(nameKey);
+    return {
+      ...line,
+      // Prefer a real materials_price_book id so "Remember for future jobs" can write.
+      catalog_material_id: location?.id ?? line.catalog_material_id ?? null,
+      supplier: location?.supplier ?? null,
+      aisle: location?.aisle ?? null,
+      bay: location?.bay ?? null,
+    };
+  });
+}
+
 export async function insertBuyListLines(
   client: PoolClient,
   accountId: string,
@@ -153,8 +229,9 @@ export async function insertBuyListLines(
     await client.query(
       `INSERT INTO job_material_lines
          (account_id, job_id, name, quantity, unit_label, store_section,
-          status, source, catalog_material_id, sku, notes, sort_order)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          status, source, catalog_material_id, sku, notes, sort_order,
+          supplier, aisle, bay)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
       [
         accountId,
         jobId,
@@ -168,6 +245,9 @@ export async function insertBuyListLines(
         line.sku,
         line.notes,
         line.sort_order,
+        line.supplier ?? null,
+        line.aisle ?? null,
+        line.bay ?? null,
       ],
     );
     n++;
@@ -227,7 +307,8 @@ export async function seedJobBuyList(
     };
   }
 
-  const candidates = await buildSeedLinesFromEstimate(client, estimate);
+  const candidateLines = await buildSeedLinesFromEstimate(client, estimate);
+  const candidates = await hydrateBuyListLocations(client, opts.accountId, candidateLines);
 
   if (opts.reseed || alreadySeeded) {
     const existing = await client.query<{ name: string; unit_label: string | null }>(

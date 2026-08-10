@@ -313,6 +313,10 @@ Acceptance Criteria:
 - [ ] Burdened rate defined once, imported by both `EstimateSummaryCard.tsx`
   and `hybrid-pricing/engine.ts`.
 
+Notes:
+Surfaced during CEO review of PR #589. Priority P2 — the card's Fixed-price
+math is currently correct, only the comparison framing is misleading.
+
 # TASK-100: Standalone & Direct Job/Visit Quick Materials Generator (Uncouple Materials from Estimates)
 
 Status:

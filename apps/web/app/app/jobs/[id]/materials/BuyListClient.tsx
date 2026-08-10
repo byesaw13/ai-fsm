@@ -2,18 +2,25 @@
 
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { groupByStoreSection, type BuyListStatus } from "@/lib/jobs/buy-list";
+import {
+  filterStoreRunLines,
+  groupByStoreSection,
+  type BuyListStatus,
+  type StoreRunLine,
+} from "@/lib/jobs/buy-list";
+import {
+  StoreRunLauncher,
+  type SupplierPreference,
+} from "./StoreRunLauncher";
+import { StoreRunRoute } from "./StoreRunRoute";
+import { StoreRunSummary } from "./StoreRunSummary";
 
-export type BuyListLine = {
-  id: string;
-  name: string;
-  quantity: string | number;
-  unit_label: string | null;
-  store_section: string | null;
-  status: BuyListStatus;
+export type BuyListLine = StoreRunLine & {
   source: string;
   notes: string | null;
 };
+
+type StoreRunMode = "list" | "launch" | "route" | "summary";
 
 const STATUS_LABELS: Record<BuyListStatus, string> = {
   needed: "Needed",
@@ -28,12 +35,14 @@ export function BuyListClient({
   seededAt,
   canEdit,
   canSeed,
+  supplierPreferences = [],
 }: {
   jobId: string;
   initialLines: BuyListLine[];
   seededAt: string | null;
   canEdit: boolean;
   canSeed: boolean;
+  supplierPreferences?: SupplierPreference[];
 }) {
   const router = useRouter();
   const [lines, setLines] = useState(initialLines);
@@ -45,9 +54,43 @@ export function BuyListClient({
   const [section, setSection] = useState("");
   const [filter, setFilter] = useState<"needed" | "all">("needed");
 
+  const [storeRunMode, setStoreRunMode] = useState<StoreRunMode>("list");
+  const [storeRunSupplier, setStoreRunSupplier] = useState<string | null>(null);
+  const [runStartLines, setRunStartLines] = useState<BuyListLine[]>([]);
+  const [summaryPurchasedIds, setSummaryPurchasedIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const [summaryFinalLines, setSummaryFinalLines] = useState<BuyListLine[]>([]);
+
   const refresh = useCallback(() => {
     router.refresh();
   }, [router]);
+
+  const refreshLines = useCallback(async (): Promise<BuyListLine[]> => {
+    const response = await fetch(`/api/v1/jobs/${jobId}/materials`, {
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error("Could not refresh buy list");
+    const payload = await response.json();
+    const fresh = (payload?.data?.lines ?? []) as BuyListLine[];
+    setLines(fresh);
+    return fresh;
+  }, [jobId]);
+
+  function updateLine(updated: BuyListLine) {
+    setLines((prev) =>
+      prev.map((line) => (line.id === updated.id ? { ...line, ...updated } : line)),
+    );
+  }
+
+  function exitStoreRun() {
+    setStoreRunMode("list");
+    setStoreRunSupplier(null);
+    setRunStartLines([]);
+    setSummaryPurchasedIds(new Set());
+    setSummaryFinalLines([]);
+  }
 
   async function seed(reseed: boolean) {
     setBusy(true);
@@ -75,10 +118,11 @@ export function BuyListClient({
         setMessage(json.error.message);
       }
       refresh();
-      // reload lines
-      const list = await fetch(`/api/v1/jobs/${jobId}/materials`, { credentials: "same-origin" });
-      const listJson = await list.json();
-      if (listJson?.data?.lines) setLines(listJson.data.lines);
+      try {
+        await refreshLines();
+      } catch {
+        /* list will catch up on next navigation */
+      }
     } finally {
       setBusy(false);
     }
@@ -110,7 +154,25 @@ export function BuyListClient({
       setQty("1");
       setUnit("");
       setSection("");
-      if (json.data) setLines((prev) => [...prev, json.data]);
+      if (json.data) {
+        const created = json.data as Partial<BuyListLine> & Pick<BuyListLine, "id" | "name" | "status">;
+        setLines((prev) => [
+          ...prev,
+          {
+            quantity: 1,
+            unit_label: null,
+            store_section: null,
+            source: "manual",
+            notes: null,
+            supplier: null,
+            aisle: null,
+            bay: null,
+            catalog_material_id: null,
+            unit_cost_cents: null,
+            ...created,
+          },
+        ]);
+      }
       refresh();
     } finally {
       setBusy(false);
@@ -175,6 +237,69 @@ export function BuyListClient({
     }
   }
 
+  const hasNeeded = lines.some((line) => line.status === "needed");
+
+  if (storeRunMode === "launch") {
+    return (
+      <div data-testid="job-buy-list">
+        <StoreRunLauncher
+          lines={lines}
+          preferences={supplierPreferences}
+          canEdit={canEdit}
+          onStart={(supplier) => {
+            setStoreRunSupplier(supplier);
+            setRunStartLines(filterStoreRunLines(lines, supplier));
+            setStoreRunMode("route");
+          }}
+          onCancel={exitStoreRun}
+        />
+      </div>
+    );
+  }
+
+  if (storeRunMode === "route" && storeRunSupplier) {
+    return (
+      <div data-testid="job-buy-list">
+        <StoreRunRoute
+          jobId={jobId}
+          linesAtStart={runStartLines.length > 0 ? runStartLines : lines}
+          supplier={storeRunSupplier}
+          canEdit={canEdit}
+          onLineUpdated={updateLine}
+          onRefresh={refreshLines}
+          onComplete={(purchasedIds, finalLines) => {
+            setSummaryPurchasedIds(purchasedIds);
+            setSummaryFinalLines(finalLines);
+            setStoreRunMode("summary");
+          }}
+          onCancel={exitStoreRun}
+        />
+      </div>
+    );
+  }
+
+  if (storeRunMode === "summary") {
+    return (
+      <div data-testid="job-buy-list">
+        <StoreRunSummary
+          jobId={jobId}
+          runStartLines={runStartLines.length > 0 ? runStartLines : lines}
+          finalLines={summaryFinalLines.length > 0 ? summaryFinalLines : lines}
+          purchasedIds={summaryPurchasedIds}
+        />
+        <div style={{ marginTop: "var(--space-4)" }}>
+          <button
+            type="button"
+            className="p7-btn p7-btn-secondary p7-btn-sm"
+            onClick={exitStoreRun}
+          >
+            Back to buy list
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const visible =
     filter === "all" ? lines : lines.filter((l) => l.status === "needed");
   const groups = groupByStoreSection(
@@ -225,6 +350,17 @@ export function BuyListClient({
               </button>
             )}
           </>
+        )}
+        {hasNeeded && (
+          <button
+            type="button"
+            className="p7-btn p7-btn-primary p7-btn-sm"
+            disabled={busy}
+            onClick={() => setStoreRunMode("launch")}
+            data-testid="start-store-run"
+          >
+            Start Store Run
+          </button>
         )}
         <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
           <button
@@ -317,6 +453,13 @@ export function BuyListClient({
                         {Number(line.quantity)}
                         {line.unit_label ? ` ${line.unit_label}` : ""}
                       </span>
+                      {(line.supplier || line.aisle) && (
+                        <span style={{ fontWeight: 400, color: "var(--fg-muted)", marginLeft: 8, fontSize: 12 }}>
+                          {[line.supplier, line.aisle ? `Aisle ${line.aisle}` : null, line.bay ? `Bay ${line.bay}` : null]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                      )}
                     </span>
                     <select
                       value={line.status}
