@@ -287,6 +287,46 @@ function recomputeTotals(list: ShoppingList): ShoppingList {
   };
 }
 
+export function serviceCodesForSnapshots(
+  snapshots: Iterable<{ category: string | null; service_code: string | null }>,
+  lines: Iterable<{ category: string | null; code: string | null }>,
+): Array<string | null> {
+  const snapshotList = Array.from(snapshots);
+  const byCategory = new Map<string, Array<string | null>>();
+  for (const line of lines) {
+    if (!line.category) continue;
+    const queue = byCategory.get(line.category) ?? [];
+    queue.push(line.code);
+    byCategory.set(line.category, queue);
+  }
+  const snapshotCounts = new Map<string, number>();
+  for (const snapshot of snapshotList) {
+    if (!snapshot.category) continue;
+    const queue = byCategory.get(snapshot.category);
+    if (snapshot.service_code) {
+      const index = queue?.indexOf(snapshot.service_code) ?? -1;
+      if (index >= 0) queue?.splice(index, 1);
+    } else {
+      snapshotCounts.set(snapshot.category, (snapshotCounts.get(snapshot.category) ?? 0) + 1);
+    }
+  }
+  return snapshotList.map((snapshot) => {
+    if (snapshot.service_code) return snapshot.service_code;
+    if (!snapshot.category) return null;
+    const queue = byCategory.get(snapshot.category);
+    if (!queue || queue.length !== snapshotCounts.get(snapshot.category)) return null;
+    snapshotCounts.set(snapshot.category, (snapshotCounts.get(snapshot.category) ?? 1) - 1);
+    return queue.shift() ?? null;
+  });
+}
+
+export function priceBookCodesFromLineRows(
+  rows: Iterable<{ code: string | null; description: string | null }>,
+): string[] {
+  return Array.from(rows, (row) => row.code ?? row.description?.match(/^(\d{4})\b/)?.[1] ?? "")
+    .filter(Boolean);
+}
+
 /** True when a price-book code list includes the 1007 pilot. */
 export function includesDoorHardwareCode(codes: Iterable<string | null | undefined>): boolean {
   for (const c of codes) {

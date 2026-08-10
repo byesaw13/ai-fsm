@@ -4,6 +4,8 @@ import {
   mergeDoorHardwareTakeoffIntoShoppingList,
   packageCeil,
   includesDoorHardwareCode,
+  priceBookCodesFromLineRows,
+  serviceCodesForSnapshots,
 } from "./door-hardware-1007";
 import type { ShoppingList } from "../scope";
 
@@ -128,5 +130,32 @@ describe("includesDoorHardwareCode", () => {
   it("detects 1007", () => {
     expect(includesDoorHardwareCode(["5002", "1007"])).toBe(true);
     expect(includesDoorHardwareCode(["5002"])).toBe(false);
+  });
+});
+
+describe("priceBookCodesFromLineRows", () => {
+  it("prefers the joined price-book code over the description fallback", () => {
+    expect(
+      priceBookCodesFromLineRows([
+        { code: "1007", description: "1007 — Door hardware replacement" },
+        { code: null, description: "5002 — Interior painting" },
+      ]),
+    ).toEqual(["1007", "5002"]);
+  });
+});
+
+describe("serviceCodesForSnapshots", () => {
+  it("matches unlinked snapshots to same-category line items in order", () => {
+    expect(serviceCodesForSnapshots(
+      [{ category: "general_repairs", service_code: null }, { category: "general_repairs", service_code: null }],
+      [{ category: "general_repairs", code: "1007" }, { category: "general_repairs", code: "1001" }],
+    )).toEqual(["1007", "1001"]);
+  });
+
+  it("does not guess when same-category line and snapshot counts differ", () => {
+    expect(serviceCodesForSnapshots(
+      [{ category: "general_repairs", service_code: null }],
+      [{ category: "general_repairs", code: "1007" }, { category: "general_repairs", code: "1001" }],
+    )).toEqual([null]);
   });
 });

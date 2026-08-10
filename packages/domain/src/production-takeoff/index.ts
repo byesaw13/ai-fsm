@@ -3,6 +3,8 @@ export {
   computeDoorHardwareTakeoff,
   mergeDoorHardwareTakeoffIntoShoppingList,
   includesDoorHardwareCode,
+  priceBookCodesFromLineRows,
+  serviceCodesForSnapshots,
   packageCeil,
   type DoorHardwareType,
   type DoorHardwareTakeoffInput,

@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/middleware";
 import { query } from "@/lib/db";
 import { logger } from "@/lib/logger";
+import { shoppingListToMaterialsBySection } from "@/lib/estimates/shopping-list-display";
 import {
   computeMaterials,
   groupMaterialsBySection,
   computeDoorHardwareTakeoff,
   mergeDoorHardwareTakeoffIntoShoppingList,
   includesDoorHardwareCode,
+  priceBookCodesFromLineRows,
+  serviceCodesForSnapshots,
   DOOR_HARDWARE_PRICE_BOOK_CODE,
   type ShoppingList,
 } from "@ai-fsm/domain";
@@ -18,6 +21,7 @@ export const dynamic = "force-dynamic";
 interface SnapshotRow {
   id: string;
   category: string;
+  service_code: string | null;
   components: ScopeComponentValues;
   complexity: ComplexityValues;
   [key: string]: unknown;
@@ -54,8 +58,8 @@ export const GET = withAuth(async (request: NextRequest, session) => {
   try {
     // Verify estimate belongs to account
     const [estimateRows] = await Promise.all([
-      query<{ id: string; client_id: string }>(
-        `SELECT id, client_id FROM estimates WHERE id = $1 AND account_id = $2`,
+      query<{ id: string; client_id: string; shopping_list_json: ShoppingList | null }>(
+        `SELECT id, client_id, shopping_list_json FROM estimates WHERE id = $1 AND account_id = $2`,
         [estimateId, session.accountId]
       ),
     ]);
@@ -66,42 +70,39 @@ export const GET = withAuth(async (request: NextRequest, session) => {
       );
     }
 
-    // Line items that may reference price book codes (description often "1007 — …")
-    const lineRows = await query<{ description: string | null; price_book_id: string | null }>(
-      `SELECT description, price_book_id
-       FROM estimate_line_items
-       WHERE estimate_id = $1
-       ORDER BY sort_order ASC NULLS LAST`,
+    const saved = estimateRows[0].shopping_list_json;
+    if (saved?.sections?.length) {
+      return NextResponse.json({
+        sections: shoppingListToMaterialsBySection(saved),
+        materialTotalCents:
+          saved.total_catalog_cost_cents + saved.total_specified_cost_cents,
+      });
+    }
+
+    // One code per persisted line: joined price-book identity wins over description fallback.
+    const lineRows = await query<{ code: string | null; category: string | null; description: string | null }>(
+      `SELECT pb.code, pb.category, eli.description
+       FROM estimate_line_items eli
+       LEFT JOIN price_book pb ON pb.id = eli.price_book_id
+       WHERE eli.estimate_id = $1
+       ORDER BY eli.sort_order ASC NULLS LAST`,
       [estimateId],
     );
-    const codesFromDesc = lineRows
-      .map((r) => {
-        const m = r.description?.match(/^(\d{4})\b/);
-        return m?.[1] ?? null;
-      })
-      .filter(Boolean) as string[];
-    // Also resolve codes from price_book when id present
-    const pbIds = lineRows.map((r) => r.price_book_id).filter(Boolean) as string[];
-    let codesFromPb: string[] = [];
-    if (pbIds.length > 0) {
-      const ph = pbIds.map((_, i) => `$${i + 1}`).join(", ");
-      const pbRows = await query<{ code: string }>(
-        `SELECT code FROM price_book WHERE id IN (${ph})`,
-        pbIds,
-      );
-      codesFromPb = pbRows.map((r) => r.code);
-    }
-    const allCodes = [...codesFromDesc, ...codesFromPb];
+    const allCodes = priceBookCodesFromLineRows(lineRows);
     const has1007 = includesDoorHardwareCode(allCodes);
 
     // Load scope snapshots for this estimate
     const snapshots = await query<SnapshotRow>(
-      `SELECT id, category, components, complexity
-       FROM estimate_scope_snapshots
-       WHERE estimate_id = $1
-       ORDER BY created_at ASC`,
+      `SELECT ess.id, ess.category, ess.components, ess.complexity, pb.code AS service_code
+       FROM estimate_scope_snapshots ess
+       LEFT JOIN estimate_line_items eli ON eli.id = ess.estimate_line_item_id
+       LEFT JOIN price_book pb ON pb.id = eli.price_book_id
+       WHERE ess.estimate_id = $1
+       ORDER BY ess.created_at ASC`,
       [estimateId]
     );
+
+    const snapshotCodes = serviceCodesForSnapshots(snapshots, lineRows);
 
     if (snapshots.length === 0) {
       if (has1007) {
@@ -116,7 +117,7 @@ export const GET = withAuth(async (request: NextRequest, session) => {
         });
         const list = mergeDoorHardwareTakeoffIntoShoppingList(null, takeoff);
         return NextResponse.json({
-          sections: list.sections,
+          sections: shoppingListToMaterialsBySection(list),
           materialTotalCents: list.total_specified_cost_cents + list.total_catalog_cost_cents,
           takeoffWarnings: takeoff.warnings,
         });
@@ -124,13 +125,7 @@ export const GET = withAuth(async (request: NextRequest, session) => {
       return NextResponse.json({ sections: [], materialTotalCents: 0 });
     }
 
-    // Load service materials for all categories in the snapshots.
-    // TASK-103: when 1007 is on the estimate, skip general_repairs category dump
-    // (mud/tape/screws kit unrelated to door hardware — takeoff supplies the kit).
-    let categories = [...new Set(snapshots.map((s) => s.category).filter(Boolean))];
-    if (has1007) {
-      categories = categories.filter((c) => c !== "general_repairs");
-    }
+    const categories = [...new Set(snapshots.map((s) => s.category).filter(Boolean))];
     if (categories.length === 0) {
       if (has1007) {
         const unitCount = Math.max(
@@ -144,7 +139,7 @@ export const GET = withAuth(async (request: NextRequest, session) => {
         });
         const list = mergeDoorHardwareTakeoffIntoShoppingList(null, takeoff);
         return NextResponse.json({
-          sections: list.sections,
+          sections: shoppingListToMaterialsBySection(list),
           materialTotalCents: list.total_specified_cost_cents + list.total_catalog_cost_cents,
           takeoffWarnings: takeoff.warnings,
         });
@@ -187,7 +182,8 @@ export const GET = withAuth(async (request: NextRequest, session) => {
     }));
 
     // Compute materials for each snapshot and aggregate
-    const allComputed = snapshots.flatMap((snap) => {
+    const allComputed = snapshots.flatMap((snap, index) => {
+      if (snapshotCodes[index] === DOOR_HARDWARE_PRICE_BOOK_CODE) return [];
       const categoryMaterials = serviceMaterials.filter((m) => m.category === snap.category);
       return computeMaterials(categoryMaterials, snap.components ?? {}, snap.complexity ?? {});
     });
@@ -248,7 +244,7 @@ export const GET = withAuth(async (request: NextRequest, session) => {
       materialTotalCents =
         merged.total_catalog_cost_cents + merged.total_specified_cost_cents;
       return NextResponse.json({
-        sections: merged.sections,
+        sections: shoppingListToMaterialsBySection(merged),
         materialTotalCents,
         takeoffWarnings: takeoff.warnings,
       });
