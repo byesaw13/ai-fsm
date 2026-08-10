@@ -185,6 +185,34 @@ describe("mapShoppingListJsonToLines", () => {
     });
   });
 
+  // TASK-101: door hardware takeoff uses service_code 1007 → source kit
+  it("maps service_code 1007 specified items as source kit", () => {
+    const lines = mapShoppingListJsonToLines({
+      sections: [
+        {
+          section: "Hardware & Fasteners",
+          computed_items: [],
+          specified_items: [
+            {
+              name: "Door strike plate",
+              units_to_order: 1,
+              unit_label: "each",
+              store_section: "Hardware & Fasteners",
+              service_code: "1007",
+              notes: "Match latch type",
+            },
+          ],
+        },
+      ],
+    });
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({
+      name: "Door strike plate",
+      source: "kit",
+      catalog_material_id: null,
+    });
+  });
+
   // TASK T1 (materials trust calibration): ai_materials_delta is a new
   // top-level key added to shopping_list_json alongside `sections`, used to
   // persist the AI-proposed vs. founder-edited materials delta. This mapper

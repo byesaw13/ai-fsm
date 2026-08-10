@@ -1,5 +1,12 @@
 import type { PrepLevel, ShoppingList, EstimateResult, RoomSpec, ProjectOptions } from "@ai-fsm/domain";
-import { buildShoppingList, buildShoppingListFromEstimateResult } from "@ai-fsm/domain";
+import {
+  buildShoppingList,
+  buildShoppingListFromEstimateResult,
+  computeDoorHardwareTakeoff,
+  mergeDoorHardwareTakeoffIntoShoppingList,
+  includesDoorHardwareCode,
+  DOOR_HARDWARE_PRICE_BOOK_CODE,
+} from "@ai-fsm/domain";
 import type { ScopeBuilderResult } from "@/components/ScopeBuilder";
 import type { PriceBookEntry } from "@/app/app/estimates/new/hooks/useEstimatePriceBook";
 
@@ -97,14 +104,38 @@ export function buildManualShoppingList(
   priceBookItems: PriceBookEntry[],
   scopeResults: Record<string, ScopeBuilderResult>
 ): ShoppingList | null {
+  // TASK-103: price_book 1007 must NOT pull category-wide general_repairs
+  // materials (joint compound / mesh tape). Use deterministic takeoff only.
   const computedByService = priceBookItems
+    .filter((item) => item.service.code !== DOOR_HARDWARE_PRICE_BOOK_CODE)
     .map((item) => ({
       service_name: item.service.name,
       materials: scopeResults[item.instanceId]?.materials ?? [],
     }))
     .filter((s) => s.materials.length > 0);
-  if (computedByService.length === 0) return null;
-  return buildShoppingList(computedByService, []);
+
+  // Door hardware takeoff can produce a list even when other scope materials
+  // are empty — do not early-return before that merge.
+  const base =
+    computedByService.length > 0 ? buildShoppingList(computedByService, []) : null;
+
+  const codes = priceBookItems.map((i) => i.service.code);
+  if (!includesDoorHardwareCode(codes)) {
+    return base;
+  }
+
+  // Default pilot inputs: one unit per 1007 line item; Dovetails-supplied lockset.
+  // Structured assessment inputs can refine these later.
+  const unitCount = priceBookItems.filter(
+    (i) => i.service.code === DOOR_HARDWARE_PRICE_BOOK_CODE,
+  ).length || 1;
+
+  const takeoff = computeDoorHardwareTakeoff({
+    hardwareType: "lockset",
+    unitCount,
+    customerSupplied: false,
+  });
+  return mergeDoorHardwareTakeoffIntoShoppingList(base, takeoff);
 }
 
 export const DEFAULT_TIERS: OptionTier[] = [

@@ -1,5 +1,12 @@
 import type { PoolClient } from "pg";
-import { computeMaterials, groupMaterialsBySection } from "@ai-fsm/domain";
+import {
+  computeMaterials,
+  groupMaterialsBySection,
+  computeDoorHardwareTakeoff,
+  mergeDoorHardwareTakeoffIntoShoppingList,
+  includesDoorHardwareCode,
+  DOOR_HARDWARE_PRICE_BOOK_CODE,
+} from "@ai-fsm/domain";
 import type { ComplexityValues, ScopeComponentValues, ServiceMaterial } from "@ai-fsm/domain";
 import {
   mapRecomputedSectionsToLines,
@@ -139,6 +146,36 @@ export async function buildSeedLinesFromEstimate(
 ): Promise<BuyListLineInput[]> {
   const fromJson = mapShoppingListJsonToLines(estimate.shopping_list_json);
   if (fromJson.length > 0) return fromJson;
+
+  // TASK-103: if estimate has 1007, prefer door takeoff over category recompute
+  // (recompute dumps joint compound / mesh tape for general_repairs).
+  const lineCodes = await client.query<{ code: string | null; description: string | null }>(
+    `SELECT pb.code, eli.description
+     FROM estimate_line_items eli
+     LEFT JOIN price_book pb ON pb.id = eli.price_book_id
+     WHERE eli.estimate_id = $1`,
+    [estimate.id],
+  );
+  const codes: string[] = [];
+  for (const row of lineCodes.rows) {
+    if (row.code) codes.push(row.code);
+    const m = row.description?.match(/^(\d{4})\b/);
+    if (m) codes.push(m[1]);
+  }
+  if (includesDoorHardwareCode(codes)) {
+    const unitCount = Math.max(
+      1,
+      codes.filter((c) => c === DOOR_HARDWARE_PRICE_BOOK_CODE).length,
+    );
+    const takeoff = computeDoorHardwareTakeoff({
+      hardwareType: "lockset",
+      unitCount,
+      customerSupplied: false,
+    });
+    const list = mergeDoorHardwareTakeoffIntoShoppingList(null, takeoff);
+    return mapShoppingListJsonToLines(list);
+  }
+
   return recomputeShoppingLines(client, estimate.id);
 }
 

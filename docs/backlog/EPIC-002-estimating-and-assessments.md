@@ -370,6 +370,62 @@ Acceptance Criteria:
 - [ ] Quick Buy List launched from an assessment pre-fills from that assessment's summary.
 - [ ] Standalone results can be saved to a chosen job's buy list.
 
+# TASK-103: Door Hardware (1007) Deterministic Materials Takeoff → Buy List
+
+Status:
+Ready
+
+Phase:
+3
+
+Problem:
+Door-related estimates either invent materials via AI prompts or, when the job
+buy list falls back to category recompute, pull every `general_repairs`
+service_materials row (drywall compound, mesh tape, etc.) that has nothing to
+do with door hardware. Founders re-key hardware kits; techs hit store runs for
+screws/strike plates that should have been on the list.
+
+Business Value:
+Proves the Production Intelligence *principle* (work first, deterministic
+materials, no fabricated authority) on one real price_book code without
+building the full Work Item / licensed-catalog platform. Seeds job buy lists
+from a trustworthy takeoff for **1007 Door hardware replacement**.
+
+Scope:
+- Pure domain function `computeDoorHardwareTakeoff` for price_book code 1007
+  with inputs: `hardwareType`, `unitCount`, `customerSupplied`.
+- Emit `shopping_list_json.sections` using `specified_items` (null catalog ids —
+  avoid UUID cast trap in buy-list hydration).
+- Line `source` = **kit** (existing CHECK value; no new enum).
+- Server-side merge helper on estimate shopping-list build (create path via
+  `buildManualShoppingList` + shopping-list API when estimate includes 1007).
+- **Critical:** do not include category-wide `general_repairs` materials (mud/tape)
+  for 1007 lines — takeoff kit only.
+- Unit + integration tests.
+- Quarantine TASK-098 hybrid-pricing public export from domain index (do not wire).
+
+Out of Scope:
+- work_items tables / Production Profiles platform
+- Craftsman import or raw licensed rows
+- Estimate price arithmetic cutover
+- Families beyond 1007
+- Auto-calibration / readiness full state machine
+- Quick-estimate price_book_id identity fix (follow-up; document gap)
+
+Acceptance Criteria:
+- [x] Pure takeoff unit tests cover qty, package/waste, zero count, customer-supplied.
+- [x] Incomplete inputs return empty items (no silent invent).
+- [x] Domain barrel does not re-export hybrid-pricing.
+- [x] `buildManualShoppingList` merges 1007 kit and **excludes** general_repairs scope materials for 1007.
+- [x] Shopping-list API merges 1007 takeoff when lines reference 1007.
+- [x] `mapShoppingListJsonToLines` maps service_code 1007 → source kit.
+- [ ] Job buy-list seed integration: no drywall mud/tape for 1007-only estimates.
+- [ ] End-to-end owner flow on live/prod after deploy.
+
+Notes:
+CEO+eng review 2026-08-10. Renumbered from accidental TASK-101 (that ID already
+shipped as Quick Materials on main #591). Temporary identity = price_book 1007.
+
 ## Completed
 
 - [TASK-018: Assessment Summary Engine](../archive/backlog-done/TASK-018-assessment-summary-engine.md) — Done (Wave 3 2026-08-05)

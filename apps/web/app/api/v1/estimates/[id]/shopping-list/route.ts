@@ -2,7 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/middleware";
 import { query } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import { computeMaterials, groupMaterialsBySection } from "@ai-fsm/domain";
+import {
+  computeMaterials,
+  groupMaterialsBySection,
+  computeDoorHardwareTakeoff,
+  mergeDoorHardwareTakeoffIntoShoppingList,
+  includesDoorHardwareCode,
+  DOOR_HARDWARE_PRICE_BOOK_CODE,
+  type ShoppingList,
+} from "@ai-fsm/domain";
 import type { ServiceMaterial, ScopeComponentValues, ComplexityValues } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +46,7 @@ interface MaterialRow {
 
 // GET /api/v1/estimates/[id]/shopping-list
 // Returns computed materials grouped by store section for all scope snapshots on this estimate.
+// TASK-101: also merges deterministic door-hardware (1007) takeoff when line items include that code.
 export const GET = withAuth(async (request: NextRequest, session) => {
   // pathname: /api/v1/estimates/<id>/shopping-list → [-2] = id
   const estimateId = request.nextUrl.pathname.split("/").at(-2)!;
@@ -57,6 +66,34 @@ export const GET = withAuth(async (request: NextRequest, session) => {
       );
     }
 
+    // Line items that may reference price book codes (description often "1007 — …")
+    const lineRows = await query<{ description: string | null; price_book_id: string | null }>(
+      `SELECT description, price_book_id
+       FROM estimate_line_items
+       WHERE estimate_id = $1
+       ORDER BY sort_order ASC NULLS LAST`,
+      [estimateId],
+    );
+    const codesFromDesc = lineRows
+      .map((r) => {
+        const m = r.description?.match(/^(\d{4})\b/);
+        return m?.[1] ?? null;
+      })
+      .filter(Boolean) as string[];
+    // Also resolve codes from price_book when id present
+    const pbIds = lineRows.map((r) => r.price_book_id).filter(Boolean) as string[];
+    let codesFromPb: string[] = [];
+    if (pbIds.length > 0) {
+      const ph = pbIds.map((_, i) => `$${i + 1}`).join(", ");
+      const pbRows = await query<{ code: string }>(
+        `SELECT code FROM price_book WHERE id IN (${ph})`,
+        pbIds,
+      );
+      codesFromPb = pbRows.map((r) => r.code);
+    }
+    const allCodes = [...codesFromDesc, ...codesFromPb];
+    const has1007 = includesDoorHardwareCode(allCodes);
+
     // Load scope snapshots for this estimate
     const snapshots = await query<SnapshotRow>(
       `SELECT id, category, components, complexity
@@ -67,12 +104,51 @@ export const GET = withAuth(async (request: NextRequest, session) => {
     );
 
     if (snapshots.length === 0) {
+      if (has1007) {
+        const unitCount = Math.max(
+          1,
+          allCodes.filter((c) => c === DOOR_HARDWARE_PRICE_BOOK_CODE).length,
+        );
+        const takeoff = computeDoorHardwareTakeoff({
+          hardwareType: "lockset",
+          unitCount,
+          customerSupplied: false,
+        });
+        const list = mergeDoorHardwareTakeoffIntoShoppingList(null, takeoff);
+        return NextResponse.json({
+          sections: list.sections,
+          materialTotalCents: list.total_specified_cost_cents + list.total_catalog_cost_cents,
+          takeoffWarnings: takeoff.warnings,
+        });
+      }
       return NextResponse.json({ sections: [], materialTotalCents: 0 });
     }
 
-    // Load service materials for all categories in the snapshots
-    const categories = [...new Set(snapshots.map((s) => s.category).filter(Boolean))];
+    // Load service materials for all categories in the snapshots.
+    // TASK-103: when 1007 is on the estimate, skip general_repairs category dump
+    // (mud/tape/screws kit unrelated to door hardware — takeoff supplies the kit).
+    let categories = [...new Set(snapshots.map((s) => s.category).filter(Boolean))];
+    if (has1007) {
+      categories = categories.filter((c) => c !== "general_repairs");
+    }
     if (categories.length === 0) {
+      if (has1007) {
+        const unitCount = Math.max(
+          1,
+          allCodes.filter((c) => c === DOOR_HARDWARE_PRICE_BOOK_CODE).length,
+        );
+        const takeoff = computeDoorHardwareTakeoff({
+          hardwareType: "lockset",
+          unitCount,
+          customerSupplied: false,
+        });
+        const list = mergeDoorHardwareTakeoffIntoShoppingList(null, takeoff);
+        return NextResponse.json({
+          sections: list.sections,
+          materialTotalCents: list.total_specified_cost_cents + list.total_catalog_cost_cents,
+          takeoffWarnings: takeoff.warnings,
+        });
+      }
       return NextResponse.json({ sections: [], materialTotalCents: 0 });
     }
     const catPlaceholders = categories.map((_, i) => `$${i + 1}`).join(", ");
@@ -139,7 +215,44 @@ export const GET = withAuth(async (request: NextRequest, session) => {
     }));
 
     const sections = groupMaterialsBySection(deduplicated);
-    const materialTotalCents = deduplicated.reduce((sum, i) => sum + i.total_cost_cents, 0);
+    let materialTotalCents = deduplicated.reduce((sum, i) => sum + i.total_cost_cents, 0);
+
+    // TASK-101: merge 1007 door hardware kit into response when estimate includes code
+    if (has1007) {
+      const unitCount = Math.max(
+        1,
+        allCodes.filter((c) => c === DOOR_HARDWARE_PRICE_BOOK_CODE).length,
+      );
+      const takeoff = computeDoorHardwareTakeoff({
+        hardwareType: "lockset",
+        unitCount,
+        customerSupplied: false,
+      });
+      // Adapt API section shape into ShoppingList for merge, then return merge result
+      const asList: ShoppingList = {
+        sections: sections.map((sec) => ({
+          section: sec.section,
+          computed_items: (sec.items ?? []).map((it: { material: ServiceMaterial; quantity: number; total_cost_cents: number }) => ({
+            material: it.material,
+            quantity: it.quantity,
+            total_cost_cents: it.total_cost_cents,
+          })),
+          specified_items: [],
+          section_total_cents: 0,
+        })),
+        total_catalog_cost_cents: materialTotalCents,
+        total_specified_cost_cents: 0,
+        generated_at: new Date().toISOString(),
+      };
+      const merged = mergeDoorHardwareTakeoffIntoShoppingList(asList, takeoff);
+      materialTotalCents =
+        merged.total_catalog_cost_cents + merged.total_specified_cost_cents;
+      return NextResponse.json({
+        sections: merged.sections,
+        materialTotalCents,
+        takeoffWarnings: takeoff.warnings,
+      });
+    }
 
     return NextResponse.json({ sections, materialTotalCents });
   } catch (error) {

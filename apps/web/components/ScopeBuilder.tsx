@@ -319,7 +319,12 @@ export function ScopeBuilder({ category, serviceCode, unitType, basePriceCents, 
     const sqft = typeof components.wall_sqft === "number" ? components.wall_sqft :
                  typeof components.sqft === "number" ? components.sqft : undefined;
 
-    const rawMats = computeMaterials(materialRules, components, complexity);
+    // TASK-103: door hardware (1007) must not use category-wide general_repairs
+    // materials (joint compound, mesh tape, etc.). Kit comes from production takeoff.
+    const rawMats =
+      serviceCode === "1007"
+        ? []
+        : computeMaterials(materialRules, components, complexity);
     const { allowed: mats } = validateMaterialsForTrade(rawMats, category);
     const matTotal = mats.reduce((sum, m) => sum + m.total_cost_cents, 0);
 
