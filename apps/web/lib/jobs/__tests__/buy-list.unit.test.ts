@@ -47,26 +47,62 @@ describe("hydrateBuyListLocations", () => {
     const query = vi.fn().mockResolvedValue({
       rows: [{
         id: "catalog-1",
+        name: "Screws",
+        unit: "ea",
         supplier: "Home Depot",
         aisle: "12",
         bay: "4",
       }],
     });
     const lines: BuyListLineInput[] = [
-      { ...baseBuyListLine, name: "Screws", catalog_material_id: "catalog-1" },
+      { ...baseBuyListLine, name: "Screws", unit_label: "ea", catalog_material_id: "catalog-1" },
       { ...baseBuyListLine, name: "Custom trim", catalog_material_id: null },
     ];
 
     await expect(
       hydrateBuyListLocations({ query } as never, "account-1", lines),
     ).resolves.toMatchObject([
-      { supplier: "Home Depot", aisle: "12", bay: "4" },
+      { supplier: "Home Depot", aisle: "12", bay: "4", catalog_material_id: "catalog-1" },
       { supplier: null, aisle: null, bay: null },
     ]);
     expect(query).toHaveBeenCalledWith(
-      expect.stringContaining("account_id = $1"),
-      ["account-1", ["catalog-1"]],
+      expect.stringContaining("materials_price_book"),
+      ["account-1", ["catalog-1"], expect.arrayContaining(["screws", "custom trim"])],
     );
+  });
+
+  it("resolves location by name+unit when catalog id is a service_materials id", async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [{
+        id: "mpb-real",
+        name: "Drywall screws",
+        unit: "box",
+        supplier: "Home Depot",
+        aisle: "13",
+        bay: null,
+      }],
+    });
+    const lines: BuyListLineInput[] = [
+      {
+        ...baseBuyListLine,
+        name: "Drywall screws",
+        unit_label: "box",
+        // service_materials id — not a materials_price_book row
+        catalog_material_id: "service-mat-1",
+      },
+    ];
+
+    await expect(
+      hydrateBuyListLocations({ query } as never, "account-1", lines),
+    ).resolves.toMatchObject([
+      {
+        supplier: "Home Depot",
+        aisle: "13",
+        bay: null,
+        // remapped to the real price-book id for remember-for-future
+        catalog_material_id: "mpb-real",
+      },
+    ]);
   });
 });
 
@@ -299,11 +335,14 @@ describe("Store Run helpers", () => {
       line({ id: "a4", store_section: "Lumber", aisle: "4", bay: "7" }),
       line({ id: "paint", store_section: "Paint", aisle: null }),
       line({ id: "unknown", store_section: null, aisle: "Rear wall" }),
+      // Mid-string numbers are not aisle numbers
+      line({ id: "bay-text", store_section: "Misc", aisle: "Rear wall near bay 12" }),
     ]);
     expect(stops.map(({ key }) => key)).toEqual([
       "Lumber::4",
       "Fasteners::13",
       "Paint::department",
+      "Misc::unknown",
       "Unknown Location::unknown",
     ]);
     expect(stops[0].lines.map(({ id }) => id)).toEqual(["a4"]);

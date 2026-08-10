@@ -147,31 +147,71 @@ export async function hydrateBuyListLocations(
   accountId: string,
   lines: BuyListLineInput[],
 ): Promise<BuyListLineInput[]> {
+  // Seeded estimate lines often store service_materials.id in catalog_material_id.
+  // Location memory lives on account materials_price_book — resolve by id when it
+  // is a real price-book row, otherwise by name+unit so aisle/supplier still copy.
   const ids = [...new Set(
-    lines.flatMap((line) => line.catalog_material_id ? [line.catalog_material_id] : []),
+    lines.flatMap((line) => (line.catalog_material_id ? [line.catalog_material_id] : [])),
   )];
-  if (ids.length === 0) {
+  const nameUnitPairs = [
+    ...new Map(
+      lines.map((line) => {
+        const name = line.name.trim().toLowerCase();
+        const unit = (line.unit_label ?? "").trim().toLowerCase() || "each";
+        return [`${name}||${unit}`, { name, unit }] as const;
+      }),
+    ).values(),
+  ];
+
+  if (ids.length === 0 && nameUnitPairs.length === 0) {
     return lines.map((line) => ({ ...line, supplier: null, aisle: null, bay: null }));
   }
 
   const result = await client.query<{
     id: string;
+    name: string;
+    unit: string;
     supplier: string | null;
     aisle: string | null;
     bay: string | null;
   }>(
-    `SELECT id, supplier, aisle, bay
+    `SELECT id, name, unit, supplier, aisle, bay
      FROM materials_price_book
-     WHERE account_id = $1 AND id = ANY($2::uuid[])`,
-    [accountId, ids],
+     WHERE account_id = $1
+       AND is_active = true
+       AND (
+         (cardinality($2::uuid[]) > 0 AND id = ANY($2::uuid[]))
+         OR (
+           cardinality($3::text[]) > 0
+           AND lower(name) = ANY($3::text[])
+         )
+       )`,
+    [
+      accountId,
+      ids,
+      nameUnitPairs.map((pair) => pair.name),
+    ],
   );
-  const locations = new Map(result.rows.map((row) => [row.id, row]));
+
+  const byId = new Map(result.rows.map((row) => [row.id, row]));
+  const byNameUnit = new Map(
+    result.rows.map((row) => {
+      const name = (row.name ?? "").trim().toLowerCase();
+      const unit = (row.unit ?? "each").trim().toLowerCase() || "each";
+      return [`${name}||${unit}`, row] as const;
+    }),
+  );
+
   return lines.map((line) => {
-    const location = line.catalog_material_id
-      ? locations.get(line.catalog_material_id)
-      : undefined;
+    const unitKey = (line.unit_label ?? "").trim().toLowerCase() || "each";
+    const nameKey = `${line.name.trim().toLowerCase()}||${unitKey}`;
+    const location =
+      (line.catalog_material_id ? byId.get(line.catalog_material_id) : undefined) ??
+      byNameUnit.get(nameKey);
     return {
       ...line,
+      // Prefer a real materials_price_book id so "Remember for future jobs" can write.
+      catalog_material_id: location?.id ?? line.catalog_material_id ?? null,
       supplier: location?.supplier ?? null,
       aisle: location?.aisle ?? null,
       bay: location?.bay ?? null,

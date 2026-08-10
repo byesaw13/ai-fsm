@@ -48,9 +48,11 @@ export interface StoreRunStop {
 const normalized = (value: string | null | undefined) =>
   value?.trim().toLowerCase() ?? "";
 
+/** Leading aisle number only — "13", "Aisle 13B" → 13; "Rear wall near bay 12" → null. */
 const leadingAisleNumber = (aisle: string | null): number | null => {
-  const match = aisle?.match(/\d+/);
-  return match ? Number(match[0]) : null;
+  if (!aisle) return null;
+  const match = aisle.trim().match(/^(?:aisle\s*)?(\d+)/i);
+  return match ? Number(match[1]) : null;
 };
 
 export function filterStoreRunLines<T extends StoreRunLine>(
