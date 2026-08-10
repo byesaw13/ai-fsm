@@ -5,7 +5,7 @@ import { getSession } from "@/lib/auth/session";
 import { canCreateInvoices } from "@/lib/auth/permissions";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import type { InvoiceStatus } from "@ai-fsm/domain";
-import { invoiceDueOnCompletion } from "@ai-fsm/domain";
+import { invoiceDueOnCompletion, daysUntilInvoiceDue } from "@ai-fsm/domain";
 import {
   PageContainer,
   PageHeader,
@@ -68,12 +68,9 @@ function formatDollars(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
+/** Calendar days until due (ET). 0 = due today, negative = overdue. */
 function getDaysUntilDue(dueDate: string | null): number | null {
-  if (!dueDate) return null;
-  const due = new Date(dueDate);
-  const now = new Date();
-  const diffMs = due.getTime() - now.getTime();
-  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  return daysUntilInvoiceDue(dueDate);
 }
 
 function formatAging(days: number | null): string | null {
