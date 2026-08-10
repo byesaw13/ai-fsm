@@ -1,11 +1,50 @@
 import type { Client } from "pg";
-import { calendarDaysOverdue } from "@ai-fsm/domain";
 import { logger } from "./logger.js";
 import { invoiceFollowupEmailHtml } from "@ai-fsm/email-templates";
 import { appUrl } from "./mailer.js";
 import { enqueueNotification } from "./notification/enqueue.js";
 import { PRIORITY } from "./notification/priority.js";
 import type { AutomationRow, RunResult } from "./automations/types.js";
+
+/**
+ * Full Eastern calendar days past due (0 if due today / future).
+ * Kept local — worker image does not ship @ai-fsm/domain (ESM resolution).
+ * Must stay aligned with packages/domain calendarDaysOverdue.
+ */
+export function calendarDaysOverdue(
+  dueDate: string | null | undefined,
+  now: Date = new Date(),
+  timeZone = "America/New_York",
+): number {
+  if (dueDate == null || dueDate === "") return 0;
+  const ymd = (input: Date | string): string => {
+    if (typeof input === "string") {
+      const s = input.trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+      const utcMidnight = s.match(
+        /^(\d{4}-\d{2}-\d{2})T00:00:00(?:\.\d+)?(?:Z|[+-]00:00)$/,
+      );
+      if (utcMidnight) return utcMidnight[1];
+    }
+    const d = typeof input === "string" ? new Date(input) : input;
+    if (Number.isNaN(d.getTime())) return "";
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+  };
+  const dueYmd = ymd(dueDate);
+  const nowYmd = ymd(now);
+  if (!dueYmd || !nowYmd) return 0;
+  const [dy, dm, dd] = dueYmd.split("-").map(Number);
+  const [ny, nm, nd] = nowYmd.split("-").map(Number);
+  const days = Math.round(
+    (Date.UTC(dy, dm - 1, dd) - Date.UTC(ny, nm - 1, nd)) / 86_400_000,
+  );
+  return days < 0 ? -days : 0;
+}
 
 /**
  * Overdue Invoice Follow-Up Automation

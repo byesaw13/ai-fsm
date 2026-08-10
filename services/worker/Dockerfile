@@ -13,12 +13,11 @@ COPY services/worker/package.json services/worker/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM deps AS build
-COPY packages/domain packages/domain
 COPY packages/log packages/log
 COPY packages/money packages/money
 COPY packages/email-templates packages/email-templates
 COPY services/worker services/worker
-RUN pnpm --filter @ai-fsm/domain --filter @ai-fsm/log --filter @ai-fsm/money --filter @ai-fsm/email-templates --filter @ai-fsm/worker build
+RUN pnpm --filter @ai-fsm/log --filter @ai-fsm/money --filter @ai-fsm/email-templates --filter @ai-fsm/worker build
 
 FROM node:20-alpine AS run
 WORKDIR /app
@@ -27,8 +26,6 @@ RUN corepack enable
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/packages/domain/package.json ./packages/domain/package.json
-COPY --from=build /app/packages/domain/dist ./packages/domain/dist
 COPY --from=build /app/packages/log/package.json ./packages/log/package.json
 COPY --from=build /app/packages/log/dist ./packages/log/dist
 COPY --from=build /app/packages/money/package.json ./packages/money/package.json
@@ -40,12 +37,10 @@ COPY --from=build /app/services/worker/node_modules ./services/worker/node_modul
 COPY --from=build /app/services/worker/dist ./services/worker/dist
 # Workspace packages point main at src/ for dev; production runs compiled dist/.
 RUN sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|' \
-      packages/domain/package.json \
       packages/log/package.json \
       packages/money/package.json \
       packages/email-templates/package.json \
  && sed -i 's|"types": "src/index.ts"|"types": "dist/index.d.ts"|' \
-      packages/domain/package.json \
       packages/log/package.json \
       packages/money/package.json \
       packages/email-templates/package.json \
@@ -56,7 +51,6 @@ RUN sed -i 's|"main": "src/index.ts"|"main": "dist/index.js"|' \
       -e 's|"./src/index.ts"|"./dist/index.js"|g' \
       packages/log/package.json \
  && mkdir -p node_modules/@ai-fsm \
- && ln -s ../../packages/domain node_modules/@ai-fsm/domain \
  && ln -s ../../packages/log node_modules/@ai-fsm/log \
  && ln -s ../../packages/money node_modules/@ai-fsm/money \
  && ln -s ../../packages/email-templates node_modules/@ai-fsm/email-templates
