@@ -78,11 +78,17 @@ export const GET = withAuth(async (request: NextRequest, session: AuthSession) =
       );
 
       const lines = await client.query(
-        `SELECT id, name, quantity, unit_label, store_section, status, source,
-                catalog_material_id, sku, notes, sort_order, created_at, updated_at
-         FROM job_material_lines
-         WHERE job_id = $1 AND account_id = $2
-         ORDER BY sort_order ASC, created_at ASC`,
+        `SELECT jml.id, jml.name, jml.quantity, jml.unit_label,
+                jml.store_section, jml.status, jml.source, jml.notes,
+                jml.supplier, jml.aisle, jml.bay, jml.catalog_material_id,
+                jml.sku, jml.sort_order, jml.created_at, jml.updated_at,
+                mpb.unit_cost_cents
+         FROM job_material_lines jml
+         LEFT JOIN materials_price_book mpb
+           ON mpb.id = jml.catalog_material_id
+          AND mpb.account_id = jml.account_id
+         WHERE jml.job_id = $1 AND jml.account_id = $2
+         ORDER BY jml.sort_order ASC, jml.created_at ASC`,
         [jobId, session.accountId],
       );
 
