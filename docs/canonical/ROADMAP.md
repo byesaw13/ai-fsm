@@ -80,11 +80,14 @@ Location capture, visit candidates, day map, hybrid tracking are **shipped infra
 - Estimate guardrails visible; approved estimate → project readiness explicit
 - Invoice discounts, payment provider model, Square card payments (TASK-060, TASK-068, TASK-069)
 - Referral ROI reporting (TASK-017)
+- **Narrow production takeoff foundation (authorized 2026-08-10 CEO+eng review):** price_book code **1007** door-hardware deterministic material takeoff into `shopping_list_json` → job buy-list seed. See **TASK-103**. This is **not** full Production Intelligence (no Work Item Library platform, no licensed Craftsman import activation, no estimate-price engine flip).
+- **Gate:** Phase 1 ops remains active in parallel. Owner may proceed with TASK-103 as Phase 3 estimate/materials work; broader PI (TASK-047/048, multi-family catalog, calc snapshots) stays Phase 4 until this slice proves out.
 
 ### Phase 4 — Production Intelligence (deferred)
 
 - Work Item Library (TASK-047) and Confidence Engine (TASK-048) remain proposed
-- No PI expansion until Phases 0–3 are boring
+- Catalog-wide Production Profiles, Material Assemblies platform, calibration publish, licensed source catalog volume import
+- No broader PI expansion until Phases 0–3 are boring **and** TASK-103 pilot evidence exists
 
 ## Phase → Epic Mapping
 

@@ -1,5 +1,14 @@
 import type { PoolClient } from "pg";
-import { computeMaterials, groupMaterialsBySection } from "@ai-fsm/domain";
+import {
+  computeMaterials,
+  groupMaterialsBySection,
+  computeDoorHardwareTakeoff,
+  mergeDoorHardwareTakeoffIntoShoppingList,
+  includesDoorHardwareCode,
+  priceBookCodesFromLineRows,
+  serviceCodesForSnapshots,
+  DOOR_HARDWARE_PRICE_BOOK_CODE,
+} from "@ai-fsm/domain";
 import type { ComplexityValues, ScopeComponentValues, ServiceMaterial } from "@ai-fsm/domain";
 import {
   mapRecomputedSectionsToLines,
@@ -41,16 +50,20 @@ export async function pickSeedEstimate(
 async function recomputeShoppingLines(
   client: PoolClient,
   estimateId: string,
+  lineRows: Array<{ category: string | null; code: string | null }>,
 ): Promise<BuyListLineInput[]> {
   const snapshots = await client.query<{
     category: string;
+    service_code: string | null;
     components: ScopeComponentValues;
     complexity: ComplexityValues;
   }>(
-    `SELECT category, components, complexity
-     FROM estimate_scope_snapshots
-     WHERE estimate_id = $1
-     ORDER BY created_at ASC`,
+    `SELECT ess.category, ess.components, ess.complexity, pb.code AS service_code
+     FROM estimate_scope_snapshots ess
+     LEFT JOIN estimate_line_items eli ON eli.id = ess.estimate_line_item_id
+     LEFT JOIN price_book pb ON pb.id = eli.price_book_id
+     WHERE ess.estimate_id = $1
+     ORDER BY ess.created_at ASC`,
     [estimateId],
   );
   if (snapshots.rows.length === 0) return [];
@@ -112,9 +125,12 @@ async function recomputeShoppingLines(
     sort_order: m.sort_order,
   }));
 
+  const snapshotCodes = serviceCodesForSnapshots(snapshots.rows, lineRows);
+
   // Merge duplicate material.id across snapshots (same as shopping-list path).
   const byId = new Map<string, ReturnType<typeof computeMaterials>[number]>();
-  for (const snap of snapshots.rows) {
+  for (const [index, snap] of snapshots.rows.entries()) {
+    if (snapshotCodes[index] === DOOR_HARDWARE_PRICE_BOOK_CODE) continue;
     const mats = serviceMaterials.filter((m) => m.category === snap.category);
     for (const item of computeMaterials(mats, snap.components ?? {}, snap.complexity ?? {})) {
       const existing = byId.get(item.material.id);
@@ -139,7 +155,33 @@ export async function buildSeedLinesFromEstimate(
 ): Promise<BuyListLineInput[]> {
   const fromJson = mapShoppingListJsonToLines(estimate.shopping_list_json);
   if (fromJson.length > 0) return fromJson;
-  return recomputeShoppingLines(client, estimate.id);
+
+  // Persisted JSON is authoritative. Legacy estimates recompute, then add the 1007 kit.
+  const lineCodes = await client.query<{ code: string | null; category: string | null; description: string | null }>(
+    `SELECT pb.code, pb.category, eli.description
+     FROM estimate_line_items eli
+     LEFT JOIN price_book pb ON pb.id = eli.price_book_id
+     WHERE eli.estimate_id = $1`,
+    [estimate.id],
+  );
+  const codes = priceBookCodesFromLineRows(lineCodes.rows);
+  const recomputed = await recomputeShoppingLines(client, estimate.id, lineCodes.rows);
+  if (includesDoorHardwareCode(codes)) {
+    const unitCount = Math.max(
+      1,
+      codes.filter((c) => c === DOOR_HARDWARE_PRICE_BOOK_CODE).length,
+    );
+    const takeoff = computeDoorHardwareTakeoff({
+      hardwareType: "lockset",
+      unitCount,
+      customerSupplied: false,
+    });
+    const list = mergeDoorHardwareTakeoffIntoShoppingList(null, takeoff);
+    const kit = mapShoppingListJsonToLines(list);
+    return [...recomputed, ...mergeMissingLines(recomputed, kit)];
+  }
+
+  return recomputed;
 }
 
 export async function hydrateBuyListLocations(

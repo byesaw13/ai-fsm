@@ -12,7 +12,7 @@ import {
   type BuyListLineInput,
   type StoreRunLine,
 } from "../buy-list";
-import { hydrateBuyListLocations } from "../buy-list-seed";
+import { buildSeedLinesFromEstimate, hydrateBuyListLocations } from "../buy-list-seed";
 
 const baseBuyListLine: BuyListLineInput = {
   name: "Deck screws",
@@ -182,6 +182,34 @@ describe("mapShoppingListJsonToLines", () => {
       quantity: 1,
       source: "estimate",
       sku: "WR-1",
+    });
+  });
+
+  // TASK-101: door hardware takeoff uses service_code 1007 → source kit
+  it("maps service_code 1007 specified items as source kit", () => {
+    const lines = mapShoppingListJsonToLines({
+      sections: [
+        {
+          section: "Hardware & Fasteners",
+          computed_items: [],
+          specified_items: [
+            {
+              name: "Door strike plate",
+              units_to_order: 1,
+              unit_label: "each",
+              store_section: "Hardware & Fasteners",
+              service_code: "1007",
+              notes: "Match latch type",
+            },
+          ],
+        },
+      ],
+    });
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({
+      name: "Door strike plate",
+      source: "kit",
+      catalog_material_id: null,
     });
   });
 
@@ -362,5 +390,39 @@ describe("Store Run helpers", () => {
       summarizeStoreRun(lines, new Set(["known", "unknown"]))
         .estimatedPurchasedTotalCents,
     ).toBeNull();
+  });
+});
+
+describe("buildSeedLinesFromEstimate", () => {
+  it("merges one 1007 kit with recomputed lines for a mixed estimate", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("FROM estimate_line_items eli")) {
+        return { rows: [{ code: "1007", category: "general_repairs", description: "1007 — Door hardware replacement" }] };
+      }
+      if (sql.includes("estimate_scope_snapshots")) {
+        return { rows: [
+          { category: "general_repairs", service_code: "1007", components: {}, complexity: {} },
+          { category: "general_repairs", service_code: "1001", components: {}, complexity: {} },
+        ] };
+      }
+      return {
+        rows: [{
+          id: "compound", price_book_id: null, category: "general_repairs",
+          material_name: "Joint compound", description: null, quantity_type: "static",
+          scope_component_key: null, quantity_multiplier: null, quantity_flat: 1,
+          waste_factor: 1, unit: "gal", unit_cost_cents: 3000,
+          store_section: "Paint", is_consumable: false, is_optional: false,
+          condition_factor_key: null, sort_order: 0,
+        }],
+      };
+    });
+
+    const lines = await buildSeedLinesFromEstimate(
+      { query } as never,
+      { id: "estimate-1", status: "approved", shopping_list_json: null },
+    );
+
+    expect(lines.find((line) => line.name === "Joint compound")?.quantity).toBe(1);
+    expect(lines.find((line) => line.name.includes("lockset"))?.quantity).toBe(1);
   });
 });
