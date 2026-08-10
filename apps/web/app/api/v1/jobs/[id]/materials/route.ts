@@ -183,6 +183,86 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
         return NextResponse.json({ data: result });
       }
 
+      if (action === "ai_generate") {
+        if (session.role === "tech") {
+          return NextResponse.json(
+            { error: { code: "FORBIDDEN", message: "Techs cannot generate buy lists", traceId: session.traceId } },
+            { status: 403 },
+          );
+        }
+
+        const jobRes = await client.query<{ title: string; description: string | null }>(
+          `SELECT title, description FROM jobs WHERE id = $1 AND account_id = $2`,
+          [jobId, session.accountId]
+        );
+        const job = jobRes.rows[0];
+        if (!job) {
+          return NextResponse.json(
+            { error: { code: "NOT_FOUND", message: "Job not found", traceId: session.traceId } },
+            { status: 404 }
+          );
+        }
+
+        const scopeText = [job.title, job.description].filter(Boolean).join(". ");
+        const { generateMaterials, MaterialsGenerationError } = await import(
+          "@/lib/estimates/materials-generator"
+        );
+        let generated;
+        try {
+          generated = await generateMaterials({ scope: scopeText, job_type: "general_repair" });
+        } catch (err) {
+          // Surface configuration/generation problems with their real status
+          // (503 not-configured, 422 truncated, ...) instead of a generic 500,
+          // matching the standalone /api/v1/materials/quick route.
+          if (err instanceof MaterialsGenerationError) {
+            return NextResponse.json(
+              { error: { code: err.code, message: err.message, traceId: session.traceId } },
+              { status: err.status },
+            );
+          }
+          throw err;
+        }
+
+        // Idempotent: re-generating replaces prior AI-proposed needed lines so a
+        // double-click or retry can't silently double the buy list (overbuying).
+        // Purchased / on-truck / manually-added lines are left untouched.
+        await client.query(
+          `DELETE FROM job_material_lines
+             WHERE job_id = $1 AND account_id = $2 AND source = 'ai' AND status = 'needed'`,
+          [jobId, session.accountId],
+        );
+
+        let insertedCount = 0;
+        for (let i = 0; i < generated.items.length; i++) {
+          const item = generated.items[i]!;
+          await client.query(
+            `INSERT INTO job_material_lines
+               (account_id, job_id, name, quantity, unit_label, store_section, status, source, notes, sort_order)
+             VALUES ($1, $2, $3, $4, $5, $6, 'needed', 'ai', $7, $8)`,
+            [
+              session.accountId,
+              jobId,
+              item.name,
+              item.quantity,
+              item.unit,
+              item.category || "General",
+              item.notes || null,
+              i,
+            ]
+          );
+          insertedCount++;
+        }
+
+        await client.query(
+          `UPDATE jobs SET materials_plan_seeded_at = NOW() WHERE id = $1 AND account_id = $2`,
+          [jobId, session.accountId]
+        );
+
+        return NextResponse.json({
+          data: { mode: "ai_generated", inserted: insertedCount, items: generated.items },
+        });
+      }
+
       if (session.role === "tech") {
         return NextResponse.json(
           { error: { code: "FORBIDDEN", message: "Techs can only update status", traceId: session.traceId } },

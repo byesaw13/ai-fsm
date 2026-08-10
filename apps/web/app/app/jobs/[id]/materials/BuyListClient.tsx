@@ -211,6 +211,32 @@ export function BuyListClient({
     }
   }
 
+  async function generateAiMaterials() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/v1/jobs/${jobId}/materials`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "ai_generate" }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMessage(json?.error?.message ?? "AI materials generation failed");
+        return;
+      }
+      const data = json?.data;
+      setMessage(`Generated ${data?.inserted ?? 0} purchase-ready item(s) with AI.`);
+      refresh();
+      const list = await fetch(`/api/v1/jobs/${jobId}/materials`, { credentials: "same-origin" });
+      const listJson = await list.json();
+      if (listJson?.data?.lines) setLines(listJson.data.lines);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const hasNeeded = lines.some((line) => line.status === "needed");
 
   if (storeRunMode === "launch") {
@@ -274,7 +300,6 @@ export function BuyListClient({
     );
   }
 
-
   const visible =
     filter === "all" ? lines : lines.filter((l) => l.status === "needed");
   const groups = groupByStoreSection(
@@ -297,6 +322,16 @@ export function BuyListClient({
             <button
               type="button"
               className="p7-btn p7-btn-primary p7-btn-sm"
+              disabled={busy}
+              onClick={() => void generateAiMaterials()}
+              data-testid="buy-list-ai-generate"
+              style={{ background: "var(--accent)" }}
+            >
+              🤖 Generate with AI
+            </button>
+            <button
+              type="button"
+              className="p7-btn p7-btn-secondary p7-btn-sm"
               disabled={busy}
               onClick={() => void seed(false)}
               data-testid="buy-list-seed"

@@ -20,6 +20,7 @@ export interface QuickAction {
 /** Owner Dashboard (`/app`) quick actions. */
 export const OWNER_QUICK_ACTIONS: QuickAction[] = [
   { label: "New Estimate", href: "/app/estimates", icon: "📝" },
+  { label: "Quick Materials", href: "/app/materials/quick", icon: "📦" },
   { label: "New Project", href: "/app/jobs", icon: "🛠️" },
   { label: "Schedule", href: "/app/schedule", icon: "📅" },
   { label: "Invoices", href: "/app/invoices", icon: "🧾" },
@@ -33,6 +34,7 @@ export const OWNER_QUICK_ACTIONS: QuickAction[] = [
  */
 export const FIELD_QUICK_ACTIONS: QuickAction[] = [
   { label: "New Estimate", href: "/app/estimates", icon: "📝" },
+  { label: "Quick Materials", href: "/app/materials/quick", icon: "📦" },
   { label: "New Project", href: "/app/jobs", icon: "🛠️" },
   { label: "Add Expense", href: "/app/expenses/new", icon: "🛒" },
   { label: "Upload Receipt", href: "/app/expenses/new", icon: "🧾" },

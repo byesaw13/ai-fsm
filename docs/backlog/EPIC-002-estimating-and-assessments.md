@@ -317,6 +317,59 @@ Notes:
 Surfaced during CEO review of PR #589. Priority P2 — the card's Fixed-price
 math is currently correct, only the comparison framing is misleading.
 
+# TASK-101: Standalone & Direct Job/Visit Quick Materials Generator (Uncouple Materials from Estimates)
+
+Status:
+Done (implementation; live AI path requires ANTHROPIC_API_KEY set)
+
+Phase:
+3
+
+Problem:
+Generating a materials/buy list currently requires navigating into a formal client Estimate (`/app/estimates/[id]`). In field reality, technicians and founders frequently need a fast purchase-ready materials list directly from a Site Assessment (`/app/visits/[id]/assessment`), a Job (`/app/jobs/[id]/materials`), or a Standalone Quick Tool (`/app/materials/quick`) without being forced to create an Estimate first.
+
+Business Value:
+Uncouples materials generation from client estimates, saving time on site and enabling instant supply-house buy lists from any job, assessment, or voice/text scope description.
+
+Scope:
+- Create standalone Quick Materials List tool at `/app/materials/quick` (accessible from Quick Actions / Navigation).
+- Add direct "🤖 Generate AI Materials List" button on the Job Materials page (`/app/jobs/[id]/materials`) that populates `job_material_lines` idempotently.
+- Provide a one-tap "Copy Supply House Text" order on the standalone tool.
+
+Out of Scope:
+- Direct API automated purchase ordering with distributors.
+
+Deferred to follow-up (TASK-102):
+- Pass site-assessment context (visit ID + canonical assessment summary) into the quick generator instead of the current context-free link.
+- "Save to Job Buy List" from the standalone tool (job selector + persist to `job_material_lines`).
+
+Acceptance Criteria:
+- [x] Standalone page `/app/materials/quick` allows entering scope text and generating a materials list immediately.
+- [x] Job Materials page (`/app/jobs/[id]/materials`) has a one-tap "Generate AI Materials List" button that populates `job_material_lines`.
+- [x] Generated materials list features a one-tap "Copy Order Text" button.
+
+# TASK-102: Quick Materials — assessment context + save-to-job (follow-up to TASK-101)
+
+Status:
+Proposed
+
+Phase:
+3
+
+Problem:
+The standalone Quick Materials generator (TASK-101) takes free-typed scope only. Launching it from a populated site assessment discards the visit ID and assessment summary, and standalone results cannot be persisted to a job's buy list.
+
+Scope:
+- Carry visit context (visit ID) from the assessment page into `/app/materials/quick` and use the canonical assessment summary (`buildAssessmentSummary`) as generator input.
+- Add a "Save to Job Buy List" action on the standalone tool: job selector + persist generated items to `job_material_lines` (reuse the idempotent `ai_generate` path).
+
+Out of Scope:
+- Automated distributor ordering.
+
+Acceptance Criteria:
+- [ ] Quick Buy List launched from an assessment pre-fills from that assessment's summary.
+- [ ] Standalone results can be saved to a chosen job's buy list.
+
 ## Completed
 
 - [TASK-018: Assessment Summary Engine](../archive/backlog-done/TASK-018-assessment-summary-engine.md) — Done (Wave 3 2026-08-05)
