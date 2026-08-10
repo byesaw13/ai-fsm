@@ -313,9 +313,32 @@ Acceptance Criteria:
 - [ ] Burdened rate defined once, imported by both `EstimateSummaryCard.tsx`
   and `hybrid-pricing/engine.ts`.
 
-Notes:
-Surfaced during CEO review of PR #589. Priority P2 — the card's Fixed-price
-math is currently correct, only the comparison framing is misleading.
+# TASK-100: Standalone & Direct Job/Visit Quick Materials Generator (Uncouple Materials from Estimates)
+
+Status:
+In Progress
+
+Phase:
+3
+
+Problem:
+Generating a materials/buy list currently requires navigating into a formal client Estimate (`/app/estimates/[id]`). In field reality, technicians and founders frequently need a fast purchase-ready materials list directly from a Site Assessment (`/app/visits/[id]/assessment`), a Job (`/app/jobs/[id]/materials`), or a Standalone Quick Tool (`/app/materials/quick`) without being forced to create an Estimate first.
+
+Business Value:
+Uncouples materials generation from client estimates, saving time on site and enabling instant supply-house buy lists from any job, assessment, or voice/text scope description.
+
+Scope:
+- Create standalone Quick Materials List tool at `/app/materials/quick` (accessible from Quick Actions / Navigation).
+- Add direct "🤖 Generate AI Materials List" button on Job Materials page (`/app/jobs/[id]/materials`) and Assessment page (`/app/visits/[id]/assessment`).
+- Provide one-tap "Copy Order Text" (for texting supply house / crew) and "Save to Job Buy List".
+
+Out of Scope:
+- Direct API automated purchase ordering with distributors.
+
+Acceptance Criteria:
+- [ ] Standalone page `/app/materials/quick` allows entering scope text and generating a materials list immediately.
+- [ ] Job Materials page (`/app/jobs/[id]/materials`) has a one-tap "Generate AI Materials List" button that populates `job_material_lines`.
+- [ ] Generated materials list features a one-tap "Copy Order Text" button.
 
 ## Completed
 

@@ -177,6 +177,61 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
         return NextResponse.json({ data: result });
       }
 
+      if (action === "ai_generate") {
+        if (session.role === "tech") {
+          return NextResponse.json(
+            { error: { code: "FORBIDDEN", message: "Techs cannot generate buy lists", traceId: session.traceId } },
+            { status: 403 },
+          );
+        }
+
+        const jobRes = await client.query<{ title: string; description: string | null }>(
+          `SELECT title, description FROM jobs WHERE id = $1 AND account_id = $2`,
+          [jobId, session.accountId]
+        );
+        const job = jobRes.rows[0];
+        if (!job) {
+          return NextResponse.json(
+            { error: { code: "NOT_FOUND", message: "Job not found", traceId: session.traceId } },
+            { status: 404 }
+          );
+        }
+
+        const scopeText = [job.title, job.description].filter(Boolean).join(". ");
+        const { generateMaterials } = await import("@/lib/estimates/materials-generator");
+        const generated = await generateMaterials({ scope: scopeText, job_type: "general_repair" });
+
+        let insertedCount = 0;
+        for (let i = 0; i < generated.items.length; i++) {
+          const item = generated.items[i]!;
+          await client.query(
+            `INSERT INTO job_material_lines
+               (account_id, job_id, name, quantity, unit_label, store_section, status, source, notes, sort_order)
+             VALUES ($1, $2, $3, $4, $5, $6, 'needed', 'ai', $7, $8)`,
+            [
+              session.accountId,
+              jobId,
+              item.name,
+              item.quantity,
+              item.unit,
+              item.category || "General",
+              item.notes || null,
+              i,
+            ]
+          );
+          insertedCount++;
+        }
+
+        await client.query(
+          `UPDATE jobs SET materials_plan_seeded_at = NOW() WHERE id = $1 AND account_id = $2`,
+          [jobId, session.accountId]
+        );
+
+        return NextResponse.json({
+          data: { mode: "ai_generated", inserted: insertedCount, items: generated.items },
+        });
+      }
+
       if (session.role === "tech") {
         return NextResponse.json(
           { error: { code: "FORBIDDEN", message: "Techs can only update status", traceId: session.traceId } },

@@ -160,11 +160,16 @@ export default async function AssessmentPage({
         backHref={visit.job_id ? `/app/jobs/${visit.job_id}` : `/app/visits/${id}`}
         backLabel={visit.job_title ?? "Visit"}
         actions={
-          visit.job_id ? (
-            <LinkButton href={`/app/jobs/${visit.job_id}` as Route} variant="secondary" size="sm">
-              Project
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <LinkButton href="/app/materials/quick" variant="secondary" size="sm">
+              📦 Quick Buy List
             </LinkButton>
-          ) : undefined
+            {visit.job_id && (
+              <LinkButton href={`/app/jobs/${visit.job_id}` as Route} variant="secondary" size="sm">
+                Project
+              </LinkButton>
+            )}
+          </div>
         }
       />
 
