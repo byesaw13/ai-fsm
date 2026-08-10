@@ -413,16 +413,27 @@ export function resolveIssueDueDate(input: {
  * Calendar date label YYYY-MM-DD in `timeZone` (default America/New_York).
  * Used so "due today" is day-based, not UTC-instant-based.
  *
- * Plain `YYYY-MM-DD` strings are treated as a calendar label already (no
- * UTC-midnight reinterpretation — `new Date("2026-06-12")` is UTC midnight
- * and would shift to the previous Eastern evening).
+ * Representations we accept:
+ * - Plain `YYYY-MM-DD` → use as the calendar label (date pickers / MCP).
+ * - ISO at **UTC midnight** (`…T00:00:00.000Z`) → use the **UTC** date
+ *   components. Date pickers often do `new Date("YYYY-MM-DD").toISOString()`,
+ *   which is UTC midnight of the picked day; converting that through ET would
+ *   shift to the previous evening and mark due one day early.
+ * - Other instants (including `dueDateUponCompletion` Eastern-midnight stamps
+ *   like `T04:00:00.000Z` in EDT) → convert via `timeZone`.
  */
 export function calendarYmdInTimeZone(
   input: Date | string,
   timeZone = "America/New_York",
 ): string {
-  if (typeof input === "string" && /^\d{4}-\d{2}-\d{2}$/.test(input.trim())) {
-    return input.trim();
+  if (typeof input === "string") {
+    const s = input.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    // Legacy date-picker: ISO UTC midnight for the intended calendar day.
+    const utcMidnight = s.match(
+      /^(\d{4}-\d{2}-\d{2})T00:00:00(?:\.\d+)?(?:Z|[+-]00:00)$/,
+    );
+    if (utcMidnight) return utcMidnight[1];
   }
   const d = typeof input === "string" ? new Date(input) : input;
   if (Number.isNaN(d.getTime())) return "";

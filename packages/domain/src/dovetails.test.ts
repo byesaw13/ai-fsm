@@ -97,4 +97,13 @@ describe("calendar-day invoice overdue (due-upon-completion same-day send)", () 
     expect(daysUntilInvoiceDue(dueFuture, afternoonSameDay)).toBe(10);
     expect(isInvoiceCalendarOverdue(dueFuture, afternoonSameDay)).toBe(false);
   });
+
+  it("UTC-midnight ISO from date pickers keeps the UTC calendar day", () => {
+    // Picked 2026-08-20 → often stored as 2026-08-20T00:00:00.000Z
+    const picker = "2026-08-20T00:00:00.000Z";
+    // Afternoon ET on Aug 20 must not treat as Aug 19 (overdue)
+    expect(daysUntilInvoiceDue(picker, "2026-08-20T21:00:00.000Z")).toBe(0);
+    expect(isInvoiceCalendarOverdue(picker, "2026-08-20T21:00:00.000Z")).toBe(false);
+    expect(isInvoiceCalendarOverdue(picker, "2026-08-21T12:00:00.000Z")).toBe(true);
+  });
 });
