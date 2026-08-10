@@ -320,7 +320,7 @@ math is currently correct, only the comparison framing is misleading.
 # TASK-100: Standalone & Direct Job/Visit Quick Materials Generator (Uncouple Materials from Estimates)
 
 Status:
-In Progress
+Done (implementation; live AI path requires ANTHROPIC_API_KEY set)
 
 Phase:
 3
@@ -340,9 +340,9 @@ Out of Scope:
 - Direct API automated purchase ordering with distributors.
 
 Acceptance Criteria:
-- [ ] Standalone page `/app/materials/quick` allows entering scope text and generating a materials list immediately.
-- [ ] Job Materials page (`/app/jobs/[id]/materials`) has a one-tap "Generate AI Materials List" button that populates `job_material_lines`.
-- [ ] Generated materials list features a one-tap "Copy Order Text" button.
+- [x] Standalone page `/app/materials/quick` allows entering scope text and generating a materials list immediately.
+- [x] Job Materials page (`/app/jobs/[id]/materials`) has a one-tap "Generate AI Materials List" button that populates `job_material_lines`.
+- [x] Generated materials list features a one-tap "Copy Order Text" button.
 
 ## Completed
 
