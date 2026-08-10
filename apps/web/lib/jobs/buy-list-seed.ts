@@ -194,13 +194,12 @@ export async function hydrateBuyListLocations(
   );
 
   const byId = new Map(result.rows.map((row) => [row.id, row]));
-  const byNameUnit = new Map(
-    result.rows.map((row) => {
-      const name = (row.name ?? "").trim().toLowerCase();
-      const unit = (row.unit ?? "each").trim().toLowerCase() || "each";
-      return [`${name}||${unit}`, row] as const;
-    }),
-  );
+  const byNameUnit = new Map<string, (typeof result.rows)[number]>();
+  for (const row of result.rows) {
+    const name = (row.name ?? "").trim().toLowerCase();
+    const unit = (row.unit ?? "each").trim().toLowerCase() || "each";
+    byNameUnit.set(`${name}||${unit}`, row);
+  }
 
   return lines.map((line) => {
     const unitKey = (line.unit_label ?? "").trim().toLowerCase() || "each";
