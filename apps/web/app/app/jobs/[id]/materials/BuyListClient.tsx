@@ -53,6 +53,21 @@ export function BuyListClient({
   const [unit, setUnit] = useState("");
   const [section, setSection] = useState("");
   const [filter, setFilter] = useState<"needed" | "all">("needed");
+  const [showTaskBuilder, setShowTaskBuilder] = useState(false);
+  const [taskOptions, setTaskOptions] = useState<
+    Array<{
+      code: string;
+      name: string;
+      template_count: number;
+      default_price_cents: number | null;
+      labor_hours_typical: number | null;
+      audit: { missingLaborHours: boolean; underCostFloor: boolean; suggestedPackageCents: number | null };
+    }>
+  >([]);
+  const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
+  const [includeOptional, setIncludeOptional] = useState(false);
+  const [includeConsumable, setIncludeConsumable] = useState(false);
+  const [drywallSqft, setDrywallSqft] = useState("");
 
   const [storeRunMode, setStoreRunMode] = useState<StoreRunMode>("list");
   const [storeRunSupplier, setStoreRunSupplier] = useState<string | null>(null);
@@ -211,6 +226,76 @@ export function BuyListClient({
     }
   }
 
+  async function openTaskBuilder() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/v1/price-book/material-templates", {
+        credentials: "same-origin",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMessage(json?.error?.message ?? "Could not load task templates");
+        return;
+      }
+      setTaskOptions(json?.data?.tasks ?? []);
+      setSelectedCodes([]);
+      setShowTaskBuilder(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function buildFromTasks() {
+    if (selectedCodes.length === 0) {
+      setMessage("Pick at least one price-book task.");
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const dimensions: Record<string, number> = {};
+      const sqft = parseFloat(drywallSqft);
+      if (Number.isFinite(sqft) && sqft > 0) dimensions.drywall_sqft = sqft;
+
+      const res = await fetch(`/api/v1/jobs/${jobId}/materials/build`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          price_book_codes: selectedCodes,
+          dimensions,
+          include_optional: includeOptional,
+          include_consumable: includeConsumable,
+          commit: true,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMessage(json?.error?.message ?? "Build from tasks failed");
+        return;
+      }
+      const inserted = json?.data?.inserted ?? 0;
+      const skipped = json?.data?.skipped_existing ?? 0;
+      setMessage(
+        inserted > 0
+          ? `Added ${inserted} must-buy item(s) from task packs${skipped ? ` (${skipped} already on list)` : ""}.`
+          : skipped > 0
+            ? "All template items were already on the list."
+            : "No lines produced (check dimensions for measured items).",
+      );
+      setShowTaskBuilder(false);
+      refresh();
+      try {
+        await refreshLines();
+      } catch {
+        /* ignore */
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function generateAiMaterials() {
     setBusy(true);
     setMessage(null);
@@ -323,11 +408,19 @@ export function BuyListClient({
               type="button"
               className="p7-btn p7-btn-primary p7-btn-sm"
               disabled={busy}
+              onClick={() => void openTaskBuilder()}
+              data-testid="buy-list-build-tasks"
+            >
+              Build from tasks
+            </button>
+            <button
+              type="button"
+              className="p7-btn p7-btn-secondary p7-btn-sm"
+              disabled={busy}
               onClick={() => void generateAiMaterials()}
               data-testid="buy-list-ai-generate"
-              style={{ background: "var(--accent)" }}
             >
-              🤖 Generate with AI
+              Generate with AI
             </button>
             <button
               type="button"
@@ -407,6 +500,131 @@ export function BuyListClient({
         >
           {message}
         </p>
+      )}
+
+      {showTaskBuilder && (
+        <div
+          data-testid="buy-list-task-builder"
+          style={{
+            marginBottom: "var(--space-4)",
+            padding: "var(--space-3)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            display: "grid",
+            gap: "var(--space-3)",
+          }}
+        >
+          <div>
+            <strong style={{ fontSize: "var(--text-sm)" }}>Build from price-book tasks</strong>
+            <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--fg-muted)" }}>
+              Deterministic packs — must-buy only by default. AI is not used. Yellow flags mean labor hours or package pricing need review.
+            </p>
+          </div>
+          {taskOptions.length === 0 ? (
+            <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+              No task packs seeded yet. Run migration 172 or add price_book_material_templates.
+            </p>
+          ) : (
+            <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gap: 6, maxHeight: 240, overflow: "auto" }}>
+              {taskOptions.map((t) => {
+                const checked = selectedCodes.includes(t.code);
+                const warn = t.audit?.missingLaborHours || t.audit?.underCostFloor;
+                return (
+                  <li key={t.code}>
+                    <label
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "flex-start",
+                        fontSize: "var(--text-sm)",
+                        cursor: "pointer",
+                        minHeight: 44,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setSelectedCodes((prev) =>
+                            checked ? prev.filter((c) => c !== t.code) : [...prev, t.code],
+                          );
+                        }}
+                      />
+                      <span>
+                        <strong>{t.code}</strong> {t.name}
+                        <span style={{ color: "var(--fg-muted)" }}>
+                          {" "}
+                          · {t.template_count} items
+                          {t.default_price_cents != null
+                            ? ` · $${(t.default_price_cents / 100).toFixed(0)}`
+                            : ""}
+                        </span>
+                        {warn && (
+                          <span style={{ display: "block", color: "var(--color-warning, #b45309)", fontSize: 12 }}>
+                            Pricing review:{" "}
+                            {t.audit.missingLaborHours
+                              ? "missing labor hours"
+                              : "package below cost floor"}
+                            {t.audit.suggestedPackageCents != null
+                              ? ` (hours×rate ≈ $${(t.audit.suggestedPackageCents / 100).toFixed(0)})`
+                              : ""}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)", alignItems: "center" }}>
+            <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12 }}>
+              <input
+                type="checkbox"
+                checked={includeOptional}
+                onChange={(e) => setIncludeOptional(e.target.checked)}
+              />
+              Include optional
+            </label>
+            <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12 }}>
+              <input
+                type="checkbox"
+                checked={includeConsumable}
+                onChange={(e) => setIncludeConsumable(e.target.checked)}
+              />
+              Include consumables
+            </label>
+            <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12 }}>
+              Drywall sqft
+              <input
+                value={drywallSqft}
+                onChange={(e) => setDrywallSqft(e.target.value)}
+                inputMode="decimal"
+                placeholder="if patch/sheet"
+                style={{ width: 88, padding: "4px 6px", borderRadius: 6, border: "1px solid var(--border)" }}
+              />
+            </label>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="p7-btn p7-btn-primary p7-btn-sm"
+              disabled={busy || selectedCodes.length === 0}
+              onClick={() => void buildFromTasks()}
+              data-testid="buy-list-build-commit"
+            >
+              Add to buy list
+            </button>
+            <button
+              type="button"
+              className="p7-btn p7-btn-secondary p7-btn-sm"
+              disabled={busy}
+              onClick={() => setShowTaskBuilder(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       {lines.length === 0 ? (

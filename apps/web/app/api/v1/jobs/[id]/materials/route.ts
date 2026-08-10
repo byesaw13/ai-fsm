@@ -82,6 +82,7 @@ export const GET = withAuth(async (request: NextRequest, session: AuthSession) =
                 jml.store_section, jml.status, jml.source, jml.notes,
                 jml.supplier, jml.aisle, jml.bay, jml.catalog_material_id,
                 jml.sku, jml.sort_order, jml.created_at, jml.updated_at,
+                jml.role, jml.generation_source, jml.price_book_code,
                 mpb.unit_cost_cents
          FROM job_material_lines jml
          LEFT JOIN materials_price_book mpb
