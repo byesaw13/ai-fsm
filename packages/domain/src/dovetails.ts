@@ -409,6 +409,93 @@ export function resolveIssueDueDate(input: {
   return dueDateUponCompletion(input.now ?? new Date());
 }
 
+/**
+ * Calendar date label YYYY-MM-DD in `timeZone` (default America/New_York).
+ * Used so "due today" is day-based, not UTC-instant-based.
+ *
+ * Representations we accept:
+ * - Plain `YYYY-MM-DD` → use as the calendar label (date pickers / MCP).
+ * - ISO at **UTC midnight** (`…T00:00:00.000Z`) → use the **UTC** date
+ *   components. Date pickers often do `new Date("YYYY-MM-DD").toISOString()`,
+ *   which is UTC midnight of the picked day; converting that through ET would
+ *   shift to the previous evening and mark due one day early.
+ * - Other instants (including `dueDateUponCompletion` Eastern-midnight stamps
+ *   like `T04:00:00.000Z` in EDT) → convert via `timeZone`.
+ */
+export function calendarYmdInTimeZone(
+  input: Date | string,
+  timeZone = "America/New_York",
+): string {
+  if (typeof input === "string") {
+    const s = input.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    // Legacy date-picker: ISO UTC midnight for the intended calendar day.
+    const utcMidnight = s.match(
+      /^(\d{4}-\d{2}-\d{2})T00:00:00(?:\.\d+)?(?:Z|[+-]00:00)$/,
+    );
+    if (utcMidnight) return utcMidnight[1];
+  }
+  const d = typeof input === "string" ? new Date(input) : input;
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+/**
+ * Whole calendar days from "today" to the due date in `timeZone`.
+ *
+ * - `0`  = due today (not overdue)
+ * - `>0` = due in the future
+ * - `<0` = overdue by |n| full calendar days
+ *
+ * `due_date` is stored as local-midnight-as-UTC for the due day. Comparing
+ * that instant to `now()` wrongly marks same-day invoices OVERDUE as soon as
+ * they are sent after midnight. Calendar comparison is the product rule.
+ */
+export function daysUntilInvoiceDue(
+  dueDate: string | Date | null | undefined,
+  now: Date | string = new Date(),
+  timeZone = "America/New_York",
+): number | null {
+  if (dueDate == null || dueDate === "") return null;
+  const dueYmd = calendarYmdInTimeZone(dueDate, timeZone);
+  const nowYmd = calendarYmdInTimeZone(now, timeZone);
+  if (!dueYmd || !nowYmd) return null;
+  const [dy, dm, dd] = dueYmd.split("-").map(Number);
+  const [ny, nm, nd] = nowYmd.split("-").map(Number);
+  const dueUtc = Date.UTC(dy, dm - 1, dd);
+  const nowUtc = Date.UTC(ny, nm - 1, nd);
+  return Math.round((dueUtc - nowUtc) / 86_400_000);
+}
+
+/** True only when the due calendar day is strictly before today in `timeZone`. */
+export function isInvoiceCalendarOverdue(
+  dueDate: string | Date | null | undefined,
+  now: Date | string = new Date(),
+  timeZone = "America/New_York",
+): boolean {
+  const days = daysUntilInvoiceDue(dueDate, now, timeZone);
+  return days !== null && days < 0;
+}
+
+/**
+ * Full calendar days past the due date (0 if due today or in the future).
+ * Prefer this over millisecond-based aging for follow-ups and MCP.
+ */
+export function calendarDaysOverdue(
+  dueDate: string | Date | null | undefined,
+  now: Date | string = new Date(),
+  timeZone = "America/New_York",
+): number {
+  const days = daysUntilInvoiceDue(dueDate, now, timeZone);
+  if (days === null || days >= 0) return 0;
+  return -days;
+}
+
 export const ESTIMATE_DOCUMENT_SECTIONS = {
   preparation:
     "Preparation includes site protection, access setup, surface or work-area readiness, and confirming conditions before work begins.",

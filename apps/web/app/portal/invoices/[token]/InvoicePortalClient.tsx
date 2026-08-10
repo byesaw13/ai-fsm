@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { STANDARD_INVOICE_TERMS, resolveDepositPolicy, renderDepositTerms, invoiceDueOnCompletion } from "@ai-fsm/domain";
+import {
+  STANDARD_INVOICE_TERMS,
+  resolveDepositPolicy,
+  renderDepositTerms,
+  invoiceDueOnCompletion,
+  isInvoiceCalendarOverdue,
+} from "@ai-fsm/domain";
 import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
 import { amountDueCents, isInvoiceFullyPaid } from "@/lib/invoices/payments";
 import { PaidStamp } from "@/components/invoices/PaidStamp";
@@ -81,8 +87,14 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
     invoiceKind: invoice.invoice_kind,
     jobStatus: invoice.job_status,
   });
+  // Calendar-day overdue (America/New_York): same-day "due upon completion"
+  // stamps midnight local, which is already past when you send later that day.
+  // Instant comparison would show OVERDUE immediately — use day boundaries.
   const isOverdue =
-    !dueOnCompletion && invoice.due_date && new Date(invoice.due_date) < new Date() && !isPaid && !isVoid;
+    !dueOnCompletion &&
+    !isPaid &&
+    !isVoid &&
+    isInvoiceCalendarOverdue(invoice.due_date);
 
   // Redirect to the Square-hosted checkout page for the balance. On return, the
   // Square webhook updates the invoice; the client sees it reflected on reload.

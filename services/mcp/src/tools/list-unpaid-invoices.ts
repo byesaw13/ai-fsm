@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { calendarDaysOverdue } from "@ai-fsm/domain";
 import type { Executor, Session } from "../types.js";
 import { money } from "../money.js";
 import type { ToolModule } from "./types.js";
@@ -19,14 +20,6 @@ type Row = {
   sent_at: string | null;
   client_name: string;
 };
-
-function daysOverdue(dueDate: string | null, now: Date): number | null {
-  if (!dueDate) return null;
-  const due = new Date(dueDate).getTime();
-  if (Number.isNaN(due)) return null;
-  const diff = Math.floor((now.getTime() - due) / 86400000);
-  return diff > 0 ? diff : 0;
-}
 
 export async function run(exec: Executor, ctx: Session, input: unknown): Promise<unknown> {
   const { client_id, limit } = schema.parse(input);
@@ -49,6 +42,8 @@ export async function run(exec: Executor, ctx: Session, input: unknown): Promise
   const invoices = rows.map((r) => {
     const balance = r.total_cents - r.paid_cents;
     totalOutstanding += balance;
+    // Calendar-day aging (ET): same due day is 0 overdue, not fractional day.
+    const overdue = calendarDaysOverdue(r.due_date, now);
     return {
       id: r.id,
       invoice_number: r.invoice_number,
@@ -58,7 +53,7 @@ export async function run(exec: Executor, ctx: Session, input: unknown): Promise
       paid: money(r.paid_cents),
       balance: money(balance),
       due_date: r.due_date,
-      days_overdue: daysOverdue(r.due_date, now),
+      days_overdue: r.due_date ? overdue : null,
       sent_at: r.sent_at,
     };
   });

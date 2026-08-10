@@ -1,4 +1,5 @@
 import type { Client } from "pg";
+import { calendarDaysOverdue } from "@ai-fsm/domain";
 import { logger } from "./logger.js";
 import { invoiceFollowupEmailHtml } from "@ai-fsm/email-templates";
 import { appUrl } from "./mailer.js";
@@ -89,7 +90,10 @@ export async function findOverdueInvoices(
      WHERE i.account_id = $1
        AND i.status IN ('overdue', 'sent', 'partial')
        AND i.due_date IS NOT NULL
-       AND i.due_date < now()
+       -- Calendar-day overdue (ET): due local midnight same day must not
+       -- count as overdue until the next Eastern calendar day.
+       AND (i.due_date AT TIME ZONE 'America/New_York')::date
+           < (now() AT TIME ZONE 'America/New_York')::date
        -- TASK-078: never dun a whole-job (standard/final) invoice while the job is
        -- still open — that balance is "due on completion". Deposit invoices ARE due
        -- immediately, so they stay eligible even on an open job.
@@ -116,10 +120,8 @@ export function getCadenceSteps(
   daysOverdue: number[],
   now?: Date
 ): number[] {
-  const due = new Date(dueDate);
-  const current = now ?? new Date();
-  const elapsedMs = current.getTime() - due.getTime();
-  const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
+  // Full Eastern calendar days past due (0 if due today).
+  const elapsedDays = calendarDaysOverdue(dueDate, now ?? new Date());
 
   return daysOverdue
     .filter((d) => elapsedDays >= d)

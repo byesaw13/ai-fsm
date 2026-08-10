@@ -179,6 +179,9 @@ importers:
 
   services/mcp:
     dependencies:
+      '@ai-fsm/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@ai-fsm/log':
         specifier: workspace:*
         version: link:../../packages/log
@@ -222,6 +225,9 @@ importers:
 
   services/worker:
     dependencies:
+      '@ai-fsm/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@ai-fsm/email-templates':
         specifier: workspace:*
         version: link:../../packages/email-templates
