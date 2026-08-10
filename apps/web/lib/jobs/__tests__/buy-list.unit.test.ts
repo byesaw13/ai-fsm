@@ -1,12 +1,110 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  buildStoreRunStops,
+  filterStoreRunLines,
   groupByStoreSection,
   mapRecomputedSectionsToLines,
   mapShoppingListJsonToLines,
   matchKey,
   mergeMissingLines,
   normalizeQuantity,
+  summarizeStoreRun,
+  type BuyListLineInput,
+  type StoreRunLine,
 } from "../buy-list";
+import { hydrateBuyListLocations } from "../buy-list-seed";
+
+const baseBuyListLine: BuyListLineInput = {
+  name: "Deck screws",
+  quantity: 1,
+  unit_label: "box",
+  store_section: "Fasteners",
+  status: "needed",
+  source: "estimate",
+  catalog_material_id: null,
+  sku: null,
+  notes: null,
+  sort_order: 0,
+};
+
+const line = (overrides: Partial<StoreRunLine>): StoreRunLine => ({
+  id: crypto.randomUUID(),
+  name: "Deck screws",
+  quantity: 1,
+  unit_label: "box",
+  store_section: "Fasteners",
+  status: "needed",
+  supplier: "Home Depot",
+  aisle: null,
+  bay: null,
+  catalog_material_id: null,
+  unit_cost_cents: null,
+  ...overrides,
+});
+
+describe("hydrateBuyListLocations", () => {
+  it("copies saved catalog purchasing data without inventing free-text locations", async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [{
+        id: "catalog-1",
+        name: "Screws",
+        unit: "ea",
+        supplier: "Home Depot",
+        aisle: "12",
+        bay: "4",
+      }],
+    });
+    const lines: BuyListLineInput[] = [
+      { ...baseBuyListLine, name: "Screws", unit_label: "ea", catalog_material_id: "catalog-1" },
+      { ...baseBuyListLine, name: "Custom trim", catalog_material_id: null },
+    ];
+
+    await expect(
+      hydrateBuyListLocations({ query } as never, "account-1", lines),
+    ).resolves.toMatchObject([
+      { supplier: "Home Depot", aisle: "12", bay: "4", catalog_material_id: "catalog-1" },
+      { supplier: null, aisle: null, bay: null },
+    ]);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("materials_price_book"),
+      ["account-1", ["catalog-1"], expect.arrayContaining(["screws", "custom trim"])],
+    );
+  });
+
+  it("resolves location by name+unit when catalog id is a service_materials id", async () => {
+    const query = vi.fn().mockResolvedValue({
+      rows: [{
+        id: "mpb-real",
+        name: "Drywall screws",
+        unit: "box",
+        supplier: "Home Depot",
+        aisle: "13",
+        bay: null,
+      }],
+    });
+    const lines: BuyListLineInput[] = [
+      {
+        ...baseBuyListLine,
+        name: "Drywall screws",
+        unit_label: "box",
+        // service_materials id — not a materials_price_book row
+        catalog_material_id: "service-mat-1",
+      },
+    ];
+
+    await expect(
+      hydrateBuyListLocations({ query } as never, "account-1", lines),
+    ).resolves.toMatchObject([
+      {
+        supplier: "Home Depot",
+        aisle: "13",
+        bay: null,
+        // remapped to the real price-book id for remember-for-future
+        catalog_material_id: "mpb-real",
+      },
+    ]);
+  });
+});
 
 describe("matchKey", () => {
   it("is case-insensitive on name and unit", () => {
@@ -213,5 +311,56 @@ describe("groupByStoreSection", () => {
     ]);
     expect(groups.find((g) => g.section === "Plumbing")?.lines).toHaveLength(2);
     expect(groups.find((g) => g.section === "Other")?.lines).toHaveLength(1);
+  });
+});
+
+describe("Store Run helpers", () => {
+  it("includes only selected-supplier and unassigned needed lines", () => {
+    const selected = filterStoreRunLines(
+      [
+        line({ id: "hd", supplier: " Home Depot " }),
+        line({ id: "none", supplier: null }),
+        line({ id: "lowes", supplier: "Lowe's" }),
+        line({ id: "truck", supplier: "Home Depot", status: "on_truck" }),
+        line({ id: "done", supplier: "Home Depot", status: "purchased" }),
+      ],
+      "home depot",
+    );
+    expect(selected.map(({ id }) => id)).toEqual(["hd", "none"]);
+  });
+
+  it("orders numeric aisles first, then department-only, then unknown", () => {
+    const stops = buildStoreRunStops([
+      line({ id: "a13", store_section: "Fasteners", aisle: "Aisle 13" }),
+      line({ id: "a4", store_section: "Lumber", aisle: "4", bay: "7" }),
+      line({ id: "paint", store_section: "Paint", aisle: null }),
+      line({ id: "unknown", store_section: null, aisle: "Rear wall" }),
+      // Mid-string numbers are not aisle numbers
+      line({ id: "bay-text", store_section: "Misc", aisle: "Rear wall near bay 12" }),
+    ]);
+    expect(stops.map(({ key }) => key)).toEqual([
+      "Lumber::4",
+      "Fasteners::13",
+      "Paint::department",
+      "Misc::unknown",
+      "Unknown Location::unknown",
+    ]);
+    expect(stops[0].lines.map(({ id }) => id)).toEqual(["a4"]);
+  });
+
+  it("returns a total only when every session purchase has a catalog cost", () => {
+    const lines = [
+      line({ id: "known", quantity: 2, unit_cost_cents: 399 }),
+      line({ id: "unknown", quantity: 1.5, unit_cost_cents: null }),
+    ];
+    expect(summarizeStoreRun(lines, new Set(["known"]))).toMatchObject({
+      purchasedCount: 1,
+      stillNeededCount: 1,
+      estimatedPurchasedTotalCents: 798,
+    });
+    expect(
+      summarizeStoreRun(lines, new Set(["known", "unknown"]))
+        .estimatedPurchasedTotalCents,
+    ).toBeNull();
   });
 });

@@ -13,6 +13,10 @@ const patchBody = z.object({
   quantity: z.number().positive().optional(),
   unit_label: z.string().max(50).nullable().optional(),
   store_section: z.string().max(100).nullable().optional(),
+  supplier: z.string().trim().min(1).max(100).nullable().optional(),
+  aisle: z.string().trim().max(50).nullable().optional(),
+  bay: z.string().trim().max(50).nullable().optional(),
+  remember_for_future: z.boolean().optional(),
   status: z.enum(STATUSES).optional(),
   notes: z.string().max(2000).nullable().optional(),
 });
@@ -111,10 +115,11 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
         );
       }
 
+      const { remember_for_future, ...linePatch } = parsed.data;
       const sets: string[] = [];
       const params: unknown[] = [];
       let i = 1;
-      for (const [key, val] of Object.entries(parsed.data)) {
+      for (const [key, val] of Object.entries(linePatch)) {
         if (val === undefined) continue;
         sets.push(`${key} = $${i++}`);
         params.push(key === "name" && typeof val === "string" ? val.trim() : val);
@@ -139,7 +144,16 @@ export const PATCH = withAuth(async (request: NextRequest, session: AuthSession)
           { status: 404 },
         );
       }
-      return NextResponse.json({ data: r.rows[0] });
+      const updated = r.rows[0];
+      if (remember_for_future && updated.catalog_material_id) {
+        await client.query(
+          `UPDATE materials_price_book
+           SET supplier = $1, aisle = $2, bay = $3
+           WHERE id = $4 AND account_id = $5`,
+          [updated.supplier, updated.aisle, updated.bay, updated.catalog_material_id, session.accountId],
+        );
+      }
+      return NextResponse.json({ data: updated });
     });
   } catch (err) {
     logger.error("PATCH /api/v1/jobs/[id]/materials/[lineId]", err, { traceId: session.traceId });

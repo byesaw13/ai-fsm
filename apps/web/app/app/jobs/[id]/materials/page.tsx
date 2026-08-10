@@ -16,6 +16,7 @@ import {
 } from "@/components/ui";
 import { JobMaterialsPanel } from "../JobMaterialsPanel";
 import { BuyListClient, type BuyListLine } from "./BuyListClient";
+import type { SupplierPreference } from "./StoreRunLauncher";
 
 export const dynamic = "force-dynamic";
 
@@ -60,14 +61,33 @@ export default async function JobMaterialsPage({ params, searchParams }: PagePro
     if (!assigned) notFound();
   }
 
-  const lines = await queryForSession<BuyListLine>(
+  const lines = (await queryForSession<Record<string, unknown>>(
     session,
-    `SELECT id, name, quantity, unit_label, store_section, status, source, notes
-     FROM job_material_lines
-     WHERE job_id = $1 AND account_id = $2
-     ORDER BY sort_order ASC, created_at ASC`,
+    `SELECT jml.id, jml.name, jml.quantity, jml.unit_label,
+            jml.store_section, jml.status, jml.source, jml.notes,
+            jml.supplier, jml.aisle, jml.bay, jml.catalog_material_id,
+            mpb.unit_cost_cents
+     FROM job_material_lines jml
+     LEFT JOIN materials_price_book mpb
+       ON mpb.id = jml.catalog_material_id
+      AND mpb.account_id = jml.account_id
+     WHERE jml.job_id = $1 AND jml.account_id = $2
+     ORDER BY jml.sort_order ASC, jml.created_at ASC`,
     [jobId, session.accountId],
-  );
+  )) as unknown as BuyListLine[];
+
+  const supplierPreferences = (await queryForSession<{
+    supplier: string;
+    branch_label: string;
+    address: string | null;
+  }>(
+    session,
+    `SELECT supplier, branch_label, address
+     FROM account_supplier_preferences
+     WHERE account_id = $1
+     ORDER BY supplier`,
+    [session.accountId],
+  )) as SupplierPreference[];
 
   const showPurchases = canManageExpenses(session.role) || session.role === "owner" || session.role === "admin";
   const expenses =
@@ -168,6 +188,7 @@ export default async function JobMaterialsPage({ params, searchParams }: PagePro
             seededAt={job.materials_plan_seeded_at}
             canEdit={canEdit}
             canSeed={canSeed}
+            supplierPreferences={supplierPreferences}
           />
         </Card>
       ) : (
