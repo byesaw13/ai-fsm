@@ -204,8 +204,33 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
         }
 
         const scopeText = [job.title, job.description].filter(Boolean).join(". ");
-        const { generateMaterials } = await import("@/lib/estimates/materials-generator");
-        const generated = await generateMaterials({ scope: scopeText, job_type: "general_repair" });
+        const { generateMaterials, MaterialsGenerationError } = await import(
+          "@/lib/estimates/materials-generator"
+        );
+        let generated;
+        try {
+          generated = await generateMaterials({ scope: scopeText, job_type: "general_repair" });
+        } catch (err) {
+          // Surface configuration/generation problems with their real status
+          // (503 not-configured, 422 truncated, ...) instead of a generic 500,
+          // matching the standalone /api/v1/materials/quick route.
+          if (err instanceof MaterialsGenerationError) {
+            return NextResponse.json(
+              { error: { code: err.code, message: err.message, traceId: session.traceId } },
+              { status: err.status },
+            );
+          }
+          throw err;
+        }
+
+        // Idempotent: re-generating replaces prior AI-proposed needed lines so a
+        // double-click or retry can't silently double the buy list (overbuying).
+        // Purchased / on-truck / manually-added lines are left untouched.
+        await client.query(
+          `DELETE FROM job_material_lines
+             WHERE job_id = $1 AND account_id = $2 AND source = 'ai' AND status = 'needed'`,
+          [jobId, session.accountId],
+        );
 
         let insertedCount = 0;
         for (let i = 0; i < generated.items.length; i++) {
