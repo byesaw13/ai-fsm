@@ -5,7 +5,11 @@ import {
   DEFAULT_PRICING_SETTINGS,
   buildPricingRules,
   groupMaterialsBySection,
+  computeDoorHardwareTakeoff,
+  DOOR_HARDWARE_PRICE_BOOK_CODE,
   type BusinessPricingSettings,
+  type ComputedMaterial,
+  type ServiceMaterial,
 } from "@ai-fsm/domain";
 import type { MaterialsBySection } from "@ai-fsm/domain";
 import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
@@ -110,11 +114,59 @@ export function useEstimateLiveIntel(input: UseEstimateLiveIntelInput): Estimate
     }
 
     // ── Materials ─────────────────────────────────────────────────────────────
-    // Aggregate ComputedMaterial[] from all ScopeBuilderResult instances
-    const allMaterials = Object.values(scopeResults).flatMap((sr) => sr.materials ?? []);
+    // Aggregate ComputedMaterial[] from ScopeBuilder — exclude 1007 instances
+    // (category dump is wrong; kit is production takeoff — TASK-103).
+    const doorInstanceIds = new Set(
+      priceBookItems
+        .filter((i) => i.service.code === DOOR_HARDWARE_PRICE_BOOK_CODE)
+        .map((i) => i.instanceId),
+    );
+    const allMaterials = Object.entries(scopeResults)
+      .filter(([id]) => !doorInstanceIds.has(id))
+      .flatMap(([, sr]) => sr.materials ?? []);
+
+    // Inject 1007 kit as synthetic computed rows for live UI (no catalog UUID).
+    const doorCount = doorInstanceIds.size;
+    if (doorCount > 0) {
+      const takeoff = computeDoorHardwareTakeoff({
+        hardwareType: "lockset",
+        unitCount: doorCount,
+        customerSupplied: false,
+      });
+      for (const spec of takeoff.items) {
+        const fakeMaterial: ServiceMaterial = {
+          id: `takeoff-1007-${spec.name}`,
+          price_book_id: null,
+          category: "general_repairs",
+          material_name: spec.name,
+          description: spec.notes,
+          quantity_type: "static",
+          scope_component_key: null,
+          quantity_multiplier: null,
+          quantity_flat: spec.units_to_order,
+          waste_factor: 1,
+          unit: spec.unit_label,
+          unit_cost_cents: spec.unit_cost_cents ?? 0,
+          store_section: spec.store_section,
+          is_consumable: true,
+          is_optional: false,
+          condition_factor_key: null,
+          sort_order: 0,
+        };
+        const row: ComputedMaterial = {
+          material: fakeMaterial,
+          quantity: spec.units_to_order,
+          total_cost_cents: (spec.unit_cost_cents ?? 0) * spec.units_to_order,
+        };
+        allMaterials.push(row);
+      }
+    }
+
     const materialsBySection = groupMaterialsBySection(allMaterials);
     const hasAnyMaterials = allMaterials.length > 0;
-    const materialsTotalCents = scopeMaterialsTotalCents;
+    // scopeMaterialsTotalCents still includes 1007 scope dump until parent recalculates;
+    // prefer sum of displayed materials for reliability.
+    const materialsTotalCents = allMaterials.reduce((s, m) => s + m.total_cost_cents, 0);
 
     // ── Labor cost estimate ───────────────────────────────────────────────────
     let estimatedLaborHours = 0;

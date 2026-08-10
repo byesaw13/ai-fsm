@@ -8,9 +8,11 @@ import {
   roomSpecsToEstimateSpec,
   buildShoppingListFromEstimateResult,
   CURRENT_RULES,
+  serviceCodesForSnapshots,
 } from "@ai-fsm/domain";
-import type { ServiceMaterial, ScopeComponentValues, ComplexityValues, MaterialsBySection, RoomSpec } from "@ai-fsm/domain";
+import type { ServiceMaterial, ScopeComponentValues, ComplexityValues, MaterialsBySection, RoomSpec, ShoppingList } from "@ai-fsm/domain";
 import { PrintButton } from "../print/PrintButton";
+import { shoppingListToMaterialsBySection } from "@/lib/estimates/shopping-list-display";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +21,15 @@ interface EstimateRow {
   client_name: string | null;
   client_email: string | null;
   created_at: string;
+  room_specs: unknown;
+  shopping_list_json: ShoppingList | null;
   [key: string]: unknown;
 }
 
 interface SnapshotRow {
   id: string;
   category: string;
+  service_code: string | null;
   components: ScopeComponentValues;
   complexity: ComplexityValues;
   [key: string]: unknown;
@@ -65,31 +70,49 @@ export default async function ShoppingListPage({
 
   const { id: estimateId } = await params;
 
-  const [estimateRows, snapshotRows] = await Promise.all([
+  const [estimateRows, snapshotRows, lineRows] = await Promise.all([
     query<EstimateRow>(
       `SELECT e.id, c.name AS client_name, c.email AS client_email, e.created_at,
-              e.room_specs
+              e.room_specs, e.shopping_list_json
        FROM estimates e
        LEFT JOIN clients c ON c.id = e.client_id
        WHERE e.id = $1 AND e.account_id = $2`,
       [estimateId, session.accountId]
     ),
     query<SnapshotRow>(
-      `SELECT id, category, components, complexity
-       FROM estimate_scope_snapshots
-       WHERE estimate_id = $1
-       ORDER BY created_at ASC`,
+      `SELECT ess.id, ess.category, ess.components, ess.complexity, pb.code AS service_code
+       FROM estimate_scope_snapshots ess
+       LEFT JOIN estimate_line_items eli ON eli.id = ess.estimate_line_item_id
+       LEFT JOIN price_book pb ON pb.id = eli.price_book_id
+       WHERE ess.estimate_id = $1
+       ORDER BY ess.created_at ASC`,
       [estimateId]
+    ),
+    query<{ code: string | null; category: string | null }>(
+      `SELECT pb.code, pb.category
+       FROM estimate_line_items eli
+       LEFT JOIN price_book pb ON pb.id = eli.price_book_id
+       WHERE eli.estimate_id = $1
+       ORDER BY eli.sort_order ASC NULLS LAST`,
+      [estimateId],
     ),
   ]);
 
   if (estimateRows.length === 0) notFound();
   const estimate = estimateRows[0];
+  const snapshotCodes = serviceCodesForSnapshots(snapshotRows, lineRows);
 
   let sections: MaterialsBySection[] = [];
   let materialTotalCents = 0;
 
-  if (snapshotRows.length > 0) {
+  if (estimate.shopping_list_json?.sections?.length) {
+    sections = shoppingListToMaterialsBySection(estimate.shopping_list_json);
+    materialTotalCents =
+      estimate.shopping_list_json.total_catalog_cost_cents +
+      estimate.shopping_list_json.total_specified_cost_cents;
+  }
+
+  if (sections.length === 0 && snapshotRows.length > 0) {
     const categories = [...new Set(snapshotRows.map((s) => s.category).filter(Boolean))];
 
     if (categories.length > 0) {
@@ -128,7 +151,8 @@ export default async function ShoppingListPage({
         sort_order: m.sort_order,
       }));
 
-      const allComputed = snapshotRows.flatMap((snap) => {
+      const allComputed = snapshotRows.flatMap((snap, index) => {
+        if (snapshotCodes[index] === "1007") return [];
         const mats = serviceMaterials.filter((m) => m.category === snap.category);
         return computeMaterials(mats, snap.components ?? {}, snap.complexity ?? {});
       });

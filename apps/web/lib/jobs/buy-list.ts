@@ -216,13 +216,19 @@ export function mapShoppingListJsonToLines(json: unknown): BuyListLineInput[] {
         null;
       const store =
         (typeof item.store_section === "string" && item.store_section) || sectionName;
+      // TASK-101: kit takeoff lines use service_code 1007; map to source=kit.
+      // Never pass through arbitrary JSON source strings (DB CHECK allowlist).
+      const serviceCode =
+        typeof item.service_code === "string" ? item.service_code : null;
+      const source: BuyListLineInput["source"] =
+        serviceCode === "1007" ? "kit" : "estimate";
       lines.push({
         name,
         quantity: qty,
         unit_label: unit,
         store_section: store,
         status: "needed",
-        source: "estimate",
+        source,
         catalog_material_id: null,
         sku: typeof item.sku === "string" ? item.sku : null,
         notes: typeof item.notes === "string" ? item.notes : null,
