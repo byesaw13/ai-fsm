@@ -25,7 +25,8 @@ export interface BuyListLineInput {
 export interface StoreRunLine {
   id: string;
   name: string;
-  quantity: number;
+  /** pg `numeric` often arrives as string; helpers coerce before math */
+  quantity: number | string;
   unit_label: string | null;
   store_section: string | null;
   status: BuyListStatus;
@@ -109,10 +110,12 @@ export function summarizeStoreRun(
       (line) => line.status === "needed" && !purchasedIds.has(line.id),
     ).length,
     estimatedPurchasedTotalCents: complete
-      ? purchased.reduce(
-          (sum, line) => sum + Math.round(line.quantity * line.unit_cost_cents!),
-          0,
-        )
+      ? purchased.reduce((sum, line) => {
+          const qty = typeof line.quantity === "number"
+            ? line.quantity
+            : Number(line.quantity);
+          return sum + Math.round((Number.isFinite(qty) ? qty : 0) * line.unit_cost_cents!);
+        }, 0)
       : null,
   };
 }
