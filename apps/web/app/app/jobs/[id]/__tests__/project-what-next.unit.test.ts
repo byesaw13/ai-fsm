@@ -48,6 +48,36 @@ function baseProps(overrides: Partial<ProjectWhatNextProps> = {}): ProjectWhatNe
 }
 
 describe("computeWhatNext — pre-sale and close-out branches", () => {
+  it("recovers when invoice is paid but project status is still open", () => {
+    const next = computeWhatNext(
+      baseProps({
+        jobStatus: "in_progress",
+        stage: "in_progress",
+        hasPaidInvoice: true,
+        hasUnpaidInvoice: false,
+        latestInvoiceId: INVOICE_ID,
+        readyForCloseout: true,
+      }),
+    );
+    expect(next.message).toMatch(/paid but project is still open/i);
+    expect(next.actionLabel).toBe("Complete project");
+    expect(next.actionHref).toContain("#project-status");
+  });
+
+  it("asks to mark invoiced when completed but paid invoice already exists", () => {
+    const next = computeWhatNext(
+      baseProps({
+        jobStatus: "completed",
+        stage: "completed",
+        hasPaidInvoice: true,
+        hasUnpaidInvoice: false,
+        latestInvoiceId: INVOICE_ID,
+      }),
+    );
+    expect(next.message).toMatch(/finish project books/i);
+    expect(next.actionLabel).toBe("Mark as Invoiced");
+  });
+
   it("shows open assessment form when assessment packet is incomplete", () => {
     const next = computeWhatNext(
       baseProps({

@@ -23,6 +23,7 @@ import { JobIntakePanel } from "./JobIntakePanel";
 import { AssetLinksPanel } from "./AssetLinksPanel";
 import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { ProjectWhatNext } from "./ProjectWhatNext";
+import { ProjectCloseoutCoach } from "./ProjectCloseoutCoach";
 import { ProjectOverview } from "./ProjectOverview";
 import { ProjectUnplannedTasks } from "./ProjectUnplannedTasks";
 import { DailyRecapPanel } from "@/app/app/field/DailyRecapPanel";
@@ -38,6 +39,10 @@ import { withExpenseContext } from "@/lib/expenses/db";
 import { JobMaterialsPanel } from "./JobMaterialsPanel";
 import { JobLedgerCard } from "./JobLedgerCard";
 import { loadJobLedger } from "@/lib/jobs/job-ledger";
+import {
+  materialsCostForInternalPnl,
+  internalPnlCostCents,
+} from "@/lib/jobs/internal-pnl";
 import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { isHomeboxEnabled } from "@/lib/homebox/client";
 import { withAssetContext, listAssetLinks } from "@/lib/homebox/db";
@@ -351,16 +356,25 @@ export default async function JobDetailPage({
              (SELECT internal_labor_cost_cents FROM estimates
               WHERE job_id = $1 AND account_id = $2 AND status = 'approved'
               ORDER BY created_at DESC LIMIT 1) AS estimated_labor_cost_cents,
+             -- Parity with trackedLaborMinutesFromActivityEntries (job + visit + work_order)
              (SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (ae.ended_at - ae.started_at)) / 60), 0)::numeric
                 FROM activity_entries ae
                WHERE ae.account_id = $2
                  AND ae.activity_type = 'job_work'
                  AND ae.voided_at IS NULL
+                 AND ae.started_at IS NOT NULL
                  AND ae.ended_at IS NOT NULL
+                 AND (ae.labor_bucket IS NULL OR ae.labor_bucket = 'billable')
                  AND (
                    (ae.entity_type = 'job' AND ae.entity_id = $1)
                    OR (ae.entity_type = 'visit' AND ae.entity_id IN (
-                     SELECT v.id FROM visits v WHERE v.job_id = $1 AND v.account_id = $2
+                     SELECT v.id FROM visits v
+                     WHERE v.job_id = $1 AND v.account_id = $2
+                       AND v.visit_type IS DISTINCT FROM 'site_visit'
+                   ))
+                   OR (ae.entity_type = 'work_order' AND ae.entity_id IN (
+                     SELECT wo.id FROM work_orders wo
+                     WHERE wo.job_id = $1 AND wo.account_id = $2
                    ))
                  )
              ) AS tracked_labor_minutes,
@@ -623,7 +637,8 @@ export default async function JobDetailPage({
 
   // Profitability (owner/admin only)
   // Labor: prefer actual tracked job_work hours × burdened cost rate; fall back to
-  // estimate internal labor. actual_cost_cents is the parts rollup; materials are receipts.
+  // estimate internal labor. Materials: receipt expenses win; jobs.actual_cost_cents
+  // is only a fallback parts rollup — never sum both (double-count).
   const revenueCents = commercialCounts?.invoice_total_cents ?? commercialCounts?.estimated_total_cents ?? null;
   const partsCostCents = commercialCounts?.parts_cost_cents ?? 0;
   const materialsReceiptCostCents = jobMaterialExpenses.reduce((sum, e) => sum + e.amount_cents, 0);
@@ -673,10 +688,15 @@ export default async function JobDetailPage({
     estimatedLaborCostCents: estimatedLaborCents,
   });
   const laborCostCents = laborMargin.laborCostCents;
-  const costCents =
-    laborCostCents !== null || partsCostCents > 0 || materialsReceiptCostCents > 0
-      ? (laborCostCents ?? 0) + partsCostCents + materialsReceiptCostCents
-      : null;
+  const materialsForPnl = materialsCostForInternalPnl({
+    materialsReceiptCents: materialsReceiptCostCents,
+    partsRollupCents: partsCostCents,
+  });
+  const costCents = internalPnlCostCents({
+    laborCostCents,
+    materialsReceiptCents: materialsReceiptCostCents,
+    partsRollupCents: partsCostCents,
+  });
   const grossMarginCents = revenueCents !== null && costCents !== null ? revenueCents - costCents : null;
   const grossMarginPct =
     grossMarginCents !== null && revenueCents !== null && revenueCents > 0
@@ -1079,39 +1099,48 @@ export default async function JobDetailPage({
       />
 
       {!isTech && commercialCounts && (
-        <ProjectWhatNext
-          jobId={job.id}
-          clientId={job.client_id ?? null}
-          jobStatus={currentStatus}
-          stage={pipelineStage}
-          pricingMode={commercialCounts.booking_pricing_mode as "flat_rate" | "hourly_internal" | null}
-          bookingRequestId={commercialCounts.booking_request_id}
-          estimateCount={estimateCount}
-          hasSentEstimate={commercialCounts.has_sent_estimate}
-          lastEstimateSentAt={commercialCounts.last_estimate_sent_at}
-          hasApprovedEstimate={commercialCounts.has_approved_estimate}
-          approvedEstimateId={commercialCounts.approved_estimate_id}
-          hasDepositInvoice={commercialCounts.has_deposit_invoice}
-          depositPaid={commercialCounts.deposit_paid}
-          hasActiveVisit={activeExecutionVisits.length > 0}
-          activeVisitId={activeExecutionVisits[0]?.id ?? null}
-          latestVisitId={latestVisit?.id ?? null}
-          readyForCloseout={readyForCloseout}
-          hasCompletedExecutionVisit={completedExecutionVisitCount > 0}
-          hasOpenWorkOrder={openWorkOrderCount > 0}
-          hasUnpaidInvoice={commercialCounts.has_unpaid_invoice}
-          hasPaidInvoice={commercialCounts.has_paid_invoice}
-          latestInvoiceId={commercialCounts.latest_invoice_id}
-          hasOpenPreSaleSiteVisit={openPreSaleSiteVisits.length > 0}
-          hasCompletedPreSaleSiteVisit={hasCompletedPreSaleSiteVisit}
-          hasExpiredEstimate={expiredEstimateCount > 0}
-          latestExpiredEstimateId={commercialCounts.latest_expired_estimate_id}
-          hasDraftWorkOrderWithPricing={commercialCounts.has_draft_work_order_with_pricing}
-          preSaleSiteVisitId={openPreSaleSiteVisit?.id ?? null}
-          assessmentFormIncomplete={assessmentFormIncomplete}
-          hasCompletedAssessmentVisit={hasCompletedAssessmentVisit}
-          hasSalesWalkthroughOnly={hasSalesWalkthroughOnly}
-        />
+        <>
+          <ProjectCloseoutCoach
+            jobId={job.id}
+            jobStatus={currentStatus}
+            hasPaidInvoice={commercialCounts.has_paid_invoice}
+            hasUnpaidInvoice={commercialCounts.has_unpaid_invoice}
+            latestInvoiceId={commercialCounts.latest_invoice_id}
+          />
+          <ProjectWhatNext
+            jobId={job.id}
+            clientId={job.client_id ?? null}
+            jobStatus={currentStatus}
+            stage={pipelineStage}
+            pricingMode={commercialCounts.booking_pricing_mode as "flat_rate" | "hourly_internal" | null}
+            bookingRequestId={commercialCounts.booking_request_id}
+            estimateCount={estimateCount}
+            hasSentEstimate={commercialCounts.has_sent_estimate}
+            lastEstimateSentAt={commercialCounts.last_estimate_sent_at}
+            hasApprovedEstimate={commercialCounts.has_approved_estimate}
+            approvedEstimateId={commercialCounts.approved_estimate_id}
+            hasDepositInvoice={commercialCounts.has_deposit_invoice}
+            depositPaid={commercialCounts.deposit_paid}
+            hasActiveVisit={activeExecutionVisits.length > 0}
+            activeVisitId={activeExecutionVisits[0]?.id ?? null}
+            latestVisitId={latestVisit?.id ?? null}
+            readyForCloseout={readyForCloseout}
+            hasCompletedExecutionVisit={completedExecutionVisitCount > 0}
+            hasOpenWorkOrder={openWorkOrderCount > 0}
+            hasUnpaidInvoice={commercialCounts.has_unpaid_invoice}
+            hasPaidInvoice={commercialCounts.has_paid_invoice}
+            latestInvoiceId={commercialCounts.latest_invoice_id}
+            hasOpenPreSaleSiteVisit={openPreSaleSiteVisits.length > 0}
+            hasCompletedPreSaleSiteVisit={hasCompletedPreSaleSiteVisit}
+            hasExpiredEstimate={expiredEstimateCount > 0}
+            latestExpiredEstimateId={commercialCounts.latest_expired_estimate_id}
+            hasDraftWorkOrderWithPricing={commercialCounts.has_draft_work_order_with_pricing}
+            preSaleSiteVisitId={openPreSaleSiteVisit?.id ?? null}
+            assessmentFormIncomplete={assessmentFormIncomplete}
+            hasCompletedAssessmentVisit={hasCompletedAssessmentVisit}
+            hasSalesWalkthroughOnly={hasSalesWalkthroughOnly}
+          />
+        </>
       )}
 
       {/* The control-panel board: every project artifact indexed exactly once */}
@@ -1388,9 +1417,9 @@ export default async function JobDetailPage({
             <Card id="project-status" data-testid="job-transition-panel">
               <SectionHeader title="Close Out Project" />
               <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                Visits and work orders never close this project. When field work is done, use
-                Complete &amp; Invoice — that drafts the final invoice from actuals (T&amp;M time,
-                materials, and lift/equipment) and opens it so you can send or share the link.
+                {commercialCounts?.latest_invoice_id
+                  ? "Visits and work orders never close this project. If the invoice already exists (or is paid), use Complete project then Mark as Invoiced — that will not create a second invoice."
+                  : "Visits and work orders never close this project. When field work is done, use Complete & Invoice — that drafts the final invoice from actuals (T&M time, materials, and lift/equipment) and opens it so you can send or share the link."}
               </p>
               <JobTransitionForm
                 jobId={job.id}
@@ -1398,6 +1427,7 @@ export default async function JobDetailPage({
                 statusLabels={JOB_STATUS_LABELS}
                 clientId={job.client_id}
                 approvedEstimateId={commercialCounts?.approved_estimate_id ?? null}
+                hasExistingFinalInvoice={!!commercialCounts?.latest_invoice_id}
               />
             </Card>
           )}
@@ -1720,16 +1750,16 @@ export default async function JobDetailPage({
                       </dd>
                     </div>
                   )}
-                  {partsCostCents > 0 && (
-                    <div className="p7-detail-row">
-                      <dt>Parts Cost</dt>
-                      <dd>${(partsCostCents / 100).toFixed(2)}</dd>
-                    </div>
-                  )}
-                  {materialsReceiptCostCents > 0 && (
+                  {materialsForPnl.source === "receipts" && materialsForPnl.materialsCents > 0 && (
                     <div className="p7-detail-row">
                       <dt>Materials (receipts)</dt>
-                      <dd>${(materialsReceiptCostCents / 100).toFixed(2)}</dd>
+                      <dd>${(materialsForPnl.materialsCents / 100).toFixed(2)}</dd>
+                    </div>
+                  )}
+                  {materialsForPnl.source === "parts_rollup" && materialsForPnl.materialsCents > 0 && (
+                    <div className="p7-detail-row">
+                      <dt>Parts Cost</dt>
+                      <dd>${(materialsForPnl.materialsCents / 100).toFixed(2)}</dd>
                     </div>
                   )}
                   {costCents !== null && (
@@ -1763,11 +1793,11 @@ export default async function JobDetailPage({
                       <dd>{commercialCounts.travel_miles} mi</dd>
                     </div>
                   )}
-                  {laborMargin.source === "none" && !partsCostCents && !materialsReceiptCostCents && (
+                  {laborMargin.source === "none" && materialsForPnl.source === "none" && (
                     <div className="p7-detail-row">
                       <dt></dt>
                       <dd style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
-                        No tracked time, approved estimate, or parts logged yet
+                        No tracked time, approved estimate, or materials logged yet
                       </dd>
                     </div>
                   )}

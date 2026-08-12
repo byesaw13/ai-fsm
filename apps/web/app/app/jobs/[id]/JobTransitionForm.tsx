@@ -22,6 +22,8 @@ interface Props {
   /** When completing, open create-invoice if no draft was produced. */
   clientId?: string | null;
   approvedEstimateId?: string | null;
+  /** When true, Complete won't create a second invoice — label as Complete project. */
+  hasExistingFinalInvoice?: boolean;
 }
 
 export function JobTransitionForm({
@@ -30,6 +32,7 @@ export function JobTransitionForm({
   statusLabels,
   clientId,
   approvedEstimateId,
+  hasExistingFinalInvoice = false,
 }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -122,7 +125,9 @@ export function JobTransitionForm({
           >
             {loading
               ? "Updating…"
-              : (ACTION_LABELS[status] ?? `→ ${statusLabels[status]}`)}
+              : status === "completed" && hasExistingFinalInvoice
+                ? "Complete project"
+                : (ACTION_LABELS[status] ?? `→ ${statusLabels[status]}`)}
           </Button>
         ))}
       </div>
