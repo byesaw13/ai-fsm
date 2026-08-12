@@ -2,7 +2,12 @@ import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth/session";
 import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
-import { canCreateEstimates, canManageClients, canTransitionJob } from "@/lib/auth/permissions";
+import {
+  canCreateEstimates,
+  canCreateInvoices,
+  canManageClients,
+  canTransitionJob,
+} from "@/lib/auth/permissions";
 import { query, queryOne } from "@/lib/db";
 import { buildJobCreateHref, formatClientContact, formatPropertyAddress } from "@/lib/crm/normalization";
 import {
@@ -294,6 +299,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
   const canCreateJobs = canTransitionJob(session.role);
   const canCreateEstimate = canCreateEstimates(session.role);
+  const canCreateInvoice = canCreateInvoices(session.role);
   const outstandingInvoice = invoices.find((i) => ["draft", "sent", "partial", "overdue"].includes(i.status)) ?? null;
   const openEstimate = estimates.find((e) => ["draft", "sent", "approved"].includes(e.status)) ?? null;
   const recentHistory = activityEvents.filter((e) => !["draft", "sent", "scheduled", "arrived", "in_progress", "partial", "overdue"].includes(String(e.status))).slice(0, 3);
@@ -356,9 +362,20 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         backLabel="Clients"
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
+            {/* Billing first — strongest create action on this page */}
+            {canCreateInvoice ? (
+              <LinkButton
+                href={`/app/invoices/new?client_id=${client.id}`}
+                variant="primary"
+                size="sm"
+                data-testid="client-create-invoice-btn"
+              >
+                + Invoice
+              </LinkButton>
+            ) : null}
             {client.phone ? (
               <>
-                <a href={`tel:${client.phone}`} className="p7-btn p7-btn-primary p7-btn-sm" style={{ textDecoration: "none" }}>
+                <a href={`tel:${client.phone}`} className="p7-btn p7-btn-secondary p7-btn-sm" style={{ textDecoration: "none" }}>
                   Call
                 </a>
                 <a href={`sms:${client.phone}`} className="p7-btn p7-btn-secondary p7-btn-sm" style={{ textDecoration: "none" }}>
@@ -378,7 +395,6 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               </a>
             ) : null}
             <CopyPortalLinkButton url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/${client.portal_token}`} label="Portal" />
-            {canCreateJobs ? <LinkButton href={buildJobCreateHref(client.id)} variant="secondary" size="sm">+ Project</LinkButton> : null}
           </div>
         }
       />
@@ -389,7 +405,19 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         {rightNowItems.length === 0 ? (
           <EmptyState
             title="Nothing open"
-            description="No active projects, assessments, estimates, or invoices for this customer."
+            description="No active projects, assessments, estimates, or invoices. Need to bill? Create an invoice without an estimate."
+            action={
+              canCreateInvoice ? (
+                <LinkButton
+                  href={`/app/invoices/new?client_id=${client.id}`}
+                  variant="primary"
+                  size="sm"
+                  data-testid="client-create-invoice-empty-btn"
+                >
+                  + Invoice
+                </LinkButton>
+              ) : undefined
+            }
           />
         ) : (
           <div style={{ display: "grid", gap: "var(--space-2)" }}>
@@ -409,6 +437,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             ))}
           </div>
         )}
+        {/* Secondary creates only — + Invoice lives in the header (and empty-state CTA) */}
         <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginTop: "var(--space-3)" }}>
           {canCreateEstimate ? (
             <LinkButton href={`/app/estimates/new?client_id=${client.id}`} variant="ghost" size="sm">
