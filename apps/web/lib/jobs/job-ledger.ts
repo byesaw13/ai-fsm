@@ -183,11 +183,19 @@ export async function loadJobLedger(
        WHERE ae.account_id = $2
          AND ae.activity_type = 'job_work'
          AND ae.voided_at IS NULL
+         AND ae.started_at IS NOT NULL
          AND ae.ended_at IS NOT NULL
+         AND (ae.labor_bucket IS NULL OR ae.labor_bucket = 'billable')
          AND (
            (ae.entity_type = 'job' AND ae.entity_id = $1)
            OR (ae.entity_type = 'visit' AND ae.entity_id IN (
-             SELECT v.id FROM visits v WHERE v.job_id = $1 AND v.account_id = $2
+             SELECT v.id FROM visits v
+             WHERE v.job_id = $1 AND v.account_id = $2
+               AND v.visit_type IS DISTINCT FROM 'site_visit'
+           ))
+           OR (ae.entity_type = 'work_order' AND ae.entity_id IN (
+             SELECT wo.id FROM work_orders wo
+             WHERE wo.job_id = $1 AND wo.account_id = $2
            ))
          )`,
       [jobId, session.accountId],

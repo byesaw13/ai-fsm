@@ -141,6 +141,38 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
     };
   }
 
+  // Recovery: money finished before project status (wrong order — still common).
+  // Guide owner through status closeout without creating another invoice.
+  if (
+    hasPaidInvoice &&
+    !hasUnpaidInvoice &&
+    jobStatus !== "invoiced" &&
+    jobStatus !== "cancelled"
+  ) {
+    if (jobStatus === "completed") {
+      return {
+        message: "Invoice is paid — finish project books",
+        detail:
+          "Status is still Completed. Mark as Invoiced so this leaves the active work queue.",
+        actionLabel: "Mark as Invoiced",
+        actionHref: `/app/jobs/${jobId}#project-status`,
+        secondary: latestInvoiceId
+          ? { label: "Open paid invoice", href: `/app/invoices/${latestInvoiceId}` }
+          : { label: "All invoices", href: `/app/invoices?job_id=${jobId}` },
+      };
+    }
+    return {
+      message: "Invoice is paid but project is still open",
+      detail:
+        "Close in order: Complete project (won’t create a second invoice) → Mark as Invoiced. Visits don’t close the project.",
+      actionLabel: "Complete project",
+      actionHref: `/app/jobs/${jobId}#project-status`,
+      secondary: latestInvoiceId
+        ? { label: "Open paid invoice", href: `/app/invoices/${latestInvoiceId}` }
+        : { label: "All invoices", href: `/app/invoices?job_id=${jobId}` },
+    };
+  }
+
   if (hasUnpaidInvoice || jobStatus === "invoiced") {
     return {
       message: "Invoice is out — collect payment",
