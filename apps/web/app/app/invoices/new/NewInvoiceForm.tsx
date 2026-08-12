@@ -11,6 +11,8 @@ import {
   SectionHeader,
   Textarea,
 } from "@/components/ui";
+import { InlineClientForm } from "../../estimates/new/InlineClientForm";
+import { InlinePropertyForm } from "../../estimates/new/InlinePropertyForm";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,6 +34,7 @@ interface NewInvoiceFormProps {
   properties: Property[];
   initialClientId?: string;
   initialJobId?: string;
+  initialPropertyId?: string;
   prefillLineItems?: LineItemRow[];
 }
 
@@ -67,11 +70,17 @@ export function NewInvoiceForm({
   properties,
   initialClientId,
   initialJobId,
+  initialPropertyId,
   prefillLineItems,
 }: NewInvoiceFormProps) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [inlineForm, setInlineForm] = useState<"client" | "property" | null>(null);
+
+  // Local lists so inline creates show up without a full page reload
+  const [clientList, setClientList] = useState(clients);
+  const [propertyList, setPropertyList] = useState(properties);
 
   const [clientId, setClientId] = useState(
     initialClientId && clients.some((c) => c.id === initialClientId)
@@ -81,7 +90,11 @@ export function NewInvoiceForm({
   const [jobId, setJobId] = useState(
     initialJobId && jobs.some((j) => j.id === initialJobId) ? initialJobId : ""
   );
-  const [propertyId, setPropertyId] = useState("");
+  const [propertyId, setPropertyId] = useState(
+    initialPropertyId && properties.some((p) => p.id === initialPropertyId)
+      ? initialPropertyId
+      : ""
+  );
   // Payment terms: due upon completion — default to today.
   const [dueDate, setDueDate] = useState(() => {
     const d = new Date();
@@ -101,8 +114,8 @@ export function NewInvoiceForm({
     [clientId, jobs]
   );
   const filteredProperties = useMemo(
-    () => (clientId ? properties.filter((p) => p.client_id === clientId) : []),
-    [clientId, properties]
+    () => (clientId ? propertyList.filter((p) => p.client_id === clientId) : []),
+    [clientId, propertyList]
   );
 
   useEffect(() => {
@@ -113,6 +126,32 @@ export function NewInvoiceForm({
     if (propertyId && !filteredProperties.some((p) => p.id === propertyId))
       setPropertyId("");
   }, [filteredProperties, propertyId]);
+
+  function handleClientCreated(client: { id: string; name: string }) {
+    setClientList((prev) =>
+      prev.some((c) => c.id === client.id)
+        ? prev
+        : [...prev, client].sort((a, b) => a.name.localeCompare(b.name))
+    );
+    setClientId(client.id);
+    setJobId("");
+    setPropertyId("");
+    setInlineForm(null);
+  }
+
+  function handlePropertyCreated(property: {
+    id: string;
+    address: string;
+    client_id: string;
+  }) {
+    setPropertyList((prev) =>
+      prev.some((p) => p.id === property.id)
+        ? prev
+        : [...prev, property].sort((a, b) => a.address.localeCompare(b.address))
+    );
+    setPropertyId(property.id);
+    setInlineForm(null);
+  }
 
   // Live totals
   const subtotalCents = lineItems.reduce((sum, row) => sum + lineTotal(row), 0);
@@ -214,21 +253,48 @@ export function NewInvoiceForm({
 
       {/* Details */}
       <div className="p7-form-grid p7-form-grid-2">
-        <Select
-          id="client_id"
-          label="Client"
-          required
-          value={clientId}
-          onChange={(e) => {
-            setClientId(e.target.value);
-            setJobId("");
-            setPropertyId("");
-          }}
-          disabled={pending}
-          options={clients.map((c) => ({ value: c.id, label: c.name }))}
-          placeholder="Select a client"
-          hint={clients.length === 0 ? "No clients yet. Create one first." : undefined}
-        />
+        <div>
+          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-end" }}>
+            <div style={{ flex: 1 }}>
+              <Select
+                id="client_id"
+                label="Client"
+                required
+                value={clientId}
+                onChange={(e) => {
+                  setClientId(e.target.value);
+                  setJobId("");
+                  setPropertyId("");
+                  setInlineForm(null);
+                }}
+                disabled={pending}
+                options={clientList.map((c) => ({ value: c.id, label: c.name }))}
+                placeholder="Select a client"
+                hint={
+                  clientList.length === 0
+                    ? "No clients yet — use + New to add one."
+                    : undefined
+                }
+              />
+            </div>
+            <button
+              type="button"
+              className="p7-btn p7-btn-secondary p7-btn-sm"
+              onClick={() => setInlineForm(inlineForm === "client" ? null : "client")}
+              disabled={pending}
+              style={{ flexShrink: 0, marginBottom: "1px" }}
+              data-testid="inline-new-client-btn"
+            >
+              + New
+            </button>
+          </div>
+          {inlineForm === "client" && (
+            <InlineClientForm
+              onCreated={handleClientCreated}
+              onCancel={() => setInlineForm(null)}
+            />
+          )}
+        </div>
 
         <Select
           id="job_id"
@@ -245,20 +311,50 @@ export function NewInvoiceForm({
           }
         />
 
-        <Select
-          id="property_id"
-          label="Property (optional)"
-          value={propertyId}
-          onChange={(e) => setPropertyId(e.target.value)}
-          disabled={pending || !clientId}
-          options={filteredProperties.map((p) => ({ value: p.id, label: p.address }))}
-          placeholder="None"
-          hint={
-            clientId && filteredProperties.length === 0
-              ? "No properties for this client."
-              : undefined
-          }
-        />
+        <div>
+          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-end" }}>
+            <div style={{ flex: 1 }}>
+              <Select
+                id="property_id"
+                label="Property (optional)"
+                value={propertyId}
+                onChange={(e) => setPropertyId(e.target.value)}
+                disabled={pending || !clientId}
+                options={filteredProperties.map((p) => ({
+                  value: p.id,
+                  label: p.address,
+                }))}
+                placeholder="None"
+                hint={
+                  clientId && filteredProperties.length === 0
+                    ? "No properties yet — use + New to add one."
+                    : undefined
+                }
+              />
+            </div>
+            {clientId ? (
+              <button
+                type="button"
+                className="p7-btn p7-btn-secondary p7-btn-sm"
+                onClick={() =>
+                  setInlineForm(inlineForm === "property" ? null : "property")
+                }
+                disabled={pending}
+                style={{ flexShrink: 0, marginBottom: "1px" }}
+                data-testid="inline-new-property-btn"
+              >
+                + New
+              </button>
+            ) : null}
+          </div>
+          {inlineForm === "property" && clientId ? (
+            <InlinePropertyForm
+              clientId={clientId}
+              onCreated={handlePropertyCreated}
+              onCancel={() => setInlineForm(null)}
+            />
+          ) : null}
+        </div>
 
         <Input
           id="due_date"

@@ -41,7 +41,12 @@ interface EstimateLineItem {
 }
 
 interface PageProps {
-  searchParams: Promise<{ client_id?: string; job_id?: string; approved_estimate_id?: string }>;
+  searchParams: Promise<{
+    client_id?: string;
+    job_id?: string;
+    property_id?: string;
+    approved_estimate_id?: string;
+  }>;
 }
 
 export default async function NewInvoicePage({ searchParams }: PageProps) {
@@ -49,7 +54,7 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
   if (!session) redirect("/login");
   if (!canCreateInvoices(session.role)) redirect("/app/invoices");
 
-  const { client_id, job_id, approved_estimate_id } = await searchParams;
+  const { client_id, job_id, property_id, approved_estimate_id } = await searchParams;
 
   const [clients, jobs, properties] = await Promise.all([
     query<Client>(
@@ -117,7 +122,9 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
       <p style={{ margin: "0 0 var(--space-4)", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
         {prefillSource === "tm_actuals"
           ? "Prefilling from tracked time and materials on this T&M project — edit before sending."
-          : "Prefill from a project when you can — line items and client stay editable."}
+          : prefillSource === "estimate"
+            ? "Prefilling from the approved estimate — edit before sending. An estimate is optional; you can also write a blank invoice."
+            : "Write a draft invoice directly — no estimate required. Pick or create a client, add line items, then send."}
       </p>
       <Card>
         <NewInvoiceForm
@@ -126,6 +133,7 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
           properties={properties}
           initialClientId={client_id}
           initialJobId={job_id}
+          initialPropertyId={property_id}
           prefillLineItems={prefillLineItems}
         />
       </Card>
