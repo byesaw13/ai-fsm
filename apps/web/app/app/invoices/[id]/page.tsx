@@ -4,7 +4,15 @@ import type { Route } from "next";
 import { getSession } from "@/lib/auth/session";
 import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { DocumentClientLocationCard } from "@/components/documents/DocumentClientLocationCard";
-import { canCreateInvoices, canRecordPayments, canSendInvoices, canLinkDocuments } from "@/lib/auth/permissions";
+import {
+  canCreateInvoices,
+  canDeleteRecords,
+  canRecordPayments,
+  canSendInvoices,
+  canLinkDocuments,
+} from "@/lib/auth/permissions";
+import { canOwnerHardDeleteInvoice } from "@/lib/invoices/delete-policy";
+import { DeleteInvoiceButton } from "./DeleteInvoiceButton";
 import {
   documentJoins,
   documentLocationSelect,
@@ -193,6 +201,12 @@ export default async function InvoiceDetailPage({
     (s) => s !== "paid" && s !== "partial" && (s !== "draft" || invoice.paid_cents === 0)
   );
   const canTransition = canCreateInvoices(session.role);
+  const canDelete =
+    canDeleteRecords(session.role) &&
+    canOwnerHardDeleteInvoice({
+      status: currentStatus,
+      paid_cents: invoice.paid_cents,
+    });
   // Deposit credit (separate deposit invoice model) + payments on this invoice.
   // balance_cents is generated as total - deposit only (excludes paid_cents).
   const amountDue = amountDueCents(
@@ -785,6 +799,20 @@ export default async function InvoiceDetailPage({
           <LinkedDocuments session={session} entityType="invoice" entityId={invoice.id} />
         </div>
       </div>
+
+      {canDelete && (
+        <div className="card danger-card" data-testid="danger-zone" style={{ marginTop: "var(--space-4)" }}>
+          <h2>Danger Zone</h2>
+          <p className="muted">
+            Permanently delete wrong or test invoices with no payments. Recorded in the audit log.
+          </p>
+          <DeleteInvoiceButton
+            invoiceId={invoice.id}
+            status={currentStatus}
+            invoiceNumber={invoice.invoice_number}
+          />
+        </div>
+      )}
     </PageContainer>
   );
 }

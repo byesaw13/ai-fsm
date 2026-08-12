@@ -491,8 +491,16 @@ export async function deleteEstimateById(
   id: string,
   session: SessionContext
 ): Promise<void> {
-  const existing = await client.query<{ id: string; status: string }>(
-    `SELECT id, status FROM estimates WHERE id = $1 AND account_id = $2`,
+  const existing = await client.query<{
+    id: string;
+    status: string;
+    estimate_number: string | null;
+    total_cents: number;
+    client_id: string | null;
+    job_id: string | null;
+  }>(
+    `SELECT id, status, estimate_number, total_cents, client_id, job_id
+     FROM estimates WHERE id = $1 AND account_id = $2`,
     [id, session.accountId]
   );
 
@@ -501,8 +509,28 @@ export async function deleteEstimateById(
   }
 
   const est = existing.rows[0];
-  if (est.status !== "draft") {
-    throw Object.assign(new Error("Only draft estimates may be deleted"), { code: "IMMUTABLE_ENTITY" });
+
+  // Owner may delete wrong/test estimates in any status. Block only when money
+  // has already been collected on a linked invoice — those need void/refund first.
+  const paidLinked = await client.query<{ invoice_number: string; status: string }>(
+    `SELECT invoice_number, status
+     FROM invoices
+     WHERE estimate_id = $1
+       AND account_id = $2
+       AND (paid_cents > 0 OR status IN ('paid', 'partial'))
+     LIMIT 3`,
+    [id, session.accountId]
+  );
+  if ((paidLinked.rowCount ?? 0) > 0) {
+    const labels = paidLinked.rows
+      .map((r) => `${r.invoice_number} (${r.status})`)
+      .join(", ");
+    throw Object.assign(
+      new Error(
+        `Cannot delete estimate: linked invoice(s) have payments (${labels}). Void or reverse those payments first.`
+      ),
+      { code: "IMMUTABLE_ENTITY" }
+    );
   }
 
   await client.query(`DELETE FROM estimates WHERE id = $1`, [id]);
@@ -514,6 +542,12 @@ export async function deleteEstimateById(
     action: "delete",
     actor_id: session.userId,
     trace_id: session.traceId,
-    old_value: { status: est.status },
+    old_value: {
+      status: est.status,
+      estimate_number: est.estimate_number,
+      total_cents: est.total_cents,
+      client_id: est.client_id,
+      job_id: est.job_id,
+    },
   });
 }
