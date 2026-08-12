@@ -318,15 +318,28 @@ describe.skipIf(!RUN_INTEGRATION)("Estimates API integration", () => {
       expect(status).toBe(200);
     });
 
-    it("returns 422 when trying to delete non-draft estimate", async () => {
-      // testEstimateId is now 'approved' from the transition tests above
-      const { status, data } = await apiRequest(
+    it("allows owner to delete a non-draft estimate when no paid invoices are linked", async () => {
+      // Create + send a disposable estimate so we do not tear down suite fixtures.
+      const { data: created } = await apiRequest(
+        "POST",
+        "/api/v1/estimates",
+        adminCookie,
+        {
+          client_id: testClientId,
+          flat_rate_cents: 0,
+        }
+      );
+      const deleteId = created.id as string;
+      await apiRequest("POST", `/api/v1/estimates/${deleteId}/transition`, ownerCookie, {
+        status: "sent",
+      });
+
+      const { status } = await apiRequest(
         "DELETE",
-        `/api/v1/estimates/${testEstimateId}`,
+        `/api/v1/estimates/${deleteId}`,
         ownerCookie
       );
-      expect(status).toBe(422);
-      expect(data.error.code).toBe("IMMUTABLE_ENTITY");
+      expect(status).toBe(200);
     });
   });
 });

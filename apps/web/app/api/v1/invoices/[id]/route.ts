@@ -7,6 +7,10 @@ import { getPathId } from "@/lib/route-utils";
 import { upsertMaterialHandlingFeeLine } from "@/lib/invoices/job-expenses";
 import { recalculateInvoiceTotals } from "@/lib/invoices/line-items";
 import { INVOICE_DEPOSIT_TYPES } from "@/lib/invoices/deposit";
+import {
+  canOwnerHardDeleteInvoice,
+  ownerHardDeleteInvoiceBlockReason,
+} from "@/lib/invoices/delete-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -256,8 +260,16 @@ export const DELETE = withRole(["owner"], async (request, session) => {
 
   try {
     await withInvoiceContext(session, async (client) => {
-      const existing = await client.query<{ id: string; status: string; invoice_number: string }>(
-        `SELECT id, status, invoice_number FROM invoices WHERE id = $1 AND account_id = $2`,
+      const existing = await client.query<{
+        id: string;
+        status: string;
+        invoice_number: string;
+        paid_cents: number;
+        total_cents: number;
+        client_id: string | null;
+      }>(
+        `SELECT id, status, invoice_number, paid_cents, total_cents, client_id
+         FROM invoices WHERE id = $1 AND account_id = $2`,
         [id, session.accountId]
       );
 
@@ -266,12 +278,18 @@ export const DELETE = withRole(["owner"], async (request, session) => {
       }
 
       const inv = existing.rows[0];
-      if (inv.status !== "draft") {
+      if (!canOwnerHardDeleteInvoice(inv)) {
         throw Object.assign(
-          new Error(`Only draft invoices may be deleted (current: ${inv.status})`),
+          new Error(ownerHardDeleteInvoiceBlockReason(inv) ?? "Invoice cannot be deleted"),
           { code: "IMMUTABLE_ENTITY" }
         );
       }
+
+      // Orphan payment rows should not exist when paid_cents=0, but clear any just in case.
+      await client.query(`DELETE FROM payments WHERE invoice_id = $1 AND account_id = $2`, [
+        id,
+        session.accountId,
+      ]);
 
       // Delete line items first
       await client.query(`DELETE FROM invoice_line_items WHERE invoice_id = $1`, [id]);
@@ -286,7 +304,13 @@ export const DELETE = withRole(["owner"], async (request, session) => {
         action: "delete",
         actor_id: session.userId,
         trace_id: session.traceId,
-        old_value: { status: inv.status, invoice_number: inv.invoice_number },
+        old_value: {
+          status: inv.status,
+          invoice_number: inv.invoice_number,
+          paid_cents: inv.paid_cents,
+          total_cents: inv.total_cents,
+          client_id: inv.client_id,
+        },
       });
     });
 

@@ -362,12 +362,21 @@ export default async function EstimateDetailPage({
       {/* Linked Paperless documents (contracts, signed approvals, reference docs) */}
       <LinkedDocuments session={session} entityType="estimate" entityId={estimate.id} />
 
-      {/* Danger Zone — owner only, draft status only */}
-      {canDelete && currentStatus === "draft" && (
+      {/* Danger Zone — owner only; any status (blocked server-side if paid invoices linked) */}
+      {canDelete && (
         <div className="card danger-card" data-testid="danger-zone">
           <h2>Danger Zone</h2>
-          <p className="muted">Delete this estimate permanently. Only available for draft estimates.</p>
-          <DeleteEstimateButton estimateId={estimate.id} />
+          <p className="muted">
+            Permanently delete wrong or test estimates. Recorded in the audit log.
+            {currentStatus !== "draft"
+              ? " Available in any status when no linked invoice has payments."
+              : null}
+          </p>
+          <DeleteEstimateButton
+            estimateId={estimate.id}
+            status={currentStatus}
+            estimateNumber={estimate.estimate_number}
+          />
         </div>
       )}
     </PageContainer>
