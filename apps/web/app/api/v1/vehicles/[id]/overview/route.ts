@@ -169,6 +169,7 @@ export const GET = withRole(["owner", "admin", "tech"], async (req: NextRequest,
         odometerSuspect: r.odometer_suspect,
       }));
       const mpgMap = mpgByClosedAt(fuelForMpg);
+      const canOpenReceipt = session.role === "owner" || session.role === "admin";
       const recentFuel = fuelRows.map((r) => {
         const gallons = Number(r.gallons);
         const amountCents = r.amount_cents;
@@ -183,7 +184,7 @@ export const GET = withRole(["owner", "admin", "tech"], async (req: NextRequest,
           expense_id: r.expense_id,
           vendor_name: r.vendor_name,
           amount_cents: amountCents,
-          has_receipt: r.has_receipt,
+          has_receipt: r.has_receipt && canOpenReceipt,
           dollars_per_gallon:
             amountCents != null && gallons > 0
               ? Math.round((amountCents / 100 / gallons) * 1000) / 1000
