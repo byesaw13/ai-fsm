@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
+import type { Route } from "next";
 import { getSession } from "@/lib/auth/session";
 import { queryForSession } from "@/lib/db";
-import { PageContainer, PageHeader } from "@/components/ui";
+import { LinkButton, PageContainer, PageHeader } from "@/components/ui";
 import { TimelineEditor } from "../TimelineEditor";
 import { LocationSegmentsPanel } from "../LocationSegmentsPanel";
 import { ManualSiteVisitButton } from "../ManualSiteVisitButton";
@@ -86,9 +87,19 @@ export default async function TimelinePage({
   return (
     <PageContainer>
       <PageHeader
-        title="Activity Timeline"
+        title="Vehicle tracking"
         subtitle={label}
-        actions={<ManualSiteVisitButton />}
+        actions={
+          <span style={{ display: "inline-flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+            <LinkButton href={"/app/mileage" as Route} variant="ghost" size="sm">
+              Mileage
+            </LinkButton>
+            <LinkButton href={"/app/mileage/vehicles" as Route} variant="ghost" size="sm">
+              Vehicles
+            </LinkButton>
+            <ManualSiteVisitButton />
+          </span>
+        }
       />
       <LikelySiteBanner />
       <div style={{ marginBottom: "var(--space-4)" }}>

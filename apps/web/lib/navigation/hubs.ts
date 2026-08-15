@@ -25,6 +25,7 @@ export const PEOPLE_HUB_LINKS: HubLink[] = [
 export const MONEY_HUB_LINKS: HubLink[] = [
   { href: "/app/invoices", label: "Invoices" },
   { href: "/app/expenses", label: "Expenses" },
+  { href: "/app/mileage", label: "Mileage" },
   { href: "/app/materials", label: "Materials" },
   { href: "/app/reports", label: "Reports" },
 ];

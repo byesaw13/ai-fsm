@@ -24,6 +24,7 @@ import {
   IconSchedule,
   IconQueue,
   IconDayReview,
+  IconField,
 } from "./NavIcons";
 import {
   AttentionBell,
@@ -76,6 +77,7 @@ const NAV_TODAY:      NavItem = { href: "/app",              label: "Overview", 
 // (who don't do field work) and the all-techs list never see it here.
 const NAV_MY_DAY:     NavItem = { href: "/app/my-work",      label: "My Day",     Icon: IconMyDay };
 const NAV_DAY_REVIEW: NavItem = { href: "/app/day-review",   label: "Day Review", Icon: IconDayReview };
+const NAV_TRACKING:   NavItem = { href: "/app/timeline",     label: "Tracking",   Icon: IconField };
 const NAV_REQUESTS:   NavItem = { href: "/app/requests",     label: "Requests",   Icon: IconInbox };
 const NAV_CLIENTS:    NavItem = { href: "/app/clients",      label: "Clients",    Icon: IconClients,   adminOnly: true };
 const NAV_PROPS:      NavItem = { href: "/app/properties",   label: "Properties", Icon: IconProperties, adminOnly: true };
@@ -90,7 +92,7 @@ const NAV_SETTINGS:   NavItem = { href: "/app/settings",     label: "Settings", 
 /** Nested hub IA — Home / Work / People / Money (+ Settings). Home item is injected per role/view. */
 function buildHubSections(home: NavItem): NavSection[] {
   return [
-    { label: "Home", items: [home, NAV_DAY_REVIEW] },
+    { label: "Home", items: [home, NAV_DAY_REVIEW, NAV_TRACKING] },
     {
       label: "Work",
       items: [NAV_REQUESTS, NAV_ESTIMATES, NAV_JOBS, NAV_WORK_ORDERS, NAV_SCHEDULE],
@@ -141,12 +143,13 @@ export function getBottomNavItems(role: Role): NavItem[] {
           href: "/app/my-work",
           label: "Home",
           Icon: IconMyDay,
-          activePrefixes: ["/app/my-work", "/app/my-day"],
+          activePrefixes: ["/app/my-work", "/app/my-day", "/app/day-review", "/app/timeline"],
         }
       : {
           href: "/app",
           label: "Home",
           Icon: IconDashboard,
+          activePrefixes: ["/app/day-review", "/app/timeline"],
         };
 
   const work: NavItem = {
@@ -172,7 +175,7 @@ export function getBottomNavItems(role: Role): NavItem[] {
     href: "/app/invoices",
     label: "Money",
     Icon: IconInvoices,
-    activePrefixes: ["/app/invoices", "/app/reports", "/app/expenses", "/app/materials"],
+    activePrefixes: ["/app/invoices", "/app/reports", "/app/expenses", "/app/materials", "/app/mileage"],
   };
 
   return [home, work, people, money];

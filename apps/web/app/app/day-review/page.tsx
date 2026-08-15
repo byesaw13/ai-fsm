@@ -4,7 +4,7 @@ import { businessToday } from "@/lib/operations/business-day";
 import { getDayReview } from "@/lib/day-review/queries";
 import { loadDayCloseStatus } from "@/lib/day-review/close-status";
 import { loadDayVisitTimelines } from "@/lib/visits/load-visit-timeline";
-import { PageContainer, PageHeader } from "@/components/ui";
+import { LinkButton, PageContainer, PageHeader } from "@/components/ui";
 import { DayCloseChecklist } from "../day-close/DayCloseChecklist";
 import { ProductionStorySection } from "./ProductionStorySection";
 import { VisitsSection } from "./VisitsSection";
@@ -51,6 +51,13 @@ export default async function DayReviewPage({
           month: "long",
           day: "numeric",
         })}
+        actions={
+          session.role === "owner" || session.role === "admin" ? (
+            <LinkButton href={`/app/timeline?date=${date}`} variant="ghost" size="sm">
+              Vehicle tracking
+            </LinkButton>
+          ) : undefined
+        }
       />
       <DayCloseChecklist
         businessDayId={payload.businessDayId}

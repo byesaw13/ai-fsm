@@ -43,5 +43,9 @@ describe("hubs navigation", () => {
     );
     expect(activeHubHref("/app/reports", MONEY_HUB_LINKS)).toBe("/app/reports");
     expect(MONEY_HUB_LINKS.map((l) => l.href)).toContain("/app/materials");
+    expect(MONEY_HUB_LINKS.map((l) => l.href)).toContain("/app/mileage");
+    expect(activeHubHref("/app/mileage/vehicles", MONEY_HUB_LINKS)).toBe(
+      "/app/mileage",
+    );
   });
 });

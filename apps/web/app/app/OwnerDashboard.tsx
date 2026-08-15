@@ -194,7 +194,7 @@ export function OwnerDashboard({
             </Card>
 
             <Card className="owner-dash-mileage">
-              <SectionHeader title="Mileage" action={viewAll("/app/mileage")} />
+              <SectionHeader title="Mileage" action={viewAll("/app/timeline", "Vehicle tracking")} />
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", marginBottom: "var(--space-4)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)" }}>
                   <span style={{ color: "var(--fg-muted)" }}>Today Driven</span>
@@ -211,7 +211,10 @@ export function OwnerDashboard({
                   <strong>{yesterdayMiles} mi</strong>
                 </div>
               </div>
-              <LinkButton href="/app/my-work" variant="secondary" size="sm">Log Mileage</LinkButton>
+              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                <LinkButton href="/app/timeline" variant="secondary" size="sm">Open tracking</LinkButton>
+                <LinkButton href="/app/mileage" variant="ghost" size="sm">Mileage log</LinkButton>
+              </div>
             </Card>
           </div>
 

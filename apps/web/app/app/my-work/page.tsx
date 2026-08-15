@@ -147,6 +147,9 @@ export default async function MyWorkPage() {
             </LinkButton>
           ) : (
             <span style={{ display: "inline-flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+              <LinkButton href={"/app/timeline" as Route} variant="ghost" size="sm">
+                Vehicle tracking
+              </LinkButton>
               <ManualSiteVisitButton />
               <span className="p7-only-desktop">
                 <LinkButton href="/app" variant="secondary" size="sm">
@@ -190,6 +193,7 @@ export default async function MyWorkPage() {
             enabled={fieldDay.locationSettings.enabled}
             pausedUntil={fieldDay.locationSettings.pausedUntil}
             hasActiveWorkday={!!fieldDay.openSession}
+            showTrackingLink={!isTech}
           />
         </div>
       )}
