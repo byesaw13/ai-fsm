@@ -44,7 +44,7 @@ Scope:
   `roomSpecsToEstimateSpec`) — estimate UI uses them.
 
 Out of Scope:
-- Daily Recap, membership visit chrome, collapsing the live dual-engine mapper.
+- Membership visit chrome, collapsing the live dual-engine mapper.
 
 Acceptance Criteria:
 - [x] MCP package gone; TASK-034 and TASK-035 Cancelled.

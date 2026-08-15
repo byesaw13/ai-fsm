@@ -26,7 +26,6 @@ import { ProjectWhatNext } from "./ProjectWhatNext";
 import { ProjectCloseoutCoach } from "./ProjectCloseoutCoach";
 import { ProjectOverview } from "./ProjectOverview";
 import { ProjectUnplannedTasks } from "./ProjectUnplannedTasks";
-import { DailyRecapPanel } from "@/app/app/field/DailyRecapPanel";
 import { UseTmBriefingButton } from "./UseTmBriefingButton";
 import { buildJobTmBriefing } from "@/lib/estimates/job-tm-briefing";
 import { VendorCoordinationCard } from "./VendorCoordinationCard";
@@ -1314,9 +1313,6 @@ export default async function JobDetailPage({
               />
             </Card>
           ) : null}
-
-          {/* Log a day: narrate what got done, AI attributes per-task time to that date */}
-          {!isTech && taskProgress.total > 0 ? <DailyRecapPanel jobId={job.id} /> : null}
 
           {!isTech && (taskProgress.total > 0 || unplannedTasks.length > 0) ? (
             <Card id="job-unplanned" data-testid="job-unplanned-card">

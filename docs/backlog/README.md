@@ -95,7 +95,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-110**.
+Next available ID: **TASK-111**.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -217,6 +217,7 @@ truth-pass also archived TASK-023 and TASK-050 (epic already Done, README lagged
 | TASK-107 | AI Day Draft (GPS + jobs + receipts → one confirm) | 007 | In Progress |
 | TASK-108 | Ponytail first cut — delete unused hybrid-pricing, vocabulary, log stubs | 002 | Done |
 | TASK-109 | Ponytail second cut — MCP, dead APIs, unused paint helpers | 005 | Done |
+| TASK-110 | Delete Daily Recap (Day Draft is the evening close) | 007 | Done |
 
 ## Status legend
 

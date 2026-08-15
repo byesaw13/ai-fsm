@@ -421,7 +421,7 @@ export async function ensureFieldDayVisit(
     classification: string;
     arrivalTime: string;
     departureTime: string;
-    /** When known (e.g. Daily Recap scoped to a WO), skip multi-WO ambiguity. */
+    /** When known, skip multi-WO ambiguity. */
     workOrderId?: string | null;
     /** Note stored on auto-created visits (default: GPS confirm copy). */
     techNotes?: string | null;
@@ -480,7 +480,7 @@ export async function ensureFieldDayVisit(
     return { visitId: null, created: false, reason: "job_not_available" };
   }
 
-  // Prefer an explicit WO (Daily Recap); must be bookable (draft→ready, not completed).
+  // Prefer an explicit WO; must be bookable (draft→ready, not completed).
   // Else resolve so multi-WO jobs don't mis-attach.
   let workOrderId: string | null = null;
   if (opts.workOrderId) {
