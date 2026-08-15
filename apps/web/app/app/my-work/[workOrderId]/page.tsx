@@ -13,7 +13,6 @@ import { getPool } from "@/lib/db";
 import { loadWorkOrderCompletionCriteria } from "@/lib/work-orders/task-time";
 import { FieldWorkActions } from "../FieldWorkActions";
 import { FieldCloseout } from "../FieldCloseout";
-import { DailyRecapPanel } from "../../field/DailyRecapPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -153,8 +152,6 @@ export default async function MyWorkOrderPage({
           hasActiveVisit={!!activeVisit[0]}
         />
       </Card>
-
-      <DailyRecapPanel jobId={wo.job_id} workOrderId={workOrderId} />
 
       <Card>
         <SectionHeader title="Timeline" count={timeline.length} />

@@ -176,10 +176,8 @@ Scope (Slice 1 — done):
 - `work_order_tasks` (first-class checklist items, migration 155, backfilled from
   `completion_criteria`); `activity_entries.task_id` + `work_order` entity type
   (migration 156).
-- AI Daily Recap: narration + candidate tasks → reviewable per-task time/status +
-  non-task buckets; owner confirms; commit writes `activity_entries.task_id` and
-  toggles task done/blocked. Design:
-  `docs/superpowers/specs/` (approved plan lively-puzzling-perlis).
+- AI Daily Recap shipped, then deleted in TASK-110. `work_order_tasks` and
+  `activity_entries.task_id` stay. Evening close is Day Draft.
 
 Out of Scope (Slice 1):
 - AI *decomposition* of the task list (Slice 2); baseline analytics (Slice 3).
@@ -187,7 +185,7 @@ Out of Scope (Slice 1):
 Slice 1b (shipped):
 - Field checklist + complete gate + status sync load **`work_order_tasks`** as
   the source of truth (`loadWorkOrderCompletionCriteria`); seed from JSONB once
-  for legacy WOs. Toggles + Daily Recap mirror back into `completion_criteria`.
+  for legacy WOs. Field closeout toggles still mirror back into `completion_criteria`.
 
 Acceptance Criteria:
 - [x] Time can be attributed to a task; the recap parses the owner's worked
@@ -220,8 +218,8 @@ Scope (Slice 2 — done):
   tasks[] }] }, behind the ANTHROPIC_API_KEY guard. Unit-tested.
 - POST /api/v1/estimates/[id]/decompose (draft, read-only) and .../apply (creates
   **one** work order + first-class tasks; flattens multi-area AI proposals).
-- Improves the daily-recap prompt to prefer a matching candidate task over a
-  non-task bucket (from the live shakedown finding).
+- Decomposer prefers a matching candidate task over a non-task bucket
+  (from the live shakedown finding).
 
 Out of Scope:
 - Decomposition from a free-form job description (estimate-driven for now).

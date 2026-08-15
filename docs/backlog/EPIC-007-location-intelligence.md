@@ -445,8 +445,34 @@ Acceptance Criteria:
       until the owner taps Accept.
 
 Notes:
-Follows Daily Recap's "draft then confirm" rule, but the draft is built
-from evidence first — the owner does not narrate the day.
+Draft then confirm. Evidence first — the owner does not narrate the day.
+
+# TASK-110: Delete Daily Recap (Day Draft is the evening close)
+
+Status:
+Done
+
+Phase:
+1
+
+Problem:
+Two “tell the AI your day” paths: Daily Recap (narrate → per-task time) and
+Day Draft (GPS + jobs + receipts → confirm). Same rule, two writers.
+
+Business Value:
+One evening close.
+
+Scope:
+- Delete DailyRecapPanel, `/api/v1/field/daily-recap`, interpret + commit.
+- Keep Day Draft, visit confirm, `work_order_tasks`, and `activity_entries.task_id`.
+
+Out of Scope:
+- Habit learning. Membership visit chrome.
+
+Acceptance Criteria:
+- [x] Recap UI and APIs gone.
+- [x] Job and My Work pages no longer mount recap.
+- [x] Day Draft confirm routes unchanged.
 
 # TASK-077: Auto-start the job on arrival at a scheduled customer (opt-in)
 

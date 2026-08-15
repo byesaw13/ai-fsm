@@ -49,7 +49,7 @@ export type DayReviewPayload = {
     id: string;
     activityType: string;
     entityLabel: string | null;
-    /** Task label when activity_entries.task_id is set (Daily Recap). */
+    /** Task label when activity_entries.task_id is set. */
     taskLabel: string | null;
     note: string | null;
     startedAt: string;

@@ -88,7 +88,7 @@ export function laborCostForMargin(opts: {
  * Includes:
  *   - job entity (unplanned / legacy)
  *   - visit entity (GPS confirm + field-day spine) — not site_visit assessments
- *   - work_order entity (Daily Recap commits when no visit yet, or direct WO time)
+ *   - work_order entity (direct WO time when no visit)
  *
  * Excludes:
  *   - voided / open rows
