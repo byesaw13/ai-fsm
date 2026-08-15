@@ -230,6 +230,9 @@ describe("shouldRelearnPropertyCoords", () => {
 
 
 describe("shouldCreateVisitCandidate (TASK-079 dwell floor)", () => {
+  it("shares the 5-minute reportable-stop floor", () => {
+    expect(VISIT_CANDIDATE_MIN_DWELL_MINUTES).toBe(5);
+  });
   it("rejects a below-floor confidence", () => {
     expect(shouldCreateVisitCandidate({ score: VISIT_CONFIDENCE_FLOOR - 1, durationMinutes: 30, hasScheduledVisit: false })).toBe(false);
   });

@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { classifyDrive, type DriveClassification } from "./location";
+import {
+  classifyDrive,
+  classifyStop,
+  MIN_STOP_SECONDS,
+  type DriveClassification,
+} from "./location";
 
 const min = (m: number) => m * 60;
 
@@ -33,5 +38,30 @@ describe("classifyDrive", () => {
     expect(classifyDrive({ distanceMeters: 3000, durationSeconds: 3600 })).toBe("ok");
     // just under 1 km/h → noise
     expect(classifyDrive({ distanceMeters: 990, durationSeconds: 3600 })).toBe("noise");
+  });
+});
+
+describe("classifyStop", () => {
+  // Cases drawn from real captured stops (2026-08-10..14).
+  const cases: Array<[string, { durationSeconds: number; hasScheduledVisit?: boolean }, "ok" | "noise"]> = [
+    // HA still / zone flicker — auto-dismissed.
+    ["0.1 min address flicker", { durationSeconds: 6 }, "noise"],
+    ["0.3 min Nashua Rd", { durationSeconds: 18 }, "noise"],
+    ["1.0 min same address", { durationSeconds: 60 }, "noise"],
+    ["1.7 min traffic-light still", { durationSeconds: min(1.7) }, "noise"],
+    ["3.5 min Home Depot blip", { durationSeconds: min(3.5) }, "noise"],
+    ["4.0 min Lowe's blip", { durationSeconds: min(4.0) }, "noise"],
+    ["just under 5 min", { durationSeconds: MIN_STOP_SECONDS - 1 }, "noise"],
+    // Reportable stays — kept.
+    ["exactly 5 min", { durationSeconds: MIN_STOP_SECONDS }, "ok"],
+    ["8.3 min Transfer station", { durationSeconds: min(8.3) }, "ok"],
+    ["25.8 min shop stop", { durationSeconds: min(25.8) }, "ok"],
+    // Scheduled visit today — even a brief arrival counts.
+    ["0 min at a scheduled visit", { durationSeconds: 0, hasScheduledVisit: true }, "ok"],
+    ["2 min at a scheduled visit", { durationSeconds: min(2), hasScheduledVisit: true }, "ok"],
+  ];
+
+  it.each(cases)("%s → %s", (_label, input, expected) => {
+    expect(classifyStop(input)).toBe(expected);
   });
 });

@@ -95,7 +95,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-106**.
+Next available ID: **TASK-107**.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -213,6 +213,7 @@ truth-pass also archived TASK-023 and TASK-050 (epic already Done, README lagged
 | TASK-103 | Door hardware (1007) deterministic materials takeoff → buy list | 002 | Ready |
 | TASK-104 | Discoverable vehicle tracking | 006 | In Progress |
 | TASK-105 | Vehicle fuel history, MPG, and receipt view | 001 | In Progress |
+| TASK-106 | False-stop detection (5-minute dwell floor) | 007 | In Progress |
 
 ## Status legend
 
