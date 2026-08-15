@@ -3,9 +3,11 @@ import { getSession } from "@/lib/auth/session";
 import { businessToday } from "@/lib/operations/business-day";
 import { getDayReview } from "@/lib/day-review/queries";
 import { loadDayCloseStatus } from "@/lib/day-review/close-status";
+import { loadDayDraft } from "@/lib/day-review/load-day-draft";
 import { loadDayVisitTimelines } from "@/lib/visits/load-visit-timeline";
 import { LinkButton, PageContainer, PageHeader } from "@/components/ui";
 import { DayCloseChecklist } from "../day-close/DayCloseChecklist";
+import { DayDraftSection } from "./DayDraftSection";
 import { ProductionStorySection } from "./ProductionStorySection";
 import { VisitsSection } from "./VisitsSection";
 import { TimeSection } from "./TimeSection";
@@ -25,10 +27,11 @@ export default async function DayReviewPage({
   // Default to today in the business timezone — a UTC date rolls over to
   // tomorrow during evening hours, so the owner couldn't review the current day.
   const date = sp.date ?? businessToday();
-  const [payload, closeStatus, productionStory] = await Promise.all([
+  const [payload, closeStatus, productionStory, dayDraft] = await Promise.all([
     getDayReview(session.accountId, date),
     loadDayCloseStatus(session, date),
     loadDayVisitTimelines(session.accountId, date),
+    loadDayDraft(session.accountId, date),
   ]);
 
   if (!payload) {
@@ -65,6 +68,7 @@ export default async function DayReviewPage({
         closedAt={payload.closedAt}
         initial={closeStatus}
       />
+      {dayDraft ? <DayDraftSection date={date} draft={dayDraft} /> : null}
       <ProductionStorySection cards={productionStory} />
       <details className="mb-8">
         <summary className="cursor-pointer font-semibold mb-4">Today&apos;s details</summary>
