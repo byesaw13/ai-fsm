@@ -10,7 +10,6 @@ import {
   PAINTING_TRIM_ADD_CENTS,
   MATERIAL_HANDLING_CLIENT_RATE,
   LABOR_COST_CENTS_PER_HOUR,
-  PREP_LEVEL_MULTIPLIERS,
 } from "./dovetails";
 
 // ---------------------------------------------------------------------------
