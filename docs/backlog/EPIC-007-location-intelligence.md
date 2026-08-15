@@ -405,6 +405,49 @@ Notes:
 The stop sibling of TASK-040. Thresholds live in `classifyStop`;
 migration 172's backfill mirrors them.
 
+# TASK-107: AI Day Draft (GPS + jobs + receipts → one confirm)
+
+Status:
+In Progress
+
+Phase:
+1
+
+Problem:
+Day Review still asks the owner to confirm visits, stops, and drives as
+separate piles. The evidence is already in the system (GPS, scheduled
+visits, receipts, clock). The owner should see one proposed day and only
+handle exceptions.
+
+Business Value:
+End-of-day review becomes "does this look right?" instead of 20 taps.
+Ready items write through the existing confirm paths. The ledger still
+only changes when the owner accepts.
+
+Scope:
+- Pure `assembleDayDraft` (packages/domain): ready vs exception vs already
+  logged, from segments + visit candidates + same-day expenses + clock.
+- Day Review **Day draft** section: accept ready items in one tap; list
+  exceptions. Confirm uses existing visit-candidate and segment PATCH
+  routes (no second writer).
+- Optional "Write a summary" (Anthropic) that cannot change items.
+
+Out of Scope:
+- Habit learning across days.
+- Auto-accept without a tap.
+- Merging split same-place stops.
+
+Acceptance Criteria:
+- [ ] A scheduled high-confidence stop is ready as job work.
+- [ ] A supply-house stop with a matching receipt is ready as material run.
+- [ ] An unlabeled stop or a drive with no GPS miles is an exception.
+- [ ] Accept writes through existing confirm routes; nothing is written
+      until the owner taps Accept.
+
+Notes:
+Follows Daily Recap's "draft then confirm" rule, but the draft is built
+from evidence first — the owner does not narrate the day.
+
 # TASK-077: Auto-start the job on arrival at a scheduled customer (opt-in)
 
 Status:

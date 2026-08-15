@@ -89,6 +89,7 @@ export * from "./location";
 export * from "./geo";
 export * from "./visit-matching";
 export * from "./day-review";
+export * from "./day-draft";
 export * from "./mileage";
 export * from "./hybrid-mileage";
 export * from "./vehicle-mpg";
