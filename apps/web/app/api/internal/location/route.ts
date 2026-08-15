@@ -310,6 +310,17 @@ export async function POST(req: NextRequest) {
          WHERE id = $2 AND account_id = $3 AND ended_at IS NULL`,
         [mut.closeOpen.endedAt, open.id, accountId, distanceMeters, isLikelyNoise, dismissAsNoise],
       );
+      if (dismissAsNoise && open.kind === "stop") {
+        await client.query(
+          `UPDATE visit_candidates
+           SET status = 'ignored', classification = 'ignore', updated_at = now()
+           WHERE account_id = $1
+             AND location_segment_id = $2
+             AND status = 'pending'
+             AND visit_id IS NULL`,
+          [accountId, open.id],
+        );
+      }
     }
     if (mut.updateOpen && open) {
       const u = mut.updateOpen;

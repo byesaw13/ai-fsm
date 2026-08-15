@@ -387,10 +387,8 @@ Scope:
 - Apply at capture: auto-dismiss noise stops (`is_likely_noise` +
   `status = dismissed`).
 - Raise `VISIT_CANDIDATE_MIN_DWELL_MINUTES` to 5 so it shares the same floor.
-- One-time backfill of existing provisional short stops (migration 172).
-- Collapse leftover flagged noise out of the default Stops & drives confirm
-  list (same pattern as Day Review Time).
-- Dashboard "locations to label" count ignores `is_likely_noise`.
+- One-time backfill of existing provisional short stops (migration 172),
+  including pending unscheduled visit-candidate cards on those stops.
 
 Out of Scope:
 - Merging split same-place stops around a dismissed noise drive.

@@ -28,7 +28,30 @@ WHERE ls.kind = 'stop'
       AND vc.visit_id IS NOT NULL
   );
 
+-- The old 3-minute visit-candidate floor may already have created a pending
+-- card for a 3–5 minute unscheduled stop. Dismissing the segment alone would
+-- leave that card as an orphan match on the confirm list.
+UPDATE visit_candidates vc
+SET status = 'ignored',
+    classification = 'ignore',
+    updated_at = now()
+WHERE vc.status = 'pending'
+  AND vc.visit_id IS NULL
+  AND EXISTS (
+    SELECT 1
+    FROM location_segments ls
+    WHERE ls.id = vc.location_segment_id
+      AND ls.kind = 'stop'
+      AND ls.status = 'dismissed'
+      AND ls.is_likely_noise
+      AND ls.ended_at IS NOT NULL
+      AND EXTRACT(EPOCH FROM (ls.ended_at - ls.started_at)) < 300
+  );
+
 -- Reversal:
 -- UPDATE location_segments SET status = 'provisional', is_likely_noise = false
 --  WHERE kind = 'stop' AND status = 'dismissed' AND is_likely_noise
 --    AND EXTRACT(EPOCH FROM (ended_at - started_at)) < 300;
+-- UPDATE visit_candidates SET status = 'pending', classification = NULL
+--  WHERE status = 'ignored' AND classification = 'ignore'
+--    AND visit_id IS NULL;
