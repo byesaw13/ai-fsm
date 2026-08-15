@@ -111,27 +111,4 @@ describe.skipIf(!RUN_HTTP_INTEGRATION)("Auth API (HTTP integration)", () => {
     });
   });
 
-  describe("GET /api/v1/auth/me", () => {
-    it("returns current user when authenticated", async () => {
-      const loginResponse = await login();
-      const cookie = loginResponse.headers.get("set-cookie") ?? "";
-
-      const response = await fetch(`${BASE_URL}/api/v1/auth/me`, {
-        headers: { cookie },
-      });
-
-      expect(response.status).toBe(200);
-      const body = await json<{ email: string; role: string; account_id: string }>(response);
-      expect(body.email).toBe("admin@test.com");
-      expect(body.role).toBe("admin");
-      expect(body.account_id).toBe("11111111-1111-1111-1111-111111111111");
-    });
-
-    it("returns 401 UNAUTHORIZED when not authenticated", async () => {
-      const response = await fetch(`${BASE_URL}/api/v1/auth/me`);
-
-      expect(response.status).toBe(401);
-      expect((await json<ErrorBody>(response)).error?.code).toBe("UNAUTHORIZED");
-    });
-  });
 });

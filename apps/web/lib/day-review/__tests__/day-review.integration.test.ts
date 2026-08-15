@@ -54,29 +54,6 @@ describe.skipIf(!RUN_HTTP_INTEGRATION)("Internal endpoints", () => {
 });
 
 describe.skipIf(!RUN_HTTP_INTEGRATION)("Day Review API", () => {
-  describe("GET /api/v1/day-review/:date", () => {
-    it("returns 400 for invalid date", async () => {
-      const session = await login();
-      const res = await fetch(`${BASE_URL}/api/v1/day-review/not-a-date`, {
-        headers: { Cookie: session },
-      });
-      expect(res.status).toBe(400);
-    });
-
-    it("returns 404 for date with no business day", async () => {
-      const session = await login();
-      const res = await fetch(`${BASE_URL}/api/v1/day-review/1990-01-01`, {
-        headers: { Cookie: session },
-      });
-      expect(res.status).toBe(404);
-    });
-
-    it("returns 401 without auth", async () => {
-      const res = await fetch(`${BASE_URL}/api/v1/day-review/2026-07-01`);
-      expect(res.status).toBe(401);
-    });
-  });
-
   describe("POST /api/v1/day-review/close", () => {
     it("returns 400 without id", async () => {
       const session = await login();

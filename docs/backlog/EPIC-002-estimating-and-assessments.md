@@ -250,7 +250,7 @@ Scope:
   `vocabulary.ts`.
 
 Out of Scope:
-- Any later ponytail cut (MCP, dead APIs, paint adapters).
+- Later ponytail cuts beyond TASK-109.
 - UI behavior changes.
 
 Acceptance Criteria:

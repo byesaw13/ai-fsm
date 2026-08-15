@@ -52,7 +52,7 @@ describe.skipIf(!RUN_INTEGRATION)("Operations Engine — lifecycle independence"
   }
 
   const isClockedIn = async () => !!(await api("GET", "/api/v1/time-clock/current")).json.data;
-  const activeActivity = async () => (await api("GET", "/api/v1/activities/today")).json.data?.active ?? null;
+  const activeActivity = async () => (await api("GET", "/api/v1/operations/current")).json.data?.activity ?? null;
   // Direct DB read — the business-day read route was deleted (no UI consumer);
   // the transition endpoint under test is exercised via HTTP as before.
   const currentDay = async (): Promise<{ id: string; status: string } | null> =>

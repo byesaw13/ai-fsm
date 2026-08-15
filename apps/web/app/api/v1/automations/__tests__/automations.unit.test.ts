@@ -30,7 +30,6 @@ vi.mock("../../../../../lib/db/audit", () => ({
 }));
 
 import { GET, POST } from "../route";
-import { GET as getEvents } from "../events/route";
 
 function makeRequest(method: string, url: string, body?: unknown): NextRequest {
   return new NextRequest(url, {
@@ -76,17 +75,6 @@ describe("GET /api/v1/automations", () => {
     mockQuery.mockResolvedValue([]);
 
     const res = await GET(makeRequest("GET", BASE));
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.data).toEqual([]);
-  });
-});
-
-describe("GET /api/v1/automations/events", () => {
-  it("returns 200 with events array", async () => {
-    mockQuery.mockResolvedValue([]);
-
-    const res = await getEvents(makeRequest("GET", BASE + "/events"));
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data).toEqual([]);

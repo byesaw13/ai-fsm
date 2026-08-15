@@ -45,22 +45,6 @@ describe.skipIf(!RUN_INTEGRATION)("Automations API integration", () => {
     });
   });
 
-  describe("GET /api/v1/automations/events", () => {
-    it("returns 200 with events array for authenticated user", async () => {
-      const res = await fetch(BASE + "/api/v1/automations/events", {
-        headers: { Cookie: adminCookie },
-      });
-      expect(res.status).toBe(200);
-      const json = await res.json();
-      expect(Array.isArray(json.data)).toBe(true);
-    });
-
-    it("returns 401 when not authenticated", async () => {
-      const res = await fetch(BASE + "/api/v1/automations/events");
-      expect(res.status).toBe(401);
-    });
-  });
-
   describe("POST /api/v1/automations/[id]/run", () => {
     it("returns 404 for non-existent automation", async () => {
       const fakeId = "00000000-0000-0000-0000-000000000999";

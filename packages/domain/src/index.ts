@@ -55,14 +55,7 @@ export type { ProductionRate, ProductionRateModifier, LaborEstimate } from "./pr
 export {
   computeRoomMeasurements,
   computePaintingProject,
-  isPaintingEstimateAboveFloor,
-  numericPrepToRoomLevel,
-  toPaintRoomSpec,
-  computePaintRoom,
-  computePaintRooms,
 } from "./painting";
-/** @deprecated Use estimateResultToLegacyFields from estimate-engine adapters */
-export { roomResultToLegacyFields } from "./painting";
 export type {
   RoomPrepLevel,
   PaintGrade,
@@ -72,9 +65,6 @@ export type {
   RoomMeasurements,
   RoomPaintingResult,
   PaintingProjectResult,
-  PrepLevelNumeric,
-  PaintRoom,
-  PaintRoomOutput,
 } from "./painting";
 export * from "./activities";
 export * from "./business-day";

@@ -95,7 +95,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-109**.
+Next available ID: **TASK-110**.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -144,8 +144,8 @@ truth-pass also archived TASK-023 and TASK-050 (epic already Done, README lagged
 | TASK-031 | Owner ↔ field role split (reconciled) | 006 | Done |
 | TASK-032 | Owner ↔ field role split (reconciled) | 006 | Done |
 | TASK-033 | Read-Only Business MCP Server | 005 | Done |
-| TASK-034 | MCP Non-Superuser RLS Verification | 005 | Proposed |
-| TASK-035 | MCP Write Tools v1 (operations writes) | 001 | Proposed |
+| TASK-034 | MCP Non-Superuser RLS Verification | 005 | Cancelled (MCP deleted TASK-109) |
+| TASK-035 | MCP Write Tools v1 (operations writes) | 001 | Cancelled (MCP deleted TASK-109) |
 | TASK-036 | PR Gatekeeper MCP Server | 005 | Deferred |
 | TASK-038 | Surface consolidation (one daily home) | 006 | Done |
 | TASK-039 | Job & estimate numbering | 005 | Done |
@@ -216,6 +216,7 @@ truth-pass also archived TASK-023 and TASK-050 (epic already Done, README lagged
 | TASK-106 | False-stop detection (5-minute dwell floor) | 007 | In Progress |
 | TASK-107 | AI Day Draft (GPS + jobs + receipts → one confirm) | 007 | In Progress |
 | TASK-108 | Ponytail first cut — delete unused hybrid-pricing, vocabulary, log stubs | 002 | Done |
+| TASK-109 | Ponytail second cut — MCP, dead APIs, unused paint helpers | 005 | Done |
 
 ## Status legend
 

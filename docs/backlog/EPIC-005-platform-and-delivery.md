@@ -10,44 +10,46 @@ workflow.
 # TASK-034: MCP Non-Superuser RLS Verification
 
 Status:
-Proposed
+Cancelled (MCP package deleted, TASK-109)
 
 Phase:
 cross-cutting
 
 Problem:
-The MCP integration tests (TASK-033) run as a Postgres superuser, which bypasses
-RLS. Account isolation is therefore proven only through the tools' explicit
-`account_id` predicates, not through RLS policies alone. That is acceptable for
-the read-only phase (it matches what production currently relies on), but it
-leaves the row-level-security half of the defense-in-depth model unverified.
+The MCP integration tests ran as a superuser, so RLS was unverified.
+
+**Status note (PR / TASK-109):** `services/mcp` is gone. No MCP surface to verify.
+
+# TASK-109: Ponytail second cut — MCP, dead APIs, unused paint helpers
+
+Status:
+Done
+
+Phase:
+cross-cutting
+
+Problem:
+Read-only MCP was never in compose or daily use. JSON twins of server pages,
+membership CRUD, and unused fleet TCO routes had no UI callers. A second
+painting model (`PaintRoom` / `computePaintRoom`) and
+`computeSqftPaintingEstimate` had zero app callers.
 
 Business Value:
-- Confirms the database enforces tenant isolation even if an application-level
-  `account_id` filter is ever dropped from a query by mistake.
-- De-risks future write tools (TASK-035), where a scoping bug would be worse.
+Less unused surface. Estimate forms keep the live adapters.
 
 Scope:
-- Add integration coverage that connects as a **non-superuser application role**
-  (no `BYPASSRLS`), with the same `app.current_*` session vars the server sets.
-- Verify `app_role()` / `app_account_id()` resolve correctly for that role.
-- Verify RLS policies **alone** prevent cross-account reads (A cannot see B) with
-  the explicit `account_id` predicate deliberately removed in the test query.
-- Confirm the MCP surface stays secure under both RLS and app-level filtering.
+- Delete `services/mcp` and cancel TASK-034 / TASK-035.
+- Delete unused JSON/TCO/membership CRUD API routes. Keep tables and RSC pages.
+- Delete unused paint helpers. Keep `adapters.ts` (`sqftPaintingToSpec`,
+  `roomSpecsToEstimateSpec`) — estimate UI uses them.
 
 Out of Scope:
-- Changing the production DB role or connection model.
-- Any new tools.
+- Daily Recap, membership visit chrome, collapsing the live dual-engine mapper.
 
 Acceptance Criteria:
-- [ ] A non-superuser role is provisioned in the integration setup.
-- [ ] Cross-account access is blocked by RLS with no explicit `account_id` filter.
-- [ ] `app_role()` resolves to the operator's role for that connection.
-- [ ] Tests skip gracefully when `TEST_DATABASE_URL` is unset.
-
-Notes:
-Tracks the one caveat surfaced when reviewing TASK-033's integration tests.
-Originally framed as `MCP-RLS-001`.
+- [x] MCP package gone; TASK-034 and TASK-035 Cancelled.
+- [x] Deleted routes have no remaining app callers.
+- [x] Live paint adapters still compile and are imported by estimate forms.
 
 # TASK-036: PR Gatekeeper MCP Server
 
