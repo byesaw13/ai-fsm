@@ -14,10 +14,13 @@ export function LocationCaptureControl({
   enabled,
   pausedUntil,
   hasActiveWorkday,
+  showTrackingLink = false,
 }: {
   enabled: boolean;
   pausedUntil: string | null;
   hasActiveWorkday: boolean;
+  /** Owner/admin only — /app/timeline redirects techs away. */
+  showTrackingLink?: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -71,18 +74,20 @@ export function LocationCaptureControl({
       <Button size="sm" variant="ghost" disabled={busy} onClick={() => patch({ enabled: !enabled }, enabled ? "Capture turned off" : "Capture turned on")}>
         {enabled ? "Turn off" : "Turn on"}
       </Button>
-      <Link
-        href={"/app/timeline" as Route}
-        style={{
-          marginLeft: "auto",
-          color: "var(--accent)",
-          fontWeight: 600,
-          textDecoration: "none",
-          fontSize: "var(--text-sm)",
-        }}
-      >
-        Vehicle tracking →
-      </Link>
+      {showTrackingLink ? (
+        <Link
+          href={"/app/timeline" as Route}
+          style={{
+            marginLeft: "auto",
+            color: "var(--accent)",
+            fontWeight: 600,
+            textDecoration: "none",
+            fontSize: "var(--text-sm)",
+          }}
+        >
+          Vehicle tracking →
+        </Link>
+      ) : null}
     </div>
   );
 }

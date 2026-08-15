@@ -193,6 +193,7 @@ export default async function MyWorkPage() {
             enabled={fieldDay.locationSettings.enabled}
             pausedUntil={fieldDay.locationSettings.pausedUntil}
             hasActiveWorkday={!!fieldDay.openSession}
+            showTrackingLink={!isTech}
           />
         </div>
       )}

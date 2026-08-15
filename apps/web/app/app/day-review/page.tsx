@@ -52,9 +52,11 @@ export default async function DayReviewPage({
           day: "numeric",
         })}
         actions={
-          <LinkButton href={`/app/timeline?date=${date}`} variant="ghost" size="sm">
-            Vehicle tracking
-          </LinkButton>
+          session.role === "owner" || session.role === "admin" ? (
+            <LinkButton href={`/app/timeline?date=${date}`} variant="ghost" size="sm">
+              Vehicle tracking
+            </LinkButton>
+          ) : undefined
         }
       />
       <DayCloseChecklist
