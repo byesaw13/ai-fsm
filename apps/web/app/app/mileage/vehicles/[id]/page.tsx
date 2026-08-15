@@ -4,7 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useParams } from "next/navigation";
-import { PageContainer, PageHeader, Card, LinkButton } from "@/components/ui";
+import {
+  Button,
+  Card,
+  Input,
+  LinkButton,
+  MetricGrid,
+  PageContainer,
+  PageHeader,
+} from "@/components/ui";
+import { dollarsFromCents, formatFillDate, vehicleCostLabel } from "@/lib/vehicles/fuel-display";
+import { VehicleFuelPanel, type FuelFill } from "./VehicleFuelPanel";
 
 type Vehicle = {
   id: string;
@@ -44,7 +54,9 @@ type OverviewData = {
     monthly_payment_cents: number;
     current_balance_cents: number | null;
   } | null;
-  recent_fuel: Array<{ id: string; filled_at: string; gallons: number; odometer: number | null }>;
+  recent_fuel: FuelFill[];
+  last_fill: FuelFill | null;
+  mpg: { last: number | null; last_five: number | null };
   recent_service: Array<{
     id: string;
     serviced_at: string;
@@ -63,17 +75,13 @@ const SERVICE_TYPES = [
   "other",
 ];
 
-function dollars(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
-
 export default function VehicleDetailPage() {
   const params = useParams();
   const id = String(params.id ?? "");
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<"overview" | "fuel" | "service">("overview");
+  const [tab, setTab] = useState<"overview" | "fuel" | "service">("fuel");
   const [pending, setPending] = useState(false);
   const [toast, setToast] = useState("");
 
@@ -126,6 +134,10 @@ export default function VehicleDetailPage() {
   }, [load]);
 
   const isTrailer = vehicle?.kind === "trailer";
+
+  useEffect(() => {
+    if (isTrailer) setTab("overview");
+  }, [isTrailer]);
 
   async function logFuel(e: React.FormEvent) {
     e.preventDefault();
@@ -211,64 +223,92 @@ export default function VehicleDetailPage() {
 
   const dues = overview?.next_service_dues?.filter((d) => d.status !== "ok") ?? [];
   const renewals = overview?.next_renewals ?? [];
+  const lastFill = overview?.last_fill ?? overview?.recent_fuel?.[0] ?? null;
 
   return (
     <PageContainer>
       <PageHeader
         title={vehicle.nickname}
-        subtitle={[vehicle.year, vehicle.make, vehicle.model, vehicle.plate]
-          .filter(Boolean)
-          .join(" · ")}
+        subtitle={[vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ")}
         actions={
-          <LinkButton href={"/app/mileage/vehicles" as Route} variant="secondary" size="sm">
-            ← Fleet
-          </LinkButton>
+          <span style={{ display: "inline-flex", gap: "var(--space-2)", alignItems: "center" }}>
+            {vehicle.plate && (
+              <span
+                style={{
+                  fontFamily: "var(--font-mono, ui-monospace, monospace)",
+                  fontSize: "var(--text-xs)",
+                  letterSpacing: "0.08em",
+                  padding: "4px 8px",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-sm)",
+                }}
+              >
+                {vehicle.plate}
+              </span>
+            )}
+            <LinkButton href={"/app/mileage/vehicles" as Route} variant="secondary" size="sm">
+              Fleet
+            </LinkButton>
+          </span>
         }
       />
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        <span
-          style={{
-            fontSize: 12,
-            fontWeight: 700,
-            padding: "2px 8px",
-            borderRadius: 4,
-            background: "#ffedd5",
-          }}
-        >
-          {(vehicle.kind ?? "truck").toUpperCase()}
-        </span>
-        {vehicle.current_odometer != null && (
-          <span style={{ fontSize: 13, color: "var(--fg-muted)" }}>
-            Odo {vehicle.current_odometer.toLocaleString()} mi
-          </span>
-        )}
-        {overview?.cost_last_90_days && overview.cost_last_90_days.total_cents > 0 && (
-          <span style={{ fontSize: 13, color: "var(--fg-muted)" }}>
-            90d cost {dollars(overview.cost_last_90_days.total_cents)}
-          </span>
-        )}
+      <div style={{ marginBottom: "var(--space-4)" }}>
+        <MetricGrid
+          metrics={[
+            {
+              label: "Odometer",
+              value:
+                vehicle.current_odometer != null
+                  ? vehicle.current_odometer.toLocaleString()
+                  : "—",
+              sub: "mi",
+            },
+            {
+              label: "Last fill",
+              value: lastFill
+                ? `${Number(lastFill.gallons).toLocaleString(undefined, { maximumFractionDigits: 1 })} gal`
+                : "—",
+              sub: lastFill
+                ? `${formatFillDate(lastFill.filled_at)}${
+                    lastFill.amount_cents != null
+                      ? ` · ${dollarsFromCents(lastFill.amount_cents)}`
+                      : ""
+                  }`
+                : "No fills yet",
+            },
+            {
+              label: "MPG",
+              value: overview?.mpg.last != null ? String(overview.mpg.last) : "—",
+              sub:
+                overview?.mpg.last_five != null
+                  ? `Last 5 fills ${overview.mpg.last_five}`
+                  : "Needs two full tanks",
+            },
+            {
+              label: "90-day cost",
+              value: dollarsFromCents(overview?.cost_last_90_days.total_cents ?? 0),
+              sub: "Fuel, service, papers",
+            },
+          ]}
+        />
       </div>
 
-      <nav style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+      <nav
+        style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}
+        aria-label="Vehicle sections"
+      >
         {tabs.map((t) => (
-          <button
+          <Button
             key={t}
             type="button"
+            size="sm"
+            variant={tab === t ? "primary" : "ghost"}
             onClick={() => setTab(t)}
-            style={{
-              minHeight: 44,
-              padding: "0 14px",
-              borderRadius: 8,
-              border: "1px solid var(--border)",
-              background: tab === t ? "var(--color-accent, #c2410c)" : "transparent",
-              color: tab === t ? "#fff" : "inherit",
-              fontWeight: 600,
-              textTransform: "capitalize",
-            }}
+            style={{ textTransform: "capitalize" }}
           >
-            {t}
-          </button>
+            {t === "fuel" ? "Fuel" : t === "service" ? "Service" : "Overview"}
+          </Button>
         ))}
       </nav>
 
@@ -290,13 +330,13 @@ export default function VehicleDetailPage() {
             {overview?.cost_last_90_days ? (
               <>
                 <p style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
-                  {dollars(overview.cost_last_90_days.total_cents)}
+                  {dollarsFromCents(overview.cost_last_90_days.total_cents)}
                 </p>
                 {overview.cost_last_90_days.by_category.length > 0 && (
                   <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 14 }}>
                     {overview.cost_last_90_days.by_category.map((c) => (
                       <li key={c.category}>
-                        {c.category.replace(/_/g, " ")}: {dollars(c.total_cents)}
+                        {vehicleCostLabel(c.category)}: {dollarsFromCents(c.total_cents)}
                       </li>
                     ))}
                   </ul>
@@ -339,9 +379,9 @@ export default function VehicleDetailPage() {
             <Card>
               <h2 style={{ marginTop: 0, fontSize: 16 }}>Loan</h2>
               <p style={{ margin: 0, fontSize: 14 }}>
-                {overview.loan.lender} · {dollars(overview.loan.monthly_payment_cents)}/mo
+                {overview.loan.lender} · {dollarsFromCents(overview.loan.monthly_payment_cents)}/mo
                 {overview.loan.current_balance_cents != null &&
-                  ` · balance ${dollars(overview.loan.current_balance_cents)}`}
+                  ` · balance ${dollarsFromCents(overview.loan.current_balance_cents)}`}
               </p>
             </Card>
           )}
@@ -350,13 +390,23 @@ export default function VehicleDetailPage() {
             <Card>
               <h2 style={{ marginTop: 0, fontSize: 16 }}>Recent fuel</h2>
               <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14 }}>
-                {overview.recent_fuel.map((f) => (
+                {overview.recent_fuel.slice(0, 3).map((f) => (
                   <li key={f.id}>
-                    {f.filled_at.slice(0, 10)} · {Number(f.gallons)} gal
-                    {f.odometer != null ? ` · ${f.odometer.toLocaleString()} mi` : ""}
+                    {formatFillDate(f.filled_at)} · {Number(f.gallons).toFixed(1)} gal
+                    {f.amount_cents != null ? ` · ${dollarsFromCents(f.amount_cents)}` : ""}
+                    {f.mpg != null ? ` · ${f.mpg} mpg` : ""}
                   </li>
                 ))}
               </ul>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setTab("fuel")}
+                style={{ marginTop: 8 }}
+              >
+                All fills →
+              </Button>
             </Card>
           )}
 
@@ -377,51 +427,19 @@ export default function VehicleDetailPage() {
       )}
 
       {tab === "fuel" && !isTrailer && (
-        <Card>
-          <h2 style={{ marginTop: 0 }}>Log fuel</h2>
-          <form onSubmit={logFuel} style={{ display: "grid", gap: 12, maxWidth: 360 }}>
-            <label>
-              Odometer
-              <input
-                inputMode="decimal"
-                value={odo}
-                onChange={(e) => setOdo(e.target.value)}
-                style={{ display: "block", width: "100%", minHeight: 44, marginTop: 4 }}
-              />
-            </label>
-            <label>
-              Gallons
-              <input
-                required
-                inputMode="decimal"
-                value={gallons}
-                onChange={(e) => setGallons(e.target.value)}
-                style={{ display: "block", width: "100%", minHeight: 44, marginTop: 4 }}
-              />
-            </label>
-            <label>
-              Total $
-              <input
-                required
-                inputMode="decimal"
-                value={dollarsIn}
-                onChange={(e) => setDollarsIn(e.target.value)}
-                style={{ display: "block", width: "100%", minHeight: 44, marginTop: 4 }}
-              />
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 44 }}>
-              <input
-                type="checkbox"
-                checked={fullTank}
-                onChange={(e) => setFullTank(e.target.checked)}
-              />
-              Full tank
-            </label>
-            <button type="submit" disabled={pending} style={{ minHeight: 44, fontWeight: 600 }}>
-              {pending ? "Saving…" : "Save fuel"}
-            </button>
-          </form>
-        </Card>
+        <VehicleFuelPanel
+          fills={overview?.recent_fuel ?? []}
+          odo={odo}
+          gallons={gallons}
+          dollarsIn={dollarsIn}
+          fullTank={fullTank}
+          pending={pending}
+          onOdo={setOdo}
+          onGallons={setGallons}
+          onDollars={setDollarsIn}
+          onFullTank={setFullTank}
+          onSubmit={logFuel}
+        />
       )}
 
       {tab === "service" && (
@@ -457,40 +475,30 @@ export default function VehicleDetailPage() {
                 })}
               </div>
             </fieldset>
-            <label>
-              Odometer
-              <input
-                inputMode="decimal"
-                value={svcOdo}
-                onChange={(e) => setSvcOdo(e.target.value)}
-                style={{ display: "block", width: "100%", minHeight: 44, marginTop: 4 }}
-              />
-            </label>
-            <label>
-              Vendor
-              <input
-                value={svcVendor}
-                onChange={(e) => setSvcVendor(e.target.value)}
-                style={{ display: "block", width: "100%", minHeight: 44, marginTop: 4 }}
-              />
-            </label>
-            <label>
-              Total $
-              <input
-                required
-                inputMode="decimal"
-                value={svcDollars}
-                onChange={(e) => setSvcDollars(e.target.value)}
-                style={{ display: "block", width: "100%", minHeight: 44, marginTop: 4 }}
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={pending || svcTypes.length === 0}
-              style={{ minHeight: 44, fontWeight: 600 }}
-            >
+            <Input
+              id="svc-odo"
+              label="Odometer"
+              inputMode="numeric"
+              value={svcOdo}
+              onChange={(e) => setSvcOdo(e.target.value)}
+            />
+            <Input
+              id="svc-vendor"
+              label="Vendor"
+              value={svcVendor}
+              onChange={(e) => setSvcVendor(e.target.value)}
+            />
+            <Input
+              id="svc-dollars"
+              label="Total $"
+              required
+              inputMode="decimal"
+              value={svcDollars}
+              onChange={(e) => setSvcDollars(e.target.value)}
+            />
+            <Button type="submit" disabled={pending || svcTypes.length === 0}>
               {pending ? "Saving…" : "Save service"}
-            </button>
+            </Button>
           </form>
         </Card>
       )}

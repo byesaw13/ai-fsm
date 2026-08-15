@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeMpgSegments, latestMpg } from "./vehicle-mpg";
+import { computeMpgSegments, latestMpg, rollingMpg, mpgByClosedAt } from "./vehicle-mpg";
 
 describe("vehicle-mpg (TASK-093)", () => {
   it("computes full-tank delta with partials accumulated", () => {
@@ -30,5 +30,19 @@ describe("vehicle-mpg (TASK-093)", () => {
         { filledAt: "2026-01-01T10:00:00Z", odometer: 10000, gallons: 15, isFullTank: true, odometerSuspect: false },
       ]),
     ).toBeNull();
+  });
+
+  it("keys MPG to the closing fill and rolls last segments", () => {
+    const logs = [
+      { filledAt: "2026-06-11", odometer: 100000, gallons: 20, isFullTank: true, odometerSuspect: false },
+      { filledAt: "2026-06-20", odometer: 100300, gallons: 20, isFullTank: true, odometerSuspect: false },
+      { filledAt: "2026-07-06", odometer: 100600, gallons: 20, isFullTank: true, odometerSuspect: false },
+    ];
+    const byClose = mpgByClosedAt(logs);
+    expect(byClose.get("2026-06-11")).toBeUndefined();
+    expect(byClose.get("2026-06-20")).toBe(15);
+    expect(byClose.get("2026-07-06")).toBe(15);
+    expect(rollingMpg(logs, 5)).toBe(15);
+    expect(latestMpg(logs)).toBe(15);
   });
 });
