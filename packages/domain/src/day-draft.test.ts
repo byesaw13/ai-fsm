@@ -184,6 +184,63 @@ describe("assembleDayDraft", () => {
     expect(draft.readyCount).toBe(0);
   });
 
+  it("treats a provisional stop fully covered by the ledger as already logged", () => {
+    const draft = assembleDayDraft(evidence({
+      segments: [seg({ id: "s1", kind: "stop", startedAt: t("13:00"), endedAt: t("15:00") })],
+      loggedEntries: [{ startedAt: t("12:00"), endedAt: t("16:00") }],
+    }));
+    expect(draft.items[0].alreadyLogged).toBe(true);
+    expect(draft.items[0].ready).toBe(false);
+  });
+
+  it("flags a partial overlap instead of marking it ready", () => {
+    const draft = assembleDayDraft(evidence({
+      segments: [seg({
+        id: "s1",
+        kind: "stop",
+        placeLabel: "Home Depot",
+        zone: "Home Depot",
+        suggestedActivity: "material_run",
+        startedAt: t("13:00"),
+        endedAt: t("15:00"),
+      })],
+      loggedEntries: [{ startedAt: t("14:00"), endedAt: t("14:30") }],
+    }));
+    expect(draft.items[0].ready).toBe(false);
+    expect(draft.items[0].exception).toBe("Overlaps logged time");
+  });
+
+  it("counts standalone ledger time in attributed minutes", () => {
+    const draft = assembleDayDraft(evidence({
+      segments: [],
+      loggedEntries: [{ startedAt: t("12:00"), endedAt: t("16:00") }],
+      clockedMinutes: 240,
+    }));
+    expect(draft.attributedMinutes).toBe(240);
+    expect(draft.reconciliation).toContain("matches the clocked day");
+  });
+
+  it("holds an unknown work-order match as an exception", () => {
+    const draft = assembleDayDraft(evidence({
+      segments: [seg({ id: "s1", kind: "stop" })],
+      candidates: [{
+        id: "c1",
+        segmentId: "s1",
+        clientName: "Kim Tufts",
+        propertyAddress: "Wells",
+        score: 88,
+        jobId: "job-1",
+        visitId: "vis-1",
+        workOrderId: null,
+        clientId: "cli-1",
+        woResolution: "unknown",
+        visitType: "job",
+      }],
+    }));
+    expect(draft.items[0].ready).toBe(false);
+    expect(draft.items[0].exception).toBe("Pick a work order");
+  });
+
   it("adds untracked gaps between signal segments", () => {
     const draft = assembleDayDraft(evidence({
       segments: [

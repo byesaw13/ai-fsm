@@ -109,6 +109,51 @@ function minutesBetween(start: string, end: string): number {
   return Math.max(0, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000));
 }
 
+export function unionMinutes(spans: { startedAt: string; endedAt: string }[]): number {
+  const sorted = spans
+    .map((s) => ({ a: new Date(s.startedAt).getTime(), b: new Date(s.endedAt).getTime() }))
+    .filter((s) => s.b > s.a)
+    .sort((x, y) => x.a - y.a);
+  if (sorted.length === 0) return 0;
+  let total = 0;
+  let curA = sorted[0].a;
+  let curB = sorted[0].b;
+  for (let i = 1; i < sorted.length; i++) {
+    const next = sorted[i];
+    if (next.a <= curB) {
+      curB = Math.max(curB, next.b);
+    } else {
+      total += curB - curA;
+      curA = next.a;
+      curB = next.b;
+    }
+  }
+  total += curB - curA;
+  return Math.round(total / 60000);
+}
+
+function coverageOf(start: string, end: string, entries: DayDraftEvidenceEntry[]): "none" | "full" | "overlap" {
+  const a = new Date(start).getTime();
+  const b = new Date(end).getTime();
+  let covered = false;
+  let overlaps = false;
+  for (const e of entries) {
+    const ea = new Date(e.startedAt).getTime();
+    const eb = new Date(e.endedAt).getTime();
+    if (ea <= a && eb >= b) covered = true;
+    if (ea < b && eb > a) overlaps = true;
+  }
+  if (covered) return "full";
+  if (overlaps) return "overlap";
+  return "none";
+}
+
+function workOrderIsResolved(match: DayDraftEvidenceCandidate): boolean {
+  if (match.workOrderId) return true;
+  const res = (match.woResolution ?? "").toLowerCase();
+  return res === "clear" || res === "resolved" || res === "none";
+}
+
 const STORE_TOKENS = [
   "home depot",
   "lowe",
@@ -182,6 +227,7 @@ function draftOneSegment(
   seg: DayDraftEvidenceSegment,
   candidates: DayDraftEvidenceCandidate[],
   expenses: DayDraftEvidenceExpense[],
+  loggedEntries: DayDraftEvidenceEntry[],
   defaultVehicleId: string | null,
   visitScoreFloor: number,
 ): DayDraftItem | null {
@@ -193,7 +239,9 @@ function draftOneSegment(
   const place = seg.placeLabel ?? seg.zone ?? (seg.kind === "drive" ? "Driving" : "Stop");
   const suggested = seg.suggestedActivity ?? suggestActivityForSegment({ kind: seg.kind, zone: seg.zone ?? seg.placeLabel });
   const match = candidates.find((c) => c.segmentId === seg.id) ?? null;
-  const alreadyLogged = seg.status === "confirmed" || seg.activityEntryId != null;
+  const coverage = coverageOf(seg.startedAt, seg.endedAt, loggedEntries);
+  const alreadyLogged =
+    seg.status === "confirmed" || seg.activityEntryId != null || coverage === "full";
   const expenseHint = seg.kind === "stop" ? expenseMatchesPlace(place, expenses) : null;
 
   const item = emptyItem({
@@ -218,7 +266,19 @@ function draftOneSegment(
     item.label = place;
     item.proposedActivity = suggested;
     item.confidence = "high";
-    item.reasons = ["Already on the ledger"];
+    item.reasons = coverage === "full" && !seg.activityEntryId
+      ? ["Time already on the ledger"]
+      : ["Already on the ledger"];
+    return item;
+  }
+
+  if (coverage === "overlap") {
+    item.label = place;
+    item.proposedActivity = suggested ?? (seg.kind === "drive" ? "travel" : null);
+    item.exception = "Overlaps logged time";
+    item.reasons = ["Partial overlap with an existing activity"];
+    item.confidence = "low";
+    item.ready = false;
     return item;
   }
 
@@ -250,7 +310,7 @@ function draftOneSegment(
     item.label = match.propertyAddress ? `${who} · ${match.propertyAddress}` : who;
     item.reasons = [`${match.score}% match`];
     if (match.visitId) item.reasons.push("Scheduled visit today");
-    if (match.woResolution === "ambiguous") {
+    if (!workOrderIsResolved(match)) {
       item.confidence = "medium";
       item.exception = "Pick a work order";
       item.ready = false;
@@ -300,6 +360,7 @@ export function assembleDayDraft(input: DayDraftEvidence): DayDraft {
       seg,
       input.candidates,
       input.expenses,
+      input.loggedEntries,
       input.defaultVehicleId,
       visitScoreFloor,
     );
@@ -330,9 +391,12 @@ export function assembleDayDraft(input: DayDraftEvidence): DayDraft {
   const readyCount = items.filter((i) => i.ready).length;
   const exceptionCount = items.filter((i) => i.exception && !i.alreadyLogged).length;
   const alreadyLoggedCount = items.filter((i) => i.alreadyLogged).length;
-  const attributedMinutes = items
-    .filter((i) => i.kind !== "gap" && (i.ready || i.alreadyLogged))
-    .reduce((sum, i) => sum + i.minutes, 0);
+  const attributedMinutes = unionMinutes([
+    ...items
+      .filter((i) => i.kind !== "gap" && (i.ready || i.alreadyLogged))
+      .map((i) => ({ startedAt: i.startedAt, endedAt: i.endedAt })),
+    ...input.loggedEntries,
+  ]);
 
   return {
     items,
