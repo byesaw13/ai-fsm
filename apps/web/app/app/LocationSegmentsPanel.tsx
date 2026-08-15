@@ -384,9 +384,9 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
 
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-      <SectionHeader title="Your day" count={toLabel > 0 ? toLabel : undefined} />
+      <SectionHeader title="Stops & drives" count={toLabel > 0 ? toLabel : undefined} />
       <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", margin: "calc(-1 * var(--space-2)) 0 0" }}>
-        Auto-recorded stops &amp; drives — label each into your day. Customer matches appear on the stop.
+        GPS vehicle tracking — label each stop and drive into your day. Customer matches appear on the stop.
       </p>
 
       {loading ? (

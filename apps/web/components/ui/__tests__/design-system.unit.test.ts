@@ -170,8 +170,9 @@ describe("getNavSections (nested hubs)", () => {
       const hrefs = flattenSections(getNavSections("owner", view)).map((i) => i.href);
       for (const href of shared) expect(hrefs).toContain(href);
       expect(hrefs).toContain(view === "field" ? "/app/my-work" : "/app");
+      expect(hrefs).toContain("/app/timeline");
       expect(hrefs).not.toContain("/app/mileage");
-      expect(hrefs).toHaveLength(12);
+      expect(hrefs).toHaveLength(13);
     }
   });
 
@@ -180,7 +181,8 @@ describe("getNavSections (nested hubs)", () => {
     expect(hrefs).not.toContain("/app/my-work"); // EPIC-006 P5
     expect(hrefs).toContain("/app");
     expect(hrefs).toContain("/app/settings");
-    expect(hrefs).toHaveLength(12);
+    expect(hrefs).toContain("/app/timeline");
+    expect(hrefs).toHaveLength(13);
   });
 
   it("Layer 2+ tools are not in main nav", () => {
@@ -200,7 +202,8 @@ describe("getNavSections (nested hubs)", () => {
       const sections = getNavSections("owner", view);
       expect(sections.map((s) => s.label).filter(Boolean)).toEqual(HUB_LABELS);
       const hrefs = flattenSections(sections).map((i) => i.href);
-      expect(hrefs).toHaveLength(12);
+      expect(hrefs).toHaveLength(13);
+      expect(hrefs).toContain("/app/timeline");
       if (view === "field") {
         expect(hrefs).toContain("/app/my-work");
         expect(hrefs).not.toContain("/app"); // no Overview home in Field
@@ -254,6 +257,24 @@ describe("getNavSections (nested hubs)", () => {
       expect(field).toContain(href);
       expect(office).toContain(href);
     }
+  });
+
+  it("Home hub lists Tracking next to Day Review for owner/admin", () => {
+    const adminHome = getNavSections("admin").find((s) => s.label === "Home");
+    expect(adminHome?.items.map((i) => i.label)).toEqual([
+      "Overview",
+      "Day Review",
+      "Tracking",
+    ]);
+    expect(adminHome?.items.map((i) => i.href)).toContain("/app/timeline");
+
+    const ownerHome = getNavSections("owner", "office").find((s) => s.label === "Home");
+    expect(ownerHome?.items.some((i) => i.href === "/app/timeline" && i.label === "Tracking")).toBe(
+      true,
+    );
+
+    const tech = flattenSections(getNavSections("tech")).map((i) => i.href);
+    expect(tech).not.toContain("/app/timeline");
   });
 
   it("Work hub lists requests through schedule in order", () => {
@@ -310,6 +331,14 @@ describe("getBottomNavItems (mobile hubs)", () => {
     expect(isNavActive("/app/estimates/new", work!.href, work!.activePrefixes)).toBe(true);
     expect(isNavActive("/app/schedule", work!.href, work!.activePrefixes)).toBe(true);
     expect(isNavActive("/app/clients", work!.href, work!.activePrefixes)).toBe(false);
+  });
+
+  it("Home stays active on Tracking; Money stays active on Mileage", () => {
+    const ownerHome = getBottomNavItems("owner").find((i) => i.label === "Home");
+    const money = getBottomNavItems("owner").find((i) => i.label === "Money");
+    expect(isNavActive("/app/timeline", ownerHome!.href, ownerHome!.activePrefixes)).toBe(true);
+    expect(isNavActive("/app/day-review", ownerHome!.href, ownerHome!.activePrefixes)).toBe(true);
+    expect(isNavActive("/app/mileage/vehicles", money!.href, money!.activePrefixes)).toBe(true);
   });
 });
 

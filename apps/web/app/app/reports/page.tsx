@@ -65,7 +65,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
               Referral ROI →
             </Link>
             <Link href={"/app/timeline" as Route} style={{ color: "var(--accent)", fontSize: "var(--text-sm)" }}>
-              Activity Timeline →
+              Vehicle tracking →
             </Link>
             <Link href={"/app/reports/close" as Route} style={{ color: "var(--accent)", fontSize: "var(--text-sm)" }}>
               Month-End Close →

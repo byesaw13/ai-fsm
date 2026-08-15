@@ -5,10 +5,9 @@ import {
 } from "../quick-actions";
 
 describe("quick actions", () => {
-  it("does not expose the Activity Timeline as a quick action (now lives under Reports)", () => {
-    // TASK-038 step 3: the Activity Timeline moved to back-office — it's reached
-    // from a persistent link in the Reports header, not the dashboard quick
-    // actions. Guard against it creeping back into either surface.
+  it("does not expose vehicle tracking as a field quick action (it lives in Home nav)", () => {
+    // Tracking is a Home-hub destination for owner/admin, not a one-tap field
+    // shortcut. Guard against it crowding the dashboard / My Day action strips.
     for (const set of [OWNER_QUICK_ACTIONS, FIELD_QUICK_ACTIONS]) {
       expect(set.some((a) => a.href === "/app/timeline")).toBe(false);
     }

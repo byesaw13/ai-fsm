@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { Card, PageContainer, PageHeader, SectionHeader } from "@/components/ui";
+import { Card, HubSubnav, LinkButton, PageContainer, PageHeader, SectionHeader } from "@/components/ui";
+import { MONEY_HUB_LINKS } from "@/lib/navigation/hubs";
 
 interface Vehicle {
   id: string;
@@ -132,15 +133,22 @@ export default function VehiclesPage() {
         backHref="/app/mileage"
         backLabel="Mileage"
         actions={
-          <button
-            className="p7-btn p7-btn-primary"
-            onClick={() => { setShowAdd(true); setAddError(""); }}
-            style={{ display: showAdd ? "none" : undefined }}
-          >
-            + Add Vehicle
-          </button>
+          <span style={{ display: "inline-flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+            <LinkButton href={"/app/timeline" as Route} variant="ghost" size="sm">
+              Vehicle tracking
+            </LinkButton>
+            <button
+              className="p7-btn p7-btn-primary"
+              onClick={() => { setShowAdd(true); setAddError(""); }}
+              style={{ display: showAdd ? "none" : undefined }}
+            >
+              + Add Vehicle
+            </button>
+          </span>
         }
       />
+
+      <HubSubnav hub="Money" links={MONEY_HUB_LINKS} pathname="/app/mileage" />
 
       {error && <div className="p7-alert p7-alert-danger">{error}</div>}
 

@@ -6,6 +6,7 @@ import { query } from "@/lib/db";
 import {
   Card,
   EmptyState,
+  HubSubnav,
   LinkButton,
   MetricGrid,
   PageContainer,
@@ -13,6 +14,7 @@ import {
   Tabs,
 } from "@/components/ui";
 import type { TabDef } from "@/components/ui";
+import { MONEY_HUB_LINKS } from "@/lib/navigation/hubs";
 
 export const dynamic = "force-dynamic";
 
@@ -132,6 +134,9 @@ export default async function MileagePage({ searchParams }: PageProps) {
         actions={
           canManage ? (
             <div style={{ display: "flex", gap: "var(--space-2)" }}>
+              <LinkButton href={"/app/timeline" as Route} variant="ghost" size="sm">
+                Vehicle tracking
+              </LinkButton>
               <LinkButton href={"/app/mileage/vehicles" as Route} variant="ghost" size="sm">
                 Vehicles
               </LinkButton>
@@ -142,6 +147,8 @@ export default async function MileagePage({ searchParams }: PageProps) {
           ) : undefined
         }
       />
+
+      <HubSubnav hub="Money" links={MONEY_HUB_LINKS} pathname="/app/mileage" />
 
       <Tabs tabs={recentMonths()} activeKey={activeMonth} />
 

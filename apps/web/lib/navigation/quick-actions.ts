@@ -4,10 +4,9 @@
  * Extracted from the dashboard components so the destinations are a single,
  * testable source of truth.
  *
- * The Activity Timeline (account-wide time/mileage ledger) is owner/admin-only
- * back-office and now lives under Reports (a persistent "Activity Timeline →"
- * link in the Reports header), so it is intentionally absent from both quick
- * action sets. The /app/timeline route still enforces the owner/admin guard.
+ * Vehicle tracking (`/app/timeline`) is owner/admin-only and lives in the Home
+ * hub as Tracking — not in these field/dashboard quick-action strips. The
+ * route still enforces the owner/admin guard.
  */
 
 export interface QuickAction {
@@ -30,7 +29,7 @@ export const OWNER_QUICK_ACTIONS: QuickAction[] = [
 
 /**
  * Field My Day (`/app/my-work`) quick actions. Rendered for technicians as well
- * as owners, so it intentionally omits the owner/admin-only Activity Timeline.
+ * as owners, so it intentionally omits owner/admin-only vehicle tracking.
  */
 export const FIELD_QUICK_ACTIONS: QuickAction[] = [
   { label: "New Estimate", href: "/app/estimates", icon: "📝" },

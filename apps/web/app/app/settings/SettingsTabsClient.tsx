@@ -224,6 +224,8 @@ export function SettingsTabsClient({ role, userId, me, account, users, square, l
                   { href: "/app/price-book",            label: "Price Book",           desc: "Service / labor pricing catalog" },
                   { href: "/app/materials",             label: "Materials Catalog",    desc: "SKU barcodes and last/avg material prices from receipts" },
                   { href: "/app/expenses",              label: "Expenses",             desc: "Job and business expense tracking" },
+                  { href: "/app/timeline",              label: "Vehicle tracking",     desc: "GPS stops, drives, and the day map" },
+                  { href: "/app/mileage",               label: "Mileage & Vehicles",   desc: "Odometer sessions, fleet, fuel, and service" },
                   { href: "/app/automations",           label: "Automations",          desc: "Workflow automation rules" },
                 ].map(({ href, label, desc }) => (
                   <Link

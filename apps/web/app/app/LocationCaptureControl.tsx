@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { Button, useToast } from "@/components/ui";
 
@@ -69,6 +71,18 @@ export function LocationCaptureControl({
       <Button size="sm" variant="ghost" disabled={busy} onClick={() => patch({ enabled: !enabled }, enabled ? "Capture turned off" : "Capture turned on")}>
         {enabled ? "Turn off" : "Turn on"}
       </Button>
+      <Link
+        href={"/app/timeline" as Route}
+        style={{
+          marginLeft: "auto",
+          color: "var(--accent)",
+          fontWeight: 600,
+          textDecoration: "none",
+          fontSize: "var(--text-sm)",
+        }}
+      >
+        Vehicle tracking →
+      </Link>
     </div>
   );
 }
