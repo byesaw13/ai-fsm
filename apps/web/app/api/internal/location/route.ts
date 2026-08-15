@@ -7,6 +7,7 @@ import {
   DETECTED_ACTIVITIES,
   LOCATION_EVENT_KINDS,
   classifyDrive,
+  classifyStop,
   haversineMeters,
   pathDistanceMeters,
   rankVisitCandidates,
@@ -270,16 +271,32 @@ export async function POST(req: NextRequest) {
           );
         }
       }
-      // Classify a closing drive by average speed: auto-dismiss the obvious
-      // noise (parked Bluetooth cycle, GPS drift, sub-minute blip) and flag the
-      // borderline so the owner can clear it in one tap. Shared rule:
-      // classifyDrive (packages/domain). Stops are never classified.
+      // Classify a closing segment. Drives: average speed (parked Bluetooth,
+      // GPS drift, sub-minute blip). Stops: 5-minute dwell floor — HA still/
+      // zone flicker is not a review item. Shared rules in packages/domain.
+      const durationSeconds =
+        (new Date(mut.closeOpen.endedAt).getTime() - new Date(open.startedAt).getTime()) / 1000;
       let isLikelyNoise = false;
       let dismissAsNoise = false;
+      let stopDetect: DetectVisitResult | null = null;
       if (open.kind === "drive") {
-        const durationSeconds =
-          (new Date(mut.closeOpen.endedAt).getTime() - new Date(open.startedAt).getTime()) / 1000;
         const cls = classifyDrive({ distanceMeters, durationSeconds });
+        isLikelyNoise = cls !== "ok";
+        dismissAsNoise = cls === "noise";
+      } else if (open.kind === "stop") {
+        // Visit match first so a scheduled arrival keeps a short stop.
+        stopDetect = await detectVisitCandidate(
+          client,
+          accountId,
+          open,
+          mut.closeOpen.endedAt,
+          data.person ?? data.device_id ?? null,
+        );
+        arrivalPrompt = stopDetect.arrivalPrompt;
+        const cls = classifyStop({
+          durationSeconds,
+          hasScheduledVisit: stopDetect.hasScheduledVisit,
+        });
         isLikelyNoise = cls !== "ok";
         dismissAsNoise = cls === "noise";
       }
@@ -293,19 +310,6 @@ export async function POST(req: NextRequest) {
          WHERE id = $2 AND account_id = $3 AND ended_at IS NULL`,
         [mut.closeOpen.endedAt, open.id, accountId, distanceMeters, isLikelyNoise, dismissAsNoise],
       );
-
-      // EPIC-007 slice 1: a closed stop may be a customer visit. Score it against
-      // the account's properties (schedule + open-job signals now, distance once
-      // coords are learned) and persist the top match as a pending candidate.
-      if (open.kind === "stop") {
-        arrivalPrompt = await detectVisitCandidate(
-          client,
-          accountId,
-          open,
-          mut.closeOpen.endedAt,
-          data.person ?? data.device_id ?? null,
-        );
-      }
     }
     if (mut.updateOpen && open) {
       const u = mut.updateOpen;
@@ -369,6 +373,11 @@ type ArrivalPromptPayload = {
   confidence: number;
 };
 
+type DetectVisitResult = {
+  arrivalPrompt: ArrivalPromptPayload | null;
+  hasScheduledVisit: boolean;
+};
+
 interface ClosedStop {
   id: string;
   startedAt: string;
@@ -400,7 +409,8 @@ async function detectVisitCandidate(
   stop: ClosedStop,
   endedAt: string,
   personOrDevice: string | null = null,
-): Promise<ArrivalPromptPayload | null> {
+): Promise<DetectVisitResult> {
+  const none: DetectVisitResult = { arrivalPrompt: null, hasScheduledVisit: false };
   const durationMinutes = (new Date(endedAt).getTime() - new Date(stop.startedAt).getTime()) / 60000;
 
   const { rows } = await client.query<CandidateRow & { today_visit_type: string | null; today_assigned: string | null }>(
@@ -444,7 +454,7 @@ async function detectVisitCandidate(
        AND (p.latitude IS NOT NULL OR tv.visit_id IS NOT NULL OR oj.id IS NOT NULL)`,
     [accountId, stop.startedAt],
   );
-  if (rows.length === 0) return null;
+  if (rows.length === 0) return none;
 
   const ranked = rankVisitCandidates({
     stop: { latitude: stop.latitude, longitude: stop.longitude, durationMinutes },
@@ -463,8 +473,8 @@ async function detectVisitCandidate(
   });
 
   const top = ranked[0];
-  // TASK-079: dwell floor — a sub-3-min stop with no scheduled visit is jitter, not
-  // a visit. Keeps the day-review from filling with 0/1/2-min candidate cards.
+  // TASK-079 / TASK-106: dwell floor — a sub-5-min stop with no scheduled
+  // visit is jitter, not a visit. Keeps day-review from filling with flicker.
   if (
     !top ||
     !shouldCreateVisitCandidate({
@@ -474,7 +484,7 @@ async function detectVisitCandidate(
       distanceMeters: top.distanceMeters,
     })
   ) {
-    return null;
+    return none;
   }
 
   const openWos = await listOpenWorkOrdersAtProperty(
@@ -585,7 +595,8 @@ async function detectVisitCandidate(
     ],
   );
   const candidateId = inserted[0]?.id;
-  if (!candidateId) return null;
+  if (!candidateId) return none;
+  const hasScheduledVisit = visitIdForInsert != null;
 
   // Presence-only on scheduled visit: high-trust bar only (E4 harden). Never
   // owner-fallback; person map or assigned tech required.
@@ -616,7 +627,7 @@ async function detectVisitCandidate(
     }
   }
 
-  if (!liveEligible) return null;
+  if (!liveEligible) return { arrivalPrompt: null, hasScheduledVisit };
 
   const woTitle =
     resolution.options.find((o) => o.id === resolution.workOrderId)?.title ?? null;
@@ -630,11 +641,14 @@ async function detectVisitCandidate(
   const propertyLabel = propRows[0]?.address ?? propRows[0]?.client_name ?? null;
 
   return {
-    candidate_id: candidateId,
-    property_label: propertyLabel,
-    wo_title: woTitle,
-    wo_resolution: resolution.status,
-    deep_link: `/app/my-work?proposal=${candidateId}`,
-    confidence: top.score,
+    arrivalPrompt: {
+      candidate_id: candidateId,
+      property_label: propertyLabel,
+      wo_title: woTitle,
+      wo_resolution: resolution.status,
+      deep_link: `/app/my-work?proposal=${candidateId}`,
+      confidence: top.score,
+    },
+    hasScheduledVisit,
   };
 }

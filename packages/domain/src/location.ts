@@ -118,6 +118,39 @@ export function classifyDrive(input: {
 }
 
 // ---------------------------------------------------------------------------
+// False-stop detection (HA still / zone flicker)
+// ---------------------------------------------------------------------------
+
+/**
+ * How a captured stop looks once it closes:
+ * - "noise" → shorter than the reportable dwell (traffic-light still, GPS
+ *             zone flicker, a 30-second "stopped" blip). Auto-dismissed.
+ * - "ok"    → long enough to be a real stay, or a scheduled visit was there
+ *             today (even a brief arrival counts).
+ *
+ * Unlike drives there is no suspect band: a 4-minute flicker is not a
+ * review item. The owner asked for a 5-minute reporting floor.
+ */
+export type StopClassification = "ok" | "noise";
+
+/** Product rule: a stop shorter than this is HA jitter, not a reportable stay. */
+export const MIN_STOP_SECONDS = 5 * 60;
+
+/**
+ * Classify a closed stop by dwell. Pure — the single source of truth shared
+ * by the capture route, the visit-candidate dwell floor, and the backfill
+ * migration.
+ */
+export function classifyStop(input: {
+  durationSeconds: number;
+  hasScheduledVisit?: boolean;
+}): StopClassification {
+  if (input.hasScheduledVisit) return "ok";
+  if (input.durationSeconds < MIN_STOP_SECONDS) return "noise";
+  return "ok";
+}
+
+// ---------------------------------------------------------------------------
 // Privacy (TASK-046): home/private zones must not surface in reports or maps.
 // ---------------------------------------------------------------------------
 

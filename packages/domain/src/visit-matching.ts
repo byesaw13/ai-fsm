@@ -9,6 +9,7 @@
 
 import { haversineMeters } from "./geo";
 import type { ActivityType } from "./activities";
+import { MIN_STOP_SECONDS } from "./location";
 
 const FEET_TO_METERS = 0.3048;
 const WITHIN_NEAR_FEET = 150;
@@ -71,11 +72,12 @@ export interface VisitMatch {
 export const VISIT_CONFIDENCE_FLOOR = 40;
 
 /**
- * TASK-079: minimum on-site dwell before a stop becomes a visit candidate. Below
- * this, a stop is GPS jitter / a pass-through, not a visit — unless a visit is
- * scheduled there today (then even a brief arrival counts).
+ * TASK-079 / TASK-106: minimum on-site dwell before a stop becomes a visit
+ * candidate. Matches the reportable-stop floor in `classifyStop` (5 min).
+ * Below this, a stop is GPS jitter / a pass-through, not a visit — unless a
+ * visit is scheduled there today (then even a brief arrival counts).
  */
-export const VISIT_CANDIDATE_MIN_DWELL_MINUTES = 3;
+export const VISIT_CANDIDATE_MIN_DWELL_MINUTES = MIN_STOP_SECONDS / 60;
 
 /**
  * Should a closed stop become a pending visit candidate? Pure gate used by the

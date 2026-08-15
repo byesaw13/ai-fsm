@@ -367,7 +367,10 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
     void patchVisit(match.id, { action: "ignore" }, "Match cleared — label the stop yourself", seg.id);
   }
 
-  const provisional = segments.filter((s) => s.status === "provisional");
+  const allProvisional = segments.filter((s) => s.status === "provisional");
+  // TASK-106: flagged HA flicker stays out of the default confirm pile.
+  const provisional = allProvisional.filter((s) => !s.is_likely_noise);
+  const noiseProvisional = allProvisional.filter((s) => s.is_likely_noise);
   const confirmed = segments.filter((s) => s.status === "confirmed");
   // Orphan matches: no segment link, missing segment, or linked to a segment that
   // is no longer provisional (legacy data from before confirm/dismiss cleared
@@ -625,6 +628,43 @@ export function LocationSegmentsPanel({ day, entries }: { day?: string; entries:
               </div>
             </div>
           ))}
+
+          {noiseProvisional.length > 0 ? (
+            <details style={{ marginTop: "var(--space-2)" }}>
+              <summary style={{ color: "var(--text-muted)", fontSize: "0.8rem", cursor: "pointer" }}>
+                {noiseProvisional.length} low-signal segment{noiseProvisional.length === 1 ? "" : "s"} hidden (GPS noise)
+              </summary>
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)", marginTop: "var(--space-2)" }}>
+                {noiseProvisional.map((seg) => (
+                  <div
+                    key={seg.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "var(--space-2)",
+                      fontSize: "0.85rem",
+                      color: "var(--text-muted)",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span>{seg.kind === "drive" ? "🚗" : "📍"}</span>
+                    <span>{seg.place_label ?? (seg.kind === "drive" ? "Driving" : "Stop")}</span>
+                    <span>
+                      · {formatElapsed(seg.started_at, seg.ended_at ? new Date(seg.ended_at).getTime() : Date.now())}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={pending === seg.id}
+                      onClick={() => patchSegment(seg.id, { action: "dismiss" }, "Dismissed")}
+                    >
+                      Dismiss
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </details>
+          ) : null}
 
           {confirmed.length > 0 ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)", marginTop: "var(--space-2)" }}>
