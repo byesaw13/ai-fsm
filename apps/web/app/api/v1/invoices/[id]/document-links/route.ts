@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withRole } from "@/lib/auth/middleware";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import { appendAuditLog } from "@/lib/db/audit";
-import { logger } from "@ai-fsm/log/web";
+import { logger } from "@/lib/logger";
 
 import {
   assertClientInAccount,

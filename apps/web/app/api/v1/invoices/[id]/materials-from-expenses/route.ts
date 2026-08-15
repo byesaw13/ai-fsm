@@ -7,7 +7,7 @@ import {
   assertDraftInvoice,
   recalculateInvoiceTotals,
 } from "@/lib/invoices/line-items";
-import { logger } from "@ai-fsm/log/web";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 

@@ -46,6 +46,13 @@ export const JOB_STATUS_LABELS: Record<JobStatus, string> = {
   cancelled: "Cancelled",
 };
 
+export const ACTIVE_JOB_STATUSES: readonly JobStatus[] = [
+  "draft",
+  "quoted",
+  "scheduled",
+  "in_progress",
+];
+
 export const jobTransitions: Record<JobStatus, readonly JobStatus[]> = {
   draft: ["quoted", "scheduled"],
   quoted: ["scheduled", "draft"],

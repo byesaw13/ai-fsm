@@ -7,7 +7,7 @@ import type { AuthSession } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
 import type { PoolClient } from "pg";
 import { appendAuditLog } from "@/lib/db/audit";
-import { logger } from "@ai-fsm/log/web";
+import { logger } from "@/lib/logger";
 import { accountLogoDir, type CompanyProfileSettings } from "@/lib/company/branding";
 
 export const dynamic = "force-dynamic";

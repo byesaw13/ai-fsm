@@ -12,7 +12,7 @@ import {
 } from "@/lib/expenses/receipt-line-items";
 import { learnMaterialsFromLineItems } from "@/lib/materials/catalog";
 import { appendAuditLog } from "@/lib/db/audit";
-import { logger } from "@ai-fsm/log/web";
+import { logger } from "@/lib/logger";
 import fs from "fs";
 import path from "path";
 

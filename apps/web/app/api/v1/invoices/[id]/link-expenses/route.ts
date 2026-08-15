@@ -5,7 +5,7 @@ import { appendAuditLog } from "@/lib/db/audit";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import { assertDraftInvoice, recalculateInvoiceTotals } from "@/lib/invoices/line-items";
 import { linkAndAppendMaterialsToInvoice } from "@/lib/invoices/job-expenses";
-import { logger } from "@ai-fsm/log/web";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 

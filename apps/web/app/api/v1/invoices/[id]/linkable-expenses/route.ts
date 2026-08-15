@@ -6,7 +6,7 @@ import {
   fetchLinkableMaterialExpenses,
   loadJobLinkContext,
 } from "@/lib/invoices/job-expenses";
-import { logger } from "@ai-fsm/log/web";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
