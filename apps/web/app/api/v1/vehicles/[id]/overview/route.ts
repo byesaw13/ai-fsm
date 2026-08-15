@@ -5,6 +5,10 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   computeRenewalDueStatus,
   computeServiceNextDue,
+  latestMpg,
+  mpgByClosedAt,
+  rollingMpg,
+  type FuelLogForMpg,
   type ServiceRecordForDue,
   type ServiceScheduleForDue,
 } from "@ai-fsm/domain";
@@ -133,15 +137,61 @@ export const GET = withRole(["owner", "admin", "tech"], async (req: NextRequest,
         };
       });
 
-      const { rows: recentFuel } = await client.query(
-        `SELECT id, filled_at::text, odometer, gallons, is_full_tank, odometer_suspect,
-                notes, expense_id, created_at::text
-         FROM vehicle_fuel_logs
-         WHERE account_id = $1 AND vehicle_id = $2
-         ORDER BY filled_at DESC
-         LIMIT 5`,
+      const { rows: fuelRows } = await client.query<{
+        id: string;
+        filled_at: string;
+        odometer: number | null;
+        gallons: string;
+        is_full_tank: boolean;
+        odometer_suspect: boolean;
+        notes: string | null;
+        expense_id: string | null;
+        vendor_name: string | null;
+        amount_cents: number | null;
+        has_receipt: boolean;
+      }>(
+        `SELECT f.id, f.filled_at::text, f.odometer, f.gallons::text, f.is_full_tank,
+                f.odometer_suspect, f.notes, f.expense_id,
+                e.vendor_name, e.amount_cents, (e.receipt_url IS NOT NULL) AS has_receipt
+         FROM vehicle_fuel_logs f
+         LEFT JOIN expenses e ON e.id = f.expense_id
+         WHERE f.account_id = $1 AND f.vehicle_id = $2
+         ORDER BY f.filled_at DESC
+         LIMIT 50`,
         [session.accountId, vehicleId],
       );
+
+      const fuelForMpg: FuelLogForMpg[] = fuelRows.map((r) => ({
+        filledAt: r.filled_at,
+        odometer: r.odometer,
+        gallons: Number(r.gallons),
+        isFullTank: r.is_full_tank,
+        odometerSuspect: r.odometer_suspect,
+      }));
+      const mpgMap = mpgByClosedAt(fuelForMpg);
+      const recentFuel = fuelRows.map((r) => {
+        const gallons = Number(r.gallons);
+        const amountCents = r.amount_cents;
+        return {
+          id: r.id,
+          filled_at: r.filled_at,
+          odometer: r.odometer,
+          gallons,
+          is_full_tank: r.is_full_tank,
+          odometer_suspect: r.odometer_suspect,
+          notes: r.notes,
+          expense_id: r.expense_id,
+          vendor_name: r.vendor_name,
+          amount_cents: amountCents,
+          has_receipt: r.has_receipt,
+          dollars_per_gallon:
+            amountCents != null && gallons > 0
+              ? Math.round((amountCents / 100 / gallons) * 1000) / 1000
+              : null,
+          mpg: mpgMap.get(r.filled_at) ?? null,
+        };
+      });
+      const lastFill = recentFuel[0] ?? null;
 
       const { rows: recentService } = await client.query(
         `SELECT id, serviced_at::text, odometer, odometer_suspect, service_types,
@@ -196,6 +246,11 @@ export const GET = withRole(["owner", "admin", "tech"], async (req: NextRequest,
         next_service_dues: nextServiceDues,
         next_renewals: nextRenewals,
         recent_fuel: recentFuel,
+        last_fill: lastFill,
+        mpg: {
+          last: latestMpg(fuelForMpg),
+          last_five: rollingMpg(fuelForMpg, 5),
+        },
         recent_service: recentService,
         cost_last_90_days: costLast90Days,
         loan: loanRows[0] ?? null,
