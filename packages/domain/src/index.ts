@@ -20,14 +20,9 @@ export * from "./pricing-settings";
 export * from "./estimate-engine";
 export * from "./job-materials";
 export * from "./stages";
-export * from "./operational-visibility";
 export * from "./scope";
 export * from "./assessment-summary";
 export * from "./construction-profiles";
-// TASK-098 hybrid-pricing is quarantined: do not re-export from the domain barrel.
-// Import from `@ai-fsm/domain/hybrid-pricing` path or packages/domain/src/hybrid-pricing
-// only for tests. Application code must not wire it (TASK-101 / CEO review 2026-08-10).
-// export * from "./hybrid-pricing";
 export * from "./production-takeoff";
 export * from "./work-order";
 export * from "./completion-criteria";
@@ -49,7 +44,6 @@ export {
 } from "./sub-statuses";
 export type { JobSubStatus, VisitSubStatus } from "./sub-statuses";
 export { computeLaborDays, formatLaborEstimate } from "./production";
-export * from "./vocabulary";
 export type {
   InterviewRoom,
   InterviewFixture,

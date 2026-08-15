@@ -5,7 +5,7 @@ import { withExpenseContext } from "@/lib/expenses/db";
 import { replaceExpenseLineItems } from "@/lib/expenses/line-items";
 import { learnMaterialsFromLineItems } from "@/lib/materials/catalog";
 import { appendAuditLog } from "@/lib/db/audit";
-import { logger } from "@ai-fsm/log/web";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 

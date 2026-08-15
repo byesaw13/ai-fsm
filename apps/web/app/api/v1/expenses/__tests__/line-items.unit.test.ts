@@ -17,7 +17,7 @@ vi.mock("@/lib/expenses/db", () => ({
   withExpenseContext: (...args: unknown[]) => mockWithExpenseContext(...args),
 }));
 
-vi.mock("@ai-fsm/log/web", () => ({
+vi.mock("@/lib/logger", () => ({
   logger: { error: vi.fn() },
 }));
 

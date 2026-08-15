@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@/lib/auth/middleware";
 import { getPool } from "@/lib/db";
-import { logger } from "@ai-fsm/log/web";
+import { logger } from "@/lib/logger";
 import { loadFieldSiteContext } from "@/lib/field/site-context";
 
 export const dynamic = "force-dynamic";
