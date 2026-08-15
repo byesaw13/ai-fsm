@@ -31,10 +31,6 @@
 - Response 200: `{ message: "ok" }`
 - Clears session
 
-### GET `/api/v1/auth/me`
-- Response 200: `{ id, email, full_name, role, account_id }`
-- Response 401: Unauthorized
-
 ## Error Model
 
 All errors follow this shape:

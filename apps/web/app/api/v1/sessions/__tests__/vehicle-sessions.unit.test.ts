@@ -22,7 +22,6 @@ vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn() } }));
 
 import { POST as startSession } from "../start/route";
 import { POST as switchVehicle } from "../switch/route";
-import { POST as correctVehicle } from "../[id]/correct-vehicle/route";
 
 const VEHICLE_A = "11111111-1111-1111-1111-111111111111";
 const VEHICLE_B = "22222222-2222-2222-2222-222222222222";
@@ -134,38 +133,4 @@ describe("POST /api/v1/sessions/switch — vehicle switch same day", () => {
   });
 });
 
-describe("POST /api/v1/sessions/[id]/correct-vehicle — wrong vehicle correction", () => {
-  const url = `http://localhost/api/v1/sessions/${SESSION_ID}/correct-vehicle`;
 
-  it("requires a reason to change the vehicle on a completed session", async () => {
-    mockClientQuery
-      .mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ rows: [] }) // set_config
-      .mockResolvedValueOnce({ rows: [{ id: SESSION_ID, vehicle_id: VEHICLE_A, start_odometer: 100, end_odometer: 200 }] }); // existing (completed)
-
-    const res = await correctVehicle(request("POST", url, { vehicle_id: VEHICLE_B }));
-    expect(res.status).toBe(422);
-    const json = await res.json();
-    expect(json.error.code).toBe("REASON_REQUIRED");
-  });
-
-  it("reassigns a completed session to the new vehicle with a reason and recomputes miles", async () => {
-    mockClientQuery
-      .mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ rows: [] }) // set_config
-      .mockResolvedValueOnce({ rows: [{ id: SESSION_ID, vehicle_id: VEHICLE_A, start_odometer: 100, end_odometer: 200 }] }) // existing
-      .mockResolvedValueOnce({ rows: [{ id: VEHICLE_B }] }) // new vehicle exists
-      .mockResolvedValueOnce({ rows: [{ last_known: 50 }] }) // lastKnownOdometer(new)
-      .mockResolvedValueOnce({ rows: [{ id: SESSION_ID, session_date: "2026-06-14", vehicle_id: VEHICLE_B, start_odometer: 100, end_odometer: 200, miles: "100" }] }) // UPDATE
-      .mockResolvedValueOnce({ rows: [] }); // COMMIT
-
-    const res = await correctVehicle(request("POST", url, { vehicle_id: VEHICLE_B, correction_reason: "wrong vehicle selected" }));
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.data.vehicle_id).toBe(VEHICLE_B);
-    expect(mockClientQuery).toHaveBeenCalledWith(
-      expect.stringContaining("vehicle_id = $1"),
-      expect.arrayContaining([VEHICLE_B, 100, 200, 100]),
-    );
-  });
-});

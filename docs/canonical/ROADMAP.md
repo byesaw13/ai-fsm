@@ -110,7 +110,6 @@ EPIC-005 (platform/delivery) → cross-cutting; every task still cites a phase
 - New dashboard families
 - AI-first product repositioning (AI assists estimates; does not define product)
 - Greenfield rebuild / migration squash
-- MCP write tools (TASK-035)
 - PR Gatekeeper MCP (TASK-036) until merged and proven in daily use
 
 ## Shipped and Canonical (not out of scope)
@@ -121,7 +120,6 @@ These are part of the product today:
 - Location capture, day map, visit candidates (Phase 1 infrastructure)
 - Work Order model (`docs/canonical/DOMAIN_MODEL.md`)
 - Role-based workspaces / My Work field home (EPIC-006)
-- Read-only Business MCP (TASK-033)
 
 ## Documentation Hierarchy
 

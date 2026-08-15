@@ -158,19 +158,6 @@ export function sqftPaintingToSpec(input: SqftPaintingInput): EstimateSpec {
   };
 }
 
-/** Run computeEstimate on sqft painting input and return legacy-shaped result fields. */
-export function computeSqftPaintingEstimate(input: SqftPaintingInput): SqftPaintingResult {
-  const legacy = computeSqftPaintingResult(input);
-  const engine = computeEstimate(sqftPaintingToSpec(input), CURRENT_RULES);
-  return {
-    ...legacy,
-    total_cents: engine.summary.totalCents,
-    material_handling_cents: engine.summary.handlingCents,
-    deposit_cents: engine.summary.depositCents,
-    balance_cents: engine.summary.balanceDueCents,
-  };
-}
-
 function dominantPaintQuality(rooms: PaintingRoomSpec[]): PaintQuality {
   const gradeCounts: Partial<Record<PaintGrade, number>> = {};
   for (const room of rooms) {
@@ -265,7 +252,7 @@ export function roomSpecsToEstimateSpec(
   return spec;
 }
 
-/** Mirror roomResultToLegacyFields — recovers legacy columns from source rooms. */
+/** Recover legacy sqft/prep columns from source rooms. */
 export function estimateResultToLegacyFields(
   _result: EstimateResult,
   sourceRooms: PaintingRoomSpec[]

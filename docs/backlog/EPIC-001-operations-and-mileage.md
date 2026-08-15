@@ -316,7 +316,7 @@ ClockBar, day-close gate shipped. Residual: void/correct clock UI; pay policy fi
 # TASK-035: MCP Write Tools v1 (low-risk operations writes)
 
 Status:
-Proposed
+Cancelled (MCP package deleted, TASK-109)
 
 Phase:
 cross-cutting

@@ -8,7 +8,6 @@ export {
   estimateResultToLegacyFields,
   buildShoppingListFromEstimateResult,
   computeSqftPaintingResult,
-  computeSqftPaintingEstimate,
   type SqftPaintingInput,
   type SqftPaintingResult,
   type LegacyPaintingFields,

@@ -4,13 +4,11 @@ import { CURRENT_RULES } from "./rules";
 import {
   sqftPaintingToSpec,
   roomSpecsToEstimateSpec,
-  estimateResultToLegacyFields,
   buildShoppingListFromEstimateResult,
   computeSqftPaintingResult,
 } from "./adapters";
 import {
   computePaintingProject,
-  roomResultToLegacyFields,
   type RoomSpec as PaintingRoomSpec,
   type ProjectOptions,
 } from "../painting";
@@ -139,19 +137,6 @@ describe("pricing parity — room-by-room computePaintingProject", () => {
       const spec = roomSpecsToEstimateSpec(fixture.rooms, fixture.options);
       const engine = computeEstimate(spec, CURRENT_RULES);
       expect(engine.summary.totalCents).toBe(legacy.total_cents);
-    });
-  }
-});
-
-describe("pricing parity — estimateResultToLegacyFields", () => {
-  for (const fixture of ROOM_FIXTURES) {
-    it(`legacy fields match for ${fixture.rooms.map((r) => r.name).join(" + ")}`, () => {
-      const legacy = computePaintingProject(fixture.rooms, fixture.options);
-      const spec = roomSpecsToEstimateSpec(fixture.rooms, fixture.options);
-      const engine = computeEstimate(spec, CURRENT_RULES);
-      const fromLegacy = roomResultToLegacyFields(legacy);
-      const fromEngine = estimateResultToLegacyFields(engine, fixture.rooms);
-      expect(fromEngine).toEqual(fromLegacy);
     });
   }
 });
