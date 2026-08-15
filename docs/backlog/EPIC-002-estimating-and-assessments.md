@@ -203,7 +203,7 @@ Acceptance Criteria:
 # TASK-098: 3-Layer Hybrid Estimating Engine (Standard Benchmarks + Distributor Catalogs + Local Actuals Calibration)
 
 Status:
-Scaffolded, not wired
+Cancelled (unused scaffold deleted, PR #603 / TASK-108)
 
 Phase:
 3
@@ -212,68 +212,79 @@ Problem:
 Single-source estimating fails because generic AI lacks trade labor standards, supplier catalog pricing is disconnected from scope drafts, and national benchmark averages don't reflect Dovetails' actual past job performance.
 
 Business Value:
-Creates a unified 3-layer pricing model: Layer 1 (CSI/RSMeans labor-hour standards), Layer 2 (Home Depot / Lowe's / distributor material catalogs & fastener kits), Layer 3 (Dovetails local historical actuals & Bayesian calibration).
+Would have created a 3-layer pricing model: Layer 1 (CSI/RSMeans labor-hour standards), Layer 2 (distributor catalogs), Layer 3 (local actuals calibration). Never wired; zero callers.
 
-**Status note (CEO review, PR #589):** the domain module (`packages/domain/src/hybrid-pricing/`) is built, tested (7 unit tests), and exported — but verified via `grep` that nothing in `apps/web` or `services/` calls it. It delivers zero user-facing value today. Four known bugs must be fixed before this is safe to wire in (see Acceptance Criteria) — do not call this from the app until all are resolved.
+**Status note (PR #603):** `packages/domain/src/hybrid-pricing/` is gone. It was quarantined, unexported, and unused. Restore from git history before `fdc055c` only if this work is explicitly reopened as a new task. Do not treat the acceptance criteria below as describing the current tree.
 
-**Status note (Eng review, PR #589, outside-voice pass):** the `layer1Unmatched` fix (commit 9b65b47) only annotates the summary text — it does not exclude `GENERIC_UNMATCHED_BENCHMARK`'s fabricated hours from `finalLineTotalCents`/`grandTotalCents`. See new blocking AC below.
-
-Scope:
-- Create domain module `packages/domain/src/hybrid-pricing/` implementing Layer 1 (RSMeans-style trade labor standards), Layer 2 (Distributor catalog mapping & hardware kits), and Layer 3 (Historical actuals calibration blending).
-- Update price book entries and AI estimate generator to combine all three layers seamlessly.
-- Expose 3-Layer pricing breakdown on the estimate creation/edit UI.
+Scope (historical):
+- Domain module `packages/domain/src/hybrid-pricing/` with Layer 1 / 2 / 3 engines.
+- Wire into price book + AI estimate generator + estimate UI.
 
 Out of Scope:
 - Scraping restricted paid APIs without consent.
 
 Acceptance Criteria:
-- [x] `packages/domain/src/hybrid-pricing/` created with Layer 1, Layer 2, and Layer 3 engines.
-- [ ] **Blocking:** fix `findLayer1Benchmark`'s same-trade wrong-match risk — `query.includes(b.tradeCategory)` matches the FIRST catalog entry for that trade on any query containing the trade name, even when it's the wrong item (verified: "electrical panel upgrade" silently matches the chandelier-hang benchmark, no `layer1Unmatched` flag, confident-looking wrong output). The zero-match case is already fixed (throws `UnmatchedBenchmarkError`); this is the milder same-trade sibling of that bug, still live.
-- [ ] **Blocking:** Layer 2 (`getLayer2MaterialCost`) only meaningfully covers PVC trim and chandelier fixtures — plumbing, painting, and drywall (all present in Layer 1) fall through to a generic $3.50/unit + $15 placeholder with no warning surfaced to the user, unlike `layer1Unmatched`. When fixing, mirror the `UnmatchedBenchmarkError`/`layer1Unmatched` pattern already built for Layer 1 in `standards-catalog.ts`/`engine.ts` rather than re-deriving a new approach.
-- [ ] **Blocking:** `computeHybridEstimateItem`'s `layer1Unmatched` flag is display-only — it doesn't gate the number. On an unmatched item it still runs `GENERIC_UNMATCHED_BENCHMARK` (flat `standardLaborHoursPerUnit: 1.0`, hardcoded `unit: "each"` regardless of the request's real unit) through the normal cost math and rolls the result into `finalLineTotalCents`/`grandTotalCents` — a fabricated number with a warning stapled on, not excluded from the total. Fix: exclude the unmatched line from the computed total (e.g. return $0/force manual entry) instead of estimating a fake one.
-- [ ] **Blocking:** wire an actual call site in `apps/web` (currently none) before marking this "In Progress" again.
-- [ ] Estimate engine computes combined quote with trade labor hours, live/catalog material prices, and local actuals adjustment factor.
-- [ ] Unit tests verify 3-layer pricing calculations.
+- [x] Unused scaffold deleted (TASK-108). Rebuild from git if ever resumed.
+
+# TASK-108: Ponytail first cut — delete unused hybrid-pricing, vocabulary, log stubs
+
+Status:
+Done (PR #603)
+
+Phase:
+cross-cutting
+
+Problem:
+Quarantined `hybrid-pricing`, unused `vocabulary.ts`, unused
+`operational-visibility.ts`, and unused `@ai-fsm/log` web/worker/mcp stubs
+had zero callers. TASK-098 still claimed the scaffold existed.
+
+Business Value:
+Less unused code. Backlog matches the tree.
+
+Scope:
+- Delete the unused modules.
+- Move `ACTIVE_JOB_STATUSES` onto `statuses.ts`.
+- Retarget `@ai-fsm/log/web` callers to `@/lib/logger`.
+- Mark TASK-098 Cancelled. Update DOMAIN_GUARDRAILS so it no longer points at
+  `vocabulary.ts`.
+
+Out of Scope:
+- Any later ponytail cut (MCP, dead APIs, paint adapters).
+- UI behavior changes.
+
+Acceptance Criteria:
+- [x] Deleted modules have no remaining imports.
+- [x] TASK-098 status is Cancelled; resume only from git history.
+- [x] DOMAIN_GUARDRAILS no longer imports a deleted adapter.
 
 # TASK-099: Reconcile Materials Delta Capture (TASK-094) with Estimate Benchmark Calibration (TASK-098)
 
 Status:
-Proposed
+Deferred (TASK-098 cancelled)
 
 Phase:
 3
 
 Problem:
-TASK-094 (materials trust calibration) and TASK-098 (3-layer hybrid estimating
-engine, Layer 3) are independently building toward the same goal — calibrating
-future estimates against real outcomes — with no connection between them.
-TASK-094 captures AI-proposed-vs-founder-edited deltas at estimate time;
-TASK-098's benchmark script compares estimate-vs-actual at job completion.
-Left unreconciled, this risks two parallel, drifting "trust the numbers"
-mechanisms instead of one coherent calibration source of truth.
+TASK-094 (materials trust calibration) and TASK-098 (3-layer hybrid estimating)
+were independently building toward the same goal. TASK-098's unused scaffold
+was deleted in PR #603. Nothing to reconcile until a hybrid engine is rebuilt.
 
 Business Value:
-A single calibration system is more trustworthy and maintainable than two
-independent ones computing related but different signals.
+A single calibration system is more trustworthy than two drifting ones.
 
 Scope:
-- Once both have accumulated meaningful data, evaluate whether TASK-094's
-  delta signal and TASK-098's benchmark output should feed one shared
-  calibration model, or remain deliberately separate (pre-job judgment vs.
-  post-job outcome are genuinely different signals — may be correct to keep
-  distinct).
+- Revisit only if TASK-098 is reopened as a new task and both sources have data.
 
 Out of Scope:
-- Any implementation now — both sources are still evidence-gathering stage
-  (TASK-094 has zero real data yet; TASK-098's benchmark run found N=1 clean
-  sample). Premature to reconcile before either has enough data to reconcile.
+- Any implementation now.
 
 Acceptance Criteria:
-- [ ] Revisit once TASK-094 or TASK-098 has enough real data to make the
-  reconciliation question concrete rather than speculative.
+- [ ] Revisit only after a hybrid-estimating rebuild exists and TASK-094 has data.
 
 Notes:
-Surfaced during CEO review of PR #589 (hybrid estimating engine).
+Surfaced during CEO review of PR #589. TASK-098 cancelled in PR #603.
 
 # TASK-100: Fix T&M vs Fixed-Rate Comparison Card (Hours-Overrun Modeling)
 
@@ -289,10 +300,8 @@ T&M estimated hours from the same `effectiveHours` value used for the fixed
 quote, so the comparison structurally can never model an hours-overrun
 scenario — the actual reason T&M exists as a pricing option. The
 "Recommendation: Fixed yields $X more" line is close to tautological given
-how it's computed. Separately, the $85/hr burdened rate is hardcoded
-independently in both `EstimateSummaryCard.tsx` and
-`hybrid-pricing/engine.ts` with no shared constant — a landmine if the two
-diverge later.
+how it's computed. The $85/hr burdened rate is hardcoded in
+`EstimateSummaryCard.tsx` (`hybrid-pricing/engine.ts` was deleted in PR #603).
 
 Business Value:
 A T&M-vs-Fixed comparison that can actually inform the pricing decision,
@@ -302,7 +311,7 @@ Scope:
 - Model T&M hours independently of the fixed quote's hour estimate — e.g. a
   founder-adjustable "expected overrun %" input, or (once TASK-095/098 have
   real data) a historical variance-based estimate.
-- Extract the burdened labor rate into one shared constant both files import.
+- Extract the burdened labor rate into one shared constant.
 
 Out of Scope:
 - Automated overrun prediction from historical data — depends on TASK-095
@@ -310,8 +319,7 @@ Out of Scope:
 
 Acceptance Criteria:
 - [ ] T&M estimated hours can diverge from the fixed quote's hours in the UI.
-- [ ] Burdened rate defined once, imported by both `EstimateSummaryCard.tsx`
-  and `hybrid-pricing/engine.ts`.
+- [ ] Burdened rate defined once and imported by `EstimateSummaryCard.tsx`.
 
 Notes:
 Surfaced during CEO review of PR #589. Priority P2 — the card's Fixed-price
@@ -402,7 +410,7 @@ Scope:
 - **Critical:** do not include category-wide `general_repairs` materials (mud/tape)
   for 1007 lines — takeoff kit only.
 - Unit + integration tests.
-- Quarantine TASK-098 hybrid-pricing public export from domain index (do not wire).
+- Quarantine TASK-098 hybrid-pricing public export from domain index (do not wire). Deleted entirely in PR #603.
 
 Out of Scope:
 - work_items tables / Production Profiles platform

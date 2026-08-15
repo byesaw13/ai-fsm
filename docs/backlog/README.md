@@ -95,7 +95,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-108**.
+Next available ID: **TASK-109**.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -205,8 +205,8 @@ truth-pass also archived TASK-023 and TASK-050 (epic already Done, README lagged
 | TASK-095 | Estimate vs Actual Benchmark & Calibration Runner (PI-011) | 008 | In Progress |
 | TASK-096 | Financial Truth Card & Actionable Advisory Guardrails | 002 | Done |
 | TASK-097 | Trade Construction Knowledge Engine | 002 | Done |
-| TASK-098 | 3-Layer Hybrid Estimating Engine | 002 | Quarantined (no wire; root export removed TASK-103) |
-| TASK-099 | Reconcile TASK-094 delta capture with TASK-098 benchmark calibration | 002 | Proposed |
+| TASK-098 | 3-Layer Hybrid Estimating Engine | 002 | Cancelled (scaffold deleted PR #603) |
+| TASK-099 | Reconcile TASK-094 delta capture with TASK-098 benchmark calibration | 002 | Deferred |
 | TASK-100 | Fix T&M vs Fixed comparison card (hours-overrun modeling, shared rate constant) | 002 | Proposed |
 | TASK-101 | Standalone & direct quick materials generator (uncouple materials from estimates) | 002 | Done |
 | TASK-102 | Quick materials — assessment context + save-to-job (follow-up to TASK-101) | 002 | Proposed |
@@ -215,6 +215,7 @@ truth-pass also archived TASK-023 and TASK-050 (epic already Done, README lagged
 | TASK-105 | Vehicle fuel history, MPG, and receipt view | 001 | In Progress |
 | TASK-106 | False-stop detection (5-minute dwell floor) | 007 | In Progress |
 | TASK-107 | AI Day Draft (GPS + jobs + receipts → one confirm) | 007 | In Progress |
+| TASK-108 | Ponytail first cut — delete unused hybrid-pricing, vocabulary, log stubs | 002 | Done |
 
 ## Status legend
 
@@ -225,6 +226,7 @@ truth-pass also archived TASK-023 and TASK-050 (epic already Done, README lagged
 | `In Progress` | Actively being built. |
 | `Done` | Shipped. Lives in `docs/archive/backlog-done/`. |
 | `Deferred` | Intentionally on hold. |
+| `Cancelled` | Will not be built. Leave a one-line reason; do not keep dead scaffold. |
 
 ## Handling completed work
 

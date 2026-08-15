@@ -29,7 +29,7 @@ Owner/staff UI uses these labels. Backend names do not change.
 | `work_order` | **Work Order** |
 | `visit` | **Visit** |
 
-Use `primaryUiLabel()` from `packages/domain/src/vocabulary.ts` or `PRIMARY_UI_LABELS` — do not hardcode "Job" in owner-facing copy.
+Use the table above in owner-facing copy — do not label a `job` as "Job".
 
 ## Allowed presentation aliases
 
@@ -63,7 +63,7 @@ Treat these as retired UI vocabulary unless they are part of a compatibility ali
 
 1. Keep backend tables, routes, columns, and status enums stable unless a migration is explicit.
 2. Use UI aliases only in presentation components, not in the API contract.
-3. Use one adapter layer for translations between old labels and canonical terms.
+3. Use the tables in this file for label translations. Do not add a vocabulary adapter unless more than one caller needs it.
 4. Update canonical docs and tests in the same change when vocabulary changes.
 5. Do not introduce parallel concepts unless they are explicit compatibility aliases.
 6. If a change could rename a concept in storage or API, stop and describe the migration plan first.
@@ -74,4 +74,3 @@ Treat these as retired UI vocabulary unless they are part of a compatibility ali
 - [docs/canonical/DOMAIN_MODEL.md](./canonical/DOMAIN_MODEL.md)
 - [docs/canonical/WORKFLOW.md](./canonical/WORKFLOW.md)
 - [docs/superpowers/specs/2026-07-01-job-work-order-visit-model-design.md](./superpowers/specs/2026-07-01-job-work-order-visit-model-design.md)
-- [packages/domain/src/vocabulary.ts](../packages/domain/src/vocabulary.ts)
