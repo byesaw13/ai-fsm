@@ -348,6 +348,32 @@ Notes:
 Reverses the TASK-038 "timeline lives only under Reports" decision for
 discoverability. Reports can keep a link; it is no longer the only door.
 
+# TASK-111: Keep attention notification panel on-screen (desktop)
+
+Status:
+Done
+
+Phase:
+cross-cutting
+
+Problem:
+The sidebar bell dropdown is 340px and `right: 0` on a 240px left sidebar, so
+titles start off the left edge of the desktop viewport.
+
+Business Value:
+Owner can read recent activity without dragging the window or guessing.
+
+Scope:
+- Position the panel with a viewport clamp (`placeAttentionPanel`).
+- Keep mobile More-sheet placement readable.
+
+Out of Scope:
+- New notification types or email.
+
+Acceptance Criteria:
+- [x] Desktop: panel left edge ≥ 0; full title visible.
+- [x] Mobile More sheet: panel stays inside the viewport.
+
 ## Completed
 
 - [TASK-058: Workspace mode auto-by-device + Settings override](../archive/backlog-done/TASK-058-workspace-auto-route.md) — Done

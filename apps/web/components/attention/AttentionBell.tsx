@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatBadgeCount } from "@/lib/attention/counts";
+import { placeAttentionPanel } from "./place-panel";
 
 export type AttentionSummary = {
   requestsCount: number;
@@ -82,8 +83,21 @@ export function AttentionBell({
   const [open, setOpen] = useState(false);
   const [events, setEvents] = useState<AttentionEvent[]>([]);
   const [loading, setLoading] = useState(false);
+  const [box, setBox] = useState<ReturnType<typeof placeAttentionPanel> | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const badge = formatBadgeCount(summary.unreadEventCount);
+
+  const place = useCallback(() => {
+    const el = buttonRef.current;
+    if (!el) return;
+    setBox(
+      placeAttentionPanel(el.getBoundingClientRect(), {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      }),
+    );
+  }, []);
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
@@ -98,8 +112,16 @@ export function AttentionBell({
   }, []);
 
   useEffect(() => {
-    if (open) void loadEvents();
-  }, [open, loadEvents]);
+    if (!open) return;
+    void loadEvents();
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open, loadEvents, place]);
 
   useEffect(() => {
     if (!open) return;
@@ -137,8 +159,15 @@ export function AttentionBell({
   return (
     <div ref={panelRef} style={{ position: "relative" }}>
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          setOpen((v) => {
+            const next = !v;
+            if (next) place();
+            return next;
+          });
+        }}
         aria-expanded={open}
         aria-label={badge ? `${badge} unread notifications` : "Notifications"}
         data-testid="attention-bell"
@@ -186,23 +215,22 @@ export function AttentionBell({
         )}
       </button>
 
-      {open && (
+      {open && box && (
         <div
           data-testid="attention-bell-panel"
           style={{
-            position: "absolute",
-            right: 0,
-            top: "calc(100% + 8px)",
-            width: 340,
-            maxWidth: "min(340px, calc(100vw - 24px))",
-            maxHeight: 420,
+            position: "fixed",
+            left: box.left,
+            top: box.top,
+            width: box.width,
+            maxHeight: box.maxHeight,
             overflow: "auto",
             background: "var(--bg-elevated, #fff)",
             color: "var(--fg)",
             border: "1px solid var(--border)",
             borderRadius: 12,
-            boxShadow: "0 12px 40px rgba(0,0,0,.18)",
-            zIndex: 80,
+            boxShadow: "var(--shadow-lg)",
+            zIndex: "var(--z-modal)",
           }}
         >
           <div
