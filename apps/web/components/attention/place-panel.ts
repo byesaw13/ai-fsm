@@ -21,10 +21,10 @@ export function placeAttentionPanel(
       left,
       top: button.bottom + gap,
       width,
-      maxHeight: Math.min(panel.maxHeight, Math.max(120, below)),
+      maxHeight: Math.min(panel.maxHeight, Math.max(0, below)),
     };
   }
-  const maxHeight = Math.min(panel.maxHeight, Math.max(120, above));
+  const maxHeight = Math.min(panel.maxHeight, Math.max(0, above));
   return {
     left,
     top: Math.max(margin, button.top - gap - maxHeight),

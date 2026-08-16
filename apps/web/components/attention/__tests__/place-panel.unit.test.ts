@@ -28,6 +28,15 @@ describe("placeAttentionPanel", () => {
     expect(box.left).toBe(736 - box.width);
   });
 
+  it("does not invent height when the viewport is shorter than 120px below the bell", () => {
+    const box = placeAttentionPanel(
+      { left: 164, right: 200, top: 10, bottom: 46 },
+      { width: 1440, height: 100 },
+      panel,
+    );
+    expect(box.top + box.maxHeight).toBeLessThanOrEqual(100 - 12);
+  });
+
   it("never starts left of the viewport (the old desktop bug)", () => {
     const box = placeAttentionPanel(
       { left: 164, right: 200, top: 10, bottom: 46 },
