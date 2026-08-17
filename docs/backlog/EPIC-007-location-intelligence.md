@@ -362,91 +362,6 @@ owner will actually use day-to-day.
 
 
 
-# TASK-106: False-stop detection (5-minute dwell floor)
-
-Status:
-In Progress
-
-Phase:
-1
-
-Problem:
-HA Companion `still` / `in_vehicle` and zone flicker open a stop on every
-transition. `classifyDrive` auto-dismisses drive noise; stops were never
-classified. TASK-079's 3-minute floor only gated `visit_candidates`, so
-0–4 minute address blips still piled up as provisional items on the time log
-(~7–20 things to tap through on a busy day).
-
-Business Value:
-The owner only reviews real stays and trips. HA turbulence under 5 minutes
-clears itself unless a scheduled visit was there.
-
-Scope:
-- Pure `classifyStop` (packages/domain): noise under 5 minutes, ok at/over
-  5 minutes or when a scheduled visit is attached.
-- Apply at capture: auto-dismiss noise stops (`is_likely_noise` +
-  `status = dismissed`).
-- Raise `VISIT_CANDIDATE_MIN_DWELL_MINUTES` to 5 so it shares the same floor.
-- One-time backfill of existing provisional short stops (migration 172),
-  including pending unscheduled visit-candidate cards on those stops.
-
-Out of Scope:
-- Merging split same-place stops around a dismissed noise drive.
-- Auto-confirming real drives or Home overnight stays.
-- Changing HA automations (raw feed stays honest; FSM processes it).
-
-Acceptance Criteria:
-- [ ] A closed stop under 5 minutes with no scheduled visit is auto-dismissed.
-- [ ] A brief stop at a scheduled visit today stays on the confirm list.
-- [ ] Existing provisional short stops are backfilled by the migration.
-- [ ] `classifyStop` is unit-tested against the real-data examples.
-
-Notes:
-The stop sibling of TASK-040. Thresholds live in `classifyStop`;
-migration 172's backfill mirrors them.
-
-# TASK-107: AI Day Draft (GPS + jobs + receipts → one confirm)
-
-Status:
-In Progress
-
-Phase:
-1
-
-Problem:
-Day Review still asks the owner to confirm visits, stops, and drives as
-separate piles. The evidence is already in the system (GPS, scheduled
-visits, receipts, clock). The owner should see one proposed day and only
-handle exceptions.
-
-Business Value:
-End-of-day review becomes "does this look right?" instead of 20 taps.
-Ready items write through the existing confirm paths. The ledger still
-only changes when the owner accepts.
-
-Scope:
-- Pure `assembleDayDraft` (packages/domain): ready vs exception vs already
-  logged, from segments + visit candidates + same-day expenses + clock.
-- Day Review **Day draft** section: accept ready items in one tap; list
-  exceptions. Confirm uses existing visit-candidate and segment PATCH
-  routes (no second writer).
-- Optional "Write a summary" (Anthropic) that cannot change items.
-
-Out of Scope:
-- Habit learning across days.
-- Auto-accept without a tap.
-- Merging split same-place stops.
-
-Acceptance Criteria:
-- [ ] A scheduled high-confidence stop is ready as job work.
-- [ ] A supply-house stop with a matching receipt is ready as material run.
-- [ ] An unlabeled stop or a drive with no GPS miles is an exception.
-- [ ] Accept writes through existing confirm routes; nothing is written
-      until the owner taps Accept.
-
-Notes:
-Draft then confirm. Evidence first — the owner does not narrate the day.
-
 # TASK-110: Delete Daily Recap (Day Draft is the evening close)
 
 Status:
@@ -536,6 +451,8 @@ silently dirties payroll/billable.
 
 ## Completed
 
+- [TASK-106: False-stop detection (5-minute dwell floor)](../archive/backlog-done/TASK-106-false-stop-detection.md) — Done (PR #601)
+- [TASK-107: AI Day Draft](../archive/backlog-done/TASK-107-ai-day-draft.md) — Done (PR #602)
 - [TASK-076: Stop anchor stability](../archive/backlog-done/TASK-076-stop-anchor-stability.md) — Done (code audit 2026-08-06)
 
 

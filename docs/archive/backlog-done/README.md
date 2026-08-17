@@ -25,6 +25,11 @@ these files are kept for historical reference.
 | [TASK-027](TASK-027-hybrid-tracking.md) | Hybrid Tracking |
 | [TASK-033](TASK-033-read-only-mcp.md) | Read-Only Business MCP Server |
 | [TASK-060](TASK-060-invoice-discounts.md) | Invoice Discounts |
+| [TASK-095](TASK-095-estimate-benchmark-runner.md) | Estimate vs Actual Benchmark Runner |
+| [TASK-104](TASK-104-discoverable-vehicle-tracking.md) | Discoverable vehicle tracking |
+| [TASK-105](TASK-105-vehicle-fuel-history.md) | Vehicle fuel history, MPG, receipt view |
+| [TASK-106](TASK-106-false-stop-detection.md) | False-stop detection (5-minute dwell) |
+| [TASK-107](TASK-107-ai-day-draft.md) | AI Day Draft |
 | [TASK-058](TASK-058-workspace-auto-route.md) | Workspace mode auto-by-device |
 | [TASK-059](TASK-059-my-day-start-surface.md) | My Day start-surface consolidation |
 | [TASK-020](TASK-020-pwa-installability.md) | PWA Installability |
