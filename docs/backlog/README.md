@@ -108,6 +108,9 @@ Code-audit 2026-08-06: closed TASK-069 (live Square prod pay), TASK-054 (day clo
 TASK-076 (stop anchor). Left PARTIAL: 052 payroll residual, 049 inbox, 066 visit rollup.
 Wave finish 2026-08-05: In Progress emptied — TASK-056, TASK-018, TASK-017 shipped;
 truth-pass also archived TASK-023 and TASK-050 (epic already Done, README lagged).
+Truth pass 2026-08-17: archived shipped 104/105/106/107 (#599–#602) and 095
+(script + 2026-08-08 run). Ticked TASK-094 merged-to-main. TASK-103 seed AC
+closed in tests; owner-flow AC still open.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
@@ -202,7 +205,7 @@ truth-pass also archived TASK-023 and TASK-050 (epic already Done, README lagged
 | TASK-091 | Hybrid mileage verification pack (odo + GPS + export) | 001 | Done |
 | TASK-093 | Vehicle & Trailer Cost-of-Ownership | 001 | Done |
 | TASK-094 | Materials Estimate Trust & Calibration (Approach D) | 002 | In Progress |
-| TASK-095 | Estimate vs Actual Benchmark & Calibration Runner (PI-011) | 008 | In Progress |
+| TASK-095 | Estimate vs Actual Benchmark & Calibration Runner (PI-011) | 008 | Done |
 | TASK-096 | Financial Truth Card & Actionable Advisory Guardrails | 002 | Done |
 | TASK-097 | Trade Construction Knowledge Engine | 002 | Done |
 | TASK-098 | 3-Layer Hybrid Estimating Engine | 002 | Cancelled (scaffold deleted PR #603) |
@@ -210,11 +213,11 @@ truth-pass also archived TASK-023 and TASK-050 (epic already Done, README lagged
 | TASK-100 | Fix T&M vs Fixed comparison card (hours-overrun modeling, shared rate constant) | 002 | Proposed |
 | TASK-101 | Standalone & direct quick materials generator (uncouple materials from estimates) | 002 | Done |
 | TASK-102 | Quick materials — assessment context + save-to-job (follow-up to TASK-101) | 002 | Proposed |
-| TASK-103 | Door hardware (1007) deterministic materials takeoff → buy list | 002 | Ready |
-| TASK-104 | Discoverable vehicle tracking | 006 | In Progress |
-| TASK-105 | Vehicle fuel history, MPG, and receipt view | 001 | In Progress |
-| TASK-106 | False-stop detection (5-minute dwell floor) | 007 | In Progress |
-| TASK-107 | AI Day Draft (GPS + jobs + receipts → one confirm) | 007 | In Progress |
+| TASK-103 | Door hardware (1007) deterministic materials takeoff → buy list | 002 | In Progress |
+| TASK-104 | Discoverable vehicle tracking | 006 | Done |
+| TASK-105 | Vehicle fuel history, MPG, and receipt view | 001 | Done |
+| TASK-106 | False-stop detection (5-minute dwell floor) | 007 | Done |
+| TASK-107 | AI Day Draft (GPS + jobs + receipts → one confirm) | 007 | Done |
 | TASK-108 | Ponytail first cut — delete unused hybrid-pricing, vocabulary, log stubs | 002 | Done |
 | TASK-109 | Ponytail second cut — MCP, dead APIs, unused paint helpers | 005 | Done |
 | TASK-110 | Delete Daily Recap (Day Draft is the evening close) | 007 | Done |

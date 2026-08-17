@@ -56,7 +56,7 @@ Acceptance Criteria:
 - [x] AI-guessed price saves no longer update `avg_paid_cents`/
   `purchase_count`; real receipt-backed purchases are unaffected (regression
   tested).
-- [ ] Merged to main.
+- [x] Merged to main.
 - [ ] Real usage over a few weeks shows whether there's a genuine systematic
   **edit-rate** pattern (e.g. "decking quantity consistently gets increased by
   founders") worth building calibration against — the actual deliverable of
@@ -381,7 +381,7 @@ Acceptance Criteria:
 # TASK-103: Door Hardware (1007) Deterministic Materials Takeoff → Buy List
 
 Status:
-Ready
+In Progress
 
 Phase:
 3
@@ -427,12 +427,18 @@ Acceptance Criteria:
 - [x] `buildManualShoppingList` merges 1007 kit and **excludes** general_repairs scope materials for 1007.
 - [x] Shopping-list API merges 1007 takeoff when lines reference 1007.
 - [x] `mapShoppingListJsonToLines` maps service_code 1007 → source kit.
-- [ ] Job buy-list seed integration: no drywall mud/tape for 1007-only estimates.
+- [x] Job buy-list seed integration: no drywall mud/tape for 1007-only estimates.
 - [ ] End-to-end owner flow on live/prod after deploy.
 
 Notes:
 CEO+eng review 2026-08-10. Renumbered from accidental TASK-101 (that ID already
 shipped as Quick Materials on main #591). Temporary identity = price_book 1007.
+Closeout 2026-08-17: takeoff shipped on main (#593) and is deployed (garonhome
+at a41f680). Buy-list seed AC covered by `buildSeedLinesFromEstimate` +
+`buildManualShoppingList` 1007-only unit tests. Remaining AC is a logged-in
+owner pass on https://app.mydovetails.com (create 1007 estimate → seed job
+buy list → confirm no mud/tape). Headless browser on this host cannot launch
+(Chromium sandbox).
 
 ## Completed
 

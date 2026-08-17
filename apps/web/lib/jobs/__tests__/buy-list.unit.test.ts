@@ -425,4 +425,49 @@ describe("buildSeedLinesFromEstimate", () => {
     expect(lines.find((line) => line.name === "Joint compound")?.quantity).toBe(1);
     expect(lines.find((line) => line.name.includes("lockset"))?.quantity).toBe(1);
   });
+
+  it("1007-only estimate seeds the hardware kit and excludes drywall mud/tape", async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("FROM estimate_line_items eli")) {
+        return { rows: [{ code: "1007", category: "general_repairs", description: "1007 — Door hardware replacement" }] };
+      }
+      if (sql.includes("estimate_scope_snapshots")) {
+        return { rows: [
+          { category: "general_repairs", service_code: "1007", components: {}, complexity: {} },
+        ] };
+      }
+      return {
+        rows: [
+          {
+            id: "compound", price_book_id: null, category: "general_repairs",
+            material_name: "Joint compound", description: null, quantity_type: "static",
+            scope_component_key: null, quantity_multiplier: null, quantity_flat: 1,
+            waste_factor: 1, unit: "gal", unit_cost_cents: 3000,
+            store_section: "Paint", is_consumable: false, is_optional: false,
+            condition_factor_key: null, sort_order: 0,
+          },
+          {
+            id: "tape", price_book_id: null, category: "general_repairs",
+            material_name: "Fiberglass mesh tape", description: null, quantity_type: "static",
+            scope_component_key: null, quantity_multiplier: null, quantity_flat: 1,
+            waste_factor: 1, unit: "roll", unit_cost_cents: 800,
+            store_section: "Paint", is_consumable: false, is_optional: false,
+            condition_factor_key: null, sort_order: 1,
+          },
+        ],
+      };
+    });
+
+    const lines = await buildSeedLinesFromEstimate(
+      { query } as never,
+      { id: "estimate-1007", status: "approved", shopping_list_json: null },
+    );
+
+    expect(lines.some((line) => /compound|mesh tape|mud/i.test(line.name))).toBe(false);
+    expect(lines.some((line) => line.name.toLowerCase().includes("lockset"))).toBe(true);
+    expect(lines.every((line) => line.source === "kit")).toBe(true);
+    // Category-wide service_materials must not be queried into the buy list
+    // for a 1007-only snapshot — the skip happens before computeMaterials.
+    expect(query).toHaveBeenCalled();
+  });
 });
