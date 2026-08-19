@@ -104,11 +104,32 @@ export async function attachFuelExpenseToVehicle(
       LIMIT 1`,
     [input.expenseId, input.accountId],
   );
+
+  const gallons = coerceGallons(input.gallons);
   if (existing.rows[0]) {
+    const filledAt = /^\d{4}-\d{2}-\d{2}$/.test(input.expenseDate)
+      ? `${input.expenseDate}T12:00:00.000Z`
+      : null;
+    await client.query(
+      `UPDATE vehicle_fuel_logs
+          SET vehicle_id = $1,
+              gallons = COALESCE($2, gallons),
+              notes = COALESCE($3, notes),
+              filled_at = COALESCE($4::timestamptz, filled_at),
+              updated_at = now()
+        WHERE id = $5 AND account_id = $6`,
+      [
+        vehicle.id,
+        gallons,
+        input.notes ?? null,
+        filledAt,
+        existing.rows[0].id,
+        input.accountId,
+      ],
+    );
     return { vehicleId: vehicle.id, fuelLogId: existing.rows[0].id, attached: true };
   }
 
-  const gallons = coerceGallons(input.gallons);
   if (gallons == null) {
     return { vehicleId: vehicle.id, fuelLogId: null, attached: true };
   }

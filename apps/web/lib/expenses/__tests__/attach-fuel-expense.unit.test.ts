@@ -140,6 +140,7 @@ describe("attachFuelExpenseToVehicle", () => {
         sql.includes("SELECT id FROM vehicle_fuel_logs")
           ? { rows: [{ id: FUEL_LOG }], rowCount: 1 }
           : null,
+      (sql) => (sql.includes("UPDATE vehicle_fuel_logs") ? { rows: [], rowCount: 1 } : null),
     ]);
 
     const result = await attachFuelExpenseToVehicle(client, {
@@ -155,5 +156,10 @@ describe("attachFuelExpenseToVehicle", () => {
       String(call[0]).includes("INSERT INTO vehicle_fuel_logs"),
     );
     expect(insert).toBeUndefined();
+    const updateLog = (client.query as ReturnType<typeof vi.fn>).mock.calls.find((call) =>
+      String(call[0]).includes("UPDATE vehicle_fuel_logs"),
+    );
+    expect(updateLog?.[1]?.[0]).toBe(VEHICLE);
+    expect(updateLog?.[1]?.[1]).toBe(20);
   });
 });

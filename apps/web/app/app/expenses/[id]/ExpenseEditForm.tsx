@@ -19,6 +19,7 @@ interface Expense {
   client_id: string | null;
   notes: string | null;
   vehicle_id?: string | null;
+  fuel_gallons?: number | string | null;
 }
 
 interface Props {
@@ -42,9 +43,12 @@ export function ExpenseEditForm({ expense, jobs, clients, vehicles = [], categor
   const [clientId, setClientId] = useState(expense.client_id ?? "");
   const [notes, setNotes] = useState(expense.notes ?? "");
   const [vehicleId, setVehicleId] = useState(expense.vehicle_id ?? "");
-  const [gallonsStr, setGallonsStr] = useState(
-    () => String(parseGallonsFromFuelText(expense.notes) ?? ""),
-  );
+  const [gallonsStr, setGallonsStr] = useState(() => {
+    if (expense.fuel_gallons != null && expense.fuel_gallons !== "") {
+      return String(expense.fuel_gallons);
+    }
+    return String(parseGallonsFromFuelText(expense.notes) ?? "");
+  });
   const [pending, setPending] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
