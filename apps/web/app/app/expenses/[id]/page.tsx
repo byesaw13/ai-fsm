@@ -44,7 +44,7 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
               e.expense_date, e.job_id, e.client_id, e.property_id, e.vehicle_id,
               e.notes, e.receipt_url, e.created_by, e.created_at, e.updated_at,
               j.title AS job_title, c.name AS client_name, v.nickname AS vehicle_nickname,
-              f.gallons AS fuel_gallons
+              f.gallons AS fuel_gallons, f.odometer AS fuel_odometer
        FROM expenses e
        LEFT JOIN jobs j ON j.id = e.job_id
        LEFT JOIN clients c ON c.id = e.client_id
@@ -273,6 +273,7 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
                   notes: expense.notes ?? null,
                   vehicle_id: expense.vehicle_id ?? null,
                   fuel_gallons: expense.fuel_gallons ?? null,
+                  fuel_odometer: expense.fuel_odometer ?? null,
                 }}
                 jobs={jobs}
                 clients={clients}

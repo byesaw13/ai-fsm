@@ -7,7 +7,11 @@ import { Input, Select, Textarea, Button } from "@/components/ui";
 import type { ExpenseCategory } from "@ai-fsm/domain";
 import { formatJobPickerLabel } from "@ai-fsm/domain";
 import { parseDollarsToCents, formatCentsToDollars } from "@/lib/expenses/math";
-import { isFuelExpenseCategory, parseGallonsFromFuelText } from "@/lib/expenses/fuel-from-receipt";
+import {
+  isFuelExpenseCategory,
+  parseGallonsFromFuelText,
+  reviewFuelReceipt,
+} from "@/lib/expenses/fuel-from-receipt";
 
 interface Expense {
   id: string;
@@ -20,6 +24,7 @@ interface Expense {
   notes: string | null;
   vehicle_id?: string | null;
   fuel_gallons?: number | string | null;
+  fuel_odometer?: number | string | null;
 }
 
 interface Props {
@@ -49,6 +54,11 @@ export function ExpenseEditForm({ expense, jobs, clients, vehicles = [], categor
     }
     return String(parseGallonsFromFuelText(expense.notes) ?? "");
   });
+  const [odometerStr, setOdometerStr] = useState(() =>
+    expense.fuel_odometer != null && expense.fuel_odometer !== ""
+      ? String(expense.fuel_odometer)
+      : "",
+  );
   const [pending, setPending] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +100,9 @@ export function ExpenseEditForm({ expense, jobs, clients, vehicles = [], categor
           vehicle_id: isFuelExpenseCategory(category) ? vehicleId || null : null,
           gallons: isFuelExpenseCategory(category) && gallonsStr.trim()
             ? Number(gallonsStr)
+            : null,
+          odometer: isFuelExpenseCategory(category) && odometerStr.trim()
+            ? parseInt(odometerStr, 10)
             : null,
         }),
       });
@@ -204,8 +217,27 @@ export function ExpenseEditForm({ expense, jobs, clients, vehicles = [], categor
             placeholder="23.707"
             disabled={pending}
           />
+          <Input
+            id="edit_odometer"
+            label="Odometer"
+            inputMode="numeric"
+            value={odometerStr}
+            onChange={(e) => setOdometerStr(e.target.value)}
+            placeholder="That day's start mileage if blank"
+            disabled={pending}
+          />
         </div>
       )}
+      {isFuelExpenseCategory(category) &&
+        reviewFuelReceipt({
+          gallons: gallonsStr.trim() ? Number(gallonsStr) : null,
+          amountCents: amountStr.trim() ? parseDollarsToCents(amountStr) : null,
+          notes,
+        }).warnings.map((w) => (
+          <p key={w} role="status" style={{ margin: 0, color: "var(--color-warning, #b45309)", fontSize: "var(--text-sm)" }}>
+            {w}
+          </p>
+        ))}
 
       {jobs.length > 0 && (
         <Select

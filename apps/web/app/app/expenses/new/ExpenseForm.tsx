@@ -8,7 +8,11 @@ import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS, formatJobPickerLabel } fro
 import { parseDollarsToCents } from "@/lib/expenses/math";
 import { currentMonthKey } from "@/lib/expenses/ui";
 import { buildPoMatchText, suggestJobFromPoText } from "@/lib/expenses/match-job-po";
-import { isFuelExpenseCategory, parseGallonsFromFuelText } from "@/lib/expenses/fuel-from-receipt";
+import {
+  isFuelExpenseCategory,
+  parseGallonsFromFuelText,
+  reviewFuelReceipt,
+} from "@/lib/expenses/fuel-from-receipt";
 
 interface Props {
   jobs: { id: string; title: string; job_number?: string | null; client_id?: string | null }[];
@@ -46,6 +50,7 @@ export function ExpenseForm({
   const [notes, setNotes] = useState("");
   const [vehicleId, setVehicleId] = useState(activeVehicleId ?? "");
   const [gallonsStr, setGallonsStr] = useState("");
+  const [odometerStr, setOdometerStr] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -176,6 +181,9 @@ export function ExpenseForm({
           vehicle_id: isFuelExpenseCategory(category) ? vehicleId || null : null,
           gallons: isFuelExpenseCategory(category) && gallonsStr.trim()
             ? Number(gallonsStr)
+            : null,
+          odometer: isFuelExpenseCategory(category) && odometerStr.trim()
+            ? parseInt(odometerStr, 10)
             : null,
         }),
       });
@@ -440,6 +448,42 @@ export function ExpenseForm({
               hint="Needed for MPG. Pulled from the receipt when we can read it."
             />
           </div>
+          <Input
+            id="odometer"
+            label="Odometer (optional)"
+            inputMode="numeric"
+            value={odometerStr}
+            onChange={(e) => setOdometerStr(e.target.value)}
+            placeholder="Leave blank for that day's start mileage"
+            disabled={pending}
+            hint="Blank uses that day's vehicle start, or the previous day's close."
+          />
+          {(() => {
+            const review = reviewFuelReceipt({
+              gallons: gallonsStr.trim() ? Number(gallonsStr) : null,
+              amountCents: amountStr.trim() ? parseDollarsToCents(amountStr) : null,
+              notes,
+            });
+            if (review.warnings.length === 0) return null;
+            return (
+              <ul
+                role="status"
+                style={{
+                  margin: 0,
+                  paddingLeft: "1.2rem",
+                  color: "var(--color-warning, #b45309)",
+                  fontSize: "var(--text-sm)",
+                }}
+              >
+                {review.warnings.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+                {review.impliedGallons != null ? (
+                  <li>Suggested gallons from the total: {review.impliedGallons}</li>
+                ) : null}
+              </ul>
+            );
+          })()}
         </div>
       )}
 
