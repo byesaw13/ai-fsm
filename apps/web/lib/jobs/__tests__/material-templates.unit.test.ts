@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   auditPriceBookRow,
   expandMaterialTemplates,
+  expandMaterialTemplatesDetailed,
   expandTemplateQuantity,
   suggestedPackageCents,
   type MaterialTemplateRow,
@@ -66,6 +67,22 @@ describe("expandTemplateQuantity", () => {
       ),
     ).toBe(4);
   });
+
+  it("treats multiplier > 1 as coverage divisor", () => {
+    // 96 / 32 * 1.1 → 3.3 → ceil 4
+    expect(
+      expandTemplateQuantity(
+        {
+          quantity_type: "per_input",
+          quantity_flat: null,
+          input_key: "drywall_sqft",
+          quantity_multiplier: 32,
+          waste_factor: 1.1,
+        },
+        { drywall_sqft: 96 },
+      ),
+    ).toBe(4);
+  });
 });
 
 describe("expandMaterialTemplates", () => {
@@ -96,6 +113,25 @@ describe("expandMaterialTemplates", () => {
     ]);
     expect(lines).toHaveLength(1);
     expect(lines[0].quantity).toBe(3);
+  });
+
+  it("multiplies static packs by task qty", () => {
+    const lines = expandMaterialTemplates([base({ material_name: "Wax ring" })], { taskQty: 2 });
+    expect(lines[0].quantity).toBe(2);
+  });
+
+  it("records omitted must-buy when dimension missing", () => {
+    const { lines, omitted } = expandMaterialTemplatesDetailed([
+      base({
+        material_name: "Drywall sheet 1/2\" 4×8",
+        quantity_type: "per_input",
+        quantity_flat: null,
+        input_key: "drywall_sqft",
+        quantity_multiplier: 0.03125,
+      }),
+    ]);
+    expect(lines).toEqual([]);
+    expect(omitted[0]?.reason).toBe("missing_dimension");
   });
 });
 

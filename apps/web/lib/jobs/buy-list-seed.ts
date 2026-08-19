@@ -352,7 +352,14 @@ export async function seedJobBuyList(
   const candidateLines = await buildSeedLinesFromEstimate(client, estimate);
   const candidates = await hydrateBuyListLocations(client, opts.accountId, candidateLines);
 
-  if (opts.reseed || alreadySeeded) {
+  const existingCount = await client.query<{ n: string }>(
+    `SELECT COUNT(*)::text AS n FROM job_material_lines
+     WHERE job_id = $1 AND account_id = $2`,
+    [opts.jobId, opts.accountId],
+  );
+  const hasExistingLines = (parseInt(existingCount.rows[0]?.n ?? "0", 10) || 0) > 0;
+
+  if (opts.reseed || alreadySeeded || hasExistingLines) {
     const existing = await client.query<{ name: string; unit_label: string | null }>(
       `SELECT name, unit_label FROM job_material_lines
        WHERE job_id = $1 AND account_id = $2`,

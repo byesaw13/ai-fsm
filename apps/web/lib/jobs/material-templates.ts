@@ -54,6 +54,20 @@ export interface ExpandedMaterialLine {
   search_query: string | null;
 }
 
+export type OmitReason = "missing_dimension" | "customer_supplied" | "invalid_multiplier";
+
+export interface OmittedMaterialLine {
+  name: string;
+  reason: OmitReason;
+  input_key: string | null;
+  role: MaterialRole;
+  price_book_code: string;
+}
+
+export type ExpandOutcome =
+  | { kind: "quantity"; quantity: number }
+  | { kind: "omit"; reason: OmitReason };
+
 function num(v: number | string | null | undefined): number | null {
   if (v == null) return null;
   const n = typeof v === "number" ? v : Number(v);
@@ -68,36 +82,56 @@ export function expandTemplateQuantity(
   >,
   dimensions: DimensionMap = {},
 ): number | null {
+  const outcome = expandTemplateQuantityOutcome(template, dimensions);
+  return outcome.kind === "quantity" ? outcome.quantity : null;
+}
+
+export function expandTemplateQuantityOutcome(
+  template: Pick<
+    MaterialTemplateRow,
+    "quantity_type" | "quantity_flat" | "input_key" | "quantity_multiplier" | "waste_factor"
+  >,
+  dimensions: DimensionMap = {},
+): ExpandOutcome {
   const waste = num(template.waste_factor) ?? 1;
   if (template.quantity_type === "static") {
     const base = num(template.quantity_flat) ?? 1;
-    return Math.max(1, Math.ceil(base * waste));
+    return { kind: "quantity", quantity: Math.max(1, Math.ceil(base * waste)) };
   }
 
   if (template.quantity_type === "per_input") {
     const key = template.input_key?.trim();
-    if (!key) return null;
+    if (!key) return { kind: "omit", reason: "missing_dimension" };
     const scope = num(dimensions[key]);
-    if (scope == null || scope <= 0) return null;
+    if (scope == null || scope <= 0) return { kind: "omit", reason: "missing_dimension" };
     const mult = num(template.quantity_multiplier) ?? 1;
-    // mult is either rate (qty = scope * mult) or coverage (qty = scope / mult)
-    // Convention: quantity_multiplier > 1 with per_input on sqft usually means coverage divisor
-    // when material is sheets: 1/32 = 0.03125 stored as multiplier meaning sheets per sqft.
-    const raw = scope * mult;
-    return Math.max(1, Math.ceil(raw * waste));
+    if (mult <= 0) return { kind: "omit", reason: "invalid_multiplier" };
+    // multiplier > 1 is coverage (sqft per sheet); <= 1 is a rate (sheets per sqft).
+    const raw = mult > 1 ? scope / mult : scope * mult;
+    return { kind: "quantity", quantity: Math.max(1, Math.ceil(raw * waste)) };
   }
 
-  // tier: flat quantity if input present
   if (template.quantity_type === "tier") {
     const key = template.input_key?.trim();
-    if (!key) return num(template.quantity_flat) ?? 1;
+    if (!key) {
+      const base = num(template.quantity_flat) ?? 1;
+      return { kind: "quantity", quantity: Math.max(1, Math.ceil(base * waste)) };
+    }
     const scope = num(dimensions[key]);
-    if (scope == null || scope <= 0) return null;
+    if (scope == null || scope <= 0) return { kind: "omit", reason: "missing_dimension" };
     const base = num(template.quantity_flat) ?? 1;
-    return Math.max(1, Math.ceil(base * waste));
+    return { kind: "quantity", quantity: Math.max(1, Math.ceil(base * waste)) };
   }
 
-  return null;
+  return { kind: "omit", reason: "invalid_multiplier" };
+}
+
+export interface ExpandTemplatesOptions {
+  dimensions?: DimensionMap;
+  includeOptional?: boolean;
+  includeConsumable?: boolean;
+  customerSuppliedNames?: string[];
+  taskQty?: number;
 }
 
 /**
@@ -106,34 +140,59 @@ export function expandTemplateQuantity(
  */
 export function expandMaterialTemplates(
   templates: MaterialTemplateRow[],
-  options: {
-    dimensions?: DimensionMap;
-    includeOptional?: boolean;
-    includeConsumable?: boolean;
-    customerSuppliedNames?: string[];
-  } = {},
+  options: ExpandTemplatesOptions = {},
 ): ExpandedMaterialLine[] {
+  return expandMaterialTemplatesDetailed(templates, options).lines;
+}
+
+export function expandMaterialTemplatesDetailed(
+  templates: MaterialTemplateRow[],
+  options: ExpandTemplatesOptions = {},
+): { lines: ExpandedMaterialLine[]; omitted: OmittedMaterialLine[] } {
   const {
     dimensions = {},
     includeOptional = false,
     includeConsumable = false,
     customerSuppliedNames = [],
+    taskQty = 1,
   } = options;
 
+  const qtyScale = Number.isFinite(taskQty) && taskQty > 0 ? Math.ceil(taskQty) : 1;
   const blocked = new Set(
     customerSuppliedNames.map((n) => n.trim().toLowerCase()).filter(Boolean),
   );
 
   const byKey = new Map<string, ExpandedMaterialLine>();
+  const omitted: OmittedMaterialLine[] = [];
 
   for (const t of templates) {
     if (t.role === "optional" && !includeOptional) continue;
     if (t.role === "consumable" && !includeConsumable) continue;
-    if (blocked.has(t.material_name.trim().toLowerCase())) continue;
 
-    const quantity = expandTemplateQuantity(t, dimensions);
-    if (quantity == null) continue;
+    if (blocked.has(t.material_name.trim().toLowerCase())) {
+      omitted.push({
+        name: t.material_name.trim(),
+        reason: "customer_supplied",
+        input_key: t.input_key,
+        role: t.role,
+        price_book_code: t.price_book_code,
+      });
+      continue;
+    }
 
+    const outcome = expandTemplateQuantityOutcome(t, dimensions);
+    if (outcome.kind === "omit") {
+      omitted.push({
+        name: t.material_name.trim(),
+        reason: outcome.reason,
+        input_key: t.input_key,
+        role: t.role,
+        price_book_code: t.price_book_code,
+      });
+      continue;
+    }
+
+    const quantity = outcome.quantity * qtyScale;
     const unit = t.unit_label?.trim() || null;
     const key = `${t.material_name.trim().toLowerCase()}||${(unit ?? "").toLowerCase()}`;
     const existing = byKey.get(key);
@@ -162,7 +221,7 @@ export function expandMaterialTemplates(
     });
   }
 
-  return [...byKey.values()];
+  return { lines: [...byKey.values()], omitted };
 }
 
 /** Suggested package price from labor hours × bill rate (cents). */

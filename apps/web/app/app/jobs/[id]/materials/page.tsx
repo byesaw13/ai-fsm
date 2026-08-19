@@ -179,8 +179,7 @@ export default async function JobMaterialsPage({ params, searchParams }: PagePro
               color: "var(--fg-muted)",
             }}
           >
-            What to purchase or pack for this job. Seed from the estimate when available; mark
-            status as you buy and load the truck. This is not the receipts list.
+            What to buy or pack. Mark status as you shop. This is not the receipts list.
           </p>
           <BuyListClient
             jobId={jobId}
