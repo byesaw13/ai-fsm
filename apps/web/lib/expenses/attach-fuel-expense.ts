@@ -170,8 +170,8 @@ export async function attachFuelExpenseToVehicle(
     [vehicle.id, input.expenseId, input.accountId],
   );
 
-  const existing = await client.query<{ id: string }>(
-    `SELECT id FROM vehicle_fuel_logs
+  const existing = await client.query<{ id: string; odometer: number | null }>(
+    `SELECT id, odometer FROM vehicle_fuel_logs
       WHERE expense_id = $1 AND account_id = $2
       LIMIT 1`,
     [input.expenseId, input.accountId],
@@ -197,11 +197,14 @@ export async function attachFuelExpenseToVehicle(
     ? `${input.expenseDate}T12:00:00.000Z`
     : new Date().toISOString();
 
-  const resolvedOdo =
-    input.odometer != null && input.odometer > 0
-      ? { odometer: Math.round(input.odometer), source: "explicit" as const }
-      : await odometerForFuelDate(client, input.accountId, vehicle.id, input.expenseDate);
-  const odometer = resolvedOdo?.odometer ?? null;
+  const explicitOdo =
+    input.odometer != null && input.odometer > 0 ? Math.round(input.odometer) : null;
+  const autoOdo =
+    explicitOdo == null
+      ? await odometerForFuelDate(client, input.accountId, vehicle.id, input.expenseDate)
+      : null;
+  const odometer =
+    explicitOdo ?? existing.rows[0]?.odometer ?? autoOdo?.odometer ?? null;
   const odometerSuspect =
     odometer != null
       ? await odometerSuspectForFill(
@@ -221,11 +224,8 @@ export async function attachFuelExpenseToVehicle(
               gallons = COALESCE($2, gallons),
               notes = COALESCE($3, notes),
               filled_at = COALESCE($4::timestamptz, filled_at),
-              odometer = COALESCE(odometer, $5),
-              odometer_suspect = CASE
-                WHEN odometer IS NULL AND $5 IS NOT NULL THEN $6
-                ELSE odometer_suspect
-              END,
+              odometer = $5,
+              odometer_suspect = $6,
               updated_at = now()
         WHERE id = $7 AND account_id = $8`,
       [

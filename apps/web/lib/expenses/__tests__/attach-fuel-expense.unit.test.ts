@@ -89,7 +89,10 @@ describe("attachFuelExpenseToVehicle", () => {
     const client = clientFor([
       openSessionHandler(),
       (sql) => (sql.includes("UPDATE expenses") ? { rows: [], rowCount: 1 } : null),
-      (sql) => (sql.includes("SELECT id FROM vehicle_fuel_logs") ? { rows: [], rowCount: 0 } : null),
+      (sql) =>
+        sql.includes("SELECT id, odometer FROM vehicle_fuel_logs")
+          ? { rows: [], rowCount: 0 }
+          : null,
       dayOdoHandler(110156, 110101),
       (sql) => (sql.includes("MAX(odometer)") || sql.includes("MIN(odometer)")
         ? { rows: [{ odo: null }], rowCount: 1 }
@@ -131,7 +134,10 @@ describe("attachFuelExpenseToVehicle", () => {
     const client = clientFor([
       openSessionHandler(),
       (sql) => (sql.includes("UPDATE expenses") ? { rows: [], rowCount: 1 } : null),
-      (sql) => (sql.includes("SELECT id FROM vehicle_fuel_logs") ? { rows: [], rowCount: 0 } : null),
+      (sql) =>
+        sql.includes("SELECT id, odometer FROM vehicle_fuel_logs")
+          ? { rows: [], rowCount: 0 }
+          : null,
     ]);
 
     const result = await attachFuelExpenseToVehicle(client, {
@@ -158,8 +164,8 @@ describe("attachFuelExpenseToVehicle", () => {
         : null),
       (sql) => (sql.includes("UPDATE expenses") ? { rows: [], rowCount: 1 } : null),
       (sql) =>
-        sql.includes("SELECT id FROM vehicle_fuel_logs")
-          ? { rows: [{ id: FUEL_LOG }], rowCount: 1 }
+        sql.includes("SELECT id, odometer FROM vehicle_fuel_logs")
+          ? { rows: [{ id: FUEL_LOG, odometer: 109000 }], rowCount: 1 }
           : null,
       (sql) => (sql.includes("UPDATE vehicle_fuel_logs") ? { rows: [], rowCount: 1 } : null),
     ]);
@@ -182,5 +188,35 @@ describe("attachFuelExpenseToVehicle", () => {
     );
     expect(updateLog?.[1]?.[0]).toBe(VEHICLE);
     expect(updateLog?.[1]?.[1]).toBe(20);
+  });
+
+  it("replaces a stored odometer when the form sends a new reading", async () => {
+    const client = clientFor([
+      openSessionHandler(),
+      (sql) => (sql.includes("UPDATE expenses") ? { rows: [], rowCount: 1 } : null),
+      (sql) =>
+        sql.includes("SELECT id, odometer FROM vehicle_fuel_logs")
+          ? { rows: [{ id: FUEL_LOG, odometer: 109000 }], rowCount: 1 }
+          : null,
+      (sql) =>
+        sql.includes("MAX(odometer)") || sql.includes("MIN(odometer)")
+          ? { rows: [{ odo: null }], rowCount: 1 }
+          : null,
+      (sql) => (sql.includes("UPDATE vehicle_fuel_logs") ? { rows: [], rowCount: 1 } : null),
+    ]);
+
+    await attachFuelExpenseToVehicle(client, {
+      accountId: ACCOUNT,
+      userId: USER,
+      expenseId: EXPENSE,
+      category: "fuel",
+      expenseDate: "2026-08-18",
+      gallons: 20,
+      odometer: 110200,
+    });
+    const updateLog = (client.query as ReturnType<typeof vi.fn>).mock.calls.find((call) =>
+      String(call[0]).includes("UPDATE vehicle_fuel_logs"),
+    );
+    expect(updateLog?.[1]?.[4]).toBe(110200);
   });
 });
