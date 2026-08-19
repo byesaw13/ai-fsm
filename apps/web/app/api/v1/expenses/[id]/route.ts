@@ -82,6 +82,7 @@ const updateExpenseSchema = z.object({
   commercial_tag: commercialTagSchema.nullable().optional(),
   vehicle_id: z.string().uuid().nullable().optional(),
   gallons: z.number().positive().max(500).nullable().optional(),
+  odometer: z.number().int().positive().nullable().optional(),
 });
 
 export const PATCH = withRole(["owner", "admin"], async (request, session) => {
@@ -141,8 +142,9 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         category: string;
         expense_date: string;
         notes: string | null;
+        amount_cents: number;
       }>(
-        `SELECT id, vendor_name, category, expense_date::text AS expense_date, notes
+        `SELECT id, vendor_name, category, expense_date::text AS expense_date, notes, amount_cents
            FROM expenses WHERE id = $1 AND account_id = $2`,
         [id, session.accountId]
       );
@@ -202,7 +204,13 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
           notes: nextNotes,
           gallons:
             updates.gallons ??
-            gallonsFromParsedReceipt({ category: nextCategory, notes: nextNotes }),
+            gallonsFromParsedReceipt({
+              category: nextCategory,
+              notes: nextNotes,
+              amountCents: updates.amount_cents ?? existing.rows[0].amount_cents,
+            }),
+          amountCents: updates.amount_cents ?? existing.rows[0].amount_cents,
+          odometer: updates.odometer ?? null,
           vehicleId: updates.vehicle_id ?? null,
         });
       }

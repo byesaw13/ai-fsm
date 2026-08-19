@@ -27,6 +27,27 @@ trustworthy enough to feed tax mileage, vehicle cost, and job profitability.
 > `Job → Visit → activity_entries`; Work Order stays separate until the time
 > truth is clean.
 
+# TASK-114: Fuel receipt odometer from that day + number sanity check
+
+Status:
+Done
+
+Phase:
+1
+
+Problem:
+An old fuel receipt saves gallons and dollars but leaves `vehicle_fuel_logs.odometer`
+null. MPG cannot close. The day already has a vehicle session start (or the previous
+day's close). OCR also sometimes copies the pump $/gal into the gallons field
+("3.909 gallons at $3.909/gal").
+
+Scope:
+- Auto-fill odometer: same-day session `start_odometer`, else previous day's
+  `end_odometer`. Do not use "latest ever" (wrong for backdated fills).
+- Flag suspect only if the reading sits outside neighboring fills.
+- Warn (and correct when obvious) when gallons match the pump price and the
+  receipt total implies a real fill volume.
+
 # TASK-113: Fuel receipt attaches to the logged-in vehicle
 
 Status:

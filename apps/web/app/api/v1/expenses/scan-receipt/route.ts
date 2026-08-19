@@ -151,6 +151,7 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
       category,
       gallons: parsed.gallons,
       notes: parsed.notes,
+      amountCents: amount_cents,
       line_items,
     });
 

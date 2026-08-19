@@ -180,6 +180,7 @@ const createExpenseSchema = z.object({
   notes: z.string().max(2000).nullable().optional(),
   vehicle_id: z.string().uuid().nullable().optional(),
   gallons: z.number().positive().max(500).nullable().optional(),
+  odometer: z.number().int().positive().nullable().optional(),
 });
 
 export const POST = withRole(["owner", "admin"], async (request, session) => {
@@ -224,6 +225,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     notes,
     vehicle_id,
     gallons,
+    odometer,
   } = parseResult.data;
 
   try {
@@ -258,7 +260,13 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         notes: notes ?? null,
         gallons:
           gallons ??
-          gallonsFromParsedReceipt({ category, notes: notes ?? null }),
+          gallonsFromParsedReceipt({
+            category,
+            notes: notes ?? null,
+            amountCents: amount_cents,
+          }),
+        amountCents: amount_cents,
+        odometer: odometer ?? null,
         vehicleId: vehicle_id ?? null,
       });
 
