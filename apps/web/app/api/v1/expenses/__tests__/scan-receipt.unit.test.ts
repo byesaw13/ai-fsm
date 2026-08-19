@@ -148,4 +148,30 @@ describe("POST /api/v1/expenses/scan-receipt", () => {
     const json = await res.json();
     expect(json.data.line_items).toEqual([]);
   });
+
+  it("returns gallons from a fuel receipt parse", async () => {
+    mockCreate.mockResolvedValue({
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            vendor_name: "Speedway",
+            amount_cents: 8888,
+            expense_date: "2026-08-18",
+            category: "fuel",
+            notes: "Regular unleaded, 23.707 gallons at $3.749/gal",
+            gallons: 23.707,
+          }),
+        },
+      ],
+    });
+
+    const file = new File(["fake"], "receipt.jpg", { type: "image/jpeg" });
+    const res = await POST(requestWithFile(file));
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.gallons).toBe(23.707);
+    expect(json.data.category).toBe("fuel");
+  });
 });

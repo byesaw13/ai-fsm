@@ -28,7 +28,7 @@ export default async function NewExpensePage({
 
   // Open / in-progress jobs only — closed jobs clutter receipt entry.
   // Always include defaultJobId when deep-linked from a job page.
-  const [jobs, clients] = await Promise.all([
+  const [jobs, clients, vehicles, openSession] = await Promise.all([
     query<{ id: string; title: string; job_number: string | null; client_id: string | null }>(
       isMaterialRun
         ? `SELECT j.id, j.title, j.job_number, j.client_id
@@ -63,6 +63,21 @@ export default async function NewExpensePage({
       `SELECT id, name FROM clients WHERE account_id = $1 ORDER BY name ASC LIMIT 100`,
       [session.accountId]
     ),
+    query<{ id: string; nickname: string }>(
+      `SELECT id, nickname FROM vehicles
+        WHERE account_id = $1 AND is_active = true AND kind <> 'trailer'
+        ORDER BY is_default DESC, nickname ASC`,
+      [session.accountId],
+    ),
+    query<{ vehicle_id: string }>(
+      `SELECT vehicle_id FROM vehicle_sessions
+        WHERE account_id = $1 AND created_by = $2
+          AND status = 'open' AND end_odometer IS NULL AND miles IS NULL
+          AND vehicle_id IS NOT NULL
+        ORDER BY started_at DESC NULLS LAST
+        LIMIT 1`,
+      [session.accountId, session.userId],
+    ),
   ]);
 
   return (
@@ -86,6 +101,8 @@ export default async function NewExpensePage({
       <ExpenseForm
         jobs={jobs}
         clients={clients}
+        vehicles={vehicles}
+        activeVehicleId={openSession[0]?.vehicle_id ?? (vehicles.length === 1 ? vehicles[0].id : null)}
         defaultJobId={defaultJobId}
         defaultClientId={defaultClientId}
         mode={isMaterialRun ? "run" : "standard"}

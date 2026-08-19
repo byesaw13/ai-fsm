@@ -27,6 +27,41 @@ trustworthy enough to feed tax mileage, vehicle cost, and job profitability.
 > `Job → Visit → activity_entries`; Work Order stays separate until the time
 > truth is clean.
 
+# TASK-113: Fuel receipt attaches to the logged-in vehicle
+
+Status:
+Done
+
+Phase:
+1
+
+Problem:
+Scanning or typing a fuel receipt creates an `expenses` row (`category = fuel`)
+and stops there. It never sets `expenses.vehicle_id` and never writes
+`vehicle_fuel_logs`. The truck you started the day in is already on an open
+`vehicle_sessions` row. Result: the fill does not show on the vehicle Fuel tab
+or in MPG, and cost-of-ownership misses the receipt.
+
+Scope:
+- On create/update of a fuel expense, resolve the truck: explicit picker, else
+  the user's open vehicle session, else the default / only non-trailer.
+- Stamp `expenses.vehicle_id`.
+- If gallons are on the scan or notes, insert one `vehicle_fuel_logs` row
+  linked to that expense (no second expense).
+- Expense form shows vehicle + gallons when category is Fuel.
+
+Out of Scope:
+- Auto-odometer from the pump (leave odometer null; MPG waits for a later fill
+  with an odometer or a manual edit).
+- Linking an old fuel expense from a one-off SQL script (operator can re-save).
+
+Acceptance Criteria:
+- [ ] Fuel receipt while a vehicle session is open appears on that truck's Fuel
+      tab with gallons when the receipt has them.
+- [ ] Saving the same expense twice does not create a second fuel log.
+- [ ] Non-fuel receipts are unchanged.
+- [ ] Unit tests cover gallons parse + attach.
+
 # TASK-061: Backfill legacy visit time into activity_entries
 
 Status:

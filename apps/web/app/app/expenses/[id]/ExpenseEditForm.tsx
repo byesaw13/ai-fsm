@@ -7,6 +7,7 @@ import { Input, Select, Textarea, Button } from "@/components/ui";
 import type { ExpenseCategory } from "@ai-fsm/domain";
 import { formatJobPickerLabel } from "@ai-fsm/domain";
 import { parseDollarsToCents, formatCentsToDollars } from "@/lib/expenses/math";
+import { isFuelExpenseCategory, parseGallonsFromFuelText } from "@/lib/expenses/fuel-from-receipt";
 
 interface Expense {
   id: string;
@@ -17,16 +18,18 @@ interface Expense {
   job_id: string | null;
   client_id: string | null;
   notes: string | null;
+  vehicle_id?: string | null;
 }
 
 interface Props {
   expense: Expense;
   jobs: { id: string; title: string; job_number?: string | null }[];
   clients: { id: string; name: string }[];
+  vehicles?: { id: string; nickname: string }[];
   categories: { value: string; label: string }[];
 }
 
-export function ExpenseEditForm({ expense, jobs, clients, categories }: Props) {
+export function ExpenseEditForm({ expense, jobs, clients, vehicles = [], categories }: Props) {
   const router = useRouter();
 
   const initialAmount = (expense.amount_cents / 100).toFixed(2);
@@ -38,6 +41,10 @@ export function ExpenseEditForm({ expense, jobs, clients, categories }: Props) {
   const [jobId, setJobId] = useState(expense.job_id ?? "");
   const [clientId, setClientId] = useState(expense.client_id ?? "");
   const [notes, setNotes] = useState(expense.notes ?? "");
+  const [vehicleId, setVehicleId] = useState(expense.vehicle_id ?? "");
+  const [gallonsStr, setGallonsStr] = useState(
+    () => String(parseGallonsFromFuelText(expense.notes) ?? ""),
+  );
   const [pending, setPending] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +83,10 @@ export function ExpenseEditForm({ expense, jobs, clients, categories }: Props) {
           job_id: jobId || null,
           client_id: clientId || null,
           notes: notes.trim() || null,
+          vehicle_id: isFuelExpenseCategory(category) ? vehicleId || null : null,
+          gallons: isFuelExpenseCategory(category) && gallonsStr.trim()
+            ? Number(gallonsStr)
+            : null,
         }),
       });
 
@@ -163,6 +174,34 @@ export function ExpenseEditForm({ expense, jobs, clients, categories }: Props) {
         disabled={pending}
         error={fieldErrors.expense_date}
       />
+
+      {isFuelExpenseCategory(category) && (
+        <div className="p7-form-grid-2">
+          <Select
+            id="edit_vehicle_id"
+            label="Vehicle"
+            value={vehicleId}
+            onChange={(e) => setVehicleId(e.target.value)}
+            options={[
+              { value: "", label: vehicles.length ? "Select vehicle…" : "No trucks on file" },
+              ...vehicles.map((v) => ({ value: v.id, label: v.nickname })),
+            ]}
+            disabled={pending || vehicles.length === 0}
+          />
+          <Input
+            id="edit_gallons"
+            label="Gallons"
+            type="number"
+            inputMode="decimal"
+            min="0.001"
+            step="0.001"
+            value={gallonsStr}
+            onChange={(e) => setGallonsStr(e.target.value)}
+            placeholder="23.707"
+            disabled={pending}
+          />
+        </div>
+      )}
 
       {jobs.length > 0 && (
         <Select
