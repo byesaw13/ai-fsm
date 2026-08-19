@@ -6,6 +6,8 @@ import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
 import { isValidMonthKey } from "@/lib/expenses/ui";
 import { expenseCategorySchema } from "@ai-fsm/domain";
+import { attachFuelExpenseToVehicle } from "@/lib/expenses/attach-fuel-expense";
+import { gallonsFromParsedReceipt } from "@/lib/expenses/fuel-from-receipt";
 
 export const dynamic = "force-dynamic";
 
@@ -176,6 +178,8 @@ const createExpenseSchema = z.object({
   job_id: z.string().uuid().nullable().optional(),
   client_id: z.string().uuid().nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
+  vehicle_id: z.string().uuid().nullable().optional(),
+  gallons: z.number().positive().max(500).nullable().optional(),
 });
 
 export const POST = withRole(["owner", "admin"], async (request, session) => {
@@ -210,11 +214,20 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     );
   }
 
-  const { vendor_name, category, amount_cents, expense_date, job_id, client_id, notes } =
-    parseResult.data;
+  const {
+    vendor_name,
+    category,
+    amount_cents,
+    expense_date,
+    job_id,
+    client_id,
+    notes,
+    vehicle_id,
+    gallons,
+  } = parseResult.data;
 
   try {
-    const expenseId = await withExpenseContext(session, async (client) => {
+    const created = await withExpenseContext(session, async (client) => {
       const result = await client.query<{ id: string }>(
         `INSERT INTO expenses
            (account_id, vendor_name, category, amount_cents, expense_date,
@@ -236,6 +249,19 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
       const id = result.rows[0].id;
 
+      const fuel = await attachFuelExpenseToVehicle(client, {
+        accountId: session.accountId,
+        userId: session.userId,
+        expenseId: id,
+        category,
+        expenseDate: expense_date,
+        notes: notes ?? null,
+        gallons:
+          gallons ??
+          gallonsFromParsedReceipt({ category, notes: notes ?? null }),
+        vehicleId: vehicle_id ?? null,
+      });
+
       await appendAuditLog(client, {
         account_id: session.accountId,
         entity_type: "expense",
@@ -243,13 +269,23 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         action: "insert",
         actor_id: session.userId,
         trace_id: session.traceId,
-        new_value: { vendor_name, category, amount_cents, expense_date },
+        new_value: {
+          vendor_name,
+          category,
+          amount_cents,
+          expense_date,
+          vehicle_id: fuel.vehicleId,
+          fuel_log_id: fuel.fuelLogId,
+        },
       });
 
-      return id;
+      return { id, vehicleId: fuel.vehicleId, fuelLogId: fuel.fuelLogId };
     });
 
-    return NextResponse.json({ id: expenseId }, { status: 201 });
+    return NextResponse.json(
+      { id: created.id, vehicle_id: created.vehicleId, fuel_log_id: created.fuelLogId },
+      { status: 201 },
+    );
   } catch (error) {
     logger.error("POST /api/v1/expenses error", error, {
       traceId: session.traceId,

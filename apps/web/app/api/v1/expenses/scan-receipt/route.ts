@@ -11,6 +11,7 @@ import {
   reconcileReceiptParse,
   type ParsedReceipt,
 } from "@/lib/expenses/receipt-line-items";
+import { gallonsFromParsedReceipt } from "@/lib/expenses/fuel-from-receipt";
 
 export const dynamic = "force-dynamic";
 
@@ -146,6 +147,13 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
         ? parsed.po_number.trim()
         : null;
 
+    const gallons = gallonsFromParsedReceipt({
+      category,
+      gallons: parsed.gallons,
+      notes: parsed.notes,
+      line_items,
+    });
+
     return NextResponse.json({
       data: {
         vendor_name: parsed.vendor_name?.trim() || null,
@@ -155,6 +163,7 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
         category,
         notes: parsed.notes?.trim() || null,
         po_number,
+        gallons,
         line_items,
         reconciliation,
         parse_model: model,

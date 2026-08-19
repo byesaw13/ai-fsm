@@ -41,12 +41,15 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
   const expense = await withExpenseContext(session, async (client) => {
     const result = await client.query(
       `SELECT e.id, e.vendor_name, e.category, e.amount_cents,
-              e.expense_date, e.job_id, e.client_id, e.property_id,
+              e.expense_date, e.job_id, e.client_id, e.property_id, e.vehicle_id,
               e.notes, e.receipt_url, e.created_by, e.created_at, e.updated_at,
-              j.title AS job_title, c.name AS client_name
+              j.title AS job_title, c.name AS client_name, v.nickname AS vehicle_nickname,
+              f.gallons AS fuel_gallons
        FROM expenses e
        LEFT JOIN jobs j ON j.id = e.job_id
        LEFT JOIN clients c ON c.id = e.client_id
+       LEFT JOIN vehicles v ON v.id = e.vehicle_id
+       LEFT JOIN vehicle_fuel_logs f ON f.expense_id = e.id AND f.account_id = e.account_id
        WHERE e.id = $1 AND e.account_id = $2`,
       [id, session.accountId]
     );
@@ -72,9 +75,9 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
   const cat = expense.category as ExpenseCategory;
 
   // Fetch open jobs for the edit form (plus the currently linked job if closed).
-  const { jobs, clients } = canManage
+  const { jobs, clients, vehicles } = canManage
     ? await withExpenseContext(session, async (client) => {
-        const [jobsResult, clientsResult] = await Promise.all([
+        const [jobsResult, clientsResult, vehiclesResult] = await Promise.all([
           client.query<{ id: string; title: string; job_number: string | null }>(
             `SELECT id, title, job_number FROM jobs
              WHERE account_id = $1
@@ -93,10 +96,20 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
             `SELECT id, name FROM clients WHERE account_id = $1 ORDER BY name ASC LIMIT 100`,
             [session.accountId]
           ),
+          client.query<{ id: string; nickname: string }>(
+            `SELECT id, nickname FROM vehicles
+              WHERE account_id = $1 AND is_active = true AND kind <> 'trailer'
+              ORDER BY is_default DESC, nickname ASC`,
+            [session.accountId],
+          ),
         ]);
-        return { jobs: jobsResult.rows, clients: clientsResult.rows };
+        return {
+          jobs: jobsResult.rows,
+          clients: clientsResult.rows,
+          vehicles: vehiclesResult.rows,
+        };
       })
-    : { jobs: [], clients: [] };
+    : { jobs: [], clients: [], vehicles: [] };
 
   return (
     <PageContainer>
@@ -172,6 +185,19 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
                 <dt>Date</dt>
                 <dd>{formatExpenseDate(dateStr)}</dd>
               </div>
+              {expense.vehicle_nickname && (
+                <div className="p7-detail-row">
+                  <dt>Vehicle</dt>
+                  <dd>
+                    <a
+                      href={`/app/mileage/vehicles/${expense.vehicle_id}`}
+                      style={{ color: "var(--accent)", textDecoration: "none" }}
+                    >
+                      {expense.vehicle_nickname}
+                    </a>
+                  </dd>
+                </div>
+              )}
               {expense.job_title && (
                 <div className="p7-detail-row">
                   <dt>Project</dt>
@@ -245,9 +271,12 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
                   job_id: expense.job_id ?? null,
                   client_id: expense.client_id ?? null,
                   notes: expense.notes ?? null,
+                  vehicle_id: expense.vehicle_id ?? null,
+                  fuel_gallons: expense.fuel_gallons ?? null,
                 }}
                 jobs={jobs}
                 clients={clients}
+                vehicles={vehicles}
                 categories={EXPENSE_CATEGORIES.map((c) => ({
                   value: c,
                   label: EXPENSE_CATEGORY_LABELS[c],

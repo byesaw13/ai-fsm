@@ -8,10 +8,13 @@ import { EXPENSE_CATEGORIES, EXPENSE_CATEGORY_LABELS, formatJobPickerLabel } fro
 import { parseDollarsToCents } from "@/lib/expenses/math";
 import { currentMonthKey } from "@/lib/expenses/ui";
 import { buildPoMatchText, suggestJobFromPoText } from "@/lib/expenses/match-job-po";
+import { isFuelExpenseCategory, parseGallonsFromFuelText } from "@/lib/expenses/fuel-from-receipt";
 
 interface Props {
   jobs: { id: string; title: string; job_number?: string | null; client_id?: string | null }[];
   clients: { id: string; name: string }[];
+  vehicles?: { id: string; nickname: string }[];
+  activeVehicleId?: string | null;
   defaultJobId?: string;
   defaultClientId?: string;
   mode?: "standard" | "run";
@@ -19,7 +22,15 @@ interface Props {
 
 type OpenSessionResponse = { data: { id: string } | null };
 
-export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode = "standard" }: Props) {
+export function ExpenseForm({
+  jobs,
+  clients,
+  vehicles = [],
+  activeVehicleId = null,
+  defaultJobId,
+  defaultClientId,
+  mode = "standard",
+}: Props) {
   const router = useRouter();
   const isMaterialRun = mode === "run";
 
@@ -33,6 +44,8 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
   const [jobId, setJobId] = useState(defaultJobId ?? "");
   const [clientId, setClientId] = useState(defaultClientId ?? "");
   const [notes, setNotes] = useState("");
+  const [vehicleId, setVehicleId] = useState(activeVehicleId ?? "");
+  const [gallonsStr, setGallonsStr] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -77,6 +90,7 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
         notes: n,
         line_items,
         po_number,
+        gallons,
       } = data.data;
       scannedLineItemsRef.current = Array.isArray(line_items) ? line_items : [];
       if (vendor_name) setVendorName(vendor_name);
@@ -91,6 +105,14 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
         }
       }
       if (nextNotes) setNotes(nextNotes);
+      const scannedGallons =
+        typeof gallons === "number"
+          ? gallons
+          : parseGallonsFromFuelText(typeof n === "string" ? n : nextNotes);
+      if (scannedGallons != null) setGallonsStr(String(scannedGallons));
+      if ((cat === "fuel" || cat === "vehicle_fuel") && !vehicleId && activeVehicleId) {
+        setVehicleId(activeVehicleId);
+      }
 
       // Pre-select open job when Supply PO uniquely matches — never override an
       // existing choice (deep-link defaultJobId or user pick before scan).
@@ -151,6 +173,10 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
           job_id: jobId || null,
           client_id: clientId || null,
           notes: notes.trim() || null,
+          vehicle_id: isFuelExpenseCategory(category) ? vehicleId || null : null,
+          gallons: isFuelExpenseCategory(category) && gallonsStr.trim()
+            ? Number(gallonsStr)
+            : null,
         }),
       });
 
@@ -325,7 +351,17 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
           id="category"
           label="Category"
           value={category}
-          onChange={(e) => setCategory(e.target.value)}
+          onChange={(e) => {
+            const next = e.target.value;
+            setCategory(next);
+            if (isFuelExpenseCategory(next)) {
+              if (!vehicleId && activeVehicleId) setVehicleId(activeVehicleId);
+              if (!gallonsStr) {
+                const parsed = parseGallonsFromFuelText(notes);
+                if (parsed != null) setGallonsStr(String(parsed));
+              }
+            }
+          }}
           options={categoryOptions}
           placeholder="Select category…"
           required
@@ -360,6 +396,52 @@ export function ExpenseForm({ jobs, clients, defaultJobId, defaultClientId, mode
         error={fieldErrors.expense_date}
         hint={`Expenses outside ${currentMonth} will not appear in this month's summary.`}
       />
+
+      {isFuelExpenseCategory(category) && (
+        <div
+          style={{
+            display: "grid",
+            gap: "var(--space-3)",
+            padding: "var(--space-3)",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--border)",
+            background: "var(--bg-subtle, #f8f8f9)",
+          }}
+        >
+          <p style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 600 }}>
+            {vehicleId
+              ? `This fill goes on ${vehicles.find((v) => v.id === vehicleId)?.nickname ?? "the truck"}.`
+              : "Pick the truck this fill belongs to."}
+          </p>
+          <div className="p7-form-grid-2">
+            <Select
+              id="vehicle_id"
+              label="Vehicle"
+              value={vehicleId}
+              onChange={(e) => setVehicleId(e.target.value)}
+              options={[
+                { value: "", label: vehicles.length ? "Select vehicle…" : "No trucks on file" },
+                ...vehicles.map((v) => ({ value: v.id, label: v.nickname })),
+              ]}
+              disabled={pending || vehicles.length === 0}
+              hint={activeVehicleId && vehicleId === activeVehicleId ? "Open session" : undefined}
+            />
+            <Input
+              id="gallons"
+              label="Gallons"
+              type="number"
+              inputMode="decimal"
+              min="0.001"
+              step="0.001"
+              value={gallonsStr}
+              onChange={(e) => setGallonsStr(e.target.value)}
+              placeholder="23.707"
+              disabled={pending}
+              hint="Needed for MPG. Pulled from the receipt when we can read it."
+            />
+          </div>
+        </div>
+      )}
 
       {poMatchLabel && (
         <p

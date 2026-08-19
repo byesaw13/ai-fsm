@@ -6,6 +6,8 @@ import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
 import { expenseCategorySchema, EXPENSE_COMMERCIAL_TAGS } from "@ai-fsm/domain";
 import { getPathId } from "@/lib/route-utils";
+import { attachFuelExpenseToVehicle } from "@/lib/expenses/attach-fuel-expense";
+import { gallonsFromParsedReceipt, isFuelExpenseCategory } from "@/lib/expenses/fuel-from-receipt";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +80,8 @@ const updateExpenseSchema = z.object({
   client_id: z.string().uuid().nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
   commercial_tag: commercialTagSchema.nullable().optional(),
+  vehicle_id: z.string().uuid().nullable().optional(),
+  gallons: z.number().positive().max(500).nullable().optional(),
 });
 
 export const PATCH = withRole(["owner", "admin"], async (request, session) => {
@@ -131,8 +135,15 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
 
   try {
     await withExpenseContext(session, async (client) => {
-      const existing = await client.query<{ id: string; vendor_name: string }>(
-        `SELECT id, vendor_name FROM expenses WHERE id = $1 AND account_id = $2`,
+      const existing = await client.query<{
+        id: string;
+        vendor_name: string;
+        category: string;
+        expense_date: string;
+        notes: string | null;
+      }>(
+        `SELECT id, vendor_name, category, expense_date::text AS expense_date, notes
+           FROM expenses WHERE id = $1 AND account_id = $2`,
         [id, session.accountId]
       );
 
@@ -177,6 +188,24 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
          WHERE id = $${idx} AND account_id = $${idx + 1}`,
         params
       );
+
+      const nextCategory = updates.category ?? existing.rows[0].category;
+      const nextNotes = updates.notes !== undefined ? updates.notes : existing.rows[0].notes;
+      const nextDate = (updates.expense_date ?? existing.rows[0].expense_date).slice(0, 10);
+      if (isFuelExpenseCategory(nextCategory)) {
+        await attachFuelExpenseToVehicle(client, {
+          accountId: session.accountId,
+          userId: session.userId,
+          expenseId: id,
+          category: nextCategory,
+          expenseDate: nextDate,
+          notes: nextNotes,
+          gallons:
+            updates.gallons ??
+            gallonsFromParsedReceipt({ category: nextCategory, notes: nextNotes }),
+          vehicleId: updates.vehicle_id ?? null,
+        });
+      }
 
       await appendAuditLog(client, {
         account_id: session.accountId,
