@@ -194,7 +194,7 @@ describe("processCaptures", () => {
 });
 
 describe("transcribeCaptureAudio", () => {
-  it("throws a retryable error when no audio-capable API key is set", async () => {
+  it("throws a retryable error when no stored transcript and no Whisper key", async () => {
     const prevA = process.env.ANTHROPIC_API_KEY;
     const prevO = process.env.OPENAI_API_KEY;
     delete process.env.ANTHROPIC_API_KEY;
@@ -207,8 +207,33 @@ describe("transcribeCaptureAudio", () => {
           mimeType: "audio/webm",
           filePath: "/app/uploads/captures/cap-1/audio.webm",
         }),
-      ).rejects.toThrow(/transcription unavailable/i);
+      ).rejects.toThrow(/no stored transcript and no OPENAI_API_KEY/i);
     } finally {
+      if (prevA != null) process.env.ANTHROPIC_API_KEY = prevA;
+      else delete process.env.ANTHROPIC_API_KEY;
+      if (prevO != null) process.env.OPENAI_API_KEY = prevO;
+      else delete process.env.OPENAI_API_KEY;
+    }
+  });
+
+  it("does not treat Anthropic as speech-to-text even when ANTHROPIC_API_KEY is set", async () => {
+    const prevA = process.env.ANTHROPIC_API_KEY;
+    const prevO = process.env.OPENAI_API_KEY;
+    process.env.ANTHROPIC_API_KEY = "sk-ant-test";
+    delete process.env.OPENAI_API_KEY;
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    try {
+      await expect(
+        transcribeCaptureAudio({
+          captureId: "cap-1",
+          audioFilename: "audio.webm",
+          mimeType: "audio/webm",
+          filePath: "/app/uploads/captures/cap-1/audio.webm",
+        }),
+      ).rejects.toThrow(/no stored transcript and no OPENAI_API_KEY/i);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
       if (prevA != null) process.env.ANTHROPIC_API_KEY = prevA;
       else delete process.env.ANTHROPIC_API_KEY;
       if (prevO != null) process.env.OPENAI_API_KEY = prevO;

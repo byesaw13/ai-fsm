@@ -4,6 +4,7 @@ export type PendingCapture = {
   audioName: string;
   photo?: Blob;
   photoName?: string;
+  transcript?: string;
 };
 
 const DB_NAME = "dovetails-promise-capture";
