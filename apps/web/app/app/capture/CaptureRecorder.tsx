@@ -34,6 +34,7 @@ function extensionForMime(mime: string): string {
 
 async function postCapture(item: PendingCapture): Promise<"ok" | "auth" | "fail"> {
   const form = new FormData();
+  form.append("client_id", item.id);
   form.append("audio", item.audio, item.audioName);
   if (item.photo) form.append("photo", item.photo, item.photoName || "photo.jpg");
   try {

@@ -84,7 +84,7 @@ describe("promise entity links", () => {
   it("labels entity types for the open-row list", () => {
     expect(promiseEntityLabel("booking_request")).toBe("Request");
     expect(promiseEntityLabel("estimate")).toBe("Estimate");
-    expect(promiseEntityLabel("job")).toBe("Job");
+    expect(promiseEntityLabel("job")).toBe("Project");
     expect(promiseEntityLabel("invoice")).toBe("Invoice");
   });
 });

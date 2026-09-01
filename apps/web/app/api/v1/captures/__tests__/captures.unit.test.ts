@@ -107,7 +107,11 @@ describe("POST /api/v1/captures", () => {
     expect(fsMocks.writeFileSync).toHaveBeenCalledTimes(1);
 
     expect(mockQuery).toHaveBeenCalled();
-    const [sql, params] = mockQuery.mock.calls[0] as [string, unknown[]];
+    const insertCall = mockQuery.mock.calls.find(([sql]) =>
+      String(sql).includes("INSERT INTO capture_evidence"),
+    ) as [string, unknown[]];
+    expect(insertCall).toBeTruthy();
+    const [sql, params] = insertCall;
     expect(sql).toContain("INSERT INTO capture_evidence");
     expect(params[0]).toBe(captureId);
     expect(params[1]).toBe(mockSession.accountId);
@@ -130,6 +134,25 @@ describe("POST /api/v1/captures", () => {
     expect(json.error.traceId).toBe(mockSession.traceId);
     expect(mockWithDbSession).not.toHaveBeenCalled();
     expect(fsMocks.writeFileSync).not.toHaveBeenCalled();
+  });
+
+  it("retries with the same client_id return the original capture without a second insert", async () => {
+    const clientId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+    mockQuery.mockImplementation(async (sql: string, params: unknown[]) => {
+      if (String(sql).includes("SELECT id FROM capture_evidence")) {
+        return { rows: [{ id: params[0] }] };
+      }
+      return { rows: [] };
+    });
+
+    const form = new FormData();
+    form.append("client_id", clientId);
+    form.append("audio", audioFile());
+    const res = await POST(postRequest(form));
+    expect(res.status).toBe(200);
+    expect((await res.json()).data.id).toBe(clientId);
+    expect(fsMocks.writeFileSync).not.toHaveBeenCalled();
+    expect(mockQuery.mock.calls.some(([sql]) => String(sql).includes("INSERT"))).toBe(false);
   });
 
   it("returns 422 when audio file is missing", async () => {

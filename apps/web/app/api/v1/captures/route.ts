@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import { randomUUID } from "crypto";
+import { z } from "zod";
 import { withRole } from "@/lib/auth/middleware";
 import type { AuthSession } from "@/lib/auth/middleware";
 import { withDbSession } from "@/lib/db";
@@ -119,7 +120,24 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     }
   }
 
-  const captureId = randomUUID();
+  const clientIdRaw = formData.get("client_id");
+  const clientId =
+    typeof clientIdRaw === "string" && z.string().uuid().safeParse(clientIdRaw).success
+      ? clientIdRaw
+      : randomUUID();
+
+  const existing = await withDbSession(session, async (client) => {
+    const { rows } = await client.query<{ id: string }>(
+      `SELECT id FROM capture_evidence WHERE id = $1 AND account_id = $2`,
+      [clientId, session.accountId],
+    );
+    return rows[0] ?? null;
+  });
+  if (existing) {
+    return NextResponse.json({ data: { id: existing.id } }, { status: 200 });
+  }
+
+  const captureId = clientId;
   const audioFilename = `audio-${randomUUID()}.${safeExtension(audio, AUDIO_EXT, "webm")}`;
   const photoFilename = photo
     ? `photo-${randomUUID()}.${safeExtension(photo, PHOTO_EXT, "jpg")}`
@@ -173,6 +191,10 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
 
     return NextResponse.json({ data: { id: row.id } }, { status: 201 });
   } catch (err) {
+    const code = (err as { code?: string }).code;
+    if (code === "23505") {
+      return NextResponse.json({ data: { id: captureId } }, { status: 200 });
+    }
     try { fs.unlinkSync(audioPath); } catch { /* ignore */ }
     if (photoPath) {
       try { fs.unlinkSync(photoPath); } catch { /* ignore */ }
