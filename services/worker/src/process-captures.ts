@@ -183,9 +183,10 @@ async function processOne(
 }
 
 /**
- * Transcribe a capture audio file. Prefers ANTHROPIC_API_KEY when the
- * Messages API will accept audio; otherwise optional OPENAI_API_KEY Whisper.
- * Never deletes the file. Throws so the poll can mark failed and retry.
+ * Optional Whisper fallback when OPENAI_API_KEY is set.
+ * Anthropic Messages cannot transcribe audio (document/audio blocks 400).
+ * Chrome SpeechRecognition stores the transcript on POST, so this path is
+ * usually skipped. Never deletes the file. Throws so the poll can mark failed.
  */
 export async function transcribeCaptureAudio(args: {
   captureId: string;
@@ -193,10 +194,11 @@ export async function transcribeCaptureAudio(args: {
   mimeType: string | null;
   filePath: string;
 }): Promise<string> {
-  const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim();
   const openaiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!anthropicKey && !openaiKey) {
-    throw new Error("transcription unavailable: no ANTHROPIC_API_KEY or OPENAI_API_KEY");
+  if (!openaiKey) {
+    throw new Error(
+      "transcription unavailable: no stored transcript and no OPENAI_API_KEY",
+    );
   }
 
   const bytes = await readFile(args.filePath);
@@ -204,23 +206,7 @@ export async function transcribeCaptureAudio(args: {
     ? args.mimeType
     : guessAudioMime(args.audioFilename);
 
-  if (anthropicKey) {
-    try {
-      return await transcribeWithAnthropic(bytes, mimeType, anthropicKey);
-    } catch (err) {
-      logger.info("process-captures: anthropic transcribe failed", {
-        captureId: args.captureId,
-        error: errorMessage(err),
-      });
-      if (!openaiKey) throw err;
-    }
-  }
-
-  if (openaiKey) {
-    return transcribeWithWhisper(bytes, args.audioFilename, mimeType, openaiKey);
-  }
-
-  throw new Error("transcription unavailable: audio transcription failed");
+  return transcribeWithWhisper(bytes, args.audioFilename, mimeType, openaiKey);
 }
 
 function guessAudioMime(filename: string): string {
@@ -230,54 +216,6 @@ function guessAudioMime(filename: string): string {
   if (ext === ".m4a" || ext === ".mp4") return "audio/mp4";
   if (ext === ".ogg" || ext === ".oga") return "audio/ogg";
   return "audio/webm";
-}
-
-async function transcribeWithAnthropic(
-  bytes: Buffer,
-  mimeType: string,
-  apiKey: string,
-): Promise<string> {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5",
-      max_tokens: 1024,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: "Transcribe this audio verbatim. Return only the transcript, with no commentary.",
-            },
-            {
-              type: "document",
-              source: {
-                type: "base64",
-                media_type: mimeType,
-                data: bytes.toString("base64"),
-              },
-            },
-          ],
-        },
-      ],
-    }),
-  });
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`anthropic transcribe HTTP ${response.status}: ${body.slice(0, 200)}`);
-  }
-  const payload = (await response.json()) as {
-    content?: Array<{ type?: string; text?: string }>;
-  };
-  const text = payload.content?.find((b) => b.type === "text")?.text?.trim();
-  if (!text) throw new Error("anthropic transcribe returned no text");
-  return text;
 }
 
 async function transcribeWithWhisper(

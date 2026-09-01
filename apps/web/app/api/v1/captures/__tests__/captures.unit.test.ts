@@ -120,6 +120,35 @@ describe("POST /api/v1/captures", () => {
     expect(typeof params[4]).toBe("string");
     expect(writePath).toBe(`${uploadDir}/${params[4]}`);
     expect(params[12]).toBe("pending");
+    expect(params[13]).toBeNull();
+  });
+
+  it("stores a client transcript so the worker can extract without Whisper", async () => {
+    const form = new FormData();
+    form.append("audio", audioFile());
+    form.append("transcript", "  I told Mrs. Chen I would call tomorrow.  ");
+
+    const res = await POST(postRequest(form));
+    expect(res.status).toBe(201);
+
+    const insertCall = mockQuery.mock.calls.find(([sql]) =>
+      String(sql).includes("INSERT INTO capture_evidence"),
+    ) as [string, unknown[]];
+    expect(insertCall[0]).toMatch(/transcript/);
+    expect(insertCall[1][13]).toBe("I told Mrs. Chen I would call tomorrow.");
+  });
+
+  it("caps an oversized transcript", async () => {
+    const form = new FormData();
+    form.append("audio", audioFile());
+    form.append("transcript", "x".repeat(20_050));
+
+    const res = await POST(postRequest(form));
+    expect(res.status).toBe(201);
+    const insertCall = mockQuery.mock.calls.find(([sql]) =>
+      String(sql).includes("INSERT INTO capture_evidence"),
+    ) as [string, unknown[]];
+    expect(String(insertCall[1][13])).toHaveLength(20_000);
   });
 
   it("returns 403 for tech", async () => {

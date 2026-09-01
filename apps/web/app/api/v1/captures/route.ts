@@ -16,6 +16,14 @@ export const dynamic = "force-dynamic";
 
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const MAX_TRANSCRIPT_CHARS = 20_000;
+
+function clientTranscript(value: FormDataEntryValue | null): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, MAX_TRANSCRIPT_CHARS);
+}
 
 const ALLOWED_AUDIO = new Set([
   "audio/webm",
@@ -120,6 +128,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     }
   }
 
+  const transcript = clientTranscript(formData.get("transcript"));
   const clientIdRaw = formData.get("client_id");
   const clientId =
     typeof clientIdRaw === "string" && z.string().uuid().safeParse(clientIdRaw).success
@@ -167,8 +176,8 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
            id, account_id, created_by, source,
            audio_filename, audio_original_name, audio_mime_type, audio_size_bytes,
            photo_filename, photo_original_name, photo_mime_type, photo_size_bytes,
-           processing_state
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           processing_state, transcript
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
          RETURNING id`,
         [
           captureId,
@@ -184,6 +193,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
           photo?.type || (photo ? "image/jpeg" : null),
           photo?.size ?? null,
           "pending",
+          transcript,
         ],
       );
       return rows[0];
