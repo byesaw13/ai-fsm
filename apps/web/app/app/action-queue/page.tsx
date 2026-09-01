@@ -3,9 +3,24 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { queryForSession } from "@/lib/db";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, LinkButton } from "@/components/ui";
+import {
+  OPEN_OWNER_PROMISES_SQL,
+  OWNER_PROMISE_ACTION_TYPE,
+  customerPromiseBucket,
+  formatPromiseDue,
+  promiseEntityHref,
+  promiseEntityLabel,
+  shouldShowOpenPromises,
+  toPromiseToneInput,
+  type OpenOwnerPromiseRow,
+} from "@/lib/captures/promise-queue";
 
 export const dynamic = "force-dynamic";
+
+type PageProps = {
+  searchParams: Promise<{ promises?: string }>;
+};
 
 type CountRow = { count: string };
 type MoneyRow = { count: string; total_cents: string };
@@ -28,11 +43,12 @@ function fmt(cents: number | string): string {
   return `$${(n / 100).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 }
 
-export default async function ActionQueuePage() {
+export default async function ActionQueuePage({ searchParams }: PageProps) {
   const session = await getSession();
   if (!session) redirect("/login");
   if (session.role === "tech") redirect("/app/my-work");
 
+  const { promises: promisesParam } = await searchParams;
   const accountId = session.accountId;
   const [
     draftInvoices,
@@ -46,6 +62,7 @@ export default async function ActionQueuePage() {
     pendingRequests,
     overdueInvoices,
     exceptionRows,
+    openPromiseRows,
   ] = await Promise.all([
     queryForSession<CountRow>(session,
       `SELECT COUNT(*)::text AS count
@@ -127,6 +144,11 @@ export default async function ActionQueuePage() {
        UNION ALL
        SELECT 'visit' AS kind, COUNT(*)::text AS count FROM visits WHERE account_id = $1 AND sub_status IS NOT NULL`,
       [accountId]),
+    queryForSession<OpenOwnerPromiseRow>(
+      session,
+      OPEN_OWNER_PROMISES_SQL,
+      [accountId, OWNER_PROMISE_ACTION_TYPE],
+    ),
   ]);
 
   const draftInvoiceCount = parseN(draftInvoices[0]);
@@ -172,9 +194,12 @@ export default async function ActionQueuePage() {
     { label: "Review Requests", count: requestCount, href: "/app/requests" as Route, detail: "Needs routing or follow-up", tone: "warning" },
     { label: "Collect Overdue Invoices", count: overdueCount, href: "/app/invoices?status=overdue" as Route, detail: `${fmt(overdueTotal)} outstanding`, tone: "danger" },
     { label: "Clear Exception Lanes", count: exceptionJobCount + exceptionVisitCount, href: "/app/jobs" as Route, detail: `${exceptionJobCount} job${exceptionJobCount !== 1 ? "s" : ""} / ${exceptionVisitCount} visit${exceptionVisitCount !== 1 ? "s" : ""}`, tone: "warning" },
+    customerPromiseBucket(toPromiseToneInput(openPromiseRows)),
   ] satisfies QueueItem[])
     .filter((item) => item.count > 0)
     .sort((a, b) => ({ danger: 0, warning: 1, default: 2 })[a.tone] - ({ danger: 0, warning: 1, default: 2 })[b.tone]);
+
+  const showPromiseRows = shouldShowOpenPromises(openPromiseRows.length, promisesParam);
 
   return (
     <div style={{ padding: "var(--space-4) var(--space-4) var(--space-12)", display: "flex", flexDirection: "column", gap: "var(--space-5)", maxWidth: 760 }}>
@@ -182,9 +207,9 @@ export default async function ActionQueuePage() {
         <h1 style={{ margin: 0, fontSize: "var(--text-2xl)", fontWeight: 800 }}>Action Queue</h1>
       </header>
 
-      {items.length === 0 ? (
+      {items.length === 0 && !showPromiseRows ? (
         <EmptyState title="All clear" description="No execution actions need attention right now." />
-      ) : (
+      ) : items.length > 0 ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           {items.map((item) => (
             <Link key={item.label} href={item.href} className="mobile-work-item">
@@ -196,7 +221,41 @@ export default async function ActionQueuePage() {
             </Link>
           ))}
         </div>
-      )}
+      ) : null}
+
+      {showPromiseRows ? (
+        <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+          <h2 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 700 }}>Customer Promises</h2>
+          {openPromiseRows.length === 0 ? (
+            <EmptyState title="No open promises" description="Captured customer promises show up here after Day Review confirmation." />
+          ) : (
+            openPromiseRows.map((row) => {
+              const entityHref = promiseEntityHref(row.entity_type, row.entity_id);
+              const entityLabel = promiseEntityLabel(row.entity_type);
+              return (
+                <div key={row.id} className="mobile-work-item">
+                  <span>
+                    <strong>{row.title}</strong>
+                    <small>
+                      {entityLabel} · {row.entity_id} · {formatPromiseDue(row.due_at)}
+                    </small>
+                  </span>
+                  <span style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <LinkButton href={entityHref} variant="secondary" size="sm">
+                      Open {entityLabel.toLowerCase()}
+                    </LinkButton>
+                    <form method="POST" action={`/api/v1/action-items/${row.id}/resolve`}>
+                      <button type="submit" className="p7-btn p7-btn-primary p7-btn-sm">
+                        Mark done
+                      </button>
+                    </form>
+                  </span>
+                </div>
+              );
+            })
+          )}
+        </section>
+      ) : null}
     </div>
   );
 }

@@ -6,6 +6,13 @@ import { LinkButton, PageContainer, PageHeader, WhatNext } from "@/components/ui
 import { OwnerDashboard } from "./OwnerDashboard";
 import type { CommandVisit, CountAction, MaterialJob } from "./DashboardWidgets";
 import { loadFieldDayData } from "@/lib/my-work/field-day-data";
+import {
+  OPEN_OWNER_PROMISES_SQL,
+  OWNER_PROMISE_ACTION_TYPE,
+  customerPromiseBucket,
+  toPromiseToneInput,
+  type OpenOwnerPromiseRow,
+} from "@/lib/captures/promise-queue";
 import { AttentionCard } from "./AttentionCard";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +51,7 @@ export default async function AppPage() {
     pendingSegmentRows,
     expenseRows,
     fieldDay,
+    openPromiseRows,
   ] = await Promise.all([
     queryForSession<CommandVisit>(session,
       `SELECT DISTINCT ON (j.id)
@@ -185,6 +193,12 @@ export default async function AppPage() {
     // Field workday (vehicle session, starting mileage, day mileage) — merges
     // the My Day surface into the dashboard so it's one screen.
     loadFieldDayData(session, true),
+
+    queryForSession<OpenOwnerPromiseRow>(
+      session,
+      OPEN_OWNER_PROMISES_SQL,
+      [accountId, OWNER_PROMISE_ACTION_TYPE],
+    ),
   ]);
 
   const exp = expenseRows[0];
@@ -255,6 +269,7 @@ export default async function AppPage() {
       detail: "Auto-recorded stops & drives to log to your day",
       tone: "default",
     },
+    customerPromiseBucket(toPromiseToneInput(openPromiseRows)),
   ] satisfies CountAction[])
     .filter((item) => item.count > 0)
     .sort((a, b) => ({ danger: 0, warning: 1, default: 2 })[a.tone] - ({ danger: 0, warning: 1, default: 2 })[b.tone]);

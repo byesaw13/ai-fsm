@@ -104,6 +104,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - ${FSM_DATA_ROOT:-/opt/business/ai-fsm/data}/uploads:/app/uploads
     networks:
       - internal
     logging:

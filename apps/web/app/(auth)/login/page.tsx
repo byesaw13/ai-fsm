@@ -39,9 +39,14 @@ export default function LoginPage() {
       const isPhone =
         typeof window !== "undefined" &&
         window.matchMedia("(max-width: 767px)").matches;
+      const next =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("next")
+          : null;
       const dest = resolvePostLoginHref(role, {
         cookieHeader: typeof document !== "undefined" ? document.cookie : null,
         isPhone,
+        next,
       });
       window.location.replace(dest);
     } catch {

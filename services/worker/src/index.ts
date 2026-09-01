@@ -7,6 +7,7 @@ import { pruneAttentionEvents } from "./prune-attention-events.js";
 import { processWorkflowEvents } from "./workflow-events.js";
 import { dispatchNotificationQueue } from "./notification/dispatch.js";
 import { runVehicleMaintenanceReminders } from "./vehicle-maintenance-reminder.js";
+import { processCaptures } from "./process-captures.js";
 import { logger } from "./logger.js";
 
 const pollMs = Number(process.env.WORKER_POLL_MS ?? "30000");
@@ -66,6 +67,11 @@ async function runPollIteration(client: Client): Promise<void> {
 
     // TASK-093: vehicle service/renewal attention + monthly loan payment expenses
     await runVehicleMaintenanceReminders(client);
+
+    const captureResult = await processCaptures(client);
+    if (captureResult.processed > 0 || captureResult.errors > 0) {
+      logger.info("process-captures complete", { ...captureResult });
+    }
   } catch (error) {
     logger.error("worker poll failed", error);
     const msg = (error as Error)?.message ?? "";
