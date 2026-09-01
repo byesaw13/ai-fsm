@@ -32,6 +32,14 @@ describe("security headers middleware", () => {
     expect(policy).toContain("geolocation=()");
   });
 
+  it("allows microphone on /app/capture only", async () => {
+    const capture = middleware(makeRequest("/app/capture"));
+    expect(capture.headers.get("Permissions-Policy") ?? "").toContain("microphone=(self)");
+    const elsewhere = middleware(makeRequest("/app"));
+    expect(elsewhere.headers.get("Permissions-Policy") ?? "").toContain("microphone=()");
+    expect(elsewhere.headers.get("Permissions-Policy") ?? "").not.toContain("microphone=(self)");
+  });
+
   it("sets Content-Security-Policy with frame-ancestors none", async () => {
     const res = middleware(makeRequest());
     const csp = res.headers.get("Content-Security-Policy") ?? "";

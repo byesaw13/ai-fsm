@@ -63,6 +63,8 @@ The Daily Command Center at `/app` is an orchestration layer over existing workf
 
 The only stored addition for this loop is open vehicle-session state: a session may start with a start odometer and close later with an end odometer and computed miles. Receipts, material runs, follow-ups, tomorrow preview, and end-of-day warnings remain derived from existing records.
 
+Owner promise capture (TASK-115) is evidence plus confirmation, not a second task list. Zero-context voice is stored as `capture_evidence`. Day Review confirms at most three items per session onto an `action_items` row attached to a booking request, estimate, project, or invoice. Completion lives on that `action_items` row. The Daily Command Center may show a counted Customer Promises bucket; it does not gain a new briefing, inbox, or scorer.
+
 The deeper architecture of this loop — separating payroll, presence, activity, vehicle, and location into independent lifecycles under a flexible Business Day, with a live Current Operations State — is defined in `docs/canonical/OPERATIONS.md` (the **Operations Engine**). That doc governs how the daily loop's concerns fit together; this section stays the simple product view.
 
 ## Status Model

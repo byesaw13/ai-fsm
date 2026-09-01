@@ -68,6 +68,8 @@ Location capture, visit candidates, day map, hybrid tracking are **shipped infra
 
 **Done when:** Payroll, activity, vehicle, and location concerns are independently lifecyclable; day close does not overload unrelated concerns.
 
+**Phase 1 exception — TASK-115 Promise Capture Pilot.** Authorized 2026-09-01. Adds a capture-evidence table and an additive `action_items.source_capture_id` change so an owner promise recorded on Tuesday still exists on an FSM object on Thursday. This is an explicit exception to the table freeze. It does not open Owner OS, coaching, a second inbox, or a new priority scorer. See `docs/superpowers/specs/2026-09-01-promise-capture-pilot-design.md`.
+
 ### Phase 2 — Property-Centered Surfaces
 
 - Property timeline reachable from client, job, visit, estimate, invoice surfaces
@@ -96,6 +98,7 @@ Backlog tasks must cite a phase. EPICs organize tasks; phases set priority.
 ```text
 Phase 0 → EPIC-006 (role workspaces), TASK-059, day-close field work
 Phase 1 → EPIC-001 (operations engine), EPIC-007 (field execution infrastructure)
+Phase 1 exception → TASK-115 (promise capture; EPIC-005 delivery surface)
 Phase 2 → EPIC-003 (property intelligence)
 Phase 3 → EPIC-002 (estimating), EPIC-004 (billing)
 Phase 4 → EPIC-008 (production intelligence stub)

@@ -1,8 +1,15 @@
 import { redirect } from "next/navigation";
+import type { Route } from "next";
+import { headers } from "next/headers";
 import { getSession } from "@/lib/auth/session";
 import { queryForSession } from "@/lib/db";
 import { businessToday } from "@/lib/operations/business-day";
 import { AppShell } from "@/components/AppShell";
+import {
+  CAPTURE_PATH,
+  loginRedirectForPath,
+  pathnameFromHeaders,
+} from "@/lib/auth/post-login-destination";
 
 export const dynamic = "force-dynamic";
 
@@ -11,8 +18,15 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const headerList = await headers();
+  const pathname = pathnameFromHeaders(headerList);
   const session = await getSession();
-  if (!session) redirect("/login");
+  // Capture is the only path allowed to round-trip through /login?next=.
+  if (!session) redirect(loginRedirectForPath(pathname) as Route);
+
+  if (pathname === CAPTURE_PATH) {
+    return <>{children}</>;
+  }
 
   const [users, reviewRows] = await Promise.all([
     queryForSession<{ full_name: string }>(

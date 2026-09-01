@@ -7,7 +7,11 @@ import { NextResponse, type NextRequest } from "next/server";
  * response-level security controls that apply globally.
  */
 export function middleware(request: NextRequest) {
-  const response = NextResponse.next();
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
+  const response = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
 
   // ── Security headers ──────────────────────────────────────────────
   // Prevent clickjacking
@@ -19,10 +23,14 @@ export function middleware(request: NextRequest) {
   // Referrer policy — send origin only on cross-origin
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
 
-  // Permissions policy — disable unused browser features
+  // Permissions policy — disable unused browser features. Capture (TASK-115)
+  // needs the microphone on this origin; keep it off everywhere else.
+  const capturePage = request.nextUrl.pathname === "/app/capture";
   response.headers.set(
     "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=(), payment=()"
+    capturePage
+      ? "camera=(self), microphone=(self), geolocation=(), payment=()"
+      : "camera=(), microphone=(), geolocation=(), payment=()"
   );
 
   // Content-Security-Policy — restrictive baseline

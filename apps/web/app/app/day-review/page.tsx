@@ -5,9 +5,12 @@ import { getDayReview } from "@/lib/day-review/queries";
 import { loadDayCloseStatus } from "@/lib/day-review/close-status";
 import { loadDayDraft } from "@/lib/day-review/load-day-draft";
 import { loadDayVisitTimelines } from "@/lib/visits/load-visit-timeline";
+import { loadReviewCaptures } from "@/lib/captures/review-query";
+import { loadPromiseEntityOptions } from "@/lib/captures/entity-picker";
 import { LinkButton, PageContainer, PageHeader } from "@/components/ui";
 import { DayCloseChecklist } from "../day-close/DayCloseChecklist";
 import { DayDraftSection } from "./DayDraftSection";
+import { PromiseStrip } from "./PromiseStrip";
 import { ProductionStorySection } from "./ProductionStorySection";
 import { VisitsSection } from "./VisitsSection";
 import { TimeSection } from "./TimeSection";
@@ -27,17 +30,46 @@ export default async function DayReviewPage({
   // Default to today in the business timezone — a UTC date rolls over to
   // tomorrow during evening hours, so the owner couldn't review the current day.
   const date = sp.date ?? businessToday();
-  const [payload, closeStatus, productionStory, dayDraft] = await Promise.all([
-    getDayReview(session.accountId, date),
-    loadDayCloseStatus(session, date),
-    loadDayVisitTimelines(session.accountId, date),
-    loadDayDraft(session.accountId, date),
-  ]);
+  const canReviewPromises = session.role === "owner" || session.role === "admin";
+  const [payload, closeStatus, productionStory, dayDraft, reviewCaptures, promiseEntities] =
+    await Promise.all([
+      getDayReview(session.accountId, date),
+      loadDayCloseStatus(session, date),
+      loadDayVisitTimelines(session.accountId, date),
+      loadDayDraft(session.accountId, date),
+      canReviewPromises ? loadReviewCaptures(session) : Promise.resolve([]),
+      canReviewPromises
+        ? loadPromiseEntityOptions(session, { date })
+        : Promise.resolve([]),
+    ]);
+
+  const promiseStrip = canReviewPromises ? (
+    <PromiseStrip captures={reviewCaptures} entities={promiseEntities} />
+  ) : null;
+
+  const header = (
+    <PageHeader
+      title="Day Review"
+      subtitle={new Date(date + "T12:00:00").toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      })}
+      actions={
+        canReviewPromises ? (
+          <LinkButton href={`/app/timeline?date=${date}`} variant="ghost" size="sm">
+            Vehicle tracking
+          </LinkButton>
+        ) : undefined
+      }
+    />
+  );
 
   if (!payload) {
     return (
       <PageContainer>
-        <PageHeader title="Day Review" />
+        {header}
+        {promiseStrip}
         <p className="text-muted-foreground mt-8 text-center">
           No business day found for {date}. Start your day first.
         </p>
@@ -47,21 +79,8 @@ export default async function DayReviewPage({
 
   return (
     <PageContainer>
-      <PageHeader
-        title="Day Review"
-        subtitle={new Date(date + "T12:00:00").toLocaleDateString("en-US", {
-          weekday: "long",
-          month: "long",
-          day: "numeric",
-        })}
-        actions={
-          session.role === "owner" || session.role === "admin" ? (
-            <LinkButton href={`/app/timeline?date=${date}`} variant="ghost" size="sm">
-              Vehicle tracking
-            </LinkButton>
-          ) : undefined
-        }
-      />
+      {header}
+      {promiseStrip}
       <DayCloseChecklist
         businessDayId={payload.businessDayId}
         dayStatus={payload.status}
