@@ -252,6 +252,7 @@ export default async function MyWorkPage() {
         dayMileage={fieldDay.dayMileage}
         heroVisit={heroVisit}
         clockedIn={fieldDay.clockedIn}
+        canCapture={isOwner}
       >
         <Card style={{ marginBottom: "var(--space-4)" }}>
           <SectionHeader title="Active Work Orders" count={workOrders.length} />

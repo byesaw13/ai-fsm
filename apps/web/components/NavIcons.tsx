@@ -150,6 +150,16 @@ export function IconPriceBook(props: IconProps) {
   );
 }
 
+export function IconCapture(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="7" y="2" width="6" height="10" rx="3" />
+      <path d="M4.5 9.5a5.5 5.5 0 0 0 11 0" />
+      <path d="M10 15v3M7 18h6" />
+    </Icon>
+  );
+}
+
 export function IconMyDay(props: IconProps) {
   return (
     <Icon {...props}>
