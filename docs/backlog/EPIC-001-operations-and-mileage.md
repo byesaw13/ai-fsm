@@ -335,7 +335,7 @@ and the load-bearing invariant that closing any other concern never moves the da
 # TASK-052: Payroll clock + payroll policies
 
 Status:
-Proposed
+Done
 
 Phase:
 1
@@ -358,15 +358,25 @@ Out of Scope:
 - Payroll calculation/payout; activity coupling (must stay independent).
 
 Acceptance Criteria:
-- [ ] Clock spans many activities; switching activity never touches the clock.
-- [ ] Corrections void + re-add, never delete.
-- [ ] Account-scoped RLS; additive migration.
+- [x] Clock spans many activities; switching activity never touches the clock.
+- [x] Corrections void + re-add, never delete.
+- [x] Account-scoped RLS; additive migration.
 
 Notes:
 Phase 2.
 
 Code audit 2026-08-06: **PARTIAL** — clock in/out, migration 129,
 ClockBar, day-close gate shipped. Residual: void/correct clock UI; pay policy fields.
+
+Closed 2026-09-04: pay-policy fields already shipped in migration 129
+(`pay_type`, `hourly_rate_snapshot_cents`, `break_policy`). The void/correct
+clock UI is now built — a "Fix times" panel under ClockBar lists today's (and
+any still-open) sessions with per-session **Correct** (void + re-add corrected
+times) and **Void**, each requiring a reason and writing an audit-log entry.
+Service: `listTodayClocks` / `voidClock` / `correctClock`
+(`lib/operations/time-clock.ts`); routes `GET /api/v1/time-clock/today`,
+`POST /api/v1/time-clock/[id]/{void,correct}`; validator
+`validateClockCorrection` (`packages/domain/src/payroll.ts`, unit-tested).
 
 
 # TASK-035: MCP Write Tools v1 (low-risk operations writes)

@@ -90,6 +90,78 @@ export async function clockIn(
   throw new Error("clockIn: conflict but no open clock found");
 }
 
+/**
+ * The user's non-voided clock sessions worth correcting: any still-open session
+ * (e.g. a forgot-to-clock-out from yesterday) plus everything from today.
+ * Newest first.
+ */
+export async function listTodayClocks(
+  client: PoolClient,
+  accountId: string,
+  userId: string,
+): Promise<TimeClockRow[]> {
+  const { rows } = await client.query<TimeClockRow>(
+    `SELECT ${COLS} FROM time_clock_sessions
+      WHERE account_id = $1 AND user_id = $2 AND voided_at IS NULL
+        AND (status = 'open' OR clock_in_at >= date_trunc('day', now()))
+      ORDER BY clock_in_at DESC`,
+    [accountId, userId],
+  );
+  return rows;
+}
+
+/**
+ * Void a clock session (never delete — payroll is financial history). Records
+ * the reason. Returns null if the session isn't found / already voided (RLS
+ * scopes to the account; the update policy limits techs to their own rows).
+ */
+export async function voidClock(
+  client: PoolClient,
+  accountId: string,
+  sessionId: string,
+  reason: string,
+): Promise<TimeClockRow | null> {
+  const { rows } = await client.query<TimeClockRow>(
+    `UPDATE time_clock_sessions
+        SET voided_at = now(), correction_reason = $3
+      WHERE id = $1 AND account_id = $2 AND voided_at IS NULL
+      RETURNING ${COLS}`,
+    [sessionId, accountId, reason],
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * Correct a clock session by voiding it and re-adding a corrected one (AC:
+ * "corrections void + re-add, never delete"). Both happen in the caller's tx.
+ * The new row keeps the original's user/day/pay fields. Pass `clockOutAt = null`
+ * to leave the corrected session open. Returns the new row, or null if the
+ * original wasn't found / already voided.
+ */
+export async function correctClock(
+  client: PoolClient,
+  accountId: string,
+  sessionId: string,
+  actorId: string,
+  input: { clockInAt: string; clockOutAt: string | null; reason: string },
+): Promise<TimeClockRow | null> {
+  const voided = await voidClock(client, accountId, sessionId, input.reason);
+  if (!voided) return null;
+
+  const { rows } = await client.query<TimeClockRow>(
+    `INSERT INTO time_clock_sessions
+       (account_id, user_id, business_day_id, clock_in_at, clock_out_at, status,
+        pay_type, hourly_rate_snapshot_cents, notes, created_by)
+     SELECT account_id, user_id, business_day_id, $3::timestamptz, $4::timestamptz,
+            CASE WHEN $4 IS NULL THEN 'open' ELSE 'closed' END,
+            pay_type, hourly_rate_snapshot_cents, notes, $5
+       FROM time_clock_sessions WHERE id = $1 AND account_id = $2
+     RETURNING ${COLS}`,
+    [sessionId, accountId, input.clockInAt, input.clockOutAt, actorId],
+  );
+  return rows[0] ?? null;
+}
+
 /** Clock out the open clock. Returns null if there was nothing open. */
 export async function clockOut(
   client: PoolClient,

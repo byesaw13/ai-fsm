@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ACTIVITY_TYPE_META, type ActivityType } from "@ai-fsm/domain";
+import { ClockCorrections } from "./ClockCorrections";
 
 // Offered right after Clock In — "what are you doing now?" hands payroll off to
 // the activity ledger (the two stay independent; this is just a convenience).
@@ -191,6 +192,8 @@ export function ClockBar() {
           </div>
         </div>
       )}
+
+      <ClockCorrections />
     </>
   );
 }
