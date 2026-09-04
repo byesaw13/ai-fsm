@@ -53,6 +53,21 @@ export const ATTENTION_EMAIL_TYPES = [
 
 export type AttentionEmailType = (typeof ATTENTION_EMAIL_TYPES)[number];
 
+/**
+ * Types that also fire a Web Push to owners/admins (TASK-118). Superset of the
+ * email types plus a new booking/lead — the high-signal items worth interrupting
+ * for.
+ */
+export const ATTENTION_PUSH_TYPES = [
+  "booking_request.created",
+  "invoice.opened",
+  "invoice.paid",
+  "estimate.approved",
+  "estimate.declined",
+] as const;
+
+export type AttentionPushType = (typeof ATTENTION_PUSH_TYPES)[number];
+
 export interface EmitAttentionEventInput {
   accountId: string;
   type: AttentionEventType;

@@ -7,6 +7,53 @@ workflow.
 
 ## Active tasks
 
+# TASK-118: Native Web Push notifications
+
+Status:
+In Progress
+
+Phase:
+cross-cutting
+
+Problem:
+The app only surfaces new information while it is open (the attention bell polls;
+LiveRefresh re-fetches). Closed/backgrounded, the user learns nothing. Arrival
+prompts today rely on the Home Assistant Companion app and attention items on
+email — neither is a notification from the app itself, and neither scales to
+multiple field techs on their own phones.
+
+Business Value:
+The installed PWA notifies the right person on their phone — arrival on site, a
+new booking/lead, attention items, an end-of-day reminder — even when the app is
+closed. Independent of Home Assistant; per-user.
+
+Scope:
+- `push_subscriptions` table + RLS (migration 175); `web-push`/VAPID.
+- Service worker `push` + `notificationclick` handlers (keep network-only fetch).
+- `lib/push/*`: subscriptions, send (web tier only — worker has no egress),
+  recipients, pure payload builder.
+- Routes: `POST/GET /api/v1/push/{subscribe,unsubscribe,public-key,test}`;
+  `POST /api/internal/push/day-review-reminder` (internal-key, scheduler-triggered).
+- Client "Enable notifications" control in Settings → Your Profile.
+- Triggers: arrival (location route), booking/lead + attention (emitAttentionEvent),
+  day-review reminder (internal endpoint).
+
+Out of Scope:
+- Offline caching (SW stays network-only apart from push).
+- Per-tech targeting of attention items (owner/admins only in v1).
+- Retiring the HA Companion arrival push (config decision; may double until then).
+
+Acceptance Criteria:
+- [ ] A device can subscribe/unsubscribe; subscription is account/user-scoped (RLS).
+- [ ] A test push arrives on an installed PWA with the app closed.
+- [ ] Arrival, new booking/lead, and attention items push the right recipients.
+- [ ] Sends run only on the web tier; dead subscriptions (404/410) are pruned.
+- [ ] Push degrades to a no-op when VAPID env is unset.
+
+Notes:
+VAPID keys in env (`npx web-push generate-vapid-keys`). iOS works only for a
+home-screen-installed PWA (16.4+) — no code difference, just an install note.
+
 # TASK-115: Promise Capture Pilot
 
 Status:

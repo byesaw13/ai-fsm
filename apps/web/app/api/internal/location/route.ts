@@ -19,6 +19,7 @@ import {
 } from "@ai-fsm/domain";
 import type { PoolClient } from "pg";
 import { reduceLocationEvent, type OpenSegment } from "@/lib/location/segments";
+import { sendPushToUser, sendPushToOwners } from "@/lib/push/send";
 import { autoRecordScheduledVisitPresence } from "@/lib/field/confirm-visit";
 import { listOpenWorkOrdersAtProperty } from "@/lib/field/open-work-orders";
 
@@ -650,6 +651,21 @@ async function detectVisitCandidate(
     [top.propertyId, accountId],
   );
   const propertyLabel = propRows[0]?.address ?? propRows[0]?.client_name ?? null;
+
+  // Native Web Push mirror of the arrival prompt (TASK-118). Fresh candidate =
+  // first prompt, so this fires once. To the resolved tech; owners on the solo
+  // path. Fire-and-forget on its own connection; never throws.
+  const arrivalBody = propertyLabel
+    ? `Arrived at ${propertyLabel}${woTitle ? ` · ${woTitle}` : ""}`
+    : "Confirm your arrival at the job.";
+  const arrivalPush = {
+    title: "You're on site",
+    body: arrivalBody,
+    url: `/app/my-work?proposal=${candidateId}`,
+    tag: `arrival-${candidateId}`,
+  };
+  if (stampUserId) await sendPushToUser(accountId, stampUserId, arrivalPush);
+  else await sendPushToOwners(accountId, arrivalPush);
 
   return {
     arrivalPrompt: {

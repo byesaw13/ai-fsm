@@ -1,7 +1,9 @@
 import type { PoolClient } from "pg";
 import { logger } from "@/lib/logger";
 import type { EmitAttentionEventInput } from "./types";
+import { ATTENTION_PUSH_TYPES } from "./types";
 import { enqueueAttentionOwnerEmail } from "./email";
+import { sendPushToOwners } from "@/lib/push/send";
 
 /**
  * Insert an attention event. Never throws to callers — primary flows must not fail.
@@ -73,6 +75,17 @@ export async function emitAttentionEvent(
         logger.error("attention owner email failed (non-fatal)", emailErr, {
           type: input.type,
           entityId: input.entityId,
+        });
+      }
+
+      // Web Push to owners/admins (TASK-118). Runs on its own connection (not
+      // the caller's tx) and never throws, so no savepoint is needed here.
+      if ((ATTENTION_PUSH_TYPES as readonly string[]).includes(input.type)) {
+        await sendPushToOwners(input.accountId, {
+          title: input.title,
+          body: input.summary ?? undefined,
+          url: input.href,
+          tag: `attn-${input.type}-${input.entityId}`,
         });
       }
     }
