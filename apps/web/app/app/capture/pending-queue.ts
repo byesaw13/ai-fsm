@@ -1,7 +1,7 @@
 export type PendingCapture = {
   id: string;
-  audio: Blob;
-  audioName: string;
+  audio?: Blob;
+  audioName?: string;
   photo?: Blob;
   photoName?: string;
   transcript?: string;

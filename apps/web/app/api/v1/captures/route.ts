@@ -103,16 +103,19 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
 
   const audio = asFile(formData.get("audio"));
   const photo = asFile(formData.get("photo"));
+  const transcript = clientTranscript(formData.get("transcript"));
 
-  if (!audio || audio.size === 0) {
-    return errorJson(session, 422, "VALIDATION_ERROR", "audio is required");
+  if ((!audio || audio.size === 0) && !transcript) {
+    return errorJson(session, 422, "VALIDATION_ERROR", "audio or transcript is required");
   }
-  if (audio.size > MAX_AUDIO_BYTES) {
-    return errorJson(session, 422, "VALIDATION_ERROR", "Audio exceeds 25 MB limit");
-  }
-  const audioMime = baseMime(audio.type);
-  if (audioMime && !ALLOWED_AUDIO.has(audioMime)) {
-    return errorJson(session, 422, "VALIDATION_ERROR", "Only audio files are allowed");
+  if (audio) {
+    if (audio.size > MAX_AUDIO_BYTES) {
+      return errorJson(session, 422, "VALIDATION_ERROR", "Audio exceeds 25 MB limit");
+    }
+    const audioMime = baseMime(audio.type);
+    if (audioMime && !ALLOWED_AUDIO.has(audioMime)) {
+      return errorJson(session, 422, "VALIDATION_ERROR", "Only audio files are allowed");
+    }
   }
 
   if (photo) {
@@ -128,7 +131,6 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     }
   }
 
-  const transcript = clientTranscript(formData.get("transcript"));
   const clientIdRaw = formData.get("client_id");
   const clientId =
     typeof clientIdRaw === "string" && z.string().uuid().safeParse(clientIdRaw).success
@@ -147,26 +149,32 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
   }
 
   const captureId = clientId;
-  const audioFilename = `audio-${randomUUID()}.${safeExtension(audio, AUDIO_EXT, "webm")}`;
+  const audioFilename = audio
+    ? `audio-${randomUUID()}.${safeExtension(audio, AUDIO_EXT, "webm")}`
+    : null;
   const photoFilename = photo
     ? `photo-${randomUUID()}.${safeExtension(photo, PHOTO_EXT, "jpg")}`
     : null;
-  const audioPath = captureFilePath(captureId, audioFilename);
+  const audioPath = audioFilename ? captureFilePath(captureId, audioFilename) : null;
   const photoPath = photoFilename ? captureFilePath(captureId, photoFilename) : null;
-  if (!audioPath || (photoFilename && !photoPath)) {
+  if ((audioFilename && !audioPath) || (photoFilename && !photoPath)) {
     return errorJson(session, 500, "INTERNAL_ERROR", "Failed to save file");
   }
 
-  const uploadDir = captureDir(captureId);
-  try {
-    fs.mkdirSync(uploadDir, { recursive: true });
-    fs.writeFileSync(audioPath, Buffer.from(await audio.arrayBuffer()));
-    if (photo && photoPath) {
-      fs.writeFileSync(photoPath, Buffer.from(await photo.arrayBuffer()));
+  if (audioPath || photoPath) {
+    const uploadDir = captureDir(captureId);
+    try {
+      fs.mkdirSync(uploadDir, { recursive: true });
+      if (audio && audioPath) {
+        fs.writeFileSync(audioPath, Buffer.from(await audio.arrayBuffer()));
+      }
+      if (photo && photoPath) {
+        fs.writeFileSync(photoPath, Buffer.from(await photo.arrayBuffer()));
+      }
+    } catch (err) {
+      logger.error("[captures POST] file write failed", err, { traceId: session.traceId });
+      return errorJson(session, 500, "INTERNAL_ERROR", "Failed to save file");
     }
-  } catch (err) {
-    logger.error("[captures POST] file write failed", err, { traceId: session.traceId });
-    return errorJson(session, 500, "INTERNAL_ERROR", "Failed to save file");
   }
 
   try {
@@ -185,9 +193,9 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
           session.userId,
           "recorder",
           audioFilename,
-          audio.name,
-          audio.type || "audio/webm",
-          audio.size,
+          audio?.name ?? null,
+          audio ? audio.type || "audio/webm" : null,
+          audio?.size ?? null,
           photoFilename,
           photo?.name ?? null,
           photo?.type || (photo ? "image/jpeg" : null),
@@ -205,7 +213,9 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     if (code === "23505") {
       return NextResponse.json({ data: { id: captureId } }, { status: 200 });
     }
-    try { fs.unlinkSync(audioPath); } catch { /* ignore */ }
+    if (audioPath) {
+      try { fs.unlinkSync(audioPath); } catch { /* ignore */ }
+    }
     if (photoPath) {
       try { fs.unlinkSync(photoPath); } catch { /* ignore */ }
     }
