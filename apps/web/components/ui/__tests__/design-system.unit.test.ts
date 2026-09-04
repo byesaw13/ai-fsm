@@ -172,7 +172,8 @@ describe("getNavSections (nested hubs)", () => {
       expect(hrefs).toContain(view === "field" ? "/app/my-work" : "/app");
       expect(hrefs).toContain("/app/timeline");
       expect(hrefs).not.toContain("/app/mileage");
-      expect(hrefs).toHaveLength(13);
+      expect(hrefs).toContain("/app/capture");
+      expect(hrefs).toHaveLength(14);
     }
   });
 
@@ -182,7 +183,8 @@ describe("getNavSections (nested hubs)", () => {
     expect(hrefs).toContain("/app");
     expect(hrefs).toContain("/app/settings");
     expect(hrefs).toContain("/app/timeline");
-    expect(hrefs).toHaveLength(13);
+    expect(hrefs).toContain("/app/capture");
+    expect(hrefs).toHaveLength(14);
   });
 
   it("Layer 2+ tools are not in main nav", () => {
@@ -202,8 +204,9 @@ describe("getNavSections (nested hubs)", () => {
       const sections = getNavSections("owner", view);
       expect(sections.map((s) => s.label).filter(Boolean)).toEqual(HUB_LABELS);
       const hrefs = flattenSections(sections).map((i) => i.href);
-      expect(hrefs).toHaveLength(13);
+      expect(hrefs).toHaveLength(14);
       expect(hrefs).toContain("/app/timeline");
+      expect(hrefs).toContain("/app/capture");
       if (view === "field") {
         expect(hrefs).toContain("/app/my-work");
         expect(hrefs).not.toContain("/app"); // no Overview home in Field
@@ -228,6 +231,7 @@ describe("getNavSections (nested hubs)", () => {
     expect(hrefs).not.toContain("/app/estimates");
     expect(hrefs).not.toContain("/app/invoices");
     expect(hrefs).not.toContain("/app/automations");
+    expect(hrefs).not.toContain("/app/capture");
   });
 
   it("leads with My Day for owner/tech, Overview for pure admin", () => {
@@ -263,6 +267,7 @@ describe("getNavSections (nested hubs)", () => {
     const adminHome = getNavSections("admin").find((s) => s.label === "Home");
     expect(adminHome?.items.map((i) => i.label)).toEqual([
       "Overview",
+      "Capture",
       "Day Review",
       "Tracking",
     ]);
@@ -338,6 +343,7 @@ describe("getBottomNavItems (mobile hubs)", () => {
     const money = getBottomNavItems("owner").find((i) => i.label === "Money");
     expect(isNavActive("/app/timeline", ownerHome!.href, ownerHome!.activePrefixes)).toBe(true);
     expect(isNavActive("/app/day-review", ownerHome!.href, ownerHome!.activePrefixes)).toBe(true);
+    expect(isNavActive("/app/capture", ownerHome!.href, ownerHome!.activePrefixes)).toBe(true);
     expect(isNavActive("/app/mileage/vehicles", money!.href, money!.activePrefixes)).toBe(true);
   });
 });

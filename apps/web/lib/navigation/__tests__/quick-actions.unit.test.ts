@@ -27,4 +27,9 @@ describe("quick actions", () => {
       expect(new Set(labels).size).toBe(labels.length);
     }
   });
+
+  it("puts Capture first on the owner dashboard, not in the tech field strip", () => {
+    expect(OWNER_QUICK_ACTIONS[0]).toMatchObject({ label: "Capture", href: "/app/capture" });
+    expect(FIELD_QUICK_ACTIONS.some((a) => a.href === "/app/capture")).toBe(false);
+  });
 });

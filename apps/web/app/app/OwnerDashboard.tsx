@@ -4,6 +4,7 @@ import { Card, SectionHeader, MetricGrid, StatusStepper, LinkButton } from "@/co
 import { ActionQueue, JobsToday, Materials } from "./DashboardWidgets";
 import type { CommandVisit, CountAction, MaterialJob } from "./DashboardWidgets";
 import { OWNER_QUICK_ACTIONS } from "@/lib/navigation/quick-actions";
+import { CAPTURE_HREF, CaptureLink } from "@/components/CaptureLink";
 import { formatCents } from "@/lib/money";
 import type { OpenSession, VehicleOption } from "@/lib/my-work/field-day-types";
 
@@ -270,39 +271,54 @@ export function OwnerDashboard({
           <Card className="owner-dash-actions">
             <SectionHeader title="Quick Actions" />
             <div className="owner-dash-qa-grid">
-              {OWNER_QUICK_ACTIONS.map((qa) => (
-                <Link
-                  key={qa.label}
-                  href={qa.href as Route}
-                  className="p7-card-hover"
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: "var(--space-2)",
-                    padding: "var(--space-3) var(--space-1)",
-                    borderRadius: "var(--radius-md)",
-                    textDecoration: "none",
-                    color: "var(--fg)",
-                    textAlign: "center",
-                  }}
-                >
-                  <span
-                    style={{
-                      display: "grid",
-                      placeItems: "center",
-                      width: "42px",
-                      height: "42px",
-                      borderRadius: "var(--radius-lg)",
-                      background: "var(--accent-subtle)",
-                      fontSize: "1.25rem",
-                    }}
+              {OWNER_QUICK_ACTIONS.map((qa) => {
+                const tileStyle = {
+                  display: "flex" as const,
+                  flexDirection: "column" as const,
+                  alignItems: "center",
+                  gap: "var(--space-2)",
+                  padding: "var(--space-3) var(--space-1)",
+                  borderRadius: "var(--radius-md)",
+                  textDecoration: "none",
+                  color: "var(--fg)",
+                  textAlign: "center" as const,
+                };
+                const tile = (
+                  <>
+                    <span
+                      style={{
+                        display: "grid",
+                        placeItems: "center",
+                        width: "42px",
+                        height: "42px",
+                        borderRadius: "var(--radius-lg)",
+                        background: "var(--accent-subtle)",
+                        fontSize: "1.25rem",
+                      }}
+                    >
+                      {qa.icon}
+                    </span>
+                    <span style={{ fontSize: "var(--text-xs)", fontWeight: 600 }}>{qa.label}</span>
+                  </>
+                );
+                if (qa.href === CAPTURE_HREF) {
+                  return (
+                    <CaptureLink key={qa.label} className="p7-card-hover" style={tileStyle}>
+                      {tile}
+                    </CaptureLink>
+                  );
+                }
+                return (
+                  <Link
+                    key={qa.label}
+                    href={qa.href as Route}
+                    className="p7-card-hover"
+                    style={tileStyle}
                   >
-                    {qa.icon}
-                  </span>
-                  <span style={{ fontSize: "var(--text-xs)", fontWeight: 600 }}>{qa.label}</span>
-                </Link>
-              ))}
+                    {tile}
+                  </Link>
+                );
+              })}
             </div>
           </Card>
 

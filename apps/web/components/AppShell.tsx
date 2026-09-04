@@ -8,6 +8,7 @@ import type { Role } from "@ai-fsm/domain";
 import { ToastProvider } from "./ui/Toast";
 import { QuickLeadModal } from "./QuickLeadModal";
 import { FloatingActionButton } from "./FloatingActionButton";
+import { CAPTURE_HREF, CaptureLink } from "./CaptureLink";
 import { WorkspaceAutoRoute } from "./WorkspaceAutoRoute";
 import { LiveRefresh } from "./LiveRefresh";
 import {
@@ -26,6 +27,7 @@ import {
   IconQueue,
   IconDayReview,
   IconField,
+  IconCapture,
 } from "./NavIcons";
 import {
   AttentionBell,
@@ -77,6 +79,7 @@ const NAV_TODAY:      NavItem = { href: "/app",              label: "Overview", 
 // EPIC-006 Phase 5: the field surface. Owners can switch into it; pure admins
 // (who don't do field work) and the all-techs list never see it here.
 const NAV_MY_DAY:     NavItem = { href: "/app/my-work",      label: "My Day",     Icon: IconMyDay };
+const NAV_CAPTURE:    NavItem = { href: "/app/capture",      label: "Capture",    Icon: IconCapture };
 const NAV_DAY_REVIEW: NavItem = { href: "/app/day-review",   label: "Day Review", Icon: IconDayReview };
 const NAV_TRACKING:   NavItem = { href: "/app/timeline",     label: "Tracking",   Icon: IconField };
 const NAV_REQUESTS:   NavItem = { href: "/app/requests",     label: "Requests",   Icon: IconInbox };
@@ -93,7 +96,7 @@ const NAV_SETTINGS:   NavItem = { href: "/app/settings",     label: "Settings", 
 /** Nested hub IA — Home / Work / People / Money (+ Settings). Home item is injected per role/view. */
 function buildHubSections(home: NavItem): NavSection[] {
   return [
-    { label: "Home", items: [home, NAV_DAY_REVIEW, NAV_TRACKING] },
+    { label: "Home", items: [home, NAV_CAPTURE, NAV_DAY_REVIEW, NAV_TRACKING] },
     {
       label: "Work",
       items: [NAV_REQUESTS, NAV_ESTIMATES, NAV_JOBS, NAV_WORK_ORDERS, NAV_SCHEDULE],
@@ -144,13 +147,13 @@ export function getBottomNavItems(role: Role): NavItem[] {
           href: "/app/my-work",
           label: "Home",
           Icon: IconMyDay,
-          activePrefixes: ["/app/my-work", "/app/my-day", "/app/day-review", "/app/timeline"],
+          activePrefixes: ["/app/my-work", "/app/my-day", "/app/day-review", "/app/timeline", "/app/capture"],
         }
       : {
           href: "/app",
           label: "Home",
           Icon: IconDashboard,
-          activePrefixes: ["/app/day-review", "/app/timeline"],
+          activePrefixes: ["/app/day-review", "/app/timeline", "/app/capture"],
         };
 
   const work: NavItem = {
@@ -330,15 +333,9 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
                       item.href === NAV_ESTIMATES.href)
                       ? (`${item.href}?attention=1` as Route)
                       : (item.href as Route);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={href}
-                      className={`p7-nav-item ${active ? "p7-nav-active" : ""}`}
-                      aria-current={active ? "page" : undefined}
-                      title={item.label}
-                      style={{ display: "flex", alignItems: "center", gap: 8 }}
-                    >
+                  const navClass = `p7-nav-item ${active ? "p7-nav-active" : ""}`;
+                  const navInner = (
+                    <>
                       <span className="p7-nav-icon" aria-hidden="true" style={{ position: "relative" }}>
                         <item.Icon size={18} />
                         {item.href === NAV_DAY_REVIEW.href && reviewPending && (
@@ -347,6 +344,31 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
                       </span>
                       <span className="p7-nav-label">{item.label}</span>
                       {isAdminOrOwner && <NavCountBadge count={count} />}
+                    </>
+                  );
+                  if (item.href === CAPTURE_HREF) {
+                    return (
+                      <CaptureLink
+                        key={item.href}
+                        className={navClass}
+                        aria-current={active ? "page" : undefined}
+                        title={item.label}
+                        style={{ display: "flex", alignItems: "center", gap: 8 }}
+                      >
+                        {navInner}
+                      </CaptureLink>
+                    );
+                  }
+                  return (
+                    <Link
+                      key={item.href}
+                      href={href}
+                      className={navClass}
+                      aria-current={active ? "page" : undefined}
+                      title={item.label}
+                      style={{ display: "flex", alignItems: "center", gap: 8 }}
+                    >
+                      {navInner}
                     </Link>
                   );
                 })}
@@ -473,14 +495,9 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
                             item.href === NAV_ESTIMATES.href)
                             ? (`${item.href}?attention=1` as Route)
                             : (item.href as Route);
-                        return (
-                          <Link
-                            key={item.href}
-                            href={href}
-                            className={`p7-more-item ${active ? "p7-nav-active" : ""}`}
-                            aria-current={active ? "page" : undefined}
-                            onClick={() => setShowMore(false)}
-                          >
+                        const moreClass = `p7-more-item ${active ? "p7-nav-active" : ""}`;
+                        const moreInner = (
+                          <>
                             <span className="p7-nav-icon" aria-hidden="true" style={{ position: "relative" }}>
                               <item.Icon size={20} />
                               {item.href === NAV_DAY_REVIEW.href && reviewPending && (
@@ -510,6 +527,29 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
                               )}
                             </span>
                             <span>{item.label}</span>
+                          </>
+                        );
+                        if (item.href === CAPTURE_HREF) {
+                          return (
+                            <CaptureLink
+                              key={item.href}
+                              className={moreClass}
+                              aria-current={active ? "page" : undefined}
+                              onClick={() => setShowMore(false)}
+                            >
+                              {moreInner}
+                            </CaptureLink>
+                          );
+                        }
+                        return (
+                          <Link
+                            key={item.href}
+                            href={href}
+                            className={moreClass}
+                            aria-current={active ? "page" : undefined}
+                            onClick={() => setShowMore(false)}
+                          >
+                            {moreInner}
                           </Link>
                         );
                       })}
@@ -543,7 +583,10 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
         )}
       </div>
       {showQuickLead && <QuickLeadModal onClose={() => setShowQuickLead(false)} />}
-      {isAdminOrOwner && !pathname.startsWith("/app/my-work") && !pathname.startsWith("/app/my-day") && <FloatingActionButton />}
+      {isAdminOrOwner &&
+        !pathname.startsWith("/app/my-work") &&
+        !pathname.startsWith("/app/my-day") &&
+        !pathname.startsWith("/app/capture") && <FloatingActionButton />}
     </ToastProvider>
   );
 }

@@ -22,6 +22,7 @@ export function MyDayMobileLayout({
   dayMileage,
   heroVisit,
   clockedIn,
+  canCapture = false,
   children,
 }: {
   openSession: OpenSession | null;
@@ -30,6 +31,7 @@ export function MyDayMobileLayout({
   dayMileage: DayMileageSummary;
   heroVisit: HeroVisit | null;
   clockedIn: boolean;
+  canCapture?: boolean;
   children: React.ReactNode;
 }) {
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -127,7 +129,7 @@ export function MyDayMobileLayout({
       />
 
       <div style={{ marginBottom: "var(--space-6)" }}>
-        <FieldQuickActions />
+        <FieldQuickActions showCapture={canCapture} />
       </div>
 
       {children}
