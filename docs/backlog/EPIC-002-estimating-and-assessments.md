@@ -328,7 +328,8 @@ math is currently correct, only the comparison framing is misleading.
 # TASK-101: Standalone & Direct Job/Visit Quick Materials Generator (Uncouple Materials from Estimates)
 
 Status:
-Done (implementation; live AI path requires ANTHROPIC_API_KEY set)
+Done (live — ANTHROPIC_API_KEY set on garonhome; verified 2026-09-04, web
+container reaches Anthropic with HTTP 200)
 
 Phase:
 3
