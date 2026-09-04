@@ -7,7 +7,13 @@ import {
   savePending,
   type PendingCapture,
 } from "./pending-queue";
-import { browserSpeechAvailable, startBrowserSpeech } from "./speech-transcript";
+import {
+  browserSpeechAvailable,
+  cannotShareMicrophone,
+  speechErrorMessage,
+  startBrowserSpeech,
+  type SpeechStop,
+} from "./speech-transcript";
 
 type MicState = "starting" | "ready" | "denied" | "unsupported";
 type RecordState = "idle" | "recording" | "saving";
@@ -44,11 +50,12 @@ function extensionForMime(mime: string): string {
 }
 
 async function postCapture(item: PendingCapture): Promise<"ok" | "auth" | "fail"> {
+  const spoken = item.transcript?.trim();
+  if (!item.audio && !spoken) return "fail";
   const form = new FormData();
   form.append("client_id", item.id);
-  form.append("audio", item.audio, item.audioName);
+  if (item.audio && item.audioName) form.append("audio", item.audio, item.audioName);
   if (item.photo) form.append("photo", item.photo, item.photoName || "photo.jpg");
-  const spoken = item.transcript?.trim();
   if (spoken) form.append("transcript", spoken);
   try {
     const res = await fetch("/api/v1/captures", { method: "POST", body: form });
@@ -66,6 +73,8 @@ export function CaptureRecorder() {
   const [status, setStatus] = useState("Starting microphone…");
   const [photo, setPhoto] = useState<File | null>(null);
   const [failedCount, setFailedCount] = useState(0);
+  const [needTyped, setNeedTyped] = useState(false);
+  const [typedDraft, setTypedDraft] = useState("");
 
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -77,7 +86,8 @@ export function CaptureRecorder() {
   const recordRef = useRef<RecordState>("idle");
   const photoRef = useRef<File | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
-  const stopSpeechRef = useRef<(() => Promise<string>) | null>(null);
+  const stopSpeechRef = useRef<SpeechStop | null>(null);
+  const speechOnlyRef = useRef(false);
 
   function setRecordState(next: RecordState) {
     recordRef.current = next;
@@ -114,6 +124,29 @@ export function CaptureRecorder() {
     }
   }, []);
 
+  const saveItem = useCallback(async (item: PendingCapture, spoken: string) => {
+    await savePending(item);
+    const result = await postCapture(item);
+    if (result === "ok") {
+      await removePending(item.id);
+      setPhoto(null);
+      setNeedTyped(false);
+      setTypedDraft("");
+      setRecordState("idle");
+      setStatus(savedStatus(spoken));
+      void flushPending();
+      return;
+    }
+    if (result === "auth") {
+      setRecordState("idle");
+      window.location.replace(LOGIN_NEXT);
+      return;
+    }
+    setFailedCount((count) => count + 1);
+    setRecordState("idle");
+    setStatus("Couldn't save. Tap retry — the recording is still on this phone.");
+  }, [flushPending]);
+
   useEffect(() => {
     let cancelled = false;
     async function startMic() {
@@ -128,14 +161,16 @@ export function CaptureRecorder() {
           for (const track of stream.getTracks()) track.stop();
           return;
         }
-        streamRef.current = stream;
-        mimeRef.current = pickRecorderMime();
+        const speechOnly = cannotShareMicrophone() && browserSpeechAvailable();
+        if (speechOnly) {
+          for (const track of stream.getTracks()) track.stop();
+          streamRef.current = null;
+        } else {
+          streamRef.current = stream;
+          mimeRef.current = pickRecorderMime();
+        }
         setMic("ready");
-        setStatus(
-          browserSpeechAvailable()
-            ? "Tap or hold to record"
-            : "Tap or hold to record. Use Chrome so the words extract.",
-        );
+        setStatus("Tap or hold to record");
         void flushPending();
       } catch {
         if (!cancelled) {
@@ -154,17 +189,76 @@ export function CaptureRecorder() {
     };
   }, [flushPending]);
 
+  const finishSpeechOnly = useCallback(async () => {
+    const stopSpeech = stopSpeechRef.current;
+    stopSpeechRef.current = null;
+    speechOnlyRef.current = false;
+    activeRef.current = false;
+    const result = stopSpeech ? await stopSpeech() : { text: "", error: "" };
+    const spoken = result.text.trim();
+    if (!spoken) {
+      setNeedTyped(true);
+      setRecordState("idle");
+      setStatus(
+        speechErrorMessage(result.error) ||
+          "I couldn't catch the words. Type the promise.",
+      );
+      return;
+    }
+    await saveItem(
+      {
+        id: crypto.randomUUID(),
+        photo: photoRef.current ?? undefined,
+        photoName: photoRef.current?.name,
+        transcript: spoken,
+      },
+      spoken,
+    );
+  }, [saveItem]);
+
   const stopAndSave = useCallback(() => {
+    if (speechOnlyRef.current) {
+      setRecordState("saving");
+      setStatus("Saving…");
+      void finishSpeechOnly();
+      return;
+    }
     const recorder = recorderRef.current;
     if (!recorder || recorder.state === "inactive") return;
     setRecordState("saving");
     setStatus("Saving…");
     recorder.stop();
+  }, [finishSpeechOnly]);
+
+  const startSpeechOnly = useCallback(() => {
+    speechOnlyRef.current = true;
+    activeRef.current = true;
+    setNeedTyped(false);
+    setRecordState("recording");
+    setStatus("Recording… tap or release to save");
+    stopSpeechRef.current = startBrowserSpeech((text) => {
+      if (recordRef.current !== "recording") return;
+      setStatus(text ? `Recording… ${text}` : "Recording… tap or release to save");
+    });
   }, []);
 
   const startRecording = useCallback(() => {
+    if (mic !== "ready" || recordRef.current !== "idle" || activeRef.current) return;
+    const speechOnly = cannotShareMicrophone() && browserSpeechAvailable();
+    if (speechOnly) {
+      startSpeechOnly();
+      return;
+    }
     const stream = streamRef.current;
-    if (!stream || mic !== "ready" || recordRef.current !== "idle" || activeRef.current) return;
+    if (!stream) {
+      if (browserSpeechAvailable()) {
+        startSpeechOnly();
+        return;
+      }
+      setMic("unsupported");
+      setStatus("This browser cannot record audio.");
+      return;
+    }
     if (typeof MediaRecorder === "undefined") {
       setMic("unsupported");
       setStatus("This browser cannot record audio.");
@@ -186,51 +280,35 @@ export function CaptureRecorder() {
       recorderRef.current = null;
       const stopSpeech = stopSpeechRef.current;
       stopSpeechRef.current = null;
-      const spoken = (stopSpeech ? await stopSpeech() : "").trim();
-      if (blob.size === 0) {
+      const spoken = (stopSpeech ? (await stopSpeech()).text : "").trim();
+      if (blob.size === 0 && !spoken) {
         setRecordState("idle");
-        setStatus(
-          browserSpeechAvailable()
-            ? "Tap or hold to record"
-            : "Tap or hold to record. Use Chrome so the words extract.",
-        );
+        setStatus("Tap or hold to record");
         return;
       }
-      const item: PendingCapture = {
-        id: crypto.randomUUID(),
-        audio: blob,
-        audioName: `capture.${extensionForMime(blob.type)}`,
-        photo: photoRef.current ?? undefined,
-        photoName: photoRef.current?.name,
-        transcript: spoken || undefined,
-      };
-      await savePending(item);
-      const result = await postCapture(item);
-      if (result === "ok") {
-        await removePending(item.id);
-        setPhoto(null);
-        setRecordState("idle");
-        setStatus(savedStatus(spoken));
-        void flushPending();
-        return;
-      }
-      if (result === "auth") {
-        setRecordState("idle");
-        window.location.replace(LOGIN_NEXT);
-        return;
-      }
-      setFailedCount((count) => count + 1);
-      setRecordState("idle");
-      setStatus("Couldn't save. Tap retry — the recording is still on this phone.");
+      await saveItem(
+        {
+          id: crypto.randomUUID(),
+          audio: blob.size > 0 ? blob : undefined,
+          audioName: blob.size > 0 ? `capture.${extensionForMime(blob.type)}` : undefined,
+          photo: photoRef.current ?? undefined,
+          photoName: photoRef.current?.name,
+          transcript: spoken || undefined,
+        },
+        spoken,
+      );
     };
     try {
       activeRef.current = true;
+      setNeedTyped(false);
       setRecordState("recording");
       setStatus("Recording… tap or release to save");
-      stopSpeechRef.current = startBrowserSpeech((text) => {
-        if (recordRef.current !== "recording") return;
-        setStatus(text ? `Recording… ${text}` : "Recording… tap or release to save");
-      });
+      if (browserSpeechAvailable()) {
+        stopSpeechRef.current = startBrowserSpeech((text) => {
+          if (recordRef.current !== "recording") return;
+          setStatus(text ? `Recording… ${text}` : "Recording… tap or release to save");
+        });
+      }
       recorder.start(250);
     } catch {
       activeRef.current = false;
@@ -240,7 +318,7 @@ export function CaptureRecorder() {
       setRecordState("idle");
       setStatus("Could not start recording.");
     }
-  }, [flushPending, mic]);
+  }, [mic, saveItem, startSpeechOnly]);
 
   function onPointerDown(event: PointerEvent<HTMLButtonElement>) {
     if (mic !== "ready") return;
@@ -332,6 +410,50 @@ export function CaptureRecorder() {
       >
         {record === "recording" ? "Stop" : busy ? "Saving" : "Record"}
       </button>
+
+      {needTyped && (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            const spoken = typedDraft.trim();
+            if (!spoken) return;
+            setRecordState("saving");
+            void saveItem(
+              {
+                id: crypto.randomUUID(),
+                photo: photoRef.current ?? undefined,
+                photoName: photoRef.current?.name,
+                transcript: spoken,
+              },
+              spoken,
+            );
+          }}
+          style={{
+            width: "min(420px, 100%)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-3)",
+          }}
+        >
+          <textarea
+            value={typedDraft}
+            onChange={(event) => setTypedDraft(event.target.value)}
+            rows={3}
+            placeholder="I told Mrs. Chen I would call tomorrow."
+            style={{
+              width: "100%",
+              fontSize: 16,
+              padding: "var(--space-3)",
+              borderRadius: "var(--radius-md)",
+              border: "1px solid var(--border)",
+              fontFamily: "inherit",
+            }}
+          />
+          <button type="submit" className="p7-btn p7-btn-primary" disabled={busy || typedDraft.trim().length === 0}>
+            Save words
+          </button>
+        </form>
+      )}
 
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "var(--space-3)" }}>
         <input

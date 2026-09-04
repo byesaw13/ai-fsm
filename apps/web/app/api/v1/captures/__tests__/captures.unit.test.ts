@@ -138,6 +138,21 @@ describe("POST /api/v1/captures", () => {
     expect(insertCall[1][13]).toBe("I told Mrs. Chen I would call tomorrow.");
   });
 
+  it("stores a transcript without audio for Android speech-only captures", async () => {
+    const form = new FormData();
+    form.append("transcript", "I told Mrs. Chen I would call tomorrow.");
+
+    const res = await POST(postRequest(form));
+    expect(res.status).toBe(201);
+    expect(fsMocks.writeFileSync).not.toHaveBeenCalled();
+
+    const insertCall = mockQuery.mock.calls.find(([sql]) =>
+      String(sql).includes("INSERT INTO capture_evidence"),
+    ) as [string, unknown[]];
+    expect(insertCall[1][4]).toBeNull();
+    expect(insertCall[1][13]).toBe("I told Mrs. Chen I would call tomorrow.");
+  });
+
   it("caps an oversized transcript", async () => {
     const form = new FormData();
     form.append("audio", audioFile());
