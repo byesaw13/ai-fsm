@@ -179,6 +179,40 @@ Notes:
 Invoice numbering is the reference implementation (`invoices.invoice_number`,
 unique index per account). Identified as a genuine gap in the June 2026 recovery fact-check retained in git history; that fact-check also corrected the earlier assumption that invoice numbering was missing — it exists.
 
+# TASK-117: Passive live refresh of app data
+
+Status:
+Done
+
+Phase:
+cross-cutting
+
+Problem:
+Pages are server-rendered and only refetch their data on a manual reload or
+after an explicit `router.refresh()`. Newly-arrived server state — arrival
+proposals (the "on site" popup), attention items, etc. — sits stale until the
+user reloads, so field users miss the arrival prompt when they open the app.
+
+Business Value:
+The app reflects the current state of the world on its own. A tech arriving at
+a job sees the arrival prompt without knowing to reload.
+
+Scope:
+- One `LiveRefresh` client component mounted once in `AppShell`; calls
+  `router.refresh()` on an interval while the tab is visible and immediately on
+  focus/visibility so resume surfaces new state at once.
+- Guard so a refresh never yanks focus mid-edit (recent typing / open menu),
+  while lingering focus after resume does not freeze refresh.
+
+Out of Scope:
+- Real-time push (SSE/WebSocket). Polling is sufficient for the current field
+  headcount; revisit only if sub-30s cross-user latency is needed.
+
+Acceptance Criteria:
+- [x] Server-rendered data refreshes without a manual reload.
+- [x] Refresh pauses during active typing / open menus, resumes when idle.
+- [x] Mounted once, so every page under `AppShell` benefits.
+
 ## Completed
 
 - [TASK-020: PWA Installability](../archive/backlog-done/TASK-020-pwa-installability.md) — Done
