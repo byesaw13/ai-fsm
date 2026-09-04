@@ -1,14 +1,14 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { SectionHeader } from "@/components/ui";
+import { CaptureLink } from "@/components/CaptureLink";
 import { FIELD_QUICK_ACTIONS } from "@/lib/navigation/quick-actions";
 
 export function FieldQuickActions({ showCapture = false }: { showCapture?: boolean }) {
   return (
     <section data-testid="field-quick-actions">
       {showCapture && (
-        <Link
-          href={"/app/capture" as Route}
+        <CaptureLink
           data-testid="capture-promise"
           className="p7-btn p7-btn-primary"
           style={{
@@ -22,7 +22,7 @@ export function FieldQuickActions({ showCapture = false }: { showCapture?: boole
           }}
         >
           Capture a promise
-        </Link>
+        </CaptureLink>
       )}
       <SectionHeader title="Quick Actions" as="h3" />
       <div className="my-day-quick-grid" style={{ marginTop: "var(--space-3)" }}>

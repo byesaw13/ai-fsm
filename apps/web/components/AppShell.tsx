@@ -8,6 +8,7 @@ import type { Role } from "@ai-fsm/domain";
 import { ToastProvider } from "./ui/Toast";
 import { QuickLeadModal } from "./QuickLeadModal";
 import { FloatingActionButton } from "./FloatingActionButton";
+import { CAPTURE_HREF, CaptureLink } from "./CaptureLink";
 import { WorkspaceAutoRoute } from "./WorkspaceAutoRoute";
 import { LiveRefresh } from "./LiveRefresh";
 import {
@@ -332,15 +333,9 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
                       item.href === NAV_ESTIMATES.href)
                       ? (`${item.href}?attention=1` as Route)
                       : (item.href as Route);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={href}
-                      className={`p7-nav-item ${active ? "p7-nav-active" : ""}`}
-                      aria-current={active ? "page" : undefined}
-                      title={item.label}
-                      style={{ display: "flex", alignItems: "center", gap: 8 }}
-                    >
+                  const navClass = `p7-nav-item ${active ? "p7-nav-active" : ""}`;
+                  const navInner = (
+                    <>
                       <span className="p7-nav-icon" aria-hidden="true" style={{ position: "relative" }}>
                         <item.Icon size={18} />
                         {item.href === NAV_DAY_REVIEW.href && reviewPending && (
@@ -349,6 +344,31 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
                       </span>
                       <span className="p7-nav-label">{item.label}</span>
                       {isAdminOrOwner && <NavCountBadge count={count} />}
+                    </>
+                  );
+                  if (item.href === CAPTURE_HREF) {
+                    return (
+                      <CaptureLink
+                        key={item.href}
+                        className={navClass}
+                        aria-current={active ? "page" : undefined}
+                        title={item.label}
+                        style={{ display: "flex", alignItems: "center", gap: 8 }}
+                      >
+                        {navInner}
+                      </CaptureLink>
+                    );
+                  }
+                  return (
+                    <Link
+                      key={item.href}
+                      href={href}
+                      className={navClass}
+                      aria-current={active ? "page" : undefined}
+                      title={item.label}
+                      style={{ display: "flex", alignItems: "center", gap: 8 }}
+                    >
+                      {navInner}
                     </Link>
                   );
                 })}
@@ -475,14 +495,9 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
                             item.href === NAV_ESTIMATES.href)
                             ? (`${item.href}?attention=1` as Route)
                             : (item.href as Route);
-                        return (
-                          <Link
-                            key={item.href}
-                            href={href}
-                            className={`p7-more-item ${active ? "p7-nav-active" : ""}`}
-                            aria-current={active ? "page" : undefined}
-                            onClick={() => setShowMore(false)}
-                          >
+                        const moreClass = `p7-more-item ${active ? "p7-nav-active" : ""}`;
+                        const moreInner = (
+                          <>
                             <span className="p7-nav-icon" aria-hidden="true" style={{ position: "relative" }}>
                               <item.Icon size={20} />
                               {item.href === NAV_DAY_REVIEW.href && reviewPending && (
@@ -512,6 +527,29 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
                               )}
                             </span>
                             <span>{item.label}</span>
+                          </>
+                        );
+                        if (item.href === CAPTURE_HREF) {
+                          return (
+                            <CaptureLink
+                              key={item.href}
+                              className={moreClass}
+                              aria-current={active ? "page" : undefined}
+                              onClick={() => setShowMore(false)}
+                            >
+                              {moreInner}
+                            </CaptureLink>
+                          );
+                        }
+                        return (
+                          <Link
+                            key={item.href}
+                            href={href}
+                            className={moreClass}
+                            aria-current={active ? "page" : undefined}
+                            onClick={() => setShowMore(false)}
+                          >
+                            {moreInner}
                           </Link>
                         );
                       })}

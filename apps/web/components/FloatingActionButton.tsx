@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { useState } from "react";
+import { CAPTURE_HREF, CaptureLink } from "./CaptureLink";
 
 interface QuickAction {
   href: string;
@@ -57,24 +58,46 @@ export function FloatingActionButton() {
             alignItems: "flex-end",
           }}
         >
-          {ACTIONS.map((action) => (
-            <Link
-              key={action.href}
-              href={action.href as Route}
-              onClick={() => setOpen(false)}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: "var(--space-3)",
-                padding: "var(--space-3) var(--space-4)", borderRadius: "var(--radius-full)",
-                background: "var(--bg-card)", border: "1px solid var(--border)",
-                boxShadow: "var(--shadow-md, 0 4px 12px rgba(0,0,0,0.15))",
-                color: "var(--fg)", fontWeight: 600, fontSize: "var(--text-sm)",
-                textDecoration: "none", whiteSpace: "nowrap",
-              }}
-            >
-              <span style={{ fontSize: "var(--text-lg)" }}>{action.emoji}</span>
-              {action.label}
-            </Link>
-          ))}
+          {ACTIONS.map((action) => {
+            const itemStyle = {
+              display: "inline-flex" as const,
+              alignItems: "center",
+              gap: "var(--space-3)",
+              padding: "var(--space-3) var(--space-4)",
+              borderRadius: "var(--radius-full)",
+              background: "var(--bg-card)",
+              border: "1px solid var(--border)",
+              boxShadow: "var(--shadow-md, 0 4px 12px rgba(0,0,0,0.15))",
+              color: "var(--fg)",
+              fontWeight: 600,
+              fontSize: "var(--text-sm)",
+              textDecoration: "none",
+              whiteSpace: "nowrap" as const,
+            };
+            const inner = (
+              <>
+                <span style={{ fontSize: "var(--text-lg)" }}>{action.emoji}</span>
+                {action.label}
+              </>
+            );
+            if (action.href === CAPTURE_HREF) {
+              return (
+                <CaptureLink key={action.href} onClick={() => setOpen(false)} style={itemStyle}>
+                  {inner}
+                </CaptureLink>
+              );
+            }
+            return (
+              <Link
+                key={action.href}
+                href={action.href as Route}
+                onClick={() => setOpen(false)}
+                style={itemStyle}
+              >
+                {inner}
+              </Link>
+            );
+          })}
         </div>
       )}
 
