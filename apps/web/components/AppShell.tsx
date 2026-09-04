@@ -9,6 +9,7 @@ import { ToastProvider } from "./ui/Toast";
 import { QuickLeadModal } from "./QuickLeadModal";
 import { FloatingActionButton } from "./FloatingActionButton";
 import { WorkspaceAutoRoute } from "./WorkspaceAutoRoute";
+import { LiveRefresh } from "./LiveRefresh";
 import {
   IconDashboard,
   IconEstimates,
@@ -252,6 +253,7 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
 
   return (
     <ToastProvider>
+      <LiveRefresh />
       <div className={`p7-layout ${collapsed ? "p7-layout-collapsed" : ""}`}>
         {/* ---- Desktop/Tablet Sidebar ---- */}
         <aside className="p7-sidebar" aria-label="Main navigation">
