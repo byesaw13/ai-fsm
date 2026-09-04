@@ -30,6 +30,33 @@ export function isClockOpen(status: TimeClockStatus): boolean {
 }
 
 /**
+ * Validate a proposed clock correction before it is applied (void + re-add).
+ * Pure so it can guard both the API and the UI. `now` is injectable for tests.
+ * Returns the parsed ISO strings on success, or a human-readable error.
+ */
+export function validateClockCorrection(
+  input: { clockInAt: string; clockOutAt?: string | null; reason: string },
+  now: Date = new Date(),
+): { ok: true; clockInAt: string; clockOutAt: string | null } | { ok: false; error: string } {
+  const reason = input.reason?.trim() ?? "";
+  if (!reason) return { ok: false, error: "A reason is required for a correction." };
+
+  const inMs = new Date(input.clockInAt).getTime();
+  if (!Number.isFinite(inMs)) return { ok: false, error: "Clock-in time is invalid." };
+  if (inMs > now.getTime()) return { ok: false, error: "Clock-in time can't be in the future." };
+
+  let outIso: string | null = null;
+  if (input.clockOutAt) {
+    const outMs = new Date(input.clockOutAt).getTime();
+    if (!Number.isFinite(outMs)) return { ok: false, error: "Clock-out time is invalid." };
+    if (outMs <= inMs) return { ok: false, error: "Clock-out must be after clock-in." };
+    if (outMs > now.getTime()) return { ok: false, error: "Clock-out time can't be in the future." };
+    outIso = new Date(outMs).toISOString();
+  }
+  return { ok: true, clockInAt: new Date(inMs).toISOString(), clockOutAt: outIso };
+}
+
+/**
  * Worked minutes for a clock session. Pure: an open session (no clock-out) is
  * measured to `now`. Never negative. Break deductions are a Payroll-Policy
  * concern applied downstream — this is raw elapsed time only.
