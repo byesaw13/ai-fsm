@@ -7,6 +7,7 @@ import { Card } from "@/components/ui";
 import { CompanyForm } from "./CompanyForm";
 import { TeamPanel, type TeamMember } from "./TeamPanel";
 import { ProfileForm } from "./ProfileForm";
+import { EnableNotifications } from "@/components/push/EnableNotifications";
 import { SquarePanel, type SquareStatus } from "./SquarePanel";
 import { WorkspaceModeSetting } from "./WorkspaceModeSetting";
 import { LocationDaySettings, type LocationDayValues } from "./LocationDaySettings";
@@ -75,6 +76,14 @@ export function SettingsTabsClient({ role, userId, me, account, users, square, l
                 initialPhone={me.phone}
                 role={role}
               />
+            </Card>
+            <h3 style={{ fontSize: 16, fontWeight: 700, margin: "24px 0 8px 0" }}>Notifications</h3>
+            <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: 0, marginBottom: 16 }}>
+              Get a push notification on this device when you arrive at a job, a new
+              request comes in, and other items that need you — even when the app is closed.
+            </p>
+            <Card padding="default">
+              <EnableNotifications />
             </Card>
           </section>
         )}

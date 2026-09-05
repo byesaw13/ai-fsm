@@ -45,6 +45,16 @@ const schema = z.object({
    * submit intake requests.
    */
   BOOKING_ACCOUNT_ID: z.string().uuid().optional(),
+  /**
+   * Web Push (VAPID) — optional. If any is unset, push degrades gracefully:
+   * the public-key endpoint returns none, the client can't subscribe, and
+   * sends are a no-op. Generate a keypair once with:
+   *   npx web-push generate-vapid-keys
+   * VAPID_SUBJECT is a mailto: or https: contact URL required by the spec.
+   */
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().optional(),
 });
 
 let cachedEnv: ReturnType<typeof schema.parse> | null = null;
