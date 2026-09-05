@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
 import { businessToday } from "@/lib/operations/business-day";
+import { sendPushToOwners } from "@/lib/push/send";
 
 export const dynamic = "force-dynamic";
 
@@ -12,10 +13,12 @@ export async function POST(req: NextRequest) {
   }
 
   const row = await queryOne<{
+    account_id: string;
     suppress_weekend_start_prompt: boolean;
     has_open_mileage_today: boolean;
   }>(
-    `SELECT a.suppress_weekend_start_prompt,
+    `SELECT a.id AS account_id,
+            a.suppress_weekend_start_prompt,
             EXISTS (
               SELECT 1 FROM vehicle_sessions vs
               WHERE vs.account_id = a.id
@@ -41,6 +44,14 @@ export async function POST(req: NextRequest) {
   if ((day === 0 || day === 6) && row.suppress_weekend_start_prompt) {
     return NextResponse.json({ signal: "suppress_weekend" });
   }
+
+  // Native Web Push (TASK-116). sendPushToOwners never throws; HA JSON is unchanged.
+  await sendPushToOwners(row.account_id, {
+    title: "Start your day?",
+    body: "RAM connected — tap to open My Work.",
+    url: "/app/my-work",
+    tag: `start-day-${businessToday()}`,
+  });
 
   return NextResponse.json({ signal: "start" });
 }

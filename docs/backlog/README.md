@@ -95,7 +95,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-116**.
+Next available ID: **TASK-119**.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -226,6 +226,8 @@ closed in tests; owner-flow AC still open.
 | TASK-113 | Fuel receipt attaches to the logged-in vehicle | 001 | Done |
 | TASK-114 | Fuel receipt odometer from that day + number sanity check | 001 | Done |
 | TASK-115 | Promise Capture Pilot | 005 | In Progress |
+| TASK-116 | Field-ops Web Push (start-day, home arrival, My Work prompt) | 005 | In Progress |
+| TASK-118 | Native Web Push notifications | 005 | Done |
 
 ## Status legend
 

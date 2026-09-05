@@ -276,11 +276,10 @@ automation:
   # When the RAM connects, ask FSM whether to start the day. FSM checks:
   #   - no open business day exists
   #   - not a suppressed weekend (per account settings)
-  # If the FSM says "start", push a Companion notification.
+  # If the FSM says "start", it sends Web Push to the installed PWA (TASK-116).
+  # Do not add notify.mobile_app — that opened Companion instead of Dovetails.
   #
   # Requires HA ≥ 2023.11 (response_variable support on rest_command actions).
-  # Replace "mobile_app_nicks_s25" with your actual notify entity name
-  # (check Settings → People → your user → Companion app → notify entity).
   - id: fsm_start_day_prompt_ram
     alias: FSM - start-day prompt on RAM connect
     triggers:
@@ -296,19 +295,15 @@ automation:
         response_variable: prompt_result
       - condition: template
         value_template: "{{ prompt_result['content']['signal'] == 'start' }}"
-      - action: notify.mobile_app_nicks_s25
-        data:
-          title: "Start your day?"
-          message: "RAM connected — tap to open Day Review and begin tracking."
-          data:
-            url: "/app/my-day"
+      # TASK-116: FSM sends Web Push to the installed PWA (url /app/my-work).
+      # Do not notify.mobile_app here — that opened Companion instead of Dovetails.
     mode: single
 
   # --- Day-review nudge on home arrival after cutoff time (2026-07-01) ------
   # Fires when Nick arrives at the Home zone after 5 PM (or the configured
   # cutoff). The FSM endpoint checks if the day is open and hasn't been prompted
   # yet. On success it stamps review_prompted_at (enabling the nav badge) and
-  # the automation pushes a Companion notification.
+  # FSM sends Web Push to the installed PWA (TASK-116).
   - id: fsm_day_review_prompt_home_arrival
     alias: FSM - day-review prompt on home arrival
     triggers:
@@ -329,12 +324,9 @@ automation:
         response_variable: review_result
       - condition: template
         value_template: "{{ review_result['content']['result'] == 'prompted' }}"
-      - action: notify.mobile_app_nicks_s25
-        data:
-          title: "Time to close out your day"
-          message: "You're home — review today's visits and close the day."
-          data:
-            url: "/app/day-review"
+      # TASK-116: FSM sends Web Push to the installed PWA (url /app/day-review)
+      # when result == prompted. Do not notify.mobile_app — that opened Companion.
+      # The 8 PM fsm_day_review_push_schedule reminder (TASK-118) is separate.
     mode: single
 
   # Refresh the open stop's address as the geocode updates while still. This is

@@ -9,6 +9,7 @@ import { FieldQuickActions } from "./FieldQuickActions";
 import { ClockBar } from "../ClockBar";
 import { FieldRightNowCard } from "../my-work/FieldRightNowCard";
 import { SitePresenceCard } from "@/components/field/SitePresenceCard";
+import { PushPermissionPrompt } from "@/components/push/PushPermissionPrompt";
 import { isDaySetupComplete, type DaySetupState } from "@/lib/my-day/day-setup";
 import type { HeroVisit } from "@/lib/my-day/visit-hero";
 import type { OpenSession, VehicleOption } from "@/lib/my-work/field-day-types";
@@ -53,6 +54,8 @@ export function MyDayMobileLayout({
           <NextVisitHero visit={heroVisit} />
         </div>
       )}
+
+      <PushPermissionPrompt enabled={!!canCapture} />
 
       {!complete ? (
         <div className="p7-field-hero" style={{ marginBottom: "var(--space-4)" }}>

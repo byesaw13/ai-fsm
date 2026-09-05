@@ -22,6 +22,7 @@ import { reduceLocationEvent, type OpenSegment } from "@/lib/location/segments";
 import { sendPushToUser, sendPushToOwners } from "@/lib/push/send";
 import { autoRecordScheduledVisitPresence } from "@/lib/field/confirm-visit";
 import { listOpenWorkOrdersAtProperty } from "@/lib/field/open-work-orders";
+import { stampLivePromptedAt } from "@/lib/field/stamp-live-prompted";
 
 export const dynamic = "force-dynamic";
 
@@ -666,6 +667,8 @@ async function detectVisitCandidate(
   };
   if (stampUserId) await sendPushToUser(accountId, stampUserId, arrivalPush);
   else await sendPushToOwners(accountId, arrivalPush);
+
+  await stampLivePromptedAt(client, candidateId, accountId);
 
   return {
     arrivalPrompt: {

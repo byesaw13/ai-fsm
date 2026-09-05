@@ -70,6 +70,8 @@ Location capture, visit candidates, day map, hybrid tracking are **shipped infra
 
 **Phase 1 exception — TASK-115 Promise Capture Pilot.** Authorized 2026-09-01. Adds a capture-evidence table and an additive `action_items.source_capture_id` change so an owner promise recorded on Tuesday still exists on an FSM object on Thursday. This is an explicit exception to the table freeze. It does not open Owner OS, coaching, a second inbox, or a new priority scorer. See `docs/superpowers/specs/2026-09-01-promise-capture-pilot-design.md`.
 
+**Phase 1 exception — TASK-116 Field-ops Web Push.** Authorized 2026-09-05. No new table. Wires start-day and home-arrival day-review onto the TASK-118 send helper, stamps arrival `live_prompted_at`, adds a one-time My Work subscribe prompt, and drops the remaining Companion `notify.mobile_app` actions for those events. Does not reopen Owner OS or replace Companion GPS/Bluetooth.
+
 ### Phase 2 — Property-Centered Surfaces
 
 - Property timeline reachable from client, job, visit, estimate, invoice surfaces
