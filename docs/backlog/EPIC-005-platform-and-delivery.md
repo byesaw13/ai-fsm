@@ -10,7 +10,8 @@ workflow.
 # TASK-118: Native Web Push notifications
 
 Status:
-In Progress
+Done (PR #617, deployed to garonhome 2026-09-05; VAPID keys set; day-review
+reminder scheduled; verified on an Android device)
 
 Phase:
 cross-cutting
@@ -41,18 +42,62 @@ Scope:
 Out of Scope:
 - Offline caching (SW stays network-only apart from push).
 - Per-tech targeting of attention items (owner/admins only in v1).
-- Retiring the HA Companion arrival push (config decision; may double until then).
 
 Acceptance Criteria:
-- [ ] A device can subscribe/unsubscribe; subscription is account/user-scoped (RLS).
-- [ ] A test push arrives on an installed PWA with the app closed.
-- [ ] Arrival, new booking/lead, and attention items push the right recipients.
-- [ ] Sends run only on the web tier; dead subscriptions (404/410) are pruned.
-- [ ] Push degrades to a no-op when VAPID env is unset.
+- [x] A device can subscribe/unsubscribe; subscription is account/user-scoped (RLS).
+- [x] A test push arrives on an installed PWA with the app closed.
+- [x] Arrival, new booking/lead, and attention items push the right recipients.
+- [x] Sends run only on the web tier; dead subscriptions (404/410) are pruned.
+- [x] Push degrades to a no-op when VAPID env is unset.
 
-Notes:
-VAPID keys in env (`npx web-push generate-vapid-keys`). iOS works only for a
-home-screen-installed PWA (16.4+) — no code difference, just an install note.
+Notes / delivery record:
+- Shipped in PR #617; deployed to garonhome 2026-09-05 (migration 175 applied).
+- **VAPID keys generated and set** in the garonhome `.env`
+  (`VAPID_PUBLIC_KEY`/`PRIVATE_KEY`/`SUBJECT`); `/api/v1/push/public-key` reports
+  configured. **Key rotation caveat:** rotating VAPID keys silently breaks
+  existing subscriptions and the client does NOT auto-recover — on load
+  `EnableNotifications` re-POSTs the existing subscription unchanged (still bound
+  to the old server key), and there is no `pushsubscriptionchange` handler. After
+  a rotation each device must toggle notifications **off then on** to
+  re-subscribe. Known-limitation follow-up: compare the stored key / handle
+  `pushsubscriptionchange` to recreate automatically. So avoid rotating unless
+  necessary.
+- **Load-bearing constraint:** web-push endpoints are external, and the worker
+  container has no internet egress (`internal: true` network), so all sends run
+  on the **web tier**. Do not route push through the worker-drained
+  `notification_queue`. `lib/push/send.ts` uses a dedicated max-2 pg pool so it
+  never competes with the request pool.
+- **No HA job-arrival push ever existed** (the `arrival-prompt` ACK route was a
+  planned-but-unwired integration), so the native arrival push does not double
+  with anything — nothing had to be disabled for arrival.
+- **Day-review reminder scheduled via Home Assistant** (not the worker, which
+  lacks egress): HA automation `fsm_day_review_push_schedule` fires at 20:00 →
+  `rest_command.fsm_day_review_push` → `POST /api/internal/push/day-review-reminder`
+  (only pushes users with an OPEN business day). The prior HA "home after 5 PM"
+  nudge (`fsm_day_review_prompt_home_arrival`) is commented out to avoid doubling.
+  HA config at `~/docker/homeassistant/{automations,rest_commands}.yaml` on
+  garonhome; apply via a homeassistant container restart.
+- **Verified on hardware:** the four trigger-style pushes (arrival, booking,
+  invoice/attention, day-review) and the scheduled 8 PM reminder all delivered to
+  an installed Android PWA with the app closed.
+- Codex review (5 findings) addressed before merge: shared-device subscription
+  reassociation, the pool-exhaustion deadlock, VAPID-init-inside-guard,
+  `ON DELETE CASCADE` for subscriptions, and honest test-push reporting.
+- iOS: works only for a home-screen-installed PWA (16.4+) — no code difference,
+  just an install step. Untested on iOS (no device in the field yet).
+
+Follow-ups (not blocking):
+- The duplicate migration number `175` (`175_capture_evidence.sql` +
+  `175_push_subscriptions.sql`) is harmless **only because both are already
+  applied and left as-is** — `schema_migrations` is keyed by full filename and
+  they sort/apply deterministically and independently. **Do NOT renumber either
+  file:** `deploy-garonhome.sh` would treat the new name as unseen and re-run the
+  migration, hitting the unconditional `CREATE TRIGGER` and failing the deploy.
+  Applied migration filenames are immutable; only new numbers must avoid future
+  collisions.
+- Key-rotation auto-recovery (see the rotation caveat above): handle
+  `pushsubscriptionchange` / compare the server key so devices re-subscribe
+  without a manual off/on. Low priority — rotation is rare.
 
 # TASK-115: Promise Capture Pilot
 
