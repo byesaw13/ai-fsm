@@ -29,7 +29,7 @@ export function shouldShowPushPrompt({
 }): boolean {
   return (
     supported &&
-    permission === "default" &&
+    (permission === "default" || permission === "granted") &&
     !prompted &&
     configured &&
     !hasSubscription
@@ -70,8 +70,9 @@ export function PushPermissionPrompt({ enabled }: { enabled: boolean }) {
       return;
     }
     const supported = isPushSupported();
-    // Skip network until permission/support/dismiss could actually show the card.
-    if (!supported || Notification.permission !== "default" || isPrompted()) {
+    // Denied cannot be re-prompted. Granted still needs a live server
+    // subscription — hide only after we confirm or re-POST one.
+    if (!supported || isPrompted() || Notification.permission === "denied") {
       setVisible(false);
       return;
     }
@@ -92,12 +93,27 @@ export function PushPermissionPrompt({ enabled }: { enabled: boolean }) {
         const reg = await navigator.serviceWorker.getRegistration();
         const existing = await reg?.pushManager.getSubscription();
         if (cancelled) return;
+        if (existing) {
+          // Shared device / failed POST: reassociate the browser subscription
+          // with this session the same way EnableNotifications does.
+          const saved = await fetch("/api/v1/push/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(existing.toJSON()),
+          }).catch(() => null);
+          if (cancelled) return;
+          if (saved?.ok) {
+            setVisible(false);
+            return;
+          }
+          // Server still has no usable row — keep Enable so they can retry.
+        }
         setVisible(
           shouldShowPushPrompt({
             permission: Notification.permission,
             prompted: isPrompted(),
             configured: true,
-            hasSubscription: Boolean(existing),
+            hasSubscription: false,
             supported: true,
           }),
         );
@@ -163,7 +179,7 @@ export function PushPermissionPrompt({ enabled }: { enabled: boolean }) {
       <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
         <button
           type="button"
-          className="p7-btn p7-btn-primary p7-btn-sm"
+          className="p7-btn p7-btn-primary"
           onClick={enable}
           disabled={working}
         >
@@ -171,7 +187,7 @@ export function PushPermissionPrompt({ enabled }: { enabled: boolean }) {
         </button>
         <button
           type="button"
-          className="p7-btn p7-btn-ghost p7-btn-sm"
+          className="p7-btn p7-btn-ghost"
           onClick={dismiss}
           disabled={working}
         >

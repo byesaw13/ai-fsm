@@ -22,8 +22,12 @@ describe("shouldShowPushPrompt", () => {
     expect(shouldShowPushPrompt({ ...show, permission: "denied" })).toBe(false);
   });
 
-  it("hides when permission is granted", () => {
-    expect(shouldShowPushPrompt({ ...show, permission: "granted" })).toBe(false);
+  it("shows when permission is granted but there is no subscription", () => {
+    expect(shouldShowPushPrompt({ ...show, permission: "granted" })).toBe(true);
+  });
+
+  it("hides when permission is granted and a subscription exists", () => {
+    expect(shouldShowPushPrompt({ ...show, permission: "granted", hasSubscription: true })).toBe(false);
   });
 
   it("hides after Not now", () => {
