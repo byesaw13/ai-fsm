@@ -10,7 +10,8 @@ workflow.
 # TASK-118: Native Web Push notifications
 
 Status:
-In Progress
+Done (PR #617, deployed to garonhome 2026-09-05; VAPID keys set; day-review
+reminder scheduled; verified on an Android device)
 
 Phase:
 cross-cutting
@@ -41,18 +42,48 @@ Scope:
 Out of Scope:
 - Offline caching (SW stays network-only apart from push).
 - Per-tech targeting of attention items (owner/admins only in v1).
-- Retiring the HA Companion arrival push (config decision; may double until then).
 
 Acceptance Criteria:
-- [ ] A device can subscribe/unsubscribe; subscription is account/user-scoped (RLS).
-- [ ] A test push arrives on an installed PWA with the app closed.
-- [ ] Arrival, new booking/lead, and attention items push the right recipients.
-- [ ] Sends run only on the web tier; dead subscriptions (404/410) are pruned.
-- [ ] Push degrades to a no-op when VAPID env is unset.
+- [x] A device can subscribe/unsubscribe; subscription is account/user-scoped (RLS).
+- [x] A test push arrives on an installed PWA with the app closed.
+- [x] Arrival, new booking/lead, and attention items push the right recipients.
+- [x] Sends run only on the web tier; dead subscriptions (404/410) are pruned.
+- [x] Push degrades to a no-op when VAPID env is unset.
 
-Notes:
-VAPID keys in env (`npx web-push generate-vapid-keys`). iOS works only for a
-home-screen-installed PWA (16.4+) — no code difference, just an install note.
+Notes / delivery record:
+- Shipped in PR #617; deployed to garonhome 2026-09-05 (migration 175 applied).
+- **VAPID keys generated and set** in the garonhome `.env`
+  (`VAPID_PUBLIC_KEY`/`PRIVATE_KEY`/`SUBJECT`); `/api/v1/push/public-key` reports
+  configured. Rotating the keys invalidates existing subscriptions (clients
+  re-subscribe on next load).
+- **Load-bearing constraint:** web-push endpoints are external, and the worker
+  container has no internet egress (`internal: true` network), so all sends run
+  on the **web tier**. Do not route push through the worker-drained
+  `notification_queue`. `lib/push/send.ts` uses a dedicated max-2 pg pool so it
+  never competes with the request pool.
+- **No HA job-arrival push ever existed** (the `arrival-prompt` ACK route was a
+  planned-but-unwired integration), so the native arrival push does not double
+  with anything — nothing had to be disabled for arrival.
+- **Day-review reminder scheduled via Home Assistant** (not the worker, which
+  lacks egress): HA automation `fsm_day_review_push_schedule` fires at 20:00 →
+  `rest_command.fsm_day_review_push` → `POST /api/internal/push/day-review-reminder`
+  (only pushes users with an OPEN business day). The prior HA "home after 5 PM"
+  nudge (`fsm_day_review_prompt_home_arrival`) is commented out to avoid doubling.
+  HA config at `~/docker/homeassistant/{automations,rest_commands}.yaml` on
+  garonhome; apply via a homeassistant container restart.
+- **Verified on hardware:** the four trigger-style pushes (arrival, booking,
+  invoice/attention, day-review) and the scheduled 8 PM reminder all delivered to
+  an installed Android PWA with the app closed.
+- Codex review (5 findings) addressed before merge: shared-device subscription
+  reassociation, the pool-exhaustion deadlock, VAPID-init-inside-guard,
+  `ON DELETE CASCADE` for subscriptions, and honest test-push reporting.
+- iOS: works only for a home-screen-installed PWA (16.4+) — no code difference,
+  just an install step. Untested on iOS (no device in the field yet).
+
+Follow-ups (not blocking):
+- Renumber the duplicate migration `175` (`175_capture_evidence.sql` +
+  `175_push_subscriptions.sql`) in a future migration-hygiene pass — harmless
+  (tracked by filename, both applied), cosmetic only.
 
 # TASK-115: Promise Capture Pilot
 
