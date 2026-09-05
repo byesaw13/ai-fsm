@@ -54,8 +54,14 @@ Notes / delivery record:
 - Shipped in PR #617; deployed to garonhome 2026-09-05 (migration 175 applied).
 - **VAPID keys generated and set** in the garonhome `.env`
   (`VAPID_PUBLIC_KEY`/`PRIVATE_KEY`/`SUBJECT`); `/api/v1/push/public-key` reports
-  configured. Rotating the keys invalidates existing subscriptions (clients
-  re-subscribe on next load).
+  configured. **Key rotation caveat:** rotating VAPID keys silently breaks
+  existing subscriptions and the client does NOT auto-recover — on load
+  `EnableNotifications` re-POSTs the existing subscription unchanged (still bound
+  to the old server key), and there is no `pushsubscriptionchange` handler. After
+  a rotation each device must toggle notifications **off then on** to
+  re-subscribe. Known-limitation follow-up: compare the stored key / handle
+  `pushsubscriptionchange` to recreate automatically. So avoid rotating unless
+  necessary.
 - **Load-bearing constraint:** web-push endpoints are external, and the worker
   container has no internet egress (`internal: true` network), so all sends run
   on the **web tier**. Do not route push through the worker-drained
@@ -81,9 +87,17 @@ Notes / delivery record:
   just an install step. Untested on iOS (no device in the field yet).
 
 Follow-ups (not blocking):
-- Renumber the duplicate migration `175` (`175_capture_evidence.sql` +
-  `175_push_subscriptions.sql`) in a future migration-hygiene pass — harmless
-  (tracked by filename, both applied), cosmetic only.
+- The duplicate migration number `175` (`175_capture_evidence.sql` +
+  `175_push_subscriptions.sql`) is harmless **only because both are already
+  applied and left as-is** — `schema_migrations` is keyed by full filename and
+  they sort/apply deterministically and independently. **Do NOT renumber either
+  file:** `deploy-garonhome.sh` would treat the new name as unseen and re-run the
+  migration, hitting the unconditional `CREATE TRIGGER` and failing the deploy.
+  Applied migration filenames are immutable; only new numbers must avoid future
+  collisions.
+- Key-rotation auto-recovery (see the rotation caveat above): handle
+  `pushsubscriptionchange` / compare the server key so devices re-subscribe
+  without a manual off/on. Low priority — rotation is rare.
 
 # TASK-115: Promise Capture Pilot
 
