@@ -1,61 +1,63 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Capture the markFailed UPDATE.
-const poolQuery = vi.fn().mockResolvedValue({ rows: [] });
-const clientQuery = vi.fn();
+// Route client.query by SQL text: return subscription rows for the SELECT,
+// capture the failed_at UPDATE, ack BEGIN/COMMIT/set_config.
+const rows = [
+  { id: "sub-live", user_id: "u1", endpoint: "https://push/live", p256dh: "a", auth: "b" },
+  { id: "sub-dead", user_id: "u1", endpoint: "https://push/dead", p256dh: "c", auth: "d" },
+];
+const updateCalls: Array<{ sql: string; params: unknown[] }> = [];
+
+const clientQuery = vi.fn(async (sql: string, params?: unknown[]) => {
+  if (sql.includes("FROM push_subscriptions") && sql.includes("SELECT")) return { rows };
+  if (sql.includes("failed_at")) {
+    updateCalls.push({ sql, params: params ?? [] });
+    return { rows: [] };
+  }
+  return { rows: [] };
+});
 const release = vi.fn();
 
 vi.mock("@/lib/db", () => ({
-  getPool: () => ({
-    query: poolQuery,
-    connect: async () => ({ query: clientQuery, release }),
-  }),
+  getPool: () => ({ connect: async () => ({ query: clientQuery, release }) }),
 }));
 
 const sendNotification = vi.fn();
-vi.mock("@/lib/push/vapid", () => ({
-  getWebPush: () => ({ sendNotification }),
-}));
-
-const listSubscriptionsForUsers = vi.fn();
-vi.mock("@/lib/push/subscriptions", () => ({
-  listSubscriptionsForUsers: (...args: unknown[]) => listSubscriptionsForUsers(...args),
-}));
+vi.mock("@/lib/push/vapid", () => ({ getWebPush: () => ({ sendNotification }) }));
 
 import { sendPushToUsers } from "@/lib/push/send";
 
-const rows = [
-  { id: "sub-live", endpoint: "https://push/live", p256dh: "a", auth: "b" },
-  { id: "sub-dead", endpoint: "https://push/dead", p256dh: "c", auth: "d" },
-];
-
 describe("sendPushToUsers", () => {
   beforeEach(() => {
-    poolQuery.mockClear();
+    clientQuery.mockClear();
     sendNotification.mockReset();
-    listSubscriptionsForUsers.mockReset();
-    listSubscriptionsForUsers.mockResolvedValue(rows);
+    updateCalls.length = 0;
   });
 
   it("delivers to live subs and prunes ones that return 410", async () => {
-    sendNotification.mockImplementation((sub: { endpoint: string }) => {
-      if (sub.endpoint.endsWith("/dead")) return Promise.reject({ statusCode: 410 });
-      return Promise.resolve();
-    });
+    sendNotification.mockImplementation((sub: { endpoint: string }) =>
+      sub.endpoint.endsWith("/dead") ? Promise.reject({ statusCode: 410 }) : Promise.resolve(),
+    );
 
     const sent = await sendPushToUsers("acct-1", ["u1"], { title: "Hi", url: "/app" });
 
     expect(sent).toBe(1);
-    // The dead subscription was marked failed_at, by id.
-    const updateCall = poolQuery.mock.calls.find((c) => String(c[0]).includes("failed_at"));
-    expect(updateCall).toBeTruthy();
-    expect(updateCall![1]).toEqual([["sub-dead"]]);
+    expect(updateCalls).toHaveLength(1);
+    expect(updateCalls[0].params).toEqual([["sub-dead"]]);
   });
 
   it("does not prune on a transient (non-410) error", async () => {
     sendNotification.mockRejectedValue({ statusCode: 500 });
     const sent = await sendPushToUsers("acct-1", ["u1"], { title: "Hi" });
     expect(sent).toBe(0);
-    expect(poolQuery.mock.calls.some((c) => String(c[0]).includes("failed_at"))).toBe(false);
+    expect(updateCalls).toHaveLength(0);
+  });
+
+  it("sets the account RLS context before reading", async () => {
+    sendNotification.mockResolvedValue(undefined);
+    await sendPushToUsers("acct-9", ["u1"], { title: "Hi" });
+    const setConfig = clientQuery.mock.calls.find((c) => String(c[0]).includes("app.current_account_id"));
+    expect(setConfig).toBeTruthy();
+    expect(setConfig![1]).toEqual(["acct-9"]);
   });
 });

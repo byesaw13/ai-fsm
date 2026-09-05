@@ -18,8 +18,6 @@ export interface WebPushSubscription {
   keys: { p256dh: string; auth: string };
 }
 
-const COLS = `id, user_id, endpoint, p256dh, auth`;
-
 /** Upsert a subscription for a user. Re-subscribing the same endpoint refreshes it. */
 export async function saveSubscription(
   client: PoolClient,
@@ -54,29 +52,3 @@ export async function deleteSubscription(
   );
 }
 
-export async function listSubscriptionsForUser(
-  client: PoolClient,
-  accountId: string,
-  userId: string,
-): Promise<PushSubscriptionRow[]> {
-  const { rows } = await client.query<PushSubscriptionRow>(
-    `SELECT ${COLS} FROM push_subscriptions
-      WHERE account_id = $1 AND user_id = $2 AND failed_at IS NULL`,
-    [accountId, userId],
-  );
-  return rows;
-}
-
-export async function listSubscriptionsForUsers(
-  client: PoolClient,
-  accountId: string,
-  userIds: string[],
-): Promise<PushSubscriptionRow[]> {
-  if (userIds.length === 0) return [];
-  const { rows } = await client.query<PushSubscriptionRow>(
-    `SELECT ${COLS} FROM push_subscriptions
-      WHERE account_id = $1 AND user_id = ANY($2) AND failed_at IS NULL`,
-    [accountId, userIds],
-  );
-  return rows;
-}
