@@ -55,6 +55,17 @@ export function EnableNotifications() {
         }
         const reg = await navigator.serviceWorker.getRegistration();
         const existing = await reg?.pushManager.getSubscription();
+        if (existing) {
+          // Shared device: the origin's subscription may still be assigned to a
+          // previous user server-side. Re-POST so it's reassociated with the
+          // current session (subscribe upserts on endpoint) — otherwise the
+          // old user keeps getting this device's notifications.
+          await fetch("/api/v1/push/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(existing.toJSON()),
+          }).catch(() => {});
+        }
         setState(existing ? "on" : "off");
       } catch {
         if (!cancelled) setState("off");
@@ -118,7 +129,17 @@ export function EnableNotifications() {
     setMsg(null);
     try {
       const res = await fetch("/api/v1/push/test", { method: "POST" });
-      setMsg(res.ok ? "Test sent — check your notifications." : "Test failed.");
+      const json = await res.json().catch(() => ({}));
+      const sent = json?.data?.sent ?? 0;
+      // A 200 with sent === 0 means nothing was delivered (no live subscription
+      // on this device) — don't report a false success.
+      setMsg(
+        res.ok && sent > 0
+          ? "Test sent — check your notifications."
+          : res.ok
+            ? "No device received it — try turning notifications off and on again."
+            : "Test failed.",
+      );
     } catch {
       setMsg("Test failed.");
     }

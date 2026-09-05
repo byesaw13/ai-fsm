@@ -18,12 +18,21 @@ const clientQuery = vi.fn(async (sql: string, params?: unknown[]) => {
 });
 const release = vi.fn();
 
-vi.mock("@/lib/db", () => ({
-  getPool: () => ({ connect: async () => ({ query: clientQuery, release }) }),
+// send.ts builds its own dedicated pg Pool.
+vi.mock("pg", () => ({
+  Pool: class {
+    connect() {
+      return Promise.resolve({ query: clientQuery, release });
+    }
+  },
 }));
+vi.mock("@/lib/env", () => ({ getEnv: () => ({ DATABASE_URL: "postgres://test" }) }));
 
 const sendNotification = vi.fn();
-vi.mock("@/lib/push/vapid", () => ({ getWebPush: () => ({ sendNotification }) }));
+vi.mock("@/lib/push/vapid", () => ({
+  getWebPush: () => ({ sendNotification }),
+  isPushConfigured: () => true,
+}));
 
 import { sendPushToUsers } from "@/lib/push/send";
 

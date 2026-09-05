@@ -10,17 +10,30 @@
  * reads/prunes are correct whether or not the app DB role bypasses RLS — the
  * same defensive pattern as withDbSession and the location ingest route.
  */
-import type { PoolClient } from "pg";
-import { getPool } from "@/lib/db";
+import { Pool, type PoolClient } from "pg";
+import { getEnv } from "@/lib/env";
 import { logger } from "@/lib/logger";
-import { getWebPush } from "./vapid";
+import { getWebPush, isPushConfigured } from "./vapid";
 import { buildPushPayload, type PushInput } from "./payload";
 import { ownerAndAdminUserIds } from "./recipients";
 import { type PushSubscriptionRow } from "./subscriptions";
 
+/**
+ * Dedicated connection pool for push, separate from the request pool. Callers
+ * (booking/estimate/payment/location) invoke sends while still holding their own
+ * request-pool connection; acquiring from the same pool here could exhaust it
+ * and deadlock. This isolated small pool cannot starve request traffic, and each
+ * send releases its connection before the web-push network round-trips.
+ */
+let pushPool: Pool | null = null;
+function getPushPool(): Pool {
+  if (!pushPool) pushPool = new Pool({ connectionString: getEnv().DATABASE_URL, max: 2 });
+  return pushPool;
+}
+
 /** Run fn in a short tx with the account's RLS context set locally. */
 async function withAccountTx<T>(accountId: string, fn: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await getPool().connect();
+  const client = await getPushPool().connect();
   try {
     await client.query("BEGIN");
     await client.query(
@@ -100,7 +113,7 @@ export async function sendPushToUsers(
   userIds: string[],
   input: PushInput,
 ): Promise<number> {
-  if (!getWebPush()) return 0;
+  if (!isPushConfigured()) return 0;
   try {
     const rows = await loadSubs(accountId, userIds);
     return await deliver(accountId, rows, input);
@@ -120,7 +133,7 @@ export async function sendPushToUser(
 
 /** Push to every owner/admin in the account (the office-facing recipients). */
 export async function sendPushToOwners(accountId: string, input: PushInput): Promise<number> {
-  if (!getWebPush()) return 0;
+  if (!isPushConfigured()) return 0;
   try {
     const ids = await withAccountTx(accountId, (client) => ownerAndAdminUserIds(client, accountId));
     const rows = await loadSubs(accountId, ids);

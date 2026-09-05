@@ -9,8 +9,10 @@
 CREATE TABLE IF NOT EXISTS push_subscriptions (
   id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id    UUID        NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-  -- RESTRICT: keep the row if a user is removed; deactivate the user instead.
-  user_id       UUID        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  -- CASCADE: a push subscription is an ephemeral device token, not history worth
+  -- keeping. Removing a user should drop their subscriptions, not block the
+  -- delete with a FK violation (there is no user-deactivation flow).
+  user_id       UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   endpoint      TEXT        NOT NULL,
   p256dh        TEXT        NOT NULL,
   auth          TEXT        NOT NULL,
