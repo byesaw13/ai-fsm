@@ -7,6 +7,83 @@ workflow.
 
 ## Active tasks
 
+# TASK-116: Field-ops Web Push (start-day, home-arrival day-review, My Work prompt)
+
+Status:
+In Progress
+
+Phase:
+1 (no new table; completes field-ops triggers on the TASK-118 platform)
+
+Problem:
+TASK-118 shipped native Web Push (subscribe, VAPID, SW, arrival, attention, 8 PM
+day-review reminder) and verified it on an Android PWA. Start-day still only
+notifies via Home Assistant Companion with a relative `/app/my-day` URL, so RAM
+connect opens Companion instead of Dovetails. Home-arrival day-review is the
+same: FSM decides on `POST /api/internal/day-review-prompt` but does not send
+Web Push; the repo HA yaml still calls `notify.mobile_app_nicks_s25`. Arrival
+already pushes from the location route but never stamps
+`visit_candidates.live_prompted_at`. Subscribe is Settings-only; My Work never
+asks.
+
+Business Value:
+The three field interrupts — RAM start-day, on-site, home-arrival day-review —
+arrive as Dovetails-icon banners and open the installed PWA. Companion stays the
+GPS/Bluetooth sensor.
+
+Scope:
+- On `signal === "start"`, `POST /api/internal/start-day-prompt` fire-and-forget
+  `sendPushToOwners` (TASK-118 helper). Title `Start your day?` Body
+  `RAM connected — tap to open My Work.` url `/app/my-work` tag
+  `start-day-{businessDate}`. Do not change the JSON body HA already reads.
+- On `result === "prompted"`, `POST /api/internal/day-review-prompt` send
+  `Time to close out your day` / `You're home — review today's visits and close
+  the day.` url `/app/day-review` tag `day-review-{businessDate}`. Keep the
+  existing 8 PM `day-review-reminder` endpoint; do not delete it.
+- After the existing arrival send in `location/route.ts`, stamp
+  `visit_candidates.live_prompted_at` so HA ack is no longer required.
+- One-time owner prompt on `/app/my-work` when permission is `default` and not
+  dismissed (`localStorage` `dovetails.push.prompted`). Button uses a user
+  gesture (same subscribe path as `EnableNotifications`). Hide when already
+  subscribed, blocked, or dismissed. Do not add a second Settings control —
+  Profile already has TASK-118's Enable notifications.
+- HA yaml last: remove `notify.mobile_app_nicks_s25` from start-day and
+  home-arrival automations. Keep `rest_command` POSTs to FSM. Keep location /
+  Bluetooth automations. Keep the 8 PM `fsm_day_review_push` schedule.
+- Relative urls only (`buildPushPayload` rejects non-`/` urls). SW origin is
+  `https://app.mydovetails.com`.
+
+Out of Scope:
+- Rebuilding TASK-118 (table, VAPID, SW, subscribe API, attention, booking)
+- HA inbound webhooks, TWA, Share Target, SSE, offline cache
+- Replacing Companion GPS / Bluetooth
+- Tech recipients, customer messages, `notification_queue`
+- Absolute-URL Companion notify (path A)
+- Renumbering migration 175
+
+Acceptance Criteria:
+- [ ] `signal === "start"` sends start-day Web Push to `/app/my-work`. Other
+      signals do not send. HA JSON is unchanged.
+- [ ] `result === "prompted"` sends day-review Web Push to `/app/day-review`.
+      Skipped results do not send.
+- [ ] Arrival send stamps `live_prompted_at` on that candidate.
+- [ ] Owner on `/app/my-work` sees one Enable-alerts prompt when permission is
+      default; dismiss remembers; Settings → Profile still toggles.
+- [ ] Tech is not prompted. Admin still never lands on My Work.
+- [ ] Repo `docs/working/ha-location-capture.yaml` no longer calls
+      `notify.mobile_app` for start-day or home-arrival. Location POSTs remain.
+- [ ] `pnpm gate:fast` passes.
+
+Notes:
+- GitHub: https://github.com/byesaw13/ai-fsm/issues/619
+- Platform: TASK-118 / PR #617. Do not add `web-push` again or a second
+  subscriptions table.
+- Send on the web tier only (`lib/push/send.ts`). Never throw to the HA POST.
+- Select `a.id AS account_id` in the two prompt queries so `sendPushToOwners`
+  has an account.
+- After one successful S25 start-day or home-arrival push, apply the HA yaml
+  on garonhome (`~/docker/homeassistant/`) and reload automations.
+
 # TASK-118: Native Web Push notifications
 
 Status:

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
 import { businessToday, businessMinutesNow } from "@/lib/operations/business-day";
+import { sendPushToOwners } from "@/lib/push/send";
 
 export const dynamic = "force-dynamic";
 
@@ -12,11 +13,13 @@ export async function POST(req: NextRequest) {
   }
 
   const row = await queryOne<{
+    account_id: string;
     business_day_id: string | null;
     cutoff_time: string;
     already_prompted: boolean;
   }>(
-    `SELECT bd.id AS business_day_id,
+    `SELECT a.id AS account_id,
+            bd.id AS business_day_id,
             a.day_review_cutoff_time::text AS cutoff_time,
             (bd.review_prompted_at IS NOT NULL) AS already_prompted
      FROM accounts a
@@ -48,6 +51,13 @@ export async function POST(req: NextRequest) {
     `UPDATE business_days SET review_prompted_at = now(), updated_at = now() WHERE id = $1`,
     [row.business_day_id],
   );
+
+  await sendPushToOwners(row.account_id, {
+    title: "Time to close out your day",
+    body: "You're home — review today's visits and close the day.",
+    url: "/app/day-review",
+    tag: `day-review-${businessToday()}`,
+  });
 
   return NextResponse.json({ result: "prompted" });
 }
