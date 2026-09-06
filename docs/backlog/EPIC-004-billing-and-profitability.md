@@ -59,7 +59,7 @@ Acceptance Criteria:
       one action switches to a price-book rate or flat fee.
 - [ ] The billed total is floored to the existing `minimum_service_fee_cents`
       (no second minimum added); per-job override works via the existing path.
-- [ ] `QuickBookModal` opens from all three launch points (Schedule +, My Day,
+- [x] `QuickBookModal` opens from all three launch points (Schedule +, My Day,
       global FAB) as one shared component.
 - [ ] "Done" closes the visit only; the business day stays open until Day Review.
 - [ ] No duplicate booking/capture path is introduced.
@@ -69,6 +69,11 @@ Priority item from the 2026-09-05 owner workflow review. Capture = existing
 quick-book (`apps/web/app/api/v1/quick-book/route.ts`). Design + flow:
 `docs/working/2026-09-05-quick-job-lane-spec.md`. Button placement is a field
 surface (EPIC-006/007); the residual **here** is the billing seam.
+
+Shipped so far:
+- Service-minimum floor (#624 slice 1, #625 slice 2).
+- Three launch points around one `QuickBookModal` (`components/jobs/QuickBookModal.tsx`);
+  omitted assignee defaults to the current user so the visit lands on My Day.
 
 # TASK-120: Big-job billing — deposit gate + progress (thirds) billing
 

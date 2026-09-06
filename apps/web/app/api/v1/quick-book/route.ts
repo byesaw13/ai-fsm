@@ -13,6 +13,7 @@ import { logger } from "@/lib/logger";
 import { syncWorkOrderLeadFromVisit } from "@/lib/work-orders/assign-lead";
 import { createDefaultWorkOrderForJob } from "@/lib/work-orders/create-default";
 import { syncWorkOrderStatus } from "@/lib/work-orders/sync-status";
+import { resolveQuickBookAssignee } from "@/lib/jobs/quick-book";
 
 export const dynamic = "force-dynamic";
 
@@ -127,6 +128,8 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       createdBy: session.userId,
     });
 
+    const assignedUserId = resolveQuickBookAssignee(d.assigned_user_id, session.userId);
+
     // ── 4. Create visit ──────────────────────────────────────────────────────
     const { rows: visitRows } = await client.query(
       `INSERT INTO visits (account_id, job_id, work_order_id, assigned_user_id, scheduled_start, scheduled_end, visit_type)
@@ -136,7 +139,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
         session.accountId,
         jobId,
         workOrderId,
-        d.assigned_user_id ?? null,
+        assignedUserId,
         d.scheduled_start,
         d.scheduled_end,
       ],
@@ -156,7 +159,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       client,
       workOrderId,
       session.accountId,
-      d.assigned_user_id ?? null,
+      assignedUserId,
     );
     await syncWorkOrderStatus(client, workOrderId, session.accountId);
 

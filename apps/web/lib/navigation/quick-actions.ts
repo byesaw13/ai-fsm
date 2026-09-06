@@ -14,6 +14,8 @@ export interface QuickAction {
   /** Internal app path. Components cast this to Next's typed `Route`. */
   href: string;
   icon: string;
+  /** Opens the shared QuickBookModal instead of navigating (TASK-119). */
+  action?: "quick-book";
 }
 
 /** Owner Dashboard (`/app`) quick actions. */
@@ -33,10 +35,23 @@ export const OWNER_QUICK_ACTIONS: QuickAction[] = [
  * as owners, so it intentionally omits owner/admin-only vehicle tracking.
  */
 export const FIELD_QUICK_ACTIONS: QuickAction[] = [
+  { label: "Quick job", href: "/app/my-work", icon: "🧰", action: "quick-book" },
   { label: "New Estimate", href: "/app/estimates", icon: "📝" },
   { label: "Quick Materials", href: "/app/materials/quick", icon: "📦" },
   { label: "New Project", href: "/app/jobs", icon: "🛠️" },
   { label: "Add Expense", href: "/app/expenses/new", icon: "🛒" },
   { label: "Upload Receipt", href: "/app/expenses/new", icon: "🧾" },
   { label: "New Request", href: "/app/intake/new", icon: "⚡" },
+];
+
+/** Global + sheet (owner/admin). Quick job opens the same modal as My Day / Schedule. */
+export const FAB_QUICK_ACTIONS: QuickAction[] = [
+  { label: "Capture", href: "/app/capture", icon: "🎙️" },
+  { label: "Quick job", href: "/app/my-work", icon: "🧰", action: "quick-book" },
+  { label: "Quick Estimate", href: "/app/estimates/quick", icon: "⚡" },
+  { label: "New Invoice", href: "/app/invoices/new", icon: "💵" },
+  { label: "New Project", href: "/app/jobs/new", icon: "🧰" },
+  { label: "New Request", href: "/app/intake/new", icon: "📋" },
+  { label: "Material Run", href: "/app/expenses/new?mode=run", icon: "🧾" },
+  { label: "Log Mileage", href: "/app/mileage/new", icon: "🚗" },
 ];
