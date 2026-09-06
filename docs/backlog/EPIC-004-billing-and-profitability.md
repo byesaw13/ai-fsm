@@ -57,6 +57,9 @@ Acceptance Criteria:
 - [ ] A quick-booked visit captures on-site time with one tap.
 - [ ] Invoicing that job pre-fills hours at the bill rate with no manual entry;
       one action switches to a price-book rate or flat fee.
+      (Toggle shipped: invoice editor Hourly / Price-book / Flat via
+      `POST /api/v1/invoices/:id/labor-rate`. Prefill-on-create still uses
+      existing T&M path.)
 - [ ] The billed total is floored to the existing `minimum_service_fee_cents`
       (no second minimum added); per-job override works via the existing path.
 - [x] `QuickBookModal` opens from all three launch points (Schedule +, My Day,
