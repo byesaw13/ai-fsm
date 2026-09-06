@@ -7,6 +7,7 @@ import { sendEmail, appUrl, isEmailConfigured } from "@/lib/email/mailer";
 import { invoiceEmailHtml, invoiceEmailText } from "@ai-fsm/email-templates";
 import { logCommunication } from "@/lib/communications-log";
 import { loadInvoicePdf } from "@/lib/pdf/load";
+import { applyServiceMinimum, isServiceMinimumEligible } from "@/lib/invoices/service-minimum";
 import { dueDateUponCompletion, invoiceDueOnCompletion } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
@@ -20,10 +21,12 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         `SELECT i.id, i.status, i.invoice_number, i.total_cents, i.balance_cents,
                 i.deposit_cents, i.due_date, i.notes, i.sent_at, i.paid_at, i.share_token,
                 i.invoice_kind, j.status AS job_status,
+                e.minimum_service_override_reason AS estimate_override,
                 c.id AS client_id, c.name AS client_name, c.email AS client_email
          FROM invoices i
          JOIN clients c ON c.id = i.client_id
          LEFT JOIN jobs j ON j.id = i.job_id
+         LEFT JOIN estimates e ON e.id = i.estimate_id
          WHERE i.id = $1 AND i.account_id = $2`,
         [id, session.accountId]
       );
@@ -36,6 +39,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         due_date: string | null; notes: string | null; sent_at: string | null;
         paid_at: string | null; share_token: string;
         invoice_kind: string; job_status: string | null;
+        estimate_override: string | null;
         client_id: string; client_name: string; client_email: string | null;
       };
 
@@ -51,6 +55,37 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
       if (!isEmailConfigured()) {
         return { status: 503, message: "Email is not configured on this server" };
+      }
+
+      // TASK-119: floor a draft to the account's service minimum before it goes
+      // out — maintains the single "Service minimum" adjustment line and refreshes
+      // totals so the email + PDF reflect it. Only on the draft→sent finalize
+      // (sent invoices are immutable). Non-fatal: a settings hiccup must not block
+      // the send — fall through with the current totals.
+      if (
+        inv.status === "draft" &&
+        isServiceMinimumEligible({
+          invoiceKind: inv.invoice_kind,
+          minimumServiceOverrideReason: inv.estimate_override,
+        })
+      ) {
+        // SAVEPOINT: a failure here must not poison the send transaction — that
+        // would let the email go out while the later status update rolls back,
+        // risking a duplicate email on retry. Roll back to the savepoint and
+        // continue the send with the current totals.
+        try {
+          await client.query("SAVEPOINT svc_min");
+          const totals = await applyServiceMinimum(client, id, session.accountId);
+          await client.query("RELEASE SAVEPOINT svc_min");
+          inv.total_cents = totals.total_cents;
+          inv.balance_cents = totals.balance_cents;
+        } catch (err) {
+          await client.query("ROLLBACK TO SAVEPOINT svc_min").catch(() => {});
+          logger.warn("[invoices/send] service minimum not applied", {
+            invoiceId: id,
+            error: (err as Error).message,
+          });
+        }
       }
 
       const isPaid = inv.status === "paid";
