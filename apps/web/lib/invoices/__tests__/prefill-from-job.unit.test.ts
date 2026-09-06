@@ -19,4 +19,17 @@ describe("jobPricingModeFromSources", () => {
   it("returns null for an unrecognized mode so callers do not guess", () => {
     expect(jobPricingModeFromSources("something_else", null)).toBeNull();
   });
+
+  it("does not treat an undecided booking (pricing_mode NULL) as a quick job", () => {
+    expect(jobPricingModeFromSources(null, null, { hasBooking: true })).toBeNull();
+  });
+
+  it("still uses an explicit booking mode when a booking exists", () => {
+    expect(
+      jobPricingModeFromSources(null, "hourly_internal", { hasBooking: true }),
+    ).toBe("hourly_internal");
+    expect(jobPricingModeFromSources(null, "flat_rate", { hasBooking: true })).toBe(
+      "flat_rate",
+    );
+  });
 });

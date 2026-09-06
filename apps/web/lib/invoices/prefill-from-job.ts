@@ -26,15 +26,19 @@ export type JobPricingMode = "flat_rate" | "hourly_internal";
 
 /**
  * Estimate wins, then booking. Quick-book jobs have neither — they bill hourly
- * at the account labor rate (TASK-119). Unrecognized strings stay null.
+ * at the account labor rate (TASK-119). A booking whose pricing_mode is still
+ * NULL is undecided intake, not a quick job. Unrecognized strings stay null.
  */
 export function jobPricingModeFromSources(
   estimatePricingMode: string | null | undefined,
   bookingPricingMode: string | null | undefined,
+  options?: { hasBooking?: boolean },
 ): JobPricingMode | null {
-  const mode = estimatePricingMode ?? bookingPricingMode ?? "hourly_internal";
+  const mode = estimatePricingMode ?? bookingPricingMode ?? null;
   if (mode === "hourly_internal" || mode === "flat_rate") return mode;
-  return null;
+  if (mode != null) return null;
+  if (options?.hasBooking) return null;
+  return "hourly_internal";
 }
 
 export async function resolveJobPricingMode(
@@ -44,6 +48,7 @@ export async function resolveJobPricingMode(
   const rows = await query<{
     estimate_pricing_mode: string | null;
     booking_pricing_mode: string | null;
+    has_booking: boolean;
   }>(
     `SELECT
        (SELECT pricing_mode FROM estimates
@@ -51,12 +56,17 @@ export async function resolveJobPricingMode(
         ORDER BY created_at DESC LIMIT 1) AS estimate_pricing_mode,
        (SELECT pricing_mode FROM booking_requests
         WHERE job_id = $1 AND account_id = $2
-        ORDER BY created_at DESC LIMIT 1) AS booking_pricing_mode`,
+        ORDER BY created_at DESC LIMIT 1) AS booking_pricing_mode,
+       EXISTS (
+         SELECT 1 FROM booking_requests
+         WHERE job_id = $1 AND account_id = $2
+       ) AS has_booking`,
     [jobId, accountId],
   );
   return jobPricingModeFromSources(
     rows[0]?.estimate_pricing_mode,
     rows[0]?.booking_pricing_mode,
+    { hasBooking: Boolean(rows[0]?.has_booking) },
   );
 }
 
@@ -117,32 +127,43 @@ export async function prefillLineItemsFromTmActuals(
       });
     }
 
-    const materials = await materialLineItemsFromJobExpenses(
-      client,
-      accountId,
-      jobId,
-      items.length,
+    // Create-invoice prefills have no line_item_type / source_expense_id, so
+    // expenses would land as labor and the rate toggle would overwrite them.
+    // Quoted T&M jobs still include receipts; quick jobs (no estimate) are labor-only.
+    const approvedEstimate = await client.query(
+      `SELECT 1 FROM estimates
+       WHERE job_id = $1 AND account_id = $2 AND status = 'approved'
+       LIMIT 1`,
+      [jobId, accountId],
     );
-    for (const m of materials) {
-      items.push({
-        description: m.description,
-        quantity: String(m.quantity),
-        unit_price: (m.unit_price_cents / 100).toFixed(2),
-      });
-    }
+    if ((approvedEstimate.rowCount ?? 0) > 0) {
+      const materials = await materialLineItemsFromJobExpenses(
+        client,
+        accountId,
+        jobId,
+        items.length,
+      );
+      for (const m of materials) {
+        items.push({
+          description: m.description,
+          quantity: String(m.quantity),
+          unit_price: (m.unit_price_cents / 100).toFixed(2),
+        });
+      }
 
-    const equipment = await equipmentLineItemsFromJobExpenses(
-      client,
-      accountId,
-      jobId,
-      items.length,
-    );
-    for (const e of equipment) {
-      items.push({
-        description: e.description,
-        quantity: String(e.quantity),
-        unit_price: (e.unit_price_cents / 100).toFixed(2),
-      });
+      const equipment = await equipmentLineItemsFromJobExpenses(
+        client,
+        accountId,
+        jobId,
+        items.length,
+      );
+      for (const e of equipment) {
+        items.push({
+          description: e.description,
+          quantity: String(e.quantity),
+          unit_price: (e.unit_price_cents / 100).toFixed(2),
+        });
+      }
     }
 
     return items;
