@@ -35,8 +35,11 @@ Scope:
   `labor_billing_cents_per_hour` via the existing bridge
   (`upsertLaborLineFromTrackedTime`, `lib/invoices/line-items.ts`), with a toggle
   to a price-book task rate or flat fee ("whichever is most profitable").
-- **Configurable minimum-hours floor (default 1h)** applied to the hourly labor
-  line so short stops bill at least the minimum; overridable per job.
+- Floor the billed total to the **existing** `minimum_service_fee_cents`
+  (`packages/domain/src/pricing-settings.ts`, applied via `buildPricingRules`) —
+  do NOT add a second minimum; reuse the existing per-record override path for
+  per-job adjustment. (The owner's "1-hour minimum" = set that value; it is
+  currently ~$185.)
 - Surface the existing `QuickBookModal` from **three launch points** — Schedule
   "+" (exists), a My Day button, and the global FloatingActionButton — one shared
   component, no forked flow.
@@ -54,6 +57,11 @@ Acceptance Criteria:
 - [ ] A quick-booked visit captures on-site time with one tap.
 - [ ] Invoicing that job pre-fills hours at the bill rate with no manual entry;
       one action switches to a price-book rate or flat fee.
+- [ ] The billed total is floored to the existing `minimum_service_fee_cents`
+      (no second minimum added); per-job override works via the existing path.
+- [ ] `QuickBookModal` opens from all three launch points (Schedule +, My Day,
+      global FAB) as one shared component.
+- [ ] "Done" closes the visit only; the business day stays open until Day Review.
 - [ ] No duplicate booking/capture path is introduced.
 
 Notes:
