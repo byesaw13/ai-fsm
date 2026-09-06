@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatCents, parseDollarsToCents } from "@ai-fsm/money";
+import { PriceBookSelector } from "@/components/PriceBookSelector";
 
 type LineItemType = "labor" | "materials" | "handling_fee" | "adjustment";
 
@@ -49,6 +50,8 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [rateUi, setRateUi] = useState<"idle" | "price_book" | "flat">("idle");
+  const [flatDollars, setFlatDollars] = useState("");
   const [draft, setDraft] = useState({
     description: "",
     quantity: "1",
@@ -128,7 +131,16 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
   }
 
   async function laborFromTime() {
-    await request(`/api/v1/invoices/${invoiceId}/labor-from-time`, { method: "POST" });
+    await applyLaborRate({ mode: "hourly" });
+  }
+
+  async function applyLaborRate(body: Record<string, unknown>) {
+    await request(`/api/v1/invoices/${invoiceId}/labor-rate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    setRateUi("idle");
   }
 
   async function materialsFromReceipts() {
@@ -170,7 +182,25 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
             className="p7-btn p7-btn-secondary p7-btn-sm"
             data-testid="invoice-labor-from-time-btn"
           >
-            + Pull labor from tracked time
+            Hourly (tracked time)
+          </button>
+          <button
+            type="button"
+            onClick={() => setRateUi((v) => (v === "price_book" ? "idle" : "price_book"))}
+            disabled={pending}
+            className="p7-btn p7-btn-secondary p7-btn-sm"
+            data-testid="invoice-labor-price-book-btn"
+          >
+            Price-book task
+          </button>
+          <button
+            type="button"
+            onClick={() => setRateUi((v) => (v === "flat" ? "idle" : "flat"))}
+            disabled={pending}
+            className="p7-btn p7-btn-secondary p7-btn-sm"
+            data-testid="invoice-labor-flat-btn"
+          >
+            Flat fee
           </button>
           <button
             type="button"
@@ -183,6 +213,48 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
             + Pull materials from job receipts
           </button>
         </div>
+      )}
+
+      {jobId && rateUi === "price_book" && (
+        <div style={{ marginBottom: "var(--space-3)" }} data-testid="invoice-labor-price-book">
+          <PriceBookSelector
+            onAddToEstimate={(service, priceCents) => {
+              void applyLaborRate({
+                mode: "price_book",
+                price_book_id: service.id,
+                price_cents: priceCents,
+              });
+            }}
+          />
+        </div>
+      )}
+
+      {jobId && rateUi === "flat" && (
+        <form
+          data-testid="invoice-labor-flat"
+          style={{ marginBottom: "var(--space-3)", display: "flex", gap: "var(--space-2)", alignItems: "end" }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            const cents = parseDollarsToCents(flatDollars);
+            if (cents <= 0) return;
+            void applyLaborRate({ mode: "flat", flat_cents: cents });
+          }}
+        >
+          <label style={{ fontSize: "var(--text-sm)" }}>
+            Flat fee ($)
+            <input
+              className="p7-input"
+              value={flatDollars}
+              onChange={(e) => setFlatDollars(e.target.value)}
+              inputMode="decimal"
+              placeholder="185.00"
+              style={{ display: "block", marginTop: 4 }}
+            />
+          </label>
+          <button type="submit" className="p7-btn p7-btn-primary p7-btn-sm" disabled={pending}>
+            Apply
+          </button>
+        </form>
       )}
 
       {/* Line items table — sturdy and scannable */}
