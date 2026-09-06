@@ -7,6 +7,7 @@ import { sendEmail, appUrl, isEmailConfigured } from "@/lib/email/mailer";
 import { invoiceEmailHtml, invoiceEmailText } from "@ai-fsm/email-templates";
 import { logCommunication } from "@/lib/communications-log";
 import { loadInvoicePdf } from "@/lib/pdf/load";
+import { applyServiceMinimum } from "@/lib/invoices/service-minimum";
 import { dueDateUponCompletion, invoiceDueOnCompletion } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +52,24 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
       if (!isEmailConfigured()) {
         return { status: 503, message: "Email is not configured on this server" };
+      }
+
+      // TASK-119: floor a draft to the account's service minimum before it goes
+      // out — maintains the single "Service minimum" adjustment line and refreshes
+      // totals so the email + PDF reflect it. Only on the draft→sent finalize
+      // (sent invoices are immutable). Non-fatal: a settings hiccup must not block
+      // the send — fall through with the current totals.
+      if (inv.status === "draft") {
+        try {
+          const totals = await applyServiceMinimum(client, id, session.accountId);
+          inv.total_cents = totals.total_cents;
+          inv.balance_cents = totals.balance_cents;
+        } catch (err) {
+          logger.warn("[invoices/send] service minimum not applied", {
+            invoiceId: id,
+            error: (err as Error).message,
+          });
+        }
       }
 
       const isPaid = inv.status === "paid";

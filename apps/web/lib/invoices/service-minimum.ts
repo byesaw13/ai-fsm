@@ -1,0 +1,104 @@
+/**
+ * Service-minimum floor on an invoice (TASK-119 slice 2).
+ *
+ * Ensures an invoice's total reaches the account's configured
+ * `minimum_service_fee_cents` by maintaining a single "Service minimum"
+ * adjustment line for the shortfall — reusing that one configured minimum
+ * rather than inventing a second. Applied at finalization (draft→sent).
+ *
+ * The decision is a pure function (`planServiceMinimum`, unit-tested); the DB
+ * wrapper (`applyServiceMinimum`) just executes it.
+ */
+import type { PoolClient } from "pg";
+import { serviceMinimumAdjustmentCents } from "./tracked-labor";
+import {
+  createInvoiceLineItem,
+  updateInvoiceLineItem,
+  recalculateInvoiceTotals,
+  type InvoiceTotals,
+} from "./line-items";
+
+/** Description that marks the single auto-managed minimum-adjustment line. */
+export const SERVICE_MINIMUM_LABEL = "Service minimum";
+
+interface MinLine {
+  total_cents: number;
+  is_service_minimum: boolean;
+}
+
+export type ServiceMinimumPlan =
+  | { action: "none" }
+  | { action: "create"; amountCents: number }
+  | { action: "update"; amountCents: number }
+  | { action: "remove" };
+
+/**
+ * Decide what to do with the minimum-adjustment line. Base = every line EXCEPT
+ * the existing minimum line (so recomputing never compounds). If the base is
+ * short, create/update the top-up; if it now meets the minimum, remove a stale
+ * top-up. Pure.
+ */
+export function planServiceMinimum(lines: MinLine[], minimumCents: number): ServiceMinimumPlan {
+  const baseCents = lines
+    .filter((l) => !l.is_service_minimum)
+    .reduce((sum, l) => sum + l.total_cents, 0);
+  const shortfall = serviceMinimumAdjustmentCents(baseCents, minimumCents);
+  const hasExisting = lines.some((l) => l.is_service_minimum);
+
+  if (shortfall > 0) {
+    return { action: hasExisting ? "update" : "create", amountCents: shortfall };
+  }
+  return hasExisting ? { action: "remove" } : { action: "none" };
+}
+
+/**
+ * Apply the service minimum to a draft invoice: maintain the single
+ * "Service minimum" adjustment line and recalculate totals. Idempotent.
+ * Caller must have the invoice's RLS/session context set (finalize path).
+ */
+export async function applyServiceMinimum(
+  client: PoolClient,
+  invoiceId: string,
+  accountId: string,
+): Promise<InvoiceTotals> {
+  const { loadPricingSettings } = await import("@/lib/pricing/settings");
+  const settings = await loadPricingSettings(client, accountId);
+  const minimumCents = settings.minimum_service_fee_cents;
+
+  const { rows } = await client.query<{ id: string; total_cents: number; line_item_type: string; description: string }>(
+    `SELECT id, total_cents, line_item_type, description
+       FROM invoice_line_items WHERE invoice_id = $1`,
+    [invoiceId],
+  );
+  const isMin = (r: { line_item_type: string; description: string }) =>
+    r.line_item_type === "adjustment" && r.description === SERVICE_MINIMUM_LABEL;
+
+  const plan = planServiceMinimum(
+    rows.map((r) => ({ total_cents: Number(r.total_cents), is_service_minimum: isMin(r) })),
+    minimumCents,
+  );
+
+  const existing = rows.find(isMin);
+  if (plan.action === "create") {
+    await createInvoiceLineItem(client, invoiceId, {
+      description: SERVICE_MINIMUM_LABEL,
+      quantity: 1,
+      unit_price_cents: plan.amountCents,
+      line_item_type: "adjustment",
+    });
+  } else if (plan.action === "update" && existing) {
+    await updateInvoiceLineItem(client, invoiceId, existing.id, {
+      description: SERVICE_MINIMUM_LABEL,
+      quantity: 1,
+      unit_price_cents: plan.amountCents,
+      line_item_type: "adjustment",
+    });
+  } else if (plan.action === "remove" && existing) {
+    await client.query(`DELETE FROM invoice_line_items WHERE id = $1 AND invoice_id = $2`, [
+      existing.id,
+      invoiceId,
+    ]);
+  }
+
+  return recalculateInvoiceTotals(client, invoiceId, accountId);
+}
