@@ -29,11 +29,17 @@ already on the invoice — no paper, no re-entry.
 
 Scope:
 - One-tap start/stop time on a quick-booked visit using the existing clock /
-  `activity_entries`.
+  `activity_entries`. "Done" **closes the visit but leaves the business day open**
+  (day closes at Day Review — matches TASK-052/056 lifecycle independence).
 - Invoice from the job with the labor line pre-filled from tracked time at
   `labor_billing_cents_per_hour` via the existing bridge
   (`upsertLaborLineFromTrackedTime`, `lib/invoices/line-items.ts`), with a toggle
   to a price-book task rate or flat fee ("whichever is most profitable").
+- **Configurable minimum-hours floor (default 1h)** applied to the hourly labor
+  line so short stops bill at least the minimum; overridable per job.
+- Surface the existing `QuickBookModal` from **three launch points** — Schedule
+  "+" (exists), a My Day button, and the global FloatingActionButton — one shared
+  component, no forked flow.
 - Manual time correction on the visit (reuse the TASK-052 clock-correction
   pattern) for the forgot-to-start case.
 

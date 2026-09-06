@@ -99,11 +99,23 @@ rate reconciliation stays with pricing work (PI-002/004), not blocking here.
   under a minute, no paper.
 - `pnpm gate:fast` before PR.
 
-## Open questions for the owner (resolve before build)
+## Decisions (owner, 2026-09-05) — resolved
 
-- Where should "Quick job" live most naturally — a Schedule "+", a My Day
-  button, a global quick-add, or all three?
-- Trip/minimum charge on hourly quick jobs — is there a minimum (e.g. 1 hr) to
-  auto-apply?
-- Should a quick job auto-close its business-day/visit on "Done", or stay open
-  until end-of-day?
+1. **Entry point = all three launch points, one shared modal.** Surface the
+   existing `QuickBookModal` from the Schedule "+" (already there), a **My Day**
+   button, and the global **FloatingActionButton** / quick-add. One component,
+   three launch points — reach it from wherever the job comes in (calendar
+   planning, in the field, an ad-hoc call). Do not fork the flow.
+2. **Minimum charge = a configurable 1-hour minimum** on hourly quick jobs
+   (a setting, default 1h; overridable per job). The invoice's tracked-time
+   labor line is floored to the minimum when hours fall below it; the owner can
+   still switch that line to a price-book rate or flat fee ("whichever is most
+   profitable").
+3. **On "Done" → close the visit, keep the business day open.** Completing the
+   quick job closes its visit (billable/done) but the business day stays open for
+   more jobs and closes at Day Review. This matches the operations-engine
+   independence (payroll/day and visit lifecycles are separate — TASK-052/056).
+
+Build-affecting deltas these add to TASK-119: the configurable minimum-hours
+setting + its application to the labor line; the three launch points around the
+one QuickBookModal; and "Done closes the visit only."
