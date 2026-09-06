@@ -3,6 +3,7 @@
  *
  * T&M (hourly_internal): actual tracked labor + job material expenses.
  * Flat rate: approved estimate line items (caller may pass estimate id).
+ * Quick-book jobs have no estimate or booking — they default to hourly.
  */
 import { query, getPool } from "@/lib/db";
 import {
@@ -21,10 +22,25 @@ export type PrefillLineItem = {
   unit_price: string;
 };
 
+export type JobPricingMode = "flat_rate" | "hourly_internal";
+
+/**
+ * Estimate wins, then booking. Quick-book jobs have neither — they bill hourly
+ * at the account labor rate (TASK-119). Unrecognized strings stay null.
+ */
+export function jobPricingModeFromSources(
+  estimatePricingMode: string | null | undefined,
+  bookingPricingMode: string | null | undefined,
+): JobPricingMode | null {
+  const mode = estimatePricingMode ?? bookingPricingMode ?? "hourly_internal";
+  if (mode === "hourly_internal" || mode === "flat_rate") return mode;
+  return null;
+}
+
 export async function resolveJobPricingMode(
   accountId: string,
   jobId: string,
-): Promise<"flat_rate" | "hourly_internal" | null> {
+): Promise<JobPricingMode | null> {
   const rows = await query<{
     estimate_pricing_mode: string | null;
     booking_pricing_mode: string | null;
@@ -38,9 +54,10 @@ export async function resolveJobPricingMode(
         ORDER BY created_at DESC LIMIT 1) AS booking_pricing_mode`,
     [jobId, accountId],
   );
-  const mode = rows[0]?.estimate_pricing_mode ?? rows[0]?.booking_pricing_mode ?? null;
-  if (mode === "hourly_internal" || mode === "flat_rate") return mode;
-  return null;
+  return jobPricingModeFromSources(
+    rows[0]?.estimate_pricing_mode,
+    rows[0]?.booking_pricing_mode,
+  );
 }
 
 /**

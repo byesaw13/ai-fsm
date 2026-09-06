@@ -121,7 +121,7 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
       <HubSubnav hub="Money" links={MONEY_HUB_LINKS} pathname="/app/invoices" />
       <p style={{ margin: "0 0 var(--space-4)", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
         {prefillSource === "tm_actuals"
-          ? "Prefilling from tracked time and materials on this T&M project — edit before sending."
+          ? "Prefilling from tracked time and materials — edit before sending."
           : prefillSource === "estimate"
             ? "Prefilling from the approved estimate — edit before sending. An estimate is optional; you can also write a blank invoice."
             : "Write a draft invoice directly — no estimate required. Pick or create a client, add line items, then send."}
