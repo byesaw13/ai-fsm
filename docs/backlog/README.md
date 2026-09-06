@@ -228,9 +228,9 @@ closed in tests; owner-flow AC still open.
 | TASK-115 | Promise Capture Pilot | 005 | In Progress |
 | TASK-116 | Field-ops Web Push (start-day, home arrival, My Work prompt) | 005 | In Progress |
 | TASK-118 | Native Web Push notifications | 005 | Done |
-| TASK-119 | Quick-job lane (capture → do → bill, no estimate) | 006 | Proposed |
+| TASK-119 | Quick-job billing seam — time → invoice for quick-booked jobs | 004 | Proposed |
 | TASK-120 | Big-job billing — deposit gate + progress (thirds) billing | 004 | Proposed |
-| TASK-121 | Big-job execution — synced task check-off + unified job spend | 006 | Proposed |
+| TASK-121 | Unified job materials & spend view | 004 | Proposed |
 
 ## Status legend
 

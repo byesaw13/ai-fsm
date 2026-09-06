@@ -16,8 +16,11 @@ in the system and carries the hours straight to the invoice.
 
 ## What already exists (reuse — do not rebuild)
 
-- **Quick Project create:** `apps/web/app/app/jobs/new` — "Quick Project" =
-  title + client, "fill in details later." Creates a Job with minimal input.
+- **Quick capture — ALREADY BUILT:** `POST /api/v1/quick-book` +
+  `QuickBookModal` (`apps/web/app/app/schedule/`) create client-or-new + job +
+  default work order (`lib/work-orders/create-default.ts`) + scheduled visit in
+  ONE transaction, no estimate. **This is the capture step** — do not rebuild it
+  or extend the separate `jobs/new` Quick Project path.
 - **Schedule = visits:** `apps/web/app/app/schedule/ScheduleCalendar.tsx`; a
   visit carries `client_name`, `scheduled_start/end`; `visits.job_id` references
   a job (`ON DELETE SET NULL`).
@@ -34,16 +37,13 @@ The pieces exist; the lane is the **seams** between them.
 
 ## The flow
 
-### 1. Capture (one step)
-A single "Quick job" entry point (from the Schedule "+", My Day, and a global
-quick-add). Inputs: **client** (search existing or type a new name → create
-client inline), **title** ("assemble bed"), **when** (now / pick a slot).
-Result: creates Job (quick, no estimate) + Visit on the schedule, in one submit.
-No Project detail screen, no estimate.
-
-- If "now": create the visit at the current time and drop the user straight into
-  the do-it state.
-- Reuse the Quick Project create; extend it to also insert the scheduled visit.
+### 1. Capture — ALREADY BUILT (quick-book)
+`quick-book` already does one-transaction capture (client-or-new + job + default
+work order + scheduled visit, no estimate) via `QuickBookModal` on the schedule.
+The only residual on the capture side is **discoverability** — surfacing that
+entry point beyond the calendar (a My Day / global quick-add shortcut) and a
+"now" option that drops straight into the do-it state. **Do not build a second
+booking flow.**
 
 ### 2. Do it (time auto-captured)
 On arrival (or "Start") one tap begins time on the visit via the existing clock /
@@ -78,10 +78,9 @@ rate reconciliation stays with pricing work (PI-002/004), not blocking here.
 
 ## Acceptance criteria
 
-- [ ] Create + schedule a quick job in one flow — no estimate, no Project detail
-      step, new client can be typed inline.
-- [ ] On-site time is captured with one tap and appears on the invoice with no
-      manual re-entry.
+- [ ] Capture uses the existing quick-book flow — no duplicate booking path added.
+- [ ] On-site time is captured with one tap on the quick-booked visit and appears
+      on the invoice with no manual re-entry.
 - [ ] Invoice defaults to hourly at the bill rate; switch to price-book or flat
       in one action.
 - [ ] The job, client, and hours are persisted and queryable afterward.
