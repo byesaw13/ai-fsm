@@ -6,8 +6,6 @@ REPO_ROOT="${FSM_REPO_ROOT:-${DEPLOY_ROOT}/repo}"
 ENV_FILE="${FSM_ENV_FILE:-${DEPLOY_ROOT}/env/.env}"
 COMPOSE_FILE="${FSM_COMPOSE_FILE:-${REPO_ROOT}/infra/compose.garonhome.yml}"
 BACKUP_DIR="${FSM_BACKUP_DIR:-${DEPLOY_ROOT}/backups}"
-DATA_ROOT="${FSM_DATA_ROOT:-${DEPLOY_ROOT}/data}"
-PASSPHRASE_FILE="${FSM_BACKUP_PASSPHRASE_FILE:-${DEPLOY_ROOT}/env/backup.passphrase}"
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 DB_FILE="${BACKUP_DIR}/ai_fsm_${TIMESTAMP}.dump"
 UPLOADS_FILE="${BACKUP_DIR}/ai_fsm_uploads_${TIMESTAMP}.tar.gz"
@@ -17,6 +15,18 @@ set -a
 # shellcheck disable=SC1090
 source "${ENV_FILE}"
 set +a
+
+# Resolve AFTER sourcing .env so FSM_DATA_ROOT / FSM_BACKUP_PASSPHRASE_FILE set
+# only in the env file are honored (they would otherwise fall back to defaults
+# and silently skip the uploads / encrypted-.env backups).
+DATA_ROOT="${FSM_DATA_ROOT:-${DEPLOY_ROOT}/data}"
+PASSPHRASE_FILE="${FSM_BACKUP_PASSPHRASE_FILE:-${DEPLOY_ROOT}/env/backup.passphrase}"
+
+# ponytail: DB dump and the uploads tar are taken sequentially while web/worker
+# stay live, so an upload deleted between the two can leave a dump row whose file
+# is missing from the archive. Acceptable for a solo nightly backup run at a
+# low-activity hour; upgrade to a coordinated filesystem snapshot only if
+# concurrent write volume during the backup window ever makes this real.
 
 mkdir -p "${BACKUP_DIR}"
 
