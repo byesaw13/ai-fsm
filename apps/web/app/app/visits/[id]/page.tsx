@@ -34,6 +34,7 @@ import { VisitResolutionPanel } from "./VisitResolutionPanel";
 import { VisitPartsPanel } from "./VisitPartsPanel";
 import { VisitClosingChecklist } from "./VisitClosingChecklist";
 import { CompletionChecklist } from "./CompletionChecklist";
+import { isQuickJobPacketExempt } from "@/lib/completion-guard";
 import { SubStatusSelect } from "@/components/SubStatusSelect";
 import { MembershipVisitPanel } from "./MembershipVisitPanel";
 import { VisitSnapshotPanel } from "./VisitSnapshotPanel";
@@ -346,6 +347,22 @@ export default async function VisitDetailPage({
       : null;
 
   const overdue = isVisitOverdue(visit);
+
+  const estimateOnJob = visit.job_id
+    ? await queryOneForSession<{ exists: boolean }>(
+        session,
+        `SELECT EXISTS(
+           SELECT 1 FROM estimates e
+           WHERE e.job_id = $1 AND e.account_id = $2
+         ) AS exists`,
+        [visit.job_id, session.accountId],
+      )
+    : null;
+  const isQuickJob = isQuickJobPacketExempt({
+    visit_type: visit.visit_type,
+    work_order_id: visit.work_order_id,
+    has_estimate: Boolean(estimateOnJob?.exists),
+  });
 
   // For repair visits that are active, check for an approved estimate so we can surface the conditions panel
   const approvedEstimate =
@@ -792,6 +809,7 @@ export default async function VisitDetailPage({
                 canUpdate={canNotes}
                 canComplete={canTransition}
                 closePhotosItemId={closePhotosItemId}
+                isQuickJob={isQuickJob}
               />
             </Card>
           )}

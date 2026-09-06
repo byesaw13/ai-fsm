@@ -64,7 +64,9 @@ Acceptance Criteria:
       (no second minimum added); per-job override works via the existing path.
 - [x] `QuickBookModal` opens from all three launch points (Schedule +, My Day,
       global FAB) as one shared component.
-- [ ] "Done" closes the visit only; the business day stays open until Day Review.
+- [x] "Done" closes the visit only; the business day stays open until Day Review.
+      (Quick-book shape only: standard visit + work order + no estimate.
+      Site visits and quoted jobs still require the packet.)
 - [ ] No duplicate booking/capture path is introduced.
 
 Notes:

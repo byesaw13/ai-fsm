@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkCompletionPacket } from "../completion-guard";
+import { checkCompletionPacket, isQuickJobPacketExempt } from "../completion-guard";
 
 describe("checkCompletionPacket", () => {
   it("requires a packet with at least one photo", () => {
@@ -62,5 +62,72 @@ describe("checkCompletionPacket", () => {
       photos_waived: true,
       photos_waiver_reason: "Client declined photos",
     })).toEqual({ ok: false, error: "MISSING_SIGNATURE" });
+  });
+
+  it("quick job (no estimate): photo not required, signature not required", () => {
+    expect(checkCompletionPacket(null, { requirePhoto: false, requireSignature: false })).toEqual({
+      ok: true,
+    });
+    expect(
+      checkCompletionPacket(
+        { photo_urls: [], signature_url: null, signature_waiver: false },
+        { requirePhoto: false, requireSignature: false },
+      ),
+    ).toEqual({ ok: true });
+  });
+
+  it("quick job still accepts a photo if one was taken", () => {
+    expect(
+      checkCompletionPacket(
+        {
+          photo_urls: ["https://example.com/photo.jpg"],
+          signature_url: null,
+          signature_waiver: false,
+        },
+        { requirePhoto: false, requireSignature: false },
+      ),
+    ).toEqual({ ok: true });
+  });
+});
+
+describe("isQuickJobPacketExempt", () => {
+  it("is true for a standard work-order visit with no estimate (quick-book shape)", () => {
+    expect(
+      isQuickJobPacketExempt({
+        visit_type: "standard",
+        work_order_id: "wo-1",
+        has_estimate: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("is false for a site_visit even when there is no estimate", () => {
+    expect(
+      isQuickJobPacketExempt({
+        visit_type: "site_visit",
+        work_order_id: null,
+        has_estimate: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("is false when the job already has an estimate", () => {
+    expect(
+      isQuickJobPacketExempt({
+        visit_type: "standard",
+        work_order_id: "wo-1",
+        has_estimate: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("is false for a standard visit with no work order", () => {
+    expect(
+      isQuickJobPacketExempt({
+        visit_type: "standard",
+        work_order_id: null,
+        has_estimate: false,
+      }),
+    ).toBe(false);
   });
 });

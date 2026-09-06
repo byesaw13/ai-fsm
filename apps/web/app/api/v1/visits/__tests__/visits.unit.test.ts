@@ -478,12 +478,63 @@ describe("POST /api/v1/visits/[id]/transition", () => {
     mockClientQuery
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [{ ...SAMPLE_VISIT, status: "in_progress" }] })
+      .mockResolvedValueOnce({
+        rows: [{ ...SAMPLE_VISIT, status: "in_progress", has_estimate: true }],
+      })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
 
     const res = await visitTransition(
       makeRequest("POST", `${VISITS_BASE}/${VISIT_ID}/transition`, { status: "completed" })
+    );
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.error.code).toBe("MISSING_PHOTO");
+  });
+
+  it("quick job (no estimate): in_progress → completed without a packet → 200", async () => {
+    const quick = {
+      ...SAMPLE_VISIT,
+      status: "in_progress",
+      visit_type: "standard",
+      work_order_id: WORK_ORDER_ID,
+      has_estimate: false,
+    };
+    const updated = { ...quick, status: "completed", completed_at: NOW };
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [quick] })
+      .mockResolvedValueOnce({ rows: [] }) // no completion packet
+      .mockResolvedValueOnce({ rows: [updated] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const res = await visitTransition(
+      makeRequest("POST", `${VISITS_BASE}/${VISIT_ID}/transition`, { status: "completed" }),
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data.status).toBe("completed");
+  });
+
+  it("site_visit without estimate still requires a completion packet → 422", async () => {
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{
+          ...SAMPLE_VISIT,
+          status: "in_progress",
+          visit_type: "site_visit",
+          work_order_id: null,
+          has_estimate: false,
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const res = await visitTransition(
+      makeRequest("POST", `${VISITS_BASE}/${VISIT_ID}/transition`, { status: "completed" }),
     );
     expect(res.status).toBe(422);
     const json = await res.json();

@@ -20,6 +20,8 @@ interface CompletionChecklistProps {
   canUpdate: boolean;
   canComplete: boolean;
   closePhotosItemId?: string;
+  /** No-estimate (quick-book) jobs skip photo/signature to complete. */
+  isQuickJob?: boolean;
 }
 
 type CompletionPhotoEntry = {
@@ -48,6 +50,7 @@ export function CompletionChecklist({
   canUpdate,
   canComplete,
   closePhotosItemId,
+  isQuickJob = false,
 }: CompletionChecklistProps) {
   const router = useRouter();
   const toast = useToast();
@@ -82,13 +85,16 @@ export function CompletionChecklist({
     }
   }, [photoUrls.length, photosWaived]);
 
-  const guard = checkCompletionPacket({
-    photo_urls: photoUrls,
-    signature_url: signatureUrl.trim() || null,
-    signature_waiver: signatureWaiver,
-    photos_waived: photosWaived,
-    photos_waiver_reason: photosWaived ? photosWaiverReason : null,
-  });
+  const guard = checkCompletionPacket(
+    {
+      photo_urls: photoUrls,
+      signature_url: signatureUrl.trim() || null,
+      signature_waiver: signatureWaiver,
+      photos_waived: photosWaived,
+      photos_waiver_reason: photosWaived ? photosWaiverReason : null,
+    },
+    { requirePhoto: !isQuickJob, requireSignature: !isQuickJob },
+  );
   const missingMessage = guard.ok ? null : ERROR_LABELS[guard.error ?? ""] ?? "Completion packet is incomplete.";
   const signatureStatus = signatureWaiver ? "waived" : signatureUrl.trim() ? "captured" : "missing";
 
@@ -513,6 +519,12 @@ export function CompletionChecklist({
         />
         <span style={{ fontSize: "var(--text-sm)" }}>Client signature waived</span>
       </label>
+
+      {isQuickJob && (
+        <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+          Quick job — photos and signature are optional.
+        </p>
+      )}
 
       {missingMessage && (
         <p className="warning-inline" style={{ margin: 0 }}>
