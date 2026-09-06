@@ -250,3 +250,20 @@ export function trackedLaborCents(
 ): number {
   return roundedQuarterHoursFromMinutes(minutes) * billingRateCentsPerHour;
 }
+
+/**
+ * Service-minimum top-up (TASK-119). The cents to ADD so an invoice reaches the
+ * account's existing `business_pricing_settings.minimum_service_fee_cents` — 0 if
+ * it already meets it. Total-based on purpose: pass the summed subtotal of ALL
+ * lines (labor + materials + …) so a job with materials floors the *total*, not
+ * the labor component (which would over-charge). Rounds to whole cents so the
+ * decision matches the persisted integer-cent invoice. The caller adds a single
+ * minimum-adjustment line when this is > 0; it reuses the one configured minimum
+ * rather than introducing a second.
+ */
+export function serviceMinimumAdjustmentCents(
+  subtotalCents: number,
+  serviceMinimumCents: number,
+): number {
+  return Math.max(0, Math.round(serviceMinimumCents) - Math.round(subtotalCents));
+}
