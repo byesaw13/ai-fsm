@@ -252,17 +252,18 @@ export function trackedLaborCents(
 }
 
 /**
- * Quick-job billing (TASK-119): tracked labor floored to the account's existing
- * service minimum (`business_pricing_settings.minimum_service_fee_cents`). Reuses
- * that single minimum rather than introducing a second one, so a short stop still
- * bills at least the minimum. Pure — the route/UI supplies the rate and minimum.
+ * Service-minimum top-up (TASK-119). The cents to ADD so an invoice reaches the
+ * account's existing `business_pricing_settings.minimum_service_fee_cents` — 0 if
+ * it already meets it. Total-based on purpose: pass the summed subtotal of ALL
+ * lines (labor + materials + …) so a job with materials floors the *total*, not
+ * the labor component (which would over-charge). Rounds to whole cents so the
+ * decision matches the persisted integer-cent invoice. The caller adds a single
+ * minimum-adjustment line when this is > 0; it reuses the one configured minimum
+ * rather than introducing a second.
  */
-export function quickJobBilledCents(
-  minutes: number,
-  billingRateCentsPerHour: number,
+export function serviceMinimumAdjustmentCents(
+  subtotalCents: number,
   serviceMinimumCents: number,
-): { laborCents: number; billedCents: number; minimumApplied: boolean } {
-  const laborCents = trackedLaborCents(minutes, billingRateCentsPerHour);
-  const billedCents = Math.max(laborCents, serviceMinimumCents);
-  return { laborCents, billedCents, minimumApplied: billedCents > laborCents };
+): number {
+  return Math.max(0, Math.round(serviceMinimumCents) - Math.round(subtotalCents));
 }

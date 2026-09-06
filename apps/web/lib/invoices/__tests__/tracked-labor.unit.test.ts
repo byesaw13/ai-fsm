@@ -8,7 +8,7 @@ import {
   TRACKED_LABOR_JOB_WORK_WHERE,
   trackedHoursFromMinutes,
   trackedLaborCents,
-  quickJobBilledCents,
+  serviceMinimumAdjustmentCents,
 } from "../tracked-labor";
 
 describe("trackedHoursFromMinutes", () => {
@@ -124,37 +124,30 @@ describe("mapTrackedLaborDayRows", () => {
   });
 });
 
-describe("quickJobBilledCents", () => {
-  const RATE = 115_00; // $115/hr bill rate
+describe("serviceMinimumAdjustmentCents", () => {
   const MIN = 185_00; // existing minimum_service_fee_cents
 
-  it("floors a short quick job up to the service minimum", () => {
-    // 30 min → 0.5h × $115 = $57.50, below the $185 minimum
-    const r = quickJobBilledCents(30, RATE, MIN);
-    expect(r.laborCents).toBe(57_50);
-    expect(r.billedCents).toBe(185_00);
-    expect(r.minimumApplied).toBe(true);
+  it("tops up a below-minimum invoice total to the minimum", () => {
+    // $57.50 labor only → needs $127.50 to reach $185
+    expect(serviceMinimumAdjustmentCents(57_50, MIN)).toBe(127_50);
   });
 
-  it("leaves labor above the minimum unchanged", () => {
-    // 180 min → 3h × $115 = $345, above the minimum
-    const r = quickJobBilledCents(180, RATE, MIN);
-    expect(r.laborCents).toBe(345_00);
-    expect(r.billedCents).toBe(345_00);
-    expect(r.minimumApplied).toBe(false);
+  it("applies to the WHOLE subtotal (labor + materials), not labor alone", () => {
+    // $57.50 labor + $100 materials = $157.50 → tops up $27.50 to $185
+    expect(serviceMinimumAdjustmentCents(157_50, MIN)).toBe(27_50);
   });
 
-  it("does not apply at the exact minimum boundary", () => {
-    // 90 min → 1.5h × $100 = $150 == $150 minimum
-    const r = quickJobBilledCents(90, 100_00, 150_00);
-    expect(r.billedCents).toBe(150_00);
-    expect(r.minimumApplied).toBe(false);
+  it("is zero when the subtotal already meets or exceeds the minimum", () => {
+    expect(serviceMinimumAdjustmentCents(345_00, MIN)).toBe(0);
+    expect(serviceMinimumAdjustmentCents(185_00, MIN)).toBe(0); // exact boundary
   });
 
-  it("bills the minimum when no time was tracked", () => {
-    const r = quickJobBilledCents(0, RATE, MIN);
-    expect(r.laborCents).toBe(0);
-    expect(r.billedCents).toBe(185_00);
-    expect(r.minimumApplied).toBe(true);
+  it("rounds to whole cents before comparing (no fractional-cent drift)", () => {
+    // fractional subtotal (odd rate × quarter hour) rounds before the top-up
+    expect(serviceMinimumAdjustmentCents(15750.25, MIN)).toBe(27_50);
+  });
+
+  it("bills the full minimum when the subtotal is zero", () => {
+    expect(serviceMinimumAdjustmentCents(0, MIN)).toBe(185_00);
   });
 });
