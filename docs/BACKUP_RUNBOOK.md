@@ -12,10 +12,14 @@ Deploy root: `/opt/business/ai-fsm/`
 
 | Backup type | Tool | Frequency | Retention |
 |-------------|------|-----------|-----------|
-| Logical (SQL dump) | `pg_dump` | Daily (cron) | 7 days local + 30 days offsite |
+| Logical (SQL dump) | `pg_dump` | Daily (cron) | 7 days local + 30 days offsite (Google Drive, via rclone) |
+| Uploaded files (`data/uploads/`) | `tar` | Daily (cron) | 7 days local + 30 days offsite |
+| Secrets (`.env`) | `gpg --symmetric` | Daily (cron) | 7 days local + 30 days offsite |
 | WAL archiving | Not configured | — | N/A (MVP) |
 
 > **MVP note**: WAL archiving is deferred for post-MVP. Logical backups are sufficient for a low-write field-service app with acceptable RPO of 24 hours.
+
+> **Why the `.env` backup matters**: GitHub has the code, but `.env` is gitignored by design (it holds `POSTGRES_PASSWORD`, `AUTH_SECRET`, `APP_ENCRYPTION_KEY`, `ANTHROPIC_API_KEY`, Square tokens). Without a copy of it, a full disk loss leaves you with a restorable database whose `APP_ENCRYPTION_KEY`-protected rows (e.g. Square credentials) are permanently unreadable, even though the bytes are intact.
 
 ---
 
@@ -42,26 +46,36 @@ Add to crontab (`crontab -e`):
 
 The backup script (`scripts/backup-garonhome.sh`) performs:
 1. `pg_dump` from the running postgres container to `/opt/business/ai-fsm/backups/ai_fsm_YYYYMMDDTHHMMSSZ.dump`
-2. Prints a timestamped confirmation line with file size
-3. Prunes `.dump` files older than 7 days
+2. `tar` of `/opt/business/ai-fsm/data/uploads/` to `ai_fsm_uploads_YYYYMMDDTHHMMSSZ.tar.gz`
+3. `gpg --symmetric` encryption of `.env` to `ai_fsm_env_YYYYMMDDTHHMMSSZ.gpg` (requires a passphrase file — see setup below; skipped with a warning if the file is missing)
+4. Pushes all three files offsite via `rclone`
+5. Prunes local copies of all three older than 7 days
+6. Prunes offsite (Google Drive) copies older than 30 days via `rclone delete --min-age`
+
+### One-time setup: the `.env` backup passphrase
+
+```bash
+# On garonhome, once:
+openssl rand -base64 32 > /opt/business/ai-fsm/env/backup.passphrase
+chmod 600 /opt/business/ai-fsm/env/backup.passphrase
+```
+
+Then store that passphrase value in the company password manager (1Password/Bitwarden) as the durable source of truth — the file on disk and the encrypted `.gpg` backups are both useless without it, and it isn't itself backed up (deliberately, so a stolen backup set alone can't decrypt itself).
 
 ---
 
 ## Offsite / Remote Backup
 
-Push to a remote destination after local backup completes.
-Example using `rclone` to S3-compatible storage:
+This is already automatic — `scripts/backup-garonhome.sh` pushes every dump/uploads-tar/`.env.gpg` to the `googledrive:ai-fsm-backups` Google Drive folder via `rclone` as part of the nightly cron run, and prunes copies there older than 30 days (`rclone delete --min-age 30d`, configurable via `FSM_BACKUP_REMOTE_RETENTION_DAYS`).
+
+Direct folder link: `https://drive.google.com/drive/folders/1gYp-bXjpAj3DpTKOvF6RZt1ElH4HNT36`
+
+If you can't find the backups in Drive, it's almost always because the browser session is on a different Google account than the one `rclone` authorized. Check which account by inspecting the token in `rclone config show googledrive`, or just open the direct folder link above and let Google prompt an account switch.
+
+To verify what's actually on Drive right now (bypasses the local log, checks the source of truth):
 
 ```bash
-rclone copy /opt/business/ai-fsm/backups/ remote:ai-fsm-backups/ \
-  --include "ai_fsm_*.dump" \
-  --min-age 0s
-```
-
-Or `rsync` to a secondary host:
-
-```bash
-rsync -avz /opt/business/ai-fsm/backups/ backup-host:/backups/ai-fsm/
+rclone lsl googledrive:ai-fsm-backups
 ```
 
 ---
@@ -129,6 +143,32 @@ docker compose --env-file /opt/business/ai-fsm/env/.env \
 ```
 
 #### 5. Verify (see Validation Drill below)
+
+---
+
+## Restoring Uploads and Secrets
+
+Needed for a full disaster-recovery rebuild (new host, or a wiped drive) — the DB restore above only covers the database.
+
+### Restore uploaded files
+
+```bash
+tar -xzf ai_fsm_uploads_YYYYMMDDTHHMMSSZ.tar.gz -C /opt/business/ai-fsm/data/
+```
+
+### Restore `.env`
+
+Requires the passphrase from the password manager (see one-time setup above):
+
+```bash
+gpg --batch --yes --decrypt \
+  --passphrase-file /path/to/passphrase \
+  -o /opt/business/ai-fsm/env/.env \
+  ai_fsm_env_YYYYMMDDTHHMMSSZ.gpg
+chmod 600 /opt/business/ai-fsm/env/.env
+```
+
+On a brand-new host, pull all three files (dump, uploads tar, `.gpg`) from the `googledrive:ai-fsm-backups` rclone remote first, then run these restores before `docker compose up`.
 
 ---
 
@@ -238,4 +278,4 @@ No error output = file is structurally valid.
 
 1. **No point-in-time recovery (PITR)** — WAL archiving not configured. Maximum data loss = 24 hours (last backup).
 2. **No replication / standby** — single-node PostgreSQL. If garonhome.local hardware fails, restore from offsite backup to another x86 host.
-3. **Backup encryption** — dump files are not encrypted at rest. If the host is physically accessible to untrusted parties, add `gpg --encrypt` to the backup script.
+3. **DB dump and uploads tar are not encrypted at rest** — only `.env` is encrypted before it leaves the host. If the offsite Google Drive account itself is a concern, add `gpg --encrypt` to the dump and uploads steps too.
