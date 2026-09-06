@@ -95,7 +95,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-119**.
+Next available ID: **TASK-122**.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -228,6 +228,9 @@ closed in tests; owner-flow AC still open.
 | TASK-115 | Promise Capture Pilot | 005 | In Progress |
 | TASK-116 | Field-ops Web Push (start-day, home arrival, My Work prompt) | 005 | In Progress |
 | TASK-118 | Native Web Push notifications | 005 | Done |
+| TASK-119 | Quick-job billing seam — time → invoice for quick-booked jobs | 004 | Proposed |
+| TASK-120 | Big-job billing — deposit gate + progress (thirds) billing | 004 | Proposed |
+| TASK-121 | Unified job materials & spend view | 004 | Proposed |
 
 ## Status legend
 

@@ -5,7 +5,135 @@ of what each job actually earned.
 
 ## Active tasks
 
-_(none — Square card payments closed after live prod verification 2026-08-06)_
+# TASK-119: Quick-job billing seam — time → invoice for quick-booked jobs
+
+Status:
+Proposed
+
+Phase:
+3
+
+Problem:
+From a workflow review with the owner: quick jobs ("come assemble a bed") are
+abandoned to paper, then billed by making a manual invoice and re-entering
+everything — hours, client history, repeat-work signal all lost. The **capture**
+step is already solved on main: `POST /api/v1/quick-book` + `QuickBookModal`
+create client-or-new + job + default work order + scheduled visit in one
+transaction, no estimate. What's missing is the seam from that quick-booked visit
+to getting paid: time is never captured on it, and the invoice is built from
+scratch.
+
+Business Value:
+High-frequency small jobs get billed straight from the schedule with hours
+already on the invoice — no paper, no re-entry.
+
+Scope:
+- One-tap start/stop time on a quick-booked visit using the existing clock /
+  `activity_entries`.
+- Invoice from the job with the labor line pre-filled from tracked time at
+  `labor_billing_cents_per_hour` via the existing bridge
+  (`upsertLaborLineFromTrackedTime`, `lib/invoices/line-items.ts`), with a toggle
+  to a price-book task rate or flat fee ("whichever is most profitable").
+- Manual time correction on the visit (reuse the TASK-052 clock-correction
+  pattern) for the forgot-to-start case.
+
+Out of Scope:
+- Rebuilding capture — **quick-book already does it; do NOT create a second
+  booking flow** off the separate Quick Project path.
+- Estimates for quick jobs (never).
+- Full 4-labor-rate reconciliation (pricing work / PI-002/004) — uses the one
+  bill rate.
+
+Acceptance Criteria:
+- [ ] A quick-booked visit captures on-site time with one tap.
+- [ ] Invoicing that job pre-fills hours at the bill rate with no manual entry;
+      one action switches to a price-book rate or flat fee.
+- [ ] No duplicate booking/capture path is introduced.
+
+Notes:
+Priority item from the 2026-09-05 owner workflow review. Capture = existing
+quick-book (`apps/web/app/api/v1/quick-book/route.ts`). Design + flow:
+`docs/working/2026-09-05-quick-job-lane-spec.md`. Button placement is a field
+surface (EPIC-006/007); the residual **here** is the billing seam.
+
+# TASK-120: Big-job billing — deposit gate + progress (thirds) billing
+
+Status:
+Proposed
+
+Phase:
+3
+
+Problem:
+From a workflow review with the owner: big multi-day jobs **always** take a
+deposit before work starts, but that's a manual detour today rather than a step
+in the approve→start flow. And long jobs need staged billing — the owner's rule
+is **jobs longer than two weeks bill in thirds (⅓ up front as the deposit, ⅓ at
+the midpoint, final at completion)**. Deposits exist (TASK-071, done); explicit
+progress/staged invoicing likely does not.
+
+Business Value:
+Cash flow matches how the work is actually funded — money up front on every big
+job, and a middle payment on long ones so the owner isn't carrying weeks of
+labor and materials before seeing a dime.
+
+Scope:
+- Make "take a deposit" a first-class step right after estimate approval (reuse
+  the existing invoice deposit form + MarkDepositReceived), so starting a big job
+  prompts/records the deposit rather than requiring a manual invoice.
+- Add **progress billing**: for jobs over a duration threshold (default 2 weeks),
+  support a ⅓ / ⅓ / final schedule — deposit, midpoint, completion — with each
+  stage generating an invoice against the job total.
+
+Out of Scope:
+- Automatic detection of the 2-week threshold beyond a simple prompt/flag (owner
+  can opt a job into staged billing).
+- Changing how job totals or line items are computed.
+
+Acceptance Criteria:
+- [ ] Approving a big estimate leads directly into recording a deposit (no manual
+      standalone-invoice detour).
+- [ ] A job can be billed in thirds (deposit / midpoint / final), each stage a
+      tracked invoice summing to the job total.
+- [ ] Existing single-invoice-at-completion flow still works for normal jobs.
+
+Notes:
+From the 2026-09-05 owner workflow review. Deposit primitive = TASK-071 (done).
+Pairs with TASK-119 (quick-job billing) and TASK-121 (job spend view).
+
+# TASK-121: Unified job materials & spend view
+
+Status:
+Proposed
+
+Phase:
+3
+
+Problem:
+Job materials live in two places — the planned **buy list** and **ad-hoc expense
+receipts** attached to the job — so there is no single view of planned vs actual
+spend. (Per-task check-off is **already shipped and synced** via `VisitDayTasks`
++ `JobTasksPanel` over `work_order_tasks` — NOT in scope.)
+
+Business Value:
+One honest picture of what a job planned to spend vs what it actually spent,
+feeding job profitability.
+
+Scope:
+- A single "job materials & spend" view merging the buy list and the job's
+  `expenses` receipts, with a spend total rolling into job cost / the job ledger.
+
+Out of Scope:
+- Task check-off sync (already shipped — TASK-018 work-order tasks).
+- Changing the Job→Visit→Work Order model.
+
+Acceptance Criteria:
+- [ ] One job view shows planned buy-list items and ad-hoc receipts together with
+      a spend total, comparable against the estimate.
+
+Notes:
+From the 2026-09-05 owner workflow review (materials "mix of buy list + ad-hoc
+receipts"). The task-sync half of the original idea was dropped — already built.
 
 ## Completed
 
