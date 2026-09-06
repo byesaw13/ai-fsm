@@ -63,4 +63,29 @@ describe("checkCompletionPacket", () => {
       photos_waiver_reason: "Client declined photos",
     })).toEqual({ ok: false, error: "MISSING_SIGNATURE" });
   });
+
+  it("quick job (no estimate): photo not required, signature not required", () => {
+    expect(checkCompletionPacket(null, { requirePhoto: false, requireSignature: false })).toEqual({
+      ok: true,
+    });
+    expect(
+      checkCompletionPacket(
+        { photo_urls: [], signature_url: null, signature_waiver: false },
+        { requirePhoto: false, requireSignature: false },
+      ),
+    ).toEqual({ ok: true });
+  });
+
+  it("quick job still accepts a photo if one was taken", () => {
+    expect(
+      checkCompletionPacket(
+        {
+          photo_urls: ["https://example.com/photo.jpg"],
+          signature_url: null,
+          signature_waiver: false,
+        },
+        { requirePhoto: false, requireSignature: false },
+      ),
+    ).toEqual({ ok: true });
+  });
 });

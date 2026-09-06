@@ -347,6 +347,18 @@ export default async function VisitDetailPage({
 
   const overdue = isVisitOverdue(visit);
 
+  const estimateOnJob = visit.job_id
+    ? await queryOneForSession<{ exists: boolean }>(
+        session,
+        `SELECT EXISTS(
+           SELECT 1 FROM estimates e
+           WHERE e.job_id = $1 AND e.account_id = $2
+         ) AS exists`,
+        [visit.job_id, session.accountId],
+      )
+    : null;
+  const isQuickJob = !estimateOnJob?.exists;
+
   // For repair visits that are active, check for an approved estimate so we can surface the conditions panel
   const approvedEstimate =
     isRepairFlow &&
@@ -792,6 +804,7 @@ export default async function VisitDetailPage({
                 canUpdate={canNotes}
                 canComplete={canTransition}
                 closePhotosItemId={closePhotosItemId}
+                isQuickJob={isQuickJob}
               />
             </Card>
           )}

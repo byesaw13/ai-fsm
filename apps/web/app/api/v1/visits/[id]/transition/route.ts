@@ -19,6 +19,7 @@ interface VisitRow {
   completed_at: string | null;
   tech_notes: string | null;
   updated_at: string;
+  has_estimate?: boolean;
 }
 import { seedConditionSnapshots } from "../../../../../../lib/visits/condition-seeding";
 import { writeWorkflowEvent } from "../../../../../../lib/workflow-events";
@@ -76,7 +77,14 @@ export const POST = withAuth(
       );
 
       const existing = await client.query(
-        `SELECT * FROM visits WHERE id = $1 AND account_id = $2 FOR UPDATE`,
+        `SELECT v.*,
+                EXISTS(
+                  SELECT 1 FROM estimates e
+                  WHERE e.job_id = v.job_id AND e.account_id = v.account_id
+                ) AS has_estimate
+         FROM visits v
+         WHERE v.id = $1 AND v.account_id = $2
+         FOR UPDATE`,
         [id, session.accountId]
       );
 
@@ -176,7 +184,11 @@ export const POST = withAuth(
            WHERE visit_id = $1 AND account_id = $2`,
           [id, session.accountId]
         );
-        const guard = checkCompletionPacket(packetResult.rows[0] ?? null);
+        const quoted = Boolean(visit.has_estimate);
+        const guard = checkCompletionPacket(packetResult.rows[0] ?? null, {
+          requirePhoto: quoted,
+          requireSignature: quoted,
+        });
 
         if (!guard.ok) {
           await client.query("ROLLBACK");
