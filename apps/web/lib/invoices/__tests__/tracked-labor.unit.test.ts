@@ -8,6 +8,7 @@ import {
   TRACKED_LABOR_JOB_WORK_WHERE,
   trackedHoursFromMinutes,
   trackedLaborCents,
+  quickJobBilledCents,
 } from "../tracked-labor";
 
 describe("trackedHoursFromMinutes", () => {
@@ -120,5 +121,40 @@ describe("mapTrackedLaborDayRows", () => {
     expect(days[0].minutes).toBe(364);
     expect(days[1].hours).toBe(10.39);
     expect(days[1].entry_count).toBe(1);
+  });
+});
+
+describe("quickJobBilledCents", () => {
+  const RATE = 115_00; // $115/hr bill rate
+  const MIN = 185_00; // existing minimum_service_fee_cents
+
+  it("floors a short quick job up to the service minimum", () => {
+    // 30 min → 0.5h × $115 = $57.50, below the $185 minimum
+    const r = quickJobBilledCents(30, RATE, MIN);
+    expect(r.laborCents).toBe(57_50);
+    expect(r.billedCents).toBe(185_00);
+    expect(r.minimumApplied).toBe(true);
+  });
+
+  it("leaves labor above the minimum unchanged", () => {
+    // 180 min → 3h × $115 = $345, above the minimum
+    const r = quickJobBilledCents(180, RATE, MIN);
+    expect(r.laborCents).toBe(345_00);
+    expect(r.billedCents).toBe(345_00);
+    expect(r.minimumApplied).toBe(false);
+  });
+
+  it("does not apply at the exact minimum boundary", () => {
+    // 90 min → 1.5h × $100 = $150 == $150 minimum
+    const r = quickJobBilledCents(90, 100_00, 150_00);
+    expect(r.billedCents).toBe(150_00);
+    expect(r.minimumApplied).toBe(false);
+  });
+
+  it("bills the minimum when no time was tracked", () => {
+    const r = quickJobBilledCents(0, RATE, MIN);
+    expect(r.laborCents).toBe(0);
+    expect(r.billedCents).toBe(185_00);
+    expect(r.minimumApplied).toBe(true);
   });
 });

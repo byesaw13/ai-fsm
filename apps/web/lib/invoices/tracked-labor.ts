@@ -250,3 +250,19 @@ export function trackedLaborCents(
 ): number {
   return roundedQuarterHoursFromMinutes(minutes) * billingRateCentsPerHour;
 }
+
+/**
+ * Quick-job billing (TASK-119): tracked labor floored to the account's existing
+ * service minimum (`business_pricing_settings.minimum_service_fee_cents`). Reuses
+ * that single minimum rather than introducing a second one, so a short stop still
+ * bills at least the minimum. Pure — the route/UI supplies the rate and minimum.
+ */
+export function quickJobBilledCents(
+  minutes: number,
+  billingRateCentsPerHour: number,
+  serviceMinimumCents: number,
+): { laborCents: number; billedCents: number; minimumApplied: boolean } {
+  const laborCents = trackedLaborCents(minutes, billingRateCentsPerHour);
+  const billedCents = Math.max(laborCents, serviceMinimumCents);
+  return { laborCents, billedCents, minimumApplied: billedCents > laborCents };
+}
