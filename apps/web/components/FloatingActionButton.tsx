@@ -4,8 +4,9 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useState } from "react";
 import { CAPTURE_HREF, CaptureLink } from "./CaptureLink";
-import { QuickBookButton } from "./jobs/QuickBookButton";
+import { QuickBookModal } from "./jobs/QuickBookModal";
 import { FAB_QUICK_ACTIONS } from "@/lib/navigation/quick-actions";
+import { QUICK_JOB_SUCCESS_HREF } from "@/lib/jobs/quick-book";
 
 /**
  * Persistent floating action button for Mobile Workspace.
@@ -14,8 +15,11 @@ import { FAB_QUICK_ACTIONS } from "@/lib/navigation/quick-actions";
  */
 export function FloatingActionButton() {
   const [open, setOpen] = useState(false);
+  const [quickBookOpen, setQuickBookOpen] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
+    <>
     <div className="p7-fab-wrap">
       {/* Backdrop */}
       {open && (
@@ -68,9 +72,18 @@ export function FloatingActionButton() {
             );
             if (action.action === "quick-book") {
               return (
-                <QuickBookButton key={action.label} style={itemStyle} testId="fab-quick-job">
+                <button
+                  key={action.label}
+                  type="button"
+                  data-testid="fab-quick-job"
+                  style={{ ...itemStyle, cursor: "pointer" }}
+                  onClick={() => {
+                    setOpen(false);
+                    setQuickBookOpen(true);
+                  }}
+                >
                   {inner}
-                </QuickBookButton>
+                </button>
               );
             }
             if (action.href === CAPTURE_HREF) {
@@ -124,5 +137,15 @@ export function FloatingActionButton() {
         +
       </button>
     </div>
+    {quickBookOpen && (
+      <QuickBookModal
+        initialDate={today}
+        startNow
+        assignSelf
+        successHref={QUICK_JOB_SUCCESS_HREF}
+        onClose={() => setQuickBookOpen(false)}
+      />
+    )}
+    </>
   );
 }

@@ -2,15 +2,18 @@
 export const QUICK_JOB_SUCCESS_HREF = "/app/my-work";
 
 /**
- * Quick-booked visits only show on My Day when assigned to the viewer.
- * If the form omits a tech, assign the person who booked it.
+ * Explicit tech wins. Field launches pass assignSelf so the visit lands on My Day.
+ * Schedule's Unassigned option omits both and stays unassigned.
  */
 export function resolveQuickBookAssignee(
   requested: string | undefined,
   sessionUserId: string,
-): string {
+  assignSelf = false,
+): string | null {
   const trimmed = requested?.trim();
-  return trimmed ? trimmed : sessionUserId;
+  if (trimmed) return trimmed;
+  if (assignSelf) return sessionUserId;
+  return null;
 }
 
 /** Local calendar date + HH:mm, rounded up to the next half hour ("Now"). */

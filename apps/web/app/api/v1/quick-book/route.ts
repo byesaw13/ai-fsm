@@ -35,6 +35,8 @@ const bodySchema = z.object({
   scheduled_start: z.string().datetime(),
   scheduled_end: z.string().datetime(),
   assigned_user_id: z.string().uuid().optional(),
+  /** My Day / FAB: assign the booker. Schedule Unassigned omits this. */
+  assign_self: z.boolean().optional(),
 }).refine(d => d.client_id || d.client_name, {
   message: "Provide either client_id (existing) or client_name (new)",
 });
@@ -128,7 +130,11 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       createdBy: session.userId,
     });
 
-    const assignedUserId = resolveQuickBookAssignee(d.assigned_user_id, session.userId);
+    const assignedUserId = resolveQuickBookAssignee(
+      d.assigned_user_id,
+      session.userId,
+      d.assign_self === true,
+    );
 
     // ── 4. Create visit ──────────────────────────────────────────────────────
     const { rows: visitRows } = await client.query(

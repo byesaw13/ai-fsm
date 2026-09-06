@@ -24,6 +24,7 @@ export function MyDayMobileLayout({
   heroVisit,
   clockedIn,
   canCapture = false,
+  canQuickBook = false,
   children,
 }: {
   openSession: OpenSession | null;
@@ -33,6 +34,7 @@ export function MyDayMobileLayout({
   heroVisit: HeroVisit | null;
   clockedIn: boolean;
   canCapture?: boolean;
+  canQuickBook?: boolean;
   children: React.ReactNode;
 }) {
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -132,7 +134,7 @@ export function MyDayMobileLayout({
       />
 
       <div style={{ marginBottom: "var(--space-6)" }}>
-        <FieldQuickActions showCapture={canCapture} />
+        <FieldQuickActions showCapture={canCapture} canQuickBook={canQuickBook} />
       </div>
 
       {children}

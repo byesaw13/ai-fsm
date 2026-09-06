@@ -10,11 +10,17 @@ describe("resolveQuickBookAssignee", () => {
 
   it("uses the requested tech when one is provided", () => {
     expect(resolveQuickBookAssignee("user-tech", sessionUser)).toBe("user-tech");
+    expect(resolveQuickBookAssignee("user-tech", sessionUser, true)).toBe("user-tech");
   });
 
-  it("defaults to the current user so the visit lands on My Day", () => {
-    expect(resolveQuickBookAssignee(undefined, sessionUser)).toBe(sessionUser);
-    expect(resolveQuickBookAssignee("", sessionUser)).toBe(sessionUser);
+  it("defaults to the current user only when assignSelf is set (My Day / FAB)", () => {
+    expect(resolveQuickBookAssignee(undefined, sessionUser, true)).toBe(sessionUser);
+    expect(resolveQuickBookAssignee("", sessionUser, true)).toBe(sessionUser);
+  });
+
+  it("keeps Schedule Unassigned as unassigned", () => {
+    expect(resolveQuickBookAssignee(undefined, sessionUser)).toBeNull();
+    expect(resolveQuickBookAssignee("", sessionUser, false)).toBeNull();
   });
 });
 

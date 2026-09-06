@@ -5,7 +5,13 @@ import { CaptureLink } from "@/components/CaptureLink";
 import { QuickBookButton } from "@/components/jobs/QuickBookButton";
 import { FIELD_QUICK_ACTIONS } from "@/lib/navigation/quick-actions";
 
-export function FieldQuickActions({ showCapture = false }: { showCapture?: boolean }) {
+export function FieldQuickActions({
+  showCapture = false,
+  canQuickBook = false,
+}: {
+  showCapture?: boolean;
+  canQuickBook?: boolean;
+}) {
   return (
     <section data-testid="field-quick-actions">
       {showCapture && (
@@ -27,7 +33,7 @@ export function FieldQuickActions({ showCapture = false }: { showCapture?: boole
       )}
       <SectionHeader title="Quick Actions" as="h3" />
       <div className="my-day-quick-grid" style={{ marginTop: "var(--space-3)" }}>
-        {FIELD_QUICK_ACTIONS.map((act) => {
+        {FIELD_QUICK_ACTIONS.filter((act) => act.action !== "quick-book" || canQuickBook).map((act) => {
           const tileStyle = {
             display: "flex" as const,
             flexDirection: "column" as const,

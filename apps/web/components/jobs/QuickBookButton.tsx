@@ -33,6 +33,7 @@ export function QuickBookButton({
         <QuickBookModal
           initialDate={today}
           startNow
+          assignSelf
           successHref={QUICK_JOB_SUCCESS_HREF}
           onClose={() => setOpen(false)}
         />

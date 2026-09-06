@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { nextHalfHourLocal } from "@/lib/jobs/quick-book";
 
 interface UserOption { id: string; full_name: string; role: string; }
@@ -14,6 +15,8 @@ interface Props {
   successHref?: string;
   /** Walk-up: round start to the next half hour, default 1 hour. */
   startNow?: boolean;
+  /** Assign the booker (My Day / FAB). Schedule Unassigned omits this. */
+  assignSelf?: boolean;
 }
 
 const JOB_TYPE_OPTIONS = [
@@ -60,7 +63,13 @@ function buildISO(date: string, time: string): string {
   return new Date(`${date}T${time}:00`).toISOString();
 }
 
-export function QuickBookModal({ initialDate, onClose, successHref, startNow = false }: Props) {
+export function QuickBookModal({
+  initialDate,
+  onClose,
+  successHref,
+  startNow = false,
+  assignSelf = false,
+}: Props) {
   const router = useRouter();
   const nowSlot = startNow ? nextHalfHourLocal() : null;
 
@@ -149,6 +158,7 @@ export function QuickBookModal({ initialDate, onClose, successHref, startNow = f
     };
     if (notes.trim()) payload.notes = notes.trim();
     if (assignedUserId) payload.assigned_user_id = assignedUserId;
+    if (assignSelf) payload.assign_self = true;
 
     if (selectedClient) {
       payload.client_id = selectedClient.id;
@@ -169,7 +179,7 @@ export function QuickBookModal({ initialDate, onClose, successHref, startNow = f
       }
       router.refresh();
       onClose();
-      if (successHref) router.push(successHref);
+      if (successHref) router.push(successHref as Route);
     } catch {
       setError("Network error — please try again");
     } finally {
