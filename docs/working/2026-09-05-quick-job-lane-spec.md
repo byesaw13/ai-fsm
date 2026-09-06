@@ -83,27 +83,54 @@ rate reconciliation stays with pricing work (PI-002/004), not blocking here.
       on the invoice with no manual re-entry.
 - [ ] Invoice defaults to hourly at the bill rate; switch to price-book or flat
       in one action.
+- [ ] The billed total is floored to the existing `minimum_service_fee_cents`
+      (no second minimum introduced); a per-job override is possible via the
+      existing override path.
+- [ ] `QuickBookModal` is reachable from all three launch points (Schedule +,
+      My Day, global FAB) via one shared component — no forked flow.
+- [ ] "Done" closes the visit only; the business day stays open until Day Review.
 - [ ] The job, client, and hours are persisted and queryable afterward.
 - [ ] Existing big-job/estimate flows are untouched.
 
 ## Testing / verification
 
 - **Unit:** the rate-selection helper (hourly vs price-book vs flat → line
-  amount) — pure, table-tested.
-- **Integration (Tier 3, real DB + server):** quick-create endpoint makes a
-  Job+Visit scoped to the account; tracked minutes on the visit produce the
-  expected labor line via `upsertLaborLineFromTrackedTime`. Harness:
-  `apps/web/lib/**/__tests__/*.integration.test.ts` (see the push/clock suites).
+  amount) — pure, table-tested — **including the `minimum_service_fee_cents`
+  floor** (below-minimum time floors to the setting; override respected).
+- **Integration (Tier 3, real DB + server):** tracked minutes on a quick-booked
+  visit produce the expected labor line via `upsertLaborLineFromTrackedTime`,
+  floored to the service minimum; "Done" closes the visit while the business day
+  stays open. Harness: `apps/web/lib/**/__tests__/*.integration.test.ts`.
+- **Component/manual:** the three launch points (Schedule +, My Day, global FAB)
+  all open the same `QuickBookModal`.
 - **Manual (the real proof):** on the installed PWA, capture a "assemble bed"
   job in ≤3 taps, start/stop time, invoice it — confirm hours pre-filled — in
   under a minute, no paper.
 - `pnpm gate:fast` before PR.
 
-## Open questions for the owner (resolve before build)
+## Decisions (owner, 2026-09-05) — resolved
 
-- Where should "Quick job" live most naturally — a Schedule "+", a My Day
-  button, a global quick-add, or all three?
-- Trip/minimum charge on hourly quick jobs — is there a minimum (e.g. 1 hr) to
-  auto-apply?
-- Should a quick job auto-close its business-day/visit on "Done", or stay open
-  until end-of-day?
+1. **Entry point = all three launch points, one shared modal.** Surface the
+   existing `QuickBookModal` from the Schedule "+" (already there), a **My Day**
+   button, and the global **FloatingActionButton** / quick-add. One component,
+   three launch points — reach it from wherever the job comes in (calendar
+   planning, in the field, an ad-hoc call). Do not fork the flow.
+2. **Minimum charge = reuse the EXISTING service minimum, not a new floor.**
+   `business_pricing_settings.minimum_service_fee_cents` already exists and is the
+   pricing minimum via `buildPricingRules` (`packages/domain/src/pricing-settings.ts`),
+   with a per-record override path (`minimum_service_override_reason/note`). Floor
+   the quick-job total to that single configured minimum — do **NOT** add a
+   separate 1-hour minimum (that would be a second source of pricing truth and
+   could underbill the configured value, currently ~$185). The owner's
+   "configurable minimum" intent is satisfied by that setting; if a one-hour floor
+   is wanted, set `minimum_service_fee_cents` to one hour's bill rate. Per-job
+   adjustment uses the existing override mechanism. The line can still switch to a
+   price-book rate or flat fee ("whichever is most profitable").
+3. **On "Done" → close the visit, keep the business day open.** Completing the
+   quick job closes its visit (billable/done) but the business day stays open for
+   more jobs and closes at Day Review. This matches the operations-engine
+   independence (payroll/day and visit lifecycles are separate — TASK-052/056).
+
+Build-affecting deltas these add to TASK-119: the configurable minimum-hours
+setting + its application to the labor line; the three launch points around the
+one QuickBookModal; and "Done closes the visit only."
