@@ -253,6 +253,7 @@ export default async function MyWorkPage() {
         heroVisit={heroVisit}
         clockedIn={fieldDay.clockedIn}
         canCapture={isOwner}
+        canQuickBook={isOwner}
       >
         <Card style={{ marginBottom: "var(--space-4)" }}>
           <SectionHeader title="Active Work Orders" count={workOrders.length} />

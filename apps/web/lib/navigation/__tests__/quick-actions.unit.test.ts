@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   OWNER_QUICK_ACTIONS,
   FIELD_QUICK_ACTIONS,
+  FAB_QUICK_ACTIONS,
 } from "../quick-actions";
 
 describe("quick actions", () => {
@@ -31,5 +32,18 @@ describe("quick actions", () => {
   it("puts Capture first on the owner dashboard, not in the tech field strip", () => {
     expect(OWNER_QUICK_ACTIONS[0]).toMatchObject({ label: "Capture", href: "/app/capture" });
     expect(FIELD_QUICK_ACTIONS.some((a) => a.href === "/app/capture")).toBe(false);
+  });
+
+  it("puts Quick job first on My Day (TASK-119 launch point)", () => {
+    expect(FIELD_QUICK_ACTIONS[0]).toMatchObject({
+      label: "Quick job",
+      action: "quick-book",
+    });
+  });
+
+  it("exposes Quick job on the global FAB (TASK-119 launch point)", () => {
+    expect(FAB_QUICK_ACTIONS.some((a) => a.label === "Quick job" && a.action === "quick-book")).toBe(
+      true,
+    );
   });
 });

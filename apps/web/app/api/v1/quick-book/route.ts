@@ -13,6 +13,7 @@ import { logger } from "@/lib/logger";
 import { syncWorkOrderLeadFromVisit } from "@/lib/work-orders/assign-lead";
 import { createDefaultWorkOrderForJob } from "@/lib/work-orders/create-default";
 import { syncWorkOrderStatus } from "@/lib/work-orders/sync-status";
+import { resolveQuickBookAssignee } from "@/lib/jobs/quick-book";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,8 @@ const bodySchema = z.object({
   scheduled_start: z.string().datetime(),
   scheduled_end: z.string().datetime(),
   assigned_user_id: z.string().uuid().optional(),
+  /** My Day / FAB: assign the booker. Schedule Unassigned omits this. */
+  assign_self: z.boolean().optional(),
 }).refine(d => d.client_id || d.client_name, {
   message: "Provide either client_id (existing) or client_name (new)",
 });
@@ -127,6 +130,12 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       createdBy: session.userId,
     });
 
+    const assignedUserId = resolveQuickBookAssignee(
+      d.assigned_user_id,
+      session.userId,
+      d.assign_self === true,
+    );
+
     // ── 4. Create visit ──────────────────────────────────────────────────────
     const { rows: visitRows } = await client.query(
       `INSERT INTO visits (account_id, job_id, work_order_id, assigned_user_id, scheduled_start, scheduled_end, visit_type)
@@ -136,7 +145,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
         session.accountId,
         jobId,
         workOrderId,
-        d.assigned_user_id ?? null,
+        assignedUserId,
         d.scheduled_start,
         d.scheduled_end,
       ],
@@ -156,7 +165,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       client,
       workOrderId,
       session.accountId,
-      d.assigned_user_id ?? null,
+      assignedUserId,
     );
     await syncWorkOrderStatus(client, workOrderId, session.accountId);
 

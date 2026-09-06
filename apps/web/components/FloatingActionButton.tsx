@@ -4,22 +4,9 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useState } from "react";
 import { CAPTURE_HREF, CaptureLink } from "./CaptureLink";
-
-interface QuickAction {
-  href: string;
-  label: string;
-  emoji: string;
-}
-
-const ACTIONS: QuickAction[] = [
-  { href: "/app/capture", label: "Capture", emoji: "🎙️" },
-  { href: "/app/estimates/quick", label: "Quick Estimate", emoji: "⚡" },
-  { href: "/app/invoices/new",    label: "New Invoice",    emoji: "💵" },
-  { href: "/app/jobs/new",        label: "New Project",    emoji: "🧰" },
-  { href: "/app/intake/new",      label: "New Request",    emoji: "📋" },
-  { href: "/app/expenses/new?mode=run", label: "Material Run", emoji: "🧾" },
-  { href: "/app/mileage/new",     label: "Log Mileage",    emoji: "🚗" },
-];
+import { QuickBookModal } from "./jobs/QuickBookModal";
+import { FAB_QUICK_ACTIONS } from "@/lib/navigation/quick-actions";
+import { QUICK_JOB_SUCCESS_HREF } from "@/lib/jobs/quick-book";
 
 /**
  * Persistent floating action button for Mobile Workspace.
@@ -28,8 +15,11 @@ const ACTIONS: QuickAction[] = [
  */
 export function FloatingActionButton() {
   const [open, setOpen] = useState(false);
+  const [quickBookOpen, setQuickBookOpen] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
+    <>
     <div className="p7-fab-wrap">
       {/* Backdrop */}
       {open && (
@@ -58,7 +48,7 @@ export function FloatingActionButton() {
             alignItems: "flex-end",
           }}
         >
-          {ACTIONS.map((action) => {
+          {FAB_QUICK_ACTIONS.map((action) => {
             const itemStyle = {
               display: "inline-flex" as const,
               alignItems: "center",
@@ -76,10 +66,26 @@ export function FloatingActionButton() {
             };
             const inner = (
               <>
-                <span style={{ fontSize: "var(--text-lg)" }}>{action.emoji}</span>
+                <span style={{ fontSize: "var(--text-lg)" }}>{action.icon}</span>
                 {action.label}
               </>
             );
+            if (action.action === "quick-book") {
+              return (
+                <button
+                  key={action.label}
+                  type="button"
+                  data-testid="fab-quick-job"
+                  style={{ ...itemStyle, cursor: "pointer" }}
+                  onClick={() => {
+                    setOpen(false);
+                    setQuickBookOpen(true);
+                  }}
+                >
+                  {inner}
+                </button>
+              );
+            }
             if (action.href === CAPTURE_HREF) {
               return (
                 <CaptureLink key={action.href} onClick={() => setOpen(false)} style={itemStyle}>
@@ -131,5 +137,15 @@ export function FloatingActionButton() {
         +
       </button>
     </div>
+    {quickBookOpen && (
+      <QuickBookModal
+        initialDate={today}
+        startNow
+        assignSelf
+        successHref={QUICK_JOB_SUCCESS_HREF}
+        onClose={() => setQuickBookOpen(false)}
+      />
+    )}
+    </>
   );
 }
