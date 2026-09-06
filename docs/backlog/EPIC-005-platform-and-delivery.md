@@ -7,6 +7,44 @@ workflow.
 
 ## Active tasks
 
+# TASK-122: Backup hardening — uploads + encrypted .env alongside the DB dump
+
+Status:
+In Progress
+
+Phase:
+cross-cutting
+
+Problem:
+`backup-garonhome.sh` dumped only the Postgres database. A disaster restore would
+lose uploaded files (receipts, job photos under `DATA_ROOT/uploads`) and could
+not decrypt `APP_ENCRYPTION_KEY`-protected data (e.g. Square tokens) because the
+`.env` was not backed up. The backup was not restore-complete.
+
+Business Value:
+A restore actually brings the business back — data, media, and the secrets needed
+to read encrypted fields — not just the database.
+
+Scope:
+- Also archive `DATA_ROOT/uploads` (tar.gz) and a GPG-symmetric (AES256)
+  encrypted copy of `.env`; copy all three artifacts offsite. Missing uploads dir
+  / passphrase file warn and skip (non-fatal); pruning still runs.
+- `FSM_BACKUP_PASSPHRASE_FILE` + `FSM_BACKUP_REMOTE_RETENTION_DAYS` documented in
+  `garonhome.env.example`; runbook updated.
+- Resolve env-dependent paths after sourcing `.env`.
+
+Out of Scope:
+- Coordinated DB/filesystem snapshot to eliminate the small dump-vs-tar race
+  (documented as an accepted limitation for a solo nightly run).
+
+Acceptance Criteria:
+- [ ] Backup produces DB dump + uploads archive + encrypted `.env`, all copied
+      offsite; missing inputs warn and skip without failing the run.
+- [ ] `FSM_DATA_ROOT` / `FSM_BACKUP_PASSPHRASE_FILE` set only in `.env` are honored.
+
+Notes:
+Shipped in PR #623. Deposit/restore steps: `docs/BACKUP_RUNBOOK.md`.
+
 # TASK-116: Field-ops Web Push (start-day, home-arrival day-review, My Work prompt)
 
 Status:
