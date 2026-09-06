@@ -95,4 +95,58 @@ describe.skipIf(!RUN)("applyServiceMinimum", () => {
     expect(await minLine()).toHaveLength(0);
     expect(totals.total_cents).toBe(1050_00); // $50 labor + $1000 materials
   });
+
+  it("preserves existing tax when flooring (does not zero it)", async () => {
+    // fresh invoice: $50 labor + $10 tax, below the minimum
+    const num = `SVCMIN-TAX-${Date.now()}`;
+    const inv = await client.query(
+      `INSERT INTO invoices (account_id, client_id, invoice_number, created_by, tax_cents)
+       VALUES ($1, $2, $3, $4, 10_00) RETURNING id`,
+      [SEED_ACCOUNT, clientId, num, SEED_OWNER],
+    );
+    const taxedId = inv.rows[0].id;
+    try {
+      await createInvoiceLineItem(client, taxedId, {
+        description: "Labor",
+        quantity: 1,
+        unit_price_cents: 50_00,
+        line_item_type: "labor",
+      });
+      const totals = await applyServiceMinimum(client, taxedId, SEED_ACCOUNT);
+      expect(totals.tax_cents).toBe(10_00); // tax untouched
+      // total = floored subtotal (the minimum) + preserved tax
+      expect(totals.total_cents).toBe(totals.subtotal_cents + 10_00);
+      expect(totals.subtotal_cents).toBeGreaterThan(50_00);
+    } finally {
+      await client.query(`DELETE FROM invoice_line_items WHERE invoice_id = $1`, [taxedId]);
+      await client.query(`DELETE FROM invoices WHERE id = $1`, [taxedId]);
+    }
+  });
+
+  it("does not write (preserves tax) when already at/above the minimum", async () => {
+    const num = `SVCMIN-NOOP-${Date.now()}`;
+    const inv = await client.query(
+      `INSERT INTO invoices (account_id, client_id, invoice_number, created_by, tax_cents)
+       VALUES ($1, $2, $3, $4, 7_00) RETURNING id`,
+      [SEED_ACCOUNT, clientId, num, SEED_OWNER],
+    );
+    const okId = inv.rows[0].id;
+    try {
+      await createInvoiceLineItem(client, okId, {
+        description: "Labor",
+        quantity: 1,
+        unit_price_cents: 500_00, // well above the minimum
+        line_item_type: "labor",
+      });
+      const totals = await applyServiceMinimum(client, okId, SEED_ACCOUNT);
+      expect(await client.query(
+        `SELECT 1 FROM invoice_line_items WHERE invoice_id = $1 AND description = $2`,
+        [okId, SERVICE_MINIMUM_LABEL],
+      ).then((r) => r.rowCount)).toBe(0); // no minimum line added
+      expect(totals.tax_cents).toBe(7_00); // tax preserved on the no-op path
+    } finally {
+      await client.query(`DELETE FROM invoice_line_items WHERE invoice_id = $1`, [okId]);
+      await client.query(`DELETE FROM invoices WHERE id = $1`, [okId]);
+    }
+  });
 });

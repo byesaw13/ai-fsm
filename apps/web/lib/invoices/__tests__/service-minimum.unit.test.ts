@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { planServiceMinimum } from "../service-minimum";
+import { planServiceMinimum, isServiceMinimumEligible } from "../service-minimum";
 
 const MIN = 185_00;
 
@@ -57,5 +57,21 @@ describe("planServiceMinimum", () => {
     expect(planServiceMinimum([{ total_cents: 185_00, is_service_minimum: false }], MIN)).toEqual({
       action: "none",
     });
+  });
+});
+
+describe("isServiceMinimumEligible", () => {
+  it("applies to standard and final invoices with no override", () => {
+    expect(isServiceMinimumEligible({ invoiceKind: "standard", minimumServiceOverrideReason: null })).toBe(true);
+    expect(isServiceMinimumEligible({ invoiceKind: "final", minimumServiceOverrideReason: null })).toBe(true);
+  });
+
+  it("never applies to a deposit invoice (precomputed total, no line items)", () => {
+    expect(isServiceMinimumEligible({ invoiceKind: "deposit", minimumServiceOverrideReason: null })).toBe(false);
+  });
+
+  it("does not override an approved below-minimum estimate price", () => {
+    expect(isServiceMinimumEligible({ invoiceKind: "final", minimumServiceOverrideReason: "owner_approved" })).toBe(false);
+    expect(isServiceMinimumEligible({ invoiceKind: "standard", minimumServiceOverrideReason: "bundled" })).toBe(false);
   });
 });
