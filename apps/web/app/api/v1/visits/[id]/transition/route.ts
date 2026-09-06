@@ -5,7 +5,7 @@ import type { AuthSession } from "../../../../../../lib/auth/middleware";
 import { getPool } from "../../../../../../lib/db";
 import { appendAuditLog } from "../../../../../../lib/db/audit";
 import { logger } from "../../../../../../lib/logger";
-import { checkCompletionPacket } from "../../../../../../lib/completion-guard";
+import { checkCompletionPacket, isQuickJobPacketExempt } from "../../../../../../lib/completion-guard";
 import { visitTransitions, visitStatusSchema } from "@ai-fsm/domain";
 import type { VisitStatus } from "@ai-fsm/domain";
 interface VisitRow {
@@ -19,6 +19,7 @@ interface VisitRow {
   completed_at: string | null;
   tech_notes: string | null;
   updated_at: string;
+  visit_type?: string | null;
   has_estimate?: boolean;
 }
 import { seedConditionSnapshots } from "../../../../../../lib/visits/condition-seeding";
@@ -184,10 +185,10 @@ export const POST = withAuth(
            WHERE visit_id = $1 AND account_id = $2`,
           [id, session.accountId]
         );
-        const quoted = Boolean(visit.has_estimate);
+        const exempt = isQuickJobPacketExempt(visit);
         const guard = checkCompletionPacket(packetResult.rows[0] ?? null, {
-          requirePhoto: quoted,
-          requireSignature: quoted,
+          requirePhoto: !exempt,
+          requireSignature: !exempt,
         });
 
         if (!guard.ok) {

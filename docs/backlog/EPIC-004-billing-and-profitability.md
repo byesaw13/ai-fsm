@@ -65,8 +65,8 @@ Acceptance Criteria:
 - [x] `QuickBookModal` opens from all three launch points (Schedule +, My Day,
       global FAB) as one shared component.
 - [x] "Done" closes the visit only; the business day stays open until Day Review.
-      (No-estimate/quick-book visits skip the photo+signature packet so My Day
-      Complete can finish in one tap; quoted jobs still require the packet.)
+      (Quick-book shape only: standard visit + work order + no estimate.
+      Site visits and quoted jobs still require the packet.)
 - [ ] No duplicate booking/capture path is introduced.
 
 Notes:

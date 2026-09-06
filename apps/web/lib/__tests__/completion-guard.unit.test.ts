@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkCompletionPacket } from "../completion-guard";
+import { checkCompletionPacket, isQuickJobPacketExempt } from "../completion-guard";
 
 describe("checkCompletionPacket", () => {
   it("requires a packet with at least one photo", () => {
@@ -87,5 +87,47 @@ describe("checkCompletionPacket", () => {
         { requirePhoto: false, requireSignature: false },
       ),
     ).toEqual({ ok: true });
+  });
+});
+
+describe("isQuickJobPacketExempt", () => {
+  it("is true for a standard work-order visit with no estimate (quick-book shape)", () => {
+    expect(
+      isQuickJobPacketExempt({
+        visit_type: "standard",
+        work_order_id: "wo-1",
+        has_estimate: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("is false for a site_visit even when there is no estimate", () => {
+    expect(
+      isQuickJobPacketExempt({
+        visit_type: "site_visit",
+        work_order_id: null,
+        has_estimate: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("is false when the job already has an estimate", () => {
+    expect(
+      isQuickJobPacketExempt({
+        visit_type: "standard",
+        work_order_id: "wo-1",
+        has_estimate: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("is false for a standard visit with no work order", () => {
+    expect(
+      isQuickJobPacketExempt({
+        visit_type: "standard",
+        work_order_id: null,
+        has_estimate: false,
+      }),
+    ).toBe(false);
   });
 });

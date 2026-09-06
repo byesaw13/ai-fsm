@@ -493,13 +493,18 @@ describe("POST /api/v1/visits/[id]/transition", () => {
   });
 
   it("quick job (no estimate): in_progress → completed without a packet → 200", async () => {
-    const updated = { ...SAMPLE_VISIT, status: "completed", completed_at: NOW, has_estimate: false };
+    const quick = {
+      ...SAMPLE_VISIT,
+      status: "in_progress",
+      visit_type: "standard",
+      work_order_id: WORK_ORDER_ID,
+      has_estimate: false,
+    };
+    const updated = { ...quick, status: "completed", completed_at: NOW };
     mockClientQuery
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({
-        rows: [{ ...SAMPLE_VISIT, status: "in_progress", has_estimate: false }],
-      })
+      .mockResolvedValueOnce({ rows: [quick] })
       .mockResolvedValueOnce({ rows: [] }) // no completion packet
       .mockResolvedValueOnce({ rows: [updated] })
       .mockResolvedValueOnce({ rows: [] });
@@ -510,6 +515,30 @@ describe("POST /api/v1/visits/[id]/transition", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data.status).toBe("completed");
+  });
+
+  it("site_visit without estimate still requires a completion packet → 422", async () => {
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({
+        rows: [{
+          ...SAMPLE_VISIT,
+          status: "in_progress",
+          visit_type: "site_visit",
+          work_order_id: null,
+          has_estimate: false,
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const res = await visitTransition(
+      makeRequest("POST", `${VISITS_BASE}/${VISIT_ID}/transition`, { status: "completed" }),
+    );
+    expect(res.status).toBe(422);
+    const json = await res.json();
+    expect(json.error.code).toBe("MISSING_PHOTO");
   });
 
   it("arrived → completed is invalid → 422 INVALID_TRANSITION", async () => {

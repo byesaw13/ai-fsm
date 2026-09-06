@@ -8,6 +8,19 @@ export interface CompletionPacket {
 
 export type CompletionGuardError = "MISSING_PHOTO" | "MISSING_SIGNATURE";
 
+/** Quick-book shape: standard visit under a WO, job never quoted. */
+export function isQuickJobPacketExempt(visit: {
+  visit_type?: string | null;
+  work_order_id?: string | null;
+  has_estimate?: boolean;
+}): boolean {
+  return (
+    !visit.has_estimate &&
+    visit.visit_type === "standard" &&
+    Boolean(visit.work_order_id)
+  );
+}
+
 export type CompletionGuardOptions = {
   /** Default true. Quick (no-estimate) jobs skip photos. */
   requirePhoto?: boolean;
