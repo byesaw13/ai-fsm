@@ -89,8 +89,10 @@ Out of Scope:
 - Changing how job totals or line items are computed.
 
 Acceptance Criteria:
-- [ ] Approving a big estimate leads directly into recording a deposit (no manual
-      standalone-invoice detour). **← remaining: the deposit gate.**
+- [x] Approving a big estimate leads directly into recording a deposit (no manual
+      standalone-invoice detour). (Deposit gate: first-class Deposit step in the
+      approved handoff + "Collect a deposit before starting" as the job's next
+      action; one-tap `POST /api/v1/jobs/:id/deposit-invoice`.)
 - [x] A job can be billed in thirds (deposit / midpoint / final), each stage a
       tracked invoice summing to the job total. (Progress invoices, #633.)
 - [x] Existing single-invoice-at-completion flow still works for normal jobs.
@@ -99,14 +101,18 @@ Notes:
 From the 2026-09-05 owner workflow review. Deposit primitive = TASK-071 (done).
 Pairs with TASK-119 (quick-job billing) and TASK-121 (job spend view).
 
-Shipped so far (#633):
-- Progress (thirds) billing: `invoice_kind='progress'` (migration 177),
+Shipped:
+- Progress (thirds) billing (#633): `invoice_kind='progress'` (migration 177),
   `POST /api/v1/jobs/:id/progress-invoice` (⅓ default, clamped to remaining), and
   the final invoice credits deposit + progress via `loadCreditedInvoicesForEstimate`
   so the stages sum to exactly the project total.
+- Deposit gate: `POST /api/v1/jobs/:id/deposit-invoice` (idempotent; amount =
+  estimate deposit or company standard %); first-class Deposit step in
+  `ApprovedHandoff` (collect / send / mark-received inline); `ProjectWhatNext`
+  prompts "Collect a deposit before starting" with "Schedule anyway" (prompt,
+  not block).
 
-Remaining (AC1): the **deposit gate** — make taking a deposit a first-class step
-in the approve→start flow (the deposit primitive already exists, TASK-071).
+All ACs met — ready to move to Done/archive.
 
 ## Completed
 

@@ -33,3 +33,22 @@ export function requestedDepositCents(
   }
   return 0;
 }
+
+/**
+ * Default deposit for the "collect a deposit" action on an approved job
+ * (TASK-120 deposit gate): the estimate's configured `deposit_cents` when the
+ * owner set one, otherwise the company standard deposit % of the project total
+ * (Settings → Company "Standard deposit (%)"). Clamped to [0, total].
+ */
+export function defaultDepositCents(input: {
+  estimateTotalCents: number;
+  configuredDepositCents?: number | null;
+  depositPercent: number;
+}): number {
+  const total = Math.max(0, Math.round(input.estimateTotalCents || 0));
+  if (total === 0) return 0;
+  const configured = Math.max(0, Math.round(input.configuredDepositCents ?? 0));
+  if (configured > 0) return Math.min(total, configured);
+  const pct = Math.min(100, Math.max(0, input.depositPercent || 0));
+  return Math.min(total, Math.round(total * (pct / 100)));
+}
