@@ -36,6 +36,7 @@ import { fetchJobMaterialExpenses, type JobMaterialExpenseWithLines } from "@/li
 import { withExpenseContext } from "@/lib/expenses/db";
 import { MaterialsBudgetLine } from "./MaterialsBudgetLine";
 import { mobileJobActionHrefs } from "./mobile-job-actions";
+import { JobPhotoGallery } from "./JobPhotoGallery";
 import { JobLedgerCard } from "./JobLedgerCard";
 import { loadJobLedger } from "@/lib/jobs/job-ledger";
 import {
@@ -530,13 +531,13 @@ export default async function JobDetailPage({
          JOIN visits v ON v.id = vm.visit_id AND v.account_id = vm.account_id
          WHERE v.job_id = $1 AND vm.account_id = $2 AND v.assigned_user_id = $3
          ORDER BY vm.created_at DESC
-         LIMIT 48`
+         LIMIT 12`
       : `SELECT vm.id, vm.visit_id, vm.category, vm.original_name
          FROM visit_media vm
          JOIN visits v ON v.id = vm.visit_id AND v.account_id = vm.account_id
          WHERE v.job_id = $1 AND vm.account_id = $2
          ORDER BY vm.created_at DESC
-         LIMIT 48`,
+         LIMIT 12`,
     session.role === "tech"
       ? [id, session.accountId, session.userId]
       : [id, session.accountId],
@@ -1022,35 +1023,7 @@ export default async function JobDetailPage({
               No photos on this job yet. Capture them from a visit.
             </p>
           ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                gap: "var(--space-2)",
-              }}
-            >
-              {jobPhotos.map((photo) => (
-                <a
-                  key={photo.id}
-                  href={`/app/visits/${photo.visit_id}`}
-                  style={{
-                    display: "block",
-                    aspectRatio: "1",
-                    borderRadius: 8,
-                    overflow: "hidden",
-                    background: "var(--bg-card)",
-                    border: "1px solid var(--border)",
-                  }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`/api/v1/visits/${photo.visit_id}/media/${photo.id}/image`}
-                    alt={photo.original_name || photo.category || "Job photo"}
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  />
-                </a>
-              ))}
-            </div>
+            <JobPhotoGallery photos={jobPhotos} />
           )}
         </section>
 
