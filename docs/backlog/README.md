@@ -95,9 +95,8 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-126**. (TASK-123 reserved for agent tooling / dev-stack,
-TASK-125 for the nav restructure — Jobs→Projects + Work Orders — per the
-simplification plan; don't reuse.)
+Next available ID: **TASK-126**. (TASK-123 reserved for agent tooling / dev-stack
+per the simplification plan; don't reuse.)
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -234,6 +233,7 @@ closed in tests; owner-flow AC still open.
 | TASK-120 | Big-job billing — deposit gate + progress (thirds) billing | 004 | Proposed |
 | TASK-121 | Unified job materials & spend view | 004 | Proposed |
 | TASK-124 | De-jargon naming — "Needs attention" + consistent "My Day" | 006 | In Progress |
+| TASK-125 | Nav restructure — Jobs→Projects, drop Work Orders from nav | 006 | In Progress |
 
 ## Status legend
 

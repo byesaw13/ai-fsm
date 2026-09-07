@@ -24,7 +24,6 @@ import {
   IconReports,
   IconVisits,
   IconSchedule,
-  IconQueue,
   IconDayReview,
   IconField,
   IconCapture,
@@ -86,8 +85,8 @@ const NAV_REQUESTS:   NavItem = { href: "/app/requests",     label: "Requests", 
 const NAV_CLIENTS:    NavItem = { href: "/app/clients",      label: "Clients",    Icon: IconClients,   adminOnly: true };
 const NAV_PROPS:      NavItem = { href: "/app/properties",   label: "Properties", Icon: IconProperties, adminOnly: true };
 const NAV_ESTIMATES:  NavItem = { href: "/app/estimates",    label: "Estimates",  Icon: IconEstimates, adminOnly: true };
-const NAV_JOBS:       NavItem = { href: "/app/jobs",         label: "Jobs",       Icon: IconJobs,       adminOnly: true };
-const NAV_WORK_ORDERS: NavItem = { href: "/app/work-orders", label: "Work Orders", Icon: IconQueue,     adminOnly: true };
+const NAV_JOBS:       NavItem = { href: "/app/jobs",         label: "Projects",   Icon: IconJobs,       adminOnly: true };
+// TASK-125: Work Orders are reached inside a Project, not from the top nav.
 const NAV_SCHEDULE:   NavItem = { href: "/app/schedule",     label: "Schedule",   Icon: IconSchedule,  adminOnly: true };
 const NAV_INVOICES:   NavItem = { href: "/app/invoices",     label: "Invoices",   Icon: IconInvoices,  adminOnly: true };
 const NAV_REPORTS:    NavItem = { href: "/app/reports",      label: "Reports",    Icon: IconReports,   adminOnly: true };
@@ -99,7 +98,7 @@ function buildHubSections(home: NavItem): NavSection[] {
     { label: "Home", items: [home, NAV_CAPTURE, NAV_DAY_REVIEW, NAV_TRACKING] },
     {
       label: "Work",
-      items: [NAV_REQUESTS, NAV_ESTIMATES, NAV_JOBS, NAV_WORK_ORDERS, NAV_SCHEDULE],
+      items: [NAV_REQUESTS, NAV_ESTIMATES, NAV_JOBS, NAV_SCHEDULE],
     },
     { label: "People", items: [NAV_CLIENTS, NAV_PROPS] },
     { label: "Money", items: [NAV_INVOICES, NAV_REPORTS] },
