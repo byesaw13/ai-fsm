@@ -91,6 +91,68 @@ toggle). Rename the owner "Today" nav label to "Dashboard".
 > a shared panel — recorded per ID below (all Done, verified in code). No further
 > build here; new field-cockpit work is TASK-074/075.
 
+# TASK-129: One daily home leftover fold — Needs attention + today's timeline on My Day
+
+Status:
+In Progress
+
+Phase:
+0
+
+Problem:
+A1 leftover after TASK-124 (naming) and TASK-038 (landing). Overview still
+merged Start Day / Daily Workflow into the office dashboard; `/app/action-queue`
+was an orphan; today's activity lived only on Tracking.
+
+Business Value:
+From the phone, the day is one screen (My Day) plus evening Day Review.
+Needs-attention and today's blocks are on that screen, not competing homes.
+
+Scope:
+- My Day (`/app/my-work`) hosts the owner **Needs attention** list (the old
+  action-queue) and a **Today so far** strip from `activity_entries`.
+- `/app/action-queue` redirects to My Day `#attention`. Deep links and promise
+  resolve keep working.
+- Overview strips Start Day / Daily Workflow / field-day merge; CTA "Go to My Day".
+- Keep Day Review and Tracking (`/app/timeline`) as their own jobs (close /
+  reconstruct). No schema change.
+
+Out of Scope:
+- TASK-074/075 next-action / inline complete.
+- Deleting routes (redirect and demote only).
+
+Acceptance Criteria:
+- [x] Owner My Day shows Needs attention and today's activity blocks.
+- [x] `/app/action-queue` redirects to My Day.
+- [x] Overview no longer hosts Start Day / Daily Workflow.
+
+# TASK-130: Findability — lightweight "what can I do here?" command search
+
+Status:
+In Progress
+
+Phase:
+2
+
+Problem:
+A5. Capabilities exist but are undiscoverable across 50+ pages. No in-app
+search of destinations.
+
+Business Value:
+A new tech (or Nick on a phone) can find a named capability in seconds via
+Find / Ctrl+K instead of hunting hubs.
+
+Scope:
+- Command palette over existing routes (`quick-actions.ts` + hub links).
+- Ctrl/⌘K and a Find button in the shell. Role-filtered. No new module.
+
+Out of Scope:
+- Global record search (clients/jobs by name). New destinations.
+
+Acceptance Criteria:
+- [x] Ctrl/⌘K opens a filterable list of existing app destinations.
+- [x] Techs do not see owner-only money/office routes.
+
 # TASK-028: Extract the field UI into a reusable surface
 
 Status:

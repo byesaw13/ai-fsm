@@ -95,7 +95,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-128**.
+Next available ID: **TASK-131**.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -236,6 +236,9 @@ closed in tests; owner-flow AC still open.
 | TASK-123 | Agent accessibility — invariants doc + dev/test stack script | 005 | Done |
 | TASK-126 | Phone job shortcuts go to the matching job surface | 006 | Done |
 | TASK-127 | Pricing reconciliation — retire stray hardcoded labor rates | 004 | In Progress |
+| TASK-128 | CI guard against new duplicate migration numbers | 005 | In Progress |
+| TASK-129 | One daily home leftover fold — Needs attention + today's timeline on My Day | 006 | In Progress |
+| TASK-130 | Findability — lightweight "what can I do here?" command search | 006 | In Progress |
 
 ## Status legend
 

@@ -29,7 +29,7 @@ Do not remove a required check to merge a feature PR. If a required check itself
 
 | Check | Depends on | Purpose |
 |---|---|---|
-| `lint` | none | ESLint across workspaces. |
+| `lint` | none | ESLint across workspaces, plus `scripts/check-migration-prefixes.mjs` (no new duplicate `NNN_` prefixes). |
 | `typecheck` | none | TypeScript `--noEmit` across workspaces. |
 | `build` | `lint`, `typecheck` | Production build with build-time env placeholders only. |
 | `test` | `lint`, `typecheck` | Unit and DB integration tests against PostgreSQL. |

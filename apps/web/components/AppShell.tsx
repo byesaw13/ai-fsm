@@ -8,6 +8,7 @@ import type { Role } from "@ai-fsm/domain";
 import { ToastProvider } from "./ui/Toast";
 import { QuickLeadModal } from "./QuickLeadModal";
 import { FloatingActionButton } from "./FloatingActionButton";
+import { CommandPalette } from "./CommandPalette";
 import { CAPTURE_HREF, CaptureLink } from "./CaptureLink";
 import { WorkspaceAutoRoute } from "./WorkspaceAutoRoute";
 import { LiveRefresh } from "./LiveRefresh";
@@ -283,6 +284,10 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
             </button>
           </div>
 
+          <div style={{ display: "flex", gap: 8, padding: collapsed ? "0 8px" : "0 0 4px", alignItems: "center" }}>
+            <CommandPalette role={role} />
+          </div>
+
           {/* New Request button — owner/admin only */}
           {isAdminOrOwner && (
             <button
@@ -465,11 +470,26 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
               onClick={() => setShowMore(false)}
             />
             <div id="p7-more-sheet" className="p7-more-sheet" role="dialog" aria-label="All destinations">
-              {isAdminOrOwner && (
-                <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 12px 0" }}>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "8px 12px 0" }}>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event("dovetails:find"))}
+                  style={{
+                    border: "1px solid var(--border)",
+                    background: "var(--bg-card)",
+                    borderRadius: 6,
+                    padding: "6px 10px",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Find
+                </button>
+                {isAdminOrOwner && (
                   <AttentionBell summary={attention} onChanged={() => void refreshAttention()} />
-                </div>
-              )}
+                )}
+              </div>
               <div className="p7-more-sections">
                 {sections.map((section, sectionIdx) => (
                   <div key={sectionIdx} className="p7-more-section">

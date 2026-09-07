@@ -81,6 +81,10 @@ wait_http() {
 log "lint"
 pnpm lint
 
+log "migration prefixes"
+node scripts/check-migration-prefixes.mjs
+node --test scripts/check-migration-prefixes.test.mjs
+
 log "typecheck"
 pnpm typecheck
 

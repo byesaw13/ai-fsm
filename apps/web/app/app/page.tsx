@@ -5,7 +5,6 @@ import { queryForSession } from "@/lib/db";
 import { LinkButton, PageContainer, PageHeader, WhatNext } from "@/components/ui";
 import { OwnerDashboard } from "./OwnerDashboard";
 import type { CommandVisit, CountAction, MaterialJob } from "./DashboardWidgets";
-import { loadFieldDayData } from "@/lib/my-work/field-day-data";
 import {
   OPEN_OWNER_PROMISES_SQL,
   OWNER_PROMISE_ACTION_TYPE,
@@ -50,7 +49,6 @@ export default async function AppPage() {
     paidThisMonthCentsRows,
     pendingSegmentRows,
     expenseRows,
-    fieldDay,
     openPromiseRows,
   ] = await Promise.all([
     queryForSession<CommandVisit>(session,
@@ -190,10 +188,6 @@ export default async function AppPage() {
        FROM expenses WHERE account_id = $1`,
       [accountId]),
 
-    // Field workday (vehicle session, starting mileage, day mileage) — merges
-    // the My Day surface into the dashboard so it's one screen.
-    loadFieldDayData(session, true),
-
     queryForSession<OpenOwnerPromiseRow>(
       session,
       OPEN_OWNER_PROMISES_SQL,
@@ -307,11 +301,6 @@ export default async function AppPage() {
         outstandingInvoicesCents={outstandingInvoicesCents}
         pendingDepositsCents={pendingDepositsCents}
         paidThisMonthCents={paidThisMonthCents}
-        openSession={fieldDay.openSession}
-        vehicles={fieldDay.vehicles}
-        dayMileage={fieldDay.dayMileage}
-        yesterdayMiles={fieldDay.yesterdayMiles}
-        pendingSegments={pendingSegments}
         todayExpensesCents={todayExpensesCents}
         monthExpensesCents={monthExpensesCents}
         receiptsMissing={receiptsMissing}
