@@ -12,7 +12,7 @@ export const WORK_HUB_LINKS: HubLink[] = [
   { href: "/app/requests", label: "Requests" },
   { href: "/app/estimates", label: "Estimates" },
   { href: "/app/jobs", label: "Projects" },
-  { href: "/app/work-orders", label: "Work Orders" },
+  // TASK-125: Work Orders dropped from the hub — reached inside a Project.
   { href: "/app/schedule", label: "Schedule" },
   { href: "/app/visits", label: "Visits" },
 ];
