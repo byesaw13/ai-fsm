@@ -229,11 +229,11 @@ closed in tests; owner-flow AC still open.
 | TASK-116 | Field-ops Web Push (start-day, home arrival, My Work prompt) | 005 | In Progress |
 | TASK-118 | Native Web Push notifications | 005 | Done |
 | TASK-119 | Quick-job billing seam — time → invoice for quick-booked jobs | 004 | Proposed |
-| TASK-120 | Big-job billing — deposit gate + progress (thirds) billing | 004 | Proposed |
+| TASK-120 | Big-job billing — deposit gate + progress (thirds) billing | 004 | In Progress |
 | TASK-121 | Unified job materials & spend view | 004 | Proposed |
-| TASK-124 | De-jargon naming — "Needs attention" + consistent "My Day" | 006 | In Progress |
-| TASK-125 | Nav restructure — Jobs→Projects, drop Work Orders from nav | 006 | In Progress |
-| TASK-123 | Agent accessibility — invariants doc + dev/test stack script | 005 | In Progress |
+| TASK-124 | De-jargon naming — "Needs attention" + consistent "My Day" | 006 | Done |
+| TASK-125 | Nav restructure — Jobs→Projects, drop Work Orders from nav | 006 | Done |
+| TASK-123 | Agent accessibility — invariants doc + dev/test stack script | 005 | Done |
 
 ## Status legend
 

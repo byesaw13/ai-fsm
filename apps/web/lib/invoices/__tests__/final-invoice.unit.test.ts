@@ -13,6 +13,13 @@ import type { PoolClient } from "pg";
 
 vi.mock("@/lib/invoices/db", () => ({
   generateInvoiceNumber: vi.fn().mockResolvedValue("INV-0042"),
+  // Consumes one ordinal client.query slot (the deposit/progress-rows query) and
+  // returns its rows, so the ordinal mock positions below stay unchanged.
+  loadCreditedInvoicesForEstimate: vi
+    .fn()
+    .mockImplementation(async (client: { query: () => Promise<{ rows: unknown[] }> }) =>
+      (await client.query()).rows,
+    ),
 }));
 
 vi.mock("@/lib/db/audit", () => ({

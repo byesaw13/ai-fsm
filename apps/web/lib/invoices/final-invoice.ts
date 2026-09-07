@@ -18,7 +18,7 @@
  */
 
 import type { PoolClient } from "pg";
-import { generateInvoiceNumber } from "@/lib/invoices/db";
+import { generateInvoiceNumber, loadCreditedInvoicesForEstimate } from "@/lib/invoices/db";
 import { reconcileFinalInvoice } from "@/lib/invoices/billing";
 import { appendAuditLog } from "@/lib/db/audit";
 import {
@@ -364,19 +364,9 @@ export async function createDraftFinalInvoiceForJob(
   let reconciliationNote: string | null = null;
 
   if (job.estimate_id) {
-    const depositRows = await client.query<{
-      invoice_number: string;
-      total_cents: number;
-      status: string;
-    }>(
-      `SELECT invoice_number, total_cents, status
-       FROM invoices
-       WHERE estimate_id = $1 AND account_id = $2 AND invoice_kind = 'deposit'`,
-      [job.estimate_id, accountId]
-    );
     const rec = reconcileFinalInvoice({
       invoiceTotalCents: totalCents,
-      depositInvoices: depositRows.rows,
+      depositInvoices: await loadCreditedInvoicesForEstimate(client, job.estimate_id, accountId),
     });
     depositCreditCents = rec.depositCreditCents;
     reconciliationNote = rec.reconciliationNote;
@@ -472,18 +462,7 @@ export async function createDraftFinalInvoiceForJob(
     if (job.estimate_id && depositCreditCents > 0) {
       const rec = reconcileFinalInvoice({
         invoiceTotalCents: totals.total_cents,
-        depositInvoices: (
-          await client.query<{
-            invoice_number: string;
-            total_cents: number;
-            status: string;
-          }>(
-            `SELECT invoice_number, total_cents, status
-             FROM invoices
-             WHERE estimate_id = $1 AND account_id = $2 AND invoice_kind = 'deposit'`,
-            [job.estimate_id, accountId]
-          )
-        ).rows,
+        depositInvoices: await loadCreditedInvoicesForEstimate(client, job.estimate_id, accountId),
       });
       await client.query(
         `UPDATE invoices
@@ -531,18 +510,7 @@ export async function createDraftFinalInvoiceForJob(
         if (job.estimate_id) {
           const rec = reconcileFinalInvoice({
             invoiceTotalCents: totals.total_cents,
-            depositInvoices: (
-              await client.query<{
-                invoice_number: string;
-                total_cents: number;
-                status: string;
-              }>(
-                `SELECT invoice_number, total_cents, status
-                 FROM invoices
-                 WHERE estimate_id = $1 AND account_id = $2 AND invoice_kind = 'deposit'`,
-                [job.estimate_id, accountId]
-              )
-            ).rows,
+            depositInvoices: await loadCreditedInvoicesForEstimate(client, job.estimate_id, accountId),
           });
           await client.query(
             `UPDATE invoices

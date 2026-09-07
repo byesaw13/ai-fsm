@@ -27,6 +27,7 @@ import { ProjectCloseoutCoach } from "./ProjectCloseoutCoach";
 import { ProjectOverview } from "./ProjectOverview";
 import { ProjectUnplannedTasks } from "./ProjectUnplannedTasks";
 import { UseTmBriefingButton } from "./UseTmBriefingButton";
+import { NewProgressInvoiceButton } from "./NewProgressInvoiceButton";
 import { buildJobTmBriefing } from "@/lib/estimates/job-tm-briefing";
 import { VendorCoordinationCard } from "./VendorCoordinationCard";
 import { JobWorkOrdersPanel, type JobWorkOrderRow } from "./JobWorkOrdersPanel";
@@ -1196,6 +1197,21 @@ export default async function JobDetailPage({
           workOrderCount={workOrderBoard.length}
         />
       )}
+
+      {/* Staged (thirds) billing for long jobs: deposit exists → bill a midpoint
+          progress payment before the final. Hidden once the job is closed out. */}
+      {!isTech &&
+        commercialCounts?.has_approved_estimate &&
+        !["completed", "invoiced", "cancelled"].includes(currentStatus) && (
+          <Card style={{ marginBottom: "var(--space-4)" }} data-testid="progress-billing">
+            <SectionHeader title="Progress billing" />
+            <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--muted)" }}>
+              For a long job, bill a staged payment now. The final invoice credits
+              it so the stages sum to the project total.
+            </p>
+            <NewProgressInvoiceButton jobId={job.id} />
+          </Card>
+        )}
 
       {job.description ? (
         <Card style={{ marginBottom: "var(--space-4)" }} data-testid="project-scope">

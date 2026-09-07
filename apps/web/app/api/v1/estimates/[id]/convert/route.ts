@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { withRole } from "@/lib/auth/middleware";
 import { appendAuditLog } from "@/lib/db/audit";
-import { withInvoiceContext, generateInvoiceNumber } from "@/lib/invoices/db";
+import { withInvoiceContext, generateInvoiceNumber, loadCreditedInvoicesForEstimate } from "@/lib/invoices/db";
 import { reconcileFinalInvoice } from "@/lib/invoices/billing";
 import { logger } from "@/lib/logger";
 import { loadTravelSettings } from "@/lib/travel/settings";
@@ -100,21 +100,11 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         };
       }
 
-      // 3b. Reconcile against any deposit invoices already billed so the final
-      //     invoice credits the deposit and the two never double-bill.
-      const depositInvoices = await client.query<{
-        invoice_number: string;
-        total_cents: number;
-        status: string;
-      }>(
-        `SELECT invoice_number, total_cents, status FROM invoices
-         WHERE estimate_id = $1 AND account_id = $2 AND invoice_kind = 'deposit'`,
-        [id, session.accountId]
-      );
-
+      // 3b. Reconcile against any deposit/progress invoices already billed so the
+      //     final invoice credits them and the stages never double-bill.
       const reconciliation = reconcileFinalInvoice({
         invoiceTotalCents: estimate.total_cents,
-        depositInvoices: depositInvoices.rows,
+        depositInvoices: await loadCreditedInvoicesForEstimate(client, id, session.accountId),
       });
 
       // 4. Fetch estimate line items for copying (exclude travel — re-materialized
