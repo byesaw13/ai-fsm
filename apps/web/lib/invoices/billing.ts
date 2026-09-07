@@ -62,8 +62,10 @@ export function reconcileFinalInvoice(input: {
   let reconciliationNote: string | null = null;
   if (depositCreditCents > 0) {
     const refs = liveDeposits.map((d) => d.invoice_number).join(", ");
+    // "payments" rather than "deposit": the credit may combine a deposit AND
+    // one or more staged progress invoices (TASK-120), all billed before the final.
     reconciliationNote =
-      `Project total ${formatCents(invoiceTotalCents)} less deposit already invoiced ` +
+      `Project total ${formatCents(invoiceTotalCents)} less payments already invoiced ` +
       `${formatCents(depositCreditCents)} (${refs}). Balance due ${formatCents(balanceDueCents)}.`;
   }
 
