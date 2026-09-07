@@ -244,6 +244,24 @@ describe("computeWhatNext — money, field, T&M", () => {
     expect(next.message).not.toMatch(/schedule/i);
   });
 
+  it("approved estimate with no deposit prompts to collect one before starting (deposit gate)", () => {
+    const next = computeWhatNext(
+      baseProps({
+        jobStatus: "draft",
+        stage: "approved",
+        hasApprovedEstimate: true,
+        approvedEstimateId: ESTIMATE_ID,
+        hasDepositInvoice: false,
+        depositPaid: false,
+      }),
+    );
+
+    expect(next.message).toMatch(/collect a deposit/i);
+    expect(next.actionHref).toContain(`/app/estimates/${ESTIMATE_ID}`);
+    // Prompt, don't block: scheduling stays reachable as the secondary.
+    expect(next.secondary?.href).toContain("/visits/new");
+  });
+
   it("T&M owner-completed copy mentions time and materials", () => {
     const next = computeWhatNext(
       baseProps({

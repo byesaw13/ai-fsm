@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { formatCents } from "@ai-fsm/money";
 import { CreateJobFromEstimateButton } from "../CreateJobFromEstimateButton";
 import { EstimateConvertButton } from "../EstimateConvertButton";
+import { CollectDepositButton } from "../../../jobs/[id]/CollectDepositButton";
+import { RecordDepositPaymentButton } from "../../../jobs/[id]/RecordDepositPaymentButton";
 import type { EstimateInvoiceRow, EstimateRow } from "../detail-data";
 
 interface Props {
@@ -52,8 +55,66 @@ export function ApprovedHandoff({
             {hasMaterialsPlan ? "Open Materials Plan →" : "Prepare Materials Plan →"}
           </Link>
         </div>
+        <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-3)" }} data-testid="handoff-deposit-step">
+          <p style={{ margin: "0 0 var(--space-1)", fontWeight: 700 }}>2. Deposit</p>
+          {(() => {
+            const depositAmountCents =
+              depositInvoice?.total_cents ?? (estimate.deposit_cents > 0 ? estimate.deposit_cents : null);
+            if (!estimate.job_id) {
+              return (
+                <p className="muted" style={{ minHeight: 42 }}>
+                  Link this estimate to a project to collect a deposit.
+                </p>
+              );
+            }
+            if (depositPaid) {
+              return (
+                <p className="muted" style={{ minHeight: 42 }}>
+                  ✓ Deposit received{depositAmountCents != null ? ` — ${formatCents(depositAmountCents)}` : ""}.
+                </p>
+              );
+            }
+            if (depositInvoice) {
+              return (
+                <>
+                  <p className="muted" style={{ minHeight: 42 }}>
+                    Deposit invoice {depositInvoice.invoice_number}
+                    {depositAmountCents != null ? ` (${formatCents(depositAmountCents)})` : ""} —{" "}
+                    {depositInvoice.status === "draft"
+                      ? "send it, then mark it received before work starts."
+                      : "waiting on payment; mark it received when it lands."}
+                  </p>
+                  <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                    <Link href={`/app/invoices/${depositInvoice.id}`} className="p7-btn p7-btn-primary p7-btn-sm">
+                      {depositInvoice.status === "draft" ? "Send Deposit →" : "Open Deposit →"}
+                    </Link>
+                    {depositInvoice.status !== "draft" && depositAmountCents != null && (
+                      <RecordDepositPaymentButton invoiceId={depositInvoice.id} amountCents={depositAmountCents} />
+                    )}
+                  </div>
+                </>
+              );
+            }
+            if (finalInvoice) {
+              return (
+                <p className="muted" style={{ minHeight: 42 }}>
+                  Final billing already started — a deposit is not collected after the final invoice.
+                </p>
+              );
+            }
+            return (
+              <>
+                <p className="muted" style={{ minHeight: 42 }}>
+                  Collect a deposit before work starts. Defaults to this estimate&apos;s deposit, or your
+                  standard deposit % from Settings.
+                </p>
+                <CollectDepositButton jobId={estimate.job_id} />
+              </>
+            );
+          })()}
+        </div>
         <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-3)" }}>
-          <p style={{ margin: "0 0 var(--space-1)", fontWeight: 700 }}>2. Schedule &amp; work</p>
+          <p style={{ margin: "0 0 var(--space-1)", fontWeight: 700 }}>3. Schedule &amp; work</p>
           <p className="muted" style={{ minHeight: 42 }}>
             {estimate.job_id
               ? jobVisitCount > 0
@@ -73,7 +134,7 @@ export function ApprovedHandoff({
           )}
         </div>
         <div style={{ border: "1px solid var(--border)", borderRadius: "var(--radius)", padding: "var(--space-3)" }}>
-          <p style={{ margin: "0 0 var(--space-1)", fontWeight: 700 }}>3. Final billing</p>
+          <p style={{ margin: "0 0 var(--space-1)", fontWeight: 700 }}>4. Final billing</p>
           <p className="muted" style={{ minHeight: 42 }}>
             {finalInvoice
               ? "Final invoice draft exists — review and send when ready."
@@ -96,19 +157,6 @@ export function ApprovedHandoff({
             <Link href={`/app/jobs/${estimate.job_id}#project-status`} className="p7-btn p7-btn-secondary p7-btn-sm">
               Complete project first →
             </Link>
-          )}
-          {depositInvoice && (
-            <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-              Deposit:{" "}
-              <Link
-                href={`/app/invoices/${depositInvoice.id}`}
-                style={{ color: "var(--accent)" }}
-                data-testid="deposit-invoice-link"
-              >
-                {depositInvoice.invoice_number}
-              </Link>{" "}
-              · {depositPaid ? "paid" : depositInvoice.status}
-            </p>
           )}
         </div>
       </div>

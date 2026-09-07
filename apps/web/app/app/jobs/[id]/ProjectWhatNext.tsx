@@ -368,10 +368,15 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
   }
 
   if (hasApprovedEstimate && !hasDepositInvoice) {
+    // Deposit gate (TASK-120): a deposit is taken before work starts. Prompt for
+    // it as the primary action, but don't block — "Schedule anyway" stays open.
     return {
-      message: "Estimate approved — schedule the work",
-      actionLabel: "Schedule Visit",
-      actionHref: `/app/jobs/${jobId}/visits/new`,
+      message: "Collect a deposit before starting",
+      actionLabel: "Collect a deposit",
+      actionHref: approvedEstimateId
+        ? `/app/estimates/${approvedEstimateId}#materials-plan-handoff`
+        : `/app/jobs/${jobId}/visits/new`,
+      secondary: { label: "Schedule anyway", href: `/app/jobs/${jobId}/visits/new` },
       extras: approvedEstimateId
         ? [
             { label: "Approved estimate", href: `/app/estimates/${approvedEstimateId}` },
