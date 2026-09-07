@@ -20,6 +20,7 @@ import { buildClientDocumentFilename } from "@/lib/estimates/guardrails";
 import { ChangeOrdersClient } from "./ChangeOrdersClient";
 import { DecomposeWorkPanel } from "./DecomposeWorkPanel";
 import { loadEstimateDetail } from "./detail-data";
+import { laborHoursFromCostCents } from "@/lib/pricing/labor-hours";
 import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { STATUS_LABELS } from "./format";
 import { EstimateBanners } from "./sections/EstimateBanners";
@@ -262,8 +263,11 @@ export default async function EstimateDetailPage({
           initialIncludesTrim={estimate.includes_trim}
           initialIncludesCeiling={estimate.includes_ceiling}
           initialMaterialCostCents={estimate.internal_material_cost_cents}
-          initialLaborHours={estimate.internal_labor_cost_cents !== null && estimate.sq_ft !== null
-            ? Math.round((estimate.internal_labor_cost_cents / 8500) * 10) / 10
+          initialLaborHours={estimate.sq_ft !== null
+            ? laborHoursFromCostCents(
+                estimate.internal_labor_cost_cents,
+                pricingSettings.labor_cost_cents_per_hour,
+              )
             : null}
           initialTripCount={estimate.trip_count}
           initialRequiresDryingOrCuring={estimate.requires_drying_or_curing}
