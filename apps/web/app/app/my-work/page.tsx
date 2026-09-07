@@ -138,7 +138,7 @@ export default async function MyWorkPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="My Work"
+        title="My Day"
         subtitle={`${greeting} — ${statusLabel}`}
         actions={
           isTech ? (

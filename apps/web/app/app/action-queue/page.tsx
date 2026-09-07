@@ -204,11 +204,11 @@ export default async function ActionQueuePage({ searchParams }: PageProps) {
   return (
     <div style={{ padding: "var(--space-4) var(--space-4) var(--space-12)", display: "flex", flexDirection: "column", gap: "var(--space-5)", maxWidth: 760 }}>
       <header>
-        <h1 style={{ margin: 0, fontSize: "var(--text-2xl)", fontWeight: 800 }}>Action Queue</h1>
+        <h1 style={{ margin: 0, fontSize: "var(--text-2xl)", fontWeight: 800 }}>Needs attention</h1>
       </header>
 
       {items.length === 0 && !showPromiseRows ? (
-        <EmptyState title="All clear" description="No execution actions need attention right now." />
+        <EmptyState title="All clear" description="Nothing needs your attention right now." />
       ) : items.length > 0 ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
           {items.map((item) => (
