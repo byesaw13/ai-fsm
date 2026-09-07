@@ -18,3 +18,13 @@ export function laborHoursFromCostCents(
   if (!costRateCentsPerHour || costRateCentsPerHour <= 0) return null;
   return Math.round((internalLaborCostCents / costRateCentsPerHour) * 10) / 10;
 }
+
+/** Persist labor-only cost. Do not store engine estimatedCostCents (labor+materials). */
+export function laborCostCentsFromHours(
+  hours: number | null | undefined,
+  costRateCentsPerHour: number | null | undefined,
+): number | null {
+  if (hours == null || hours <= 0) return null;
+  if (!costRateCentsPerHour || costRateCentsPerHour <= 0) return null;
+  return Math.round(hours * costRateCentsPerHour);
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { laborHoursFromCostCents } from "../labor-hours";
+import { laborCostCentsFromHours, laborHoursFromCostCents } from "../labor-hours";
 
 describe("laborHoursFromCostCents", () => {
   it("divides cost by the cost rate the engine used (not a hardcoded rate)", () => {
@@ -29,3 +29,23 @@ describe("laborHoursFromCostCents", () => {
     expect(laborHoursFromCostCents(400_00, null)).toBeNull();
   });
 });
+
+describe("laborCostCentsFromHours", () => {
+  it("stores hours × cost rate (labor only, not materials)", () => {
+    expect(laborCostCentsFromHours(8, 50_00)).toBe(400_00);
+  });
+
+  it("round-trips with laborHoursFromCostCents", () => {
+    const cost = laborCostCentsFromHours(8, 50_00);
+    expect(laborHoursFromCostCents(cost, 50_00)).toBe(8);
+  });
+
+  it("does not use a materials-inclusive engine total as labor cost", () => {
+    // $400 labor + $500 materials. Inverting the sum at $50/hr would seed 18h.
+    const laborOnly = laborCostCentsFromHours(8, 50_00);
+    const withMaterials = laborOnly! + 500_00;
+    expect(laborHoursFromCostCents(withMaterials, 50_00)).toBe(18);
+    expect(laborHoursFromCostCents(laborOnly, 50_00)).toBe(8);
+  });
+});
+
