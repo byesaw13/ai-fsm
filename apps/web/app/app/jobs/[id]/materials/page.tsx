@@ -15,6 +15,9 @@ import {
   SectionHeader,
 } from "@/components/ui";
 import { JobMaterialsPanel } from "../JobMaterialsPanel";
+import { MaterialsBudgetLine } from "../MaterialsBudgetLine";
+import { LinkForgottenExpensesPanel } from "@/components/invoices/LinkForgottenExpensesPanel";
+import { loadJobLedger } from "@/lib/jobs/job-ledger";
 import { BuyListClient, type BuyListLine } from "./BuyListClient";
 import type { SupplierPreference } from "./StoreRunLauncher";
 
@@ -96,6 +99,13 @@ export default async function JobMaterialsPage({ params, searchParams }: PagePro
           fetchJobMaterialExpenses(client, session.accountId, jobId),
         )
       : [];
+
+  // Materials budget (allowance vs spent) so Purchases is the complete spend
+  // view — the same at-a-glance line the project hub shows (TASK-121).
+  const materialsBucket =
+    tab === "purchases" && showPurchases
+      ? (await loadJobLedger(session, jobId))?.rows.find((r) => r.bucket === "materials") ?? null
+      : null;
 
   const canEdit = session.role === "owner" || session.role === "admin";
   const canSeed = canEdit;
@@ -202,6 +212,11 @@ export default async function JobMaterialsPage({ params, searchParams }: PagePro
           >
             Receipts and expenses linked to this job (actuals).
           </p>
+          <MaterialsBudgetLine
+            allowanceCents={materialsBucket?.estimateCents}
+            spentCents={materialsBucket?.actualCents ?? 0}
+            testId="materials-allowance-remaining"
+          />
           {expenses.length === 0 ? (
             <EmptyState
               title="No receipts linked"
@@ -210,6 +225,7 @@ export default async function JobMaterialsPage({ params, searchParams }: PagePro
           ) : (
             <JobMaterialsPanel expenses={expenses} />
           )}
+          <LinkForgottenExpensesPanel mode="job" jobId={jobId} />
         </Card>
       )}
     </PageContainer>
