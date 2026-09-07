@@ -160,7 +160,6 @@ describe("getNavSections (nested hubs)", () => {
       "/app/properties",
       "/app/estimates",
       "/app/jobs",
-      "/app/work-orders",
       "/app/schedule",
       "/app/invoices",
       "/app/reports",
@@ -173,7 +172,7 @@ describe("getNavSections (nested hubs)", () => {
       expect(hrefs).toContain("/app/timeline");
       expect(hrefs).not.toContain("/app/mileage");
       expect(hrefs).toContain("/app/capture");
-      expect(hrefs).toHaveLength(14);
+      expect(hrefs).toHaveLength(13);
     }
   });
 
@@ -184,7 +183,7 @@ describe("getNavSections (nested hubs)", () => {
     expect(hrefs).toContain("/app/settings");
     expect(hrefs).toContain("/app/timeline");
     expect(hrefs).toContain("/app/capture");
-    expect(hrefs).toHaveLength(14);
+    expect(hrefs).toHaveLength(13);
   });
 
   it("Layer 2+ tools are not in main nav", () => {
@@ -204,7 +203,7 @@ describe("getNavSections (nested hubs)", () => {
       const sections = getNavSections("owner", view);
       expect(sections.map((s) => s.label).filter(Boolean)).toEqual(HUB_LABELS);
       const hrefs = flattenSections(sections).map((i) => i.href);
-      expect(hrefs).toHaveLength(14);
+      expect(hrefs).toHaveLength(13);
       expect(hrefs).toContain("/app/timeline");
       expect(hrefs).toContain("/app/capture");
       if (view === "field") {
@@ -282,15 +281,18 @@ describe("getNavSections (nested hubs)", () => {
     expect(tech).not.toContain("/app/timeline");
   });
 
-  it("Work hub lists requests through schedule in order", () => {
+  it("Work hub lists requests through schedule in order — Work Orders dropped (TASK-125)", () => {
     const work = getNavSections("admin").find((s) => s.label === "Work");
     expect(work?.items.map((i) => i.href)).toEqual([
       "/app/requests",
       "/app/estimates",
       "/app/jobs",
-      "/app/work-orders",
       "/app/schedule",
     ]);
+    // Work Orders are reached inside a Job, not from the top nav.
+    expect(work?.items.map((i) => i.href)).not.toContain("/app/work-orders");
+    // Jobs is labelled "Projects" to match the page + handyman language.
+    expect(work?.items.find((i) => i.href === "/app/jobs")?.label).toBe("Projects");
   });
 });
 
