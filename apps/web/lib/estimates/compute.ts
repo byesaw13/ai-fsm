@@ -10,6 +10,7 @@ import type { EstimateSpec, EstimateResult } from "@ai-fsm/domain";
 import { getPool, query } from "@/lib/db";
 import { calculateDepositPolicy } from "@/lib/estimates/deposit-policy";
 import { loadPricingRules } from "@/lib/pricing/settings";
+import { laborCostCentsFromHours } from "@/lib/pricing/labor-hours";
 
 export interface ComputeAndPersistArgs {
   estimateId: string;
@@ -102,7 +103,10 @@ export async function computeAndPersist(args: ComputeAndPersistArgs): Promise<Co
       result.summary.totalCents,
       depositPolicy.deposit_cents,
       depositPolicy.balance_cents,
-      result.internalSummary.estimatedCostCents,
+      laborCostCentsFromHours(
+        result.internalSummary.effectiveLaborHours,
+        rules.laborCostCentsPerHour,
+      ),
       Math.round(result.internalSummary.grossMarginPct * 100 * 10) / 10,
       estimateId,
       accountId,

@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 import { appendAuditLog } from "@/lib/db/audit";
 import { calcTotals, lineItemTotal } from "./math";
 import { computeEstimate, sqftPaintingToSpec, CURRENT_RULES } from "@ai-fsm/domain";
+import { laborCostCentsFromHours } from "@/lib/pricing/labor-hours";
 import { calculateDepositPolicy, estimateMaterialsDepositBasis } from "./deposit-policy";
 import { computeConditionTier } from "./guardrails";
 
@@ -302,7 +303,10 @@ export async function updateEstimateById(
         CURRENT_RULES
       );
       subtotal_cents = engine.summary.totalCents;
-      new_internal_labor = engine.internalSummary.estimatedCostCents;
+      new_internal_labor = laborCostCentsFromHours(
+        patch.labor_hours_estimate!,
+        CURRENT_RULES.laborCostCentsPerHour,
+      );
       new_internal_material = patch.material_cost_cents ?? null;
     } else {
       if (patch.flat_rate_cents !== undefined) {

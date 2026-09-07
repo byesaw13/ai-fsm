@@ -22,6 +22,7 @@ import { calculateDepositPolicy, estimateMaterialsDepositBasis } from "@/lib/est
 import type { EstimateSpec } from "@ai-fsm/domain";
 import { getPool } from "@/lib/db";
 import { loadPricingRules } from "@/lib/pricing/settings";
+import { laborCostCentsFromHours } from "@/lib/pricing/labor-hours";
 import { advanceBookingRequestStage } from "@/lib/booking-requests/advance-stage";
 
 export const dynamic = "force-dynamic";
@@ -366,7 +367,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       pricingRules
     );
     subtotal_cents = engine.summary.totalCents;
-    internal_labor_cost_cents = engine.internalSummary.estimatedCostCents;
+    internal_labor_cost_cents = laborCostCentsFromHours(
+      labor_hours_estimate,
+      pricingRules.laborCostCentsPerHour,
+    );
     margin_pct = engine.internalSummary.grossMarginPct;
   } else if (is_multi_option) {
     subtotal_cents = 0;
