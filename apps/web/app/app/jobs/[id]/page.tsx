@@ -4,7 +4,7 @@ import type { Route } from "next";
 import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth/session";
 import { getPool, queryForSession, queryOneForSession } from "@/lib/db";
-import { formatVisitTime, isVisitOverdue } from "@/lib/visits/formatting";
+import { formatVisitDateTime, formatVisitTime, isVisitOverdue } from "@/lib/visits/formatting";
 import {
   canTransitionJob,
   canCreateVisit,
@@ -35,6 +35,8 @@ import { loadJobTaskProgress } from "@/lib/work-orders/job-tasks";
 import { fetchJobMaterialExpenses, type JobMaterialExpenseWithLines } from "@/lib/invoices/job-expenses";
 import { withExpenseContext } from "@/lib/expenses/db";
 import { MaterialsBudgetLine } from "./MaterialsBudgetLine";
+import { mobileJobActionHrefs } from "./mobile-job-actions";
+import { JobPhotoGallery } from "./JobPhotoGallery";
 import { JobLedgerCard } from "./JobLedgerCard";
 import { loadJobLedger } from "@/lib/jobs/job-ledger";
 import {
@@ -175,18 +177,27 @@ function AdvancedDetails({ title, children }: { title: string; children: ReactNo
   );
 }
 
-function MobileJobAction({ href, label, detail, primary = false }: { href: Route; label: string; detail?: string; primary?: boolean }) {
-  return (
-    <Link
-      href={href}
-      className={`mobile-work-item ${primary ? "mobile-work-item-primary" : ""}`}
-      style={{ minHeight: 72 }}
-    >
+function MobileJobAction({ href, label, detail, primary = false }: { href: Route | string; label: string; detail?: string; primary?: boolean }) {
+  const className = `mobile-work-item ${primary ? "mobile-work-item-primary" : ""}`;
+  const body = (
+    <>
       <span>
         <strong>{label}</strong>
         {detail && <small>{detail}</small>}
       </span>
       <b>Open</b>
+    </>
+  );
+  if (href.startsWith("#")) {
+    return (
+      <a href={href} className={className} style={{ minHeight: 72 }}>
+        {body}
+      </a>
+    );
+  }
+  return (
+    <Link href={href as Route} className={className} style={{ minHeight: 72 }}>
+      {body}
     </Link>
   );
 }
@@ -506,6 +517,31 @@ export default async function JobDetailPage({
       [id, session.accountId],
     ).catch(() => []),
   ]);
+
+  const jobPhotos = await queryForSession<{
+    id: string;
+    visit_id: string;
+    category: string;
+    original_name: string;
+  }>(
+    session,
+    session.role === "tech"
+      ? `SELECT vm.id, vm.visit_id, vm.category, vm.original_name
+         FROM visit_media vm
+         JOIN visits v ON v.id = vm.visit_id AND v.account_id = vm.account_id
+         WHERE v.job_id = $1 AND vm.account_id = $2 AND v.assigned_user_id = $3
+         ORDER BY vm.created_at DESC
+         LIMIT 12`
+      : `SELECT vm.id, vm.visit_id, vm.category, vm.original_name
+         FROM visit_media vm
+         JOIN visits v ON v.id = vm.visit_id AND v.account_id = vm.account_id
+         WHERE v.job_id = $1 AND vm.account_id = $2
+         ORDER BY vm.created_at DESC
+         LIMIT 12`,
+    session.role === "tech"
+      ? [id, session.accountId, session.userId]
+      : [id, session.accountId],
+  ).catch(() => []);
 
   const trackedLaborDays: TrackedLaborDay[] = mapTrackedLaborDayRows(trackedLaborDayRows ?? []);
 
@@ -864,7 +900,22 @@ export default async function JobDetailPage({
   // Phone layout — rendered alongside the desktop layout and toggled by
   // viewport width (p7-only-* utilities), replacing the workspace-mode cookie.
   const currentVisit = activeVisits.find((v) => v.status === "in_progress" || v.status === "arrived") ?? activeVisits[0] ?? visits[0] ?? null;
-  const visitHref = currentVisit ? (`/app/visits/${currentVisit.id}` as Route) : null;
+  const actionHrefs = mobileJobActionHrefs({
+    jobId: job.id,
+    visitId: currentVisit?.id ?? null,
+  });
+  const projectNotes = [
+    ...(job.intake_notes?.trim()
+      ? [{ key: "intake", label: "Intake", body: job.intake_notes.trim() }]
+      : []),
+    ...visits
+      .filter((v) => typeof v.tech_notes === "string" && v.tech_notes.trim())
+      .map((v) => ({
+        key: v.id,
+        label: v.scheduled_start ? formatVisitDateTime(String(v.scheduled_start)) : "Visit",
+        body: v.tech_notes!.trim(),
+      })),
+  ];
   // Universal maps link: opens the native maps app on both iOS and Android
   // (and the browser as fallback). maps.apple.com only deep-links cleanly on iOS.
   const mapHref = job.property_address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.property_address)}` : null;
@@ -925,7 +976,7 @@ export default async function JobDetailPage({
           {mapHref ? <MobileJobExternalAction href={mapHref} label="Map" /> : null}
         </section>
 
-        <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+        <section id="job-scope" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", scrollMarginTop: 16 }}>
           <h2 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 800 }}>Current Job</h2>
           <div style={{ padding: "var(--space-4)", border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", fontSize: "var(--text-sm)", whiteSpace: "pre-wrap", color: job.description ? "var(--fg)" : "var(--fg-muted)" }}>
             {job.description || "No scope notes have been added yet."}
@@ -942,14 +993,12 @@ export default async function JobDetailPage({
         </section>
 
         <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-          {visitHref ? (
-            <>
-              <MobileJobAction href={visitHref} label="Scope" detail="Open the active visit scope and checklist" primary />
-              <MobileJobAction href={`${visitHref}#visit-issue` as Route} label="Photos" detail="Capture before, assessment, and completion photos" />
-              <MobileJobAction href={`${visitHref}#visit-parts` as Route} label="Materials" detail="Record parts and materials used" />
-              <MobileJobAction href={`${visitHref}#visit-resolution` as Route} label="Notes" detail="Document the work performed" />
-              <MobileJobAction href={`${visitHref}#visit-completion` as Route} label="Complete Visit" detail="Finish photos, signature, and closeout" primary />
-            </>
+          <MobileJobAction href={actionHrefs.scope} label="Scope" detail="This job's scope" primary />
+          <MobileJobAction href={actionHrefs.photos} label="Photos" detail="Photos from this job" />
+          <MobileJobAction href={actionHrefs.materials} label="Materials" detail="Buy list and receipts for this job" />
+          <MobileJobAction href={actionHrefs.notes} label="Notes" detail="Notes for this project" />
+          {actionHrefs.complete ? (
+            <MobileJobAction href={actionHrefs.complete} label="Complete Visit" detail="Finish and close out the current visit" primary />
           ) : (
             <div style={{ padding: "var(--space-4)", border: "1px solid var(--border)", borderRadius: 8, background: "var(--bg-card)", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
               No visit is scheduled for this job yet.
@@ -965,6 +1014,43 @@ export default async function JobDetailPage({
               {visits.length > 0 ? "Add a day to schedule" : "Schedule a day"}
             </Link>
           ) : null}
+        </section>
+
+        <section id="job-photos" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", scrollMarginTop: 16 }}>
+          <h2 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 800 }}>Photos</h2>
+          {jobPhotos.length === 0 ? (
+            <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+              No photos on this job yet. Capture them from a visit.
+            </p>
+          ) : (
+            <JobPhotoGallery photos={jobPhotos} />
+          )}
+        </section>
+
+        <section id="job-notes" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", scrollMarginTop: 16 }}>
+          <h2 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 800 }}>Notes</h2>
+          {projectNotes.length === 0 ? (
+            <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+              No notes on this project yet.
+            </p>
+          ) : (
+            projectNotes.map((note) => (
+              <div
+                key={note.key}
+                style={{
+                  padding: "var(--space-4)",
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  background: "var(--bg-card)",
+                }}
+              >
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", fontWeight: 700, marginBottom: "var(--space-1)" }}>
+                  {note.label}
+                </div>
+                <div style={{ fontSize: "var(--text-sm)", whiteSpace: "pre-wrap" }}>{note.body}</div>
+              </div>
+            ))
+          )}
         </section>
 
         <AdvancedDetails title="Secondary Details">
