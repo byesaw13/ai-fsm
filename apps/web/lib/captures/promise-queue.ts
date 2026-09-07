@@ -4,7 +4,7 @@ import { OWNER_PROMISE_ACTION_TYPE, promiseBucketTone } from "@ai-fsm/domain";
 export { OWNER_PROMISE_ACTION_TYPE };
 
 export const CUSTOMER_PROMISE_BUCKET_LABEL = "Customer Promises";
-export const CUSTOMER_PROMISE_BUCKET_HREF = "/app/my-work?promises=1#attention";
+export const CUSTOMER_PROMISE_BUCKET_HREF = "/app/action-queue?promises=1";
 export const CUSTOMER_PROMISE_BUCKET_DETAIL = "Open captured promises";
 
 export const OPEN_OWNER_PROMISES_SQL = `

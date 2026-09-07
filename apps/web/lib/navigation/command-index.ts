@@ -77,7 +77,7 @@ function dedupe(items: CommandItem[]): CommandItem[] {
 export const COMMAND_INDEX: CommandItem[] = dedupe([
   ...DESTINATIONS,
   ...fromQuick(OWNER_QUICK_ACTIONS, OWNER_ADMIN, "owner"),
-  ...fromQuick(FIELD_QUICK_ACTIONS, ALL, "field"),
+  ...fromQuick(FIELD_QUICK_ACTIONS, OWNER_ADMIN, "field"),
   ...fromQuick(FAB_QUICK_ACTIONS, OWNER_ADMIN, "fab"),
 ]);
 

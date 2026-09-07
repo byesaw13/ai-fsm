@@ -62,33 +62,7 @@ export function CommandPalette({ role }: { role: Role }) {
     setActive(0);
   }, [query]);
 
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        data-testid="command-palette-open"
-        aria-label="Find what you can do"
-        title="Find (Ctrl/⌘ K)"
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "6px 10px",
-          borderRadius: 6,
-          border: "1px solid var(--border)",
-          background: "var(--bg-card)",
-          color: "var(--fg-muted)",
-          fontSize: 13,
-          fontWeight: 600,
-          cursor: "pointer",
-        }}
-      >
-        Find
-        <kbd style={{ fontSize: 11, opacity: 0.7 }}>⌘K</kbd>
-      </button>
-
-      {open ? (
+  return open ? (
         <div
           className="p7-modal-overlay"
           role="dialog"
@@ -172,7 +146,5 @@ export function CommandPalette({ role }: { role: Role }) {
             </div>
           </div>
         </div>
-      ) : null}
-    </>
-  );
+  ) : null;
 }

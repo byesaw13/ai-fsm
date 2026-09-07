@@ -207,16 +207,6 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      {needsAttention && (
-        <NeedsAttentionPanel
-          items={needsAttention.items}
-          openPromiseRows={needsAttention.openPromiseRows}
-          promisesParam={promisesParam}
-        />
-      )}
-
-      <TodayTimeline entries={fieldDay.activityEntries} showTrackingLink={!isTech} />
-
       <MyDayMobileLayout
         openSession={fieldDay.openSession}
         vehicles={fieldDay.vehicles}
@@ -227,6 +217,21 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
         canCapture={isOwner}
         canQuickBook={isOwner}
       >
+        {needsAttention && (
+          <NeedsAttentionPanel
+            items={needsAttention.items}
+            openPromiseRows={needsAttention.openPromiseRows}
+            promisesParam={promisesParam}
+          />
+        )}
+        <TodayTimeline
+          entries={
+            isTech
+              ? fieldDay.activityEntries.filter((e) => e.user_id === session.userId)
+              : fieldDay.activityEntries
+          }
+          showTrackingLink={!isTech}
+        />
         <Card style={{ marginBottom: "var(--space-4)" }}>
           <SectionHeader title="Active Work Orders" count={workOrders.length} />
           {workOrders.length === 0 ? (

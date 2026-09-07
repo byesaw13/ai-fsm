@@ -13,6 +13,9 @@ describe("command index", () => {
     expect(hrefs).toContain("/app/visits");
     expect(hrefs).not.toContain("/app/invoices");
     expect(hrefs).not.toContain("/app/timeline");
+    expect(hrefs).not.toContain("/app/estimates");
+    expect(hrefs).not.toContain("/app/expenses/new");
+    expect(hrefs).not.toContain("/app/intake/new");
   });
 
   it("filters by label and keywords", () => {

@@ -285,7 +285,7 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
           </div>
 
           <div style={{ display: "flex", gap: 8, padding: collapsed ? "0 8px" : "0 0 4px", alignItems: "center" }}>
-            <CommandPalette role={role} />
+            <FindButton testId="command-palette-open" />
           </div>
 
           {/* New Request button — owner/admin only */}
@@ -471,21 +471,7 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
             />
             <div id="p7-more-sheet" className="p7-more-sheet" role="dialog" aria-label="All destinations">
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "8px 12px 0" }}>
-                <button
-                  type="button"
-                  onClick={() => window.dispatchEvent(new Event("dovetails:find"))}
-                  style={{
-                    border: "1px solid var(--border)",
-                    background: "var(--bg-card)",
-                    borderRadius: 6,
-                    padding: "6px 10px",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Find
-                </button>
+                <FindButton />
                 {isAdminOrOwner && (
                   <AttentionBell summary={attention} onChanged={() => void refreshAttention()} />
                 )}
@@ -606,7 +592,36 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
         !pathname.startsWith("/app/my-work") &&
         !pathname.startsWith("/app/my-day") &&
         !pathname.startsWith("/app/capture") && <FloatingActionButton />}
+      <CommandPalette role={role} />
     </ToastProvider>
+  );
+}
+
+function FindButton({ testId }: { testId?: string }) {
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      onClick={() => window.dispatchEvent(new Event("dovetails:find"))}
+      aria-label="Find what you can do"
+      title="Find (Ctrl/⌘ K)"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "6px 10px",
+        borderRadius: 6,
+        border: "1px solid var(--border)",
+        background: "var(--bg-card)",
+        color: "var(--fg-muted)",
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: "pointer",
+      }}
+    >
+      Find
+      <kbd style={{ fontSize: 11, opacity: 0.7 }}>⌘K</kbd>
+    </button>
   );
 }
 

@@ -162,7 +162,7 @@ describe("POST /api/v1/action-items/[id]/resolve", () => {
       }),
     );
     expect(res.status).toBe(303);
-    expect(res.headers.get("location")).toBe("http://localhost:3000/app/my-work?promises=1#attention");
+    expect(res.headers.get("location")).toBe("http://localhost:3000/app/action-queue?promises=1");
   });
 });
 

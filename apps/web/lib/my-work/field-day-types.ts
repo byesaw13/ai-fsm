@@ -25,6 +25,7 @@ export type OpenSession = {
 
 export type ActivityEntryDto = DayEntry & {
   id: string;
+  user_id: string | null;
   entity_type: string | null;
   entity_id: string | null;
   assignment_kind: string | null;
