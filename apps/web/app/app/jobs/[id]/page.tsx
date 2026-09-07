@@ -1202,6 +1202,7 @@ export default async function JobDetailPage({
           progress payment before the final. Hidden once the job is closed out. */}
       {!isTech &&
         commercialCounts?.has_approved_estimate &&
+        !commercialCounts.latest_invoice_id &&
         !["completed", "invoiced", "cancelled"].includes(currentStatus) && (
           <Card style={{ marginBottom: "var(--space-4)" }} data-testid="progress-billing">
             <SectionHeader title="Progress billing" />

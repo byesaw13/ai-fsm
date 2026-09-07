@@ -87,5 +87,7 @@ describe.skipIf(!RUN)("final invoice credits deposit + progress", () => {
     expect(rec.balanceDueCents).toBe(100_00);
     // The whole point: stages + balance sum to exactly the project total.
     expect(rec.depositCreditCents + rec.balanceDueCents).toBe(TOTAL);
+    // Note must not mislabel a mixed deposit+progress credit as "deposit".
+    expect(rec.reconciliationNote).toContain("payments already invoiced");
   });
 });

@@ -41,13 +41,30 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
   try {
     const result = await withInvoiceContext(session, async (client) => {
+      // The estimate→job relationship lives on estimates.job_id (there is no
+      // jobs.estimate_id column); mirror final-invoice.ts and take the latest
+      // approved estimate. Also detect an existing final invoice: the final's
+      // credit is snapshotted at creation, so a progress invoice made afterward
+      // would go uncredited and could overcollect — reject that.
       const jobRow = await client.query<{
         client_id: string | null;
         property_id: string | null;
         estimate_id: string | null;
+        total_cents: number | null;
+        final_invoice_id: string | null;
       }>(
-        `SELECT client_id, property_id, estimate_id
-         FROM jobs WHERE id = $1 AND account_id = $2`,
+        `SELECT j.client_id, j.property_id, e.id AS estimate_id, e.total_cents,
+                (SELECT id FROM invoices
+                  WHERE estimate_id = e.id AND account_id = j.account_id
+                    AND invoice_kind = 'final' AND status <> 'void'
+                  LIMIT 1) AS final_invoice_id
+         FROM jobs j
+         LEFT JOIN LATERAL (
+           SELECT id, total_cents FROM estimates
+           WHERE job_id = j.id AND account_id = j.account_id AND status = 'approved'
+           ORDER BY created_at DESC LIMIT 1
+         ) e ON true
+         WHERE j.id = $1 AND j.account_id = $2`,
         [jobId, session.accountId],
       );
       if (jobRow.rowCount === 0) {
@@ -62,12 +79,14 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         );
       }
 
-      // Project total comes from the approved estimate.
-      const estRow = await client.query<{ total_cents: number }>(
-        `SELECT total_cents FROM estimates WHERE id = $1 AND account_id = $2`,
-        [job.estimate_id, session.accountId],
-      );
-      const totalCents = estRow.rows[0]?.total_cents ?? 0;
+      if (job.final_invoice_id) {
+        throw Object.assign(
+          new Error("A final invoice already exists — progress invoices must be created before the final."),
+          { code: "FINAL_EXISTS" },
+        );
+      }
+
+      const totalCents = job.total_cents ?? 0;
 
       // Already billed toward the total: non-void deposit + prior progress invoices.
       const already = await client.query<{ sum_cents: string }>(
@@ -151,7 +170,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         { status: 404 },
       );
     }
-    if (err.code === "NO_ESTIMATE" || err.code === "FULLY_INVOICED") {
+    if (err.code === "NO_ESTIMATE" || err.code === "FULLY_INVOICED" || err.code === "FINAL_EXISTS") {
       return NextResponse.json(
         { error: { code: err.code, message: err.message, traceId: session.traceId } },
         { status: 400 },
