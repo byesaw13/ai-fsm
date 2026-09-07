@@ -48,7 +48,9 @@ homeassistant container restart.
 branches** (175 shipped twice). Applied filenames are **immutable** — renaming
 one makes the deploy treat it as new and re-run it, hitting its unconditional
 `CREATE TRIGGER` and failing. Claim the next number at **merge** time from the
-highest existing; never renumber an applied migration.
+highest existing; never renumber an applied migration. CI (`scripts/check-migration-prefixes.mjs`,
+TASK-128) fails a PR that adds a new file onto an existing prefix; the current
+collisions are grandfathered by exact filename.
 
 ## Backlog gating + merge gates
 New work needs a `docs/backlog/` task first, citing a ROADMAP phase (0–4 or

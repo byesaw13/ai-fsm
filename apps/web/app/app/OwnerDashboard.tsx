@@ -1,29 +1,17 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { Card, SectionHeader, MetricGrid, StatusStepper, LinkButton } from "@/components/ui";
+import { Card, SectionHeader, MetricGrid, LinkButton } from "@/components/ui";
 import { ActionQueue, JobsToday, Materials } from "./DashboardWidgets";
 import type { CommandVisit, CountAction, MaterialJob } from "./DashboardWidgets";
 import { OWNER_QUICK_ACTIONS } from "@/lib/navigation/quick-actions";
 import { CAPTURE_HREF, CaptureLink } from "@/components/CaptureLink";
 import { formatCents } from "@/lib/money";
-import type { OpenSession, VehicleOption } from "@/lib/my-work/field-day-types";
-
-// EPIC-006 / mockup merge: single-screen dashboard. Combines the field workday
-// (Start Day, vehicle, mileage — from loadFieldDayData) with the business
-// widgets (schedule, action queue, expenses, revenue) so the owner runs the
-// whole day from one screen. The full interactive Start-Day wizard still lives
-// on /app/my-work; here we show a summary + CTA into it.
+// Overview is the office numbers screen (TASK-129). Start Day / vehicle /
+// mileage live on My Day — this page links there instead of duplicating them.
 
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
-
-const WORKFLOW_STEPS = [
-  { key: "start", label: "Start Day" },
-  { key: "work", label: "Work Day" },
-  { key: "follow", label: "Follow Ups" },
-  { key: "end", label: "End Day" },
-];
 
 export function OwnerDashboard({
   actionQueue,
@@ -34,11 +22,6 @@ export function OwnerDashboard({
   outstandingInvoicesCents = 0,
   pendingDepositsCents = 0,
   paidThisMonthCents = 0,
-  openSession,
-  vehicles,
-  dayMileage,
-  yesterdayMiles,
-  pendingSegments,
   todayExpensesCents,
   monthExpensesCents,
   receiptsMissing,
@@ -51,46 +34,10 @@ export function OwnerDashboard({
   outstandingInvoicesCents?: number;
   pendingDepositsCents?: number;
   paidThisMonthCents?: number;
-  openSession: OpenSession | null;
-  vehicles: VehicleOption[];
-  dayMileage: { totalMiles: number; openSessions: number };
-  yesterdayMiles: number;
-  pendingSegments: number;
   todayExpensesCents: number;
   monthExpensesCents: number;
   receiptsMissing: number;
 }) {
-  const dayStarted = !!openSession;
-  const startedJobs = todayJobs.filter(
-    (j) => j.visit_status === "in_progress" || j.visit_status === "arrived",
-  ).length;
-  const todaysVehicle = openSession
-    ? { name: openSession.vehicle_nickname ?? "Vehicle", odometer: openSession.start_odometer }
-    : vehicles[0]
-      ? { name: vehicles[0].nickname, odometer: vehicles[0].current_odometer }
-      : null;
-
-  // Right-rail "Today's Workflow" checklist — derived from live state.
-  const workflowChecklist: { label: string; status: string; alert?: boolean }[] = [
-    { label: "Start Day", status: dayStarted ? "Started" : "Not started", alert: !dayStarted },
-    { label: "Jobs", status: `${startedJobs} of ${todayJobs.length} started` },
-    {
-      label: "Expenses & Receipts",
-      status: receiptsMissing > 0 ? `${receiptsMissing} to upload` : "Up to date",
-      alert: receiptsMissing > 0,
-    },
-    {
-      label: "Mileage",
-      status: pendingSegments > 0 ? `${pendingSegments} to log` : `${dayMileage.totalMiles} mi today`,
-      alert: pendingSegments > 0,
-    },
-    {
-      label: "Follow Ups",
-      status: actionQueue.length > 0 ? `${actionQueue.length} pending` : "Clear",
-      alert: actionQueue.length > 0,
-    },
-    { label: "End Day", status: dayStarted ? "When you're done" : "—" },
-  ];
 
   const viewAll = (href: string, label = "View All") => (
     <Link
@@ -103,51 +50,14 @@ export function OwnerDashboard({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
-      {/* ---- DAILY WORKFLOW ---- */}
-      <Card>
-        <SectionHeader title="Daily Workflow" />
-        <StatusStepper steps={WORKFLOW_STEPS} currentStep={dayStarted ? "work" : "start"} />
-
-        <div
-          style={{
-            marginTop: "var(--space-4)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-lg)",
-            padding: "var(--space-4)",
-            display: "flex",
-            gap: "var(--space-4)",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <div style={{ minWidth: "240px", flex: "1 1 auto" }}>
-            <h3 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 700 }}>
-              {dayStarted ? "Your day is underway" : "Start Your Day"}
-            </h3>
-            <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", margin: "var(--space-1) 0 var(--space-3)" }}>
-              {dayStarted
-                ? "Vehicle and starting mileage are logged. Keep working from My Day."
-                : "Record your starting mileage to keep your day on track."}
-            </p>
-            <LinkButton href="/app/my-work" variant="primary" size="sm">
-              {dayStarted ? "Continue in My Day" : "Record Starting Mileage"}
-            </LinkButton>
-          </div>
-
-          {todaysVehicle && (
-            <div style={{ textAlign: "right", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-              <div>Today&apos;s Vehicle</div>
-              <div style={{ color: "var(--fg)", fontWeight: 600 }}>{todaysVehicle.name}</div>
-              <div style={{ marginTop: "var(--space-2)" }}>
-                {dayStarted ? "Starting Mileage" : "Last Recorded"}
-              </div>
-              <div style={{ color: "var(--accent)", fontSize: "var(--text-2xl)", fontWeight: 700 }}>
-                {todaysVehicle.odometer != null ? `${todaysVehicle.odometer.toLocaleString()} mi` : "—"}
-              </div>
-            </div>
-          )}
-        </div>
+      <Card data-testid="go-to-my-day">
+        <SectionHeader title="The day lives on My Day" />
+        <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", margin: "0 0 var(--space-3)" }}>
+          Start Day, today&apos;s work, needs-attention, and the day&apos;s timeline are one screen. This page is the office numbers.
+        </p>
+        <LinkButton href="/app/my-work" variant="primary" size="sm">
+          Go to My Day
+        </LinkButton>
       </Card>
 
       {/* ---- MAIN GRID: operations (left) + rail (right) ---- */}
@@ -172,52 +82,25 @@ export function OwnerDashboard({
             </div>
           </div>
 
-          {/* Expenses + Mileage */}
-          <div className="owner-dash-row2">
-            <Card className="owner-dash-expenses">
-              <SectionHeader title="Expenses & Receipts" action={viewAll("/app/expenses")} />
-              {receiptsMissing > 0 && (
-                <p style={{ color: "var(--color-danger)", fontWeight: 700, fontSize: "var(--text-sm)", margin: "0 0 var(--space-3)" }}>
-                  {receiptsMissing} receipt{receiptsMissing !== 1 ? "s" : ""} to upload
-                </p>
-              )}
-              <div style={{ display: "flex", gap: "var(--space-8)", marginBottom: "var(--space-4)" }}>
-                <div>
-                  <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>Today&apos;s Expenses</div>
-                  <div style={{ fontSize: "var(--text-xl)", fontWeight: 700 }}>{formatCents(todayExpensesCents)}</div>
-                </div>
-                <div>
-                  <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>This Month</div>
-                  <div style={{ fontSize: "var(--text-xl)", fontWeight: 700 }}>{formatCents(monthExpensesCents)}</div>
-                </div>
+          <Card className="owner-dash-expenses">
+            <SectionHeader title="Expenses & Receipts" action={viewAll("/app/expenses")} />
+            {receiptsMissing > 0 && (
+              <p style={{ color: "var(--color-danger)", fontWeight: 700, fontSize: "var(--text-sm)", margin: "0 0 var(--space-3)" }}>
+                {receiptsMissing} receipt{receiptsMissing !== 1 ? "s" : ""} to upload
+              </p>
+            )}
+            <div style={{ display: "flex", gap: "var(--space-8)", marginBottom: "var(--space-4)" }}>
+              <div>
+                <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>Today&apos;s Expenses</div>
+                <div style={{ fontSize: "var(--text-xl)", fontWeight: 700 }}>{formatCents(todayExpensesCents)}</div>
               </div>
-              <LinkButton href="/app/expenses/new" variant="secondary" size="sm">+ Add Expense</LinkButton>
-            </Card>
-
-            <Card className="owner-dash-mileage">
-              <SectionHeader title="Mileage" action={viewAll("/app/timeline", "Vehicle tracking")} />
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", marginBottom: "var(--space-4)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)" }}>
-                  <span style={{ color: "var(--fg-muted)" }}>Today Driven</span>
-                  <strong style={{ color: dayMileage.totalMiles === 0 ? "var(--color-danger)" : "var(--fg)" }}>
-                    {dayMileage.totalMiles} mi
-                  </strong>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)" }}>
-                  <span style={{ color: "var(--fg-muted)" }}>Trips to Log</span>
-                  <strong style={{ color: pendingSegments > 0 ? "var(--color-danger)" : "var(--fg)" }}>{pendingSegments}</strong>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--text-sm)" }}>
-                  <span style={{ color: "var(--fg-muted)" }}>Yesterday</span>
-                  <strong>{yesterdayMiles} mi</strong>
-                </div>
+              <div>
+                <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>This Month</div>
+                <div style={{ fontSize: "var(--text-xl)", fontWeight: 700 }}>{formatCents(monthExpensesCents)}</div>
               </div>
-              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-                <LinkButton href="/app/timeline" variant="secondary" size="sm">Open tracking</LinkButton>
-                <LinkButton href="/app/mileage" variant="ghost" size="sm">Mileage log</LinkButton>
-              </div>
-            </Card>
-          </div>
+            </div>
+            <LinkButton href="/app/expenses/new" variant="secondary" size="sm">+ Add Expense</LinkButton>
+          </Card>
 
           <div className="owner-dash-materials" id="materials">
             <Materials count={materialCount} jobs={materialJobs} />
@@ -246,27 +129,6 @@ export function OwnerDashboard({
 
         {/* ---- RIGHT RAIL ---- */}
         <div className="owner-dash-col" style={{ display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
-          {/* Today's Workflow checklist */}
-          <Card>
-            <SectionHeader title="Today's Workflow" />
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              {workflowChecklist.map((item) => (
-                <div
-                  key={item.label}
-                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "var(--space-3) 0", borderBottom: "1px solid var(--border-subtle)" }}
-                >
-                  <span style={{ fontWeight: 600, fontSize: "var(--text-sm)" }}>{item.label}</span>
-                  <span style={{ fontSize: "var(--text-xs)", fontWeight: 600, color: item.alert ? "var(--color-danger)" : "var(--fg-muted)" }}>
-                    {item.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div style={{ marginTop: "var(--space-3)" }}>
-              <LinkButton href="/app/my-work" variant="secondary" size="sm">View Full Workflow</LinkButton>
-            </div>
-          </Card>
-
           {/* Quick Actions */}
           <Card className="owner-dash-actions">
             <SectionHeader title="Quick Actions" />

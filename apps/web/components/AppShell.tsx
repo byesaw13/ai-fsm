@@ -8,6 +8,7 @@ import type { Role } from "@ai-fsm/domain";
 import { ToastProvider } from "./ui/Toast";
 import { QuickLeadModal } from "./QuickLeadModal";
 import { FloatingActionButton } from "./FloatingActionButton";
+import { CommandPalette } from "./CommandPalette";
 import { CAPTURE_HREF, CaptureLink } from "./CaptureLink";
 import { WorkspaceAutoRoute } from "./WorkspaceAutoRoute";
 import { LiveRefresh } from "./LiveRefresh";
@@ -283,6 +284,10 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
             </button>
           </div>
 
+          <div style={{ display: "flex", gap: 8, padding: collapsed ? "0 8px" : "0 0 4px", alignItems: "center" }}>
+            <FindButton testId="command-palette-open" />
+          </div>
+
           {/* New Request button — owner/admin only */}
           {isAdminOrOwner && (
             <button
@@ -465,11 +470,12 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
               onClick={() => setShowMore(false)}
             />
             <div id="p7-more-sheet" className="p7-more-sheet" role="dialog" aria-label="All destinations">
-              {isAdminOrOwner && (
-                <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 12px 0" }}>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "8px 12px 0" }}>
+                <FindButton />
+                {isAdminOrOwner && (
                   <AttentionBell summary={attention} onChanged={() => void refreshAttention()} />
-                </div>
-              )}
+                )}
+              </div>
               <div className="p7-more-sections">
                 {sections.map((section, sectionIdx) => (
                   <div key={sectionIdx} className="p7-more-section">
@@ -586,7 +592,36 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
         !pathname.startsWith("/app/my-work") &&
         !pathname.startsWith("/app/my-day") &&
         !pathname.startsWith("/app/capture") && <FloatingActionButton />}
+      <CommandPalette role={role} />
     </ToastProvider>
+  );
+}
+
+function FindButton({ testId }: { testId?: string }) {
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      onClick={() => window.dispatchEvent(new Event("dovetails:find"))}
+      aria-label="Find what you can do"
+      title="Find (Ctrl/⌘ K)"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "6px 10px",
+        borderRadius: 6,
+        border: "1px solid var(--border)",
+        background: "var(--bg-card)",
+        color: "var(--fg-muted)",
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: "pointer",
+      }}
+    >
+      Find
+      <kbd style={{ fontSize: 11, opacity: 0.7 }}>⌘K</kbd>
+    </button>
   );
 }
 

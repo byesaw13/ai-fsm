@@ -23,8 +23,15 @@ import {
   type VisitType,
 } from "@ai-fsm/domain";
 import { PageContainer, PageHeader, Card, SectionHeader, EmptyState, LinkButton } from "@/components/ui";
+import { loadNeedsAttention } from "@/lib/attention/load-needs-attention";
+import { NeedsAttentionPanel } from "../NeedsAttentionPanel";
+import { TodayTimeline } from "./TodayTimeline";
 
 export const dynamic = "force-dynamic";
+
+type PageProps = {
+  searchParams: Promise<{ promises?: string }>;
+};
 
 type WoCard = {
   id: string;
@@ -45,10 +52,11 @@ type AssessmentCard = {
   job_title: string | null;
 };
 
-export default async function MyWorkPage() {
+export default async function MyWorkPage({ searchParams }: PageProps) {
   const session = await getSession();
   if (!session) redirect("/login");
   if (session.role === "admin") redirect("/app");
+  const { promises: promisesParam } = await searchParams;
 
   const isTech = session.role === "tech";
   const isOwner = session.role === "owner";
@@ -122,6 +130,7 @@ export default async function MyWorkPage() {
 
   const todayVisits = heroVisits.filter((v) => isSameCalendarDay(v.scheduled_start));
   const heroVisit = pickHeroVisit(todayVisits, now.getTime());
+  const needsAttention = isOwner ? await loadNeedsAttention(session) : null;
 
   const nowHour = now.getHours();
   const greeting =
@@ -198,53 +207,6 @@ export default async function MyWorkPage() {
         </div>
       )}
 
-      {fieldDay.ownerPeek && (
-        <Link
-          href={"/app/action-queue" as Route}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "var(--space-3)",
-            marginBottom: "var(--space-4)",
-            padding: "var(--space-2) var(--space-3)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-md)",
-            background: "var(--bg-card)",
-            textDecoration: "none",
-            color: "inherit",
-          }}
-        >
-          <div style={{ display: "flex", gap: "var(--space-5)", flexWrap: "wrap" }}>
-            <span style={{ fontSize: "var(--text-sm)" }}>
-              <strong style={{ color: "var(--color-red-600)" }}>
-                ${(fieldDay.ownerPeek.outstandingCents / 100).toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                })}
-              </strong>
-              <span style={{ color: "var(--fg-muted)" }}> outstanding</span>
-            </span>
-            <span style={{ fontSize: "var(--text-sm)" }}>
-              <strong>{fieldDay.ownerPeek.draftInvoices}</strong>
-              <span style={{ color: "var(--fg-muted)" }}>
-                {" "}
-                draft invoice{fieldDay.ownerPeek.draftInvoices !== 1 ? "s" : ""} to review
-              </span>
-            </span>
-          </div>
-          <span
-            style={{
-              color: "var(--accent)",
-              fontSize: "var(--text-xs)",
-              fontWeight: 700,
-              whiteSpace: "nowrap",
-            }}
-          >
-            Office →
-          </span>
-        </Link>
-      )}
-
       <MyDayMobileLayout
         openSession={fieldDay.openSession}
         vehicles={fieldDay.vehicles}
@@ -255,6 +217,21 @@ export default async function MyWorkPage() {
         canCapture={isOwner}
         canQuickBook={isOwner}
       >
+        {needsAttention && (
+          <NeedsAttentionPanel
+            items={needsAttention.items}
+            openPromiseRows={needsAttention.openPromiseRows}
+            promisesParam={promisesParam}
+          />
+        )}
+        <TodayTimeline
+          entries={
+            isTech
+              ? fieldDay.activityEntries.filter((e) => e.user_id === session.userId)
+              : fieldDay.activityEntries
+          }
+          showTrackingLink={!isTech}
+        />
         <Card style={{ marginBottom: "var(--space-4)" }}>
           <SectionHeader title="Active Work Orders" count={workOrders.length} />
           {workOrders.length === 0 ? (
