@@ -54,20 +54,20 @@ Out of Scope:
   bill rate.
 
 Acceptance Criteria:
-- [ ] A quick-booked visit captures on-site time with one tap.
-- [ ] Invoicing that job pre-fills hours at the bill rate with no manual entry;
+- [x] A quick-booked visit captures on-site time with one tap.
+      (I'm here starts `job_work`; Complete visit stops it.)
+- [x] Invoicing that job pre-fills hours at the bill rate with no manual entry;
       one action switches to a price-book rate or flat fee.
-      (Toggle shipped: invoice editor Hourly / Price-book / Flat via
-      `POST /api/v1/invoices/:id/labor-rate`. Prefill-on-create still uses
-      existing T&M path.)
-- [ ] The billed total is floored to the existing `minimum_service_fee_cents`
+      (Toggle: `POST /api/v1/invoices/:id/labor-rate`. Create-invoice prefills
+      T&M actuals because no-estimate jobs resolve as `hourly_internal`.)
+- [x] The billed total is floored to the existing `minimum_service_fee_cents`
       (no second minimum added); per-job override works via the existing path.
 - [x] `QuickBookModal` opens from all three launch points (Schedule +, My Day,
       global FAB) as one shared component.
 - [x] "Done" closes the visit only; the business day stays open until Day Review.
       (Quick-book shape only: standard visit + work order + no estimate.
       Site visits and quoted jobs still require the packet.)
-- [ ] No duplicate booking/capture path is introduced.
+- [x] No duplicate booking/capture path is introduced.
 
 Notes:
 Priority item from the 2026-09-05 owner workflow review. Capture = existing
@@ -79,6 +79,12 @@ Shipped so far:
 - Service-minimum floor (#624 slice 1, #625 slice 2).
 - Three launch points around one `QuickBookModal` (`components/jobs/QuickBookModal.tsx`);
   omitted assignee defaults to the current user so the visit lands on My Day.
+- Invoice labor Hourly / Price-book / Flat (#627).
+- Skip photo/signature packet on quick-book visits (#628).
+- Create-invoice prefills tracked time for no-estimate jobs (`jobPricingModeFromSources`
+  defaults to `hourly_internal`).
+Leftover in scope (not an AC): manual time correction on the visit for
+forgot-to-start.
 
 # TASK-120: Big-job billing — deposit gate + progress (thirds) billing
 
