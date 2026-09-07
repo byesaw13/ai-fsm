@@ -37,8 +37,11 @@ Acceptance Criteria:
       standalone-invoice detour). (Deposit gate: first-class Deposit step in the
       approved handoff + "Collect a deposit before starting" as the job's next
       action; one-tap `POST /api/v1/jobs/:id/deposit-invoice`.)
-- [x] A job can be billed in thirds (deposit / midpoint / final), each stage a
-      tracked invoice summing to the job total. (Progress invoices, #633.)
+- [x] A job can be billed in stages (deposit / midpoint / final), each a
+      tracked invoice summing to the job total. Progress defaults to ⅓ of the
+      project (clamped to remaining). Deposit amount is the estimate's
+      configured deposit or the company Standard deposit % — not forced to ⅓.
+      (#633, #638)
 - [x] Existing single-invoice-at-completion flow still works for normal jobs.
 
 Notes:
@@ -46,10 +49,12 @@ From the 2026-09-05 owner workflow review. Deposit primitive = TASK-071 (done).
 Pairs with TASK-119 (quick-job billing) and TASK-121 (job spend view).
 
 Shipped (#633 progress, #638 deposit gate):
-- Progress (thirds) billing (#633): `invoice_kind='progress'` (migration 177),
+- Progress billing (#633): `invoice_kind='progress'` (migration 177),
   `POST /api/v1/jobs/:id/progress-invoice` (⅓ default, clamped to remaining), and
   the final invoice credits deposit + progress via `loadCreditedInvoicesForEstimate`
-  so the stages sum to exactly the project total.
+  so the stages sum to exactly the project total. Equal ⅓/⅓/⅓ only happens when
+  the deposit itself is one third; otherwise the deposit setting wins and the
+  remainder is split across progress + final.
 - Deposit gate (#638): `POST /api/v1/jobs/:id/deposit-invoice` (idempotent; amount =
   estimate deposit or company standard %); first-class Deposit step in
   `ApprovedHandoff` (collect / send / record payment); `ProjectWhatNext`
