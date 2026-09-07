@@ -19,8 +19,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-export DATABASE_URL="${DATABASE_URL:-postgresql://ai_fsm:ai_fsm_dev_password@localhost:5432/ai_fsm}"
-export REDIS_URL="${REDIS_URL:-redis://localhost:6379/0}"
+# ALWAYS target the local compose DB over loopback — never an ambient
+# DATABASE_URL. `db:seed` inserts demo users with a known password, so a stray
+# prod/remote URL in the environment must not be able to migrate or seed it.
+# (Constructed from 127.0.0.1, so it can only ever reach the local container.)
+DEV_DB_PORT="${POSTGRES_PORT:-5432}"
+export DATABASE_URL="postgresql://ai_fsm:ai_fsm_dev_password@127.0.0.1:${DEV_DB_PORT}/ai_fsm"
+export REDIS_URL="redis://127.0.0.1:6379/0"
 COMPOSE=(docker compose -f infra/compose.dev.yml)
 
 wait_for_pg() {
