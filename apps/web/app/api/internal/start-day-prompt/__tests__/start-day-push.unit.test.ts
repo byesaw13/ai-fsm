@@ -79,7 +79,7 @@ describe("POST /api/internal/start-day-prompt — start push", () => {
     expect(mockSendPushToOwners).toHaveBeenCalledOnce();
     expect(mockSendPushToOwners).toHaveBeenCalledWith(ACCOUNT, {
       title: "Start your day?",
-      body: "RAM connected — tap to open My Work.",
+      body: "RAM connected — tap to open My Day.",
       url: "/app/my-work",
       tag: "start-day-2026-09-05",
     });

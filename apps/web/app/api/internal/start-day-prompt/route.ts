@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
   // Native Web Push (TASK-116). sendPushToOwners never throws; HA JSON is unchanged.
   await sendPushToOwners(row.account_id, {
     title: "Start your day?",
-    body: "RAM connected — tap to open My Work.",
+    body: "RAM connected — tap to open My Day.",
     url: "/app/my-work",
     tag: `start-day-${businessToday()}`,
   });

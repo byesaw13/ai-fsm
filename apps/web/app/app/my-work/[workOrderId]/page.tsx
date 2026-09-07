@@ -99,7 +99,7 @@ export default async function MyWorkOrderPage({
         title={wo.title}
         subtitle={[wo.client_name, wo.property_address].filter(Boolean).join(" · ") || undefined}
         backHref="/app/my-work"
-        backLabel="My Work"
+        backLabel="My Day"
       />
 
       <Card style={{ marginBottom: "var(--space-4)" }}>
