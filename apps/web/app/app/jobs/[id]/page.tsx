@@ -6,7 +6,6 @@ import { getSession } from "@/lib/auth/session";
 import { getPool, queryForSession, queryOneForSession } from "@/lib/db";
 import { formatVisitTime, isVisitOverdue } from "@/lib/visits/formatting";
 import {
-  canManageExpenses,
   canTransitionJob,
   canCreateVisit,
   canDeleteRecords,
@@ -33,10 +32,9 @@ import { VendorCoordinationCard } from "./VendorCoordinationCard";
 import { JobWorkOrdersPanel, type JobWorkOrderRow } from "./JobWorkOrdersPanel";
 import { JobTasksPanel } from "./JobTasksPanel";
 import { loadJobTaskProgress } from "@/lib/work-orders/job-tasks";
-import { LinkForgottenExpensesPanel } from "@/components/invoices/LinkForgottenExpensesPanel";
 import { fetchJobMaterialExpenses, type JobMaterialExpenseWithLines } from "@/lib/invoices/job-expenses";
 import { withExpenseContext } from "@/lib/expenses/db";
-import { JobMaterialsPanel } from "./JobMaterialsPanel";
+import { MaterialsBudgetLine } from "./MaterialsBudgetLine";
 import { JobLedgerCard } from "./JobLedgerCard";
 import { loadJobLedger } from "@/lib/jobs/job-ledger";
 import {
@@ -516,7 +514,6 @@ export default async function JobDetailPage({
   const canTransition = canTransitionJob(session.role);
   const canAddVisit = canCreateVisit(session.role);
   const canDelete = canDeleteRecords(session.role);
-  const canLinkExpenses = canManageExpenses(session.role);
   const canEstimate = canCreateEstimates(session.role);
   const isTech = session.role === "tech";
 
@@ -1369,59 +1366,35 @@ export default async function JobDetailPage({
             </Card>
           )}
 
-          {/* Materials: buy list link + receipts + link unassigned */}
+          {/* Materials & spend summary — the full plan (buy list) + receipts +
+              link-unassigned live on the Materials page (TASK-121). This is the
+              at-a-glance budget + a way in. */}
           {!isTech && (
             <Card id="job-materials" data-testid="job-materials-panel">
               <SectionHeader
-                title="Materials"
+                title="Materials & spend"
                 count={jobMaterialExpenses.length > 0 ? jobMaterialExpenses.length : undefined}
                 action={
                   <LinkButton
-                    href={`/app/jobs/${job.id}/materials?tab=buy` as Route}
+                    href={`/app/jobs/${job.id}/materials?tab=${jobMaterialExpenses.length > 0 ? "purchases" : "buy"}` as Route}
                     variant="secondary"
                     size="sm"
-                    data-testid="open-buy-list"
+                    data-testid="open-materials"
                   >
-                    Buy list →
+                    Materials →
                   </LinkButton>
                 }
               />
-              {jobLedger?.rows.find((r) => r.bucket === "materials")?.estimateCents != null ? (
-                <p
-                  style={{
-                    margin: "0 0 var(--space-2)",
-                    fontSize: "var(--text-sm)",
-                    color: "var(--fg-muted)",
-                  }}
-                  data-testid="materials-allowance-remaining"
-                >
-                  Allowance{" "}
-                  {formatCents(jobLedger.rows.find((r) => r.bucket === "materials")!.estimateCents!)}
-                  {" · "}
-                  Spent{" "}
-                  {formatCents(jobLedger.rows.find((r) => r.bucket === "materials")!.actualCents)}
-                  {" · "}
-                  {(() => {
-                    const m = jobLedger.rows.find((r) => r.bucket === "materials")!;
-                    const v = (m.estimateCents ?? 0) - m.actualCents;
-                    return v >= 0
-                      ? `${formatCents(v)} remaining`
-                      : `${formatCents(-v)} over`;
-                  })()}
-                </p>
-              ) : null}
-              {(jobMaterialExpenses.length > 0 || canLinkExpenses) ? (
-                <>
-                  <JobMaterialsPanel expenses={jobMaterialExpenses} />
-                  {canLinkExpenses && (
-                    <LinkForgottenExpensesPanel mode="job" jobId={job.id} />
-                  )}
-                </>
-              ) : (
-                <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-                  Open the buy list to plan what to purchase. Receipts show here after you log a material run.
-                </p>
-              )}
+              <MaterialsBudgetLine
+                allowanceCents={jobLedger?.rows.find((r) => r.bucket === "materials")?.estimateCents}
+                spentCents={jobLedger?.rows.find((r) => r.bucket === "materials")?.actualCents ?? 0}
+                testId="materials-allowance-remaining"
+              />
+              <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                {jobMaterialExpenses.length > 0
+                  ? `${jobMaterialExpenses.length} receipt${jobMaterialExpenses.length === 1 ? "" : "s"} logged. Open Materials to see purchases, plan the buy list, or link expenses.`
+                  : "Open Materials to plan the buy list and log receipts as you buy."}
+              </p>
             </Card>
           )}
 
