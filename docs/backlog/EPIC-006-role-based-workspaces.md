@@ -91,119 +91,6 @@ toggle). Rename the owner "Today" nav label to "Dashboard".
 > a shared panel — recorded per ID below (all Done, verified in code). No further
 > build here; new field-cockpit work is TASK-074/075.
 
-# TASK-124: De-jargon naming — "Needs attention" + consistent "My Day"
-
-Status:
-In Progress
-
-Phase:
-cross-cutting
-
-Problem:
-Engine terms leak into the UI (A6). The owner's action surface is headed
-"Action Queue" (engine phrasing), and the daily home is labelled **My Day** in
-the nav but its page header reads **My Work** — the same screen has two names.
-
-Business Value:
-The interface reads in plain handyman language and names the daily home one way,
-lowering "which screen is this?" friction. Copy-only; no routes, logic, or nav
-structure change.
-
-Scope:
-- `/app/action-queue` heading "Action Queue" → **"Needs attention"**; de-jargon
-  its empty-state copy ("execution actions" → plain language).
-- `/app/my-work` PageHeader "My Work" → **"My Day"** to match the nav label.
-
-Out of Scope:
-- Renaming/removing **Work Orders** and Jobs→Projects (that's the nav-structure
-  task, TASK-125).
-- Route/URL changes (keep `/app/action-queue`, `/app/my-work` — deep links + PWA
-  shortcuts survive).
-- "Activity" / "Job Ledger" wording (ambiguous — not clearly jargon).
-
-Acceptance Criteria:
-- [ ] The action surface reads "Needs attention"; no user-facing "Action Queue".
-- [ ] The daily home reads "My Day" in both nav and page header.
-- [ ] No route, logic, or nav-structure change; `pnpm gate:fast` green.
-
-Notes:
-A6 from the 2026-09-05 simplification plan. Pairs with TASK-125 (Jobs→Projects,
-Work Orders nav). Naming polish, deliberately small.
-
-# TASK-125: Nav restructure — Jobs→Projects, drop Work Orders from nav
-
-Status:
-In Progress
-
-Phase:
-cross-cutting
-
-Problem:
-A2 of the simplification plan. The nav labelled the work pipeline "Jobs" while
-the pages already say "Projects" (jobs list, create, visit forms), and
-**Work Orders** sat as a top-level nav item though it's really a detail inside a
-Project. Five work nouns to hold; two of them inconsistent/redundant at the top.
-
-Business Value:
-The owner nav reads as the pipeline they think in — Requests → Estimates →
-Projects → Invoices — with Work Orders reached inside a Project, not competing at
-the top. Fewer top-level nouns, consistent "Projects" wording.
-
-Scope:
-- `getNavSections` (AppShell): rename the Jobs nav item to **"Projects"**; drop
-  `NAV_WORK_ORDERS` from the Work hub (route + page kept; reached from a Project).
-- Routes unchanged (`/app/jobs`, `/app/work-orders`) — deep links + PWA survive;
-  Work Orders still reachable from the Job/Project detail's Work Orders section.
-
-Out of Scope:
-- Renaming every "Job" mention to "Project" (job detail body copy, report column
-  headers) — primary nav/list/create surfaces only.
-- Removing Visits from tech nav (techs need it).
-- Any data-model change (Job→Visit→Work Order stays).
-
-Acceptance Criteria:
-- [ ] Owner/admin nav shows "Projects" (not "Jobs") and no top-level Work Orders.
-- [ ] Work Orders remain reachable from a Project's detail; routes unchanged.
-- [ ] `getNavSections` unit tests updated; `pnpm gate:fast` green.
-
-Notes:
-A2 from the 2026-09-05 plan. Pairs with TASK-124 (naming). Nav labels/structure
-only — no routes, no schema.
-
-# TASK-126: Phone job shortcuts go to the matching job surface
-
-Status:
-In Progress
-
-Phase:
-2
-
-Problem:
-On the phone job page, Scope / Photos / Materials / Notes all hashed to the
-active visit (`#visit-issue` / `#visit-parts` / `#visit-resolution`). Those
-cards only exist on repair-flow visits, so a normal job dumped every button
-onto the same visit page.
-
-Business Value:
-Each shortcut opens the thing it names — this job's scope, this job's photos,
-this job's materials, this project's notes — so the phone work page is a
-reference, not a maze.
-
-Scope:
-- Retarget the four `MobileJobAction` links: in-page `#job-scope` / `#job-photos`
-  / `#job-notes`, and `/app/jobs/:id/materials`.
-- Photos: gallery of `visit_media` for this job. Notes: intake + visit tech
-  notes for this job only. Complete Visit still opens the visit.
-
-Out of Scope:
-- New upload UI (capture still happens on the visit).
-- Desktop job hub layout.
-
-Acceptance Criteria:
-- [x] Photos / Materials / Notes / Scope no longer all land on the same visit page.
-- [x] Materials opens the job materials page.
-- [x] Notes lists this project's notes only.
-
 # TASK-028: Extract the field UI into a reusable surface
 
 Status:
@@ -443,6 +330,9 @@ Acceptance Criteria:
 
 ## Completed
 
+- [TASK-124: De-jargon naming — "Needs attention" + consistent "My Day"](../archive/backlog-done/TASK-124-de-jargon-naming.md) — Done (#630)
+- [TASK-125: Nav restructure — Jobs→Projects, drop Work Orders from nav](../archive/backlog-done/TASK-125-nav-restructure-projects.md) — Done (#631)
+- [TASK-126: Phone job shortcuts go to the matching job surface](../archive/backlog-done/TASK-126-phone-job-shortcuts.md) — Done (#635)
 - [TASK-104: Discoverable vehicle tracking](../archive/backlog-done/TASK-104-discoverable-vehicle-tracking.md) — Done (PR #599)
 - [TASK-058: Workspace mode auto-by-device + Settings override](../archive/backlog-done/TASK-058-workspace-auto-route.md) — Done
 - [TASK-081: Nested hubs UX system (Home / Work / People / Money)](../archive/backlog-done/TASK-081-nested-hubs-ux.md) — Done
