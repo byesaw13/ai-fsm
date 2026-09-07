@@ -74,6 +74,7 @@ describe("POST deposit-invoice", () => {
         rowCount: 1,
       }) // jobRow
       .mockResolvedValueOnce({ rows: [{ settings: { deposit_percent: 30 } }], rowCount: 1 }) // accounts
+      .mockResolvedValueOnce({ rows: [{ sum_cents: "0" }], rowCount: 1 }) // already billed
       .mockResolvedValueOnce({ rows: [{ id: "NEWDEP" }], rowCount: 1 }); // insert
     const res = await POST(post());
     expect(res.status).toBe(201);
@@ -93,9 +94,23 @@ describe("POST deposit-invoice", () => {
         rowCount: 1,
       })
       .mockResolvedValueOnce({ rows: [{ settings: { deposit_percent: 30 } }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ sum_cents: "0" }], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [{ id: "NEWDEP" }], rowCount: 1 });
     const res = await POST(post());
     expect((await res.json()).amount_cents).toBe(25000);
+  });
+
+  it("clamps the deposit to remaining balance after progress invoices", async () => {
+    mockClientQuery
+      .mockResolvedValueOnce({
+        rows: [{ client_id: "C1", property_id: null, estimate_id: "E1", total_cents: 100000, deposit_cents: 0, existing_deposit_id: null, final_invoice_id: null }],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [{ settings: { deposit_percent: 30 } }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ sum_cents: "80000" }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [{ id: "NEWDEP" }], rowCount: 1 });
+    const res = await POST(post());
+    expect((await res.json()).amount_cents).toBe(20000);
   });
 
   it("400 FINAL_EXISTS when a final invoice already exists", async () => {

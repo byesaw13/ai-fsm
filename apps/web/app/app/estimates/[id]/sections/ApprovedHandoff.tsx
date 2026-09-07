@@ -3,7 +3,7 @@ import { formatCents } from "@ai-fsm/money";
 import { CreateJobFromEstimateButton } from "../CreateJobFromEstimateButton";
 import { EstimateConvertButton } from "../EstimateConvertButton";
 import { CollectDepositButton } from "../../../jobs/[id]/CollectDepositButton";
-import { MarkDepositReceivedButton } from "../../../invoices/[id]/MarkDepositReceivedButton";
+import { RecordDepositPaymentButton } from "../../../jobs/[id]/RecordDepositPaymentButton";
 import type { EstimateInvoiceRow, EstimateRow } from "../detail-data";
 
 interface Props {
@@ -89,10 +89,17 @@ export function ApprovedHandoff({
                       {depositInvoice.status === "draft" ? "Send Deposit →" : "Open Deposit →"}
                     </Link>
                     {depositInvoice.status !== "draft" && depositAmountCents != null && (
-                      <MarkDepositReceivedButton invoiceId={depositInvoice.id} depositCents={depositAmountCents} />
+                      <RecordDepositPaymentButton invoiceId={depositInvoice.id} amountCents={depositAmountCents} />
                     )}
                   </div>
                 </>
+              );
+            }
+            if (finalInvoice) {
+              return (
+                <p className="muted" style={{ minHeight: 42 }}>
+                  Final billing already started — a deposit is not collected after the final invoice.
+                </p>
               );
             }
             return (

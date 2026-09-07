@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { withRole } from "@/lib/auth/middleware";
 import { appendAuditLog } from "@/lib/db/audit";
 import { withInvoiceContext, generateInvoiceNumber } from "@/lib/invoices/db";
-import { defaultDepositCents } from "@/lib/invoices/deposit";
+import { gatedDepositCents } from "@/lib/invoices/deposit";
 import { resolveDepositPolicy } from "@ai-fsm/domain";
 import { logger } from "@/lib/logger";
 
@@ -88,13 +88,30 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       );
       const depositPercent = resolveDepositPolicy(acct.rows[0]?.settings ?? null).percent;
 
-      const amountCents = defaultDepositCents({
+      const already = await client.query<{ sum_cents: string }>(
+        `SELECT COALESCE(SUM(total_cents), 0)::bigint AS sum_cents
+         FROM invoices
+         WHERE estimate_id = $1 AND account_id = $2
+           AND invoice_kind IN ('deposit', 'progress')
+           AND status <> 'void'`,
+        [job.estimate_id, session.accountId],
+      );
+      const alreadyInvoicedCents = Number(already.rows[0]?.sum_cents ?? 0);
+
+      const amountCents = gatedDepositCents({
         estimateTotalCents: job.total_cents ?? 0,
         configuredDepositCents: job.deposit_cents,
         depositPercent,
+        alreadyInvoicedCents,
       });
 
       if (amountCents <= 0) {
+        if (alreadyInvoicedCents > 0) {
+          throw Object.assign(
+            new Error("Nothing left to bill — existing invoices already cover the project total"),
+            { code: "FULLY_INVOICED" },
+          );
+        }
         throw Object.assign(
           new Error("No deposit amount — set an estimate total or a company standard deposit %."),
           { code: "NO_AMOUNT" },
@@ -160,7 +177,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         { status: 404 },
       );
     }
-    if (err.code === "NO_ESTIMATE" || err.code === "FINAL_EXISTS" || err.code === "NO_AMOUNT") {
+    if (err.code === "NO_ESTIMATE" || err.code === "FINAL_EXISTS" || err.code === "NO_AMOUNT" || err.code === "FULLY_INVOICED") {
       return NextResponse.json(
         { error: { code: err.code, message: err.message, traceId: session.traceId } },
         { status: 400 },

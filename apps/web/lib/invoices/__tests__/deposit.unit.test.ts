@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { requestedDepositCents, defaultDepositCents } from "../deposit";
+import { requestedDepositCents, defaultDepositCents, gatedDepositCents } from "../deposit";
 
 describe("requestedDepositCents", () => {
   it("computes a percentage of the full total (incl. tax)", () => {
@@ -51,6 +51,41 @@ describe("defaultDepositCents", () => {
     ).toBe(100_00);
     expect(
       defaultDepositCents({ estimateTotalCents: 0, configuredDepositCents: 0, depositPercent: 30 }),
+    ).toBe(0);
+  });
+});
+
+describe("gatedDepositCents", () => {
+  it("is the configured/company deposit when nothing has been billed yet", () => {
+    expect(
+      gatedDepositCents({
+        estimateTotalCents: 1000_00,
+        configuredDepositCents: 0,
+        depositPercent: 30,
+        alreadyInvoicedCents: 0,
+      }),
+    ).toBe(300_00);
+  });
+
+  it("clamps to remaining balance after progress invoices", () => {
+    expect(
+      gatedDepositCents({
+        estimateTotalCents: 1000_00,
+        configuredDepositCents: 0,
+        depositPercent: 30,
+        alreadyInvoicedCents: 800_00,
+      }),
+    ).toBe(200_00);
+  });
+
+  it("is 0 when progress already covers the total", () => {
+    expect(
+      gatedDepositCents({
+        estimateTotalCents: 1000_00,
+        configuredDepositCents: 300_00,
+        depositPercent: 30,
+        alreadyInvoicedCents: 1000_00,
+      }),
     ).toBe(0);
   });
 });
