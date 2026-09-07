@@ -1,5 +1,9 @@
 # AI Quick References
 
+**Start here:** [`INVARIANTS.md`](./INVARIANTS.md) — operational facts an agent
+must know before auditing status, building infra, or deploying (deploy lag,
+worker egress, RLS/superuser, migration numbering, HA schedules, running tests).
+
 This directory is intentionally small. Treat the canonical docs as the source of truth:
 
 - docs/canonical/ARCHITECTURE.md

@@ -14,6 +14,11 @@ Use documentation in this order:
 
 ## Read This First
 
+**Operational invariants (before auditing status, building infra, or deploying):**
+`ai/INVARIANTS.md` — the deploy-lag trap (check `origin/main` AND `/opt`, not the
+local checkout), worker-no-egress, superuser/RLS, migration numbering, HA-driven
+schedules, and how to run the test tiers (`scripts/dev-stack.sh`).
+
 Product direction:
 
 - `docs/canonical/PRODUCT_VISION.md`
