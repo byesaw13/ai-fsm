@@ -62,6 +62,7 @@ services:
     environment:
       NODE_ENV: production
       APP_PORT: "3000"
+      TZ: America/New_York
       SECURE_COOKIES: "${SECURE_COOKIES:-true}"
     depends_on:
       postgres:
@@ -101,6 +102,7 @@ services:
       - ${FSM_ENV_FILE:-/opt/business/ai-fsm/env/.env}
     environment:
       NODE_ENV: production
+      TZ: America/New_York
     depends_on:
       postgres:
         condition: service_healthy

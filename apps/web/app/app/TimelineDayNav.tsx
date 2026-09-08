@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { formatBusinessYmd } from "@/lib/time/business-tz";
 
 function shiftDay(day: string, deltaDays: number): string {
   const d = new Date(`${day}T12:00:00`);
@@ -23,7 +24,7 @@ export function TimelineDayNav({ date }: { date: string }) {
       <button
         type="button"
         className="p7-btn p7-btn-secondary p7-btn-sm"
-        onClick={() => router.push(`/app/timeline?date=${new Date().toLocaleDateString("en-CA")}`)}
+        onClick={() => router.push(`/app/timeline?date=${formatBusinessYmd(new Date())}`)}
       >
         Today
       </button>

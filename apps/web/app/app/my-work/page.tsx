@@ -3,7 +3,8 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { queryForSession } from "@/lib/db";
-import { isSameCalendarDay } from "@/lib/visits/formatting";
+import { formatVisitTime, isSameCalendarDay } from "@/lib/visits/formatting";
+import { formatBusinessDateTime } from "@/lib/time/business-tz";
 import { pickHeroVisit, type HeroVisit } from "@/lib/my-day/visit-hero";
 import { loadFieldDayData } from "@/lib/my-work/field-day-data";
 import {
@@ -141,7 +142,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
     statusLabel += " · In progress now";
   } else if (heroVisit) {
     const d = new Date(heroVisit.scheduled_start);
-    statusLabel += ` · ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).toLowerCase()} next`;
+    statusLabel += ` · ${formatVisitTime(heroVisit.scheduled_start).toLowerCase()} next`;
   }
 
   return (
@@ -262,11 +263,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
                         {status}
                         {derived}
                         {wo.next_scheduled &&
-                          ` · Next ${new Date(wo.next_scheduled).toLocaleString([], {
-                            weekday: "short",
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}`}
+                          ` · Next ${formatBusinessDateTime(wo.next_scheduled)}`}
                       </small>
                     </Link>
                   </li>
@@ -296,13 +293,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
                       {VISIT_TYPE_LABELS[v.visit_type as VisitType] ?? v.visit_type}
                     </div>
                     <small style={{ color: "var(--fg-muted)" }}>
-                      {new Date(v.scheduled_start).toLocaleString([], {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}
+                      {formatBusinessDateTime(v.scheduled_start)}
                     </small>
                   </Link>
                 </li>

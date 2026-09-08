@@ -11,6 +11,7 @@ import {
   heroPrimaryAction,
   type HeroVisit,
 } from "@/lib/my-day/visit-hero";
+import { formatBusinessTime } from "@/lib/time/business-tz";
 
 async function transitionVisit(visitId: string, targetStatus: string): Promise<string | null> {
   const res = await fetch(`/api/v1/visits/${visitId}/transition`, {
@@ -24,7 +25,7 @@ async function transitionVisit(visitId: string, targetStatus: string): Promise<s
 }
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return formatBusinessTime(iso);
 }
 
 export function NextVisitHero({ visit }: { visit: HeroVisit }) {

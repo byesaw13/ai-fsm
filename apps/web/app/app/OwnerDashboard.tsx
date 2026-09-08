@@ -6,11 +6,12 @@ import type { CommandVisit, CountAction, MaterialJob } from "./DashboardWidgets"
 import { OWNER_QUICK_ACTIONS } from "@/lib/navigation/quick-actions";
 import { CAPTURE_HREF, CaptureLink } from "@/components/CaptureLink";
 import { formatCents } from "@/lib/money";
+import { formatBusinessTime } from "@/lib/time/business-tz";
 // Overview is the office numbers screen (TASK-129). Start Day / vehicle /
 // mileage live on My Day — this page links there instead of duplicating them.
 
 function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return formatBusinessTime(iso);
 }
 
 export function OwnerDashboard({

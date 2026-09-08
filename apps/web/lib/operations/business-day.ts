@@ -1,12 +1,9 @@
 import type { PoolClient } from "pg";
 import type { BusinessDayStatus } from "@ai-fsm/domain";
 
-/**
- * The business operates in one local timezone (a single NH business). "Today" is
- * computed in that zone so an evening request never opens tomorrow's row the way
- * a UTC date would. Override with BUSINESS_TZ.
- */
-export const BUSINESS_TIMEZONE = process.env.BUSINESS_TZ || "America/New_York";
+import { BUSINESS_TIMEZONE } from "@/lib/time/business-tz";
+
+export { BUSINESS_TIMEZONE };
 
 /** Today's date (YYYY-MM-DD) in the business timezone. */
 export function businessToday(tz: string = BUSINESS_TIMEZONE): string {

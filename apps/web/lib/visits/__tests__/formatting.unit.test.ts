@@ -12,6 +12,12 @@ describe("visits/formatting UI helpers", () => {
   const base = "2026-02-23T15:00:00.000Z";
   const nowMs = new Date("2026-02-23T16:30:00.000Z").getTime();
 
+  it("treats evening Eastern as the same business day across UTC midnight", () => {
+    const fivePmEt = "2026-02-23T22:00:00.000Z"; // Feb 23 5:00 PM ET
+    const tenPmEt = new Date("2026-02-24T03:00:00.000Z"); // Feb 23 10:00 PM ET
+    expect(isSameCalendarDay(fivePmEt, tenPmEt)).toBe(true);
+  });
+
   it("formats visit time in America/New_York (not container UTC)", () => {
     // 15:00 UTC on a winter date = 10:00 AM Eastern
     const out = formatVisitTime(base);

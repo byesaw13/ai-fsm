@@ -12,6 +12,7 @@ import {
 import type { ScheduleValue } from "@/components/ui";
 import { scheduleToISOPair } from "@/components/ui";
 import { reviewScheduleDay } from "@/lib/jobs/schedule-guard";
+import { easternWallToUtc, formatBusinessDate, formatBusinessTime } from "@/lib/time/business-tz";
 import { VISIT_TYPES, VISIT_TYPE_LABELS, type VisitType } from "@ai-fsm/domain";
 
 interface User {
@@ -56,16 +57,10 @@ interface VisitScheduleFormProps {
 }
 
 function formatDayLabel(dateStr: string, startTime: string, durationMin: number): string {
-  const start = new Date(`${dateStr}T${startTime}:00`);
+  const start = easternWallToUtc(dateStr, startTime);
   const end = new Date(start.getTime() + durationMin * 60_000);
-  const day = start.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-  const t0 = start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  const t1 = end.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  return `${day} · ${t0} – ${t1}`;
+  const day = formatBusinessDate(start, { weekday: "short", year: undefined });
+  return `${day} · ${formatBusinessTime(start)} – ${formatBusinessTime(end)}`;
 }
 
 function defaultVisitType(

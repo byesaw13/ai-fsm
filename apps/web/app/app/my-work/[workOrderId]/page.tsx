@@ -13,6 +13,7 @@ import { getPool } from "@/lib/db";
 import { loadWorkOrderCompletionCriteria } from "@/lib/work-orders/task-time";
 import { FieldWorkActions } from "../FieldWorkActions";
 import { FieldCloseout } from "../FieldCloseout";
+import { formatBusinessDateTime } from "@/lib/time/business-tz";
 
 export const dynamic = "force-dynamic";
 
@@ -118,13 +119,7 @@ export default async function MyWorkOrderPage({
             <div className="p7-detail-row">
               <dt>Next appointment</dt>
               <dd>
-                {new Date(nextVisit[0].scheduled_start).toLocaleString([], {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
+                {formatBusinessDateTime(nextVisit[0].scheduled_start)}
               </dd>
             </div>
           )}

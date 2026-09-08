@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { nextHalfHourLocal } from "@/lib/jobs/quick-book";
+import { easternWallToUtc, formatBusinessTime } from "@/lib/time/business-tz";
 
 interface UserOption { id: string; full_name: string; role: string; }
 interface ClientResult { id: string; name: string; }
@@ -60,7 +61,7 @@ const DURATION_OPTIONS = [
 ];
 
 function buildISO(date: string, time: string): string {
-  return new Date(`${date}T${time}:00`).toISOString();
+  return easternWallToUtc(date, time).toISOString();
 }
 
 export function QuickBookModal({
@@ -147,7 +148,7 @@ export function QuickBookModal({
     setError(null);
     setSubmitting(true);
 
-    const endMs = new Date(`${date}T${startTime}:00`).getTime() + duration * 60_000;
+    const endMs = easternWallToUtc(date, startTime).getTime() + duration * 60_000;
     const endISO = new Date(endMs).toISOString();
 
     const payload: Record<string, unknown> = {
@@ -188,8 +189,8 @@ export function QuickBookModal({
   }
 
   // Computed end time label
-  const endMs = new Date(`${date}T${startTime}:00`).getTime() + duration * 60_000;
-  const endLabel = new Date(endMs).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const endMs = easternWallToUtc(date, startTime).getTime() + duration * 60_000;
+  const endLabel = formatBusinessTime(endMs);
 
   return (
     <div

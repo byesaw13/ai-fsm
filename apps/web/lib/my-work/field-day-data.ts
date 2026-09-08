@@ -1,6 +1,7 @@
 import { queryForSession } from "@/lib/db";
 import type { SessionPayload } from "@/lib/auth/session";
 import { businessToday } from "@/lib/operations/business-day";
+import { formatBusinessDate } from "@/lib/time/business-tz";
 import { summarizeDayMileage, type VehicleSessionRow } from "@/lib/mileage/sessions";
 import type { OpenSession, VehicleOption } from "@/lib/my-work/field-day-types";
 import type { ActivityEntryDto } from "@/lib/my-work/field-day-types";
@@ -131,12 +132,7 @@ export async function loadFieldDayData(
   }
 
   return {
-    todayLabel: new Date().toLocaleDateString("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    }),
+    todayLabel: formatBusinessDate(new Date(), { weekday: "long" }),
     openSession: openSessionRows[0] ?? null,
     vehicles: fieldVehicles,
     activityEntries: fieldActivity,

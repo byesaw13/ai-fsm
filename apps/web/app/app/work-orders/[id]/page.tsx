@@ -9,6 +9,7 @@ import {
   type WorkOrderRoomLine,
   type CompletionCriterion,
 } from "@ai-fsm/domain";
+import { formatBusinessDate, formatBusinessTime } from "@/lib/time/business-tz";
 import {
   PageContainer,
   PageHeader,
@@ -71,16 +72,7 @@ function hoursBetween(startIso: string, endIso: string): number {
 }
 
 function formatVisitWhen(startIso: string, endIso: string): string {
-  const s = new Date(startIso);
-  const e = new Date(endIso);
-  const day = s.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-  const t0 = s.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  const t1 = e.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  return `${day} · ${t0} – ${t1}`;
+  return `${formatBusinessDate(startIso, { weekday: "short", year: undefined })} · ${formatBusinessTime(startIso)} – ${formatBusinessTime(endIso)}`;
 }
 
 export default async function WorkOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {

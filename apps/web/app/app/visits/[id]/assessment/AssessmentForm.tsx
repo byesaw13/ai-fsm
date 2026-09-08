@@ -10,6 +10,7 @@ import {
   type AssessmentTradeKey,
 } from "@ai-fsm/domain";
 import { useToast } from "@/components/ui";
+import { formatBusinessTime } from "@/lib/time/business-tz";
 import { writeAssessmentContext } from "@/lib/estimates/assessment-context";
 import { MaterialsGenerator } from "@/app/app/estimates/components/MaterialsGenerator";
 import type { MaterialItem } from "@/app/app/estimates/components/MaterialsGenerator";
@@ -167,7 +168,7 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
         setError(data.error?.message ?? "Save failed");
         return false;
       }
-      setSavedAt(new Date().toLocaleTimeString());
+      setSavedAt(formatBusinessTime(new Date()));
       return true;
     } catch {
       setError("Network error — try again");

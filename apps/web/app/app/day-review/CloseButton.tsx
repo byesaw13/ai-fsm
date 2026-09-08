@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatBusinessTime } from "@/lib/time/business-tz";
 
 export function CloseButton({
   businessDayId,
@@ -38,7 +39,7 @@ export function CloseButton({
     return (
       <div className="text-center">
         <p className="text-sm text-muted-foreground mb-2">
-          Day closed{closedAt ? ` at ${new Date(closedAt).toLocaleTimeString()}` : ""}.
+          Day closed{closedAt ? ` at ${formatBusinessTime(closedAt)}` : ""}.
         </p>
         {!reopening ? (
           <button

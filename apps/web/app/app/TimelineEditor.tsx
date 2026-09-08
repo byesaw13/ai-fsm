@@ -10,6 +10,7 @@ import {
 } from "@ai-fsm/domain";
 import { DayTimeSummary } from "./ActivityTracker";
 import type { ActivityEntryDto } from "@/lib/my-work/field-day-types";
+import { easternWallToUtc, formatBusinessTime, utcToEasternClock } from "@/lib/time/business-tz";
 import {
   asTimelineEntry,
   proposeRebalance,
@@ -23,16 +24,15 @@ import {
 // ---------------------------------------------------------------------------
 
 function clockValue(iso: string): string {
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return utcToEasternClock(iso);
 }
 
 function isoFromClock(day: string, hhmm: string): string {
-  return new Date(`${day}T${hhmm}:00`).toISOString();
+  return easternWallToUtc(day, hhmm).toISOString();
 }
 
 function fmtClock(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return formatBusinessTime(iso);
 }
 
 function shiftDay(day: string, deltaDays: number): string {

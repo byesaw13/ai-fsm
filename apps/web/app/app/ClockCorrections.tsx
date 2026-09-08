@@ -3,6 +3,11 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { clockDurationMinutes, validateClockCorrection } from "@ai-fsm/domain";
+import {
+  easternDatetimeLocalToUtc,
+  formatBusinessTime,
+  utcToEasternDatetimeLocal,
+} from "@/lib/time/business-tz";
 
 /**
  * Correct or void today's payroll clock entries (TASK-052). Corrections never
@@ -19,13 +24,11 @@ type Row = {
 
 function toLocalInput(iso: string | null): string {
   if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return utcToEasternDatetimeLocal(iso);
 }
 
 function timeRange(r: Row): string {
-  const t = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const t = (iso: string) => formatBusinessTime(iso);
   const mins = clockDurationMinutes(r.clock_in_at, r.clock_out_at);
   const dur = `${Math.floor(mins / 60)}h ${mins % 60}m`;
   return r.clock_out_at ? `${t(r.clock_in_at)} – ${t(r.clock_out_at)} · ${dur}` : `${t(r.clock_in_at)} – open · ${dur}`;
@@ -87,8 +90,8 @@ export function ClockCorrections() {
   }
 
   async function saveCorrection(id: string) {
-    const clockInAt = inAt ? new Date(inAt).toISOString() : "";
-    const clockOutAt = outAt ? new Date(outAt).toISOString() : null;
+    const clockInAt = inAt ? easternDatetimeLocalToUtc(inAt).toISOString() : "";
+    const clockOutAt = outAt ? easternDatetimeLocalToUtc(outAt).toISOString() : null;
     const check = validateClockCorrection({ clockInAt, clockOutAt, reason });
     if (!check.ok) {
       setError(check.error);

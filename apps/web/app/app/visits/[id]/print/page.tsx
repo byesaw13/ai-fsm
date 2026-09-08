@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { query, queryOne } from "@/lib/db";
 import { buildClientDocumentFilename } from "@/lib/estimates/guardrails";
 import { PrintButton } from "./PrintButton";
+import { formatBusinessTime } from "@/lib/time/business-tz";
 import type { ChecklistDisposition } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
@@ -49,9 +50,7 @@ function fmtDate(d: Date | string | null | undefined): string {
 
 function fmtTime(d: Date | string | null | undefined): string {
   if (!d) return "—";
-  return new Date(d).toLocaleTimeString("en-US", {
-    hour: "numeric", minute: "2-digit", hour12: true,
-  });
+  return formatBusinessTime(d);
 }
 
 function addr(

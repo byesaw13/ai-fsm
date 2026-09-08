@@ -4,11 +4,7 @@ import { buildVisitTriage, type TriageVisitRow } from "../triage";
 const DAY = 86_400_000;
 const pastISO = new Date(Date.now() - 2 * DAY).toISOString();
 const futureISO = new Date(Date.now() + 7 * DAY).toISOString();
-const todayNoonISO = (() => {
-  const d = new Date();
-  d.setHours(12, 0, 0, 0);
-  return d.toISOString();
-})();
+const todayNoonISO = new Date().toISOString();
 
 function visit(
   over: Partial<TriageVisitRow> & { id: string }
