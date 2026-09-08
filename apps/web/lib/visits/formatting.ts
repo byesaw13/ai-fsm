@@ -1,5 +1,10 @@
 import type { VisitStatus } from "@ai-fsm/domain";
-import { BUSINESS_TIMEZONE } from "@/lib/operations/business-day";
+import {
+  formatBusinessDate,
+  formatBusinessTime,
+  formatBusinessYmd,
+  isSameBusinessDay,
+} from "@/lib/time/business-tz";
 
 export interface VisitLikeForUi {
   scheduled_start: string;
@@ -12,38 +17,19 @@ export interface VisitLikeForUi {
  * inside a UTC container; without an explicit timeZone, Eastern times show 4h off (EDT).
  */
 export function formatVisitTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: BUSINESS_TIMEZONE,
-  });
+  return formatBusinessTime(iso);
 }
 
 export function formatVisitDateTime(iso: string): string {
-  const d = new Date(iso);
-  const date = d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: BUSINESS_TIMEZONE,
-  });
-  return `${date} ${formatVisitTime(iso)}`;
+  return `${formatBusinessDate(iso)} ${formatVisitTime(iso)}`;
 }
 
 export function formatVisitDateLabel(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    timeZone: BUSINESS_TIMEZONE,
-  });
+  return formatBusinessDate(iso, { weekday: "short", year: undefined });
 }
 
-/** YYYY-MM-DD in the business timezone (for day-boundary comparisons). */
 function businessCalendarDate(isoOrMs: string | number): string {
-  return new Date(isoOrMs).toLocaleDateString("en-CA", {
-    timeZone: BUSINESS_TIMEZONE,
-  });
+  return formatBusinessYmd(isoOrMs);
 }
 
 /**
@@ -80,12 +66,7 @@ export function isVisitOverdue(
 }
 
 export function isSameCalendarDay(iso: string, ref = new Date()): boolean {
-  const d = new Date(iso);
-  return (
-    d.getDate() === ref.getDate() &&
-    d.getMonth() === ref.getMonth() &&
-    d.getFullYear() === ref.getFullYear()
-  );
+  return isSameBusinessDay(iso, ref);
 }
 
 export function formatOverdueLabel(iso: string, nowMs = Date.now()): string {

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ChangeEvent } from "react";
+import { formatBusinessTime } from "@/lib/time/business-tz";
 
 // ---------------------------------------------------------------------------
 // ScheduleFields — date picker + time dropdown + duration selector
@@ -59,7 +60,7 @@ function formatEndTime(v: ScheduleValue): string | null {
   if (!v.date || !v.startTime) return null;
   const start = new Date(`${v.date}T${v.startTime}:00`);
   const end = new Date(start.getTime() + v.duration * 60_000);
-  return end.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return formatBusinessTime(end);
 }
 
 interface ScheduleFieldsProps {

@@ -12,6 +12,7 @@ import {
 import type { ScheduleValue } from "@/components/ui";
 import { scheduleToISOPair } from "@/components/ui";
 import { reviewScheduleDay } from "@/lib/jobs/schedule-guard";
+import { formatBusinessTime } from "@/lib/time/business-tz";
 import { VISIT_TYPES, VISIT_TYPE_LABELS, type VisitType } from "@ai-fsm/domain";
 
 interface User {
@@ -63,8 +64,8 @@ function formatDayLabel(dateStr: string, startTime: string, durationMin: number)
     month: "short",
     day: "numeric",
   });
-  const t0 = start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  const t1 = end.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const t0 = formatBusinessTime(start);
+  const t1 = formatBusinessTime(end);
   return `${day} · ${t0} – ${t1}`;
 }
 

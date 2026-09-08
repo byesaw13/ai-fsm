@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import type { Route } from "next";
+import { formatBusinessTime } from "@/lib/time/business-tz";
 
 // ---------------------------------------------------------------------------
 // Timeline — ordered activity / schedule list (Pattern 3)
@@ -112,8 +113,7 @@ export function Timeline({
 
 function formatTimestamp(ts: string): string {
   try {
-    const d = new Date(ts);
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return formatBusinessTime(ts);
   } catch {
     return ts;
   }

@@ -14,6 +14,7 @@ import {
   type AssignmentKind,
 } from "@ai-fsm/domain";
 import { summarizeDay, formatMinutes, formatElapsed } from "@/lib/activities/summary";
+import { formatBusinessTime } from "@/lib/time/business-tz";
 import type { ActivityEntryDto } from "@/lib/my-work/field-day-types";
 
 
@@ -418,7 +419,7 @@ export function DayTimeSummary({ entries }: { entries: ActivityEntryDto[] }) {
             🔴 {formatMinutes(summary.unaccountedMinutes)} unaccounted
           </strong>
           <span style={{ color: "#92400e", fontSize: "var(--text-sm)", marginLeft: 8 }}>
-            biggest gap {new Date(summary.largestGap.start).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}–{new Date(summary.largestGap.end).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+            biggest gap {formatBusinessTime(summary.largestGap.start)}–{formatBusinessTime(summary.largestGap.end)}
           </span>
           <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginTop: "var(--space-2)" }}>
             {BACKFILL_TYPES.map((t) => (

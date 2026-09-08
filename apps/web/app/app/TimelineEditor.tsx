@@ -10,6 +10,7 @@ import {
 } from "@ai-fsm/domain";
 import { DayTimeSummary } from "./ActivityTracker";
 import type { ActivityEntryDto } from "@/lib/my-work/field-day-types";
+import { formatBusinessTime } from "@/lib/time/business-tz";
 import {
   asTimelineEntry,
   proposeRebalance,
@@ -32,7 +33,7 @@ function isoFromClock(day: string, hhmm: string): string {
 }
 
 function fmtClock(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return formatBusinessTime(iso);
 }
 
 function shiftDay(day: string, deltaDays: number): string {

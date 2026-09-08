@@ -3,9 +3,10 @@ import type { Route } from "next";
 import { ACTIVITY_TYPE_META, type ActivityType } from "@ai-fsm/domain";
 import { Card, EmptyState, SectionHeader } from "@/components/ui";
 import type { ActivityEntryDto } from "@/lib/my-work/field-day-types";
+import { formatBusinessTime } from "@/lib/time/business-tz";
 
 function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return formatBusinessTime(iso);
 }
 
 function typeLabel(activityType: string): string {

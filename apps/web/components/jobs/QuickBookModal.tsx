@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { nextHalfHourLocal } from "@/lib/jobs/quick-book";
+import { formatBusinessTime } from "@/lib/time/business-tz";
 
 interface UserOption { id: string; full_name: string; role: string; }
 interface ClientResult { id: string; name: string; }
@@ -189,7 +190,7 @@ export function QuickBookModal({
 
   // Computed end time label
   const endMs = new Date(`${date}T${startTime}:00`).getTime() + duration * 60_000;
-  const endLabel = new Date(endMs).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  const endLabel = formatBusinessTime(endMs);
 
   return (
     <div

@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { QuickBookModal } from "./QuickBookModal";
 import { ScheduleViewToggle } from "./ScheduleViewToggle";
+import { formatBusinessTime } from "@/lib/time/business-tz";
 
 export interface VisitRow {
   id: string;
@@ -61,9 +62,7 @@ function getWeekStartFromStr(dateStr: string): Date {
 }
 
 function formatTimeRange(start: string, end: string): string {
-  const s = new Date(start);
-  const e = new Date(end);
-  return `${s.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – ${e.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
+  return `${formatBusinessTime(start)} – ${formatBusinessTime(end)}`;
 }
 
 function computeNewSchedule(origStart: string, origEnd: string, targetDate: string) {

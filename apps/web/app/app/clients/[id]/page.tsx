@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth/permissions";
 import { query, queryOne } from "@/lib/db";
 import { buildJobCreateHref, formatClientContact, formatPropertyAddress } from "@/lib/crm/normalization";
+import { formatBusinessDateTime } from "@/lib/time/business-tz";
 import {
   Breadcrumbs,
   Card,
@@ -311,7 +312,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       key: `a-${a.id}`,
       href: a.assessment_completed ? `/app/visits/${a.id}` : `/app/visits/${a.id}/assessment`,
       title: a.assessment_completed ? "Assessment — close visit" : "Assessment — finish form",
-      meta: `${a.job_title ?? "Project"} · ${new Date(a.scheduled_start).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`,
+      meta: `${a.job_title ?? "Project"} · ${formatBusinessDateTime(a.scheduled_start)}`,
       status: a.status,
       priority: 0 as number,
     })),
@@ -320,7 +321,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       href: `/app/jobs/${j.id}`,
       title: j.title,
       meta: [j.property_address, j.next_visit_start
-        ? `Next: ${new Date(j.next_visit_start).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
+        ? `Next: ${formatBusinessDateTime(j.next_visit_start)}`
         : null].filter(Boolean).join(" · ") || "Active project",
       status: j.status,
       priority: 1 as number,

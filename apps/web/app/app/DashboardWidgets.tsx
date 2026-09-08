@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, EmptyState, LinkButton, SectionHeader, StatusBadge, useToast } from "@/components/ui";
 import type { StatusVariant } from "@/components/ui";
+import { formatBusinessTime } from "@/lib/time/business-tz";
 
 export type CountAction = {
   label: string;
@@ -36,7 +37,7 @@ export type MaterialJob = {
 
 function fmtTime(iso: string | null): string {
   if (!iso) return "Today";
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  return formatBusinessTime(iso);
 }
 
 function accentForTone(tone: CountAction["tone"]): string {

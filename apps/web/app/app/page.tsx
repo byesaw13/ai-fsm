@@ -13,6 +13,7 @@ import {
   type OpenOwnerPromiseRow,
 } from "@/lib/captures/promise-queue";
 import { AttentionCard } from "./AttentionCard";
+import { formatBusinessDate } from "@/lib/time/business-tz";
 
 export const dynamic = "force-dynamic";
 
@@ -28,12 +29,7 @@ export default async function AppPage() {
   if (session.role === "tech") redirect("/app/my-work");
 
   const accountId = session.accountId;
-  const todayLabel = new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+  const todayLabel = formatBusinessDate(new Date(), { weekday: "long" });
 
   const [
     todayJobs,

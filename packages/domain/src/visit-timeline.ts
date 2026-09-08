@@ -67,10 +67,18 @@ function activityTitle(activityType: string, label?: string | null): string {
 function formatRange(startIso: string, endIso: string | null): string {
   try {
     const start = new Date(startIso);
-    const startLabel = start.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const startLabel = start.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "America/New_York",
+    });
     if (!endIso) return `${startLabel}–`;
     const end = new Date(endIso);
-    const endLabel = end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const endLabel = end.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "America/New_York",
+    });
     return `${startLabel}–${endLabel}`;
   } catch {
     return endIso ? `${startIso}–${endIso}` : `${startIso}–`;

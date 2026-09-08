@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ACTIVITY_TYPE_META, type ActivityType } from "@ai-fsm/domain";
 import { ClockCorrections } from "./ClockCorrections";
+import { formatBusinessTime } from "@/lib/time/business-tz";
 
 // Offered right after Clock In — "what are you doing now?" hands payroll off to
 // the activity ledger (the two stay independent; this is just a convenience).
@@ -30,7 +31,7 @@ function elapsedLabel(sinceIso: string, now: number): string {
 }
 
 function timeLabel(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return formatBusinessTime(iso);
 }
 
 export function ClockBar() {
