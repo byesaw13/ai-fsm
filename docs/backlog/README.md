@@ -114,6 +114,7 @@ closed in tests; owner-flow AC still open.
 
 | ID | Title | Epic | Status |
 | --- | --- | --- | --- |
+| TASK-131 | Audit hardening — framework security patch | 005 | In Progress |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
 | TASK-003 | Wrong Vehicle Correction | 001 | Done |
@@ -239,8 +240,6 @@ closed in tests; owner-flow AC still open.
 | TASK-128 | CI guard against new duplicate migration numbers | 005 | In Progress |
 | TASK-129 | One daily home leftover fold — Needs attention + today's timeline on My Day | 006 | In Progress |
 | TASK-130 | Findability — lightweight "what can I do here?" command search | 006 | In Progress |
-
-| TASK-131 | Audit hardening — framework security patch | 005 | In Progress |
 
 ## Status legend
 
