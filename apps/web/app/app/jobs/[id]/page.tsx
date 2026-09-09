@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth/session";
-import { getPool, queryForSession, queryOneForSession } from "@/lib/db";
+import { withDbSession, queryForSession, queryOneForSession } from "@/lib/db";
 import { formatVisitDateTime, formatVisitTime, isVisitOverdue } from "@/lib/visits/formatting";
 import {
   canTransitionJob,
@@ -249,32 +249,9 @@ export default async function JobDetailPage({
     if (!assigned) notFound();
   }
 
-  // Task progress for multi-day jobs (project hub).
-  let taskProgress = {
-    total: 0,
-    required_total: 0,
-    done: 0,
-    required_done: 0,
-    percent: 0,
-    tasks: [] as Awaited<ReturnType<typeof loadJobTaskProgress>>["tasks"],
-  };
-  {
-    const pool = getPool();
-    const client = await pool.connect();
-    try {
-      await client.query(
-        `SELECT set_config('app.current_user_id',$1,true), set_config('app.current_account_id',$2,true), set_config('app.current_role',$3,true)`,
-        [session.userId, session.accountId, session.role],
-      );
-      taskProgress = await loadJobTaskProgress(client, id, session.accountId);
-    } finally {
-      client.release();
-    }
-  }
-
   const homeboxEnabled = isHomeboxEnabled();
 
-  const [visits, workOrders, commercialCounts, assetLinks, jobMaterialExpenses, trackedLaborDayRows, visitTaskRows] =
+  const [visits, workOrders, commercialCounts, assetLinks, jobMaterialExpenses, trackedLaborDayRows, visitTaskRows, taskProgress, jobPhotos, otherJobExpenses] =
     await Promise.all([
     session.role === "tech"
       ? queryForSession<VisitRow>(
@@ -516,9 +493,8 @@ export default async function JobDetailPage({
         ORDER BY t.sort_order ASC, t.created_at ASC`,
       [id, session.accountId],
     ).catch(() => []),
-  ]);
-
-  const jobPhotos = await queryForSession<{
+    withDbSession(session, (client) => loadJobTaskProgress(client, id, session.accountId)),
+    queryForSession<{
     id: string;
     visit_id: string;
     category: string;
@@ -541,7 +517,23 @@ export default async function JobDetailPage({
     session.role === "tech"
       ? [id, session.accountId, session.userId]
       : [id, session.accountId],
-  ).catch(() => []);
+  ).catch(() => []),
+    session.role !== "tech"
+      ? queryForSession<{
+          amount_cents: number;
+          commercial_tag: string | null;
+          category: string;
+          notes: string | null;
+          vendor_name: string;
+        }>(
+          session,
+          `SELECT amount_cents, commercial_tag, category, notes, vendor_name
+           FROM expenses
+           WHERE account_id = $2 AND job_id = $1 AND category <> 'materials'`,
+          [id, session.accountId],
+        ).catch(() => [])
+      : [],
+  ]);
 
   const trackedLaborDays: TrackedLaborDay[] = mapTrackedLaborDayRows(trackedLaborDayRows ?? []);
 
@@ -678,24 +670,6 @@ export default async function JobDetailPage({
   const estimatedLaborCents = commercialCounts?.estimated_labor_cost_cents ?? null;
   const trackedMinutes = Number(commercialCounts?.tracked_labor_minutes ?? 0);
 
-  // Non-materials job expenses (lift/tools/other) so equipment actuals are not dropped
-  // when materials preload is supplied.
-  const otherJobExpenses =
-    !isTech
-      ? await queryForSession<{
-          amount_cents: number;
-          commercial_tag: string | null;
-          category: string;
-          notes: string | null;
-          vendor_name: string;
-        }>(
-          session,
-          `SELECT amount_cents, commercial_tag, category, notes, vendor_name
-           FROM expenses
-           WHERE account_id = $2 AND job_id = $1 AND category <> 'materials'`,
-          [id, session.accountId],
-        ).catch(() => [])
-      : [];
 
   const jobLedger =
     !isTech

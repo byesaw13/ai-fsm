@@ -9,7 +9,7 @@ import {
 } from "@ai-fsm/domain";
 import { PageContainer, PageHeader, Card, SectionHeader, LinkButton, Timeline } from "@/components/ui";
 import { fetchWorkOrderTimeline } from "@/lib/work-orders/timeline";
-import { getPool } from "@/lib/db";
+import { withDbSession } from "@/lib/db";
 import { loadWorkOrderCompletionCriteria } from "@/lib/work-orders/task-time";
 import { FieldWorkActions } from "../FieldWorkActions";
 import { FieldCloseout } from "../FieldCloseout";
@@ -53,23 +53,9 @@ export default async function MyWorkOrderPage({
   const wo = rows[0];
   if (!wo) notFound();
 
-  const pool = getPool();
-  const client = await pool.connect();
-  let criteria;
-  try {
-    await client.query(
-      `SELECT set_config('app.current_user_id',$1,true), set_config('app.current_account_id',$2,true), set_config('app.current_role',$3,true)`,
-      [session.userId, session.accountId, session.role],
-    );
-    criteria = await loadWorkOrderCompletionCriteria(
-      client,
-      workOrderId,
-      session.accountId,
-      wo.completion_criteria,
-    );
-  } finally {
-    client.release();
-  }
+  const criteria = await withDbSession(session, (client) =>
+    loadWorkOrderCompletionCriteria(client, workOrderId, session.accountId, wo.completion_criteria),
+  );
 
   const [activeVisit, nextVisit, timeline] = await Promise.all([
     queryForSession<{ id: string }>(

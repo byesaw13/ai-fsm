@@ -16,15 +16,6 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
-    image: redis:7
-    container_name: ai-fsm-redis-dev
-    ports:
-      - "6379:6379"
-    command: ["redis-server", "--appendonly", "yes"]
-    volumes:
-      - redis_dev:/data
 
 volumes:
   pgdata_dev:
-  redis_dev:

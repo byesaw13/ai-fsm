@@ -14,7 +14,7 @@
 #   SKIP_E2E=1           skip playwright e2e tests
 #
 # Requirements (full gate only):
-#   - Docker running (spins up ephemeral postgres + redis on high ports)
+#   - Docker running (spins up ephemeral postgres on high ports)
 #   - A free local web port (defaults to 3000, falls forward when occupied)
 set -euo pipefail
 
@@ -83,7 +83,7 @@ pnpm lint
 
 log "migration prefixes"
 node scripts/check-migration-prefixes.mjs
-node --test scripts/check-migration-prefixes.test.mjs
+node --test scripts/*.test.mjs
 
 log "typecheck"
 pnpm typecheck
@@ -103,18 +103,17 @@ if [[ "$FAST" == "true" ]]; then
 fi
 
 # ── Phase 2 & 3: Integration + E2E ───────────────────────────────────────────
-# Spin up ephemeral postgres and redis on non-standard ports to avoid
+# Spin up ephemeral postgres on non-standard ports to avoid
 # conflicting with any running dev services.
 TEST_PG_NAME="ai-fsm-gate-pg-$$"
-TEST_REDIS_NAME="ai-fsm-gate-redis-$$"
 TEST_PG_PORT="15432"
-TEST_REDIS_PORT="16379"
 TEST_DB="ai_fsm_test"
 TEST_USER="ai_fsm_test"
 TEST_PASS="ai_fsm_gate_pw"
 TEST_DATABASE_URL="postgresql://${TEST_USER}:${TEST_PASS}@localhost:${TEST_PG_PORT}/${TEST_DB}"
-TEST_REDIS_URL="redis://localhost:${TEST_REDIS_PORT}/0"
 TEST_AUTH_SECRET="gate-test-auth-secret-min-32-chars!!"
+TEST_INTERNAL_KEY="gate-internal-test-only"
+TEST_RUNTIME_DATABASE_URL="postgresql://ai_fsm_web:gate-runtime-only@localhost:${TEST_PG_PORT}/${TEST_DB}"
 TEST_WEB_PORT="${TEST_WEB_PORT:-$(choose_port 3000)}"
 TEST_BASE_URL="http://localhost:${TEST_WEB_PORT}"
 SERVER_PID=""
@@ -122,7 +121,7 @@ SERVER_PID=""
 cleanup() {
   log "cleanup"
   [[ -n "${SERVER_PID:-}" ]] && kill "$SERVER_PID" 2>/dev/null || true
-  docker rm -f "$TEST_PG_NAME" "$TEST_REDIS_NAME" 2>/dev/null || true
+  docker rm -f "$TEST_PG_NAME" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 
@@ -136,27 +135,24 @@ docker run -d --name "$TEST_PG_NAME" \
   -p "${TEST_PG_PORT}:5432" \
   postgres:16 >/dev/null
 
-log "starting ephemeral redis (port ${TEST_REDIS_PORT})"
-docker run -d --name "$TEST_REDIS_NAME" \
-  -p "${TEST_REDIS_PORT}:6379" \
-  redis:7 >/dev/null
-
 log "waiting for postgres"
 wait_tcp localhost "$TEST_PG_PORT" postgres 30
 # Give postgres a moment to finish initialising after the port is open
 sleep 2
 
 log "migrations + seed"
-DATABASE_URL="$TEST_DATABASE_URL" bash scripts/db-migrate.sh
+MIGRATION_DATABASE_URL="$TEST_DATABASE_URL" DATABASE_URL="$TEST_DATABASE_URL" bash scripts/db-migrate.sh
 DATABASE_URL="$TEST_DATABASE_URL" bash scripts/db-seed.sh
 
 if [[ "${SKIP_INTEGRATION:-}" != "1" ]]; then
+  MIGRATION_DATABASE_URL="$TEST_DATABASE_URL" RUNTIME_DB_PASSWORD=gate-runtime-only bash scripts/db-provision-runtime.sh
+
   log "starting test server"
   DATABASE_URL="$TEST_DATABASE_URL" \
-  REDIS_URL="$TEST_REDIS_URL" \
   AUTH_SECRET="$TEST_AUTH_SECRET" \
-  E2E_DISABLE_LOGIN_RATE_LIMIT=1 \
+  LOCATION_INTERNAL_KEY="$TEST_INTERNAL_KEY" \
   E2E_SKIP_EMAIL_DELIVERY=1 \
+  E2E_DISABLE_LOGIN_RATE_LIMIT=1 \
   NODE_ENV=development \
     pnpm --filter @ai-fsm/web exec next dev --port "${TEST_WEB_PORT}" >/tmp/ai-fsm-gate-server.log 2>&1 &
   SERVER_PID=$!
@@ -170,6 +166,8 @@ if [[ "${SKIP_INTEGRATION:-}" != "1" ]]; then
 
   log "integration tests"
   TEST_DATABASE_URL="$TEST_DATABASE_URL" \
+  TEST_RUNTIME_DATABASE_URL="$TEST_RUNTIME_DATABASE_URL" \
+  LOCATION_INTERNAL_KEY="$TEST_INTERNAL_KEY" \
   TEST_BASE_URL="$TEST_BASE_URL" \
     pnpm test:integration
 fi
@@ -179,8 +177,8 @@ if [[ "${SKIP_E2E:-}" != "1" ]]; then
   # Playwright reuses the already-running gate server. Pass the same port and
   # database settings in case Playwright needs to start its own server in CI.
   DATABASE_URL="$TEST_DATABASE_URL" \
-  REDIS_URL="$TEST_REDIS_URL" \
   AUTH_SECRET="$TEST_AUTH_SECRET" \
+  LOCATION_INTERNAL_KEY="$TEST_INTERNAL_KEY" \
   E2E_SKIP_EMAIL_DELIVERY=1 \
   PORT="$TEST_WEB_PORT" \
   TEST_BASE_URL="$TEST_BASE_URL" \

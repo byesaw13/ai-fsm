@@ -2,12 +2,11 @@ import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { canCreateEstimates, canCreateVisit } from "@/lib/auth/permissions";
-import { getPool, queryForSession } from "@/lib/db";
+import { withDbSession, queryForSession } from "@/lib/db";
 import {
   WORK_ORDER_UI_STATUSES,
   WORK_ORDER_STATUS_LABELS,
   type WorkOrderRoomLine,
-  type CompletionCriterion,
 } from "@ai-fsm/domain";
 import { formatBusinessDate, formatBusinessTime } from "@/lib/time/business-tz";
 import {
@@ -130,23 +129,9 @@ export default async function WorkOrderDetailPage({ params }: { params: Promise<
     : "draft";
 
   // Slice 1b: tasks are checklist source of truth (same as My Work closeout).
-  const pool = getPool();
-  const client = await pool.connect();
-  let completionCriteria: CompletionCriterion[] = [];
-  try {
-    await client.query(
-      `SELECT set_config('app.current_user_id',$1,true), set_config('app.current_account_id',$2,true), set_config('app.current_role',$3,true)`,
-      [session.userId, session.accountId, session.role],
-    );
-    completionCriteria = await loadWorkOrderCompletionCriteria(
-      client,
-      id,
-      session.accountId,
-      wo.completion_criteria,
-    );
-  } finally {
-    client.release();
-  }
+  const completionCriteria = await withDbSession(session, (client) =>
+    loadWorkOrderCompletionCriteria(client, id, session.accountId, wo.completion_criteria),
+  );
 
   const timeline = await fetchWorkOrderTimeline(session, id);
   const canSchedule = canCreateVisit(session.role) && !!wo.job_id && wo.status !== "cancelled" && wo.status !== "completed";

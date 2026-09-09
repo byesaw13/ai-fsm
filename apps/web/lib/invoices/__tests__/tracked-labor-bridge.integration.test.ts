@@ -76,10 +76,16 @@ describe.skipIf(!RUN)("invoice labor bridge — activity_entries source of truth
   }
 
   async function mkVisit(jobId: string): Promise<string> {
+    const workOrder = await client.query<{ id: string }>(
+      `INSERT INTO work_orders (account_id, client_id, job_id, title, created_by, status)
+       SELECT account_id, client_id, id, 'Bridge work', created_by, 'ready'
+       FROM jobs WHERE id = $1 RETURNING id`,
+      [jobId],
+    );
     const r = await client.query<{ id: string }>(
-      `INSERT INTO visits (account_id, job_id, scheduled_start, scheduled_end, visit_type)
-       VALUES ($1,$2, now(), now() + interval '1 hour', 'site_visit') RETURNING id`,
-      [ACCOUNT, jobId],
+      `INSERT INTO visits (account_id, job_id, work_order_id, scheduled_start, scheduled_end, visit_type)
+       VALUES ($1,$2,$3, now(), now() + interval '1 hour', 'standard') RETURNING id`,
+      [ACCOUNT, jobId, workOrder.rows[0].id],
     );
     return r.rows[0].id;
   }
@@ -156,6 +162,14 @@ describe.skipIf(!RUN)("invoice labor bridge — activity_entries source of truth
     // unification made job/visit/work_order attribution equally billable,
     // so this COUNTS (job A total: 125 visit-linked + 70 job-linked = 195).
     await noiseActivity({ activity_type: "job_work", entity_type: "job", entity_id: jobA, startISO: "2026-03-10T16:00:00Z", min: 70 });
+
+    // Assessment time is not billable production labor.
+    const assessment = await client.query<{ id: string }>(
+      `INSERT INTO visits (account_id, job_id, scheduled_start, scheduled_end, visit_type)
+       VALUES ($1,$2, now(), now() + interval '1 hour', 'site_visit') RETURNING id`,
+      [ACCOUNT, jobA],
+    );
+    await jobWorkOnVisit(assessment.rows[0].id, "2026-03-12T09:00:00Z", 60);
 
     // Noise on Job A's visit that the bridge MUST exclude:
     await noiseActivity({ activity_type: "travel", entity_type: "visit", entity_id: visitA, startISO: "2026-03-10T10:40:00Z", min: 60 }); // wrong verb
