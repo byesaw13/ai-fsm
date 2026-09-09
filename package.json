@@ -22,7 +22,7 @@
     "db:seed": "bash scripts/db-seed.sh"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.9.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",
