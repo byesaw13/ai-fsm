@@ -8,8 +8,8 @@ Every suite has a defined tier, required environment, and documented skip behavi
 | Tier | Name | Run in CI? | Required env vars | Skip mechanism |
 |------|------|-----------|------------------|----------------|
 | 1 | Unit | ✅ Always | None | Never skipped |
-| 2 | DB integration | ✅ When DB available | `TEST_DATABASE_URL` | `describe.skipIf(!process.env.TEST_DATABASE_URL)` |
-| 3 | HTTP integration | ❌ Not in CI | `TEST_DATABASE_URL` + `TEST_BASE_URL` | `describe.skipIf(!RUN_INTEGRATION)` where `RUN_INTEGRATION = !!TEST_DATABASE_URL && !!TEST_BASE_URL` |
+| 2 | DB integration | ✅ Always | `TEST_DATABASE_URL` | `describe.skipIf(!process.env.TEST_DATABASE_URL)` |
+| 3 | HTTP integration | ✅ Always | `TEST_DATABASE_URL` + `TEST_BASE_URL` | `describe.skipIf(!RUN_INTEGRATION)` where `RUN_INTEGRATION = !!TEST_DATABASE_URL && !!TEST_BASE_URL` |
 | 4 | E2E (Playwright) | ✅ Required smoke | `TEST_BASE_URL` + running server + seeded DB | `e2e-smoke` runs `tests/e2e/core-flow.spec.ts`; broader suite is on demand |
 
 ---
@@ -40,7 +40,7 @@ Run on every CI push. No external dependencies. Never skipped.
 
 **How to run:**
 ```bash
-pnpm test
+pnpm test:unit
 ```
 
 ---
@@ -66,7 +66,7 @@ describe.skipIf(!shouldRun)("My Suite", () => { ... });
 
 **How to run locally:**
 ```bash
-TEST_DATABASE_URL=postgresql://ai_fsm:ai_fsm_dev_password@localhost:55432/ai_fsm pnpm test
+TEST_DATABASE_URL=postgresql://ai_fsm:ai_fsm_dev_password@localhost:55432/ai_fsm pnpm test:integration
 ```
 
 **How CI provides this:**
@@ -81,8 +81,8 @@ Migrations are applied before tests run.
 
 ## Tier 3 — HTTP Integration Tests
 
-Require BOTH a live DB and a running Next.js web server. **Not run in CI.**
-Skip when either `TEST_DATABASE_URL` or `TEST_BASE_URL` is absent.
+Require BOTH a live DB and a running Next.js web server. CI starts the server and explicitly runs `pnpm test:integration`.
+Local runs may skip when a prerequisite is absent; CI configuration throws instead.
 
 **Skip pattern used (standardized):**
 ```typescript
@@ -108,18 +108,12 @@ pnpm dev:web
 # Terminal 2 — run with both env vars
 TEST_DATABASE_URL=postgresql://ai_fsm:ai_fsm_dev_password@localhost:55432/ai_fsm \
 TEST_BASE_URL=http://localhost:3000 \
-pnpm test
+pnpm test:integration
 ```
 
-**Why not in CI?**
-Running `next dev` or `next start` in CI requires building first and then managing a
-long-running process, which complicates the CI job. Tier 3 is covered by E2E (Tier 4)
-for smoke testing and by Tier 2 for individual service logic. A future CI job can
-wire Tier 3 using the pattern:
-```yaml
-- run: pnpm build && pnpm start &
-- run: sleep 5 && TEST_BASE_URL=http://localhost:3000 pnpm test
-```
+CI provides a disposable `LOCATION_INTERNAL_KEY` to both the server and tests.
+The restricted-role regression additionally uses `TEST_RUNTIME_DATABASE_URL`,
+provisioned by `scripts/db-provision-runtime.sh` after migrations.
 
 ---
 
@@ -159,23 +153,14 @@ pnpm exec playwright test tests/e2e/core-flow.spec.ts --reporter=list
 
 ## CI Skip Inventory
 
-Skips in CI are intentional. This table documents every expected skip.
+CI runs unit tests separately from integration tests. Both `TEST_DATABASE_URL` and
+`TEST_BASE_URL` are mandatory for web integration; the worker requires the database.
+Missing configuration fails before collecting tests.
 
-| Suite | Skip count in CI | Reason |
-|-------|-----------------|--------|
-| `auth.integration.test.ts` | 8 | Tier 3: TEST_BASE_URL absent in CI |
-| `estimates.integration.test.ts` | 16 | Tier 3: TEST_BASE_URL absent in CI |
-| `invoices.integration.test.ts` | 12 | Tier 3: TEST_BASE_URL absent in CI |
-| `api.integration.test.ts` (automations) | 6 | Tier 3: TEST_BASE_URL absent in CI |
-| `payments.integration.test.ts` | 1 | Sentinel skip (confirms guard works when DB absent locally) |
-| Playwright full suite | not in test job | Tier 4 broad suite is on demand; required release smoke runs in `e2e-smoke` |
-
-**Expected CI output:**
-```
-Tests  ~250 passed | ~48 skipped
-```
-
-Any test skip NOT in the table above is unexpected and must be investigated.
+The only intentional integration skips are the inverse sentinel tests in payment
+and worker suites that describe missing local database configuration. No functional
+DB or HTTP suite may skip in CI. The broad Playwright suite remains on demand;
+`e2e-smoke` runs the required release flow.
 
 ---
 

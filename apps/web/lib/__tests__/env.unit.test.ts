@@ -3,14 +3,12 @@ import { getEnv, _resetEnvCache } from "../env";
 
 const VALID_ENV = {
   DATABASE_URL: "postgres://test:test@localhost/test",
-  REDIS_URL: "redis://localhost:6379/0",
   AUTH_SECRET: "this-is-a-valid-secret-exactly-32-chars!",
   NODE_ENV: "test",
 };
 
 const ENV_KEYS = [
   "DATABASE_URL",
-  "REDIS_URL",
   "AUTH_SECRET",
   "NODE_ENV",
   "NEXT_PHASE",
@@ -54,12 +52,6 @@ describe("getEnv validation", () => {
     Object.assign(process.env, { ...VALID_ENV, NODE_ENV: "production" });
     delete process.env.DATABASE_URL;
     expect(() => getEnv()).toThrow(/DATABASE_URL/);
-  });
-
-  it("succeeds when REDIS_URL is absent (field is optional)", () => {
-    Object.assign(process.env, { ...VALID_ENV });
-    delete process.env.REDIS_URL;
-    expect(() => getEnv()).not.toThrow();
   });
 
   it("returns parsed env when all values are valid", () => {

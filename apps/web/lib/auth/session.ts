@@ -1,7 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { roleSchema, type Role } from "@ai-fsm/domain";
-import { queryOne } from "../db";
+import { queryOneForSession } from "../db";
 import { getEnv } from "../env";
 
 const COOKIE_NAME = "fsm_session";
@@ -49,9 +49,10 @@ export async function getSession(): Promise<SessionPayload | null> {
   const verified = await verifySession(token);
   if (!verified) return null;
 
-  const user = await queryOne<UserSessionRow>(
-    `SELECT id, account_id, role FROM users WHERE id = $1`,
-    [verified.userId],
+  const user = await queryOneForSession<UserSessionRow>(
+    verified,
+    `SELECT id, account_id, role FROM users WHERE id = $1 AND account_id = $2`,
+    [verified.userId, verified.accountId],
   );
   if (!user) return null;
 

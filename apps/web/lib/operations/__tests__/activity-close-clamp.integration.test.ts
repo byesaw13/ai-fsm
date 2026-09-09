@@ -17,6 +17,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Client } from "pg";
+import { randomUUID } from "node:crypto";
 
 const RUN = !!process.env.TEST_DATABASE_URL;
 
@@ -37,13 +38,21 @@ describe.skipIf(!RUN)("activity_entries close clamp (migration 167)", () => {
       );
       await client.query("BEGIN");
 
+      // A private user avoids the one-active-timer constraint on the shared owner.
+      const userId = randomUUID();
+      await client.query(
+        `INSERT INTO users (id, account_id, email, full_name, password_hash, role)
+         VALUES ($1, $2, $3, 'Timer test', 'unused', 'tech')`,
+        [userId, SEED_ACCOUNT, `timer-${userId}@test.invalid`],
+      );
+
       // Open timer starting 5 minutes in the future — the crash scenario.
       const { rows: ins } = await client.query<{ id: string }>(
         `INSERT INTO activity_entries
            (account_id, user_id, session_date, activity_type, category, source, started_at)
          VALUES ($1, $2, current_date, 'job_work', 'revenue', 'manual', now() + interval '5 minutes')
          RETURNING id`,
-        [SEED_ACCOUNT, SEED_OWNER],
+        [SEED_ACCOUNT, userId],
       );
       const id = ins[0].id;
 

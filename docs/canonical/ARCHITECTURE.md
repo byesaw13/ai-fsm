@@ -2,7 +2,7 @@
 
 ## System Shape
 
-Dovetails FSM is a pnpm monorepo with a Next.js web app, shared domain package, PostgreSQL database, Redis-backed worker support, SQL migrations, and Docker Compose deployment profiles.
+Dovetails FSM is a pnpm monorepo with a Next.js web app, shared domain package, PostgreSQL database, PostgreSQL-backed worker queues, SQL migrations, and Docker Compose deployment profiles.
 
 ## Runtime Components
 
@@ -24,7 +24,7 @@ The canonical product model is defined in `docs/canonical/DOMAIN_MODEL.md`. Tech
 
 The active production target is garonhome.local using `infra/compose.garonhome.yml` and a deploy root under `/opt/business/ai-fsm`.
 
-Development uses local Compose services for PostgreSQL and Redis.
+Development uses local Compose service for PostgreSQL.
 
 ## Quality Gates
 

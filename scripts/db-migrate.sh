@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ -z "${DATABASE_URL:-}" ]]; then
-  echo "DATABASE_URL is required"
+# Runtime DATABASE_URL can be restricted; use separate admin credentials for DDL.
+DATABASE_URL="${MIGRATION_DATABASE_URL:-${DATABASE_URL:-}}"
+if [[ -z "${DATABASE_URL}" ]]; then
+  echo "MIGRATION_DATABASE_URL (or DATABASE_URL for existing setups) is required"
   exit 1
 fi
 

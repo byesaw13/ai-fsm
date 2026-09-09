@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withRole } from "@/lib/auth/middleware";
 import type { AuthSession } from "@/lib/auth/middleware";
-import { getPool } from "@/lib/db";
+import { withDbSession } from "@/lib/db";
 import { logger } from "@/lib/logger";
 import { calculateTravelForAccount } from "@/lib/travel/calculate";
 
@@ -51,25 +51,16 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     );
   }
 
-  const pool = getPool();
-  const client = await pool.connect();
   try {
-    await client.query(
-      `SELECT set_config('app.current_user_id', $1, true),
-              set_config('app.current_account_id', $2, true),
-              set_config('app.current_role', $3, true)`,
-      [session.userId, session.accountId, session.role]
-    );
-
-    const result = await calculateTravelForAccount(client, session.accountId, parsed.data);
-    return NextResponse.json({ data: result });
+    return await withDbSession(session, async (client) => {
+      const result = await calculateTravelForAccount(client, session.accountId, parsed.data);
+      return NextResponse.json({ data: result });
+    });
   } catch (error) {
     logger.error("POST /api/v1/travel/calculate", error, { traceId: session.traceId });
     return NextResponse.json(
       { error: { code: "INTERNAL_ERROR", message: "Travel calculation failed", traceId: session.traceId } },
       { status: 500 }
     );
-  } finally {
-    client.release();
   }
 });

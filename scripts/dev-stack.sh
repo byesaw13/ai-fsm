@@ -2,11 +2,11 @@
 # =============================================================================
 # dev-stack.sh — one-command local dev/test stack (TASK-123)
 #
-# Brings up the dev Postgres + Redis (infra/compose.dev.yml), applies migrations
+# Brings up the dev Postgres (infra/compose.dev.yml), applies migrations
 # and seed, and optionally runs the Tier-3 integration tests — the sequence
 # otherwise hand-assembled every time you need the real (non-mocked) DB.
 #
-#   bash scripts/dev-stack.sh up           # DB+redis up, migrated, seeded
+#   bash scripts/dev-stack.sh up           # DB up, migrated, seeded
 #   bash scripts/dev-stack.sh integration  # up, then run integration tests
 #   bash scripts/dev-stack.sh down         # stop containers (keeps volumes)
 #   bash scripts/dev-stack.sh reset        # down + delete volumes (fresh DB)
@@ -25,7 +25,7 @@ cd "$(dirname "$0")/.."
 # (Constructed from 127.0.0.1, so it can only ever reach the local container.)
 DEV_DB_PORT="${POSTGRES_PORT:-5432}"
 export DATABASE_URL="postgresql://ai_fsm:ai_fsm_dev_password@127.0.0.1:${DEV_DB_PORT}/ai_fsm"
-export REDIS_URL="redis://127.0.0.1:6379/0"
+export MIGRATION_DATABASE_URL="$DATABASE_URL"
 COMPOSE=(docker compose -f infra/compose.dev.yml)
 
 wait_for_pg() {
@@ -40,7 +40,7 @@ wait_for_pg() {
 }
 
 up() {
-  "${COMPOSE[@]}" up -d postgres redis
+  "${COMPOSE[@]}" up -d postgres
   wait_for_pg
   pnpm db:migrate
   pnpm db:seed

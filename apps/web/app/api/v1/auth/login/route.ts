@@ -83,11 +83,7 @@ export async function POST(request: NextRequest) {
     // Look up user by email. The schema allows the same email in multiple
     // accounts, so fail closed instead of guessing which tenant to log into.
     const matches = await query<UserRow>(
-      `SELECT id, email, full_name, role, account_id, password_hash
-       FROM users
-       WHERE lower(email) = lower($1)
-       ORDER BY created_at ASC
-       LIMIT 2`,
+      `SELECT * FROM app_login_candidates($1)`,
       [email.toLowerCase().trim()]
     );
     const user = matches[0];

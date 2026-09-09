@@ -34,6 +34,7 @@ describe.skipIf(!shouldRun)("Visit Reminder Integration Tests", () => {
   let testClientId: string;
   let testJobId: string;
   let testVisitId: string;
+  let testWorkOrderId: string;
   let testAutomationId: string;
 
   beforeAll(async () => {
@@ -58,12 +59,19 @@ describe.skipIf(!shouldRun)("Visit Reminder Integration Tests", () => {
     );
     testJobId = jobRes.rows[0].id;
 
+    const workOrder = await client.query<{ id: string }>(
+      `INSERT INTO work_orders (account_id, client_id, job_id, title, created_by, status)
+       VALUES ($1, $2, $3, 'Reminder work', $4, 'ready') RETURNING id`,
+      [ACCOUNT_A, testClientId, testJobId, OWNER_A],
+    );
+    testWorkOrderId = workOrder.rows[0].id;
+
     // Create a visit scheduled 12 hours from now (within 24h reminder window)
     const visitRes = await client.query<{ id: string }>(
-      `INSERT INTO visits (account_id, job_id, assigned_user_id, status, scheduled_start, scheduled_end)
-       VALUES ($1, $2, $3, 'scheduled', now() + interval '12 hours', now() + interval '13 hours')
+      `INSERT INTO visits (account_id, job_id, assigned_user_id, status, scheduled_start, scheduled_end, work_order_id)
+       VALUES ($1, $2, $3, 'scheduled', now() + interval '12 hours', now() + interval '13 hours', $4)
        RETURNING id`,
-      [ACCOUNT_A, testJobId, TECH_A]
+      [ACCOUNT_A, testJobId, TECH_A, testWorkOrderId]
     );
     testVisitId = visitRes.rows[0].id;
 
@@ -92,6 +100,9 @@ describe.skipIf(!shouldRun)("Visit Reminder Integration Tests", () => {
     }
     if (testVisitId) {
       await client.query(`DELETE FROM visits WHERE id = $1`, [testVisitId]);
+    }
+    if (testWorkOrderId) {
+      await client.query(`DELETE FROM work_orders WHERE id = $1`, [testWorkOrderId]);
     }
     if (testJobId) {
       await client.query(`DELETE FROM jobs WHERE id = $1`, [testJobId]);

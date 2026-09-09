@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
-import { getPool, queryForSession, queryOneForSession } from "@/lib/db";
+import { withDbSession, queryForSession, queryOneForSession } from "@/lib/db";
 import {
   canTransitionVisit,
   canAssignVisit,
@@ -281,20 +281,9 @@ export default async function VisitDetailPage({
     : null;
 
   // Planned tasks for this field day (progress on the project).
-  let dayTasks: Awaited<ReturnType<typeof loadVisitPlannedTasks>> = [];
-  {
-    const pool = getPool();
-    const client = await pool.connect();
-    try {
-      await client.query(
-        `SELECT set_config('app.current_user_id',$1,true), set_config('app.current_account_id',$2,true), set_config('app.current_role',$3,true)`,
-        [session.userId, session.accountId, session.role],
-      );
-      dayTasks = await loadVisitPlannedTasks(client, id, session.accountId);
-    } finally {
-      client.release();
-    }
-  }
+  const dayTasks = await withDbSession(session, (client) =>
+    loadVisitPlannedTasks(client, id, session.accountId),
+  );
 
   // Load checklist (lazy-seeded on first access) unless visit is cancelled
   const checklistItems =
