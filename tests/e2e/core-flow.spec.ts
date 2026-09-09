@@ -33,7 +33,7 @@ async function completeEstimateWizard(page: Page) {
   await page.getByRole("button", { name: "Next" }).click();
   await Promise.all([
     page.waitForURL(/\/app\/estimates\/[0-9a-f-]+/),
-    page.locator('[data-testid="submit-estimate-btn"]').evaluate((button) => (button as HTMLButtonElement).click()),
+    page.locator('#main-content [data-testid="submit-estimate-btn"]').evaluate((button) => (button as HTMLButtonElement).click()),
   ]);
 }
 
@@ -82,14 +82,14 @@ test.describe("Required release smoke — admin core flow", () => {
     await page.fill("#title", `Release Smoke Job ${Date.now()}`);
     await page.locator("#client_id").selectOption({ label: clientName });
     await page.selectOption("#priority", "2");
-    await page.locator('[data-testid="job-create-form"] button[type="submit"]').click();
+    await page.locator('#main-content [data-testid="job-create-form"] button[type="submit"]').click();
 
     await page.waitForURL(/\/app\/jobs\/[0-9a-f-]+/);
     const match = page.url().match(/\/app\/jobs\/([0-9a-f-]+)/);
     expect(match).toBeTruthy();
     jobId = match![1];
 
-    await expect(page.locator('[data-testid="job-status"]')).toContainText("Draft");
+    await expect(page.locator('#main-content [data-testid="job-status"]')).toContainText("Draft");
   });
 
   test("4. Admin can schedule a visit for the job", async ({ page }) => {
@@ -97,23 +97,22 @@ test.describe("Required release smoke — admin core flow", () => {
     await login(page);
 
     await page.goto(`${BASE}/app/jobs/${jobId}`);
-    await expect(page.locator('[data-testid="add-visit-btn"]')).toBeVisible();
-    await page.click('[data-testid="add-visit-btn"]');
+    await page.getByRole("link", { name: "+ Add a day", exact: true }).click();
 
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const dateStr = tomorrow.toISOString().slice(0, 10);
 
-    await page.locator('[data-testid="visit-schedule-form"] input[type="date"]').fill(dateStr);
-    await page.locator('[data-testid="visit-schedule-form"] select').first().selectOption("09:00");
-    await page.locator('[data-testid="visit-schedule-form"] button[type="submit"]').click();
+    await page.locator('#main-content [data-testid="visit-schedule-form"] input[type="date"]').fill(dateStr);
+    await page.locator('#main-content [data-testid="visit-schedule-form"] select').first().selectOption("09:00");
+    await page.locator('#main-content [data-testid="visit-schedule-form"] button[type="submit"]').click();
 
     await page.waitForURL(/\/app\/visits\/[0-9a-f-]+/);
     const match = page.url().match(/\/app\/visits\/([0-9a-f-]+)/);
     expect(match).toBeTruthy();
     visitId = match![1];
 
-    await expect(page.locator('[data-testid="visit-status"]')).toContainText("Scheduled");
+    await expect(page.locator('#main-content [data-testid="visit-status"]')).toContainText("Scheduled");
   });
 
   test("5. Admin can create an estimate for the launch client", async ({ page }) => {
@@ -133,7 +132,7 @@ test.describe("Required release smoke — admin core flow", () => {
     expect(match).toBeTruthy();
     estimateId = match![1];
 
-    await expect(page.locator('[data-testid="estimate-status"]')).toContainText("Draft");
+    await expect(page.locator('#main-content [data-testid="estimate-status"]')).toContainText("Draft");
   });
 
   test("6. Admin can transition estimate draft -> sent -> approved", async ({ page }) => {
@@ -141,13 +140,11 @@ test.describe("Required release smoke — admin core flow", () => {
     await login(page);
 
     await page.goto(`${BASE}/app/estimates/${estimateId}`);
-    await expect(page.locator('[data-testid="transition-btn-sent"]')).toBeVisible();
-    await page.click('[data-testid="transition-btn-sent"]');
-    await expect(page.locator('[data-testid="estimate-status"]')).toContainText("Sent");
+    await page.getByRole("button", { name: "Mark as Sent", exact: true }).click();
+    await expect(page.locator('#main-content [data-testid="estimate-status"]')).toContainText("Sent");
 
-    await expect(page.locator('[data-testid="transition-btn-approved"]')).toBeVisible();
-    await page.click('[data-testid="transition-btn-approved"]');
-    await expect(page.locator('[data-testid="estimate-status"]')).toContainText("Approved");
+    await page.getByRole("button", { name: "Mark as Approved", exact: true }).click();
+    await expect(page.locator('#main-content [data-testid="estimate-status"]')).toContainText("Approved");
   });
 
   test("7. Admin can convert approved estimate to invoice", async ({ page }) => {
@@ -155,19 +152,15 @@ test.describe("Required release smoke — admin core flow", () => {
     await login(page);
 
     await page.goto(`${BASE}/app/estimates/${estimateId}`);
-    await expect(page.locator('[data-testid="estimate-status"]')).toContainText("Approved");
-    // Convert lives on the green approved banner (and handoff card).
-    await expect(page.locator('[data-testid="approved-banner"]')).toBeVisible({ timeout: 10000 });
-    const convertBtn = page.locator('[data-testid="convert-estimate-btn"]');
-    await expect(convertBtn).toBeVisible({ timeout: 10000 });
-    await convertBtn.click();
+    await expect(page.locator('#main-content [data-testid="estimate-status"]')).toContainText("Approved");
+    await page.getByRole("button", { name: "→ Convert to Invoice", exact: true }).click();
 
     await page.waitForURL(/\/app\/invoices\/[0-9a-f-]+/);
     const match = page.url().match(/\/app\/invoices\/([0-9a-f-]+)/);
     expect(match).toBeTruthy();
     invoiceId = match![1];
 
-    await expect(page.locator('[data-testid="invoice-status"]')).toContainText("Draft");
+    await expect(page.locator('#main-content [data-testid="invoice-status"]')).toContainText("Draft");
   });
 
   test("8. Admin can record payment on the invoice", async ({ page }) => {
@@ -175,23 +168,27 @@ test.describe("Required release smoke — admin core flow", () => {
     await login(page);
 
     await page.goto(`${BASE}/app/invoices/${invoiceId}`);
-    const statusText = (await page.locator('[data-testid="invoice-status"]').textContent())?.trim();
+    const statusText = (await page.locator('#main-content [data-testid="invoice-status"]').textContent())?.trim();
     if (statusText === "Draft") {
-      await expect(page.locator('[data-testid="invoice-transition-btn-sent"]')).toBeVisible();
-      await page.click('[data-testid="invoice-transition-btn-sent"]');
+      await page.getByRole("button", { name: "→ Sent", exact: true }).click();
     }
-    await expect(page.locator('[data-testid="invoice-status"]')).toContainText("Sent");
+    await expect(page.locator('#main-content [data-testid="invoice-status"]')).toContainText("Sent");
 
-    const dueText = await page.locator('[data-testid="invoice-due"]').textContent();
+    const dueText = await page.locator('#main-content [data-testid="invoice-due"]').textContent();
     const amountDue = dueText?.replace(/[^0-9.]/g, "") || "200.00";
 
     await page.fill('[data-testid="payment-amount-input"]', amountDue);
     await page.selectOption('[data-testid="payment-method-select"]', "check");
     await page.fill('[data-testid="payment-notes-input"]', "Release smoke payment");
-    await page.click('[data-testid="record-payment-submit"]');
+    const [paymentResponse] = await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith("/payments") && response.request().method() === "POST"),
+      page.click('#main-content [data-testid="record-payment-submit"]'),
+    ]);
+    expect(paymentResponse.ok()).toBe(true);
+    await page.reload();
 
-    await expect(page.locator('[data-testid="invoice-status"]')).toContainText("Paid");
-    await expect(page.locator('[data-testid="invoice-paid"]')).toBeVisible();
+    await expect(page.locator('#main-content [data-testid="invoice-status"]')).toContainText("Paid");
+    await expect(page.locator('#main-content [data-testid="invoice-paid"]')).toBeVisible();
   });
 
   test("9. Admin can verify the paid invoice on invoices list", async ({ page }) => {

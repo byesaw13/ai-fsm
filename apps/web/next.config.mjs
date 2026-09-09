@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: [
@@ -14,9 +16,8 @@ const nextConfig = {
     };
     return config;
   },
-  experimental: {
-    typedRoutes: true
-  },
+  typedRoutes: true,
+  outputFileTracingRoot: fileURLToPath(new URL("../..", import.meta.url)),
   output: 'standalone',
   typescript: {
     ignoreBuildErrors: false
