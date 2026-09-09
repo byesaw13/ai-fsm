@@ -152,6 +152,7 @@ if [[ "${SKIP_INTEGRATION:-}" != "1" ]]; then
   AUTH_SECRET="$TEST_AUTH_SECRET" \
   LOCATION_INTERNAL_KEY="$TEST_INTERNAL_KEY" \
   E2E_SKIP_EMAIL_DELIVERY=1 \
+  E2E_DISABLE_LOGIN_RATE_LIMIT=1 \
   NODE_ENV=development \
     pnpm --filter @ai-fsm/web exec next dev --port "${TEST_WEB_PORT}" >/tmp/ai-fsm-gate-server.log 2>&1 &
   SERVER_PID=$!

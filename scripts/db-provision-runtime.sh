@@ -40,6 +40,7 @@ BEGIN
 END $$;
 ALTER ROLE :"runtime_role" LOGIN PASSWORD :'runtime_password';
 SELECT format('GRANT CONNECT ON DATABASE %I TO %I', current_database(), :'runtime_role') \gexec
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO :"runtime_role";
 -- No schema CREATE, TRUNCATE, REFERENCES, migration-table or non-RLS table grants.
 SELECT format('GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.%I TO %I', c.relname, :'runtime_role')
