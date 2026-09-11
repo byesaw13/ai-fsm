@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
 const mockSession = {
@@ -31,11 +31,38 @@ function requestWithForm(form: FormData): NextRequest {
 }
 
 describe("POST /api/v1/expenses/[id]/receipt", () => {
+  beforeEach(() => {
+    mockWithExpenseContext.mockReset();
+  });
+
   it("requires a file", async () => {
     const res = await POST(requestWithForm(new FormData()));
     expect(res.status).toBe(422);
     const json = await res.json();
     expect(json.error.message).toBe("file is required");
+  });
+
+  it("keeps the first photo when the expense already has a receipt", async () => {
+    mockWithExpenseContext.mockImplementation(async (_session: unknown, fn: Function) =>
+      fn({
+        query: async () => ({
+          rows: [{
+            id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            receipt_url: "/app/uploads/expenses/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/first.jpg",
+            vendor_name: "Home Depot",
+            expense_date: "2026-09-08",
+          }],
+        }),
+      }),
+    );
+
+    const form = new FormData();
+    form.append("file", new File(["img"], "second.jpg", { type: "image/jpeg" }));
+    const res = await POST(requestWithForm(form));
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data.kept_existing).toBe(true);
+    expect(json.data.receipt_url).toContain("first.jpg");
   });
 
   it("rejects non-image files before touching the database", async () => {

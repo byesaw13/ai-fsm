@@ -8,6 +8,10 @@ import { isValidMonthKey } from "@/lib/expenses/ui";
 import { expenseCategorySchema } from "@ai-fsm/domain";
 import { attachFuelExpenseToVehicle } from "@/lib/expenses/attach-fuel-expense";
 import { gallonsFromParsedReceipt } from "@/lib/expenses/fuel-from-receipt";
+import {
+  expenseDateKey,
+  findMatchingExpense,
+} from "@/lib/expenses/duplicate-match";
 
 export const dynamic = "force-dynamic";
 
@@ -181,6 +185,7 @@ const createExpenseSchema = z.object({
   vehicle_id: z.string().uuid().nullable().optional(),
   gallons: z.number().positive().max(500).nullable().optional(),
   odometer: z.number().int().positive().nullable().optional(),
+  external_ref: z.string().min(1).max(80).nullable().optional(),
 });
 
 export const POST = withRole(["owner", "admin"], async (request, session) => {
@@ -226,15 +231,65 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     vehicle_id,
     gallons,
     odometer,
+    external_ref,
   } = parseResult.data;
 
   try {
     const created = await withExpenseContext(session, async (client) => {
+      const sameDay = await client.query<{
+        id: string;
+        vendor_name: string;
+        amount_cents: number;
+        expense_date: string | Date;
+        external_ref: string | null;
+      }>(
+        `SELECT id, vendor_name, amount_cents, expense_date, external_ref
+         FROM expenses
+         WHERE account_id = $1 AND expense_date = $2::date`,
+        [session.accountId, expense_date],
+      );
+      const matched = findMatchingExpense(
+        {
+          vendor_name,
+          expense_date,
+          amount_cents,
+          external_ref: external_ref ?? null,
+        },
+        sameDay.rows.map((row) => ({
+          id: row.id,
+          vendor_name: row.vendor_name,
+          amount_cents: row.amount_cents,
+          expense_date: expenseDateKey(row.expense_date),
+          external_ref: row.external_ref,
+        })),
+      );
+
+      if (matched?.id) {
+        await client.query(
+          `UPDATE expenses SET
+             external_ref = COALESCE(external_ref, $3),
+             job_id = COALESCE(job_id, $4),
+             client_id = COALESCE(client_id, $5),
+             amount_cents = GREATEST(amount_cents, $6),
+             updated_at = now()
+           WHERE id = $1 AND account_id = $2`,
+          [
+            matched.id,
+            session.accountId,
+            external_ref ?? null,
+            job_id ?? null,
+            client_id ?? null,
+            amount_cents,
+          ],
+        );
+        return { id: matched.id, merged: true, vehicleId: null, fuelLogId: null };
+      }
+
       const result = await client.query<{ id: string }>(
         `INSERT INTO expenses
            (account_id, vendor_name, category, amount_cents, expense_date,
-            job_id, client_id, notes, created_by)
-         VALUES ($1, $2, $3, $4, $5::date, $6, $7, $8, $9)
+            job_id, client_id, notes, created_by, external_ref)
+         VALUES ($1, $2, $3, $4, $5::date, $6, $7, $8, $9, $10)
          RETURNING id`,
         [
           session.accountId,
@@ -246,6 +301,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           client_id ?? null,
           notes ?? null,
           session.userId,
+          external_ref ?? null,
         ]
       );
 
@@ -287,12 +343,17 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         },
       });
 
-      return { id, vehicleId: fuel.vehicleId, fuelLogId: fuel.fuelLogId };
+      return { id, merged: false, vehicleId: fuel.vehicleId, fuelLogId: fuel.fuelLogId };
     });
 
     return NextResponse.json(
-      { id: created.id, vehicle_id: created.vehicleId, fuel_log_id: created.fuelLogId },
-      { status: 201 },
+      {
+        id: created.id,
+        merged: created.merged,
+        vehicle_id: created.vehicleId,
+        fuel_log_id: created.fuelLogId,
+      },
+      { status: created.merged ? 200 : 201 },
     );
   } catch (error) {
     logger.error("POST /api/v1/expenses error", error, {

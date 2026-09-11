@@ -3,6 +3,11 @@ import { randomUUID } from "crypto";
 import { z } from "zod";
 import { withRole } from "@/lib/auth/middleware";
 import { withExpenseContext } from "@/lib/expenses/db";
+import {
+  expenseDateKey,
+  findMatchingExpense,
+  type ExpenseFingerprint,
+} from "@/lib/expenses/duplicate-match";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
 
@@ -61,6 +66,27 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       let skipped = 0;
       let materials = 0;
 
+      const dates = [...new Set(transactions.map((t) => t.date))];
+      const existingRes = await client.query<{
+        id: string;
+        vendor_name: string;
+        amount_cents: number;
+        expense_date: string | Date;
+        external_ref: string | null;
+      }>(
+        `SELECT id, vendor_name, amount_cents, expense_date, external_ref
+         FROM expenses
+         WHERE account_id = $1 AND expense_date = ANY($2::date[])`,
+        [session.accountId, dates],
+      );
+      const fingerprints: ExpenseFingerprint[] = existingRes.rows.map((row) => ({
+        id: row.id,
+        vendor_name: row.vendor_name,
+        amount_cents: row.amount_cents,
+        expense_date: expenseDateKey(row.expense_date),
+        external_ref: row.external_ref,
+      }));
+
       for (const t of transactions) {
         const vendorLabel = source === "lowes_csv" ? "Lowe's" : "Home Depot";
         const notes =
@@ -68,21 +94,56 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
           (t.line_items.length
             ? `${t.line_items.length} item(s) · imported from ${vendorLabel}`
             : `Imported from ${vendorLabel}`);
-        const ins = await client.query<{ id: string }>(
-          `INSERT INTO expenses
-             (account_id, job_id, client_id, vendor_name, category, amount_cents,
-              expense_date, notes, source, external_ref, created_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8, $9, $10, $11)
-           ON CONFLICT (account_id, source, external_ref)
-             WHERE source IS NOT NULL AND external_ref IS NOT NULL
-           DO NOTHING
-           RETURNING id`,
-          [
-            session.accountId, t.job_id ?? null, t.client_id ?? null, t.vendor,
-            t.expense_category, t.amount_cents, t.date, notes, source, t.external_ref, session.userId,
-          ]
-        );
-        if (ins.rows[0]) created++; else { skipped++; continue; }
+        const candidate: ExpenseFingerprint = {
+          vendor_name: t.vendor,
+          expense_date: t.date,
+          amount_cents: t.amount_cents,
+          external_ref: t.external_ref,
+        };
+        const matched = findMatchingExpense(candidate, fingerprints);
+        if (matched?.id) {
+          await client.query(
+            `UPDATE expenses SET
+               source = COALESCE(source, $3),
+               external_ref = COALESCE(external_ref, $4),
+               job_id = COALESCE(job_id, $5),
+               client_id = COALESCE(client_id, $6),
+               updated_at = now()
+             WHERE id = $1 AND account_id = $2`,
+            [
+              matched.id,
+              session.accountId,
+              source,
+              t.external_ref,
+              t.job_id ?? null,
+              t.client_id ?? null,
+            ],
+          );
+          matched.external_ref = matched.external_ref ?? t.external_ref;
+          skipped++;
+        } else {
+          const ins = await client.query<{ id: string }>(
+            `INSERT INTO expenses
+               (account_id, job_id, client_id, vendor_name, category, amount_cents,
+                expense_date, notes, source, external_ref, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8, $9, $10, $11)
+             ON CONFLICT (account_id, source, external_ref)
+               WHERE source IS NOT NULL AND external_ref IS NOT NULL
+             DO NOTHING
+             RETURNING id`,
+            [
+              session.accountId, t.job_id ?? null, t.client_id ?? null, t.vendor,
+              t.expense_category, t.amount_cents, t.date, notes, source, t.external_ref, session.userId,
+            ]
+          );
+          if (ins.rows[0]) {
+            created++;
+            fingerprints.push({ ...candidate, id: ins.rows[0].id });
+          } else {
+            skipped++;
+            continue;
+          }
+        }
 
         if (update_prices) {
           for (const li of t.line_items) {
