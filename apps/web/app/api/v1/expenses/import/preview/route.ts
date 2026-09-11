@@ -4,6 +4,11 @@ import { withExpenseContext } from "@/lib/expenses/db";
 import { logger } from "@/lib/logger";
 import { parsePurchaseCsv } from "@/lib/expenses/import/detect";
 import {
+  csvImportStatus,
+  expenseDateKey,
+  type ExpenseFingerprint,
+} from "@/lib/expenses/duplicate-match";
+import {
   RECEIPT_LINKABLE_JOB_STATUS_SQL,
   receiptJobOrderSql,
 } from "@/lib/expenses/open-jobs";
@@ -96,11 +101,23 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
   const source = parsed.source;
 
   try {
-    const { existingRefs, jobs } = await withExpenseContext(session, async (client) => {
-      const refs = await client.query<{ external_ref: string }>(
-        `SELECT external_ref FROM expenses WHERE account_id = $1 AND source = $2`,
-        [session.accountId, source]
-      );
+    const dates = [...new Set(parsed.transactions.map((t) => t.date))];
+    const { existing, jobs } = await withExpenseContext(session, async (client) => {
+      const existingRows = dates.length
+        ? await client.query<{
+            id: string;
+            vendor_name: string;
+            amount_cents: number;
+            expense_date: string | Date;
+            external_ref: string | null;
+            source: string | null;
+          }>(
+            `SELECT id, vendor_name, amount_cents, expense_date, external_ref, source
+             FROM expenses
+             WHERE account_id = $1 AND expense_date = ANY($2::date[])`,
+            [session.accountId, dates],
+          )
+        : { rows: [] };
       const jobRows = await client.query<JobRow>(
         `SELECT j.id, j.title, j.job_number, j.client_id, c.name AS client_name, p.address
          FROM jobs j
@@ -112,14 +129,35 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
          LIMIT 200`,
         [session.accountId]
       );
-      return { existingRefs: new Set(refs.rows.map((r) => r.external_ref)), jobs: jobRows.rows };
+      return { existing: existingRows.rows, jobs: jobRows.rows };
     });
 
-    const transactions = parsed.transactions.map((t) => ({
-      ...t,
-      already_imported: existingRefs.has(t.external_ref),
-      suggestion: t.is_return ? null : suggestJob(t.job_name, jobs),
+    const fingerprints: ExpenseFingerprint[] = existing.map((row) => ({
+      id: row.id,
+      vendor_name: row.vendor_name,
+      amount_cents: row.amount_cents,
+      expense_date: expenseDateKey(row.expense_date),
+      external_ref: row.external_ref,
+      source: row.source,
     }));
+
+    const transactions = parsed.transactions.map((t) => {
+      const status = csvImportStatus(
+        {
+          vendor_name: t.vendor,
+          expense_date: t.date,
+          amount_cents: t.amount_cents,
+          external_ref: t.external_ref,
+        },
+        fingerprints,
+      );
+      return {
+        ...t,
+        already_imported: status === "already_imported",
+        matched_receipt: status === "matched_receipt",
+        suggestion: t.is_return ? null : suggestJob(t.job_name, jobs),
+      };
+    });
 
     const importable = transactions.filter((t) => !t.already_imported && !t.is_return);
     const summary = {

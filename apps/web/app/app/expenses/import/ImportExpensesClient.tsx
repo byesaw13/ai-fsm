@@ -16,6 +16,7 @@ type Txn = {
   line_items: LineItem[];
   is_return: boolean;
   already_imported: boolean;
+  matched_receipt: boolean;
   suggestion: { job_id: string; client_id: string | null; label: string } | null;
 };
 type Summary = {
@@ -129,7 +130,8 @@ export function ImportExpensesClient() {
         <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
           Upload a <strong>Home Depot</strong> Pro Xtra purchase export <em>or</em> a <strong>Lowe&apos;s</strong>{" "}
           purchase-history CSV. We auto-detect the store. Each trip/invoice becomes one expense (job-matched when
-          possible), and SKUs update your materials catalog.
+          possible), and SKUs update your materials catalog. A photographed receipt of the same trip is reused — we
+          do not create a second expense.
         </p>
         <input
           ref={fileRef}
@@ -201,6 +203,7 @@ export function ImportExpensesClient() {
                       <td style={{ padding: "var(--space-2) var(--space-3)", whiteSpace: "nowrap" }}>
                         {t.already_imported ? <Badge text="Already imported" />
                           : t.is_return ? <Badge text="Return / credit" />
+                          : t.matched_receipt ? <Badge text="Matched receipt" accent />
                           : t.suggestion ? <Badge text="Matched" accent />
                           : <span style={{ color: "var(--fg-muted)" }}>New</span>}
                       </td>

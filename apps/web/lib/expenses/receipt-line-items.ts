@@ -24,6 +24,7 @@ Return ONLY valid JSON (no markdown fences):
   "notes": "string or null — short trip summary",
   "tax_cents": number or null — tax line in cents if shown,
   "po_number": "string or null — job / supply PO if written or printed (e.g. J260029, J-2026-0029, PO J260029). Do NOT invent.",
+  "transaction_id": "string or null — store transaction / invoice / order number as printed (Home Depot Transaction ID, Lowe's order/invoice #). Copy digits/letters only as shown. Do NOT invent.",
   "gallons": number or null — gallons pumped on a fuel receipt (e.g. 23.707). Null if not a fuel fill or not printed.,
   "line_items": [
     {
@@ -49,6 +50,7 @@ Return ONLY valid JSON (no markdown fences):
 9. category: materials for lumber, hardware, paint, fasteners, drywall, trim, etc.; tools for tools; fuel for gas.
 10. po_number: only when a job/PO reference is clearly present (handwritten or printed). Prefer the short form when both appear (J260029). Never invent a PO.
 11. gallons: only on gas/fuel receipts. Copy the gallons figure printed on the pump/receipt. Do not invent. Do not use dollars as gallons.
+12. transaction_id: copy the printed store transaction / invoice / order number when visible. Never invent.
 
 ## Store-specific hints
 - Home Depot: often shows SKU, short name, qty @ unit, then line total. Internet SKU may appear.
@@ -76,6 +78,8 @@ export type ParsedReceipt = {
   tax_cents?: number | null;
   /** Supply PO / job number if OCR found one (J260029, J-2026-0029, …). */
   po_number?: string | null;
+  /** Store transaction / invoice number if printed. */
+  transaction_id?: string | null;
   /** Gallons pumped when this is a fuel receipt. */
   gallons?: number | null;
   line_items?: ParsedReceiptLineItem[];

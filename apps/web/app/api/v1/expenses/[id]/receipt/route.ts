@@ -139,27 +139,46 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
   const filePath = path.join(uploadDir, `${randomUUID()}.${safeExtension(file)}`);
 
   try {
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
-    const expense = await withExpenseContext(session, async (client) => {
+    const existing = await withExpenseContext(session, async (client) => {
       const found = await client.query<ExpenseReceiptSyncRow>(
         `SELECT id, receipt_url, vendor_name, expense_date
          FROM expenses WHERE id = $1 AND account_id = $2`,
         [id, session.accountId]
       );
-      if (!found.rows[0]) return null;
+      return found.rows[0] ?? null;
+    });
 
+    if (!existing) {
+      return NextResponse.json(
+        { error: { code: "NOT_FOUND", message: "Expense not found", traceId: session.traceId } },
+        { status: 404 }
+      );
+    }
+
+    if (existing.receipt_url) {
+      return NextResponse.json(
+        { data: { id: existing.id, receipt_url: existing.receipt_url, kept_existing: true } },
+        { status: 201 },
+      );
+    }
+
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    const expense = await withExpenseContext(session, async (client) => {
       fs.mkdirSync(uploadDir, { recursive: true });
       fs.writeFileSync(filePath, fileBuffer);
 
       const updated = await client.query<ExpenseReceiptRow>(
         `UPDATE expenses
          SET receipt_url = $1, updated_at = now()
-         WHERE id = $2 AND account_id = $3
+         WHERE id = $2 AND account_id = $3 AND receipt_url IS NULL
          RETURNING id, receipt_url`,
         [filePath, id, session.accountId]
       );
-      if (!updated.rows[0]) return null;
-      return { ...found.rows[0], ...updated.rows[0] };
+      if (!updated.rows[0]) {
+        try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+        return { ...existing, kept_existing: true as const };
+      }
+      return { ...existing, ...updated.rows[0] };
     });
 
     if (!expense) {
@@ -167,6 +186,13 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       return NextResponse.json(
         { error: { code: "NOT_FOUND", message: "Expense not found", traceId: session.traceId } },
         { status: 404 }
+      );
+    }
+
+    if ("kept_existing" in expense && expense.kept_existing) {
+      return NextResponse.json(
+        { data: { id: expense.id, receipt_url: expense.receipt_url, kept_existing: true } },
+        { status: 201 },
       );
     }
 

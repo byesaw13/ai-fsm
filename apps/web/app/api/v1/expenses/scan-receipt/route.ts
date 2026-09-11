@@ -147,6 +147,11 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
         ? parsed.po_number.trim()
         : null;
 
+    const transaction_id =
+      typeof parsed.transaction_id === "string" && parsed.transaction_id.trim()
+        ? parsed.transaction_id.trim()
+        : null;
+
     const gallons = gallonsFromParsedReceipt({
       category,
       gallons: parsed.gallons,
@@ -164,6 +169,7 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
         category,
         notes: parsed.notes?.trim() || null,
         po_number,
+        transaction_id,
         gallons,
         line_items,
         reconciliation,

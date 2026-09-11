@@ -69,6 +69,7 @@ export function ExpenseForm({
   const scannedLineItemsRef = useRef<
     { name: string; quantity: number; unit_cost_cents: number; sku?: string | null }[]
   >([]);
+  const scannedTxnIdRef = useRef<string | null>(null);
 
   /** Banner after OCR matched a Supply PO to an open project. */
   const [poMatchLabel, setPoMatchLabel] = useState<string | null>(null);
@@ -78,6 +79,7 @@ export function ExpenseForm({
     setScanning(true);
     setScanError(null);
     setPoMatchLabel(null);
+    scannedTxnIdRef.current = null;
     try {
       const formData = new FormData();
       formData.append("receipt", file);
@@ -95,9 +97,14 @@ export function ExpenseForm({
         notes: n,
         line_items,
         po_number,
+        transaction_id,
         gallons,
       } = data.data;
       scannedLineItemsRef.current = Array.isArray(line_items) ? line_items : [];
+      scannedTxnIdRef.current =
+        typeof transaction_id === "string" && transaction_id.trim()
+          ? transaction_id.trim()
+          : null;
       if (vendor_name) setVendorName(vendor_name);
       if (amount_cents) setAmountStr((amount_cents / 100).toFixed(2));
       if (expense_date) setExpenseDate(expense_date);
@@ -185,6 +192,7 @@ export function ExpenseForm({
           odometer: isFuelExpenseCategory(category) && odometerStr.trim()
             ? parseInt(odometerStr, 10)
             : null,
+          external_ref: scannedTxnIdRef.current,
         }),
       });
 

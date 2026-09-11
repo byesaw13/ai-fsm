@@ -55,6 +55,7 @@ describe("POST /api/v1/expenses/scan-receipt", () => {
             expense_date: "2026-07-10",
             category: "materials",
             notes: "Deck repair run",
+            transaction_id: "3325",
             line_items: [
               { name: "2x4 lumber", quantity: 10, unit_cost_cents: 400, sku: "12345" },
               { name: "Deck screws", quantity: 1, unit_cost_cents: 400, sku: null },
@@ -70,6 +71,7 @@ describe("POST /api/v1/expenses/scan-receipt", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.data.vendor_name).toBe("Home Depot");
+    expect(json.data.transaction_id).toBe("3325");
     expect(json.data.line_items).toEqual([
       {
         name: "2x4 lumber",
