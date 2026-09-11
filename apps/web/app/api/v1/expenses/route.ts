@@ -242,8 +242,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         amount_cents: number;
         expense_date: string | Date;
         external_ref: string | null;
+        source: string | null;
       }>(
-        `SELECT id, vendor_name, amount_cents, expense_date, external_ref
+        `SELECT id, vendor_name, amount_cents, expense_date, external_ref, source
          FROM expenses
          WHERE account_id = $1 AND expense_date = $2::date`,
         [session.accountId, expense_date],
@@ -261,10 +262,22 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           amount_cents: row.amount_cents,
           expense_date: expenseDateKey(row.expense_date),
           external_ref: row.external_ref,
+          source: row.source,
         })),
       );
 
       if (matched?.id) {
+        const before = await client.query<{
+          amount_cents: number;
+          job_id: string | null;
+          client_id: string | null;
+          external_ref: string | null;
+        }>(
+          `SELECT amount_cents, job_id, client_id, external_ref
+           FROM expenses WHERE id = $1 AND account_id = $2`,
+          [matched.id, session.accountId],
+        );
+        const oldRow = before.rows[0];
         await client.query(
           `UPDATE expenses SET
              external_ref = COALESCE(external_ref, $3),
@@ -282,6 +295,22 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             amount_cents,
           ],
         );
+        await appendAuditLog(client, {
+          account_id: session.accountId,
+          entity_type: "expense",
+          entity_id: matched.id,
+          action: "update",
+          actor_id: session.userId,
+          trace_id: session.traceId,
+          old_value: oldRow ?? null,
+          new_value: {
+            merged_from: "photo_save",
+            amount_cents,
+            job_id: job_id ?? null,
+            client_id: client_id ?? null,
+            external_ref: external_ref ?? null,
+          },
+        });
         return { id: matched.id, merged: true, vehicleId: null, fuelLogId: null };
       }
 

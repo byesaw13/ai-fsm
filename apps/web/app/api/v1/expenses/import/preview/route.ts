@@ -110,8 +110,9 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
             amount_cents: number;
             expense_date: string | Date;
             external_ref: string | null;
+            source: string | null;
           }>(
-            `SELECT id, vendor_name, amount_cents, expense_date, external_ref
+            `SELECT id, vendor_name, amount_cents, expense_date, external_ref, source
              FROM expenses
              WHERE account_id = $1 AND expense_date = ANY($2::date[])`,
             [session.accountId, dates],
@@ -137,6 +138,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       amount_cents: row.amount_cents,
       expense_date: expenseDateKey(row.expense_date),
       external_ref: row.external_ref,
+      source: row.source,
     }));
 
     const transactions = parsed.transactions.map((t) => {

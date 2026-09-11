@@ -170,11 +170,14 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       const updated = await client.query<ExpenseReceiptRow>(
         `UPDATE expenses
          SET receipt_url = $1, updated_at = now()
-         WHERE id = $2 AND account_id = $3
+         WHERE id = $2 AND account_id = $3 AND receipt_url IS NULL
          RETURNING id, receipt_url`,
         [filePath, id, session.accountId]
       );
-      if (!updated.rows[0]) return null;
+      if (!updated.rows[0]) {
+        try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+        return { ...existing, kept_existing: true as const };
+      }
       return { ...existing, ...updated.rows[0] };
     });
 
@@ -183,6 +186,13 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       return NextResponse.json(
         { error: { code: "NOT_FOUND", message: "Expense not found", traceId: session.traceId } },
         { status: 404 }
+      );
+    }
+
+    if ("kept_existing" in expense && expense.kept_existing) {
+      return NextResponse.json(
+        { data: { id: expense.id, receipt_url: expense.receipt_url, kept_existing: true } },
+        { status: 201 },
       );
     }
 

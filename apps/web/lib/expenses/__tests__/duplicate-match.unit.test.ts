@@ -75,6 +75,19 @@ describe("findMatchingExpense", () => {
     expect(findMatchingExpense(csv, [existing])).toBeNull();
   });
 
+  it("does not match the same transaction id at a different store", () => {
+    expect(
+      findMatchingExpense(csv, [{
+        id: "lowes-1",
+        vendor_name: "Lowe's",
+        expense_date: "2026-09-08",
+        amount_cents: 4996,
+        external_ref: "3325",
+        source: "lowes_csv",
+      }]),
+    ).toBeNull();
+  });
+
   it("returns null when two existing rows both fit (ambiguous)", () => {
     const other = { ...photo, id: "photo-2" };
     expect(findMatchingExpense(csv, [photo, other])).toBeNull();
@@ -103,9 +116,31 @@ describe("csvImportStatus", () => {
           expense_date: "2026-09-08",
           amount_cents: 4996,
           external_ref: "3325",
+          source: "home_depot_csv",
         }],
       ),
     ).toBe("already_imported");
+  });
+
+  it("treats an OCR-stamped photo as matched receipt, not already imported", () => {
+    expect(
+      csvImportStatus(
+        {
+          vendor_name: "The Home Depot",
+          expense_date: "2026-09-08",
+          amount_cents: 4996,
+          external_ref: "3325",
+        },
+        [{
+          id: "photo-1",
+          vendor_name: "Home Depot",
+          expense_date: "2026-09-08",
+          amount_cents: 5308,
+          external_ref: "3325",
+          source: null,
+        }],
+      ),
+    ).toBe("matched_receipt");
   });
 
   it("marks a photo of the same trip as matched receipt (still import to merge)", () => {

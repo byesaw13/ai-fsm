@@ -12,7 +12,12 @@ export type ExpenseFingerprint = {
   expense_date: string;
   amount_cents: number;
   external_ref?: string | null;
+  source?: string | null;
 };
+
+function isCsvImportSource(source?: string | null): boolean {
+  return source === "home_depot_csv" || source === "lowes_csv";
+}
 
 const AMOUNT_TOLERANCE_CENTS = 3;
 const SALES_TAX_RATES = [0, 0.0625];
@@ -55,13 +60,17 @@ export function findMatchingExpense(
   existing: ExpenseFingerprint[],
 ): ExpenseFingerprint | null {
   const candTxn = normalizeTxnId(candidate.external_ref);
+  const family = vendorFamily(candidate.vendor_name);
   if (candTxn) {
-    const byRef = existing.filter((e) => normalizeTxnId(e.external_ref) === candTxn);
+    const byRef = existing.filter(
+      (e) =>
+        normalizeTxnId(e.external_ref) === candTxn &&
+        vendorFamily(e.vendor_name) === family,
+    );
     if (byRef.length === 1) return byRef[0];
     if (byRef.length > 1) return null;
   }
 
-  const family = vendorFamily(candidate.vendor_name);
   const hits = existing.filter((e) => {
     if (e.id && candidate.id && e.id === candidate.id) return false;
     if (vendorFamily(e.vendor_name) !== family) return false;
@@ -79,8 +88,8 @@ export function csvImportStatus(
 ): "new" | "already_imported" | "matched_receipt" {
   const match = findMatchingExpense(candidate, existing);
   if (!match) return "new";
-  if (normalizeTxnId(match.external_ref) === normalizeTxnId(candidate.external_ref)) {
-    return "already_imported";
-  }
+  const sameRef =
+    normalizeTxnId(match.external_ref) === normalizeTxnId(candidate.external_ref);
+  if (sameRef && isCsvImportSource(match.source)) return "already_imported";
   return "matched_receipt";
 }
