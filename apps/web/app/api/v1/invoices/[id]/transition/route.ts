@@ -144,7 +144,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         });
       }
 
-      if (targetStatus === "paid" && invoice.job_id) {
+      if ((targetStatus === "paid" || targetStatus === "void") && invoice.job_id) {
         const { closeJobIfFullyPaid } = await import("@/lib/jobs/close-if-paid");
         await closeJobIfFullyPaid(client, {
           accountId: session.accountId,

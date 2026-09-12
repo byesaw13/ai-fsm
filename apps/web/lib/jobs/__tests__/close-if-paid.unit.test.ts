@@ -14,6 +14,15 @@ describe("shouldCloseJobFromInvoices", () => {
     ).toBe(false);
   });
 
+  it("does not close while a deposit sibling is still open", () => {
+    expect(
+      shouldCloseJobFromInvoices([
+        { invoice_kind: "final", status: "paid" },
+        { invoice_kind: "deposit", status: "sent" },
+      ]),
+    ).toBe(false);
+  });
+
   it("does not close while a standard invoice is still sent", () => {
     expect(
       shouldCloseJobFromInvoices([

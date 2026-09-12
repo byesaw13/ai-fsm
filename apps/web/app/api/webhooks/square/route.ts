@@ -235,8 +235,8 @@ async function handleCompletedPayment(
         [accountId, invoiceId, JSON.stringify({ amountCents, method: "square" })]
       );
       const jobLink = await client.query<{ job_id: string | null; created_by: string }>(
-        `SELECT job_id, created_by FROM invoices WHERE id = $1`,
-        [invoiceId],
+        `SELECT job_id, created_by FROM invoices WHERE id = $1 AND account_id = $2`,
+        [invoiceId, accountId],
       );
       if (jobLink.rows[0]?.job_id) {
         const { closeJobIfFullyPaid } = await import("@/lib/jobs/close-if-paid");

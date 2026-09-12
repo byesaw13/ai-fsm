@@ -8,19 +8,15 @@ export type InvoicePaidSnapshot = {
   status: string;
 };
 
-/** True when at least one standard/final invoice is paid and none remain open. */
+/** True when a standard/final is paid and no bill (including deposit/progress) is still open. */
 export function shouldCloseJobFromInvoices(invoices: InvoicePaidSnapshot[]): boolean {
-  const relevant = invoices.filter(
+  const live = invoices.filter((i) => i.status !== "void" && i.status !== "cancelled");
+  const paidFinal = live.filter(
     (i) =>
-      (i.invoice_kind === "final" || i.invoice_kind === "standard") &&
-      i.status !== "void" &&
-      i.status !== "cancelled",
-  );
-  const paid = relevant.filter((i) => i.status === "paid").length;
-  const open = relevant.filter((i) =>
-    (OPEN_STATUSES as readonly string[]).includes(i.status),
+      (i.invoice_kind === "final" || i.invoice_kind === "standard") && i.status === "paid",
   ).length;
-  return paid > 0 && open === 0;
+  const open = live.filter((i) => (OPEN_STATUSES as readonly string[]).includes(i.status)).length;
+  return paidFinal > 0 && open === 0;
 }
 
 /**
@@ -49,16 +45,11 @@ export async function closeJobIfFullyPaid(
     [opts.jobId, opts.accountId],
   );
   const from = job.rows[0]?.status;
-  if (!from || from === "invoiced" || from === "cancelled") return null;
+  if (!from || from === "invoiced" || from === "cancelled" || from === "scheduled") {
+    return null;
+  }
 
-  if (from === "in_progress" || from === "scheduled") {
-    if (from === "scheduled") {
-      await client.query(
-        `UPDATE jobs SET status = 'in_progress', updated_at = now()
-         WHERE id = $1 AND account_id = $2 AND status = 'scheduled'`,
-        [opts.jobId, opts.accountId],
-      );
-    }
+  if (from === "in_progress") {
     await client.query(
       `UPDATE jobs SET status = 'completed', updated_at = now()
        WHERE id = $1 AND account_id = $2 AND status = 'in_progress'`,
