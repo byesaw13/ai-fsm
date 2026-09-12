@@ -4,6 +4,8 @@ import { allRequiredCriteriaMet, type CompletionCriterion } from "./completion-c
 export interface WorkOrderVisitSnapshot {
   status: VisitStatus;
   scheduled_start: string | Date;
+  /** Field closeout fork. NULL/omitted = legacy Complete. */
+  closeout_kind?: "done" | "return" | null;
 }
 
 export interface DeriveWorkOrderStatusInput {
@@ -43,6 +45,16 @@ export function deriveWorkOrderStatus({
     visits.some((v) => v.status === "completed");
 
   if (allVisitsDone && allRequiredCriteriaMet(completionCriteria)) {
+    const latestCompleted = [...visits]
+      .filter((v) => v.status === "completed")
+      .sort(
+        (a, b) =>
+          new Date(b.scheduled_start).getTime() - new Date(a.scheduled_start).getTime(),
+      )[0];
+    // Coming back with no next visit planted must not auto-complete the WO.
+    if (latestCompleted?.closeout_kind === "return") {
+      return currentStatus === "waiting" ? "waiting" : "dispatched";
+    }
     return "completed";
   }
 

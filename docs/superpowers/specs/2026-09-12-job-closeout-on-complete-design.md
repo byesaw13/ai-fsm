@@ -1,7 +1,7 @@
 # Job closeout on Complete — Design Spec
 
 **Date:** 2026-09-12  
-**Status:** Proposed (owner approval required before build)  
+**Status:** In Progress (owner approved 2026-09-12)  
 **Backlog:** TASK-133 (parent) · TASK-134–138 (slices)  
 **Phase:** 3 (billing connected to completed work) with a field surface in EPIC-007
 

@@ -105,7 +105,12 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
     queryForSession<HeroVisit>(
       session,
       `SELECT v.id, v.status, v.scheduled_start::text, j.title AS job_title,
-              p.address AS property_address, c.name AS client_name, c.phone AS client_phone
+              p.address AS property_address, c.name AS client_name, c.phone AS client_phone,
+              (SELECT t.label FROM visit_tasks vt
+               JOIN work_order_tasks t ON t.id = vt.task_id
+               WHERE vt.visit_id = v.id AND vt.account_id = v.account_id
+                 AND t.completed = false AND t.status <> 'done'
+               ORDER BY t.sort_order ASC LIMIT 1) AS first_up
        FROM visits v
        LEFT JOIN jobs j ON j.id = v.job_id
        LEFT JOIN clients c ON c.id = j.client_id

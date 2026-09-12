@@ -53,6 +53,9 @@ interface CreateFinalInvoiceParams {
    *  estimate items exist (e.g. time-and-materials jobs with no formal estimate). */
   visitId?: string;
   traceId?: string;
+  /** Field closeout: one labor description, materials rollup, dumping line, no handling. */
+  closeoutRollup?: boolean;
+  laborDescription?: string | null;
 }
 
 interface CreateFinalInvoiceResult {
@@ -69,7 +72,8 @@ interface CreateFinalInvoiceResult {
 export async function createDraftFinalInvoiceForJob(
   params: CreateFinalInvoiceParams
 ): Promise<CreateFinalInvoiceResult | null> {
-  const { client, jobId, accountId, userId, visitId, traceId } = params;
+  const { client, jobId, accountId, userId, visitId, traceId, closeoutRollup, laborDescription } =
+    params;
 
   // ── Guard: skip if a final invoice already exists for this job ──────────
   // We gate on job_id (not estimate_id) so the check catches invoices created
@@ -152,6 +156,7 @@ export async function createDraftFinalInvoiceForJob(
   let appendTmMaterialsAfterCreate = false;
   /** When true, lift/equipment expenses are appended after insert. */
   let appendTmEquipmentAfterCreate = false;
+  let appendCloseoutRollupAfterCreate = false;
   /** Material + handling + equipment preview used only for totals before insert. */
   let materialPreviewSubtotal = 0;
 
@@ -254,7 +259,7 @@ export async function createDraftFinalInvoiceForJob(
         }
       }
       lineItems.push({
-        description: "Labor",
+        description: (laborDescription && laborDescription.trim()) || "Labor",
         quantity: billableHours,
         unit_price_cents: billRate,
         line_item_type: "labor",
@@ -264,7 +269,9 @@ export async function createDraftFinalInvoiceForJob(
 
     // Job materials receipts → invoice lines (with handling fee when configured).
     // Preview for totals; insert happens after invoice create so source_expense_id is set.
-    const materialPreview = await materialLineItemsFromJobExpenses(
+    const materialPreview = closeoutRollup
+      ? []
+      : await materialLineItemsFromJobExpenses(
       client,
       accountId,
       jobId,
@@ -278,8 +285,23 @@ export async function createDraftFinalInvoiceForJob(
       );
     }
 
+    if (closeoutRollup) {
+      const { loadJobExpensesForCloseout, closeoutRollupFromExpenses } = await import(
+        "@/lib/invoices/closeout-rollup"
+      );
+      const rollup = closeoutRollupFromExpenses(
+        await loadJobExpensesForCloseout(client, accountId, jobId),
+      );
+      if (rollup.materialsCents + rollup.dumpCents > 0) {
+        appendCloseoutRollupAfterCreate = true;
+        materialPreviewSubtotal += rollup.materialsCents + rollup.dumpCents;
+      }
+    }
+
     // Lift / equipment (tag or lift heuristic) — billed at cost, no handling fee.
-    const equipmentPreview = await equipmentLineItemsFromJobExpenses(
+    const equipmentPreview = closeoutRollup
+      ? []
+      : await equipmentLineItemsFromJobExpenses(
       client,
       accountId,
       jobId,
@@ -423,6 +445,14 @@ export async function createDraftFinalInvoiceForJob(
   );
   const invoiceId = invoiceRes.rows[0].id;
 
+  if (closeoutRollup) {
+    await client.query(
+      `UPDATE invoices SET apply_material_handling = false, updated_at = now()
+       WHERE id = $1 AND account_id = $2`,
+      [invoiceId, accountId],
+    );
+  }
+
   // ── Line items ───────────────────────────────────────────────────────────
   for (let i = 0; i < lineItems.length; i++) {
     const li = lineItems[i];
@@ -438,7 +468,11 @@ export async function createDraftFinalInvoiceForJob(
   // T&M materials + equipment: link expenses with source_expense_id, then
   // re-sum totals so the draft matches what the job ledger showed as actuals.
   let materialLineCount = 0;
-  if (appendTmMaterialsAfterCreate || appendTmEquipmentAfterCreate) {
+  if (
+    appendTmMaterialsAfterCreate ||
+    appendTmEquipmentAfterCreate ||
+    appendCloseoutRollupAfterCreate
+  ) {
     if (appendTmMaterialsAfterCreate) {
       const { lineItems: materialLines } = await appendMaterialsFromJobExpenses(
         client,
@@ -456,6 +490,23 @@ export async function createDraftFinalInvoiceForJob(
         jobId
       );
       materialLineCount += equipmentLines.length;
+    }
+    if (appendCloseoutRollupAfterCreate) {
+      const {
+        loadJobExpensesForCloseout,
+        closeoutRollupFromExpenses,
+        appendCloseoutExpenseRollup,
+      } = await import("@/lib/invoices/closeout-rollup");
+      const rollup = closeoutRollupFromExpenses(
+        await loadJobExpensesForCloseout(client, accountId, jobId),
+      );
+      const rollupLines = await appendCloseoutExpenseRollup(
+        client,
+        invoiceId,
+        rollup,
+        lineItems.length,
+      );
+      materialLineCount += rollupLines.length;
     }
     const totals = await recalculateInvoiceTotals(client, invoiceId, accountId);
     // Re-apply deposit credit against the post-actuals total.

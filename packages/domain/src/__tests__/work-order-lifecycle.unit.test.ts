@@ -70,6 +70,45 @@ describe("deriveWorkOrderStatus", () => {
     ).toBe("waiting");
   });
 
+  it("does not complete the WO when the latest visit is coming back", () => {
+    expect(
+      deriveWorkOrderStatus({
+        currentStatus: "dispatched",
+        visits: [
+          {
+            status: "completed",
+            scheduled_start: "2026-06-28T09:00:00Z",
+            closeout_kind: "return",
+          },
+        ],
+        completionCriteria: [{ ...criteria[0], completed: true }],
+        now,
+      }),
+    ).toBe("dispatched");
+  });
+
+  it("completes the WO when the latest visit is done", () => {
+    expect(
+      deriveWorkOrderStatus({
+        currentStatus: "dispatched",
+        visits: [
+          {
+            status: "completed",
+            scheduled_start: "2026-06-28T09:00:00Z",
+            closeout_kind: "return",
+          },
+          {
+            status: "completed",
+            scheduled_start: "2026-06-29T09:00:00Z",
+            closeout_kind: "done",
+          },
+        ],
+        completionCriteria: [{ ...criteria[0], completed: true }],
+        now,
+      }),
+    ).toBe("completed");
+  });
+
   it("never changes cancelled", () => {
     expect(
       deriveWorkOrderStatus({

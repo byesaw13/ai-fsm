@@ -12,6 +12,7 @@ import {
   type HeroVisit,
 } from "@/lib/my-day/visit-hero";
 import { formatBusinessTime } from "@/lib/time/business-tz";
+import { CloseoutWizard } from "@/components/visits/CloseoutWizard";
 
 async function transitionVisit(visitId: string, targetStatus: string): Promise<string | null> {
   const res = await fetch(`/api/v1/visits/${visitId}/transition`, {
@@ -32,6 +33,7 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
   const router = useRouter();
   const toast = useToast();
   const [pending, setPending] = useState(false);
+  const [closeoutOpen, setCloseoutOpen] = useState(false);
 
   const mapsUrl = buildMapsUrl(visit.property_address);
   const telUrl = buildTelUrl(visit.client_phone);
@@ -44,14 +46,19 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
   async function handlePrimary() {
     if (!action) return;
     setPending(true);
-    const target = action === "start" ? "arrived" : "completed";
+    if (action === "complete") {
+      setPending(false);
+      setCloseoutOpen(true);
+      return;
+    }
+    const target = "arrived";
     const err = await transitionVisit(visit.id, target);
     setPending(false);
     if (err) {
       toast.error(err);
       return;
     }
-    toast.success(action === "start" ? "Arrived on site" : "Visit completed");
+    toast.success("Arrived on site");
     router.refresh();
   }
 
@@ -66,6 +73,11 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
       ) : null}
       {visit.property_address ? (
         <div className="p7-field-hero__meta">{visit.property_address}</div>
+      ) : null}
+      {visit.first_up ? (
+        <div className="p7-field-hero__meta" data-testid="hero-first-up">
+          First up: {visit.first_up}
+        </div>
       ) : null}
 
       <div className="p7-field-hero__actions">
@@ -142,6 +154,7 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
       >
         Open visit →
       </Link>
+      <CloseoutWizard visitId={visit.id} open={closeoutOpen} onClose={() => setCloseoutOpen(false)} />
     </div>
   );
 }

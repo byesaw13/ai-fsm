@@ -41,7 +41,7 @@ export async function syncWorkOrderStatus(
   if (!wo || wo.status === "draft" || wo.status === "cancelled") return null;
 
   const visitRes = await client.query<WorkOrderVisitSnapshot>(
-    `SELECT status, scheduled_start FROM visits
+    `SELECT status, scheduled_start, closeout_kind FROM visits
      WHERE work_order_id = $1 AND account_id = $2`,
     [workOrderId, accountId],
   );
@@ -59,6 +59,7 @@ export async function syncWorkOrderStatus(
     visits: visitRes.rows.map((v) => ({
       status: v.status as VisitStatus,
       scheduled_start: v.scheduled_start,
+      closeout_kind: v.closeout_kind,
     })),
     completionCriteria: criteria,
   });
