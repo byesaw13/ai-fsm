@@ -82,6 +82,13 @@ export async function appendCloseoutExpenseRollup(
       );
     }
     lines.push(line);
+    await attachHiddenExpenseLinks(
+      client,
+      invoiceId,
+      preview.materialExpenseIds.slice(1),
+      order,
+    );
+    order += Math.max(0, preview.materialExpenseIds.length - 1);
   }
   if (preview.dumpCents > 0) {
     const line = await createInvoiceLineItem(client, invoiceId, {
@@ -98,6 +105,31 @@ export async function appendCloseoutExpenseRollup(
       );
     }
     lines.push(line);
+    await attachHiddenExpenseLinks(
+      client,
+      invoiceId,
+      preview.dumpExpenseIds.slice(1),
+      order,
+    );
   }
   return lines;
+}
+
+/** $0 customer-hidden lines so remaining rollup receipts count as billed. */
+async function attachHiddenExpenseLinks(
+  client: PoolClient,
+  invoiceId: string,
+  expenseIds: string[],
+  sortStart: number,
+): Promise<void> {
+  let order = sortStart;
+  for (const expenseId of expenseIds) {
+    await client.query(
+      `INSERT INTO invoice_line_items
+         (invoice_id, description, quantity, unit_price_cents, total_cents,
+          line_item_type, sort_order, source_expense_id, visible_to_customer)
+       VALUES ($1, 'Materials (billed in rollup)', 1, 0, 0, 'materials', $2, $3, false)`,
+      [invoiceId, order++, expenseId],
+    );
+  }
 }

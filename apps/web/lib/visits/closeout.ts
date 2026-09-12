@@ -1,5 +1,7 @@
 import type { PoolClient } from "pg";
 import {
+  checkSchedulingPreconditions,
+  FIELD_ACTIVE_VISIT_STATUSES,
   laborDescriptionFromVisitNotes,
   visitTransitions,
   type VisitCloseoutBody,
@@ -82,6 +84,13 @@ async function completeVisitRow(
   );
   const visit = existing.rows[0];
   if (!visit) throw new CloseoutError("NOT_FOUND", "Visit not found", 404);
+  if (
+    session.role === "tech" &&
+    visit.assigned_user_id &&
+    visit.assigned_user_id !== session.userId
+  ) {
+    throw new CloseoutError("FORBIDDEN", "This visit is assigned to someone else", 403);
+  }
 
   let current = visit.status;
   if (current === "arrived") {
@@ -274,6 +283,38 @@ async function scheduleReturnVisit(
   const start = easternWallToUtc(date, prefill.startTime);
   const end = new Date(start.getTime() + prefill.durationMinutes * 60_000);
 
+  const jobRow = await client.query<{ status: string }>(
+    `SELECT status FROM jobs WHERE id = $1 AND account_id = $2`,
+    [current.job_id, session.accountId],
+  );
+  const fieldActive = await client.query<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM visits
+     WHERE job_id = $1 AND account_id = $2 AND status = ANY($3::text[])`,
+    [current.job_id, session.accountId, [...FIELD_ACTIVE_VISIT_STATUSES]],
+  );
+  const overlap = await client.query<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM visits
+     WHERE job_id = $1 AND account_id = $2
+       AND status NOT IN ('cancelled','completed')
+       AND scheduled_start < $4::timestamptz
+       AND scheduled_end > $3::timestamptz`,
+    [current.job_id, session.accountId, start.toISOString(), end.toISOString()],
+  );
+  const guard = checkSchedulingPreconditions({
+    jobStatus: jobRow.rows[0]?.status ?? null,
+    fieldActiveVisitCount: parseInt(fieldActive.rows[0]?.count ?? "0", 10),
+    overlappingVisitCount: parseInt(overlap.rows[0]?.count ?? "0", 10),
+  });
+  if (!guard.ok) {
+    const message =
+      guard.error === "VISIT_OVERLAP"
+        ? "That time overlaps an existing visit on this project. Pick a different day."
+        : guard.error === "ACTIVE_VISIT_EXISTS"
+          ? "A visit is already in progress for this project."
+          : "Could not schedule the next visit on this project.";
+    throw new CloseoutError(guard.error ?? "PRECONDITION_FAILED", message);
+  }
+
   const { rows } = await client.query<{ id: string }>(
     `INSERT INTO visits
        (account_id, job_id, work_order_id, assigned_user_id, scheduled_start, scheduled_end, visit_type, status)
@@ -371,8 +412,7 @@ export async function runVisitCloseout(
   }
 
   if (input.kind === "done" && completed.job_id) {
-    const isOwner = session.role === "owner" || session.role === "admin";
-    if (isOwner && (jobStatus === "in_progress" || jobStatus === "scheduled")) {
+    if (jobStatus === "in_progress" || jobStatus === "scheduled") {
       const notes = await client.query<{ tech_notes: string | null }>(
         `SELECT tech_notes FROM visits
          WHERE job_id = $1 AND account_id = $2 AND status = 'completed'
@@ -389,12 +429,31 @@ export async function runVisitCloseout(
         titleRow.rows[0]?.title ?? "Labor",
       );
 
-      await client.query(
-        `UPDATE jobs SET status = 'completed', updated_at = now()
-         WHERE id = $1 AND account_id = $2 AND status = 'in_progress'`,
-        [completed.job_id, session.accountId],
+      const completedJob = await client.query<{ complete_job_from_closeout: string | null }>(
+        `SELECT complete_job_from_closeout($1) AS complete_job_from_closeout`,
+        [completed.job_id],
       );
-      jobStatus = "completed";
+      if (completedJob.rows[0]?.complete_job_from_closeout === "completed") {
+        jobStatus = "completed";
+      } else {
+        const again = await client.query<{ status: string }>(
+          `SELECT status FROM jobs WHERE id = $1 AND account_id = $2`,
+          [completed.job_id, session.accountId],
+        );
+        jobStatus = again.rows[0]?.status ?? jobStatus;
+      }
+
+      if (jobStatus !== "completed") {
+        return {
+          visit_id: completed.id,
+          job_id: completed.job_id,
+          job_status: jobStatus,
+          closeout_kind: input.kind,
+          next_visit_id: nextVisitId,
+          invoice_id: invoiceId,
+          first_up_task_id: firstUpTaskId,
+        };
+      }
 
       await client.query("SAVEPOINT before_final_invoice");
       try {
