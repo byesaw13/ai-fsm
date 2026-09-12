@@ -5,6 +5,10 @@ of what each job actually earned.
 
 ## Active tasks
 
+# TASK-136: Done — complete project and draft the invoice
+
+See [TASK-136-done-invoice-from-complete.md](./TASK-136-done-invoice-from-complete.md). Parent TASK-133. Field Complete + done uses `createDraftFinalInvoiceForJob` with named labor, materials rollup, dumping line.
+
 # TASK-127: Pricing reconciliation — retire stray hardcoded labor rates
 
 Status:

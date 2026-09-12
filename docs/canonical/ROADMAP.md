@@ -80,6 +80,7 @@ Location capture, visit candidates, day map, hybrid tracking are **shipped infra
 
 ### Phase 3 — Estimate & Billing Closure
 
+- **Phase 3 wedge — TASK-133 Job closeout on Complete (proposed 2026-09-12).** Field Complete asks done vs coming back. Done completes the project and drafts the invoice (work named, materials rolled up, dumping separate). Coming back requires today’s notes, next visit, and first-up for the covering tech. Night is leftovers only. Spec: `docs/superpowers/specs/2026-09-12-job-closeout-on-complete-design.md`. Does not add a chatbot, briefing table, or GPS-creates-project. Owner approval required before build.
 - Assessment summary engine complete (TASK-018)
 - Estimate guardrails visible; approved estimate → project readiness explicit
 - Invoice discounts, payment provider model, Square card payments (TASK-060, TASK-068, TASK-069)

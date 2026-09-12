@@ -8,6 +8,7 @@ import {
   toPromiseToneInput,
   type OpenOwnerPromiseRow,
 } from "@/lib/captures/promise-queue";
+import { loadCloseoutLeftovers } from "@/lib/attention/closeout-leftovers";
 
 export type NeedsAttentionItem = {
   label: string;
@@ -49,6 +50,7 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
     overdueInvoices,
     exceptionRows,
     openPromiseRows,
+    leftovers,
   ] = await Promise.all([
     queryForSession<CountRow>(
       session,
@@ -157,6 +159,7 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
       OPEN_OWNER_PROMISES_SQL,
       [accountId, OWNER_PROMISE_ACTION_TYPE],
     ),
+    loadCloseoutLeftovers(session),
   ]);
 
   const draftInvoiceCount = parseN(draftInvoices[0]);
@@ -174,6 +177,27 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
 
   const items = (
     [
+      {
+        label: "Finished, no invoice",
+        count: leftovers.finishedUnbilled,
+        href: "/app/invoices?status=draft" as Route,
+        detail: "Jobs closed or marked done without an invoice",
+        tone: "danger",
+      },
+      {
+        label: "Open, no next visit",
+        count: leftovers.openNoNextVisit,
+        href: "/app/jobs" as Route,
+        detail: "Coming-back jobs with no day on the calendar",
+        tone: "warning",
+      },
+      {
+        label: "Receipts not on a job",
+        count: leftovers.unlinkedReceiptsToday,
+        href: "/app/expenses" as Route,
+        detail: "Today’s receipts still unattached",
+        tone: "warning",
+      },
       {
         label: "Review Draft Invoices",
         count: draftInvoiceCount,

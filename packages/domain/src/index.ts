@@ -84,3 +84,4 @@ export * from "./job-po";
 export * from "./referral-roi";
 export * from "./visit-timeline";
 export * from "./promise-capture";
+export * from "./visit-closeout";

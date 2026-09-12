@@ -104,6 +104,7 @@ export type Visit = {
   arrived_at?: string | null;
   completed_at?: string | null;
   tech_notes?: string | null;
+  closeout_kind?: "done" | "return" | null;
   materials_used?: string | null;
   created_at: string;
   updated_at: string;

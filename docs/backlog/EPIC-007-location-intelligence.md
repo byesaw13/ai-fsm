@@ -19,6 +19,28 @@ detection), Passive Capture, Bluetooth vehicle detection, Drive detection,
 Mileage automation, Day Map, Visit Review, Operational Inbox, Site Presence, and
 the Visit production surfaces (Production Rollup + Timeline).
 
+## Active tasks
+
+# TASK-133: Job closeout on Complete (parent)
+
+See [TASK-133-job-closeout-on-complete.md](./TASK-133-job-closeout-on-complete.md). Children: TASK-134, TASK-135, TASK-137, TASK-138 (invoice slice is TASK-136 in EPIC-004).
+
+# TASK-134: Complete fork — done vs coming back
+
+See [TASK-134-complete-done-or-return.md](./TASK-134-complete-done-or-return.md).
+
+# TASK-135: Coming back — today’s work, next visit, first-up
+
+See [TASK-135-return-day-log-next-visit.md](./TASK-135-return-day-log-next-visit.md).
+
+# TASK-137: Next-person briefing on the next visit
+
+See [TASK-137-next-person-briefing.md](./TASK-137-next-person-briefing.md).
+
+# TASK-138: Night leftovers after job closeout
+
+See [TASK-138-night-closeout-leftovers.md](./TASK-138-night-closeout-leftovers.md).
+
 ## Relationship to existing work (read first)
 
 This epic **extends TASK-024**, it does not replace it. The phone→FSM pipeline is

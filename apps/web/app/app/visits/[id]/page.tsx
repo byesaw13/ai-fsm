@@ -42,6 +42,8 @@ import { VisitCommandBanner } from "./VisitCommandBanner";
 import { VisitDayTasks } from "./VisitDayTasks";
 import { loadVisitPlannedTasks } from "@/lib/work-orders/job-tasks";
 import { VisitPropertyContext } from "./VisitPropertyContext";
+import { VisitHandoffCard } from "@/components/visits/VisitHandoffCard";
+import { loadVisitBriefing } from "@/lib/visits/briefing";
 import type { PropertyIssueContextRow, PropertyNoteContextRow, LastServiceRow } from "./VisitPropertyContext";
 import { VisitRecommendationPanel } from "./VisitRecommendationPanel";
 import { OnMyWayButton } from "./OnMyWayButton";
@@ -353,6 +355,10 @@ export default async function VisitDetailPage({
     has_estimate: Boolean(estimateOnJob?.exists),
   });
 
+  const briefing = visit.job_id
+    ? await withDbSession(session, (c) => loadVisitBriefing(c, session.accountId, visit.id))
+    : null;
+
   // For repair visits that are active, check for an approved estimate so we can surface the conditions panel
   const approvedEstimate =
     isRepairFlow &&
@@ -577,6 +583,10 @@ export default async function VisitDetailPage({
                 }
               />
             </Card>
+          )}
+
+          {briefing && currentStatus !== "cancelled" && currentStatus !== "completed" && (
+            <VisitHandoffCard briefing={briefing} />
           )}
 
           {/* ── Property context — shown for active visits with a property ── */}

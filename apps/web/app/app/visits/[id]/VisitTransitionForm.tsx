@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { VisitStatus } from "@ai-fsm/domain";
 import { Button, useToast } from "@/components/ui";
+import { CloseoutWizard } from "@/components/visits/CloseoutWizard";
 import type { ButtonVariant } from "@/components/ui";
 
 interface Props {
@@ -45,8 +46,13 @@ export function VisitTransitionForm({
   const router = useRouter();
   const toast = useToast();
   const [loading, setLoading] = useState(false);
+  const [closeoutOpen, setCloseoutOpen] = useState(false);
 
   async function transition(targetStatus: VisitStatus) {
+    if (targetStatus === "completed") {
+      setCloseoutOpen(true);
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch(`/api/v1/visits/${visitId}/transition`, {
@@ -97,6 +103,7 @@ export function VisitTransitionForm({
     const isBlocked = blockers.length > 0;
 
     return (
+      <>
       <div data-testid="visit-transition-buttons">
         {isBlocked && (
           <div
@@ -128,6 +135,8 @@ export function VisitTransitionForm({
           {loading ? "Updating…" : action.label}
         </Button>
       </div>
+      <CloseoutWizard visitId={visitId} open={closeoutOpen} onClose={() => setCloseoutOpen(false)} />
+      </>
     );
   }
 
@@ -158,6 +167,7 @@ export function VisitTransitionForm({
         >
           Cancel Visit
         </Button>
+        <CloseoutWizard visitId={visitId} open={closeoutOpen} onClose={() => setCloseoutOpen(false)} />
       </div>
     );
   }

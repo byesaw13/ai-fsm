@@ -6,6 +6,7 @@ export type HeroVisit = {
   property_address: string | null;
   client_name: string | null;
   client_phone: string | null;
+  first_up?: string | null;
 };
 
 function isOverdueScheduled(visit: HeroVisit, nowMs: number): boolean {
