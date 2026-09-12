@@ -120,7 +120,21 @@ export const POST = withRole(
       // Owner explicit project completion → draft final invoice for billing review.
       // Visits / work orders never complete the project or create this invoice.
       let final_invoice_id: string | null = null;
+      let closedBecausePaid = false;
       if (targetStatus === "completed") {
+        const { closeJobIfFullyPaid } = await import("@/lib/jobs/close-if-paid");
+        const paidClose = await closeJobIfFullyPaid(client, {
+          accountId: session.accountId,
+          jobId: id,
+          actorId: session.userId,
+          traceId: session.traceId,
+        });
+        if (paidClose?.to === "invoiced") {
+          closedBecausePaid = true;
+          updated.status = "invoiced";
+        }
+      }
+      if (targetStatus === "completed" && !closedBecausePaid) {
         await client.query("SAVEPOINT before_final_invoice");
         try {
           const result = await createDraftFinalInvoiceForJob({
@@ -200,7 +214,10 @@ export const POST = withRole(
         actor_id: session.userId,
         trace_id: session.traceId,
         old_value: { status: currentStatus },
-        new_value: { status: targetStatus, final_invoice_id },
+        new_value: {
+          status: closedBecausePaid ? "invoiced" : targetStatus,
+          final_invoice_id,
+        },
       });
 
       await client.query("COMMIT");
@@ -208,6 +225,10 @@ export const POST = withRole(
       const response: Record<string, unknown> = { data: updated };
       if (final_invoice_id) {
         response.final_invoice_id = final_invoice_id;
+      }
+      if (closedBecausePaid) {
+        response.job_status = "invoiced";
+        response.closed_because_paid = true;
       }
       if (intakeWarning) {
         response.warning = intakeWarning;

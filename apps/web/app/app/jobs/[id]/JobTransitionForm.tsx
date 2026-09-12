@@ -70,6 +70,8 @@ export function JobTransitionForm({
         error?: { message?: string };
         warning?: string;
         final_invoice_id?: string | null;
+        job_status?: string;
+        closed_because_paid?: boolean;
       };
       if (!res.ok) {
         setError(data.error?.message ?? "Transition failed");
@@ -77,6 +79,13 @@ export function JobTransitionForm({
       }
 
       if (data.warning) setWarning(data.warning);
+
+      // Paid invoice already closed the books — don't send the owner to deliver.
+      if (data.closed_because_paid || data.job_status === "invoiced") {
+        setSuccess("Paid — project closed");
+        router.refresh();
+        return;
+      }
 
       // Complete & Invoice: land on the draft (or existing) invoice ready to deliver.
       if (targetStatus === "completed") {
@@ -126,7 +135,7 @@ export function JobTransitionForm({
             {loading
               ? "Updating…"
               : status === "completed" && hasExistingFinalInvoice
-                ? "Complete project"
+                ? "Close job"
                 : (ACTION_LABELS[status] ?? `→ ${statusLabels[status]}`)}
           </Button>
         ))}

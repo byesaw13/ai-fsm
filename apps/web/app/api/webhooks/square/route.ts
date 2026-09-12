@@ -234,6 +234,18 @@ async function handleCompletedPayment(
          VALUES ($1, 'invoice.paid', 'invoice', $2, $3)`,
         [accountId, invoiceId, JSON.stringify({ amountCents, method: "square" })]
       );
+      const jobLink = await client.query<{ job_id: string | null; created_by: string }>(
+        `SELECT job_id, created_by FROM invoices WHERE id = $1`,
+        [invoiceId],
+      );
+      if (jobLink.rows[0]?.job_id) {
+        const { closeJobIfFullyPaid } = await import("@/lib/jobs/close-if-paid");
+        await closeJobIfFullyPaid(client, {
+          accountId,
+          jobId: jobLink.rows[0].job_id,
+          actorId: jobLink.rows[0].created_by,
+        });
+      }
     }
     // Owner attention (in-app + optional email via queue)
     if (inv.rows[0] && (inv.rows[0].status === "paid" || inv.rows[0].status === "partial")) {

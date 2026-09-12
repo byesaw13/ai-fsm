@@ -95,7 +95,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-139**.
+Next available ID: **TASK-140**.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -122,6 +122,7 @@ closed in tests; owner-flow AC still open.
 | TASK-136 | [Done — complete project and draft the invoice](TASK-136-done-invoice-from-complete.md) | 004 | Proposed |
 | TASK-137 | [Next-person briefing on the next visit](TASK-137-next-person-briefing.md) | 007 | Proposed |
 | TASK-138 | [Night leftovers after job closeout](TASK-138-night-closeout-leftovers.md) | 007 | Proposed |
+| TASK-139 | [Paid invoice closes the job](TASK-139-paid-invoice-closes-job.md) | 004 | In Progress |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
 | TASK-003 | Wrong Vehicle Correction | 001 | Done |
