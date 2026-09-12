@@ -95,7 +95,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-133**.
+Next available ID: **TASK-139**.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -116,6 +116,12 @@ closed in tests; owner-flow AC still open.
 | --- | --- | --- | --- |
 | TASK-131 | Audit hardening — framework security patch | 005 | In Progress |
 | TASK-132 | [Audit hardening: CI, database roles, project loading](TASK-132-audit-hardening.md) | 005 | In Progress |
+| TASK-133 | [Job closeout on Complete (parent)](TASK-133-job-closeout-on-complete.md) | 007 | Proposed |
+| TASK-134 | [Complete fork — done vs coming back](TASK-134-complete-done-or-return.md) | 007 | Proposed |
+| TASK-135 | [Coming back — day log, next visit, first-up](TASK-135-return-day-log-next-visit.md) | 007 | Proposed |
+| TASK-136 | [Done — complete project and draft the invoice](TASK-136-done-invoice-from-complete.md) | 004 | Proposed |
+| TASK-137 | [Next-person briefing on the next visit](TASK-137-next-person-briefing.md) | 007 | Proposed |
+| TASK-138 | [Night leftovers after job closeout](TASK-138-night-closeout-leftovers.md) | 007 | Proposed |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
 | TASK-003 | Wrong Vehicle Correction | 001 | Done |
