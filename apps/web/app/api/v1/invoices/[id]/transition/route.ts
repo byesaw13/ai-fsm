@@ -70,8 +70,9 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         status: InvoiceStatus;
         paid_cents: number;
         sent_at: string | null;
+        job_id: string | null;
       }>(
-        `SELECT id, status, paid_cents, sent_at FROM invoices WHERE id = $1 AND account_id = $2`,
+        `SELECT id, status, paid_cents, sent_at, job_id FROM invoices WHERE id = $1 AND account_id = $2`,
         [id, session.accountId]
       );
 
@@ -140,6 +141,16 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           eventType: "invoice.void",
           entityType: "invoice",
           entityId: id,
+        });
+      }
+
+      if ((targetStatus === "paid" || targetStatus === "void") && invoice.job_id) {
+        const { closeJobIfFullyPaid } = await import("@/lib/jobs/close-if-paid");
+        await closeJobIfFullyPaid(client, {
+          accountId: session.accountId,
+          jobId: invoice.job_id,
+          actorId: session.userId,
+          traceId: session.traceId,
         });
       }
     });

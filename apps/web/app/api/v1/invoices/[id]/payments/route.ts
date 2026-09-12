@@ -332,6 +332,15 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             entityId: invoiceId,
             payload: { amountCents: amount_cents, method },
           });
+          if (invoice.job_id) {
+            const { closeJobIfFullyPaid } = await import("@/lib/jobs/close-if-paid");
+            await closeJobIfFullyPaid(client, {
+              accountId: session.accountId,
+              jobId: invoice.job_id,
+              actorId: session.userId,
+              traceId: session.traceId,
+            });
+          }
         }
       }
 
