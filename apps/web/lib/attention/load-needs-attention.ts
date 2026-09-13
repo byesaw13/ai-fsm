@@ -243,7 +243,7 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
         count: materialCount,
         href: (materialJobs.length === 1
           ? `/app/jobs/${materialJobs[0].job_id}/materials?tab=buy`
-          : "/app#materials") as Route,
+          : "/app/materials") as Route,
         detail:
           materialJobs.length === 1
             ? `Buy list: ${materialJobs[0].title}`
