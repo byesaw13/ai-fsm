@@ -75,6 +75,8 @@ export * from "./visit-matching";
 export * from "./day-review";
 export * from "./day-draft";
 export * from "./mileage";
+export * from "./mileage-month";
+export * from "./mileage-tag";
 export * from "./hybrid-mileage";
 export * from "./vehicle-mpg";
 export * from "./vehicle-next-due";

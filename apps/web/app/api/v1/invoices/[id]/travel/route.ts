@@ -275,6 +275,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
               AND v.account_id = s.account_id
              WHERE s.account_id = $1
                AND s.status IS DISTINCT FROM 'voided'
+               AND (s.miles_source IN ('odometer', 'manual_miles') OR s.miles_source IS NULL)
                AND (
                  (a.entity_type = 'job' AND a.entity_id = $2)
                  OR (a.entity_type = 'visit' AND v.job_id = $2)

@@ -5,13 +5,14 @@ export type CloseoutLeftoverCounts = {
   finishedUnbilled: number;
   openNoNextVisit: number;
   unlinkedReceiptsToday: number;
+  untaggedClaimMiles: number;
 };
 
 export async function loadCloseoutLeftovers(
   session: SessionPayload,
 ): Promise<CloseoutLeftoverCounts> {
   const accountId = session.accountId;
-  const [unbilled, noNext, receipts] = await Promise.all([
+  const [unbilled, noNext, receipts, untaggedMiles] = await Promise.all([
     queryForSession<{ count: string }>(
       session,
       `SELECT COUNT(*)::text AS count
@@ -62,10 +63,24 @@ export async function loadCloseoutLeftovers(
          AND e.expense_date = (CURRENT_TIMESTAMP AT TIME ZONE 'America/New_York')::date`,
       [accountId],
     ),
+    queryForSession<{ count: string }>(
+      session,
+      `SELECT COUNT(*)::text AS count
+       FROM vehicle_sessions s
+       WHERE s.account_id = $1
+         AND s.status = 'closed'
+         AND s.session_date >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/New_York')::date - 14
+         AND (s.miles_source IN ('odometer', 'manual_miles') OR s.miles_source IS NULL)
+         AND NOT EXISTS (
+           SELECT 1 FROM vehicle_session_activities a WHERE a.session_id = s.id
+         )`,
+      [accountId],
+    ),
   ]);
   return {
     finishedUnbilled: parseInt(unbilled[0]?.count ?? "0", 10),
     openNoNextVisit: parseInt(noNext[0]?.count ?? "0", 10),
     unlinkedReceiptsToday: parseInt(receipts[0]?.count ?? "0", 10),
+    untaggedClaimMiles: parseInt(untaggedMiles[0]?.count ?? "0", 10),
   };
 }

@@ -199,6 +199,13 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
         tone: "warning",
       },
       {
+        label: "Miles not on a job",
+        count: leftovers.untaggedClaimMiles,
+        href: "/app/mileage" as Route,
+        detail: "Odometer days in the last 14 days with no job tag",
+        tone: "warning",
+      },
+      {
         label: "Review Draft Invoices",
         count: draftInvoiceCount,
         href: "/app/invoices?status=draft" as Route,

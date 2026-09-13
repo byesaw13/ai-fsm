@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
@@ -15,6 +16,8 @@ import {
 } from "@/components/ui";
 import type { TabDef } from "@/components/ui";
 import { MONEY_HUB_LINKS } from "@/lib/navigation/hubs";
+import { groupMileageMonth, milesSourceLabel, type MilesSource } from "@ai-fsm/domain";
+import { TagClaimControl } from "@/components/mileage/TagClaimControl";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +40,8 @@ interface SessionRow {
   vehicle_nickname: string | null;
   vehicle_plate: string | null;
   created_by_name: string | null;
+  miles_source: MilesSource | null;
+  status: string | null;
   activities: ActivityRow[];
   [key: string]: unknown;
 }
@@ -73,8 +78,8 @@ export default async function MileagePage({ searchParams }: PageProps) {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const { month } = await searchParams;
-  const activeMonth = month && /^\d{4}-\d{2}$/.test(month) ? month : currentMonth();
+  const { month: monthParam } = await searchParams;
+  const activeMonth = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : currentMonth();
 
   const [year, mon] = activeMonth.split("-");
   const monthLabel = new Date(parseInt(year), parseInt(mon) - 1, 1).toLocaleDateString(undefined, {
@@ -84,7 +89,7 @@ export default async function MileagePage({ searchParams }: PageProps) {
   const sessions = await query<SessionRow>(
     `SELECT s.id, s.session_date::text,
             COALESCE(s.miles, s.end_odometer - s.start_odometer) AS miles,
-            s.start_odometer, s.end_odometer, s.notes,
+            s.start_odometer, s.end_odometer, s.notes, s.miles_source, s.status,
             s.vehicle_id, v.nickname AS vehicle_nickname, v.plate AS vehicle_plate,
             u.full_name AS created_by_name,
             COALESCE(
@@ -120,9 +125,29 @@ export default async function MileagePage({ searchParams }: PageProps) {
     [session.accountId, activeMonth]
   );
 
-  const totalMiles = sessions.reduce((sum, r) => sum + parseFloat(r.miles), 0);
-  const sessionCount = sessions.length;
-  const avgMiles = sessionCount > 0 ? totalMiles / sessionCount : 0;
+  const monthSummary = groupMileageMonth(
+    sessions.map((r) => {
+      const acts = Array.isArray(r.activities)
+        ? r.activities
+        : typeof r.activities === "string"
+          ? (JSON.parse(r.activities) as ActivityRow[])
+          : [];
+      r.activities = acts;
+      return {
+        id: r.id,
+        session_date: r.session_date,
+        miles: parseFloat(r.miles) || 0,
+        miles_source: r.miles_source,
+        status: r.status,
+        start_odometer: r.start_odometer,
+        end_odometer: r.end_odometer,
+        notes: r.notes,
+        tagged: acts.length > 0,
+      };
+    }),
+  );
+  const sessionById = new Map(sessions.map((s) => [s.id, s]));
+  const avgMiles = monthSummary.claimDays > 0 ? monthSummary.claimMiles / monthSummary.claimDays : 0;
 
   const canManage = session.role === "owner" || session.role === "admin";
 
@@ -154,13 +179,25 @@ export default async function MileagePage({ searchParams }: PageProps) {
 
       <MetricGrid
         metrics={[
-          { label: "Total Miles", value: totalMiles.toFixed(1) },
-          { label: "Sessions", value: String(sessionCount) },
-          { label: "Avg per Session", value: avgMiles > 0 ? avgMiles.toFixed(1) : "—" },
+          { label: "Claim miles", value: monthSummary.claimMiles.toFixed(1) },
+          { label: "GPS check", value: monthSummary.gpsMiles.toFixed(1) },
+          { label: "Odometer days", value: String(monthSummary.claimDays) },
+          { label: "Avg per day", value: avgMiles > 0 ? avgMiles.toFixed(1) : "—" },
         ]}
       />
+      {monthSummary.hiddenVoided + monthSummary.hiddenNoiseHops > 0 ? (
+        <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginTop: 0 }}>
+          Hidden: {monthSummary.hiddenVoided} voided
+          {monthSummary.hiddenNoiseHops > 0 ? `, ${monthSummary.hiddenNoiseHops} GPS hops under 1 mile` : ""}.
+          Claim miles are odometer (or typed). GPS hops are a check, not extra driving.
+        </p>
+      ) : (
+        <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginTop: 0 }}>
+          Claim miles are odometer (or typed). GPS hops are a check, not extra driving.
+        </p>
+      )}
 
-      {sessions.length === 0 ? (
+      {monthSummary.days.length === 0 ? (
         <EmptyState
           title={`No sessions logged for ${monthLabel}`}
           description={canManage ? "Use the button above to log a vehicle session." : "No mileage recorded this month."}
@@ -179,83 +216,132 @@ export default async function MileagePage({ searchParams }: PageProps) {
               </tr>
             </thead>
             <tbody>
-              {sessions.map((s) => (
-                <tr key={s.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                  <td style={{ padding: "var(--space-2) var(--space-3)", whiteSpace: "nowrap", verticalAlign: "top" }}>
-                    {new Date(s.session_date + "T00:00:00").toLocaleDateString(undefined, {
-                      weekday: "short", month: "short", day: "numeric",
-                    })}
-                  </td>
-                  <td style={{ padding: "var(--space-2) var(--space-3)", verticalAlign: "top" }}>
-                    {s.vehicle_nickname ? (
-                      <div>
-                        <div style={{ fontWeight: 600 }}>{s.vehicle_nickname}</div>
-                        {s.vehicle_plate && (
-                          <div style={{ fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--fg-muted)", letterSpacing: 1 }}>{s.vehicle_plate}</div>
-                        )}
-                      </div>
-                    ) : (
-                      <span style={{ color: "var(--fg-muted)" }}>—</span>
-                    )}
-                  </td>
-                  <td style={{ padding: "var(--space-2) var(--space-3)", verticalAlign: "top" }}>
-                    {s.activities.length === 0 ? (
-                      <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
-                        {s.notes ?? "—"}
-                      </span>
-                    ) : (
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-1)" }}>
-                        {s.activities.map((a) => {
-                          const entityHref = a.entity_type === "job" && a.entity_id
-                            ? `/app/jobs/${a.entity_id}`
-                            : a.entity_type === "visit" && a.entity_id
-                            ? `/app/visits/${a.entity_id}`
-                            : a.entity_type === "estimate" && a.entity_id
-                            ? `/app/estimates/${a.entity_id}`
-                            : null;
-                          const chip = (
-                            <span style={{
-                              display: "inline-block",
-                              padding: "2px 6px",
-                              borderRadius: 99,
-                              fontSize: "var(--text-xs)",
-                              fontWeight: 500,
-                              background: "var(--surface-raised)",
-                              border: "1px solid var(--border)",
-                              color: "var(--fg)",
-                              whiteSpace: "nowrap",
-                            }}>
-                              <span style={{ color: "var(--fg-muted)" }}>{ENTITY_TYPE_LABELS[a.entity_type] ?? a.entity_type}:</span>{" "}
-                              {a.entity_title ?? a.label ?? "—"}
-                            </span>
-                          );
-                          return entityHref ? (
-                            <Link key={a.id} href={entityHref as Route} style={{ textDecoration: "none" }}>{chip}</Link>
+              {monthSummary.days.map((day) => {
+                const claimRows = day.claimSessions.map((cs) => sessionById.get(cs.id)).filter(Boolean) as SessionRow[];
+                const hopRows = day.gpsHops.map((h) => sessionById.get(h.id)).filter(Boolean) as SessionRow[];
+                return (
+                  <Fragment key={day.date}>
+                    {claimRows.map((s, i) => (
+                      <tr key={s.id} style={{ borderBottom: hopRows.length && i === claimRows.length - 1 ? undefined : "1px solid var(--border)" }}>
+                        <td style={{ padding: "var(--space-2) var(--space-3)", whiteSpace: "nowrap", verticalAlign: "top" }}>
+                          {i === 0
+                            ? new Date(s.session_date + "T00:00:00").toLocaleDateString(undefined, {
+                                weekday: "short", month: "short", day: "numeric",
+                              })
+                            : null}
+                        </td>
+                        <td style={{ padding: "var(--space-2) var(--space-3)", verticalAlign: "top" }}>
+                          {s.vehicle_nickname ? (
+                            <div>
+                              <div style={{ fontWeight: 600 }}>{s.vehicle_nickname}</div>
+                              {s.vehicle_plate && (
+                                <div style={{ fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--fg-muted)", letterSpacing: 1 }}>{s.vehicle_plate}</div>
+                              )}
+                              <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                                {milesSourceLabel(s.miles_source) ?? "Odometer"}
+                              </div>
+                            </div>
                           ) : (
-                            <span key={a.id}>{chip}</span>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {s.notes && s.activities.length > 0 && (
-                      <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginTop: "var(--space-1)" }}>{s.notes}</div>
-                    )}
-                  </td>
-                  <td style={{ padding: "var(--space-2) var(--space-3)", fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--fg-muted)", whiteSpace: "nowrap", verticalAlign: "top" }}>
-                    {s.start_odometer != null && s.end_odometer != null
-                      ? `${s.start_odometer.toLocaleString()} → ${s.end_odometer.toLocaleString()}`
-                      : "—"}
-                  </td>
-                  <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right", fontWeight: 700, verticalAlign: "top" }}>
-                    {parseFloat(s.miles).toFixed(1)}
-                  </td>
-                </tr>
-              ))}
+                            <span style={{ color: "var(--fg-muted)" }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ padding: "var(--space-2) var(--space-3)", verticalAlign: "top" }}>
+                          {s.activities.length === 0 ? (
+                            <>
+                              <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+                                {s.notes ?? "Not tagged"}
+                              </span>
+                              {canManage ? <TagClaimControl sessionId={s.id} date={s.session_date} /> : null}
+                            </>
+                          ) : (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-1)" }}>
+                              {s.activities.map((a) => {
+                                const entityHref = a.entity_type === "job" && a.entity_id
+                                  ? `/app/jobs/${a.entity_id}`
+                                  : a.entity_type === "visit" && a.entity_id
+                                  ? `/app/visits/${a.entity_id}`
+                                  : a.entity_type === "estimate" && a.entity_id
+                                  ? `/app/estimates/${a.entity_id}`
+                                  : null;
+                                const chip = (
+                                  <span style={{
+                                    display: "inline-block",
+                                    padding: "2px 6px",
+                                    borderRadius: 99,
+                                    fontSize: "var(--text-xs)",
+                                    fontWeight: 500,
+                                    background: "var(--surface-raised)",
+                                    border: "1px solid var(--border)",
+                                    color: "var(--fg)",
+                                    whiteSpace: "nowrap",
+                                  }}>
+                                    <span style={{ color: "var(--fg-muted)" }}>{ENTITY_TYPE_LABELS[a.entity_type] ?? a.entity_type}:</span>{" "}
+                                    {a.entity_title ?? a.label ?? "—"}
+                                  </span>
+                                );
+                                return entityHref ? (
+                                  <Link key={a.id} href={entityHref as Route} style={{ textDecoration: "none" }}>{chip}</Link>
+                                ) : (
+                                  <span key={a.id}>{chip}</span>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ padding: "var(--space-2) var(--space-3)", fontFamily: "monospace", fontSize: "var(--text-xs)", color: "var(--fg-muted)", whiteSpace: "nowrap", verticalAlign: "top" }}>
+                          {s.start_odometer != null && s.end_odometer != null
+                            ? `${s.start_odometer.toLocaleString()} → ${s.end_odometer.toLocaleString()}`
+                            : "—"}
+                        </td>
+                        <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right", fontWeight: 700, verticalAlign: "top" }}>
+                          {parseFloat(s.miles).toFixed(1)}
+                        </td>
+                      </tr>
+                    ))}
+                    {claimRows.length === 0 ? (
+                      <tr key={`${day.date}-empty`}>
+                        <td style={{ padding: "var(--space-2) var(--space-3)", whiteSpace: "nowrap" }}>
+                          {new Date(day.date + "T00:00:00").toLocaleDateString(undefined, {
+                            weekday: "short", month: "short", day: "numeric",
+                          })}
+                        </td>
+                        <td colSpan={3} style={{ padding: "var(--space-2) var(--space-3)", color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+                          GPS hops only — no odometer claim this day
+                        </td>
+                        <td />
+                      </tr>
+                    ) : null}
+                    {hopRows.map((s) => (
+                      <tr key={s.id} style={{ borderBottom: "1px solid var(--border)", color: "var(--fg-muted)" }}>
+                        <td />
+                        <td style={{ padding: "var(--space-1) var(--space-3)", fontSize: "var(--text-xs)" }}>
+                          GPS hop
+                        </td>
+                        <td style={{ padding: "var(--space-1) var(--space-3)", fontSize: "var(--text-xs)" }}>
+                          {s.notes ?? "Auto-captured drive"}
+                        </td>
+                        <td />
+                        <td style={{ padding: "var(--space-1) var(--space-3)", textAlign: "right", fontSize: "var(--text-xs)" }}>
+                          {parseFloat(s.miles).toFixed(1)}
+                        </td>
+                      </tr>
+                    ))}
+                    {day.hiddenNoiseHops > 0 ? (
+                      <tr key={`${day.date}-noise`} style={{ borderBottom: "1px solid var(--border)" }}>
+                        <td />
+                        <td colSpan={4} style={{ padding: "var(--space-1) var(--space-3)", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                          {day.hiddenNoiseHops} GPS hop{day.hiddenNoiseHops === 1 ? "" : "s"} under 1 mile hidden
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
             </tbody>
             <tfoot>
               <tr style={{ borderTop: "2px solid var(--border)", fontWeight: 700 }}>
-                <td colSpan={4} style={{ padding: "var(--space-2) var(--space-3)" }}>Total</td>
-                <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{totalMiles.toFixed(1)}</td>
+                <td colSpan={4} style={{ padding: "var(--space-2) var(--space-3)" }}>Claim total</td>
+                <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{monthSummary.claimMiles.toFixed(1)}</td>
               </tr>
             </tfoot>
           </table>

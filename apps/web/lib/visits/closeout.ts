@@ -16,6 +16,8 @@ import { setVisitPlannedTasks } from "@/lib/work-orders/job-tasks";
 import { syncWorkOrderStatus, syncWorkOrdersForJob } from "@/lib/work-orders/sync-status";
 import { writeWorkflowEvent } from "@/lib/workflow-events";
 import { seedConditionSnapshots } from "@/lib/visits/condition-seeding";
+import { tagMileageForCompletedVisit } from "@/lib/mileage/tag-from-visit";
+import { formatBusinessYmd } from "@/lib/time/business-tz";
 
 export type CloseoutSession = {
   userId: string;
@@ -362,6 +364,36 @@ export async function runVisitCloseout(
   let jobStatus: string | null = null;
 
   if (completed.job_id) {
+    const visitTimes = await client.query<{
+      scheduled_start: string;
+      scheduled_end: string;
+      arrived_at: string | null;
+      completed_at: string | null;
+    }>(
+      `SELECT scheduled_start::text, scheduled_end::text,
+              arrived_at::text, completed_at::text
+       FROM visits WHERE id = $1 AND account_id = $2`,
+      [visitId, session.accountId],
+    );
+    const vt = visitTimes.rows[0];
+    const execution =
+      completed.visit_type === "standard" || completed.visit_type === "punch_list";
+    if (vt && execution) {
+      const windowStart = new Date(vt.arrived_at ?? vt.scheduled_start);
+      const windowEnd = new Date(vt.completed_at ?? vt.scheduled_end);
+      try {
+        await tagMileageForCompletedVisit(client, {
+          accountId: session.accountId,
+          jobId: completed.job_id,
+          visitId,
+          day: formatBusinessYmd(vt.completed_at ?? vt.scheduled_start),
+          windowStart,
+          windowEnd,
+        });
+      } catch {
+        // Mileage tag is best-effort; closeout still succeeds.
+      }
+    }
     const jobRow = await client.query<{ status: string; title: string }>(
       `SELECT status, title FROM jobs WHERE id = $1 AND account_id = $2`,
       [completed.job_id, session.accountId],
