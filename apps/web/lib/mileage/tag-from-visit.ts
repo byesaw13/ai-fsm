@@ -20,13 +20,14 @@ export async function tagMileageForCompletedVisit(
   },
 ): Promise<{ strategy: string; tagged: number }> {
   const others = await client.query<{ count: string }>(
-    `SELECT COUNT(*)::text AS count
+    `SELECT COUNT(DISTINCT v.job_id)::text AS count
      FROM visits v
      WHERE v.account_id = $1
        AND v.id <> $2
+       AND v.job_id IS NOT NULL
        AND v.job_id IS DISTINCT FROM $3
-       AND v.status = 'completed'
-       AND v.visit_type IS DISTINCT FROM 'site_visit'
+       AND v.status NOT IN ('cancelled')
+       AND v.visit_type IN ('standard', 'punch_list')
        AND timezone('America/New_York', COALESCE(v.completed_at, v.scheduled_start))::date = $4::date`,
     [opts.accountId, opts.visitId, opts.jobId, opts.day],
   );

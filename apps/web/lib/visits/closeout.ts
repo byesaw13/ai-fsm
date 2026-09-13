@@ -376,7 +376,9 @@ export async function runVisitCloseout(
       [visitId, session.accountId],
     );
     const vt = visitTimes.rows[0];
-    if (vt) {
+    const execution =
+      completed.visit_type === "standard" || completed.visit_type === "punch_list";
+    if (vt && execution) {
       const windowStart = new Date(vt.arrived_at ?? vt.scheduled_start);
       const windowEnd = new Date(vt.completed_at ?? vt.scheduled_end);
       try {
