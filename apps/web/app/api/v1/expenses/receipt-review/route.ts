@@ -14,7 +14,7 @@ import {
   suggestJobFromPoText,
 } from "@/lib/expenses/match-job-po";
 import { formatJobPickerLabel } from "@ai-fsm/domain";
-import { patchForNonJobDestination, RECEIPT_DESTINATIONS } from "@/lib/expenses/destinations";
+import { patchForNonJobDestination } from "@/lib/expenses/destinations";
 import type { ReceiptDestination } from "@/lib/expenses/destinations";
 
 export const dynamic = "force-dynamic";
