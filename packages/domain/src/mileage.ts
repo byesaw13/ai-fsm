@@ -22,6 +22,14 @@ export function isGpsEstimateSource(source: MilesSource | null | undefined): boo
   return source === "gps_estimate" || source === "bt_gps_estimate";
 }
 
+/** Tax / job-cost claim — odometer or typed miles. GPS hops are not a claim. */
+export function isClaimMilesSource(source: MilesSource | null | undefined): boolean {
+  return source === "odometer" || source === "manual_miles" || source == null;
+}
+
+/** GPS hops shorter than this are red-light noise, not trips. */
+export const GPS_HOP_NOISE_MILES = 1;
+
 /** Owner-visible short label for capture method badges. */
 export function milesSourceLabel(source: MilesSource | null | undefined): string | null {
   if (!source) return null;

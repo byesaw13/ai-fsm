@@ -6,6 +6,10 @@ trustworthy enough to feed tax mileage, vehicle cost, and job profitability.
 
 ## Active tasks
 
+# TASK-140 / 141 / 142: Mileage claim vs GPS + tags
+
+See [TASK-140](./TASK-140-mileage-claim-vs-gps.md), [TASK-141](./TASK-141-tag-miles-from-complete.md), [TASK-142](./TASK-142-untagged-miles-leftover.md). Spec: `docs/superpowers/specs/2026-09-12-mileage-claim-and-tags-design.md`.
+
 > The TASK-049…057 block is the **Operations Engine** program. Canonical design:
 > `docs/canonical/OPERATIONS.md`. Build order and rationale: that doc + the
 > approved plan. The model treats the app as an Operations Engine (the historical

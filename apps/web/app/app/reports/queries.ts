@@ -237,6 +237,8 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
        FROM vehicle_sessions s
        JOIN vehicle_session_activities a ON a.session_id = s.id
        WHERE s.account_id = $1 AND a.entity_type = 'job' AND a.entity_id IS NOT NULL
+         AND s.status IS DISTINCT FROM 'voided'
+         AND (s.miles_source IN ('odometer', 'manual_miles') OR s.miles_source IS NULL)
          AND to_char(s.session_date, 'YYYY-MM') = $2
        GROUP BY a.entity_id
      ) mil ON mil.job_id = j.id
