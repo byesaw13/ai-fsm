@@ -5,6 +5,10 @@ of what each job actually earned.
 
 ## Active tasks
 
+# TASK-144: Receipt review destinations
+
+See [TASK-144-receipt-destinations.md](./TASK-144-receipt-destinations.md).
+
 # TASK-139: Paid invoice closes the job
 
 See [TASK-139-paid-invoice-closes-job.md](./TASK-139-paid-invoice-closes-job.md).

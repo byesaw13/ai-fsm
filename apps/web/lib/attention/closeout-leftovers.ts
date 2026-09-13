@@ -60,6 +60,7 @@ export async function loadCloseoutLeftovers(
        FROM expenses e
        WHERE e.account_id = $1
          AND e.job_id IS NULL
+         AND e.reviewed_at IS NULL
          AND e.expense_date = (CURRENT_TIMESTAMP AT TIME ZONE 'America/New_York')::date`,
       [accountId],
     ),

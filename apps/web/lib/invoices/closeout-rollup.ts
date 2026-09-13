@@ -28,6 +28,7 @@ export async function loadJobExpensesForCloseout(
      FROM expenses e
      WHERE e.account_id = $1
        AND e.job_id = $2
+       AND e.billable IS DISTINCT FROM false
        AND NOT EXISTS (
          SELECT 1 FROM invoice_line_items ili
          WHERE ili.source_expense_id = e.id

@@ -14,6 +14,8 @@ import {
   suggestJobFromPoText,
 } from "@/lib/expenses/match-job-po";
 import { formatJobPickerLabel } from "@ai-fsm/domain";
+import { patchForNonJobDestination } from "@/lib/expenses/destinations";
+import type { ReceiptDestination } from "@/lib/expenses/destinations";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +34,7 @@ type OpenJob = {
   title: string;
   job_number: string | null;
   client_id: string | null;
+  status: string;
 };
 
 /**
@@ -47,7 +50,8 @@ export const GET = withRole(["owner", "admin"], async (_request: NextRequest, se
          FROM expenses e
          WHERE e.account_id = $1
            AND e.job_id IS NULL
-           AND e.category = 'materials'
+           AND e.reviewed_at IS NULL
+           AND e.category IN ('materials', 'tools')
            AND e.expense_date >= (CURRENT_DATE - interval '180 days')
          ORDER BY e.expense_date DESC, e.created_at DESC
          LIMIT 100`,
@@ -55,12 +59,20 @@ export const GET = withRole(["owner", "admin"], async (_request: NextRequest, se
       );
 
       const jobs = await client.query<OpenJob>(
-        `SELECT id, title, job_number, client_id
+        `SELECT id, title, job_number, client_id, status
          FROM jobs
          WHERE account_id = $1
-           AND status IN (${RECEIPT_LINKABLE_JOB_STATUS_SQL})
-         ORDER BY ${receiptJobOrderSql()}
-         LIMIT 200`,
+           AND (
+             status IN (${RECEIPT_LINKABLE_JOB_STATUS_SQL})
+             OR (
+               status IN ('completed', 'invoiced')
+               AND updated_at >= now() - interval '60 days'
+             )
+           )
+         ORDER BY
+           CASE WHEN status IN (${RECEIPT_LINKABLE_JOB_STATUS_SQL}) THEN 0 ELSE 1 END,
+           ${receiptJobOrderSql()}
+         LIMIT 250`,
         [session.accountId],
       );
 
@@ -99,13 +111,20 @@ export const GET = withRole(["owner", "admin"], async (_request: NextRequest, se
 
       return {
         items,
-        open_jobs: jobs.rows.map((j) => ({
-          id: j.id,
-          title: j.title,
-          job_number: j.job_number,
-          client_id: j.client_id,
-          label: formatJobPickerLabel(j.title, j.job_number),
-        })),
+        open_jobs: jobs.rows.map((j) => {
+          const closed = j.status === "completed" || j.status === "invoiced";
+          return {
+            id: j.id,
+            title: j.title,
+            job_number: j.job_number,
+            client_id: j.client_id,
+            status: j.status,
+            closed,
+            label: closed
+              ? `${formatJobPickerLabel(j.title, j.job_number)} (closed — books only)`
+              : formatJobPickerLabel(j.title, j.job_number),
+          };
+        }),
         suggested_count: items.filter((i) => i.suggestion).length,
       };
     });
@@ -128,11 +147,22 @@ export const GET = withRole(["owner", "admin"], async (_request: NextRequest, se
   }
 });
 
-const assignSchema = z.object({
-  expense_id: z.string().uuid(),
-  job_id: z.string().uuid(),
-  client_id: z.string().uuid().nullable().optional(),
-});
+const assignSchema = z
+  .object({
+    expense_id: z.string().uuid(),
+    destination: z.enum(["job", "truck", "stock", "tools", "overhead"]).default("job"),
+    job_id: z.string().uuid().optional(),
+    client_id: z.string().uuid().nullable().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.destination === "job" && !val.job_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "job_id required when destination is job",
+        path: ["job_id"],
+      });
+    }
+  });
 
 /**
  * POST assign an unlinked expense to a job (human Accept in review queue).
@@ -169,7 +199,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     );
   }
 
-  const { expense_id, job_id, client_id } = parsed.data;
+  const { expense_id, destination, job_id, client_id } = parsed.data;
 
   try {
     const result = await withExpenseContext(session, async (client) => {
@@ -178,8 +208,9 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
         job_id: string | null;
         client_id: string | null;
         vendor_name: string;
+        reviewed_at: string | null;
       }>(
-        `SELECT id, job_id, client_id, vendor_name
+        `SELECT id, job_id, client_id, vendor_name, reviewed_at::text
          FROM expenses
          WHERE id = $1 AND account_id = $2`,
         [expense_id, session.accountId],
@@ -187,18 +218,55 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
       if (expense.rowCount === 0) {
         throw Object.assign(new Error("Expense not found"), { code: "NOT_FOUND" });
       }
-      if (expense.rows[0].job_id) {
-        throw Object.assign(new Error("Expense already linked to a project"), {
+      if (expense.rows[0].job_id || expense.rows[0].reviewed_at) {
+        throw Object.assign(new Error("Expense already filed"), {
           code: "CONFLICT",
         });
       }
 
-      const job = await client.query<{ id: string; client_id: string | null }>(
-        `SELECT id, client_id FROM jobs WHERE id = $1 AND account_id = $2`,
+      if (destination !== "job") {
+        const patch = patchForNonJobDestination(destination);
+        const filed = await client.query(
+          `UPDATE expenses
+           SET allocation = $1, category = $2, billable = false, reviewed_at = now(), updated_at = now()
+           WHERE id = $3 AND account_id = $4 AND job_id IS NULL AND reviewed_at IS NULL`,
+          [patch.allocation, patch.category, expense_id, session.accountId],
+        );
+        if ((filed.rowCount ?? 0) === 0) {
+          throw Object.assign(new Error("Expense already filed"), { code: "CONFLICT" });
+        }
+        await appendAuditLog(client, {
+          account_id: session.accountId,
+          actor_id: session.userId,
+          action: "update",
+          entity_type: "expense",
+          entity_id: expense_id,
+          trace_id: session.traceId,
+          new_value: {
+            source: "receipt_review",
+            destination,
+            allocation: patch.allocation,
+            category: patch.category,
+          },
+        });
+        return { id: expense_id, destination, job_id: null };
+      }
+
+      const job = await client.query<{
+        id: string;
+        client_id: string | null;
+        status: string;
+      }>(
+        `SELECT id, client_id, status FROM jobs WHERE id = $1 AND account_id = $2`,
         [job_id, session.accountId],
       );
       if (job.rowCount === 0) {
         throw Object.assign(new Error("Job not found"), { code: "NOT_FOUND" });
+      }
+      if (job.rows[0].status === "cancelled") {
+        throw Object.assign(new Error("Cannot link to a cancelled project"), {
+          code: "CONFLICT",
+        });
       }
 
       const nextClientId =
@@ -206,14 +274,17 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
           ? client_id
           : expense.rows[0].client_id ?? job.rows[0].client_id ?? null;
 
+      const booksOnly =
+        job.rows[0].status === "completed" || job.rows[0].status === "invoiced";
       const updated = await client.query(
         `UPDATE expenses
-         SET job_id = $1, client_id = $2, updated_at = now()
-         WHERE id = $3 AND account_id = $4 AND job_id IS NULL`,
-        [job_id, nextClientId, expense_id, session.accountId],
+         SET job_id = $1, client_id = $2, allocation = 'job', billable = $5,
+             reviewed_at = now(), updated_at = now()
+         WHERE id = $3 AND account_id = $4 AND job_id IS NULL AND reviewed_at IS NULL`,
+        [job_id, nextClientId, expense_id, session.accountId, !booksOnly],
       );
       if ((updated.rowCount ?? 0) === 0) {
-        throw Object.assign(new Error("Expense already linked to a project"), {
+        throw Object.assign(new Error("Expense already filed"), {
           code: "CONFLICT",
         });
       }
@@ -227,12 +298,20 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
         trace_id: session.traceId,
         new_value: {
           source: "receipt_review",
+          destination: "job",
           job_id,
           client_id: nextClientId,
+          job_status: job.rows[0].status,
         },
       });
 
-      return { id: expense_id, job_id, client_id: nextClientId };
+      return {
+        id: expense_id,
+        destination: "job" as ReceiptDestination,
+        job_id,
+        client_id: nextClientId,
+        books_only: booksOnly,
+      };
     });
 
     return NextResponse.json({ data: result });

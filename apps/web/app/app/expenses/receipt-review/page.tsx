@@ -15,7 +15,7 @@ export default async function ReceiptReviewPage() {
     <PageContainer>
       <PageHeader
         title="Receipt review"
-        subtitle="Link unlinked materials receipts using Supply PO (e.g. J260029). Confirm before assigning."
+        subtitle="Job, truck, stock, or tools. Closed jobs stay on the books and do not rebill."
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
             <LinkButton href="/app/expenses" variant="ghost" size="sm">
