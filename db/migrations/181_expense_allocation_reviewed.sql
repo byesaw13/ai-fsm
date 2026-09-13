@@ -8,6 +8,9 @@ ALTER TABLE expenses
   ADD COLUMN IF NOT EXISTS allocation TEXT;
 
 ALTER TABLE expenses
+  ADD COLUMN IF NOT EXISTS billable BOOLEAN NOT NULL DEFAULT true;
+
+ALTER TABLE expenses
   DROP CONSTRAINT IF EXISTS expenses_allocation_check;
 
 ALTER TABLE expenses
@@ -22,6 +25,9 @@ COMMENT ON COLUMN expenses.reviewed_at IS
 
 COMMENT ON COLUMN expenses.allocation IS
   'Where this spend lives: job (job_id set), truck, stock, tools, overhead. Not a fake project.';
+
+COMMENT ON COLUMN expenses.billable IS
+  'False for truck/stock/tools/overhead and for books-only links to already-invoiced jobs. Invoice rollups skip these.';
 
 CREATE INDEX IF NOT EXISTS idx_expenses_unreviewed
   ON expenses (account_id, expense_date DESC)

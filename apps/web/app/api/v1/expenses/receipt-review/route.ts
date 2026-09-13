@@ -226,12 +226,15 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
 
       if (destination !== "job") {
         const patch = patchForNonJobDestination(destination);
-        await client.query(
+        const filed = await client.query(
           `UPDATE expenses
-           SET allocation = $1, category = $2, reviewed_at = now(), updated_at = now()
+           SET allocation = $1, category = $2, billable = false, reviewed_at = now(), updated_at = now()
            WHERE id = $3 AND account_id = $4 AND job_id IS NULL AND reviewed_at IS NULL`,
           [patch.allocation, patch.category, expense_id, session.accountId],
         );
+        if ((filed.rowCount ?? 0) === 0) {
+          throw Object.assign(new Error("Expense already filed"), { code: "CONFLICT" });
+        }
         await appendAuditLog(client, {
           account_id: session.accountId,
           actor_id: session.userId,
@@ -271,11 +274,14 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
           ? client_id
           : expense.rows[0].client_id ?? job.rows[0].client_id ?? null;
 
+      const booksOnly =
+        job.rows[0].status === "completed" || job.rows[0].status === "invoiced";
       const updated = await client.query(
         `UPDATE expenses
-         SET job_id = $1, client_id = $2, allocation = 'job', reviewed_at = now(), updated_at = now()
+         SET job_id = $1, client_id = $2, allocation = 'job', billable = $5,
+             reviewed_at = now(), updated_at = now()
          WHERE id = $3 AND account_id = $4 AND job_id IS NULL AND reviewed_at IS NULL`,
-        [job_id, nextClientId, expense_id, session.accountId],
+        [job_id, nextClientId, expense_id, session.accountId, !booksOnly],
       );
       if ((updated.rowCount ?? 0) === 0) {
         throw Object.assign(new Error("Expense already filed"), {
@@ -304,7 +310,7 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
         destination: "job" as ReceiptDestination,
         job_id,
         client_id: nextClientId,
-        books_only: job.rows[0].status === "completed" || job.rows[0].status === "invoiced",
+        books_only: booksOnly,
       };
     });
 
