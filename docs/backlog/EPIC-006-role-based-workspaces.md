@@ -26,6 +26,12 @@ attention?"*; My Day answers *"What do I do right now?"*.
 owner is blocked from My Day. The fix is mostly *redistribute + unlock*, not
 build-from-scratch.
 
+## Active tasks
+
+# TASK-143: Overview is the leak list
+
+See [TASK-143-overview-leak-list.md](./TASK-143-overview-leak-list.md).
+
 ## Architecture
 
 > **Historical (2026-06):** the `WorkdayPanel`/`DailyCommandCenter` design below was
