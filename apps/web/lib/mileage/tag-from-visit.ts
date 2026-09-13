@@ -1,5 +1,10 @@
 import type { PoolClient } from "pg";
-import { isClaimMilesSource, isGpsEstimateSource, mileageTagStrategy } from "@ai-fsm/domain";
+import {
+  isClaimMilesSource,
+  isGpsEstimateSource,
+  mileageTagStrategy,
+  type MilesSource,
+} from "@ai-fsm/domain";
 
 const PAD_MS = 30 * 60 * 1000;
 
@@ -29,7 +34,7 @@ export async function tagMileageForCompletedVisit(
 
   const sessions = await client.query<{
     id: string;
-    miles_source: string | null;
+    miles_source: MilesSource | null;
     started_at: string | null;
     ended_at: string | null;
     tagged: boolean;

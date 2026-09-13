@@ -78,8 +78,8 @@ export default async function MileagePage({ searchParams }: PageProps) {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const { month } = await searchParams;
-  const activeMonth = month && /^\d{4}-\d{2}$/.test(month) ? month : currentMonth();
+  const { month: monthParam } = await searchParams;
+  const activeMonth = monthParam && /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : currentMonth();
 
   const [year, mon] = activeMonth.split("-");
   const monthLabel = new Date(parseInt(year), parseInt(mon) - 1, 1).toLocaleDateString(undefined, {
@@ -125,7 +125,7 @@ export default async function MileagePage({ searchParams }: PageProps) {
     [session.accountId, activeMonth]
   );
 
-  const month = groupMileageMonth(
+  const monthSummary = groupMileageMonth(
     sessions.map((r) => {
       const acts = Array.isArray(r.activities)
         ? r.activities
@@ -147,7 +147,7 @@ export default async function MileagePage({ searchParams }: PageProps) {
     }),
   );
   const sessionById = new Map(sessions.map((s) => [s.id, s]));
-  const avgMiles = month.claimDays > 0 ? month.claimMiles / month.claimDays : 0;
+  const avgMiles = monthSummary.claimDays > 0 ? monthSummary.claimMiles / monthSummary.claimDays : 0;
 
   const canManage = session.role === "owner" || session.role === "admin";
 
@@ -179,16 +179,16 @@ export default async function MileagePage({ searchParams }: PageProps) {
 
       <MetricGrid
         metrics={[
-          { label: "Claim miles", value: month.claimMiles.toFixed(1) },
-          { label: "GPS check", value: month.gpsMiles.toFixed(1) },
-          { label: "Odometer days", value: String(month.claimDays) },
+          { label: "Claim miles", value: monthSummary.claimMiles.toFixed(1) },
+          { label: "GPS check", value: monthSummary.gpsMiles.toFixed(1) },
+          { label: "Odometer days", value: String(monthSummary.claimDays) },
           { label: "Avg per day", value: avgMiles > 0 ? avgMiles.toFixed(1) : "—" },
         ]}
       />
-      {month.hiddenVoided + month.hiddenNoiseHops > 0 ? (
+      {monthSummary.hiddenVoided + monthSummary.hiddenNoiseHops > 0 ? (
         <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)", marginTop: 0 }}>
-          Hidden: {month.hiddenVoided} voided
-          {month.hiddenNoiseHops > 0 ? `, ${month.hiddenNoiseHops} GPS hops under 1 mile` : ""}.
+          Hidden: {monthSummary.hiddenVoided} voided
+          {monthSummary.hiddenNoiseHops > 0 ? `, ${monthSummary.hiddenNoiseHops} GPS hops under 1 mile` : ""}.
           Claim miles are odometer (or typed). GPS hops are a check, not extra driving.
         </p>
       ) : (
@@ -197,7 +197,7 @@ export default async function MileagePage({ searchParams }: PageProps) {
         </p>
       )}
 
-      {month.days.length === 0 ? (
+      {monthSummary.days.length === 0 ? (
         <EmptyState
           title={`No sessions logged for ${monthLabel}`}
           description={canManage ? "Use the button above to log a vehicle session." : "No mileage recorded this month."}
@@ -216,7 +216,7 @@ export default async function MileagePage({ searchParams }: PageProps) {
               </tr>
             </thead>
             <tbody>
-              {month.days.map((day) => {
+              {monthSummary.days.map((day) => {
                 const claimRows = day.claimSessions.map((cs) => sessionById.get(cs.id)).filter(Boolean) as SessionRow[];
                 const hopRows = day.gpsHops.map((h) => sessionById.get(h.id)).filter(Boolean) as SessionRow[];
                 return (
@@ -341,7 +341,7 @@ export default async function MileagePage({ searchParams }: PageProps) {
             <tfoot>
               <tr style={{ borderTop: "2px solid var(--border)", fontWeight: 700 }}>
                 <td colSpan={4} style={{ padding: "var(--space-2) var(--space-3)" }}>Claim total</td>
-                <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{month.claimMiles.toFixed(1)}</td>
+                <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{monthSummary.claimMiles.toFixed(1)}</td>
               </tr>
             </tfoot>
           </table>
