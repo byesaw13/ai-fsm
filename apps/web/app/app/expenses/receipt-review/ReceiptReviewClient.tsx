@@ -31,6 +31,7 @@ type OpenJob = {
   job_number: string | null;
   client_id: string | null;
   label: string;
+  closed?: boolean;
 };
 
 export function ReceiptReviewClient() {
@@ -67,39 +68,34 @@ export function ReceiptReviewClient() {
     void load();
   }, [load]);
 
-  async function assign(expenseId: string, jobId: string, clientId: string | null) {
+  async function assign(
+    expenseId: string,
+    body: Record<string, unknown>,
+    okMessage: string,
+  ) {
     setBusyId(expenseId);
     try {
       const res = await fetch("/api/v1/expenses/receipt-review", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          expense_id: expenseId,
-          job_id: jobId,
-          client_id: clientId,
-        }),
+        body: JSON.stringify({ expense_id: expenseId, ...body }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(json.error?.message ?? "Could not link expense");
+        toast.error(json.error?.message ?? "Could not file expense");
         return;
       }
-      toast.success("Linked to project");
-      setItems((prev) => prev.filter((i) => i.id !== expenseId));
-      setSuggestedCount((c) => Math.max(0, c - 1));
+      toast.success(json.data?.books_only ? "Linked for books (won’t rebill)" : okMessage);
+      setItems((prev) => {
+        const row = prev.find((i) => i.id === expenseId);
+        if (row?.suggestion) setSuggestedCount((c) => Math.max(0, c - 1));
+        return prev.filter((i) => i.id !== expenseId);
+      });
     } catch {
-      toast.error("Network error linking expense");
+      toast.error("Network error filing expense");
     } finally {
       setBusyId(null);
     }
-  }
-
-  function dismiss(expenseId: string) {
-    setItems((prev) => {
-      const row = prev.find((i) => i.id === expenseId);
-      if (row?.suggestion) setSuggestedCount((c) => Math.max(0, c - 1));
-      return prev.filter((i) => i.id !== expenseId);
-    });
   }
 
   if (loading) {
@@ -115,8 +111,8 @@ export function ReceiptReviewClient() {
       <Card data-testid="receipt-review-empty">
         <p style={{ margin: 0, fontWeight: 700 }}>All caught up</p>
         <p style={{ margin: "8px 0 0", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-          No unlinked materials expenses in the last 180 days. Use Supply PO at the store so new
-          scans match automatically.
+          No unlinked materials or tools waiting. Truck, stock, and overhead receipts stay off
+          this list once filed. Use Supply PO at the store so job buys match automatically.
         </p>
       </Card>
     );
@@ -128,7 +124,8 @@ export function ReceiptReviewClient() {
         data-testid="receipt-review-summary"
         style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}
       >
-        {items.length} unlinked · {suggestedCount} with Supply PO match
+        {items.length} unlinked · {suggestedCount} with Supply PO match. Closed jobs are
+        books-only. Truck / stock / tools are not projects.
       </p>
 
       {items.map((item) => {
@@ -231,11 +228,26 @@ export function ReceiptReviewClient() {
                   }}
                 >
                   <option value="">Select project…</option>
-                  {openJobs.map((j) => (
-                    <option key={j.id} value={j.id}>
-                      {j.label}
-                    </option>
-                  ))}
+                  <optgroup label="Open">
+                    {openJobs
+                      .filter((j) => !j.closed)
+                      .map((j) => (
+                        <option key={j.id} value={j.id}>
+                          {j.label}
+                        </option>
+                      ))}
+                  </optgroup>
+                  {openJobs.some((j) => j.closed) ? (
+                    <optgroup label="Closed (books only — won’t rebill)">
+                      {openJobs
+                        .filter((j) => j.closed)
+                        .map((j) => (
+                          <option key={j.id} value={j.id}>
+                            {j.label}
+                          </option>
+                        ))}
+                    </optgroup>
+                  ) : null}
                 </select>
 
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -248,24 +260,50 @@ export function ReceiptReviewClient() {
                     onClick={() =>
                       void assign(
                         item.id,
-                        chosen,
-                        // Only the chosen job's client — never fall back to a discarded suggestion.
-                        chosenJob?.client_id ?? null,
+                        {
+                          destination: "job",
+                          job_id: chosen,
+                          client_id: chosenJob?.client_id ?? null,
+                        },
+                        "Linked to project",
                       )
                     }
                     data-testid="receipt-review-accept"
                   >
-                    Accept
+                    {chosenJob?.closed ? "Link for books" : "Accept"}
                   </Button>
+                  {(
+                    [
+                      ["truck", "Truck"],
+                      ["stock", "Stock"],
+                      ["tools", "Tools"],
+                    ] as const
+                  ).map(([dest, label]) => (
+                    <Button
+                      key={dest}
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={busyId === item.id}
+                      onClick={() =>
+                        void assign(item.id, { destination: dest }, `Filed as ${label}`)
+                      }
+                      data-testid={`receipt-review-${dest}`}
+                    >
+                      {label}
+                    </Button>
+                  ))}
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     disabled={busyId === item.id}
-                    onClick={() => dismiss(item.id)}
+                    onClick={() =>
+                      void assign(item.id, { destination: "overhead" }, "Filed as overhead")
+                    }
                     data-testid="receipt-review-dismiss"
                   >
-                    Dismiss
+                    Overhead
                   </Button>
                 </div>
               </div>
