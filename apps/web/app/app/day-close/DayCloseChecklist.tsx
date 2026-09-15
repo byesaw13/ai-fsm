@@ -250,6 +250,17 @@ export function DayCloseChecklist({
           )}
         </TaskRow>
 
+        <TaskRow title="Today’s stops" status={derived.rows.stops.status}>
+          {(payload.unansweredStops ?? 0) > 0 ? (
+            <span>
+              {payload.unansweredStops} stop{payload.unansweredStops === 1 ? "" : "s"} still need a reason
+              above.
+            </span>
+          ) : (
+            "Every GPS stop has a reason."
+          )}
+        </TaskRow>
+
         <TaskRow title="Notes" status={derived.rows.notes.status}>
           {notesAcknowledged ? (
             "Nothing else to note."

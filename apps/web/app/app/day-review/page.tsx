@@ -8,7 +8,9 @@ import { loadDayVisitTimelines } from "@/lib/visits/load-visit-timeline";
 import { loadReviewCaptures } from "@/lib/captures/review-query";
 import { loadPromiseEntityOptions } from "@/lib/captures/entity-picker";
 import { LinkButton, PageContainer, PageHeader } from "@/components/ui";
+import { loadStopInterview } from "@/lib/day-review/load-stop-interview";
 import { DayCloseChecklist } from "../day-close/DayCloseChecklist";
+import { StopInterviewSection } from "./StopInterviewSection";
 import { DayDraftSection } from "./DayDraftSection";
 import { PromiseStrip } from "./PromiseStrip";
 import { ProductionStorySection } from "./ProductionStorySection";
@@ -31,12 +33,13 @@ export default async function DayReviewPage({
   // tomorrow during evening hours, so the owner couldn't review the current day.
   const date = sp.date ?? businessToday();
   const canReviewPromises = session.role === "owner" || session.role === "admin";
-  const [payload, closeStatus, productionStory, dayDraft, reviewCaptures, promiseEntities] =
+  const [payload, closeStatus, productionStory, dayDraft, stopInterview, reviewCaptures, promiseEntities] =
     await Promise.all([
       getDayReview(session.accountId, date),
       loadDayCloseStatus(session, date),
       loadDayVisitTimelines(session.accountId, date),
       loadDayDraft(session.accountId, date),
+      loadStopInterview(session.accountId, date),
       canReviewPromises ? loadReviewCaptures(session) : Promise.resolve([]),
       canReviewPromises
         ? loadPromiseEntityOptions(session, { date })
@@ -81,11 +84,12 @@ export default async function DayReviewPage({
     <PageContainer>
       {header}
       {promiseStrip}
+      <StopInterviewSection payload={stopInterview} />
       <DayCloseChecklist
         businessDayId={payload.businessDayId}
         dayStatus={payload.status}
         closedAt={payload.closedAt}
-        initial={closeStatus}
+        initial={{ ...closeStatus, unansweredStops: stopInterview.unansweredCount }}
       />
       {dayDraft ? <DayDraftSection date={date} draft={dayDraft} /> : null}
       <ProductionStorySection cards={productionStory} />

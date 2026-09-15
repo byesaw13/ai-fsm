@@ -41,6 +41,12 @@ See [TASK-137-next-person-briefing.md](./TASK-137-next-person-briefing.md).
 
 See [TASK-138-night-closeout-leftovers.md](./TASK-138-night-closeout-leftovers.md).
 
+# TASK-145: Night stop interview
+
+See [TASK-145-night-stop-interview.md](./TASK-145-night-stop-interview.md).
+Day Review walks GPS stops (reason → job / receipt / tomorrow). TASK-138
+counts stay on Overview; this is the question walk.
+
 ## Relationship to existing work (read first)
 
 This epic **extends TASK-024**, it does not replace it. The phone→FSM pipeline is

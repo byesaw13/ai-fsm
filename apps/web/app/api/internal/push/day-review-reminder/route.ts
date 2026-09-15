@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
     let sent = 0;
     for (const row of rows) {
       sent += await sendPushToUser(row.account_id, row.user_id, {
-        title: "Wrap up your day",
-        body: "Your workday is still open — review and close it out.",
+        title: "Walk today’s stops",
+        body: "Say what each stop was, plant tomorrow, then close the day.",
         url: "/app/day-review",
         tag: "day-review-reminder",
       });
