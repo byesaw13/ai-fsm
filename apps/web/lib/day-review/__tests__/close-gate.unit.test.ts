@@ -22,6 +22,7 @@ beforeEach(() => {
     if (sql.includes("vehicle_sessions")) return [];
     if (sql.includes("expenses")) return [{ count: "0" }];
     if (sql.includes("visits")) return [{ count: "0" }];
+    if (sql.includes("location_segments")) return [{ count: "0" }];
     return [];
   });
 });
@@ -43,10 +44,28 @@ describe("assertDayCloseAllowed (TASK-054 server gate)", () => {
       if (sql.includes("vehicle_sessions")) return [];
       if (sql.includes("expenses")) return [{ count: "0" }];
       if (sql.includes("visits")) return [{ count: "0" }];
+      if (sql.includes("location_segments")) return [{ count: "0" }];
       return [];
     });
     const result = await assertDayCloseAllowed(session, "2026-07-06");
     expect(result).toEqual({ ok: true });
+  });
+
+  it("blocks when GPS stops have no reason (TASK-145)", async () => {
+    mockQueryForSession.mockImplementation(async (_s, sql: string) => {
+      if (sql.includes("time_clock_sessions")) return [];
+      if (sql.includes("activity_entries")) return [];
+      if (sql.includes("vehicle_sessions")) return [];
+      if (sql.includes("expenses")) return [{ count: "0" }];
+      if (sql.includes("visits")) return [{ count: "0" }];
+      if (sql.includes("location_segments")) return [{ count: "2" }];
+      return [];
+    });
+    const result = await assertDayCloseAllowed(session, "2026-09-14");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toMatch(/stops/i);
+    }
   });
 
   it("scopes open vehicle_sessions by day owner (created_by), not whole account", async () => {
@@ -60,6 +79,7 @@ describe("assertDayCloseAllowed (TASK-054 server gate)", () => {
       if (sql.includes("vehicle_sessions")) return [];
       if (sql.includes("expenses")) return [{ count: "0" }];
       if (sql.includes("visits")) return [{ count: "0" }];
+      if (sql.includes("location_segments")) return [{ count: "0" }];
       return [];
     });
     await assertDayCloseAllowed(session, "2026-07-06");
@@ -79,6 +99,7 @@ describe("assertDayCloseAllowed (TASK-054 server gate)", () => {
       }
       if (sql.includes("expenses")) return [{ count: "0" }];
       if (sql.includes("visits")) return [{ count: "0" }];
+      if (sql.includes("location_segments")) return [{ count: "0" }];
       return [];
     });
     const result = await assertDayCloseAllowed(session, "2026-07-06");

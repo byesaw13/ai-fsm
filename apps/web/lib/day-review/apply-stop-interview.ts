@@ -70,7 +70,7 @@ export async function applyStopInterview(
      FROM location_segments s
      LEFT JOIN visit_candidates vc
        ON vc.location_segment_id = s.id AND vc.account_id = s.account_id
-     WHERE s.id = $1 AND s.account_id = $2`
+     WHERE s.id = $1 AND s.account_id = $2`,
     [input.segmentId, session.accountId],
   );
   const seg = rows[0];
@@ -124,7 +124,7 @@ export async function applyStopInterview(
     if (seg.candidate_id) {
       await client.query(
         `UPDATE visit_candidates
-         SET classification = $1, updated_at = now()
+         SET status = 'ignored', classification = $1, updated_at = now()
          WHERE id = $2 AND account_id = $3`,
         [input.reason, seg.candidate_id, session.accountId],
       );
@@ -146,7 +146,7 @@ export async function applyStopInterview(
       classification: "job_work",
       arrivalTime: seg.started_at,
       departureTime: seg.ended_at,
-      workOrderId: seg.work_order_id,
+      workOrderId: input.reason === "new_work" ? null : seg.work_order_id,
       techNotes: notes,
     });
     visitId = ensured.visitId;
