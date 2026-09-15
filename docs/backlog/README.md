@@ -95,7 +95,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-145**.
+Next available ID: **TASK-146**.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -128,6 +128,7 @@ closed in tests; owner-flow AC still open.
 | TASK-142 | [Untagged claim miles leftover](TASK-142-untagged-miles-leftover.md) | 001 | In Progress |
 | TASK-143 | [Overview is the leak list](TASK-143-overview-leak-list.md) | 006 | In Progress |
 | TASK-144 | [Receipt destinations](TASK-144-receipt-destinations.md) | 004 | In Progress |
+| TASK-145 | [Night stop interview](TASK-145-night-stop-interview.md) | 007 | In Progress |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
 | TASK-003 | Wrong Vehicle Correction | 001 | Done |

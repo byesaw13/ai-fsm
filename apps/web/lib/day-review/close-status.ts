@@ -90,5 +90,6 @@ export async function loadDayCloseStatus(
     missingReceiptPhotos: parseInt(receiptRows[0]?.count ?? "0", 10),
     visitsToday: parseInt(visitRows[0]?.count ?? "0", 10),
     notesAcknowledged: false,
+    unansweredStops: 0,
   };
 }
