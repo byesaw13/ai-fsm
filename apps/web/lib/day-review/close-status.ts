@@ -28,7 +28,7 @@ export async function loadDayCloseStatus(
   date: string,
   userId: string = session.userId,
 ): Promise<DayCloseStatusPayload> {
-  const [clockRows, activityRows, sessionRows, receiptRows, visitRows] = await Promise.all([
+  const [clockRows, activityRows, sessionRows, receiptRows, visitRows, stopRows] = await Promise.all([
     queryForSession<{ status: string }>(
       session,
       `SELECT status FROM time_clock_sessions
@@ -70,6 +70,20 @@ export async function loadDayCloseStatus(
          AND status NOT IN ('cancelled')`,
       [session.accountId, date, userId],
     ),
+    queryForSession<{ count: string }>(
+      session,
+      `SELECT COUNT(*)::text AS count FROM location_segments
+       WHERE account_id = $1
+         AND segment_date = $2::date
+         AND kind = 'stop'
+         AND status <> 'dismissed'
+         AND COALESCE(is_likely_noise, false) = false
+         AND ended_at IS NOT NULL
+         AND stop_reason IS NULL
+         AND lower(COALESCE(zone, '')) NOT IN ('home', 'private')
+         AND lower(COALESCE(place_label, '')) NOT IN ('home', 'private')`,
+      [session.accountId, date],
+    ),
   ]);
 
   const active = activityRows[0];
@@ -90,6 +104,6 @@ export async function loadDayCloseStatus(
     missingReceiptPhotos: parseInt(receiptRows[0]?.count ?? "0", 10),
     visitsToday: parseInt(visitRows[0]?.count ?? "0", 10),
     notesAcknowledged: false,
-    unansweredStops: 0,
+    unansweredStops: parseInt(stopRows[0]?.count ?? "0", 10),
   };
 }
