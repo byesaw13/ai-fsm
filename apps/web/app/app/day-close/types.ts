@@ -7,6 +7,7 @@ export type DayCloseStatusPayload = {
   missingReceiptPhotos: number;
   visitsToday: number;
   notesAcknowledged: boolean;
+  unansweredStops: number;
 };
 
 export type DayCloseDerived = {
@@ -21,6 +22,7 @@ export type DayCloseDerived = {
     mileage: { status: DayCloseRowStatus };
     expenses: { status: DayCloseRowStatus };
     notes: { status: DayCloseRowStatus };
+    stops: { status: DayCloseRowStatus };
   };
   closeButtonHint: string;
 };

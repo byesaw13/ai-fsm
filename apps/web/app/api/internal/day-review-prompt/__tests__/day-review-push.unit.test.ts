@@ -36,8 +36,8 @@ import { POST } from "../route";
 const ACCOUNT_ID = "acct-owner-1";
 const BUSINESS_DAY_ID = "bd-1";
 const DAY_REVIEW_PUSH = {
-  title: "Time to close out your day",
-  body: "You're home — review today's visits and close the day.",
+  title: "Walk today’s stops",
+  body: "Say what each stop was, plant tomorrow, then close the day.",
   url: "/app/day-review",
   tag: "day-review-2026-09-05",
 };

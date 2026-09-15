@@ -9,6 +9,7 @@ const base: DayCloseStatusPayload = {
   missingReceiptPhotos: 0,
   visitsToday: 2,
   notesAcknowledged: false,
+  unansweredStops: 0,
 };
 
 describe("deriveDayCloseStatus", () => {
@@ -52,5 +53,12 @@ describe("deriveDayCloseStatus", () => {
   it("notes prompt is soft and clears when acknowledged", () => {
     expect(deriveDayCloseStatus(base).rows.notes.status).toBe("warning");
     expect(deriveDayCloseStatus({ ...base, notesAcknowledged: true }).rows.notes.status).toBe("ok");
+  });
+
+  it("blocks close when GPS stops are unanswered", () => {
+    const s = deriveDayCloseStatus({ ...base, unansweredStops: 3 });
+    expect(s.canClose).toBe(false);
+    expect(s.rows.stops.status).toBe("blocked");
+    expect(s.closeButtonHint).toMatch(/stops/i);
   });
 });

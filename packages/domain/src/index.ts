@@ -74,6 +74,7 @@ export * from "./geo";
 export * from "./visit-matching";
 export * from "./day-review";
 export * from "./day-draft";
+export * from "./stop-interview";
 export * from "./mileage";
 export * from "./mileage-month";
 export * from "./mileage-tag";
