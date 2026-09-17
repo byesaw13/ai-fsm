@@ -56,8 +56,10 @@ test.describe("Admin smoke — jobs and visits", () => {
     if (await firstCard.isVisible()) {
       await firstCard.click();
       await page.waitForURL(/\/app\/jobs\/[0-9a-f-]+/);
-      // Transition panel present for admin
-      await expect(page.locator('[data-testid="job-status"]')).toBeVisible();
+      // Assert the admin-only transition panel itself, not just the always-present
+      // status badge, so a role/rendering regression that hides the controls fails
+      // the smoke test (Codex).
+      await expect(page.locator('[data-testid="job-transition-panel"]')).toBeVisible();
     }
   });
 
