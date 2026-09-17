@@ -53,8 +53,8 @@ export async function POST(req: NextRequest) {
   );
 
   await sendPushToOwners(row.account_id, {
-    title: "Time to close out your day",
-    body: "You're home — review today's visits and close the day.",
+    title: "Walk today’s stops",
+    body: "Say what each stop was, plant tomorrow, then close the day.",
     url: "/app/day-review",
     tag: `day-review-${businessToday()}`,
   });

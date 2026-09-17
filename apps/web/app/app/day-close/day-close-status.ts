@@ -11,6 +11,7 @@ export function deriveDayCloseStatus(payload: DayCloseStatusPayload): DayCloseDe
   const mileage = row(!payload.openSession);
   const expenses = row(payload.missingReceiptPhotos === 0, payload.missingReceiptPhotos > 0);
   const notes = row(payload.notesAcknowledged, !payload.notesAcknowledged);
+  const stops = row((payload.unansweredStops ?? 0) === 0);
 
   const rows = {
     payroll: { status: payroll },
@@ -18,8 +19,9 @@ export function deriveDayCloseStatus(payload: DayCloseStatusPayload): DayCloseDe
     mileage: { status: mileage },
     expenses: { status: expenses },
     notes: { status: notes },
+    stops: { status: stops },
   };
-  const hardBlockerCount = [payroll, activity, mileage].filter((s) => s === "blocked").length;
+  const hardBlockerCount = [payroll, activity, mileage, stops].filter((s) => s === "blocked").length;
   const softWarningCount = [expenses, notes].filter((s) => s === "warning").length;
   const readyCount = Object.values(rows).filter((r) => r.status === "ok").length;
 
@@ -27,14 +29,16 @@ export function deriveDayCloseStatus(payload: DayCloseStatusPayload): DayCloseDe
   if (hardBlockerCount === 1 && payload.clockOpen) closeButtonHint = "Close Day — clock out first";
   else if (hardBlockerCount === 1 && payload.activeActivity) closeButtonHint = "Close Day — stop activity first";
   else if (hardBlockerCount === 1 && payload.openSession) closeButtonHint = "Close Day — close mileage first";
-  else if (hardBlockerCount > 1) closeButtonHint = `Close Day — ${hardBlockerCount} items left`;
+  else if (hardBlockerCount === 1 && (payload.unansweredStops ?? 0) > 0) {
+    closeButtonHint = "Close Day — finish today’s stops first";
+  } else if (hardBlockerCount > 1) closeButtonHint = `Close Day — ${hardBlockerCount} items left`;
 
   return {
     canClose: hardBlockerCount === 0,
     hardBlockerCount,
     softWarningCount,
     readyCount,
-    totalTasks: 5,
+    totalTasks: 6,
     rows,
     closeButtonHint,
   };
