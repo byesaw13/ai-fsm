@@ -35,8 +35,18 @@ batch processor — it bypasses RLS by design).
       sent). Add a bounded `SECURITY DEFINER` resolver (like `app_login_candidates`
       for auth login) that maps a portal token/email → account, and set context
       from it. (Codex P1 on PR #651.)
+- [ ] **Square webhook bootstrap.** `api/webhooks/square` looks up
+      `integration_settings` by location with no context; under `ai_fsm_web` it
+      acks and drops completed payments. Bounded `locationId → account` lookup +
+      `set_config` before the rest of the handler.
+- [ ] **Public estimate respond.** `api/v1/estimates/[id]/respond` updates
+      `estimates` from a signed token before context; RLS makes approve/decline
+      look successful while the row stays `sent`. Set context from the token
+      before the UPDATE.
 - [ ] **Verify every authenticated read/write path sets context** end to end
       under the restricted role (the flip runbook's verification checklist).
+      Include remaining sessionless/token/internal entry points, not only
+      portal + booking + intake.
 
 ## Non-goals
 

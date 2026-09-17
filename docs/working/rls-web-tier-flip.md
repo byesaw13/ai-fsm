@@ -58,9 +58,24 @@ not yet. Enabling the flip before fixing these breaks portal features silently:
    calls `emitAttentionEvent` on a raw pooled client pre-context; migration 185's
    `attention_events` INSERT policy is therefore **permissive** so those telemetry
    writes are not silently dropped. Verify this still holds before flipping.
+3. **Square webhook account lookup (P1).** `api/webhooks/square` reads
+   `integration_settings` by `locationId` with no session and no
+   `app.current_account_id`. Under `ai_fsm_web` that SELECT returns no row, the
+   handler acks `{ received: true }`, and completed payments stay pending (Square
+   stops retrying). **Fix:** a bounded `SECURITY DEFINER` lookup
+   `locationId → account_id` (or set context from the resolved account before the
+   rest of the handler), then `set_config` in-transaction.
+4. **Public estimate respond (P1).** `api/v1/estimates/[id]/respond` updates
+   `estimates` from a signed token *before* setting account context. RLS returns
+   no row, the handler treats it as idempotent success, and the customer sees
+   approve/decline while the estimate stays `sent`. **Fix:** resolve `account_id`
+   from the token (or a SECURITY DEFINER helper) and `set_config` before the
+   UPDATE.
 
-Until blocker 1 lands, treat the flip as **not ready** even though the coverage
-guard is green (the guard checks table RLS, not every app read-path's context).
+Until blockers 1, 3, and 4 land, treat the flip as **not ready** even though the
+coverage guard is green (the guard checks table RLS, not every app read-path's
+context). Audit remaining sessionless/token/internal entry points in the same
+pass — booking and intake already `set_config` in-transaction.
 
 ## Change 1 — env (`infra/garonhome.env.example` and the live env file)
 

@@ -39,9 +39,11 @@ create policy change_orders_select on change_orders
   for select
   using (account_id = app_account_id());
 
+-- Insert matches POST /api/v1/change-orders (owner/admin/tech). Updates stay
+-- owner/admin, matching PATCH /api/v1/change-orders/[id].
 create policy change_orders_insert on change_orders
   for insert
-  with check (account_id = app_account_id() and is_owner_or_admin());
+  with check (account_id = app_account_id());
 
 create policy change_orders_update on change_orders
   for update
@@ -71,8 +73,7 @@ create policy change_order_line_items_select on change_order_line_items
 create policy change_order_line_items_insert on change_order_line_items
   for insert
   with check (
-    is_owner_or_admin()
-    and exists (
+    exists (
       select 1 from change_orders co
       where co.id = change_order_id
         and co.account_id = app_account_id()
