@@ -112,6 +112,15 @@ export async function POST(request: NextRequest) {
 
   try {
     await client.query("BEGIN");
+    // Set the tenant context for RLS: this public form has no session, but the
+    // account is known (BOOKING_ACCOUNT_ID), so account-scoped write policies on
+    // booking_requests/intake_invites are satisfied once the app runs as the
+    // restricted (non-superuser) DB role. No-op while running as superuser.
+    await client.query(
+      `SELECT set_config('app.current_account_id', $1, true),
+              set_config('app.current_role', 'owner', true)`,
+      [accountId],
+    );
 
     const { bookingId } = await createIntakeRecords(client, {
       accountId,

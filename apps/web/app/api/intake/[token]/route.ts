@@ -76,6 +76,14 @@ export async function POST(
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    // Tenant context for RLS: the account is resolved from the token'd invite
+    // above, so account-scoped write policies (intake_invites, booking_requests)
+    // are satisfied under the restricted DB role. No-op as superuser today.
+    await client.query(
+      `SELECT set_config('app.current_account_id', $1, true),
+              set_config('app.current_role', 'owner', true)`,
+      [invite.account_id]
+    );
 
     // Mark invite as used
     await client.query(

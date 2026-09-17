@@ -83,6 +83,8 @@ pnpm lint
 
 log "migration prefixes"
 node scripts/check-migration-prefixes.mjs
+log "rls coverage"
+node scripts/check-rls-coverage.mjs
 node --test scripts/*.test.mjs
 
 log "typecheck"

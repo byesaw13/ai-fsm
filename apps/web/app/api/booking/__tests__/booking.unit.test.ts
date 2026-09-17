@@ -70,6 +70,7 @@ describe("POST /api/booking", () => {
 
     mockClientQuery
       .mockResolvedValueOnce({ rows: [] })                  // BEGIN
+      .mockResolvedValueOnce({ rows: [] })                  // set_config tenant context (RLS)
       .mockResolvedValueOnce({ rows: [{ id: OWNER_USER_ID }] }) // SELECT owner/admin user
       .mockResolvedValueOnce({ rows: [] })                  // SELECT client by email → not found
       .mockResolvedValueOnce({ rows: [{ id: CLIENT_ID }] }) // INSERT client
@@ -129,6 +130,7 @@ describe("POST /api/booking", () => {
 
     mockClientQuery
       .mockResolvedValueOnce({ rows: [] })                    // BEGIN
+      .mockResolvedValueOnce({ rows: [] })                    // set_config tenant context (RLS)
       .mockResolvedValueOnce({ rows: [{ id: OWNER_USER_ID }] }) // SELECT owner/admin user
       .mockResolvedValueOnce({ rows: [{ id: CLIENT_ID }] })  // SELECT client by email → found
       .mockResolvedValueOnce({ rows: [] })                    // UPDATE contact preferences
