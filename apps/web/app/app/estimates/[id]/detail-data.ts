@@ -8,7 +8,6 @@ import {
   type DocumentLocationRow,
 } from "@/lib/documents/service-location";
 import { loadPricingSettings, type BusinessPricingSettings } from "@/lib/pricing/settings";
-import { selectActiveHandoffInvoices } from "./handoff-invoices";
 
 // ---------------------------------------------------------------------------
 // Row types
@@ -243,15 +242,15 @@ export async function loadEstimateDetail(
       const invRows = await pool.query<EstimateInvoiceRow>(
         `SELECT id, invoice_kind, invoice_number, status, total_cents, balance_cents
          FROM invoices
-         WHERE estimate_id = $1 AND account_id = $2
-           AND invoice_kind IN ('deposit','final')
+         WHERE estimate_id = $1 AND account_id = $2 AND invoice_kind IN ('deposit','final')
            AND status <> 'void'
          ORDER BY created_at DESC`,
         [id, session.accountId]
       );
-      const picked = selectActiveHandoffInvoices(invRows.rows);
-      depositInvoice = picked.depositInvoice;
-      finalInvoice = picked.finalInvoice;
+      // Latest live deposit/final (void excluded above) — a voided deposit is not
+      // the active handoff.
+      depositInvoice = invRows.rows.find((r) => r.invoice_kind === "deposit") ?? null;
+      finalInvoice = invRows.rows.find((r) => r.invoice_kind === "final") ?? null;
     } catch {
       // Non-critical — proceed without billing summary
     }
