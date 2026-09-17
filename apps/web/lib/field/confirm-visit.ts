@@ -425,6 +425,11 @@ export async function ensureFieldDayVisit(
     workOrderId?: string | null;
     /** Note stored on auto-created visits (default: GPS confirm copy). */
     techNotes?: string | null;
+    /**
+     * Override GPS auto-complete. Night stop interview passes false so
+     * runVisitCloseout can apply Done vs Coming back after presence is stamped.
+     */
+    complete?: boolean;
   },
 ): Promise<EnsureFieldDayResult> {
   const durationMinutes = Math.max(
@@ -433,6 +438,12 @@ export async function ensureFieldDayVisit(
       (new Date(opts.departureTime).getTime() - new Date(opts.arrivalTime).getTime()) / 60_000,
     ),
   );
+  const complete =
+    opts.complete ??
+    shouldCompleteVisitFromPresence({
+      classification: opts.classification,
+      durationMinutes,
+    });
 
   if (opts.visitId) {
     // Existing calendar visit: mark that we were on site and stamp GPS times.
@@ -443,10 +454,7 @@ export async function ensureFieldDayVisit(
       visitId: opts.visitId,
       arrivalTime: opts.arrivalTime,
       departureTime: opts.departureTime,
-      complete: shouldCompleteVisitFromPresence({
-        classification: opts.classification,
-        durationMinutes,
-      }),
+      complete,
     });
     return { visitId: opts.visitId, created: false, reason: "candidate_visit" };
   }
@@ -523,10 +531,7 @@ export async function ensureFieldDayVisit(
       visitId: existing,
       arrivalTime: opts.arrivalTime,
       departureTime: opts.departureTime,
-      complete: shouldCompleteVisitFromPresence({
-        classification: opts.classification,
-        durationMinutes,
-      }),
+      complete,
     });
     return { visitId: existing, created: false, reason: "existing_day" };
   }
@@ -547,7 +552,7 @@ export async function ensureFieldDayVisit(
        tech_notes
      ) VALUES (
        $1, $2, $3, $4,
-       'standard', 'completed',
+       'standard', $9,
        $5, $6, $5, $7,
        $8
      )
@@ -559,8 +564,9 @@ export async function ensureFieldDayVisit(
       opts.userId,
       opts.arrivalTime,
       new Date(endMs).toISOString(),
-      opts.departureTime,
+      complete ? opts.departureTime : null,
       techNotes,
+      complete ? "completed" : "in_progress",
     ],
   );
 

@@ -118,6 +118,14 @@ function StopCard({
       toast.error("Name the new work");
       return;
     }
+    if (stopRequiresNotes(reason) && !kind) {
+      toast.error("Done with this job, or coming back?");
+      return;
+    }
+    if (kind === "return" && !firstUp.trim()) {
+      toast.error("What’s first when you get here?");
+      return;
+    }
     setBusy(true);
     try {
       const res = await fetch("/api/v1/day-review/stops", {

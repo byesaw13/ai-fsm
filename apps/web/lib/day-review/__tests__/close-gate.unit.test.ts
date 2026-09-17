@@ -90,6 +90,28 @@ describe("assertDayCloseAllowed (TASK-054 server gate)", () => {
     expect(vehicleParams).toEqual([session.accountId, "2026-07-06", session.userId]);
   });
 
+  it("counts unanswered GPS stops for the account (HA feed has no user_id)", async () => {
+    const sqls: string[] = [];
+    const params: unknown[][] = [];
+    mockQueryForSession.mockImplementation(async (_s, sql: string, p: unknown[]) => {
+      sqls.push(sql);
+      params.push(p);
+      if (sql.includes("time_clock_sessions")) return [];
+      if (sql.includes("activity_entries")) return [];
+      if (sql.includes("vehicle_sessions")) return [];
+      if (sql.includes("expenses")) return [{ count: "0" }];
+      if (sql.includes("visits")) return [{ count: "0" }];
+      if (sql.includes("location_segments")) return [{ count: "0" }];
+      return [];
+    });
+    await assertDayCloseAllowed(session, "2026-09-14", "other-user");
+    const stopSql = sqls.find((s) => s.includes("location_segments"));
+    expect(stopSql).toBeDefined();
+    expect(stopSql).not.toMatch(/user_id/);
+    const stopParams = params[sqls.indexOf(stopSql!)];
+    expect(stopParams).toEqual([session.accountId, "2026-09-14"]);
+  });
+
   it("blocks when the day owner has an open vehicle session", async () => {
     mockQueryForSession.mockImplementation(async (_s, sql: string) => {
       if (sql.includes("time_clock_sessions")) return [];

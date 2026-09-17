@@ -5,14 +5,14 @@ import {
   stopIsBillable,
   stopReasonOptions,
   stopRequiresNotes,
+  type Role,
   type StopReason,
   type VisitCloseoutKind,
 } from "@ai-fsm/domain";
 import { appendAuditLog } from "@/lib/db/audit";
-import {
-  ensureFieldDayVisit,
-  ignoreVisitCandidateForSegment,
-} from "@/lib/field/confirm-visit";
+import { canManageExpenses } from "@/lib/auth/permissions";
+import { RECEIPT_LINKABLE_JOB_STATUS_SQL } from "@/lib/expenses/open-jobs";
+import { ensureFieldDayVisit } from "@/lib/field/confirm-visit";
 import { createDefaultWorkOrderForJob } from "@/lib/work-orders/create-default";
 import { runVisitCloseout, CloseoutError } from "@/lib/visits/closeout";
 
@@ -45,6 +45,7 @@ type SegmentRow = {
   started_at: string;
   ended_at: string | null;
   place_label: string | null;
+  activity_entry_id: string | null;
   candidate_id: string | null;
   property_id: string | null;
   client_id: string | null;
@@ -54,9 +55,13 @@ type SegmentRow = {
   candidate_status: string | null;
 };
 
+function isOwnerOrAdmin(role: string): boolean {
+  return role === "owner" || role === "admin";
+}
+
 export async function applyStopInterview(
   client: PoolClient,
-  session: { accountId: string; userId: string; role: string; traceId: string },
+  session: { accountId: string; userId: string; role: Role; traceId: string },
   input: StopInterviewInput,
 ): Promise<{ jobId: string | null; visitId: string | null }> {
   if (!(STOP_REASONS as readonly string[]).includes(input.reason)) {
@@ -65,6 +70,7 @@ export async function applyStopInterview(
 
   const { rows } = await client.query<SegmentRow>(
     `SELECT s.id, s.started_at::text, s.ended_at::text, s.place_label,
+            s.activity_entry_id,
             vc.id AS candidate_id, vc.property_id, vc.matched_client_id AS client_id,
             vc.visit_id, vc.job_id, vc.work_order_id, vc.status AS candidate_status
      FROM location_segments s
@@ -93,6 +99,33 @@ export async function applyStopInterview(
   if (stopRequiresNotes(input.reason) && !notes) {
     throw new StopInterviewError("VALIDATION_ERROR", "What did you do today is required");
   }
+  if (stopIsBillable(input.reason) && !input.closeoutKind) {
+    throw new StopInterviewError(
+      "VALIDATION_ERROR",
+      "Done or coming back is required for work stops",
+    );
+  }
+  if (
+    stopIsBillable(input.reason) &&
+    input.closeoutKind === "return" &&
+    (!input.nextWhen || !input.firstUp?.trim())
+  ) {
+    throw new StopInterviewError(
+      "VALIDATION_ERROR",
+      "Coming back needs when and what’s first",
+    );
+  }
+
+  if (stopCreatesJob(input.reason) && !isOwnerOrAdmin(session.role)) {
+    throw new StopInterviewError("FORBIDDEN", "Only owner or admin can start new work", 403);
+  }
+  if (
+    input.reason === "store" &&
+    ((input.expenseIds?.length ?? 0) > 0 || input.expenseJobId) &&
+    !canManageExpenses(session.role)
+  ) {
+    throw new StopInterviewError("FORBIDDEN", "Only owner or admin can file receipts", 403);
+  }
 
   let jobId = open?.id ?? null;
   let visitId = seg.visit_id;
@@ -108,6 +141,8 @@ export async function applyStopInterview(
       title,
       notes,
     });
+    // Candidate may still point at the invoiced/closed job's visit.
+    visitId = null;
   }
 
   await client.query(
@@ -118,23 +153,18 @@ export async function applyStopInterview(
   );
 
   if (input.reason === "not_work" || input.reason === "pickup") {
-    if (seg.id) {
-      await ignoreVisitCandidateForSegment(client, seg.id, session.accountId);
-    }
-    if (seg.candidate_id) {
-      await client.query(
-        `UPDATE visit_candidates
-         SET status = 'ignored', classification = $1, updated_at = now()
-         WHERE id = $2 AND account_id = $3`,
-        [input.reason, seg.candidate_id, session.accountId],
-      );
-    }
+    await detachRejectedStop(client, session.accountId, seg, input.reason);
     return { jobId: null, visitId: null };
   }
 
   if (input.reason === "store") {
-    await fileReceipts(client, session, input.expenseIds ?? [], input.expenseJobId ?? jobId);
-    return { jobId: input.expenseJobId ?? jobId, visitId: null };
+    const filedJobId = await fileReceipts(
+      client,
+      session,
+      input.expenseIds ?? [],
+      input.expenseJobId ?? jobId,
+    );
+    return { jobId: filedJobId, visitId: null };
   }
 
   if (stopIsBillable(input.reason) && jobId && seg.ended_at) {
@@ -148,13 +178,14 @@ export async function applyStopInterview(
       departureTime: seg.ended_at,
       workOrderId: input.reason === "new_work" ? null : seg.work_order_id,
       techNotes: notes,
+      complete: false,
     });
     visitId = ensured.visitId;
     if (seg.candidate_id) {
       await client.query(
         `UPDATE visit_candidates
-         SET job_id = COALESCE($1, job_id),
-             visit_id = COALESCE($2, visit_id),
+         SET job_id = $1,
+             visit_id = $2,
              classification = 'job_work',
              status = 'confirmed',
              confirmed_at = COALESCE(confirmed_at, now()),
@@ -171,14 +202,7 @@ export async function applyStopInterview(
         [notes, visitId, session.accountId],
       );
     }
-    const canCloseout =
-      visitId &&
-      input.closeoutKind &&
-      (input.closeoutKind === "done" ||
-        (input.closeoutKind === "return" &&
-          Boolean(input.nextWhen) &&
-          Boolean(input.firstUp?.trim())));
-    if (canCloseout && visitId && input.closeoutKind) {
+    if (visitId && input.closeoutKind) {
       try {
         await runVisitCloseout(client, session, visitId, {
           kind: input.closeoutKind,
@@ -189,13 +213,48 @@ export async function applyStopInterview(
         });
       } catch (err) {
         if (!(err instanceof CloseoutError)) throw err;
-        // Visit may already be completed by GPS confirm — notes already saved.
+        // Already closed during the day via Complete — notes already saved.
         if (err.code !== "INVALID_TRANSITION") throw err;
       }
     }
   }
 
   return { jobId, visitId };
+}
+
+async function detachRejectedStop(
+  client: PoolClient,
+  accountId: string,
+  seg: SegmentRow,
+  reason: StopReason,
+): Promise<void> {
+  if (seg.activity_entry_id) {
+    await client.query(
+      `UPDATE activity_entries
+       SET voided_at = now()
+       WHERE id = $1 AND account_id = $2 AND voided_at IS NULL`,
+      [seg.activity_entry_id, accountId],
+    );
+    await client.query(
+      `UPDATE location_segments
+       SET activity_entry_id = NULL, updated_at = now()
+       WHERE id = $1 AND account_id = $2`,
+      [seg.id, accountId],
+    );
+  }
+  await client.query(
+    `UPDATE visit_candidates
+     SET status = 'ignored',
+         classification = $1,
+         job_id = NULL,
+         visit_id = NULL,
+         work_order_id = NULL,
+         updated_at = now()
+     WHERE location_segment_id = $2
+       AND account_id = $3
+       AND status IN ('pending', 'confirmed')`,
+    [reason, seg.id, accountId],
+  );
 }
 
 async function openJobAtProperty(
@@ -269,9 +328,23 @@ async function fileReceipts(
   session: { accountId: string },
   expenseIds: string[],
   jobId: string | null,
-): Promise<void> {
-  if (expenseIds.length === 0) return;
+): Promise<string | null> {
+  if (expenseIds.length === 0) return jobId;
+  let targetJobId: string | null = null;
   if (jobId) {
+    const { rows } = await client.query<{ id: string }>(
+      `SELECT id FROM jobs
+       WHERE id = $1 AND account_id = $2
+         AND status IN (${RECEIPT_LINKABLE_JOB_STATUS_SQL})`,
+      [jobId, session.accountId],
+    );
+    if (!rows[0]) {
+      throw new StopInterviewError(
+        "VALIDATION_ERROR",
+        "Receipt job is not an open job on this account",
+      );
+    }
+    targetJobId = rows[0].id;
     await client.query(
       `UPDATE expenses
        SET job_id = $1, allocation = 'job', billable = true,
@@ -279,7 +352,7 @@ async function fileReceipts(
        WHERE account_id = $2
          AND id = ANY($3::uuid[])
          AND job_id IS NULL AND reviewed_at IS NULL`,
-      [jobId, session.accountId, expenseIds],
+      [targetJobId, session.accountId, expenseIds],
     );
   } else {
     await client.query(
@@ -292,4 +365,5 @@ async function fileReceipts(
       [session.accountId, expenseIds],
     );
   }
+  return targetJobId;
 }

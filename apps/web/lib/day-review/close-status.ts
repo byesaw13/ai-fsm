@@ -72,6 +72,9 @@ export async function loadDayCloseStatus(
     ),
     queryForSession<{ count: string }>(
       session,
+      // GPS ingest is account-scoped (one HA feed, one open segment per account;
+      // location_segments has no user_id). Unanswered stops therefore gate the
+      // account's Close Day, not a per-technician subset.
       `SELECT COUNT(*)::text AS count FROM location_segments
        WHERE account_id = $1
          AND segment_date = $2::date
