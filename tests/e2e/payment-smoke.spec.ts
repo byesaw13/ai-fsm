@@ -19,7 +19,7 @@ test.describe("Payment Recording E2E", () => {
     await page.fill('#email, input[name="email"]', "owner@test.com");
     await page.fill('#password, input[name="password"]', "password");
     await page.click('button[type="submit"]');
-    await page.waitForURL("**/app/**");
+    await page.waitForURL(/\/app(?:\/my-work)?$/);
   });
 
   test("invoice detail page shows payment form for sent invoice", async ({ page }) => {
@@ -89,7 +89,7 @@ test.describe("Payment Recording E2E", () => {
     await page.fill('#email, input[name="email"]', "tech@test.com");
     await page.fill('#password, input[name="password"]', "password");
     await page.click('button[type="submit"]');
-    await page.waitForURL("**/app/**");
+    await page.waitForURL(/\/app(?:\/my-work)?$/);
 
     // Tech should not see the invoices nav link (per role-based nav)
     // But if they navigate directly, payment form should be hidden

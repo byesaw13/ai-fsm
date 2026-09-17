@@ -17,7 +17,7 @@ test.describe("Day Review", () => {
 
   test("navigates to day-review page", async ({ page }) => {
     await page.goto(`${BASE}/app/day-review`);
-    await expect(page.getByText("Day Review")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Day Review" })).toBeVisible();
   });
 
   test("shows close checklist when business day exists", async ({ page }) => {
@@ -26,7 +26,7 @@ test.describe("Day Review", () => {
     const empty = page.getByText(/No business day found/i);
     await expect(checklist.or(empty)).toBeVisible();
     if (await checklist.isVisible()) {
-      await expect(page.getByText("Payroll")).toBeVisible();
+      await expect(page.getByText("Payroll", { exact: true })).toBeVisible();
       await expect(page.getByRole("button", { name: /Close Day/i })).toBeVisible();
     }
   });

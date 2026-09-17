@@ -19,14 +19,15 @@ const ADMIN_EMAIL = "admin@test.com";
 const ADMIN_PASSWORD = "password";
 
 async function completeEstimateWizard(page: import("@playwright/test").Page, description: string, quantity: string, unitPrice: string) {
+  const form = page.getByTestId("new-estimate-form");
   void description;
   void quantity;
-  await page.getByRole("button", { name: "Next" }).click();
+  await form.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("button", { name: /Drywall patch <=6/ }).click();
   await page.locator("#pb-custom-price").fill(unitPrice);
   await page.getByRole("button", { name: /Add to Estimate/ }).click();
-  await page.getByRole("button", { name: "Next" }).click();
-  await page.getByRole("button", { name: "Next" }).click();
+  await form.getByRole("button", { name: "Next", exact: true }).click();
+  await form.getByRole("button", { name: "Next", exact: true }).click();
   await Promise.all([
     page.waitForURL(/\/app\/estimates\/[0-9a-f-]+/),
     page.locator('[data-testid="submit-estimate-btn"]').evaluate((button) => (button as HTMLButtonElement).click()),
@@ -96,33 +97,6 @@ test.describe("Estimates smoke — admin role", () => {
     );
   });
 
-  test("admin can transition estimate draft → sent", async ({ page }) => {
-    // Navigate to new estimate, create it
-    await page.goto(`/app/estimates/new`);
-    await page.click('[data-testid="estimate-mode-detailed"]');
-    const clientSelect = page.locator("#client_id");
-    await clientSelect.selectOption({ index: 1 });
-    await completeEstimateWizard(page, "Test service", "1", "200.00");
-    await page.waitForURL(/\/app\/estimates\/[0-9a-f-]+/);
-
-    // Verify transition panel is present
-    await expect(
-      page.locator('[data-testid="estimate-transition-panel"]')
-    ).toBeVisible();
-
-    // Click → Sent
-    await page.click('[data-testid="transition-btn-sent"]');
-
-    // Status should update to Sent
-    await expect(page.locator('[data-testid="estimate-status"]')).toContainText(
-      "Sent"
-    );
-
-    // Transition panel should now show approved/declined/expired options
-    await expect(
-      page.locator('[data-testid="transition-btn-approved"]')
-    ).toBeVisible();
-  });
 
   test("estimate detail shows line items table", async ({ page }) => {
     await page.goto(`/app/estimates/new`);

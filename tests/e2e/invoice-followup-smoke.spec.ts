@@ -25,7 +25,7 @@ test.describe("Invoice Follow-Up Automation E2E", () => {
       "password"
     );
     await page.click('button[type="submit"]');
-    await page.waitForURL("**/app/**");
+    await page.waitForURL(/\/app(?:\/my-work)?$/);
   });
 
   test("automations page is accessible and lists follow-up type", async ({

@@ -53,9 +53,7 @@ test.describe("My Day mobile", () => {
 
   test("field right now visible when clocked in", async ({ page }) => {
     await page.goto(`${BASE}/app/my-work`);
-    await expect(
-      page.getByTestId("field-right-now").or(page.getByTestId("start-my-day-button")),
-    ).toBeVisible();
+    await expect(page.getByTestId("field-right-now")).toBeVisible();
   });
 
   test("no manage day accordion", async ({ page }) => {

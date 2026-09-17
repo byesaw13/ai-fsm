@@ -25,7 +25,7 @@ test("admin can create client, property, and job from property context", async (
   await page.waitForURL(/\/app\/clients\/[0-9a-f-]+/);
   await expect(page.locator("h1")).toContainText(clientName);
 
-  await page.getByRole("link", { name: "Add Property" }).click();
+  await page.getByRole("link", { name: "+ Property", exact: true }).click();
   await page.waitForURL(/\/app\/properties\/new\?client_id=/);
   await page.fill("#property_name", "Main Site");
   await page.fill("#address", propertyAddress);
