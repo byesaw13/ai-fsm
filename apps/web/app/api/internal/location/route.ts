@@ -18,7 +18,7 @@ import {
   resolveLocationPersonUserId,
 } from "@ai-fsm/domain";
 import type { PoolClient } from "pg";
-import { reduceLocationEvent, type OpenSegment } from "@/lib/location/segments";
+import { reduceLocationEvent, stopsAreSamePlace, type OpenSegment } from "@/lib/location/segments";
 import { sendPushToUser, sendPushToOwners } from "@/lib/push/send";
 import { autoRecordScheduledVisitPresence } from "@/lib/field/confirm-visit";
 import { listOpenWorkOrdersAtProperty } from "@/lib/field/open-work-orders";
@@ -250,6 +250,9 @@ export async function POST(req: NextRequest) {
     mutClosed = Boolean(mut.closeOpen);
 
     // 3. Apply. Close BEFORE open so the one-open invariant always holds.
+    // Hoisted so the blip-coalescing step below (after the close) can tell
+    // whether the drive that just closed was a sub-minute noise blip.
+    let driveDismissedAsNoise = false;
     if (mut.closeOpen && open) {
       // For a closing drive, estimate distance by accumulating great-circle
       // legs over the GPS points captured during the drive (periodic location
@@ -285,6 +288,7 @@ export async function POST(req: NextRequest) {
         const cls = classifyDrive({ distanceMeters, durationSeconds });
         isLikelyNoise = cls !== "ok";
         dismissAsNoise = cls === "noise";
+        driveDismissedAsNoise = dismissAsNoise;
       } else if (open.kind === "stop") {
         // Visit match first so a scheduled arrival keeps a short stop.
         stopDetect = await detectVisitCandidate(
@@ -338,7 +342,51 @@ export async function POST(req: NextRequest) {
         [u.placeLabel ?? null, u.zone ?? null, u.latitude ?? null, u.longitude ?? null, u.vehicleId ?? null, open.id, accountId],
       );
     }
-    if (mut.open) {
+    // Blip coalescing (TASK-147): if the drive we just closed was a sub-minute
+    // noise blip and the reducer wants to open a stop at the same place as the
+    // stop that preceded the drive, the dwell never really ended. Reopen the
+    // prior stop instead of leaving a duplicate second stop (+ dead drive) that
+    // would surface as its own end-of-day interview card. The prior stop's
+    // ended_at equals this drive's start (the reducer closed it there).
+    let coalescedPriorStopId: string | null = null;
+    if (driveDismissedAsNoise && open?.kind === "drive" && mut.open?.kind === "stop") {
+      const { rows: prior } = await client.query<{
+        id: string;
+        zone: string | null;
+        latitude: number | null;
+        longitude: number | null;
+      }>(
+        `SELECT id, zone, latitude, longitude
+           FROM location_segments
+          WHERE account_id = $1 AND kind = 'stop' AND ended_at = $2::timestamptz
+          ORDER BY started_at DESC
+          LIMIT 1`,
+        [accountId, open.startedAt],
+      );
+      const p = prior[0];
+      if (
+        p &&
+        stopsAreSamePlace(p, {
+          zone: mut.open.zone,
+          latitude: mut.open.latitude,
+          longitude: mut.open.longitude,
+        })
+      ) {
+        await client.query(
+          `UPDATE location_segments
+              SET ended_at = NULL,
+                  is_likely_noise = false,
+                  status = CASE WHEN status = 'dismissed' THEN 'pending' ELSE status END,
+                  updated_at = now()
+            WHERE id = $1 AND account_id = $2 AND ended_at = $3::timestamptz`,
+          [p.id, accountId, open.startedAt],
+        );
+        coalescedPriorStopId = p.id;
+        segmentId = p.id;
+      }
+    }
+
+    if (mut.open && !coalescedPriorStopId) {
       const o = mut.open;
       // segment_date derives from the event's own timestamp, not the server's
       // current date, so backfilled/retried events land on the right day (P2).
