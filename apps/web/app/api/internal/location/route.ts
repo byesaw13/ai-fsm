@@ -373,13 +373,27 @@ export async function POST(req: NextRequest) {
         })
       ) {
         await client.query(
+          // 'provisional' is the un-dismissed active state — the status CHECK
+          // (migration 114) allows only provisional/confirmed/dismissed, so a
+          // short early-dwell blip (prior stop was dismissed as noise) must
+          // reopen as provisional, not an invalid status.
           `UPDATE location_segments
               SET ended_at = NULL,
                   is_likely_noise = false,
-                  status = CASE WHEN status = 'dismissed' THEN 'pending' ELSE status END,
+                  status = CASE WHEN status = 'dismissed' THEN 'provisional' ELSE status END,
                   updated_at = now()
             WHERE id = $1 AND account_id = $2 AND ended_at = $3::timestamptz`,
           [p.id, accountId, open.startedAt],
+        );
+        // The prior stop's close may have created a visit_candidate frozen at
+        // the blip start. detectVisitCandidate uses ON CONFLICT DO NOTHING, so
+        // it would never correct the duration. Drop the still-pending, unlinked
+        // candidate so the eventual real close re-detects it over the full dwell.
+        await client.query(
+          `DELETE FROM visit_candidates
+            WHERE account_id = $1 AND location_segment_id = $2
+              AND visit_id IS NULL AND status = 'pending'`,
+          [accountId, p.id],
         );
         coalescedPriorStopId = p.id;
         segmentId = p.id;
