@@ -128,6 +128,7 @@ closed in tests; owner-flow AC still open.
 | TASK-142 | [Untagged claim miles leftover](TASK-142-untagged-miles-leftover.md) | 001 | In Progress |
 | TASK-143 | [Overview is the leak list](TASK-143-overview-leak-list.md) | 006 | In Progress |
 | TASK-144 | [Receipt destinations](TASK-144-receipt-destinations.md) | 004 | In Progress |
+| TASK-146 | [RLS enforcement on the web tier](TASK-146-rls-web-tier-enforcement.md) | 005 | In Progress |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
 | TASK-003 | Wrong Vehicle Correction | 001 | Done |
