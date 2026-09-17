@@ -23,9 +23,9 @@ test.describe("Tech smoke — assigned jobs and visits", () => {
     await page.waitForURL(/\/app(?:\/my-work)?$/);
   });
 
-  test("tech sees Jobs page without create button", async ({ page }) => {
+  test("tech sees Projects page without create button", async ({ page }) => {
     await page.goto(`${BASE}/app/jobs`);
-    await expect(page.locator("h1")).toContainText("Jobs");
+    await expect(page.locator("h1")).toContainText("Projects");
     // Tech must NOT see the create job button
     await expect(page.locator('[data-testid="create-job-btn"]')).not.toBeVisible();
   });

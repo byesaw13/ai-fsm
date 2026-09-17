@@ -25,12 +25,13 @@ async function login(page: Page) {
 }
 
 async function completeEstimateWizard(page: Page) {
-  await page.getByRole("button", { name: "Next" }).click();
+  const form = page.getByTestId("new-estimate-form");
+  await form.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("button", { name: /Drywall patch <=6/ }).click();
   await page.locator("#pb-custom-price").fill("250.00");
   await page.getByRole("button", { name: /Add to Estimate/ }).click();
-  await page.getByRole("button", { name: "Next" }).click();
-  await page.getByRole("button", { name: "Next" }).click();
+  await form.getByRole("button", { name: "Next", exact: true }).click();
+  await form.getByRole("button", { name: "Next", exact: true }).click();
   await Promise.all([
     page.waitForURL(/\/app\/estimates\/[0-9a-f-]+/),
     page.locator('#main-content [data-testid="submit-estimate-btn"]').evaluate((button) => (button as HTMLButtonElement).click()),
@@ -170,7 +171,12 @@ test.describe("Required release smoke — admin core flow", () => {
     await page.goto(`${BASE}/app/invoices/${invoiceId}`);
     const statusText = (await page.locator('#main-content [data-testid="invoice-status"]').textContent())?.trim();
     if (statusText === "Draft") {
-      await page.getByRole("button", { name: "→ Sent", exact: true }).click();
+      const [transitionResponse] = await Promise.all([
+        page.waitForResponse((response) => response.url().endsWith("/transition") && response.request().method() === "POST"),
+        page.getByRole("button", { name: "→ Sent", exact: true }).click(),
+      ]);
+      expect(transitionResponse.ok()).toBe(true);
+      await page.reload();
     }
     await expect(page.locator('#main-content [data-testid="invoice-status"]')).toContainText("Sent");
 

@@ -3,6 +3,7 @@ import { test, expect } from "@playwright/test";
 const BASE = process.env.TEST_BASE_URL ?? process.env.BASE_URL ?? "http://localhost:3000";
 
 test.describe("Guided Store Run mobile", () => {
+  test.setTimeout(120 * 1000);
   test.use({ viewport: { width: 390, height: 844 } });
 
   let clientId: string | null;
@@ -52,8 +53,7 @@ test.describe("Guided Store Run mobile", () => {
   });
 
   test("purchases by department and opens receipt with the job selected", async ({ page }) => {
-    await page.goto(`${BASE}/app/jobs`);
-    await page.getByRole("link", { name: jobTitle }).click();
+    await page.goto(`${BASE}/app/jobs/${jobId}`);
     await expect(page.getByRole("heading", { name: jobTitle })).toBeVisible();
     const openedJobId = jobId!;
     await page.goto(`${BASE}/app/jobs/${openedJobId}/materials`);

@@ -23,9 +23,9 @@ test.describe("Admin smoke — jobs and visits", () => {
     await page.waitForURL(/\/app(?:\/my-work)?$/);
   });
 
-  test("admin sees Jobs page with create button", async ({ page }) => {
+  test("admin sees Projects page with create button", async ({ page }) => {
     await page.goto(`${BASE}/app/jobs`);
-    await expect(page.locator("h1")).toContainText("Jobs");
+    await expect(page.locator("h1")).toContainText("Projects");
     // Admin sees the create job button
     await expect(page.locator('[data-testid="create-job-btn"]')).toBeVisible();
   });
@@ -55,8 +55,11 @@ test.describe("Admin smoke — jobs and visits", () => {
     const firstCard = page.locator('[data-testid="job-card"]').first();
     if (await firstCard.isVisible()) {
       await firstCard.click();
-      // Transition panel present for admin
-      await expect(page.getByRole("heading", { name: "Command" })).toBeVisible();
+      await page.waitForURL(/\/app\/jobs\/[0-9a-f-]+/);
+      // Assert the admin-only transition panel itself, not just the always-present
+      // status badge, so a role/rendering regression that hides the controls fails
+      // the smoke test (Codex).
+      await expect(page.locator('[data-testid="job-transition-panel"]')).toBeVisible();
     }
   });
 
@@ -65,6 +68,7 @@ test.describe("Admin smoke — jobs and visits", () => {
     const firstCard = page.locator('[data-testid="visit-card"]').first();
     if (await firstCard.isVisible()) {
       await firstCard.click();
+      await page.waitForURL(/\/app\/visits\/[0-9a-f-]+/);
       await expect(page.locator('[data-testid="visit-notes-panel"]')).toBeVisible();
     }
   });
