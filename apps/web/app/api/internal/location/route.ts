@@ -356,9 +356,15 @@ export async function POST(req: NextRequest) {
         latitude: number | null;
         longitude: number | null;
       }>(
+        // Only coalesce a stop the system still owns: an unreviewed provisional
+        // stop, or one auto-dismissed as noise. Never reopen a stop the owner
+        // manually confirmed or dismissed while the (possibly >1min) noise drive
+        // was open — that would clobber their decision.
         `SELECT id, zone, latitude, longitude
            FROM location_segments
           WHERE account_id = $1 AND kind = 'stop' AND ended_at = $2::timestamptz
+            AND (status = 'provisional'
+                 OR (status = 'dismissed' AND COALESCE(is_likely_noise, false) = true))
           ORDER BY started_at DESC
           LIMIT 1`,
         [accountId, open.startedAt],
@@ -373,26 +379,42 @@ export async function POST(req: NextRequest) {
         })
       ) {
         await client.query(
-          // 'provisional' is the un-dismissed active state — the status CHECK
-          // (migration 114) allows only provisional/confirmed/dismissed, so a
-          // short early-dwell blip (prior stop was dismissed as noise) must
-          // reopen as provisional, not an invalid status.
+          // Reopen as 'provisional' (the un-dismissed active state — the status
+          // CHECK in migration 114 allows only provisional/confirmed/dismissed).
+          // Fill any place metadata the prior stop was missing from the richer
+          // arrival fix (e.g. a coords-only prior stop gains the new zone/label/
+          // activity) without overwriting data it already has.
           `UPDATE location_segments
               SET ended_at = NULL,
                   is_likely_noise = false,
-                  status = CASE WHEN status = 'dismissed' THEN 'provisional' ELSE status END,
+                  status = 'provisional',
+                  zone = COALESCE(zone, $4),
+                  place_label = COALESCE(place_label, $5),
+                  latitude = COALESCE(latitude, $6),
+                  longitude = COALESCE(longitude, $7),
+                  suggested_activity_type = COALESCE(suggested_activity_type, $8),
                   updated_at = now()
             WHERE id = $1 AND account_id = $2 AND ended_at = $3::timestamptz`,
-          [p.id, accountId, open.startedAt],
+          [
+            p.id,
+            accountId,
+            open.startedAt,
+            mut.open.zone,
+            mut.open.placeLabel,
+            mut.open.latitude,
+            mut.open.longitude,
+            mut.open.suggestedActivityType,
+          ],
         );
         // The prior stop's close may have created a visit_candidate frozen at
-        // the blip start. detectVisitCandidate uses ON CONFLICT DO NOTHING, so
-        // it would never correct the duration. Drop the still-pending, unlinked
-        // candidate so the eventual real close re-detects it over the full dwell.
+        // the blip start. detectVisitCandidate uses ON CONFLICT DO NOTHING, so it
+        // would never correct the departure/duration (or, for a scheduled match,
+        // re-report hasScheduledVisit). Drop the still-pending candidate — linked
+        // or not — so the eventual real close re-detects it over the full dwell.
+        // Reviewed candidates (status <> 'pending') are left untouched.
         await client.query(
           `DELETE FROM visit_candidates
-            WHERE account_id = $1 AND location_segment_id = $2
-              AND visit_id IS NULL AND status = 'pending'`,
+            WHERE account_id = $1 AND location_segment_id = $2 AND status = 'pending'`,
           [accountId, p.id],
         );
         coalescedPriorStopId = p.id;
