@@ -169,6 +169,40 @@ function hasStopLocation(ev: IncomingLocationEvent): boolean {
   );
 }
 
+/**
+ * Blip coalescing (TASK-147): a sub-minute "blip" — a spurious in_vehicle /
+ * zone flicker while parked — makes the reducer close the stop, open a phantom
+ * drive, then open a SECOND stop at the same place. The phantom drive is later
+ * dismissed as noise, but both stops otherwise survive and each surfaces as its
+ * own end-of-day interview card (the user sees "3 jobs" for one dwell). When the
+ * drive that just closed was noise and the stop opening after it is the same
+ * place as the stop that preceded the drive, the dwell never really ended — the
+ * ingest route reopens the prior stop instead of creating a duplicate.
+ *
+ * Same place = same zone when both are zoned, else coordinates within the stop
+ * anchor radius (the same jitter tolerance used for pin hysteresis).
+ */
+export function stopsAreSamePlace(
+  a: { zone: string | null; latitude: number | null; longitude: number | null },
+  b: { zone: string | null; latitude: number | null; longitude: number | null },
+): boolean {
+  if (a.zone && b.zone) return a.zone === b.zone;
+  if (
+    a.latitude != null &&
+    a.longitude != null &&
+    b.latitude != null &&
+    b.longitude != null
+  ) {
+    return (
+      haversineMeters(
+        { latitude: a.latitude, longitude: a.longitude },
+        { latitude: b.latitude, longitude: b.longitude },
+      ) <= STOP_ANCHOR_RADIUS_M
+    );
+  }
+  return false;
+}
+
 export function reduceLocationEvent(
   open: OpenSegment | null,
   ev: IncomingLocationEvent,

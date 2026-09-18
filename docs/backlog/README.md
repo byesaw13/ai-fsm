@@ -131,6 +131,7 @@ closed in tests; owner-flow AC still open.
 | TASK-144 | [Receipt destinations](TASK-144-receipt-destinations.md) | 004 | In Progress |
 | TASK-145 | [Night stop interview](TASK-145-night-stop-interview.md) | 007 | In Progress |
 | TASK-146 | [RLS enforcement on the web tier](TASK-146-rls-web-tier-enforcement.md) | 005 | In Progress |
+| TASK-147 | [GPS blip coalescing — one dwell, one stop](TASK-147-gps-blip-coalescing.md) | 007 | In Progress |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
 | TASK-003 | Wrong Vehicle Correction | 001 | Done |

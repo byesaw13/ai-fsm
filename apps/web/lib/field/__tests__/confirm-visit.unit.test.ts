@@ -133,4 +133,21 @@ describe("auto presence path policy (E4)", () => {
       }),
     ).toBe(true);
   });
+
+  it("confirmed-candidate re-close (TASK-147) does use the complete flag — human already confirmed", () => {
+    // detectVisitCandidate restamps via applyGpsPresenceToVisit with this
+    // flag after a coalesced re-close of a confirmed candidate.
+    expect(
+      shouldCompleteVisitFromPresence({
+        classification: "job_work",
+        durationMinutes: 5,
+      }),
+    ).toBe(false);
+    expect(
+      shouldCompleteVisitFromPresence({
+        classification: "job_work",
+        durationMinutes: 45,
+      }),
+    ).toBe(true);
+  });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { reduceLocationEvent, type OpenSegment, type IncomingLocationEvent } from "./segments";
+import { reduceLocationEvent, stopsAreSamePlace, type OpenSegment, type IncomingLocationEvent } from "./segments";
 
 const T1 = "2026-06-19T13:00:00.000Z";
 const T2 = "2026-06-19T13:30:00.000Z";
@@ -290,5 +290,74 @@ describe("a typical morning", () => {
     // leave supply house (driving) then stop at a customer with no zone
     out = reduceLocationEvent(drive(), ev({ kind: "activity_change", detectedActivity: "still", geocodedAddress: "14 Oak St", occurredAt: "2026-06-19T09:05:00Z" }));
     expect(out.open).toMatchObject({ kind: "stop", placeLabel: "14 Oak St", suggestedActivityType: null });
+  });
+});
+
+describe("blip coalescing — stopsAreSamePlace (TASK-147)", () => {
+  const ashLat = 43.201, ashLng = -71.501;
+  it("same zone = same place (reopen the prior stop)", () => {
+    expect(
+      stopsAreSamePlace(
+        { zone: "4 Ash", latitude: null, longitude: null },
+        { zone: "4 Ash", latitude: null, longitude: null },
+      ),
+    ).toBe(true);
+  });
+  it("different zones are different places", () => {
+    expect(
+      stopsAreSamePlace(
+        { zone: "4 Ash", latitude: ashLat, longitude: ashLng },
+        { zone: "Home Depot", latitude: ashLat, longitude: ashLng },
+      ),
+    ).toBe(false);
+  });
+  it("zone-less coords within the anchor radius = same place", () => {
+    // ~15m north of the anchor — inside STOP_ANCHOR_RADIUS_M (40m).
+    expect(
+      stopsAreSamePlace(
+        { zone: null, latitude: ashLat, longitude: ashLng },
+        { zone: null, latitude: ashLat + 0.00013, longitude: ashLng },
+      ),
+    ).toBe(true);
+  });
+  it("coords beyond the anchor radius are a real relocation, not a blip", () => {
+    // ~110m north — a genuinely different stop, must NOT coalesce.
+    expect(
+      stopsAreSamePlace(
+        { zone: null, latitude: ashLat, longitude: ashLng },
+        { zone: null, latitude: ashLat + 0.001, longitude: ashLng },
+      ),
+    ).toBe(false);
+  });
+  it("no zone and missing coords cannot be judged the same place", () => {
+    expect(
+      stopsAreSamePlace(
+        { zone: null, latitude: null, longitude: null },
+        { zone: null, latitude: ashLat, longitude: ashLng },
+      ),
+    ).toBe(false);
+  });
+  it("a blip mid-dwell produces two same-place stops (what the route coalesces)", () => {
+    // At 4 Ash, a spurious in_vehicle blip closes the stop and opens a drive...
+    const leaving = reduceLocationEvent(
+      stop({ zone: "4 Ash", latitude: ashLat, longitude: ashLng }),
+      ev({ kind: "activity_change", detectedActivity: "in_vehicle", occurredAt: "2026-06-19T10:00:00Z" }),
+    );
+    expect(leaving.closeOpen).toBeDefined();
+    expect(leaving.open?.kind).toBe("drive");
+    // ...then it settles and opens a SECOND stop at the same place.
+    const backParked = reduceLocationEvent(
+      drive({ startedAt: "2026-06-19T10:00:00Z" }),
+      ev({ kind: "activity_change", detectedActivity: "still", zone: "4 Ash", latitude: ashLat, longitude: ashLng, occurredAt: "2026-06-19T10:00:40Z" }),
+    );
+    expect(backParked.open?.kind).toBe("stop");
+    // The two stops are the same place → the ingest route reopens the first
+    // instead of leaving a duplicate end-of-day card.
+    expect(
+      stopsAreSamePlace(
+        { zone: "4 Ash", latitude: ashLat, longitude: ashLng },
+        { zone: backParked.open!.zone, latitude: backParked.open!.latitude, longitude: backParked.open!.longitude },
+      ),
+    ).toBe(true);
   });
 });
