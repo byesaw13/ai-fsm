@@ -20,7 +20,11 @@ import {
 import type { PoolClient } from "pg";
 import { reduceLocationEvent, stopsAreSamePlace, type OpenSegment } from "@/lib/location/segments";
 import { sendPushToUser, sendPushToOwners } from "@/lib/push/send";
-import { autoRecordScheduledVisitPresence } from "@/lib/field/confirm-visit";
+import {
+  applyGpsPresenceToVisit,
+  autoRecordScheduledVisitPresence,
+  shouldCompleteVisitFromPresence,
+} from "@/lib/field/confirm-visit";
 import { listOpenWorkOrdersAtProperty } from "@/lib/field/open-work-orders";
 import { stampLivePromptedAt } from "@/lib/field/stamp-live-prompted";
 
@@ -708,24 +712,68 @@ async function detectVisitCandidate(
   // skips a confirmed row, so extend both here to the real departure. No-op
   // unless a confirmed candidate exists for this segment (only on a coalesced
   // re-close). RETURNING gates the activity extend + the keep signal.
-  const { rows: reconciled } = await client.query<{ id: string }>(
+  const { rows: reconciled } = await client.query<{
+    id: string;
+    visit_id: string | null;
+    classification: string | null;
+  }>(
     `UPDATE visit_candidates
         SET departure_time = $3::timestamptz, duration_minutes = $4
       WHERE account_id = $1 AND location_segment_id = $2
         AND status = 'confirmed' AND departure_time < $3::timestamptz
-    RETURNING id`,
+    RETURNING id, visit_id, classification`,
     [accountId, stop.id, endedAt, Math.round(durationMinutes)],
   );
   if (reconciled[0]) {
-    await client.query(
+    // Ingest cannot 409 + proposeRebalance (that's the interactive confirm
+    // route). Cap ended_at at the next later activity start so a switch or
+    // log during the reopened dwell is never double-counted.
+    const { rows: extended } = await client.query<{ user_id: string }>(
       `UPDATE activity_entries a
-          SET ended_at = $3::timestamptz
+          SET ended_at = LEAST(
+                $3::timestamptz,
+                COALESCE(
+                  (
+                    SELECT MIN(b.started_at)
+                    FROM activity_entries b
+                    WHERE b.account_id = a.account_id
+                      AND b.user_id = a.user_id
+                      AND b.voided_at IS NULL
+                      AND b.id <> a.id
+                      AND b.started_at > a.started_at
+                      AND b.started_at < $3::timestamptz
+                  ),
+                  $3::timestamptz
+                )
+              )
          FROM visit_candidates vc
         WHERE vc.account_id = $1 AND vc.location_segment_id = $2
           AND vc.status = 'confirmed' AND vc.activity_entry_id = a.id
-          AND a.account_id = $1 AND a.ended_at < $3::timestamptz`,
+          AND a.account_id = $1 AND a.ended_at < $3::timestamptz
+      RETURNING a.user_id`,
       [accountId, stop.id, endedAt],
     );
+    const linkedVisitId = reconciled[0].visit_id;
+    const restampUserId = stampUserId ?? extended[0]?.user_id ?? null;
+    if (linkedVisitId && restampUserId) {
+      // Human already confirmed this candidate; re-apply GPS presence with
+      // the full dwell so a visit left in_progress (short first close) can
+      // complete, and an already-completed visit gets the later completed_at.
+      await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [
+        restampUserId,
+      ]);
+      await applyGpsPresenceToVisit(client, {
+        accountId,
+        userId: restampUserId,
+        visitId: linkedVisitId,
+        arrivalTime: stop.startedAt,
+        departureTime: endedAt,
+        complete: shouldCompleteVisitFromPresence({
+          classification: reconciled[0].classification ?? "",
+          durationMinutes: Math.round(durationMinutes),
+        }),
+      });
+    }
     // An already-confirmed stop must never be dismissed by the dwell floor:
     // signal "keep" so classifyStop treats the reopened close as a real stay.
     return { arrivalPrompt: null, hasScheduledVisit: true };
