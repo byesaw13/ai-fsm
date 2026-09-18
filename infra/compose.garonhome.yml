@@ -53,6 +53,10 @@ services:
       dockerfile: apps/web/Dockerfile
     image: ai-fsm-web:${APP_TAG:-latest}
     restart: unless-stopped
+    # Locally-built image (no registry) — tell homelab Watchtower to skip it
+    # instead of logging a "pull access denied" failure every scan.
+    labels:
+      - com.centurylinklabs.watchtower.enable=false
     # No host port mapping. The PWA's secure origin is provided by a Cloudflare
     # Tunnel (cloudflared) that routes to this service over the business_proxy
     # network via the `ai-fsm-web` alias — no inbound host ports are exposed.
@@ -98,6 +102,9 @@ services:
       dockerfile: services/worker/Dockerfile
     image: ai-fsm-worker:${APP_TAG:-latest}
     restart: unless-stopped
+    # Locally-built image (no registry) — skip it in homelab Watchtower.
+    labels:
+      - com.centurylinklabs.watchtower.enable=false
     env_file:
       - ${FSM_ENV_FILE:-/opt/business/ai-fsm/env/.env}
     environment:
