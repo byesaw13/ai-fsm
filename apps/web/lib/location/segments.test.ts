@@ -77,9 +77,13 @@ describe("reduceLocationEvent — zone_leave", () => {
 });
 
 describe("reduceLocationEvent — activity_change", () => {
-  it("in_vehicle opens a drive when stopped", () => {
+  it("in_vehicle while stopped is a no-op — Bluetooth connect is the leave (TASK-150)", () => {
     const out = reduceLocationEvent(stop({ zone: "home" }), ev({ kind: "activity_change", detectedActivity: "in_vehicle" }));
-    expect(out.closeOpen).toEqual({ endedAt: T2 });
+    expect(out).toEqual({});
+  });
+
+  it("in_vehicle with no open segment still opens a drive", () => {
+    const out = reduceLocationEvent(null, ev({ kind: "activity_change", detectedActivity: "in_vehicle" }));
     expect(out.open?.kind).toBe("drive");
   });
 
@@ -102,21 +106,34 @@ describe("reduceLocationEvent — activity_change", () => {
     expect(out).toEqual({});
   });
 
-  it("still outside the fence closes the stop and opens a new one (TASK-148)", () => {
-    const out = reduceLocationEvent(
+  it("still outside the fence holds unless it is a different known property (TASK-150)", () => {
+    const flicker = reduceLocationEvent(
       stop({ placeLabel: "4 Ash", latitude: 43.201, longitude: -71.501 }),
       ev({
         kind: "activity_change",
         detectedActivity: "still",
-        geocodedAddress: "6 Ash",
+        geocodedAddress: "8 Bus Rd",
         latitude: 43.202,
         longitude: -71.501,
       }),
     );
-    expect(out.closeOpen).toEqual({ endedAt: T2 });
-    expect(out.open).toMatchObject({
+    expect(flicker).toEqual({});
+
+    const otherJob = reduceLocationEvent(
+      stop({ placeLabel: "4 Ash", latitude: 43.201, longitude: -71.501 }),
+      ev({
+        kind: "activity_change",
+        detectedActivity: "still",
+        geocodedAddress: "63 Landing",
+        latitude: 43.202,
+        longitude: -71.501,
+      }),
+      { differentProperty: true },
+    );
+    expect(otherJob.closeOpen).toEqual({ endedAt: T2 });
+    expect(otherJob.open).toMatchObject({
       kind: "stop",
-      placeLabel: "6 Ash",
+      placeLabel: "63 Landing",
       latitude: 43.202,
       longitude: -71.501,
     });
@@ -371,27 +388,12 @@ describe("blip coalescing — stopsAreSamePlace (TASK-147)", () => {
       ),
     ).toBe(false);
   });
-  it("a blip mid-dwell produces two same-place stops (what the route coalesces)", () => {
-    // At 4 Ash, a spurious in_vehicle blip closes the stop and opens a drive...
-    const leaving = reduceLocationEvent(
-      stop({ zone: "4 Ash", latitude: ashLat, longitude: ashLng }),
+  it("phone in_vehicle while parked no longer blips a drive (TASK-150)", () => {
+    const parked = stop({ zone: "4 Ash", latitude: ashLat, longitude: ashLng });
+    const blip = reduceLocationEvent(
+      parked,
       ev({ kind: "activity_change", detectedActivity: "in_vehicle", occurredAt: "2026-06-19T10:00:00Z" }),
     );
-    expect(leaving.closeOpen).toBeDefined();
-    expect(leaving.open?.kind).toBe("drive");
-    // ...then it settles and opens a SECOND stop at the same place.
-    const backParked = reduceLocationEvent(
-      drive({ startedAt: "2026-06-19T10:00:00Z" }),
-      ev({ kind: "activity_change", detectedActivity: "still", zone: "4 Ash", latitude: ashLat, longitude: ashLng, occurredAt: "2026-06-19T10:00:40Z" }),
-    );
-    expect(backParked.open?.kind).toBe("stop");
-    // The two stops are the same place → the ingest route reopens the first
-    // instead of leaving a duplicate end-of-day card.
-    expect(
-      stopsAreSamePlace(
-        { zone: "4 Ash", latitude: ashLat, longitude: ashLng },
-        { zone: backParked.open!.zone, latitude: backParked.open!.latitude, longitude: backParked.open!.longitude },
-      ),
-    ).toBe(true);
+    expect(blip).toEqual({});
   });
 });

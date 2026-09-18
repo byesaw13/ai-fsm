@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { geofenceMeters, isStopNearProperty, matchCustomerAtStop, relocationRadiusForStop } from "../stop-proximity";
+import {
+  geofenceMeters,
+  isDifferentPropertyStill,
+  isStopNearProperty,
+  matchCustomerAtStop,
+  relocationRadiusForStop,
+} from "../stop-proximity";
 import { DEFAULT_RELOCATION_METERS, MIN_RELOCATION_METERS } from "@ai-fsm/domain";
 
 describe("stop-proximity", () => {
@@ -73,5 +79,59 @@ describe("stop-proximity", () => {
       },
     ]);
     expect(r).toBe(MIN_RELOCATION_METERS);
+  });
+
+  it("isDifferentPropertyStill holds on unmatched neighbor geocode (TASK-150)", () => {
+    const ash = {
+      propertyId: "p-ash",
+      clientId: "c1",
+      clientName: "Peter",
+      address: "4 Ash St",
+      latitude: 42.789695,
+      longitude: -71.247093,
+      geofenceRadiusFeet: 250,
+      jobId: "j1",
+    };
+    const open = { latitude: 42.7896, longitude: -71.2471 };
+    // ~110m north — outside 80m floor, no other property → hold
+    expect(
+      isDifferentPropertyStill(
+        open,
+        { latitude: 42.7906, longitude: -71.2471 },
+        [ash],
+        MIN_RELOCATION_METERS,
+      ),
+    ).toBe(false);
+  });
+
+  it("isDifferentPropertyStill splits when the ping is a different known property", () => {
+    const ash = {
+      propertyId: "p-ash",
+      clientId: "c1",
+      clientName: "Peter",
+      address: "4 Ash St",
+      latitude: 42.789695,
+      longitude: -71.247093,
+      geofenceRadiusFeet: 250,
+      jobId: "j1",
+    };
+    const landing = {
+      propertyId: "p-landing",
+      clientId: "c2",
+      clientName: "TJ",
+      address: "63 Landing",
+      latitude: 42.801,
+      longitude: -71.26,
+      geofenceRadiusFeet: 150,
+      jobId: "j2",
+    };
+    expect(
+      isDifferentPropertyStill(
+        { latitude: 42.7896, longitude: -71.2471 },
+        { latitude: 42.801, longitude: -71.26 },
+        [ash, landing],
+        MIN_RELOCATION_METERS,
+      ),
+    ).toBe(true);
   });
 });

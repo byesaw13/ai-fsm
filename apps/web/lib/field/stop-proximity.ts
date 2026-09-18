@@ -1,5 +1,6 @@
 import {
   haversineMeters,
+  isOutsideStopFence,
   rankVisitCandidates,
   relocationRadiusMeters,
   type VisitMatchCandidate,
@@ -127,4 +128,31 @@ export function relocationRadiusForStop(
   if (!match) return relocationRadiusMeters(null);
   const prop = properties.find((p) => p.propertyId === match.propertyId);
   return relocationRadiusMeters(prop?.geofenceRadiusFeet);
+}
+
+/**
+ * TASK-150: a `still` ping outside the current fence only means "left this
+ * job" when it matches a *different* known property. Unmatched neighbor
+ * geocodes (8 Bus Rd, 69 N Policy next to 4 Ash) hold.
+ */
+export function isDifferentPropertyStill(
+  openStop: StopCoords,
+  ping: StopCoords,
+  properties: PropertyGeo[],
+  relocationRadiusM: number,
+): boolean {
+  if (
+    !isOutsideStopFence({
+      from: openStop,
+      to: ping,
+      radiusMeters: relocationRadiusM,
+    })
+  ) {
+    return false;
+  }
+  const there = matchCustomerAtStop(ping, 10, properties);
+  if (!there) return false;
+  const here = matchCustomerAtStop(openStop, 10, properties);
+  if (!here) return true;
+  return here.propertyId !== there.propertyId;
 }
