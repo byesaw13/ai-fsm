@@ -246,6 +246,27 @@ describe("shouldCreateVisitCandidate (TASK-079 dwell floor)", () => {
   it("keeps even a brief stop when a visit is scheduled there today", () => {
     expect(shouldCreateVisitCandidate({ score: 90, durationMinutes: 0, hasScheduledVisit: true })).toBe(true);
   });
+  it("Bluetooth park (TASK-149) skips the dwell floor when distance is known", () => {
+    expect(
+      shouldCreateVisitCandidate({
+        score: 90,
+        durationMinutes: 0,
+        hasScheduledVisit: false,
+        distanceMeters: 20,
+        parkedArrival: true,
+      }),
+    ).toBe(true);
+  });
+  it("Bluetooth park without a distance proof still needs the 5-minute floor", () => {
+    expect(
+      shouldCreateVisitCandidate({
+        score: 90,
+        durationMinutes: 0,
+        hasScheduledVisit: false,
+        parkedArrival: true,
+      }),
+    ).toBe(false);
+  });
   it("rejects known-far matches even when scheduled today", () => {
     expect(
       shouldCreateVisitCandidate({
