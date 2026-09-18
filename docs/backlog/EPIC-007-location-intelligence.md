@@ -47,6 +47,13 @@ See [TASK-145-night-stop-interview.md](./TASK-145-night-stop-interview.md).
 Day Review walks GPS stops (reason → job / receipt / tomorrow). TASK-138
 counts stay on Overview; this is the question walk.
 
+# TASK-148: Geofence-anchored stops + home fence
+
+See [TASK-148-geofence-anchored-stops.md](./TASK-148-geofence-anchored-stops.md).
+Walking must not smear one stop across two houses. Home is a fence, not the
+string `home`. Live prompt for a distance-proven open job; night interview
+sees the stop that is still open.
+
 ## Relationship to existing work (read first)
 
 This epic **extends TASK-024**, it does not replace it. The phone→FSM pipeline is

@@ -3,6 +3,11 @@ import {
   classifyDrive,
   classifyStop,
   MIN_STOP_SECONDS,
+  DEFAULT_RELOCATION_METERS,
+  MIN_RELOCATION_METERS,
+  relocationRadiusMeters,
+  isOutsideStopFence,
+  shouldLearnHomeCoords,
   type DriveClassification,
 } from "./location";
 
@@ -63,5 +68,75 @@ describe("classifyStop", () => {
 
   it.each(cases)("%s → %s", (_label, input, expected) => {
     expect(classifyStop(input)).toBe(expected);
+  });
+});
+
+describe("relocationRadiusMeters (TASK-148)", () => {
+  it("uses 250ft when the stop is unmatched", () => {
+    expect(relocationRadiusMeters(null)).toBeCloseTo(DEFAULT_RELOCATION_METERS);
+    expect(relocationRadiusMeters(undefined)).toBeCloseTo(DEFAULT_RELOCATION_METERS);
+  });
+
+  it("floors a 150ft geofence at 80m so jitter cannot split", () => {
+    expect(relocationRadiusMeters(150)).toBe(MIN_RELOCATION_METERS);
+  });
+
+  it("uses a wide rural geofence as-is", () => {
+    expect(relocationRadiusMeters(400)).toBeCloseTo(400 * 0.3048);
+  });
+});
+
+describe("isOutsideStopFence (TASK-148)", () => {
+  const ash = { latitude: 43.201, longitude: -71.501 };
+  it("stays inside for a walk around the house (~22m)", () => {
+    expect(
+      isOutsideStopFence({
+        from: ash,
+        to: { latitude: ash.latitude + 0.0002, longitude: ash.longitude },
+        radiusMeters: MIN_RELOCATION_METERS,
+      }),
+    ).toBe(false);
+  });
+  it("splits a walk next door (~111m)", () => {
+    expect(
+      isOutsideStopFence({
+        from: ash,
+        to: { latitude: ash.latitude + 0.001, longitude: ash.longitude },
+        radiusMeters: MIN_RELOCATION_METERS,
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("shouldLearnHomeCoords (TASK-148)", () => {
+  it("learns the first home-zone fix", () => {
+    expect(
+      shouldLearnHomeCoords({
+        zone: "home",
+        latitude: 43.2,
+        longitude: -71.5,
+        stored: null,
+      }),
+    ).toEqual({ learn: true, reason: "missing" });
+  });
+  it("ignores non-home zones", () => {
+    expect(
+      shouldLearnHomeCoords({
+        zone: "4 Ash",
+        latitude: 43.2,
+        longitude: -71.5,
+        stored: null,
+      }).learn,
+    ).toBe(false);
+  });
+  it("relearns when the home pin moved >500m", () => {
+    expect(
+      shouldLearnHomeCoords({
+        zone: "Home",
+        latitude: 43.21,
+        longitude: -71.5,
+        stored: { latitude: 43.2, longitude: -71.5 },
+      }),
+    ).toMatchObject({ learn: true, reason: "moved" });
   });
 });

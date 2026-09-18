@@ -8,6 +8,7 @@
  */
 
 import type { ActivityType } from "./activities";
+import { haversineMeters } from "./geo";
 
 /** Raw event kinds emitted by the HA bridge. */
 export const LOCATION_EVENT_KINDS = [
@@ -151,17 +152,98 @@ export function classifyStop(input: {
 }
 
 // ---------------------------------------------------------------------------
+// Geofence-anchored stops (TASK-148)
+// ---------------------------------------------------------------------------
+
+/** Floor so a 150ft property fence is not inside GPS jitter (~40m). */
+export const MIN_RELOCATION_METERS = 80;
+
+/** Unmatched stop: 250ft, same far-band used for auto-detect. */
+export const DEFAULT_RELOCATION_METERS = 250 * 0.3048;
+
+/** Learned home fence when HA did not name the zone. */
+export const DEFAULT_HOME_FENCE_METERS = 100;
+
+const HOME_RELEARN_METERS = 500;
+
+export function relocationRadiusMeters(
+  geofenceRadiusFeet?: number | null,
+): number {
+  if (geofenceRadiusFeet == null) return DEFAULT_RELOCATION_METERS;
+  return Math.max(MIN_RELOCATION_METERS, geofenceRadiusFeet * 0.3048);
+}
+
+export function isOutsideStopFence(opts: {
+  from: { latitude: number; longitude: number };
+  to: { latitude: number; longitude: number };
+  radiusMeters: number;
+}): boolean {
+  return haversineMeters(opts.from, opts.to) > opts.radiusMeters;
+}
+
+export type HomeFence = {
+  latitude: number;
+  longitude: number;
+  radiusMeters?: number;
+};
+
+export function isInsideHomeFence(
+  latitude: number | null | undefined,
+  longitude: number | null | undefined,
+  home: HomeFence | null | undefined,
+): boolean {
+  if (latitude == null || longitude == null || !home) return false;
+  const radius = home.radiusMeters ?? DEFAULT_HOME_FENCE_METERS;
+  return (
+    haversineMeters(
+      { latitude, longitude },
+      { latitude: home.latitude, longitude: home.longitude },
+    ) <= radius
+  );
+}
+
+export function shouldLearnHomeCoords(opts: {
+  zone: string | null | undefined;
+  latitude: number | null | undefined;
+  longitude: number | null | undefined;
+  stored: { latitude: number; longitude: number } | null;
+}): { learn: boolean; reason: "missing" | "moved" | "not_home" | "no_coords" | "keep" } {
+  if ((opts.zone ?? "").trim().toLowerCase() !== "home") {
+    return { learn: false, reason: "not_home" };
+  }
+  if (opts.latitude == null || opts.longitude == null) {
+    return { learn: false, reason: "no_coords" };
+  }
+  if (!opts.stored) return { learn: true, reason: "missing" };
+  const dist = haversineMeters(
+    { latitude: opts.latitude, longitude: opts.longitude },
+    opts.stored,
+  );
+  if (dist > HOME_RELEARN_METERS) return { learn: true, reason: "moved" };
+  return { learn: false, reason: "keep" };
+}
+
+// ---------------------------------------------------------------------------
 // Privacy (TASK-046): home/private zones must not surface in reports or maps.
+// TASK-148: a learned home fence also hides a geocoded street address.
 // ---------------------------------------------------------------------------
 
 /** True when a segment's zone or label is a private/home place (HA zones). */
 export function isPrivateLocation(
   zone: string | null | undefined,
   placeLabel: string | null | undefined,
+  opts?: {
+    latitude?: number | null;
+    longitude?: number | null;
+    home?: HomeFence | null;
+  },
 ): boolean {
   const z = (zone ?? "").trim().toLowerCase();
   const p = (placeLabel ?? "").trim().toLowerCase();
   if (z === "home" || p === "home") return true;
   if (z === "private" || p === "private") return true;
+  if (opts && isInsideHomeFence(opts.latitude, opts.longitude, opts.home)) {
+    return true;
+  }
   return false;
 }

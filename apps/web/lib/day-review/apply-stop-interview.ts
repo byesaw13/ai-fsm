@@ -81,7 +81,7 @@ export async function applyStopInterview(
   );
   const seg = rows[0];
   if (!seg) throw new StopInterviewError("NOT_FOUND", "Stop not found", 404);
-  if (!seg.ended_at) throw new StopInterviewError("VALIDATION_ERROR", "Stop is still open");
+  const endedAt = seg.ended_at ?? new Date().toISOString();
 
   const open = await openJobAtProperty(client, session.accountId, seg.property_id);
   const options = stopReasonOptions({
@@ -167,7 +167,7 @@ export async function applyStopInterview(
     return { jobId: filedJobId, visitId: null };
   }
 
-  if (stopIsBillable(input.reason) && jobId && seg.ended_at) {
+  if (stopIsBillable(input.reason) && jobId) {
     const ensured = await ensureFieldDayVisit(client, {
       accountId: session.accountId,
       userId: session.userId,
@@ -175,7 +175,7 @@ export async function applyStopInterview(
       visitId,
       classification: "job_work",
       arrivalTime: seg.started_at,
-      departureTime: seg.ended_at,
+      departureTime: endedAt,
       workOrderId: input.reason === "new_work" ? null : seg.work_order_id,
       techNotes: notes,
       complete: false,

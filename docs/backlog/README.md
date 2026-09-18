@@ -95,7 +95,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-147**.
+Next available ID: **TASK-149**.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -131,7 +131,8 @@ closed in tests; owner-flow AC still open.
 | TASK-144 | [Receipt destinations](TASK-144-receipt-destinations.md) | 004 | In Progress |
 | TASK-145 | [Night stop interview](TASK-145-night-stop-interview.md) | 007 | In Progress |
 | TASK-146 | [RLS enforcement on the web tier](TASK-146-rls-web-tier-enforcement.md) | 005 | In Progress |
-| TASK-147 | [GPS blip coalescing — one dwell, one stop](TASK-147-gps-blip-coalescing.md) | 007 | In Progress |
+| TASK-147 | [GPS blip coalescing — one dwell, one stop](TASK-147-gps-blip-coalescing.md) | 007 | Done |
+| TASK-148 | [Geofence-anchored stops + home fence](TASK-148-geofence-anchored-stops.md) | 007 | In Progress |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
 | TASK-003 | Wrong Vehicle Correction | 001 | Done |
