@@ -28,6 +28,7 @@ import {
 } from "@/lib/field/confirm-visit";
 import { listOpenWorkOrdersAtProperty } from "@/lib/field/open-work-orders";
 import {
+  isDifferentPropertyStill,
   relocationRadiusForStop,
   type PropertyGeo,
 } from "@/lib/field/stop-proximity";
@@ -274,6 +275,7 @@ export async function POST(req: NextRequest) {
     }
 
     let relocationRadiusM: number | undefined;
+    let geos: PropertyGeo[] = [];
     if (open?.kind === "stop" && open.latitude != null && open.longitude != null) {
       const { rows: props } = await client.query<{
         id: string;
@@ -288,7 +290,7 @@ export async function POST(req: NextRequest) {
           WHERE p.account_id = $1 AND p.latitude IS NOT NULL AND p.longitude IS NOT NULL`,
         [accountId],
       );
-      const geos: PropertyGeo[] = props.map((p) => ({
+      geos = props.map((p) => ({
         propertyId: p.id,
         clientId: p.client_id,
         clientName: "",
@@ -298,6 +300,24 @@ export async function POST(req: NextRequest) {
         geofenceRadiusFeet: p.geofence_radius_feet,
       }));
       relocationRadiusM = relocationRadiusForStop(open, geos);
+    }
+
+    let differentProperty = false;
+    if (
+      data.kind === "activity_change" &&
+      data.detected_activity === "still" &&
+      open?.kind === "stop" &&
+      open.latitude != null &&
+      open.longitude != null &&
+      data.latitude != null &&
+      data.longitude != null
+    ) {
+      differentProperty = isDifferentPropertyStill(
+        { latitude: open.latitude, longitude: open.longitude },
+        { latitude: data.latitude, longitude: data.longitude },
+        geos,
+        relocationRadiusM ?? relocationRadiusForStop(open, geos),
+      );
     }
 
     const mut = reduceLocationEvent(
@@ -312,7 +332,7 @@ export async function POST(req: NextRequest) {
         detectedActivity: data.detected_activity ?? null,
         vehicleId: resolvedVehicleId,
       },
-      { relocationRadiusM },
+      { relocationRadiusM, differentProperty },
     );
     mutOpenKind = mut.open?.kind ?? null;
     mutClosed = Boolean(mut.closeOpen);

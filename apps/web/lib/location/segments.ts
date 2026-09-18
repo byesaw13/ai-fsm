@@ -208,6 +208,11 @@ export function stopsAreSamePlace(
 export type ReduceLocationOpts = {
   /** Property geofence (or unmatched default). Walking inside stays one dwell. */
   relocationRadiusM?: number;
+  /**
+   * TASK-150: GPS `still` outside the fence only splits when the ping matches
+   * a *different* known property. Neighbor geocode flicker holds.
+   */
+  differentProperty?: boolean;
 };
 
 export function reduceLocationEvent(
@@ -267,27 +272,19 @@ export function reduceLocationEvent(
       const act = ev.detectedActivity ?? null;
       if (act === "in_vehicle") {
         if (open?.kind === "drive") return NO_OP; // already driving
-        return {
-          ...(open ? { closeOpen: { endedAt: ev.occurredAt } } : {}),
-          open: openDrive(ev),
-        };
+        // TASK-150: phone `in_vehicle` while parked is not Bluetooth. Hold the
+        // stop; vehicle_connect is the leave signal. (2026-09-18 4 Ash sat in
+        // `in_vehicle` for an hour and opened a fake drive.)
+        if (open?.kind === "stop") return NO_OP;
+        return { open: openDrive(ev) };
       }
       if (act === "still") {
         // Stopped moving → a stop here (address fills in via location_update).
         if (open?.kind === "stop") {
-          // TASK-148: settled outside the property fence is a new stop
-          // (tools walk next door). Inside the fence stays one dwell.
-          if (
-            open.latitude != null &&
-            open.longitude != null &&
-            ev.latitude != null &&
-            ev.longitude != null &&
-            isOutsideStopFence({
-              from: { latitude: open.latitude, longitude: open.longitude },
-              to: { latitude: ev.latitude, longitude: ev.longitude },
-              radiusMeters: relocationRadiusM,
-            })
-          ) {
+          // TASK-150: geocode flicker (8 Bus Rd / N Policy next to 4 Ash) must
+          // not open a new card. Only a still ping that matches a *different*
+          // known property relocates.
+          if (opts.differentProperty) {
             return {
               closeOpen: { endedAt: ev.occurredAt },
               open: openStop(ev, stopLabel(ev)),

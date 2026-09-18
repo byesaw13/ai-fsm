@@ -1,7 +1,7 @@
 # TASK-149: Park (Bluetooth disconnect) → confirm location
 
 **Epic:** 007 (Field Execution / location capture)
-**Status:** In Progress
+**Status:** Done (PR #657)
 
 ## Problem
 

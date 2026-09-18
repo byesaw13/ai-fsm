@@ -60,6 +60,12 @@ See [TASK-149-park-arrival-prompt.md](./TASK-149-park-arrival-prompt.md).
 Ignition off matches the open job immediately and pushes “You’re on site.”
 The 5-minute GPS floor stays for still/jitter.
 
+# TASK-150: Hold until Bluetooth / zone / different property
+
+See [TASK-150-hold-until-vehicle.md](./TASK-150-hold-until-vehicle.md).
+Do not split a job stop on geocode flicker or phone `in_vehicle`. Leave is
+vehicle connect, a named zone, or `still` at a different known property.
+
 ## Relationship to existing work (read first)
 
 This epic **extends TASK-024**, it does not replace it. The phone→FSM pipeline is
