@@ -112,6 +112,31 @@ describe("applyStopInterview (TASK-145 Codex review)", () => {
     expect(ensureFieldDayVisit).not.toHaveBeenCalled();
   });
 
+  it("allows answering a still-open stop using now as departure (TASK-148)", async () => {
+    const { client } = makeClient({
+      segment: { ended_at: null },
+      openJob: { id: JOB },
+    });
+    await applyStopInterview(client, session(), {
+      segmentId: SEGMENT,
+      reason: "job_work",
+      notes: "Still hanging the door",
+      closeoutKind: "return",
+      nextWhen: "tomorrow",
+      firstUp: "Finish the closer",
+    });
+    expect(ensureFieldDayVisit).toHaveBeenCalledWith(
+      client,
+      expect.objectContaining({
+        complete: false,
+        jobId: JOB,
+        arrivalTime: "2026-09-14T14:00:00.000Z",
+      }),
+    );
+    const departure = ensureFieldDayVisit.mock.calls[0][1].departureTime as string;
+    expect(Date.parse(departure)).toBeGreaterThan(Date.parse("2026-09-14T14:00:00.000Z"));
+  });
+
   it("does not auto-complete the visit before closeout", async () => {
     const { client } = makeClient({ openJob: { id: JOB } });
     await applyStopInterview(client, session(), {

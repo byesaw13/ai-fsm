@@ -341,8 +341,14 @@ describe("isLivePromptEligible", () => {
     expect(isLivePromptEligible({ ...base, distanceProven: false })).toBe(false);
   });
 
-  it("false when not scheduled today", () => {
+  it("false when not scheduled today and no open job", () => {
     expect(isLivePromptEligible({ ...base, scheduledToday: false })).toBe(false);
+  });
+
+  it("true for a distance-proven open job even without a visit scheduled today (TASK-148)", () => {
+    expect(
+      isLivePromptEligible({ ...base, scheduledToday: false, openJob: true }),
+    ).toBe(true);
   });
 
   it("false when already prompted or not pending", () => {

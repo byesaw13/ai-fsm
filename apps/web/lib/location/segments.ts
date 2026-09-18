@@ -19,7 +19,9 @@
  */
 
 import {
+  DEFAULT_RELOCATION_METERS,
   haversineMeters,
+  isOutsideStopFence,
   suggestActivityForSegment,
   type ActivityType,
   type DetectedActivity,
@@ -203,10 +205,17 @@ export function stopsAreSamePlace(
   return false;
 }
 
+export type ReduceLocationOpts = {
+  /** Property geofence (or unmatched default). Walking inside stays one dwell. */
+  relocationRadiusM?: number;
+};
+
 export function reduceLocationEvent(
   open: OpenSegment | null,
   ev: IncomingLocationEvent,
+  opts: ReduceLocationOpts = {},
 ): SegmentMutations {
+  const relocationRadiusM = opts.relocationRadiusM ?? DEFAULT_RELOCATION_METERS;
   switch (ev.kind) {
     case "zone_enter": {
       // Already parked in this exact zone → nothing changes.
@@ -265,7 +274,27 @@ export function reduceLocationEvent(
       }
       if (act === "still") {
         // Stopped moving → a stop here (address fills in via location_update).
-        if (open?.kind === "stop") return NO_OP; // already stopped
+        if (open?.kind === "stop") {
+          // TASK-148: settled outside the property fence is a new stop
+          // (tools walk next door). Inside the fence stays one dwell.
+          if (
+            open.latitude != null &&
+            open.longitude != null &&
+            ev.latitude != null &&
+            ev.longitude != null &&
+            isOutsideStopFence({
+              from: { latitude: open.latitude, longitude: open.longitude },
+              to: { latitude: ev.latitude, longitude: ev.longitude },
+              radiusMeters: relocationRadiusM,
+            })
+          ) {
+            return {
+              closeOpen: { endedAt: ev.occurredAt },
+              open: openStop(ev, stopLabel(ev)),
+            };
+          }
+          return NO_OP;
+        }
         return {
           ...(open ? { closeOpen: { endedAt: ev.occurredAt } } : {}),
           open: openStop(ev, stopLabel(ev)),
@@ -287,26 +316,35 @@ export function reduceLocationEvent(
       if (open.kind !== "stop") return NO_OP;
       // Anchor hysteresis (TASK-076): once a stop has a fix, a ping within
       // STOP_ANCHOR_RADIUS_M is the same place — don't let jitter walk the pin.
-      // Label/zone still settle here (the HA automation sends a delayed
-      // same-coords update to correct a stale drive-time address after parking);
-      // only the coordinate drift is suppressed.
+      // TASK-148: a ping *outside the property fence* also must not walk the
+      // pin (that smeared one dwell onto the next house). Split happens on
+      // `still` outside the fence, not on every walking ping.
+      const hasFix = open.latitude != null && open.longitude != null;
+      const hasPing = ev.latitude != null && ev.longitude != null;
       const nearAnchor =
-        open.latitude != null &&
-        open.longitude != null &&
-        ev.latitude != null &&
-        ev.longitude != null &&
+        hasFix &&
+        hasPing &&
         haversineMeters(
-          { latitude: open.latitude, longitude: open.longitude },
-          { latitude: ev.latitude, longitude: ev.longitude },
+          { latitude: open.latitude!, longitude: open.longitude! },
+          { latitude: ev.latitude!, longitude: ev.longitude! },
         ) <= STOP_ANCHOR_RADIUS_M;
+      const outsideFence =
+        hasFix &&
+        hasPing &&
+        isOutsideStopFence({
+          from: { latitude: open.latitude!, longitude: open.longitude! },
+          to: { latitude: ev.latitude!, longitude: ev.longitude! },
+          radiusMeters: relocationRadiusM,
+        });
+      if (outsideFence) return NO_OP;
       const patch: UpdateOpenSpec = {};
       const nextLabel = stopLabel(ev);
       if (shouldRefreshStopLabel(open, nextLabel)) {
         patch.placeLabel = nextLabel;
       }
       if (!open.zone && ev.zone) patch.zone = ev.zone;
-      // Coords: fill when missing, refine a zone-less pin only on a real move
-      // (beyond the anchor radius). Within the radius the pin stays put.
+      // Coords: fill when missing. Inside the fence, jitter within the
+      // 40m anchor stays put; a first-fix (no coords yet) still lands.
       if (!nearAnchor) {
         if ((open.latitude == null || !open.zone) && ev.latitude != null) patch.latitude = ev.latitude;
         if ((open.longitude == null || !open.zone) && ev.longitude != null) patch.longitude = ev.longitude;

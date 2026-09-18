@@ -16,6 +16,7 @@ import {
   isLivePromptEligible,
   shouldAutoStampPresence,
   resolveLocationPersonUserId,
+  shouldLearnHomeCoords,
 } from "@ai-fsm/domain";
 import type { PoolClient } from "pg";
 import { reduceLocationEvent, stopsAreSamePlace, type OpenSegment } from "@/lib/location/segments";
@@ -26,6 +27,10 @@ import {
   shouldCompleteVisitFromPresence,
 } from "@/lib/field/confirm-visit";
 import { listOpenWorkOrdersAtProperty } from "@/lib/field/open-work-orders";
+import {
+  relocationRadiusForStop,
+  type PropertyGeo,
+} from "@/lib/field/stop-proximity";
 import { stampLivePromptedAt } from "@/lib/field/stamp-live-prompted";
 
 export const dynamic = "force-dynamic";
@@ -240,16 +245,75 @@ export async function POST(req: NextRequest) {
       : null;
     segmentId = open?.id ?? null;
 
-    const mut = reduceLocationEvent(open, {
-      kind: data.kind,
-      occurredAt,
+    // TASK-148: learn home coords from HA zone "home" so a geocoded street
+    // address at the shop/house stays private.
+    const { rows: homeRows } = await client.query<{
+      home_latitude: number | null;
+      home_longitude: number | null;
+    }>(
+      `SELECT home_latitude, home_longitude FROM accounts WHERE id = $1`,
+      [accountId],
+    );
+    const storedHome =
+      homeRows[0]?.home_latitude != null && homeRows[0]?.home_longitude != null
+        ? { latitude: homeRows[0].home_latitude, longitude: homeRows[0].home_longitude }
+        : null;
+    const learnHome = shouldLearnHomeCoords({
       zone: data.zone ?? null,
       latitude: data.latitude ?? null,
       longitude: data.longitude ?? null,
-      geocodedAddress: data.geocoded_address ?? null,
-      detectedActivity: data.detected_activity ?? null,
-      vehicleId: resolvedVehicleId,
+      stored: storedHome,
     });
+    if (learnHome.learn && data.latitude != null && data.longitude != null) {
+      await client.query(
+        `UPDATE accounts
+            SET home_latitude = $2, home_longitude = $3, updated_at = now()
+          WHERE id = $1`,
+        [accountId, data.latitude, data.longitude],
+      );
+    }
+
+    let relocationRadiusM: number | undefined;
+    if (open?.kind === "stop" && open.latitude != null && open.longitude != null) {
+      const { rows: props } = await client.query<{
+        id: string;
+        client_id: string;
+        address: string | null;
+        latitude: number;
+        longitude: number;
+        geofence_radius_feet: number;
+      }>(
+        `SELECT p.id, p.client_id, p.address, p.latitude, p.longitude, p.geofence_radius_feet
+           FROM properties p
+          WHERE p.account_id = $1 AND p.latitude IS NOT NULL AND p.longitude IS NOT NULL`,
+        [accountId],
+      );
+      const geos: PropertyGeo[] = props.map((p) => ({
+        propertyId: p.id,
+        clientId: p.client_id,
+        clientName: "",
+        address: p.address ?? "",
+        latitude: p.latitude,
+        longitude: p.longitude,
+        geofenceRadiusFeet: p.geofence_radius_feet,
+      }));
+      relocationRadiusM = relocationRadiusForStop(open, geos);
+    }
+
+    const mut = reduceLocationEvent(
+      open,
+      {
+        kind: data.kind,
+        occurredAt,
+        zone: data.zone ?? null,
+        latitude: data.latitude ?? null,
+        longitude: data.longitude ?? null,
+        geocodedAddress: data.geocoded_address ?? null,
+        detectedActivity: data.detected_activity ?? null,
+        vehicleId: resolvedVehicleId,
+      },
+      { relocationRadiusM },
+    );
     mutOpenKind = mut.open?.kind ?? null;
     mutClosed = Boolean(mut.closeOpen);
 
@@ -538,18 +602,13 @@ async function detectVisitCandidate(
        LIMIT 1
      ) tv ON true
      LEFT JOIN LATERAL (
-       -- Active jobs + recently *completed* (false closeout / multi-day T&M).
-       -- Exclude *invoiced*: that kept Brian Floss scoring at home for 14 days
-       -- after the job was billed. Distance hard-gate still applies separately.
+       -- Open work only. Completed-in-14-days used to steal today's job_id
+       -- (TASK-148): the house can still match via coords; night interview
+       -- asks work-on-this vs new work. Invoiced stays excluded (Floss).
        SELECT j.id FROM jobs j
        WHERE j.property_id = p.id
-         AND (
-           j.status IN ('scheduled','in_progress')
-           OR (j.status = 'completed' AND j.updated_at >= now() - interval '14 days')
-         )
-       ORDER BY
-         CASE WHEN j.status IN ('scheduled','in_progress') THEN 0 ELSE 1 END,
-         j.scheduled_start ASC NULLS LAST
+         AND j.status IN ('scheduled','in_progress')
+       ORDER BY j.scheduled_start ASC NULLS LAST
        LIMIT 1
      ) oj ON true
      WHERE p.account_id = $1
@@ -567,7 +626,7 @@ async function detectVisitCandidate(
       longitude: r.longitude,
       scheduledToday: r.today_visit_id != null,
       openJob: r.open_job_id != null,
-      jobId: r.today_job_id ?? r.open_job_id ?? null,
+      jobId: r.open_job_id ?? null,
       visitId: r.today_visit_id ?? null,
       recentClient: r.recent_client,
       repeatClient: Number(r.job_count) > 1,
@@ -667,6 +726,7 @@ async function detectVisitCandidate(
     confidenceScore: top.score,
     distanceProven,
     scheduledToday: top.visitId != null,
+    openJob: jobIdForInsert != null,
     alreadyPrompted: false,
     status: "pending",
   });

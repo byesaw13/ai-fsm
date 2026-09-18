@@ -75,16 +75,27 @@ export async function loadDayCloseStatus(
       // GPS ingest is account-scoped (one HA feed, one open segment per account;
       // location_segments has no user_id). Unanswered stops therefore gate the
       // account's Close Day, not a per-technician subset.
-      `SELECT COUNT(*)::text AS count FROM location_segments
-       WHERE account_id = $1
-         AND segment_date = $2::date
-         AND kind = 'stop'
-         AND status <> 'dismissed'
-         AND COALESCE(is_likely_noise, false) = false
-         AND ended_at IS NOT NULL
-         AND stop_reason IS NULL
-         AND lower(COALESCE(zone, '')) NOT IN ('home', 'private')
-         AND lower(COALESCE(place_label, '')) NOT IN ('home', 'private')`,
+      `SELECT COUNT(*)::text AS count
+         FROM location_segments s
+         JOIN accounts a ON a.id = s.account_id
+        WHERE s.account_id = $1
+          AND s.segment_date = $2::date
+          AND s.kind = 'stop'
+          AND s.status <> 'dismissed'
+          AND COALESCE(s.is_likely_noise, false) = false
+          AND s.stop_reason IS NULL
+          AND lower(COALESCE(s.zone, '')) NOT IN ('home', 'private')
+          AND lower(COALESCE(s.place_label, '')) NOT IN ('home', 'private')
+          AND NOT (
+            a.home_latitude IS NOT NULL AND s.latitude IS NOT NULL AND s.longitude IS NOT NULL
+            AND (
+              6371000 * acos(LEAST(1::float, GREATEST(-1::float,
+                cos(radians(a.home_latitude)) * cos(radians(s.latitude))
+                * cos(radians(s.longitude) - radians(a.home_longitude))
+                + sin(radians(a.home_latitude)) * sin(radians(s.latitude))
+              )))
+            ) <= COALESCE(a.home_radius_meters, 100)
+          )`,
       [session.accountId, date],
     ),
   ]);

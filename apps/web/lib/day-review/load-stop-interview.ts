@@ -1,18 +1,20 @@
-import { query } from "@/lib/db";
+import { query, queryOne } from "@/lib/db";
 import {
   defaultStopReason,
   isOpenJobStatus,
   isPrivateLocation,
   looksLikeStorePlace,
   stopReasonOptions,
+  type HomeFence,
   type StopReason,
 } from "@ai-fsm/domain";
 
 export type StopInterviewCard = {
   segmentId: string;
   startedAt: string;
-  endedAt: string;
+  endedAt: string | null;
   minutes: number;
+  stillThere: boolean;
   placeLabel: string;
   candidateId: string | null;
   propertyId: string | null;
@@ -46,11 +48,22 @@ export async function loadStopInterview(
   accountId: string,
   date: string,
 ): Promise<StopInterviewPayload> {
-  const [segments, openJobs, closedJobs, receipts] = await Promise.all([
+  const [homeRow, segments, openJobs, closedJobs, receipts] = await Promise.all([
+    queryOne<{
+      home_latitude: number | null;
+      home_longitude: number | null;
+      home_radius_meters: number | null;
+    }>(
+      `SELECT home_latitude, home_longitude, home_radius_meters
+         FROM accounts WHERE id = $1`,
+      [accountId],
+    ),
     query<{
       id: string;
       started_at: string;
-      ended_at: string;
+      ended_at: string | null;
+      latitude: number | null;
+      longitude: number | null;
       place_label: string | null;
       zone: string | null;
       stop_reason: string | null;
@@ -61,7 +74,8 @@ export async function loadStopInterview(
       client_name: string | null;
       property_address: string | null;
     }>(
-      `SELECT s.id, s.started_at::text, s.ended_at::text, s.place_label, s.zone,
+      `SELECT s.id, s.started_at::text, s.ended_at::text, s.latitude, s.longitude,
+              s.place_label, s.zone,
               s.stop_reason, s.stop_notes,
               vc.id AS candidate_id, vc.property_id,
               vc.matched_client_id AS client_id,
@@ -75,7 +89,6 @@ export async function loadStopInterview(
          AND s.kind = 'stop'
          AND s.status <> 'dismissed'
          AND COALESCE(s.is_likely_noise, false) = false
-         AND s.ended_at IS NOT NULL
        ORDER BY s.started_at ASC`,
       [accountId, date],
     ),
@@ -123,21 +136,39 @@ export async function loadStopInterview(
 
   const openByProperty = new Map(openJobs.map((j) => [j.property_id, j]));
   const closedByProperty = new Map(closedJobs.map((j) => [j.property_id, j]));
+  const home: HomeFence | null =
+    homeRow?.home_latitude != null && homeRow?.home_longitude != null
+      ? {
+          latitude: homeRow.home_latitude,
+          longitude: homeRow.home_longitude,
+          radiusMeters: homeRow.home_radius_meters ?? undefined,
+        }
+      : null;
 
   const stops: StopInterviewCard[] = [];
+  const now = Date.now();
   for (const s of segments) {
-    if (isPrivateLocation(s.zone, s.place_label)) continue;
+    if (
+      isPrivateLocation(s.zone, s.place_label, {
+        latitude: s.latitude,
+        longitude: s.longitude,
+        home,
+      })
+    ) {
+      continue;
+    }
     const place = s.place_label ?? s.zone ?? "Stop";
     const open = s.property_id ? openByProperty.get(s.property_id) : undefined;
     const closed = s.property_id ? closedByProperty.get(s.property_id) : undefined;
     const hasOpenJob = Boolean(open && isOpenJobStatus(open.status));
     const hasProperty = Boolean(s.property_id);
     const started = new Date(s.started_at).getTime();
-    const ended = new Date(s.ended_at).getTime();
+    const ended = s.ended_at ? new Date(s.ended_at).getTime() : now;
     stops.push({
       segmentId: s.id,
       startedAt: s.started_at,
       endedAt: s.ended_at,
+      stillThere: s.ended_at == null,
       minutes: Math.max(0, Math.round((ended - started) / 60000)),
       placeLabel: place,
       candidateId: s.candidate_id,

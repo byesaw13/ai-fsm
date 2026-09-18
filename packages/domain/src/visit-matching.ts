@@ -376,13 +376,15 @@ export function isLivePromptEligible(input: {
   confidenceScore: number;
   distanceProven: boolean;
   scheduledToday: boolean;
+  /** Distance-proven open job (scheduled/in_progress) — TASK-148. */
+  openJob?: boolean;
   alreadyPrompted: boolean;
   status: "pending" | "confirmed" | "ignored" | string;
 }): boolean {
   if (input.status !== "pending") return false;
   if (input.alreadyPrompted) return false;
   if (!input.workdayOpen) return false;
-  if (!input.scheduledToday) return false;
+  if (!input.scheduledToday && !input.openJob) return false;
   if (!input.distanceProven) return false;
   if (input.confidenceScore < LIVE_PROMPT_CONFIDENCE_FLOOR) return false;
   return true;

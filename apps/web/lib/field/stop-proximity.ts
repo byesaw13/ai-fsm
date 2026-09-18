@@ -1,4 +1,9 @@
-import { haversineMeters, rankVisitCandidates, type VisitMatchCandidate } from "@ai-fsm/domain";
+import {
+  haversineMeters,
+  rankVisitCandidates,
+  relocationRadiusMeters,
+  type VisitMatchCandidate,
+} from "@ai-fsm/domain";
 
 /** Hard cap — auto-detect never fires beyond ~250 ft even if geofence is wider. */
 export const MAX_AUTO_DETECT_METERS = 250 * 0.3048;
@@ -104,4 +109,22 @@ export function matchCustomerAtStop(
   }
 
   return null;
+}
+
+/** Fence used by the ingest reducer: matched property geofence, else unmatched default. */
+export function relocationRadiusForStop(
+  stop: { latitude: number | null; longitude: number | null },
+  properties: PropertyGeo[],
+): number {
+  if (stop.latitude == null || stop.longitude == null || properties.length === 0) {
+    return relocationRadiusMeters(null);
+  }
+  const match = matchCustomerAtStop(
+    { latitude: stop.latitude, longitude: stop.longitude },
+    10,
+    properties,
+  );
+  if (!match) return relocationRadiusMeters(null);
+  const prop = properties.find((p) => p.propertyId === match.propertyId);
+  return relocationRadiusMeters(prop?.geofenceRadiusFeet);
 }

@@ -102,6 +102,40 @@ describe("reduceLocationEvent — activity_change", () => {
     expect(out).toEqual({});
   });
 
+  it("still outside the fence closes the stop and opens a new one (TASK-148)", () => {
+    const out = reduceLocationEvent(
+      stop({ placeLabel: "4 Ash", latitude: 43.201, longitude: -71.501 }),
+      ev({
+        kind: "activity_change",
+        detectedActivity: "still",
+        geocodedAddress: "6 Ash",
+        latitude: 43.202,
+        longitude: -71.501,
+      }),
+    );
+    expect(out.closeOpen).toEqual({ endedAt: T2 });
+    expect(out.open).toMatchObject({
+      kind: "stop",
+      placeLabel: "6 Ash",
+      latitude: 43.202,
+      longitude: -71.501,
+    });
+  });
+
+  it("still inside the fence does not split (walk around the house)", () => {
+    const out = reduceLocationEvent(
+      stop({ placeLabel: "4 Ash", latitude: 43.201, longitude: -71.501 }),
+      ev({
+        kind: "activity_change",
+        detectedActivity: "still",
+        geocodedAddress: "4 Ash",
+        latitude: 43.2012,
+        longitude: -71.501,
+      }),
+    );
+    expect(out).toEqual({});
+  });
+
   it("ignores walking/unknown as non-transitions", () => {
     expect(reduceLocationEvent(drive(), ev({ kind: "activity_change", detectedActivity: "walking" }))).toEqual({});
     expect(reduceLocationEvent(stop(), ev({ kind: "activity_change", detectedActivity: "unknown" }))).toEqual({});
@@ -125,12 +159,12 @@ describe("reduceLocationEvent — location_update", () => {
     expect(out.updateOpen).toEqual({ latitude: 42.1, longitude: -71.2 });
   });
 
-  it("refreshes an unknown stop label and coordinates as geocoding settles", () => {
+  it("lets a nearby geocode settle the label without walking the pin (TASK-148)", () => {
     const out = reduceLocationEvent(
-      stop({ placeLabel: "Old Road", latitude: 42, longitude: -71 }),
-      ev({ kind: "location_update", geocodedAddress: "Town Transfer Station", latitude: 42.1, longitude: -71.2 }),
+      stop({ placeLabel: "Old Road", latitude: 42.0, longitude: -71.0 }),
+      ev({ kind: "location_update", geocodedAddress: "Town Transfer Station", latitude: 42.0002, longitude: -71.0 }),
     );
-    expect(out.updateOpen).toEqual({ placeLabel: "Transfer station", latitude: 42.1, longitude: -71.2 });
+    expect(out.updateOpen).toEqual({ placeLabel: "Transfer station" });
   });
 
   it("is a no-op during a drive", () => {
@@ -157,12 +191,12 @@ describe("reduceLocationEvent — location_update", () => {
     expect(out.updateOpen).toEqual({ placeLabel: "16 Oak St" }); // label settles, pin stays
   });
 
-  it("still updates when the stop genuinely moves beyond the anchor radius", () => {
+  it("freezes the pin on a far location_update — walking must not smear the stop (TASK-148)", () => {
     const out = reduceLocationEvent(
       stop({ placeLabel: "14 Oak St", latitude: 42.0, longitude: -71.0 }),
       ev({ kind: "location_update", geocodedAddress: "50 Elm St", latitude: 42.001, longitude: -71.0 }),
     );
-    expect(out.updateOpen).toEqual({ placeLabel: "50 Elm St", latitude: 42.001, longitude: -71.0 });
+    expect(out).toEqual({});
   });
 
   it("still fills a missing label for an anchored stop even within the radius", () => {

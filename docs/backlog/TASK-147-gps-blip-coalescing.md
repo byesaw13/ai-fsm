@@ -1,7 +1,7 @@
 # TASK-147: GPS blip coalescing — one dwell, one stop
 
 **Epic:** 007 (Operations & Mileage / location capture)
-**Status:** In Progress
+**Status:** Done (PR #654)
 
 ## Problem
 

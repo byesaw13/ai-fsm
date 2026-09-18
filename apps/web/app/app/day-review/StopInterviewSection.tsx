@@ -59,7 +59,10 @@ export function StopInterviewSection({ payload }: { payload: StopInterviewPayloa
         {answered.map((stop) => (
           <Card key={stop.segmentId} data-testid={`stop-done-${stop.segmentId}`}>
             <div style={{ fontWeight: 600, fontSize: "var(--text-sm)" }}>
-              {fmtTime(stop.startedAt)} · {stop.clientName ? `${stop.clientName} · ` : ""}
+              {fmtTime(stop.startedAt)}
+              {stop.stillThere ? " · still there" : ""}
+              {" · "}
+              {stop.clientName ? `${stop.clientName} · ` : ""}
               {stop.propertyAddress ?? stop.placeLabel}
             </div>
             <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
@@ -160,10 +163,14 @@ function StopCard({
   return (
     <Card data-testid={`stop-card-${stop.segmentId}`}>
       <div style={{ fontWeight: 600 }}>
-        {fmtTime(stop.startedAt)}–{fmtTime(stop.endedAt)} · {who}
+        {fmtTime(stop.startedAt)}
+        {stop.stillThere ? "–now" : stop.endedAt ? `–${fmtTime(stop.endedAt)}` : ""}
+        {" · "}
+        {who}
+        {stop.stillThere ? " (still there)" : ""}
       </div>
       <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)", marginBottom: 8 }}>
-        {stop.minutes} min
+        {stop.minutes} min{stop.stillThere ? " so far" : ""}
         {stop.openJob ? ` · open ${stop.openJob.number}` : ""}
         {stop.lastClosedJob
           ? ` · last job ${stop.lastClosedJob.number} is ${stop.lastClosedJob.status}`

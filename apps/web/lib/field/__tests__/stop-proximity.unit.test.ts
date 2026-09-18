@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { geofenceMeters, isStopNearProperty, matchCustomerAtStop } from "../stop-proximity";
+import { geofenceMeters, isStopNearProperty, matchCustomerAtStop, relocationRadiusForStop } from "../stop-proximity";
+import { DEFAULT_RELOCATION_METERS, MIN_RELOCATION_METERS } from "@ai-fsm/domain";
 
 describe("stop-proximity", () => {
   const stop = { latitude: 42.9956, longitude: -71.4548 };
@@ -50,5 +51,27 @@ describe("stop-proximity", () => {
       }),
     ).toBe(true);
     expect(geofenceMeters(500)).toBeLessThanOrEqual(250 * 0.3048);
+  });
+
+  it("relocationRadiusForStop uses unmatched default when no property hits", () => {
+    expect(
+      relocationRadiusForStop({ latitude: 42.9956, longitude: -71.4548 }, []),
+    ).toBeCloseTo(DEFAULT_RELOCATION_METERS);
+  });
+
+  it("relocationRadiusForStop floors a 150ft match at 80m (TASK-148)", () => {
+    const r = relocationRadiusForStop(stop, [
+      {
+        propertyId: "p1",
+        clientId: "c1",
+        clientName: "Gina",
+        address: "142 Brock",
+        latitude: 42.99565,
+        longitude: -71.45485,
+        geofenceRadiusFeet: 150,
+        jobId: "j1",
+      },
+    ]);
+    expect(r).toBe(MIN_RELOCATION_METERS);
   });
 });
