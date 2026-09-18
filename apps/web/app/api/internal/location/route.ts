@@ -356,15 +356,12 @@ export async function POST(req: NextRequest) {
         latitude: number | null;
         longitude: number | null;
       }>(
-        // Only coalesce a stop the system still owns: an unreviewed provisional
-        // stop, or one auto-dismissed as noise. Never reopen a stop the owner
-        // manually confirmed or dismissed while the (possibly >1min) noise drive
-        // was open — that would clobber their decision.
+        // Candidate prior stop: the one the noise drive closed (its ended_at
+        // equals the drive's start). Place-match is advisory; the reopen below
+        // re-asserts eligibility atomically.
         `SELECT id, zone, latitude, longitude
            FROM location_segments
           WHERE account_id = $1 AND kind = 'stop' AND ended_at = $2::timestamptz
-            AND (status = 'provisional'
-                 OR (status = 'dismissed' AND COALESCE(is_likely_noise, false) = true))
           ORDER BY started_at DESC
           LIMIT 1`,
         [accountId, open.startedAt],
@@ -378,23 +375,31 @@ export async function POST(req: NextRequest) {
           longitude: mut.open.longitude,
         })
       ) {
-        await client.query(
-          // Reopen as 'provisional' (the un-dismissed active state — the status
-          // CHECK in migration 114 allows only provisional/confirmed/dismissed).
-          // Fill any place metadata the prior stop was missing from the richer
-          // arrival fix (e.g. a coords-only prior stop gains the new zone/label/
-          // activity) without overwriting data it already has.
+        // Reopen as 'provisional' (the un-dismissed active state — the status
+        // CHECK in migration 114 allows only provisional/confirmed/dismissed).
+        // The eligibility predicate is in the WHERE (not just the SELECT above)
+        // and gated by RETURNING, so a review that committed since the SELECT
+        // wins the race and is never clobbered. We only coalesce a stop the
+        // system still owns: unreviewed provisional, or auto-noise-dismissed.
+        const { rows: reopened } = await client.query<{ id: string }>(
           `UPDATE location_segments
               SET ended_at = NULL,
                   is_likely_noise = false,
                   status = 'provisional',
                   zone = COALESCE(zone, $4),
-                  place_label = COALESCE(place_label, $5),
+                  -- Day Review reads place_label before zone: when the prior
+                  -- stop was unzoned, prefer the returning event's (often
+                  -- recognized) label so a stale drive-time geocode is replaced.
+                  place_label = CASE WHEN zone IS NULL THEN COALESCE($5, place_label)
+                                     ELSE COALESCE(place_label, $5) END,
                   latitude = COALESCE(latitude, $6),
                   longitude = COALESCE(longitude, $7),
                   suggested_activity_type = COALESCE(suggested_activity_type, $8),
                   updated_at = now()
-            WHERE id = $1 AND account_id = $2 AND ended_at = $3::timestamptz`,
+            WHERE id = $1 AND account_id = $2 AND ended_at = $3::timestamptz
+              AND (status = 'provisional'
+                   OR (status = 'dismissed' AND COALESCE(is_likely_noise, false) = true))
+          RETURNING id`,
           [
             p.id,
             accountId,
@@ -406,19 +411,15 @@ export async function POST(req: NextRequest) {
             mut.open.suggestedActivityType,
           ],
         );
-        // The prior stop's close may have created a visit_candidate frozen at
-        // the blip start. detectVisitCandidate uses ON CONFLICT DO NOTHING, so it
-        // would never correct the departure/duration (or, for a scheduled match,
-        // re-report hasScheduledVisit). Drop the still-pending candidate — linked
-        // or not — so the eventual real close re-detects it over the full dwell.
-        // Reviewed candidates (status <> 'pending') are left untouched.
-        await client.query(
-          `DELETE FROM visit_candidates
-            WHERE account_id = $1 AND location_segment_id = $2 AND status = 'pending'`,
-          [accountId, p.id],
-        );
-        coalescedPriorStopId = p.id;
-        segmentId = p.id;
+        // Only coalesce if the reopen actually matched an eligible stop. We do
+        // NOT delete the prior stop's pending visit_candidate: that would strand
+        // an arrival push already sent for it (and re-create a new one → double
+        // prompt). Instead the eventual real close refreshes that candidate's
+        // interval in place via ON CONFLICT DO UPDATE (see detectVisitCandidate).
+        if (reopened[0]) {
+          coalescedPriorStopId = reopened[0].id;
+          segmentId = reopened[0].id;
+        }
       }
     }
 
@@ -666,14 +667,24 @@ async function detectVisitCandidate(
     status: "pending",
   });
 
-  const { rows: inserted } = await client.query<{ id: string }>(
+  const { rows: inserted } = await client.query<{ id: string; was_inserted: boolean }>(
+    // Blip coalescing (TASK-147) can re-close a stop whose candidate already
+    // exists. Refresh the interval in place for a still-pending candidate (so the
+    // full-dwell departure/duration is recorded and a scheduled match is not lost
+    // to a frozen row) — but xmax=0 distinguishes a genuine INSERT from that
+    // refresh so the arrival push below fires exactly once. Reviewed candidates
+    // (status <> 'pending') are left untouched (the WHERE skips them).
     `INSERT INTO visit_candidates
        (account_id, location_segment_id, property_id, matched_client_id, job_id, visit_id,
         work_order_id, wo_resolution, live_eligible,
         distance_meters, confidence_score, arrival_time, departure_time, duration_minutes)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-     ON CONFLICT (location_segment_id) DO NOTHING
-     RETURNING id`,
+     ON CONFLICT (location_segment_id) DO UPDATE
+       SET departure_time = EXCLUDED.departure_time,
+           duration_minutes = EXCLUDED.duration_minutes,
+           distance_meters = EXCLUDED.distance_meters
+       WHERE visit_candidates.status = 'pending'
+     RETURNING id, (xmax::text::bigint = 0) AS was_inserted`,
     [
       accountId,
       stop.id,
@@ -693,7 +704,12 @@ async function detectVisitCandidate(
   );
   const candidateId = inserted[0]?.id;
   if (!candidateId) return none;
+  const wasInserted = inserted[0]?.was_inserted === true;
   const hasScheduledVisit = visitIdForInsert != null;
+  // A refresh (coalesced re-close) of an existing candidate: the interval is now
+  // corrected and hasScheduledVisit is reported, but the arrival prompt already
+  // fired on the first close — do not push again.
+  if (!wasInserted) return { arrivalPrompt: null, hasScheduledVisit };
 
   // Presence-only on scheduled visit: high-trust bar only (E4 harden). Never
   // owner-fallback; person map or assigned tech required.
