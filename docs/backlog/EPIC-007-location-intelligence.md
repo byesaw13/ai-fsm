@@ -54,6 +54,12 @@ Walking must not smear one stop across two houses. Home is a fence, not the
 string `home`. Live prompt for a distance-proven open job; night interview
 sees the stop that is still open.
 
+# TASK-149: Park (Bluetooth disconnect) → confirm location
+
+See [TASK-149-park-arrival-prompt.md](./TASK-149-park-arrival-prompt.md).
+Ignition off matches the open job immediately and pushes “You’re on site.”
+The 5-minute GPS floor stays for still/jitter.
+
 ## Relationship to existing work (read first)
 
 This epic **extends TASK-024**, it does not replace it. The phone→FSM pipeline is

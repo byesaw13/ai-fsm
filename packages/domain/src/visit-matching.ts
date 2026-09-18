@@ -91,6 +91,12 @@ export function shouldCreateVisitCandidate(input: {
   hasScheduledVisit: boolean;
   /** Distance to matched property when both have coords; omit if unknown. */
   distanceMeters?: number | null;
+  /**
+   * Bluetooth ignition-off (TASK-149). Skip the 5-minute GPS dwell when we
+   * already have a distance to a property — the van parked is the arrival.
+   * Without distance, still require the dwell floor.
+   */
+  parkedArrival?: boolean;
 }): boolean {
   if (
     input.distanceMeters != null &&
@@ -100,6 +106,7 @@ export function shouldCreateVisitCandidate(input: {
   }
   if (input.score < VISIT_CONFIDENCE_FLOOR) return false;
   if (input.hasScheduledVisit) return true;
+  if (input.parkedArrival && input.distanceMeters != null) return true;
   return input.durationMinutes >= VISIT_CANDIDATE_MIN_DWELL_MINUTES;
 }
 

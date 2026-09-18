@@ -506,6 +506,33 @@ export async function POST(req: NextRequest) {
       segmentId = ins[0]?.id ?? segmentId;
     }
 
+    // TASK-149: ignition off is the arrival signal. Don't wait 5 minutes of
+    // GPS still — match the open/just-opened stop to a job and push confirm.
+    if (data.kind === "vehicle_disconnect" && !arrivalPrompt) {
+      const parkId = segmentId;
+      const parkStarted =
+        mut.open?.kind === "stop"
+          ? mut.open.startedAt
+          : open?.kind === "stop"
+            ? open.startedAt
+            : null;
+      const parkLat =
+        mut.open?.latitude ?? open?.latitude ?? data.latitude ?? null;
+      const parkLng =
+        mut.open?.longitude ?? open?.longitude ?? data.longitude ?? null;
+      if (parkId && parkStarted && (parkLat != null || parkLng != null)) {
+        const parkDetect = await detectVisitCandidate(
+          client,
+          accountId,
+          { id: parkId, startedAt: parkStarted, latitude: parkLat, longitude: parkLng },
+          occurredAt,
+          data.person ?? data.device_id ?? null,
+          { parkedArrival: true },
+        );
+        arrivalPrompt = parkDetect.arrivalPrompt;
+      }
+    }
+
     await client.query("COMMIT");
   } catch (err) {
     await client.query("ROLLBACK").catch(() => {});
@@ -575,6 +602,7 @@ async function detectVisitCandidate(
   stop: ClosedStop,
   endedAt: string,
   personOrDevice: string | null = null,
+  opts: { parkedArrival?: boolean } = {},
 ): Promise<DetectVisitResult> {
   const none: DetectVisitResult = { arrivalPrompt: null, hasScheduledVisit: false };
   const durationMinutes = (new Date(endedAt).getTime() - new Date(stop.startedAt).getTime()) / 60000;
@@ -643,6 +671,7 @@ async function detectVisitCandidate(
       durationMinutes,
       hasScheduledVisit: top.visitId != null,
       distanceMeters: top.distanceMeters,
+      parkedArrival: opts.parkedArrival === true,
     })
   ) {
     return none;
@@ -659,9 +688,11 @@ async function detectVisitCandidate(
     overrideWorkOrderId: null,
   });
 
-  // ~150 ft near band (matches domain WITHIN_NEAR_FEET)
+  // Close-path live prompt uses the 150ft near band. Park (Bluetooth
+  // disconnect) uses the 250ft far band — same cap as auto-detect / hold.
+  const provenMeters = (opts.parkedArrival ? 250 : 150) * 0.3048;
   const distanceProven =
-    top.distanceMeters != null && top.distanceMeters <= 150 * 0.3048;
+    top.distanceMeters != null && top.distanceMeters <= provenMeters;
 
   // Prefer assignment from the resolved work order so job/visit/WO stay consistent.
   let jobIdForInsert = top.jobId;

@@ -1,7 +1,7 @@
 # TASK-148: Geofence-anchored stops + home fence
 
 **Epic:** 007 (Field Execution / location capture)
-**Status:** In Progress
+**Status:** Done (PR #655)
 
 ## Problem
 
