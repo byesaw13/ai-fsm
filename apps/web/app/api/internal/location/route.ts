@@ -702,6 +702,34 @@ async function detectVisitCandidate(
       Math.round(durationMinutes),
     ],
   );
+  // Reconcile a candidate the owner CONFIRMED during a reopened (coalesced)
+  // dwell: the confirm stamped its interval — and the billable activity it
+  // created — at the blip-truncated first close. The pending-only upsert above
+  // skips a confirmed row, so extend both here to the real departure. No-op
+  // unless a confirmed candidate exists for this segment (only on a coalesced
+  // re-close). RETURNING gates the activity extend + the keep signal.
+  const { rows: reconciled } = await client.query<{ id: string }>(
+    `UPDATE visit_candidates
+        SET departure_time = $3::timestamptz, duration_minutes = $4
+      WHERE account_id = $1 AND location_segment_id = $2
+        AND status = 'confirmed' AND departure_time < $3::timestamptz
+    RETURNING id`,
+    [accountId, stop.id, endedAt, Math.round(durationMinutes)],
+  );
+  if (reconciled[0]) {
+    await client.query(
+      `UPDATE activity_entries a
+          SET ended_at = $3::timestamptz
+         FROM visit_candidates vc
+        WHERE vc.account_id = $1 AND vc.location_segment_id = $2
+          AND vc.status = 'confirmed' AND vc.activity_entry_id = a.id
+          AND a.account_id = $1 AND a.ended_at < $3::timestamptz`,
+      [accountId, stop.id, endedAt],
+    );
+    // An already-confirmed stop must never be dismissed by the dwell floor:
+    // signal "keep" so classifyStop treats the reopened close as a real stay.
+    return { arrivalPrompt: null, hasScheduledVisit: true };
+  }
   const candidateId = inserted[0]?.id;
   if (!candidateId) return none;
   const wasInserted = inserted[0]?.was_inserted === true;
