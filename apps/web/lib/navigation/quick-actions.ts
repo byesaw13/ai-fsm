@@ -40,6 +40,12 @@ export const FIELD_QUICK_ACTIONS: QuickAction[] = [
   { label: "Quote", href: "/app/estimates/new", icon: "📝" },
 ];
 
+/** Today Receipt tile. Pin to the open job so Home Depot does not float unattached. */
+export function fieldReceiptHref(jobId: string | null | undefined): string {
+  if (!jobId) return "/app/expenses/new";
+  return `/app/expenses/new?job=${encodeURIComponent(jobId)}`;
+}
+
 /** Global + sheet (owner/admin). Quick job opens the same modal as My Day / Schedule. */
 export const FAB_QUICK_ACTIONS: QuickAction[] = [
   { label: "Capture", href: "/app/capture", icon: "🎙️" },

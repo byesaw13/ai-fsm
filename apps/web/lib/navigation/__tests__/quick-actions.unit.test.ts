@@ -3,6 +3,7 @@ import {
   OWNER_QUICK_ACTIONS,
   FIELD_QUICK_ACTIONS,
   FAB_QUICK_ACTIONS,
+  fieldReceiptHref,
 } from "../quick-actions";
 
 describe("quick actions", () => {
@@ -45,5 +46,12 @@ describe("quick actions", () => {
     expect(FAB_QUICK_ACTIONS.some((a) => a.label === "Quick job" && a.action === "quick-book")).toBe(
       true,
     );
+  });
+
+  it("pins a Today receipt to the current job when we know the house", () => {
+    expect(fieldReceiptHref("fc42141c-870d-4af3-9933-b2e03d4950a0")).toBe(
+      "/app/expenses/new?job=fc42141c-870d-4af3-9933-b2e03d4950a0",
+    );
+    expect(fieldReceiptHref(null)).toBe("/app/expenses/new");
   });
 });

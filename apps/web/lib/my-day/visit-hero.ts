@@ -2,6 +2,7 @@ export type HeroVisit = {
   id: string;
   status: string;
   scheduled_start: string;
+  job_id?: string | null;
   job_title: string | null;
   property_address: string | null;
   client_name: string | null;

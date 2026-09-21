@@ -36,6 +36,7 @@ type PageProps = {
 
 type WoCard = {
   id: string;
+  job_id: string;
   title: string;
   status: string;
   client_name: string | null;
@@ -68,7 +69,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
     loadFieldDayData(session, isOwner),
     queryForSession<WoCard>(
       session,
-      `SELECT w.id, w.title, w.status, c.name AS client_name, p.address AS property_address,
+      `SELECT w.id, w.job_id::text, w.title, w.status, c.name AS client_name, p.address AS property_address,
               (SELECT MIN(v.scheduled_start)::text FROM visits v
                WHERE v.work_order_id = w.id AND v.status = 'scheduled' AND v.scheduled_start > now()) AS next_scheduled,
               (SELECT v.id::text FROM visits v
@@ -104,7 +105,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
     ),
     queryForSession<HeroVisit>(
       session,
-      `SELECT v.id, v.status, v.scheduled_start::text, j.title AS job_title,
+      `SELECT v.id, v.status, v.scheduled_start::text, j.id::text AS job_id, j.title AS job_title,
               p.address AS property_address, c.name AS client_name, c.phone AS client_phone,
               (SELECT t.label FROM visit_tasks vt
                JOIN work_order_tasks t ON t.id = vt.task_id
@@ -221,6 +222,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
         heroVisit={heroVisit}
         clockedIn={fieldDay.clockedIn}
         hasParkProposal={proposals.length > 0}
+        currentJobId={heroVisit?.job_id ?? workOrders.find((w) => w.active_visit_id)?.job_id ?? workOrders[0]?.job_id ?? null}
         canCapture={isOwner}
         canQuickBook={isOwner}
       >

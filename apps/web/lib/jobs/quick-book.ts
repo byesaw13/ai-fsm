@@ -1,6 +1,25 @@
 /** Field home after a My Day / FAB quick-job capture (TASK-119). */
 export const QUICK_JOB_SUCCESS_HREF = "/app/my-work";
 
+/** Driveway / walk-up jobs are T&M. Stored on the job so billing cannot guess a bid. */
+export const QUICK_JOB_PRICING_MODE = "hourly_internal" as const;
+
+export type QuickBookHouse =
+  | { kind: "existing"; propertyId: string }
+  | { kind: "create"; address: string };
+
+/** A house is required. GPS, receipts, and history have nowhere to live without one. */
+export function resolveQuickBookHouse(input: {
+  property_id?: string | null;
+  address?: string | null;
+}): QuickBookHouse | null {
+  const propertyId = input.property_id?.trim();
+  if (propertyId) return { kind: "existing", propertyId };
+  const address = input.address?.trim();
+  if (address) return { kind: "create", address };
+  return null;
+}
+
 /**
  * Explicit tech wins. Field launches pass assignSelf so the visit lands on My Day.
  * Schedule's Unassigned option omits both and stays unassigned.

@@ -25,6 +25,7 @@ export function MyDayMobileLayout({
   heroVisit,
   clockedIn,
   hasParkProposal = false,
+  currentJobId = null,
   canCapture = false,
   canQuickBook = false,
   children,
@@ -36,6 +37,7 @@ export function MyDayMobileLayout({
   heroVisit: HeroVisit | null;
   clockedIn: boolean;
   hasParkProposal?: boolean;
+  currentJobId?: string | null;
   canCapture?: boolean;
   canQuickBook?: boolean;
   children: React.ReactNode;
@@ -198,7 +200,7 @@ export function MyDayMobileLayout({
       />
 
       <div style={{ marginBottom: "var(--space-6)" }}>
-        <FieldQuickActions canQuickBook={canQuickBook} />
+        <FieldQuickActions canQuickBook={canQuickBook} currentJobId={currentJobId} />
       </div>
 
       {children}
