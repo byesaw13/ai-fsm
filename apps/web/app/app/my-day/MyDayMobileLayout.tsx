@@ -9,6 +9,7 @@ import { NextVisitHero } from "./NextVisitHero";
 import { FieldQuickActions } from "./FieldQuickActions";
 import { FieldRightNowCard } from "../my-work/FieldRightNowCard";
 import { PushPermissionPrompt } from "@/components/push/PushPermissionPrompt";
+import { todayNowKind, todayShowsFieldRightNow } from "@/lib/my-day/today-now";
 import { useToast } from "@/components/ui";
 import { isDaySetupComplete, startDayMode, type DaySetupState } from "@/lib/my-day/day-setup";
 import { shouldShowVisitHero, type HeroVisit } from "@/lib/my-day/visit-hero";
@@ -160,17 +161,27 @@ export function MyDayMobileLayout({
         </div>
       )}
 
+      {complete &&
+      todayShowsFieldRightNow(
+        todayNowKind({
+          dayStarted: complete,
+          hasParkProposal,
+          hasHero: showHero,
+        }),
+      ) ? (
+        <div style={{ marginBottom: "var(--space-4)" }}>
+          <FieldRightNowCard
+            openSession={openSession}
+            vehicles={vehicles}
+            activityEntries={activityEntries}
+            milesToday={dayMileage.totalMiles}
+            onStartMileage={() => setWizardOpen(true)}
+          />
+        </div>
+      ) : null}
+
       {complete ? (
         <>
-          <div style={{ marginBottom: "var(--space-4)" }}>
-            <FieldRightNowCard
-              openSession={openSession}
-              vehicles={vehicles}
-              activityEntries={activityEntries}
-              milesToday={dayMileage.totalMiles}
-              onStartMileage={() => setWizardOpen(true)}
-            />
-          </div>
           <Link
             href="/app/day-review"
             data-testid="end-my-day-button"
