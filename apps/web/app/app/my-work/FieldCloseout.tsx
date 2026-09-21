@@ -1,32 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import type { CompletionCriterion } from "@ai-fsm/domain";
-import { allRequiredCriteriaMet } from "@ai-fsm/domain";
-import { Button } from "@/components/ui";
 
 export function FieldCloseout({
   workOrderId,
   initialCriteria,
   woStatus,
-  hasActiveVisit,
 }: {
   workOrderId: string;
   initialCriteria: CompletionCriterion[];
   woStatus: string;
-  hasActiveVisit: boolean;
+  hasActiveVisit?: boolean;
 }) {
-  const router = useRouter();
   const [criteria, setCriteria] = useState(initialCriteria);
   const [saving, setSaving] = useState(false);
-  const [completing, setCompleting] = useState(false);
-
-  const canComplete =
-    woStatus !== "completed" &&
-    woStatus !== "cancelled" &&
-    !hasActiveVisit &&
-    allRequiredCriteriaMet(criteria);
 
   async function saveCriteria(next: CompletionCriterion[]) {
     setSaving(true);
@@ -57,24 +45,7 @@ export function FieldCloseout({
     await saveCriteria(next);
   }
 
-  async function completeWorkOrder() {
-    if (!confirm("Mark this work order complete?")) return;
-    setCompleting(true);
-    try {
-      const res = await fetch(`/api/v1/work-orders/${workOrderId}/complete`, { method: "POST" });
-      const json = await res.json();
-      if (!res.ok) {
-        alert(json.error?.message ?? "Could not complete work order");
-        return;
-      }
-      router.refresh();
-      router.push("/app/my-work");
-    } finally {
-      setCompleting(false);
-    }
-  }
-
-  if (criteria.length === 0 && !canComplete) return null;
+  if (criteria.length === 0) return null;
 
   return (
     <div style={{ marginTop: "var(--space-4)" }}>
@@ -105,17 +76,7 @@ export function FieldCloseout({
           </ul>
         </>
       )}
-      {canComplete && (
-        <Button
-          type="button"
-          variant="secondary"
-          loading={completing}
-          onClick={completeWorkOrder}
-          style={{ marginTop: criteria.length > 0 ? "var(--space-3)" : undefined }}
-        >
-          Complete Work Order
-        </Button>
-      )}
+      {/* Work orders complete as a side effect of visit Done — not a field button. */}
     </div>
   );
 }

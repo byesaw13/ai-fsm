@@ -4,6 +4,7 @@ import {
   isOpenJobStatus,
   isPrivateLocation,
   looksLikeStorePlace,
+  shouldSkipNightStopInterview,
   stopReasonOptions,
   type HomeFence,
   type StopReason,
@@ -48,7 +49,7 @@ export async function loadStopInterview(
   accountId: string,
   date: string,
 ): Promise<StopInterviewPayload> {
-  const [homeRow, segments, openJobs, closedJobs, receipts] = await Promise.all([
+  const [homeRow, segments, openJobs, closedJobs, receipts, closedOutToday] = await Promise.all([
     queryOne<{
       home_latitude: number | null;
       home_longitude: number | null;
@@ -132,10 +133,24 @@ export async function loadStopInterview(
        ORDER BY created_at`,
       [accountId, date],
     ),
+    query<{ property_id: string }>(
+      `SELECT DISTINCT j.property_id
+         FROM visits v
+         JOIN jobs j ON j.id = v.job_id AND j.account_id = v.account_id
+        WHERE v.account_id = $1
+          AND v.closeout_kind = 'done'
+          AND v.status = 'completed'
+          AND j.property_id IS NOT NULL
+          AND timezone('America/New_York', COALESCE(v.completed_at, v.updated_at))::date = $2::date`,
+      [accountId, date],
+    ),
   ]);
 
   const openByProperty = new Map(openJobs.map((j) => [j.property_id, j]));
   const closedByProperty = new Map(closedJobs.map((j) => [j.property_id, j]));
+  const closedOutPropertyIds = new Set(
+    closedOutToday.map((r) => r.property_id).filter((id): id is string => Boolean(id)),
+  );
   const home: HomeFence | null =
     homeRow?.home_latitude != null && homeRow?.home_longitude != null
       ? {
@@ -154,6 +169,16 @@ export async function loadStopInterview(
         longitude: s.longitude,
         home,
       })
+    ) {
+      continue;
+    }
+    if (
+      shouldSkipNightStopInterview({
+        answeredReason: s.stop_reason,
+        propertyId: s.property_id,
+        closedOutPropertyIds,
+      }) &&
+      !s.stop_reason
     ) {
       continue;
     }

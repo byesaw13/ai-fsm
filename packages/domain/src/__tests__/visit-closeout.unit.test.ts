@@ -56,6 +56,23 @@ describe("visitCloseoutBodySchema", () => {
     expect(parsed.success).toBe(true);
   });
 
+  it("accepts Hold vs Send on done", () => {
+    expect(
+      visitCloseoutBodySchema.safeParse({
+        kind: "done",
+        today_notes: "Assembled the bed",
+        send_invoice: false,
+      }).success,
+    ).toBe(true);
+    expect(
+      visitCloseoutBodySchema.safeParse({
+        kind: "done",
+        today_notes: "Assembled the bed",
+        send_invoice: true,
+      }).success,
+    ).toBe(true);
+  });
+
   it("requires next_when and first_up on return", () => {
     const parsed = visitCloseoutBodySchema.safeParse({
       kind: "return",
