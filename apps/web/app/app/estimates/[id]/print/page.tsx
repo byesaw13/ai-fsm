@@ -209,7 +209,7 @@ export default async function EstimatePrintPage({
             <p style={{ color: "#666", fontSize: 13 }}>{branding.tagline ?? "Licensed & Insured"}</p>
           </div>
           <div style={{ textAlign: "right" }}>
-            <h1>Estimate</h1>
+            <h1>Quote</h1>
             <p className="meta-label">{estimateNumber}</p>
             <p className="meta-label no-print">{documentFilename}</p>
             <p className="meta-label">Document standard: {DOCUMENT_STANDARD_VERSION}</p>
@@ -433,7 +433,7 @@ export default async function EstimatePrintPage({
 
         {/* Estimate terms (Settings → Estimate terms; falls back to domain default) */}
         <div className="section-block">
-          <h2>Estimate Terms</h2>
+          <h2>Quote Terms</h2>
           <p className="terms">{estimateTermsBody}</p>
         </div>
 

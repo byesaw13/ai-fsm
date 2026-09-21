@@ -15,6 +15,7 @@ import {
   ACTIVE_JOB_STATUSES_EXCLUDED,
   houseHeading,
   houseStartHere,
+  houseWhatsNext,
 } from "../property-history-helpers";
 import { eventHrefFor } from "../PropertyTimeline";
 import type { TimelineEvent } from "../PropertyTimeline";
@@ -84,6 +85,43 @@ describe("houseStartHere", () => {
   it("is silent when nothing was left", () => {
     expect(houseStartHere({ firstUp: "  ", nextVisitStart: "2026-09-22T12:00:00Z" })).toBeNull();
     expect(houseStartHere({ firstUp: null, nextVisitStart: null })).toBeNull();
+  });
+});
+
+describe("houseWhatsNext", () => {
+  it("leads with start here when the next person has a note", () => {
+    const next = houseWhatsNext({
+      startHere: "Closet doors in the truck.",
+      nextVisitId: "v1",
+      nextVisitAssigned: true,
+      unsentBillId: "inv1",
+      openQuoteId: "est1",
+    });
+    expect(next?.title).toBe("Start here");
+    expect(next?.href).toBe("/app/visits/v1");
+  });
+
+  it("asks to send the bill when work is filed and the bill is on Hold", () => {
+    const next = houseWhatsNext({
+      startHere: null,
+      nextVisitId: null,
+      nextVisitAssigned: false,
+      unsentBillId: "inv1",
+      openQuoteId: "est1",
+    });
+    expect(next?.title).toBe("Send the bill");
+    expect(next?.href).toBe("/app/invoices/inv1");
+  });
+
+  it("asks to assign a covering tech when a day is set with nobody on Today", () => {
+    const next = houseWhatsNext({
+      startHere: null,
+      nextVisitId: "v2",
+      nextVisitAssigned: false,
+      unsentBillId: null,
+      openQuoteId: null,
+    });
+    expect(next?.title).toBe("Assign covering tech");
   });
 });
 

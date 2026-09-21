@@ -14,6 +14,7 @@ import { scheduleToISOPair } from "@/components/ui";
 import { reviewScheduleDay } from "@/lib/jobs/schedule-guard";
 import { easternWallToUtc, formatBusinessDate, formatBusinessTime } from "@/lib/time/business-tz";
 import { VISIT_TYPES, VISIT_TYPE_LABELS, type VisitType } from "@ai-fsm/domain";
+import { coveringTechFieldHint, coveringTechFieldLabel } from "@/lib/visits/covering-tech";
 
 interface User {
   id: string;
@@ -548,14 +549,14 @@ export function VisitScheduleForm({
       {canAssign && (
         <Select
           id="assigned_user_id"
-          label="Assign To"
+          label={coveringTechFieldLabel()}
           value={assignedUserId}
           onChange={(e) => setAssignedUserId(e.target.value)}
           disabled={pending}
           hint={
             users.length === 0
               ? "No users available. Create users first."
-              : undefined
+              : coveringTechFieldHint()
           }
           options={techUsers.map((u) => ({
             value: u.id,

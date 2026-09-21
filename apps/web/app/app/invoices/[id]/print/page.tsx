@@ -174,7 +174,7 @@ export default async function InvoicePrintPage({
   return (
     <>
       <style>{`
-        /* Forest & Cedar — aligned with tokens.css + server PDF accents */
+        /* Cedar & Clay — aligned with tokens.css + server PDF accents */
         @media print {
           body { margin: 0; }
           .no-print { display: none !important; }
@@ -186,8 +186,8 @@ export default async function InvoicePrintPage({
         .wrap { max-width: 780px; margin: 0 auto; padding: 48px 40px; position: relative; }
         h1 { font-size: 28px; margin: 0; color: #1c1917; letter-spacing: -0.01em; }
         h2 { font-size: 13px; font-weight: 700; text-transform: uppercase;
-             letter-spacing: 0.08em; color: #166534; margin: 36px 0 10px;
-             border-bottom: 1.5px solid #166534; padding-bottom: 6px; }
+             letter-spacing: 0.08em; color: #c1540f; margin: 36px 0 10px;
+             border-bottom: 1.5px solid #c1540f; padding-bottom: 6px; }
         p { margin: 4px 0; line-height: 1.55; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th { text-align: left; padding: 10px 10px; border-bottom: 2px solid #1c1917;
@@ -196,13 +196,13 @@ export default async function InvoicePrintPage({
         td { padding: 10px; border-bottom: 1px solid #e7e5e4; font-size: 14px; vertical-align: top; }
         .amt { text-align: right; font-variant-numeric: tabular-nums; }
         tfoot td { font-weight: 600; border-top: 2px solid #1c1917; border-bottom: none; padding-top: 12px; }
-        tfoot tr.total-row td { font-size: 16px; color: #166534; }
+        tfoot tr.total-row td { font-size: 16px; color: #c1540f; }
         .terms { font-size: 13px; color: #44403c; line-height: 1.65; white-space: pre-wrap; }
         .section-block { margin-top: 28px; }
         .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 28px;
-                      padding-bottom: 20px; border-bottom: 1.5px solid #166534; margin-bottom: 8px; }
+                      padding-bottom: 20px; border-bottom: 1.5px solid #c1540f; margin-bottom: 8px; }
         .letterhead { display: flex; gap: 16px; align-items: flex-start; }
-        .company-name { font-size: 20px; font-weight: 700; color: #166534; }
+        .company-name { font-size: 20px; font-weight: 700; color: #c1540f; }
         .meta-label { color: #57534e; font-size: 12px; }
         .company-logo { max-height: 56px; max-width: 160px; object-fit: contain; }
         .bill-row { display: flex; gap: 48px; margin-top: 28px; }

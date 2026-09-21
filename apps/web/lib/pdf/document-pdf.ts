@@ -4,8 +4,8 @@
  * Uses pdf-lib (pure JS, no native deps, no font files on disk) so it runs
  * cleanly inside the Next.js server runtime and on the garonhome mini PC.
  *
- * Layout mirrors the HTML print pages (Forest & Cedar): serif body, branded
- * letterhead with forest accent rule, Bill To + Service Location columns,
+ * Layout mirrors the HTML print pages (Cedar & Clay): serif body, branded
+ * letterhead with burnt-orange accent rule, Bill To + Service Location columns,
  * section headers, line-item table, totals, notes, and payment/estimate terms.
  */
 import { PDFDocument, StandardFonts, rgb, degrees, type PDFFont, type PDFPage } from "pdf-lib";
@@ -20,12 +20,12 @@ const PAGE_H = 792;
 const MARGIN = 54;
 const CONTENT_W = PAGE_W - MARGIN * 2;
 
-// Forest & Cedar identity (tokens.css): deep forest accent + warm stone neutrals.
+// Cedar & Clay identity (tokens.css): burnt-orange accent + warm stone neutrals.
 const INK = rgb(0.11, 0.1, 0.09); // slate-900 #1c1917
 const MUTED = rgb(0.34, 0.33, 0.31); // stone-600 #57534e (print meta-label)
 const MUTED_SOFT = rgb(0.47, 0.44, 0.42); // slate-500 #78716c (footer)
 const RULE_STRONG = rgb(0.16, 0.15, 0.14); // near ink for table header/totals
-const ACCENT = rgb(0.086, 0.396, 0.204); // forest-800 #166534
+const ACCENT = rgb(0.757, 0.329, 0.059); // burnt-orange #c1540f
 const ROW_RULE = rgb(0.91, 0.9, 0.89); // slate-200-ish
 const PAID_RED = rgb(0.725, 0.11, 0.11); // #b91c1c — matches PaidStamp
 
@@ -84,6 +84,7 @@ export interface InvoicePdfData {
   notes?: string | null;
   lineItems: PdfLineItem[];
   branding?: PdfBranding | null;
+  photoRecap?: { bytes: Uint8Array; mimeType: string }[];
 }
 
 export interface EstimatePdfData {
@@ -187,7 +188,7 @@ function ensureSpace(ctx: Ctx, needed: number): void {
 }
 
 interface RenderInput {
-  docType: "Invoice" | "Estimate";
+  docType: "Invoice" | "Quote";
   ref: string;
   /**
    * Internal workflow status (draft/sent/partial/etc). Not shown on the
@@ -217,6 +218,8 @@ interface RenderInput {
   /** When true, draw a red PAID stamp (invoices only). */
   isPaid?: boolean;
   paidAt?: string | Date | null;
+  /** Day's after/before photos, already loaded as image bytes. */
+  photoRecap?: { bytes: Uint8Array; mimeType: string }[];
 }
 
 async function renderDocument(input: RenderInput): Promise<Uint8Array> {
@@ -291,7 +294,7 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
   }
 
   const rightX = PAGE_W - MARGIN;
-  // Title case to match HTML print ("Invoice" / "Estimate")
+  // Title case to match HTML print ("Invoice" / "Quote")
   rightText(input.docType, rightX, ctx.y, 22, bold, INK);
   rightText(input.ref, rightX, ctx.y - 18, 10, font, MUTED);
   rightText(`Document standard: ${DOCUMENT_STANDARD_VERSION}`, rightX, ctx.y - 32, 8, font, MUTED);
@@ -488,6 +491,34 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
     }
   }
 
+  if (input.photoRecap && input.photoRecap.length > 0) {
+    ctx.y -= 14;
+    ensureSpace(ctx, 80);
+    drawSectionHeader(ctx, "TODAY'S WORK");
+    const gap = 8;
+    const cell = (CONTENT_W - gap * 3) / 4;
+    let x = MARGIN;
+    for (const photo of input.photoRecap.slice(0, 4)) {
+      try {
+        const isPng =
+          photo.mimeType.includes("png") ||
+          (photo.bytes[0] === 0x89 && photo.bytes[1] === 0x50);
+        const img = isPng
+          ? await ctx.doc.embedPng(photo.bytes)
+          : await ctx.doc.embedJpg(photo.bytes);
+        const scale = Math.min(cell / img.width, 72 / img.height, 1);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        ensureSpace(ctx, h + 8);
+        ctx.page.drawImage(img, { x, y: ctx.y - h, width: w, height: h });
+        x += cell + gap;
+      } catch {
+        /* skip a bad file rather than failing the bill */
+      }
+    }
+    ctx.y -= 80;
+  }
+
   // --- Payment / Estimate Terms (body section, not just footer) -------------
   if (input.terms && input.terms.trim()) {
     ctx.y -= 14;
@@ -649,6 +680,7 @@ export async function buildInvoicePdf(d: InvoicePdfData): Promise<Uint8Array> {
     branding: d.branding,
     isPaid,
     paidAt: d.paidAt,
+    photoRecap: d.photoRecap,
   });
 }
 
@@ -666,12 +698,12 @@ export async function buildEstimatePdf(d: EstimatePdfData): Promise<Uint8Array> 
   const site = (d.branding?.website?.trim() || DEFAULT_BRAND_URL).replace(/^https?:\/\//, "");
   const terms =
     d.branding?.estimateTerms?.trim() ||
-    "This estimate is provided in good faith and may be adjusted if scope or conditions change.";
+    "This quote is provided in good faith and may be adjusted if scope or conditions change.";
   const footer = `Questions? Reach us at ${site}. Thank you for considering us.`;
 
   return renderDocument({
     optionGroups: multiOption ? d.options : undefined,
-    docType: "Estimate",
+    docType: "Quote",
     ref: d.estimateRef,
     status: d.status,
     clientName: d.clientName,
@@ -686,7 +718,7 @@ export async function buildEstimatePdf(d: EstimatePdfData): Promise<Uint8Array> 
     totals,
     notes: d.notes,
     terms,
-    termsTitle: "ESTIMATE TERMS",
+    termsTitle: "QUOTE TERMS",
     // Only state the deposit policy when this estimate actually requires a
     // deposit — otherwise the PDF would demand one the estimate didn't.
     depositTerms: d.depositCents && d.depositCents > 0 ? d.branding?.depositTerms : null,

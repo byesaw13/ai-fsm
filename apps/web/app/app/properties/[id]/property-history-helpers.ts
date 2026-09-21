@@ -45,9 +45,72 @@ export const NOTE_SOURCE_LABELS: Record<string, string> = {
   office:     "Office",
 };
 
+export type HouseWhatsNext = {
+  title: string;
+  detail: string;
+  href: string;
+  action: string;
+};
+
+/**
+ * One next move at the house. Priority: do the work, send the bill,
+ * follow the quote, assign a covering tech.
+ */
+export function houseWhatsNext(input: {
+  startHere: string | null;
+  nextVisitId: string | null;
+  nextVisitAssigned: boolean;
+  nextVisitHref?: string | null;
+  unsentBillId: string | null;
+  openQuoteId: string | null;
+  assignHref?: string | null;
+}): HouseWhatsNext | null {
+  if (input.startHere && input.nextVisitId) {
+    return {
+      title: "Start here",
+      detail: input.startHere,
+      href: input.nextVisitHref ?? `/app/visits/${input.nextVisitId}`,
+      action: "Open today",
+    };
+  }
+  if (input.unsentBillId) {
+    return {
+      title: "Send the bill",
+      detail: "Work is filed. The bill is still on Hold.",
+      href: `/app/invoices/${input.unsentBillId}`,
+      action: "Open bill",
+    };
+  }
+  if (input.openQuoteId) {
+    return {
+      title: "Follow up the quote",
+      detail: "A quote is out. The house is waiting on a yes.",
+      href: `/app/estimates/${input.openQuoteId}`,
+      action: "Open quote",
+    };
+  }
+  if (input.nextVisitId && !input.nextVisitAssigned) {
+    return {
+      title: "Assign covering tech",
+      detail: "A day is on the calendar with nobody on Today.",
+      href: input.assignHref ?? `/app/visits/${input.nextVisitId}`,
+      action: "Assign",
+    };
+  }
+  if (input.nextVisitId) {
+    return {
+      title: "Next day is set",
+      detail: "The covering tech has Today.",
+      href: input.nextVisitHref ?? `/app/visits/${input.nextVisitId}`,
+      action: "Open visit",
+    };
+  }
+  return null;
+}
+
 export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
-  estimate_pdf:    "Estimate",
-  estimate_docx:   "Estimate (Word)",
+  estimate_pdf:    "Quote",
+  estimate_docx:   "Quote (Word)",
   invoice_pdf:     "Invoice",
   invoice_docx:    "Invoice (Word)",
   receipt:         "Receipt",
