@@ -34,6 +34,7 @@ import {
   DOCUMENT_TYPE_LABELS,
   houseHeading,
   houseStartHere,
+  houseWhatsNext,
 } from "./property-history-helpers";
 
 export const dynamic = "force-dynamic";
@@ -68,6 +69,8 @@ type ActiveJobRow = {
   next_visit_id: string | null;
   next_visit_start: string | null;
   next_visit_status: string | null;
+  next_assigned_user_id: string | null;
+  next_assigned_name: string | null;
   first_up: string | null;
 };
 
@@ -220,18 +223,22 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
               v.id AS next_visit_id,
               v.scheduled_start AS next_visit_start,
               v.status AS next_visit_status,
+              v.assigned_user_id AS next_assigned_user_id,
+              v.assigned_name AS next_assigned_name,
               v.first_up
        FROM jobs j
        LEFT JOIN LATERAL (
-         SELECT id, scheduled_start, status,
+         SELECT visits.id, visits.scheduled_start, visits.status, visits.assigned_user_id,
+                u.full_name AS assigned_name,
                 (SELECT t.label FROM visit_tasks vt
                    JOIN work_order_tasks t ON t.id = vt.task_id
                   WHERE vt.visit_id = visits.id
                     AND t.completed = false AND t.status <> 'done'
                   ORDER BY t.sort_order ASC LIMIT 1) AS first_up
          FROM visits
-         WHERE job_id = j.id AND status NOT IN ('completed','cancelled')
-         ORDER BY scheduled_start ASC NULLS LAST
+         LEFT JOIN users u ON u.id = visits.assigned_user_id
+         WHERE visits.job_id = j.id AND visits.status NOT IN ('completed','cancelled')
+         ORDER BY visits.scheduled_start ASC NULLS LAST
          LIMIT 1
        ) v ON true
        WHERE j.property_id = $1 AND j.account_id = $2
@@ -264,7 +271,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
        FROM invoices i
        LEFT JOIN jobs j ON j.id = i.job_id
        WHERE i.property_id = $1 AND i.account_id = $2
-         AND i.status IN ('sent','partial','overdue')
+         AND i.status IN ('draft','sent','partial','overdue')
        ORDER BY i.created_at DESC
        LIMIT 10`,
       [id, session.accountId]
@@ -476,18 +483,33 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
           {(() => {
             const lead = activeJobs[0];
             const startHere = lead ? houseStartHere({ firstUp: lead.first_up, nextVisitStart: lead.next_visit_start }) : null;
-            if (!startHere) return null;
+            const unsentBill = openInvoices.find((i) => i.status === "draft") ?? null;
+            const openQuote = openEstimates.find((e) => e.status === "sent" || e.status === "draft") ?? null;
+            const next = houseWhatsNext({
+              startHere,
+              nextVisitId: lead?.next_visit_id ?? null,
+              nextVisitAssigned: Boolean(lead?.next_assigned_user_id),
+              nextVisitHref: lead?.next_visit_id ? `/app/visits/${lead.next_visit_id}` : null,
+              unsentBillId: unsentBill?.id ?? null,
+              openQuoteId: openQuote?.id ?? null,
+              assignHref: lead?.next_visit_id ? `/app/visits/${lead.next_visit_id}` : null,
+            });
+            if (!next) return null;
             return (
-              <Card data-testid="house-start-here">
-                <SectionHeader title="Start here" />
-                <p style={{ margin: 0, fontSize: "var(--text-base)", fontWeight: 600 }}>{startHere}</p>
-                {lead.next_visit_id ? (
-                  <div style={{ marginTop: "var(--space-3)" }}>
-                    <LinkButton href={`/app/visits/${lead.next_visit_id}`} variant="primary" size="sm">
-                      Open today
-                    </LinkButton>
-                  </div>
+              <Card data-testid="house-whats-next">
+                <SectionHeader title="What's next" />
+                <p style={{ margin: 0, fontSize: "var(--text-base)", fontWeight: 600 }}>{next.title}</p>
+                <p style={{ margin: "var(--space-2) 0 0", color: "var(--fg-muted)" }}>{next.detail}</p>
+                {lead?.next_assigned_name ? (
+                  <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                    Covering tech: {lead.next_assigned_name}
+                  </p>
                 ) : null}
+                <div style={{ marginTop: "var(--space-3)" }}>
+                  <LinkButton href={next.href} variant="primary" size="sm">
+                    {next.action}
+                  </LinkButton>
+                </div>
               </Card>
             );
           })()}

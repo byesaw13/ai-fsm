@@ -99,7 +99,7 @@ export default async function NewVisitPage({
     multi === "1"
       ? "Schedule Multiple Days"
       : resolvedIntent === "assessment"
-        ? "Schedule Assessment"
+        ? "Book a look"
         : resolvedIntent === "book_work" || hasPrefill
           ? "Add a Day to the Schedule"
           : "Schedule Visit";

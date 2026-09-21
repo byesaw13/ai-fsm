@@ -117,7 +117,7 @@ describe("computeWhatNext — pre-sale and close-out branches", () => {
     );
 
     expect(next.message).toMatch(/without assessment packet/i);
-    expect(next.actionLabel).toBe("Create Estimate");
+    expect(next.actionLabel).toBe("Create Quote");
     expect(next.secondary?.href).toContain("visit_type=site_visit");
   });
 
@@ -130,7 +130,7 @@ describe("computeWhatNext — pre-sale and close-out branches", () => {
     );
 
     expect(next.message).toBe("Create estimate from walkthrough");
-    expect(next.actionLabel).toBe("Create Estimate");
+    expect(next.actionLabel).toBe("Create Quote");
     expect(next.actionHref).toBe(
       `/app/estimates/new?job_id=${JOB_ID}&client_id=${CLIENT_ID}&pricing_mode=flat_rate`,
     );
@@ -146,7 +146,7 @@ describe("computeWhatNext — pre-sale and close-out branches", () => {
     );
 
     expect(next.message).toBe("Create estimate from work order scope");
-    expect(next.actionLabel).toBe("Create Estimate");
+    expect(next.actionLabel).toBe("Create Quote");
     expect(next.actionHref).toBe(
       `/app/estimates/new?job_id=${JOB_ID}&client_id=${CLIENT_ID}&pricing_mode=flat_rate`,
     );

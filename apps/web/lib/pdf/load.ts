@@ -25,6 +25,8 @@ import {
   type EstimateOptionGroup,
   type PdfBranding,
 } from "./document-pdf";
+import { selectDayPhotoRecap, visitMediaPath } from "./photo-recap";
+import fs from "fs";
 
 export interface LoadedPdf {
   filename: string;
@@ -68,6 +70,48 @@ function brandingFromAccount(
 }
 
 /** Filename status bucket — mirrors the invoice/estimate detail pages. */
+async function loadJobPhotoRecap(
+  client: PoolClient,
+  accountId: string,
+  jobId: string | null,
+): Promise<{ bytes: Uint8Array; mimeType: string }[]> {
+  if (!jobId) return [];
+  const { rows } = await client.query<{
+    filename: string;
+    mime_type: string;
+    category: string;
+    visit_id: string;
+  }>(
+    `SELECT vm.filename, vm.mime_type, vm.category, vm.visit_id::text
+       FROM visit_media vm
+       JOIN visits v ON v.id = vm.visit_id AND v.account_id = vm.account_id
+      WHERE v.job_id = $1
+        AND vm.account_id = $2
+        AND vm.category IN ('after', 'before')
+      ORDER BY CASE vm.category WHEN 'after' THEN 0 ELSE 1 END, vm.created_at DESC
+      LIMIT 12`,
+    [jobId, accountId],
+  );
+  const picked = selectDayPhotoRecap(
+    rows.map((r) => ({
+      category: r.category,
+      visitId: r.visit_id,
+      filename: r.filename,
+      mimeType: r.mime_type,
+    })),
+  );
+  const recap: { bytes: Uint8Array; mimeType: string }[] = [];
+  for (const photo of picked) {
+    try {
+      const buf = fs.readFileSync(visitMediaPath(photo.visitId, photo.filename));
+      recap.push({ bytes: new Uint8Array(buf), mimeType: photo.mimeType });
+    } catch {
+      /* missing file on disk — skip */
+    }
+  }
+  return recap;
+}
+
 function invoiceFileStatus(status: string): string {
   if (status === "void") return "archived";
   if (status === "paid") return "final";
@@ -82,7 +126,7 @@ export async function loadInvoicePdf(
 ): Promise<LoadedPdf | null> {
   // Same location joins/select as the HTML print page so service address matches.
   const { rows, rowCount } = await client.query(
-    `SELECT i.id, i.invoice_number, i.status, i.subtotal_cents, i.tax_cents,
+    `SELECT i.id, i.invoice_number, i.status, i.job_id, i.subtotal_cents, i.tax_cents,
             i.total_cents, i.paid_cents, i.deposit_cents, i.paid_at, i.due_date, i.notes,
             i.deposit_type, i.deposit_percentage, i.deposit_fixed_cents,
             i.sent_at, i.created_at, i.client_id,
@@ -111,6 +155,11 @@ export async function loadInvoicePdf(
     String(inv.account_name ?? ""),
     inv.account_settings,
     accountId
+  );
+  const photoRecap = await loadJobPhotoRecap(
+    client,
+    accountId,
+    (inv.job_id as string | null) ?? null,
   );
 
   const serviceLocation = resolveServiceLocation({
@@ -153,6 +202,7 @@ export async function loadInvoicePdf(
     notes: inv.notes as string | null,
     lineItems: mapLineItems(lineItems.rows),
     branding,
+    photoRecap,
   });
 
   const filename = buildClientDocumentFilename({

@@ -176,6 +176,45 @@ describe("buildInvoicePdf", () => {
   });
 });
 
+describe("PDF voice", () => {
+  it("labels a quote as Quote, not Estimate", async () => {
+    const bytes = await buildEstimatePdf({
+      estimateRef: "Q-1",
+      status: "sent",
+      clientName: "Peter",
+      issueDate: "2026-09-21",
+      subtotalCents: 10000,
+      totalCents: 10000,
+      lineItems: [{ description: "Assemble bed", quantity: 1, unitPriceCents: 10000, totalCents: 10000 }],
+    });
+    const text = pdfDrawnText(bytes);
+    expect(text).toContain("Quote");
+    expect(text.split("\n")).not.toContain("Estimate");
+  });
+
+  it("embeds a photo recap section on the bill", async () => {
+    const jpeg = Uint8Array.from(
+      Buffer.from(
+        "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAGfAD//2Q==",
+        "base64",
+      ),
+    );
+    const bytes = await buildInvoicePdf({
+      invoiceNumber: "BILL-1",
+      status: "draft",
+      clientName: "Peter",
+      issueDate: "2026-09-21",
+      subtotalCents: 10000,
+      totalCents: 10000,
+      paidCents: 0,
+      lineItems: [{ description: "Assemble bed + hardware", quantity: 1, unitPriceCents: 10000, totalCents: 10000 }],
+      photoRecap: [{ bytes: jpeg, mimeType: "image/jpeg" }],
+    });
+    const text = pdfDrawnText(bytes);
+    expect(text).toContain("TODAY'S WORK");
+  });
+});
+
 describe("buildEstimatePdf", () => {
   it("renders multi-option estimates from option groups (parent total is 0)", async () => {
     const bytes = await buildEstimatePdf({
