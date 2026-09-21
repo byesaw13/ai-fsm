@@ -46,6 +46,7 @@ describe("nav speaks those nouns", () => {
 
     const people = getNavSections("admin").find((s) => s.label === "People");
     expect(people?.items.find((i) => i.href === "/app/properties")?.label).toBe(UI.houses);
+    expect(people?.items.find((i) => i.href === "/app/clients")?.label).toBe(UI.people);
   });
 
   it("gives the owner phone tabs Today / Jobs / People / Money", () => {
@@ -87,18 +88,32 @@ describe("hubs and command palette", () => {
     expect(PEOPLE_HUB_LINKS.find((l) => l.href === "/app/properties")?.label).toBe(UI.houses);
 
     const labels = [...WORK_HUB_LINKS, ...PEOPLE_HUB_LINKS, ...MONEY_HUB_LINKS].map((l) => l.label);
+    expect(labels).toContain(UI.people);
+    expect(labels).not.toContain("Clients");
+    expect(labels).not.toContain("Work Orders");
+    expect(labels).not.toContain("Visits");
     expect(labels).not.toContain("Projects");
     expect(labels).not.toContain("My Day");
     expect(labels).not.toContain("Overview");
   });
 
-  it("command index finds Today, Desk, Jobs, Quotes, Bills", () => {
+  it("command index finds Today, Desk, Jobs, Quotes, Bills, People", () => {
     const labels = filterCommands("", "owner").map((c) => c.label);
     expect(labels).toEqual(
-      expect.arrayContaining([UI.today, UI.desk, UI.jobs, UI.quotes, UI.bills, "Tracking"]),
+      expect.arrayContaining([
+        UI.today,
+        UI.desk,
+        UI.jobs,
+        UI.quotes,
+        UI.bills,
+        UI.people,
+        "Tracking",
+      ]),
     );
+    expect(labels).not.toContain("Clients");
     expect(labels).not.toContain("My Day");
     expect(labels).not.toContain("Projects");
     expect(labels).not.toContain("Overview");
+    expect(labels).not.toContain("Work Orders");
   });
 });

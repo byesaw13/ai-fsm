@@ -17,6 +17,29 @@ describe("hubs navigation", () => {
     expect(MONEY_HUB_LINKS.map((l) => l.href)).toContain("/app/invoices");
   });
 
+  it("labels the clients destination People, not Clients", () => {
+    expect(PEOPLE_HUB_LINKS).toEqual([
+      { href: "/app/clients", label: "People" },
+      { href: "/app/properties", label: "Houses" },
+    ]);
+  });
+
+  it("does not put Work Orders or Visits on the Work hub a human sees", () => {
+    const hrefs = WORK_HUB_LINKS.map((l) => l.href);
+    const labels = WORK_HUB_LINKS.map((l) => l.label);
+    expect(hrefs).toEqual([
+      "/app/requests",
+      "/app/estimates",
+      "/app/jobs",
+      "/app/schedule",
+    ]);
+    expect(hrefs).not.toContain("/app/work-orders");
+    expect(hrefs).not.toContain("/app/visits");
+    expect(labels).not.toContain("Work Orders");
+    expect(labels).not.toContain("Visits");
+    expect(labels).not.toContain("Clients");
+  });
+
   it("matches prefix paths for hub chips", () => {
     expect(isHubLinkActive("/app/jobs/abc", "/app/jobs")).toBe(true);
     expect(isHubLinkActive("/app/estimates/new", "/app/estimates")).toBe(true);

@@ -26,7 +26,7 @@ export const OWNER_QUICK_ACTIONS: QuickAction[] = [
   { label: "New Job", href: "/app/jobs", icon: "🛠️" },
   { label: "Schedule", href: "/app/schedule", icon: "📅" },
   { label: "Bills", href: "/app/invoices", icon: "🧾" },
-  { label: "Clients", href: "/app/clients", icon: "👥" },
+  { label: "People", href: "/app/clients", icon: "👥" },
   { label: "New Request", href: "/app/intake/new", icon: "⚡" },
 ];
 

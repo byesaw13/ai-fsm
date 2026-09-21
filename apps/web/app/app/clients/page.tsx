@@ -19,6 +19,7 @@ import {
 } from "@/components/ui";
 import type { DataTableColumn, FilterDef } from "@/components/ui";
 import { PEOPLE_HUB_LINKS } from "@/lib/navigation/hubs";
+import { UI } from "@/lib/vocabulary";
 
 export const dynamic = "force-dynamic";
 
@@ -98,7 +99,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
   const columns: DataTableColumn<ClientRow>[] = [
     {
       key: "name",
-      label: "Client",
+      label: UI.person,
       render: (row) => (
         <div>
           <Link href={`/app/clients/${row.id}` as Route} style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>
@@ -185,15 +186,15 @@ export default async function ClientsPage({ searchParams }: PageProps) {
   return (
     <PageContainer>
       <PageHeader
-        title="Clients"
-        subtitle={`${clients.length} client${clients.length === 1 ? "" : "s"} · Jobs = work in this app (includes invoiced). Square = historical payments from Square export.`}
+        title={UI.people}
+        subtitle={`${clients.length} ${clients.length === 1 ? "person" : "people"} · Jobs = work in this app (includes invoiced). Square = historical payments from Square export.`}
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)" }}>
             <LinkButton href="/app/clients/import" variant="secondary">
               Import Square CSV
             </LinkButton>
             <LinkButton href="/app/clients/new" variant="primary" data-testid="create-client-btn">
-              + New Client
+              + New person
             </LinkButton>
           </div>
         }
@@ -204,9 +205,9 @@ export default async function ClientsPage({ searchParams }: PageProps) {
 
       {clients.length === 0 ? (
         <EmptyState
-          title={search ? "No clients match your search" : "No clients yet"}
-          description={search ? "Try a different search term." : "Create your first client to start scheduling jobs and visits."}
-          action={<LinkButton href="/app/clients/new">Create First Client</LinkButton>}
+          title={search ? "No people match your search" : "No people yet"}
+          description={search ? "Try a different search term." : "Add a person to start scheduling jobs."}
+          action={<LinkButton href="/app/clients/new">New person</LinkButton>}
           data-testid="clients-empty"
         />
       ) : (
