@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { nextHalfHourLocal } from "@/lib/jobs/quick-book";
+import { coveringTechFieldHint, coveringTechFieldLabel } from "@/lib/visits/covering-tech";
 import { easternWallToUtc, formatBusinessTime } from "@/lib/time/business-tz";
 
 interface UserOption { id: string; full_name: string; role: string; }
@@ -363,14 +364,16 @@ export function QuickBookModal({
             </button>
           </div>
 
-          {/* Assign tech */}
           {users.length > 0 && (
             <div>
-              <label style={labelStyle}>Assign to (optional)</label>
+              <label style={labelStyle}>{coveringTechFieldLabel()}</label>
               <select value={assignedUserId} onChange={(e) => setAssignedUserId(e.target.value)} style={inputStyle}>
                 <option value="">Unassigned</option>
                 {users.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
               </select>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 3 }}>
+                {coveringTechFieldHint()}
+              </div>
             </div>
           )}
 

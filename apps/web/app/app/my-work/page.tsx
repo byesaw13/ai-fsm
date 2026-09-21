@@ -29,6 +29,7 @@ import { NeedsAttentionPanel } from "../NeedsAttentionPanel";
 import { TodayTimeline } from "./TodayTimeline";
 import { todayEmptyCopy, todayJobCountLabel, todayJobsHeading } from "./today-list";
 import { filterAttentionForSurface } from "@/lib/attention/surfaces";
+import { coveringTechStartHere, todayCoveringTechSql } from "@/lib/visits/covering-tech";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,7 @@ type WoCard = {
   property_address: string | null;
   next_scheduled: string | null;
   active_visit_id: string | null;
+  first_up: string | null;
 };
 
 type AssessmentCard = {
@@ -77,12 +79,19 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
               (SELECT v.id::text FROM visits v
                WHERE v.work_order_id = w.id AND v.assigned_user_id = $2
                  AND v.status IN ('dispatched','traveling','arrived','in_progress','waiting')
-               LIMIT 1) AS active_visit_id
+               LIMIT 1) AS active_visit_id,
+              (SELECT t.label FROM visit_tasks vt
+               JOIN work_order_tasks t ON t.id = vt.task_id
+               JOIN visits vfirst ON vfirst.id = vt.visit_id
+               WHERE vfirst.work_order_id = w.id AND vfirst.assigned_user_id = $2
+                 AND vfirst.status NOT IN ('completed','cancelled')
+                 AND t.completed = false AND t.status <> 'done'
+               ORDER BY vfirst.scheduled_start ASC, t.sort_order ASC LIMIT 1) AS first_up
        FROM work_orders w
        JOIN jobs j ON j.id = w.job_id
        LEFT JOIN clients c ON c.id = w.client_id
        LEFT JOIN properties p ON p.id = j.property_id
-       WHERE w.account_id = $1 AND w.assigned_user_id = $2
+       WHERE w.account_id = $1 AND ${todayCoveringTechSql("$2")}
          AND w.status NOT IN ('draft','completed','cancelled')
        ORDER BY
          CASE w.status WHEN 'dispatched' THEN 0 WHEN 'scheduled' THEN 1 WHEN 'waiting' THEN 2 ELSE 3 END,
@@ -259,6 +268,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
                 const status =
                   WORK_ORDER_STATUS_LABELS[wo.status as WorkOrderStatus] ?? wo.status;
                 const derived = wo.active_visit_id ? " · In progress" : "";
+                const startHere = coveringTechStartHere(wo.first_up);
                 return (
                   <li key={wo.id} style={{ borderBottom: "1px solid var(--border)" }}>
                     <Link
@@ -272,6 +282,11 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
                     >
                       <strong>{wo.client_name ?? "Client"}</strong>
                       <div>{wo.title}</div>
+                      {startHere ? (
+                        <div data-testid="today-start-here" style={{ marginTop: "var(--space-1)" }}>
+                          Start here: {startHere}
+                        </div>
+                      ) : null}
                       <small style={{ color: "var(--fg-muted)" }}>
                         {status}
                         {derived}
