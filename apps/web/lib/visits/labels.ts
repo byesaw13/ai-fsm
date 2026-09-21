@@ -56,7 +56,7 @@ export const INTAKE_ROUTING_PATHS = [
 ] as const;
 
 export const INTAKE_PATH_LABELS: Record<IntakeRoutingPath, string> = {
-  site_visit: "Schedule assessment",
+  site_visit: "Book a look",
   book_work: "Book work appointment",
   remote_estimate: "Remote estimate only",
   pending: "Not chosen yet",

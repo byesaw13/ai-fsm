@@ -4,6 +4,7 @@ import { generateInvoiceNumber } from "@/lib/invoices/db";
 /**
  * Side effects that accompany an estimate being approved:
  *  - auto-create the deposit invoice (once) only when deposit_required is true and deposit_cents > 0
+ * Callers must create/link the job first so this deposit inherits job_id.
  *
  * The deposit invoice is created as a DRAFT (invoice_kind='deposit') so the
  * owner reviews and sends it deliberately — it is never silently put into a

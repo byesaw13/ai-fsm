@@ -21,7 +21,7 @@ const STATUS_LABELS: Record<string, string> = {
   reviewed: "Ready",
   assessment_booked: "Assessment booked",
   estimated: "Estimated",
-  converted: "Converted",
+  converted: "Won",
   lost: "Lost",
   cancelled: "Cancelled",
 };

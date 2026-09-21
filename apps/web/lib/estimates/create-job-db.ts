@@ -23,10 +23,15 @@ interface CreateJobFromEstimateOptions {
   traceId?: string;
   /**
    * When true, skip the "client already has recent completed/billed work" guard
-   * and create a new project anyway. Explicit create-job UI can pass this after
+   * and create a new job anyway. Explicit create-job UI can pass this after
    * the operator confirms.
    */
   forceNewProject?: boolean;
+  /**
+   * Link this approved quote onto an existing job at the house.
+   * Never inferred — silent merge is forbidden.
+   */
+  linkExistingJobId?: string;
 }
 
 export interface RecentClientWork {
@@ -125,30 +130,40 @@ export async function findRecentClientWork(
   }));
 }
 
-/**
- * Prefer linking an unlinked estimate to an existing open job for the same
- * client (and property when set) instead of spawning a parallel project.
- */
-async function findOpenJobToLink(
+async function assertLinkableJob(
   client: PoolClient,
   accountId: string,
   clientId: string,
-  propertyId: string | null
-): Promise<string | null> {
+  jobId: string,
+): Promise<void> {
   const res = await client.query<{ id: string }>(
     `SELECT j.id
      FROM jobs j
-     WHERE j.account_id = $1
-       AND j.client_id = $2
-       AND j.status IN ('draft', 'quoted', 'scheduled', 'in_progress')
-       AND ($3::uuid IS NULL OR j.property_id IS NULL OR j.property_id = $3)
-     ORDER BY
-       CASE WHEN $3::uuid IS NOT NULL AND j.property_id = $3 THEN 0 ELSE 1 END,
-       j.updated_at DESC
-     LIMIT 1`,
-    [accountId, clientId, propertyId]
+     WHERE j.id = $1
+       AND j.account_id = $2
+       AND j.client_id = $3
+       AND j.status IN ('draft', 'quoted', 'scheduled', 'in_progress')`,
+    [jobId, accountId, clientId],
   );
-  return res.rows[0]?.id ?? null;
+  if (!res.rows[0]) {
+    throw Object.assign(new Error("Job not found to link this quote"), { code: "NOT_FOUND" });
+  }
+}
+
+async function backfillDepositJobId(
+  client: PoolClient,
+  accountId: string,
+  estimateId: string,
+  jobId: string,
+): Promise<void> {
+  await client.query(
+    `UPDATE invoices
+        SET job_id = $1
+      WHERE account_id = $2
+        AND estimate_id = $3
+        AND job_id IS NULL`,
+    [jobId, accountId, estimateId],
+  );
 }
 
 /**
@@ -157,8 +172,8 @@ async function findOpenJobToLink(
  * or otherwise ensure serialization.
  *
  * Also:
- * - Links to an open job for the same client when one exists (no new project).
- * - Blocks spawning a new project when the client was recently completed/billed
+ * - Links to an existing job only when `linkExistingJobId` is passed (no silent merge).
+ * - Blocks spawning a new job when the client was recently completed/billed
  *   unless `forceNewProject` is set (throws CLIENT_RECENT_WORK).
  */
 export async function createJobFromEstimate({
@@ -167,6 +182,7 @@ export async function createJobFromEstimate({
   accountId,
   createdBy,
   forceNewProject = false,
+  linkExistingJobId,
 }: CreateJobFromEstimateOptions): Promise<CreateJobResult> {
   const estRes = await client.query<{
     id: string;
@@ -177,11 +193,12 @@ export async function createJobFromEstimate({
     booking_request_id: string | null;
     notes: string | null;
     total_cents: number;
+    pricing_mode: "flat_rate" | "hourly_internal" | null;
     client_name: string | null;
     property_address: string | null;
   }>(
     `SELECT e.id, e.status, e.client_id, e.property_id, e.job_id, e.booking_request_id,
-            e.notes, e.total_cents,
+            e.notes, e.total_cents, e.pricing_mode,
             c.name AS client_name,
             p.address AS property_address
      FROM estimates e
@@ -207,6 +224,7 @@ export async function createJobFromEstimate({
 
   // Idempotent — already has a job; ensure a work order exists too.
   if (est.job_id) {
+    await backfillDepositJobId(client, accountId, estimateId, est.job_id);
     const wo = await promoteOrCreateWorkOrderFromEstimate({
       client,
       estimateId,
@@ -222,27 +240,22 @@ export async function createJobFromEstimate({
     };
   }
 
-  // Prefer linking to an open project for this client rather than forking.
-  const openJobId = await findOpenJobToLink(
-    client,
-    accountId,
-    est.client_id,
-    est.property_id
-  );
-  if (openJobId) {
+  if (linkExistingJobId) {
+    await assertLinkableJob(client, accountId, est.client_id, linkExistingJobId);
     await client.query(`UPDATE estimates SET job_id = $1 WHERE id = $2`, [
-      openJobId,
+      linkExistingJobId,
       estimateId,
     ]);
+    await backfillDepositJobId(client, accountId, estimateId, linkExistingJobId);
     const wo = await promoteOrCreateWorkOrderFromEstimate({
       client,
       estimateId,
-      jobId: openJobId,
+      jobId: linkExistingJobId,
       accountId,
       createdBy,
     });
     return {
-      jobId: openJobId,
+      jobId: linkExistingJobId,
       created: false,
       linkedExisting: true,
       workOrderId: wo.workOrderId,
@@ -293,8 +306,8 @@ export async function createJobFromEstimate({
   const jobRes = await client.query<{ id: string }>(
     `INSERT INTO jobs
        (account_id, client_id, property_id, title, description,
-        status, job_type, booking_request_id, created_by)
-     VALUES ($1, $2, $3, $4, $5, 'quoted', 'custom', $6, $7)
+        status, job_type, booking_request_id, created_by, pricing_mode)
+     VALUES ($1, $2, $3, $4, $5, 'quoted', 'custom', $6, $7, $8)
      RETURNING id`,
     [
       accountId,
@@ -304,6 +317,7 @@ export async function createJobFromEstimate({
       description,
       est.booking_request_id ?? null,
       createdBy,
+      est.pricing_mode === "hourly_internal" ? "hourly_internal" : "flat_rate",
     ]
   );
   const jobId = jobRes.rows[0].id;
@@ -313,6 +327,7 @@ export async function createJobFromEstimate({
     jobId,
     estimateId,
   ]);
+  await backfillDepositJobId(client, accountId, estimateId, jobId);
 
   const wo = await promoteOrCreateWorkOrderFromEstimate({
     client,

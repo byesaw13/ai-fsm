@@ -111,7 +111,7 @@ function getAction(row: RequestRow): { label: string; href: string; detail: stri
       };
     case "schedule_assessment":
       return {
-        label: "Schedule Assessment",
+        label: "Book a look",
         href: `/app/requests/${row.id}`,
         detail: guidance.recommendedDetail,
       };
@@ -213,7 +213,7 @@ export default async function RequestsPage({ searchParams }: PageProps) {
     <PageContainer>
       <PageHeader
         title="Requests"
-        subtitle="Called → assessment → estimated → converted (or lost after 60 days idle)."
+        subtitle="Called → book a look → quoted → won (or lost after 60 days idle)."
         actions={<LinkButton href="/app/intake/new">New Request</LinkButton>}
       />
       <HubSubnav hub="Work" links={WORK_HUB_LINKS} pathname="/app/requests" />

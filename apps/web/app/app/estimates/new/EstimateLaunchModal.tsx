@@ -15,8 +15,9 @@ type PricingMode = "itemized" | "flat_rate" | "multi_option";
 
 /**
  * Resolve the form's pricing mode from the chosen entry mode.
- * An explicit override (e.g. a ?pricing_mode= URL param) always wins; otherwise
- * Quick → flat-rate (the common default) and Detailed/AI/T&M → itemized.
+ * An explicit presentation override always wins; otherwise
+ * Quick → one price and Detailed/AI/T&M → itemized.
+ * Commercial bid vs T&M is a separate field (`pricing_mode` on the estimate).
  */
 export function resolveEntryPricingMode(
   mode: EstimateMode,

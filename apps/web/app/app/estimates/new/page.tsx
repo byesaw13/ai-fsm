@@ -9,6 +9,7 @@ import { EstimateEntryShell } from "./EstimateEntryShell";
 import { buildWalkthroughScopeNotes } from "@/lib/estimates/walkthrough-prefill";
 import { loadAssessmentSummary } from "@/lib/estimates/assessment-summary-loader";
 import { buildJobTmBriefing } from "@/lib/estimates/job-tm-briefing";
+import { splitQuotePricingQuery } from "@/lib/estimates/commercial-pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,7 @@ interface PageProps {
     property_id?: string;
     vault_item_id?: string;
     from_visit?: string;
-    pricing_mode?: "itemized" | "flat_rate" | "multi_option";
+    pricing_mode?: string;
     /** Entry mode shortcut: quick | detailed | ai | tm */
     mode?: "quick" | "detailed" | "ai" | "tm";
     /** When "1", T&M path auto-runs generate after loading job notes */
@@ -91,6 +92,7 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
     from_assessment,
     visit_id,
   } = await searchParams;
+  const quotePricing = splitQuotePricingQuery(pricing_mode);
 
   // TASK-018 slice 2: when opened from an assessment, recover the canonical
   // summary from persistence so a refresh / deep-link (no sessionStorage) still
@@ -348,7 +350,8 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
         initialPropertyId={property_id ?? bookingRequestContext?.property_id ?? undefined}
         initialVaultItemId={vault_item_id}
         vaultItemContext={vaultItemContext}
-        initialPricingMode={pricing_mode}
+        initialPricingMode={quotePricing.presentation}
+        commercialPricingMode={quotePricing.commercial}
         initialMode={
           mode === "quick" || mode === "detailed" || mode === "ai" || mode === "tm"
             ? mode
