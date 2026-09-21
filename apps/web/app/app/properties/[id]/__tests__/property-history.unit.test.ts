@@ -13,6 +13,8 @@ import {
   NOTE_SOURCE_LABELS,
   DOCUMENT_TYPE_LABELS,
   ACTIVE_JOB_STATUSES_EXCLUDED,
+  houseHeading,
+  houseStartHere,
 } from "../property-history-helpers";
 import { eventHrefFor } from "../PropertyTimeline";
 import type { TimelineEvent } from "../PropertyTimeline";
@@ -62,6 +64,28 @@ describe("ACTIVE_JOB_STATUSES_EXCLUDED", () => {
 // ---------------------------------------------------------------------------
 // propertyActiveJobStatusColor
 // ---------------------------------------------------------------------------
+
+describe("houseHeading", () => {
+  it("uses the street address as the house name", () => {
+    expect(houseHeading(null, "4 Ash St")).toBe("4 Ash St");
+    expect(houseHeading("  ", "4 Ash St")).toBe("4 Ash St");
+  });
+  it("prefers a named house when one exists", () => {
+    expect(houseHeading("The Marinelli place", "4 Ash St")).toBe("The Marinelli place");
+  });
+});
+
+describe("houseStartHere", () => {
+  it("returns the coming-back first-up so the next tech does not walk the house", () => {
+    expect(houseStartHere({ firstUp: "Closet doors still in the truck.", nextVisitStart: null })).toBe(
+      "Closet doors still in the truck.",
+    );
+  });
+  it("is silent when nothing was left", () => {
+    expect(houseStartHere({ firstUp: "  ", nextVisitStart: "2026-09-22T12:00:00Z" })).toBeNull();
+    expect(houseStartHere({ firstUp: null, nextVisitStart: null })).toBeNull();
+  });
+});
 
 describe("propertyActiveJobStatusColor", () => {
   it("in_progress → blue", () => {

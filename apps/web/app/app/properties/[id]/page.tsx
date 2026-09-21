@@ -32,6 +32,8 @@ import {
   formatPropertyDate,
   NOTE_SOURCE_LABELS,
   DOCUMENT_TYPE_LABELS,
+  houseHeading,
+  houseStartHere,
 } from "./property-history-helpers";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +46,7 @@ type PropertyRow = {
   id: string;
   client_id: string;
   client_name: string;
+  client_phone: string | null;
   name: string | null;
   address: string;
   city: string | null;
@@ -65,6 +68,7 @@ type ActiveJobRow = {
   next_visit_id: string | null;
   next_visit_start: string | null;
   next_visit_status: string | null;
+  first_up: string | null;
 };
 
 type OpenEstimateRow = {
@@ -175,7 +179,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
   // Round 1: property summary (simplified — correlated subqueries removed).
   // Active work counts are derived from parallel queries in round 2.
   const property = await queryOne<PropertyRow>(
-    `SELECT p.*, c.name AS client_name,
+    `SELECT p.*, c.name AS client_name, c.phone AS client_phone,
             COUNT(DISTINCT j.id)::int AS job_count,
             COUNT(DISTINCT v.id) FILTER (WHERE v.status = 'completed')::int AS completed_visit_count
      FROM properties p
@@ -183,7 +187,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
      LEFT JOIN jobs j ON j.property_id = p.id AND j.account_id = p.account_id
      LEFT JOIN visits v ON v.job_id = j.id AND v.account_id = p.account_id
      WHERE p.id = $1 AND p.account_id = $2
-     GROUP BY p.id, c.name`,
+     GROUP BY p.id, c.name, c.phone`,
     [id, session.accountId]
   );
   if (!property) notFound();
@@ -215,10 +219,16 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
       `SELECT j.id, j.title, j.status,
               v.id AS next_visit_id,
               v.scheduled_start AS next_visit_start,
-              v.status AS next_visit_status
+              v.status AS next_visit_status,
+              v.first_up
        FROM jobs j
        LEFT JOIN LATERAL (
-         SELECT id, scheduled_start, status
+         SELECT id, scheduled_start, status,
+                (SELECT t.label FROM visit_tasks vt
+                   JOIN work_order_tasks t ON t.id = vt.task_id
+                  WHERE vt.visit_id = visits.id
+                    AND t.completed = false AND t.status <> 'done'
+                  ORDER BY t.sort_order ASC LIMIT 1) AS first_up
          FROM visits
          WHERE job_id = j.id AND status NOT IN ('completed','cancelled')
          ORDER BY scheduled_start ASC NULLS LAST
@@ -414,22 +424,28 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
             label: property.client_name ?? "Client",
           },
           {
-            label:
-              property.name?.trim() ||
-              formatPropertyAddress(property) ||
-              "Property",
+            label: houseHeading(property.name, property.address),
           },
         ]}
       />
       <PageHeader
-        title={property.name?.trim() || "Property"}
-        subtitle={formatPropertyAddress(property)}
+        title={houseHeading(property.name, property.address)}
+        subtitle={
+          property.name?.trim()
+            ? `${property.client_name} · ${formatPropertyAddress(property)}`
+            : property.client_name
+        }
         backHref="/app/properties"
-        backLabel="Properties"
+        backLabel="Houses"
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+            {property.client_phone ? (
+              <LinkButton href={`tel:${property.client_phone.replace(/\D/g, "")}`} variant="secondary" size="sm">
+                Call
+              </LinkButton>
+            ) : null}
             <LinkButton href={`/app/clients/${property.client_id}`} variant="secondary" size="sm">
-              Client
+              {property.client_name}
             </LinkButton>
             {canCreateEstimates(session.role) && (
               <LinkButton
@@ -437,7 +453,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                 variant="secondary"
                 size="sm"
               >
-                + Estimate
+                + Quote
               </LinkButton>
             )}
             {canTransitionJob(session.role) && (
@@ -447,7 +463,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                 size="sm"
                 data-testid="create-job-from-property-btn"
               >
-                + Project
+                + Job
               </LinkButton>
             )}
           </div>
@@ -457,17 +473,36 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
       <div className="p7-detail-layout" style={{ marginTop: "var(--space-4)" }}>
         <div className="p7-detail-primary">
 
+          {(() => {
+            const lead = activeJobs[0];
+            const startHere = lead ? houseStartHere({ firstUp: lead.first_up, nextVisitStart: lead.next_visit_start }) : null;
+            if (!startHere) return null;
+            return (
+              <Card data-testid="house-start-here">
+                <SectionHeader title="Start here" />
+                <p style={{ margin: 0, fontSize: "var(--text-base)", fontWeight: 600 }}>{startHere}</p>
+                {lead.next_visit_id ? (
+                  <div style={{ marginTop: "var(--space-3)" }}>
+                    <LinkButton href={`/app/visits/${lead.next_visit_id}`} variant="primary" size="sm">
+                      Open today
+                    </LinkButton>
+                  </div>
+                ) : null}
+              </Card>
+            );
+          })()}
+
           {/* ── Active Work ──────────────────────────────────────────────── */}
           <Card>
-              <SectionHeader title="Operations" count={activeWorkCount} />
+              <SectionHeader title="Open work" count={activeWorkCount} />
 
               {activeJobs.length > 0 && (
                 <div style={{ marginBottom: openEstimates.length > 0 || openInvoices.length > 0 ? "var(--space-3)" : 0 }}>
                   {activeJobs.slice(0, 2).map((job) => {
                     const color = propertyActiveJobStatusColor(job.status);
                     const nextLabel = job.next_visit_start
-                      ? `Next visit ${new Date(job.next_visit_start).toLocaleDateString([], { month: "short", day: "numeric" })}`
-                      : "No visit scheduled";
+                      ? `Next ${new Date(job.next_visit_start).toLocaleDateString([], { month: "short", day: "numeric" })}`
+                      : "No day scheduled";
                     return (
                       <ItemCard
                         key={job.id}
@@ -546,10 +581,13 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
             </Card>
           )}
 
-          {/* ── Full History ─────────────────────────────────────────────── */}
-          <Disclosure title="Full History" count={timelineEvents.length}>
-            <PropertyTimeline events={timelineEvents} />
-          </Disclosure>
+          {/* ── History ──────────────────────────────────────────────────── */}
+          {timelineEvents.length > 0 && (
+            <Card data-testid="house-timeline">
+              <SectionHeader title="History" count={timelineEvents.length} />
+              <PropertyTimeline events={timelineEvents} />
+            </Card>
+          )}
 
           {/* ── Property Health ──────────────────────────────────────────── */}
           {hasHealth && (

@@ -24,6 +24,48 @@ export function shouldShowCompletionRecord(status: string): boolean {
   return status === "completed";
 }
 
+export type VisitFieldKind = "standard" | "site_visit" | "membership" | "repair";
+
+export function visitFieldKind(input: {
+  visitType: string;
+  isRepairFlow: boolean;
+  isMembershipVisit: boolean;
+}): VisitFieldKind {
+  if (input.visitType === "site_visit") return "site_visit";
+  if (input.isMembershipVisit) return "membership";
+  if (input.isRepairFlow) return "repair";
+  return "standard";
+}
+
+export type VisitPanel =
+  | "briefing"
+  | "day_tasks"
+  | "actions"
+  | "notes"
+  | "materials"
+  | "complete"
+  | "production_story"
+  | "property_context"
+  | "membership"
+  | "assessment"
+  | "repair_issue"
+  | "walkthrough_checklist"
+  | "snapshot"
+  | "follow_up"
+  | "closing_checklist";
+
+/** Default = on-site. More = specialist modules the contractor does not need every day. */
+export function visitPanelSlot(panel: VisitPanel, kind: VisitFieldKind): "default" | "more" {
+  const alwaysDefault: VisitPanel[] = ["briefing", "day_tasks", "actions", "notes", "materials", "complete"];
+  if (alwaysDefault.includes(panel)) return "default";
+  if (panel === "repair_issue") return kind === "repair" ? "default" : "more";
+  if (panel === "assessment") return kind === "site_visit" ? "default" : "more";
+  if (panel === "membership" || panel === "walkthrough_checklist") {
+    return kind === "membership" ? "default" : "more";
+  }
+  return "more";
+}
+
 export const ISSUE_SEVERITY_COLORS: Record<string, { fg: string; bg: string }> = {
   minor:    { fg: "#6b7280", bg: "#f3f4f6" },
   moderate: { fg: "#d97706", bg: "#fef3c7" },

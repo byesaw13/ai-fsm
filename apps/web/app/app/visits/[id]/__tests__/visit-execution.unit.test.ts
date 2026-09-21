@@ -16,6 +16,8 @@ import {
   shouldShowCompletionRecord,
   formatContextDate,
   buildEstimateUrl,
+  visitFieldKind,
+  visitPanelSlot,
 } from "../visit-execution-helpers";
 
 // ---------------------------------------------------------------------------
@@ -65,6 +67,58 @@ describe("active + terminal union = all DB statuses", () => {
 // ---------------------------------------------------------------------------
 // shouldShowPropertyContext
 // ---------------------------------------------------------------------------
+
+describe("visitFieldKind", () => {
+  it("is standard for a normal work day", () => {
+    expect(
+      visitFieldKind({ visitType: "standard", isRepairFlow: false, isMembershipVisit: false }),
+    ).toBe("standard");
+  });
+  it("is site_visit for a walkthrough", () => {
+    expect(
+      visitFieldKind({ visitType: "site_visit", isRepairFlow: false, isMembershipVisit: false }),
+    ).toBe("site_visit");
+  });
+  it("is membership when the visit is a membership day", () => {
+    expect(
+      visitFieldKind({ visitType: "standard", isRepairFlow: false, isMembershipVisit: true }),
+    ).toBe("membership");
+  });
+  it("is repair when the job is a repair flow", () => {
+    expect(
+      visitFieldKind({ visitType: "standard", isRepairFlow: true, isMembershipVisit: false }),
+    ).toBe("repair");
+  });
+});
+
+describe("visitPanelSlot", () => {
+  it("keeps briefing, notes, materials, and complete on the default field surface", () => {
+    for (const kind of ["standard", "repair", "site_visit", "membership"] as const) {
+      expect(visitPanelSlot("briefing", kind)).toBe("default");
+      expect(visitPanelSlot("notes", kind)).toBe("default");
+      expect(visitPanelSlot("materials", kind)).toBe("default");
+      expect(visitPanelSlot("complete", kind)).toBe("default");
+    }
+  });
+  it("puts production story, snapshot, and follow-up behind More", () => {
+    expect(visitPanelSlot("production_story", "standard")).toBe("more");
+    expect(visitPanelSlot("snapshot", "standard")).toBe("more");
+    expect(visitPanelSlot("follow_up", "standard")).toBe("more");
+    expect(visitPanelSlot("property_context", "standard")).toBe("more");
+  });
+  it("keeps repair issue on the default surface for repair days only", () => {
+    expect(visitPanelSlot("repair_issue", "repair")).toBe("default");
+    expect(visitPanelSlot("repair_issue", "standard")).toBe("more");
+  });
+  it("keeps assessment on the default surface for site visits only", () => {
+    expect(visitPanelSlot("assessment", "site_visit")).toBe("default");
+    expect(visitPanelSlot("assessment", "standard")).toBe("more");
+  });
+  it("keeps membership on the default surface for membership days only", () => {
+    expect(visitPanelSlot("membership", "membership")).toBe("default");
+    expect(visitPanelSlot("membership", "standard")).toBe("more");
+  });
+});
 
 describe("shouldShowPropertyContext", () => {
   it("returns true for scheduled (tech preparing for visit)", () => {

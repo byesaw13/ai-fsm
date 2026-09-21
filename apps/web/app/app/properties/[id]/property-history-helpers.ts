@@ -22,6 +22,23 @@ export function formatPropertyDate(iso: string): string {
   return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 }
 
+/** Street address is the house. A nickname wins when someone named it. */
+export function houseHeading(name: string | null | undefined, address: string): string {
+  const named = name?.trim();
+  if (named) return named;
+  const street = address.trim();
+  return street || "House";
+}
+
+/** Coming-back note the next person should see before they walk the house. */
+export function houseStartHere(input: {
+  firstUp: string | null | undefined;
+  nextVisitStart?: string | null;
+}): string | null {
+  const firstUp = input.firstUp?.trim();
+  return firstUp ? firstUp : null;
+}
+
 export const NOTE_SOURCE_LABELS: Record<string, string> = {
   owner:      "Owner",
   technician: "Tech",
