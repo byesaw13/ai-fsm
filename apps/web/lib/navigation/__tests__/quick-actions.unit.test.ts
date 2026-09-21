@@ -34,11 +34,11 @@ describe("quick actions", () => {
     expect(FIELD_QUICK_ACTIONS.some((a) => a.href === "/app/capture")).toBe(false);
   });
 
-  it("puts Quick job first on My Day (TASK-119 launch point)", () => {
-    expect(FIELD_QUICK_ACTIONS[0]).toMatchObject({
-      label: "Quick job",
-      action: "quick-book",
-    });
+  it("Today strip is Job, Receipt, Quote — nothing else", () => {
+    expect(FIELD_QUICK_ACTIONS.map((a) => a.label)).toEqual(["Job", "Receipt", "Quote"]);
+    expect(FIELD_QUICK_ACTIONS[0]).toMatchObject({ action: "quick-book" });
+    expect(FIELD_QUICK_ACTIONS[1].href).toBe("/app/expenses/new");
+    expect(FIELD_QUICK_ACTIONS[2].href).toMatch(/^\/app\/estimates/);
   });
 
   it("exposes Quick job on the global FAB (TASK-119 launch point)", () => {

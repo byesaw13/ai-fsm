@@ -1,17 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { StartMyDayWizard } from "./StartMyDayWizard";
 import { DayStatusPill } from "./DayStatusPill";
 import { NextVisitHero } from "./NextVisitHero";
 import { FieldQuickActions } from "./FieldQuickActions";
-import { ClockBar } from "../ClockBar";
 import { FieldRightNowCard } from "../my-work/FieldRightNowCard";
-import { SitePresenceCard } from "@/components/field/SitePresenceCard";
 import { PushPermissionPrompt } from "@/components/push/PushPermissionPrompt";
-import { isDaySetupComplete, type DaySetupState } from "@/lib/my-day/day-setup";
-import type { HeroVisit } from "@/lib/my-day/visit-hero";
+import { useToast } from "@/components/ui";
+import { isDaySetupComplete, startDayMode, type DaySetupState } from "@/lib/my-day/day-setup";
+import { shouldShowVisitHero, type HeroVisit } from "@/lib/my-day/visit-hero";
+import { pickStartVehicle } from "@/lib/mileage/start-day";
 import type { OpenSession, VehicleOption } from "@/lib/my-work/field-day-types";
 import type { ActivityEntryDto } from "@/lib/my-work/field-day-types";
 import type { DayMileageSummary } from "@/lib/mileage/sessions";
@@ -23,6 +24,7 @@ export function MyDayMobileLayout({
   dayMileage,
   heroVisit,
   clockedIn,
+  hasParkProposal = false,
   canCapture = false,
   canQuickBook = false,
   children,
@@ -33,52 +35,116 @@ export function MyDayMobileLayout({
   dayMileage: DayMileageSummary;
   heroVisit: HeroVisit | null;
   clockedIn: boolean;
+  hasParkProposal?: boolean;
   canCapture?: boolean;
   canQuickBook?: boolean;
   children: React.ReactNode;
 }) {
+  const router = useRouter();
+  const toast = useToast();
   const [wizardOpen, setWizardOpen] = useState(false);
   const [vehicleStepDone, setVehicleStepDone] = useState(!!openSession);
+  const [starting, setStarting] = useState(false);
   const setup: DaySetupState = {
     clockedIn,
     hasOpenSession: !!openSession,
     vehicleReady: !!openSession || vehicleStepDone,
   };
   const complete = isDaySetupComplete(setup);
-  const partial = !complete && clockedIn;
+  const defaultVehicle = useMemo(() => pickStartVehicle(vehicles), [vehicles]);
+  const mode = startDayMode({
+    clockedIn,
+    hasOpenSession: !!openSession,
+    hasVehicle: !!defaultVehicle,
+    lastOdometer: defaultVehicle?.current_odometer ?? null,
+  });
+  const showHero = !!heroVisit && shouldShowVisitHero({ hasParkProposal });
+
+  async function oneTapStart() {
+    setStarting(true);
+    try {
+      if (!clockedIn) {
+        const clock = await fetch("/api/v1/time-clock/clock-in", { method: "POST" });
+        if (!clock.ok) {
+          const json = await clock.json().catch(() => ({}));
+          toast.error(json.error?.message ?? "Could not clock in");
+          setWizardOpen(true);
+          return;
+        }
+      }
+      const vehicle = pickStartVehicle(vehicles);
+      const odo = vehicle?.current_odometer;
+      if (!vehicle || odo == null) {
+        setWizardOpen(true);
+        return;
+      }
+      const session = await fetch("/api/v1/sessions/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vehicle_id: vehicle.id, start_odometer: odo }),
+      });
+      if (!session.ok) {
+        setWizardOpen(true);
+        return;
+      }
+      window.dispatchEvent(new Event("ops:refresh"));
+      router.refresh();
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  function onStartDay() {
+    if (mode === "one_tap") {
+      void oneTapStart();
+      return;
+    }
+    setWizardOpen(true);
+  }
 
   return (
     <>
-      {/* Next visit first when present so Navigate / Call / Open stay above the
-          fixed bottom nav without scrolling (QA ISSUE-005). */}
-      {heroVisit && (
+      {showHero && heroVisit ? (
         <div style={{ marginBottom: "var(--space-4)" }}>
           <NextVisitHero visit={heroVisit} />
         </div>
-      )}
+      ) : null}
 
       <PushPermissionPrompt enabled={!!canCapture} />
 
       {!complete ? (
         <div className="p7-field-hero" style={{ marginBottom: "var(--space-4)" }}>
-          <div className="p7-field-hero__kicker">Home · My Day</div>
+          <div className="p7-field-hero__kicker">Today</div>
           <div className="p7-field-hero__title">
-            {partial ? "Finish starting your day" : "Start your day"}
+            {mode === "odometer" ? "Enter today’s miles" : "Start your day"}
           </div>
           <p className="p7-field-hero__meta" style={{ margin: 0 }}>
-            {partial
-              ? "Clock, vehicle, and mileage — confirm what’s left."
-              : "One flow: clock in, pick the truck, start mileage."}
+            {mode === "one_tap"
+              ? `${defaultVehicle?.nickname ?? "Truck"} · ${defaultVehicle?.current_odometer?.toLocaleString()} mi`
+              : mode === "odometer"
+                ? "One number. Then you’re tracking."
+                : "Clock in, pick the truck, start mileage."}
           </p>
           <div className="p7-field-hero__actions">
             <button
               type="button"
               data-testid="start-my-day-button"
               className="p7-field-hero__primary"
-              onClick={() => setWizardOpen(true)}
+              disabled={starting}
+              onClick={onStartDay}
             >
-              {partial ? "Continue My Day" : "Start My Day"}
+              {starting ? "…" : mode === "one_tap" ? "Start day" : "Start My Day"}
             </button>
+            {mode === "one_tap" ? (
+              <button
+                type="button"
+                data-testid="start-day-more"
+                className="p7-field-hero__secondary"
+                onClick={() => setWizardOpen(true)}
+              >
+                Different truck
+              </button>
+            ) : null}
           </div>
         </div>
       ) : (
@@ -92,9 +158,17 @@ export function MyDayMobileLayout({
         </div>
       )}
 
-      {clockedIn && (
+      {complete ? (
         <>
-          <ClockBar />
+          <div style={{ marginBottom: "var(--space-4)" }}>
+            <FieldRightNowCard
+              openSession={openSession}
+              vehicles={vehicles}
+              activityEntries={activityEntries}
+              milesToday={dayMileage.totalMiles}
+              onStartMileage={() => setWizardOpen(true)}
+            />
+          </div>
           <Link
             href="/app/day-review"
             data-testid="end-my-day-button"
@@ -110,20 +184,10 @@ export function MyDayMobileLayout({
               gap: "var(--space-2)",
             }}
           >
-            End My Day
+            End day
           </Link>
-          <SitePresenceCard />
-          <div style={{ marginBottom: "var(--space-4)" }}>
-            <FieldRightNowCard
-              openSession={openSession}
-              vehicles={vehicles}
-              activityEntries={activityEntries}
-              milesToday={dayMileage.totalMiles}
-              onStartMileage={() => setWizardOpen(true)}
-            />
-          </div>
         </>
-      )}
+      ) : null}
 
       <StartMyDayWizard
         open={wizardOpen}
@@ -134,7 +198,7 @@ export function MyDayMobileLayout({
       />
 
       <div style={{ marginBottom: "var(--space-6)" }}>
-        <FieldQuickActions showCapture={canCapture} canQuickBook={canQuickBook} />
+        <FieldQuickActions canQuickBook={canQuickBook} />
       </div>
 
       {children}

@@ -439,7 +439,7 @@ export function selectArrivalNextAction(input: {
   alreadyOnSiteWork: boolean;
   /**
    * Still on site (open stop / null departure). When false, confirm is historical
-   * labeling only — do not promise "Start job work" (switch_activity stays off).
+   * labeling only — do not promise "Start this job" (switch_activity stays off).
    */
   stillOnSite?: boolean;
 }): ArrivalNextAction {
@@ -470,7 +470,7 @@ export function selectArrivalNextAction(input: {
       input.activityType === "admin");
   return {
     show: true,
-    primaryLabel: startingJob ? "Start job work" : "Confirm arrival",
+    primaryLabel: startingJob ? "Start this job" : "Confirm arrival",
     suppressReason: null,
   };
 }
