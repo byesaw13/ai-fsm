@@ -5,11 +5,17 @@ describe("day-setup", () => {
   it("complete when all three true", () => {
     expect(isDaySetupComplete({ clockedIn: true, hasOpenSession: true, vehicleReady: true })).toBe(true);
   });
-  it("incomplete when clock missing", () => {
-    expect(isDaySetupComplete({ clockedIn: false, hasOpenSession: true, vehicleReady: true })).toBe(false);
+  it("complete when the van is already on, even without a cashier clock-in", () => {
+    expect(isDaySetupComplete({ clockedIn: false, hasOpenSession: true, vehicleReady: true })).toBe(true);
+  });
+  it("incomplete when the van session is not open", () => {
+    expect(isDaySetupComplete({ clockedIn: true, hasOpenSession: false, vehicleReady: true })).toBe(false);
   });
   it("next step is clock first", () => {
     expect(nextIncompleteStep({ clockedIn: false, hasOpenSession: false, vehicleReady: false })).toBe("clock");
+  });
+  it("skips cashier clock-in when the van session is already open", () => {
+    expect(nextIncompleteStep({ clockedIn: false, hasOpenSession: true, vehicleReady: true })).toBeNull();
   });
   it("next step is vehicle when clocked in", () => {
     expect(nextIncompleteStep({ clockedIn: true, hasOpenSession: false, vehicleReady: false })).toBe("vehicle");
@@ -27,6 +33,16 @@ describe("startDayMode", () => {
     expect(
       startDayMode({
         clockedIn: true,
+        hasOpenSession: true,
+        hasVehicle: true,
+        lastOdometer: 48210,
+      }),
+    ).toBe("done");
+  });
+  it("is done when the van is already on even if payroll clock has not refreshed", () => {
+    expect(
+      startDayMode({
+        clockedIn: false,
         hasOpenSession: true,
         hasVehicle: true,
         lastOdometer: 48210,

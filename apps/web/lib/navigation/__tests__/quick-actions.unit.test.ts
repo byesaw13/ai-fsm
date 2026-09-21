@@ -35,6 +35,13 @@ describe("quick actions", () => {
     expect(FIELD_QUICK_ACTIONS.some((a) => a.href === "/app/capture")).toBe(false);
   });
 
+  it("labels the clients destination People, not Clients", () => {
+    expect(OWNER_QUICK_ACTIONS.some((a) => a.href === "/app/clients" && a.label === "People")).toBe(
+      true,
+    );
+    expect(OWNER_QUICK_ACTIONS.map((a) => a.label)).not.toContain("Clients");
+  });
+
   it("Today strip is Job, Receipt, Quote — nothing else", () => {
     expect(FIELD_QUICK_ACTIONS.map((a) => a.label)).toEqual(["Job", "Receipt", "Quote"]);
     expect(FIELD_QUICK_ACTIONS[0]).toMatchObject({ action: "quick-book" });

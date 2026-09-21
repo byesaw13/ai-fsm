@@ -109,7 +109,7 @@ export function MyDayMobileLayout({
     <>
       {showHero && heroVisit ? (
         <div style={{ marginBottom: "var(--space-4)" }}>
-          <NextVisitHero visit={heroVisit} />
+          <NextVisitHero visit={heroVisit} canSend={canCapture} />
         </div>
       ) : null}
 

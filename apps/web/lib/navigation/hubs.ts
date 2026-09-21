@@ -3,6 +3,8 @@
  * Sidebar owns destinations; list pages use these for in-page hub chips (T1).
  */
 
+import { UI } from "@/lib/vocabulary";
+
 export type HubLink = {
   href: string;
   label: string;
@@ -10,16 +12,15 @@ export type HubLink = {
 
 export const WORK_HUB_LINKS: HubLink[] = [
   { href: "/app/requests", label: "Requests" },
-  { href: "/app/estimates", label: "Quotes" },
-  { href: "/app/jobs", label: "Jobs" },
-  // Work orders are reached inside a Job, not from the hub.
+  { href: "/app/estimates", label: UI.quotes },
+  { href: "/app/jobs", label: UI.jobs },
+  // Work orders and visits are internal packets, not hub nouns.
   { href: "/app/schedule", label: "Schedule" },
-  { href: "/app/visits", label: "Visits" },
 ];
 
 export const PEOPLE_HUB_LINKS: HubLink[] = [
-  { href: "/app/clients", label: "Clients" },
-  { href: "/app/properties", label: "Houses" },
+  { href: "/app/clients", label: UI.people },
+  { href: "/app/properties", label: UI.houses },
 ];
 
 export const MONEY_HUB_LINKS: HubLink[] = [

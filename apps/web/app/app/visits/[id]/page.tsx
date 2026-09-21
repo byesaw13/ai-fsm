@@ -7,6 +7,7 @@ import {
   canAssignVisit,
   canUpdateVisitNotes,
   canUpdateChecklist,
+  canSendInvoices,
 } from "@/lib/auth/permissions";
 import {
   getVaultCollectionStep,
@@ -910,6 +911,7 @@ export default async function VisitDetailPage({
                 canComplete={canTransition}
                 closePhotosItemId={closePhotosItemId}
                 isQuickJob={isQuickJob}
+                canSend={canSendInvoices(session.role)}
               />
             </Card>
           )}

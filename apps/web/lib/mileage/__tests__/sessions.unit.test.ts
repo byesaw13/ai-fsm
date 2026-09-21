@@ -8,6 +8,7 @@ import {
   isSuspiciousMiles,
   lastCheckpointOdometer,
   lastKnownOdometer,
+  startOpenVehicleSession,
   summarizeDayMileage,
   validateStartOdometer,
   type VehicleSessionRow,
@@ -119,6 +120,25 @@ describe("lastKnownOdometer — per-vehicle history", () => {
   it("returns null for a vehicle with no sessions", async () => {
     const client = mockClient([{ last_known: null }]);
     expect(await lastKnownOdometer(client, "acct", "veh")).toBeNull();
+  });
+});
+
+describe("startOpenVehicleSession", () => {
+  it("inserts an open session at the known start odometer", async () => {
+    const client = mockClient([{ id: "sess-1" }]);
+    const row = await startOpenVehicleSession(client, {
+      accountId: "acct",
+      userId: "user",
+      vehicleId: "veh-ram",
+      sessionDate: "2026-09-21",
+      startOdometer: 48210,
+      notes: "Bluetooth vehicle connect",
+    });
+    expect(row).toEqual({ id: "sess-1" });
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining("INSERT INTO vehicle_sessions"),
+      ["acct", "veh-ram", "2026-09-21", 48210, "Bluetooth vehicle connect", "user"],
+    );
   });
 });
 

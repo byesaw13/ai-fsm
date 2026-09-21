@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { depositVsSpendGuide } from "@/lib/guide/next-move";
 
 interface Props {
   invoiceId: string;
@@ -142,6 +143,14 @@ export function RecordPaymentForm({ invoiceId, remainingCents }: Props) {
               </option>
             ))}
           </select>
+          {paymentType === "deposit" ? (
+            <p style={{ margin: "8px 0 0", fontSize: 14 }} data-testid="deposit-spend-guide">
+              {(() => {
+                const guide = depositVsSpendGuide();
+                return `${guide.move} ${guide.why}`;
+              })()}
+            </p>
+          ) : null}
         </div>
 
         <div className="form-group">

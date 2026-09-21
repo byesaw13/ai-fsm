@@ -206,6 +206,7 @@ export function JobsToday({ jobs, readOnly = false }: { jobs: CommandVisit[]; re
           visitId={closeoutVisitId}
           open
           onClose={() => setCloseoutVisitId(null)}
+          canSend
         />
       ) : null}
     </>

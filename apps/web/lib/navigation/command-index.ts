@@ -32,13 +32,13 @@ const DESTINATIONS: CommandItem[] = [
     label: l.label,
     href: l.href,
     keywords: l.label.toLowerCase(),
-    roles: l.href === "/app/visits" ? ALL : OWNER_ADMIN,
+    roles: OWNER_ADMIN,
   })),
   ...PEOPLE_HUB_LINKS.map((l) => ({
     id: `people-${l.href}`,
     label: l.label,
     href: l.href,
-    keywords: l.label.toLowerCase(),
+    keywords: `${l.label.toLowerCase()} clients`,
     roles: OWNER_ADMIN,
   })),
   ...MONEY_HUB_LINKS.map((l) => ({

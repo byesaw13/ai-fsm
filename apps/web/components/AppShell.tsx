@@ -23,7 +23,6 @@ import {
   IconClients,
   IconInvoices,
   IconReports,
-  IconVisits,
   IconSchedule,
   IconDayReview,
   IconField,
@@ -81,7 +80,7 @@ const NAV_CAPTURE:    NavItem = { href: "/app/capture",      label: "Capture",  
 const NAV_DAY_REVIEW: NavItem = { href: "/app/day-review",   label: "Day Review", Icon: IconDayReview };
 const NAV_TRACKING:   NavItem = { href: "/app/timeline",     label: "Tracking",   Icon: IconField };
 const NAV_REQUESTS:   NavItem = { href: "/app/requests",     label: "Requests",   Icon: IconInbox };
-const NAV_CLIENTS:    NavItem = { href: "/app/clients",      label: "Clients",    Icon: IconClients,   adminOnly: true };
+const NAV_CLIENTS:    NavItem = { href: "/app/clients",      label: "People",     Icon: IconClients,   adminOnly: true };
 const NAV_PROPS:      NavItem = { href: "/app/properties",   label: "Houses",     Icon: IconProperties, adminOnly: true };
 const NAV_ESTIMATES:  NavItem = { href: "/app/estimates",    label: "Quotes",     Icon: IconEstimates, adminOnly: true };
 const NAV_JOBS:       NavItem = { href: "/app/jobs",         label: "Jobs",       Icon: IconJobs,       adminOnly: true };
@@ -112,9 +111,9 @@ function buildHubSections(home: NavItem): NavSection[] {
 /** Returns filtered nav sections for a given role and active workspace view. */
 export function getNavSections(role: Role, view: "office" | "field" = "field"): NavSection[] {
   if (role === "tech") {
+    // Today + Day Review. Visit kitchen stays on Now (More), not a Visits tab.
     const myDay: NavItem = { href: "/app/my-work", label: "Today", Icon: IconMyDay };
-    const visits: NavItem = { href: "/app/visits", label: "Visits", Icon: IconVisits };
-    return [{ label: "", items: [myDay, visits, NAV_DAY_REVIEW] }];
+    return [{ label: "", items: [myDay, NAV_DAY_REVIEW] }];
   }
 
   // EPIC-006 Phase 5: pure admins never see the field home.
@@ -131,13 +130,12 @@ export function getNavSections(role: Role, view: "office" | "field" = "field"): 
 /**
  * Mobile bottom tab shortcuts. Owner: Today / Jobs / People / Money;
  * Admin: Desk / Jobs / People / Money. AppShell adds More as the 5th slot.
- * Tech: Today + Visits.
+ * Tech: Today + Day Review. Visit kitchen is on Now (More), not a tab.
  */
 export function getBottomNavItems(role: Role): NavItem[] {
   if (role === "tech") {
     const myDay: NavItem = { href: "/app/my-work", label: "Today", Icon: IconMyDay };
-    const visits: NavItem = { href: "/app/visits", label: "Visits", Icon: IconVisits };
-    return [myDay, visits];
+    return [myDay, NAV_DAY_REVIEW];
   }
 
   const home: NavItem =

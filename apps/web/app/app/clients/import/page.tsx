@@ -17,7 +17,7 @@ export default async function ClientImportPage() {
         title="Import Clients from CSV"
         subtitle="Upload a Square customer export or any CSV with client data."
         backHref="/app/clients"
-        backLabel="Clients"
+        backLabel="People"
       />
       <ClientImportForm />
     </PageContainer>

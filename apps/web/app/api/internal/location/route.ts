@@ -33,6 +33,12 @@ import {
   type PropertyGeo,
 } from "@/lib/field/stop-proximity";
 import { stampLivePromptedAt } from "@/lib/field/stamp-live-prompted";
+import {
+  applyCompanyDayOnConnect,
+  locationEventDropReason,
+  shouldStartCompanyDayOnEvent,
+} from "@/lib/my-day/van-start-day";
+import { formatBusinessYmd } from "@/lib/time/business-tz";
 
 export const dynamic = "force-dynamic";
 
@@ -132,9 +138,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
   }
 
-  // Privacy gating (TASK-046): only capture when tracking is enabled, not
-  // paused, and an active Start-Day workday session exists for the event's date.
-  // Otherwise drop the event entirely — nothing is stored off-workday.
+  // Privacy gating (TASK-046): drop when tracking is off or paused. GPS still
+  // needs an open workday session; vehicle_connect may start that session.
   const gate = await queryOne<{ enabled: boolean; paused: boolean; active_session: boolean }>(
     `SELECT a.location_tracking_enabled AS enabled,
             (a.location_paused_until IS NOT NULL AND a.location_paused_until > now()) AS paused,
@@ -147,10 +152,12 @@ export async function POST(req: NextRequest) {
      FROM accounts a WHERE a.id = $1`,
     [accountId, occurredAt],
   );
-  const ignored = !gate?.enabled ? "tracking_disabled"
-    : gate.paused ? "paused"
-    : !gate.active_session ? "no_active_workday"
-    : null;
+  const ignored = locationEventDropReason({
+    enabled: gate?.enabled === true,
+    paused: gate?.paused === true,
+    activeSession: gate?.active_session === true,
+    kind: data.kind,
+  });
   if (ignored) {
     logger.info("location event dropped by privacy gate", { traceId, reason: ignored });
     return NextResponse.json({ ok: true, ignored });
@@ -219,6 +226,32 @@ export async function POST(req: NextRequest) {
         [accountId, data.vehicle_bluetooth],
       );
       resolvedVehicleId = veh[0]?.id ?? null;
+    }
+
+    // Bluetooth connect IS Start day: clock the mapped person in and open a
+    // mileage session when last odometer is known. Skip (don't crash ingest)
+    // when the HA person cannot be mapped. Disconnect never closes the day.
+    if (shouldStartCompanyDayOnEvent(data.kind)) {
+      const connectUserId = resolveLocationPersonUserId(
+        data.person ?? data.device_id ?? null,
+        loadLocationPersonMap(),
+      );
+      if (connectUserId) {
+        await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [connectUserId]);
+        await client.query("SAVEPOINT van_start_day");
+        try {
+          await applyCompanyDayOnConnect(client, {
+            accountId,
+            userId: connectUserId,
+            vehicleId: resolvedVehicleId,
+            sessionDate: formatBusinessYmd(occurredAt),
+          });
+          await client.query("RELEASE SAVEPOINT van_start_day");
+        } catch (err) {
+          await client.query("ROLLBACK TO SAVEPOINT van_start_day");
+          logger.error("location ingest: van start-day failed", err as Error, { traceId });
+        }
+      }
     }
 
     // 2. Currently-open segment (locked) → reducer.

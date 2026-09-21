@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Modal, Textarea, useToast } from "@/components/ui";
+import { closeoutHoldSendCopy, comingBackStartHereGuide } from "@/lib/guide/next-move";
 
 type Kind = "done" | "return";
 type NextWhen = "tomorrow" | "date" | "unsure";
@@ -12,12 +13,15 @@ export function CloseoutWizard({
   open,
   onClose,
   onBeforeSubmit,
+  canSend = false,
 }: {
   visitId: string;
   open: boolean;
   onClose: () => void;
   /** e.g. save completion packet before closeout */
   onBeforeSubmit?: () => Promise<boolean>;
+  /** Owner/admin Send. Tech files; owner Send stays explicit. Default off. */
+  canSend?: boolean;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -42,6 +46,9 @@ export function CloseoutWizard({
     onClose();
   }
 
+  const holdSend = closeoutHoldSendCopy(canSend);
+  const returnGuide = comingBackStartHereGuide();
+
   async function submit(sendBill = false) {
     if (!kind) return;
     const today_notes = notes.trim();
@@ -50,7 +57,7 @@ export function CloseoutWizard({
       return;
     }
     if (kind === "return" && !firstUp.trim()) {
-      toast.error("What’s first when you get here is required");
+      toast.error(returnGuide.move);
       return;
     }
     if (kind === "return" && nextWhen === "date" && !nextDate) {
@@ -69,7 +76,7 @@ export function CloseoutWizard({
         body: JSON.stringify({
           kind,
           today_notes,
-          ...(kind === "done" ? { send_invoice: sendBill } : {}),
+          ...(kind === "done" ? { send_invoice: sendBill && canSend } : {}),
           ...(kind === "return"
             ? {
                 next_when: nextWhen,
@@ -87,7 +94,7 @@ export function CloseoutWizard({
       const invoiceId = json.data?.invoice_id as string | undefined;
       reset();
       onClose();
-      if (kind === "done" && invoiceId && sendBill) {
+      if (kind === "done" && invoiceId && sendBill && canSend) {
         const sent = await fetch(`/api/v1/invoices/${invoiceId}/send`, { method: "POST" });
         if (sent.ok) {
           toast.success("Bill sent");
@@ -183,30 +190,40 @@ export function CloseoutWizard({
                     data-testid="closeout-first-up"
                     placeholder="Paint the bedroom. Closet doors still in the truck."
                   />
+                  <p style={{ margin: "8px 0 0", color: "var(--fg-muted)", fontSize: 14 }}>
+                    {returnGuide.move} {returnGuide.why}
+                  </p>
                 </label>
               </>
             ) : null}
 
             {kind === "done" ? (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  loading={pending}
-                  onClick={() => void submit(false)}
-                  data-testid="closeout-hold"
-                >
-                  Hold bill
-                </Button>
-                <Button
-                  type="button"
-                  variant="primary"
-                  loading={pending}
-                  onClick={() => void submit(true)}
-                  data-testid="closeout-send"
-                >
-                  Send bill
-                </Button>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: 14 }} data-testid="closeout-send-why">
+                  {holdSend.sendLabel ? `${holdSend.sendLabel}. ${holdSend.why}` : holdSend.why}
+                </p>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    loading={pending}
+                    onClick={() => void submit(false)}
+                    data-testid="closeout-hold"
+                  >
+                    {holdSend.holdLabel}
+                  </Button>
+                  {holdSend.sendLabel ? (
+                    <Button
+                      type="button"
+                      variant="primary"
+                      loading={pending}
+                      onClick={() => void submit(true)}
+                      data-testid="closeout-send"
+                    >
+                      {holdSend.sendLabel}
+                    </Button>
+                  ) : null}
+                </div>
               </div>
             ) : (
               <Button
