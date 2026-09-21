@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isDumpExpense,
   laborDescriptionFromVisitNotes,
+  quotedWorkNeedsPhoto,
   visitCloseoutBodySchema,
 } from "../visit-closeout";
 
@@ -79,5 +80,27 @@ describe("visitCloseoutBodySchema", () => {
       today_notes: "Paint prep",
     });
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe("quotedWorkNeedsPhoto", () => {
+  it("requires a photo on quoted bid work", () => {
+    expect(quotedWorkNeedsPhoto({ pricingMode: "flat_rate", isQuickJobExempt: false })).toBe(true);
+  });
+
+  it("requires a photo on quoted T&M (not a driveway quick job)", () => {
+    expect(
+      quotedWorkNeedsPhoto({ pricingMode: "hourly_internal", isQuickJobExempt: false }),
+    ).toBe(true);
+  });
+
+  it("skips the photo gate for a driveway quick job", () => {
+    expect(
+      quotedWorkNeedsPhoto({ pricingMode: "hourly_internal", isQuickJobExempt: true }),
+    ).toBe(false);
+  });
+
+  it("requires a photo when the lane is unknown and it is not a quick job", () => {
+    expect(quotedWorkNeedsPhoto({ pricingMode: null, isQuickJobExempt: false })).toBe(true);
   });
 });

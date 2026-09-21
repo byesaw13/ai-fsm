@@ -23,6 +23,8 @@ interface CompletionChecklistProps {
   closePhotosItemId?: string;
   /** No-estimate (quick-book) jobs skip photo/signature to complete. */
   isQuickJob?: boolean;
+  /** Owner/admin Send. Tech files; owner Send stays explicit. */
+  canSend?: boolean;
 }
 
 type CompletionPhotoEntry = {
@@ -52,6 +54,7 @@ export function CompletionChecklist({
   canComplete,
   closePhotosItemId,
   isQuickJob = false,
+  canSend = true,
 }: CompletionChecklistProps) {
   const router = useRouter();
   const toast = useToast();
@@ -537,6 +540,7 @@ export function CompletionChecklist({
         open={closeoutOpen}
         onClose={() => setCloseoutOpen(false)}
         onBeforeSubmit={savePacket}
+        canSend={canSend}
       />
     </div>
   );

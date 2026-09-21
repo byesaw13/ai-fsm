@@ -1,6 +1,8 @@
 // Pure helper functions for the Property History page.
 // Isolated here so tests can import without touching Next.js server components.
 
+import { comingBackStartHereGuide, sendVsHoldGuide } from "@/lib/guide/next-move";
+
 // Real DB job status values. Pipeline stage names are derived — not stored.
 export const ACTIVE_JOB_STATUSES_EXCLUDED = ["completed", "invoiced", "cancelled"] as const;
 
@@ -48,13 +50,14 @@ export const NOTE_SOURCE_LABELS: Record<string, string> = {
 export type HouseWhatsNext = {
   title: string;
   detail: string;
+  why: string;
   href: string;
   action: string;
 };
 
 /**
  * One next move at the house. Priority: do the work, send the bill,
- * follow the quote, assign a covering tech.
+ * follow the quote, assign a covering tech, write start-here.
  */
 export function houseWhatsNext(input: {
   startHere: string | null;
@@ -69,38 +72,57 @@ export function houseWhatsNext(input: {
     return {
       title: "Start here",
       detail: input.startHere,
+      why: input.startHere,
       href: input.nextVisitHref ?? `/app/visits/${input.nextVisitId}`,
       action: "Open today",
     };
   }
   if (input.unsentBillId) {
+    const guide = sendVsHoldGuide();
     return {
       title: "Send the bill",
-      detail: "Work is filed. The bill is still on Hold.",
+      detail: guide.why,
+      why: guide.why,
       href: `/app/invoices/${input.unsentBillId}`,
       action: "Open bill",
     };
   }
   if (input.openQuoteId) {
+    const detail = "A quote is out. The house is waiting on a yes.";
     return {
       title: "Follow up the quote",
-      detail: "A quote is out. The house is waiting on a yes.",
+      detail,
+      why: detail,
       href: `/app/estimates/${input.openQuoteId}`,
       action: "Open quote",
     };
   }
   if (input.nextVisitId && !input.nextVisitAssigned) {
+    const detail = "A day is on the calendar with nobody on Today.";
     return {
       title: "Assign covering tech",
-      detail: "A day is on the calendar with nobody on Today.",
+      detail,
+      why: detail,
       href: input.assignHref ?? `/app/visits/${input.nextVisitId}`,
       action: "Assign",
     };
   }
+  if (input.nextVisitId && !input.startHere) {
+    const guide = comingBackStartHereGuide();
+    return {
+      title: guide.move,
+      detail: guide.why,
+      why: guide.why,
+      href: input.nextVisitHref ?? `/app/visits/${input.nextVisitId}`,
+      action: "Write it",
+    };
+  }
   if (input.nextVisitId) {
+    const detail = "The covering tech has Today.";
     return {
       title: "Next day is set",
-      detail: "The covering tech has Today.",
+      detail,
+      why: detail,
       href: input.nextVisitHref ?? `/app/visits/${input.nextVisitId}`,
       action: "Open visit",
     };

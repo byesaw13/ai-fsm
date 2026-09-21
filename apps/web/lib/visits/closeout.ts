@@ -3,6 +3,7 @@ import {
   checkSchedulingPreconditions,
   FIELD_ACTIVE_VISIT_STATUSES,
   laborDescriptionFromVisitNotes,
+  quotedWorkNeedsPhoto,
   visitTransitions,
   type VisitCloseoutBody,
   type VisitStatus,
@@ -72,16 +73,19 @@ async function completeVisitRow(
     membership_visit_phase: string | null;
     membership_snapshot_sent_at: string | null;
     has_estimate: boolean;
+    pricing_mode: string | null;
   }>(
     `SELECT v.id, v.status, v.job_id, v.work_order_id, v.assigned_user_id, v.visit_type,
             v.generated_from_plan_id, v.membership_visit_phase, v.membership_snapshot_sent_at,
             EXISTS(
               SELECT 1 FROM estimates e
               WHERE e.job_id = v.job_id AND e.account_id = v.account_id
-            ) AS has_estimate
+            ) AS has_estimate,
+            j.pricing_mode
      FROM visits v
+     LEFT JOIN jobs j ON j.id = v.job_id AND j.account_id = v.account_id
      WHERE v.id = $1 AND v.account_id = $2
-     FOR UPDATE`,
+     FOR UPDATE OF v`,
     [visitId, session.accountId],
   );
   const visit = existing.rows[0];
@@ -139,8 +143,12 @@ async function completeVisitRow(
     work_order_id: visit.work_order_id,
     has_estimate: visit.has_estimate,
   });
+  const needsPhoto = quotedWorkNeedsPhoto({
+    pricingMode: visit.pricing_mode,
+    isQuickJobExempt: exempt,
+  });
   const guard = checkCompletionPacket(packetResult.rows[0] ?? null, {
-    requirePhoto: !exempt,
+    requirePhoto: needsPhoto,
     requireSignature: !exempt,
   });
   if (!guard.ok) {
