@@ -424,7 +424,7 @@ describe("selectArrivalNextAction", () => {
     expect(r.suppressReason).toBe("already_on_site_work");
   });
 
-  it("offers Start job work when traveling / idle and still on site", () => {
+  it("offers Start this job when traveling / idle and still on site", () => {
     const r = selectArrivalNextAction({
       hasProposal: true,
       confidenceScore: 90,
@@ -434,10 +434,10 @@ describe("selectArrivalNextAction", () => {
       stillOnSite: true,
     });
     expect(r.show).toBe(true);
-    expect(r.primaryLabel).toBe("Start job work");
+    expect(r.primaryLabel).toBe("Start this job");
   });
 
-  it("does not promise Start job work for closed (departed) proposals", () => {
+  it("does not promise Start this job for closed (departed) proposals", () => {
     const r = selectArrivalNextAction({
       hasProposal: true,
       confidenceScore: 90,

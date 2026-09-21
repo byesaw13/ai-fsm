@@ -9,6 +9,7 @@ import {
   buildMapsUrl,
   buildTelUrl,
   heroPrimaryAction,
+  heroPrimaryLabel,
   type HeroVisit,
 } from "@/lib/my-day/visit-hero";
 import { formatBusinessTime } from "@/lib/time/business-tz";
@@ -39,9 +40,8 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
   const telUrl = buildTelUrl(visit.client_phone);
   const action = heroPrimaryAction(visit.status);
   const activeOnSite = visit.status === "arrived" || visit.status === "in_progress";
-  const kicker = activeOnSite ? "Right now" : "Next visit";
-  const primaryLabel =
-    action === "start" ? "I'm here" : action === "complete" ? "Complete visit" : null;
+  const kicker = activeOnSite ? "Right now" : "Next";
+  const primaryLabel = heroPrimaryLabel(visit.status);
 
   async function handlePrimary() {
     if (!action) return;
@@ -58,7 +58,7 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
       toast.error(err);
       return;
     }
-    toast.success("Arrived on site");
+    toast.success("Job started");
     router.refresh();
   }
 
@@ -121,26 +121,6 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
         </div>
       </div>
 
-      {activeOnSite && (
-        <div className="p7-field-hero__tools">
-          {[
-            { label: "Photos", icon: "📸" },
-            { label: "Checklist", icon: "✅" },
-            { label: "Parts", icon: "🔩" },
-            { label: "Notes", icon: "📝" },
-          ].map((tool) => (
-            <Link
-              key={tool.label}
-              href={`/app/visits/${visit.id}` as Route}
-              className="p7-field-hero__tool"
-            >
-              <span style={{ fontSize: "var(--text-lg)" }}>{tool.icon}</span>
-              {tool.label}
-            </Link>
-          ))}
-        </div>
-      )}
-
       <Link
         href={`/app/visits/${visit.id}` as Route}
         className="p7-field-hero__meta"
@@ -152,7 +132,7 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
           textDecoration: "none",
         }}
       >
-        Open visit →
+        Open →
       </Link>
       <CloseoutWizard visitId={visit.id} open={closeoutOpen} onClose={() => setCloseoutOpen(false)} />
     </div>

@@ -37,7 +37,12 @@ test.describe("My Day mobile", () => {
     if (!(await startBtn.isVisible())) {
       test.skip();
     }
-    await startBtn.click();
+    const more = page.getByTestId("start-day-more");
+    if (await more.isVisible()) {
+      await more.click();
+    } else {
+      await startBtn.click();
+    }
     const wizard = page.getByTestId("start-my-day-wizard");
     await expect(wizard).toBeVisible();
     await expect(wizard.getByRole("button", { name: "Clock in" })).toBeVisible();
@@ -48,7 +53,7 @@ test.describe("My Day mobile", () => {
   test("quick actions grid visible", async ({ page }) => {
     await page.goto(`${BASE}/app/my-work`);
     await expect(page.getByTestId("field-quick-actions")).toBeVisible();
-    await expect(page.getByText("New Estimate")).toBeVisible();
+    await expect(page.getByText("Quote")).toBeVisible();
   });
 
   test("field right now visible when clocked in", async ({ page }) => {

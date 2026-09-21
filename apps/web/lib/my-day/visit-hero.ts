@@ -49,6 +49,18 @@ export function heroPrimaryAction(status: string): "start" | "complete" | null {
   return null;
 }
 
+export function heroPrimaryLabel(status: string): string | null {
+  const action = heroPrimaryAction(status);
+  if (action === "start") return "Start this job";
+  if (action === "complete") return "Complete";
+  return null;
+}
+
+/** GPS park confirm is the one arrival question — do not stack a second hero. */
+export function shouldShowVisitHero(input: { hasParkProposal: boolean }): boolean {
+  return !input.hasParkProposal;
+}
+
 export function excludeHeroVisit<T extends { id: string }>(visits: T[], heroId: string | null): T[] {
   if (!heroId) return visits;
   return visits.filter((v) => v.id !== heroId);

@@ -168,20 +168,13 @@ export function NowBar({
         data-ops-clocked-in={opsSummary ? String(opsSummary.clockedIn) : undefined}
         data-ops-transitions={opsSummary ? opsSummary.transitions.join(",") : undefined}
       >
-        {opsSummary && (
+        {opsSummary ? (
           <span
             data-testid="ops-state-hint"
-            style={{
-              fontSize: "var(--text-xs)",
-              fontWeight: 600,
-              letterSpacing: "0.04em",
-              textTransform: "uppercase",
-              color: hasActive ? "rgba(255,255,255,0.65)" : "var(--fg-muted)",
-            }}
-          >
-            {opsSummary.clockedIn ? "Payroll clock on" : "Payroll clock off"}
-          </span>
-        )}
+            data-ops-clocked-in={String(opsSummary.clockedIn)}
+            hidden
+          />
+        ) : null}
         {hasActive && meta && displayStartedAt ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
             <span style={{ fontSize: "var(--text-xs)", textTransform: "uppercase", letterSpacing: "0.06em", color: "rgba(255, 255, 255, 0.7)", fontWeight: 700 }}>

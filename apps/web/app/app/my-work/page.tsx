@@ -153,7 +153,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
   return (
     <PageContainer>
       <PageHeader
-        title="My Day"
+        title="Today"
         subtitle={`${greeting} — ${statusLabel}`}
         actions={
           isTech ? (
@@ -220,6 +220,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
         dayMileage={fieldDay.dayMileage}
         heroVisit={heroVisit}
         clockedIn={fieldDay.clockedIn}
+        hasParkProposal={proposals.length > 0}
         canCapture={isOwner}
         canQuickBook={isOwner}
       >

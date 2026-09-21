@@ -31,17 +31,13 @@ export const OWNER_QUICK_ACTIONS: QuickAction[] = [
 ];
 
 /**
- * Field My Day (`/app/my-work`) quick actions. Rendered for technicians as well
- * as owners, so it intentionally omits owner/admin-only vehicle tracking.
+ * Today (`/app/my-work`) capture strip. Three intents: driveway job, receipt
+ * on the current house, quote. Everything else is a drawer on the desk.
  */
 export const FIELD_QUICK_ACTIONS: QuickAction[] = [
-  { label: "Quick job", href: "/app/my-work", icon: "🧰", action: "quick-book" },
-  { label: "New Estimate", href: "/app/estimates", icon: "📝" },
-  { label: "Quick Materials", href: "/app/materials/quick", icon: "📦" },
-  { label: "New Project", href: "/app/jobs", icon: "🛠️" },
-  { label: "Add Expense", href: "/app/expenses/new", icon: "🛒" },
-  { label: "Upload Receipt", href: "/app/expenses/new", icon: "🧾" },
-  { label: "New Request", href: "/app/intake/new", icon: "⚡" },
+  { label: "Job", href: "/app/my-work", icon: "🧰", action: "quick-book" },
+  { label: "Receipt", href: "/app/expenses/new", icon: "🧾" },
+  { label: "Quote", href: "/app/estimates/new", icon: "📝" },
 ];
 
 /** Global + sheet (owner/admin). Quick job opens the same modal as My Day / Schedule. */
