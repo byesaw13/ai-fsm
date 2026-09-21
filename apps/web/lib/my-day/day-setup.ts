@@ -6,11 +6,13 @@ export type DaySetupState = {
   vehicleReady: boolean;
 };
 
+/** Van session is the timesheet — no cashier clock-in once the van is on. */
 export function isDaySetupComplete(state: DaySetupState): boolean {
-  return state.clockedIn && state.hasOpenSession && state.vehicleReady;
+  return state.hasOpenSession && state.vehicleReady;
 }
 
 export function nextIncompleteStep(state: DaySetupState): DaySetupStep | null {
+  if (state.hasOpenSession && state.vehicleReady) return null;
   if (!state.clockedIn) return "clock";
   if (!state.vehicleReady) return "vehicle";
   if (!state.hasOpenSession) return "mileage";
@@ -26,7 +28,7 @@ export function startDayMode(input: {
   hasVehicle: boolean;
   lastOdometer: number | null;
 }): StartDayMode {
-  if (input.clockedIn && input.hasOpenSession) return "done";
+  if (input.hasOpenSession) return "done";
   if (!input.hasVehicle) return "wizard";
   if (input.lastOdometer == null || !Number.isInteger(input.lastOdometer) || input.lastOdometer < 0) {
     return "odometer";

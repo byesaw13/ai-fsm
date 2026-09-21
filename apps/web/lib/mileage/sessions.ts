@@ -64,6 +64,37 @@ export async function findOpenSessionForVehicle(
   return rows[0] ?? null;
 }
 
+export type StartOpenVehicleSessionOpts = {
+  accountId: string;
+  userId: string;
+  vehicleId: string;
+  sessionDate: string;
+  startOdometer: number;
+  notes?: string | null;
+};
+
+/** Open a mileage session at a known start odometer. Caller must already hold the tx. */
+export async function startOpenVehicleSession(
+  client: PoolClient,
+  opts: StartOpenVehicleSessionOpts,
+): Promise<{ id: string }> {
+  const { rows } = await client.query<{ id: string }>(
+    `INSERT INTO vehicle_sessions
+       (account_id, vehicle_id, session_date, start_odometer, end_odometer, miles, notes, started_at, created_by, status)
+     VALUES ($1, $2, $3::date, $4, NULL, NULL, $5, now(), $6, 'open')
+     RETURNING id`,
+    [
+      opts.accountId,
+      opts.vehicleId,
+      opts.sessionDate,
+      opts.startOdometer,
+      opts.notes ?? null,
+      opts.userId,
+    ],
+  );
+  return rows[0];
+}
+
 /**
  * A proposed start_odometer must be >= the vehicle's last known reading, unless
  * the caller is running an explicit correction flow.
