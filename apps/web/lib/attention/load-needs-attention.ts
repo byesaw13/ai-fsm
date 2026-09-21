@@ -9,6 +9,7 @@ import {
   type OpenOwnerPromiseRow,
 } from "@/lib/captures/promise-queue";
 import { loadCloseoutLeftovers } from "@/lib/attention/closeout-leftovers";
+import { HOLD_SEND_BILL_LABEL } from "@/lib/attention/surfaces";
 
 export type NeedsAttentionItem = {
   label: string;
@@ -178,10 +179,10 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
   const items = (
     [
       {
-        label: "Finished, no invoice",
+        label: HOLD_SEND_BILL_LABEL,
         count: leftovers.finishedUnbilled,
         href: "/app/invoices?status=draft" as Route,
-        detail: "Jobs closed or marked done without an invoice",
+        detail: "Work is filed. The bill is still on Hold — send it.",
         tone: "danger",
       },
       {

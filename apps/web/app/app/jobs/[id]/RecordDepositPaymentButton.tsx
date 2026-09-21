@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui";
+import { depositVsSpendGuide } from "@/lib/guide/next-move";
 
 /** Record a payment on a sent deposit invoice (does not PATCH deposit_paid_at). */
 export function RecordDepositPaymentButton({
@@ -43,14 +44,20 @@ export function RecordDepositPaymentButton({
     }
   }
 
+  const guide = depositVsSpendGuide();
   return (
-    <button
-      className="p7-btn p7-btn-secondary p7-btn-sm"
-      onClick={handleClick}
-      disabled={pending}
-      data-testid="record-deposit-payment-btn"
-    >
-      {pending ? "Saving…" : `Mark $${(amountCents / 100).toFixed(2)} received`}
-    </button>
+    <span style={{ display: "inline-flex", flexDirection: "column", gap: 4 }}>
+      <button
+        className="p7-btn p7-btn-secondary p7-btn-sm"
+        onClick={handleClick}
+        disabled={pending}
+        data-testid="record-deposit-payment-btn"
+      >
+        {pending ? "Saving…" : `Mark $${(amountCents / 100).toFixed(2)} received`}
+      </button>
+      <span style={{ fontSize: 13, color: "var(--fg-muted)" }} data-testid="deposit-spend-guide">
+        {guide.move} {guide.why}
+      </span>
+    </span>
   );
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withRole } from "@/lib/auth/middleware";
+import { canSendInvoices } from "@/lib/auth/permissions";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
@@ -14,6 +15,19 @@ export const dynamic = "force-dynamic";
 
 export const POST = withRole(["owner", "admin"], async (request, session) => {
   const id = request.nextUrl.pathname.split("/").at(-2)!;
+
+  if (!canSendInvoices(session.role)) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "FORBIDDEN",
+          message: "The office sends bills. Field files the work.",
+          traceId: session.traceId,
+        },
+      },
+      { status: 403 },
+    );
+  }
 
   try {
     const result = await withInvoiceContext(session, async (client) => {

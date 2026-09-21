@@ -23,6 +23,15 @@ export function isDumpExpense(input: {
   return false;
 }
 
+/** Quoted / brand work cannot file empty. Driveway quick jobs can. */
+export function quotedWorkNeedsPhoto(input: {
+  pricingMode?: string | null;
+  isQuickJobExempt: boolean;
+}): boolean {
+  // pricingMode is the commercial lane (bid vs T&M). Driveway skip is isQuickJobExempt.
+  return !input.isQuickJobExempt;
+}
+
 /** Stack completed-visit day logs into one labor description (oldest first). */
 export function laborDescriptionFromVisitNotes(
   notes: Array<string | null | undefined>,

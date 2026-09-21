@@ -111,6 +111,20 @@ describe("houseWhatsNext", () => {
     });
     expect(next?.title).toBe("Send the bill");
     expect(next?.href).toBe("/app/invoices/inv1");
+    expect(next?.why).toBe("People pay what they still remember.");
+  });
+
+  it("asks to write start-here when coming back with no first thing for Thursday", () => {
+    const next = houseWhatsNext({
+      startHere: null,
+      nextVisitId: "v3",
+      nextVisitAssigned: true,
+      unsentBillId: null,
+      openQuoteId: null,
+    });
+    expect(next?.title).toBe("Write the first thing Thursday’s person should do.");
+    expect(next?.why).toBeTruthy();
+    expect(next?.href).toBe("/app/visits/v3");
   });
 
   it("asks to assign a covering tech when a day is set with nobody on Today", () => {

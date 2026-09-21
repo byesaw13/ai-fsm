@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { VisitStatus } from "@ai-fsm/domain";
+import type { Role, VisitStatus } from "@ai-fsm/domain";
 import { Button, useToast } from "@/components/ui";
 import { CloseoutWizard } from "@/components/visits/CloseoutWizard";
+import { canSendInvoices } from "@/lib/auth/permissions";
 import type { ButtonVariant } from "@/components/ui";
 
 interface Props {
@@ -135,7 +136,12 @@ export function VisitTransitionForm({
           {loading ? "Updating…" : action.label}
         </Button>
       </div>
-      <CloseoutWizard visitId={visitId} open={closeoutOpen} onClose={() => setCloseoutOpen(false)} />
+      <CloseoutWizard
+        visitId={visitId}
+        open={closeoutOpen}
+        onClose={() => setCloseoutOpen(false)}
+        canSend={canSendInvoices(role as Role)}
+      />
       </>
     );
   }
@@ -167,7 +173,12 @@ export function VisitTransitionForm({
         >
           Cancel Visit
         </Button>
-        <CloseoutWizard visitId={visitId} open={closeoutOpen} onClose={() => setCloseoutOpen(false)} />
+        <CloseoutWizard
+          visitId={visitId}
+          open={closeoutOpen}
+          onClose={() => setCloseoutOpen(false)}
+          canSend={canSendInvoices(role as Role)}
+        />
       </div>
     );
   }
