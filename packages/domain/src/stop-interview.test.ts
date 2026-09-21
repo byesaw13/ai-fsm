@@ -6,6 +6,7 @@ import {
   stopCreatesJob,
   stopReasonOptions,
   stopRequiresNotes,
+  shouldSkipNightStopInterview,
 } from "./stop-interview";
 
 describe("stop interview (TASK-145)", () => {
@@ -34,6 +35,30 @@ describe("stop interview (TASK-145)", () => {
   it("pickup is not a bill and does not create a job", () => {
     expect(stopCreatesJob("pickup")).toBe(false);
     expect(stopRequiresNotes("pickup")).toBe(false);
+  });
+
+  it("skips night cards for a house already filed Done today", () => {
+    expect(
+      shouldSkipNightStopInterview({
+        answeredReason: null,
+        propertyId: "prop-ash",
+        closedOutPropertyIds: new Set(["prop-ash"]),
+      }),
+    ).toBe(true);
+    expect(
+      shouldSkipNightStopInterview({
+        answeredReason: null,
+        propertyId: "prop-ash",
+        closedOutPropertyIds: new Set(),
+      }),
+    ).toBe(false);
+    expect(
+      shouldSkipNightStopInterview({
+        answeredReason: "job_work",
+        propertyId: "prop-other",
+        closedOutPropertyIds: new Set(),
+      }),
+    ).toBe(true);
   });
 
   it("unknown address without a property cannot start new work", () => {

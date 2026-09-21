@@ -80,3 +80,14 @@ export function stopCreatesJob(reason: StopReason): boolean {
 export function stopIsBillable(reason: StopReason): boolean {
   return reason === "job_work" || reason === "new_work";
 }
+
+/** Night leftover skip: already answered, or this house was filed Done today. */
+export function shouldSkipNightStopInterview(input: {
+  answeredReason: string | null;
+  propertyId: string | null;
+  closedOutPropertyIds: ReadonlySet<string>;
+}): boolean {
+  if (input.answeredReason) return true;
+  if (input.propertyId && input.closedOutPropertyIds.has(input.propertyId)) return true;
+  return false;
+}

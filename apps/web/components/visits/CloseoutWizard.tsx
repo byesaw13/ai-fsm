@@ -42,7 +42,7 @@ export function CloseoutWizard({
     onClose();
   }
 
-  async function submit() {
+  async function submit(sendBill = false) {
     if (!kind) return;
     const today_notes = notes.trim();
     if (!today_notes) {
@@ -69,6 +69,7 @@ export function CloseoutWizard({
         body: JSON.stringify({
           kind,
           today_notes,
+          ...(kind === "done" ? { send_invoice: sendBill } : {}),
           ...(kind === "return"
             ? {
                 next_when: nextWhen,
@@ -86,12 +87,20 @@ export function CloseoutWizard({
       const invoiceId = json.data?.invoice_id as string | undefined;
       reset();
       onClose();
-      if (kind === "done" && invoiceId) {
-        toast.success("Draft invoice ready");
-        router.push(`/app/invoices/${invoiceId}?deliver=1`);
-        return;
+      if (kind === "done" && invoiceId && sendBill) {
+        const sent = await fetch(`/api/v1/invoices/${invoiceId}/send`, { method: "POST" });
+        if (sent.ok) {
+          toast.success("Bill sent");
+        } else {
+          toast.success("Draft ready — send from the bill");
+          router.push(`/app/invoices/${invoiceId}?deliver=1` as never);
+          return;
+        }
+      } else if (kind === "done" && invoiceId) {
+        toast.success("Bill held as draft");
+      } else {
+        toast.success(kind === "done" ? "Job closed" : "Day logged — coming back");
       }
-      toast.success(kind === "done" ? "Job closed" : "Day logged — coming back");
       router.refresh();
     } catch {
       toast.error("Could not close out");
@@ -178,15 +187,38 @@ export function CloseoutWizard({
               </>
             ) : null}
 
-            <Button
-              type="button"
-              variant="primary"
-              loading={pending}
-              onClick={() => void submit()}
-              data-testid="closeout-submit"
-            >
-              {kind === "done" ? "Close and draft invoice" : "Save and come back"}
-            </Button>
+            {kind === "done" ? (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={pending}
+                  onClick={() => void submit(false)}
+                  data-testid="closeout-hold"
+                >
+                  Hold bill
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  loading={pending}
+                  onClick={() => void submit(true)}
+                  data-testid="closeout-send"
+                >
+                  Send bill
+                </Button>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="primary"
+                loading={pending}
+                onClick={() => void submit(false)}
+                data-testid="closeout-submit"
+              >
+                Save and come back
+              </Button>
+            )}
           </>
         ) : null}
       </div>
