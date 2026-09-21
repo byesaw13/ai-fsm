@@ -265,7 +265,7 @@ export default async function InvoiceDetailPage({
       )}
       <Breadcrumbs
         items={[
-          { href: "/app/invoices", label: "Invoices" },
+          { href: "/app/invoices", label: "Bills" },
           ...(invoice.client_id
             ? [
                 {
@@ -278,7 +278,7 @@ export default async function InvoiceDetailPage({
             ? [
                 {
                   href: `/app/jobs/${invoice.job_id}`,
-                  label: invoice.job_title ?? "Project",
+                  label: invoice.job_title ?? "Job",
                 },
               ]
             : []),
@@ -289,7 +289,7 @@ export default async function InvoiceDetailPage({
         title={invoice.invoice_number}
         subtitle={invoice.client_name ?? undefined}
         backHref="/app/invoices"
-        backLabel="Invoices"
+        backLabel="Bills"
         actions={
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
             <CopyPortalLinkButton

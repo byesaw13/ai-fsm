@@ -44,7 +44,7 @@ test.describe("Estimates smoke — admin role", () => {
 
   test("admin sees Estimates page with create button", async ({ page }) => {
     await page.goto(`${BASE}/app/estimates`);
-    await expect(page.locator("h1")).toContainText("Estimates");
+    await expect(page.locator("h1")).toContainText("Quotes");
     await expect(
       page.locator('[data-testid="create-estimate-btn"]')
     ).toBeVisible();
@@ -71,7 +71,7 @@ test.describe("Estimates smoke — admin role", () => {
     await page.goto(`${BASE}/app/estimates`);
     await page.click('[data-testid="create-estimate-btn"]');
     await page.waitForURL(`${BASE}/app/estimates/new`);
-    await expect(page.locator("h1")).toContainText("New Estimate");
+    await expect(page.locator("h1")).toContainText("New Quote");
   });
 
   test("admin can create an estimate and see it in detail", async ({

@@ -471,10 +471,10 @@ export default async function VisitDetailPage({
             : [
                 ...(visit.job_id
                   ? [
-                      { href: "/app/jobs", label: "Projects" },
+                      { href: "/app/jobs", label: "Jobs" },
                       {
                         href: `/app/jobs/${visit.job_id}`,
-                        label: visit.job_title ?? "Project",
+                        label: visit.job_title ?? "Job",
                       },
                     ]
                   : [{ href: "/app/visits", label: "Visits" }]),

@@ -10,20 +10,20 @@ export type HubLink = {
 
 export const WORK_HUB_LINKS: HubLink[] = [
   { href: "/app/requests", label: "Requests" },
-  { href: "/app/estimates", label: "Estimates" },
-  { href: "/app/jobs", label: "Projects" },
-  // TASK-125: Work Orders dropped from the hub — reached inside a Project.
+  { href: "/app/estimates", label: "Quotes" },
+  { href: "/app/jobs", label: "Jobs" },
+  // Work orders are reached inside a Job, not from the hub.
   { href: "/app/schedule", label: "Schedule" },
   { href: "/app/visits", label: "Visits" },
 ];
 
 export const PEOPLE_HUB_LINKS: HubLink[] = [
   { href: "/app/clients", label: "Clients" },
-  { href: "/app/properties", label: "Properties" },
+  { href: "/app/properties", label: "Houses" },
 ];
 
 export const MONEY_HUB_LINKS: HubLink[] = [
-  { href: "/app/invoices", label: "Invoices" },
+  { href: "/app/invoices", label: "Bills" },
   { href: "/app/expenses", label: "Expenses" },
   { href: "/app/mileage", label: "Mileage" },
   { href: "/app/materials", label: "Materials" },

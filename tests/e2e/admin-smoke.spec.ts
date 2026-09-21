@@ -23,9 +23,9 @@ test.describe("Admin smoke — jobs and visits", () => {
     await page.waitForURL(/\/app(?:\/my-work)?$/);
   });
 
-  test("admin sees Projects page with create button", async ({ page }) => {
+  test("admin sees Jobs page with create button", async ({ page }) => {
     await page.goto(`${BASE}/app/jobs`);
-    await expect(page.locator("h1")).toContainText("Projects");
+    await expect(page.locator("h1")).toContainText("Jobs");
     // Admin sees the create job button
     await expect(page.locator('[data-testid="create-job-btn"]')).toBeVisible();
   });
@@ -33,7 +33,7 @@ test.describe("Admin smoke — jobs and visits", () => {
   test("admin nav shows core business links", async ({ page }) => {
     await page.goto(`${BASE}/app/jobs`);
     await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Clients' })).toBeVisible();
-    await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Estimates' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Quotes' })).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link', { name: 'Settings' })).toBeVisible();
   });
 

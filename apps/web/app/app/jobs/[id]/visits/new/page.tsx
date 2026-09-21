@@ -84,7 +84,7 @@ export default async function NewVisitPage({
   const backHref = initialWorkOrderId
     ? `/app/work-orders/${initialWorkOrderId}`
     : `/app/jobs/${id}`;
-  const backLabel = initialWorkOrderId ? "Work Order" : (job.title ?? "Project");
+  const backLabel = initialWorkOrderId ? "Work Order" : (job.title ?? "Job");
 
   const resolvedIntent =
     intent === "assessment" || visit_type === "site_visit"

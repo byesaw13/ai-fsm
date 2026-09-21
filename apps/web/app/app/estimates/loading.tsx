@@ -4,7 +4,7 @@ export default function EstimatesLoading() {
   return (
     <PageContainer>
       <PageHeader
-        title="Estimates"
+        title="Quotes"
         subtitle="Loading estimates…"
         actions={<Skeleton width="96px" height="36px" />}
       />

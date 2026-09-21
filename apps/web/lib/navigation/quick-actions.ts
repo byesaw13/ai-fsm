@@ -21,11 +21,11 @@ export interface QuickAction {
 /** Owner Dashboard (`/app`) quick actions. */
 export const OWNER_QUICK_ACTIONS: QuickAction[] = [
   { label: "Capture", href: "/app/capture", icon: "🎙️" },
-  { label: "New Estimate", href: "/app/estimates", icon: "📝" },
+  { label: "New Quote", href: "/app/estimates", icon: "📝" },
   { label: "Quick Materials", href: "/app/materials/quick", icon: "📦" },
-  { label: "New Project", href: "/app/jobs", icon: "🛠️" },
+  { label: "New Job", href: "/app/jobs", icon: "🛠️" },
   { label: "Schedule", href: "/app/schedule", icon: "📅" },
-  { label: "Invoices", href: "/app/invoices", icon: "🧾" },
+  { label: "Bills", href: "/app/invoices", icon: "🧾" },
   { label: "Clients", href: "/app/clients", icon: "👥" },
   { label: "New Request", href: "/app/intake/new", icon: "⚡" },
 ];
@@ -50,9 +50,9 @@ export function fieldReceiptHref(jobId: string | null | undefined): string {
 export const FAB_QUICK_ACTIONS: QuickAction[] = [
   { label: "Capture", href: "/app/capture", icon: "🎙️" },
   { label: "Quick job", href: "/app/my-work", icon: "🧰", action: "quick-book" },
-  { label: "Quick Estimate", href: "/app/estimates/quick", icon: "⚡" },
-  { label: "New Invoice", href: "/app/invoices/new", icon: "💵" },
-  { label: "New Project", href: "/app/jobs/new", icon: "🧰" },
+  { label: "Quick Quote", href: "/app/estimates/quick", icon: "⚡" },
+  { label: "New Bill", href: "/app/invoices/new", icon: "💵" },
+  { label: "New Job", href: "/app/jobs/new", icon: "🧰" },
   { label: "New Request", href: "/app/intake/new", icon: "📋" },
   { label: "Material Run", href: "/app/expenses/new?mode=run", icon: "🧾" },
   { label: "Log Mileage", href: "/app/mileage/new", icon: "🚗" },

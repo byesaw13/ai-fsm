@@ -71,7 +71,7 @@ export function EstimateLaunchModal({ onSelect }: EstimateLaunchModalProps) {
     }}>
       <div style={{ textAlign: "center", marginBottom: "var(--space-2)" }}>
         <h2 style={{ margin: "0 0 var(--space-1)", fontSize: "var(--text-xl)", fontWeight: 700 }}>
-          New Estimate
+          New Quote
         </h2>
         <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
           How would you like to build this estimate?

@@ -153,7 +153,7 @@ export default async function EstimatePrintPage({
   const documentFilename = buildClientDocumentFilename({
     date: estimate.sent_at ?? estimate.created_at,
     clientName: estimate.client_name,
-    jobType: estimate.job_title ?? "Project",
+    jobType: estimate.job_title ?? "Job",
     documentType: "estimate",
     status: estimate.status === "declined" || estimate.status === "expired" ? "archived" : estimate.status,
   });

@@ -215,7 +215,7 @@ export function ReceiptReviewClient() {
                 )}
 
                 <select
-                  aria-label="Project"
+                  aria-label="Job"
                   value={chosen}
                   onChange={(e) =>
                     setManualJob((m) => ({ ...m, [item.id]: e.target.value }))

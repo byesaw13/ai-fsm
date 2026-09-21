@@ -176,7 +176,7 @@ export function StartMyDayWizard({
         className="p7-field-sheet"
       >
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-3)" }}>
-          <h2 style={{ margin: 0, fontSize: "var(--text-xl)", fontWeight: 800 }}>Start My Day</h2>
+          <h2 style={{ margin: 0, fontSize: "var(--text-xl)", fontWeight: 800 }}>Start day</h2>
           <button
             type="button"
             onClick={onClose}

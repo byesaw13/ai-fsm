@@ -465,7 +465,7 @@ export function DocumentClientLocationCard({
           {locationMode === "job" && (
             <Select
               id="doc-location-job"
-              label="Project"
+              label="Job"
               value={selectedJobId}
               onChange={(e) => setSelectedJobId(e.target.value)}
               placeholder="Select a project"

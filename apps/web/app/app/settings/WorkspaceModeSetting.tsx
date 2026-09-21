@@ -24,7 +24,7 @@ function clearCookie(name: string) {
 
 const OPTIONS: { key: Choice; label: string; desc: string }[] = [
   { key: "auto", label: "Auto (by device)", desc: "Phone → Field · Tablet/computer → Office" },
-  { key: "field", label: "Field", desc: "Always do the work — My Day, visits, mileage" },
+  { key: "field", label: "Field", desc: "Always do the work — Today, visits, mileage" },
   { key: "office", label: "Office", desc: "Always run the business — dashboard, money, schedule" },
 ];
 

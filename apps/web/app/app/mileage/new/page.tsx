@@ -24,7 +24,7 @@ interface Suggestion {
 }
 
 const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
-  job:          "Project",
+  job:          "Job",
   visit:        "Visit / Walkthrough",
   estimate:     "Estimate",
   supplier_run: "Supplier Run",

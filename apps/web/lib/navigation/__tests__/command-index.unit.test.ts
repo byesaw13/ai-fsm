@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { COMMAND_INDEX, filterCommands } from "../command-index";
 
 describe("command index", () => {
-  it("exposes My Day, Overview, and Tracking for the owner", () => {
+  it("exposes Today, Desk, and Tracking for the owner", () => {
     const labels = filterCommands("", "owner").map((c) => c.label);
-    expect(labels).toEqual(expect.arrayContaining(["My Day", "Overview", "Tracking", "Projects", "Invoices"]));
+    expect(labels).toEqual(expect.arrayContaining(["Today", "Desk", "Tracking", "Jobs", "Bills"]));
   });
 
   it("hides office destinations from techs", () => {

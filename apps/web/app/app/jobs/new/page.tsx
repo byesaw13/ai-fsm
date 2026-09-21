@@ -44,7 +44,7 @@ export default async function NewJobPage({ searchParams }: PageProps) {
 
   return (
     <PageContainer>
-      <PageHeader title="New Project" backHref="/app/jobs" backLabel="Projects" />
+      <PageHeader title="New Job" backHref="/app/jobs" backLabel="Jobs" />
 
       {/* Driveway lane — same capture as Today / FAB. House required. */}
       <Card>

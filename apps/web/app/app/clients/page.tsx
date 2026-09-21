@@ -47,7 +47,7 @@ function formatClientHistoryMeta(row: ClientRow): string {
   const spend = Number(row.lifetime_spend_cents) || 0;
   const parts = [
     `${props} propert${props === 1 ? "y" : "ies"}`,
-    `${jobs} project${jobs === 1 ? "" : "s"}`,
+    `${jobs} job${jobs === 1 ? "" : "s"}`,
   ];
   if (sq > 0) parts.push(`${sq} Square txn${sq === 1 ? "" : "s"}`);
   if (spend > 0) parts.push(formatCents(spend));
@@ -117,14 +117,14 @@ export default async function ClientsPage({ searchParams }: PageProps) {
     },
     {
       key: "properties",
-      label: "Properties",
+      label: "Houses",
       align: "right",
       render: (row) => Number(row.property_count),
       width: "120px",
     },
     {
       key: "jobs",
-      label: "Projects",
+      label: "Jobs",
       align: "right",
       // Includes draft through invoiced — every FSM job row for this client.
       render: (row) => Number(row.job_count),
@@ -186,7 +186,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
     <PageContainer>
       <PageHeader
         title="Clients"
-        subtitle={`${clients.length} client${clients.length === 1 ? "" : "s"} · Projects = work in this app (includes invoiced). Square = historical payments from Square export.`}
+        subtitle={`${clients.length} client${clients.length === 1 ? "" : "s"} · Jobs = work in this app (includes invoiced). Square = historical payments from Square export.`}
         actions={
           <div style={{ display: "flex", gap: "var(--space-2)" }}>
             <LinkButton href="/app/clients/import" variant="secondary">

@@ -194,8 +194,8 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
     if (latestInvoiceId) {
       return {
         message: isTm
-          ? "Project closed — review and send the invoice"
-          : "Project closed — review and send the final invoice",
+          ? "Job closed — review and send the invoice"
+          : "Job closed — review and send the final invoice",
         actionLabel: "Open Invoice",
         actionHref: `/app/invoices/${latestInvoiceId}`,
         secondary: { label: "All invoices", href: `/app/invoices?job_id=${jobId}` },
@@ -205,8 +205,8 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
 
     return {
       message: isTm
-        ? "Project closed — invoice actual time and materials"
-        : "Project closed — send the final invoice",
+        ? "Job closed — invoice actual time and materials"
+        : "Job closed — send the final invoice",
       actionLabel: "Create Invoice",
       actionHref: `/app/invoices/new?job_id=${jobId}${cq}${estimateParam}`,
       extras,
@@ -276,7 +276,7 @@ export function computeWhatNext(props: ProjectWhatNextProps): WhatNextContent {
   // ── Field execution ────────────────────────────────────────────────────
   if (stage === "waiting") {
     return {
-      message: "Project on hold",
+      message: "Job on hold",
       detail: "Resolve the blocker, then continue the visit.",
       actionLabel: visitId ? "Open Visit" : "Schedule Visit",
       actionHref: visitId ? `/app/visits/${visitId}` : `/app/jobs/${jobId}/visits/new`,

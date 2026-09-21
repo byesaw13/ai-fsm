@@ -200,7 +200,7 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
   return (
     <PageContainer>
       <PageHeader
-        title="Invoices"
+        title="Bills"
         subtitle={`${invoices.length} total`}
         actions={
           canCreate ? (

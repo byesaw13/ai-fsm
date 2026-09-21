@@ -8,7 +8,7 @@ The primary domain model is:
 Client
   -> Property
       -> Estimate
-      -> Job                    (UI: Project)
+      -> Job
           -> Work Order
               -> Visit
           -> Invoice
@@ -21,12 +21,15 @@ These objects form the core product vocabulary. New documentation and product wo
 
 | Backend | UI label (owner/staff) |
 |---|---|
-| `jobs` | **Project** |
-| `work_orders` | **Work Order** |
-| `visits` | **Visit** |
-| `estimates` | Estimate |
+| `clients` | **Person** / People |
+| `properties` | **House** |
+| `jobs` | **Job** |
+| `work_orders` | (internal — not a nav noun) |
+| `visits` | **Visit** / Day |
+| `estimates` | **Quote** |
+| `invoices` | **Bill** |
 
-Backend tables, routes, and status enums keep their stable names (`job`, `jobs`, `/app/jobs`). Presentation maps `job` → **Project** everywhere in primary navigation and owner-facing copy.
+Backend tables, routes, and status enums keep their stable names (`job`, `jobs`, `/app/jobs`). Presentation maps `job` → **Job** everywhere in primary navigation and owner-facing copy. The field home is **Today** (`/app/my-work`). The office home is **Desk** (`/app`).
 
 **Invoice generation and payment status stay Job-level only. Work Order state is never driven by billing.**
 
@@ -54,7 +57,7 @@ A property is the physical home or service location. This is the durable center 
 Owns:
 
 - Address and location details.
-- Projects, visits, estimates, invoices, notes, media, and durable service history linked to the home.
+- Jobs, visits, quotes, bills, notes, media, and durable service history linked to the home.
 - The property timeline/read model.
 
 Does not own:

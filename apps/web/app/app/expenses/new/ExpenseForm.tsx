@@ -516,7 +516,7 @@ export function ExpenseForm({
       {(jobs.length > 0 || isMaterialRun) && (
         <Select
           id="job_id"
-          label={isMaterialRun ? "Project" : "Link to Project (optional)"}
+          label={isMaterialRun ? "Job" : "Link to Job (optional)"}
           value={jobId}
           onChange={(e) => {
             setJobId(e.target.value);

@@ -113,11 +113,11 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
     <PageContainer>
       <Breadcrumbs
         items={[
-          { href: "/app/invoices", label: "Invoices" },
-          { label: "New invoice" },
+          { href: "/app/invoices", label: "Bills" },
+          { label: "New bill" },
         ]}
       />
-      <PageHeader title="New Invoice" backHref="/app/invoices" backLabel="Invoices" />
+      <PageHeader title="New Bill" backHref="/app/invoices" backLabel="Bills" />
       <HubSubnav hub="Money" links={MONEY_HUB_LINKS} pathname="/app/invoices" />
       <p style={{ margin: "0 0 var(--space-4)", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
         {prefillSource === "tm_actuals"
