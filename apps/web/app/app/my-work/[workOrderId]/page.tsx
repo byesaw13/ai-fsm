@@ -14,6 +14,7 @@ import { loadWorkOrderCompletionCriteria } from "@/lib/work-orders/task-time";
 import { FieldWorkActions } from "../FieldWorkActions";
 import { FieldCloseout } from "../FieldCloseout";
 import { formatBusinessDateTime } from "@/lib/time/business-tz";
+import { todayCoveringTechSql } from "@/lib/visits/covering-tech";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +48,7 @@ export default async function MyWorkOrderPage({
      JOIN jobs j ON j.id = w.job_id
      LEFT JOIN clients c ON c.id = w.client_id
      LEFT JOIN properties p ON p.id = j.property_id
-     WHERE w.id = $1 AND w.account_id = $2 AND w.assigned_user_id = $3`,
+     WHERE w.id = $1 AND w.account_id = $2 AND ${todayCoveringTechSql("$3")}`,
     [workOrderId, session.accountId, session.userId],
   );
   const wo = rows[0];

@@ -6,6 +6,7 @@ import { queryOne, getPool } from "../../../../../lib/db";
 import { appendAuditLog } from "../../../../../lib/db/audit";
 import { logger } from "../../../../../lib/logger";
 import { computeCapStatus } from "../../../../../lib/visits/membership-cap";
+import { syncWorkOrderLeadFromVisit } from "../../../../../lib/work-orders/assign-lead";
 import { MEMBERSHIP_VISIT_PHASES } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
@@ -183,6 +184,20 @@ export const PATCH = withAuth(
       );
 
       const updated = rows[0];
+
+      const nextAssignee: string | null | undefined =
+        "assigned_user_id" in parsed.data &&
+        (typeof parsed.data.assigned_user_id === "string" || parsed.data.assigned_user_id === null)
+          ? parsed.data.assigned_user_id
+          : undefined;
+      if (nextAssignee !== undefined && old.work_order_id) {
+        await syncWorkOrderLeadFromVisit(
+          client,
+          old.work_order_id,
+          session.accountId,
+          nextAssignee,
+        );
+      }
 
       await appendAuditLog(client, {
         account_id: session.accountId,

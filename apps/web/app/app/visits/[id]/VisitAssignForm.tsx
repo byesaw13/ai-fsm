@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Select, useToast } from "@/components/ui";
+import {
+  coveringTechAssignedToast,
+  coveringTechFieldHint,
+  coveringTechFieldLabel,
+} from "@/lib/visits/covering-tech";
 
 interface User {
   id: string;
@@ -39,7 +44,7 @@ export function VisitAssignForm({
       if (!res.ok) {
         toast.error("Failed to update assignment");
       } else {
-        toast.success(selected ? "Visit assigned" : "Assignment removed");
+        toast.success(coveringTechAssignedToast(Boolean(selected)));
         router.refresh();
       }
     } catch {
@@ -54,6 +59,8 @@ export function VisitAssignForm({
       <div style={{ flex: 1 }}>
         <Select
           id="visit-assign"
+          label={coveringTechFieldLabel()}
+          hint={coveringTechFieldHint()}
           options={users.map((u) => ({
             value: u.id,
             label: `${u.full_name} (${u.role})`,

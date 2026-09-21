@@ -76,6 +76,7 @@ import { withChecklistContext, getOrSeedChecklist } from "@/lib/visits/checklist
 import { loadVisitTimeline } from "@/lib/visits/load-visit-timeline";
 import { VisitTimelinePanel } from "@/components/visits/VisitTimelinePanel";
 import { VISIT_STATUS_LABELS } from "@/lib/visits/triage";
+import { coveringTechFieldLabel } from "@/lib/visits/covering-tech";
 
 export const dynamic = "force-dynamic";
 
@@ -1035,7 +1036,7 @@ export default async function VisitDetailPage({
 
         <div className="p7-detail-sidebar">
           <Card>
-            <SectionHeader title="Assignment" />
+            <SectionHeader title={coveringTechFieldLabel()} />
             {canAssign ? (
               <VisitAssignForm
                 visitId={visit.id}
@@ -1045,7 +1046,7 @@ export default async function VisitDetailPage({
             ) : visit.assigned_user_name ? (
               <dl className="p7-detail-list">
                 <div className="p7-detail-row">
-                  <dt>Assigned To</dt>
+                  <dt>{coveringTechFieldLabel()}</dt>
                   <dd data-testid="assigned-tech">{visit.assigned_user_name}</dd>
                 </div>
               </dl>

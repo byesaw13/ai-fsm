@@ -345,6 +345,28 @@ describe("PATCH /api/v1/visits/[id]", () => {
     expect(json.data.assigned_user_id).toBe(USER_ID);
   });
 
+  it("assigning a covering tech puts them on the work order so Today can see the job", async () => {
+    const covering = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+    const existing = { ...SAMPLE_VISIT, work_order_id: WORK_ORDER_ID, assigned_user_id: null };
+    const updated = { ...existing, assigned_user_id: covering };
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
+      .mockResolvedValueOnce({ rows: [existing] }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [updated] }) // UPDATE visit
+      .mockResolvedValueOnce({ rows: [] }) // sync WO lead
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await visitPatch(
+      makeRequest("PATCH", `${VISITS_BASE}/${VISIT_ID}`, { assigned_user_id: covering }),
+    );
+    expect(res.status).toBe(200);
+    expect(mockClientQuery).toHaveBeenCalledWith(
+      expect.stringContaining("UPDATE work_orders SET assigned_user_id"),
+      [WORK_ORDER_ID, mockSession.accountId, covering],
+    );
+  });
+
   it("tech can update tech_notes → 200", async () => {
     // Temporarily set session role to tech
     Object.assign(mockSession, { role: "tech" });
