@@ -289,3 +289,102 @@ export async function getDayReview(
     },
   };
 }
+
+export type DayCompanyBill = {
+  id: string;
+  status: string;
+  houseLabel: string;
+  clientName: string | null;
+};
+
+export type DayCompanyReturn = {
+  when: string | null;
+  houseLabel: string;
+  startHere: string | null;
+};
+
+export type DayCompanyFacts = {
+  bills: DayCompanyBill[];
+  comingBack: DayCompanyReturn[];
+};
+
+/** Today's bills and coming-back houses for the night recap. */
+export async function loadDayCompanyFacts(
+  accountId: string,
+  date: string,
+): Promise<DayCompanyFacts> {
+  const [billRows, returnRows] = await Promise.all([
+    query<{
+      id: string;
+      status: string;
+      house_label: string;
+      client_name: string | null;
+    }>(
+      `SELECT i.id, i.status,
+              COALESCE(p.address, c.name, 'House') AS house_label,
+              c.name AS client_name
+       FROM invoices i
+       LEFT JOIN properties p ON p.id = i.property_id AND p.account_id = i.account_id
+       LEFT JOIN clients c ON c.id = i.client_id AND c.account_id = i.account_id
+       WHERE i.account_id = $1
+         AND i.status NOT IN ('void', 'cancelled')
+         AND i.invoice_kind IN ('final', 'standard')
+         AND (
+           (i.created_at AT TIME ZONE 'America/New_York')::date = $2::date
+           OR (i.sent_at AT TIME ZONE 'America/New_York')::date = $2::date
+         )
+       ORDER BY i.created_at ASC`,
+      [accountId, date],
+    ),
+    query<{
+      house_label: string;
+      next_start: string | null;
+      start_here: string | null;
+    }>(
+      `SELECT COALESCE(p.address, 'House') AS house_label,
+              (
+                SELECT nv.scheduled_start::text
+                FROM visits nv
+                WHERE nv.job_id = v.job_id
+                  AND nv.account_id = v.account_id
+                  AND nv.id <> v.id
+                  AND nv.status NOT IN ('cancelled', 'completed')
+                ORDER BY nv.scheduled_start ASC NULLS LAST
+                LIMIT 1
+              ) AS next_start,
+              (
+                SELECT t.label
+                FROM work_order_tasks t
+                WHERE t.work_order_id = v.work_order_id
+                  AND t.account_id = v.account_id
+                  AND t.completed = false
+                  AND t.status <> 'done'
+                ORDER BY t.sort_order ASC
+                LIMIT 1
+              ) AS start_here
+       FROM visits v
+       JOIN jobs j ON j.id = v.job_id AND j.account_id = v.account_id
+       LEFT JOIN properties p ON p.id = j.property_id AND p.account_id = v.account_id
+       WHERE v.account_id = $1
+         AND v.closeout_kind = 'return'
+         AND v.status = 'completed'
+         AND (COALESCE(v.completed_at, v.scheduled_start) AT TIME ZONE 'America/New_York')::date = $2::date
+       ORDER BY v.completed_at ASC NULLS LAST`,
+      [accountId, date],
+    ),
+  ]);
+
+  return {
+    bills: billRows.map((r) => ({
+      id: r.id,
+      status: r.status,
+      houseLabel: r.house_label,
+      clientName: r.client_name,
+    })),
+    comingBack: returnRows.map((r) => ({
+      when: r.next_start,
+      houseLabel: r.house_label,
+      startHere: r.start_here?.trim() || null,
+    })),
+  };
+}
