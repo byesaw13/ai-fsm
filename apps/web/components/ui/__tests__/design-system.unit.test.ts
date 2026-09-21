@@ -216,14 +216,14 @@ describe("getNavSections (nested hubs)", () => {
     }
   });
 
-  it("returns Today, Visits, and Day Review for tech role", () => {
+  it("returns Today and Day Review for tech role — no Visits tab", () => {
     const sections = getNavSections("tech");
     const items = flattenSections(sections);
-    expect(items).toHaveLength(3);
+    expect(items).toHaveLength(2);
     const hrefs = items.map((i) => i.href);
-    expect(hrefs).toContain("/app/my-work");
-    expect(hrefs).toContain("/app/visits");
-    expect(hrefs).toContain("/app/day-review");
+    expect(hrefs).toEqual(["/app/my-work", "/app/day-review"]);
+    expect(items.map((i) => i.label)).toEqual(["Today", "Day Review"]);
+    expect(hrefs).not.toContain("/app/visits");
     expect(hrefs).not.toContain("/app/field");
     expect(hrefs).not.toContain("/app/settings");
     expect(hrefs).not.toContain("/app/jobs");
@@ -312,12 +312,13 @@ describe("getBottomNavItems (mobile hubs)", () => {
     expect(hrefs).not.toContain("/app/booking-requests");
   });
 
-  it("returns 2 items for tech role with Today and Visits", () => {
+  it("returns Today and Day Review for tech bottom nav — no Visits tab", () => {
     const items = getBottomNavItems("tech");
     expect(items).toHaveLength(2);
+    expect(items.map((i) => i.label)).toEqual(["Today", "Day Review"]);
     const hrefs = items.map((i) => i.href);
-    expect(hrefs).toContain("/app/my-work");
-    expect(hrefs).toContain("/app/visits");
+    expect(hrefs).toEqual(["/app/my-work", "/app/day-review"]);
+    expect(hrefs).not.toContain("/app/visits");
     expect(hrefs).not.toContain("/app/field");
     expect(hrefs).not.toContain("/app/jobs");
   });

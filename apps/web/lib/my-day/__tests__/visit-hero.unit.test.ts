@@ -7,6 +7,13 @@ import {
   heroPrimaryLabel,
   shouldShowVisitHero,
   excludeHeroVisit,
+  heroNowVerbs,
+  heroPhotoCategory,
+  visitMediaUploadPath,
+  visitNotesPath,
+  appendTechNote,
+  heroKitchenHref,
+  heroKitchenLabel,
 } from "../visit-hero";
 
 const base = {
@@ -100,5 +107,59 @@ describe("excludeHeroVisit", () => {
   it("removes hero id from list", () => {
     const visits = [{ id: "a" }, { id: "b" }];
     expect(excludeHeroVisit(visits, "a")).toEqual([{ id: "b" }]);
+  });
+});
+
+describe("heroNowVerbs — four phone verbs on Now", () => {
+  it("is Start this job / Complete plus Photo, Call, Navigate", () => {
+    expect(heroNowVerbs("scheduled")).toEqual({
+      primary: "start",
+      secondary: ["photo", "call", "navigate"],
+    });
+    expect(heroNowVerbs("arrived")).toEqual({
+      primary: "complete",
+      secondary: ["photo", "call", "navigate"],
+    });
+    expect(heroNowVerbs("in_progress")).toEqual({
+      primary: "complete",
+      secondary: ["photo", "call", "navigate"],
+    });
+  });
+
+  it("keeps Photo on Now even when there is no primary action", () => {
+    expect(heroNowVerbs("completed").secondary).toEqual(["photo", "call", "navigate"]);
+  });
+});
+
+describe("hero photo on the current visit", () => {
+  it("posts to the existing visit media API", () => {
+    expect(visitMediaUploadPath("visit-1")).toBe("/api/v1/visits/visit-1/media");
+  });
+
+  it("uses before shots until the job is on site, then after", () => {
+    expect(heroPhotoCategory("scheduled")).toBe("before");
+    expect(heroPhotoCategory("arrived")).toBe("after");
+    expect(heroPhotoCategory("in_progress")).toBe("after");
+  });
+});
+
+describe("short voice/notes path on Now", () => {
+  it("patches the visit, not a kitchen panel", () => {
+    expect(visitNotesPath("visit-1")).toBe("/api/v1/visits/visit-1");
+  });
+
+  it("appends a spoken or typed line without clobbering prior notes", () => {
+    expect(appendTechNote(null, "  hung the door  ")).toBe("hung the door");
+    expect(appendTechNote("hung the door", "caulked the trim")).toBe(
+      "hung the door\ncaulked the trim",
+    );
+    expect(appendTechNote("hung the door", "   ")).toBe("hung the door");
+  });
+});
+
+describe("visit kitchen stays behind More", () => {
+  it("labels the kitchen More and points at the existing visit page", () => {
+    expect(heroKitchenLabel()).toBe("More");
+    expect(heroKitchenHref("visit-1")).toBe("/app/visits/visit-1");
   });
 });
