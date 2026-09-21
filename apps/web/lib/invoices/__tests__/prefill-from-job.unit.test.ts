@@ -32,4 +32,16 @@ describe("jobPricingModeFromSources", () => {
       "flat_rate",
     );
   });
+
+  it("uses the job's stored mode first so driveway T&M cannot become a bid", () => {
+    expect(
+      jobPricingModeFromSources("flat_rate", null, { jobPricingMode: "hourly_internal" }),
+    ).toBe("hourly_internal");
+    expect(
+      jobPricingModeFromSources(null, null, {
+        hasBooking: true,
+        jobPricingMode: "hourly_internal",
+      }),
+    ).toBe("hourly_internal");
+  });
 });

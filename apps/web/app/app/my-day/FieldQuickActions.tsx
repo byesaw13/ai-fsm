@@ -2,12 +2,14 @@ import Link from "next/link";
 import type { Route } from "next";
 import { SectionHeader } from "@/components/ui";
 import { QuickBookButton } from "@/components/jobs/QuickBookButton";
-import { FIELD_QUICK_ACTIONS } from "@/lib/navigation/quick-actions";
+import { FIELD_QUICK_ACTIONS, fieldReceiptHref } from "@/lib/navigation/quick-actions";
 
 export function FieldQuickActions({
   canQuickBook = false,
+  currentJobId = null,
 }: {
   canQuickBook?: boolean;
+  currentJobId?: string | null;
 }) {
   return (
     <section data-testid="field-quick-actions">
@@ -44,8 +46,9 @@ export function FieldQuickActions({
               </QuickBookButton>
             );
           }
+          const href = act.label === "Receipt" ? fieldReceiptHref(currentJobId) : act.href;
           return (
-            <Link key={act.label} href={act.href as Route} style={tileStyle}>
+            <Link key={act.label} href={href as Route} style={tileStyle}>
               {inner}
             </Link>
           );

@@ -32,8 +32,10 @@ export type JobPricingMode = "flat_rate" | "hourly_internal";
 export function jobPricingModeFromSources(
   estimatePricingMode: string | null | undefined,
   bookingPricingMode: string | null | undefined,
-  options?: { hasBooking?: boolean },
+  options?: { hasBooking?: boolean; jobPricingMode?: string | null },
 ): JobPricingMode | null {
+  const jobMode = options?.jobPricingMode ?? null;
+  if (jobMode === "hourly_internal" || jobMode === "flat_rate") return jobMode;
   const mode = estimatePricingMode ?? bookingPricingMode ?? null;
   if (mode === "hourly_internal" || mode === "flat_rate") return mode;
   if (mode != null) return null;
@@ -46,11 +48,14 @@ export async function resolveJobPricingMode(
   jobId: string,
 ): Promise<JobPricingMode | null> {
   const rows = await query<{
+    job_pricing_mode: string | null;
     estimate_pricing_mode: string | null;
     booking_pricing_mode: string | null;
     has_booking: boolean;
   }>(
     `SELECT
+       (SELECT pricing_mode FROM jobs
+        WHERE id = $1 AND account_id = $2) AS job_pricing_mode,
        (SELECT pricing_mode FROM estimates
         WHERE job_id = $1 AND account_id = $2 AND status = 'approved'
         ORDER BY created_at DESC LIMIT 1) AS estimate_pricing_mode,
@@ -66,7 +71,10 @@ export async function resolveJobPricingMode(
   return jobPricingModeFromSources(
     rows[0]?.estimate_pricing_mode,
     rows[0]?.booking_pricing_mode,
-    { hasBooking: Boolean(rows[0]?.has_booking) },
+    {
+      hasBooking: Boolean(rows[0]?.has_booking),
+      jobPricingMode: rows[0]?.job_pricing_mode,
+    },
   );
 }
 
