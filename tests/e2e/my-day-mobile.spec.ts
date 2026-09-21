@@ -56,14 +56,12 @@ test.describe("My Day mobile", () => {
     await expect(page.getByText("Quote")).toBeVisible();
   });
 
-  test("field right now visible when clocked in", async ({ page }) => {
+  test("one Now: start day or van pill, not activity chips", async ({ page }) => {
     await page.goto(`${BASE}/app/my-work`);
-    // Tolerate the not-yet-clocked-in state: field-right-now renders only when
-    // clockedIn, so on a fresh DB / independent run the start-day entry shows
-    // instead. Keeps the assertion order-independent (Codex).
     await expect(
-      page.getByTestId("field-right-now").or(page.getByTestId("start-my-day-button")),
+      page.getByTestId("start-my-day-button").or(page.getByTestId("day-status-pill")),
     ).toBeVisible();
+    await expect(page.getByTestId("field-right-now")).toHaveCount(0);
   });
 
   test("no manage day accordion", async ({ page }) => {
