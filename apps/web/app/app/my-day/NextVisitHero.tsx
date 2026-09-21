@@ -35,7 +35,7 @@ function formatTime(iso: string): string {
   return formatBusinessTime(iso);
 }
 
-export function NextVisitHero({ visit }: { visit: HeroVisit }) {
+export function NextVisitHero({ visit, canSend = false }: { visit: HeroVisit; canSend?: boolean }) {
   const router = useRouter();
   const toast = useToast();
   const [pending, setPending] = useState(false);
@@ -209,7 +209,12 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
       >
         {heroKitchenLabel()}
       </Link>
-      <CloseoutWizard visitId={visit.id} open={closeoutOpen} onClose={() => setCloseoutOpen(false)} />
+      <CloseoutWizard
+        visitId={visit.id}
+        open={closeoutOpen}
+        onClose={() => setCloseoutOpen(false)}
+        canSend={canSend}
+      />
     </div>
   );
 }

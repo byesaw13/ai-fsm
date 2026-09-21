@@ -13,14 +13,14 @@ export function CloseoutWizard({
   open,
   onClose,
   onBeforeSubmit,
-  canSend = true,
+  canSend = false,
 }: {
   visitId: string;
   open: boolean;
   onClose: () => void;
   /** e.g. save completion packet before closeout */
   onBeforeSubmit?: () => Promise<boolean>;
-  /** Owner/admin Send. Tech files; owner Send stays explicit. */
+  /** Owner/admin Send. Tech files; owner Send stays explicit. Default off. */
   canSend?: boolean;
 }) {
   const router = useRouter();
