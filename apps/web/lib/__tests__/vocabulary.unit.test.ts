@@ -72,8 +72,10 @@ describe("nav speaks those nouns", () => {
     ]);
   });
 
-  it("gives the tech Today and Visits", () => {
-    expect(getBottomNavItems("tech").map((i) => i.label)).toEqual([UI.today, "Visits"]);
+  it("gives the tech Today and Day Review — no Visits tab", () => {
+    expect(getBottomNavItems("tech").map((i) => i.label)).toEqual([UI.today, "Day Review"]);
+    expect(getBottomNavItems("tech").map((i) => i.href)).not.toContain("/app/visits");
+    expect(getNavSections("tech")[0].items.map((i) => i.href)).not.toContain("/app/visits");
   });
 });
 

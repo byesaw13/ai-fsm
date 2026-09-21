@@ -66,3 +66,44 @@ export function excludeHeroVisit<T extends { id: string }>(visits: T[], heroId: 
   if (!heroId) return visits;
   return visits.filter((v) => v.id !== heroId);
 }
+
+export const HERO_SECONDARY_VERBS = ["photo", "call", "navigate"] as const;
+export type HeroSecondaryVerb = (typeof HERO_SECONDARY_VERBS)[number];
+export type HeroNowVerbs = {
+  primary: "start" | "complete" | null;
+  secondary: readonly HeroSecondaryVerb[];
+};
+
+/** Phone Now is four verbs: Start this job / Complete, Photo, Call, Navigate. */
+export function heroNowVerbs(status: string): HeroNowVerbs {
+  return { primary: heroPrimaryAction(status), secondary: HERO_SECONDARY_VERBS };
+}
+
+export function visitMediaUploadPath(visitId: string): string {
+  return `/api/v1/visits/${visitId}/media`;
+}
+
+export function heroPhotoCategory(status: string): "before" | "after" {
+  if (status === "arrived" || status === "in_progress") return "after";
+  return "before";
+}
+
+export function visitNotesPath(visitId: string): string {
+  return `/api/v1/visits/${visitId}`;
+}
+
+export function appendTechNote(existing: string | null | undefined, addition: string): string {
+  const add = addition.trim();
+  const prev = existing?.trim() ?? "";
+  if (!add) return prev;
+  if (!prev) return add;
+  return `${prev}\n${add}`;
+}
+
+export function heroKitchenLabel(): "More" {
+  return "More";
+}
+
+export function heroKitchenHref(visitId: string): string {
+  return `/app/visits/${visitId}`;
+}
