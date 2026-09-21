@@ -135,7 +135,7 @@ export function MyDayMobileLayout({
               disabled={starting}
               onClick={onStartDay}
             >
-              {starting ? "…" : mode === "one_tap" ? "Start day" : "Start My Day"}
+              {starting ? "…" : "Start day"}
             </button>
             {mode === "one_tap" ? (
               <button

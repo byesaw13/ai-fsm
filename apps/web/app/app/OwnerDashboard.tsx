@@ -36,7 +36,7 @@ export function OwnerDashboard({
         >
           Nothing leaking. The day is on{" "}
           <Link href={"/app/my-work" as Route} style={{ color: "var(--accent)", fontWeight: 600 }}>
-            My Day
+            Today
           </Link>
           .
         </p>
@@ -114,7 +114,7 @@ export function OwnerDashboard({
 
       <p style={{ margin: 0 }}>
         <LinkButton href="/app/my-work" variant="secondary" size="sm" data-testid="go-to-my-day">
-          Go to My Day
+          Go to Today
         </LinkButton>
       </p>
     </div>

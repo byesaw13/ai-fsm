@@ -19,8 +19,8 @@ const OWNER_ADMIN: Role[] = ["owner", "admin"];
 const ALL: Role[] = ["owner", "admin", "tech"];
 
 const DESTINATIONS: CommandItem[] = [
-  { id: "my-day", label: "My Day", href: "/app/my-work", keywords: "today field home clock", roles: ["owner", "tech"] },
-  { id: "overview", label: "Overview", href: "/app", keywords: "office dashboard numbers", roles: OWNER_ADMIN },
+  { id: "my-day", label: "Today", href: "/app/my-work", keywords: "today field home clock my day", roles: ["owner", "tech"] },
+  { id: "overview", label: "Desk", href: "/app", keywords: "office dashboard numbers overview desk", roles: OWNER_ADMIN },
   { id: "capture", label: "Capture", href: "/app/capture", keywords: "voice promise record", roles: OWNER_ADMIN },
   { id: "day-review", label: "Day Review", href: "/app/day-review", keywords: "end close evening", roles: ALL },
   { id: "tracking", label: "Tracking", href: "/app/timeline", keywords: "timeline mileage gps vehicle", roles: OWNER_ADMIN },

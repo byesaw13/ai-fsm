@@ -67,7 +67,7 @@ export function TagClaimControl({
         <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
           {jobs.length === 0 ? (
             <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
-              No jobs on this day. Open a visit or pick from Projects.
+              No jobs on this day. Open a visit or pick from Jobs.
             </span>
           ) : (
             jobs.map((j) => (

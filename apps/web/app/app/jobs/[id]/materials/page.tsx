@@ -114,7 +114,7 @@ export default async function JobMaterialsPage({ params, searchParams }: PagePro
     <PageContainer>
       <Breadcrumbs
         items={[
-          { label: "Projects", href: "/app/jobs" },
+          { label: "Jobs", href: "/app/jobs" },
           { label: job.title, href: `/app/jobs/${jobId}` },
           { label: "Materials" },
         ]}

@@ -208,7 +208,7 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
   return (
     <PageContainer>
       <PageHeader
-        title="Estimates"
+        title="Quotes"
         subtitle={`${estimates.length} ${hasFilter ? "matching" : "total"}`}
         actions={
           canCreate ? (
@@ -225,7 +225,7 @@ export default async function EstimatesPage({ searchParams }: PageProps) {
                 variant="primary"
                 data-testid="create-estimate-btn"
               >
-                + New Estimate
+                + New Quote
               </LinkButton>
             </div>
           ) : undefined

@@ -114,9 +114,9 @@ const OUTCOME_META: Record<
     destination: "Estimate",
   },
   create_job: {
-    label: "Create Project",
-    detail: "Create the work thread first, then continue from the project.",
-    destination: "Project",
+    label: "Create Job",
+    detail: "Create the work thread first, then continue from the job.",
+    destination: "Job",
   },
   schedule_assessment: {
     label: "Schedule Assessment",
@@ -236,7 +236,7 @@ export function getRequestGuidance(input: RequestGuidanceInput): RequestGuidance
     (followUpKind === "view_visit"
       ? "Continue from the scheduled visit."
       : followUpKind === "view_job"
-        ? "Continue from the linked project."
+        ? "Continue from the linked job."
         : STATE_DETAILS[status]);
 
   const destinationRecord =
@@ -244,7 +244,7 @@ export function getRequestGuidance(input: RequestGuidanceInput): RequestGuidance
     (followUpKind === "view_visit"
       ? "Visit"
       : followUpKind === "view_job"
-        ? "Project"
+        ? "Job"
         : STATE_LABELS[status]);
 
   return {

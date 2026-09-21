@@ -1119,7 +1119,7 @@ export default async function JobDetailPage({
             .join(" · ") || undefined
         }
         backHref="/app/jobs"
-        backLabel="Projects"
+        backLabel="Jobs"
         actions={
           <span data-testid="job-status" style={{ display: "inline-flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
             {toSupplyPo(job.job_number) ? (
@@ -1620,7 +1620,7 @@ export default async function JobDetailPage({
                       size="sm"
                       data-testid="new-estimate-btn"
                     >
-                      + New Estimate
+                      + New Quote
                     </LinkButton>
                   }
                 />

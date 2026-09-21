@@ -5,6 +5,7 @@ import { LinkButton, PageContainer, PageHeader } from "@/components/ui";
 import { OwnerDashboard } from "./OwnerDashboard";
 import type { CommandVisit } from "./DashboardWidgets";
 import { loadNeedsAttention } from "@/lib/attention/load-needs-attention";
+import { filterAttentionForSurface } from "@/lib/attention/surfaces";
 import { formatBusinessDate } from "@/lib/time/business-tz";
 
 export const dynamic = "force-dynamic";
@@ -68,7 +69,8 @@ export default async function AppPage() {
   const nowHour = new Date().getHours();
   const greeting =
     nowHour < 12 ? "Good morning" : nowHour < 17 ? "Good afternoon" : "Good evening";
-  const leakCount = attention.items.length;
+  const deskItems = filterAttentionForSurface(attention.items, "desk");
+  const leakCount = deskItems.length;
   const subtitle =
     leakCount === 0
       ? "Nothing leaking."
@@ -92,7 +94,7 @@ export default async function AppPage() {
               {todayLabel}
             </span>
             <LinkButton href="/app/my-work" variant="secondary" size="sm">
-              My Day
+              Today
             </LinkButton>
             <LinkButton href="/app/intake/new" variant="primary" size="sm">
               + New Request
@@ -101,7 +103,7 @@ export default async function AppPage() {
         }
       />
       <OwnerDashboard
-        leakItems={attention.items}
+        leakItems={deskItems}
         openPromiseRows={attention.openPromiseRows}
         tomorrowJobs={tomorrowJobs}
         outstandingInvoicesCents={parseN(outstandingInvoicesCentsRows[0])}

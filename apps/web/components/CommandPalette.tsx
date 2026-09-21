@@ -113,7 +113,7 @@ export function CommandPalette({ role }: { role: Role }) {
               />
               {results.length === 0 ? (
                 <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
-                  Nothing matches. Try “invoice”, “My Day”, or “materials”.
+                  Nothing matches. Try “invoice”, “Today”, or “materials”.
                 </p>
               ) : (
                 <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>

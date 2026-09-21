@@ -50,7 +50,7 @@ test.describe("Invoice conversion smoke — admin role", () => {
 
   test("admin sees Invoices page", async ({ page }) => {
     await page.goto(`${BASE}/app/invoices`);
-    await expect(page.locator("h1")).toContainText("Invoices");
+    await expect(page.locator("h1")).toContainText("Bills");
   });
 
   test("invoices page shows empty state or invoice cards", async ({ page }) => {

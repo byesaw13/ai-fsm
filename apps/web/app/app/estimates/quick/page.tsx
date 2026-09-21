@@ -76,7 +76,7 @@ export default async function QuickEstimatePage({ searchParams }: PageProps) {
 
   return (
     <PageContainer>
-      <PageHeader title="Quick Estimate" backHref="/app/estimates" backLabel="Estimates" />
+      <PageHeader title="Quick Quote" backHref="/app/estimates" backLabel="Quotes" />
       <div style={{ maxWidth: 560, margin: "0 auto" }}>
         <QuickEstimateWizard
           clients={clients}

@@ -113,14 +113,14 @@ components:
 
 **Creative North Star: "The Well-Kept Toolbox"**
 
-Dovetails FSM looks and feels like a craftsman's well-kept toolbox: every control is solid, labeled, and in its place; nothing is decorative that doesn't carry weight. This is a *product* register — the design serves the work of running a residential handyman business, it does not perform. The interface recedes so the real subject (the client↔property service history, what's done, what's owed) stays in focus. The identity is **"Forest & Cedar"**: a deep forest-green accent used sparingly, set on warm stone neutrals — a trade brand, not a generic SaaS.
+Dovetails FSM looks and feels like a craftsman's well-kept toolbox: every control is solid, labeled, and in its place; nothing is decorative that doesn't carry weight. This is a *product* register — the design serves the work of running a residential handyman business, it does not perform. The interface recedes so the real subject (the client↔property service history, what's done, what's owed) stays in focus. The identity is **"Cedar & Clay"**: a burnt-orange accent used sparingly, set on warm stone neutrals — a trade brand, not a generic SaaS. Token names stay `forest-*` for compatibility; the live values are burnt-orange.
 
 Density is deliberate. The base text size is 15px (smaller than the typical 16px) because owners and office staff scan a lot of structured information — clients, estimates, line items, invoices, schedules — and the layout favors getting more honest data on screen over airy marketing whitespace. At the same time, the dominant real-world context is a **technician on a phone, outdoors, one-handed**, so anything they touch in the field must be high-contrast and large-target. The system holds both: dense and desk-efficient where coordination happens, bold and one-tap where the field happens.
 
 What it explicitly rejects: the SaaS dashboard suite (walls of KPI cards, gradient hero-metrics, a "command center" of widgets), AI-first estimator framing, membership/subscription scaffolding, the abstract multi-company "platform" feel, and consumer-app gloss. Sturdy over slick, always.
 
 **Key Characteristics:**
-- Forest-green accent on warm stone neutrals; green earns its place, it doesn't flood the screen.
+- Burnt-orange accent on warm stone neutrals; orange earns its place, it doesn't flood the screen.
 - Dense, legible, information-first layout — desk-efficient, never cramped in the field.
 - Status is everywhere (pills for estimates, invoices, visits) and never color-only.
 - Calm chrome, flat-by-default surfaces; depth appears only on interaction.
@@ -128,12 +128,12 @@ What it explicitly rejects: the SaaS dashboard suite (walls of KPI cards, gradie
 
 ## 2. Colors
 
-A restrained palette: one forest-green accent carries identity at ≤10% of any screen, set on a warm-stone neutral ramp, with four reserved status hues that never get used as decoration.
+A restrained palette: one burnt-orange accent carries identity at ≤10% of any screen, set on a warm-stone neutral ramp, with four reserved status hues that never get used as decoration. CSS token names stay `forest-*`; values match the Cedar & Clay YAML frontmatter.
 
 ### Primary
-- **Forest 800** (`#166534`): The brand accent. Primary buttons, active nav, focus rings, key links. Deliberately *rare* — it marks the one important action or the live state, not every surface.
-- **Forest 700** (`#15803d`): Hover/active state of the accent; the slightly brighter press response.
-- **Forest 900** (`#14532d`) / **Forest 50** (`#e9f6ee`): Deepest green for text-on-light emphasis; the pale tint for accent-subtle backgrounds and the 3px focus glow.
+- **Forest 800** (`oklch(0.56 0.16 41)`): The brand accent. Primary buttons, active nav, focus rings, key links. Deliberately *rare* — it marks the one important action or the live state, not every surface.
+- **Forest 700** (`oklch(0.49 0.15 40)`): Hover/active state of the accent; the slightly brighter press response.
+- **Forest 900** (`oklch(0.40 0.12 40)`) / **Forest 50** (`oklch(0.965 0.018 60)`): Deepest clay for text-on-light emphasis; the pale tint for accent-subtle backgrounds and the 3px focus glow.
 
 ### Neutral (warm stone)
 - **Stone 900** (`#1c1917`): Primary text/ink. Warm near-black, not pure gray.
@@ -144,12 +144,12 @@ A restrained palette: one forest-green accent carries identity at ≤10% of any 
 
 ### Status (reserved — never decorative)
 - **Success 600** (`#16a34a`): paid, approved, completed.
-- **Info 600** (`#2563eb`): sent, scheduled, in-progress, arrived. *Scheduled stays blue on purpose* so it can never be misread as approved/paid green now that the accent itself is green.
+- **Info 600** (`#2563eb`): sent, scheduled, in-progress, arrived. *Scheduled stays blue on purpose* so it can never be misread as approved/paid green.
 - **Warning 600** (`#d97706`): partial, expired, high-priority.
 - **Danger 600** (`#dc2626`): overdue, declined, destructive actions, urgent.
 
 ### Named Rules
-**The Green-Is-Earned Rule.** Forest accent covers ≤10% of any screen. It marks the single primary action or the live operational state — nothing else. If two greens compete on a screen, one of them is wrong.
+**The Accent-Is-Earned Rule.** Burnt-orange accent covers ≤10% of any screen. It marks the single primary action or the live operational state — nothing else. If two oranges compete on a screen, one of them is wrong.
 
 **The Status-Never-Decorates Rule.** The four status hues mean exactly one thing each (paid/sent/partial/overdue families). Never reuse a status color as an accent or background flourish — a green card must mean "good," not "pretty."
 

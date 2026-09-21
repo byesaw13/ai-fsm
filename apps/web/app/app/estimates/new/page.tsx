@@ -281,11 +281,11 @@ export default async function NewEstimatePage({ searchParams }: PageProps) {
     <PageContainer>
       <Breadcrumbs
         items={[
-          { href: "/app/estimates", label: "Estimates" },
+          { href: "/app/estimates", label: "Quotes" },
           { label: "New estimate" },
         ]}
       />
-      <PageHeader title="New Estimate" backHref="/app/estimates" backLabel="Estimates" />
+      <PageHeader title="New Quote" backHref="/app/estimates" backLabel="Quotes" />
       <HubSubnav hub="Work" links={WORK_HUB_LINKS} pathname="/app/estimates" />
       <p style={{ margin: "0 0 var(--space-4)", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
         Short steps — defaults from the client, property, and price book when available. Save draft anytime.

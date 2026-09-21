@@ -312,7 +312,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       key: `a-${a.id}`,
       href: a.assessment_completed ? `/app/visits/${a.id}` : `/app/visits/${a.id}/assessment`,
       title: a.assessment_completed ? "Assessment — close visit" : "Assessment — finish form",
-      meta: `${a.job_title ?? "Project"} · ${formatBusinessDateTime(a.scheduled_start)}`,
+      meta: `${a.job_title ?? "Job"} · ${formatBusinessDateTime(a.scheduled_start)}`,
       status: a.status,
       priority: 0 as number,
     })),
@@ -461,7 +461,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           <SectionHeader title="History summary" />
           <dl className="p7-detail-list" style={{ margin: 0 }}>
             <div className="p7-detail-row">
-              <dt>Projects in app</dt>
+              <dt>Jobs in app</dt>
               <dd>
                 {Number(allJobCountRows?.job_count ?? 0)}{" "}
                 <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
@@ -527,7 +527,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         <div className="p7-detail-primary">
           <Card>
             <SectionHeader
-              title="Properties"
+              title="Houses"
               count={properties.length}
               action={
                 <LinkButton href={`/app/properties/new?client_id=${client.id}`} variant="ghost" size="sm">

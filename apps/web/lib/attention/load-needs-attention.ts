@@ -206,21 +206,21 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
         tone: "warning",
       },
       {
-        label: "Review Draft Invoices",
+        label: "Draft bills",
         count: draftInvoiceCount,
         href: "/app/invoices?status=draft" as Route,
-        detail: "Completed work waiting for invoice review",
+        detail: "Completed work waiting for a bill",
         tone: "warning",
       },
       {
-        label: "Schedule Approved Jobs",
+        label: "Schedule jobs",
         count: scheduleCount,
         href: "/app/jobs" as Route,
         detail: "Approved or active jobs without a next visit",
         tone: "warning",
       },
       {
-        label: "Follow Up Estimates",
+        label: "Follow up quotes",
         count: sentEstimateCount + expiringEstimateCount + expiredEstimateCount,
         href: "/app/estimates?status=sent" as Route,
         detail:
@@ -232,14 +232,14 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
         tone: "warning",
       },
       {
-        label: "Collect Deposits",
+        label: "Collect deposits",
         count: depositCount,
         href: "/app/invoices?kind=deposit" as Route,
         detail: "Deposit invoices not fully collected",
         tone: "danger",
       },
       {
-        label: "Order Materials",
+        label: "Order materials",
         count: materialCount,
         href: (materialJobs.length === 1
           ? `/app/jobs/${materialJobs[0].job_id}/materials?tab=buy`
@@ -247,25 +247,25 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
         detail:
           materialJobs.length === 1
             ? `Buy list: ${materialJobs[0].title}`
-            : "Open buy lists for approved active projects",
+            : "Open buy lists for approved active jobs",
         tone: "warning",
       },
       {
-        label: "Review Requests",
+        label: "Review requests",
         count: requestCount,
         href: "/app/requests" as Route,
         detail: "Needs routing or follow-up",
         tone: "warning",
       },
       {
-        label: "Collect Overdue Invoices",
+        label: "Collect overdue bills",
         count: overdueCount,
         href: "/app/invoices?status=overdue" as Route,
         detail: `${fmt(overdueTotal)} outstanding`,
         tone: "danger",
       },
       {
-        label: "Clear Exception Lanes",
+        label: "Clear exception lanes",
         count: exceptionJobCount + exceptionVisitCount,
         href: "/app/jobs" as Route,
         detail: `${exceptionJobCount} job${exceptionJobCount !== 1 ? "s" : ""} / ${exceptionVisitCount} visit${exceptionVisitCount !== 1 ? "s" : ""}`,

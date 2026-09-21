@@ -73,23 +73,21 @@ interface NavSection {
 // bar is a 4-hub shortcut subset (+ More button in AppShell).
 // ---------------------------------------------------------------------------
 
-// The office overview/dashboard. Labelled "Overview" (not "Today") so it reads
-// as the numbers screen and doesn't compete with the My Day field surface.
-const NAV_TODAY:      NavItem = { href: "/app",              label: "Overview",   Icon: IconDashboard };
-// EPIC-006 Phase 5: the field surface. Owners can switch into it; pure admins
-// (who don't do field work) and the all-techs list never see it here.
-const NAV_MY_DAY:     NavItem = { href: "/app/my-work",      label: "My Day",     Icon: IconMyDay };
+// The office desk. Labelled "Desk" (not "Today") so it doesn't compete with the field home.
+const NAV_TODAY:      NavItem = { href: "/app",              label: "Desk",       Icon: IconDashboard };
+// Field home. Owners can switch into it; pure admins (who don't do field work) never see it here.
+const NAV_MY_DAY:     NavItem = { href: "/app/my-work",      label: "Today",      Icon: IconMyDay };
 const NAV_CAPTURE:    NavItem = { href: "/app/capture",      label: "Capture",    Icon: IconCapture };
 const NAV_DAY_REVIEW: NavItem = { href: "/app/day-review",   label: "Day Review", Icon: IconDayReview };
 const NAV_TRACKING:   NavItem = { href: "/app/timeline",     label: "Tracking",   Icon: IconField };
 const NAV_REQUESTS:   NavItem = { href: "/app/requests",     label: "Requests",   Icon: IconInbox };
 const NAV_CLIENTS:    NavItem = { href: "/app/clients",      label: "Clients",    Icon: IconClients,   adminOnly: true };
-const NAV_PROPS:      NavItem = { href: "/app/properties",   label: "Properties", Icon: IconProperties, adminOnly: true };
-const NAV_ESTIMATES:  NavItem = { href: "/app/estimates",    label: "Estimates",  Icon: IconEstimates, adminOnly: true };
-const NAV_JOBS:       NavItem = { href: "/app/jobs",         label: "Projects",   Icon: IconJobs,       adminOnly: true };
-// TASK-125: Work Orders are reached inside a Project, not from the top nav.
+const NAV_PROPS:      NavItem = { href: "/app/properties",   label: "Houses",     Icon: IconProperties, adminOnly: true };
+const NAV_ESTIMATES:  NavItem = { href: "/app/estimates",    label: "Quotes",     Icon: IconEstimates, adminOnly: true };
+const NAV_JOBS:       NavItem = { href: "/app/jobs",         label: "Jobs",       Icon: IconJobs,       adminOnly: true };
+// Work orders are reached inside a Job, not from the top nav.
 const NAV_SCHEDULE:   NavItem = { href: "/app/schedule",     label: "Schedule",   Icon: IconSchedule,  adminOnly: true };
-const NAV_INVOICES:   NavItem = { href: "/app/invoices",     label: "Invoices",   Icon: IconInvoices,  adminOnly: true };
+const NAV_INVOICES:   NavItem = { href: "/app/invoices",     label: "Bills",      Icon: IconInvoices,  adminOnly: true };
 const NAV_REPORTS:    NavItem = { href: "/app/reports",      label: "Reports",    Icon: IconReports,   adminOnly: true };
 const NAV_SETTINGS:   NavItem = { href: "/app/settings",     label: "Settings",   Icon: IconSettings,  adminOnly: true };
 
@@ -114,7 +112,7 @@ function buildHubSections(home: NavItem): NavSection[] {
 /** Returns filtered nav sections for a given role and active workspace view. */
 export function getNavSections(role: Role, view: "office" | "field" = "field"): NavSection[] {
   if (role === "tech") {
-    const myDay: NavItem = { href: "/app/my-work", label: "My Day", Icon: IconMyDay };
+    const myDay: NavItem = { href: "/app/my-work", label: "Today", Icon: IconMyDay };
     const visits: NavItem = { href: "/app/visits", label: "Visits", Icon: IconVisits };
     return [{ label: "", items: [myDay, visits, NAV_DAY_REVIEW] }];
   }
@@ -131,12 +129,13 @@ export function getNavSections(role: Role, view: "office" | "field" = "field"): 
 }
 
 /**
- * Mobile bottom tab shortcuts. Owner/admin: 4 hubs (Home / Work / People / Money);
- * AppShell adds the More button as the 5th slot. Tech: My Day + Visits.
+ * Mobile bottom tab shortcuts. Owner: Today / Jobs / People / Money;
+ * Admin: Desk / Jobs / People / Money. AppShell adds More as the 5th slot.
+ * Tech: Today + Visits.
  */
 export function getBottomNavItems(role: Role): NavItem[] {
   if (role === "tech") {
-    const myDay: NavItem = { href: "/app/my-work", label: "My Day", Icon: IconMyDay };
+    const myDay: NavItem = { href: "/app/my-work", label: "Today", Icon: IconMyDay };
     const visits: NavItem = { href: "/app/visits", label: "Visits", Icon: IconVisits };
     return [myDay, visits];
   }
@@ -145,20 +144,20 @@ export function getBottomNavItems(role: Role): NavItem[] {
     role === "owner"
       ? {
           href: "/app/my-work",
-          label: "Home",
+          label: "Today",
           Icon: IconMyDay,
           activePrefixes: ["/app/my-work", "/app/my-day", "/app/day-review", "/app/timeline", "/app/capture"],
         }
       : {
           href: "/app",
-          label: "Home",
+          label: "Desk",
           Icon: IconDashboard,
           activePrefixes: ["/app/day-review", "/app/timeline", "/app/capture"],
         };
 
   const work: NavItem = {
     href: "/app/jobs",
-    label: "Work",
+    label: "Jobs",
     Icon: IconJobs,
     activePrefixes: [
       "/app/jobs",
@@ -217,8 +216,8 @@ interface AppShellProps {
 
 export function AppShell({ role, userName, reviewPending, children }: AppShellProps) {
   const pathname = usePathname();
-  // The sidebar follows the surface you're on: My Day = field, everything else =
-  // office. So Field never shows the Overview home and vice-versa.
+  // The sidebar follows the surface you're on: Today = field, everything else =
+  // office. So Field never shows the Desk home and vice-versa.
   const sections = getNavSections(role, pathname.startsWith("/app/my-work") ? "field" : "office");
   const bottomItems = getBottomNavItems(role);
   const [showQuickLead, setShowQuickLead] = useState(false);
@@ -239,8 +238,7 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
   };
 
   const isAdminOrOwner = role === "owner" || role === "admin";
-  // Logo goes to each role's home: My Day for field roles, the office dashboard
-  // for pure admins (who get bounced there from My Day anyway).
+  // Logo goes to each role's home: Today for field roles, Desk for pure admins.
   const homeHref = role === "admin" ? "/app" : "/app/my-work";
 
   const { summary: attention, refresh: refreshAttention } = useAttentionSummary(isAdminOrOwner);

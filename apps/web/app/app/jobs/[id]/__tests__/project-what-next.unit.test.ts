@@ -217,7 +217,7 @@ describe("computeWhatNext — money, field, T&M", () => {
       }),
     );
 
-    expect(next.message).toBe("Project closed — send the final invoice");
+    expect(next.message).toBe("Job closed — send the final invoice");
     expect(next.actionLabel).toBe("Create Invoice");
     expect(next.actionHref).toContain(`/app/invoices/new?job_id=${JOB_ID}`);
     expect(next.actionHref).toContain(`approved_estimate_id=${ESTIMATE_ID}`);
@@ -237,7 +237,7 @@ describe("computeWhatNext — money, field, T&M", () => {
       }),
     );
 
-    expect(next.message).toMatch(/Project closed/);
+    expect(next.message).toMatch(/Job closed/);
     expect(next.actionLabel).toBe("Open Invoice");
     expect(next.actionHref).toBe(`/app/invoices/${INVOICE_ID}`);
     // Must not fall through to "schedule the work"

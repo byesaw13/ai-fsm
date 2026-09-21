@@ -27,6 +27,8 @@ import { PageContainer, PageHeader, Card, SectionHeader, EmptyState, LinkButton 
 import { loadNeedsAttention } from "@/lib/attention/load-needs-attention";
 import { NeedsAttentionPanel } from "../NeedsAttentionPanel";
 import { TodayTimeline } from "./TodayTimeline";
+import { todayEmptyCopy, todayJobCountLabel, todayJobsHeading } from "./today-list";
+import { filterAttentionForSurface } from "@/lib/attention/surfaces";
 
 export const dynamic = "force-dynamic";
 
@@ -137,13 +139,16 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
 
   const todayVisits = heroVisits.filter((v) => isSameCalendarDay(v.scheduled_start));
   const heroVisit = pickHeroVisit(todayVisits, now.getTime());
-  const needsAttention = isOwner ? await loadNeedsAttention(session) : null;
+  const needsAttentionRaw = isOwner ? await loadNeedsAttention(session) : null;
+  const needsAttention = needsAttentionRaw
+    ? { items: filterAttentionForSurface(needsAttentionRaw.items, "today"), openPromiseRows: [] as typeof needsAttentionRaw.openPromiseRows }
+    : null;
 
   const nowHour = now.getHours();
   const greeting =
     nowHour < 12 ? "Good morning" : nowHour < 17 ? "Good afternoon" : "Good evening";
 
-  let statusLabel = `${workOrders.length} work order${workOrders.length !== 1 ? "s" : ""}`;
+  let statusLabel = todayJobCountLabel(workOrders.length);
   if (heroVisit?.status === "in_progress" || heroVisit?.status === "arrived") {
     statusLabel += " · In progress now";
   } else if (heroVisit) {
@@ -169,7 +174,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
               <ManualSiteVisitButton />
               <span className="p7-only-desktop">
                 <LinkButton href="/app" variant="secondary" size="sm">
-                  ← Overview
+                  ← Desk
                 </LinkButton>
               </span>
             </span>
@@ -242,11 +247,11 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
           showTrackingLink={!isTech}
         />
         <Card style={{ marginBottom: "var(--space-4)" }}>
-          <SectionHeader title="Active Work Orders" count={workOrders.length} />
+          <SectionHeader title={todayJobsHeading()} count={workOrders.length} />
           {workOrders.length === 0 ? (
             <EmptyState
-              title="No work orders assigned"
-              description="When you're the lead on a work order, it appears here. Start your day above to clock in and log mileage."
+              title={todayEmptyCopy().title}
+              description={todayEmptyCopy().description}
             />
           ) : (
             <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>

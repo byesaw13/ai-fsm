@@ -79,7 +79,7 @@ export function promiseEntityLabel(entityType: string): string {
     case "estimate":
       return "Estimate";
     case "job":
-      return "Project";
+      return "Job";
     case "invoice":
       return "Invoice";
     default:

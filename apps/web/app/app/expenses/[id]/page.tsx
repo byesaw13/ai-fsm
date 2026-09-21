@@ -128,7 +128,7 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
             ? [
                 {
                   href: `/app/jobs/${expense.job_id}`,
-                  label: (expense.job_title as string | null) ?? "Project",
+                  label: (expense.job_title as string | null) ?? "Job",
                 },
               ]
             : []),

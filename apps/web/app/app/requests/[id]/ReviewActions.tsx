@@ -311,7 +311,7 @@ export function ReviewActions({
             disabled={!!pending}
             size="sm"
           >
-            Create Project →
+            Create Job →
           </Button>
         );
       case "schedule_assessment":
@@ -335,7 +335,7 @@ export function ReviewActions({
               disabled={!!pending}
               size="sm"
             >
-              Create Project →
+              Create Job →
             </Button>
           );
         }
@@ -552,7 +552,7 @@ export function ReviewActions({
             {primaryAction}
             {!primaryAction && guidance.followUpKind && guidance.followUpHref && (
               <LinkButton href={guidance.followUpHref} variant="primary" size="sm">
-                {guidance.followUpKind === "view_visit" ? "Open Visit →" : "Open Project →"}
+                {guidance.followUpKind === "view_visit" ? "Open Visit →" : "Open Job →"}
               </LinkButton>
             )}
           </div>
