@@ -13,7 +13,7 @@ export default async function NewClientPage() {
 
   return (
     <PageContainer>
-      <PageHeader title="New Client" backHref="/app/clients" backLabel="Clients" />
+      <PageHeader title="New person" backHref="/app/clients" backLabel="People" />
       <Card>
         <ClientForm mode="create" actionUrl="/api/v1/clients" cancelHref="/app/clients" />
       </Card>

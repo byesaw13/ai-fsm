@@ -4,7 +4,11 @@ import { COMMAND_INDEX, filterCommands } from "../command-index";
 describe("command index", () => {
   it("exposes Today, Desk, and Tracking for the owner", () => {
     const labels = filterCommands("", "owner").map((c) => c.label);
-    expect(labels).toEqual(expect.arrayContaining(["Today", "Desk", "Tracking", "Jobs", "Bills"]));
+    expect(labels).toEqual(
+      expect.arrayContaining(["Today", "Desk", "Tracking", "Jobs", "Bills", "People"]),
+    );
+    expect(labels).not.toContain("Clients");
+    expect(labels).not.toContain("Work Orders");
   });
 
   it("hides office destinations from techs", () => {
