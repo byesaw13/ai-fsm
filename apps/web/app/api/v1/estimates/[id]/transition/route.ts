@@ -145,20 +145,13 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         [targetStatus, id]
       );
 
-      // On approval: create deposit invoice, then auto-link a job.
+      // On approval: job first, then deposit, so the deposit lands on the job.
       // createJobFromEstimate is idempotent (returns existing job if already linked).
       if (targetStatus === "approved") {
-        const { depositInvoiceId } = await createApprovalArtifacts(client, {
-          estimateId: id,
-          accountId: session.accountId,
-          userId: session.userId,
-        });
-        createdDepositInvoiceId = depositInvoiceId;
-
-        // Auto-create (or link) the job so it's visible on the board.
+        // Auto-create the job so it's visible on the board.
         // Wrapped in a savepoint so a job-creation failure never rolls back
         // the estimate approval itself. CLIENT_RECENT_WORK is intentional:
-        // approve still succeeds; we refuse to silently spawn a second project.
+        // approve still succeeds; we refuse to silently spawn a second job.
         await client.query("SAVEPOINT before_auto_job");
         try {
           const { jobId, workOrderId } = await createJobFromEstimate({
@@ -191,6 +184,13 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
             });
           }
         }
+
+        const { depositInvoiceId } = await createApprovalArtifacts(client, {
+          estimateId: id,
+          accountId: session.accountId,
+          userId: session.userId,
+        });
+        createdDepositInvoiceId = depositInvoiceId;
 
         // Won the lead: mark linked booking request converted
         await advanceBookingRequestForEstimate(client, {

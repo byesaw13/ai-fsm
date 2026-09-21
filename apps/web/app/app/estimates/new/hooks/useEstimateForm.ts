@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { PriceBookService } from "@/components/PriceBookSelector";
 import { formatCents, getStandardEstimateTerms } from "@/lib/estimates/pricing";
+import { commercialPricingForQuote } from "@/lib/estimates/commercial-pricing";
 import type { DepositDueTrigger, DepositType } from "@/lib/estimates/deposit-policy";
 import {
   ENGINE_VERSION,
@@ -88,6 +89,8 @@ export interface NewEstimateFormProps {
   initialInterviewDraft?: { draft: import("@/lib/estimates/ai-draft").DraftEstimate; shoppingList: ShoppingList | null } | null;
   /** When set, the form auto-applies a T&M briefing draft on mount (paste → hours/range path). */
   initialTmDraft?: import("@/lib/estimates/tm-briefing").TmEstimateDraft | null;
+  /** Bid vs T&M stored on the quote. Independent of the form layout. */
+  commercialPricingMode?: "flat_rate" | "hourly_internal";
   /** Seed text for the notes/scope field (e.g. walkthrough findings). Initial value only — never overwrites edits. */
   initialNotes?: string;
   /** Booking request that originated this estimate — stored for chain traceability. */
@@ -113,6 +116,7 @@ export function useEstimateForm({
   initialPricingMode = "flat_rate",
   initialInterviewDraft,
   initialTmDraft = null,
+  commercialPricingMode,
   initialNotes,
   bookingRequestId,
   serverAssessmentContext = null,
@@ -780,6 +784,10 @@ export function useEstimateForm({
       }
 
       Object.assign(payload, {
+        pricing_mode: commercialPricingForQuote({
+          explicit: commercialPricingMode,
+          hasTmDraft: Boolean(initialTmDraft),
+        }),
         ...(initialVaultItemId ? { vault_item_id: initialVaultItemId } : {}),
         ...(bookingRequestId ? { booking_request_id: bookingRequestId } : {}),
         // Persist shopping list: AI draft takes priority; fall back to scope-derived list for manual estimates

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui";
 import { EstimateLaunchModal, resolveEntryPricingMode, type EstimateMode } from "./EstimateLaunchModal";
+import { commercialPricingForQuote, type CommercialPricingMode } from "@/lib/estimates/commercial-pricing";
 import { EstimateInterviewFlow } from "./EstimateInterviewFlow";
 import { TmBriefingFlow } from "./TmBriefingFlow";
 import { NewEstimateForm } from "./NewEstimateForm";
@@ -23,6 +24,7 @@ interface EstimateEntryShellProps {
   initialVaultItemId?: string;
   vaultItemContext?: { name: string; category: string; location: string | null } | null;
   initialPricingMode?: "itemized" | "flat_rate" | "multi_option";
+  commercialPricingMode?: CommercialPricingMode;
   initialMode?: EstimateMode;
   initialNotes?: string;
   bookingRequestId?: string;
@@ -44,6 +46,7 @@ export function EstimateEntryShell({
   initialVaultItemId,
   vaultItemContext,
   initialPricingMode,
+  commercialPricingMode,
   initialMode,
   initialNotes,
   bookingRequestId,
@@ -122,6 +125,11 @@ export function EstimateEntryShell({
         initialVaultItemId={initialVaultItemId}
         vaultItemContext={vaultItemContext}
         initialPricingMode={resolvedPricingMode}
+        commercialPricingMode={commercialPricingForQuote({
+          explicit: commercialPricingMode,
+          entryMode: initialMode,
+          hasTmDraft: Boolean(appliedTmDraft),
+        })}
         initialInterviewDraft={appliedDraft ?? undefined}
         initialTmDraft={appliedTmDraft ?? undefined}
         initialNotes={initialNotes}

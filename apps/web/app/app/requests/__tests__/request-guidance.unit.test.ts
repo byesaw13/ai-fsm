@@ -33,7 +33,7 @@ describe("getRequestGuidance", () => {
     expect(guidance.requestTypeLabel).toBe("Remote estimate");
   });
 
-  it("treats site_visit path with job as Schedule Assessment", () => {
+  it("treats site_visit path with job as Book a look", () => {
     const guidance = getRequestGuidance({
       status: "reviewed",
       pricing_mode: "flat_rate",
@@ -44,8 +44,8 @@ describe("getRequestGuidance", () => {
     });
 
     expect(guidance.primaryActionKind).toBe("schedule_assessment");
-    expect(guidance.recommendedLabel).toBe("Schedule Assessment");
-    expect(guidance.destinationRecord).toBe("Assessment");
+    expect(guidance.recommendedLabel).toBe("Book a look");
+    expect(guidance.destinationRecord).toBe("Look");
     expect(guidance.requestTypeLabel).toBe("Assessment first");
   });
 

@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
  * - Estimate must be `approved`.
  * - Idempotent: if the estimate already has a linked job, that job is returned
  *   and no new job is created (prevents duplicates).
- * - Links to an open job for the same client when one exists.
+ * - Links to an existing job only when `link_existing_job_id` is passed.
  * - Refuses to spawn a new project when the client has recent completed/billed
  *   work unless `force_new_project=true` (query or JSON body).
  * - The estimate→job link is permitted on a terminal estimate by the narrowed
@@ -31,9 +31,17 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
   let forceNewProject =
     request.nextUrl.searchParams.get("force_new_project") === "true" ||
     request.nextUrl.searchParams.get("force") === "true";
+  let linkExistingJobId = request.nextUrl.searchParams.get("link_existing_job_id") ?? undefined;
   try {
-    const body = (await request.json()) as { force_new_project?: boolean; force?: boolean };
+    const body = (await request.json()) as {
+      force_new_project?: boolean;
+      force?: boolean;
+      link_existing_job_id?: string;
+    };
     if (body?.force_new_project === true || body?.force === true) forceNewProject = true;
+    if (typeof body?.link_existing_job_id === "string") {
+      linkExistingJobId = body.link_existing_job_id;
+    }
   } catch {
     // empty body is fine
   }
@@ -47,6 +55,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         createdBy: session.userId,
         traceId: session.traceId,
         forceNewProject,
+        linkExistingJobId,
       });
 
       if (created) {

@@ -57,7 +57,7 @@ const STATE_LABELS: Record<RequestStatus, string> = {
   reviewed: "Ready to route",
   assessment_booked: "Assessment booked",
   estimated: "Estimated",
-  converted: "Converted",
+  converted: "Won",
   lost: "Lost",
   cancelled: "Closed request",
 };
@@ -69,7 +69,7 @@ const STATE_DETAILS: Record<RequestStatus, string> = {
   reviewed: "Classified — continue with the selected path.",
   assessment_booked: "Site visit is on the calendar — measure, then estimate.",
   estimated: "Estimate is out — waiting for client accept or decline.",
-  converted: "Won — linked to a project (estimate accepted or work booked).",
+  converted: "Won — linked to a job (quote accepted or work booked).",
   lost: "Did not convert — declined, chose elsewhere, or went idle.",
   cancelled: "Closed by staff (spam / not a lead) and retained in history.",
 };
@@ -79,7 +79,7 @@ export const FUNNEL_STEPS = [
   { status: "pending", label: "Called" },
   { status: "assessment_booked", label: "Assessment" },
   { status: "estimated", label: "Estimated" },
-  { status: "converted", label: "Converted" },
+  { status: "converted", label: "Won" },
 ] as const;
 
 export function funnelStepIndex(status: string): number {
@@ -105,7 +105,7 @@ const OUTCOME_META: Record<
 > = {
   choose_path: {
     label: "Choose how to proceed",
-    detail: "Assessment, book work, or remote estimate — required before the next step.",
+    detail: "Book a look, book work, or remote quote — required before the next step.",
     destination: "Path",
   },
   create_estimate: {
@@ -119,9 +119,9 @@ const OUTCOME_META: Record<
     destination: "Job",
   },
   schedule_assessment: {
-    label: "Schedule Assessment",
-    detail: "Book the on-site assessment to capture measurements, photos, and scope.",
-    destination: "Assessment",
+    label: "Book a look",
+    detail: "Book the on-site look to capture measurements, photos, and scope.",
+    destination: "Look",
   },
   schedule_work: {
     label: "Schedule Work Day",

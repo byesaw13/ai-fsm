@@ -134,6 +134,7 @@ export function QuickEstimateWizard({ clients, featuredServices, initialClientId
             flat_rate_cents,
             notes: [selectedService.name, notes.trim()].filter(Boolean).join("\n\n") || null,
             presentation_mode: "standard",
+            pricing_mode: "flat_rate",
           }),
         });
         if (!res.ok) {
