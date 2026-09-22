@@ -8,6 +8,7 @@ import { sendEmail, appUrl, isEmailConfigured } from "@/lib/email/mailer";
 import { estimateEmailHtml, estimateEmailText } from "@ai-fsm/email-templates";
 import { getEnv } from "@/lib/env";
 import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
+import { loadPricingRules } from "@/lib/pricing/settings";
 import { logCommunication } from "@/lib/communications-log";
 import { loadEstimatePdf } from "@/lib/pdf/load";
 import {
@@ -80,12 +81,13 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         return { status: 422, message: `Cannot send a ${est.status} estimate` };
       }
 
+      const { rules: pricingRules } = await loadPricingRules(client, session.accountId);
       const pricingReview = reviewEstimateGuardrails({
         ...est,
         margin_pct: null,
         has_ma_regulated_items: false,
         line_item_count: est.line_item_count,
-      });
+      }, pricingRules);
       await client.query(
         `UPDATE estimates
          SET pricing_review_status = $1,

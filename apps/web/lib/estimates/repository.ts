@@ -1,8 +1,9 @@
 import type { PoolClient } from "pg";
 import { appendAuditLog } from "@/lib/db/audit";
 import { calcTotals, lineItemTotal } from "./math";
-import { computeEstimate, sqftPaintingToSpec, CURRENT_RULES } from "@ai-fsm/domain";
+import { computeEstimate, sqftPaintingToSpec } from "@ai-fsm/domain";
 import { laborCostCentsFromHours } from "@/lib/pricing/labor-hours";
+import { loadPricingRules } from "@/lib/pricing/settings";
 import { calculateDepositPolicy, estimateMaterialsDepositBasis } from "./deposit-policy";
 import { computeConditionTier } from "./guardrails";
 
@@ -291,6 +292,9 @@ export async function updateEstimateById(
     let new_internal_material: number | null = null;
 
     if (has_painting_fields) {
+      // Recompute with the account's own labor/margin rates, not the static
+      // defaults — so an owner-adjusted rate flows into edited painting estimates.
+      const { rules: pricingRules } = await loadPricingRules(client, session.accountId);
       const engine = computeEstimate(
         sqftPaintingToSpec({
           sq_ft: patch.sq_ft!,
@@ -300,12 +304,12 @@ export async function updateEstimateById(
           material_cost_cents: patch.material_cost_cents ?? 0,
           labor_hours_estimate: patch.labor_hours_estimate!,
         }),
-        CURRENT_RULES
+        pricingRules
       );
       subtotal_cents = engine.summary.totalCents;
       new_internal_labor = laborCostCentsFromHours(
         patch.labor_hours_estimate!,
-        CURRENT_RULES.laborCostCentsPerHour,
+        pricingRules.laborCostCentsPerHour,
       );
       new_internal_material = patch.material_cost_cents ?? null;
     } else {

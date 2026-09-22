@@ -3,7 +3,9 @@ import { z } from "zod";
 import { withAuth } from "@/lib/auth/middleware";
 import { translateScope } from "@/lib/estimates/scope";
 import { formatCents } from "@/lib/estimates/pricing";
-import { computeEstimate, sqftPaintingToSpec, CURRENT_RULES } from "@ai-fsm/domain";
+import { computeEstimate, sqftPaintingToSpec } from "@ai-fsm/domain";
+import { withDbSession } from "@/lib/db";
+import { loadPricingRules } from "@/lib/pricing/settings";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -52,6 +54,12 @@ export const POST = withAuth(async (request: NextRequest, session) => {
     let estimate_preview: Record<string, string> | null = null;
     if (parsed.suggested_job_type === "painting" && parsed.sq_ft !== null && parsed.prep_level !== null) {
       const hours = parsed.labor_hours_estimate ?? Math.round((parsed.sq_ft / 100) * 4 * 10) / 10;
+      // Preview with the account's own rates so it matches the saved estimate.
+      // Load inside an RLS-scoped session (BEGIN + set_config) so this still works
+      // when the web tier runs under the restricted NOBYPASSRLS role (TASK-146).
+      const pricingRules = await withDbSession(session, async (client) =>
+        (await loadPricingRules(client, session.accountId)).rules
+      );
       const engine = computeEstimate(
         sqftPaintingToSpec({
           sq_ft: parsed.sq_ft,
@@ -61,7 +69,7 @@ export const POST = withAuth(async (request: NextRequest, session) => {
           material_cost_cents: parsed.material_cost_cents ?? 0,
           labor_hours_estimate: hours,
         }),
-        CURRENT_RULES
+        pricingRules
       );
       estimate_preview = {
         labor: formatCents(engine.summary.laborCents),
