@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buildPricingRules, DEFAULT_PRICING_SETTINGS } from "@ai-fsm/domain";
 import {
   buildClientDocumentFilename,
   reviewEstimateGuardrails,
@@ -25,6 +26,23 @@ describe("reviewEstimateGuardrails", () => {
 
     expect(review.status).toBe("passed");
     expect(review.warnings.some((w) => w.field === "minimum_service_override_reason")).toBe(true);
+  });
+
+  it("honors account-specific rules passed by the create/send paths (raised minimum fee)", () => {
+    // Regression guard for routing pricing consumers through account settings:
+    // $200 clears the $185 default minimum (no warning) but not a $300 account
+    // minimum (warning). Proves the passed rules — not CURRENT_RULES — decide.
+    const belowRaisedMin = { ...baseInput, total_cents: 20000 };
+
+    const atDefault = reviewEstimateGuardrails(belowRaisedMin);
+    expect(atDefault.warnings.some((w) => w.field === "minimum_service_override_reason")).toBe(false);
+
+    const accountRules = buildPricingRules({
+      ...DEFAULT_PRICING_SETTINGS,
+      minimum_service_fee_cents: 30000,
+    });
+    const atAccountRules = reviewEstimateGuardrails(belowRaisedMin, accountRules);
+    expect(atAccountRules.warnings.some((w) => w.field === "minimum_service_override_reason")).toBe(true);
   });
 
   it("passes a below-minimum estimate when a structured override is recorded", () => {

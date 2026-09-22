@@ -4,7 +4,7 @@ import { withAuth } from "@/lib/auth/middleware";
 import { translateScope } from "@/lib/estimates/scope";
 import { formatCents } from "@/lib/estimates/pricing";
 import { computeEstimate, sqftPaintingToSpec } from "@ai-fsm/domain";
-import { getPool } from "@/lib/db";
+import { withDbSession } from "@/lib/db";
 import { loadPricingRules } from "@/lib/pricing/settings";
 import { logger } from "@/lib/logger";
 
@@ -55,13 +55,11 @@ export const POST = withAuth(async (request: NextRequest, session) => {
     if (parsed.suggested_job_type === "painting" && parsed.sq_ft !== null && parsed.prep_level !== null) {
       const hours = parsed.labor_hours_estimate ?? Math.round((parsed.sq_ft / 100) * 4 * 10) / 10;
       // Preview with the account's own rates so it matches the saved estimate.
-      const client = await getPool().connect();
-      let pricingRules;
-      try {
-        pricingRules = (await loadPricingRules(client, session.accountId)).rules;
-      } finally {
-        client.release();
-      }
+      // Load inside an RLS-scoped session (BEGIN + set_config) so this still works
+      // when the web tier runs under the restricted NOBYPASSRLS role (TASK-146).
+      const pricingRules = await withDbSession(session, async (client) =>
+        (await loadPricingRules(client, session.accountId)).rules
+      );
       const engine = computeEstimate(
         sqftPaintingToSpec({
           sq_ft: parsed.sq_ft,
