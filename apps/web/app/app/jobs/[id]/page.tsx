@@ -684,7 +684,7 @@ export default async function JobDetailPage({
       }>(
         session,
         `SELECT u.cost_cents_per_hour, u.burden_multiplier,
-                ROUND(SUM(EXTRACT(EPOCH FROM (ae.ended_at - ae.started_at)) / 60))::int AS minutes
+                SUM(EXTRACT(EPOCH FROM (ae.ended_at - ae.started_at)) / 60.0) AS minutes
            FROM activity_entries ae
            LEFT JOIN users u ON u.id = ae.user_id
           WHERE ae.account_id = $2
