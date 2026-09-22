@@ -62,6 +62,29 @@ describe("laborCostForMargin", () => {
     expect(r.source).toBe("none");
     expect(r.laborCostCents).toBeNull();
   });
+
+  it("prefers the per-person actual cost over the flat rate when provided", () => {
+    // Two workers logged 120 min total; per-person sum ($130) differs from the
+    // flat 120min × $50 = $100. The per-person value must win.
+    const r = laborCostForMargin({
+      trackedMinutes: 120,
+      perPersonActualCostCents: 130_00,
+      estimatedLaborCostCents: 999_00,
+    });
+    expect(r.source).toBe("tracked");
+    expect(r.actualLaborCostCents).toBe(130_00);
+    expect(r.laborCostCents).toBe(130_00);
+  });
+
+  it("ignores the per-person override when no time is logged", () => {
+    const r = laborCostForMargin({
+      trackedMinutes: 0,
+      perPersonActualCostCents: 130_00,
+      estimatedLaborCostCents: 400_00,
+    });
+    expect(r.source).toBe("estimate");
+    expect(r.actualLaborCostCents).toBeNull();
+  });
 });
 
 describe("billing vs cost transforms", () => {
