@@ -67,6 +67,18 @@ describe("startCompanyDayOnConnect — van connect is Start day", () => {
     ).toEqual({ clockIn: true, startSession: true, startOdometer: 48210 });
   });
 
+  it("clocks in only when yesterday was worked without closing miles", () => {
+    expect(
+      startCompanyDayOnConnect({
+        alreadyClockedIn: false,
+        hasOpenSession: false,
+        vehicleId: VEHICLE,
+        lastOdometer: 48210,
+        priorDayNeedsMileage: true,
+      }),
+    ).toEqual({ clockIn: true, startSession: false, startOdometer: null });
+  });
+
   it("is a no-op when already clocked in and a session is open", () => {
     expect(
       startCompanyDayOnConnect({
@@ -300,10 +312,10 @@ describe("applyCompanyDayOnConnect — orchestration", () => {
 
     await applyCompanyDayOnConnect(
       mockClient(),
-      { accountId: "acct", userId: "user", vehicleId: VEHICLE },
+      { accountId: "acct", userId: "user", vehicleId: VEHICLE, sessionDate: "2026-09-21" },
       {
         getOpenClock: vi.fn().mockResolvedValue({ id: "c1" }),
-        findOpenSessionForVehicle: vi.fn().mockResolvedValue({ id: "s1" }),
+        findOpenSessionForVehicle: vi.fn().mockResolvedValue({ id: "s1", session_date: "2026-09-21" }),
         lastKnownOdometer: vi.fn().mockResolvedValue(48210),
         clockIn,
         startOpenVehicleSession,

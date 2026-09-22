@@ -239,6 +239,8 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
         currentJobId={heroVisit?.job_id ?? workOrders.find((w) => w.active_visit_id)?.job_id ?? workOrders[0]?.job_id ?? null}
         canCapture={isOwner}
         canQuickBook={isOwner}
+        priorDayNeedsMileage={fieldDay.priorDayNeedsMileage}
+        priorOpenSession={fieldDay.priorOpenSession}
       >
         {needsAttention && (
           <NeedsAttentionPanel

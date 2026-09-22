@@ -5,6 +5,7 @@ import { formatBusinessDate } from "@/lib/time/business-tz";
 import { summarizeDayMileage, type VehicleSessionRow } from "@/lib/mileage/sessions";
 import type { OpenSession, VehicleOption } from "@/lib/my-work/field-day-types";
 import type { ActivityEntryDto } from "@/lib/my-work/field-day-types";
+import { priorDayNeedsMileage } from "@/lib/my-day/day-setup";
 
 export type FieldDayData = {
   todayLabel: string;
@@ -16,6 +17,8 @@ export type FieldDayData = {
   clockedIn: boolean;
   ownerPeek: { outstandingCents: number; draftInvoices: number } | null;
   locationSettings: { enabled: boolean; pausedUntil: string | null } | null;
+  priorDayNeedsMileage: boolean;
+  priorOpenSession: OpenSession | null;
 };
 
 export async function loadFieldDayData(
@@ -28,7 +31,17 @@ export async function loadFieldDayData(
   // evening-ET request reads tomorrow's row and the just-started session vanishes.
   const today = businessToday();
 
-  const [openSessionRows, fieldVehicles, fieldActivity, todaySessionRows, yesterdayMilesRows, clockRows] =
+  const [
+    openSessionRows,
+    fieldVehicles,
+    fieldActivity,
+    todaySessionRows,
+    yesterdayMilesRows,
+    clockRows,
+    priorOpenRows,
+    lastWorkedRows,
+    lastEndedRows,
+  ] =
     await Promise.all([
       queryForSession<OpenSession>(
         session,
@@ -95,6 +108,40 @@ export async function loadFieldDayData(
          ORDER BY clock_in_at DESC LIMIT 1`,
         [accountId, session.userId],
       ),
+      queryForSession<OpenSession>(
+        session,
+        `SELECT s.id, s.session_date::text, s.vehicle_id, v.nickname AS vehicle_nickname,
+                v.plate AS vehicle_plate, s.start_odometer, s.started_at::text AS started_at
+         FROM vehicle_sessions s LEFT JOIN vehicles v ON v.id = s.vehicle_id
+         WHERE s.account_id = $1 AND s.session_date < $2::date
+           AND s.status = 'open'
+           AND s.end_odometer IS NULL AND s.miles IS NULL
+         ORDER BY s.started_at DESC LIMIT 1`,
+        [accountId, today],
+      ),
+      queryForSession<{ last_worked: string | null }>(
+        session,
+        `SELECT MAX(d)::text AS last_worked FROM (
+           SELECT session_date AS d FROM vehicle_sessions
+            WHERE account_id = $1 AND created_by = $2 AND session_date < $3::date AND status <> 'voided'
+           UNION ALL
+           SELECT clock_in_at::date FROM time_clock_sessions
+            WHERE account_id = $1 AND user_id = $2 AND voided_at IS NULL AND clock_in_at::date < $3::date
+           UNION ALL
+           SELECT scheduled_start::date FROM visits
+            WHERE account_id = $1 AND assigned_user_id = $2
+              AND status NOT IN ('cancelled') AND scheduled_start::date < $3::date
+         ) x`,
+        [accountId, session.userId, today],
+      ),
+      queryForSession<{ last_ended: string | null }>(
+        session,
+        `SELECT MAX(session_date)::text AS last_ended
+           FROM vehicle_sessions
+          WHERE account_id = $1 AND created_by = $2
+            AND end_odometer IS NOT NULL AND session_date < $3::date`,
+        [accountId, session.userId, today],
+      ),
     ]);
 
   let ownerPeek: FieldDayData["ownerPeek"] = null;
@@ -141,5 +188,12 @@ export async function loadFieldDayData(
     clockedIn: clockRows[0]?.status === "open",
     ownerPeek,
     locationSettings,
+    priorDayNeedsMileage: priorDayNeedsMileage({
+      today,
+      priorOpenSessionDate: priorOpenRows[0]?.session_date ?? null,
+      lastWorkedDate: lastWorkedRows[0]?.last_worked ?? null,
+      lastEndedMileageDate: lastEndedRows[0]?.last_ended ?? null,
+    }),
+    priorOpenSession: priorOpenRows[0] ?? null,
   };
 }
