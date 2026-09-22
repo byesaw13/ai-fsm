@@ -26,5 +26,8 @@ psql_cmd() {
 
 psql_cmd -v ON_ERROR_STOP=1 -f db/migrations/002_seed_dev.sql
 psql_cmd -v ON_ERROR_STOP=1 -f db/seeds/price_book_enriched.sql
+# Demo fixture (dev/QA only) — a job with tracked time + estimate so the job-detail
+# estimated-vs-actual labor headline is populated out of the box. Must run after 002.
+psql_cmd -v ON_ERROR_STOP=1 -f db/seeds/demo_job.sql
 
 echo "seed complete"
