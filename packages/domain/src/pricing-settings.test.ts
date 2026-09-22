@@ -59,8 +59,9 @@ describe("pricing-settings", () => {
       expect(workerCostRateCentsPerHour({ cost_cents_per_hour: 40_00, burden_multiplier: 1.35 })).toBe(54_00);
     });
 
-    it("falls back to a provided account rate, not just the default", () => {
-      expect(workerCostRateCentsPerHour({ cost_cents_per_hour: null, burden_multiplier: 1.2 }, 60_00)).toBe(72_00);
+    it("falls back to a provided account rate without re-applying burden (already burdened)", () => {
+      // No own pay rate → return the account cost clock as-is; burden must NOT double-apply.
+      expect(workerCostRateCentsPerHour({ cost_cents_per_hour: null, burden_multiplier: 1.2 }, 60_00)).toBe(60_00);
     });
 
     it("ignores non-positive burden and negative rate", () => {

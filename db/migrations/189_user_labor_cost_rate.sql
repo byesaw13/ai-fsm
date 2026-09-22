@@ -34,3 +34,22 @@ FROM business_pricing_settings bps
 WHERE bps.account_id = u.account_id
   AND u.role = 'owner'
   AND u.cost_cents_per_hour IS NULL;
+
+-- ── Reversal plan ────────────────────────────────────────────────────────────
+-- This migration is additive; the runner applies forward files only, so rollback
+-- is manual. DATA LOSS WARNING: the columns below hold per-worker pay rates that
+-- do not exist anywhere else. Before dropping them, preserve the values if the
+-- data matters (they are not recoverable from other tables afterward):
+--
+--   -- 1. (optional) snapshot the values you would lose
+--   CREATE TABLE users_labor_cost_backup_189 AS
+--     SELECT id, account_id, cost_cents_per_hour, burden_multiplier FROM users;
+--
+--   -- 2. drop the additions (reverses this migration)
+--   ALTER TABLE users DROP CONSTRAINT IF EXISTS users_burden_multiplier_pos;
+--   ALTER TABLE users DROP CONSTRAINT IF EXISTS users_cost_cents_nonneg;
+--   ALTER TABLE users DROP COLUMN IF EXISTS burden_multiplier;
+--   ALTER TABLE users DROP COLUMN IF EXISTS cost_cents_per_hour;
+--
+-- Reads tolerate absence: workerCostRateCentsPerHour() falls back to the account
+-- cost clock, so dropping the columns degrades to pre-189 behavior (no crash).
