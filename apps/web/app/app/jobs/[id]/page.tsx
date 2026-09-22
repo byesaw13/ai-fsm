@@ -65,6 +65,7 @@ import { formatCents } from "@/lib/money";
 import {
   formatMinutesAsHoursMinutes,
   laborCostForMargin,
+  laborCostVarianceCents,
   mapTrackedLaborDayRows,
   type TrackedLaborDay,
 } from "@/lib/invoices/tracked-labor";
@@ -753,14 +754,13 @@ export default async function JobDetailPage({
     estimatedLaborCostCents: estimatedLaborCents,
   });
   const laborCostCents = laborMargin.laborCostCents;
-  // Labor cost variance (actual − estimate), only when both a tracked actual and
-  // an estimate exist. Drives the prominent est→actual headline in Internal P&L.
-  const laborVarianceCents =
-    laborMargin.source === "tracked" &&
-    laborMargin.actualLaborCostCents !== null &&
-    estimatedLaborCents !== null
-      ? laborMargin.actualLaborCostCents - estimatedLaborCents
-      : null;
+  // Labor cost variance (actual − estimate) — drives the prominent est→actual
+  // headline in Internal P&L. Null unless a tracked actual and estimate both exist.
+  const laborVarianceCents = laborCostVarianceCents({
+    source: laborMargin.source,
+    actualLaborCostCents: laborMargin.actualLaborCostCents,
+    estimatedLaborCostCents: estimatedLaborCents,
+  });
   const materialsForPnl = materialsCostForInternalPnl({
     materialsReceiptCents: materialsReceiptCostCents,
     partsRollupCents: partsCostCents,
@@ -1826,9 +1826,9 @@ export default async function JobDetailPage({
                       gap: "4px 10px",
                       padding: "var(--space-2) var(--space-3)",
                       marginBottom: "var(--space-3)",
-                      borderRadius: "var(--radius)",
-                      background: "var(--bg-muted, #f8fafc)",
-                      border: "1px solid var(--border-subtle, var(--border))",
+                      borderRadius: "var(--radius-md)",
+                      background: "var(--bg-subtle)",
+                      border: "1px solid var(--border-subtle)",
                     }}
                   >
                     <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, textTransform: "uppercase", color: "var(--fg-muted)" }}>
@@ -1845,8 +1845,8 @@ export default async function JobDetailPage({
                           laborVarianceCents === 0
                             ? "var(--fg-muted)"
                             : laborVarianceCents > 0
-                              ? "var(--warning, #b45309)"
-                              : "var(--color-success, #16a34a)",
+                              ? "var(--color-warning)"
+                              : "var(--color-success)",
                       }}
                     >
                       {laborVarianceCents === 0

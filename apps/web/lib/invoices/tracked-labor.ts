@@ -90,6 +90,23 @@ export function laborCostForMargin(opts: {
 }
 
 /**
+ * Labor cost variance = actual − estimate, in cents. Only meaningful when a
+ * tracked actual and an estimated labor cost both exist; returns null otherwise
+ * (no headline). Positive = over budget, negative = under, zero = on budget.
+ */
+export function laborCostVarianceCents(opts: {
+  source: "tracked" | "estimate" | "none";
+  actualLaborCostCents: number | null;
+  estimatedLaborCostCents: number | null;
+}): number | null {
+  if (opts.source !== "tracked") return null;
+  if (opts.actualLaborCostCents === null || opts.estimatedLaborCostCents === null) {
+    return null;
+  }
+  return opts.actualLaborCostCents - opts.estimatedLaborCostCents;
+}
+
+/**
  * Shared WHERE for job-linked closed job_work rows that count as customer-billable.
  * Params: $1 accountId, $2 jobId.
  *
