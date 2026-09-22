@@ -65,6 +65,7 @@ import { formatCents } from "@/lib/money";
 import {
   formatMinutesAsHoursMinutes,
   laborCostForMargin,
+  laborCostVarianceCents,
   mapTrackedLaborDayRows,
   type TrackedLaborDay,
 } from "@/lib/invoices/tracked-labor";
@@ -753,6 +754,13 @@ export default async function JobDetailPage({
     estimatedLaborCostCents: estimatedLaborCents,
   });
   const laborCostCents = laborMargin.laborCostCents;
+  // Labor cost variance (actual − estimate) — drives the prominent est→actual
+  // headline in Internal P&L. Null unless a tracked actual and estimate both exist.
+  const laborVarianceCents = laborCostVarianceCents({
+    source: laborMargin.source,
+    actualLaborCostCents: laborMargin.actualLaborCostCents,
+    estimatedLaborCostCents: estimatedLaborCents,
+  });
   const materialsForPnl = materialsCostForInternalPnl({
     materialsReceiptCents: materialsReceiptCostCents,
     partsRollupCents: partsCostCents,
@@ -1808,6 +1816,45 @@ export default async function JobDetailPage({
             {!isTech && (revenueCents !== null || costCents !== null || trackedMinutes > 0) && (
               <Card data-testid="profitability-card">
                 <SectionHeader title="Internal P&L" />
+                {laborVarianceCents !== null && laborMargin.actualLaborCostCents !== null && estimatedLaborCents !== null && (
+                  <div
+                    data-testid="labor-variance-headline"
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "baseline",
+                      gap: "4px 10px",
+                      padding: "var(--space-2) var(--space-3)",
+                      marginBottom: "var(--space-3)",
+                      borderRadius: "var(--radius-md)",
+                      background: "var(--bg-subtle)",
+                      border: "1px solid var(--border-subtle)",
+                    }}
+                  >
+                    <span style={{ fontSize: "var(--text-xs)", fontWeight: 700, textTransform: "uppercase", color: "var(--fg-muted)" }}>
+                      Labor est → actual
+                    </span>
+                    <span style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                      {formatCents(estimatedLaborCents)} → {formatCents(laborMargin.actualLaborCostCents)}
+                    </span>
+                    <span
+                      style={{
+                        fontWeight: 700,
+                        fontVariantNumeric: "tabular-nums",
+                        color:
+                          laborVarianceCents === 0
+                            ? "var(--fg-muted)"
+                            : laborVarianceCents > 0
+                              ? "var(--color-warning)"
+                              : "var(--color-success)",
+                      }}
+                    >
+                      {laborVarianceCents === 0
+                        ? "on budget"
+                        : `${laborVarianceCents > 0 ? "▲ +" : "▼ −"}${formatCents(Math.abs(laborVarianceCents))} ${laborVarianceCents > 0 ? "over" : "under"}`}
+                    </span>
+                  </div>
+                )}
                 <dl className="p7-detail-list">
                   {revenueCents !== null && (
                     <div className="p7-detail-row">
@@ -1836,22 +1883,7 @@ export default async function JobDetailPage({
                   {estimatedLaborCents !== null && (
                     <div className="p7-detail-row">
                       <dt>Est. Labor Cost</dt>
-                      <dd>
-                        {formatCents(estimatedLaborCents)}
-                        {laborMargin.source === "tracked" && laborMargin.actualLaborCostCents !== null && (
-                          <span
-                            style={{
-                              color: "var(--fg-muted)",
-                              fontSize: "var(--text-xs)",
-                              marginLeft: 6,
-                            }}
-                            data-testid="labor-variance"
-                          >
-                            {laborMargin.actualLaborCostCents - estimatedLaborCents >= 0 ? "+" : ""}
-                            {formatCents(laborMargin.actualLaborCostCents - estimatedLaborCents)} vs est
-                          </span>
-                        )}
-                      </dd>
+                      <dd>{formatCents(estimatedLaborCents)}</dd>
                     </div>
                   )}
                   {materialsForPnl.source === "receipts" && materialsForPnl.materialsCents > 0 && (

@@ -3,6 +3,7 @@ import {
   actualLaborCostCents,
   formatMinutesAsHoursMinutes,
   laborCostForMargin,
+  laborCostVarianceCents,
   mapTrackedLaborDayRows,
   roundedQuarterHoursFromMinutes,
   TRACKED_LABOR_JOB_WORK_WHERE,
@@ -84,6 +85,30 @@ describe("laborCostForMargin", () => {
     });
     expect(r.source).toBe("estimate");
     expect(r.actualLaborCostCents).toBeNull();
+  });
+});
+
+describe("laborCostVarianceCents", () => {
+  it("is positive when actual exceeds estimate (over budget)", () => {
+    expect(laborCostVarianceCents({ source: "tracked", actualLaborCostCents: 130_00, estimatedLaborCostCents: 100_00 })).toBe(30_00);
+  });
+
+  it("is negative when actual is below estimate (under budget)", () => {
+    expect(laborCostVarianceCents({ source: "tracked", actualLaborCostCents: 80_00, estimatedLaborCostCents: 100_00 })).toBe(-20_00);
+  });
+
+  it("is zero when on budget", () => {
+    expect(laborCostVarianceCents({ source: "tracked", actualLaborCostCents: 100_00, estimatedLaborCostCents: 100_00 })).toBe(0);
+  });
+
+  it("is null without a tracked actual (source not tracked)", () => {
+    expect(laborCostVarianceCents({ source: "estimate", actualLaborCostCents: null, estimatedLaborCostCents: 100_00 })).toBeNull();
+    expect(laborCostVarianceCents({ source: "none", actualLaborCostCents: null, estimatedLaborCostCents: null })).toBeNull();
+  });
+
+  it("is null when either input is missing", () => {
+    expect(laborCostVarianceCents({ source: "tracked", actualLaborCostCents: 100_00, estimatedLaborCostCents: null })).toBeNull();
+    expect(laborCostVarianceCents({ source: "tracked", actualLaborCostCents: null, estimatedLaborCostCents: 100_00 })).toBeNull();
   });
 });
 
