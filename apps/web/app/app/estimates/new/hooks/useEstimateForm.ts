@@ -454,19 +454,20 @@ export function useEstimateForm({
   // Pricing (delegated to useEstimatePricing)
   // ---------------------------------------------------------------------------
 
+  const { settings: pricingSettings } = usePricingSettings();
+
   const pricing = useEstimatePricing({
     serviceType, mode, lineItems, tiers, flatRate, taxRate,
     sqFt, prepLevel, includesTrim, includesCeiling,
     materialCostDollars, scopeMaterialsTotalCents,
     travelSurcharge, riskAdjustment,
     depositRequired, depositType, depositPercentage, depositFixedDollars, depositDueTrigger,
+    pricingSettings,
   });
 
   // ---------------------------------------------------------------------------
   // Live intelligence (unified derived state — Block 1)
   // ---------------------------------------------------------------------------
-
-  const { settings: pricingSettings } = usePricingSettings();
 
   const liveIntel = useEstimateLiveIntel({
     serviceType, mode,

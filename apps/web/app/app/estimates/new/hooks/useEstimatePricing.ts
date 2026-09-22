@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { computeEstimate, CURRENT_RULES, ENGINE_VERSION, type EstimateSpec } from "@ai-fsm/domain";
+import { computeEstimate, buildPricingRules, ENGINE_VERSION, type BusinessPricingSettings, type EstimateSpec } from "@ai-fsm/domain";
 import { formatCents } from "@/lib/estimates/pricing";
 import { calculateDepositPolicy } from "@/lib/estimates/deposit-policy";
 import type { DepositDueTrigger, DepositType } from "@/lib/estimates/deposit-policy";
@@ -61,6 +61,8 @@ interface UseEstimatePricingInput {
   depositPercentage: string;
   depositFixedDollars: string;
   depositDueTrigger: DepositDueTrigger;
+  /** Account labor/margin rates; falls back to defaults when settings not loaded. */
+  pricingSettings?: BusinessPricingSettings;
 }
 
 // ---------------------------------------------------------------------------
@@ -72,6 +74,7 @@ export function useEstimatePricing({
   sqFt, prepLevel, includesTrim, includesCeiling, materialCostDollars,
   scopeMaterialsTotalCents, travelSurcharge, riskAdjustment,
   depositRequired, depositType, depositPercentage, depositFixedDollars, depositDueTrigger: _depositDueTrigger,
+  pricingSettings,
 }: UseEstimatePricingInput): PricingResult {
   const paintingResult = useMemo<PaintingEstimateResult | null>(() => {
     if (serviceType !== "painting") return null;
@@ -100,7 +103,7 @@ export function useEstimatePricing({
         materialCents: matCents,
       }];
     }
-    const r = computeEstimate(spec, CURRENT_RULES);
+    const r = computeEstimate(spec, buildPricingRules(pricingSettings));
     return {
       labor_flat_rate_cents: r.summary.laborCents,
       material_cents: r.summary.materialCents,
@@ -114,7 +117,7 @@ export function useEstimatePricing({
       effective_sq_ft_rate_cents: sq > 0 ? Math.round(r.summary.laborCents / sq) : 0,
       _spec: spec,
     };
-  }, [serviceType, sqFt, prepLevel, includesTrim, includesCeiling, materialCostDollars]);
+  }, [serviceType, sqFt, prepLevel, includesTrim, includesCeiling, materialCostDollars, pricingSettings]);
 
   const taxRateNum = parseFloat(taxRate) || 0;
 
