@@ -10,9 +10,16 @@
 
 | Constant | Value | Purpose |
 |---|---|---|
-| `LABOR_COST_CENTS_PER_HOUR` | $85.00/hr | Internal burdened cost. Never shown to customers. Used for margin calculations. |
+| `LABOR_COST_CENTS_PER_HOUR` | $50.00/hr | **Fallback** internal burdened cost. Never shown to customers. Used for margin math when a worker has no per-person rate. |
 | `LABOR_CUSTOMER_RATE_CENTS_PER_HOUR` | $115.00/hr | Customer-facing T&M or add-on labor line items. |
 | `MINIMUM_SERVICE_FEE_CENTS` | $185.00 | Minimum billable value per visit. Requires `minimum_service_override_reason` to waive. |
+
+**Internal cost is per-person, not a single constant (migration 189).** Each worker
+carries `users.cost_cents_per_hour` (pay) × `users.burden_multiplier` (burden).
+`workerCostRateCentsPerHour()` resolves it, falling back to the account cost clock
+(`business_pricing_settings.labor_cost_cents_per_hour`, default $50) when a person
+has no rate set. The constant above is only that final fallback — not the source of
+truth. (Prior versions of this doc listed $85; code and DB have always been $50.)
 
 ---
 

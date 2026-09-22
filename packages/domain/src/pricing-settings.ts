@@ -53,6 +53,34 @@ export function billingRateCentsForState(
   );
 }
 
+/** Per-person cost inputs from the users row (migration 189). */
+export interface WorkerCostProfile {
+  cost_cents_per_hour: number | null | undefined;
+  burden_multiplier: number | null | undefined;
+}
+
+/**
+ * Burdened internal cost rate for one worker: their pay rate × burden multiplier.
+ * The burden multiplier applies ONLY to a worker's own pay rate. When the worker
+ * has no rate set, we return the account cost clock unchanged — that value is
+ * already the burdened final fallback, so re-applying the multiplier would
+ * double-burden it. Single source of truth for "what an hour of this person's
+ * labor costs us"; replaces the scattered LABOR_COST_CENTS_PER_HOUR for actuals.
+ */
+export function workerCostRateCentsPerHour(
+  worker: WorkerCostProfile,
+  accountCostCentsPerHour: number = DEFAULT_PRICING_SETTINGS.labor_cost_cents_per_hour
+): number {
+  const hasOwnRate =
+    worker.cost_cents_per_hour != null && worker.cost_cents_per_hour >= 0;
+  if (!hasOwnRate) return accountCostCentsPerHour;
+  const burden =
+    worker.burden_multiplier != null && worker.burden_multiplier > 0
+      ? worker.burden_multiplier
+      : 1;
+  return Math.round(worker.cost_cents_per_hour! * burden);
+}
+
 /** Build engine PricingRules with account labor rates + margin floor. */
 export function buildPricingRules(
   settings: BusinessPricingSettings = DEFAULT_PRICING_SETTINGS
