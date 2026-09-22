@@ -37,10 +37,16 @@ export function actualLaborCostCents(
 /**
  * Choose labor cost for margin: prefer tracked (actual) when any time is logged,
  * else fall back to estimate internal labor cost.
+ *
+ * `perPersonActualCostCents`, when provided, is the actual cost summed from each
+ * worker's tracked time × their own burdened rate (migration 189). It wins over
+ * the flat trackedMinutes × costRate estimate so job margin reflects real per-
+ * person cost. Falls back to the flat calc when the per-person sum is unavailable.
  */
 export function laborCostForMargin(opts: {
   trackedMinutes: number;
   costRateCentsPerHour?: number;
+  perPersonActualCostCents?: number | null;
   estimatedLaborCostCents: number | null;
 }): {
   trackedMinutes: number;
@@ -52,7 +58,9 @@ export function laborCostForMargin(opts: {
   const trackedMinutes = Math.max(0, opts.trackedMinutes);
   const rate = opts.costRateCentsPerHour ?? LABOR_COST_CENTS_PER_HOUR;
   const actual =
-    trackedMinutes > 0 ? actualLaborCostCents(trackedMinutes, rate) : null;
+    trackedMinutes > 0
+      ? (opts.perPersonActualCostCents ?? actualLaborCostCents(trackedMinutes, rate))
+      : null;
 
   if (actual !== null) {
     return {

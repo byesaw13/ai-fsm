@@ -14,6 +14,7 @@ import {
 import { jobTransitions, JOB_STATUS_LABELS, toSupplyPo } from "@ai-fsm/domain";
 import type { Job, Visit, JobStatus, JobAcceptanceCategory, JobIntakeDecision } from "@ai-fsm/domain";
 import { JOB_SUB_STATUSES, SUB_STATUS_LABELS } from "@ai-fsm/domain";
+import { workerCostRateCentsPerHour, DEFAULT_PRICING_SETTINGS } from "@ai-fsm/domain";
 import { CopySupplyPoButton } from "@/components/jobs/CopySupplyPoButton";
 import { JobTransitionForm } from "./JobTransitionForm";
 import { DeleteJobButton } from "./DeleteJobButton";
@@ -670,6 +671,62 @@ export default async function JobDetailPage({
   const estimatedLaborCents = commercialCounts?.estimated_labor_cost_cents ?? null;
   const trackedMinutes = Number(commercialCounts?.tracked_labor_minutes ?? 0);
 
+  // Per-person actual labor cost: each worker's tracked job time × their own
+  // burdened rate (migration 189), summed — so estimate-vs-actual reflects who
+  // actually did the work, not a flat rate. Owner/admin only (internal cost).
+  let perPersonActualLaborCostCents: number | null = null;
+  if (!isTech && trackedMinutes > 0) {
+    const [perUserLabor, acctCost] = await Promise.all([
+      queryForSession<{
+        cost_cents_per_hour: number | null;
+        burden_multiplier: string | number | null;
+        minutes: number | string | null;
+      }>(
+        session,
+        `SELECT u.cost_cents_per_hour, u.burden_multiplier,
+                SUM(EXTRACT(EPOCH FROM (ae.ended_at - ae.started_at)) / 60.0) AS minutes
+           FROM activity_entries ae
+           LEFT JOIN users u ON u.id = ae.user_id
+          WHERE ae.account_id = $2
+            AND ae.activity_type = 'job_work'
+            AND ae.voided_at IS NULL
+            AND ae.started_at IS NOT NULL
+            AND ae.ended_at IS NOT NULL
+            AND (ae.labor_bucket IS NULL OR ae.labor_bucket = 'billable')
+            AND (
+              (ae.entity_type = 'job' AND ae.entity_id = $1)
+              OR (ae.entity_type = 'visit' AND ae.entity_id IN (
+                SELECT v.id FROM visits v
+                 WHERE v.job_id = $1 AND v.account_id = $2
+                   AND v.visit_type IS DISTINCT FROM 'site_visit'))
+              OR (ae.entity_type = 'work_order' AND ae.entity_id IN (
+                SELECT wo.id FROM work_orders wo
+                 WHERE wo.job_id = $1 AND wo.account_id = $2))
+            )
+          GROUP BY u.cost_cents_per_hour, u.burden_multiplier`,
+        [id, session.accountId],
+      ),
+      queryOneForSession<{ labor_cost_cents_per_hour: number }>(
+        session,
+        `SELECT labor_cost_cents_per_hour FROM business_pricing_settings WHERE account_id = $1`,
+        [session.accountId],
+      ),
+    ]);
+    const accountFallbackCents =
+      acctCost?.labor_cost_cents_per_hour ?? DEFAULT_PRICING_SETTINGS.labor_cost_cents_per_hour;
+    perPersonActualLaborCostCents = perUserLabor.reduce((sum, r) => {
+      const minutes = Number(r.minutes ?? 0);
+      if (minutes <= 0) return sum;
+      const rate = workerCostRateCentsPerHour(
+        {
+          cost_cents_per_hour: r.cost_cents_per_hour,
+          burden_multiplier: r.burden_multiplier == null ? null : Number(r.burden_multiplier),
+        },
+        accountFallbackCents,
+      );
+      return sum + Math.round((minutes / 60) * rate);
+    }, 0);
+  }
 
   const jobLedger =
     !isTech
@@ -692,6 +749,7 @@ export default async function JobDetailPage({
       : null;
   const laborMargin = laborCostForMargin({
     trackedMinutes,
+    perPersonActualCostCents: perPersonActualLaborCostCents,
     estimatedLaborCostCents: estimatedLaborCents,
   });
   const laborCostCents = laborMargin.laborCostCents;
