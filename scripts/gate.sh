@@ -81,6 +81,11 @@ wait_http() {
 log "lint"
 pnpm lint
 
+log "dead code (knip)"
+# Fails on unused files / dependencies (the floor that stops replacements leaving
+# corpses). Unused exports/types are warn-only — see knip.json rules.
+pnpm knip
+
 log "migration prefixes"
 node scripts/check-migration-prefixes.mjs
 log "rls coverage"

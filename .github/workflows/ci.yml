@@ -34,6 +34,15 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Run ESLint across all workspaces
         run: pnpm lint
+      - name: Dead-code check (knip)
+        # Enforces the dead-code floor inside a required check, not only local gate.sh:
+        # unused files/dependencies fail here so a bypassed local gate can't merge them.
+        # knip loads vitest configs to detect test entrypoints; the *.integration
+        # configs throw on CI unless these are present (presence check only, no DB).
+        env:
+          TEST_DATABASE_URL: postgresql://knip:knip@localhost:5432/knip
+          TEST_BASE_URL: http://localhost:3000
+        run: pnpm knip
       - name: Reject new duplicate migration prefixes
         run: |
           node scripts/check-migration-prefixes.mjs
