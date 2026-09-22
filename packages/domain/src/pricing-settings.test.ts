@@ -4,6 +4,7 @@ import {
   billingRateCentsForState,
   buildPricingRules,
   calculateFinancialComparison,
+  workerCostRateCentsPerHour,
 } from "./pricing-settings";
 
 describe("pricing-settings", () => {
@@ -43,5 +44,27 @@ describe("pricing-settings", () => {
   it("preserves unknown costs and uses configured rates", () => {
     expect(calculateFinancialComparison({ laborCostCents: null, materialCostCents: 10_000, totalQuoteCents: 100_000, laborCostRateCents: 5_000, laborBillingRateCents: 12_000 })).toBeNull();
     expect(calculateFinancialComparison({ laborCostCents: 10_000, materialCostCents: 10_000, totalQuoteCents: 100_000, laborCostRateCents: 5_000, laborBillingRateCents: 12_000 })).toMatchObject({ effectiveHours: 2, tmTotalQuoteCents: 35_500 });
+  });
+
+  describe("workerCostRateCentsPerHour", () => {
+    it("solo owner with no rate falls back to the account cost clock ($50)", () => {
+      expect(workerCostRateCentsPerHour({ cost_cents_per_hour: null, burden_multiplier: null })).toBe(50_00);
+    });
+
+    it("uses the worker's own pay rate when set", () => {
+      expect(workerCostRateCentsPerHour({ cost_cents_per_hour: 40_00, burden_multiplier: 1 })).toBe(40_00);
+    });
+
+    it("applies the burden multiplier to pay (e.g. $40 pay × 1.35 = $54)", () => {
+      expect(workerCostRateCentsPerHour({ cost_cents_per_hour: 40_00, burden_multiplier: 1.35 })).toBe(54_00);
+    });
+
+    it("falls back to a provided account rate, not just the default", () => {
+      expect(workerCostRateCentsPerHour({ cost_cents_per_hour: null, burden_multiplier: 1.2 }, 60_00)).toBe(72_00);
+    });
+
+    it("ignores non-positive burden and negative rate", () => {
+      expect(workerCostRateCentsPerHour({ cost_cents_per_hour: -5, burden_multiplier: 0 }, 50_00)).toBe(50_00);
+    });
   });
 });

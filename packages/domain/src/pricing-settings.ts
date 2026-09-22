@@ -53,6 +53,33 @@ export function billingRateCentsForState(
   );
 }
 
+/** Per-person cost inputs from the users row (migration 189). */
+export interface WorkerCostProfile {
+  cost_cents_per_hour: number | null | undefined;
+  burden_multiplier: number | null | undefined;
+}
+
+/**
+ * Burdened internal cost rate for one worker: their pay rate × burden multiplier,
+ * falling back to the account cost clock when the person has no rate set. This is
+ * the single source of truth for "what an hour of this person's labor costs us" —
+ * it replaces the scattered LABOR_COST_CENTS_PER_HOUR constant for actuals.
+ */
+export function workerCostRateCentsPerHour(
+  worker: WorkerCostProfile,
+  accountCostCentsPerHour: number = DEFAULT_PRICING_SETTINGS.labor_cost_cents_per_hour
+): number {
+  const base =
+    worker.cost_cents_per_hour != null && worker.cost_cents_per_hour >= 0
+      ? worker.cost_cents_per_hour
+      : accountCostCentsPerHour;
+  const burden =
+    worker.burden_multiplier != null && worker.burden_multiplier > 0
+      ? worker.burden_multiplier
+      : 1;
+  return Math.round(base * burden);
+}
+
 /** Build engine PricingRules with account labor rates + margin floor. */
 export function buildPricingRules(
   settings: BusinessPricingSettings = DEFAULT_PRICING_SETTINGS
