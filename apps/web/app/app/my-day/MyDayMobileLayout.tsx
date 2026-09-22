@@ -29,6 +29,8 @@ export function MyDayMobileLayout({
   currentJobId = null,
   canCapture = false,
   canQuickBook = false,
+  priorDayNeedsMileage = false,
+  priorOpenSession = null,
   children,
 }: {
   openSession: OpenSession | null;
@@ -41,6 +43,8 @@ export function MyDayMobileLayout({
   currentJobId?: string | null;
   canCapture?: boolean;
   canQuickBook?: boolean;
+  priorDayNeedsMileage?: boolean;
+  priorOpenSession?: OpenSession | null;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -60,6 +64,7 @@ export function MyDayMobileLayout({
     hasOpenSession: !!openSession,
     hasVehicle: !!defaultVehicle,
     lastOdometer: defaultVehicle?.current_odometer ?? null,
+    priorDayNeedsMileage,
   });
   const showHero = !!heroVisit && shouldShowVisitHero({ hasParkProposal });
 
@@ -119,14 +124,20 @@ export function MyDayMobileLayout({
         <div className="p7-field-hero" style={{ marginBottom: "var(--space-4)" }}>
           <div className="p7-field-hero__kicker">Today</div>
           <div className="p7-field-hero__title">
-            {mode === "odometer" ? "Enter today’s miles" : "Start your day"}
+            {priorDayNeedsMileage
+              ? "Enter the truck’s miles"
+              : mode === "odometer"
+                ? "Enter today’s miles"
+                : "Start your day"}
           </div>
           <p className="p7-field-hero__meta" style={{ margin: 0 }}>
-            {mode === "one_tap"
-              ? `${defaultVehicle?.nickname ?? "Truck"} · ${defaultVehicle?.current_odometer?.toLocaleString()} mi`
-              : mode === "odometer"
-                ? "One number. Then you’re tracking."
-                : "Clock in, pick the truck, start mileage."}
+            {priorDayNeedsMileage
+              ? "Yesterday never got a closing reading. One number, then the day can start."
+              : mode === "one_tap"
+                ? `${defaultVehicle?.nickname ?? "Truck"} · ${defaultVehicle?.current_odometer?.toLocaleString()} mi`
+                : mode === "odometer"
+                  ? "One number. Then you’re tracking."
+                  : "Clock in, pick the truck, start mileage."}
           </p>
           <div className="p7-field-hero__actions">
             <button
@@ -208,6 +219,7 @@ export function MyDayMobileLayout({
         onVehicleReady={() => setVehicleStepDone(true)}
         initialState={setup}
         vehicles={vehicles}
+        priorOpenSession={priorOpenSession}
       />
 
       <div style={{ marginBottom: "var(--space-6)" }}>

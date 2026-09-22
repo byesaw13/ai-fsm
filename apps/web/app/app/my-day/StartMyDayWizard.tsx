@@ -11,7 +11,7 @@ import {
   type DaySetupStep,
 } from "@/lib/my-day/day-setup";
 import { pickStartVehicle } from "@/lib/mileage/start-day";
-import type { VehicleOption } from "@/lib/my-work/field-day-types";
+import type { OpenSession, VehicleOption } from "@/lib/my-work/field-day-types";
 
 const STEPS: { key: DaySetupStep; label: string }[] = [
   { key: "clock", label: "Clock in" },
@@ -31,12 +31,14 @@ export function StartMyDayWizard({
   onVehicleReady,
   initialState,
   vehicles,
+  priorOpenSession = null,
 }: {
   open: boolean;
   onClose: () => void;
   onVehicleReady: () => void;
   initialState: DaySetupState;
   vehicles: VehicleOption[];
+  priorOpenSession?: OpenSession | null;
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -73,9 +75,20 @@ export function StartMyDayWizard({
 
   useEffect(() => {
     if (!open || !defaultVehicle) return;
-    setVehicleId(defaultVehicle.id);
-    setStartOdometer(String(defaultVehicle.current_odometer ?? ""));
-  }, [open, defaultVehicle?.id]);
+    setVehicleId(priorOpenSession?.vehicle_id || defaultVehicle.id);
+    setStartOdometer(String(defaultVehicle.current_odometer ?? priorOpenSession?.start_odometer ?? ""));
+  }, [open, defaultVehicle?.id, priorOpenSession?.id]);
+
+  useEffect(() => {
+    if (!open || !priorOpenSession) return;
+    const suggested = Number(startOdometer) || priorOpenSession.start_odometer;
+    setPrior({
+      openSessionId: priorOpenSession.id,
+      suggestedEnd: suggested,
+      retry: async () => undefined,
+    });
+    setPriorEnd(String(suggested));
+  }, [open, priorOpenSession?.id]);
 
   useEffect(() => {
     if (!open) return;
@@ -152,11 +165,11 @@ export function StartMyDayWizard({
       toast.error(json.error?.message ?? "Could not close the open session");
       return;
     }
-    const retry = prior.retry;
     setPrior(null);
     setPending(false);
     toast.success("Prior session closed");
-    await retry();
+    setStartOdometer(String(end));
+    await postStart(vehicleId || null, end);
   }
 
   if (!open) return null;
@@ -251,13 +264,13 @@ export function StartMyDayWizard({
       <Modal
         open={!!prior}
         onClose={() => setPrior(null)}
-        title="Close the open session first"
+        title="Yesterday’s miles"
         data-testid="prior-session-prompt"
         zIndex={520}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
           <p style={{ margin: 0 }}>
-            This vehicle still has an open mileage session from a prior day. Enter its end odometer to close it before starting today&apos;s session.
+            Yesterday never got a closing reading. Enter the number on the dash now — that closes yesterday and starts today.
           </p>
           <label style={{ display: "flex", flexDirection: "column", gap: 6, fontWeight: 600, fontSize: "var(--text-sm)" }}>
             End odometer

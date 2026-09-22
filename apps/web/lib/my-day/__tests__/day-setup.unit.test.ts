@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isDaySetupComplete, nextIncompleteStep, startDayMode } from "../day-setup";
+import { isDaySetupComplete, nextIncompleteStep, priorDayNeedsMileage, startDayMode } from "../day-setup";
 
 describe("day-setup", () => {
   it("complete when all three true", () => {
@@ -78,5 +78,74 @@ describe("startDayMode", () => {
         lastOdometer: null,
       }),
     ).toBe("wizard");
+  });
+
+  it("asks for miles before a new day when yesterday was worked and never closed", () => {
+    expect(
+      startDayMode({
+        clockedIn: false,
+        hasOpenSession: false,
+        hasVehicle: true,
+        lastOdometer: 48210,
+        priorDayNeedsMileage: true,
+      }),
+    ).toBe("odometer");
+  });
+});
+
+describe("priorDayNeedsMileage", () => {
+  it("is true when an open session is from before today", () => {
+    expect(
+      priorDayNeedsMileage({
+        today: "2026-09-21",
+        priorOpenSessionDate: "2026-09-20",
+        lastWorkedDate: "2026-09-20",
+        lastEndedMileageDate: "2026-09-19",
+      }),
+    ).toBe(true);
+  });
+
+  it("is true when they worked after the last closing reading", () => {
+    expect(
+      priorDayNeedsMileage({
+        today: "2026-09-21",
+        priorOpenSessionDate: null,
+        lastWorkedDate: "2026-09-20",
+        lastEndedMileageDate: "2026-09-18",
+      }),
+    ).toBe(true);
+  });
+
+  it("is false when yesterday already has a closing reading", () => {
+    expect(
+      priorDayNeedsMileage({
+        today: "2026-09-21",
+        priorOpenSessionDate: null,
+        lastWorkedDate: "2026-09-20",
+        lastEndedMileageDate: "2026-09-20",
+      }),
+    ).toBe(false);
+  });
+
+  it("is false when they have not worked since the last close", () => {
+    expect(
+      priorDayNeedsMileage({
+        today: "2026-09-21",
+        priorOpenSessionDate: null,
+        lastWorkedDate: "2026-09-18",
+        lastEndedMileageDate: "2026-09-18",
+      }),
+    ).toBe(false);
+  });
+
+  it("is false when there is no prior work", () => {
+    expect(
+      priorDayNeedsMileage({
+        today: "2026-09-21",
+        priorOpenSessionDate: null,
+        lastWorkedDate: null,
+        lastEndedMileageDate: null,
+      }),
+    ).toBe(false);
   });
 });

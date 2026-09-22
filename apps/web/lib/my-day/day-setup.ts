@@ -21,15 +21,31 @@ export function nextIncompleteStep(state: DaySetupState): DaySetupStep | null {
 
 export type StartDayMode = "done" | "one_tap" | "odometer" | "wizard";
 
+/** Worked a prior day and never entered closing miles — new day waits on that number. */
+export function priorDayNeedsMileage(input: {
+  today: string;
+  priorOpenSessionDate: string | null;
+  lastWorkedDate: string | null;
+  lastEndedMileageDate: string | null;
+}): boolean {
+  if (input.priorOpenSessionDate && input.priorOpenSessionDate < input.today) return true;
+  if (input.lastWorkedDate && input.lastWorkedDate < input.today) {
+    if (!input.lastEndedMileageDate || input.lastEndedMileageDate < input.lastWorkedDate) return true;
+  }
+  return false;
+}
+
 /** Van already knows the truck: one tap. Missing miles: one field. No truck: wizard. */
 export function startDayMode(input: {
   clockedIn: boolean;
   hasOpenSession: boolean;
   hasVehicle: boolean;
   lastOdometer: number | null;
+  priorDayNeedsMileage?: boolean;
 }): StartDayMode {
   if (input.hasOpenSession) return "done";
   if (!input.hasVehicle) return "wizard";
+  if (input.priorDayNeedsMileage) return "odometer";
   if (input.lastOdometer == null || !Number.isInteger(input.lastOdometer) || input.lastOdometer < 0) {
     return "odometer";
   }
