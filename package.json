@@ -18,6 +18,7 @@
     "test:e2e:ui": "playwright test --ui",
     "gate": "bash scripts/gate.sh",
     "gate:fast": "bash scripts/gate.sh --fast",
+    "knip": "knip",
     "db:migrate": "bash scripts/db-migrate.sh",
     "db:seed": "bash scripts/db-seed.sh"
   },
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",
+    "knip": "^5.30.0",
     "typescript": "^5.7.2"
   }
 }

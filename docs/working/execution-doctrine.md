@@ -117,6 +117,10 @@ Three standing rules — no sprint required:
 - When editing a file that references: `painting.ts` legacy adapter, Stripe env, duplicate pricing path, or `jobs.scheduled_start/end` — remove or redirect to canonical path in the same PR.
 - Split god components only when the PR already touches them (e.g., `WorkdayPanel` → extract subpanels as part of My Day fix).
 
+**Rule 4: Delete what you replace (enforced)**
+- A replacement deletes its predecessor in the same change. No superseded file left behind.
+- The `knip` gate step (`scripts/gate.sh`, config in `knip.json`) is the mechanical floor: unused files and dependencies **fail** the gate. Unused exports/types are warn-only (mostly over-exports — drop the `export`, don't delete blindly).
+
 ### Clean on Contact (months, opportunistic)
 
 Trigger `packages/db` extraction (Approach C) **only when**:

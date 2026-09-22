@@ -1,0 +1,29 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "rules": {
+    "files": "error",
+    "dependencies": "error",
+    "unlisted": "error",
+    "unresolved": "error",
+    "binaries": "error",
+    "duplicates": "warn",
+    "exports": "warn",
+    "types": "warn",
+    "nsExports": "warn",
+    "nsTypes": "warn",
+    "enumMembers": "warn",
+    "classMembers": "off"
+  },
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/**/*.{mjs,ts,js}"],
+      "project": ["scripts/**/*.{mjs,ts,js}"],
+      "ignoreDependencies": ["pg"]
+    },
+    "apps/web": {
+      "entry": ["public/sw.js", "scripts/**/*.mjs"]
+    },
+    "services/worker": {},
+    "packages/*": {}
+  }
+}
