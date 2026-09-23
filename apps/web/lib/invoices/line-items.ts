@@ -145,7 +145,10 @@ export async function updateInvoiceLineItem(
   }
 ): Promise<InvoiceLineItemRow> {
   const totalCents = Math.round(input.quantity * input.unit_price_cents);
-  // Store section applies only to material lines; blank normalizes to NULL.
+  // Store section applies only to material lines; blank normalizes to NULL. When
+  // the field is OMITTED (undefined), preserve the existing value — a client that
+  // patches other fields must not silently wipe the section.
+  const sectionProvided = input.store_section !== undefined;
   const storeSection =
     input.line_item_type === "materials" && input.store_section?.trim()
       ? input.store_section.trim()
@@ -157,8 +160,8 @@ export async function updateInvoiceLineItem(
          unit_price_cents = $3,
          total_cents = $4,
          line_item_type = $5,
-         store_section = $6
-     WHERE id = $7 AND invoice_id = $8
+         store_section = CASE WHEN $6 THEN $7 ELSE store_section END
+     WHERE id = $8 AND invoice_id = $9
      RETURNING id, invoice_id, description, quantity::float8 AS quantity,
                unit_price_cents, total_cents, line_item_type, sort_order, created_at`,
     [
@@ -167,6 +170,7 @@ export async function updateInvoiceLineItem(
       input.unit_price_cents,
       totalCents,
       input.line_item_type,
+      sectionProvided,
       storeSection,
       lineItemId,
       invoiceId,

@@ -81,12 +81,18 @@ export function groupInvoiceLineItems<T extends GroupableLineItem>(
 export function subgroupBySection<T extends GroupableLineItem>(
   items: T[],
 ): InvoiceLineItemSubgroup<T>[] | undefined {
-  const hasAnySection = items.some((i) => (i.store_section ?? "").trim() !== "");
+  // A blank section, or a literal "Other", is the fallback bucket (labeled Other),
+  // so an owner typing "Other" doesn't create a duplicate group.
+  const normalize = (s?: string | null): string | null => {
+    const t = (s ?? "").trim();
+    return t && t.toLowerCase() !== "other" ? t : null;
+  };
+  const hasAnySection = items.some((i) => normalize(i.store_section) !== null);
   if (!hasAnySection) return undefined;
 
   const buckets = new Map<string | null, T[]>();
   for (const item of items) {
-    const section = (item.store_section ?? "").trim() || null;
+    const section = normalize(item.store_section);
     const arr = buckets.get(section) ?? [];
     arr.push(item);
     buckets.set(section, arr);

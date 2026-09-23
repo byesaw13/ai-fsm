@@ -63,6 +63,21 @@ describe("line-item-groups", () => {
     expect(subgroupBySection([item("materials", 100), item("materials", 200)])).toBeUndefined();
   });
 
+  it("subgroupBySection: a literal 'Other' merges into the null fallback bucket", () => {
+    const subs = subgroupBySection([
+      item("materials", 100, { store_section: "Paint", sort_order: 1 }),
+      item("materials", 200, { store_section: "Other", sort_order: 2 }),
+      item("materials", 300, { store_section: null, sort_order: 3 }),
+    ]);
+    // One "Other" group, not two; Paint + Other.
+    expect(subs?.map((s) => s.label)).toEqual(["Paint", "Other"]);
+    expect(subs?.find((s) => s.label === "Other")?.subtotalCents).toBe(500); // 200 + 300
+  });
+
+  it("subgroupBySection: only 'Other'/blank sections stay flat (no real sections)", () => {
+    expect(subgroupBySection([item("materials", 100, { store_section: "Other" })])).toBeUndefined();
+  });
+
   it("materials group carries subgroups only when a section is present", () => {
     const withSection = groupInvoiceLineItems([
       item("materials", 100, { material_kind: "material", store_section: "Lumber" }),
