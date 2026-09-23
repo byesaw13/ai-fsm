@@ -19,6 +19,9 @@ const mockPool = { connect: vi.fn() };
 vi.mock("@/lib/db", () => ({ getPool: () => mockPool }));
 vi.mock("@/lib/db/audit", () => ({ appendAuditLog: vi.fn() }));
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn() } }));
+vi.mock("@/lib/operations/time-clock", () => ({
+  clockIn: vi.fn().mockResolvedValue({ alreadyOpen: false, clock: { id: "clock-1" } }),
+}));
 
 import { POST as startSession } from "../start/route";
 import { POST as switchVehicle } from "../switch/route";
