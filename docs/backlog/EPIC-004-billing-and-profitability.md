@@ -5,6 +5,10 @@ of what each job actually earned.
 
 ## Active tasks
 
+# TASK-154: Reopen and edit a partially paid invoice
+
+See [TASK-154-edit-partially-paid-invoice.md](./TASK-154-edit-partially-paid-invoice.md). T&M bills change after the deposit; reopen keeps payments attached, re-send settles to partial/paid.
+
 # TASK-153: Final invoice credits prior invoices + approved change orders
 
 See [TASK-153-final-invoice-credits-and-change-orders.md](./TASK-153-final-invoice-credits-and-change-orders.md). Up-front standard invoice blocks/isn't credited by the final invoice; approved change orders never reach the bill.
