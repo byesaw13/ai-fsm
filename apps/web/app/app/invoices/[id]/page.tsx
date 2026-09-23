@@ -200,9 +200,10 @@ export default async function InvoiceDetailPage({
     materialHandlingRateFromSettings(accountSettings) * 100,
   );
   const currentStatus = invoice.status;
-  // paid/partial are driven by RecordPaymentForm (payment trigger), not manual transition
+  // paid/partial are driven by RecordPaymentForm (payment trigger), not manual transition.
+  // Reopen to draft keeps payments attached (TASK-154) — T&M bills change after a deposit.
   const allowedTransitions = invoiceTransitions[currentStatus].filter(
-    (s) => s !== "paid" && s !== "partial" && (s !== "draft" || invoice.paid_cents === 0)
+    (s) => s !== "paid" && s !== "partial"
   );
   const canTransition = canCreateInvoices(session.role);
   const canDelete =

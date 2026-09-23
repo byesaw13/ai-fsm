@@ -9,6 +9,7 @@ import { invoiceEmailHtml, invoiceEmailText } from "@ai-fsm/email-templates";
 import { logCommunication } from "@/lib/communications-log";
 import { loadInvoicePdf } from "@/lib/pdf/load";
 import { applyServiceMinimum, isServiceMinimumEligible } from "@/lib/invoices/service-minimum";
+import { amountDueCents } from "@/lib/invoices/payments";
 import { dueDateUponCompletion, invoiceDueOnCompletion } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +34,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     const result = await withInvoiceContext(session, async (client) => {
       const { rows, rowCount } = await client.query(
         `SELECT i.id, i.status, i.invoice_number, i.total_cents, i.balance_cents,
-                i.deposit_cents, i.due_date, i.notes, i.sent_at, i.paid_at, i.share_token,
+                i.paid_cents, i.deposit_cents, i.due_date, i.notes, i.sent_at, i.paid_at, i.share_token,
                 i.invoice_kind, j.status AS job_status,
                 e.minimum_service_override_reason AS estimate_override,
                 c.id AS client_id, c.name AS client_name, c.email AS client_email
@@ -49,7 +50,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
       const inv = rows[0] as {
         id: string; status: string; invoice_number: string;
-        total_cents: number; balance_cents: number; deposit_cents: number;
+        total_cents: number; balance_cents: number; paid_cents: number; deposit_cents: number;
         due_date: string | null; notes: string | null; sent_at: string | null;
         paid_at: string | null; share_token: string;
         invoice_kind: string; job_status: string | null;
@@ -103,6 +104,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       }
 
       const isPaid = inv.status === "paid";
+      // What the client still owes: total − deposit credit − payments already made.
+      // balance_cents excludes payments, so a re-sent partially paid invoice
+      // (TASK-154) would otherwise email the full total as the balance.
+      const amountDue = amountDueCents(inv.total_cents, Number(inv.paid_cents ?? 0), inv.deposit_cents);
 
       // Public share link (no login). PDF attachment is the offline artifact.
       const viewUrl = `${appUrl()}/portal/invoices/${inv.share_token}`;
@@ -137,7 +142,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           invoiceNumber: inv.invoice_number,
           clientName: inv.client_name,
           totalCents: inv.total_cents,
-          balanceCents: isPaid ? 0 : inv.balance_cents,
+          balanceCents: isPaid ? 0 : amountDue,
           dueDateStr: isPaid ? null : dueDateStr,
           viewUrl,
           notes: inv.notes,
@@ -148,7 +153,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           invoiceNumber: inv.invoice_number,
           clientName: inv.client_name,
           totalCents: inv.total_cents,
-          balanceCents: isPaid ? 0 : inv.balance_cents,
+          balanceCents: isPaid ? 0 : amountDue,
           dueDateStr: isPaid ? null : dueDateStr,
           viewUrl,
           notes: inv.notes,
