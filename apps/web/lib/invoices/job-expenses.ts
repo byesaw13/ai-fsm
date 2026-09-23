@@ -515,7 +515,8 @@ export async function linkAndAppendMaterialsToInvoice(
   }
 
   const expenses = await client.query<JobMaterialExpenseRow>(
-    `SELECT id, vendor_name, amount_cents, notes
+    `SELECT id, vendor_name, amount_cents, notes,
+            expense_date::text AS expense_date
      FROM expenses
      WHERE account_id = $1 AND id = ANY($2::uuid[])
      ORDER BY expense_date ASC, created_at ASC`,
