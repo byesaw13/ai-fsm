@@ -58,6 +58,11 @@ async function buildMaterialLineDraftsForExpense(
   accountId: string,
   expense: JobMaterialExpenseRow,
 ): Promise<MaterialLineDraft[]> {
+  // Classify from the expense itself so every path (incl. link-forgotten, which
+  // can feed an equipment receipt through here) tags equipment correctly.
+  const material_kind: "material" | "equipment" = isEquipmentExpense(expense)
+    ? "equipment"
+    : "material";
   const skuLines = await fetchExpenseLineItems(client, accountId, expense.id);
   if (skuLines.length > 0) {
     return skuLines.map((line) => ({
@@ -65,7 +70,7 @@ async function buildMaterialLineDraftsForExpense(
       quantity: parseLineQuantity(line.quantity),
       unit_price_cents: line.unit_cost_cents,
       line_item_type: "materials" as const,
-      material_kind: "material" as const,
+      material_kind,
       source_expense_id: expense.id,
       source_expense_line_item_id: line.id,
     }));
@@ -77,7 +82,7 @@ async function buildMaterialLineDraftsForExpense(
       quantity: 1,
       unit_price_cents: expense.amount_cents,
       line_item_type: "materials",
-      material_kind: "material",
+      material_kind,
       source_expense_id: expense.id,
       source_expense_line_item_id: null,
     },
