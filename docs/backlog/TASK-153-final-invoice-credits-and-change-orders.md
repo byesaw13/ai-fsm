@@ -10,13 +10,13 @@ Epic:
 EPIC-004 Billing & Profitability
 
 Problem:
-Found closing out J-2026-0029 (Peter Marinelli, 4 Ash St, 2026-09-23). The job
+Found closing out a T&M renovation job (2026-09-23). The job
 was billed T&M, but the app could not produce the final bill:
 
 - **An up-front standard invoice blocks the final invoice.**
   `createDraftFinalInvoiceForJob` (`apps/web/lib/invoices/final-invoice.ts`)
-  returns null when any `standard` or `final` invoice exists on the job. INV-0001
-  was issued as a `standard` invoice for the full $13,535 estimate (30% paid up
+  returns null when any `standard` or `final` invoice exists on the job. The first
+  invoice was issued as a `standard` invoice for the full estimate (a deposit paid up
   front), so completing the job never drafts a final invoice.
 - **Only deposit/progress invoices are credited.** `loadCreditedInvoicesForEstimate`
   (`apps/web/lib/invoices/db.ts`) credits `invoice_kind IN ('deposit','progress')`.
@@ -32,7 +32,8 @@ was billed T&M, but the app could not produce the final bill:
   have fired even without the block above.
 
 Workaround used: a second manual invoice on the job carrying the net change
-(+$2,336.02 changes, −$1,300.00 credit adjustment line), INV-0001 left as-is.
+(changes line plus a negative credit adjustment line), first invoice left as-is.
+Superseded by TASK-154 (reopen/edit a partially paid invoice).
 
 Business Value:
 One-click honest final bill on a job that was invoiced up front: actuals (T&M) or
@@ -41,10 +42,12 @@ invoiced. No hand math in another tool, no double-billing risk.
 
 Scope:
 - **Slice 1 — credit prior invoices (T&M first).** Final invoice creation no
-  longer skips when a prior non-void standard invoice exists; it drafts the final
-  invoice and credits every prior non-void invoice on the job (deposit, progress,
-  standard) as "Less previously invoiced — INV-xxxx". Balance = actuals − prior
-  invoiced; payments stay on their original invoices.
+  longer skips when a prior issued standard invoice exists; it drafts the final
+  invoice and credits every prior **issued** invoice on the job (deposit, progress,
+  standard), each as "Less previously invoiced — INV-xxxx". Issued = `sent`,
+  `partial`, `overdue`, or `paid`; `draft` and `void` invoices were never billed
+  and are never credited. Balance = actuals − prior invoiced; payments stay on
+  their original invoices.
 - **Slice 2 — approved change orders on flat-rate final invoices.** For
   `flat_rate` jobs, each approved change order's lines are copied onto the final
   invoice with `change_order_id` set. For `hourly_internal` (T&M) jobs they are
@@ -66,9 +69,9 @@ Open question (owner decision, before slice 1):
 
 Acceptance Criteria (slice 1):
 - [ ] Completing a job that already has a partial/sent standard invoice drafts a final invoice.
-- [ ] The final invoice subtracts all prior non-void invoices on the job, each on its own labeled line.
-- [ ] Void and cancelled invoices are not credited.
-- [ ] Unit tests: prior standard, prior deposit + progress, prior void, no prior invoice (unchanged).
+- [ ] The final invoice subtracts all prior issued (sent/partial/overdue/paid) invoices on the job, each on its own labeled line.
+- [ ] Draft and void invoices are not credited.
+- [ ] Unit tests: prior standard, prior deposit + progress, prior draft, prior void, no prior invoice (unchanged).
 
 Acceptance Criteria (slice 2):
 - [ ] Flat-rate final invoice includes approved change-order lines, linked by `change_order_id`.

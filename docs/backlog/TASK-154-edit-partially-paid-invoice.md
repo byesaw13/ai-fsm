@@ -15,7 +15,7 @@ land after the deposit. The app only reopened an invoice to draft when
 `paid_cents = 0` (API guard in `invoices/[id]/transition`, UI filter on the
 invoice page, and `validate_invoice_transition` / `enforce_invoice_immutability`
 in the DB). A deposit-paid invoice was frozen, forcing a second invoice for the
-same job (J-2026-0029, 2026-09-23), which reads as unprofessional to the client.
+same job (2026-09-23), which reads as unprofessional to the client.
 
 Business Value:
 One invoice per job that tracks the real T&M total. The owner reopens it,
