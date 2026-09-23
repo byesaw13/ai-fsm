@@ -11,6 +11,7 @@ import {
 } from "@/lib/mileage/sessions";
 import { logger } from "@/lib/logger";
 import { businessToday } from "@/lib/operations/business-day";
+import { clockIn } from "@/lib/operations/time-clock";
 
 export const dynamic = "force-dynamic";
 
@@ -136,6 +137,10 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
         session.userId,
       ]
     );
+
+    await clockIn(client, session.accountId, session.userId, {
+      notes: "Start day mileage",
+    });
 
     await appendAuditLog(client, {
       account_id: session.accountId,

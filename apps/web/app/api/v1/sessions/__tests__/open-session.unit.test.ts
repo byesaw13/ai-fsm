@@ -27,6 +27,9 @@ vi.mock("@/lib/db/audit", () => ({
 vi.mock("@/lib/logger", () => ({
   logger: { error: vi.fn() },
 }));
+vi.mock("@/lib/operations/time-clock", () => ({
+  clockIn: vi.fn().mockResolvedValue({ alreadyOpen: false, clock: { id: "clock-1" } }),
+}));
 
 import { POST as startDay } from "../start/route";
 import { PATCH as closeSession } from "../[id]/route";
