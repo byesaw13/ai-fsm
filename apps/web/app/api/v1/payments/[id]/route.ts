@@ -88,7 +88,10 @@ export const DELETE = withRole(["owner"], async (request, session) => {
         newPaidCents,
         invBefore.deposit_cents,
       );
-      if (newPaidCents === 0 && newStatus !== "paid") {
+      if (invBefore.status === "draft") {
+        // Reopened for edit (TASK-154): stays draft until re-sent (mirrors 192).
+        newStatus = "draft";
+      } else if (newPaidCents === 0 && newStatus !== "paid") {
         // No payments remaining — revert to sent (the pre-payment state)
         newStatus = "sent";
       }

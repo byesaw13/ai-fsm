@@ -96,12 +96,6 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         );
       }
 
-      if (targetStatus === "draft" && invoice.paid_cents > 0) {
-        throw Object.assign(new Error("Only unpaid invoices may be reopened to draft"), {
-          code: "INVALID_TRANSITION",
-        });
-      }
-
       if (targetStatus === "draft") {
         await client.query(
           `UPDATE invoices SET status = 'draft', sent_at = NULL, updated_at = now() WHERE id = $1`,
@@ -132,7 +126,12 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         fromStatus: currentStatus,
         toStatus: targetStatus,
         changedBy: session.userId,
-        note: targetStatus === "draft" ? "Reopened unpaid invoice for correction" : null,
+        note:
+          targetStatus === "draft"
+            ? invoice.paid_cents > 0
+              ? "Reopened partially paid invoice for correction (payments kept)"
+              : "Reopened unpaid invoice for correction"
+            : null,
       });
 
       if (targetStatus === "void") {

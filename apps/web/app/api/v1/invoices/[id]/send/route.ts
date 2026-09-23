@@ -9,6 +9,8 @@ import { invoiceEmailHtml, invoiceEmailText } from "@ai-fsm/email-templates";
 import { logCommunication } from "@/lib/communications-log";
 import { loadInvoicePdf } from "@/lib/pdf/load";
 import { applyServiceMinimum, isServiceMinimumEligible } from "@/lib/invoices/service-minimum";
+import { amountDueCents } from "@/lib/invoices/payments";
+import { writeWorkflowEvent } from "@/lib/workflow-events";
 import { dueDateUponCompletion, invoiceDueOnCompletion } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
@@ -33,8 +35,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     const result = await withInvoiceContext(session, async (client) => {
       const { rows, rowCount } = await client.query(
         `SELECT i.id, i.status, i.invoice_number, i.total_cents, i.balance_cents,
-                i.deposit_cents, i.due_date, i.notes, i.sent_at, i.paid_at, i.share_token,
-                i.invoice_kind, j.status AS job_status,
+                i.paid_cents, i.deposit_cents, i.due_date, i.notes, i.sent_at, i.paid_at, i.share_token,
+                i.invoice_kind, i.job_id, j.status AS job_status,
                 e.minimum_service_override_reason AS estimate_override,
                 c.id AS client_id, c.name AS client_name, c.email AS client_email
          FROM invoices i
@@ -49,10 +51,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
       const inv = rows[0] as {
         id: string; status: string; invoice_number: string;
-        total_cents: number; balance_cents: number; deposit_cents: number;
+        total_cents: number; balance_cents: number; paid_cents: number; deposit_cents: number;
         due_date: string | null; notes: string | null; sent_at: string | null;
         paid_at: string | null; share_token: string;
-        invoice_kind: string; job_status: string | null;
+        invoice_kind: string; job_id: string | null; job_status: string | null;
         estimate_override: string | null;
         client_id: string; client_name: string; client_email: string | null;
       };
@@ -102,15 +104,23 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         }
       }
 
-      const isPaid = inv.status === "paid";
+      // What the client still owes: total − deposit credit − payments already made.
+      // balance_cents excludes payments, so a re-sent partially paid invoice
+      // (TASK-154) would otherwise email the full total as the balance.
+      const paidCents = Number(inv.paid_cents ?? 0);
+      const amountDue = amountDueCents(inv.total_cents, paidCents, inv.deposit_cents);
+      // A reopened invoice whose payments already cover the edited total becomes
+      // paid on this send (migration 192) — email the receipt, not a $0 invoice.
+      const settlesPaidOnSend = inv.status === "draft" && paidCents > 0 && amountDue === 0;
+      const isPaid = inv.status === "paid" || settlesPaidOnSend;
 
       // Public share link (no login). PDF attachment is the offline artifact.
       const viewUrl = `${appUrl()}/portal/invoices/${inv.share_token}`;
       const dueDateStr = inv.due_date
         ? new Date(inv.due_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
         : null;
-      const paidAtStr = inv.paid_at
-        ? new Date(inv.paid_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+      const paidAtStr = inv.paid_at || settlesPaidOnSend
+        ? new Date(inv.paid_at ?? Date.now()).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
         : null;
 
       // Attach the invoice as a PDF (best-effort: a render failure must not
@@ -137,7 +147,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           invoiceNumber: inv.invoice_number,
           clientName: inv.client_name,
           totalCents: inv.total_cents,
-          balanceCents: isPaid ? 0 : inv.balance_cents,
+          balanceCents: isPaid ? 0 : amountDue,
           dueDateStr: isPaid ? null : dueDateStr,
           viewUrl,
           notes: inv.notes,
@@ -148,7 +158,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           invoiceNumber: inv.invoice_number,
           clientName: inv.client_name,
           totalCents: inv.total_cents,
-          balanceCents: isPaid ? 0 : inv.balance_cents,
+          balanceCents: isPaid ? 0 : amountDue,
           dueDateStr: isPaid ? null : dueDateStr,
           viewUrl,
           notes: inv.notes,
@@ -197,15 +207,38 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         invoiceKind: inv.invoice_kind,
         jobStatus: inv.job_status,
       });
+      let statusAfter = inv.status;
       if (inv.status === "draft") {
         const dueDate = dueOnCompletion ? null : inv.due_date ?? dueDateUponCompletion();
-        await client.query(
+        // DB settles a reopened invoice with payments to partial/paid (192).
+        const upd = await client.query<{ status: string }>(
           `UPDATE invoices
            SET status = 'sent', sent_at = now(), updated_at = now(),
                due_date = COALESCE(due_date, $2::timestamptz)
-           WHERE id = $1`,
+           WHERE id = $1
+           RETURNING status`,
           [id, dueDate]
         );
+        statusAfter = upd.rows[0]?.status ?? "sent";
+        if (statusAfter === "paid") {
+          // Same side effects as the payment / webhook / transition paths.
+          await writeWorkflowEvent(client, {
+            accountId: session.accountId,
+            eventType: "invoice.paid",
+            entityType: "invoice",
+            entityId: id,
+            payload: { source: "resend_settled" },
+          });
+          if (inv.job_id) {
+            const { closeJobIfFullyPaid } = await import("@/lib/jobs/close-if-paid");
+            await closeJobIfFullyPaid(client, {
+              accountId: session.accountId,
+              jobId: inv.job_id,
+              actorId: session.userId,
+              traceId: session.traceId,
+            });
+          }
+        }
       } else if (!dueOnCompletion && !inv.due_date && ["sent", "partial", "overdue"].includes(inv.status)) {
         // One-time fill when due_date was never set (allowed by migration 149).
         // Uses sent_at as completion day so aging matches payment terms.
@@ -227,7 +260,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         old_value: { status: inv.status, sent_at: inv.sent_at },
         new_value: {
           sent_to: inv.client_email,
-          status: inv.status === "draft" ? "sent" : inv.status,
+          status: statusAfter,
           kind: isPaid ? "paid_receipt" : "invoice",
         },
       });
