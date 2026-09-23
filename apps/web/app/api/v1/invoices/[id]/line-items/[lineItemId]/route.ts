@@ -19,6 +19,7 @@ const lineItemSchema = z
     quantity: z.coerce.number().positive().max(999999.99),
     unit_price_cents: z.coerce.number().int().min(-100_000_000).max(100_000_000),
     line_item_type: z.enum(INVOICE_LINE_ITEM_TYPES),
+    store_section: z.string().trim().max(80).nullable().optional(),
   })
   // Only 'adjustment' lines may be negative — that's how a discount is entered.
   .refine((d) => d.line_item_type === "adjustment" || d.unit_price_cents >= 0, {

@@ -109,6 +109,7 @@ interface LineItemRow {
   total_cents: number;
   line_item_type: "labor" | "materials" | "handling_fee" | "adjustment";
   material_kind: string | null;
+  store_section: string | null;
   sort_order: number;
   created_at: string;
 }
@@ -158,7 +159,7 @@ export default async function InvoiceDetailPage({
 
     const lineItemsResult = await client.query(
       `SELECT id, invoice_id, estimate_line_item_id,
-              description, quantity::float8 AS quantity, unit_price_cents, total_cents, line_item_type, material_kind, sort_order, created_at
+              description, quantity::float8 AS quantity, unit_price_cents, total_cents, line_item_type, material_kind, store_section, sort_order, created_at
        FROM invoice_line_items
        WHERE invoice_id = $1
        ORDER BY sort_order ASC, created_at ASC`,
@@ -512,6 +513,22 @@ export default async function InvoiceDetailPage({
                     {(() => {
                       const groups = groupInvoiceLineItems(lineItems);
                       const showSubtotals = groups.length > 1;
+                      const renderRow = (item: LineItemRow) => (
+                        <tr key={item.id} data-testid="invoice-line-item-row">
+                          <td style={{ whiteSpace: "pre-line" }}>
+                            {item.description.replace(/<!--travel-charge-->/g, "").trim()}
+                          </td>
+                          <td>
+                            <span className="p7-badge p7-badge-count" style={{ fontSize: "10px" }}>
+                              {item.line_item_type.replace("_", " ")}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: "right", fontFamily: "var(--font-mono)" }}>{item.quantity}</td>
+                          <td style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontWeight: 600 }}>
+                            {formatDollars(item.total_cents)}
+                          </td>
+                        </tr>
+                      );
                       return groups.map((group) => (
                         <Fragment key={group.key}>
                           <tr data-testid={`invoice-group-${group.key}`}>
@@ -529,24 +546,26 @@ export default async function InvoiceDetailPage({
                               {group.label}
                             </td>
                           </tr>
-                          {group.items.map((item) => (
-                            <tr key={item.id} data-testid="invoice-line-item-row">
-                              <td style={{ whiteSpace: "pre-line" }}>
-                                {item.description
-                                  .replace(/<!--travel-charge-->/g, "")
-                                  .trim()}
-                              </td>
-                              <td>
-                                <span className="p7-badge p7-badge-count" style={{ fontSize: "10px" }}>
-                                  {item.line_item_type.replace("_", " ")}
-                                </span>
-                              </td>
-                              <td style={{ textAlign: "right", fontFamily: "var(--font-mono)" }}>{item.quantity}</td>
-                              <td style={{ textAlign: "right", fontFamily: "var(--font-mono)", fontWeight: 600 }}>
-                                {formatDollars(item.total_cents)}
-                              </td>
-                            </tr>
-                          ))}
+                          {group.subgroups
+                            ? group.subgroups.map((sub) => (
+                                <Fragment key={sub.label}>
+                                  <tr data-testid={`invoice-subsection-${group.key}`}>
+                                    <td colSpan={4} style={{ paddingLeft: "var(--space-4)", fontWeight: 600, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                                      {sub.label}
+                                    </td>
+                                  </tr>
+                                  {sub.items.map(renderRow)}
+                                  <tr data-testid={`invoice-subsection-subtotal-${group.key}`}>
+                                    <td colSpan={3} style={{ textAlign: "right", fontStyle: "italic", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+                                      {sub.label} subtotal
+                                    </td>
+                                    <td style={{ textAlign: "right", fontFamily: "var(--font-mono)", color: "var(--fg-muted)" }}>
+                                      {formatDollars(sub.subtotalCents)}
+                                    </td>
+                                  </tr>
+                                </Fragment>
+                              ))
+                            : group.items.map(renderRow)}
                           {showSubtotals && (
                             <tr data-testid={`invoice-group-subtotal-${group.key}`}>
                               <td colSpan={3} style={{ textAlign: "right", fontStyle: "italic", color: "var(--fg-muted)" }}>
