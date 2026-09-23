@@ -1,7 +1,7 @@
 # TASK-152: Job materials → invoice line items — clean labels, classification, order
 
 Status:
-In Progress (slice 1)
+In Progress (slice 2)
 
 Phase:
 3
@@ -35,9 +35,13 @@ Scope (sliced):
   itemized SKUs get a consistent, dated label (`Materials — {vendor} · {Mon D}`,
   `Lift / equipment — {vendor} · {Mon D}`) instead of a bare vendor blob. Owner
   can still rename any line in `InvoiceLineItemsEditor` (existing affordance).
-- **Slice 2: classify + group.** Give material lines a real class
-  (material / consumable / equipment-rental) and render invoice materials grouped
-  with subtotals in a stable order (kind → vendor), not one flat chronological list.
+- **Slice 2 (built): classify + group.** `invoice_line_items.material_kind`
+  (migration 190) stamps material vs equipment at line creation; a shared
+  `groupInvoiceLineItems()` helper sections lines (Labor / Materials / Equipment &
+  rentals / Handling / Adjustments) with per-section subtotals in a fixed order.
+  Applied to the owner invoice detail view. **"consumable" is allowed in the CHECK
+  but not populated — it needs a capture-time signal (slice 2b).** Grouped display
+  for the editor / print / customer portal is a follow-up (they render separately).
 - **Slice 3: reconcile plan ↔ actual.** Carry `store_section` from the buy list
   through the receipt to the bill so plan and actuals line up. Hold until 1–2 prove out.
 
@@ -56,3 +60,9 @@ Acceptance Criteria (slice 1):
 - [ ] Falls back to `Materials — {vendor}` when the date is missing; unit tests cover
       date present / absent / notes present.
 - [ ] Owner rename still works (unchanged).
+
+Acceptance Criteria (slice 2):
+- [x] Material lines carry `material_kind` (material/equipment) from creation (migration 190).
+- [x] Owner invoice view groups lines into ordered sections with per-section subtotals.
+- [x] Equipment bills under "Equipment & rentals"; legacy/untagged materials group under "Materials".
+- [x] Unit tests cover section keying, order, subtotals, empty-section omission.

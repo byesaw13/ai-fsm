@@ -44,6 +44,7 @@ type MaterialLineDraft = {
   quantity: number;
   unit_price_cents: number;
   line_item_type: "materials";
+  material_kind: "material" | "equipment";
   source_expense_id: string;
   source_expense_line_item_id: string | null;
 };
@@ -57,6 +58,11 @@ async function buildMaterialLineDraftsForExpense(
   accountId: string,
   expense: JobMaterialExpenseRow,
 ): Promise<MaterialLineDraft[]> {
+  // Classify from the expense itself so every path (incl. link-forgotten, which
+  // can feed an equipment receipt through here) tags equipment correctly.
+  const material_kind: "material" | "equipment" = isEquipmentExpense(expense)
+    ? "equipment"
+    : "material";
   const skuLines = await fetchExpenseLineItems(client, accountId, expense.id);
   if (skuLines.length > 0) {
     return skuLines.map((line) => ({
@@ -64,6 +70,7 @@ async function buildMaterialLineDraftsForExpense(
       quantity: parseLineQuantity(line.quantity),
       unit_price_cents: line.unit_cost_cents,
       line_item_type: "materials" as const,
+      material_kind,
       source_expense_id: expense.id,
       source_expense_line_item_id: line.id,
     }));
@@ -75,6 +82,7 @@ async function buildMaterialLineDraftsForExpense(
       quantity: 1,
       unit_price_cents: expense.amount_cents,
       line_item_type: "materials",
+      material_kind,
       source_expense_id: expense.id,
       source_expense_line_item_id: null,
     },
@@ -91,8 +99,8 @@ async function insertMaterialLine(
   const row = await client.query<InvoiceLineItemRow>(
     `INSERT INTO invoice_line_items
        (invoice_id, description, quantity, unit_price_cents, total_cents,
-        line_item_type, sort_order, source_expense_id, source_expense_line_item_id)
-     VALUES ($1, $2, $3, $4, $5, 'materials', $6, $7, $8)
+        line_item_type, material_kind, sort_order, source_expense_id, source_expense_line_item_id)
+     VALUES ($1, $2, $3, $4, $5, 'materials', $6, $7, $8, $9)
      RETURNING id, invoice_id, description, quantity::float8 AS quantity,
                unit_price_cents, total_cents, line_item_type, sort_order, created_at`,
     [
@@ -101,6 +109,7 @@ async function insertMaterialLine(
       draft.quantity,
       draft.unit_price_cents,
       total,
+      draft.material_kind,
       sortOrder,
       draft.source_expense_id,
       draft.source_expense_line_item_id,
@@ -707,6 +716,7 @@ export async function appendEquipmentFromJobExpenses(
       quantity: 1,
       unit_price_cents: expense.amount_cents,
       line_item_type: "materials",
+      material_kind: "equipment",
       source_expense_id: expense.id,
       source_expense_line_item_id: null,
     };
