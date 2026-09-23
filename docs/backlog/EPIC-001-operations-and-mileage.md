@@ -31,6 +31,36 @@ See [TASK-140](./TASK-140-mileage-claim-vs-gps.md), [TASK-141](./TASK-141-tag-mi
 > `Job → Visit → activity_entries`; Work Order stays separate until the time
 > truth is clean.
 
+# TASK-155: Backdated mileage start must not clock in
+
+Status:
+In Progress
+
+Phase:
+1
+
+Problem:
+`POST /api/v1/sessions/start` (#679) auto-clocks-in so opening miles opens the
+day. `clockIn` always stamps `now()` and opens `businessToday()`, so a start with
+a prior `session_date` (backfill / correction) started a live payroll shift and
+opened today's business day.
+
+Scope:
+- Only auto clock-in when the session date is the business-timezone today.
+  Payroll and mileage stay independent timelines (`docs/canonical/OPERATIONS.md`);
+  a backdated start records mileage only.
+
+Out of Scope:
+- Backdated payroll entry (payroll corrections stay on the time-clock surfaces).
+
+Acceptance Criteria:
+- [x] Non-today `session_date` inserts the session without calling `clockIn`.
+- [x] Today (explicit or defaulted) still clocks in.
+- [x] Unit tests cover both cases.
+
+Notes:
+Raised by Codex review on PR #680.
+
 # TASK-114: Fuel receipt odometer from that day + number sanity check
 
 Status:

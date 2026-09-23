@@ -51,7 +51,8 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
   }
 
   const d = parsed.data;
-  const sessionDate = d.session_date ?? todayKey();
+  const today = todayKey();
+  const sessionDate = d.session_date ?? today;
   const isCorrection = d.correction === true && !!d.correction_reason;
   const pool = getPool();
   const client = await pool.connect();
@@ -138,9 +139,14 @@ export const POST = withAuth(async (request: NextRequest, session: AuthSession) 
       ]
     );
 
-    await clockIn(client, session.accountId, session.userId, {
-      notes: "Start day mileage",
-    });
+    // Payroll and mileage are independent timelines (OPERATIONS.md). Only a
+    // start for today opens the shift; backfilling or correcting a prior day's
+    // miles must not start a payroll clock now or open today's business day.
+    if (sessionDate === today) {
+      await clockIn(client, session.accountId, session.userId, {
+        notes: "Start day mileage",
+      });
+    }
 
     await appendAuditLog(client, {
       account_id: session.accountId,

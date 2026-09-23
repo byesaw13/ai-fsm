@@ -32,6 +32,8 @@ vi.mock("@/lib/operations/time-clock", () => ({
 }));
 
 import { POST as startDay } from "../start/route";
+import { clockIn } from "@/lib/operations/time-clock";
+import { businessToday } from "@/lib/operations/business-day";
 import { PATCH as closeSession } from "../[id]/route";
 
 function request(method: string, url: string, body?: unknown): NextRequest {
@@ -69,6 +71,20 @@ describe("POST /api/v1/sessions/start", () => {
       expect.stringContaining("end_odometer, miles"),
       expect.arrayContaining([mockSession.accountId, null, "2026-06-10", 1200])
     );
+    // A prior-day backfill records mileage only — no payroll clock for today.
+    expect(clockIn).not.toHaveBeenCalled();
+  });
+
+  it("clocks in when the session is for today", async () => {
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // set_config
+      .mockResolvedValueOnce({ rows: [{ id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", session_date: businessToday(), vehicle_id: null, start_odometer: 1200 }] }) // INSERT
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await startDay(request("POST", "http://localhost/api/v1/sessions/start", { start_odometer: 1200 }));
+    expect(res.status).toBe(201);
+    expect(clockIn).toHaveBeenCalledTimes(1);
   });
 });
 
