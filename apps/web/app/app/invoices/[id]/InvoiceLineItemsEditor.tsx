@@ -14,6 +14,7 @@ interface LineItem {
   unit_price_cents: number;
   total_cents: number;
   line_item_type: LineItemType;
+  store_section?: string | null;
 }
 
 interface Props {
@@ -104,6 +105,7 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
       quantity: Number(get("quantity")),
       unit_price_cents: parseDollarsToCents(get("price")),
       line_item_type: get("type") as LineItemType,
+      store_section: get("section").trim() || null,
     };
   }
 
@@ -116,7 +118,8 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
       v.description === item.description &&
       v.quantity === item.quantity &&
       v.unit_price_cents === item.unit_price_cents &&
-      v.line_item_type === item.line_item_type;
+      v.line_item_type === item.line_item_type &&
+      (v.store_section ?? null) === (item.store_section ?? null);
     if (unchanged) return;
     await request(`/api/v1/invoices/${invoiceId}/line-items/${item.id}`, {
       method: "PATCH",
@@ -296,6 +299,22 @@ export function InvoiceLineItemsEditor({ invoiceId, jobId, lineItems }: Props) {
                         if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                       }}
                     />
+                    {item.line_item_type === "materials" && (
+                      <input
+                        type="text"
+                        data-f="section"
+                        defaultValue={item.store_section ?? ""}
+                        placeholder="Section (e.g. Lumber)"
+                        disabled={pending}
+                        className="input"
+                        aria-label="Store section"
+                        style={{ width: "100%", marginTop: 4, fontSize: "var(--text-xs)", padding: "4px 8px", color: "var(--fg-muted)" }}
+                        onBlur={(e) => commitRow(item, e.target)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                        }}
+                      />
+                    )}
                   </td>
                   <td>
                     <select

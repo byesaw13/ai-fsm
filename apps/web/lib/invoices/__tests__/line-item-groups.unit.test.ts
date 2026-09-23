@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { groupInvoiceLineItems, lineItemSectionKey } from "../line-item-groups";
+import { groupInvoiceLineItems, lineItemSectionKey, subgroupBySection } from "../line-item-groups";
 
 const item = (
   line_item_type: string,
   total_cents: number,
-  extra: { material_kind?: string | null; sort_order?: number } = {},
+  extra: { material_kind?: string | null; store_section?: string | null; sort_order?: number } = {},
 ) => ({ line_item_type, total_cents, ...extra });
 
 describe("line-item-groups", () => {
@@ -45,5 +45,33 @@ describe("line-item-groups", () => {
     ]);
     expect(groups).toHaveLength(1);
     expect(groups[0].items.map((i) => i.total_cents)).toEqual([100, 200]);
+  });
+
+  it("subgroupBySection: named sections alpha-sorted, Other (null) last, with subtotals", () => {
+    const subs = subgroupBySection([
+      item("materials", 300, { store_section: "Paint", sort_order: 3 }),
+      item("materials", 100, { store_section: "Hardware", sort_order: 1 }),
+      item("materials", 500, { store_section: null, sort_order: 4 }),
+      item("materials", 200, { store_section: "Hardware", sort_order: 2 }),
+    ]);
+    expect(subs?.map((s) => s.label)).toEqual(["Hardware", "Paint", "Other"]);
+    expect(subs?.find((s) => s.label === "Hardware")?.subtotalCents).toBe(300); // 100 + 200
+    expect(subs?.find((s) => s.label === "Other")?.subtotalCents).toBe(500);
+  });
+
+  it("subgroupBySection: undefined when no line carries a section (flat list)", () => {
+    expect(subgroupBySection([item("materials", 100), item("materials", 200)])).toBeUndefined();
+  });
+
+  it("materials group carries subgroups only when a section is present", () => {
+    const withSection = groupInvoiceLineItems([
+      item("materials", 100, { material_kind: "material", store_section: "Lumber" }),
+    ]).find((g) => g.key === "materials");
+    expect(withSection?.subgroups?.map((s) => s.label)).toEqual(["Lumber"]);
+
+    const withoutSection = groupInvoiceLineItems([
+      item("materials", 100, { material_kind: "material" }),
+    ]).find((g) => g.key === "materials");
+    expect(withoutSection?.subgroups).toBeUndefined();
   });
 });
