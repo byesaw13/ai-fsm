@@ -5,6 +5,7 @@ import {
   type ExpenseLineItemRow,
 } from "@/lib/expenses/line-items";
 import {
+  formatReceiptDate,
   materialExpenseDescription,
   materialHandlingCents,
   materialHandlingLineDescription,
@@ -21,6 +22,7 @@ export type JobMaterialExpenseRow = {
   vendor_name: string;
   amount_cents: number;
   notes: string | null;
+  expense_date?: string | null;
   commercial_tag?: string | null;
   category?: string | null;
 };
@@ -242,6 +244,7 @@ export async function fetchUninvoicedJobMaterialExpenses(
 ): Promise<JobMaterialExpenseRow[]> {
   const result = await client.query<JobMaterialExpenseRow>(
     `SELECT e.id, e.vendor_name, e.amount_cents, e.notes,
+            e.expense_date::text AS expense_date,
             e.commercial_tag, e.category
      FROM expenses e
      WHERE e.account_id = $1
@@ -269,6 +272,7 @@ export async function fetchUninvoicedJobEquipmentExpenses(
 ): Promise<JobEquipmentExpenseRow[]> {
   const result = await client.query<JobEquipmentExpenseRow>(
     `SELECT e.id, e.vendor_name, e.amount_cents, e.notes,
+            e.expense_date::text AS expense_date,
             e.commercial_tag, e.category
      FROM expenses e
      WHERE e.account_id = $1
@@ -287,10 +291,13 @@ export async function fetchUninvoicedJobEquipmentExpenses(
 export function equipmentExpenseDescription(expense: {
   vendor_name: string;
   notes: string | null;
+  expense_date?: string | null;
 }): string {
   const detail = expense.notes?.trim();
   if (detail) return detail.length > 120 ? `${detail.slice(0, 117)}…` : detail;
-  return `Lift / equipment — ${expense.vendor_name}`;
+  const vendor = expense.vendor_name?.trim() || "Supplier";
+  const date = formatReceiptDate(expense.expense_date);
+  return date ? `Lift / equipment — ${vendor} · ${date}` : `Lift / equipment — ${vendor}`;
 }
 
 function toLineItemPreview(line: ExpenseLineItemRow): ExpenseLineItemPreview {

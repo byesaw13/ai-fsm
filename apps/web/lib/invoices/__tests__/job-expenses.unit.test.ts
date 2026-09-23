@@ -4,6 +4,7 @@ import {
   materialHandlingCents,
   materialInvoiceTotalCents,
   materialExpenseDescription,
+  equipmentExpenseDescription,
   fetchJobMaterialExpenses,
 } from "../job-expenses";
 
@@ -81,5 +82,14 @@ describe("fetchJobMaterialExpenses", () => {
     const firstCallSql = (client.query as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
     expect(firstCallSql).toContain("e.job_id = $2");
     expect(firstCallSql).toContain("e.category = 'materials'");
+  });
+
+  it("equipmentExpenseDescription: clean dated fallback, notes preferred", () => {
+    expect(equipmentExpenseDescription({ vendor_name: "United Rentals", notes: null, expense_date: "2026-09-20" }))
+      .toBe("Lift / equipment — United Rentals · Sep 20");
+    expect(equipmentExpenseDescription({ vendor_name: "United Rentals", notes: null }))
+      .toBe("Lift / equipment — United Rentals");
+    expect(equipmentExpenseDescription({ vendor_name: "United Rentals", notes: "scissor lift 1 day", expense_date: "2026-09-20" }))
+      .toBe("scissor lift 1 day");
   });
 });

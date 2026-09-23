@@ -51,11 +51,24 @@ export type ExpenseLineItemPreview = {
   line_total_cents: number;
 };
 
+/** "2026-09-20" → "Sep 20" (date-only, no timezone drift). "" if unparseable/absent. */
+export function formatReceiptDate(dateStr?: string | null): string {
+  if (!dateStr) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
+  if (!m) return "";
+  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const mon = MONTHS[Number(m[2]) - 1];
+  return mon ? `${mon} ${Number(m[3])}` : "";
+}
+
 export function materialExpenseDescription(expense: {
   vendor_name: string;
   notes: string | null;
+  expense_date?: string | null;
 }): string {
   const detail = expense.notes?.trim();
   if (detail) return detail.length > 120 ? `${detail.slice(0, 117)}…` : detail;
-  return `Materials — ${expense.vendor_name}`;
+  const vendor = expense.vendor_name?.trim() || "Supplier";
+  const date = formatReceiptDate(expense.expense_date);
+  return date ? `Materials — ${vendor} · ${date}` : `Materials — ${vendor}`;
 }
