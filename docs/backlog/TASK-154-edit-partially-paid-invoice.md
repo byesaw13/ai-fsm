@@ -1,7 +1,7 @@
 # TASK-154: Reopen and edit a partially paid invoice (T&M)
 
 Status:
-In Progress
+Done (#681, migration 192, deployed 2026-09-23)
 
 Phase:
 3
@@ -39,10 +39,10 @@ Out of Scope:
 - Auto-crediting prior invoices on the final invoice (TASK-153).
 
 Acceptance Criteria:
-- [ ] A partial invoice reopens to draft with payments intact; `sent_at` clears.
-- [ ] Editing then re-sending lands on `partial` (or `paid` when covered).
-- [ ] Reopen can never change `paid_cents`.
-- [ ] A payment on a reopened draft keeps it draft.
-- [ ] Unpaid drafts still cannot jump to `partial`.
-- [ ] Re-sent email shows the balance net of payments.
-- [ ] Integration test: `apps/web/lib/invoices/__tests__/reopen-with-payments.integration.test.ts`.
+- [x] A partial invoice reopens to draft with payments intact; `sent_at` clears.
+- [x] Editing then re-sending lands on `partial` (or `paid` when covered).
+- [x] Reopen can never change `paid_cents`.
+- [x] A payment on a reopened draft keeps it draft.
+- [x] Unpaid drafts still cannot jump to `partial`.
+- [x] Re-sent email shows the balance net of payments.
+- [x] Integration test: `apps/web/lib/invoices/__tests__/reopen-with-payments.integration.test.ts`.
