@@ -5,6 +5,10 @@ of what each job actually earned.
 
 ## Active tasks
 
+# TASK-153: Final invoice credits prior invoices + approved change orders
+
+See [TASK-153-final-invoice-credits-and-change-orders.md](./TASK-153-final-invoice-credits-and-change-orders.md). Up-front standard invoice blocks/isn't credited by the final invoice; approved change orders never reach the bill.
+
 # TASK-144: Receipt review destinations
 
 See [TASK-144-receipt-destinations.md](./TASK-144-receipt-destinations.md).
