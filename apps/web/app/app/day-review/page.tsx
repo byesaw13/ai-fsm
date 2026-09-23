@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { businessToday } from "@/lib/operations/business-day";
+import { withDbSession } from "@/lib/db";
+import { ensureOpenBusinessDayIfWorked } from "@/lib/day-review/ensure-day";
 import { getDayReview, loadDayCompanyFacts } from "@/lib/day-review/queries";
 import { loadDayCloseStatus } from "@/lib/day-review/close-status";
 import { loadDayDraft } from "@/lib/day-review/load-day-draft";
@@ -37,6 +39,13 @@ export default async function DayReviewPage({
   // Default to today in the business timezone — a UTC date rolls over to
   // tomorrow during evening hours, so the owner couldn't review the current day.
   const date = sp.date ?? businessToday();
+  await withDbSession(session, (client) =>
+    ensureOpenBusinessDayIfWorked(client, {
+      accountId: session.accountId,
+      userId: session.userId,
+      date,
+    }),
+  );
   const canReviewPromises = session.role === "owner" || session.role === "admin";
   const [
     payload,
