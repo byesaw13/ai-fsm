@@ -60,7 +60,7 @@ export default async function InvoicePortalPage({
 
   const invoice = await queryOne<InvoiceRow>(
     `SELECT
-       i.id, i.account_id, i.status, i.invoice_number, i.subtotal_cents, i.tax_cents,
+       i.id, i.account_id, i.client_id, i.status, i.invoice_number, i.subtotal_cents, i.tax_cents,
        i.total_cents, i.paid_cents, i.deposit_cents, i.notes, i.due_date,
        i.work_summary, i.show_itemized_receipts,
        i.paid_at, i.deposit_type, i.deposit_percentage, i.deposit_fixed_cents,
@@ -84,8 +84,11 @@ export default async function InvoicePortalPage({
 
   // TASK-160: staff (admin preview, or a logged-in owner opening the link) are
   // not the client — never mark the invoice opened. A preview also cannot pay.
-  const [preview, staffSession] = await Promise.all([isPortalPreview(), getSession()]);
-  const staffViewer = preview || staffSession !== null;
+  const [preview, staffSession] = await Promise.all([
+    isPortalPreview(invoice.client_id as string),
+    getSession(),
+  ]);
+  const staffViewer = preview || staffSession?.accountId === invoice.account_id;
 
   // Best-effort: stamp client open so owners see Unread vs Viewed + attention feed.
   // Never block the portal render if the stamp fails.

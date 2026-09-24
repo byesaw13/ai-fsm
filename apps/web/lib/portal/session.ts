@@ -35,9 +35,15 @@ export async function getPortalSession(): Promise<{ clientId: string; isPreview:
   return row ? { clientId: row.client_id, isPreview: row.is_preview } : null;
 }
 
-/** True when this browser is in a staff "view as client" preview. */
-export async function isPortalPreview(): Promise<boolean> {
-  return (await getPortalSession())?.isPreview === true;
+/**
+ * True when this browser is in a staff "view as client" preview of `clientId`
+ * (any client when omitted). Scoped so a preview of one client never makes
+ * another client's documents read-only.
+ */
+export async function isPortalPreview(clientId?: string): Promise<boolean> {
+  const session = await getPortalSession();
+  if (!session?.isPreview) return false;
+  return clientId === undefined || session.clientId === clientId;
 }
 
 /** Ends a preview session (never a real client login) and clears its cookie. */

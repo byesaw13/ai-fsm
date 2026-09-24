@@ -15,6 +15,9 @@ describe.skipIf(!RUN)("admin portal preview", () => {
   const clientId = randomUUID();
   const invoiceId = randomUUID();
   const estimateId = randomUUID();
+  const otherClientId = randomUUID();
+  const otherEstimateId = randomUUID();
+  let otherEstimateShare = "";
   let portalToken = "";
   let invoiceShare = "";
   let estimateShare = "";
@@ -52,14 +55,21 @@ describe.skipIf(!RUN)("admin portal preview", () => {
       [estimateId, accountId, clientId, ownerId],
     );
     estimateShare = est.rows[0].share_token;
+    await db.query(`INSERT INTO clients (id, account_id, name) VALUES ($1, $2, 'Other Client')`, [otherClientId, accountId]);
+    const other = await db.query<{ share_token: string }>(
+      `INSERT INTO estimates (id, account_id, client_id, status, total_cents, created_by)
+       VALUES ($1, $2, $3, 'sent', 5000, $4) RETURNING share_token::text`,
+      [otherEstimateId, accountId, otherClientId, ownerId],
+    );
+    otherEstimateShare = other.rows[0].share_token;
   });
 
   afterAll(async () => {
     if (!db) return;
     await db.query(`DELETE FROM portal_sessions WHERE client_id = $1`, [clientId]).catch(() => undefined);
     await db.query(`DELETE FROM invoices WHERE id = $1`, [invoiceId]).catch(() => undefined);
-    await db.query(`DELETE FROM estimates WHERE id = $1`, [estimateId]).catch(() => undefined);
-    await db.query(`DELETE FROM clients WHERE id = $1`, [clientId]).catch(() => undefined);
+    await db.query(`DELETE FROM estimates WHERE id = ANY($1::uuid[])`, [[estimateId, otherEstimateId]]).catch(() => undefined);
+    await db.query(`DELETE FROM clients WHERE id = ANY($1::uuid[])`, [[clientId, otherClientId]]).catch(() => undefined);
     await db.end();
   });
 
@@ -108,6 +118,15 @@ describe.skipIf(!RUN)("admin portal preview", () => {
       [clientId],
     );
     expect(state.rows[0]).toEqual({ sms_consent: true, est_status: "sent" });
+  }, 60_000);
+
+  it("only restricts the previewed client's documents", async () => {
+    const res = await fetch(`${BASE_URL}/api/portal/estimates/${otherEstimateShare}`, {
+      method: "POST",
+      headers: { Cookie: previewCookie, "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "decline" }),
+    });
+    expect(res.status).not.toBe(403);
   }, 60_000);
 
   it("does not mark an invoice opened when staff view it", async () => {

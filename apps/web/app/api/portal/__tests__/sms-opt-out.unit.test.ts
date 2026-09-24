@@ -38,9 +38,14 @@ describe("POST /api/portal/[clientToken]/sms-opt-out", () => {
   it("403 — admin preview cannot opt the client out (TASK-160)", async () => {
     const { POST } = await import("../[clientToken]/sms-opt-out/route");
     mockIsPortalPreview.mockResolvedValue(true);
+    mockQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [{ id: CLIENT_ID, account_id: ACCOUNT_ID, sms_consent: true }] }) // SELECT client
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
     const res = await POST(makeRequest(CLIENT_TOKEN), { params: Promise.resolve({ clientToken: CLIENT_TOKEN }) });
     expect(res.status).toBe(403);
-    expect(mockPool.connect).not.toHaveBeenCalled();
+    expect(mockQuery).toHaveBeenCalledTimes(3);
+    expect(mockQuery.mock.calls[2][0]).toBe("ROLLBACK");
   });
 
   it("200 — clears consent and logs to communications_log", async () => {

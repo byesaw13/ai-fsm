@@ -85,21 +85,22 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
-  if (await isPortalPreview()) {
-    return NextResponse.json({ error: PREVIEW_READ_ONLY_MESSAGE }, { status: 403 });
-  }
   const { token } = await params;
 
   const estimate = await queryOne<{
     id: string;
     status: string;
     account_id: string;
+    client_id: string;
   } & Record<string, unknown>>(
-    `SELECT id, status, account_id FROM estimates WHERE share_token = $1`,
+    `SELECT id, status, account_id, client_id FROM estimates WHERE share_token = $1`,
     [token]
   );
 
   if (!estimate) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (await isPortalPreview(estimate.client_id)) {
+    return NextResponse.json({ error: PREVIEW_READ_ONLY_MESSAGE }, { status: 403 });
+  }
 
   if (!["sent", "approved", "declined"].includes(estimate.status)) {
     return NextResponse.json(

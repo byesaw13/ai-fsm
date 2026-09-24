@@ -8,9 +8,6 @@ export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ clientToken: string }> }
 ) {
-  if (await isPortalPreview()) {
-    return NextResponse.json({ error: PREVIEW_READ_ONLY_MESSAGE }, { status: 403 });
-  }
   const { clientToken } = await params;
   const pool = getPool();
   const client = await pool.connect();
@@ -25,6 +22,10 @@ export async function POST(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     const row = rows[0];
+    if (await isPortalPreview(row.id)) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: PREVIEW_READ_ONLY_MESSAGE }, { status: 403 });
+    }
     if (!row.sms_consent) {
       await client.query("ROLLBACK");
       return NextResponse.json({ error: "Already opted out" }, { status: 409 });

@@ -96,9 +96,6 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
-  if (await isPortalPreview()) {
-    return NextResponse.json({ error: PREVIEW_READ_ONLY_MESSAGE }, { status: 403 });
-  }
   const { token } = await params;
 
   const invoice = await queryOne<InvoiceRow>(
@@ -112,6 +109,9 @@ export async function POST(
   );
 
   if (!invoice) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (await isPortalPreview(invoice.client_id)) {
+    return NextResponse.json({ error: PREVIEW_READ_ONLY_MESSAGE }, { status: 403 });
+  }
   if (invoice.status === "paid" || invoice.status === "void") {
     return NextResponse.json({ error: "Invoice is not payable" }, { status: 422 });
   }
