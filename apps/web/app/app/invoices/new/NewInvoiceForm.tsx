@@ -164,7 +164,7 @@ export function NewInvoiceForm({
   function handlePropertyCreated(property: {
     id: string;
     address: string;
-    client_id: string;
+    client_id: string | null;
   }) {
     setPropertyList((prev) =>
       prev.some((p) => p.id === property.id)
@@ -207,8 +207,8 @@ export function NewInvoiceForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!clientId) { setError("Please select a client."); return; }
-    if (billingContext === "realtor_sponsored" && (!propertyId || !beneficiaryId || !sponsoredPurpose)) {
-      setError("Select a service property, beneficiary, and sponsored purpose.");
+    if (billingContext === "realtor_sponsored" && (!propertyId || !sponsoredPurpose)) {
+      setError("Select a service property and sponsored purpose.");
       return;
     }
     if (lineItems.length === 0) { setError("Add at least one line item."); return; }
@@ -225,7 +225,7 @@ export function NewInvoiceForm({
         notes: notes.trim() || null,
         billing_context: billingContext,
         sponsored_purpose: billingContext === "realtor_sponsored" ? sponsoredPurpose : null,
-        beneficiary_property_contact_id: billingContext === "realtor_sponsored" ? beneficiaryId : null,
+        beneficiary_property_contact_id: billingContext === "realtor_sponsored" ? beneficiaryId || null : null,
         business_purpose: billingContext === "realtor_sponsored" ? businessPurpose.trim() || null : null,
         tax_rate: taxRateNum,
         line_items: lineItems.map((row, i) => ({
@@ -383,7 +383,7 @@ export function NewInvoiceForm({
                 }
               />
             </div>
-            {clientId && billingContext === "standard" ? (
+            {clientId || billingContext === "realtor_sponsored" ? (
               <button
                 type="button"
                 className="p7-btn p7-btn-secondary p7-btn-sm"
@@ -398,9 +398,9 @@ export function NewInvoiceForm({
               </button>
             ) : null}
           </div>
-          {inlineForm === "property" && clientId ? (
+          {inlineForm === "property" && (clientId || billingContext === "realtor_sponsored") ? (
             <InlinePropertyForm
-              clientId={clientId}
+              clientId={billingContext === "realtor_sponsored" ? null : clientId}
               onCreated={handlePropertyCreated}
               onCancel={() => setInlineForm(null)}
             />
@@ -411,12 +411,11 @@ export function NewInvoiceForm({
           <>
             <Select
               id="beneficiary_property_contact_id"
-              label="Work for"
-              required
+              label="Work for (optional)"
               value={beneficiaryId}
               onChange={(event) => setBeneficiaryId(event.target.value)}
               options={beneficiaryOptions.map((contact) => ({ value: contact.id, label: contact.display_name }))}
-              placeholder={propertyId ? "Select a property contact" : "Select a property first"}
+              placeholder={propertyId ? "Not specified" : "Select a property first"}
               disabled={pending || !propertyId}
             />
             <Select

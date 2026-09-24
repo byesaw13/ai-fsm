@@ -8,6 +8,7 @@ stable. Recorded so the ideas are not lost — not a commitment to build.
 ## Active tasks
 
 - [TASK-158: Realtor-sponsored property work](TASK-158-realtor-sponsored-properties.md) — Proposed
+- [TASK-159: Sponsored work for any realtor in one form](TASK-159-sponsored-work-any-realtor.md) — In progress
 
 # TASK-011: Property Opportunities
 

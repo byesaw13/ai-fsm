@@ -344,7 +344,7 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
                           <span data-testid="invoice-sponsored-label" style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
                             · {formatSponsoredInvoiceLabel({
                               propertyAddress: inv.property_address ?? "",
-                              beneficiaryName: inv.beneficiary_name ?? "",
+                              beneficiaryName: inv.beneficiary_name,
                               workSummary: inv.work_summary,
                               invoiceNumber: inv.invoice_number,
                             })}

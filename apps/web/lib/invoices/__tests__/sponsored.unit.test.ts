@@ -17,4 +17,13 @@ describe("formatSponsoredInvoiceLabel", () => {
       invoiceNumber: "0200",
     })).toBe("96 Richardson Road — Emma — Invoice 0200");
   });
+
+  it("omits the beneficiary when none is recorded (TASK-159)", () => {
+    expect(formatSponsoredInvoiceLabel({
+      propertyAddress: "16 E Chamberlain",
+      beneficiaryName: null,
+      workSummary: "Light fixture replacement",
+      invoiceNumber: "INV-0022",
+    })).toBe("16 E Chamberlain — Light fixture replacement");
+  });
 });

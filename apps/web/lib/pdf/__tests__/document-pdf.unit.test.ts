@@ -147,6 +147,20 @@ describe("buildInvoicePdf", () => {
     }
   });
 
+  it("omits the Work for line when no beneficiary is recorded (TASK-159)", async () => {
+    const bytes = await buildInvoicePdf({
+      invoiceNumber: "INV-0022", status: "paid", clientName: "Norman Boyd",
+      propertyAddress: "16 E Chamberlain, Merrimack, NH",
+      subtotalCents: 19598, totalCents: 19598, paidCents: 19598,
+      sponsored: { paidBy: "Norman Boyd", beneficiary: null, purpose: "Other realtor-sponsored work" },
+      lineItems: [],
+    });
+    const text = pdfDrawnText(bytes);
+    expect(text).toContain("REALTOR-SPONSORED PROPERTY EXPENSE");
+    expect(text).toContain("Norman Boyd");
+    expect(text).not.toContain("Work for");
+  });
+
   it("omits the sponsored block on standard invoices", async () => {
     const bytes = await buildInvoicePdf({
       invoiceNumber: "STD-1", status: "sent", clientName: "Client",

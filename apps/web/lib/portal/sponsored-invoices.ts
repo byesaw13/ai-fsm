@@ -15,7 +15,7 @@ export interface SponsoredInvoiceRow {
   work_summary: string | null;
   property_name: string | null;
   property_address: string;
-  beneficiary_name: string;
+  beneficiary_name: string | null;
 }
 
 type Queryable = {
@@ -27,7 +27,7 @@ type Queryable = {
  *
  * Access comes from being the invoice payer, never from a property_contacts
  * relationship. Selects invoice facts, the property's name/address, and the
- * beneficiary display name only — no property notes, vault, jobs, visits,
+ * beneficiary display name (when set) only — no property notes, vault, jobs, visits,
  * contact email/phone, or other people's invoices.
  */
 export async function loadSponsoredInvoices(
@@ -42,7 +42,7 @@ export async function loadSponsoredInvoices(
             COALESCE(contact_client.name, pc.external_name) AS beneficiary_name
      FROM invoices i
      JOIN properties p ON p.id = i.property_id AND p.account_id = i.account_id
-     JOIN property_contacts pc
+     LEFT JOIN property_contacts pc
        ON pc.id = i.beneficiary_property_contact_id
       AND pc.property_id = i.property_id
       AND pc.account_id = i.account_id
