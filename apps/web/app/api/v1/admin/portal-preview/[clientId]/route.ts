@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { canManageClients } from "@/lib/auth/permissions";
 import { queryOneForSession } from "@/lib/db";
 import { createPortalSession, PORTAL_SESSION_COOKIE, PREVIEW_SESSION_SECONDS } from "@/lib/portal/session";
+import { appUrl } from "@/lib/email/mailer";
 
 export async function GET(
   request: NextRequest,
@@ -28,7 +29,8 @@ export async function GET(
   // TASK-160: short-lived, read-only preview session (not a real client login).
   const sessionToken = await createPortalSession(client.id, { preview: true });
 
-  const url = new URL(`/portal/${client.portal_token}`, request.url);
+  // request.url is the container's bind address (0.0.0.0) behind the proxy; use the public app URL.
+  const url = new URL(`/portal/${client.portal_token}`, appUrl());
   const response = NextResponse.redirect(url);
   response.cookies.set(PORTAL_SESSION_COOKIE, sessionToken, {
     httpOnly: true,
