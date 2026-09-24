@@ -320,7 +320,7 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
           </div>
         </div>
 
-        {invoice.show_itemized_receipts && (
+        {invoice.show_itemized_receipts && !isVoid && (
           <div style={{ marginTop: -8, marginBottom: 20, textAlign: "right", fontSize: 14 }}>
             <a href={`/portal/invoices/${token}/receipts`} style={{ color: "#2563eb", fontWeight: 600 }}>
               View itemized receipts →

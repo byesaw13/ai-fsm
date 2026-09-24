@@ -195,7 +195,7 @@ export default async function InvoiceDetailPage({
         ).rows
       : [];
     const itemized = jobId
-      ? await loadItemizedReceipts(client, session.accountId, jobId)
+      ? await loadItemizedReceipts(client, session.accountId, jobId, id)
       : { receipts: [], total_cents: 0 };
 
     return {

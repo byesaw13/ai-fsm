@@ -145,8 +145,9 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         expense_date: string;
         notes: string | null;
         amount_cents: number;
+        billable: boolean;
       }>(
-        `SELECT id, vendor_name, category, expense_date::text AS expense_date, notes, amount_cents
+        `SELECT id, vendor_name, category, expense_date::text AS expense_date, notes, amount_cents, billable
            FROM expenses WHERE id = $1 AND account_id = $2`,
         [id, session.accountId]
       );
@@ -155,6 +156,22 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         throw Object.assign(new Error("Expense not found"), {
           code: "NOT_FOUND",
         });
+      }
+
+      // Once invoiced, the billable flag is locked like the receipt's items:
+      // flipping it would drop the receipt from the client's itemized page
+      // while the invoice still bills it (TASK-157).
+      if (updates.billable !== undefined && updates.billable !== existing.rows[0].billable) {
+        const billed = await client.query(
+          `SELECT 1 FROM invoice_line_items WHERE source_expense_id = $1 LIMIT 1`,
+          [id],
+        );
+        if ((billed.rowCount ?? 0) > 0) {
+          throw Object.assign(
+            new Error("This receipt is already on an invoice — edit the invoice instead"),
+            { code: "ALREADY_BILLED" },
+          );
+        }
       }
 
       const setClauses: string[] = [];
@@ -243,6 +260,12 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
           },
         },
         { status: 404 }
+      );
+    }
+    if (err.code === "ALREADY_BILLED") {
+      return NextResponse.json(
+        { error: { code: "ALREADY_BILLED", message: err.message, traceId: session.traceId } },
+        { status: 409 }
       );
     }
     logger.error("PATCH /api/v1/expenses/[id] error", error, {

@@ -91,19 +91,31 @@ export function buildItemizedReceipts(
   return { receipts: out, total_cents: out.reduce((s, r) => s + r.total_cents, 0) };
 }
 
+// Only purchase-type receipts can be client-facing; overhead categories
+// (subcontractors, office, insurance, …) never appear, even if marked billable.
+export const ITEMIZABLE_EXPENSE_CATEGORIES = ["materials", "tools", "other"] as const;
+
 export async function loadItemizedReceipts(
   db: Pool | PoolClient,
   accountId: string,
   jobId: string,
+  invoiceId: string,
 ): Promise<{ receipts: ItemizedReceipt[]; total_cents: number }> {
+  // A receipt already billed line-by-line on a different (non-void) invoice
+  // belongs to that invoice, not this one.
   const receipts = await db.query<ReceiptRow>(
-    `SELECT id, expense_date::text AS expense_date, vendor_name, amount_cents
-     FROM expenses
-     WHERE account_id = $1 AND job_id = $2
-       AND billable IS DISTINCT FROM false
-       AND category NOT IN ('fuel', 'vehicle', 'vehicle_fuel', 'meals')
-     ORDER BY expense_date ASC, created_at ASC`,
-    [accountId, jobId],
+    `SELECT e.id, e.expense_date::text AS expense_date, e.vendor_name, e.amount_cents
+     FROM expenses e
+     WHERE e.account_id = $1 AND e.job_id = $2
+       AND e.billable IS DISTINCT FROM false
+       AND e.category = ANY($4::text[])
+       AND NOT EXISTS (
+         SELECT 1 FROM invoice_line_items ili
+         JOIN invoices oi ON oi.id = ili.invoice_id
+         WHERE ili.source_expense_id = e.id AND oi.id <> $3 AND oi.status <> 'void'
+       )
+     ORDER BY e.expense_date ASC, e.created_at ASC`,
+    [accountId, jobId, invoiceId, ITEMIZABLE_EXPENSE_CATEGORIES],
   );
   const ids = receipts.rows.map((r) => r.id);
   const items = ids.length

@@ -71,7 +71,7 @@ describe.skipIf(!RUN)("work summary + itemized receipts", () => {
   });
 
   it("totals only billable receipts and items", async () => {
-    const res = await loadItemizedReceipts(pool, SEED_ACCOUNT, jobId);
+    const res = await loadItemizedReceipts(pool, SEED_ACCOUNT, jobId, "00000000-0000-0000-0000-000000000000");
     expect(res.receipts).toHaveLength(2);
     expect(res.receipts[0].items.map((i) => i.name)).toEqual(["Lumber"]);
     expect(res.total_cents).toBe(4000 + 2500);

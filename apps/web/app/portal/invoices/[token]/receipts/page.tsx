@@ -22,13 +22,14 @@ function fmtDate(d: string) {
 export default async function InvoiceReceiptsPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const invoice = await queryOne<{
+    id: string;
     account_id: string;
     job_id: string | null;
     invoice_number: string;
     account_name: string;
     property_address: string | null;
   }>(
-    `SELECT i.account_id, i.job_id, i.invoice_number, a.name AS account_name, p.address AS property_address
+    `SELECT i.id, i.account_id, i.job_id, i.invoice_number, a.name AS account_name, p.address AS property_address
      FROM invoices i
      JOIN accounts a ON a.id = i.account_id
      LEFT JOIN properties p ON p.id = i.property_id
@@ -37,7 +38,7 @@ export default async function InvoiceReceiptsPage({ params }: { params: Promise<
   );
   if (!invoice?.job_id) notFound();
 
-  const { receipts, total_cents } = await loadItemizedReceipts(getPool(), invoice.account_id, invoice.job_id);
+  const { receipts, total_cents } = await loadItemizedReceipts(getPool(), invoice.account_id, invoice.job_id, invoice.id);
 
   const cell = { padding: "6px 16px", fontSize: 13 } as const;
   return (
