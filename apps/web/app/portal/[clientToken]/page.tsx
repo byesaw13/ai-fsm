@@ -1,10 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { queryOne, query } from "@/lib/db";
+import { getPool, queryOne, query } from "@/lib/db";
 import { derivePortalStage, CUSTOMER_STAGE_ORDER, CUSTOMER_STAGE_LABELS, CUSTOMER_STAGE_COLORS } from "@ai-fsm/domain";
 import { SmsOptOutButton } from "./SmsOptOutButton";
 import { getPortalSession } from "@/lib/portal/session";
 import PortalLogoutButton from "./PortalLogoutButton";
+import { loadSponsoredInvoices, type SponsoredInvoiceRow } from "@/lib/portal/sponsored-invoices";
+import { SPONSORED_PURPOSE_LABELS, formatSponsoredInvoiceLabel } from "@/lib/invoices/sponsored";
 
 export const dynamic = "force-dynamic";
 
@@ -98,7 +100,7 @@ export default async function ClientPortalPage({
     redirect(`/portal/login`);
   }
 
-  const [estimates, invoices, plans, maintenanceJobs, activeVisitRows, recentComms, properties] = await Promise.all([
+  const [estimates, invoices, plans, maintenanceJobs, activeVisitRows, recentComms, properties, sponsored] = await Promise.all([
     query<EstimateRow>(
       `SELECT e.id, e.status, e.total_cents, e.sent_at, e.expires_at,
               e.share_token, p.address AS property_address
@@ -113,7 +115,7 @@ export default async function ClientPortalPage({
               i.due_date, i.share_token, p.address AS property_address
        FROM invoices i
        LEFT JOIN properties p ON p.id = i.property_id
-       WHERE i.client_id = $1 AND i.status != 'draft'
+       WHERE i.client_id = $1 AND i.status != 'draft' AND i.billing_context = 'standard'
        ORDER BY i.created_at DESC`,
       [client.id]
     ),
@@ -172,9 +174,12 @@ export default async function ClientPortalPage({
        ORDER BY p.address`,
       [client.id, client.account_id]
     ),
+    loadSponsoredInvoices(getPool(), client.id),
   ]);
 
-  const openInvoices = invoices.filter((i) => !["paid", "void"].includes(i.status as string));
+  // Sponsored rows count toward what this payer owes, but never add properties.
+  const billed = [...invoices, ...sponsored];
+  const openInvoices = billed.filter((i) => !["paid", "void"].includes(i.status as string));
   const totalOwed = openInvoices.reduce(
     (s, i) => s + ((i.total_cents as number) - (i.paid_cents as number)),
     0
@@ -182,7 +187,7 @@ export default async function ClientPortalPage({
 
   const activeStage = derivePortalStage({
     hasOpenInvoice:      openInvoices.length > 0,
-    hasPaidInvoice:      invoices.some((i) => i.status === "paid"),
+    hasPaidInvoice:      billed.some((i) => i.status === "paid"),
     hasApprovedEstimate: estimates.some((e) => e.status === "approved"),
     hasSentEstimate:     estimates.some((e) => e.status === "sent"),
     hasScheduledVisit:   activeVisitRows.length > 0,
@@ -354,6 +359,8 @@ export default async function ClientPortalPage({
           </section>
         )}
 
+        {sponsored.length > 0 && <SponsoredWorkSection rows={sponsored} />}
+
         {maintenanceJobs.length > 0 && (
           <section style={{ marginBottom: 32 }}>
             <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Maintenance History</h2>
@@ -432,11 +439,57 @@ export default async function ClientPortalPage({
           </section>
         )}
 
-        {estimates.length === 0 && invoices.length === 0 && plans.length === 0 && maintenanceJobs.length === 0 && (
+        {estimates.length === 0 && invoices.length === 0 && sponsored.length === 0 && plans.length === 0 && maintenanceJobs.length === 0 && (
           <div style={{ textAlign: "center", color: "#9ca3af", padding: 48 }}>Nothing to show yet.</div>
         )}
 
       </div>
     </div>
+  );
+}
+
+function SponsoredWorkSection({ rows }: { rows: SponsoredInvoiceRow[] }) {
+  const groups = new Map<string, SponsoredInvoiceRow[]>();
+  for (const row of rows) {
+    const key = `${row.property_name || row.property_address} — for ${row.beneficiary_name}`;
+    groups.set(key, [...(groups.get(key) ?? []), row]);
+  }
+  return (
+    <section style={{ marginBottom: 32 }}>
+      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Sponsored Work</h2>
+      <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
+        Work you paid for at other people&apos;s properties.
+      </div>
+      {[...groups].map(([heading, group]) => (
+        <div key={heading} style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>{heading}</div>
+          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+            {group.map((inv, idx) => (
+              <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: idx < group.length - 1 ? "1px solid #f3f4f6" : "none" }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 500 }}>
+                    {formatSponsoredInvoiceLabel({
+                      propertyAddress: inv.property_address,
+                      beneficiaryName: inv.beneficiary_name,
+                      workSummary: inv.work_summary,
+                      invoiceNumber: inv.invoice_number,
+                    })}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#9ca3af" }}>
+                    #{inv.invoice_number} · {SPONSORED_PURPOSE_LABELS[inv.sponsored_purpose]}
+                    {inv.paid_at ? ` · Paid ${new Date(inv.paid_at).toLocaleDateString()}` : ""}
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+                  <div style={{ fontWeight: 600 }}>{cents(inv.total_cents)}</div>
+                  <StatusBadge status={inv.status} />
+                  <Link href={`/portal/invoices/${inv.share_token}`} style={{ fontSize: 13, color: "#2563eb" }}>View →</Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </section>
   );
 }
