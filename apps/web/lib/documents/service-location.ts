@@ -118,8 +118,8 @@ export function documentJoins(opts: {
 
   const coalesceParts =
     includeEstimateProperty && root === "i"
-      ? `${root}.property_id, j.property_id, e.property_id, ${clientFirstProperty}`
-      : `${root}.property_id, j.property_id, ${clientFirstProperty}`;
+      ? `${root}.property_id, j.property_id, e.property_id, c.primary_property_id, ${clientFirstProperty}`
+      : `${root}.property_id, j.property_id, c.primary_property_id, ${clientFirstProperty}`;
 
   return `
   JOIN clients c ON c.id = ${root}.client_id

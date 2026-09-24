@@ -97,3 +97,42 @@ export async function validateInvoiceContext(
     throw contextError("Beneficiary must belong to the selected property", "VALIDATION_ERROR");
   }
 }
+
+/**
+ * Shared SQL for document renderers (PDF, print, share-token view, export).
+ * Root invoice alias must be `i`. Beneficiary display name only — never
+ * external email/phone/notes.
+ */
+export const SPONSORED_DOCUMENT_JOIN = `
+  LEFT JOIN property_contacts spc
+    ON spc.id = i.beneficiary_property_contact_id AND spc.account_id = i.account_id
+  LEFT JOIN clients spcc ON spcc.id = spc.client_id AND spcc.account_id = i.account_id`;
+
+export const SPONSORED_DOCUMENT_SELECT = `
+  i.billing_context, i.sponsored_purpose, i.business_purpose,
+  COALESCE(spcc.name, spc.external_name) AS beneficiary_name`;
+
+export type SponsoredDocumentInfo = {
+  paidBy: string;
+  beneficiary: string;
+  purpose: string;
+  businessPurpose: string | null;
+};
+
+/** Map a row selected with SPONSORED_DOCUMENT_SELECT; null for standard invoices. */
+export function sponsoredDocumentInfo(row: {
+  billing_context?: unknown;
+  sponsored_purpose?: unknown;
+  business_purpose?: unknown;
+  beneficiary_name?: unknown;
+  client_name?: unknown;
+}): SponsoredDocumentInfo | null {
+  if (row.billing_context !== "realtor_sponsored") return null;
+  const purpose = row.sponsored_purpose as SponsoredPurpose | null;
+  return {
+    paidBy: String(row.client_name ?? "—"),
+    beneficiary: String(row.beneficiary_name ?? "—"),
+    purpose: purpose ? SPONSORED_PURPOSE_LABELS[purpose] : "—",
+    businessPurpose: (row.business_purpose as string | null) ?? null,
+  };
+}

@@ -14,6 +14,8 @@
 // Generic helpers
 // ---------------------------------------------------------------------------
 
+import { SPONSORED_PURPOSE_LABELS, type SponsoredPurpose } from "@/lib/invoices/sponsored";
+
 /** Escape a single CSV field value per RFC 4180. */
 function escapeCsvField(value: unknown): string {
   if (value === null || value === undefined) return "";
@@ -71,6 +73,13 @@ export interface InvoiceExportRow {
   paid_cents: unknown;
   due_date?: unknown;
   created_at: unknown;
+  billing_context?: unknown;
+  property_address?: unknown;
+  beneficiary_name?: unknown;
+  sponsored_purpose?: unknown;
+  business_purpose?: unknown;
+  work_summary?: unknown;
+  paid_at?: unknown;
 }
 
 export interface PaymentExportRow {
@@ -112,6 +121,13 @@ export function formatInvoicesCsv(rows: InvoiceExportRow[]): string {
   const headers = [
     "Invoice #",
     "Client",
+    "Billing Context",
+    "Service Property",
+    "Work For",
+    "Sponsored Purpose",
+    "Business Purpose",
+    "Work Summary",
+    "Paid Date",
     "Status",
     "Subtotal",
     "Tax",
@@ -123,6 +139,15 @@ export function formatInvoicesCsv(rows: InvoiceExportRow[]): string {
   const mapped: Record<string, unknown>[] = rows.map((r) => ({
     "Invoice #": r.invoice_number ?? "",
     Client: r.client_name ?? "",
+    "Billing Context": r.billing_context === "realtor_sponsored" ? "Realtor-sponsored property expense" : "Standard",
+    "Service Property": r.property_address ?? "",
+    "Work For": r.beneficiary_name ?? "",
+    "Sponsored Purpose": r.sponsored_purpose
+      ? SPONSORED_PURPOSE_LABELS[r.sponsored_purpose as SponsoredPurpose] ?? String(r.sponsored_purpose)
+      : "",
+    "Business Purpose": r.business_purpose ?? "",
+    "Work Summary": r.work_summary ?? "",
+    "Paid Date": formatDateForCsv(r.paid_at),
     Status: r.status ?? "",
     Subtotal: formatCentsForCsv(r.subtotal_cents),
     Tax: formatCentsForCsv(r.tax_cents),

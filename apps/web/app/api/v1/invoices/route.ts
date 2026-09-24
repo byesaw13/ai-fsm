@@ -81,9 +81,17 @@ export const GET = withAuth(async (request, session) => {
                 i.subtotal_cents, i.tax_cents, i.total_cents, i.paid_cents,
                 i.due_date, i.sent_at, i.paid_at, i.estimate_id,
                 i.client_id, i.job_id, i.created_at, i.updated_at,
-                c.name AS client_name
+                c.name AS client_name,
+                i.property_id, i.billing_context, i.sponsored_purpose,
+                i.beneficiary_property_contact_id, i.business_purpose, i.work_summary,
+                sp.address AS property_address,
+                COALESCE(spcc.name, spc.external_name) AS beneficiary_name
          FROM invoices i
          LEFT JOIN clients c ON c.id = i.client_id
+         LEFT JOIN properties sp ON sp.id = i.property_id AND sp.account_id = i.account_id
+         LEFT JOIN property_contacts spc
+           ON spc.id = i.beneficiary_property_contact_id AND spc.account_id = i.account_id
+         LEFT JOIN clients spcc ON spcc.id = spc.client_id AND spcc.account_id = i.account_id
          WHERE ${where}
          ORDER BY i.created_at DESC
          LIMIT $${idx} OFFSET $${idx + 1}`,

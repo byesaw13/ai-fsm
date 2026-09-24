@@ -26,6 +26,11 @@ import {
   type PdfBranding,
 } from "./document-pdf";
 import { selectDayPhotoRecap, visitMediaPath } from "./photo-recap";
+import {
+  SPONSORED_DOCUMENT_JOIN,
+  SPONSORED_DOCUMENT_SELECT,
+  sponsoredDocumentInfo,
+} from "@/lib/invoices/sponsored";
 import { appUrl } from "@/lib/email/mailer";
 import fs from "fs";
 
@@ -134,10 +139,12 @@ export async function loadInvoicePdf(
             i.sent_at, i.created_at, i.client_id,
             j.title AS job_title,
             a.name AS account_name, a.settings AS account_settings,
+            ${SPONSORED_DOCUMENT_SELECT},
             ${documentLocationSelect({ includeEstimateProperty: true })}
      FROM invoices i
      JOIN accounts a ON a.id = i.account_id
      ${documentJoins({ root: "i", includeEstimateProperty: true })}
+     ${SPONSORED_DOCUMENT_JOIN}
      WHERE i.id = $1 AND i.account_id = $2`,
     [id, accountId],
   );
@@ -206,6 +213,7 @@ export async function loadInvoicePdf(
     itemizedReceiptsUrl: inv.show_itemized_receipts
       ? `${appUrl()}/portal/invoices/${inv.share_token}/receipts`
       : null,
+    sponsored: sponsoredDocumentInfo(inv),
     lineItems: mapLineItems(lineItems.rows),
     branding,
     photoRecap,

@@ -3,6 +3,11 @@ import { queryOne, query, getPool } from "@/lib/db";
 import { loadSquareSettings } from "@/lib/integrations/square-payments";
 import { recordInvoicePortalView } from "@/lib/invoices/client-view";
 import { InvoicePortalClient } from "./InvoicePortalClient";
+import {
+  SPONSORED_DOCUMENT_JOIN,
+  SPONSORED_DOCUMENT_SELECT,
+  sponsoredDocumentInfo,
+} from "@/lib/invoices/sponsored";
 
 export const dynamic = "force-dynamic";
 
@@ -61,10 +66,12 @@ export default async function InvoicePortalPage({
        c.name AS client_name,
        p.address AS property_address, p.city AS property_city,
        p.state AS property_state, p.zip AS property_zip,
-       a.name AS account_name, a.settings AS account_settings
+       a.name AS account_name, a.settings AS account_settings,
+       ${SPONSORED_DOCUMENT_SELECT}
      FROM invoices i
      JOIN clients c ON c.id = i.client_id
      JOIN accounts a ON a.id = i.account_id
+     ${SPONSORED_DOCUMENT_JOIN}
      LEFT JOIN jobs j ON j.id = i.job_id
      LEFT JOIN properties p ON p.id = i.property_id
      WHERE i.share_token = $1`,
@@ -138,6 +145,7 @@ export default async function InvoicePortalPage({
       invoice={invoice}
       lineItems={lineItems}
       onlinePaymentAvailable={onlinePaymentAvailable}
+      sponsored={sponsoredDocumentInfo(invoice)}
     />
   );
 }

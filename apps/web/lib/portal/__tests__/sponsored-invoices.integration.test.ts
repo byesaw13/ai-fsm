@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { Client } from "pg";
+import { Client, type PoolClient } from "pg";
 import { loadSponsoredInvoices } from "../sponsored-invoices";
+import { loadInvoicePdf } from "@/lib/pdf/load";
+import { pdfDrawnText } from "@/lib/pdf/__tests__/pdf-text";
 
 const RUN = Boolean(process.env.TEST_DATABASE_URL);
 const ACCOUNT_A = "11111111-1111-1111-1111-111111111111";
@@ -95,5 +97,25 @@ describe.skipIf(!RUN)("payer-only sponsored invoice portal projection", () => {
 
   it("grants nothing to a realtor relationship without billing", async () => {
     expect(await loadSponsoredInvoices(db, otherRealtor)).toEqual([]);
+  });
+
+  it("renders the sponsored block on the stored invoice PDF", async () => {
+    const pdf = await loadInvoicePdf(db as unknown as PoolClient, ACCOUNT_A, kimInvoice);
+    const text = pdfDrawnText(pdf!.bytes);
+    for (const expected of ["REALTOR-SPONSORED PROPERTY EXPENSE", "Portal Kim", "Portal Peter", "Pre-listing preparation", "Listing prep", "4 Ash St"]) {
+      expect(text).toContain(expected);
+    }
+    const standard = await loadInvoicePdf(db as unknown as PoolClient, ACCOUNT_A, peterInvoice);
+    expect(pdfDrawnText(standard!.bytes)).not.toContain("REALTOR-SPONSORED");
+  });
+
+  it.skipIf(!process.env.TEST_BASE_URL)("shows sponsored context on the share-token invoice page", async () => {
+    const { rows } = await db.query<{ share_token: string }>(`SELECT share_token FROM invoices WHERE id = $1`, [kimInvoice]);
+    const res = await fetch(`${process.env.TEST_BASE_URL}/portal/invoices/${rows[0].share_token}`);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain("sponsored-details");
+    expect(html).toContain("Portal Peter");
+    expect(html).not.toContain("Gate code 1234");
   });
 });

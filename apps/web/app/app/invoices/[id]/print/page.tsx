@@ -18,6 +18,12 @@ import {
   documentLocationSelect,
   resolveServiceLocation,
 } from "@/lib/documents/service-location";
+import {
+  SPONSORED_DOCUMENT_JOIN,
+  SPONSORED_DOCUMENT_SELECT,
+  sponsoredDocumentInfo,
+} from "@/lib/invoices/sponsored";
+import { SponsoredDetails } from "@/components/invoices/SponsoredDetails";
 
 export const dynamic = "force-dynamic";
 
@@ -90,10 +96,12 @@ export default async function InvoicePrintPage({
          i.notes, i.due_date, i.sent_at, i.created_at,
          j.title AS job_title,
          a.name AS account_name, a.settings AS account_settings,
+         ${SPONSORED_DOCUMENT_SELECT},
          ${documentLocationSelect({ includeEstimateProperty: true })}
        FROM invoices i
        JOIN accounts a ON a.id = i.account_id
        ${documentJoins({ root: "i", includeEstimateProperty: true })}
+       ${SPONSORED_DOCUMENT_JOIN}
        WHERE i.id = $1 AND i.account_id = $2`,
       [id, session.accountId],
     );
@@ -153,6 +161,7 @@ export default async function InvoicePrintPage({
     client_zip: invoice.client_zip,
   });
   const isPaid = invoicePaid;
+  const sponsored = sponsoredDocumentInfo(invoice);
 
   const fileStatus =
     invoice.status === "void"
@@ -252,6 +261,8 @@ export default async function InvoicePrintPage({
             <p>{serviceLocation}</p>
           </div>
         </div>
+
+        {sponsored && <SponsoredDetails info={sponsored} />}
 
         {invoice.job_title && (
           <div className="section-block">
