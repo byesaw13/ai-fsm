@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 const patchPropertyBody = z
   .object({
-    client_id: z.string().uuid().optional(),
+    client_id: z.string().uuid().nullable().optional(),
     name: z.string().max(255).optional().or(z.literal("")),
     address: z.string().min(1).max(500).optional(),
     city: z.string().max(100).optional().or(z.literal("")),
@@ -49,7 +49,7 @@ export const GET = withRole(["owner", "admin"], async (request: NextRequest, ses
                AND pi2.status IN ('open', 'monitoring')
             ) AS open_issues_count
      FROM properties p
-     JOIN clients c ON c.id = p.client_id AND c.account_id = p.account_id
+     LEFT JOIN clients c ON c.id = p.client_id AND c.account_id = p.account_id
      LEFT JOIN jobs j ON j.property_id = p.id AND j.account_id = p.account_id
      LEFT JOIN visits v ON v.job_id = j.id AND v.account_id = p.account_id
      WHERE p.id = $1 AND p.account_id = $2
@@ -152,6 +152,12 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
     return NextResponse.json({ data: updated });
   } catch (err) {
     await client.query("ROLLBACK");
+    if ((err as { code?: string }).code === "23514") {
+      return NextResponse.json(
+        { error: { code: "VALIDATION_ERROR", message: (err as Error).message, traceId: session.traceId } },
+        { status: 422 }
+      );
+    }
     logger.error("[properties PATCH]", err, { traceId: session.traceId, propertyId: id });
     return NextResponse.json(
       { error: { code: "INTERNAL_ERROR", message: "Failed to update property", traceId: session.traceId } },

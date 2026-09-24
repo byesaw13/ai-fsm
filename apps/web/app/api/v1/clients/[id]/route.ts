@@ -41,6 +41,7 @@ const patchClientBody = z
     custom_mileage_rate_cents: z.number().int().min(0).nullable().optional(),
     custom_travel_time_rate_cents: z.number().int().min(0).nullable().optional(),
     minimum_project_value_exempt: z.boolean().optional(),
+    primary_property_id: z.string().uuid().nullable().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: "At least one field is required" });
 
@@ -109,6 +110,19 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
     }
 
     const patch = parsed.data;
+    if (patch.primary_property_id) {
+      const mainProperty = await client.query(
+        `SELECT id FROM properties WHERE id = $1 AND account_id = $2 AND client_id = $3`,
+        [patch.primary_property_id, session.accountId, id]
+      );
+      if (mainProperty.rowCount === 0) {
+        await client.query("ROLLBACK");
+        return NextResponse.json(
+          { error: { code: "VALIDATION_ERROR", message: "Main property must use this client as its primary service contact", traceId: session.traceId } },
+          { status: 422 }
+        );
+      }
+    }
     const setClauses: string[] = [];
     const params: unknown[] = [];
     let idx = 1;
@@ -171,6 +185,10 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
     if (patch.minimum_project_value_exempt !== undefined) {
       setClauses.push(`minimum_project_value_exempt = $${idx++}`);
       params.push(patch.minimum_project_value_exempt);
+    }
+    if (patch.primary_property_id !== undefined) {
+      setClauses.push(`primary_property_id = $${idx++}`);
+      params.push(patch.primary_property_id);
     }
     params.push(id, session.accountId);
 
@@ -237,12 +255,14 @@ export const DELETE = withRole(["owner", "admin"], async (request: NextRequest, 
       estimate_count: string;
       invoice_count: string;
       property_count: string;
+      property_contact_count: string;
     }>(
       `SELECT
          (SELECT COUNT(*) FROM jobs WHERE client_id = $1) AS job_count,
          (SELECT COUNT(*) FROM estimates WHERE client_id = $1) AS estimate_count,
          (SELECT COUNT(*) FROM invoices WHERE client_id = $1) AS invoice_count,
-         (SELECT COUNT(*) FROM properties WHERE client_id = $1) AS property_count`,
+         (SELECT COUNT(*) FROM properties WHERE client_id = $1) AS property_count,
+         (SELECT COUNT(*) FROM property_contacts WHERE client_id = $1) AS property_contact_count`,
       [id]
     );
     const d = deps.rows[0];
@@ -251,6 +271,7 @@ export const DELETE = withRole(["owner", "admin"], async (request: NextRequest, 
     if (Number(d.estimate_count) > 0) blocked.push(`${d.estimate_count} estimate(s)`);
     if (Number(d.invoice_count) > 0) blocked.push(`${d.invoice_count} invoice(s)`);
     if (Number(d.property_count) > 0) blocked.push(`${d.property_count} propert(ies)`);
+    if (Number(d.property_contact_count) > 0) blocked.push(`${d.property_contact_count} property contact(s)`);
 
     if (blocked.length > 0) {
       await client.query("ROLLBACK");

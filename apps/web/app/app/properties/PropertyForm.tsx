@@ -32,7 +32,6 @@ interface PropertyFormProps {
 }
 
 interface FormErrors {
-  client_id?: string;
   address?: string;
   [key: string]: string | undefined;
 }
@@ -60,7 +59,6 @@ export function PropertyForm({ mode, actionUrl, cancelHref, clients, initialValu
 
   function validate() {
     const next: FormErrors = {};
-    if (!form.client_id) next.client_id = "Client is required";
     if (!form.address.trim()) next.address = "Address is required";
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -76,7 +74,7 @@ export function PropertyForm({ mode, actionUrl, cancelHref, clients, initialValu
         method: mode === "create" ? "POST" : "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          client_id: form.client_id,
+          client_id: form.client_id || null,
           name: form.name.trim(),
           address: form.address.trim(),
           city: form.city.trim(),
@@ -116,13 +114,11 @@ export function PropertyForm({ mode, actionUrl, cancelHref, clients, initialValu
       <div className="p7-form-grid p7-form-grid-2">
         <Select
           id="client_id"
-          label="Client"
-          required
+          label="Primary service contact"
           value={form.client_id}
           onChange={(e) => setForm((f) => ({ ...f, client_id: e.target.value }))}
           options={clientOptions}
-          placeholder="Select client"
-          error={errors.client_id}
+          placeholder="No primary contact"
           disabled={pending}
           containerClassName="p7-form-grid-span-2"
         />

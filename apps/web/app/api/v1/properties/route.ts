@@ -9,7 +9,7 @@ import { logger } from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const createPropertyBody = z.object({
-  client_id: z.string().uuid(),
+  client_id: z.string().uuid().nullable(),
   name: z.string().max(255).optional().or(z.literal("")),
   address: z.string().min(1).max(500),
   city: z.string().max(100).optional().or(z.literal("")),
@@ -43,12 +43,12 @@ export const GET = withRole(["owner", "admin"], async (request: NextRequest, ses
             COUNT(DISTINCT j.id)::int AS job_count,
             COUNT(DISTINCT v.id)::int AS visit_count
      FROM properties p
-     JOIN clients c ON c.id = p.client_id AND c.account_id = p.account_id
+     LEFT JOIN clients c ON c.id = p.client_id AND c.account_id = p.account_id
      LEFT JOIN jobs j ON j.property_id = p.id AND j.account_id = p.account_id
      LEFT JOIN visits v ON v.job_id = j.id AND v.account_id = p.account_id
      WHERE ${conditions.join(" AND ")}
      GROUP BY p.id, c.name
-     ORDER BY c.name ASC, p.address ASC
+     ORDER BY COALESCE(c.name, '') ASC, p.address ASC
      LIMIT $${idx}`,
     params
   );
@@ -83,11 +83,10 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
     );
 
     const { client_id, name, address, city, state, zip, notes } = parsed.data;
-    const ownerClient = await client.query(
-      `SELECT id FROM clients WHERE id = $1 AND account_id = $2`,
-      [client_id, session.accountId]
-    );
-    if (ownerClient.rowCount === 0) {
+    const ownerClient = client_id
+      ? await client.query(`SELECT id FROM clients WHERE id = $1 AND account_id = $2`, [client_id, session.accountId])
+      : null;
+    if (ownerClient && ownerClient.rowCount === 0) {
       await client.query("ROLLBACK");
       return NextResponse.json(
         { error: { code: "NOT_FOUND", message: "Client not found", traceId: session.traceId } },
