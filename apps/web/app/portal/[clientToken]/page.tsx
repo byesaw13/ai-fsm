@@ -4,6 +4,7 @@ import { getPool, queryOne, query } from "@/lib/db";
 import { derivePortalStage, CUSTOMER_STAGE_ORDER, CUSTOMER_STAGE_LABELS, CUSTOMER_STAGE_COLORS } from "@ai-fsm/domain";
 import { SmsOptOutButton } from "./SmsOptOutButton";
 import { getPortalSession } from "@/lib/portal/session";
+import { getSession } from "@/lib/auth/session";
 import PortalLogoutButton from "./PortalLogoutButton";
 import { loadSponsoredInvoices, type SponsoredInvoiceRow } from "@/lib/portal/sponsored-invoices";
 import { SPONSORED_PURPOSE_LABELS, formatSponsoredInvoiceLabel } from "@/lib/invoices/sponsored";
@@ -82,7 +83,7 @@ export default async function ClientPortalPage({
 }) {
   const { clientToken } = await params;
 
-  const [portalSession, client] = await Promise.all([
+  const [portalSession, client, adminSession] = await Promise.all([
     getPortalSession(),
     queryOne<ClientRow>(
       `SELECT c.id, c.name, c.email, c.account_id, c.preferred_contact, c.sms_consent,
@@ -92,6 +93,7 @@ export default async function ClientPortalPage({
        WHERE c.portal_token = $1`,
       [clientToken]
     ),
+    getSession(),
   ]);
 
   if (!client) notFound();
@@ -196,6 +198,33 @@ export default async function ClientPortalPage({
   return (
     <div style={{ minHeight: "100vh", background: "#f9fafb", padding: "24px 16px" }}>
       <div style={{ maxWidth: 800, margin: "0 auto" }}>
+        {adminSession && (
+          <div
+            style={{
+              background: "#1e293b",
+              color: "#f8fafc",
+              padding: "10px 16px",
+              fontSize: 13,
+              fontWeight: 500,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 24,
+              borderRadius: 8,
+              boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+            }}
+          >
+            <span>
+              👁️ <strong>Admin Preview Mode</strong> — Viewing portal for <strong>{client.name}</strong>
+            </span>
+            <Link
+              href={`/app/clients/${client.id}`}
+              style={{ color: "#38bdf8", textDecoration: "none", fontWeight: 600, fontSize: 13 }}
+            >
+              Exit Preview & Return to App →
+            </Link>
+          </div>
+        )}
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 }}>
           <div>
