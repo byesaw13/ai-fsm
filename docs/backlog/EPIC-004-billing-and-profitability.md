@@ -5,6 +5,10 @@ of what each job actually earned.
 
 ## Active tasks
 
+# TASK-155: Send via Square Invoice (card or ACH)
+
+See [TASK-155-send-via-square-invoice.md](./TASK-155-send-via-square-invoice.md). Square-hosted invoice with card + ACH, webhook reconciliation, kept in step with reopen/edit; existing payment link stays as an option.
+
 # TASK-154: Reopen and edit a partially paid invoice
 
 See [TASK-154-edit-partially-paid-invoice.md](./TASK-154-edit-partially-paid-invoice.md). T&M bills change after the deposit; reopen keeps payments attached, re-send settles to partial/paid.
