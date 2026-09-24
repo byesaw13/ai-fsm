@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { withAuth, withRole } from "@/lib/auth/middleware";
 import { withInvoiceContext } from "@/lib/invoices/db";
 import { appendAuditLog } from "@/lib/db/audit";
@@ -11,8 +12,19 @@ import {
   canOwnerHardDeleteInvoice,
   ownerHardDeleteInvoiceBlockReason,
 } from "@/lib/invoices/delete-policy";
+import { SPONSORED_PURPOSES, validateInvoiceContext } from "@/lib/invoices/sponsored";
 
 export const dynamic = "force-dynamic";
+
+const patchInvoiceSchema = z.object({
+  client_id: z.string().uuid().optional(),
+  job_id: z.string().uuid().nullable().optional(),
+  property_id: z.string().uuid().nullable().optional(),
+  billing_context: z.enum(["standard", "realtor_sponsored"]).optional(),
+  sponsored_purpose: z.enum(SPONSORED_PURPOSES).nullable().optional(),
+  beneficiary_property_contact_id: z.string().uuid().nullable().optional(),
+  business_purpose: z.string().trim().max(2000).nullable().optional(),
+}).passthrough();
 
 // === Get Invoice (GET /api/v1/invoices/[id]) ===
 
@@ -27,6 +39,8 @@ export const GET = withAuth(async (request, session) => {
                 i.deposit_cents, i.balance_cents, i.deposit_paid_at,
                 i.notes, i.due_date, i.sent_at, i.paid_at,
                 i.estimate_id, i.client_id, i.job_id, i.property_id,
+                i.billing_context, i.sponsored_purpose,
+                i.beneficiary_property_contact_id, i.business_purpose,
                 i.created_by, i.created_at, i.updated_at,
                 c.name AS client_name, j.title AS job_title
          FROM invoices i
@@ -106,14 +120,38 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
     );
   }
 
+  const parsed = patchInvoiceSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: { code: "VALIDATION_ERROR", message: "Invalid request body", details: parsed.error.flatten().fieldErrors, traceId: session.traceId } },
+      { status: 422 }
+    );
+  }
+  body = parsed.data;
+
   const TERMINAL = ["paid", "void"];
-  const DRAFT_ONLY_FIELDS = ["notes", "due_date", "apply_material_handling"] as const;
+  const DRAFT_ONLY_FIELDS = [
+    "notes", "due_date", "apply_material_handling", "client_id", "job_id", "property_id",
+    "billing_context", "sponsored_purpose", "beneficiary_property_contact_id", "business_purpose",
+  ] as const;
   const NON_TERMINAL_FIELDS = ["deposit_paid_at"] as const;
 
   try {
     await withInvoiceContext(session, async (client) => {
-      const existing = await client.query<{ id: string; status: string }>(
-        `SELECT id, status FROM invoices WHERE id = $1 AND account_id = $2`,
+      const existing = await client.query<{
+        id: string;
+        status: string;
+        client_id: string;
+        job_id: string | null;
+        property_id: string | null;
+        billing_context: "standard" | "realtor_sponsored";
+        sponsored_purpose: (typeof SPONSORED_PURPOSES)[number] | null;
+        beneficiary_property_contact_id: string | null;
+        business_purpose: string | null;
+      }>(
+        `SELECT id, status, client_id, job_id, property_id, billing_context,
+                sponsored_purpose, beneficiary_property_contact_id, business_purpose
+         FROM invoices WHERE id = $1 AND account_id = $2`,
         [id, session.accountId]
       );
 
@@ -136,6 +174,21 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
 
       // draft-only fields
       if (inv.status === "draft") {
+        if (["client_id", "job_id", "property_id", "billing_context", "sponsored_purpose", "beneficiary_property_contact_id", "business_purpose"].some((key) => key in body)) {
+          await validateInvoiceContext(client, session.accountId, {
+            payerClientId: (body.client_id as string | undefined) ?? inv.client_id,
+            jobId: "job_id" in body ? body.job_id as string | null : inv.job_id,
+            propertyId: "property_id" in body ? body.property_id as string | null : inv.property_id,
+            billingContext: (body.billing_context as "standard" | "realtor_sponsored" | undefined) ?? inv.billing_context,
+            sponsoredPurpose: "sponsored_purpose" in body
+              ? body.sponsored_purpose as (typeof SPONSORED_PURPOSES)[number] | null
+              : inv.sponsored_purpose,
+            beneficiaryPropertyContactId: "beneficiary_property_contact_id" in body
+              ? body.beneficiary_property_contact_id as string | null
+              : inv.beneficiary_property_contact_id,
+            businessPurpose: "business_purpose" in body ? body.business_purpose as string | null : inv.business_purpose,
+          });
+        }
         for (const key of DRAFT_ONLY_FIELDS) {
           if (key in body) {
             setClauses.push(`${key} = $${idx++}`);
@@ -249,7 +302,7 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
     if (err.code === "VALIDATION_ERROR") {
       return NextResponse.json(
         { error: { code: "VALIDATION_ERROR", message: err.message, traceId: session.traceId } },
-        { status: 400 }
+        { status: 422 }
       );
     }
     logger.error("PATCH /api/v1/invoices/[id] error", error, { traceId: session.traceId });

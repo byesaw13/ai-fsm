@@ -7,11 +7,11 @@ import { logger } from "@/lib/logger";
 import {
   assertClientInAccount,
   assertJobForClient,
-  assertPropertyForClient,
   createPropertyForClient,
   documentLinksBodySchema,
   resolveDocumentLinkPatch,
 } from "@/lib/documents/document-links";
+import { validateInvoiceContext, type BillingContext, type SponsoredPurpose } from "@/lib/invoices/sponsored";
 
 export const dynamic = "force-dynamic";
 
@@ -59,8 +59,13 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         client_id: string;
         job_id: string | null;
         property_id: string | null;
+        billing_context: BillingContext;
+        sponsored_purpose: SponsoredPurpose | null;
+        beneficiary_property_contact_id: string | null;
+        business_purpose: string | null;
       }>(
-        `SELECT id, status, client_id, job_id, property_id
+        `SELECT id, status, client_id, job_id, property_id, billing_context,
+                sponsored_purpose, beneficiary_property_contact_id, business_purpose
          FROM invoices WHERE id = $1 AND account_id = $2`,
         [id, session.accountId],
       );
@@ -107,12 +112,18 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
 
       const next = resolveDocumentLinkPatch(patchInput, inv, jobPropertyId);
 
-      if (next.property_id) {
-        await assertPropertyForClient(client, session.accountId, next.property_id, next.client_id);
-      }
       if (next.job_id) {
         await assertJobForClient(client, session.accountId, next.job_id, next.client_id);
       }
+      await validateInvoiceContext(client, session.accountId, {
+        payerClientId: next.client_id,
+        jobId: next.job_id,
+        propertyId: next.property_id,
+        billingContext: inv.billing_context,
+        sponsoredPurpose: inv.sponsored_purpose,
+        beneficiaryPropertyContactId: inv.beneficiary_property_contact_id,
+        businessPurpose: inv.business_purpose,
+      });
 
       if (
         next.client_id === inv.client_id

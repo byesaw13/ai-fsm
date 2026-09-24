@@ -1,9 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useToast } from "@/components/ui";
+import { Select, Textarea, useToast } from "@/components/ui";
 import { formatCents } from "@ai-fsm/money";
+import {
+  SPONSORED_PURPOSE_LABELS,
+  type BillingContext,
+  type SponsoredPurpose,
+} from "@/lib/invoices/sponsored";
 
 interface InvoiceEditFormProps {
   invoiceId: string;
@@ -19,6 +24,14 @@ interface InvoiceEditFormProps {
   itemizedReceiptCount?: number;
   /** Sum of this invoice's materials lines, to reconcile against receipts. */
   materialsBilledCents?: number;
+  payerClientId: string;
+  initialPropertyId: string | null;
+  initialBillingContext: BillingContext;
+  initialSponsoredPurpose: SponsoredPurpose | null;
+  initialBeneficiaryId: string | null;
+  initialBusinessPurpose: string | null;
+  properties: { id: string; address: string; client_id: string | null }[];
+  propertyContacts: { id: string; property_id: string; display_name: string }[];
 }
 
 // "2024-01-15T00:00:00.000Z" → "2024-01-15"
@@ -38,6 +51,14 @@ export function InvoiceEditForm({
   itemizedTotalCents = null,
   itemizedReceiptCount = 0,
   materialsBilledCents = 0,
+  payerClientId,
+  initialPropertyId,
+  initialBillingContext,
+  initialSponsoredPurpose,
+  initialBeneficiaryId,
+  initialBusinessPurpose,
+  properties,
+  propertyContacts,
 }: InvoiceEditFormProps) {
   const router = useRouter();
   const toast = useToast();
@@ -47,10 +68,27 @@ export function InvoiceEditForm({
   const [dueDate, setDueDate] = useState(isoToDateString(initialDueDate));
   const [workSummary, setWorkSummary] = useState(initialWorkSummary ?? "");
   const [showItemized, setShowItemized] = useState(initialShowItemized);
+  const [billingContext, setBillingContext] = useState(initialBillingContext);
+  const [propertyId, setPropertyId] = useState(initialPropertyId ?? "");
+  const [sponsoredPurpose, setSponsoredPurpose] = useState<SponsoredPurpose | "">(initialSponsoredPurpose ?? "");
+  const [beneficiaryId, setBeneficiaryId] = useState(initialBeneficiaryId ?? "");
+  const [businessPurpose, setBusinessPurpose] = useState(initialBusinessPurpose ?? "");
+  const propertyOptions = useMemo(
+    () => billingContext === "realtor_sponsored" ? properties : properties.filter((property) => property.client_id === payerClientId),
+    [billingContext, payerClientId, properties],
+  );
+  const beneficiaryOptions = useMemo(
+    () => propertyContacts.filter((contact) => contact.property_id === propertyId),
+    [propertyContacts, propertyId],
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (billingContext === "realtor_sponsored" && (!propertyId || !beneficiaryId || !sponsoredPurpose)) {
+      setError("Select a service property, beneficiary, and sponsored purpose.");
+      return;
+    }
     setPending(true);
     try {
       const res = await fetch(`/api/v1/invoices/${invoiceId}`, {
@@ -61,6 +99,11 @@ export function InvoiceEditForm({
           due_date: dueDate ? new Date(dueDate).toISOString() : null,
           work_summary: workSummary.trim() || null,
           show_itemized_receipts: showItemized,
+          property_id: propertyId || null,
+          billing_context: billingContext,
+          sponsored_purpose: billingContext === "realtor_sponsored" ? sponsoredPurpose : null,
+          beneficiary_property_contact_id: billingContext === "realtor_sponsored" ? beneficiaryId : null,
+          business_purpose: billingContext === "realtor_sponsored" ? businessPurpose.trim() || null : null,
         }),
       });
       if (!res.ok) {
@@ -81,6 +124,79 @@ export function InvoiceEditForm({
     <div className="card action-card" data-testid="invoice-edit-form">
       <h2>Edit Invoice</h2>
       <form onSubmit={handleSubmit}>
+        <div className="form-field">
+          <Select
+            id="invoice-billing-context"
+            label="Billing context"
+            value={billingContext}
+            onChange={(event) => {
+              const next = event.target.value as BillingContext;
+              setBillingContext(next);
+              setPropertyId("");
+              setBeneficiaryId("");
+              if (next === "standard") {
+                setSponsoredPurpose("");
+                setBusinessPurpose("");
+              }
+            }}
+            options={[
+              { value: "standard", label: "Standard customer work" },
+              { value: "realtor_sponsored", label: "Realtor-sponsored property work" },
+            ]}
+            disabled={pending}
+          />
+        </div>
+        <div className="form-field">
+          <Select
+            id="invoice-property"
+            label={billingContext === "realtor_sponsored" ? "Service property" : "Property (optional)"}
+            required={billingContext === "realtor_sponsored"}
+            value={propertyId}
+            onChange={(event) => { setPropertyId(event.target.value); setBeneficiaryId(""); }}
+            options={propertyOptions.map((property) => ({ value: property.id, label: property.address }))}
+            placeholder="None"
+            disabled={pending}
+          />
+        </div>
+        {billingContext === "realtor_sponsored" ? (
+          <>
+            <div className="form-field">
+              <Select
+                id="invoice-beneficiary"
+                label="Work for"
+                required
+                value={beneficiaryId}
+                onChange={(event) => setBeneficiaryId(event.target.value)}
+                options={beneficiaryOptions.map((contact) => ({ value: contact.id, label: contact.display_name }))}
+                placeholder="Select a property contact"
+                disabled={pending || !propertyId}
+              />
+            </div>
+            <div className="form-field">
+              <Select
+                id="invoice-sponsored-purpose"
+                label="Sponsored purpose"
+                required
+                value={sponsoredPurpose}
+                onChange={(event) => setSponsoredPurpose(event.target.value as SponsoredPurpose)}
+                options={Object.entries(SPONSORED_PURPOSE_LABELS).map(([value, label]) => ({ value, label }))}
+                placeholder="Select a purpose"
+                disabled={pending}
+              />
+            </div>
+            <div className="form-field">
+              <Textarea
+                id="invoice-business-purpose"
+                label="Business-purpose note"
+                rows={3}
+                maxLength={2000}
+                value={businessPurpose}
+                onChange={(event) => setBusinessPurpose(event.target.value)}
+                disabled={pending}
+              />
+            </div>
+          </>
+        ) : null}
         <div className="form-field">
           <label htmlFor="invoice-due-date">Due Date</label>
           <input
