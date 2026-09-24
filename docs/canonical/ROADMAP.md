@@ -79,6 +79,11 @@ Location capture, visit candidates, day map, hybrid tracking are **shipped infra
 - Property timeline reachable from client, job, visit, estimate, invoice surfaces
 - Visit evidence (photos, notes, completion) promoted to permanent property record
 - Property opportunities and health records (TASK-011–013) only after Phase 0–1 stable
+- **Narrow sponsored-work exception — TASK-158.** A property may have an optional
+  primary service contact plus non-owning contacts such as a realtor. The bill-to
+  client remains the payer. A sponsoring realtor sees only invoices billed to
+  them and the minimum property identity needed to recognize that work; the
+  relationship alone never exposes the property's vault or other customer data.
 
 ### Phase 3 — Estimate & Billing Closure
 
@@ -114,7 +119,7 @@ EPIC-005 (platform/delivery) → cross-cutting; every task still cites a phase
 
 - Multi-company SaaS scaling
 - Subscription/membership **expansion** (maintain existing; do not grow subsystem)
-- Concierge/realtor routing layers
+- Concierge/realtor routing layers beyond TASK-158's narrow payer record
 - New dashboard families
 - AI-first product repositioning (AI assists estimates; does not define product)
 - Greenfield rebuild / migration squash
