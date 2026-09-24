@@ -63,8 +63,10 @@ async function buildMaterialLineDraftsForExpense(
   const material_kind: "material" | "equipment" = isEquipmentExpense(expense)
     ? "equipment"
     : "material";
-  const skuLines = await fetchExpenseLineItems(client, accountId, expense.id);
-  if (skuLines.length > 0) {
+  const allLines = await fetchExpenseLineItems(client, accountId, expense.id);
+  if (allLines.length > 0) {
+    // Items marked not-billable (drinks, storage, billed elsewhere) never reach the bill (TASK-157).
+    const skuLines = allLines.filter((line) => line.billable !== false);
     return skuLines.map((line) => ({
       description: line.name,
       quantity: parseLineQuantity(line.quantity),
@@ -361,7 +363,9 @@ export async function fetchLinkableMaterialExpenses(
 
   const enriched: LinkableMaterialExpenseRow[] = [];
   for (const expense of result.rows) {
-    const skuLines = await fetchExpenseLineItems(client, accountId, expense.id);
+    const skuLines = (await fetchExpenseLineItems(client, accountId, expense.id)).filter(
+      (line) => line.billable !== false,
+    );
     enriched.push({
       ...expense,
       line_items: skuLines.map(toLineItemPreview),

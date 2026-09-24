@@ -20,6 +20,8 @@ interface InvoiceRow extends Record<string, unknown> {
   deposit_percentage: number | null;
   deposit_fixed_cents: number | null;
   notes: string | null;
+  work_summary: string | null;
+  show_itemized_receipts: boolean;
   due_date: string | null;
   paid_at: string | null;
   client_name: string;
@@ -53,6 +55,7 @@ export default async function InvoicePortalPage({
     `SELECT
        i.id, i.account_id, i.status, i.invoice_number, i.subtotal_cents, i.tax_cents,
        i.total_cents, i.paid_cents, i.deposit_cents, i.notes, i.due_date,
+       i.work_summary, i.show_itemized_receipts,
        i.paid_at, i.deposit_type, i.deposit_percentage, i.deposit_fixed_cents,
        i.invoice_kind, j.status AS job_status,
        c.name AS client_name,

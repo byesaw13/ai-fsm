@@ -22,6 +22,7 @@ interface Expense {
   job_id: string | null;
   client_id: string | null;
   notes: string | null;
+  billable?: boolean;
   vehicle_id?: string | null;
   fuel_gallons?: number | string | null;
   fuel_odometer?: number | string | null;
@@ -47,6 +48,7 @@ export function ExpenseEditForm({ expense, jobs, clients, vehicles = [], categor
   const [jobId, setJobId] = useState(expense.job_id ?? "");
   const [clientId, setClientId] = useState(expense.client_id ?? "");
   const [notes, setNotes] = useState(expense.notes ?? "");
+  const [billable, setBillable] = useState(expense.billable !== false);
   const [vehicleId, setVehicleId] = useState(expense.vehicle_id ?? "");
   const [gallonsStr, setGallonsStr] = useState(() => {
     if (expense.fuel_gallons != null && expense.fuel_gallons !== "") {
@@ -97,6 +99,7 @@ export function ExpenseEditForm({ expense, jobs, clients, vehicles = [], categor
           job_id: jobId || null,
           client_id: clientId || null,
           notes: notes.trim() || null,
+          billable,
           vehicle_id: isFuelExpenseCategory(category) ? vehicleId || null : null,
           gallons: isFuelExpenseCategory(category) && gallonsStr.trim()
             ? Number(gallonsStr)
@@ -279,6 +282,17 @@ export function ExpenseEditForm({ expense, jobs, clients, vehicles = [], categor
         disabled={pending}
         rows={3}
       />
+
+      <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontSize: "var(--text-sm)" }}>
+        <input
+          type="checkbox"
+          checked={billable}
+          onChange={(e) => setBillable(e.target.checked)}
+          disabled={pending}
+          data-testid="expense-billable"
+        />
+        Bill to client (uncheck for duplicates, tools, or receipts billed elsewhere)
+      </label>
 
       <div className="p7-form-actions">
         <Button type="submit" variant="primary" loading={pending} disabled={pending} size="sm">

@@ -14,6 +14,7 @@ const lineItemSchema = z.object({
   quantity: z.number().positive().default(1),
   unit_cost_cents: z.number().int().nonnegative(),
   sku: z.string().max(100).nullable().optional(),
+  billable: z.boolean().default(true),
 });
 
 const putBodySchema = z.object({
@@ -87,6 +88,7 @@ export const PUT = withRole(["owner", "admin"], async (request, session) => {
           unit_cost_cents: li.unit_cost_cents,
           sku: li.sku ?? null,
           sort_order: idx,
+          billable: li.billable,
         })),
       );
 

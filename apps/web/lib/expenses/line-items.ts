@@ -8,6 +8,8 @@ export type ExpenseLineItemRow = {
   unit_cost_cents: number;
   sku: string | null;
   sort_order: number;
+  /** false = not billed to the client (TASK-157). */
+  billable: boolean;
 };
 
 export type ExpenseLineItemInput = {
@@ -16,6 +18,7 @@ export type ExpenseLineItemInput = {
   unit_cost_cents: number;
   sku?: string | null;
   sort_order?: number;
+  billable?: boolean;
 };
 
 export async function fetchExpenseLineItems(
@@ -25,7 +28,7 @@ export async function fetchExpenseLineItems(
 ): Promise<ExpenseLineItemRow[]> {
   const result = await client.query<ExpenseLineItemRow>(
     `SELECT id, expense_id, name, quantity::float8 AS quantity,
-            unit_cost_cents, sku, sort_order
+            unit_cost_cents, sku, sort_order, billable
      FROM expense_line_items
      WHERE account_id = $1 AND expense_id = $2
      ORDER BY sort_order ASC, created_at ASC`,
@@ -52,10 +55,10 @@ export async function replaceExpenseLineItems(
     const qty = item.quantity ?? 1;
     const inserted = await client.query<ExpenseLineItemRow>(
       `INSERT INTO expense_line_items
-         (account_id, expense_id, name, quantity, unit_cost_cents, sku, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (account_id, expense_id, name, quantity, unit_cost_cents, sku, sort_order, billable)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING id, expense_id, name, quantity::float8 AS quantity,
-                 unit_cost_cents, sku, sort_order`,
+                 unit_cost_cents, sku, sort_order, billable`,
       [
         accountId,
         expenseId,
@@ -64,6 +67,7 @@ export async function replaceExpenseLineItems(
         item.unit_cost_cents,
         item.sku ?? null,
         item.sort_order ?? i,
+        item.billable ?? true,
       ],
     );
     rows.push(inserted.rows[0]);

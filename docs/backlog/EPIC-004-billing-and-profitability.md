@@ -5,6 +5,10 @@ of what each job actually earned.
 
 ## Active tasks
 
+# TASK-157: Invoice work summary + itemized receipts link
+
+See [TASK-157-invoice-work-summary-itemized-receipts.md](./TASK-157-invoice-work-summary-itemized-receipts.md). Room-by-room work summary from done tasks; per-item billable receipts; public itemized receipts page that matches billed materials.
+
 # TASK-156: Track Square processing fees
 
 See [TASK-156-square-processing-fee-tracking.md](./TASK-156-square-processing-fee-tracking.md). Capture `processing_fee` from the Square webhook; job P&L shows card fees as cost; year totals for the tax deduction.

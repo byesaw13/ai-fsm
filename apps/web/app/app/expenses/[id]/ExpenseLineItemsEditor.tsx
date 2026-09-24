@@ -10,6 +10,8 @@ export interface ExpenseLineItemDraft {
   quantity: number;
   unit_cost_cents: number;
   sku: string | null;
+  /** false = not billed to the client (drinks, storage, billed elsewhere). */
+  billable?: boolean;
 }
 
 interface Props {
@@ -36,7 +38,7 @@ export function ExpenseLineItemsEditor({ expenseId, initialLineItems, billed, ca
   }
 
   function addItem() {
-    setItems((prev) => [...prev, { name: "", quantity: 1, unit_cost_cents: 0, sku: null }]);
+    setItems((prev) => [...prev, { name: "", quantity: 1, unit_cost_cents: 0, sku: null, billable: true }]);
     setSaved(false);
   }
 
@@ -55,6 +57,7 @@ export function ExpenseLineItemsEditor({ expenseId, initialLineItems, billed, ca
               quantity: item.quantity,
               unit_cost_cents: item.unit_cost_cents,
               sku: item.sku,
+              billable: item.billable !== false,
             })),
         }),
       });
@@ -91,7 +94,10 @@ export function ExpenseLineItemsEditor({ expenseId, initialLineItems, billed, ca
               key={item.id ?? i}
               style={{ display: "flex", justifyContent: "space-between", padding: "var(--space-1) 0", fontSize: "var(--text-sm)" }}
             >
-              <span>{item.name} × {item.quantity}</span>
+              <span style={item.billable === false ? { color: "var(--fg-muted)", textDecoration: "line-through" } : undefined}>
+                {item.name} × {item.quantity}
+                {item.billable === false ? " (not billed)" : ""}
+              </span>
               <span>{formatCents(item.quantity * item.unit_cost_cents)}</span>
             </li>
           ))}
@@ -146,6 +152,19 @@ export function ExpenseLineItemsEditor({ expenseId, initialLineItems, billed, ca
                 disabled={!canEdit || saving}
               />
             </div>
+            <label
+              style={{ display: "flex", alignItems: "center", gap: 4, fontSize: "var(--text-xs)", paddingBottom: "var(--space-2)", whiteSpace: "nowrap" }}
+              title="Uncheck for items not billed to the client (drinks, storage, items billed elsewhere)"
+            >
+              <input
+                type="checkbox"
+                checked={item.billable !== false}
+                onChange={(e) => updateItem(i, { billable: e.target.checked })}
+                disabled={!canEdit || saving}
+                data-testid={`line-item-billable-${i}`}
+              />
+              Bill
+            </label>
             {canEdit && (
               <Button variant="ghost" size="sm" onClick={() => removeItem(i)} disabled={saving}>
                 Remove

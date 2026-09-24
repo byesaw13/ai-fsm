@@ -26,6 +26,7 @@ import {
   type PdfBranding,
 } from "./document-pdf";
 import { selectDayPhotoRecap, visitMediaPath } from "./photo-recap";
+import { appUrl } from "@/lib/email/mailer";
 import fs from "fs";
 
 export interface LoadedPdf {
@@ -128,6 +129,7 @@ export async function loadInvoicePdf(
   const { rows, rowCount } = await client.query(
     `SELECT i.id, i.invoice_number, i.status, i.job_id, i.subtotal_cents, i.tax_cents,
             i.total_cents, i.paid_cents, i.deposit_cents, i.paid_at, i.due_date, i.notes,
+            i.work_summary, i.show_itemized_receipts, i.share_token,
             i.deposit_type, i.deposit_percentage, i.deposit_fixed_cents,
             i.sent_at, i.created_at, i.client_id,
             j.title AS job_title,
@@ -200,6 +202,10 @@ export async function loadInvoicePdf(
       ) - Number(inv.paid_cents ?? 0),
     ),
     notes: inv.notes as string | null,
+    workSummary: inv.work_summary as string | null,
+    itemizedReceiptsUrl: inv.show_itemized_receipts
+      ? `${appUrl()}/portal/invoices/${inv.share_token}/receipts`
+      : null,
     lineItems: mapLineItems(lineItems.rows),
     branding,
     photoRecap,
