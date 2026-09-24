@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isPortalPreview, PREVIEW_READ_ONLY_MESSAGE } from "@/lib/portal/session";
 import { SPONSORED_DOCUMENT_JOIN, SPONSORED_DOCUMENT_SELECT } from "@/lib/invoices/sponsored";
 import { queryOne, query, getPool } from "@/lib/db";
 import { loadSquareSettings, createSquarePaymentLink } from "@/lib/integrations/square-payments";
@@ -108,6 +109,9 @@ export async function POST(
   );
 
   if (!invoice) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (await isPortalPreview(invoice.client_id)) {
+    return NextResponse.json({ error: PREVIEW_READ_ONLY_MESSAGE }, { status: 403 });
+  }
   if (invoice.status === "paid" || invoice.status === "void") {
     return NextResponse.json({ error: "Invoice is not payable" }, { status: 422 });
   }

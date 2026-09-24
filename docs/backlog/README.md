@@ -144,6 +144,7 @@ closed in tests; owner-flow AC still open.
 | TASK-157 | [Invoice work summary by area + customer itemized receipts link](TASK-157-invoice-work-summary-itemized-receipts.md) | 004 | In Progress |
 | TASK-158 | [Realtor-sponsored property work](TASK-158-realtor-sponsored-properties.md) | 003 | Proposed |
 | TASK-159 | [Sponsored work for any realtor in one form](TASK-159-sponsored-work-any-realtor.md) | 003 | In progress |
+| TASK-160 | [Admin portal preview is read-only](TASK-160-portal-preview-read-only.md) | 003 | In progress |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
 | TASK-003 | Wrong Vehicle Correction | 001 | Done |

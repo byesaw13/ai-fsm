@@ -4,7 +4,6 @@ import { getPool, queryOne, query } from "@/lib/db";
 import { derivePortalStage, CUSTOMER_STAGE_ORDER, CUSTOMER_STAGE_LABELS, CUSTOMER_STAGE_COLORS } from "@ai-fsm/domain";
 import { SmsOptOutButton } from "./SmsOptOutButton";
 import { getPortalSession } from "@/lib/portal/session";
-import { getSession } from "@/lib/auth/session";
 import PortalLogoutButton from "./PortalLogoutButton";
 import { loadSponsoredInvoices, type SponsoredInvoiceRow } from "@/lib/portal/sponsored-invoices";
 import { SPONSORED_PURPOSE_LABELS, formatSponsoredInvoiceLabel } from "@/lib/invoices/sponsored";
@@ -83,7 +82,7 @@ export default async function ClientPortalPage({
 }) {
   const { clientToken } = await params;
 
-  const [portalSession, client, adminSession] = await Promise.all([
+  const [portalSession, client] = await Promise.all([
     getPortalSession(),
     queryOne<ClientRow>(
       `SELECT c.id, c.name, c.email, c.account_id, c.preferred_contact, c.sms_consent,
@@ -93,7 +92,6 @@ export default async function ClientPortalPage({
        WHERE c.portal_token = $1`,
       [clientToken]
     ),
-    getSession(),
   ]);
 
   if (!client) notFound();
@@ -198,7 +196,7 @@ export default async function ClientPortalPage({
   return (
     <div style={{ minHeight: "100vh", background: "#f9fafb", padding: "24px 16px" }}>
       <div style={{ maxWidth: 800, margin: "0 auto" }}>
-        {adminSession && (
+        {portalSession?.isPreview && (
           <div
             style={{
               background: "#1e293b",
@@ -215,14 +213,14 @@ export default async function ClientPortalPage({
             }}
           >
             <span>
-              👁️ <strong>Admin Preview Mode</strong> — Viewing portal for <strong>{client.name}</strong>
+              👁️ <strong>Admin Preview Mode</strong> — Viewing portal for <strong>{client.name}</strong> (read-only)
             </span>
-            <Link
-              href={`/app/clients/${client.id}`}
+            <a
+              href={`/api/v1/admin/portal-preview/exit?client=${client.id}`}
               style={{ color: "#38bdf8", textDecoration: "none", fontWeight: 600, fontSize: 13 }}
             >
               Exit Preview & Return to App →
-            </Link>
+            </a>
           </div>
         )}
 
@@ -437,7 +435,7 @@ export default async function ClientPortalPage({
                   <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>SMS messaging is disabled.</div>
                 )}
               </div>
-              {(client.sms_consent as boolean) && (
+              {(client.sms_consent as boolean) && !portalSession?.isPreview && (
                 <SmsOptOutButton clientToken={clientToken} />
               )}
             </div>

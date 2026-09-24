@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { queryOne, query, getPool } from "@/lib/db";
 import { loadSquareSettings } from "@/lib/integrations/square-payments";
 import { recordInvoicePortalView } from "@/lib/invoices/client-view";
+import { isPortalPreview } from "@/lib/portal/session";
+import { getSession } from "@/lib/auth/session";
 import { InvoicePortalClient } from "./InvoicePortalClient";
 import {
   SPONSORED_DOCUMENT_JOIN,
@@ -58,7 +60,7 @@ export default async function InvoicePortalPage({
 
   const invoice = await queryOne<InvoiceRow>(
     `SELECT
-       i.id, i.account_id, i.status, i.invoice_number, i.subtotal_cents, i.tax_cents,
+       i.id, i.account_id, i.client_id, i.status, i.invoice_number, i.subtotal_cents, i.tax_cents,
        i.total_cents, i.paid_cents, i.deposit_cents, i.notes, i.due_date,
        i.work_summary, i.show_itemized_receipts,
        i.paid_at, i.deposit_type, i.deposit_percentage, i.deposit_fixed_cents,
@@ -80,9 +82,17 @@ export default async function InvoicePortalPage({
 
   if (!invoice) notFound();
 
+  // TASK-160: staff (admin preview, or a logged-in owner opening the link) are
+  // not the client — never mark the invoice opened. A preview also cannot pay.
+  const [preview, staffSession] = await Promise.all([
+    isPortalPreview(invoice.client_id as string),
+    getSession(),
+  ]);
+  const staffViewer = preview || staffSession?.accountId === invoice.account_id;
+
   // Best-effort: stamp client open so owners see Unread vs Viewed + attention feed.
   // Never block the portal render if the stamp fails.
-  try {
+  if (!staffViewer) try {
     const pool = getPool();
     const view = await recordInvoicePortalView(
       async (sql, params) => {
@@ -128,15 +138,17 @@ export default async function InvoicePortalPage({
 
   // Online card payment is offered only when the account has Square configured.
   let onlinePaymentAvailable = false;
-  const client = await getPool().connect();
-  try {
-    const square = await loadSquareSettings(client, invoice.account_id);
-    onlinePaymentAvailable =
-      !!square?.enabled &&
-      !!square.secrets.accessToken &&
-      !!square.config.locationId;
-  } finally {
-    client.release();
+  if (!preview) {
+    const client = await getPool().connect();
+    try {
+      const square = await loadSquareSettings(client, invoice.account_id);
+      onlinePaymentAvailable =
+        !!square?.enabled &&
+        !!square.secrets.accessToken &&
+        !!square.config.locationId;
+    } finally {
+      client.release();
+    }
   }
 
   return (

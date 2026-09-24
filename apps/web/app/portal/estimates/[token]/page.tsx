@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { queryOne, query, getPool } from "@/lib/db";
 import { EstimatePortalClient } from "./EstimatePortalClient";
+import { isPortalPreview } from "@/lib/portal/session";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +59,7 @@ export default async function EstimatePortalPage({
 
   const estimate = await queryOne<EstimateRow>(
     `SELECT
-       e.id, e.account_id, e.status, e.presentation_mode, e.subtotal_cents, e.tax_cents, e.total_cents,
+       e.id, e.account_id, e.client_id, e.status, e.presentation_mode, e.subtotal_cents, e.tax_cents, e.total_cents,
        e.deposit_cents, e.notes, e.scope_assumptions, e.expires_at, e.responded_at,
        e.client_approved_name,
        c.name AS client_name,
@@ -127,6 +128,7 @@ export default async function EstimatePortalPage({
       estimate={estimate}
       lineItems={standardLineItems}
       options={optionsWithItems}
+      readOnly={await isPortalPreview(estimate.client_id as string)}
     />
   );
 }

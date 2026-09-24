@@ -46,6 +46,8 @@ interface Estimate {
 }
 
 interface Props {
+  /** TASK-160: staff "view as client" preview — no approve/decline. */
+  readOnly?: boolean;
   token: string;
   estimate: Estimate;
   lineItems: LineItem[];
@@ -153,7 +155,7 @@ function SignaturePad({ onSave }: { onSave: (svg: string) => void }) {
   );
 }
 
-export function EstimatePortalClient({ token, estimate, lineItems, options = [] }: Props) {
+export function EstimatePortalClient({ token, estimate, lineItems, options = [], readOnly = false }: Props) {
   const [status, setStatus] = useState(estimate.status);
   const [approvedName, setApprovedName] = useState(estimate.client_approved_name ?? "");
   const [name, setName] = useState("");
@@ -162,7 +164,7 @@ export function EstimatePortalClient({ token, estimate, lineItems, options = [] 
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState<"approve" | "decline" | null>(null);
 
-  const canRespond = status === "sent";
+  const canRespond = status === "sent" && !readOnly;
   const isExpired = estimate.expires_at && new Date(estimate.expires_at) < new Date();
 
   async function respond(action: "approve" | "decline") {

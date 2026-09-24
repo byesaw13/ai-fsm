@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
+import { isPortalPreview, PREVIEW_READ_ONLY_MESSAGE } from "@/lib/portal/session";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,10 @@ export async function POST(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     const row = rows[0];
+    if (await isPortalPreview(row.id)) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: PREVIEW_READ_ONLY_MESSAGE }, { status: 403 });
+    }
     if (!row.sms_consent) {
       await client.query("ROLLBACK");
       return NextResponse.json({ error: "Already opted out" }, { status: 409 });
