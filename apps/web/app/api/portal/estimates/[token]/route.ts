@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isPortalPreview, PREVIEW_READ_ONLY_MESSAGE } from "@/lib/portal/session";
 import { z } from "zod";
 import { queryOne, query, getPool } from "@/lib/db";
 import { createJobFromEstimate, getAccountOwnerUserId } from "@/lib/estimates/create-job-db";
@@ -84,6 +85,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> }
 ) {
+  if (await isPortalPreview()) {
+    return NextResponse.json({ error: PREVIEW_READ_ONLY_MESSAGE }, { status: 403 });
+  }
   const { token } = await params;
 
   const estimate = await queryOne<{

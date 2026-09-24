@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { queryOne, query, getPool } from "@/lib/db";
 import { EstimatePortalClient } from "./EstimatePortalClient";
+import { isPortalPreview } from "@/lib/portal/session";
 
 export const dynamic = "force-dynamic";
 
@@ -127,6 +128,7 @@ export default async function EstimatePortalPage({
       estimate={estimate}
       lineItems={standardLineItems}
       options={optionsWithItems}
+      readOnly={await isPortalPreview()}
     />
   );
 }

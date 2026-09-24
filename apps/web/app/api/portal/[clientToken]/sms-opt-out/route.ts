@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
+import { isPortalPreview, PREVIEW_READ_ONLY_MESSAGE } from "@/lib/portal/session";
 
 export const dynamic = "force-dynamic";
 
@@ -7,6 +8,9 @@ export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ clientToken: string }> }
 ) {
+  if (await isPortalPreview()) {
+    return NextResponse.json({ error: PREVIEW_READ_ONLY_MESSAGE }, { status: 403 });
+  }
   const { clientToken } = await params;
   const pool = getPool();
   const client = await pool.connect();

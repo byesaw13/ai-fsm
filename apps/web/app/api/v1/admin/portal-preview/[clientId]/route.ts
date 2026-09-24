@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { canManageClients } from "@/lib/auth/permissions";
 import { queryOneForSession } from "@/lib/db";
-import { createPortalSession, PORTAL_SESSION_COOKIE } from "@/lib/portal/session";
-
-const SESSION_DAYS = 30;
+import { createPortalSession, PORTAL_SESSION_COOKIE, PREVIEW_SESSION_SECONDS } from "@/lib/portal/session";
 
 export async function GET(
   request: NextRequest,
@@ -27,15 +25,16 @@ export async function GET(
     return new NextResponse("Client not found", { status: 404 });
   }
 
-  const sessionToken = await createPortalSession(client.id);
+  // TASK-160: short-lived, read-only preview session (not a real client login).
+  const sessionToken = await createPortalSession(client.id, { preview: true });
 
   const url = new URL(`/portal/${client.portal_token}`, request.url);
   const response = NextResponse.redirect(url);
   response.cookies.set(PORTAL_SESSION_COOKIE, sessionToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.SECURE_COOKIES !== "false" && process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: SESSION_DAYS * 24 * 60 * 60,
+    maxAge: PREVIEW_SESSION_SECONDS,
     path: "/",
   });
 
