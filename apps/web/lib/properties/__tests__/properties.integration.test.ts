@@ -111,6 +111,13 @@ describe.skipIf(!RUN)("property contact API", () => {
     });
     expect(missingContact.status).toBe(422);
 
+    const realtor = { client_id: clientId, role: "realtor" };
+    const first = await apiRequest("POST", `/api/v1/properties/${propertyId}/contacts`, realtor);
+    expect(first.status).toBe(201);
+    const duplicate = await apiRequest("POST", `/api/v1/properties/${propertyId}/contacts`, realtor);
+    expect(duplicate.status).toBe(409);
+    await apiRequest("DELETE", `/api/v1/properties/${propertyId}/contacts/${first.data.data.id}`);
+
     const invalidMain = await apiRequest("PATCH", `/api/v1/clients/${clientId}`, {
       primary_property_id: ownerlessPropertyId,
     });

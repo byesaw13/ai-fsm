@@ -116,6 +116,19 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     return NextResponse.json({ data: rows[0] }, { status: 201 });
   } catch (error) {
     await client.query("ROLLBACK");
+    const dbCode = (error as { code?: string }).code;
+    if (dbCode === "23505") {
+      return NextResponse.json(
+        { error: { code: "CONFLICT", message: "This person already has that role on the property", traceId: session.traceId } },
+        { status: 409 },
+      );
+    }
+    if (dbCode === "23514") {
+      return NextResponse.json(
+        { error: { code: "VALIDATION_ERROR", message: (error as Error).message, traceId: session.traceId } },
+        { status: 422 },
+      );
+    }
     logger.error("[property contacts POST]", error, { traceId: session.traceId, propertyId: pid });
     return NextResponse.json(
       { error: { code: "INTERNAL_ERROR", message: "Failed to create contact", traceId: session.traceId } },
