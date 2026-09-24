@@ -2,12 +2,9 @@ import type { SponsoredDocumentInfo } from "@/lib/invoices/sponsored";
 
 /** TASK-158: realtor-sponsored context block shared by print and customer views. */
 export function SponsoredDetails({ info }: { info: SponsoredDocumentInfo }) {
-  const rows: [string, string][] = [
-    ["Paid by", info.paidBy],
-    ["Work for", info.beneficiary],
-    ["Category", "Realtor-sponsored property expense"],
-    ["Purpose", info.purpose],
-  ];
+  const rows: [string, string][] = [["Paid by", info.paidBy]];
+  if (info.beneficiary?.trim()) rows.push(["Work for", info.beneficiary.trim()]);
+  rows.push(["Category", "Realtor-sponsored property expense"], ["Purpose", info.purpose]);
   if (info.businessPurpose?.trim()) rows.push(["Business purpose", info.businessPurpose.trim()]);
   return (
     <div className="section-block" data-testid="sponsored-details" style={{ marginTop: 24, marginBottom: 24 }}>

@@ -861,7 +861,7 @@ export default async function InvoiceDetailPage({
                 <>
                   <div className="p7-detail-row"><dt>Billing context</dt><dd>Realtor-sponsored property work</dd></div>
                   <div className="p7-detail-row"><dt>Service property</dt><dd>{invoice.property_address}</dd></div>
-                  <div className="p7-detail-row"><dt>Work for</dt><dd>{invoice.beneficiary_name}</dd></div>
+                  <div className="p7-detail-row"><dt>Work for</dt><dd>{invoice.beneficiary_name ?? "Not specified"}</dd></div>
                   <div className="p7-detail-row"><dt>Purpose</dt><dd>{invoice.sponsored_purpose ? SPONSORED_PURPOSE_LABELS[invoice.sponsored_purpose] : "—"}</dd></div>
                   {invoice.business_purpose ? (
                     <div className="p7-detail-row"><dt>Business purpose</dt><dd style={{ whiteSpace: "pre-wrap" }}>{invoice.business_purpose}</dd></div>

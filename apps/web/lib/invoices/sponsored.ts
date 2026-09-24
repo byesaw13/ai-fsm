@@ -29,12 +29,14 @@ export const SPONSORED_PURPOSE_LABELS: Record<SponsoredPurpose, string> = {
 
 export function formatSponsoredInvoiceLabel(input: {
   propertyAddress: string;
-  beneficiaryName: string;
+  beneficiaryName?: string | null;
   workSummary: string | null;
   invoiceNumber: string;
 }) {
   const summary = input.workSummary?.split("\n").map((line) => line.trim()).find(Boolean);
-  return `${input.propertyAddress} — ${input.beneficiaryName} — ${summary ?? `Invoice ${input.invoiceNumber}`}`;
+  return [input.propertyAddress, input.beneficiaryName?.trim(), summary ?? `Invoice ${input.invoiceNumber}`]
+    .filter(Boolean)
+    .join(" — ");
 }
 
 export type InvoiceContextInput = {
@@ -83,11 +85,13 @@ export async function validateInvoiceContext(
     return;
   }
 
-  if (!input.propertyId || !input.sponsoredPurpose || !input.beneficiaryPropertyContactId) {
-    throw contextError("Sponsored invoice requires property, beneficiary, and purpose", "VALIDATION_ERROR");
+  if (!input.propertyId || !input.sponsoredPurpose) {
+    throw contextError("Sponsored invoice requires property and purpose", "VALIDATION_ERROR");
   }
   const property = await client.query(`SELECT id FROM properties WHERE id = $1 AND account_id = $2`, [input.propertyId, accountId]);
   if (!property.rows[0]) throw contextError("Property not found", "NOT_FOUND");
+  // TASK-159: "work for" is optional; when set it must belong to the property.
+  if (!input.beneficiaryPropertyContactId) return;
 
   const beneficiary = await client.query(
     `SELECT id FROM property_contacts WHERE id = $1 AND property_id = $2 AND account_id = $3`,
@@ -114,7 +118,7 @@ export const SPONSORED_DOCUMENT_SELECT = `
 
 export type SponsoredDocumentInfo = {
   paidBy: string;
-  beneficiary: string;
+  beneficiary: string | null;
   purpose: string;
   businessPurpose: string | null;
 };
@@ -131,7 +135,7 @@ export function sponsoredDocumentInfo(row: {
   const purpose = row.sponsored_purpose as SponsoredPurpose | null;
   return {
     paidBy: String(row.client_name ?? "—"),
-    beneficiary: String(row.beneficiary_name ?? "—"),
+    beneficiary: (row.beneficiary_name as string | null) ?? null,
     purpose: purpose ? SPONSORED_PURPOSE_LABELS[purpose] : "—",
     businessPurpose: (row.business_purpose as string | null) ?? null,
   };

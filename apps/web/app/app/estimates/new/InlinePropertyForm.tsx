@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { Button, Input } from "@/components/ui";
 
-interface InlinePropertyFormProps {
-  clientId: string;
-  onCreated: (property: { id: string; address: string; client_id: string }) => void;
+interface InlinePropertyFormProps<C extends string | null> {
+  /** null creates a property with no primary service contact (sponsored work). */
+  clientId: C;
+  onCreated: (property: { id: string; address: string; client_id: C }) => void;
   onCancel: () => void;
 }
 
-export function InlinePropertyForm({ clientId, onCreated, onCancel }: InlinePropertyFormProps) {
+export function InlinePropertyForm<C extends string | null>({ clientId, onCreated, onCancel }: InlinePropertyFormProps<C>) {
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");

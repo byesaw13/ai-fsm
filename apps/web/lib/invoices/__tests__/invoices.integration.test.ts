@@ -308,6 +308,7 @@ describe.skipIf(!RUN_INTEGRATION)("Sponsored invoice API integration", () => {
   const foreignPropertyId = randomUUID();
   const foreignBeneficiaryId = randomUUID();
   const createdInvoiceIds: string[] = [];
+  const createdPropertyIds: string[] = [];
   let adminCookie = "";
   // Own payer row: the shared client list can be empty or churned by parallel suites in CI.
   const payerId = randomUUID();
@@ -364,7 +365,7 @@ describe.skipIf(!RUN_INTEGRATION)("Sponsored invoice API integration", () => {
         await db.query(`DELETE FROM invoices WHERE id = ANY($1::uuid[])`, [createdInvoiceIds]);
       }
       await db.query(`DELETE FROM property_contacts WHERE id = ANY($1::uuid[])`, [[beneficiaryId, foreignBeneficiaryId]]);
-      await db.query(`DELETE FROM properties WHERE id = ANY($1::uuid[])`, [[propertyId, foreignPropertyId]]);
+      await db.query(`DELETE FROM properties WHERE id = ANY($1::uuid[])`, [[propertyId, foreignPropertyId, ...createdPropertyIds]]);
       await db.query(`DELETE FROM clients WHERE id = ANY($1::uuid[])`, [[payerId, accountClientId, foreignClientId]]);
       await db.query(`DELETE FROM accounts WHERE id = $1`, [foreignAccountId]);
     } finally {
@@ -391,6 +392,35 @@ describe.skipIf(!RUN_INTEGRATION)("Sponsored invoice API integration", () => {
     expect(html).toContain("Billing context");
     expect(html).toContain("Realtor-sponsored property work");
   }, 30_000);
+
+  it("creates sponsored work at a new ownerless property with no beneficiary (TASK-159)", async () => {
+    const property = await apiRequest("POST", "/api/v1/properties", {
+      client_id: null, address: "16 E Chamberlain", city: "Merrimack", state: "NH",
+    });
+    expect(property.status).toBe(201);
+    createdPropertyIds.push(property.data.data.id);
+
+    const result = await apiRequest("POST", "/api/v1/invoices", {
+      client_id: payerId,
+      property_id: property.data.data.id,
+      billing_context: "realtor_sponsored",
+      sponsored_purpose: "other",
+      beneficiary_property_contact_id: null,
+      tax_rate: 0,
+      line_items: lineItems,
+    });
+    expect(result.status).toBe(201);
+    createdInvoiceIds.push(result.data.id);
+    const detail = await fetch(`${BASE_URL}/app/invoices/${result.data.id}`, { headers: { Cookie: adminCookie } });
+    expect(detail.status).toBe(200);
+    expect(await detail.text()).toContain("Not specified");
+
+    const missingPurpose = await apiRequest("POST", "/api/v1/invoices", {
+      client_id: payerId, property_id: property.data.data.id,
+      billing_context: "realtor_sponsored", tax_rate: 0, line_items: lineItems,
+    });
+    expect(missingPurpose.status).toBe(422);
+  }, 60_000);
 
   it("creates sponsored work for a beneficiary on the selected property", async () => {
     const result = await apiRequest("POST", "/api/v1/invoices", {

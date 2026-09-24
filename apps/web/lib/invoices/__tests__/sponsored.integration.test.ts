@@ -173,6 +173,21 @@ describe.skipIf(!RUN)("realtor-sponsored property constraints", () => {
     ).rejects.toThrow(/invoice in sent state/);
   });
 
+  it("allows sponsored work without a beneficiary but still requires a purpose (TASK-159)", async () => {
+    const noBeneficiary = randomUUID();
+    await db.query(
+      `INSERT INTO invoices
+         (id, account_id, client_id, property_id, invoice_number, created_by,
+          billing_context, sponsored_purpose)
+       VALUES ($1, $2, $3, $4, $5, $6, 'realtor_sponsored', 'pre_listing')`,
+      [noBeneficiary, ACCOUNT_A, clientA, otherPropertyA, `SPNB-${Date.now()}`, OWNER_A],
+    );
+    await expect(
+      db.query(`UPDATE invoices SET sponsored_purpose = NULL WHERE id = $1`, [noBeneficiary]),
+    ).rejects.toThrow(/invoices_sponsored_context_shape|requires property and purpose/);
+    await db.query(`DELETE FROM invoices WHERE id = $1`, [noBeneficiary]);
+  });
+
   it("protects a beneficiary referenced by an invoice", async () => {
     const invoice = await db.query<{ beneficiary_property_contact_id: string }>(
       `SELECT beneficiary_property_contact_id FROM invoices WHERE id = $1`,

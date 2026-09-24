@@ -63,7 +63,7 @@ export interface PdfBranding {
 /** TASK-158: realtor-sponsored context printed under Bill To / Service Location. */
 export interface SponsoredPdfInfo {
   paidBy: string;
-  beneficiary: string;
+  beneficiary?: string | null;
   purpose: string;
   businessPurpose?: string | null;
 }
@@ -381,12 +381,9 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
 
   // --- Realtor-sponsored context (TASK-158) ---------------------------------
   if (input.sponsored) {
-    const rows: [string, string][] = [
-      ["Paid by", input.sponsored.paidBy],
-      ["Work for", input.sponsored.beneficiary],
-      ["Category", "Realtor-sponsored property expense"],
-      ["Purpose", input.sponsored.purpose],
-    ];
+    const rows: [string, string][] = [["Paid by", input.sponsored.paidBy]];
+    if (input.sponsored.beneficiary?.trim()) rows.push(["Work for", input.sponsored.beneficiary.trim()]);
+    rows.push(["Category", "Realtor-sponsored property expense"], ["Purpose", input.sponsored.purpose]);
     const note = input.sponsored.businessPurpose?.trim();
     if (note) rows.push(["Business purpose", note]);
     ensureSpace(ctx, 40 + rows.length * 14);

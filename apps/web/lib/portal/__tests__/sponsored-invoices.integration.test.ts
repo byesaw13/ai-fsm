@@ -99,6 +99,24 @@ describe.skipIf(!RUN)("payer-only sponsored invoice portal projection", () => {
     expect(await loadSponsoredInvoices(db, otherRealtor)).toEqual([]);
   });
 
+  it("lists sponsored work that has no beneficiary (TASK-159)", async () => {
+    const id = randomUUID();
+    await db.query(
+      `INSERT INTO invoices
+         (id, account_id, client_id, property_id, invoice_number, status, total_cents,
+          billing_context, sponsored_purpose, created_by)
+       VALUES ($1, $2, $3, $4, $5, 'sent', 700, 'realtor_sponsored', 'other', $6)`,
+      [id, ACCOUNT_A, kim, ash, `KIM-NOBEN-${suffix}`, OWNER_A],
+    );
+    try {
+      const row = (await loadSponsoredInvoices(db, kim)).find((r) => r.id === id);
+      expect(row).toMatchObject({ property_address: "4 Ash St", beneficiary_name: null });
+      expect(await loadSponsoredInvoices(db, peter)).toEqual([]);
+    } finally {
+      await db.query(`DELETE FROM invoices WHERE id = $1`, [id]);
+    }
+  });
+
   it("renders the sponsored block on the stored invoice PDF", async () => {
     const pdf = await loadInvoicePdf(db as unknown as PoolClient, ACCOUNT_A, kimInvoice);
     const text = pdfDrawnText(pdf!.bytes);

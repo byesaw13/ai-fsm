@@ -85,8 +85,8 @@ export function InvoiceEditForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (billingContext === "realtor_sponsored" && (!propertyId || !beneficiaryId || !sponsoredPurpose)) {
-      setError("Select a service property, beneficiary, and sponsored purpose.");
+    if (billingContext === "realtor_sponsored" && (!propertyId || !sponsoredPurpose)) {
+      setError("Select a service property and sponsored purpose.");
       return;
     }
     setPending(true);
@@ -102,7 +102,7 @@ export function InvoiceEditForm({
           property_id: propertyId || null,
           billing_context: billingContext,
           sponsored_purpose: billingContext === "realtor_sponsored" ? sponsoredPurpose : null,
-          beneficiary_property_contact_id: billingContext === "realtor_sponsored" ? beneficiaryId : null,
+          beneficiary_property_contact_id: billingContext === "realtor_sponsored" ? beneficiaryId || null : null,
           business_purpose: billingContext === "realtor_sponsored" ? businessPurpose.trim() || null : null,
         }),
       });
@@ -163,12 +163,11 @@ export function InvoiceEditForm({
             <div className="form-field">
               <Select
                 id="invoice-beneficiary"
-                label="Work for"
-                required
+                label="Work for (optional)"
                 value={beneficiaryId}
                 onChange={(event) => setBeneficiaryId(event.target.value)}
                 options={beneficiaryOptions.map((contact) => ({ value: contact.id, label: contact.display_name }))}
-                placeholder="Select a property contact"
+                placeholder="Not specified"
                 disabled={pending || !propertyId}
               />
             </div>

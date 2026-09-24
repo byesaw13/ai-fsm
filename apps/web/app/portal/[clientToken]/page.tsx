@@ -451,7 +451,8 @@ export default async function ClientPortalPage({
 function SponsoredWorkSection({ rows }: { rows: SponsoredInvoiceRow[] }) {
   const groups = new Map<string, SponsoredInvoiceRow[]>();
   for (const row of rows) {
-    const key = `${row.property_name || row.property_address} — for ${row.beneficiary_name}`;
+    const place = row.property_name || row.property_address;
+    const key = row.beneficiary_name ? `${place} — for ${row.beneficiary_name}` : place;
     groups.set(key, [...(groups.get(key) ?? []), row]);
   }
   return (
