@@ -73,6 +73,17 @@ export default async function InvoiceReceiptsPage({ params }: { params: Promise<
                       <td style={{ ...cell, textAlign: "right", fontFamily: "monospace", whiteSpace: "nowrap" }}>{cents(item.total_cents)}</td>
                     </tr>
                   ))}
+                  {r.balance_cents !== 0 && (
+                    <tr style={{ borderTop: "1px solid #f3f4f6" }}>
+                      <td style={{ ...cell, color: "#78716c" }} colSpan={2}>
+                        Receipt balance ({r.balance_cents < 0 ? "discounts" : "tax or items not listed separately"})
+                      </td>
+                      <td style={{ ...cell, textAlign: "right", fontFamily: "monospace", whiteSpace: "nowrap", color: "#78716c" }}>
+                        {r.balance_cents < 0 ? "−" : ""}
+                        {cents(Math.abs(r.balance_cents))}
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             ) : (

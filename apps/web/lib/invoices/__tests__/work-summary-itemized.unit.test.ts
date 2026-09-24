@@ -54,13 +54,21 @@ describe("buildItemizedReceipts", () => {
     billable,
   });
 
-  it("sums billable items and excludes non-billable ones", () => {
+  it("bills the receipt total minus excluded items", () => {
     const res = buildItemizedReceipts(
-      [r("a", 5000)],
+      [r("a", 3300)],
       [item("a", "Lumber", 2, 1500), item("a", "Drink", 1, 300, false)],
     );
     expect(res.receipts[0].items.map((i) => i.name)).toEqual(["Lumber"]);
+    expect(res.receipts[0].balance_cents).toBe(0);
     expect(res.total_cents).toBe(3000);
+  });
+
+  it("shows scan-vs-receipt differences as a balance so totals match real receipts", () => {
+    // Items scanned high (a missed discount): receipt 28939, items 32202.
+    const res = buildItemizedReceipts([r("f", 28939)], [item("f", "Fan", 1, 12900, false), item("f", "Paint", 1, 19302)]);
+    expect(res.receipts[0].balance_cents).toBe(28939 - 32202);
+    expect(res.total_cents).toBe(28939 - 12900);
   });
 
   it("bills an unitemized receipt at its total", () => {

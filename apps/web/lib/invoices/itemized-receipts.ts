@@ -3,10 +3,12 @@
  * receipts and their billable items. Used by the public receipts page and the
  * owner's reconcile panel, so both always agree.
  *
- * A receipt's billable amount is the sum of its billable items when it is
- * itemized (matching `buildMaterialLineDraftsForExpense`), else its total.
- * ponytail: item sums ignore receipt-level tax/rounding; fine while NH receipts
- * carry no sales tax. Allocate tax across items if that changes.
+ * A receipt bills what was actually paid: its total minus any items marked
+ * not-billable. Scanned items often don't add up to the receipt (missed lines,
+ * discounts, tax), so the difference is shown as its own "receipt balance" row
+ * and the page always reconciles to real receipt totals.
+ * ponytail: the balance row isn't split across excluded vs billable items; an
+ * excluded item's share of tax/discount stays billed. Fine at NH's 0% tax.
  */
 
 import type { Pool, PoolClient } from "pg";
@@ -24,6 +26,8 @@ export type ItemizedReceipt = {
   vendor_name: string;
   itemized: boolean;
   items: ItemizedReceiptItem[];
+  /** Receipt total minus the sum of all scanned items (missed lines, discounts, tax). */
+  balance_cents: number;
   total_cents: number;
 };
 
@@ -56,27 +60,32 @@ export function buildItemizedReceipts(
         vendor_name: r.vendor_name,
         itemized: false,
         items: [],
+        balance_cents: 0,
         total_cents: r.amount_cents,
       });
       continue;
     }
-    const billable = all
-      .filter((i) => i.billable)
-      .map((i) => ({
+    const priced = all.map((i) => ({
+      billable: i.billable,
+      item: {
         name: i.name,
         quantity: Number(i.quantity),
         unit_cost_cents: i.unit_cost_cents,
         total_cents: Math.round(Number(i.quantity) * i.unit_cost_cents),
-      }));
+      },
+    }));
+    const billable = priced.filter((p) => p.billable).map((p) => p.item);
     // Every item excluded → the receipt bills nothing; leave it off the page.
     if (billable.length === 0) continue;
+    const balance = r.amount_cents - priced.reduce((s, p) => s + p.item.total_cents, 0);
     out.push({
       id: r.id,
       expense_date: r.expense_date,
       vendor_name: r.vendor_name,
       itemized: true,
       items: billable,
-      total_cents: billable.reduce((s, i) => s + i.total_cents, 0),
+      balance_cents: balance,
+      total_cents: billable.reduce((s, i) => s + i.total_cents, 0) + balance,
     });
   }
   return { receipts: out, total_cents: out.reduce((s, r) => s + r.total_cents, 0) };
