@@ -39,8 +39,10 @@ Scope (sliced):
   - The invoice page's Online Payment card gets a mode choice:
     **Square Invoice** (new) or **Payment link** (existing `SquareLinkActions`,
     unchanged). The owner picks per invoice; nothing is removed.
-  - Square Invoice flow: find or create the Square customer (Customers API, by
-    client email/phone) → create a Square order for the **amount due**
+  - Square Invoice flow: resolve the Square customer — use
+    `clients.square_customer_id` first (migration 142; imported clients often
+    lack email), else search by email/phone, else create; persist the resolved
+    ID back to `clients.square_customer_id` → create a Square order for the **amount due**
     (`amountDueCents`, one line: "INV-xxxx balance — {property}") → create and
     publish the invoice with `accepted_payment_methods` = card + bank_account
     (per-invoice toggles, default both on) and `delivery_method` = EMAIL or
@@ -76,13 +78,15 @@ Open questions (owner, before slice 1):
   (and send it from Dovetails / text)?
 - Should the client portal's Pay button also prefer the Square invoice URL when
   one is published?
+- Surcharge: Square applies its credit-only surcharge to invoices "at the time
+  the invoice is sent" (web). Verify API-created invoices inherit it.
 - Confirm the Square access token has INVOICES_WRITE, ORDERS_WRITE, and
   CUSTOMERS_WRITE (add to `docs/working/square-payments-runbook.md`).
 
 Acceptance Criteria (slice 1):
 - [ ] Online Payment card offers "Square Invoice" and "Payment link"; the link flow behaves exactly as today.
 - [ ] Square Invoice publishes for the current amount due with card + ACH enabled (toggleable).
-- [ ] Existing Square customer is reused; a new one is created only when none matches.
+- [ ] `clients.square_customer_id` is used first; fallback search/create persists the ID; no duplicate Square customers (test).
 - [ ] `square_invoice_id` / version / URL saved; URL copyable; delivery method honored.
 - [ ] Unit tests: amount due (partial, deposit credit), customer match vs create, payload shape (mocked SDK).
 

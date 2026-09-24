@@ -5,13 +5,13 @@ of what each job actually earned.
 
 ## Active tasks
 
+# TASK-156: Track Square processing fees
+
+See [TASK-156-square-processing-fee-tracking.md](./TASK-156-square-processing-fee-tracking.md). Capture `processing_fee` from the Square webhook; job P&L shows card fees as cost; year totals for the tax deduction.
+
 # TASK-155: Send via Square Invoice (card or ACH)
 
 See [TASK-155-send-via-square-invoice.md](./TASK-155-send-via-square-invoice.md). Square-hosted invoice with card + ACH, webhook reconciliation, kept in step with reopen/edit; existing payment link stays as an option.
-
-# TASK-154: Reopen and edit a partially paid invoice
-
-See [TASK-154-edit-partially-paid-invoice.md](./TASK-154-edit-partially-paid-invoice.md). T&M bills change after the deposit; reopen keeps payments attached, re-send settles to partial/paid.
 
 # TASK-153: Final invoice credits prior invoices + approved change orders
 
@@ -30,6 +30,7 @@ See [TASK-139-paid-invoice-closes-job.md](./TASK-139-paid-invoice-closes-job.md)
 See [TASK-136-done-invoice-from-complete.md](./TASK-136-done-invoice-from-complete.md). Parent TASK-133. Field Complete + done uses `createDraftFinalInvoiceForJob` with named labor, materials rollup, dumping line.
 
 ## Completed
+- [TASK-154: Reopen and edit a partially paid invoice](../archive/backlog-done/TASK-154-edit-partially-paid-invoice.md) — Done (#681, 2026-09-23)
 - [TASK-127: Pricing reconciliation](../archive/backlog-done/TASK-127-pricing-reconciliation.md) — Done (validated 2026-09-09)
 
 - [TASK-120: Big-job billing — deposit gate + progress (thirds) billing](../archive/backlog-done/TASK-120-big-job-billing-deposit-progress.md) — Done (#633, #638)
