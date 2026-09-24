@@ -395,7 +395,16 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                 Email
               </a>
             ) : null}
-            <CopyPortalLinkButton url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/${client.portal_token}`} label="Portal" />
+            <a
+              href={`/api/v1/admin/portal-preview/${client.id}`}
+              target="_blank"
+              rel="noreferrer"
+              className="p7-btn p7-btn-secondary p7-btn-sm"
+              style={{ textDecoration: "none" }}
+            >
+              👁️ View Portal
+            </a>
+            <CopyPortalLinkButton url={`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/portal/${client.portal_token}`} label="Copy Link" />
           </div>
         }
       />
