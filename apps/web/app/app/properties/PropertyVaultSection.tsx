@@ -24,7 +24,7 @@ interface VaultItem {
 
 interface Props {
   propertyId: string;
-  clientId: string;
+  clientId: string | null;
   initialItems: VaultItem[];
   canEdit: boolean;
 }
@@ -437,13 +437,15 @@ export function PropertyVaultSection({ propertyId, clientId, initialItems, canEd
                           </Button>
                           {canEdit && (
                             <>
-                              <LinkButton
-                                href={`/app/estimates/new?client_id=${encodeURIComponent(clientId)}&property_id=${encodeURIComponent(propertyId)}&vault_item_id=${encodeURIComponent(item.id)}`}
-                                variant="secondary"
-                                size="sm"
-                              >
-                                Estimate
-                              </LinkButton>
+                              {clientId ? (
+                                <LinkButton
+                                  href={`/app/estimates/new?client_id=${encodeURIComponent(clientId)}&property_id=${encodeURIComponent(propertyId)}&vault_item_id=${encodeURIComponent(item.id)}`}
+                                  variant="secondary"
+                                  size="sm"
+                                >
+                                  Estimate
+                                </LinkButton>
+                              ) : null}
                               <Button variant="ghost" size="sm" onClick={() => startEdit(item)}>Edit</Button>
                               <Button
                                 variant="ghost"

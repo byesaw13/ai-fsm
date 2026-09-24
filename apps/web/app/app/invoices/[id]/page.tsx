@@ -61,6 +61,7 @@ import { isEmailConfigured } from "@/lib/email/mailer";
 import { CopyPortalLinkButton } from "@/components/CopyPortalLinkButton";
 import { TravelPanel } from "@/components/travel/TravelPanel";
 import { formatInvoiceViewLabel } from "@/lib/invoices/client-view";
+import { SPONSORED_PURPOSE_LABELS, type BillingContext, type SponsoredPurpose } from "@/lib/invoices/sponsored";
 
 export const dynamic = "force-dynamic";
 
@@ -102,7 +103,16 @@ interface InvoiceRow {
   job_title: string | null;
   invoice_kind: string;
   job_status: string | null;
+  billing_context: BillingContext;
+  sponsored_purpose: SponsoredPurpose | null;
+  beneficiary_property_contact_id: string | null;
+  business_purpose: string | null;
+  property_address: string | null;
+  beneficiary_name: string | null;
 }
+
+type InvoicePropertyOption = { id: string; address: string; client_id: string | null };
+type InvoiceContactOption = { id: string; property_id: string; display_name: string };
 
 interface LineItemRow {
   id: string;
@@ -147,10 +157,14 @@ export default async function InvoiceDetailPage({
 
   const result = await withInvoiceContext(session, async (client) => {
     const invoiceResult = await client.query(
-      `SELECT i.*, c.name AS client_name, c.email AS client_email, j.title AS job_title, j.status AS job_status
+      `SELECT i.*, c.name AS client_name, c.email AS client_email, j.title AS job_title, j.status AS job_status,
+              p.address AS property_address, COALESCE(contact_client.name, pc.external_name) AS beneficiary_name
        FROM invoices i
        LEFT JOIN clients c ON c.id = i.client_id
        LEFT JOIN jobs j ON j.id = i.job_id
+       LEFT JOIN properties p ON p.id = i.property_id AND p.account_id = i.account_id
+       LEFT JOIN property_contacts pc ON pc.id = i.beneficiary_property_contact_id AND pc.account_id = i.account_id
+       LEFT JOIN clients contact_client ON contact_client.id = pc.client_id AND contact_client.account_id = pc.account_id
        WHERE i.id = $1 AND i.account_id = $2`,
       [id, session.accountId]
     );
@@ -197,6 +211,18 @@ export default async function InvoiceDetailPage({
     const itemized = jobId
       ? await loadItemizedReceipts(client, session.accountId, jobId, id)
       : { receipts: [], total_cents: 0 };
+    const properties = await client.query<InvoicePropertyOption>(
+      `SELECT id, address, client_id FROM properties WHERE account_id = $1 ORDER BY address ASC`,
+      [session.accountId],
+    );
+    const propertyContacts = await client.query<InvoiceContactOption>(
+      `SELECT pc.id, pc.property_id, COALESCE(c.name, pc.external_name) AS display_name
+       FROM property_contacts pc
+       LEFT JOIN clients c ON c.id = pc.client_id AND c.account_id = pc.account_id
+       WHERE pc.account_id = $1
+       ORDER BY COALESCE(c.name, pc.external_name) ASC`,
+      [session.accountId],
+    );
 
     return {
       invoice: invoiceResult.rows[0] as InvoiceRow,
@@ -205,12 +231,14 @@ export default async function InvoiceDetailPage({
       lineItems: lineItemsResult.rows as LineItemRow[],
       accountSettings: accountResult.rows[0]?.settings ?? {},
       location: locationResult.rows[0] as DocumentLocationRow | undefined,
+      properties: properties.rows,
+      propertyContacts: propertyContacts.rows,
     };
   });
 
   if (!result) notFound();
 
-  const { invoice, lineItems, accountSettings, location, suggestedWorkSummary, itemized } = result;
+  const { invoice, lineItems, accountSettings, location, suggestedWorkSummary, itemized, properties, propertyContacts } = result;
   const materialsBilledCents = lineItems
     .filter((li) => li.line_item_type === "materials")
     .reduce((sum, li) => sum + li.total_cents, 0);
@@ -829,6 +857,17 @@ export default async function InvoiceDetailPage({
                   </dd>
                 </div>
               )}
+              {invoice.billing_context === "realtor_sponsored" && (
+                <>
+                  <div className="p7-detail-row"><dt>Billing context</dt><dd>Realtor-sponsored property work</dd></div>
+                  <div className="p7-detail-row"><dt>Service property</dt><dd>{invoice.property_address}</dd></div>
+                  <div className="p7-detail-row"><dt>Work for</dt><dd>{invoice.beneficiary_name}</dd></div>
+                  <div className="p7-detail-row"><dt>Purpose</dt><dd>{invoice.sponsored_purpose ? SPONSORED_PURPOSE_LABELS[invoice.sponsored_purpose] : "—"}</dd></div>
+                  {invoice.business_purpose ? (
+                    <div className="p7-detail-row"><dt>Business purpose</dt><dd style={{ whiteSpace: "pre-wrap" }}>{invoice.business_purpose}</dd></div>
+                  ) : null}
+                </>
+              )}
               {invoice.estimate_id && (
                 <div className="p7-detail-row">
                   <dt>From</dt>
@@ -880,6 +919,14 @@ export default async function InvoiceDetailPage({
                   itemizedTotalCents={invoice.job_id ? itemized.total_cents : null}
                   itemizedReceiptCount={itemized.receipts.length}
                   materialsBilledCents={materialsBilledCents}
+                  payerClientId={invoice.client_id}
+                  initialPropertyId={invoice.property_id}
+                  initialBillingContext={invoice.billing_context}
+                  initialSponsoredPurpose={invoice.sponsored_purpose}
+                  initialBeneficiaryId={invoice.beneficiary_property_contact_id}
+                  initialBusinessPurpose={invoice.business_purpose}
+                  properties={properties}
+                  propertyContacts={propertyContacts}
                 />
               </div>
             )}

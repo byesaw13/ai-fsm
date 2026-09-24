@@ -13,6 +13,11 @@ import {
 } from "@/components/ui";
 import { InlineClientForm } from "../../estimates/new/InlineClientForm";
 import { InlinePropertyForm } from "../../estimates/new/InlinePropertyForm";
+import {
+  SPONSORED_PURPOSE_LABELS,
+  type BillingContext,
+  type SponsoredPurpose,
+} from "@/lib/invoices/sponsored";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -20,7 +25,8 @@ import { InlinePropertyForm } from "../../estimates/new/InlinePropertyForm";
 
 interface Client { id: string; name: string; }
 interface Job { id: string; title: string; client_id: string; }
-interface Property { id: string; address: string; client_id: string; }
+interface Property { id: string; address: string; client_id: string | null; }
+interface PropertyContact { id: string; property_id: string; display_name: string; }
 
 interface LineItemRow {
   description: string;
@@ -32,6 +38,7 @@ interface NewInvoiceFormProps {
   clients: Client[];
   jobs: Job[];
   properties: Property[];
+  propertyContacts: PropertyContact[];
   initialClientId?: string;
   initialJobId?: string;
   initialPropertyId?: string;
@@ -68,6 +75,7 @@ export function NewInvoiceForm({
   clients,
   jobs,
   properties,
+  propertyContacts,
   initialClientId,
   initialJobId,
   initialPropertyId,
@@ -104,6 +112,10 @@ export function NewInvoiceForm({
     return `${y}-${m}-${day}`;
   });
   const [notes, setNotes] = useState("");
+  const [billingContext, setBillingContext] = useState<BillingContext>("standard");
+  const [sponsoredPurpose, setSponsoredPurpose] = useState<SponsoredPurpose | "">("");
+  const [beneficiaryId, setBeneficiaryId] = useState("");
+  const [businessPurpose, setBusinessPurpose] = useState("");
   const [lineItems, setLineItems] = useState<LineItemRow[]>(
     prefillLineItems && prefillLineItems.length > 0 ? prefillLineItems : [{ ...EMPTY_ROW }]
   );
@@ -114,8 +126,14 @@ export function NewInvoiceForm({
     [clientId, jobs]
   );
   const filteredProperties = useMemo(
-    () => (clientId ? propertyList.filter((p) => p.client_id === clientId) : []),
-    [clientId, propertyList]
+    () => billingContext === "realtor_sponsored"
+      ? propertyList
+      : clientId ? propertyList.filter((p) => p.client_id === clientId) : [],
+    [billingContext, clientId, propertyList]
+  );
+  const beneficiaryOptions = useMemo(
+    () => propertyContacts.filter((contact) => contact.property_id === propertyId),
+    [propertyContacts, propertyId],
   );
 
   useEffect(() => {
@@ -126,6 +144,10 @@ export function NewInvoiceForm({
     if (propertyId && !filteredProperties.some((p) => p.id === propertyId))
       setPropertyId("");
   }, [filteredProperties, propertyId]);
+
+  useEffect(() => {
+    if (beneficiaryId && !beneficiaryOptions.some((contact) => contact.id === beneficiaryId)) setBeneficiaryId("");
+  }, [beneficiaryId, beneficiaryOptions]);
 
   function handleClientCreated(client: { id: string; name: string }) {
     setClientList((prev) =>
@@ -185,6 +207,10 @@ export function NewInvoiceForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!clientId) { setError("Please select a client."); return; }
+    if (billingContext === "realtor_sponsored" && (!propertyId || !beneficiaryId || !sponsoredPurpose)) {
+      setError("Select a service property, beneficiary, and sponsored purpose.");
+      return;
+    }
     if (lineItems.length === 0) { setError("Add at least one line item."); return; }
 
     setPending(true);
@@ -197,6 +223,10 @@ export function NewInvoiceForm({
         property_id: propertyId || null,
         due_date: dueDate ? new Date(dueDate).toISOString() : null,
         notes: notes.trim() || null,
+        billing_context: billingContext,
+        sponsored_purpose: billingContext === "realtor_sponsored" ? sponsoredPurpose : null,
+        beneficiary_property_contact_id: billingContext === "realtor_sponsored" ? beneficiaryId : null,
+        business_purpose: billingContext === "realtor_sponsored" ? businessPurpose.trim() || null : null,
         tax_rate: taxRateNum,
         line_items: lineItems.map((row, i) => ({
           description: row.description,
@@ -253,12 +283,32 @@ export function NewInvoiceForm({
 
       {/* Details */}
       <div className="p7-form-grid p7-form-grid-2">
+        <Select
+          id="billing_context"
+          label="Billing context"
+          value={billingContext}
+          onChange={(event) => {
+            const next = event.target.value as BillingContext;
+            setBillingContext(next);
+            setPropertyId("");
+            setBeneficiaryId("");
+            if (next === "standard") {
+              setSponsoredPurpose("");
+              setBusinessPurpose("");
+            }
+          }}
+          options={[
+            { value: "standard", label: "Standard customer work" },
+            { value: "realtor_sponsored", label: "Realtor-sponsored property work" },
+          ]}
+          containerClassName="p7-form-grid-span-2"
+        />
         <div>
           <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-end" }}>
             <div style={{ flex: 1 }}>
               <Select
                 id="client_id"
-                label="Client"
+                label={billingContext === "realtor_sponsored" ? "Payer client" : "Client"}
                 required
                 value={clientId}
                 onChange={(e) => {
@@ -316,7 +366,8 @@ export function NewInvoiceForm({
             <div style={{ flex: 1 }}>
               <Select
                 id="property_id"
-                label="Property (optional)"
+                label={billingContext === "realtor_sponsored" ? "Service property" : "Property (optional)"}
+                required={billingContext === "realtor_sponsored"}
                 value={propertyId}
                 onChange={(e) => setPropertyId(e.target.value)}
                 disabled={pending || !clientId}
@@ -332,7 +383,7 @@ export function NewInvoiceForm({
                 }
               />
             </div>
-            {clientId ? (
+            {clientId && billingContext === "standard" ? (
               <button
                 type="button"
                 className="p7-btn p7-btn-secondary p7-btn-sm"
@@ -355,6 +406,42 @@ export function NewInvoiceForm({
             />
           ) : null}
         </div>
+
+        {billingContext === "realtor_sponsored" ? (
+          <>
+            <Select
+              id="beneficiary_property_contact_id"
+              label="Work for"
+              required
+              value={beneficiaryId}
+              onChange={(event) => setBeneficiaryId(event.target.value)}
+              options={beneficiaryOptions.map((contact) => ({ value: contact.id, label: contact.display_name }))}
+              placeholder={propertyId ? "Select a property contact" : "Select a property first"}
+              disabled={pending || !propertyId}
+            />
+            <Select
+              id="sponsored_purpose"
+              label="Sponsored purpose"
+              required
+              value={sponsoredPurpose}
+              onChange={(event) => setSponsoredPurpose(event.target.value as SponsoredPurpose)}
+              options={Object.entries(SPONSORED_PURPOSE_LABELS).map(([value, label]) => ({ value, label }))}
+              placeholder="Select a purpose"
+              disabled={pending}
+            />
+            <Textarea
+              id="business_purpose"
+              label="Business-purpose note"
+              value={businessPurpose}
+              onChange={(event) => setBusinessPurpose(event.target.value)}
+              maxLength={2000}
+              rows={3}
+              disabled={pending}
+              containerClassName="p7-form-grid-span-2"
+              placeholder="Why the realtor is paying for this work"
+            />
+          </>
+        ) : null}
 
         <Input
           id="due_date"

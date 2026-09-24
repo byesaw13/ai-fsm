@@ -60,6 +60,14 @@ export interface PdfBranding {
   depositTerms?: string | null;
 }
 
+/** TASK-158: realtor-sponsored context printed under Bill To / Service Location. */
+export interface SponsoredPdfInfo {
+  paidBy: string;
+  beneficiary: string;
+  purpose: string;
+  businessPurpose?: string | null;
+}
+
 export interface InvoicePdfData {
   invoiceNumber: string;
   status: string;
@@ -86,6 +94,7 @@ export interface InvoicePdfData {
   workSummary?: string | null;
   /** TASK-157: public itemized receipts page, printed under the notes. */
   itemizedReceiptsUrl?: string | null;
+  sponsored?: SponsoredPdfInfo | null;
   lineItems: PdfLineItem[];
   branding?: PdfBranding | null;
   photoRecap?: { bytes: Uint8Array; mimeType: string }[];
@@ -214,6 +223,7 @@ interface RenderInput {
   notes?: string | null;
   workSummary?: string | null;
   itemizedReceiptsUrl?: string | null;
+  sponsored?: SponsoredPdfInfo | null;
   /** Body section (Payment Terms / Estimate Terms) — matches HTML print. */
   terms?: string | null;
   termsTitle?: string;
@@ -368,6 +378,30 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
   }
 
   ctx.y = Math.min(leftY, rightColY) - 18;
+
+  // --- Realtor-sponsored context (TASK-158) ---------------------------------
+  if (input.sponsored) {
+    const rows: [string, string][] = [
+      ["Paid by", input.sponsored.paidBy],
+      ["Work for", input.sponsored.beneficiary],
+      ["Category", "Realtor-sponsored property expense"],
+      ["Purpose", input.sponsored.purpose],
+    ];
+    const note = input.sponsored.businessPurpose?.trim();
+    if (note) rows.push(["Business purpose", note]);
+    ensureSpace(ctx, 40 + rows.length * 14);
+    drawSectionHeader(ctx, "REALTOR-SPONSORED PROPERTY EXPENSE");
+    for (const [label, value] of rows) {
+      const lines = wrap(value, font, 10, CONTENT_W - 110);
+      ensureSpace(ctx, 14 * lines.length);
+      text(label, MARGIN, ctx.y, 9, bold, MUTED);
+      for (const ln of lines) {
+        text(ln, MARGIN + 110, ctx.y, 10);
+        ctx.y -= 14;
+      }
+    }
+    ctx.y -= 8;
+  }
 
   // --- Job section ----------------------------------------------------------
   if (input.jobTitle && input.jobTitle.trim()) {
@@ -702,6 +736,7 @@ export async function buildInvoicePdf(d: InvoicePdfData): Promise<Uint8Array> {
     notes: d.notes,
     workSummary: d.workSummary,
     itemizedReceiptsUrl: d.itemizedReceiptsUrl,
+    sponsored: d.sponsored,
     terms,
     termsTitle: "PAYMENT TERMS",
     depositTerms: d.branding?.depositTerms,

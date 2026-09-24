@@ -224,6 +224,29 @@ describe("formatInvoicesCsv", () => {
     expect(csv).toContain("2026-03-01");
   });
 
+  it("adds sponsored bookkeeping columns after Client and escapes the business purpose", () => {
+    const csv = formatInvoicesCsv([{
+      ...row,
+      billing_context: "realtor_sponsored",
+      property_address: "96 Richardson Road",
+      beneficiary_name: "Emma",
+      sponsored_purpose: "other",
+      business_purpose: 'Repair, "as agreed"',
+      work_summary: "Door repair",
+      paid_at: "2025-09-11T12:00:00.000Z",
+    }]);
+    const [header, line] = csv.split("\r\n");
+    expect(header).toBe(
+      "Invoice #,Client,Billing Context,Service Property,Work For,Sponsored Purpose,Business Purpose,Work Summary,Paid Date,Status,Subtotal,Tax,Total,Paid,Due Date,Created",
+    );
+    expect(line).toContain('Realtor-sponsored property expense,96 Richardson Road,Emma,Other realtor-sponsored work,"Repair, ""as agreed""",Door repair,2025-09-11');
+  });
+
+  it("leaves sponsored columns empty for standard invoices", () => {
+    const [, line] = formatInvoicesCsv([row]).split("\r\n");
+    expect(line.startsWith("INV-0042,Jane Doe,Standard,,,,,,,paid")).toBe(true);
+  });
+
   it("returns header-only for empty array", () => {
     const csv = formatInvoicesCsv([]);
     const lines = csv.split("\r\n").filter(Boolean);

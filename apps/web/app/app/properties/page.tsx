@@ -23,8 +23,8 @@ export const dynamic = "force-dynamic";
 
 type PropertyRow = {
   id: string;
-  client_id: string;
-  client_name: string;
+  client_id: string | null;
+  client_name: string | null;
   name: string | null;
   address: string;
   city: string | null;
@@ -60,7 +60,7 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
     params.push(client_id);
   }
   if (search) {
-    conditions.push(`(LOWER(p.address) LIKE $${idx} OR LOWER(COALESCE(p.name, '')) LIKE $${idx} OR LOWER(c.name) LIKE $${idx})`);
+    conditions.push(`(LOWER(p.address) LIKE $${idx} OR LOWER(COALESCE(p.name, '')) LIKE $${idx} OR LOWER(COALESCE(c.name, '')) LIKE $${idx})`);
     params.push(`%${search}%`);
     idx++;
   }
@@ -70,12 +70,12 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
             COUNT(DISTINCT j.id)::int AS job_count,
             COUNT(DISTINCT v.id)::int AS visit_count
      FROM properties p
-     JOIN clients c ON c.id = p.client_id AND c.account_id = p.account_id
+     LEFT JOIN clients c ON c.id = p.client_id AND c.account_id = p.account_id
      LEFT JOIN jobs j ON j.property_id = p.id AND j.account_id = p.account_id
      LEFT JOIN visits v ON v.job_id = j.id AND v.account_id = p.account_id
      WHERE ${conditions.join(" AND ")}
      GROUP BY p.id, c.name
-     ORDER BY c.name ASC, p.address ASC
+     ORDER BY COALESCE(c.name, '') ASC, p.address ASC
      LIMIT 200`,
     params
   );
@@ -106,7 +106,9 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
     {
       key: "client",
       label: "Client",
-      render: (row) => <Link href={`/app/clients/${row.client_id}` as Route} style={{ color: "var(--accent)", textDecoration: "none" }}>{row.client_name}</Link>,
+      render: (row) => row.client_id ? (
+        <Link href={`/app/clients/${row.client_id}` as Route} style={{ color: "var(--accent)", textDecoration: "none" }}>{row.client_name}</Link>
+      ) : <span style={{ color: "var(--fg-muted)" }}>No primary contact</span>,
     },
     {
       key: "jobs",
@@ -123,7 +125,7 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
       render: (row) => (
         <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end" }}>
           <LinkButton href={`/app/properties/${row.id}`} variant="secondary" size="sm">Open</LinkButton>
-          {canCreateJobs ? <LinkButton href={buildJobCreateHref(row.client_id, row.id)} variant="ghost" size="sm">+ Job</LinkButton> : null}
+          {canCreateJobs && row.client_id ? <LinkButton href={buildJobCreateHref(row.client_id, row.id)} variant="ghost" size="sm">+ Job</LinkButton> : null}
         </div>
       ),
     },
@@ -167,7 +169,7 @@ export default async function PropertiesPage({ searchParams }: PageProps) {
                 meta={
                   <>
                     <div>{formatPropertyAddress(row)}</div>
-                    <div>{row.client_name} • {Number(row.job_count)} jobs • {Number(row.visit_count)} visits</div>
+                    <div>{row.client_name ?? "No primary contact"} • {Number(row.job_count)} jobs • {Number(row.visit_count)} visits</div>
                   </>
                 }
               />

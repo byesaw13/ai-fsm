@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { canCreateInvoices } from "@/lib/auth/permissions";
-import { query } from "@/lib/db";
+import { query, queryForSession } from "@/lib/db";
 import { Breadcrumbs, Card, PageContainer, PageHeader, HubSubnav } from "@/components/ui";
 import { MONEY_HUB_LINKS } from "@/lib/navigation/hubs";
 import { NewInvoiceForm } from "./NewInvoiceForm";
@@ -28,7 +28,14 @@ interface Job {
 interface Property {
   id: string;
   address: string;
-  client_id: string;
+  client_id: string | null;
+  [key: string]: unknown;
+}
+
+interface PropertyContact {
+  id: string;
+  property_id: string;
+  display_name: string;
   [key: string]: unknown;
 }
 
@@ -56,7 +63,7 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
 
   const { client_id, job_id, property_id, approved_estimate_id } = await searchParams;
 
-  const [clients, jobs, properties] = await Promise.all([
+  const [clients, jobs, properties, propertyContacts] = await Promise.all([
     query<Client>(
       `SELECT id, name FROM clients WHERE account_id = $1 ORDER BY name ASC`,
       [session.accountId]
@@ -67,6 +74,15 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
     ),
     query<Property>(
       `SELECT id, address, client_id FROM properties WHERE account_id = $1 ORDER BY address ASC`,
+      [session.accountId]
+    ),
+    queryForSession<PropertyContact>(
+      session,
+      `SELECT pc.id, pc.property_id, COALESCE(c.name, pc.external_name) AS display_name
+       FROM property_contacts pc
+       LEFT JOIN clients c ON c.id = pc.client_id AND c.account_id = pc.account_id
+       WHERE pc.account_id = $1
+       ORDER BY COALESCE(c.name, pc.external_name) ASC`,
       [session.accountId]
     ),
   ]);
@@ -131,6 +147,7 @@ export default async function NewInvoicePage({ searchParams }: PageProps) {
           clients={clients}
           jobs={jobs}
           properties={properties}
+          propertyContacts={propertyContacts}
           initialClientId={client_id}
           initialJobId={job_id}
           initialPropertyId={property_id}

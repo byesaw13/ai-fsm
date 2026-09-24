@@ -53,6 +53,14 @@ describe("documentJoins", () => {
     expect(sql).not.toContain("e.account_id");
   });
 
+  it("prefers the client's explicit main property before the oldest property", () => {
+    for (const sql of [documentJoins({ root: "i", includeEstimateProperty: true }), documentJoins({ root: "e" })]) {
+      const main = sql.indexOf("c.primary_property_id");
+      expect(main).toBeGreaterThan(sql.indexOf("j.property_id"));
+      expect(main).toBeLessThan(sql.indexOf("SELECT p2.id"));
+    }
+  });
+
   it("estimate joins omit estimate self-join and use e.account_id", () => {
     const sql = documentJoins({ root: "e" });
     expect(sql).toContain("JOIN clients c ON c.id = e.client_id");

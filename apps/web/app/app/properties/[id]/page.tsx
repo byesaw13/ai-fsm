@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { getSession } from "@/lib/auth/session";
 import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { canManageClients, canTransitionJob, canCreateEstimates } from "@/lib/auth/permissions";
-import { query, queryOne } from "@/lib/db";
+import { query, queryForSession, queryOne } from "@/lib/db";
 import { buildJobCreateHref, formatPropertyAddress } from "@/lib/crm/normalization";
 import { computeVaultCompleteness, type VaultCategory } from "@ai-fsm/domain";
 import {
@@ -26,6 +26,8 @@ import { PropertyIssuesPanel } from "./PropertyIssuesPanel";
 import type { IssueRow } from "./PropertyIssuesPanel";
 import { PropertyServiceHistory } from "./PropertyServiceHistory";
 import type { ServiceHistoryRow } from "./PropertyServiceHistory";
+import { PropertyContactsPanel, type PropertyContactRow } from "./PropertyContactsPanel";
+import { SetMainPropertyButton } from "./SetMainPropertyButton";
 import {
   propertyActiveJobStatusColor,
   formatPropertyCents,
@@ -45,9 +47,10 @@ export const dynamic = "force-dynamic";
 
 type PropertyRow = {
   id: string;
-  client_id: string;
-  client_name: string;
+  client_id: string | null;
+  client_name: string | null;
   client_phone: string | null;
+  primary_property_id: string | null;
   name: string | null;
   address: string;
   city: string | null;
@@ -183,14 +186,15 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
   // Active work counts are derived from parallel queries in round 2.
   const property = await queryOne<PropertyRow>(
     `SELECT p.*, c.name AS client_name, c.phone AS client_phone,
+            c.primary_property_id,
             COUNT(DISTINCT j.id)::int AS job_count,
             COUNT(DISTINCT v.id) FILTER (WHERE v.status = 'completed')::int AS completed_visit_count
      FROM properties p
-     JOIN clients c ON c.id = p.client_id AND c.account_id = p.account_id
+     LEFT JOIN clients c ON c.id = p.client_id AND c.account_id = p.account_id
      LEFT JOIN jobs j ON j.property_id = p.id AND j.account_id = p.account_id
      LEFT JOIN visits v ON v.job_id = j.id AND v.account_id = p.account_id
      WHERE p.id = $1 AND p.account_id = $2
-     GROUP BY p.id, c.name, c.phone`,
+     GROUP BY p.id, c.name, c.phone, c.primary_property_id`,
     [id, session.accountId]
   );
   if (!property) notFound();
@@ -209,6 +213,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
     vaultItems,
     conditions,
     issues,
+    contacts,
   ] = await Promise.all([
 
     // Edit form client dropdown
@@ -411,6 +416,16 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
          last_noted_at DESC`,
       [id, session.accountId]
     ),
+
+    queryForSession<PropertyContactRow>(
+      session,
+      `SELECT pc.*, c.name AS client_name, c.email AS client_email, c.phone AS client_phone
+       FROM property_contacts pc
+       LEFT JOIN clients c ON c.id = pc.client_id AND c.account_id = pc.account_id
+       WHERE pc.property_id = $1 AND pc.account_id = $2
+       ORDER BY pc.created_at ASC`,
+      [id, session.accountId]
+    ),
   ]);
 
   // Derived values
@@ -423,24 +438,20 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
 
   return (
     <PageContainer>
-      <Breadcrumbs
-        items={[
-          { href: "/app/clients", label: "Clients" },
-          {
-            href: `/app/clients/${property.client_id}`,
-            label: property.client_name ?? "Client",
-          },
-          {
-            label: houseHeading(property.name, property.address),
-          },
-        ]}
-      />
+      <Breadcrumbs items={property.client_id ? [
+        { href: "/app/clients", label: "Clients" },
+        { href: `/app/clients/${property.client_id}`, label: property.client_name ?? "Client" },
+        { label: houseHeading(property.name, property.address) },
+      ] : [
+        { href: "/app/properties", label: "Houses" },
+        { label: houseHeading(property.name, property.address) },
+      ]} />
       <PageHeader
         title={houseHeading(property.name, property.address)}
         subtitle={
           property.name?.trim()
-            ? `${property.client_name} · ${formatPropertyAddress(property)}`
-            : property.client_name
+            ? `${property.client_name ?? "No primary contact"} · ${formatPropertyAddress(property)}`
+            : property.client_name ?? "No primary contact"
         }
         backHref="/app/properties"
         backLabel="Houses"
@@ -451,10 +462,12 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                 Call
               </LinkButton>
             ) : null}
-            <LinkButton href={`/app/clients/${property.client_id}`} variant="secondary" size="sm">
-              {property.client_name}
-            </LinkButton>
-            {canCreateEstimates(session.role) && (
+            {property.client_id ? (
+              <LinkButton href={`/app/clients/${property.client_id}`} variant="secondary" size="sm">
+                {property.client_name}
+              </LinkButton>
+            ) : null}
+            {canCreateEstimates(session.role) && property.client_id && (
               <LinkButton
                 href={`/app/estimates/new?client_id=${property.client_id}&property_id=${property.id}`}
                 variant="secondary"
@@ -463,7 +476,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                 + Quote
               </LinkButton>
             )}
-            {canTransitionJob(session.role) && (
+            {canTransitionJob(session.role) && property.client_id && (
               <LinkButton
                 href={buildJobCreateHref(property.client_id, property.id)}
                 variant="primary"
@@ -770,6 +783,11 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
             />
           </Disclosure>
 
+          <Card>
+            <SectionHeader title="Property Contacts" count={contacts.length} />
+            <PropertyContactsPanel propertyId={property.id} initialContacts={contacts} clients={clients} />
+          </Card>
+
         </div>
 
         <div className="p7-detail-sidebar">
@@ -779,9 +797,14 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
               <div className="p7-detail-row">
                 <dt>Client</dt>
                 <dd>
-                  <LinkButton href={`/app/clients/${property.client_id}`} variant="ghost" size="sm">
-                    {property.client_name}
-                  </LinkButton>
+                  {property.client_id ? (
+                    <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      <LinkButton href={`/app/clients/${property.client_id}`} variant="ghost" size="sm">
+                        {property.client_name}
+                      </LinkButton>
+                      <SetMainPropertyButton clientId={property.client_id} propertyId={property.id} selected={property.primary_property_id === property.id} />
+                    </div>
+                  ) : "No primary contact"}
                 </dd>
               </div>
               <div className="p7-detail-row"><dt>Address</dt><dd>{property.address}</dd></div>
@@ -807,7 +830,7 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
                 propertyId={property.id}
                 clients={clients}
                 initialValues={{
-                  client_id: property.client_id,
+                  client_id: property.client_id ?? "",
                   name: property.name ?? "",
                   address: property.address,
                   city: property.city ?? "",

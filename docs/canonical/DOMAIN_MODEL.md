@@ -6,7 +6,7 @@ The primary domain model is:
 
 ```text
 Client
-  -> Property
+  -> primary service relationship -> Property
       -> Estimate
       -> Job
           -> Work Order
@@ -35,14 +35,15 @@ Backend tables, routes, and status enums keep their stable names (`job`, `jobs`,
 
 ## Client
 
-A client is the person or household relationship Dovetails serves.
+A client is a person or household relationship Dovetails serves or bills.
 
 Owns:
 
 - Name and contact details.
 - Communication preferences.
 - Portal/contact access where implemented.
-- One or more properties.
+- An optional main property and an optional primary service relationship to
+  one or more properties.
 
 Does not own:
 
@@ -52,7 +53,10 @@ Does not own:
 
 ## Property
 
-A property is the physical home or service location. This is the durable center of the product.
+A property is the physical home or service location. This is the durable center
+of the product. It may have a primary service contact, may be temporarily
+unassigned, and may reference non-owning contacts such as a realtor or property
+manager. These relationships do not grant portal access by themselves.
 
 Owns:
 
@@ -63,6 +67,8 @@ Owns:
 Does not own:
 
 - Client contact identity.
+- Legal ownership; the primary service contact is an operational relationship,
+  not a title record.
 - Invoice payment state.
 - Work order lead assignment (use work orders).
 
@@ -166,6 +172,8 @@ Owns:
 - Invoice line items and totals.
 - Invoice status: draft, sent, partial, paid, overdue, void.
 - Payment records.
+- The bill-to client/payer and, when applicable, sponsored-work bookkeeping
+  context such as beneficiary, property, and business purpose.
 
 Does not own:
 

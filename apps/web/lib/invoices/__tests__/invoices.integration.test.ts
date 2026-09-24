@@ -18,7 +18,8 @@
  *   AI-FSM: apps/web/lib/estimates/__tests__/estimates.integration.test.ts (pattern)
  */
 
-import { describe, it, expect, beforeAll } from "vitest";
+import { randomUUID } from "node:crypto";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Client } from "pg";
 
 // HTTP integration: requires both a running DB and a running web server.
@@ -294,5 +295,147 @@ describe.skipIf(!RUN_INTEGRATION)("Invoice conversion API integration", () => {
       );
       expect(status).toBe(403);
     });
+  });
+});
+
+describe.skipIf(!RUN_INTEGRATION)("Sponsored invoice API integration", () => {
+  const BASE_URL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
+  const accountClientId = randomUUID();
+  const propertyId = randomUUID();
+  const beneficiaryId = randomUUID();
+  const foreignAccountId = randomUUID();
+  const foreignClientId = randomUUID();
+  const foreignPropertyId = randomUUID();
+  const foreignBeneficiaryId = randomUUID();
+  const createdInvoiceIds: string[] = [];
+  let adminCookie = "";
+  // Own payer row: the shared client list can be empty or churned by parallel suites in CI.
+  const payerId = randomUUID();
+  let accountId = "";
+
+  async function apiRequest(method: string, path: string, body?: unknown) {
+    const response = await fetch(`${BASE_URL}${path}`, {
+      method,
+      headers: { "Content-Type": "application/json", Cookie: adminCookie },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return { status: response.status, data: await response.json().catch(() => ({})) };
+  }
+
+  beforeAll(async () => {
+    const login = await fetch(`${BASE_URL}/api/v1/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": `it-sponsored-${randomUUID()}` },
+      body: JSON.stringify({ email: "admin@test.com", password: "password" }),
+    });
+    adminCookie = (login.headers.get("set-cookie") ?? "").split(";")[0];
+
+    const db = new Client({ connectionString: process.env.TEST_DATABASE_URL });
+    await db.connect();
+    try {
+      accountId = (await db.query<{ account_id: string }>(`SELECT account_id FROM users WHERE email = 'admin@test.com'`)).rows[0].account_id;
+      await db.query(`INSERT INTO clients (id, account_id, name) VALUES ($1, $2, 'Sponsored payer client')`, [payerId, accountId]);
+      await db.query(`INSERT INTO clients (id, account_id, name) VALUES ($1, $2, 'Sponsored beneficiary client')`, [accountClientId, accountId]);
+      await db.query(`INSERT INTO properties (id, account_id, client_id, address) VALUES ($1, $2, $3, '469 Cilley Road')`, [propertyId, accountId, accountClientId]);
+      await db.query(
+        `INSERT INTO property_contacts (id, account_id, property_id, external_name, role)
+         VALUES ($1, $2, $3, 'Emma', 'beneficiary')`,
+        [beneficiaryId, accountId, propertyId],
+      );
+      await db.query(`INSERT INTO accounts (id, name) VALUES ($1, 'Foreign sponsored test')`, [foreignAccountId]);
+      await db.query(`INSERT INTO clients (id, account_id, name) VALUES ($1, $2, 'Foreign client')`, [foreignClientId, foreignAccountId]);
+      await db.query(`INSERT INTO properties (id, account_id, client_id, address) VALUES ($1, $2, $3, '1 Foreign Way')`, [foreignPropertyId, foreignAccountId, foreignClientId]);
+      await db.query(
+        `INSERT INTO property_contacts (id, account_id, property_id, external_name, role)
+         VALUES ($1, $2, $3, 'Foreign beneficiary', 'beneficiary')`,
+        [foreignBeneficiaryId, foreignAccountId, foreignPropertyId],
+      );
+    } finally {
+      await db.end();
+    }
+  });
+
+  afterAll(async () => {
+    const db = new Client({ connectionString: process.env.TEST_DATABASE_URL });
+    await db.connect();
+    try {
+      if (createdInvoiceIds.length) {
+        await db.query(`DELETE FROM invoice_line_items WHERE invoice_id = ANY($1::uuid[])`, [createdInvoiceIds]);
+        await db.query(`DELETE FROM invoices WHERE id = ANY($1::uuid[])`, [createdInvoiceIds]);
+      }
+      await db.query(`DELETE FROM property_contacts WHERE id = ANY($1::uuid[])`, [[beneficiaryId, foreignBeneficiaryId]]);
+      await db.query(`DELETE FROM properties WHERE id = ANY($1::uuid[])`, [[propertyId, foreignPropertyId]]);
+      await db.query(`DELETE FROM clients WHERE id = ANY($1::uuid[])`, [[payerId, accountClientId, foreignClientId]]);
+      await db.query(`DELETE FROM accounts WHERE id = $1`, [foreignAccountId]);
+    } finally {
+      await db.end();
+    }
+  });
+
+  const lineItems = [{ description: "Paint touch-ups", quantity: 1, unit_price_cents: 25000, sort_order: 0 }];
+
+  it("rejects another client's property for standard work", async () => {
+    const result = await apiRequest("POST", "/api/v1/invoices", {
+      client_id: payerId,
+      property_id: propertyId,
+      tax_rate: 0,
+      line_items: lineItems,
+    });
+    expect(result.status).toBe(422);
+  });
+
+  it("renders the sponsored billing controls", async () => {
+    const page = await fetch(`${BASE_URL}/app/invoices/new`, { headers: { Cookie: adminCookie } });
+    expect(page.status).toBe(200);
+    const html = await page.text();
+    expect(html).toContain("Billing context");
+    expect(html).toContain("Realtor-sponsored property work");
+  }, 30_000);
+
+  it("creates sponsored work for a beneficiary on the selected property", async () => {
+    const result = await apiRequest("POST", "/api/v1/invoices", {
+      client_id: payerId,
+      property_id: propertyId,
+      billing_context: "realtor_sponsored",
+      sponsored_purpose: "pre_listing",
+      beneficiary_property_contact_id: beneficiaryId,
+      business_purpose: "Prepare the client's home for listing",
+      tax_rate: 0,
+      line_items: lineItems,
+    });
+    expect(result.status).toBe(201);
+    createdInvoiceIds.push(result.data.id);
+
+    const updated = await apiRequest("PATCH", `/api/v1/invoices/${result.data.id}`, {
+      property_id: propertyId,
+      billing_context: "realtor_sponsored",
+      sponsored_purpose: "staging_appearance",
+      beneficiary_property_contact_id: beneficiaryId,
+      business_purpose: "Prepare for listing photos",
+    });
+    expect(updated.status).toBe(200);
+    const loaded = await apiRequest("GET", `/api/v1/invoices/${result.data.id}`);
+    expect(loaded.data.data).toMatchObject({
+      billing_context: "realtor_sponsored",
+      sponsored_purpose: "staging_appearance",
+      beneficiary_property_contact_id: beneficiaryId,
+      business_purpose: "Prepare for listing photos",
+    });
+    const detail = await fetch(`${BASE_URL}/app/invoices/${result.data.id}`, { headers: { Cookie: adminCookie } });
+    expect(detail.status).toBe(200);
+    expect(await detail.text()).toContain("Prepare for listing photos");
+  }, 30_000);
+
+  it("rejects property and beneficiary UUIDs from another account", async () => {
+    const result = await apiRequest("POST", "/api/v1/invoices", {
+      client_id: payerId,
+      property_id: foreignPropertyId,
+      billing_context: "realtor_sponsored",
+      sponsored_purpose: "pre_listing",
+      beneficiary_property_contact_id: foreignBeneficiaryId,
+      tax_rate: 0,
+      line_items: lineItems,
+    });
+    expect([404, 422]).toContain(result.status);
   });
 });

@@ -11,6 +11,8 @@ import {
 import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
 import { amountDueCents, isInvoiceFullyPaid } from "@/lib/invoices/payments";
 import { PaidStamp } from "@/components/invoices/PaidStamp";
+import { SponsoredDetails } from "@/components/invoices/SponsoredDetails";
+import type { SponsoredDocumentInfo } from "@/lib/invoices/sponsored";
 
 interface LineItem {
   id: string;
@@ -53,13 +55,15 @@ interface Props {
   lineItems: LineItem[];
   /** Whether the account has Square enabled — controls the online pay button. */
   onlinePaymentAvailable: boolean;
+  /** TASK-158: realtor-sponsored context; null for standard invoices. */
+  sponsored?: SponsoredDocumentInfo | null;
 }
 
 function cents(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n / 100);
 }
 
-export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAvailable }: Props) {
+export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAvailable, sponsored }: Props) {
   const [status] = useState(invoice.status);
   const [paidCents] = useState(invoice.paid_cents);
   const [loadingPayment, setLoadingPayment] = useState(false);
@@ -167,6 +171,8 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
             ) : null}
           </div>
         </div>
+
+        {sponsored && <SponsoredDetails info={sponsored} />}
 
         {/* Paid: big green zero-balance banner — impossible to miss */}
         {isPaid && (

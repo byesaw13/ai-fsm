@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { SPONSORED_DOCUMENT_JOIN, SPONSORED_DOCUMENT_SELECT } from "@/lib/invoices/sponsored";
 import { queryOne, query, getPool } from "@/lib/db";
 import { loadSquareSettings, createSquarePaymentLink } from "@/lib/integrations/square-payments";
 import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
@@ -60,10 +61,12 @@ export async function GET(
        c.name AS client_name,
        p.address AS property_address, p.city AS property_city,
        p.state AS property_state, p.zip AS property_zip,
-       a.name AS account_name, a.settings AS account_settings
+       a.name AS account_name, a.settings AS account_settings,
+       ${SPONSORED_DOCUMENT_SELECT}
      FROM invoices i
      JOIN clients c ON c.id = i.client_id
      JOIN accounts a ON a.id = i.account_id
+     ${SPONSORED_DOCUMENT_JOIN}
      LEFT JOIN properties p ON p.id = i.property_id
      WHERE i.share_token = $1`,
     [token]

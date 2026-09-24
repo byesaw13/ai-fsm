@@ -22,6 +22,7 @@ import { formatInvoiceViewLabel, isInvoiceUnread } from "@/lib/invoices/client-v
 import { amountDueCents } from "@/lib/invoices/payments";
 import { MONEY_HUB_LINKS } from "@/lib/navigation/hubs";
 import { invoiceAttentionPredicate } from "@/lib/attention/counts";
+import { formatSponsoredInvoiceLabel } from "@/lib/invoices/sponsored";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,10 @@ interface InvoiceRow {
   client_name: string | null;
   invoice_kind: string;
   job_status: string | null;
+  billing_context: string;
+  property_address: string | null;
+  beneficiary_name: string | null;
+  work_summary: string | null;
   [key: string]: unknown;
 }
 
@@ -123,10 +128,16 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
               i.due_date, i.created_at, i.sent_at,
               i.first_viewed_at, i.last_viewed_at, i.view_count,
               i.invoice_kind, j.status AS job_status,
-              c.name AS client_name
+              c.name AS client_name,
+              i.billing_context, i.work_summary, sp.address AS property_address,
+              COALESCE(spcc.name, spc.external_name) AS beneficiary_name
        FROM invoices i
        LEFT JOIN clients c ON c.id = i.client_id
        LEFT JOIN jobs j ON j.id = i.job_id
+       LEFT JOIN properties sp ON sp.id = i.property_id AND sp.account_id = i.account_id
+       LEFT JOIN property_contacts spc
+         ON spc.id = i.beneficiary_property_contact_id AND spc.account_id = i.account_id
+       LEFT JOIN clients spcc ON spcc.id = spc.client_id AND spcc.account_id = i.account_id
        WHERE i.account_id = $1
        ${attentionPred}
        ORDER BY 
@@ -329,6 +340,16 @@ export default async function InvoicesPage({ searchParams }: PageProps) {
                         {inv.client_name ? (
                           <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>· {inv.client_name}</span>
                         ) : null}
+                        {inv.billing_context === "realtor_sponsored" && (
+                          <span data-testid="invoice-sponsored-label" style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+                            · {formatSponsoredInvoiceLabel({
+                              propertyAddress: inv.property_address ?? "",
+                              beneficiaryName: inv.beneficiary_name ?? "",
+                              workSummary: inv.work_summary,
+                              invoiceNumber: inv.invoice_number,
+                            })}
+                          </span>
+                        )}
                         {unread && (
                           <span
                             data-testid="invoice-unread-badge"

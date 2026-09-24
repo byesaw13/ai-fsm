@@ -1,49 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { inflateSync } from "node:zlib";
 import { buildInvoicePdf, buildEstimatePdf } from "../document-pdf";
+import { pdfDrawnText } from "./pdf-text";
 
 /** A valid PDF byte stream begins with the "%PDF-" magic header. */
 function isPdf(bytes: Uint8Array): boolean {
   const header = Buffer.from(bytes.slice(0, 5)).toString("latin1");
   return header === "%PDF-";
-}
-
-/**
- * pdf-lib Flate-compresses content streams and encodes drawn text as hex
- * strings (`<48656C6C6F> Tj`). Inflate + decode so tests can assert on labels.
- */
-function pdfDrawnText(bytes: Uint8Array): string {
-  const raw = Buffer.from(bytes);
-  const streams: string[] = [];
-  const marker = Buffer.from("stream\n");
-  const endMarker = Buffer.from("\nendstream");
-  let from = 0;
-  while (from < raw.length) {
-    const start = raw.indexOf(marker, from);
-    if (start < 0) break;
-    const dataStart = start + marker.length;
-    const end = raw.indexOf(endMarker, dataStart);
-    if (end < 0) break;
-    const chunk = raw.subarray(dataStart, end);
-    try {
-      streams.push(inflateSync(chunk).toString("latin1"));
-    } catch {
-      /* not a flate stream (e.g. binary image / xref) */
-    }
-    from = end + endMarker.length;
-  }
-  const joined = streams.join("\n");
-  const decoded: string[] = [];
-  for (const m of joined.matchAll(/<([0-9A-Fa-f]+)>/g)) {
-    const hex = m[1];
-    if (hex.length % 2 !== 0) continue;
-    let s = "";
-    for (let i = 0; i < hex.length; i += 2) {
-      s += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16));
-    }
-    decoded.push(s);
-  }
-  return decoded.join("\n");
 }
 
 describe("buildInvoicePdf", () => {
@@ -154,6 +116,43 @@ describe("buildInvoicePdf", () => {
     });
     expect(isPdf(bytes)).toBe(true);
     expect(bytes.length).toBeGreaterThan(1500);
+  });
+
+  it("renders a paid realtor-sponsored invoice with payer, beneficiary, and purpose", async () => {
+    const bytes = await buildInvoicePdf({
+      invoiceNumber: "0200",
+      status: "paid",
+      clientName: "Kimberley Tufts",
+      propertyAddress: "96 Richardson Road, North Chelmsford",
+      issueDate: "2025-09-11",
+      paidAt: "2025-09-11",
+      subtotalCents: 30970,
+      totalCents: 30970,
+      paidCents: 30970,
+      sponsored: {
+        paidBy: "Kimberley Tufts",
+        beneficiary: "Emma",
+        purpose: "Other realtor-sponsored work",
+        businessPurpose: "Client property repair paid by realtor",
+      },
+      lineItems: [{ description: "Repair", quantity: 1, unitPriceCents: 30970, totalCents: 30970 }],
+    });
+    const text = pdfDrawnText(bytes);
+    for (const expected of [
+      "REALTOR-SPONSORED PROPERTY EXPENSE", "Paid by", "Kimberley Tufts", "Work for", "Emma",
+      "Realtor-sponsored property expense", "Other realtor-sponsored work",
+      "Client property repair paid by realtor", "96 Richardson Road, North Chelmsford", "PAID", "$0.00",
+    ]) {
+      expect(text).toContain(expected);
+    }
+  });
+
+  it("omits the sponsored block on standard invoices", async () => {
+    const bytes = await buildInvoicePdf({
+      invoiceNumber: "STD-1", status: "sent", clientName: "Client",
+      subtotalCents: 100, totalCents: 100, paidCents: 0, lineItems: [],
+    });
+    expect(pdfDrawnText(bytes)).not.toContain("REALTOR-SPONSORED");
   });
 
   it("wraps very long descriptions across multiple lines without throwing", async () => {

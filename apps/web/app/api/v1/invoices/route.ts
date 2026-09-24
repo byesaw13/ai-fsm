@@ -6,6 +6,7 @@ import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
 import { invoiceStatusSchema, resolveIssueDueDate } from "@ai-fsm/domain";
 import { manualInvoiceKind } from "@/lib/invoices/manual-kind";
+import { SPONSORED_PURPOSES, validateInvoiceContext } from "@/lib/invoices/sponsored";
 
 export const dynamic = "force-dynamic";
 
@@ -80,9 +81,17 @@ export const GET = withAuth(async (request, session) => {
                 i.subtotal_cents, i.tax_cents, i.total_cents, i.paid_cents,
                 i.due_date, i.sent_at, i.paid_at, i.estimate_id,
                 i.client_id, i.job_id, i.created_at, i.updated_at,
-                c.name AS client_name
+                c.name AS client_name,
+                i.property_id, i.billing_context, i.sponsored_purpose,
+                i.beneficiary_property_contact_id, i.business_purpose, i.work_summary,
+                sp.address AS property_address,
+                COALESCE(spcc.name, spc.external_name) AS beneficiary_name
          FROM invoices i
          LEFT JOIN clients c ON c.id = i.client_id
+         LEFT JOIN properties sp ON sp.id = i.property_id AND sp.account_id = i.account_id
+         LEFT JOIN property_contacts spc
+           ON spc.id = i.beneficiary_property_contact_id AND spc.account_id = i.account_id
+         LEFT JOIN clients spcc ON spcc.id = spc.client_id AND spcc.account_id = i.account_id
          WHERE ${where}
          ORDER BY i.created_at DESC
          LIMIT $${idx} OFFSET $${idx + 1}`,
@@ -125,6 +134,10 @@ const createInvoiceSchema = z.object({
   property_id: z.string().uuid().nullable().optional(),
   due_date: z.string().datetime().nullable().optional(),
   notes: z.string().nullable().optional(),
+  billing_context: z.enum(["standard", "realtor_sponsored"]).default("standard"),
+  sponsored_purpose: z.enum(SPONSORED_PURPOSES).nullable().optional(),
+  beneficiary_property_contact_id: z.string().uuid().nullable().optional(),
+  business_purpose: z.string().trim().max(2000).nullable().optional(),
   tax_rate: z.number().min(0).max(100).default(0),
   line_items: z.array(lineItemInputSchema).min(1, "At least one line item is required"),
 });
@@ -155,7 +168,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     );
   }
 
-  const { client_id, job_id, property_id, due_date, notes, tax_rate, line_items } = parseResult.data;
+  const {
+    client_id, job_id, property_id, due_date, notes, tax_rate, line_items,
+    billing_context, sponsored_purpose, beneficiary_property_contact_id, business_purpose,
+  } = parseResult.data;
 
   // Compute totals
   const subtotal_cents = line_items.reduce(
@@ -168,14 +184,15 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
   try {
     const invoice = await withInvoiceContext(session, async (client) => {
-      // Verify client belongs to account
-      const clientRow = await client.query(
-        `SELECT id FROM clients WHERE id = $1 AND account_id = $2`,
-        [client_id, session.accountId]
-      );
-      if (clientRow.rowCount === 0) {
-        throw Object.assign(new Error("Client not found"), { code: "NOT_FOUND" });
-      }
+      await validateInvoiceContext(client, session.accountId, {
+        payerClientId: client_id,
+        jobId: job_id,
+        propertyId: property_id,
+        billingContext: billing_context,
+        sponsoredPurpose: sponsored_purpose,
+        beneficiaryPropertyContactId: beneficiary_property_contact_id,
+        businessPurpose: business_purpose,
+      });
 
       const invoiceNumber = await generateInvoiceNumber(client, session.accountId);
       const invoiceKind = manualInvoiceKind(job_id);
@@ -199,16 +216,21 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       const result = await client.query<{ id: string }>(
         `INSERT INTO invoices
            (account_id, client_id, job_id, property_id,
+            billing_context, sponsored_purpose, beneficiary_property_contact_id, business_purpose,
             status, invoice_kind, invoice_number,
             subtotal_cents, tax_cents, total_cents, paid_cents, deposit_cents,
             notes, due_date, created_by)
-         VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, $9, 0, $10, $11, $12, $13)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'draft', $9, $10, $11, $12, $13, 0, $14, $15, $16, $17)
          RETURNING id`,
         [
           session.accountId,
           client_id,
           job_id ?? null,
           property_id ?? null,
+          billing_context,
+          sponsored_purpose ?? null,
+          beneficiary_property_contact_id ?? null,
+          business_purpose || null,
           invoiceKind,
           invoiceNumber,
           subtotal_cents,
@@ -246,7 +268,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         action: "insert",
         actor_id: session.userId,
         trace_id: session.traceId,
-        new_value: { client_id, invoice_number: invoiceNumber, total_cents },
+        new_value: {
+          client_id, property_id, billing_context, sponsored_purpose,
+          beneficiary_property_contact_id, business_purpose, invoice_number: invoiceNumber, total_cents,
+        },
       });
 
       return invoiceId;
@@ -257,8 +282,14 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     const err = error as Error & { code?: string };
     if (err.code === "NOT_FOUND") {
       return NextResponse.json(
-        { error: { code: "NOT_FOUND", message: "Client not found", traceId: session.traceId } },
+        { error: { code: "NOT_FOUND", message: err.message, traceId: session.traceId } },
         { status: 404 }
+      );
+    }
+    if (err.code === "VALIDATION_ERROR") {
+      return NextResponse.json(
+        { error: { code: "VALIDATION_ERROR", message: err.message, traceId: session.traceId } },
+        { status: 422 }
       );
     }
     logger.error("POST /api/v1/invoices error", error, { traceId: session.traceId });

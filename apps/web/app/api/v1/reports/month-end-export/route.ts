@@ -121,9 +121,16 @@ async function buildCsv(
       const { rows } = await client.query(
         `SELECT i.invoice_number, c.name AS client_name, i.status,
                 i.subtotal_cents, i.tax_cents, i.total_cents, i.paid_cents,
-                i.due_date, i.created_at
+                i.due_date, i.created_at, i.paid_at,
+                i.billing_context, i.sponsored_purpose, i.business_purpose, i.work_summary,
+                sp.address AS property_address,
+                COALESCE(spcc.name, spc.external_name) AS beneficiary_name
          FROM invoices i
          LEFT JOIN clients c ON c.id = i.client_id
+         LEFT JOIN properties sp ON sp.id = i.property_id AND sp.account_id = i.account_id
+         LEFT JOIN property_contacts spc
+           ON spc.id = i.beneficiary_property_contact_id AND spc.account_id = i.account_id
+         LEFT JOIN clients spcc ON spcc.id = spc.client_id AND spcc.account_id = i.account_id
          WHERE i.account_id = $1
            AND to_char(i.created_at, 'YYYY-MM') = $2
          ORDER BY i.created_at`,
