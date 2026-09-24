@@ -142,6 +142,19 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
             params.push(body[key] ?? null);
           }
         }
+        // TASK-157: room-by-room work summary + itemized receipts opt-in.
+        if ("work_summary" in body) {
+          const ws = body.work_summary;
+          if (ws !== null && (typeof ws !== "string" || ws.length > 8000)) {
+            throw Object.assign(new Error("work_summary must be text up to 8000 characters"), { code: "VALIDATION_ERROR" });
+          }
+          setClauses.push(`work_summary = $${idx++}`);
+          params.push(typeof ws === "string" && ws.trim() ? ws.trim() : null);
+        }
+        if ("show_itemized_receipts" in body) {
+          setClauses.push(`show_itemized_receipts = $${idx++}`);
+          params.push(body.show_itemized_receipts === true);
+        }
       }
 
       // fields settable on any non-terminal invoice

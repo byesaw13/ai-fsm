@@ -32,6 +32,8 @@ interface Invoice {
   deposit_percentage: number | null;
   deposit_fixed_cents: number | null;
   notes: string | null;
+  work_summary: string | null;
+  show_itemized_receipts: boolean;
   due_date: string | null;
   paid_at: string | null;
   client_name: string;
@@ -236,6 +238,14 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
           </div>
         )}
 
+        {/* Work completed — room by room (TASK-157) */}
+        {invoice.work_summary && (
+          <div style={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#78716c", marginBottom: 6 }}>WORK COMPLETED</div>
+            <div style={{ whiteSpace: "pre-wrap", color: "#292524", lineHeight: 1.5, fontSize: 14 }}>{invoice.work_summary}</div>
+          </div>
+        )}
+
         {/* Line items */}
         <div style={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: 10, overflow: "hidden", marginBottom: 20, position: "relative" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
@@ -309,6 +319,14 @@ export function InvoicePortalClient({ token, invoice, lineItems, onlinePaymentAv
             )}
           </div>
         </div>
+
+        {invoice.show_itemized_receipts && (
+          <div style={{ marginTop: -8, marginBottom: 20, textAlign: "right", fontSize: 14 }}>
+            <a href={`/portal/invoices/${token}/receipts`} style={{ color: "#2563eb", fontWeight: 600 }}>
+              View itemized receipts →
+            </a>
+          </div>
+        )}
 
         {/* Notes */}
         {invoice.notes && (

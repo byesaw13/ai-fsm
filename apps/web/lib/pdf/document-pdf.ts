@@ -82,6 +82,10 @@ export interface InvoicePdfData {
   /** Deposit still owed as a first payment (0 when none / already covered). */
   depositDueNowCents?: number | null;
   notes?: string | null;
+  /** TASK-157: room-by-room "Work completed" section above the line items. */
+  workSummary?: string | null;
+  /** TASK-157: public itemized receipts page, printed under the notes. */
+  itemizedReceiptsUrl?: string | null;
   lineItems: PdfLineItem[];
   branding?: PdfBranding | null;
   photoRecap?: { bytes: Uint8Array; mimeType: string }[];
@@ -208,6 +212,8 @@ interface RenderInput {
   totals: { label: string; value: string; strong?: boolean }[];
   optionGroups?: EstimateOptionGroup[];
   notes?: string | null;
+  workSummary?: string | null;
+  itemizedReceiptsUrl?: string | null;
   /** Body section (Payment Terms / Estimate Terms) — matches HTML print. */
   terms?: string | null;
   termsTitle?: string;
@@ -472,6 +478,18 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
       ctx.y -= 22;
     });
   } else {
+    if (input.workSummary && input.workSummary.trim()) {
+      ensureSpace(ctx, 60);
+      drawSectionHeader(ctx, "WORK COMPLETED");
+      for (const ln of wrap(input.workSummary.trim(), font, 10, CONTENT_W)) {
+        ensureSpace(ctx, 16);
+        // Area headings (lines without a bullet) in bold.
+        const isHeading = ln.trim() !== "" && !/^[•\-*]/.test(ln.trim());
+        text(ln, MARGIN, ctx.y, 10, isHeading ? bold : font, INK);
+        ctx.y -= 14;
+      }
+      ctx.y -= 10;
+    }
     ensureSpace(ctx, 50);
     drawSectionHeader(ctx, "LINE ITEMS");
     drawTableHeader();
@@ -489,6 +507,15 @@ async function renderDocument(input: RenderInput): Promise<Uint8Array> {
       text(ln, MARGIN, ctx.y, 10, font, INK);
       ctx.y -= 14;
     }
+  }
+
+  if (input.itemizedReceiptsUrl) {
+    ctx.y -= 10;
+    ensureSpace(ctx, 30);
+    text("Itemized receipts:", MARGIN, ctx.y, 10, bold, INK);
+    ctx.y -= 14;
+    text(input.itemizedReceiptsUrl, MARGIN, ctx.y, 9, font, ACCENT);
+    ctx.y -= 14;
   }
 
   if (input.photoRecap && input.photoRecap.length > 0) {
@@ -673,6 +700,8 @@ export async function buildInvoicePdf(d: InvoicePdfData): Promise<Uint8Array> {
     lineItems: d.lineItems,
     totals,
     notes: d.notes,
+    workSummary: d.workSummary,
+    itemizedReceiptsUrl: d.itemizedReceiptsUrl,
     terms,
     termsTitle: "PAYMENT TERMS",
     depositTerms: d.branding?.depositTerms,

@@ -35,6 +35,9 @@ import { MarkDepositReceivedButton } from "./MarkDepositReceivedButton";
 import { InvoiceDepositForm } from "./InvoiceDepositForm";
 import { requestedDepositCents, type InvoiceDepositType } from "@/lib/invoices/deposit";
 import { amountDueCents } from "@/lib/invoices/payments";
+import { formatCents } from "@ai-fsm/money";
+import { buildWorkSummaryFromTasks } from "@/lib/invoices/work-summary";
+import { loadItemizedReceipts } from "@/lib/invoices/itemized-receipts";
 import { resolveDepositPolicy } from "@ai-fsm/domain";
 import { SendInvoiceButton } from "./SendInvoiceButton";
 import { InvoiceMobileDeliverBar } from "./InvoiceMobileDeliverBar";
@@ -82,6 +85,8 @@ interface InvoiceRow {
   deposit_percentage: number | null;
   deposit_fixed_cents: number | null;
   notes: string | null;
+  work_summary: string | null;
+  show_itemized_receipts: boolean;
   due_date: string | null;
   sent_at: string | null;
   paid_at: string | null;
@@ -175,8 +180,28 @@ export default async function InvoiceDetailPage({
       [id, session.accountId]
     );
 
+    // TASK-157: suggested room-by-room summary + itemized receipts behind materials.
+    const jobId = (invoiceResult.rows[0] as InvoiceRow).job_id;
+    const summaryTasks = jobId
+      ? (
+          await client.query<{ label: string; status: string; parent_task_id: string | null }>(
+            `SELECT t.label, t.status, t.parent_task_id
+             FROM work_order_tasks t
+             JOIN work_orders w ON w.id = t.work_order_id
+             WHERE w.job_id = $1 AND w.account_id = $2
+             ORDER BY w.created_at ASC, t.sort_order ASC, t.created_at ASC`,
+            [jobId, session.accountId],
+          )
+        ).rows
+      : [];
+    const itemized = jobId
+      ? await loadItemizedReceipts(client, session.accountId, jobId)
+      : { receipts: [], total_cents: 0 };
+
     return {
       invoice: invoiceResult.rows[0] as InvoiceRow,
+      suggestedWorkSummary: buildWorkSummaryFromTasks(summaryTasks),
+      itemized,
       lineItems: lineItemsResult.rows as LineItemRow[],
       accountSettings: accountResult.rows[0]?.settings ?? {},
       location: locationResult.rows[0] as DocumentLocationRow | undefined,
@@ -185,7 +210,10 @@ export default async function InvoiceDetailPage({
 
   if (!result) notFound();
 
-  const { invoice, lineItems, accountSettings, location } = result;
+  const { invoice, lineItems, accountSettings, location, suggestedWorkSummary, itemized } = result;
+  const materialsBilledCents = lineItems
+    .filter((li) => li.line_item_type === "materials")
+    .reduce((sum, li) => sum + li.total_cents, 0);
   const serviceLocation = resolveServiceLocation(location ?? {});
   const clientBillingAddress = location
     ? formatAddressLine(
@@ -817,6 +845,23 @@ export default async function InvoiceDetailPage({
                   <dd style={{ whiteSpace: "pre-wrap" }}>{invoice.notes}</dd>
                 </div>
               )}
+              {invoice.work_summary && (
+                <div className="p7-detail-row">
+                  <dt>Work completed</dt>
+                  <dd style={{ whiteSpace: "pre-wrap" }}>{invoice.work_summary}</dd>
+                </div>
+              )}
+              {invoice.show_itemized_receipts && (
+                <div className="p7-detail-row">
+                  <dt>Itemized receipts</dt>
+                  <dd>
+                    <a href={`/portal/invoices/${invoice.share_token}/receipts`} target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>
+                      Client view
+                    </a>{" "}
+                    · {formatCents(itemized.total_cents)} across {itemized.receipts.length} receipts
+                  </dd>
+                </div>
+              )}
               <div className="p7-detail-row">
                 <dt>File</dt>
                 <dd><code style={{ fontSize: "11px" }}>{documentFilename}</code></dd>
@@ -829,6 +874,12 @@ export default async function InvoiceDetailPage({
                   invoiceId={invoice.id}
                   initialNotes={invoice.notes}
                   initialDueDate={invoice.due_date}
+                  initialWorkSummary={invoice.work_summary}
+                  suggestedWorkSummary={suggestedWorkSummary}
+                  initialShowItemized={invoice.show_itemized_receipts}
+                  itemizedTotalCents={invoice.job_id ? itemized.total_cents : null}
+                  itemizedReceiptCount={itemized.receipts.length}
+                  materialsBilledCents={materialsBilledCents}
                 />
               </div>
             )}

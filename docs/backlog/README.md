@@ -95,7 +95,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-157**.
+Next available ID: **TASK-158**.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -141,6 +141,7 @@ closed in tests; owner-flow AC still open.
 | TASK-154 | [Reopen and edit a partially paid invoice](../archive/backlog-done/TASK-154-edit-partially-paid-invoice.md) | 004 | Done |
 | TASK-155 | [Send via Square Invoice (card or ACH), payment link kept](TASK-155-send-via-square-invoice.md) | 004 | Proposed |
 | TASK-156 | [Track Square processing fees per payment and job](TASK-156-square-processing-fee-tracking.md) | 004 | Proposed |
+| TASK-157 | [Invoice work summary by area + customer itemized receipts link](TASK-157-invoice-work-summary-itemized-receipts.md) | 004 | In Progress |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
 | TASK-003 | Wrong Vehicle Correction | 001 | Done |

@@ -42,7 +42,7 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
     const result = await client.query(
       `SELECT e.id, e.vendor_name, e.category, e.amount_cents,
               e.expense_date, e.job_id, e.client_id, e.property_id, e.vehicle_id,
-              e.notes, e.receipt_url, e.created_by, e.created_at, e.updated_at,
+              e.notes, e.billable, e.receipt_url, e.created_by, e.created_at, e.updated_at,
               j.title AS job_title, c.name AS client_name, v.nickname AS vehicle_nickname,
               f.gallons AS fuel_gallons, f.odometer AS fuel_odometer
        FROM expenses e
@@ -271,6 +271,7 @@ export default async function ExpenseDetailPage({ params }: PageProps) {
                   job_id: expense.job_id ?? null,
                   client_id: expense.client_id ?? null,
                   notes: expense.notes ?? null,
+                  billable: expense.billable !== false,
                   vehicle_id: expense.vehicle_id ?? null,
                   fuel_gallons: expense.fuel_gallons ?? null,
                   fuel_odometer: expense.fuel_odometer ?? null,

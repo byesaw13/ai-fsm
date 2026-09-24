@@ -83,6 +83,8 @@ const updateExpenseSchema = z.object({
   vehicle_id: z.string().uuid().nullable().optional(),
   gallons: z.number().positive().max(500).nullable().optional(),
   odometer: z.number().int().positive().nullable().optional(),
+  /** false = receipt not billed to the client (TASK-157). */
+  billable: z.boolean().optional(),
 });
 
 export const PATCH = withRole(["owner", "admin"], async (request, session) => {
@@ -167,6 +169,7 @@ export const PATCH = withRole(["owner", "admin"], async (request, session) => {
         "client_id",
         "notes",
         "commercial_tag",
+        "billable",
       ] as const;
 
       for (const key of allowed) {
