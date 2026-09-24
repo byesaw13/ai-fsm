@@ -309,7 +309,8 @@ describe.skipIf(!RUN_INTEGRATION)("Sponsored invoice API integration", () => {
   const foreignBeneficiaryId = randomUUID();
   const createdInvoiceIds: string[] = [];
   let adminCookie = "";
-  let payerId = "";
+  // Own payer row: the shared client list can be empty or churned by parallel suites in CI.
+  const payerId = randomUUID();
   let accountId = "";
 
   async function apiRequest(method: string, path: string, body?: unknown) {
@@ -328,13 +329,12 @@ describe.skipIf(!RUN_INTEGRATION)("Sponsored invoice API integration", () => {
       body: JSON.stringify({ email: "admin@test.com", password: "password" }),
     });
     adminCookie = (login.headers.get("set-cookie") ?? "").split(";")[0];
-    const clients = await apiRequest("GET", "/api/v1/clients");
-    payerId = clients.data.data[0].id;
 
     const db = new Client({ connectionString: process.env.TEST_DATABASE_URL });
     await db.connect();
     try {
-      accountId = (await db.query<{ account_id: string }>(`SELECT account_id FROM clients WHERE id = $1`, [payerId])).rows[0].account_id;
+      accountId = (await db.query<{ account_id: string }>(`SELECT account_id FROM users WHERE email = 'admin@test.com'`)).rows[0].account_id;
+      await db.query(`INSERT INTO clients (id, account_id, name) VALUES ($1, $2, 'Sponsored payer client')`, [payerId, accountId]);
       await db.query(`INSERT INTO clients (id, account_id, name) VALUES ($1, $2, 'Sponsored beneficiary client')`, [accountClientId, accountId]);
       await db.query(`INSERT INTO properties (id, account_id, client_id, address) VALUES ($1, $2, $3, '469 Cilley Road')`, [propertyId, accountId, accountClientId]);
       await db.query(
@@ -365,7 +365,7 @@ describe.skipIf(!RUN_INTEGRATION)("Sponsored invoice API integration", () => {
       }
       await db.query(`DELETE FROM property_contacts WHERE id = ANY($1::uuid[])`, [[beneficiaryId, foreignBeneficiaryId]]);
       await db.query(`DELETE FROM properties WHERE id = ANY($1::uuid[])`, [[propertyId, foreignPropertyId]]);
-      await db.query(`DELETE FROM clients WHERE id = ANY($1::uuid[])`, [[accountClientId, foreignClientId]]);
+      await db.query(`DELETE FROM clients WHERE id = ANY($1::uuid[])`, [[payerId, accountClientId, foreignClientId]]);
       await db.query(`DELETE FROM accounts WHERE id = $1`, [foreignAccountId]);
     } finally {
       await db.end();
