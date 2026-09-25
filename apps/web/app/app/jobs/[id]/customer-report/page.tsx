@@ -20,6 +20,11 @@ export default async function CustomerReportPage({ params }: { params: Promise<{
   if (!data) notFound();
 
   const r = data.recipient;
+  // A bare skip marker (TASK-163) has no content — start from the fresh pre-fill.
+  const savedContent =
+    data.report && !(data.report.status === "skipped" && !data.report.summary && data.report.media_ids.length === 0)
+      ? data.report
+      : null;
   return (
     <PageContainer>
       <Breadcrumbs
@@ -42,14 +47,14 @@ export default async function CustomerReportPage({ params }: { params: Promise<{
         photos={data.photos}
         materialLines={data.materialLines}
         initial={
-          data.report
+          savedContent
             ? {
-                title: data.report.title,
-                summary: data.report.summary,
-                area: data.report.area,
-                work_type: data.report.work_type,
-                media_ids: data.report.media_ids,
-                records: data.report.records,
+                title: savedContent.title,
+                summary: savedContent.summary,
+                area: savedContent.area,
+                work_type: savedContent.work_type,
+                media_ids: savedContent.media_ids,
+                records: savedContent.records,
               }
             : {
                 title: data.prefill.title,

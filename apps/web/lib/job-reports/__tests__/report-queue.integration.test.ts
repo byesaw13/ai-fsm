@@ -19,7 +19,9 @@ describe.skipIf(!RUN)("customer report queue", () => {
     active: randomUUID(),       // still in progress
     skipMe: randomUUID(),
     draftMe: randomUUID(),
+    crossAccount: randomUUID(), // its only photo sits on another account's visit
   };
+  const otherAccountId = randomUUID();
   const ids = Object.values(jobs);
 
   const queueIds = async () => (await loadReportQueue(db as unknown as PoolClient, accountId)).map((r) => r.job_id);
@@ -44,6 +46,7 @@ describe.skipIf(!RUN)("customer report queue", () => {
     ownerId = admin.rows[0].id;
 
     await db.query(`INSERT INTO clients (id, account_id, name) VALUES ($1, $2, 'Queue Client')`, [clientId, accountId]);
+    await db.query(`INSERT INTO accounts (id, name) VALUES ($1, 'Other account')`, [otherAccountId]);
     const status: Record<string, string> = { active: "in_progress" };
     for (const [name, id] of Object.entries(jobs)) {
       await db.query(
@@ -51,20 +54,21 @@ describe.skipIf(!RUN)("customer report queue", () => {
          VALUES ($1, $2, $3, $4, $5, 'custom', $6)`,
         [id, accountId, clientId, `Queue ${name}`, status[name] ?? "invoiced", ownerId],
       );
+      const visitAccount = name === "crossAccount" ? otherAccountId : accountId;
       const v = await db.query<{ id: string }>(
         `INSERT INTO visits (account_id, job_id, scheduled_start, scheduled_end, visit_type, status, completed_at)
          VALUES ($1, $2, now(), now(), 'site_visit', 'completed', now()) RETURNING id`,
-        [accountId, id],
+        [visitAccount, id],
       );
       await db.query(
         `INSERT INTO visit_media (account_id, visit_id, category, filename, original_name, mime_type, size_bytes, created_by)
          VALUES ($1, $2, $3, 'x.jpg', 'x.jpg', 'image/jpeg', 1, $4)`,
-        [accountId, v.rows[0].id, name === "receiptsOnly" ? "receipt" : "after", ownerId],
+        [visitAccount, v.rows[0].id, name === "receiptsOnly" ? "receipt" : "after", ownerId],
       );
       await db.query(
-        `INSERT INTO invoices (account_id, client_id, job_id, invoice_number, status, total_cents, created_by)
-         VALUES ($1, $2, $3, $4, 'paid', 1000, $5)`,
-        [accountId, clientId, id, `Q-${name}-${Date.now()}`, ownerId],
+        `INSERT INTO invoices (account_id, client_id, job_id, invoice_number, status, total_cents, work_summary, created_by)
+         VALUES ($1, $2, $3, $4, 'paid', 1000, $5, $6)`,
+        [accountId, clientId, id, `Q-${name}-${Date.now()}`, `Summary for ${name}`, ownerId],
       );
     }
   });
@@ -77,6 +81,7 @@ describe.skipIf(!RUN)("customer report queue", () => {
     await db.query(`DELETE FROM visits WHERE job_id = ANY($1::uuid[])`, [ids]).catch(() => undefined);
     await db.query(`DELETE FROM jobs WHERE id = ANY($1::uuid[])`, [ids]).catch(() => undefined);
     await db.query(`DELETE FROM clients WHERE id = $1`, [clientId]).catch(() => undefined);
+    await db.query(`DELETE FROM accounts WHERE id = $1`, [otherAccountId]).catch(() => undefined);
     await db.end();
   });
 
@@ -85,6 +90,7 @@ describe.skipIf(!RUN)("customer report queue", () => {
     expect(q).toEqual(expect.arrayContaining([jobs.eligible, jobs.skipMe, jobs.draftMe]));
     expect(q).not.toContain(jobs.receiptsOnly);
     expect(q).not.toContain(jobs.active);
+    expect(q).not.toContain(jobs.crossAccount);
   });
 
   it("skip and publish take a job off; a saved draft stays", async () => {
@@ -99,8 +105,14 @@ describe.skipIf(!RUN)("customer report queue", () => {
     expect(q).not.toContain(jobs.eligible);
     expect(rows.find((r) => r.job_id === jobs.draftMe)?.has_draft).toBe(true);
 
-    // Skipping a published report is refused.
+    // Skipping a published report is refused, and the report stays published.
     expect((await post(jobs.eligible, { action: "skip" })).status).toBe(409);
+    const kept = await db.query(`SELECT status FROM portal_job_updates WHERE job_id = $1`, [jobs.eligible]);
+    expect(kept.rows[0].status).toBe("published");
+
+    // A skipped job reopened later still gets the fresh pre-fill.
+    const editor = await fetch(`${BASE_URL}/app/jobs/${jobs.skipMe}/customer-report`, { headers: { Cookie: adminCookie } });
+    expect(await editor.text()).toContain("Summary for skipMe");
   }, 60_000);
 
   it("Needs Attention counts the same jobs as the queue page", async () => {

@@ -61,14 +61,17 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
 
       if (input.action === "skip") {
         // TASK-163: take a finished job off the "reports to send" queue.
-        if (report?.status === "published") return { status: 409, error: "Already published — withdraw it instead" } as const;
-        await db.query(
+        // The published guard lives in the upsert so a concurrent publish can't be undone.
+        const skipped = await db.query(
           `INSERT INTO portal_job_updates (account_id, job_id, property_id, client_id, title, status, created_by)
            SELECT j.account_id, j.id, j.property_id, j.client_id, j.title, 'skipped', $3
            FROM jobs j WHERE j.id = $1 AND j.account_id = $2
-           ON CONFLICT (job_id) DO UPDATE SET status = 'skipped'`,
+           ON CONFLICT (job_id) DO UPDATE SET status = 'skipped'
+             WHERE portal_job_updates.status <> 'published'
+           RETURNING id`,
           [jobId, session.accountId, session.userId],
         );
+        if (!skipped.rowCount) return { status: 409, error: "Already published — withdraw it instead" } as const;
         return { status: 200, data: { status: "skipped" } } as const;
       }
 
