@@ -7,7 +7,8 @@ import { emitAttentionEvent } from "@/lib/attention";
 import { requirePortalClient } from "@/lib/portal/guard";
 import { checkRateLimit, getClientIp, SENSITIVE_RATE_LIMIT } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
-import { BUSINESS_PHONE_DISPLAY } from "@/lib/sms/consent";
+import { BUSINESS_PHONE_DISPLAY, SMS_CONSENT_TEXT } from "@/lib/sms/consent";
+import { appendAuditLog } from "@/lib/db/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,8 @@ const schema = z
     phone: z.string().max(30).optional(),
     email: z.string().email().max(255).optional(),
     preferred_contact: z.enum(["sms", "email", "phone"]).optional(),
+    /** The customer ticked the texting consent box (never pre-checked). */
+    sms_consent: z.literal(true).optional(),
   })
   .strict();
 
@@ -54,7 +57,20 @@ export async function PATCH(
     phone = normalized;
   }
 
+  // Texting is opt-in (CTIA/A2P): "text me" needs recorded consent and a phone,
+  // same rule as the booking form.
+  const grantsSmsConsent = data.sms_consent === true && !client.sms_consent;
+  if (data.preferred_contact === "sms") {
+    if (!client.sms_consent && !data.sms_consent) {
+      return NextResponse.json({ error: "Tick the box to agree to texts from us." }, { status: 400 });
+    }
+    if (!(phone ?? client.phone)) {
+      return NextResponse.json({ error: "Add a mobile number to get texts." }, { status: 400 });
+    }
+  }
+
   const changes: string[] = [];
+  if (grantsSmsConsent) changes.push("agreed to texts");
   if (phone && phone !== client.phone) changes.push(`phone ${client.phone ?? "(none)"} → ${phone}`);
   if (data.preferred_contact && data.preferred_contact !== client.preferred_contact) {
     changes.push(`prefers ${CONTACT_LABEL[data.preferred_contact]}`);
@@ -114,10 +130,31 @@ export async function PATCH(
       `UPDATE clients
        SET phone = COALESCE($2, phone),
            preferred_contact = COALESCE($3, preferred_contact),
+           sms_consent = sms_consent OR $4,
+           sms_consent_at = CASE WHEN $4 THEN now() ELSE sms_consent_at END,
+           sms_consent_source = CASE WHEN $4 THEN 'portal' ELSE sms_consent_source END,
+           sms_consent_text = CASE WHEN $4 THEN $5 ELSE sms_consent_text END,
            updated_at = now()
        WHERE id = $1`,
-      [client.id, phone ?? null, data.preferred_contact ?? null],
+      [client.id, phone ?? null, data.preferred_contact ?? null, grantsSmsConsent, SMS_CONSENT_TEXT],
     );
+    if (phone || data.preferred_contact || grantsSmsConsent) {
+      await appendAuditLog(db, {
+        account_id: client.account_id,
+        entity_type: "client",
+        entity_id: client.id,
+        action: "update",
+        actor_id: client.id, // the customer, via the portal
+        old_value: { phone: client.phone, preferred_contact: client.preferred_contact, sms_consent: client.sms_consent },
+        new_value: {
+          phone: phone ?? client.phone,
+          preferred_contact: data.preferred_contact ?? client.preferred_contact,
+          sms_consent: client.sms_consent || grantsSmsConsent,
+          source: "portal_profile",
+          ...(emailPending ? { email_change_requested: newEmail } : {}),
+        },
+      });
+    }
     await emitAttentionEvent(db, {
       accountId: client.account_id,
       type: "client.profile_updated",

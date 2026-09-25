@@ -9,6 +9,7 @@ export interface PortalClient extends Record<string, unknown> {
   email: string | null;
   phone: string | null;
   preferred_contact: string | null;
+  sms_consent: boolean;
 }
 
 /**
@@ -21,7 +22,7 @@ export async function requirePortalClient(
   opts: { write: boolean },
 ): Promise<{ client: PortalClient } | { response: NextResponse }> {
   const client = await queryOne<PortalClient>(
-    `SELECT id::text, account_id::text, name, email, phone, preferred_contact
+    `SELECT id::text, account_id::text, name, email, phone, preferred_contact, sms_consent
      FROM clients WHERE portal_token = $1`,
     [clientToken],
   );

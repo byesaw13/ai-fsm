@@ -7,6 +7,8 @@ import { useState, Suspense } from "react";
 function ConfirmInner() {
   const params = useSearchParams();
   const token = params.get("token") ?? "";
+  // kind=email: confirming a new email address (TASK-161), not signing in.
+  const isEmail = params.get("kind") === "email";
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -14,7 +16,7 @@ function ConfirmInner() {
   async function handleConfirm() {
     setLoading(true);
     try {
-      const res = await fetch("/api/v1/portal/auth/confirm", {
+      const res = await fetch(isEmail ? "/api/v1/portal/auth/verify-email" : "/api/v1/portal/auth/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
@@ -40,10 +42,12 @@ function ConfirmInner() {
 
   return (
     <div style={{ textAlign: "center" }}>
-      <div style={{ fontSize: 36, marginBottom: 16 }}>🔑</div>
-      <h2 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 8px" }}>Open your portal</h2>
+      <div style={{ fontSize: 36, marginBottom: 16 }}>{isEmail ? "✉" : "🔑"}</div>
+      <h2 style={{ fontSize: 20, fontWeight: 700, margin: "0 0 8px" }}>{isEmail ? "Confirm your new email" : "Open your portal"}</h2>
       <p style={{ color: "#6b7280", fontSize: 14, margin: "0 0 28px" }}>
-        Click below to sign in to your Dovetails account.
+        {isEmail
+          ? "Click below to make this your email for your Dovetails account."
+          : "Click below to sign in to your Dovetails account."}
       </p>
 
       {error && (
@@ -68,7 +72,7 @@ function ConfirmInner() {
           opacity: loading ? 0.65 : 1,
         }}
       >
-        {loading ? "Opening…" : "Continue to my portal"}
+        {loading ? "Opening…" : isEmail ? "Confirm my new email" : "Continue to my portal"}
       </button>
     </div>
   );

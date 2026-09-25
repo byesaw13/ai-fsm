@@ -30,8 +30,8 @@ Scope:
   directly. Email change: verify link to the new address (`pending_email` on
   `portal_magic_links`), applied on click, old address notified. Name/address:
   "call or text us". Owner notified + audit logged.
-- Lifetime spend: SUM(paid_cents + GREATEST(COALESCE(deposit_cents,0),0)) over
-  the client's non-draft, non-void invoices; total + year to date.
+- Lifetime spend: SUM(paid_cents) over the client's non-draft, non-void
+  invoices (deposit credit is not new money); total + year to date.
 - Print invoices: checkboxes + select all → one merged PDF via `lib/pdf/load.ts`.
   Predicate `id = ANY($ids) AND client_id = session client AND account_id AND
   status <> 'draft'`; reject unless all ids match. Max 10.

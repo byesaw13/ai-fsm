@@ -510,6 +510,7 @@ export default async function ClientPortalPage({
             phone={client.phone}
             email={client.email}
             preferredContact={client.preferred_contact}
+            smsConsent={client.sms_consent}
             readOnly={readOnly}
           />
           {client.sms_consent && !readOnly && (

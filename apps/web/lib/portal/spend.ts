@@ -6,16 +6,20 @@ export interface SpendInvoice {
   sent_at: string | null;
 }
 
-/** Money received on one invoice: payments + deposit credit (mig 193); drafts/voids count nothing. */
-export function receivedCents(inv: Pick<SpendInvoice, "status" | "paid_cents" | "deposit_cents">): number {
+/**
+ * Money received on one invoice. Payments only: `deposit_cents` on a final
+ * invoice is a credit for money collected on a separate deposit invoice
+ * (lib/invoices/payments.ts), which is counted there. Drafts/voids count nothing.
+ */
+export function receivedCents(inv: Pick<SpendInvoice, "status" | "paid_cents">): number {
   if (inv.status === "draft" || inv.status === "void") return 0;
-  return Number(inv.paid_cents ?? 0) + Math.max(Number(inv.deposit_cents ?? 0), 0);
+  return Number(inv.paid_cents ?? 0);
 }
 
 /**
- * Lifetime and this-year money received from a client (TASK-161). Uses the
- * same paid math as migration 193 (payments + deposit credit), skips drafts
- * and voids, and dates a payment by paid_at, falling back to sent_at.
+ * Lifetime and this-year money received from a client (TASK-161). Payments
+ * only (see receivedCents), skips drafts and voids, and dates a payment by
+ * paid_at, falling back to sent_at.
  */
 export function summarizeSpend(invoices: SpendInvoice[], now = new Date()): { allTimeCents: number; thisYearCents: number } {
   const year = now.getFullYear();

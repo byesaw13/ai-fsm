@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { BUSINESS_PHONE_DISPLAY } from "@/lib/sms/consent";
+import { BUSINESS_PHONE_DISPLAY, SMS_CONSENT_TEXT_SHORT } from "@/lib/sms/consent";
 import { formatPhoneDisplay } from "@/lib/phone";
 
 const CONTACT_LABEL: Record<string, string> = { sms: "Text", email: "Email", phone: "Phone call" };
@@ -15,6 +15,7 @@ export function YourInfo({
   phone,
   email,
   preferredContact,
+  smsConsent,
   readOnly,
 }: {
   clientToken: string;
@@ -22,6 +23,7 @@ export function YourInfo({
   phone: string | null;
   email: string | null;
   preferredContact: string | null;
+  smsConsent: boolean;
   readOnly: boolean;
 }) {
   const [editing, setEditing] = useState(false);
@@ -30,12 +32,15 @@ export function YourInfo({
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [consented, setConsented] = useState(smsConsent);
+  const [agree, setAgree] = useState(false); // never pre-checked
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError(null);
-    const body: Record<string, string> = { preferred_contact: draft.preferred_contact };
+    const body: Record<string, string | boolean> = { preferred_contact: draft.preferred_contact };
+    if (draft.preferred_contact === "sms" && !consented && agree) body.sms_consent = true;
     if (draft.phone.trim() && draft.phone.trim() !== formatPhoneDisplay(phone)) body.phone = draft.phone.trim();
     if (draft.email.trim() && draft.email.trim().toLowerCase() !== (email ?? "").toLowerCase()) body.email = draft.email.trim();
     const res = await fetch(`/api/portal/${clientToken}/profile`, {
@@ -49,7 +54,8 @@ export function YourInfo({
       setError(json?.error ?? "Could not save. Please try again.");
       return;
     }
-    setSaved({ phone: body.phone ?? saved.phone, preferredContact: draft.preferred_contact });
+    setSaved({ phone: typeof body.phone === "string" ? body.phone : saved.phone, preferredContact: draft.preferred_contact });
+    if (body.sms_consent) setConsented(true);
     setNote(json?.emailPending ? `Check ${body.email} for a link to confirm your new email.` : "Saved.");
     setEditing(false);
   }
@@ -66,6 +72,12 @@ export function YourInfo({
         <select id="yi-pref" value={draft.preferred_contact} onChange={(e) => setDraft({ ...draft, preferred_contact: e.target.value })} style={{ ...field, margin: "4px 0 12px" }}>
           {Object.entries(CONTACT_LABEL).map(([v, t]) => <option key={v} value={v}>{t}</option>)}
         </select>
+        {draft.preferred_contact === "sms" && !consented && (
+          <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13, color: "#374151", margin: "-4px 0 12px" }}>
+            <input type="checkbox" required checked={agree} onChange={(e) => setAgree(e.target.checked)} style={{ marginTop: 3 }} />
+            <span>{SMS_CONSENT_TEXT_SHORT}</span>
+          </label>
+        )}
         {error && <div role="alert" style={{ color: "#991b1b", fontSize: 14, marginBottom: 10 }}>{error}</div>}
         <div style={{ display: "flex", gap: 8 }}>
           <button type="submit" disabled={saving} style={{ flex: 1, background: "#111", color: "#fff", border: "none", borderRadius: 8, padding: "10px 14px", fontWeight: 700, cursor: "pointer" }}>{saving ? "Saving…" : "Save"}</button>

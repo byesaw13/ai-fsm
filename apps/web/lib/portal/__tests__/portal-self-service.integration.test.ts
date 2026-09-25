@@ -72,6 +72,7 @@ describe.skipIf(!RUN)("portal self-service", () => {
     if (!db) return;
     const ids = [clientId, otherClientId];
     await db.query(`DELETE FROM attention_events WHERE entity_id = ANY($1::uuid[])`, [ids]).catch(() => undefined);
+    await db.query(`DELETE FROM audit_log WHERE entity_id = ANY($1::uuid[])`, [ids]).catch(() => undefined);
     await db.query(
       `DELETE FROM attention_events WHERE entity_id IN (SELECT id FROM booking_requests WHERE client_id = ANY($1::uuid[]))`,
       [ids],
@@ -98,11 +99,22 @@ describe.skipIf(!RUN)("portal self-service", () => {
     expect((await patch({ phone: "603-555-0199" }, previewCookie)).status).toBe(403);
   }, 60_000);
 
-  it("profile: phone and preferred contact save and notify the owner", async () => {
-    const res = await patch({ phone: "(603) 555-0199", preferred_contact: "sms" });
+  it("profile: phone and preferred contact save, notify the owner, and are audit logged", async () => {
+    // "Text me" without consent is refused; ticking the consent box records it.
+    expect((await patch({ preferred_contact: "sms" })).status).toBe(400);
+    const res = await patch({ phone: "(603) 555-0199", preferred_contact: "sms", sms_consent: true });
     expect(res.status).toBe(200);
-    const row = await db.query(`SELECT phone, preferred_contact FROM clients WHERE id = $1`, [clientId]);
-    expect(row.rows[0]).toEqual({ phone: "+16035550199", preferred_contact: "sms" });
+    const row = await db.query(
+      `SELECT phone, preferred_contact, sms_consent, sms_consent_source FROM clients WHERE id = $1`,
+      [clientId],
+    );
+    expect(row.rows[0]).toEqual({ phone: "+16035550199", preferred_contact: "sms", sms_consent: true, sms_consent_source: "portal" });
+    const audit = await db.query(
+      `SELECT old_value->>'phone' AS old_phone, new_value->>'phone' AS new_phone FROM audit_log
+       WHERE entity_type = 'client' AND entity_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [clientId],
+    );
+    expect(audit.rows[0]).toEqual({ old_phone: "+16035550100", new_phone: "+16035550199" });
     const ev = await db.query(
       `SELECT summary FROM attention_events WHERE entity_id = $1 AND type = 'client.profile_updated'`,
       [clientId],
@@ -135,13 +147,29 @@ describe.skipIf(!RUN)("portal self-service", () => {
     expect(login.headers.get("location") ?? "").toContain("error=expired");
     expect(login.headers.get("set-cookie") ?? "").not.toContain("portal_session=");
 
-    const verify = await fetch(`${BASE_URL}/api/v1/portal/auth/verify-email?token=${token}`, { redirect: "manual" });
-    expect(verify.headers.get("location") ?? "").toContain("email=updated");
+    // A mail scanner opening the link (GET) changes nothing; it only reaches the confirm page.
+    const scanned = await fetch(`${BASE_URL}/api/v1/portal/auth/verify-email?token=${token}`, { redirect: "manual" });
+    expect(scanned.headers.get("location") ?? "").toContain("/portal/auth/confirm?kind=email");
+    const untouched = await db.query(`SELECT email FROM clients WHERE id = $1`, [clientId]);
+    expect(untouched.rows[0].email).toBe(`self-${clientId}@example.com`);
+
+    const confirm = () =>
+      fetch(`${BASE_URL}/api/v1/portal/auth/verify-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+        redirect: "manual",
+      });
+    expect((await confirm()).headers.get("location") ?? "").toContain("email=updated");
     const row = await db.query(`SELECT email FROM clients WHERE id = $1`, [clientId]);
     expect(row.rows[0].email).toBe(`verified-${clientId}@example.com`);
+    const audit = await db.query(
+      `SELECT count(*)::int AS n FROM audit_log WHERE entity_id = $1 AND new_value->>'email' = $2`,
+      [clientId, `verified-${clientId}@example.com`],
+    );
+    expect(audit.rows[0].n).toBe(1);
 
-    const again = await fetch(`${BASE_URL}/api/v1/portal/auth/verify-email?token=${token}`, { redirect: "manual" });
-    expect(again.headers.get("location") ?? "").toContain("error=expired");
+    expect((await confirm()).headers.get("location") ?? "").toContain("error=expired");
   }, 60_000);
 
   const request = (body: unknown, c = cookie) =>
