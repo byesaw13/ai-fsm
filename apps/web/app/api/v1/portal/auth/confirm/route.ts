@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
      WHERE ml.token = $1
        AND ml.used_at IS NULL
        AND ml.expires_at > now()
+       AND ml.pending_email IS NULL
        AND c.id = ml.client_id
      RETURNING ml.client_id::text, c.portal_token::text`,
     [token]

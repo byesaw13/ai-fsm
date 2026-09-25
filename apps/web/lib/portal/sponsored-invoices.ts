@@ -6,6 +6,7 @@ export interface SponsoredInvoiceRow {
   status: string;
   total_cents: number;
   paid_cents: number;
+  deposit_cents: number | null;
   due_date: string | null;
   sent_at: string | null;
   paid_at: string | null;
@@ -35,7 +36,7 @@ export async function loadSponsoredInvoices(
   clientId: string,
 ): Promise<SponsoredInvoiceRow[]> {
   const { rows } = await db.query(
-    `SELECT i.id, i.invoice_number, i.status, i.total_cents, i.paid_cents,
+    `SELECT i.id, i.invoice_number, i.status, i.total_cents, i.paid_cents, i.deposit_cents,
             i.due_date, i.sent_at, i.paid_at, i.share_token,
             i.sponsored_purpose, i.business_purpose, i.work_summary,
             p.name AS property_name, p.address AS property_address,

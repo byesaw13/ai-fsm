@@ -7,6 +7,10 @@ import { getPortalSession } from "@/lib/portal/session";
 import PortalLogoutButton from "./PortalLogoutButton";
 import { loadSponsoredInvoices, type SponsoredInvoiceRow } from "@/lib/portal/sponsored-invoices";
 import { SPONSORED_PURPOSE_LABELS, formatSponsoredInvoiceLabel } from "@/lib/invoices/sponsored";
+import { summarizeSpend } from "@/lib/portal/spend";
+import { InvoicePicker, type PickerGroup } from "./InvoicePicker";
+import { RequestServiceForm } from "./RequestServiceForm";
+import { YourInfo } from "./YourInfo";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +23,8 @@ interface InvoiceRow extends Record<string, unknown> {
   id: string; invoice_number: string; status: string;
   total_cents: number; paid_cents: number; due_date: string | null;
   share_token: string; property_address: string | null;
+  deposit_cents: number | null; paid_at: string | null; sent_at: string | null;
+  job_title: string | null;
 }
 interface PlanRow extends Record<string, unknown> {
   id: string; name: string; frequency: string; services: string[];
@@ -61,7 +67,8 @@ function StatusBadge({ status }: { status: string }) {
 interface ClientRow extends Record<string, unknown> {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
+  phone: string | null;
   account_id: string;
   account_name: string;
   preferred_contact: string;
@@ -77,15 +84,18 @@ interface CommRow extends Record<string, unknown> {
 
 export default async function ClientPortalPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ clientToken: string }>;
+  searchParams: Promise<{ email?: string }>;
 }) {
   const { clientToken } = await params;
+  const { email: emailResult } = await searchParams;
 
   const [portalSession, client] = await Promise.all([
     getPortalSession(),
     queryOne<ClientRow>(
-      `SELECT c.id, c.name, c.email, c.account_id, c.preferred_contact, c.sms_consent,
+      `SELECT c.id, c.name, c.email, c.phone, c.account_id, c.preferred_contact, c.sms_consent,
               a.name AS account_name
        FROM clients c
        JOIN accounts a ON a.id = c.account_id
@@ -112,9 +122,13 @@ export default async function ClientPortalPage({
     ),
     query<InvoiceRow>(
       `SELECT i.id, i.invoice_number, i.status, i.total_cents, i.paid_cents,
-              i.due_date, i.share_token, p.address AS property_address
+              i.due_date, i.share_token, i.deposit_cents, i.paid_at, i.sent_at,
+              j.title AS job_title,
+              COALESCE(p.address, jp.address) AS property_address
        FROM invoices i
+       LEFT JOIN jobs j ON j.id = i.job_id
        LEFT JOIN properties p ON p.id = i.property_id
+       LEFT JOIN properties jp ON jp.id = j.property_id
        WHERE i.client_id = $1 AND i.status != 'draft' AND i.billing_context = 'standard'
        ORDER BY i.created_at DESC`,
       [client.id]
@@ -184,6 +198,53 @@ export default async function ClientPortalPage({
     (s, i) => s + ((i.total_cents as number) - (i.paid_cents as number)),
     0
   );
+
+  const spend = summarizeSpend(billed);
+  const dueOf = (i: { status: string; total_cents: number; paid_cents: number; deposit_cents: number | null }) =>
+    ["paid", "void"].includes(i.status)
+      ? 0
+      : Math.max(i.total_cents - i.paid_cents - Math.max(i.deposit_cents ?? 0, 0), 0);
+  const dateOf = (i: { sent_at: string | null; due_date: string | null }) => {
+    const d = i.sent_at ?? i.due_date;
+    return d ? new Date(d).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "";
+  };
+  const invoiceGroups = groupBy(invoices, (i) => i.property_address ?? "No address yet").map(
+    ([heading, rows]): PickerGroup => ({
+      heading,
+      rows: rows.map((i) => ({
+        id: i.id,
+        label: `#${i.invoice_number}${i.job_title ? ` · ${i.job_title}` : ""}`,
+        sub: [dateOf(i), i.due_date && dueOf(i) > 0 ? `Due ${new Date(i.due_date).toLocaleDateString()}` : ""].filter(Boolean).join(" · "),
+        status: i.status,
+        totalCents: i.total_cents,
+        dueCents: dueOf(i),
+        shareToken: i.share_token,
+      })),
+    }),
+  );
+  const sponsoredGroups = groupBy(sponsored, (r) => {
+    const place = r.property_name || r.property_address;
+    return r.beneficiary_name ? `${place} — for ${r.beneficiary_name}` : place;
+  }).map(
+    ([heading, rows]): PickerGroup => ({
+      heading,
+      rows: rows.map((inv) => ({
+        id: inv.id,
+        label: formatSponsoredInvoiceLabel({
+          propertyAddress: inv.property_address,
+          beneficiaryName: inv.beneficiary_name,
+          workSummary: inv.work_summary,
+          invoiceNumber: inv.invoice_number,
+        }),
+        sub: `#${inv.invoice_number} · ${SPONSORED_PURPOSE_LABELS[inv.sponsored_purpose]}${inv.paid_at ? ` · Paid ${new Date(inv.paid_at).toLocaleDateString()}` : ""}`,
+        status: inv.status,
+        totalCents: inv.total_cents,
+        dueCents: dueOf(inv),
+        shareToken: inv.share_token,
+      })),
+    }),
+  );
+  const readOnly = Boolean(portalSession?.isPreview);
 
   const activeStage = derivePortalStage({
     hasOpenInvoice:      openInvoices.length > 0,
@@ -267,6 +328,24 @@ export default async function ClientPortalPage({
           <div style={{ background: "#fef3c7", border: "1px solid #fcd34d", borderRadius: 8, padding: "12px 16px", marginBottom: 24, color: "#92400e" }}>
             You have an outstanding balance of <strong>{cents(totalOwed)}</strong>.
           </div>
+        )}
+
+        {emailResult === "updated" && (
+          <div role="status" style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 8, padding: "12px 16px", marginBottom: 24, color: "#065f46" }}>
+            Your email address is updated.
+          </div>
+        )}
+        {emailResult === "conflict" && (
+          <div role="alert" style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "12px 16px", marginBottom: 24, color: "#991b1b" }}>
+            We couldn&apos;t switch to that email online. Please call or text us.
+          </div>
+        )}
+
+        {!readOnly && (
+          <RequestServiceForm
+            clientToken={clientToken}
+            properties={properties.map((p) => ({ id: p.id, address: p.address }))}
+          />
         )}
 
         {properties.length > 0 && (
@@ -356,37 +435,34 @@ export default async function ClientPortalPage({
           </section>
         )}
 
+        {billed.length > 0 && (
+          <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+            {[["Paid all time", spend.allTimeCents], ["This year", spend.thisYearCents]].map(([label, value]) => (
+              <div key={label as string} style={{ flex: 1, background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px" }}>
+                <div style={{ fontSize: 12, color: "#6b7280" }}>{label as string}</div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>{cents(value as number)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {invoices.length > 0 && (
           <section style={{ marginBottom: 32 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Invoices</h2>
-            <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
-              {invoices.map((inv, idx) => {
-                const balance = (inv.total_cents as number) - (inv.paid_cents as number);
-                return (
-                  <div key={inv.id as string} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderBottom: idx < invoices.length - 1 ? "1px solid #f3f4f6" : "none" }}>
-                    <div>
-                      <div style={{ fontWeight: 500 }}>#{inv.invoice_number as string}</div>
-                      {inv.property_address && <div style={{ fontSize: 12, color: "#9ca3af" }}>{inv.property_address as string}</div>}
-                      {inv.due_date && <div style={{ fontSize: 12, color: "#9ca3af" }}>Due {new Date(inv.due_date as string).toLocaleDateString()}</div>}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontWeight: 600 }}>{cents(inv.total_cents as number)}</div>
-                        {balance > 0 && balance < (inv.total_cents as number) && (
-                          <div style={{ fontSize: 12, color: "#6b7280" }}>{cents(balance)} due</div>
-                        )}
-                      </div>
-                      <StatusBadge status={inv.status as string} />
-                      <Link href={`/portal/invoices/${inv.share_token}`} style={{ fontSize: 13, color: "#2563eb" }}>View →</Link>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Invoices</h2>
+            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>Tick any to print or save them as one PDF.</div>
+            <InvoicePicker clientToken={clientToken} groups={invoiceGroups} />
           </section>
         )}
 
-        {sponsored.length > 0 && <SponsoredWorkSection rows={sponsored} />}
+        {sponsored.length > 0 && (
+          <section style={{ marginBottom: 32 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Sponsored Work</h2>
+            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
+              Work you paid for at other people&apos;s properties.
+            </div>
+            <InvoicePicker clientToken={clientToken} groups={sponsoredGroups} />
+          </section>
+        )}
 
         {maintenanceJobs.length > 0 && (
           <section style={{ marginBottom: 32 }}>
@@ -421,25 +497,21 @@ export default async function ClientPortalPage({
           </section>
         )}
 
-        {/* Contact Preferences */}
         <section style={{ marginBottom: 32 }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Contact Preferences</h2>
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-              <div>
-                <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 4 }}>Preferred contact method</div>
-                <div style={{ fontWeight: 500, textTransform: "capitalize" }}>{client.preferred_contact as string}</div>
-                {client.sms_consent ? (
-                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>SMS messaging is enabled.</div>
-                ) : (
-                  <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>SMS messaging is disabled.</div>
-                )}
-              </div>
-              {(client.sms_consent as boolean) && !portalSession?.isPreview && (
-                <SmsOptOutButton clientToken={clientToken} />
-              )}
+          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Your info</h2>
+          <YourInfo
+            clientToken={clientToken}
+            name={client.name}
+            phone={client.phone}
+            email={client.email}
+            preferredContact={client.preferred_contact}
+            readOnly={readOnly}
+          />
+          {client.sms_consent && !readOnly && (
+            <div style={{ marginTop: 10 }}>
+              <SmsOptOutButton clientToken={clientToken} />
             </div>
-          </div>
+          )}
         </section>
 
         {/* Message History */}
@@ -475,49 +547,8 @@ export default async function ClientPortalPage({
   );
 }
 
-function SponsoredWorkSection({ rows }: { rows: SponsoredInvoiceRow[] }) {
-  const groups = new Map<string, SponsoredInvoiceRow[]>();
-  for (const row of rows) {
-    const place = row.property_name || row.property_address;
-    const key = row.beneficiary_name ? `${place} — for ${row.beneficiary_name}` : place;
-    groups.set(key, [...(groups.get(key) ?? []), row]);
-  }
-  return (
-    <section style={{ marginBottom: 32 }}>
-      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Sponsored Work</h2>
-      <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
-        Work you paid for at other people&apos;s properties.
-      </div>
-      {[...groups].map(([heading, group]) => (
-        <div key={heading} style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>{heading}</div>
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
-            {group.map((inv, idx) => (
-              <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: idx < group.length - 1 ? "1px solid #f3f4f6" : "none" }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 500 }}>
-                    {formatSponsoredInvoiceLabel({
-                      propertyAddress: inv.property_address,
-                      beneficiaryName: inv.beneficiary_name,
-                      workSummary: inv.work_summary,
-                      invoiceNumber: inv.invoice_number,
-                    })}
-                  </div>
-                  <div style={{ fontSize: 12, color: "#9ca3af" }}>
-                    #{inv.invoice_number} · {SPONSORED_PURPOSE_LABELS[inv.sponsored_purpose]}
-                    {inv.paid_at ? ` · Paid ${new Date(inv.paid_at).toLocaleDateString()}` : ""}
-                  </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-                  <div style={{ fontWeight: 600 }}>{cents(inv.total_cents)}</div>
-                  <StatusBadge status={inv.status} />
-                  <Link href={`/portal/invoices/${inv.share_token}`} style={{ fontSize: 13, color: "#2563eb" }}>View →</Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </section>
-  );
+function groupBy<T>(rows: T[], key: (row: T) => string): [string, T[]][] {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) groups.set(key(row), [...(groups.get(key(row)) ?? []), row]);
+  return [...groups];
 }

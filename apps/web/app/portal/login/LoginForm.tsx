@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function LoginForm() {
+export default function LoginForm({ textEnabled = false }: { textEnabled?: boolean }) {
   const params = useSearchParams();
   const errorParam = params.get("error");
 
+  const [mode, setMode] = useState<"phone" | "email">(textEnabled ? "phone" : "email");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [submitError, setSubmitError] = useState(false);
@@ -15,10 +17,10 @@ export default function LoginForm() {
   if (sent) {
     return (
       <div style={{ textAlign: "center", padding: "24px 0" }}>
-        <div style={{ fontSize: 40, marginBottom: 16 }}>✉</div>
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>Check your email</h2>
+        <div style={{ fontSize: 40, marginBottom: 16 }}>{mode === "phone" ? "💬" : "✉"}</div>
+        <h2 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 8px" }}>{mode === "phone" ? "Check your texts" : "Check your email"}</h2>
         <p style={{ color: "#6b7280", fontSize: 14, margin: 0, lineHeight: 1.6 }}>
-          If that email is registered, you&apos;ll receive a login link shortly.
+          If that {mode === "phone" ? "number" : "email"} is on file with us, you&apos;ll receive a sign-in link shortly.
           <br />
           It expires in 1 hour and can only be used once.
         </p>
@@ -26,7 +28,7 @@ export default function LoginForm() {
           onClick={() => setSent(false)}
           style={{ marginTop: 20, background: "none", border: "none", color: "#2563eb", fontSize: 14, cursor: "pointer", padding: 0 }}
         >
-          Use a different email
+          Try again
         </button>
       </div>
     );
@@ -40,7 +42,7 @@ export default function LoginForm() {
       const res = await fetch("/api/v1/portal/request-access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify(mode === "phone" ? { phone } : { email }),
       });
       if (res.ok) {
         setSent(true);
@@ -73,19 +75,45 @@ export default function LoginForm() {
         </div>
       )}
 
+      {textEnabled && (
+        <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+          {(["phone", "email"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              aria-pressed={mode === m}
+              style={{
+                flex: 1,
+                padding: "8px 10px",
+                borderRadius: 6,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+                border: "1px solid #d1d5db",
+                background: mode === m ? "#111" : "#fff",
+                color: mode === m ? "#fff" : "#374151",
+              }}
+            >
+              {m === "phone" ? "Text me" : "Email me"}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div style={{ marginBottom: 16 }}>
-        <label htmlFor="portal-email" style={{ display: "block", fontSize: 14, fontWeight: 500, marginBottom: 6, color: "#374151" }}>
-          Email address
+        <label htmlFor="portal-contact" style={{ display: "block", fontSize: 14, fontWeight: 500, marginBottom: 6, color: "#374151" }}>
+          {mode === "phone" ? "Mobile number" : "Email address"}
         </label>
         <input
-          id="portal-email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          id="portal-contact"
+          type={mode === "phone" ? "tel" : "email"}
+          value={mode === "phone" ? phone : email}
+          onChange={(e) => (mode === "phone" ? setPhone(e.target.value) : setEmail(e.target.value))}
           required
           autoFocus
-          autoComplete="email"
-          placeholder="you@example.com"
+          autoComplete={mode === "phone" ? "tel" : "email"}
+          placeholder={mode === "phone" ? "(603) 555-0142" : "you@example.com"}
           style={{
             width: "100%",
             padding: "10px 12px",
@@ -115,7 +143,7 @@ export default function LoginForm() {
           transition: "opacity .15s",
         }}
       >
-        {loading ? "Sending…" : "Send login link"}
+        {loading ? "Sending…" : mode === "phone" ? "Text me a sign-in link" : "Email me a sign-in link"}
       </button>
     </form>
   );

@@ -129,6 +129,7 @@ export async function loadInvoicePdf(
   client: PoolClient,
   accountId: string,
   id: string,
+  opts: { photos?: boolean } = {},
 ): Promise<LoadedPdf | null> {
   // Same location joins/select as the HTML print page so service address matches.
   const { rows, rowCount } = await client.query(
@@ -165,11 +166,11 @@ export async function loadInvoicePdf(
     inv.account_settings,
     accountId
   );
-  const photoRecap = await loadJobPhotoRecap(
-    client,
-    accountId,
-    (inv.job_id as string | null) ?? null,
-  );
+  // Combined customer prints skip photos: one recap can be ~10 MB.
+  const photoRecap =
+    opts.photos === false
+      ? []
+      : await loadJobPhotoRecap(client, accountId, (inv.job_id as string | null) ?? null);
 
   const serviceLocation = resolveServiceLocation({
     property_address: inv.property_address as string | null,

@@ -23,3 +23,10 @@ export function normalizePhone(raw: string | null | undefined): string | null {
 
   return null;
 }
+
+/** "+16035550142" → "(603) 555-0142"; anything non-US is returned as stored. */
+export function formatPhoneDisplay(phone: string | null | undefined): string {
+  if (!phone) return "";
+  const m = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(normalizePhone(phone) ?? "");
+  return m ? `(${m[1]}) ${m[2]}-${m[3]}` : phone;
+}

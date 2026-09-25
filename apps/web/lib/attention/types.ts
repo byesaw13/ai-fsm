@@ -8,6 +8,7 @@ export const ATTENTION_EVENT_TYPES = [
   "invoice.opened",
   "invoice.paid",
   "invoice.partial",
+  "client.profile_updated",
 ] as const;
 
 export type AttentionEventType = (typeof ATTENTION_EVENT_TYPES)[number];
@@ -16,6 +17,7 @@ export const ATTENTION_ENTITY_TYPES = [
   "booking_request",
   "estimate",
   "invoice",
+  "client",
 ] as const;
 
 export type AttentionEntityType = (typeof ATTENTION_ENTITY_TYPES)[number];

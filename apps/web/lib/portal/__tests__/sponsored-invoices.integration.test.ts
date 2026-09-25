@@ -84,7 +84,7 @@ describe.skipIf(!RUN)("payer-only sponsored invoice portal projection", () => {
       business_purpose: "Listing prep",
     });
     expect(Object.keys(rows[0]).sort()).toEqual([
-      "beneficiary_name", "business_purpose", "due_date", "id", "invoice_number",
+      "beneficiary_name", "business_purpose", "deposit_cents", "due_date", "id", "invoice_number",
       "paid_at", "paid_cents", "property_address", "property_name", "sent_at",
       "share_token", "sponsored_purpose", "status", "total_cents", "work_summary",
     ]);

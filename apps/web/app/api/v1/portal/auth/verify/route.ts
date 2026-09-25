@@ -15,7 +15,8 @@ export async function GET(request: NextRequest) {
   // Validate without consuming
   const row = await queryOne<{ id: string }>(
     `SELECT id FROM portal_magic_links
-     WHERE token = $1 AND used_at IS NULL AND expires_at > now()`,
+     WHERE token = $1 AND used_at IS NULL AND expires_at > now()
+       AND pending_email IS NULL`,
     [token]
   );
 

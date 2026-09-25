@@ -1,7 +1,7 @@
 # TASK-161: Portal self-service — request service, edit info, lifetime spend, print invoices
 
 Status:
-Proposed
+In progress
 
 Phase:
 2
@@ -43,3 +43,15 @@ Acceptance Criteria:
 - [ ] Email only changes after the new address is verified.
 - [ ] Lifetime spend matches invoice paid math (deposits included).
 - [ ] Combined PDF rejects any id not owned by the session client.
+
+Implementation notes (2026-09-24):
+- Text sign-in shows only when `SMS_GATEWAY_URL/USERNAME/PASSWORD` are set on
+  the web service (not set in production yet). Login lookups are limited to
+  `BOOKING_ACCOUNT_ID` so the historical-import account never matches.
+- Sign-in texts go to anyone who asked, except those who opted out
+  (`CLIENT_CAN_RECEIVE_REQUESTED_SMS_SQL`). Portal opt-outs now record
+  `sms_consent_source = 'portal_opt_out'`.
+- Migration 197 adds `portal_magic_links.pending_email`. Login verify/confirm
+  ignore those rows.
+- Combined PDFs skip the photo recap (one recap can be ~10 MB).
+- The Sponsored Work list uses the same picker, so realtors can print too.
