@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Customer Home Record Mockup</title>
+<style>
+:root{--bg:#eef0f3;--card:#fff;--ink:#1f2937;--mute:#6b7280;--line:#e5e7eb;--brand:#1d4ed8;--ok:#047857;--warn:#b45309;--warnbg:#fffbeb}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111827;--card:#1f2937;--ink:#f3f4f6;--mute:#9ca3af;--line:#374151;--brand:#60a5fa;--ok:#34d399;--warn:#fbbf24;--warnbg:#3b2f14}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;padding:24px 16px}
+h1{font-size:20px;margin:0 0 4px}.sub{color:var(--mute);margin:0 0 24px;max-width:820px}
+.row{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+.col{flex:1 1 340px;max-width:380px}.label{font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);margin:0 0 8px}
+.phone{background:var(--card);border:1px solid var(--line);border-radius:28px;padding:18px 16px 24px;box-shadow:0 8px 30px rgba(0,0,0,.08)}
+.sms{background:var(--bg);border-radius:16px;padding:10px 12px;font-size:14px;margin-bottom:14px}
+.biz{font-weight:700;font-size:13px;color:var(--mute)}h2{font-size:19px;margin:4px 0}h3{font-size:15px;margin:18px 0 8px}
+.meta{color:var(--mute);font-size:13px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:12px 0 4px}
+.ph{aspect-ratio:4/3;border-radius:10px;position:relative;background:linear-gradient(135deg,#9ca3af,#6b7280)}
+.ph.after{background:linear-gradient(135deg,#86efac,#16a34a)}.ph span{position:absolute;left:6px;bottom:6px;background:rgba(0,0,0,.6);color:#fff;font-size:11px;padding:2px 6px;border-radius:6px}
+.thumbs{display:flex;gap:6px}.thumbs .ph{flex:1;aspect-ratio:1}
+ul{margin:6px 0;padding-left:18px}.keep{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:6px}
+.keep div{display:flex;justify-content:space-between;gap:8px;padding:4px 0;font-size:14px}.keep b{font-weight:600}
+.btn{display:block;width:100%;text-align:center;padding:12px;border-radius:12px;font-weight:700;border:0;font-size:15px;margin-top:10px;cursor:pointer}
+.primary{background:var(--brand);color:#fff}.ghost{background:transparent;color:var(--brand);border:1px solid var(--line)}
+.banner{background:var(--warnbg);color:var(--warn);border-radius:12px;padding:10px 12px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.card{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:8px}
+.line{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.line:first-child{border-top:0}.pill{font-size:12px;padding:2px 8px;border-radius:999px;background:#d1fae5;color:#065f46}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--mute);margin:6px 6px 0 0}.bar{height:8px;border-radius:4px;background:var(--brand);opacity:.75}
+.pill.due{background:#fef3c7;color:#92400e}.stat{display:flex;gap:10px}.stat div{flex:1;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.stat b{display:block;font-size:17px}.notes{max-width:820px;margin-top:28px}.notes li{margin:4px 0}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.chip{font-size:13px;padding:6px 10px;border-radius:999px;border:1px solid var(--line)}.chip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.grp{font-weight:700;font-size:14px;display:flex;justify-content:space-between;margin-top:12px}.link{color:var(--brand);font-weight:600;font-size:13px}
+fieldset{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px}legend{font-size:13px;color:var(--mute);padding:0 4px}.fld{border:1px solid var(--line);border-radius:8px;padding:8px;font-size:14px;color:var(--mute);margin-top:6px}
+input[type=checkbox]{width:18px;height:18px}
+</style></head><body>
+<h1>Customer Home Record: mockup</h1>
+<p class="sub">Sample data only. <b>1:</b> what a customer gets by text when a job is done (no login). <b>2:</b> portal home for a homeowner with two addresses. <b>3:</b> portal for a realtor who pays for work at their clients' homes. Tell me what feels right, what's missing, and what you'd cut.</p>
+<div class="row">
+<div class="col"><p class="label">1 · Job Report (from a text)</p><div class="phone">
+ <div class="sms">Dovetails: Your hall &amp; stair repaint is done. Photos and details: app.mydovetails.com/r/…</div>
+ <div class="biz">DOVETAILS SERVICES · JOB REPORT</div>
+ <h2>Hall &amp; stairway repaint</h2>
+ <div class="meta">12 Maple St · Finished Sep 18, 2026</div>
+ <span class="tag">Interior paint</span><span class="tag">Improvement</span>
+ <div class="pair"><div class="ph"><span>Before</span></div><div class="ph after"><span>After</span></div></div>
+ <div class="thumbs"><div class="ph after"></div><div class="ph after"></div><div class="ph after"></div><div class="ph after"><span>+4</span></div></div>
+ <h3>What we did</h3>
+ <p style="margin:0">Patched and sanded the cracked plaster along the stairway, primed the repairs, and put two coats on the walls and trim.</p>
+ <ul><li>Plaster crack repair: stairway wall</li><li>Walls: 2 coats</li><li>Trim &amp; balusters: 2 coats</li></ul>
+ <h3>Keep for your records</h3>
+ <div class="keep"><div><span>Walls: hall + stairs</span><b>BM White Dove OC-17, eggshell</b></div><div><span>Trim</span><b>BM White Dove, semi-gloss</b></div></div>
+ <button class="btn primary">See everything for 12 Maple St</button>
+ <button class="btn ghost">Questions? Text us</button>
+</div></div>
+
+<div class="col"><p class="label">2 · Portal home</p><div class="phone">
+ <div class="biz">DOVETAILS SERVICES</div><h2>Hi, Margaret</h2>
+ <div class="banner" style="margin-top:10px"><span>You owe $480.00</span><span>Pay →</span></div>
+ <div class="chips"><span class="chip">All addresses</span><span class="chip on">12 Maple St</span><span class="chip">40 Lake Rd (camp)</span></div>
+ <button class="btn primary">Request service at 12 Maple St</button>
+ <h3>Latest</h3>
+ <div class="card"><div style="display:flex;gap:10px"><div class="ph after" style="width:72px;aspect-ratio:1"></div><div><b>Hall &amp; stairway repaint</b><div class="meta">Sep 18 · 8 photos</div></div></div></div>
+ <h3>What's next</h3>
+ <div class="card"><div class="line"><span><b>Estimate: deck boards + railing</b><br><span class="meta">12 Maple St · $3,240</span></span><span class="pill due">Needs OK</span></div>
+ <div class="line"><span><b>Visit Oct 2</b><br><span class="meta">Gutter cleaning</span></span><span class="pill">Booked</span></div></div>
+ <h3>12 Maple St · Home record</h3>
+ <div class="card">
+  <div class="line"><span>Doors &amp; carpentry</span><span style="flex:1;margin:0 10px"><div class="bar" style="width:100%"></div></span><b>$3,190</b></div>
+  <div class="line"><span>Interior paint</span><span style="flex:1;margin:0 10px"><div class="bar" style="width:72%"></div></span><b>$2,310</b></div>
+  <div class="line"><span>Plumbing</span><span style="flex:1;margin:0 10px"><div class="bar" style="width:44%"></div></span><b>$1,415</b></div>
+  <div class="meta" style="margin-top:6px">Improvements $4,980 · Repairs $1,560 · Maintenance $375</div>
+ </div>
+ <div class="card"><div class="line"><span>Hall &amp; stairway repaint<br><span class="meta">Interior paint · Improvement</span></span><span class="meta">Sep 2026</span></div><div class="line"><span>Storm door replaced<br><span class="meta">Doors · Improvement</span></span><span class="meta">Jun 2026</span></div><div class="line"><span>Bathroom caulk + fan<br><span class="meta">Plumbing · Repair</span></span><span class="meta">Mar 2026</span></div></div>
+ <button class="btn ghost">Download home record (PDF)</button>
+ <h3>Keep for your records</h3>
+ <div class="card"><div class="line"><span>Hall walls</span><b style="font-size:13px">BM White Dove, eggshell</b></div><div class="line"><span>Storm door</span><b style="font-size:13px">Larson 146, white</b></div><div class="line"><span>Bath fan</span><b style="font-size:13px">Panasonic FV-0511VQ1</b></div></div>
+ <h3>Invoices</h3>
+ <div class="stat"><div><span class="meta">Paid all time</span><b>$6,915</b></div><div><span class="meta">This year</span><b>$2,310</b></div></div>
+ <div class="grp"><span>12 Maple St · 3 invoices</span><span class="link">Select all</span></div>
+ <div class="card"><div class="line"><label><input type="checkbox" checked> INV-0031 · Sep · Hall repaint</label><span class="pill due">$480 due</span></div><div class="line"><label><input type="checkbox" checked> INV-0027 · Jun · Storm door</label><span class="pill">Paid</span></div><div class="line"><label><input type="checkbox"> INV-0019 · Mar · Bath fan</label><span class="pill">Paid</span></div><div class="meta" style="margin-top:6px">Paid here: $5,245</div></div>
+ <div class="grp"><span>40 Lake Rd (camp) · 2 invoices</span><span class="link">Select all</span></div>
+ <div class="card"><div class="line"><label><input type="checkbox"> INV-0024 · May · Dock boards</label><span class="pill">Paid</span></div><div class="line"><label><input type="checkbox"> INV-0012 · Oct 2025 · Winterize</label><span class="pill">Paid</span></div><div class="meta" style="margin-top:6px">Paid here: $1,670</div></div>
+ <button class="btn ghost">Print 2 selected</button>
+ <h3>Your info</h3>
+ <div class="card"><div class="line"><span>Phone</span><span>(603) 555-0142 · Edit</span></div><div class="line"><span>Email</span><span>Add email</span></div><div class="line"><span>Best way to reach you</span><span>Text · Edit</span></div></div>
+</div></div>
+<div class="col"><p class="label">3 · Realtor portal</p><div class="phone">
+ <div class="biz">DOVETAILS SERVICES</div><h2>Hi, Dana</h2>
+ <div class="banner" style="margin-top:10px"><span>You owe $1,150 (1 invoice)</span><span>Pay →</span></div>
+ <button class="btn primary">Request work for a client's home</button>
+ <h3>Work you paid for</h3>
+ <div class="stat"><div><span class="meta">Paid all time</span><b>$4,730</b></div><div><span class="meta">This year</span><b>$3,580</b></div></div>
+ <div class="grp"><span>18 Birch Ln · listing prep</span><span class="link">Select all</span></div>
+ <div class="card"><div class="line"><label><input type="checkbox" checked> INV-0040 · Sep · Deck stain touch-up</label><span class="pill">Paid</span></div><div class="line"><label><input type="checkbox" checked> INV-0038 · Aug · Drywall + paint</label><span class="pill due">$1,150 due</span></div><div class="meta" style="margin-top:6px">Paid here: $820 · $1,150 due · <span class="link">Job reports (2)</span> · <span class="link">Home record PDF</span></div></div>
+ <div class="grp"><span>7 Elm Ct · for the Nguyens</span><span class="link">Select all</span></div>
+ <div class="card"><div class="line"><label><input type="checkbox"> INV-0033 · Jul · Door + trim repair</label><span class="pill">Paid</span></div><div class="meta" style="margin-top:6px">Paid here: $640 · <span class="link">Job report</span></div></div>
+ <div class="grp"><span>3 more addresses</span><span class="link">Show</span></div>
+ <button class="btn ghost">Print 2 selected</button>
+ <h3>Request work for a client's home</h3>
+ <fieldset><legend>New request</legend>
+  <div class="fld">Address: 22 Pine Hill Rd, Merrimack</div>
+  <div class="fld">What needs doing: touch-up paint, 2 closet doors off track</div>
+  <div class="fld">Access: lockbox 4471, vacant</div>
+  <div style="margin-top:8px;font-size:14px"><b>Who pays?</b><br><label><input type="radio" checked> Bill me (Dana)</label> &nbsp; <label><input type="radio"> Bill the homeowner</label></div>
+  <div class="fld">Homeowner name (optional)</div>
+  <button class="btn primary">Send request</button>
+ </fieldset>
+ <p class="meta" style="margin-top:10px">Dana sees only the address and the work she paid for, never the homeowner's other records.</p>
+</div></div>
+</div>
+<div class="notes"><b>Why it's laid out this way</b>
+<ul>
+<li>Most customers will only ever see screen 1, because it arrives by text with no login. Two out of three of your customers have no email on file, so today they can't log in at all. The redesign adds sign-in by text.</li>
+<li>"Keep for your records" lists only what you tick at closeout (paint, fixtures), never joint compound or dump fees.</li>
+<li>The home record is like Bodie, but it fills itself: each job you publish adds an entry with an area and "improvement / repair / maintenance", and the PDF is what a seller hands a buyer or insurer.</li>
+<li>Several addresses: switch between them at the top. Invoices are grouped by address, each with its own total and "Select all" for printing.</li>
+<li>Realtors: "Work you paid for" is grouped by client address, with a per-address total, job reports and a home-record PDF. "Request work" lets them say "bill me".</li>
+<li>Portal order is: what you owe → ask for work → newest job → what's coming → history → records → invoices.</li>
+</ul></div>
+</body></html>

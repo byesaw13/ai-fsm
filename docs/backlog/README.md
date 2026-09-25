@@ -145,6 +145,12 @@ closed in tests; owner-flow AC still open.
 | TASK-158 | [Realtor-sponsored property work](TASK-158-realtor-sponsored-properties.md) | 003 | Proposed |
 | TASK-159 | [Sponsored work for any realtor in one form](TASK-159-sponsored-work-any-realtor.md) | 003 | In progress |
 | TASK-160 | [Admin portal preview is read-only](TASK-160-portal-preview-read-only.md) | 003 | In progress |
+| TASK-161 | [Portal self-service — request service, edit info, lifetime spend, print invoices](TASK-161-portal-self-service.md) | 003 | Proposed |
+| TASK-162 | [Job Reports — publish finished work to the customer](TASK-162-job-reports.md) | 003 | Proposed |
+| TASK-163 | [Past-jobs publish queue + unpublished reminder](TASK-163-job-report-backlog-queue.md) | 003 | Proposed |
+| TASK-164 | [Portal answers what we did, what's in your home, what's next](TASK-164-portal-three-questions.md) | 003 | Proposed |
+| TASK-165 | [Home Record report (one-page house history)](TASK-165-home-record-report.md) | 003 | Proposed |
+| TASK-166 | [Realtor portal — work you paid for, by address, and "bill me" requests](TASK-166-realtor-portal.md) | 003 | Proposed |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
 | TASK-003 | Wrong Vehicle Correction | 001 | Done |

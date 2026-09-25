@@ -10,6 +10,12 @@ stable. Recorded so the ideas are not lost — not a commitment to build.
 - [TASK-158: Realtor-sponsored property work](TASK-158-realtor-sponsored-properties.md) — Proposed
 - [TASK-159: Sponsored work for any realtor in one form](TASK-159-sponsored-work-any-realtor.md) — In progress
 - [TASK-160: Admin portal preview is read-only](TASK-160-portal-preview-read-only.md) — In progress
+- [TASK-161: Portal self-service — request service, edit info, lifetime spend, print invoices](TASK-161-portal-self-service.md) — Proposed
+- [TASK-162: Job Reports — publish finished work to the customer](TASK-162-job-reports.md) — Proposed
+- [TASK-163: Past-jobs publish queue + unpublished reminder](TASK-163-job-report-backlog-queue.md) — Proposed
+- [TASK-164: Portal answers what we did, what's in your home, what's next](TASK-164-portal-three-questions.md) — Proposed
+- [TASK-165: Home Record report (one-page house history)](TASK-165-home-record-report.md) — Proposed
+- [TASK-166: Realtor portal — work you paid for, by address, and "bill me" requests](TASK-166-realtor-portal.md) — Proposed
 
 # TASK-011: Property Opportunities
 

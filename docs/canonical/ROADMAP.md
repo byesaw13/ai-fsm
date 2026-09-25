@@ -84,6 +84,12 @@ Location capture, visit candidates, day map, hybrid tracking are **shipped infra
   client remains the payer. A sponsoring realtor sees only invoices billed to
   them and the minimum property identity needed to recognize that work; the
   relationship alone never exposes the property's vault or other customer data.
+- **Phase 2 exception — Customer Home Record (TASK-161–166).** Authorized 2026-09-24.
+  Adds one table (`portal_job_updates`) so a finished job becomes an owner-published,
+  no-login Job Report, and the portal leads with what we did / what's in your home /
+  what's next. Portal self-service (request service, edit contact info, lifetime spend,
+  multi-invoice print) and the one-page Home Record report use existing tables; the realtor "bill me" request adds one boolean to `booking_requests`. Does not reopen memberships or the manual
+  vault. Design: `docs/designs/customer-home-record-job-reports.md`.
 
 ### Phase 3 — Estimate & Billing Closure
 
