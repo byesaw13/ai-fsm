@@ -165,6 +165,50 @@ describe.skipIf(!RUN)("job reports", () => {
     expect((await fetch(`${BASE_URL}/portal/reports/${tokenOf(newUrl)}`)).status).toBe(200);
   }, 60_000);
 
+  it("the portal lists reports newest work first", async () => {
+    // An older job at an address that sorts ahead of "12 Maple St" descending.
+    const oldJob = randomUUID();
+    const oldProp = randomUUID();
+    await db.query(`INSERT INTO properties (id, account_id, client_id, name, address) VALUES ($1, $2, $3, 'Z Rd', '9 Zebra Rd')`, [oldProp, accountId, clientId]);
+    await db.query(
+      `INSERT INTO jobs (id, account_id, client_id, property_id, title, status, job_type, created_by)
+       VALUES ($1, $2, $3, $4, 'Older gutter job', 'completed', 'custom', $5)`,
+      [oldJob, accountId, clientId, oldProp, ownerId],
+    );
+    await db.query(
+      `INSERT INTO visits (account_id, job_id, scheduled_start, scheduled_end, visit_type, status, completed_at)
+       VALUES ($1, $2, now() - interval '1 year', now() - interval '1 year', 'site_visit', 'completed', now() - interval '1 year')`,
+      [accountId, oldJob],
+    );
+    await db.query(
+      `INSERT INTO invoices (account_id, client_id, job_id, property_id, invoice_number, status, total_cents, created_by)
+       VALUES ($1, $2, $3, $4, $5, 'paid', 1000, $6)`,
+      [accountId, clientId, oldJob, oldProp, `JRO-${Date.now()}`, ownerId],
+    );
+    try {
+      expect((await post(oldJob, { action: "publish", ...content([]), title: "Older gutter job" })).status).toBe(200);
+      const s = await db.query<{ token: string; portal_token: string }>(
+        `INSERT INTO portal_sessions (client_id, expires_at) VALUES ($1, now() + interval '1 hour')
+         RETURNING token::text, (SELECT portal_token::text FROM clients WHERE id = $1)`,
+        [clientId],
+      );
+      const html = await (await fetch(`${BASE_URL}/portal/${s.rows[0].portal_token}`, {
+        headers: { Cookie: `portal_session=${s.rows[0].token}` },
+      })).text();
+      const recent = html.indexOf("Hall &amp; stairway repaint");
+      const older = html.indexOf("Older gutter job");
+      expect(recent).toBeGreaterThan(-1);
+      expect(older).toBeGreaterThan(recent);
+    } finally {
+      await db.query(`DELETE FROM portal_sessions WHERE client_id = $1`, [clientId]);
+      await db.query(`DELETE FROM portal_job_updates WHERE job_id = $1`, [oldJob]);
+      await db.query(`DELETE FROM invoices WHERE job_id = $1`, [oldJob]);
+      await db.query(`DELETE FROM visits WHERE job_id = $1`, [oldJob]);
+      await db.query(`DELETE FROM jobs WHERE id = $1`, [oldJob]);
+      await db.query(`DELETE FROM properties WHERE id = $1`, [oldProp]);
+    }
+  }, 60_000);
+
   it("a realtor-paid job goes to the realtor without records items", async () => {
     const res = await post(sponsoredJobId, { action: "publish", ...content([media.sponsoredAfter]) });
     expect(res.status).toBe(200);

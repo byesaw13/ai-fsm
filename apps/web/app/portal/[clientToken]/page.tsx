@@ -204,7 +204,7 @@ export default async function ClientPortalPage({
        FROM portal_job_updates r
        LEFT JOIN properties p ON p.id = r.property_id
        WHERE r.client_id = $1 AND r.account_id = $2 AND r.status = 'published' AND NOT r.sponsored
-       ORDER BY 3 DESC
+       ORDER BY published_at DESC
        LIMIT 50`,
       [client.id, client.account_id]
     ),

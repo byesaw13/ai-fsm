@@ -51,3 +51,17 @@ CREATE POLICY portal_job_updates_update ON portal_job_updates
   WITH CHECK (account_id = app_account_id() AND app_role() IN ('owner','admin'));
 CREATE POLICY portal_job_updates_delete ON portal_job_updates
   FOR DELETE USING (account_id = app_account_id() AND app_role() IN ('owner','admin'));
+
+-- Pre-context lookup for the public report page (no session yet): only
+-- resolves a PUBLISHED report's share token to its account so the caller can
+-- set app.current_account_id before reading anything under RLS.
+CREATE OR REPLACE FUNCTION portal_job_report_account(report_token uuid)
+RETURNS uuid
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+  SELECT r.account_id FROM public.portal_job_updates r
+  WHERE r.share_token = report_token AND r.status = 'published';
+$$;
+REVOKE ALL ON FUNCTION portal_job_report_account(uuid) FROM PUBLIC;
+-- scripts/db-provision-runtime.sh grants EXECUTE only to the web login role.

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { query, queryOne } from "@/lib/db";
+import { withPublishedReport } from "@/lib/job-reports/public";
 import { getSession } from "@/lib/auth/session";
 import { isPortalPreview } from "@/lib/portal/session";
 import { REPORT_AREAS, REPORT_WORK_TYPES, type ReportRecord } from "@/lib/job-reports/logic";
@@ -35,23 +35,33 @@ export default async function JobReportPage({ params }: { params: Promise<{ toke
   const { token } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(token)) notFound();
 
-  const report = await queryOne<ReportView>(
-    `SELECT r.id::text, r.account_id::text, r.client_id::text, r.title, r.summary, r.area, r.work_type,
-            r.media_ids::text[] AS media_ids, r.records, r.published_at, p.address, a.name AS business,
-            (SELECT max(v.completed_at) FROM visits v WHERE v.job_id = r.job_id)::text AS finished_at
-     FROM portal_job_updates r
-     JOIN accounts a ON a.id = r.account_id
-     LEFT JOIN properties p ON p.id = r.property_id
-     WHERE r.share_token = $1 AND r.status = 'published'`,
-    [token],
-  );
-  if (!report) notFound();
+  // Staff/preview checks use their own connections — resolve them first.
+  const [staff, loaded] = await Promise.all([
+    getSession(),
+    withPublishedReport(token, async (db, accountId) => {
+      const { rows } = await db.query<ReportView>(
+        `SELECT r.id::text, r.account_id::text, r.client_id::text, r.title, r.summary, r.area, r.work_type,
+                r.media_ids::text[] AS media_ids, r.records, r.published_at, p.address, a.name AS business,
+                (SELECT max(v.completed_at) FROM visits v WHERE v.job_id = r.job_id)::text AS finished_at
+         FROM portal_job_updates r
+         JOIN accounts a ON a.id = r.account_id
+         LEFT JOIN properties p ON p.id = r.property_id
+         WHERE r.share_token = $1 AND r.status = 'published' AND r.account_id = $2`,
+        [token, accountId],
+      );
+      const report = rows[0];
+      if (!report) return null;
+      const photos = await db.query<{ id: string; category: string }>(
+        `SELECT id::text, category FROM visit_media
+         WHERE id = ANY($1::uuid[]) AND account_id = $2 AND category <> 'receipt'`,
+        [report.media_ids, accountId],
+      );
+      return { report, photos: photos.rows };
+    }),
+  ]);
+  if (!loaded) notFound();
+  const { report, photos } = loaded;
 
-  const photos = await query<{ id: string; category: string }>(
-    `SELECT id::text, category FROM visit_media
-     WHERE id = ANY($1::uuid[]) AND account_id = $2 AND category <> 'receipt'`,
-    [report.media_ids, report.account_id],
-  );
   // Keep the owner's chosen order; lead with a before/after pair when both exist.
   const byId = new Map(photos.map((p) => [p.id, p]));
   const ordered = report.media_ids.map((id) => byId.get(id)).filter((p): p is { id: string; category: string } => !!p);
@@ -61,13 +71,15 @@ export default async function JobReportPage({ params }: { params: Promise<{ toke
   const rest = ordered.filter((p) => !pair?.includes(p));
   const src = (id: string) => `/api/portal/reports/${token}/media/${id}`;
 
-  const [staff, preview] = await Promise.all([getSession(), isPortalPreview(report.client_id)]);
+  const preview = await isPortalPreview(report.client_id);
   if (!preview && staff?.accountId !== report.account_id) {
-    await query(
-      `UPDATE portal_job_updates
-       SET view_count = view_count + 1, first_viewed_at = COALESCE(first_viewed_at, now())
-       WHERE id = $1`,
-      [report.id],
+    await withPublishedReport(token, (db, accountId) =>
+      db.query(
+        `UPDATE portal_job_updates
+         SET view_count = view_count + 1, first_viewed_at = COALESCE(first_viewed_at, now())
+         WHERE id = $1 AND account_id = $2`,
+        [report.id, accountId],
+      ),
     );
   }
 

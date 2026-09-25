@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
-import { queryOne } from "@/lib/db";
+import { withPublishedReport } from "@/lib/job-reports/public";
 import { visitMediaPath } from "@/lib/pdf/photo-recap";
 import { REPORT_PHOTO_CATEGORIES } from "@/lib/job-reports/load";
 
@@ -20,14 +20,18 @@ export async function GET(
   const { token, mediaId } = await params;
   if (!UUID.test(token) || !UUID.test(mediaId)) return notFound();
 
-  const media = await queryOne<{ visit_id: string; filename: string; mime_type: string }>(
-    `SELECT vm.visit_id::text, vm.filename, vm.mime_type
-     FROM portal_job_updates r
-     JOIN visit_media vm ON vm.id = $2 AND vm.id = ANY(r.media_ids) AND vm.account_id = r.account_id
-     JOIN visits v ON v.id = vm.visit_id AND v.job_id = r.job_id
-     WHERE r.share_token = $1 AND r.status = 'published' AND vm.category = ANY($3::text[])`,
-    [token, mediaId, [...REPORT_PHOTO_CATEGORIES]],
-  );
+  const media = await withPublishedReport(token, async (db, accountId) => {
+    const { rows } = await db.query<{ visit_id: string; filename: string; mime_type: string }>(
+      `SELECT vm.visit_id::text, vm.filename, vm.mime_type
+       FROM portal_job_updates r
+       JOIN visit_media vm ON vm.id = $2 AND vm.id = ANY(r.media_ids) AND vm.account_id = r.account_id
+       JOIN visits v ON v.id = vm.visit_id AND v.job_id = r.job_id
+       WHERE r.share_token = $1 AND r.status = 'published' AND r.account_id = $4
+         AND vm.category = ANY($3::text[])`,
+      [token, mediaId, [...REPORT_PHOTO_CATEGORIES], accountId],
+    );
+    return rows[0] ?? null;
+  });
   if (!media) return notFound();
 
   try {
