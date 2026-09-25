@@ -9,6 +9,7 @@ export interface PickerRow {
   sub: string;
   status: string;
   totalCents: number;
+  paidCents: number;
   dueCents: number;
   shareToken: string;
 }
@@ -47,7 +48,7 @@ export function InvoicePicker({ clientToken, groups }: { clientToken: string; gr
       {groups.map((g) => {
         const ids = g.rows.map((r) => r.id);
         const allOn = ids.every((id) => picked.has(id));
-        const paid = g.rows.reduce((s, r) => s + (r.totalCents - r.dueCents), 0);
+        const paid = g.rows.reduce((s, r) => s + r.paidCents, 0);
         const due = g.rows.reduce((s, r) => s + r.dueCents, 0);
         return (
           <div key={g.heading} style={{ marginBottom: 16 }}>
@@ -58,7 +59,7 @@ export function InvoicePicker({ clientToken, groups }: { clientToken: string; gr
               <button
                 type="button"
                 onClick={() => toggle(ids, !allOn)}
-                style={{ background: "none", border: "none", color: "#2563eb", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}
+                style={{ background: "none", border: "none", color: "#2563eb", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0, whiteSpace: "nowrap" }}
               >
                 {allOn ? "Clear" : "Select all"}
               </button>
@@ -74,7 +75,7 @@ export function InvoicePicker({ clientToken, groups }: { clientToken: string; gr
                     className="portal-check"
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 500 }}>{r.label}</div>
+                    <div style={{ fontWeight: 500, overflowWrap: "anywhere" }}>{r.label}</div>
                     <div style={{ fontSize: 12, color: "#9ca3af" }}>{r.sub}</div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>

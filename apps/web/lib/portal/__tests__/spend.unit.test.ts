@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { summarizeSpend } from "../spend";
+import { receivedCents, summarizeSpend } from "../spend";
 
 const inv = (o: Partial<Parameters<typeof summarizeSpend>[0][number]>) => ({
   status: "paid", paid_cents: 0, deposit_cents: 0, paid_at: null, sent_at: null, ...o,
@@ -30,5 +30,12 @@ describe("summarizeSpend", () => {
       now,
     );
     expect(r).toEqual({ allTimeCents: 100, thisYearCents: 100 });
+  });
+});
+
+describe("receivedCents", () => {
+  it("counts nothing on a void invoice (per-address totals)", () => {
+    expect(receivedCents({ status: "void", paid_cents: 279782, deposit_cents: 0 })).toBe(0);
+    expect(receivedCents({ status: "partial", paid_cents: 406050, deposit_cents: null })).toBe(406050);
   });
 });

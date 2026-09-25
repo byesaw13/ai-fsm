@@ -6,8 +6,8 @@ import { SmsOptOutButton } from "./SmsOptOutButton";
 import { getPortalSession } from "@/lib/portal/session";
 import PortalLogoutButton from "./PortalLogoutButton";
 import { loadSponsoredInvoices, type SponsoredInvoiceRow } from "@/lib/portal/sponsored-invoices";
-import { SPONSORED_PURPOSE_LABELS, formatSponsoredInvoiceLabel } from "@/lib/invoices/sponsored";
-import { summarizeSpend } from "@/lib/portal/spend";
+import { SPONSORED_PURPOSE_LABELS } from "@/lib/invoices/sponsored";
+import { receivedCents, summarizeSpend } from "@/lib/portal/spend";
 import { InvoicePicker, type PickerGroup } from "./InvoicePicker";
 import { RequestServiceForm } from "./RequestServiceForm";
 import { YourInfo } from "./YourInfo";
@@ -123,7 +123,14 @@ export default async function ClientPortalPage({
     query<InvoiceRow>(
       `SELECT i.id, i.invoice_number, i.status, i.total_cents, i.paid_cents,
               i.due_date, i.share_token, i.deposit_cents, i.paid_at, i.sent_at,
-              j.title AS job_title,
+              -- What the work was: summary's first line, else job title, else first line item.
+              COALESCE(
+                NULLIF(btrim(split_part(i.work_summary, E'\n', 1)), ''),
+                j.title,
+                (SELECT li.description FROM invoice_line_items li
+                 WHERE li.invoice_id = i.id AND li.visible_to_customer
+                 ORDER BY li.sort_order, li.created_at LIMIT 1)
+              ) AS job_title,
               COALESCE(p.address, jp.address) AS property_address
        FROM invoices i
        LEFT JOIN jobs j ON j.id = i.job_id
@@ -213,10 +220,11 @@ export default async function ClientPortalPage({
       heading,
       rows: rows.map((i) => ({
         id: i.id,
-        label: `#${i.invoice_number}${i.job_title ? ` · ${i.job_title}` : ""}`,
-        sub: [dateOf(i), i.due_date && dueOf(i) > 0 ? `Due ${new Date(i.due_date).toLocaleDateString()}` : ""].filter(Boolean).join(" · "),
+        label: i.job_title ?? `Invoice #${i.invoice_number}`,
+        sub: [`#${i.invoice_number}`, dateOf(i), i.due_date && dueOf(i) > 0 ? `Due ${new Date(i.due_date).toLocaleDateString()}` : ""].filter(Boolean).join(" · "),
         status: i.status,
         totalCents: i.total_cents,
+        paidCents: receivedCents(i),
         dueCents: dueOf(i),
         shareToken: i.share_token,
       })),
@@ -230,15 +238,12 @@ export default async function ClientPortalPage({
       heading,
       rows: rows.map((inv) => ({
         id: inv.id,
-        label: formatSponsoredInvoiceLabel({
-          propertyAddress: inv.property_address,
-          beneficiaryName: inv.beneficiary_name,
-          workSummary: inv.work_summary,
-          invoiceNumber: inv.invoice_number,
-        }),
+        // The address is already the group heading; the row says what the work was.
+        label: inv.work_summary?.split("\n")[0]?.trim() || `Invoice #${inv.invoice_number}`,
         sub: `#${inv.invoice_number} · ${SPONSORED_PURPOSE_LABELS[inv.sponsored_purpose]}${inv.paid_at ? ` · Paid ${new Date(inv.paid_at).toLocaleDateString()}` : ""}`,
         status: inv.status,
         totalCents: inv.total_cents,
+        paidCents: receivedCents(inv),
         dueCents: dueOf(inv),
         shareToken: inv.share_token,
       })),
