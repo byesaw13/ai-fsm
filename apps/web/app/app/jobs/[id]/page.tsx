@@ -1057,7 +1057,14 @@ export default async function JobDetailPage({
         </section>
 
         <section id="job-photos" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", scrollMarginTop: 16 }}>
-          <h2 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 800 }}>Photos</h2>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-2)" }}>
+            <h2 style={{ margin: 0, fontSize: "var(--text-lg)", fontWeight: 800 }}>Photos</h2>
+            {!isTech && (
+              <Link href={`/app/jobs/${job.id}/customer-report` as Route} className="p7-btn p7-btn-sm" data-testid="customer-report-link">
+                Customer report →
+              </Link>
+            )}
+          </div>
           {jobPhotos.length === 0 ? (
             <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
               No photos on this job yet. Capture them from a visit.

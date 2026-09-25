@@ -110,7 +110,7 @@ export default async function ClientPortalPage({
     redirect(`/portal/login`);
   }
 
-  const [estimates, invoices, plans, maintenanceJobs, activeVisitRows, recentComms, properties, sponsored] = await Promise.all([
+  const [estimates, invoices, plans, maintenanceJobs, activeVisitRows, recentComms, properties, sponsored, reports] = await Promise.all([
     query<EstimateRow>(
       `SELECT e.id, e.status, e.total_cents, e.sent_at, e.expires_at,
               e.share_token, p.address AS property_address
@@ -196,6 +196,18 @@ export default async function ClientPortalPage({
       [client.id, client.account_id]
     ),
     loadSponsoredInvoices(getPool(), client.id),
+    // TASK-162: published Job Reports to this client (sponsored ones stay out of their own history).
+    query<{ title: string; share_token: string; published_at: string; address: string | null; photo_count: number }>(
+      `SELECT r.title, r.share_token::text, p.address,
+              COALESCE((SELECT max(v.completed_at) FROM visits v WHERE v.job_id = r.job_id), r.published_at)::text AS published_at,
+              cardinality(r.media_ids)::int AS photo_count
+       FROM portal_job_updates r
+       LEFT JOIN properties p ON p.id = r.property_id
+       WHERE r.client_id = $1 AND r.account_id = $2 AND r.status = 'published' AND NOT r.sponsored
+       ORDER BY 3 DESC
+       LIMIT 50`,
+      [client.id, client.account_id]
+    ),
   ]);
 
   // Sponsored rows count toward what this payer owes, but never add properties.
@@ -344,6 +356,29 @@ export default async function ClientPortalPage({
           <div role="alert" style={{ background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "12px 16px", marginBottom: 24, color: "#991b1b" }}>
             We couldn&apos;t switch to that email online. Please call or text us.
           </div>
+        )}
+
+        {reports.length > 0 && (
+          <section style={{ marginBottom: 24 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>What we did</h2>
+            <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+              {reports.map((r, idx) => (
+                <Link
+                  key={r.share_token}
+                  href={`/portal/reports/${r.share_token}`}
+                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: idx < reports.length - 1 ? "1px solid #f3f4f6" : "none", color: "inherit", textDecoration: "none" }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600 }}>{r.title}</div>
+                    <div style={{ fontSize: 12, color: "#6b7280" }}>
+                      {[r.address, new Date(r.published_at).toLocaleDateString("en-US", { month: "short", year: "numeric" }), r.photo_count ? `${r.photo_count} photo${r.photo_count === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ")}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 13, color: "#2563eb", flexShrink: 0 }}>Open →</span>
+                </Link>
+              ))}
+            </div>
+          </section>
         )}
 
         {!readOnly && (
