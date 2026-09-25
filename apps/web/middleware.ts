@@ -20,8 +20,11 @@ export function middleware(request: NextRequest) {
   // Prevent MIME-type sniffing
   response.headers.set("X-Content-Type-Options", "nosniff");
 
-  // Referrer policy — send origin only on cross-origin
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  // Referrer policy — send origin only on cross-origin. Job report share
+  // links (TASK-162) are bearer URLs: never leak them, never index them.
+  const shareReport = request.nextUrl.pathname.startsWith("/portal/reports/");
+  response.headers.set("Referrer-Policy", shareReport ? "no-referrer" : "strict-origin-when-cross-origin");
+  if (shareReport) response.headers.set("X-Robots-Tag", "noindex, nofollow");
 
   // Permissions policy — disable unused browser features. Capture (TASK-115)
   // needs the microphone on this origin; keep it off everywhere else.

@@ -49,6 +49,8 @@ WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND c.relrowsecurity \gex
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO :"runtime_role";
 SELECT format('GRANT EXECUTE ON FUNCTION public.app_login_candidates(text) TO %I', :'runtime_role')
 WHERE :'runtime_role' = 'ai_fsm_web' \gexec
+SELECT format('GRANT EXECUTE ON FUNCTION public.portal_job_report_account(uuid) TO %I', :'runtime_role')
+WHERE :'runtime_role' = 'ai_fsm_web' \gexec
 COMMIT;
 SQL
 echo "Provisioned restricted ${RUNTIME_DB_ROLE}; runtime connection settings were not changed."

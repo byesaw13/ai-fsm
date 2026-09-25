@@ -134,7 +134,7 @@ Codex cold read:
 ### 1. Publish at closeout (owner side)
 - `portal_job_updates` table:
   - id, account_id, job_id (unique), property_id, client_id, share_token (uuid).
-  - summary text, area text, work_type text (improvement | repair | maintenance), media_ids uuid[], installed_line_ids uuid[].
+  - summary text, area text, work_type text (improvement | repair | maintenance), media_ids uuid[], records jsonb (copied text; replaces installed_line_ids), sponsored boolean.
   - status: draft | published | withdrawn.
   - published_at, first_viewed_at, view_count.
   - RLS policy and coverage guard, like every account table.
