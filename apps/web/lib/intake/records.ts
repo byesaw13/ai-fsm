@@ -29,6 +29,10 @@ export type IntakeRecordInput = {
   referralSource?: "online" | "friend_neighbor" | "realtor" | "repeat" | "other" | null;
   referralName?: string | null;
   intakeMetadata?: Record<string, string> | null;
+  /** Signed-in portal client: skip matching/creating, and never touch their consent. */
+  existingClientId?: string | null;
+  /** Must already belong to existingClientId (caller verifies). */
+  existingPropertyId?: string | null;
 };
 
 export type IntakeRecordResult = {
@@ -108,6 +112,7 @@ async function findOrCreateClient(
   client: PoolClient,
   input: IntakeRecordInput
 ): Promise<string> {
+  if (input.existingClientId) return input.existingClientId;
   let clientId: string | null = null;
   // Normalize to E.164 so the same person always maps to one record.
   const normalizedPhone = normalizePhone(input.phone) ?? input.phone ?? null;
@@ -176,6 +181,7 @@ async function findOrCreateProperty(
   input: IntakeRecordInput,
   clientId: string
 ): Promise<string> {
+  if (input.existingPropertyId) return input.existingPropertyId;
   const { rows: existingRows } = await client.query<{ id: string }>(
     `SELECT id FROM properties WHERE client_id = $1 AND address = $2`,
     [clientId, input.address]

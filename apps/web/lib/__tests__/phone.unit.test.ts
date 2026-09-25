@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizePhone } from "../phone";
+import { formatPhoneDisplay, normalizePhone } from "../phone";
 
 describe("normalizePhone", () => {
   it("normalizes a 10-digit US number", () => {
@@ -32,5 +32,14 @@ describe("normalizePhone", () => {
     expect(normalizePhone(null)).toBeNull();
     expect(normalizePhone(undefined)).toBeNull();
     expect(normalizePhone("abc")).toBeNull();
+  });
+});
+
+describe("formatPhoneDisplay", () => {
+  it("formats US numbers and leaves others alone", () => {
+    expect(formatPhoneDisplay("+16035550142")).toBe("(603) 555-0142");
+    expect(formatPhoneDisplay("603.555.0142")).toBe("(603) 555-0142");
+    expect(formatPhoneDisplay("+447700900123")).toBe("+447700900123");
+    expect(formatPhoneDisplay(null)).toBe("");
   });
 });

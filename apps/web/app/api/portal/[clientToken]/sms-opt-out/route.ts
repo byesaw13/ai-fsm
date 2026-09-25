@@ -31,7 +31,7 @@ export async function POST(
       return NextResponse.json({ error: "Already opted out" }, { status: 409 });
     }
     await client.query(
-      `UPDATE clients SET sms_consent = false, sms_consent_at = NOW(), preferred_contact = 'email' WHERE id = $1`,
+      `UPDATE clients SET sms_consent = false, sms_consent_at = NOW(), sms_consent_source = 'portal_opt_out', preferred_contact = 'email' WHERE id = $1`,
       [row.id]
     );
     await client.query(`SELECT set_config('app.current_account_id', $1, true)`, [row.account_id]);

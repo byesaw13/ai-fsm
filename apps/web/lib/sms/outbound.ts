@@ -2,6 +2,18 @@ import { query, queryOne } from "@/lib/db";
 import { logCommunication } from "@/lib/communications-log";
 import { normalizePhone } from "@/lib/phone";
 
+/**
+ * SQL predicate (clients aliased `c`): true when the client may receive a text
+ * they asked for (e.g. a portal sign-in link). False once they texted STOP or
+ * opted out in the portal — the only ways sms_consent goes false after being set.
+ */
+export const CLIENT_CAN_RECEIVE_REQUESTED_SMS_SQL = `NOT (
+  NOT COALESCE(c.sms_consent, false) AND (
+    COALESCE(c.sms_consent_source IN ('sms_stop', 'portal_opt_out'), false)
+    OR c.sms_consent_at IS NOT NULL
+  )
+)`;
+
 export type OutboundSmsOutcome = "sent" | "delivered" | "failed";
 
 /**
