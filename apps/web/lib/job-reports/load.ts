@@ -9,7 +9,7 @@ export interface ReportPhoto {
 
 export interface ReportRow {
   id: string;
-  status: "draft" | "published" | "withdrawn";
+  status: "draft" | "published" | "withdrawn" | "skipped";
   share_token: string;
   title: string;
   summary: string;

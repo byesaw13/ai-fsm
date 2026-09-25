@@ -25,6 +25,7 @@ const body = z.discriminatedUnion("action", [
   content.extend({ action: z.literal("save") }),
   content.extend({ action: z.literal("publish") }),
   z.object({ action: z.literal("withdraw") }),
+  z.object({ action: z.literal("skip") }),
   z.object({ action: z.literal("send"), channel: z.enum(["email", "sms"]) }),
 ]);
 
@@ -32,7 +33,7 @@ const reportUrl = (token: string) => `${appUrl()}/portal/reports/${token}`;
 
 /**
  * POST /api/v1/jobs/[id]/customer-report — TASK-162.
- * save | publish | withdraw | send. Owner/admin only. Nothing reaches the
+ * save | publish | withdraw | skip | send. Owner/admin only. Nothing reaches the
  * customer until publish; withdraw rotates the share token.
  */
 export const POST = withRole(["owner", "admin"], async (request: NextRequest, session: AuthSession) => {
@@ -56,6 +57,19 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
           [report.id],
         );
         return { status: 200, data: { status: "withdrawn" } } as const;
+      }
+
+      if (input.action === "skip") {
+        // TASK-163: take a finished job off the "reports to send" queue.
+        if (report?.status === "published") return { status: 409, error: "Already published — withdraw it instead" } as const;
+        await db.query(
+          `INSERT INTO portal_job_updates (account_id, job_id, property_id, client_id, title, status, created_by)
+           SELECT j.account_id, j.id, j.property_id, j.client_id, j.title, 'skipped', $3
+           FROM jobs j WHERE j.id = $1 AND j.account_id = $2
+           ON CONFLICT (job_id) DO UPDATE SET status = 'skipped'`,
+          [jobId, session.accountId, session.userId],
+        );
+        return { status: 200, data: { status: "skipped" } } as const;
       }
 
       if (input.action === "send") {

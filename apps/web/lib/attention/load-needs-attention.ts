@@ -9,7 +9,8 @@ import {
   type OpenOwnerPromiseRow,
 } from "@/lib/captures/promise-queue";
 import { loadCloseoutLeftovers } from "@/lib/attention/closeout-leftovers";
-import { HOLD_SEND_BILL_LABEL } from "@/lib/attention/surfaces";
+import { HOLD_SEND_BILL_LABEL, CUSTOMER_REPORTS_LABEL } from "@/lib/attention/surfaces";
+import { REPORT_QUEUE_PARAMS, REPORT_QUEUE_WHERE } from "@/lib/job-reports/queue";
 
 export type NeedsAttentionItem = {
   label: string;
@@ -52,6 +53,7 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
     exceptionRows,
     openPromiseRows,
     leftovers,
+    reportQueue,
   ] = await Promise.all([
     queryForSession<CountRow>(
       session,
@@ -161,6 +163,12 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
       [accountId, OWNER_PROMISE_ACTION_TYPE],
     ),
     loadCloseoutLeftovers(session),
+    // TASK-163: same predicate as the queue page, so the count always matches.
+    queryForSession<CountRow>(
+      session,
+      `SELECT COUNT(*)::text AS count FROM jobs j WHERE ${REPORT_QUEUE_WHERE}`,
+      REPORT_QUEUE_PARAMS(accountId),
+    ),
   ]);
 
   const draftInvoiceCount = parseN(draftInvoices[0]);
@@ -271,6 +279,13 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
         href: "/app/jobs" as Route,
         detail: `${exceptionJobCount} job${exceptionJobCount !== 1 ? "s" : ""} / ${exceptionVisitCount} visit${exceptionVisitCount !== 1 ? "s" : ""}`,
         tone: "warning",
+      },
+      {
+        label: CUSTOMER_REPORTS_LABEL,
+        count: parseN(reportQueue[0]),
+        href: "/app/jobs/customer-reports" as Route,
+        detail: "Finished jobs with photos the customer hasn't seen",
+        tone: "default",
       },
       customerPromiseBucket(toPromiseToneInput(openPromiseRows)),
     ] satisfies NeedsAttentionItem[]

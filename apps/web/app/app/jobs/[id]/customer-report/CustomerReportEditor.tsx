@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { REPORT_AREAS, REPORT_WORK_TYPES, type ReportRecord } from "@/lib/job-reports/logic";
 import type { ReportPhoto } from "@/lib/job-reports/load";
@@ -29,7 +30,7 @@ export function CustomerReportEditor(props: {
   photos: ReportPhoto[];
   materialLines: string[];
   initial: Draft;
-  status: "draft" | "published" | "withdrawn" | null;
+  status: "draft" | "published" | "withdrawn" | "skipped" | null;
   url: string | null;
   views: number;
 }) {
@@ -104,6 +105,12 @@ export function CustomerReportEditor(props: {
             </button>
           </div>
         </div>
+      )}
+      <div style={{ marginBottom: 12, fontSize: 14 }}>
+        <Link href="/app/jobs/customer-reports">← All reports to send</Link>
+      </div>
+      {props.status === "skipped" && (
+        <div style={{ color: "var(--fg-muted)", marginBottom: 12 }}>Skipped — not in the reports-to-send list. You can still publish it.</div>
       )}
       {props.status === "withdrawn" && (
         <div style={{ color: "var(--fg-muted)", marginBottom: 12 }}>Withdrawn — the old link no longer works. Publish again for a new link.</div>
