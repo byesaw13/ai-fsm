@@ -3,6 +3,9 @@ export type AttentionSurface = "today" | "desk";
 /** Unsent Hold — louder than any other Today leftover. */
 export const HOLD_SEND_BILL_LABEL = "Hold — send the bill";
 
+/** TASK-163: finished jobs whose customer report hasn't gone out. */
+export const CUSTOMER_REPORTS_LABEL = "Customer reports to send";
+
 /** Field leftovers — the phone, after the van. */
 export const ATTENTION_TODAY_LABELS = [
   HOLD_SEND_BILL_LABEL,
@@ -22,6 +25,7 @@ export const ATTENTION_DESK_LABELS = [
   "Review requests",
   "Clear exception lanes",
   "Customer Promises",
+  CUSTOMER_REPORTS_LABEL,
 ] as const;
 
 const TODAY = new Set<string>(ATTENTION_TODAY_LABELS);
