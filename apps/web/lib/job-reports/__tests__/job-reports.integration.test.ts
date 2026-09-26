@@ -137,12 +137,29 @@ describe.skipIf(!RUN)("job reports", () => {
     expect(html).toContain("BM White Dove, eggshell");
   }, 60_000);
 
-  it("counts customer views, not staff views", async () => {
-    await fetch(`${BASE_URL}/portal/reports/${tokenOf(url)}`, { headers: { Cookie: adminCookie } });
-    const before = await db.query<{ view_count: number }>(`SELECT view_count FROM portal_job_updates WHERE job_id = $1`, [jobId]);
-    await fetch(`${BASE_URL}/portal/reports/${tokenOf(url)}`);
-    const after = await db.query<{ view_count: number }>(`SELECT view_count FROM portal_job_updates WHERE job_id = $1`, [jobId]);
-    expect(after.rows[0].view_count).toBe(before.rows[0].view_count + 1);
+  it("counts real browser opens only — not previews, bots, staff, or reloads", async () => {
+    const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+    const views = async () =>
+      (await db.query<{ view_count: number }>(`SELECT view_count FROM portal_job_updates WHERE job_id = $1`, [jobId])).rows[0].view_count;
+    const beacon = (headers: Record<string, string>) =>
+      fetch(`${BASE_URL}/api/portal/reports/${tokenOf(url)}/viewed`, { method: "POST", headers });
+    const start = await views();
+
+    // A link preview / mail scanner fetches the page but never runs its script.
+    await fetch(`${BASE_URL}/portal/reports/${tokenOf(url)}`, { headers: { "User-Agent": "facebookexternalhit/1.1" } });
+    await fetch(`${BASE_URL}/portal/reports/${tokenOf(url)}`, { headers: { "User-Agent": IPHONE } });
+    expect(await views()).toBe(start);
+
+    // Bots and staff are ignored even if they post the beacon.
+    expect((await beacon({ "User-Agent": "Slackbot-LinkExpanding 1.0", "x-forwarded-for": `bot-${randomUUID()}` })).status).toBe(204);
+    await beacon({ "User-Agent": IPHONE, Cookie: adminCookie, "x-forwarded-for": `staff-${randomUUID()}` });
+    expect(await views()).toBe(start);
+
+    // A real phone counts once; reloading from the same device doesn't count again.
+    const phone = { "User-Agent": IPHONE, "x-forwarded-for": `phone-${randomUUID()}` };
+    await beacon(phone);
+    await beacon(phone);
+    expect(await views()).toBe(start + 1);
   }, 60_000);
 
   it("serves only the chosen photos", async () => {

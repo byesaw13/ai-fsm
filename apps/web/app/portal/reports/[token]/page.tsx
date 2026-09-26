@@ -2,8 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { withPublishedReport } from "@/lib/job-reports/public";
-import { getSession } from "@/lib/auth/session";
-import { isPortalPreview } from "@/lib/portal/session";
+import { ReportViewBeacon } from "./ReportViewBeacon";
 import { REPORT_AREAS, REPORT_WORK_TYPES, type ReportRecord } from "@/lib/job-reports/logic";
 import { BUSINESS_PHONE_DISPLAY, BUSINESS_PHONE_E164 } from "@/lib/sms/consent";
 
@@ -36,9 +35,7 @@ export default async function JobReportPage({ params }: { params: Promise<{ toke
   if (!/^[0-9a-f-]{36}$/i.test(token)) notFound();
 
   // Staff/preview checks use their own connections — resolve them first.
-  const [staff, loaded] = await Promise.all([
-    getSession(),
-    withPublishedReport(token, async (db, accountId) => {
+  const loaded = await withPublishedReport(token, async (db, accountId) => {
       const { rows } = await db.query<ReportView>(
         `SELECT r.id::text, r.account_id::text, r.client_id::text, r.title, r.summary, r.area, r.work_type,
                 r.media_ids::text[] AS media_ids, r.records, r.published_at, p.address, a.name AS business,
@@ -57,8 +54,7 @@ export default async function JobReportPage({ params }: { params: Promise<{ toke
         [report.media_ids, accountId],
       );
       return { report, photos: photos.rows };
-    }),
-  ]);
+  });
   if (!loaded) notFound();
   const { report, photos } = loaded;
 
@@ -71,18 +67,7 @@ export default async function JobReportPage({ params }: { params: Promise<{ toke
   const rest = ordered.filter((p) => !pair?.includes(p));
   const src = (id: string) => `/api/portal/reports/${token}/media/${id}`;
 
-  const preview = await isPortalPreview(report.client_id);
-  if (!preview && staff?.accountId !== report.account_id) {
-    await withPublishedReport(token, (db, accountId) =>
-      db.query(
-        `UPDATE portal_job_updates
-         SET view_count = view_count + 1, first_viewed_at = COALESCE(first_viewed_at, now())
-         WHERE id = $1 AND account_id = $2`,
-        [report.id, accountId],
-      ),
-    );
-  }
-
+  // Opens are counted by <ReportViewBeacon> from a real browser, not on render.
   const when = new Date(report.finished_at ?? report.published_at).toLocaleDateString("en-US", {
     month: "short", day: "numeric", year: "numeric",
   });
@@ -93,6 +78,7 @@ export default async function JobReportPage({ params }: { params: Promise<{ toke
 
   return (
     <main style={{ minHeight: "100vh", background: "#f9fafb", padding: "24px 16px" }}>
+      <ReportViewBeacon token={token} />
       <div style={{ maxWidth: 640, margin: "0 auto", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 16, padding: 20 }}>
         <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#6b7280" }}>
           {report.business} · Job report
