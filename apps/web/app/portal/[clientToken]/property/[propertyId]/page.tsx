@@ -1,6 +1,7 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { queryOne, query } from "@/lib/db";
+import { getPortalSession } from "@/lib/portal/session";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,11 @@ export default async function PortalPropertyPage({
   );
   if (!client) notFound();
 
+  // The portal token alone never grants access: the browser must hold a portal
+  // session for this same client (same rule as the portal home page).
+  const session = await getPortalSession();
+  if (!session || session.clientId !== client.id) redirect("/portal/login");
+
   // Validate property belongs to this client
   const property = await queryOne<{
     id: string; name: string | null; address: string;
@@ -52,7 +58,7 @@ export default async function PortalPropertyPage({
   );
   if (!property) notFound();
 
-  const [conditions, issues, vaultItems, recentVisits, pinnedNotes] = await Promise.all([
+  const [conditions, issues, vaultItems, recentVisits] = await Promise.all([
     query<{ area: string; condition: string; note: string | null; assessed_at: string }>(
       `SELECT DISTINCT ON (area) area, condition, note, assessed_at::text AS assessed_at
        FROM property_condition_snapshots
@@ -87,16 +93,10 @@ export default async function PortalPropertyPage({
               metadata->>'status'     AS detail
        FROM property_timeline_v
        WHERE account_id = $1 AND property_id = $2
-         AND event_type IN ('visit','note','vault_item')
+         -- Staff notes never reach customers ('note' events carry their text).
+         AND event_type IN ('visit','vault_item')
        ORDER BY occurred_at DESC NULLS LAST
        LIMIT 15`,
-      [client.account_id, propertyId]
-    ),
-    query<{ body: string; source: string; created_at: string }>(
-      `SELECT body, source, created_at::text AS created_at
-       FROM property_notes
-       WHERE account_id = $1 AND property_id = $2 AND pinned = true
-       ORDER BY created_at DESC`,
       [client.account_id, propertyId]
     ),
   ]);
@@ -119,20 +119,6 @@ export default async function PortalPropertyPage({
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: "4px 0 2px" }}>{title}</h1>
           <div style={{ fontSize: 14, color: "#6b7280" }}>{addr}</div>
         </div>
-
-        {/* Pinned notes */}
-        {pinnedNotes.length > 0 && (
-          <section style={{ marginBottom: 28 }}>
-            {pinnedNotes.map((note, i) => (
-              <div key={i} style={{ background: "#fefce8", border: "1px solid #fde68a", borderRadius: 8, padding: 14, marginBottom: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#92400e", marginBottom: 4, textTransform: "uppercase" }}>
-                  {note.source === "technician" ? "Technician Note" : "Note"}
-                </div>
-                <div style={{ fontSize: 14, color: "#374151", whiteSpace: "pre-wrap" }}>{note.body}</div>
-              </div>
-            ))}
-          </section>
-        )}
 
         {/* Conditions */}
         {conditions.length > 0 && (
