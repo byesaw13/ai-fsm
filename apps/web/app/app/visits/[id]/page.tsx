@@ -30,6 +30,7 @@ import { VisitTransitionForm } from "./VisitTransitionForm";
 import { VisitNotesForm } from "./VisitNotesForm";
 import { VisitChecklistForm } from "./VisitChecklistForm";
 import { MaterialsUsedForm } from "./MaterialsUsedForm";
+import { NeedMaterialForm } from "./NeedMaterialForm";
 import { VisitIssuePanel } from "./VisitIssuePanel";
 import { ConditionsDifferPanel } from "./ConditionsDifferPanel";
 import { VisitResolutionPanel } from "./VisitResolutionPanel";
@@ -942,6 +943,17 @@ export default async function VisitDetailPage({
             <Card id="visit-notes" data-testid="visit-notes-panel">
               <SectionHeader title="Tech Notes" />
               <VisitNotesForm visitId={visit.id} initialNotes={visit.tech_notes ?? ""} />
+            </Card>
+          )}
+
+          {!isRepairFlow && currentStatus !== "cancelled" && (
+            <Card id="need-material" data-testid="need-material-panel">
+              <SectionHeader title="Need Material" />
+              <NeedMaterialForm
+                visitId={visit.id}
+                initialValue={(visit as Visit & { materials_needed?: string | null }).materials_needed ?? null}
+                canUpdate={canNotes}
+              />
             </Card>
           )}
 

@@ -28,6 +28,7 @@ export async function loadJobTasks(
 ): Promise<JobTaskRow[]> {
   const { rows } = await client.query<JobTaskRow>(
     `SELECT t.id, t.work_order_id, t.label, t.required, t.completed, t.status, t.note, t.sort_order,
+            t.completion_outcome,
             wo.title AS work_order_title, wo.status AS work_order_status
        FROM work_order_tasks t
        JOIN work_orders wo ON wo.id = t.work_order_id AND wo.account_id = t.account_id

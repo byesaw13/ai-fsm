@@ -28,6 +28,7 @@ const ownerUpdateBody = z.object({
   scheduled_end: z.string().datetime().optional(),
   tech_notes: z.string().nullable().optional(),
   materials_used: z.string().nullable().optional(),
+  materials_needed: z.string().nullable().optional(),
   issue_description: z.string().nullable().optional(),
   membership_visit_phase: membershipVisitPhaseSchema.optional(),
   included_labor_minutes_used: z.number().int().nonnegative().optional(),
@@ -39,6 +40,7 @@ const ownerUpdateBody = z.object({
 const techUpdateBody = z.object({
   tech_notes: z.string().nullable().optional(),
   materials_used: z.string().nullable().optional(),
+  materials_needed: z.string().nullable().optional(),
   issue_description: z.string().nullable().optional(),
   membership_visit_phase: membershipVisitPhaseSchema.optional(),
   included_labor_minutes_used: z.number().int().nonnegative().optional(),

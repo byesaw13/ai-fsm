@@ -36,6 +36,10 @@ export function rowToPricingSettings(
     full_day_rate_cents: Math.round(
       num(row.full_day_rate_cents, DEFAULT_PRICING_SETTINGS.full_day_rate_cents)
     ),
+    material_handling_pct: Math.round(
+      num(row.material_handling_pct, DEFAULT_PRICING_SETTINGS.material_handling_pct)
+    ),
+    card_fee_pct: num(row.card_fee_pct, DEFAULT_PRICING_SETTINGS.card_fee_pct),
   };
 }
 

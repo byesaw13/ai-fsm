@@ -24,6 +24,8 @@ import { laborHoursFromCostCents } from "@/lib/pricing/labor-hours";
 import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { STATUS_LABELS } from "./format";
 import { EstimateBanners } from "./sections/EstimateBanners";
+import { EstimateReviewHealth } from "./EstimateReviewHealth";
+import { estimateReviewHealth } from "@/lib/estimates/review-health";
 import { EstimateSummaryCard } from "./sections/EstimateSummaryCard";
 import { EstimateLineItems } from "./sections/EstimateLineItems";
 import { ApprovedHandoff } from "./sections/ApprovedHandoff";
@@ -83,6 +85,11 @@ export default async function EstimateDetailPage({
     documentType: "estimate",
     status: estimate.status === "declined" || estimate.status === "expired" ? "archived" : estimate.status,
   });
+  const reviewHealth = estimateReviewHealth(
+    estimate.presentation_mode === "multi_option"
+      ? options.flatMap((option) => option.line_items)
+      : lineItems,
+  );
 
   return (
     <PageContainer>
@@ -176,6 +183,12 @@ export default async function EstimateDetailPage({
           </p>
         )}
       </PageHeader>
+
+      <EstimateReviewHealth
+        total={reviewHealth.total}
+        ready={reviewHealth.ready}
+        needsReview={reviewHealth.needsReview}
+      />
 
       <EstimateBanners
         estimate={estimate}

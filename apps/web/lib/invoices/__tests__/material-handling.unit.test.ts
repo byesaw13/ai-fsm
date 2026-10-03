@@ -6,6 +6,7 @@ import {
   materialHandlingCents,
   materialHandlingLineDescription,
   materialHandlingRateFromSettings,
+  resolveMaterialHandlingPct,
 } from "../material-handling";
 
 describe("material-handling", () => {
@@ -20,6 +21,27 @@ describe("material-handling", () => {
     expect(materialHandlingRateFromSettings({ material_handling_pct: 20 })).toBe(0.2);
     expect(materialHandlingCents(10_000, 0.2)).toBe(2000);
     expect(materialHandlingLineDescription(0.2)).toBe("Material handling (20%)");
+  });
+
+  it("keeps a snapshot and freezes a sent invoice", () => {
+    expect(resolveMaterialHandlingPct({
+      snapshotPct: 12,
+      pricingPct: 20,
+      legacyPct: null,
+      invoiceStatus: "sent",
+    })).toEqual({ pct: 12, writeSnapshot: false });
+    expect(resolveMaterialHandlingPct({
+      snapshotPct: null,
+      pricingPct: 20,
+      legacyPct: 15,
+      invoiceStatus: "draft",
+    })).toEqual({ pct: 20, writeSnapshot: false });
+    expect(resolveMaterialHandlingPct({
+      snapshotPct: null,
+      pricingPct: 20,
+      legacyPct: null,
+      invoiceStatus: "sent",
+    })).toEqual({ pct: 20, writeSnapshot: true });
   });
 
   it("formatReceiptDate: date-only, no timezone drift", () => {

@@ -33,6 +33,8 @@ export function usePricingSettings(): {
             minimum_service_fee_cents: json.data.minimum_service_fee_cents,
             half_day_rate_cents: json.data.half_day_rate_cents,
             full_day_rate_cents: json.data.full_day_rate_cents,
+            material_handling_pct: json.data.material_handling_pct,
+            card_fee_pct: json.data.card_fee_pct,
           });
         }
       } catch {

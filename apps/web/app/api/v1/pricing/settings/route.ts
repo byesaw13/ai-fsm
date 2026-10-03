@@ -19,6 +19,8 @@ const patchSchema = z
     minimum_service_fee_cents: z.number().int().min(0).optional(),
     half_day_rate_cents: z.number().int().min(0).optional(),
     full_day_rate_cents: z.number().int().min(0).optional(),
+    material_handling_pct: z.number().int().min(0).max(100).optional(),
+    card_fee_pct: z.number().min(0).max(10).optional(),
   })
   .refine(
     (d) => {
@@ -125,6 +127,8 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
         data.minimum_service_fee_cents ?? current.minimum_service_fee_cents,
       half_day_rate_cents: data.half_day_rate_cents ?? current.half_day_rate_cents,
       full_day_rate_cents: data.full_day_rate_cents ?? current.full_day_rate_cents,
+      material_handling_pct: data.material_handling_pct ?? current.material_handling_pct,
+      card_fee_pct: data.card_fee_pct ?? current.card_fee_pct,
     };
 
     if (next.labor_billing_cents_per_hour < next.labor_cost_cents_per_hour) {
@@ -150,6 +154,8 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
          minimum_service_fee_cents = $6,
          half_day_rate_cents = $7,
          full_day_rate_cents = $8,
+         material_handling_pct = $9,
+         card_fee_pct = $10,
          updated_at = NOW()
        WHERE account_id = $1
        RETURNING *`,
@@ -162,6 +168,8 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
         next.minimum_service_fee_cents,
         next.half_day_rate_cents,
         next.full_day_rate_cents,
+        next.material_handling_pct,
+        next.card_fee_pct,
       ]
     );
 

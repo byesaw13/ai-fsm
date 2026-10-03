@@ -14,6 +14,7 @@ export interface WorkOrderTask {
   status: "open" | "done" | "blocked" | "partial";
   note: string | null;
   sort_order: number;
+  completion_outcome?: string | null;
 }
 
 /** Loose shape from completion_criteria JSONB (canonical + legacy). */

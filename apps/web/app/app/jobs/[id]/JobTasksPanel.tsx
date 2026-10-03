@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { JobTaskRow } from "@/lib/work-orders/job-tasks";
+import { LINE_OUTCOMES, LINE_OUTCOME_LABELS, type LineOutcome } from "@/lib/invoices/line-outcome";
 
 export type JobTasksPanelProps = {
   jobId: string;
@@ -37,6 +38,29 @@ export function JobTasksPanel({ jobId: _jobId, progress, tasks, canToggle }: Job
         deliverable tasks on the work order (e.g. “Replace faucet”).
       </p>
     );
+  }
+
+  async function setOutcome(taskId: string, workOrderId: string, completionOutcome: string) {
+    if (!canToggle) return;
+    setBusyId(taskId);
+    try {
+      const res = await fetch(`/api/v1/work-orders/${workOrderId}/task-outcome`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          task_id: taskId,
+          completion_outcome: completionOutcome === "" ? null : completionOutcome,
+        }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        alert(j.error?.message ?? "Could not save how this ended");
+        return;
+      }
+      router.refresh();
+    } finally {
+      setBusyId(null);
+    }
   }
 
   async function markDone(taskId: string, workOrderId: string) {
@@ -158,6 +182,26 @@ export function JobTasksPanel({ jobId: _jobId, progress, tasks, canToggle }: Job
                 <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
                   {t.work_order_title}
                 </div>
+              )}
+              {canToggle && (
+                <label style={{ display: "block", marginTop: 4, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                  How it ended
+                  <select
+                    value={t.completion_outcome ?? ""}
+                    disabled={busyId === t.id}
+                    aria-label={`How ${t.label} ended`}
+                    data-testid="task-outcome"
+                    onChange={(e) => setOutcome(t.id, t.work_order_id, e.target.value)}
+                    style={{ display: "block", marginTop: 2, fontSize: "var(--text-sm)" }}
+                  >
+                    <option value="">Not set</option>
+                    {LINE_OUTCOMES.map((outcome) => (
+                      <option key={outcome} value={outcome}>
+                        {LINE_OUTCOME_LABELS[outcome as LineOutcome]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               )}
             </div>
           </li>

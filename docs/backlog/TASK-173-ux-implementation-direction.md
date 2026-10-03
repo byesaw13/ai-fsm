@@ -31,7 +31,7 @@ Acceptance Criteria:
 - [x] Before day start, Start Day is the primary action. End Day is still reachable and does not lead the started day.
 - [x] Today's Work lists scheduled jobs and looks together. The cards do not ask which backend object they are.
 - [x] Capture can be saved with no category, customer, or job, and the typed prompt is not promise-only.
-- [x] Staff intake can save before category, preferred date, or address are known. Those fields remain available. Migration `200_intake_progressive_capture.sql` is written and not yet applied.
+- [x] Staff intake can save before category, preferred date, or address are known. Those fields remain available. Migration `200_intake_progressive_capture.sql` is applied in production.
 - [x] A request's recommended next step is the dominant action. Pricing and status are secondary.
 - [x] Pricing Health uses the account minimum service fee.
 - [x] Invoiced, Cash Collected, and Outstanding AR use the definitions in brief section 30.
@@ -41,8 +41,13 @@ Acceptance Criteria:
 - [x] Travel Settings does not show an editable rate while Standard labor is selected.
 
 Still open on this task:
-- Needs Attention sorts by promise, money, lateness, blocked work, then cleanup. Day Review leads with unresolved items. Unit-tested. Not browser-checked.
-- Dragging a visit warns on an assignee overlap. Owner can choose Move anyway. Week cards show the property address.
-- New estimates open on the account deposit percentage. Materials only, no deposit, and custom amount stay on the same estimate. Approved amounts still snapshot through the existing deposit policy.
-- Assessment workspace, estimate review-first, visit/invoice linkage, materials-from-visit, property search, and material-handling/card-fee settings are not built yet.
+- Waves 1–4 are on main (`f0a1e13d`) and deployed. Production `/api/health` was ok and migration 200 applied. Browser checks for intake, overlap, and deposit defaults are still open.
+- Waves 5–6 land in this change. Migration `201_handling_card_fee_and_line_outcomes.sql` applies on deploy.
+  - Assessment areas show captured, needs confirmation, or not started. Photos and notes stay on the current assessment record. Markup, geometry, T1/T1R, and LiDAR are not started.
+  - An estimate header shows how many items are ready and links to lines with a blank description or a price of zero or less.
+  - A work item can end completed, changed, removed/credited, deferred, or not completed.
+  - Invoice review lists those exceptions and asks about a card fee when the policy is above zero. Send stays available.
+  - A visit can record materials needed. A new receipt suggests the active visit's job when the page was opened without a job.
+  - Search finds a house by client name, property name, street, room text, or invoice number.
+  - Pricing settings store the material-handling percent and the card-fee percent. A non-draft invoice snapshots both.
 - Phase 4 LiDAR and the production library stay deferred.

@@ -44,6 +44,8 @@ import { InvoiceMobileDeliverBar } from "./InvoiceMobileDeliverBar";
 import { InvoiceLineItemsEditor } from "./InvoiceLineItemsEditor";
 import { LinkForgottenExpensesPanel } from "@/components/invoices/LinkForgottenExpensesPanel";
 import { materialHandlingRateFromSettings } from "@/lib/invoices/material-handling";
+import { invoiceReviewExceptions } from "@/lib/invoices/review-exceptions";
+import { InvoiceReview } from "./InvoiceReview";
 import { MarkEntityAttentionRead } from "@/components/attention/MarkEntityAttentionRead";
 import {
   Breadcrumbs,
@@ -109,6 +111,7 @@ interface InvoiceRow {
   business_purpose: string | null;
   property_address: string | null;
   beneficiary_name: string | null;
+  card_fee_pct_snapshot?: string | number | null;
 }
 
 type InvoicePropertyOption = { id: string; address: string; client_id: string | null };
@@ -198,8 +201,15 @@ export default async function InvoiceDetailPage({
     const jobId = (invoiceResult.rows[0] as InvoiceRow).job_id;
     const summaryTasks = jobId
       ? (
-          await client.query<{ label: string; status: string; parent_task_id: string | null }>(
-            `SELECT t.label, t.status, t.parent_task_id
+          await client.query<{
+            id: string;
+            label: string;
+            status: string;
+            parent_task_id: string | null;
+            required: boolean;
+            completion_outcome: string | null;
+          }>(
+            `SELECT t.id, t.label, t.status, t.parent_task_id, t.required, t.completion_outcome
              FROM work_order_tasks t
              JOIN work_orders w ON w.id = t.work_order_id
              WHERE w.job_id = $1 AND w.account_id = $2
@@ -208,6 +218,16 @@ export default async function InvoiceDetailPage({
           )
         ).rows
       : [];
+    const pricing = await client.query<{ card_fee_pct: string | number }>(
+      `SELECT card_fee_pct FROM business_pricing_settings WHERE account_id = $1`,
+      [session.accountId],
+    );
+    const invoiceRow = invoiceResult.rows[0] as InvoiceRow;
+    const snap = invoiceRow.card_fee_pct_snapshot;
+    const liveFee = Number(pricing.rows[0]?.card_fee_pct ?? 0);
+    const cardFeePct = snap == null || snap === "" || !Number.isFinite(Number(snap))
+      ? liveFee
+      : Number(snap);
     const itemized = jobId
       ? await loadItemizedReceipts(client, session.accountId, jobId, id)
       : { receipts: [], total_cents: 0 };
@@ -225,8 +245,10 @@ export default async function InvoiceDetailPage({
     );
 
     return {
-      invoice: invoiceResult.rows[0] as InvoiceRow,
+      invoice: invoiceRow,
       suggestedWorkSummary: buildWorkSummaryFromTasks(summaryTasks),
+      reviewTasks: summaryTasks,
+      cardFeePct,
       itemized,
       lineItems: lineItemsResult.rows as LineItemRow[],
       accountSettings: accountResult.rows[0]?.settings ?? {},
@@ -238,7 +260,20 @@ export default async function InvoiceDetailPage({
 
   if (!result) notFound();
 
-  const { invoice, lineItems, accountSettings, location, suggestedWorkSummary, itemized, properties, propertyContacts } = result;
+  const { invoice, lineItems, accountSettings, location, suggestedWorkSummary, itemized, properties, propertyContacts, reviewTasks, cardFeePct } = result;
+  const reviewExceptions = invoiceReviewExceptions({
+    tasks: reviewTasks.map((task) => ({
+      id: task.id,
+      label: task.label,
+      required: task.required,
+      completion_outcome: task.completion_outcome,
+    })),
+    lines: lineItems.map((line) => ({
+      description: line.description,
+      line_item_type: line.line_item_type,
+    })),
+    cardFeePct,
+  });
   const materialsBilledCents = lineItems
     .filter((li) => li.line_item_type === "materials")
     .reduce((sum, li) => sum + li.total_cents, 0);
@@ -418,6 +453,8 @@ export default async function InvoiceDetailPage({
           </div>
         }
       />
+
+      <InvoiceReview exceptions={reviewExceptions} />
 
       {/* Trustworthy money bar — always visible, the point of an invoice */}
       <div className="p7-invoice-money-bar" style={{
