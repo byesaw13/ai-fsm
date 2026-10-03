@@ -6,6 +6,7 @@ import { canViewReports, canCloseMonth, canReopenMonth } from "@/lib/auth/permis
 import { withReportContext } from "@/lib/reports/db";
 import { query } from "@/lib/db";
 import { formatCents } from "@/lib/money";
+import { businessMonthKey, loadBusinessTimeZone, timestampBusinessMonthExpr } from "@/lib/reports/business-month";
 import {
   PageContainer,
   PageHeader,
@@ -30,7 +31,7 @@ interface PageProps {
 }
 
 function currentMonth(): string {
-  return new Date().toISOString().slice(0, 7);
+  return businessMonthKey(new Date(), "America/New_York");
 }
 
 function isValidMonth(m: string): boolean {
@@ -74,23 +75,32 @@ export default async function ClosePage({ searchParams }: PageProps) {
 
   // ---- Fetch checklist data ----
   // These queries use application-level account_id filtering (server component).
-  const [invoiceSummary, outstandingCount, expenseCount, paymentCount] =
+  const timeZone = await loadBusinessTimeZone(session.accountId);
+  const invoiceMonth = timestampBusinessMonthExpr("created_at", timeZone);
+  const [invoiceSummary, outstandingInPeriod, outstandingAll, expenseCount, paymentCount] =
     await Promise.all([
       query<{ total_count: string; total_cents: string }>(
         `SELECT COUNT(*)::int AS total_count,
                 COALESCE(SUM(total_cents), 0)::bigint AS total_cents
          FROM invoices
          WHERE account_id = $1
-           AND to_char(created_at, 'YYYY-MM') = $2`,
+           AND ${invoiceMonth} = $2`,
         [session.accountId, targetMonth]
       ),
       query<{ count: string }>(
         `SELECT COUNT(*)::int AS count
          FROM invoices
          WHERE account_id = $1
-           AND to_char(created_at, 'YYYY-MM') = $2
+           AND ${invoiceMonth} = $2
            AND status IN ('sent', 'partial', 'overdue')`,
         [session.accountId, targetMonth]
+      ),
+      query<{ count: string }>(
+        `SELECT COUNT(*)::int AS count
+         FROM invoices
+         WHERE account_id = $1
+           AND status IN ('sent', 'partial', 'overdue')`,
+        [session.accountId]
       ),
       query<{ count: string }>(
         `SELECT COUNT(*)::int AS count
@@ -104,15 +114,15 @@ export default async function ClosePage({ searchParams }: PageProps) {
         `SELECT COUNT(*)::int AS count
          FROM payments
          WHERE account_id = $1
-           AND received_at >= $2::date
-           AND received_at < ($2::date + interval '1 month')`,
-        [session.accountId, monthStart]
+           AND ${timestampBusinessMonthExpr("received_at", timeZone)} = $2`,
+        [session.accountId, targetMonth]
       ),
     ]);
 
   const invoiceTotal = Number(invoiceSummary[0]?.total_count ?? 0);
   const invoiceTotalCents = Number(invoiceSummary[0]?.total_cents ?? 0);
-  const outstanding = Number(outstandingCount[0]?.count ?? 0);
+  const outstandingPeriod = Number(outstandingInPeriod[0]?.count ?? 0);
+  const outstanding = Number(outstandingAll[0]?.count ?? 0);
   const expenses = Number(expenseCount[0]?.count ?? 0);
   const payments = Number(paymentCount[0]?.count ?? 0);
 
@@ -206,9 +216,17 @@ export default async function ClosePage({ searchParams }: PageProps) {
           />
           <ChecklistItem
             label={
+              outstandingPeriod === 0
+                ? "No open invoices created this month"
+                : `Open invoices created this month: ${outstandingPeriod}`
+            }
+            ok
+          />
+          <ChecklistItem
+            label={
               outstanding === 0
-                ? "No outstanding invoices (sent / partial / overdue)"
-                : `Outstanding invoices: ${outstanding} — review before closing`
+                ? "No outstanding invoices across all periods (sent / partial / overdue)"
+                : `Outstanding AR across all periods: ${outstanding} — older unpaid invoices are included`
             }
             ok={outstanding === 0}
             warn={outstanding > 0}

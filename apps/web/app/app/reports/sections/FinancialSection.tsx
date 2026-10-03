@@ -127,7 +127,7 @@ export function FinancialSection({ data, monthLabel }: { data: ReportData; month
                 <th style={TH_LEFT}>Status</th>
                 <th style={TH_RIGHT}>Count</th>
                 <th style={TH_RIGHT}>Invoiced</th>
-                <th style={TH_RIGHT}>Collected</th>
+                <th style={TH_RIGHT}>Paid on these invoices</th>
               </tr>
             </thead>
             <tbody>

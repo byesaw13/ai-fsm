@@ -1,5 +1,6 @@
 import { query } from "@/lib/db";
 import { MINIMUM_SERVICE_FEE_CENTS } from "@ai-fsm/domain";
+import { loadBusinessTimeZone, timestampBusinessMonthExpr } from "@/lib/reports/business-month";
 
 // ---------------------------------------------------------------------------
 // Row types
@@ -131,7 +132,11 @@ export interface ReportData {
   // Derived aggregates
   revenueTotalCents: number;
   revenuePaidCents: number;
+  /** Payments received during the business month. Not paid_cents on invoices created that month. */
+  cashCollectedCents: number;
+  /** Current open balance on sent, partial, and overdue invoices, every period. */
   revenueOutstandingCents: number;
+  minimumServiceFeeCents: number;
   expensesTotalCents: number;
   mileageTripCount: number;
   mileageTotalMiles: number;
@@ -147,7 +152,19 @@ export interface ReportData {
 // ---------------------------------------------------------------------------
 
 export async function loadReportData(accountId: string, targetMonth: string): Promise<ReportData> {
-  // === Revenue: invoices created in the month ===
+  const timeZone = await loadBusinessTimeZone(accountId);
+  const monthOf = (column: string) => timestampBusinessMonthExpr(column, timeZone);
+  const feeRows = await query<{ minimum_service_fee_cents: string | number }>(
+    `SELECT minimum_service_fee_cents
+     FROM business_pricing_settings
+     WHERE account_id = $1`,
+    [accountId],
+  );
+  const minimumServiceFeeCents = feeRows[0]
+    ? Number(feeRows[0].minimum_service_fee_cents)
+    : MINIMUM_SERVICE_FEE_CENTS;
+
+  // === Invoiced revenue: invoices created in the business month ===
   const invoiceStatuses = await query<InvoiceStatusRow>(
     `SELECT status,
             COUNT(*)::int as count,
@@ -155,7 +172,7 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
             COALESCE(SUM(paid_cents), 0)::bigint as paid_cents
      FROM invoices
      WHERE account_id = $1
-       AND to_char(created_at, 'YYYY-MM') = $2
+       AND ${monthOf("created_at")} = $2
      GROUP BY status
      ORDER BY status`,
     [accountId, targetMonth]
@@ -163,16 +180,28 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
 
   let revenueTotalCents = 0;
   let revenuePaidCents = 0;
-  let revenueOutstandingCents = 0;
   for (const row of invoiceStatuses) {
-    const total = Number(row.total_cents);
-    const paid = Number(row.paid_cents);
-    revenueTotalCents += total;
-    revenuePaidCents += paid;
-    if (!["paid", "void"].includes(row.status)) {
-      revenueOutstandingCents += total - paid;
-    }
+    revenueTotalCents += Number(row.total_cents);
+    revenuePaidCents += Number(row.paid_cents);
   }
+
+  const cashRows = await query<{ cash_cents: string }>(
+    `SELECT COALESCE(SUM(amount_cents), 0)::bigint AS cash_cents
+     FROM payments
+     WHERE account_id = $1
+       AND ${monthOf("received_at")} = $2`,
+    [accountId, targetMonth],
+  );
+  const cashCollectedCents = Number(cashRows[0]?.cash_cents ?? 0);
+
+  const arRows = await query<{ open_cents: string }>(
+    `SELECT COALESCE(SUM(total_cents - paid_cents), 0)::bigint AS open_cents
+     FROM invoices
+     WHERE account_id = $1
+       AND status IN ('sent', 'partial', 'overdue')`,
+    [accountId],
+  );
+  const revenueOutstandingCents = Number(arRows[0]?.open_cents ?? 0);
 
   // === Expenses: by category for the month ===
   const expensesByCategory = await query<ExpenseCategoryRow>(
@@ -281,7 +310,7 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
      LEFT JOIN invoices inv ON inv.job_id = j.id AND inv.status != 'void'
      WHERE j.account_id = $1
        AND j.job_type IS NOT NULL
-       AND (to_char(j.created_at, 'YYYY-MM') = $2 OR to_char(inv.created_at, 'YYYY-MM') = $2)
+       AND (${monthOf("j.created_at")} = $2 OR ${monthOf("inv.created_at")} = $2)
      GROUP BY j.job_type
      ORDER BY revenue_cents DESC`,
     [accountId, targetMonth]
@@ -305,7 +334,7 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
      FROM visits v
      JOIN users u ON u.id = v.assigned_user_id
      WHERE v.account_id = $1
-       AND to_char(v.scheduled_start, 'YYYY-MM') = $2
+       AND ${monthOf("v.scheduled_start")} = $2
        AND u.role = 'tech'
      GROUP BY u.id, u.full_name
      ORDER BY visits_completed DESC`,
@@ -321,7 +350,7 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
             ) as pct_of_total
      FROM estimates
      WHERE account_id = $1
-       AND to_char(created_at, 'YYYY-MM') = $2
+       AND ${monthOf("created_at")} = $2
      GROUP BY status
      ORDER BY
        CASE status
@@ -344,7 +373,7 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
        ROUND(COUNT(*)::numeric / 4.0, 1)::text AS avg_per_week
      FROM visits
      WHERE account_id = $1
-       AND to_char(scheduled_start, 'YYYY-MM') = $2`,
+       AND ${monthOf("scheduled_start")} = $2`,
     [accountId, targetMonth]
   );
   const scheduleUtil = scheduleUtilRows[0] ?? {
@@ -363,7 +392,7 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
      JOIN estimates e ON e.job_id = j.id AND e.status IN ('approved','sent')
      WHERE j.account_id = $1
        AND j.status IN ('scheduled','in_progress','completed')`,
-    [accountId, MINIMUM_SERVICE_FEE_CENTS]
+    [accountId, minimumServiceFeeCents]
   );
   const lowValue = lowValueRows[0] ?? { below_minimum: 0, total_estimated_jobs: 0 };
 
@@ -381,7 +410,7 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
           WHERE e2.account_id = $1) AS total_line_items
      FROM estimates
      WHERE account_id = $1`,
-    [accountId, MINIMUM_SERVICE_FEE_CENTS]
+    [accountId, minimumServiceFeeCents]
   );
   const pricingSummary = pricingSummaryRows[0] ?? {
     total: 0, below_minimum: 0, with_override: 0, price_book_line_items: 0, total_line_items: 0,
@@ -407,7 +436,7 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
        AND e.total_cents < $2
      ORDER BY e.created_at DESC
      LIMIT 25`,
-    [accountId, MINIMUM_SERVICE_FEE_CENTS]
+    [accountId, minimumServiceFeeCents]
   );
 
   // === Where the owner's time went (activity ledger, month-scoped) ===
@@ -424,8 +453,8 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
   );
 
   // === Derived aggregates ===
-  const netCents = revenuePaidCents - expensesTotalCents;
-  const hasAnyData = revenueTotalCents > 0 || expensesTotalCents > 0 || mileageTripCount > 0;
+  const netCents = cashCollectedCents - expensesTotalCents;
+  const hasAnyData = revenueTotalCents > 0 || cashCollectedCents > 0 || expensesTotalCents > 0 || mileageTripCount > 0;
   const totalEstimates = estimateConversion.reduce((sum, r) => sum + r.count, 0);
   const approvedEstimates = estimateConversion.find((r) => r.status === "approved")?.count ?? 0;
   const conversionRate = totalEstimates > 0 ? Math.round((approvedEstimates / totalEstimates) * 100) : 0;
@@ -446,7 +475,9 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
     timeByCategory,
     revenueTotalCents,
     revenuePaidCents,
+    cashCollectedCents,
     revenueOutstandingCents,
+    minimumServiceFeeCents,
     expensesTotalCents,
     mileageTripCount,
     mileageTotalMiles,

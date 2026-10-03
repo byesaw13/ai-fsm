@@ -149,9 +149,11 @@ export default async function BookingRequestDetailPage({
   const received = new Date(br.created_at).toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
   });
-  const preferredDate = new Date(br.preferred_date).toLocaleDateString("en-US", {
-    weekday: "long", month: "long", day: "numeric", year: "numeric",
-  });
+  const preferredDate = br.preferred_date
+    ? new Date(br.preferred_date).toLocaleDateString("en-US", {
+        weekday: "long", month: "long", day: "numeric", year: "numeric",
+      })
+    : "Not set yet";
 
   const requestGuidance = getRequestGuidance({
     status: br.status,
@@ -180,10 +182,15 @@ export default async function BookingRequestDetailPage({
       />
 
       {requestGuidance && (
-        <Card style={{ marginBottom: "var(--space-3)" }}>
-          <SectionHeader title="Request Guidance" />
-          <div style={{ display: "grid", gap: "var(--space-3)" }}>
-            {/* Funnel progress: Called → Assessment → Estimated → Converted */}
+        <Card style={{ marginBottom: "var(--space-3)" }} data-testid="request-next-step">
+          <SectionHeader title="Recommended next step" />
+          <div style={{ display: "grid", gap: "var(--space-2)", marginBottom: "var(--space-3)" }}>
+            <div style={{ fontSize: "var(--text-lg)", fontWeight: 800 }}>{requestGuidance.recommendedLabel}</div>
+            <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>{requestGuidance.recommendedDetail}</div>
+          </div>
+          <details>
+            <summary style={{ cursor: "pointer", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>Request progress</summary>
+          <div style={{ display: "grid", gap: "var(--space-3)", marginTop: "var(--space-3)" }}>
             <div data-testid="request-funnel" style={{ display: "flex", gap: "var(--space-1)", flexWrap: "wrap", alignItems: "center" }}>
               {FUNNEL_STEPS.map((step, i) => {
                 const current = funnelStepIndex(br.status);
@@ -239,12 +246,13 @@ export default async function BookingRequestDetailPage({
                 <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{requestGuidance.requestTypeDetail}</div>
               </div>
               <div>
-                <div style={{ fontSize: "var(--text-xs)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, color: "var(--fg-muted)" }}>Next Record</div>
-                <div style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>{requestGuidance.destinationRecord}</div>
-                <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{requestGuidance.recommendedLabel}</div>
+                <div style={{ fontSize: "var(--text-xs)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700, color: "var(--fg-muted)" }}>Next action</div>
+                <div style={{ fontSize: "var(--text-sm)", fontWeight: 600 }}>{requestGuidance.recommendedLabel}</div>
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{requestGuidance.recommendedDetail}</div>
               </div>
             </div>
           </div>
+          </details>
         </Card>
       )}
 

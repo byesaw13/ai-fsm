@@ -27,7 +27,7 @@ import { PageContainer, PageHeader, Card, SectionHeader, EmptyState, LinkButton 
 import { loadNeedsAttention } from "@/lib/attention/load-needs-attention";
 import { NeedsAttentionPanel } from "../NeedsAttentionPanel";
 import { TodayTimeline } from "./TodayTimeline";
-import { todayEmptyCopy, todayJobCountLabel, todayJobsHeading } from "./today-list";
+import { compareTodayWork, todayEmptyCopy, todayWorkCountLabel, todayWorkHeading } from "./today-list";
 import { filterAttentionForSurface } from "@/lib/attention/surfaces";
 import { coveringTechStartHere, todayCoveringTechSql } from "@/lib/visits/covering-tech";
 
@@ -56,6 +56,7 @@ type AssessmentCard = {
   status: string;
   client_name: string | null;
   job_title: string | null;
+  property_address: string | null;
 };
 
 export default async function MyWorkPage({ searchParams }: PageProps) {
@@ -102,10 +103,11 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
     queryForSession<AssessmentCard>(
       session,
       `SELECT v.id, v.visit_type, v.scheduled_start::text, v.status,
-              c.name AS client_name, j.title AS job_title
+              c.name AS client_name, j.title AS job_title, p.address AS property_address
        FROM visits v
        LEFT JOIN jobs j ON j.id = v.job_id
        LEFT JOIN clients c ON c.id = j.client_id
+       LEFT JOIN properties p ON p.id = j.property_id
        WHERE v.account_id = $1 AND v.assigned_user_id = $2
          AND v.work_order_id IS NULL
          AND v.visit_type = ANY($3::text[])
@@ -157,7 +159,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
   const greeting =
     nowHour < 12 ? "Good morning" : nowHour < 17 ? "Good afternoon" : "Good evening";
 
-  let statusLabel = todayJobCountLabel(workOrders.length);
+  let statusLabel = todayWorkCountLabel(workOrders.length + assessments.length);
   if (heroVisit?.status === "in_progress" || heroVisit?.status === "arrived") {
     statusLabel += " · In progress now";
   } else if (heroVisit) {
@@ -258,79 +260,95 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
           showTrackingLink={!isTech}
         />
         <Card style={{ marginBottom: "var(--space-4)" }}>
-          <SectionHeader title={todayJobsHeading()} count={workOrders.length} />
-          {workOrders.length === 0 ? (
+          <SectionHeader title={todayWorkHeading()} count={workOrders.length + assessments.length} />
+          {workOrders.length + assessments.length === 0 ? (
             <EmptyState
               title={todayEmptyCopy().title}
               description={todayEmptyCopy().description}
             />
           ) : (
             <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-              {workOrders.map((wo) => {
-                const status =
-                  WORK_ORDER_STATUS_LABELS[wo.status as WorkOrderStatus] ?? wo.status;
-                const derived = wo.active_visit_id ? " · In progress" : "";
-                const startHere = coveringTechStartHere(wo.first_up);
-                return (
-                  <li key={wo.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                    <Link
-                      href={`/app/my-work/${wo.id}` as Route}
-                      style={{
-                        display: "block",
-                        padding: "var(--space-3) 0",
-                        textDecoration: "none",
-                        color: "inherit",
-                      }}
-                    >
-                      <strong>{wo.client_name ?? "Client"}</strong>
-                      <div>{wo.title}</div>
-                      {startHere ? (
-                        <div data-testid="today-start-here" style={{ marginTop: "var(--space-1)" }}>
-                          Start here: {startHere}
-                        </div>
-                      ) : null}
-                      <small style={{ color: "var(--fg-muted)" }}>
-                        {status}
-                        {derived}
-                        {wo.next_scheduled &&
-                          ` · Next ${formatBusinessDateTime(wo.next_scheduled)}`}
-                      </small>
-                    </Link>
-                  </li>
-                );
-              })}
+              {[
+                ...workOrders.map((wo) => ({
+                  kind: "job" as const,
+                  active: Boolean(wo.active_visit_id),
+                  sortTime: wo.next_scheduled,
+                  wo,
+                })),
+                ...assessments.map((visit) => ({
+                  kind: "look" as const,
+                  active: ["dispatched", "traveling", "arrived", "in_progress", "waiting"].includes(visit.status),
+                  sortTime: visit.scheduled_start,
+                  visit,
+                })),
+              ]
+                .sort(compareTodayWork)
+                .map((item) => {
+                  if (item.kind === "job") {
+                    const wo = item.wo;
+                    const status =
+                      WORK_ORDER_STATUS_LABELS[wo.status as WorkOrderStatus] ?? wo.status;
+                    const derived = wo.active_visit_id ? " · In progress" : "";
+                    const startHere = coveringTechStartHere(wo.first_up);
+                    return (
+                      <li key={`job-${wo.id}`} style={{ borderBottom: "1px solid var(--border)" }}>
+                        <Link
+                          href={`/app/my-work/${wo.id}` as Route}
+                          style={{
+                            display: "block",
+                            padding: "var(--space-3) 0",
+                            textDecoration: "none",
+                            color: "inherit",
+                          }}
+                        >
+                          <strong>{wo.client_name ?? "Client"}</strong>
+                          {wo.property_address ? (
+                            <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>{wo.property_address}</div>
+                          ) : null}
+                          <div>{wo.title}</div>
+                          {startHere ? (
+                            <div data-testid="today-start-here" style={{ marginTop: "var(--space-1)" }}>
+                              Start here: {startHere}
+                            </div>
+                          ) : null}
+                          <small style={{ color: "var(--fg-muted)" }}>
+                            {status}
+                            {derived}
+                            {wo.next_scheduled &&
+                              ` · ${formatBusinessDateTime(wo.next_scheduled)}`}
+                          </small>
+                        </Link>
+                      </li>
+                    );
+                  }
+                  const visit = item.visit;
+                  const purpose = visit.job_title || (VISIT_TYPE_LABELS[visit.visit_type as VisitType] ?? "Look");
+                  return (
+                    <li key={`look-${visit.id}`} style={{ borderBottom: "1px solid var(--border)" }}>
+                      <Link
+                        href={`/app/visits/${visit.id}` as Route}
+                        style={{
+                          display: "block",
+                          padding: "var(--space-3) 0",
+                          textDecoration: "none",
+                          color: "inherit",
+                        }}
+                      >
+                        <strong>{visit.client_name ?? visit.job_title ?? "Customer"}</strong>
+                        {visit.property_address ? (
+                          <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>{visit.property_address}</div>
+                        ) : null}
+                        <div>{purpose}</div>
+                        <small style={{ color: "var(--fg-muted)" }}>
+                          {formatBusinessDateTime(visit.scheduled_start)}
+                        </small>
+                      </Link>
+                    </li>
+                  );
+                })}
             </ul>
           )}
         </Card>
-
-        {assessments.length > 0 && (
-          <Card>
-            <SectionHeader title="Assessments" count={assessments.length} />
-            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-              {assessments.map((v) => (
-                <li key={v.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                  <Link
-                    href={`/app/visits/${v.id}` as Route}
-                    style={{
-                      display: "block",
-                      padding: "var(--space-3) 0",
-                      textDecoration: "none",
-                      color: "inherit",
-                    }}
-                  >
-                    <strong>{v.client_name ?? v.job_title ?? "Assessment"}</strong>
-                    <div>
-                      {VISIT_TYPE_LABELS[v.visit_type as VisitType] ?? v.visit_type}
-                    </div>
-                    <small style={{ color: "var(--fg-muted)" }}>
-                      {formatBusinessDateTime(v.scheduled_start)}
-                    </small>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        )}
       </MyDayMobileLayout>
     </PageContainer>
   );
