@@ -12,11 +12,11 @@ export type IntakeRecordInput = {
   name: string;
   email?: string | null;
   phone?: string | null;
-  serviceCategory: string;
+  serviceCategory?: string | null;
   serviceDescription: string;
-  preferredDate: string;
+  preferredDate?: string | null;
   preferredTimeSlot?: string | null;
-  address: string;
+  address?: string | null;
   city?: string | null;
   state?: string | null;
   zip?: string | null;
@@ -38,7 +38,7 @@ export type IntakeRecordInput = {
 export type IntakeRecordResult = {
   bookingId: string;
   clientId: string;
-  propertyId: string;
+  propertyId: string | null;
   jobId: string;
   routingPath: "site_visit" | "remote_estimate" | "pending";
 };
@@ -182,9 +182,13 @@ async function findOrCreateProperty(
   clientId: string
 ): Promise<string> {
   if (input.existingPropertyId) return input.existingPropertyId;
+  const address = input.address?.trim();
+  if (!address) {
+    throw new Error("Cannot create a property without an address");
+  }
   const { rows: existingRows } = await client.query<{ id: string }>(
     `SELECT id FROM properties WHERE client_id = $1 AND address = $2`,
-    [clientId, input.address]
+    [clientId, address]
   );
 
   if (existingRows[0]?.id) return existingRows[0].id;
@@ -196,8 +200,8 @@ async function findOrCreateProperty(
     [
       input.accountId,
       clientId,
-      input.address,
-      input.address,
+      address,
+      address,
       input.city || null,
       input.state || null,
       input.zip || null,
@@ -253,10 +257,14 @@ export async function createIntakeRecords(
     input.createdByUserId
   );
   const clientId = await findOrCreateClient(client, input);
-  const propertyId = await findOrCreateProperty(client, input, clientId);
+  const address = input.address?.trim() || null;
+  const propertyId = address
+    ? await findOrCreateProperty(client, { ...input, address }, clientId)
+    : input.existingPropertyId ?? null;
 
-  const jobType = JOB_TYPE_BY_CATEGORY[input.serviceCategory] || "custom";
-  const categoryLabel = titleCaseCategory(input.serviceCategory);
+  const serviceCategory = input.serviceCategory?.trim() || null;
+  const jobType = (serviceCategory && JOB_TYPE_BY_CATEGORY[serviceCategory]) || "custom";
+  const categoryLabel = serviceCategory ? titleCaseCategory(serviceCategory) : "Request";
 
   const { rows: jobRows } = await client.query<{ id: string }>(
     `INSERT INTO jobs (account_id, client_id, property_id, title, description, status, job_type, created_by)
@@ -295,11 +303,11 @@ export async function createIntakeRecords(
       input.name,
       input.email || null,
       input.phone || null,
-      input.serviceCategory,
+      serviceCategory,
       input.serviceDescription,
-      input.preferredDate,
+      input.preferredDate?.trim() || null,
       input.preferredTimeSlot || null,
-      input.address,
+      address,
       input.city || null,
       input.state || null,
       input.zip || null,
@@ -369,8 +377,9 @@ export async function repairBookingRequestPipelineLinks(
   let jobId = input.jobId ?? null;
 
   if (!jobId) {
-    const jobType = JOB_TYPE_BY_CATEGORY[normalized.serviceCategory] || "custom";
-    const categoryLabel = titleCaseCategory(normalized.serviceCategory);
+    const serviceCategory = normalized.serviceCategory?.trim() || null;
+    const jobType = (serviceCategory && JOB_TYPE_BY_CATEGORY[serviceCategory]) || "custom";
+    const categoryLabel = serviceCategory ? titleCaseCategory(serviceCategory) : "Request";
 
     const { rows } = await client.query<{ id: string }>(
       `INSERT INTO jobs (account_id, client_id, property_id, title, description, status, job_type, created_by)

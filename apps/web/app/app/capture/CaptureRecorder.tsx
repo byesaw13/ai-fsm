@@ -201,7 +201,7 @@ export function CaptureRecorder() {
       setRecordState("idle");
       setStatus(
         speechErrorMessage(result.error) ||
-          "I couldn't catch the words. Type the promise.",
+          "I couldn't catch the words. Type what you need to remember.",
       );
       return;
     }
@@ -439,7 +439,7 @@ export function CaptureRecorder() {
             value={typedDraft}
             onChange={(event) => setTypedDraft(event.target.value)}
             rows={3}
-            placeholder="I told Mrs. Chen I would call tomorrow."
+            placeholder="Need primer for the Jones bathroom, or call Miller back Thursday."
             style={{
               width: "100%",
               fontSize: 16,

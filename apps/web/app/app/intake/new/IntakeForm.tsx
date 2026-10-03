@@ -116,10 +116,8 @@ export function IntakeForm() {
     const next: IntakeErrors = {};
     if (!form.name.trim()) next.name = "Client name is required";
     if (form.email.trim() && !/^\S+@\S+\.\S+$/.test(form.email.trim())) next.email = "Valid email required";
-    if (!form.service_category) next.service_category = "Service category is required";
-    if (form.service_description.trim().length < 10) next.service_description = "Description must be at least 10 characters";
-    if (!form.preferred_date) next.preferred_date = "Preferred date is required";
-    if (!form.address.trim()) next.address = "Address is required";
+    if (!form.phone.trim() && !form.email.trim()) next.phone = "A phone number or email is required";
+    if (!form.service_description.trim()) next.service_description = "Say what they need, even briefly";
     if (form.preferred_contact === "sms" && !form.phone.trim()) next.phone = "Phone is required for SMS contact";
     if (form.preferred_contact === "sms" && !form.sms_consent) next.sms_consent = "SMS consent is required for SMS contact";
     setErrors(next);
@@ -143,11 +141,11 @@ export function IntakeForm() {
           name: form.name.trim(),
           phone: form.phone.trim() || null,
           email: form.email.trim() || null,
-          service_category: form.service_category,
+          service_category: form.service_category || null,
           service_description: form.service_description.trim(),
-          preferred_date: form.preferred_date,
+          preferred_date: form.preferred_date || null,
           preferred_time_slot: form.preferred_time_slot,
-          address: form.address.trim(),
+          address: form.address.trim() || null,
           city: form.city.trim() || null,
           sms_consent: form.preferred_contact === "sms" && form.sms_consent,
           preferred_contact: form.preferred_contact,
@@ -300,11 +298,11 @@ export function IntakeForm() {
             <Detail label="Email" value={form.email || "None"} />
             <Detail label="Preferred Contact" value={form.preferred_contact.toUpperCase()} />
             <Detail label="SMS Consent" value={form.sms_consent ? "Granted" : "Not granted"} />
-            <Detail label="Service" value={categoryLabel} />
+            <Detail label="Service" value={categoryLabel || "Not yet"} />
             <Detail label="Description" value={form.service_description} preserve />
-            <Detail label="Preferred Date" value={form.preferred_date} />
+            <Detail label="Preferred Date" value={form.preferred_date || "Not yet"} />
             <Detail label="Preferred Time" value={form.preferred_time_slot} />
-            <Detail label="Address" value={[form.address, form.city].filter(Boolean).join(", ")} />
+            <Detail label="Address" value={[form.address, form.city].filter(Boolean).join(", ") || "Not yet"} />
             {Object.entries(form.intake_metadata).map(([key, val]) => {
               const q = INTAKE_QUESTIONS[form.service_category]?.find((q) => q.key === key);
               if (!q) return null;
@@ -377,7 +375,6 @@ export function IntakeForm() {
           <Select
             id="service_category"
             label="Service Category"
-            required
             value={form.service_category}
             onChange={(e) => { update("service_category", e.target.value); update("intake_metadata", {}); }}
             error={errors.service_category}
@@ -387,8 +384,7 @@ export function IntakeForm() {
           />
           <Textarea
             id="service_description"
-            label="Description"
-            required
+            label="What they need"
             value={form.service_description}
             onChange={(e) => update("service_description", e.target.value)}
             error={errors.service_description}
@@ -430,9 +426,8 @@ export function IntakeForm() {
           ))}
           <Input
             id="preferred_date"
-            label="Preferred Date"
+            label="Preferred Date (if they have one)"
             type="date"
-            required
             min={today}
             value={form.preferred_date}
             onChange={(e) => update("preferred_date", e.target.value)}
@@ -447,8 +442,7 @@ export function IntakeForm() {
           />
           <Input
             id="address"
-            label="Address"
-            required
+            label="Address (if you know it)"
             value={form.address}
             onChange={(e) => update("address", e.target.value)}
             error={errors.address}
