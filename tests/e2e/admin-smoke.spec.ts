@@ -69,7 +69,11 @@ test.describe("Admin smoke — jobs and visits", () => {
     if (await firstCard.isVisible()) {
       await firstCard.click();
       await page.waitForURL(/\/app\/visits\/[0-9a-f-]+/);
-      await expect(page.locator('[data-testid="visit-notes-panel"]')).toBeVisible();
+      const notes = page.locator('[data-testid="visit-notes-panel"]');
+      if (!(await notes.isVisible())) {
+        await page.locator("#visit-record > summary").click();
+      }
+      await expect(notes).toBeVisible();
     }
   });
 

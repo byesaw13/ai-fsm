@@ -8,6 +8,7 @@ export type HeroVisit = {
   client_name: string | null;
   client_phone: string | null;
   first_up?: string | null;
+  materials_needed?: string | null;
 };
 
 function isOverdueScheduled(visit: HeroVisit, nowMs: number): boolean {

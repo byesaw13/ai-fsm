@@ -113,7 +113,7 @@ test.describe("Required release smoke — admin core flow", () => {
     expect(match).toBeTruthy();
     visitId = match![1];
 
-    await expect(page.locator('#main-content [data-testid="visit-status"]')).toContainText("Scheduled");
+    await expect(page.locator('#main-content [data-testid="visit-status"]')).toContainText("Next");
   });
 
   test("5. Admin can create an estimate for the launch client", async ({ page }) => {

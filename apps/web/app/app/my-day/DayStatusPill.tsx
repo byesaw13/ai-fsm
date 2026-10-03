@@ -23,17 +23,7 @@ export function DayStatusPill({
       type="button"
       onClick={onReopen}
       data-testid="day-status-pill"
-      style={{
-        width: "100%",
-        textAlign: "left",
-        padding: "var(--space-3) var(--space-4)",
-        borderRadius: "var(--radius-md)",
-        border: "1px solid var(--border)",
-        background: "var(--accent-subtle)",
-        fontSize: "var(--text-sm)",
-        fontWeight: 600,
-        cursor: "pointer",
-      }}
+      className="field-day-pill"
     >
       {parts.join(" · ")}
     </button>
