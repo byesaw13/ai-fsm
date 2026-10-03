@@ -1,13 +1,13 @@
 import { Card, SectionHeader } from "@/components/ui";
 import type { ScheduleUtilRow } from "../queries";
 
-/** Schedule utilization — salvaged from the retired Operations Dashboard. */
+/** Visit counts for the month. This is volume, not labor-capacity utilization. */
 export function OperationsSection({ scheduleUtil, monthLabel }: { scheduleUtil: ScheduleUtilRow; monthLabel: string }) {
   return (
     <Card style={{ marginTop: "var(--space-6)" }}>
-      <SectionHeader title="Schedule Utilization" />
+      <SectionHeader title="Visit Volume" />
       <p style={{ padding: "0 var(--space-3) var(--space-2)", color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
-        Visits scheduled in {monthLabel}.
+        Visits with a start in {monthLabel}. This is visit volume, not booked hours divided by available hours.
       </p>
       <div style={{ padding: "var(--space-3)", display: "flex", gap: "var(--space-6)", flexWrap: "wrap", fontSize: "var(--text-sm)" }}>
         <div>

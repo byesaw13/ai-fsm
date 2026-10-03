@@ -28,6 +28,11 @@ These cross-cutting rules guide how tasks here are scoped and built. They are
 working guidance, not yet canonical product direction — promote to
 `docs/canonical/` if they prove durable.
 
+Screen and workflow changes follow
+[`docs/working/ux-implementation-direction.md`](../working/ux-implementation-direction.md).
+A task that changes UX should cite the rule or audit section it implements.
+Do not rebuild working plumbing to match a simpler interface.
+
 ### Mobile First Field Rule
 
 > Any action performed more than ~5 times per day should be executable in one
@@ -95,7 +100,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-159**.
+Next available ID: **TASK-174**. TASK-167 through TASK-172 are held by the customer home record work and are not in this index yet.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -151,6 +156,7 @@ closed in tests; owner-flow AC still open.
 | TASK-164 | [Portal answers what we did, what's in your home, what's next](TASK-164-portal-three-questions.md) | 003 | Proposed |
 | TASK-165 | [Home Record report (one-page house history)](TASK-165-home-record-report.md) | 003 | Proposed |
 | TASK-166 | [Realtor portal — work you paid for, by address, and "bill me" requests](TASK-166-realtor-portal.md) | 003 | Proposed |
+| TASK-173 | [UX implementation direction](TASK-173-ux-implementation-direction.md) | cross-cutting | In Progress |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
 | TASK-003 | Wrong Vehicle Correction | 001 | Done |

@@ -7,9 +7,9 @@ export function TechnicianSection({ rows, monthLabel }: { rows: TechPerformanceR
 
   return (
     <Card style={{ marginTop: "var(--space-4)" }}>
-      <SectionHeader title="Tech Performance" />
+      <SectionHeader title="Visit Completion" />
       <p style={{ padding: "0 var(--space-3) var(--space-2)", color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
-        Visit completion stats for technicians in {monthLabel}.
+        Completed visits divided by assigned visits in {monthLabel}. Cancelled and rescheduled visits are included in the total, so this is not an overall performance score.
       </p>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--text-sm)" }}>
         <thead>
@@ -21,20 +21,16 @@ export function TechnicianSection({ rows, monthLabel }: { rows: TechPerformanceR
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => {
-            const rate = parseFloat(row.completion_rate);
-            const rateColor = rate >= 80 ? "var(--status-success)" : rate >= 50 ? "var(--status-warning)" : "var(--status-error)";
-            return (
+          {rows.map((row) => (
               <tr key={row.user_id} style={{ borderBottom: "1px solid var(--border)" }}>
                 <td style={{ padding: "var(--space-2) var(--space-3)", fontWeight: 600 }}>{row.user_name}</td>
                 <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{row.visits_completed}</td>
                 <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right" }}>{row.total_visits}</td>
-                <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right", fontWeight: 700, color: rateColor }}>
+                <td style={{ padding: "var(--space-2) var(--space-3)", textAlign: "right", fontWeight: 700 }}>
                   {row.completion_rate}%
                 </td>
               </tr>
-            );
-          })}
+          ))}
         </tbody>
       </table>
     </Card>

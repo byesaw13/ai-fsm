@@ -28,6 +28,7 @@ export function TravelSettingsForm() {
   const [rates, setRates] = useState<MileageRateRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [laborBillingCents, setLaborBillingCents] = useState<number | null>(null);
   const [newRate, setNewRate] = useState("0.70");
   const [newRateSource, setNewRateSource] = useState<"irs" | "custom" | "business">("business");
   const [newRateDesc, setNewRateDesc] = useState("");
@@ -35,13 +36,19 @@ export function TravelSettingsForm() {
   useEffect(() => {
     void (async () => {
       try {
-        const [sRes, rRes] = await Promise.all([
+        const [sRes, rRes, pRes] = await Promise.all([
           fetch("/api/v1/travel/settings"),
           fetch("/api/v1/travel/rates"),
+          fetch("/api/v1/pricing/settings"),
         ]);
         if (sRes.ok) {
           const j = await sRes.json();
           setSettings(j.data);
+        }
+        if (pRes.ok) {
+          const j = await pRes.json();
+          const cents = j.data?.labor_billing_cents_per_hour;
+          if (typeof cents === "number") setLaborBillingCents(cents);
         }
         if (rRes.ok) {
           const j = await rRes.json();
@@ -227,22 +234,36 @@ export function TravelSettingsForm() {
               <option value="none">No travel-time charge</option>
             </select>
           </div>
-          <div className="form-group">
-            <label>Rate ($/hr)</label>
-            <input
-              type="number"
-              min={0}
-              step={0.01}
-              value={centsToDollars(settings.default_travel_time_rate_cents)}
-              onChange={(e) =>
-                setSettings({
-                  ...settings,
-                  default_travel_time_rate_cents: dollarsToCents(e.target.value),
-                })
-              }
-              disabled={settings.travel_time_rate_mode === "none"}
-            />
-          </div>
+          {settings.travel_time_rate_mode === "standard_labor" ? (
+            <div className="form-group">
+              <label>Rate ($/hr)</label>
+              <input
+                type="text"
+                readOnly
+                value={laborBillingCents == null ? "Loading Labor & Pricing rate…" : centsToDollars(laborBillingCents)}
+              />
+              <p style={{ margin: "6px 0 0", fontSize: 12, color: "var(--fg-muted)" }}>
+                Uses the Labor &amp; Pricing customer billing rate. Change that rate in Pricing settings.
+              </p>
+            </div>
+          ) : null}
+          {settings.travel_time_rate_mode === "custom" ? (
+            <div className="form-group">
+              <label>Custom rate ($/hr)</label>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                value={centsToDollars(settings.default_travel_time_rate_cents)}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    default_travel_time_rate_cents: dollarsToCents(e.target.value),
+                  })
+                }
+              />
+            </div>
+          ) : null}
           <div className="form-group">
             <label>Rounding</label>
             <select

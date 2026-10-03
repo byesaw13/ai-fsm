@@ -46,7 +46,7 @@ interface Props {
   propertyId: string | null;
   visitId: string | null;
   routingPath: string | null;
-  preferredDate: string;
+  preferredDate: string | null;
   preferredTimeSlot: string | null;
 }
 
@@ -287,7 +287,7 @@ export function ReviewActions({
       case "choose_path":
         return (
           <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-            Select a path above to unlock the next step.
+            Choose how to proceed. That unlocks the next step.
           </span>
         );
       case "create_estimate": {
@@ -382,255 +382,251 @@ export function ReviewActions({
     }
   })();
 
+  const pathPicker = !isFinal ? (
+    <details open={!pathChosen} data-testid="intake-path-picker">
+      <summary style={{ cursor: "pointer", fontWeight: pathChosen ? 500 : 700, marginBottom: "var(--space-2)" }}>
+        {pathChosen ? "Change how we proceed" : "How should we proceed?"}
+      </summary>
+      <div
+        style={{
+          padding: "var(--space-3)",
+          border: pathChosen ? "1px solid var(--border)" : "2px solid var(--accent, #2563eb)",
+          borderRadius: "var(--radius)",
+          background: "var(--bg-subtle)",
+        }}
+      >
+        <p style={{ margin: "0 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+          Book a look for unclear scope. Book work when you can show up and work. Remote quote for notes and photos only.
+        </p>
+        <div style={{ display: "grid", gap: "var(--space-2)" }}>
+          {PATH_OPTIONS.map((path) => {
+            const selected = routingPath === path;
+            return (
+              <button
+                key={path}
+                type="button"
+                data-testid={`intake-path-${path}`}
+                onClick={() => handlePathChange(path)}
+                disabled={!!pending}
+                style={{
+                  textAlign: "left",
+                  padding: "var(--space-3)",
+                  borderRadius: "var(--radius)",
+                  border: selected ? "2px solid var(--accent, #2563eb)" : "1px solid var(--border)",
+                  background: selected ? "var(--bg-card, #fff)" : "var(--bg)",
+                  cursor: pending ? "not-allowed" : "pointer",
+                }}
+              >
+                <div style={{ fontWeight: 700, fontSize: "var(--text-sm)" }}>
+                  {INTAKE_PATH_LABELS[path]}
+                  {selected ? " ✓" : ""}
+                </div>
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 4 }}>
+                  {INTAKE_PATH_DETAILS[path]}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </details>
+  ) : null;
+
   return (
-    <div className="p7-form-stack">
+    <div className="p7-form-stack" style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
       {error && (
         <div className="p7-card-danger" role="alert">
           {error}
         </div>
       )}
 
-      <Textarea
-        id="review_notes"
-        label="Review Notes"
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        placeholder="Duplicate of #…, needs address clarification, out of service area…"
-        rows={3}
-        disabled={!!pending || isFinal}
-      />
+      {!pathChosen ? pathPicker : null}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-        <div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "var(--space-2)",
-              marginBottom: "var(--space-2)",
-            }}
-          >
-            <p
-              style={{
-                margin: 0,
-                fontSize: "var(--text-xs)",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                color: "var(--fg-muted)",
-              }}
-            >
-              Pricing style
-            </p>
-            <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-              {pricingMode ? PRICING_LABELS[pricingMode] : "Optional"}
-            </span>
-          </div>
-          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-            {(["flat_rate", "hourly_internal"] as const).map((mode) => (
-              <Button
-                key={mode}
-                type="button"
-                variant={pricingMode === mode ? "primary" : "secondary"}
-                size="sm"
-                onClick={() => handlePricingModeChange(mode)}
-                loading={pending === `pricing-${mode}`}
-                disabled={!!pending || isFinal}
-              >
-                {PRICING_LABELS[mode]}
-              </Button>
-            ))}
-          </div>
-          <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-            {pricingMode
-              ? PRICING_HELPER[pricingMode]
-              : "Optional. Then choose how to proceed below."}
-          </p>
-        </div>
-
-        {/* Required path picker */}
-        {!isFinal && (
-          <div
-            data-testid="intake-path-picker"
-            style={{
-              padding: "var(--space-3)",
-              border: pathChosen ? "1px solid var(--border)" : "2px solid var(--accent, #2563eb)",
-              borderRadius: "var(--radius)",
-              background: "var(--bg-subtle)",
-            }}
-          >
-            <p
-              style={{
-                margin: 0,
-                fontSize: "var(--text-xs)",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                color: "var(--fg-muted)",
-              }}
-            >
-              How should we proceed?
-            </p>
-            <p style={{ margin: "var(--space-1) 0 var(--space-3)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-              Required. Book a look for unclear scope · Book work when you can show up and work · Remote quote for notes/photos only.
-            </p>
-            <div style={{ display: "grid", gap: "var(--space-2)" }}>
-              {PATH_OPTIONS.map((path) => {
-                const selected = routingPath === path;
-                return (
-                  <button
-                    key={path}
-                    type="button"
-                    data-testid={`intake-path-${path}`}
-                    onClick={() => handlePathChange(path)}
-                    disabled={!!pending}
-                    style={{
-                      textAlign: "left",
-                      padding: "var(--space-3)",
-                      borderRadius: "var(--radius)",
-                      border: selected ? "2px solid var(--accent, #2563eb)" : "1px solid var(--border)",
-                      background: selected ? "var(--bg-card, #fff)" : "var(--bg)",
-                      cursor: pending ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    <div style={{ fontWeight: 700, fontSize: "var(--text-sm)" }}>
-                      {INTAKE_PATH_LABELS[path]}
-                      {selected ? " ✓" : ""}
-                    </div>
-                    <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 4 }}>
-                      {INTAKE_PATH_DETAILS[path]}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        <div
+      <div
+        data-testid="request-primary-action"
+        style={{
+          padding: "var(--space-3)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius)",
+          background: "var(--bg-subtle)",
+        }}
+      >
+        <p
           style={{
-            padding: "var(--space-3)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius)",
-            background: "var(--bg-subtle)",
+            margin: 0,
+            fontSize: "var(--text-xs)",
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            color: "var(--fg-muted)",
           }}
         >
-          <p
-            style={{
-              margin: 0,
-              fontSize: "var(--text-xs)",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              color: "var(--fg-muted)",
-            }}
-          >
-            Recommended next step
-          </p>
-          <div style={{ marginTop: "var(--space-2)", display: "grid", gap: "var(--space-1)" }}>
-            <div style={{ fontSize: "var(--text-sm)", fontWeight: 700 }}>{guidance.currentStateLabel}</div>
-            <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>{guidance.currentStateDetail}</div>
-            <div style={{ fontSize: "var(--text-sm)" }}>
-              <strong>{guidance.requestTypeLabel}</strong> — {guidance.requestTypeDetail}
-            </div>
-            <div style={{ fontSize: "var(--text-sm)" }}>
-              <strong>{guidance.recommendedLabel}</strong>
-            </div>
-            <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>{guidance.recommendedDetail}</div>
-          </div>
-
-          <div
-            style={{
-              marginTop: "var(--space-3)",
-              display: "flex",
-              gap: "var(--space-2)",
-              flexWrap: "wrap",
-              alignItems: "center",
-            }}
-          >
-            {primaryAction}
-            {!primaryAction && guidance.followUpKind && guidance.followUpHref && (
-              <LinkButton href={guidance.followUpHref} variant="primary" size="sm">
-                {guidance.followUpKind === "view_visit" ? "Open Visit →" : "Open Job →"}
-              </LinkButton>
-            )}
-          </div>
-
-          {guidance.primaryActionKind === "schedule_assessment" && showAssessmentForm && (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "var(--space-3)",
-                marginTop: "var(--space-3)",
-                padding: "var(--space-3)",
-                background: "var(--bg)",
-                borderRadius: "var(--radius)",
-                border: "1px solid var(--border)",
-              }}
-            >
-              <strong style={{ fontSize: "var(--text-sm)" }}>Confirm assessment date</strong>
-              <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                Creates an <strong>Assessment</strong> visit (site visit) with the assessment form — not a work day.
-              </p>
-              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-                <div className="form-group" style={{ flex: "1 1 160px", margin: 0 }}>
-                  <label htmlFor="visit-date" style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                    Date
-                  </label>
-                  <input
-                    id="visit-date"
-                    type="date"
-                    value={visitDate}
-                    onChange={(e) => setVisitDate(e.target.value)}
-                    disabled={!!pending}
-                    style={{ width: "100%" }}
-                  />
-                </div>
-                <div className="form-group" style={{ flex: "1 1 140px", margin: 0 }}>
-                  <label htmlFor="visit-slot" style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
-                    Time
-                  </label>
-                  <select
-                    id="visit-slot"
-                    value={visitSlot}
-                    onChange={(e) => setVisitSlot(e.target.value)}
-                    disabled={!!pending}
-                    style={{ width: "100%" }}
-                  >
-                    <option value="morning">Morning (9am–11am)</option>
-                    <option value="afternoon">Afternoon (1pm–3pm)</option>
-                    <option value="evening">Evening (4pm–6pm)</option>
-                    <option value="flexible">Flexible</option>
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-                <Button
-                  variant="primary"
-                  onClick={handleConvertAssessment}
-                  loading={pending === "convert"}
-                  disabled={!!pending || !visitDate}
-                  size="sm"
-                >
-                  Book a look
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAssessmentForm(false)}
-                  disabled={!!pending}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
+          Recommended next step
+        </p>
+        <div style={{ marginTop: "var(--space-2)", fontSize: "var(--text-base)", fontWeight: 700 }}>
+          {guidance.recommendedLabel}
+        </div>
+        <div style={{ marginTop: "var(--space-1)", fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+          {guidance.recommendedDetail}
+        </div>
+        <div
+          style={{
+            marginTop: "var(--space-3)",
+            display: "flex",
+            gap: "var(--space-2)",
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          {primaryAction}
+          {!primaryAction && guidance.followUpKind && guidance.followUpHref && (
+            <LinkButton href={guidance.followUpHref} variant="primary">
+              {guidance.followUpKind === "view_visit" ? "Open the visit" : "Open the job"}
+            </LinkButton>
           )}
         </div>
 
-        {!isFinal && (
-          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+        {guidance.primaryActionKind === "schedule_assessment" && showAssessmentForm && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--space-3)",
+              marginTop: "var(--space-3)",
+              padding: "var(--space-3)",
+              background: "var(--bg)",
+              borderRadius: "var(--radius)",
+              border: "1px solid var(--border)",
+            }}
+          >
+            <strong style={{ fontSize: "var(--text-sm)" }}>Confirm assessment date</strong>
+            <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+              Creates an <strong>Assessment</strong> visit (site visit) with the assessment form — not a work day.
+            </p>
+            <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+              <div className="form-group" style={{ flex: "1 1 160px", margin: 0 }}>
+                <label htmlFor="visit-date" style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                  Date
+                </label>
+                <input
+                  id="visit-date"
+                  type="date"
+                  value={visitDate}
+                  onChange={(e) => setVisitDate(e.target.value)}
+                  disabled={!!pending}
+                  style={{ width: "100%" }}
+                />
+              </div>
+              <div className="form-group" style={{ flex: "1 1 140px", margin: 0 }}>
+                <label htmlFor="visit-slot" style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                  Time
+                </label>
+                <select
+                  id="visit-slot"
+                  value={visitSlot}
+                  onChange={(e) => setVisitSlot(e.target.value)}
+                  disabled={!!pending}
+                  style={{ width: "100%" }}
+                >
+                  <option value="morning">Morning (9am–11am)</option>
+                  <option value="afternoon">Afternoon (1pm–3pm)</option>
+                  <option value="evening">Evening (4pm–6pm)</option>
+                  <option value="flexible">Flexible</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+              <Button
+                variant="primary"
+                onClick={handleConvertAssessment}
+                loading={pending === "convert"}
+                disabled={!!pending || !visitDate}
+              >
+                Book a look
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAssessmentForm(false)}
+                disabled={!!pending}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {pathChosen ? pathPicker : null}
+
+      <details>
+        <summary style={{ cursor: "pointer", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+          Pricing and notes
+        </summary>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", marginTop: "var(--space-3)" }}>
+          <Textarea
+            id="review_notes"
+            label="Review Notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Duplicate of #…, needs address clarification, out of service area…"
+            rows={3}
+            disabled={!!pending || isFinal}
+          />
+          <div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "var(--space-2)",
+                marginBottom: "var(--space-2)",
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: "var(--text-xs)",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  color: "var(--fg-muted)",
+                }}
+              >
+                Pricing style
+              </p>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+                {pricingMode ? PRICING_LABELS[pricingMode] : "Optional"}
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+              {(["flat_rate", "hourly_internal"] as const).map((mode) => (
+                <Button
+                  key={mode}
+                  type="button"
+                  variant={pricingMode === mode ? "primary" : "secondary"}
+                  size="sm"
+                  onClick={() => handlePricingModeChange(mode)}
+                  loading={pending === `pricing-${mode}`}
+                  disabled={!!pending || isFinal}
+                >
+                  {PRICING_LABELS[mode]}
+                </Button>
+              ))}
+            </div>
+            <p style={{ margin: "var(--space-2) 0 0", fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+              {pricingMode ? PRICING_HELPER[pricingMode] : "Optional. The recommended step above is the next action."}
+            </p>
+          </div>
+        </div>
+      </details>
+
+      {!isFinal && (
+        <details>
+          <summary style={{ cursor: "pointer", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+            Status and other actions
+          </summary>
+          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginTop: "var(--space-2)" }}>
             {(["reviewed", "needs_info", "duplicate", "lost", "cancelled"] as ReviewStatus[]).map((s) => (
               <Button
                 key={s}
@@ -647,14 +643,16 @@ export function ReviewActions({
               Save Notes Only
             </Button>
           </div>
-        )}
+        </details>
+      )}
 
-        <div style={{ marginTop: "var(--space-2)", paddingTop: "var(--space-3)", borderTop: "1px dashed var(--border)" }}>
-          <p style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-xs)", fontWeight: 600, color: "var(--fg-muted)" }}>
-            Send intake form to client
-          </p>
+      <details>
+        <summary style={{ cursor: "pointer", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>
+          Send intake form to client
+        </summary>
+        <div style={{ marginTop: "var(--space-2)" }}>
           {intakeSent ? (
-            <p style={{ fontSize: "var(--text-xs)", color: "#16a34a", margin: 0 }}>✓ Intake form sent successfully.</p>
+            <p style={{ fontSize: "var(--text-xs)", color: "#16a34a", margin: 0 }}>Intake form sent.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
               {!clientEmail && (
@@ -686,7 +684,7 @@ export function ReviewActions({
               {intakeError && (
                 <p style={{ fontSize: "var(--text-xs)", color: "#dc2626", margin: 0 }}>{intakeError}</p>
               )}
-              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+              <div>
                 <Button
                   variant="secondary"
                   size="sm"
@@ -700,7 +698,7 @@ export function ReviewActions({
             </div>
           )}
         </div>
-      </div>
+      </details>
 
       {isFinal && (
         <p style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>

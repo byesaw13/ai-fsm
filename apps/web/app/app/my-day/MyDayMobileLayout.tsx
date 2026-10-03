@@ -191,28 +191,6 @@ export function MyDayMobileLayout({
         </div>
       ) : null}
 
-      {complete ? (
-        <>
-          <Link
-            href="/app/day-review"
-            data-testid="end-my-day-button"
-            className="p7-btn p7-btn-secondary"
-            style={{
-              width: "100%",
-              minHeight: 48,
-              marginBottom: "var(--space-4)",
-              fontWeight: 700,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "var(--space-2)",
-            }}
-          >
-            End day
-          </Link>
-        </>
-      ) : null}
-
       <StartMyDayWizard
         open={wizardOpen}
         onClose={() => setWizardOpen(false)}
@@ -227,6 +205,23 @@ export function MyDayMobileLayout({
       </div>
 
       {children}
+
+      {complete ? (
+        <div style={{ marginTop: "var(--space-6)", textAlign: "center" }}>
+          <Link
+            href="/app/day-review"
+            data-testid="end-my-day-button"
+            style={{
+              color: "var(--fg-muted)",
+              fontSize: "var(--text-sm)",
+              fontWeight: 600,
+              textDecoration: "underline",
+            }}
+          >
+            End day
+          </Link>
+        </div>
+      ) : null}
     </>
   );
 }

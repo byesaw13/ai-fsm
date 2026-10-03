@@ -29,6 +29,7 @@ Layer 4 — TASKS (what's the next unit of work?)
 
 Layer 5 — DOCTRINE (how do we build without making debt worse?)
   docs/working/execution-doctrine.md
+  docs/working/ux-implementation-direction.md
 ```
 
 1. Code and database migrations are the implemented truth.
@@ -51,7 +52,9 @@ Canonical docs for product direction:
 
 Working doctrine: `docs/working/execution-doctrine.md`
 
-Working, archived, and generated documents can provide implementation evidence or historical context, but they do not define product scope.
+UX implementation direction: `docs/working/ux-implementation-direction.md`. Read and follow it before UI or workflow changes. Preserve working architecture unless that file explicitly calls for replacement. It governs presentation and the code deltas it names. It does not redefine product scope in `docs/canonical/`.
+
+Other working, archived, and generated documents can provide implementation evidence or historical context, but they do not define product scope.
 
 ## Commands
 

@@ -13,6 +13,7 @@ import {
 } from "@/components/ui";
 import type { FilterDef } from "@/components/ui";
 import { MONEY_HUB_LINKS } from "@/lib/navigation/hubs";
+import { businessMonthKey } from "@/lib/reports/business-month";
 import { formatCents } from "./format";
 import { loadReportData, loadInvoiceAging } from "./queries";
 import { FinancialSection } from "./sections/FinancialSection";
@@ -39,7 +40,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   if (!canViewReports(session.role)) redirect("/app");
 
   const { month } = await searchParams;
-  const today = new Date().toISOString().slice(0, 7);
+  const today = businessMonthKey(new Date(), "America/New_York");
   const targetMonth = month && /^\d{4}-\d{2}$/.test(month) ? month : today;
 
   const data = await loadReportData(session.accountId, targetMonth);
@@ -83,9 +84,10 @@ export default async function ReportsPage({ searchParams }: PageProps) {
       {/* KPI summary */}
       <MetricGrid
         metrics={[
-          { label: "Revenue (Paid)", value: formatCents(data.revenuePaidCents), variant: data.revenuePaidCents > 0 ? "success" : "default" },
+          { label: "Invoiced", value: formatCents(data.revenueTotalCents), variant: data.revenueTotalCents > 0 ? "success" : "default" },
+          { label: "Cash Collected", value: formatCents(data.cashCollectedCents), variant: data.cashCollectedCents > 0 ? "success" : "default" },
           { label: "Total Expenses", value: formatCents(data.expensesTotalCents), variant: data.expensesTotalCents > 0 ? "alert" : "default" },
-          { label: "Net (Paid − Expenses)", value: formatCents(data.netCents), variant: data.netCents < 0 ? "alert" : data.netCents > 0 ? "success" : "default" },
+          { label: "Net (Collected − Expenses)", value: formatCents(data.netCents), variant: data.netCents < 0 ? "alert" : data.netCents > 0 ? "success" : "default" },
           { label: "Outstanding AR", value: formatCents(data.revenueOutstandingCents), variant: data.revenueOutstandingCents > 0 ? "alert" : "default" },
           { label: "Estimate Conversion", value: `${data.conversionRate}%`, variant: data.conversionRate >= 30 ? "success" : data.conversionRate > 0 ? "default" : "alert" },
           { label: "Active Jobs", value: String(data.totalJobs), variant: "default" },
@@ -118,6 +120,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         lowValue={data.lowValue}
         overrideReasonRows={data.overrideReasonRows}
         belowMinimumEstimates={data.belowMinimumEstimates}
+        minimumServiceFeeCents={data.minimumServiceFeeCents}
       />
       <EstimateMarginsSection rows={data.estimateMarginRows} />
     </PageContainer>

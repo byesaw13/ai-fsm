@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { Card, SectionHeader } from "@/components/ui";
-import { MINIMUM_SERVICE_FEE_CENTS } from "@ai-fsm/domain";
 import { formatCents, pctOf, OVERRIDE_REASON_LABELS } from "../format";
 import type { PricingSummaryRow, LowValueRow, OverrideReasonRow, BelowMinimumEstimateRow } from "../queries";
 
@@ -10,15 +9,16 @@ interface Props {
   lowValue: LowValueRow;
   overrideReasonRows: OverrideReasonRow[];
   belowMinimumEstimates: BelowMinimumEstimateRow[];
+  minimumServiceFeeCents: number;
 }
 
 /** Estimate pricing guardrails — salvaged from the retired Pricing Dashboard. */
-export function PricingHealthSection({ pricingSummary, lowValue, overrideReasonRows, belowMinimumEstimates }: Props) {
+export function PricingHealthSection({ pricingSummary, lowValue, overrideReasonRows, belowMinimumEstimates, minimumServiceFeeCents }: Props) {
   return (
     <Card style={{ marginTop: "var(--space-4)" }}>
       <SectionHeader title="Pricing Health" />
       <p style={{ padding: "0 var(--space-3) var(--space-2)", color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
-        Estimate pricing guardrails (all dates). Minimum service fee: {formatCents(MINIMUM_SERVICE_FEE_CENTS)}.
+        Estimate pricing guardrails (all dates). Minimum service fee: {formatCents(minimumServiceFeeCents)}.
       </p>
       <div style={{ padding: "var(--space-3)", display: "flex", gap: "var(--space-6)", flexWrap: "wrap", fontSize: "var(--text-sm)" }}>
         <div>

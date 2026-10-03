@@ -136,59 +136,70 @@ export function Step3Adjustments({
 
 
       <section style={{ display: "grid", gap: "var(--space-3)", padding: "var(--space-4)", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--bg)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)", alignItems: "center" }}>
-          <h3 style={{ margin: 0, fontSize: "var(--text-base)", lineHeight: 1.3 }}>Deposit & Terms</h3>
-          <label style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", fontSize: "var(--text-sm)", fontWeight: 600 }}>
-            <input
-              type="checkbox"
-              checked={depositRequired}
-              onChange={(e) => {
-                setDepositRequired(e.target.checked);
-                if (!e.target.checked) setDepositType("none");
-                if (e.target.checked && depositType === "none") setDepositType("percentage");
-              }}
-              disabled={pending}
-            />
-            Deposit required
-          </label>
+        <div>
+          <h3 style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-base)", lineHeight: 1.3 }}>Deposit</h3>
+          <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+            Percentage is the usual deposit. The amount is saved on this estimate when it is approved.
+          </p>
         </div>
 
-        {depositRequired && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "var(--space-3)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "var(--space-3)" }}>
             <label className="p7-field" style={{ marginBottom: 0 }}>
-              <span className="p7-label">Deposit type</span>
-              <select className="p7-select" value={depositType} onChange={(e) => setDepositType(e.target.value as DepositType)} disabled={pending}>
+              <span className="p7-label">Deposit</span>
+              <select
+                className="p7-select"
+                value={depositRequired ? depositType : "none"}
+                onChange={(e) => {
+                  const next = e.target.value as DepositType;
+                  if (next === "none") {
+                    setDepositRequired(false);
+                    setDepositType("none");
+                    return;
+                  }
+                  setDepositRequired(true);
+                  setDepositType(next);
+                }}
+                disabled={pending}
+              >
                 <option value="percentage">Percentage</option>
-                <option value="fixed">Fixed amount</option>
                 <option value="materials">Materials only</option>
+                <option value="none">No deposit</option>
+                <option value="fixed">Custom amount</option>
               </select>
             </label>
 
-            {depositType === "percentage" && (
+            {depositRequired && depositType === "percentage" && (
               <label className="p7-field" style={{ marginBottom: 0 }}>
                 <span className="p7-label">Deposit percentage</span>
                 <input className="p7-input" type="number" min="0" max="100" step="0.01" value={depositPercentage} onChange={(e) => setDepositPercentage(e.target.value)} disabled={pending} />
               </label>
             )}
 
-            {depositType === "fixed" && (
+            {depositRequired && depositType === "materials" && (
+              <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)", alignSelf: "end" }}>
+                Uses the customer-facing materials total. It updates if the materials change before approval.
+              </p>
+            )}
+
+            {depositRequired && depositType === "fixed" && (
               <label className="p7-field" style={{ marginBottom: 0 }}>
-                <span className="p7-label">Fixed deposit amount</span>
+                <span className="p7-label">Custom deposit amount</span>
                 <input className="p7-input" type="number" min="0" step="0.01" value={depositFixedDollars} onChange={(e) => setDepositFixedDollars(e.target.value)} disabled={pending} />
               </label>
             )}
 
-            <label className="p7-field" style={{ marginBottom: 0 }}>
-              <span className="p7-label">Deposit due</span>
-              <select className="p7-select" value={depositDueTrigger} onChange={(e) => setDepositDueTrigger(e.target.value as DepositDueTrigger)} disabled={pending}>
-                <option value="on_acceptance">On acceptance</option>
-                <option value="before_scheduling">Before scheduling</option>
-                <option value="before_material_order">Before materials are ordered</option>
-                <option value="custom">Per written agreement</option>
-              </select>
-            </label>
+            {depositRequired && (
+              <label className="p7-field" style={{ marginBottom: 0 }}>
+                <span className="p7-label">Deposit due</span>
+                <select className="p7-select" value={depositDueTrigger} onChange={(e) => setDepositDueTrigger(e.target.value as DepositDueTrigger)} disabled={pending}>
+                  <option value="on_acceptance">On acceptance</option>
+                  <option value="before_scheduling">Before scheduling</option>
+                  <option value="before_material_order">Before materials are ordered</option>
+                  <option value="custom">Per written agreement</option>
+                </select>
+              </label>
+            )}
           </div>
-        )}
 
         <div style={{ display: "grid", gap: "var(--space-2)" }}>
           <label style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", fontSize: "var(--text-sm)" }}>

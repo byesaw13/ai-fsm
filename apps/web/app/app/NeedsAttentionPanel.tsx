@@ -30,8 +30,10 @@ export function NeedsAttentionPanel({
           {items.map((item) => (
             <Link key={item.label} href={item.href} className="mobile-work-item">
               <span>
-                <strong>{item.label}</strong>
-                <small>{item.detail}</small>
+                <strong>{item.action}</strong>
+                <small>
+                  {item.priorityReason}. {item.detail}
+                </small>
               </span>
               <b>{item.count}</b>
             </Link>

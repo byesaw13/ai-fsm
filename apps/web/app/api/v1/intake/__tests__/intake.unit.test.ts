@@ -159,6 +159,45 @@ describe("POST /api/v1/intake", () => {
     ]);
   });
 
+  it("saves a phone intake before category, date, or address are known", async () => {
+    const { POST } = await import("../route");
+
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // set_config
+      .mockResolvedValueOnce({ rows: [] }) // SELECT client by email
+      .mockResolvedValueOnce({ rows: [] }) // SELECT client by phone
+      .mockResolvedValueOnce({ rows: [{ id: CLIENT_ID }] }) // INSERT client
+      .mockResolvedValueOnce({ rows: [{ id: JOB_ID }] }) // INSERT job
+      .mockResolvedValueOnce({ rows: [{ id: BOOKING_ID }] }) // INSERT booking_request
+      .mockResolvedValueOnce({ rows: [] }) // SELECT duplicate candidates
+      .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+    const res = await POST(makeRequest({
+      name: "John Smith",
+      phone: "603-555-0100",
+      email: "john@example.com",
+      service_description: "Bathroom exhaust fan",
+      preferred_contact: "phone",
+    }));
+
+    expect(res.status).toBe(201);
+    await expect(res.json()).resolves.toMatchObject({
+      id: BOOKING_ID,
+      propertyId: null,
+      routing_path: "pending",
+    });
+
+    const sql = mockClientQuery.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(sql).not.toContain("INSERT INTO properties");
+
+    const jobInsert = mockClientQuery.mock.calls.find((call) =>
+      String(call[0]).includes("INSERT INTO jobs")
+    );
+    expect(jobInsert?.[1]?.[2]).toBeNull();
+    expect(jobInsert?.[1]?.[3]).toBe("Request - John Smith");
+  });
+
   it("returns 400 for missing required fields", async () => {
     const { POST } = await import("../route");
 

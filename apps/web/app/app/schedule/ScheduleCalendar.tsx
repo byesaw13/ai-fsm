@@ -137,17 +137,17 @@ function VisitCard({ visit, isAdmin, isDragging, compact = false, onDragStart, o
       }}
       className="p7-card-hover"
     >
-      <div style={{ fontSize: "var(--text-sm)", fontWeight: 700, color: "var(--fg)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {visit.job_title}
-      </div>
-      {!compact && visit.client_name && (
-        <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 2 }}>
-          {visit.client_name}
-        </div>
-      )}
-      <div style={{ fontSize: "var(--text-xs)", color, fontWeight: 600, marginTop: 4 }}>
+      <div style={{ fontSize: "var(--text-xs)", color, fontWeight: 700 }}>
         {formatTimeRange(visit.scheduled_start, visit.scheduled_end)}
       </div>
+      <div style={{ fontSize: compact ? "var(--text-xs)" : "var(--text-sm)", fontWeight: 700, color: "var(--fg)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 2 }}>
+        {visit.client_name ? `${visit.client_name} · ${visit.job_title}` : visit.job_title}
+      </div>
+      {!compact && visit.property_address && (
+        <div style={{ fontSize: "var(--text-xs)", color: "var(--fg)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 2 }}>
+          {visit.property_address}
+        </div>
+      )}
       {!compact && visit.tech_name && (
         <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginTop: 2 }}>
           Tech: {visit.tech_name}
@@ -196,6 +196,12 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [dropError, setDropError] = useState<string | null>(null);
+  const [pendingMove, setPendingMove] = useState<{
+    visitId: string;
+    newStart: string;
+    newEnd: string;
+    message: string;
+  } | null>(null);
   const [quickBookDate, setQuickBookDate] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(toDateStr(new Date()));
   const visitsRef = useRef(visits);
@@ -296,6 +302,44 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
     setDropTarget(null);
   }, []);
 
+  const saveMove = useCallback(async (visitId: string, newStart: string, newEnd: string, allowOverlap: boolean) => {
+    try {
+      const res = await fetch(`/api/v1/visits/${visitId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scheduled_start: newStart,
+          scheduled_end: newEnd,
+          ...(allowOverlap ? { allow_overlap: true } : {}),
+        }),
+      });
+      const data = await res.json().catch(() => ({})) as { error?: { code?: string; message?: string } };
+      if (res.status === 409 && data.error?.code === "SCHEDULE_CONFLICT") {
+        setPendingMove({
+          visitId,
+          newStart,
+          newEnd,
+          message: data.error.message ?? "That time overlaps another visit.",
+        });
+        setLocalVisits(visitsRef.current);
+        return;
+      }
+      if (!res.ok) {
+        setDropError(data.error?.message ?? "Failed to reschedule");
+        setLocalVisits(visitsRef.current);
+        return;
+      }
+      setPendingMove(null);
+      setLocalVisits((prev) => prev.map((v) => (
+        v.id === visitId ? { ...v, scheduled_start: newStart, scheduled_end: newEnd } : v
+      )));
+      router.refresh();
+    } catch {
+      setDropError("Network error — reschedule failed");
+      setLocalVisits(visitsRef.current);
+    }
+  }, [router]);
+
   const handleDrop = useCallback(async (e: React.DragEvent, targetDateStr: string) => {
     e.preventDefault();
     const visitId = e.dataTransfer.getData("visitId");
@@ -306,25 +350,9 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
     if (!visitId || !origStart || !origEnd) return;
     if (toDateStr(new Date(origStart)) === targetDateStr) return;
     const { start: newStart, end: newEnd } = computeNewSchedule(origStart, origEnd, targetDateStr);
-    setLocalVisits(prev => prev.map(v => v.id === visitId ? { ...v, scheduled_start: newStart, scheduled_end: newEnd } : v));
-    try {
-      const res = await fetch(`/api/v1/visits/${visitId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scheduled_start: newStart, scheduled_end: newEnd }),
-      });
-      if (!res.ok) {
-        const data = await res.json() as { error?: { message?: string } };
-        setDropError(data.error?.message ?? "Failed to reschedule");
-        setLocalVisits(visitsRef.current);
-      } else {
-        router.refresh();
-      }
-    } catch {
-      setDropError("Network error — reschedule failed");
-      setLocalVisits(visitsRef.current);
-    }
-  }, [router]);
+    setDropError(null);
+    await saveMove(visitId, newStart, newEnd, false);
+  }, [saveMove]);
 
   const byDate = groupByDate(localVisits);
 
@@ -702,6 +730,25 @@ export function ScheduleCalendar({ visits, view, rangeStart, isAdmin }: Props) {
           )}
         </div>
       </div>
+
+      {pendingMove && (
+        <div role="alert" data-testid="schedule-conflict" style={{ marginBottom: "var(--space-3)", padding: "var(--space-3)", background: "rgba(217,119,6,0.12)", borderRadius: 6 }}>
+          <strong>Schedule conflict</strong>
+          <p style={{ margin: "var(--space-1) 0 var(--space-2)" }}>{pendingMove.message}</p>
+          <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+            <button type="button" className="p7-btn p7-btn-secondary" onClick={() => setPendingMove(null)}>
+              Choose another time
+            </button>
+            <button
+              type="button"
+              className="p7-btn p7-btn-primary"
+              onClick={() => saveMove(pendingMove.visitId, pendingMove.newStart, pendingMove.newEnd, true)}
+            >
+              Move anyway
+            </button>
+          </div>
+        </div>
+      )}
 
       {dropError && (
         <div style={{ marginBottom: "var(--space-3)", padding: "var(--space-2) var(--space-3)", background: "rgba(220,38,38,0.1)", borderRadius: 6, color: "#dc2626", fontSize: "var(--text-sm)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>

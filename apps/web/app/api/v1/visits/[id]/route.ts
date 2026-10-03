@@ -7,6 +7,12 @@ import { appendAuditLog } from "../../../../../lib/db/audit";
 import { logger } from "../../../../../lib/logger";
 import { computeCapStatus } from "../../../../../lib/visits/membership-cap";
 import { syncWorkOrderLeadFromVisit } from "../../../../../lib/work-orders/assign-lead";
+import {
+  assigneeOverlap,
+  scheduleConflictMessage,
+  scheduleSlotLabel,
+  type ScheduleSlot,
+} from "../../../../../lib/visits/schedule-overlap";
 import { MEMBERSHIP_VISIT_PHASES } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +32,7 @@ const ownerUpdateBody = z.object({
   membership_visit_phase: membershipVisitPhaseSchema.optional(),
   included_labor_minutes_used: z.number().int().nonnegative().optional(),
   membership_snapshot_sent: z.literal(true).optional(),
+  allow_overlap: z.literal(true).optional(),
 });
 
 // Tech can update notes, materials, issue description, and membership visit fields
@@ -121,12 +128,84 @@ export const PATCH = withAuth(
       }
 
       const old = existing.rows[0];
+      const data = parsed.data;
+      const scheduledStart = "scheduled_start" in data ? data.scheduled_start : undefined;
+      const scheduledEnd = "scheduled_end" in data ? data.scheduled_end : undefined;
+      const nextAssignedUserId = "assigned_user_id" in data ? data.assigned_user_id : undefined;
+      const allowOverlap = "allow_overlap" in data && data.allow_overlap === true;
+      const scheduleTouched =
+        scheduledStart !== undefined ||
+        scheduledEnd !== undefined ||
+        nextAssignedUserId !== undefined;
+
+      if (scheduleTouched && !allowOverlap) {
+        const rawAssignee = nextAssignedUserId !== undefined
+          ? nextAssignedUserId
+          : old.assigned_user_id;
+        const assignee = typeof rawAssignee === "string" ? rawAssignee : null;
+        const start = String(scheduledStart ?? old.scheduled_start ?? "");
+        const end = String(scheduledEnd ?? old.scheduled_end ?? "");
+        if (assignee && start && end) {
+          const conflictRows = await client.query<{
+            id: string;
+            assigned_user_id: string | null;
+            scheduled_start: string;
+            scheduled_end: string;
+            status: string;
+            client_name: string | null;
+            property_address: string | null;
+          }>(
+            `SELECT v.id, v.assigned_user_id, v.scheduled_start::text, v.scheduled_end::text, v.status,
+                    c.name AS client_name, p.address AS property_address
+             FROM visits v
+             JOIN jobs j ON j.id = v.job_id
+             LEFT JOIN clients c ON c.id = j.client_id
+             LEFT JOIN properties p ON p.id = j.property_id
+             WHERE v.account_id = $1
+               AND v.assigned_user_id = $2
+               AND v.id <> $3
+               AND v.status NOT IN ('cancelled', 'completed')
+               AND v.scheduled_start < $5::timestamptz
+               AND v.scheduled_end > $4::timestamptz
+             LIMIT 5`,
+            [session.accountId, assignee, String(id), start, end],
+          );
+          const slots: ScheduleSlot[] = conflictRows.rows.map((row) => ({
+            id: String(row.id),
+            assignedUserId: row.assigned_user_id == null ? null : String(row.assigned_user_id),
+            start: String(row.scheduled_start),
+            end: String(row.scheduled_end),
+            status: String(row.status),
+            label: scheduleSlotLabel(
+              row.client_name == null ? null : String(row.client_name),
+              row.property_address == null ? null : String(row.property_address),
+            ),
+          }));
+          const hit = assigneeOverlap({ id: String(id), assignedUserId: assignee, start, end }, slots);
+          if (hit) {
+            await client.query("ROLLBACK");
+            return NextResponse.json(
+              {
+                error: {
+                  code: "SCHEDULE_CONFLICT",
+                  message: scheduleConflictMessage(hit),
+                  conflict: { visit_id: hit.id, label: hit.label },
+                  traceId: session.traceId,
+                },
+              },
+              { status: 409 },
+            );
+          }
+        }
+      }
+
       const fields: string[] = [];
       const values: unknown[] = [];
       let idx = 3;
       const { membership_snapshot_sent, ...patchData } = parsed.data;
 
       for (const [key, val] of Object.entries(patchData)) {
+        if (key === "allow_overlap") continue;
         if (val !== undefined) {
           fields.push(`${key} = $${idx++}`);
           values.push(val);
