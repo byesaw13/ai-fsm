@@ -85,6 +85,13 @@ describe("visit face", () => {
       hasAddress: true,
     }).label).toBe("Open assessment");
     expect(visitCommand({
+      status: "in_progress",
+      fieldKind: "site_visit",
+      hasOpenTask: false,
+      hasAddress: true,
+      assessmentComplete: true,
+    }).label).toBe("Complete walkthrough");
+    expect(visitCommand({
       status: "traveling",
       fieldKind: "standard",
       hasOpenTask: false,
@@ -104,5 +111,12 @@ describe("visit face", () => {
     expect(checks.find((check) => check.key === "note")?.done).toBe(true);
     expect(checks.find((check) => check.key === "photos")?.done).toBe(false);
     expect(checks.find((check) => check.key === "materials")?.done).toBe(false);
+    expect(leaveChecks({
+      photoCount: 0,
+      materialsUsed: "",
+      partsRecorded: 2,
+      techNotes: "",
+      hasNextVisit: false,
+    }).find((check) => check.key === "materials")?.done).toBe(true);
   });
 });

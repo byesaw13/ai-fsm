@@ -456,8 +456,13 @@ export default async function VisitDetailPage({
     queryOneForSession<{ n: number; latest_id: string | null }>(
       session,
       `SELECT
-         (SELECT COUNT(*)::int FROM visit_media WHERE visit_id = $1 AND account_id = $2) AS n,
-         (SELECT id::text FROM visit_media WHERE visit_id = $1 AND account_id = $2 ORDER BY created_at DESC LIMIT 1) AS latest_id`,
+         (SELECT COUNT(*)::int FROM visit_media
+            WHERE visit_id = $1 AND account_id = $2
+              AND category IN ('before', 'after', 'assessment')) AS n,
+         (SELECT id::text FROM visit_media
+            WHERE visit_id = $1 AND account_id = $2
+              AND category IN ('before', 'after', 'assessment')
+            ORDER BY created_at DESC LIMIT 1) AS latest_id`,
       [id, session.accountId],
     ),
     visit.job_id
@@ -521,6 +526,8 @@ export default async function VisitDetailPage({
         photoCount={Number(mediaFace?.n ?? 0)}
         latestMediaId={mediaFace?.latest_id ?? null}
         materialsUsed={(visit as Visit & { materials_used?: string | null }).materials_used ?? null}
+        partsRecorded={visitParts.length}
+        assessmentComplete={!!assessmentCompletedAt}
         materialsNeeded={(visit as Visit & { materials_needed?: string | null }).materials_needed ?? null}
         techNotes={visit.tech_notes ?? null}
         hasNextVisit={!!laterVisit}

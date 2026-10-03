@@ -49,9 +49,11 @@ export function VisitFieldFace({
   photoCount,
   latestMediaId,
   materialsUsed,
+  partsRecorded = 0,
   materialsNeeded,
   techNotes,
   hasNextVisit,
+  assessmentComplete = false,
   canNotes,
   canCreateEstimate,
   approvedEstimateId,
@@ -75,9 +77,11 @@ export function VisitFieldFace({
   photoCount: number;
   latestMediaId: string | null;
   materialsUsed: string | null;
+  partsRecorded?: number;
   materialsNeeded: string | null;
   techNotes: string | null;
   hasNextVisit: boolean;
+  assessmentComplete?: boolean;
   canNotes: boolean;
   canCreateEstimate: boolean;
   approvedEstimateId: string | null;
@@ -94,7 +98,8 @@ export function VisitFieldFace({
   const toast = useToast();
   const photoRef = useRef<HTMLInputElement>(null);
   const primaryRef = useRef<HTMLDivElement>(null);
-  const addedSaved = useRef(false);
+  const savedLine = useRef<string | null>(null);
+  const inflight = useRef<{ line: string; promise: Promise<boolean> } | null>(null);
   const [pending, setPending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [primaryOff, setPrimaryOff] = useState(false);
@@ -102,6 +107,10 @@ export function VisitFieldFace({
   const [description, setDescription] = useState("");
   const [area, setArea] = useState("");
   const [localNotes, setLocalNotes] = useState(techNotes ?? "");
+
+  useEffect(() => {
+    setLocalNotes(techNotes ?? "");
+  }, [techNotes]);
 
   const open = openFieldTasks(tasks);
   const first = open[0] ?? null;
@@ -111,6 +120,7 @@ export function VisitFieldFace({
     fieldKind,
     hasOpenTask: !!first,
     hasAddress: !!address?.trim(),
+    assessmentComplete,
   });
   const place = fieldPlaceTitle(clientName, address);
   const purpose = fieldPurpose(jobTitle);
@@ -121,6 +131,7 @@ export function VisitFieldFace({
   const checks = leaveChecks({
     photoCount,
     materialsUsed,
+    partsRecorded,
     techNotes: localNotes,
     hasNextVisit,
   });
@@ -248,28 +259,49 @@ export function VisitFieldFace({
       toast.error("Describe the work first");
       return false;
     }
-    if (addedSaved.current) return true;
     if (!canNotes) {
       toast.error("You can’t add a note on this visit");
       return false;
     }
     const line = `Added work${area.trim() ? ` (${area.trim()})` : ""}: ${text}`;
-    const next = appendTechNote(localNotes, line);
-    const res = await fetch(visitNotesPath(visitId), {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tech_notes: next }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      toast.error(data.error?.message ?? "Could not save the note");
-      return false;
+    if (savedLine.current === line) return true;
+    if (inflight.current?.line === line) return inflight.current.promise;
+
+    const promise = (async () => {
+      const currentRes = await fetch(visitNotesPath(visitId));
+      const currentBody = await currentRes.json().catch(() => ({}));
+      if (!currentRes.ok) {
+        toast.error(currentBody.error?.message ?? "Could not read the current note");
+        return false;
+      }
+      const current = typeof currentBody?.data?.tech_notes === "string"
+        ? currentBody.data.tech_notes
+        : "";
+      const next = appendTechNote(current, line);
+      const res = await fetch(visitNotesPath(visitId), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tech_notes: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error?.message ?? "Could not save the note");
+        return false;
+      }
+      setLocalNotes(next);
+      toast.success("Saved as a note. It is not billable work yet.");
+      router.refresh();
+      return true;
+    })();
+
+    inflight.current = { line, promise };
+    try {
+      const ok = await promise;
+      if (ok) savedLine.current = line;
+      return ok;
+    } finally {
+      if (inflight.current?.promise === promise) inflight.current = null;
     }
-    setLocalNotes(next);
-    addedSaved.current = true;
-    toast.success("Saved as a note. It is not billable work yet.");
-    router.refresh();
-    return true;
   }
 
   async function saveThenGo(href: string) {
@@ -290,6 +322,17 @@ export function VisitFieldFace({
         <Link href={`/app/visits/${visitId}/assessment` as Route} className="p7-field-hero__primary">
           {command.label}
         </Link>
+      );
+    }
+    if (command.kind === "closeout") {
+      return (
+        <button
+          type="button"
+          className="p7-field-hero__primary"
+          onClick={() => openRecord("visit-actions")}
+        >
+          {command.label}
+        </button>
       );
     }
     if (command.kind === "task" && first) {

@@ -71,20 +71,27 @@ export type VisitCommand =
   | { kind: "task"; label: "Complete task" }
   | { kind: "navigate"; label: "Navigate" }
   | { kind: "assessment"; label: "Open assessment" }
+  | { kind: "closeout"; label: "Complete walkthrough" }
   | { kind: "none" };
 
 /**
  * On a work visit, start the visit before completing a task.
- * Site assessments open the existing assessment. Membership does not invent a task.
+ * A site visit opens the assessment until that assessment is saved,
+ * then the existing walkthrough close is the next action.
+ * Membership does not invent a task.
  */
 export function visitCommand(input: {
   status: string;
   fieldKind: VisitFieldKindName;
   hasOpenTask: boolean;
   hasAddress: boolean;
+  assessmentComplete?: boolean;
 }): VisitCommand {
   if (input.status === "completed" || input.status === "cancelled") return { kind: "none" };
-  if (input.fieldKind === "site_visit") return { kind: "assessment", label: "Open assessment" };
+  if (input.fieldKind === "site_visit") {
+    if (input.assessmentComplete) return { kind: "closeout", label: "Complete walkthrough" };
+    return { kind: "assessment", label: "Open assessment" };
+  }
   if (
     input.fieldKind !== "membership" &&
     (input.status === "in_progress" || input.status === "waiting") &&
@@ -107,12 +114,15 @@ export function showLeaveList(status: string): boolean {
 export function leaveChecks(input: {
   photoCount: number;
   materialsUsed: string | null | undefined;
+  /** Repair visits record parts in visit_parts instead of materials_used. */
+  partsRecorded?: number;
   techNotes: string | null | undefined;
   hasNextVisit: boolean;
 }): { key: "photos" | "materials" | "note" | "next"; label: string; done: boolean }[] {
+  const materialsDone = Boolean(input.materialsUsed?.trim()) || (input.partsRecorded ?? 0) > 0;
   return [
     { key: "photos", label: "Photos", done: input.photoCount > 0 },
-    { key: "materials", label: "Materials", done: Boolean(input.materialsUsed?.trim()) },
+    { key: "materials", label: "Materials", done: materialsDone },
     { key: "note", label: "Customer note", done: Boolean(input.techNotes?.trim()) },
     { key: "next", label: "Next visit", done: input.hasNextVisit },
   ];
