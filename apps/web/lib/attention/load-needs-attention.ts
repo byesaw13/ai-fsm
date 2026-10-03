@@ -9,6 +9,7 @@ import {
   type OpenOwnerPromiseRow,
 } from "@/lib/captures/promise-queue";
 import { loadCloseoutLeftovers } from "@/lib/attention/closeout-leftovers";
+import { attentionPriority, compareNeedsAttention } from "@/lib/attention/priority";
 import { HOLD_SEND_BILL_LABEL, CUSTOMER_REPORTS_LABEL } from "@/lib/attention/surfaces";
 import { REPORT_QUEUE_PARAMS, REPORT_QUEUE_WHERE } from "@/lib/job-reports/queue";
 
@@ -18,7 +19,34 @@ export type NeedsAttentionItem = {
   href: Route;
   detail: string;
   tone: "danger" | "warning" | "default";
+  /** What to do, shown in place of the bucket name. */
+  action: string;
+  /** Why this item is where it is in the list. */
+  priorityReason: string;
 };
+
+function presentAttention(
+  item: Omit<NeedsAttentionItem, "action" | "priorityReason">,
+  hints: { promiseTitle: string | null; materialTitle: string | null },
+): NeedsAttentionItem {
+  const priority = attentionPriority(item);
+  let action = item.label;
+  if (item.label === HOLD_SEND_BILL_LABEL) action = "Send the bill";
+  if (item.label === "Collect overdue bills") {
+    action = `Collect overdue bills — ${item.detail.replace(/ outstanding$/, "")}`;
+  }
+  if (item.label === "Collect deposits") action = "Collect the deposit";
+  if (item.label === "Order materials" && hints.materialTitle) {
+    action = `Order materials — ${hints.materialTitle}`;
+  }
+  if (item.label === "Customer Promises" && hints.promiseTitle) action = hints.promiseTitle;
+  if (item.label === "Open, no next visit" || item.label === "Schedule jobs") {
+    action = "Schedule the next visit";
+  }
+  if (item.label === "Review requests") action = "Decide the next step";
+  if (item.label === "Draft bills") action = "Send the draft bill";
+  return { ...item, action, priorityReason: priority.reason };
+}
 
 type CountRow = { count: string };
 type MoneyRow = { count: string; total_cents: string };
@@ -184,8 +212,7 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
   const exceptionJobCount = parseN(exceptionRows.find((r) => r.kind === "job"));
   const exceptionVisitCount = parseN(exceptionRows.find((r) => r.kind === "visit"));
 
-  const items = (
-    [
+  const rawItems: Array<Omit<NeedsAttentionItem, "action" | "priorityReason">> = [
       {
         label: HOLD_SEND_BILL_LABEL,
         count: leftovers.finishedUnbilled,
@@ -288,14 +315,16 @@ export async function loadNeedsAttention(session: SessionPayload): Promise<{
         tone: "default",
       },
       customerPromiseBucket(toPromiseToneInput(openPromiseRows)),
-    ] satisfies NeedsAttentionItem[]
-  )
+  ];
+  const items = rawItems
     .filter((item) => item.count > 0)
-    .sort(
-      (a, b) =>
-        ({ danger: 0, warning: 1, default: 2 })[a.tone] -
-        ({ danger: 0, warning: 1, default: 2 })[b.tone],
-    );
+    .map((item) =>
+      presentAttention(item, {
+        promiseTitle: openPromiseRows.length === 1 ? openPromiseRows[0].title : null,
+        materialTitle: materialJobs.length === 1 ? materialJobs[0].title : null,
+      }),
+    )
+    .sort(compareNeedsAttention);
 
   return { items, openPromiseRows };
 }

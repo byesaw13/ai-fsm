@@ -37,9 +37,9 @@ export function VisitRescheduleForm({ visitId, initialStart, initialEnd }: Props
   );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conflict, setConflict] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function save(allowOverlap: boolean) {
     const { start, end } = scheduleToISOPair(schedule);
     if (!start || !end) { setError("Date and time are required"); return; }
     setError(null);
@@ -48,13 +48,23 @@ export function VisitRescheduleForm({ visitId, initialStart, initialEnd }: Props
       const res = await fetch(`/api/v1/visits/${visitId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scheduled_start: start, scheduled_end: end }),
+        body: JSON.stringify({
+          scheduled_start: start,
+          scheduled_end: end,
+          ...(allowOverlap ? { allow_overlap: true } : {}),
+        }),
       });
       const data = await res.json();
+      if (res.status === 409 && data.error?.code === "SCHEDULE_CONFLICT") {
+        setConflict(data.error.message ?? "That time overlaps another visit.");
+        return;
+      }
       if (!res.ok) {
+        setConflict(null);
         setError(data.error?.message ?? "Failed to reschedule visit");
         return;
       }
+      setConflict(null);
       toast.success("Visit rescheduled");
       router.refresh();
     } catch {
@@ -64,12 +74,25 @@ export function VisitRescheduleForm({ visitId, initialStart, initialEnd }: Props
     }
   }
 
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await save(false);
+  }
+
   return (
     <Card data-testid="visit-reschedule-form">
       <SectionHeader title="Reschedule" />
       <form onSubmit={handleSubmit} className="p7-form-stack" style={{ marginTop: "var(--space-3)" }}>
         {error && (
           <p className="error-inline" role="alert">{error}</p>
+        )}
+        {conflict && (
+          <div role="alert" data-testid="schedule-conflict">
+            <p style={{ margin: "0 0 var(--space-2)" }}>Schedule conflict. {conflict}</p>
+            <Button type="button" variant="secondary" disabled={pending} onClick={() => save(true)}>
+              Move anyway
+            </Button>
+          </div>
         )}
         <ScheduleFields value={schedule} onChange={setSchedule} disabled={pending} />
         <div className="p7-form-actions">

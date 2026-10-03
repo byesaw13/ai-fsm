@@ -334,6 +334,7 @@ describe("PATCH /api/v1/visits/[id]", () => {
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
       .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
       .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] }) // assignee overlap
       .mockResolvedValueOnce({ rows: [updated] }) // UPDATE
       .mockResolvedValueOnce({ rows: [] }); // COMMIT
 
@@ -353,6 +354,7 @@ describe("PATCH /api/v1/visits/[id]", () => {
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
       .mockResolvedValueOnce({ rows: [] }) // SET LOCAL
       .mockResolvedValueOnce({ rows: [existing] }) // SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [] }) // assignee overlap
       .mockResolvedValueOnce({ rows: [updated] }) // UPDATE visit
       .mockResolvedValueOnce({ rows: [] }) // sync WO lead
       .mockResolvedValueOnce({ rows: [] }); // COMMIT
@@ -413,6 +415,57 @@ describe("PATCH /api/v1/visits/[id]", () => {
       expect.stringContaining("membership_snapshot_sent_at = COALESCE(membership_snapshot_sent_at, now())"),
       expect.any(Array)
     );
+  });
+
+  it("returns 409 when the new time overlaps the assignee, and 200 when the owner moves anyway", async () => {
+    const otherStart = "2026-10-02T13:00:00.000Z";
+    const otherEnd = "2026-10-02T15:00:00.000Z";
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+          assigned_user_id: USER_ID,
+          scheduled_start: otherStart,
+          scheduled_end: otherEnd,
+          status: "scheduled",
+          client_name: "Smith",
+          property_address: "18 Main St",
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+    const conflict = await visitPatch(
+      makeRequest("PATCH", `${VISITS_BASE}/${VISIT_ID}`, {
+        scheduled_start: otherStart,
+        scheduled_end: otherEnd,
+      }),
+    );
+    expect(conflict.status).toBe(409);
+    const conflictJson = await conflict.json();
+    expect(conflictJson.error.code).toBe("SCHEDULE_CONFLICT");
+    expect(conflictJson.error.message).toContain("Smith · 18 Main St");
+
+    const updated = { ...SAMPLE_VISIT, scheduled_start: otherStart, scheduled_end: otherEnd };
+    mockClientQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [SAMPLE_VISIT] })
+      .mockResolvedValueOnce({ rows: [updated] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const forced = await visitPatch(
+      makeRequest("PATCH", `${VISITS_BASE}/${VISIT_ID}`, {
+        scheduled_start: otherStart,
+        scheduled_end: otherEnd,
+        allow_overlap: true,
+      }),
+    );
+    expect(forced.status).toBe(200);
+    const overlapSql = mockClientQuery.mock.calls.map((call) => String(call[0])).join("\n");
+    expect(overlapSql).toContain("v.assigned_user_id = $2");
   });
 });
 

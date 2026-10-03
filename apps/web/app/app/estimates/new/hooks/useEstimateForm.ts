@@ -157,8 +157,8 @@ export function useEstimateForm({
   );
   const [taxRate, setTaxRate] = useState("0");
   const [sendImmediately, setSendImmediately] = useState(false);
-  const [depositRequired, setDepositRequired] = useState(false);
-  const [depositType, setDepositType] = useState<DepositType>("none");
+  const [depositRequired, setDepositRequired] = useState(true);
+  const [depositType, setDepositType] = useState<DepositType>("percentage");
   const [depositPercentage, setDepositPercentage] = useState(
     String(defaultDepositPercent ?? STANDARD_DEPOSIT_PERCENT),
   );

@@ -47,30 +47,40 @@ export function StopInterviewSection({ payload }: { payload: StopInterviewPayloa
       ) : null}
 
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
-        {unanswered.map((stop) => (
+        {unanswered.map((stop, index) => (
           <StopCard
             key={stop.segmentId}
             stop={stop}
             receipts={payload.receipts}
             jobTargets={payload.jobTargets}
             onSaved={() => router.refresh()}
+            anchorId={index === 0 ? "next-unresolved" : undefined}
           />
         ))}
-        {answered.map((stop) => (
-          <Card key={stop.segmentId} data-testid={`stop-done-${stop.segmentId}`}>
-            <div style={{ fontWeight: 600, fontSize: "var(--text-sm)" }}>
-              {fmtTime(stop.startedAt)}
-              {stop.stillThere ? " · still there" : ""}
-              {" · "}
-              {stop.clientName ? `${stop.clientName} · ` : ""}
-              {stop.propertyAddress ?? stop.placeLabel}
+        {answered.length > 0 ? (
+          <details data-testid="stops-already-matched">
+            <summary style={{ cursor: "pointer", fontWeight: 600 }}>
+              {answered.length} {answered.length === 1 ? "stop" : "stops"} matched already
+            </summary>
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)", marginTop: "var(--space-3)" }}>
+              {answered.map((stop) => (
+                <Card key={stop.segmentId} data-testid={`stop-done-${stop.segmentId}`}>
+                  <div style={{ fontWeight: 600, fontSize: "var(--text-sm)" }}>
+                    {fmtTime(stop.startedAt)}
+                    {stop.stillThere ? " · still there" : ""}
+                    {" · "}
+                    {stop.clientName ? `${stop.clientName} · ` : ""}
+                    {stop.propertyAddress ?? stop.placeLabel}
+                  </div>
+                  <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
+                    {STOP_REASON_LABELS[stop.answeredReason!]}
+                    {stop.answeredNotes ? ` — ${stop.answeredNotes}` : ""}
+                  </div>
+                </Card>
+              ))}
             </div>
-            <div style={{ fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>
-              {STOP_REASON_LABELS[stop.answeredReason!]}
-              {stop.answeredNotes ? ` — ${stop.answeredNotes}` : ""}
-            </div>
-          </Card>
-        ))}
+          </details>
+        ) : null}
       </div>
     </section>
   );
@@ -81,11 +91,13 @@ function StopCard({
   receipts,
   jobTargets,
   onSaved,
+  anchorId,
 }: {
   stop: StopInterviewCard;
   receipts: StopInterviewPayload["receipts"];
   jobTargets: StopInterviewPayload["jobTargets"];
   onSaved: () => void;
+  anchorId?: string;
 }) {
   const toast = useToast();
   const [reason, setReason] = useState<StopReason | null>(stop.suggested);
@@ -161,7 +173,7 @@ function StopCard({
   }
 
   return (
-    <Card data-testid={`stop-card-${stop.segmentId}`}>
+    <Card id={anchorId} data-testid={`stop-card-${stop.segmentId}`}>
       <div style={{ fontWeight: 600 }}>
         {fmtTime(stop.startedAt)}
         {stop.stillThere ? "–now" : stop.endedAt ? `–${fmtTime(stop.endedAt)}` : ""}

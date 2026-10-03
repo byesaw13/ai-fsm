@@ -24,6 +24,8 @@ import { ProductionStorySection } from "./ProductionStorySection";
 import { VisitsSection } from "./VisitsSection";
 import { TimeSection } from "./TimeSection";
 import { MileageSection } from "./MileageSection";
+import { ScrollToNextUnresolved } from "./ScrollToNextUnresolved";
+import { dayReviewLead } from "@/lib/day-review/review-lead";
 
 export const dynamic = "force-dynamic";
 
@@ -126,6 +128,15 @@ export default async function DayReviewPage({
   const story = companyDayStory(storyInput);
   const hold = storyInput.billsOnHold.length === 1 ? storyInput.billsOnHold[0] : undefined;
   const holdHref = hold?.invoiceId ? `/app/invoices/${hold.invoiceId}` : null;
+  const lead = dayReviewLead({
+    unansweredStops: stopInterview.unansweredCount,
+    suggestedStops: stopInterview.stops.filter((stop) => !stop.answeredReason && stop.suggested).length,
+    answeredStops: stopInterview.stops.filter((stop) => stop.answeredReason).length,
+    billsOnHold: storyInput.billsOnHold.length,
+    leftoverReceipts: stopInterview.receipts.length,
+    flaggedMiles: payload.mileage.flagged,
+    openPromises: reviewCaptures.length,
+  });
 
   const leftoverEngines = (
     <>
@@ -148,6 +159,20 @@ export default async function DayReviewPage({
   return (
     <PageContainer>
       {header}
+      <ScrollToNextUnresolved active={stopInterview.unansweredCount > 0} />
+      <section data-testid="day-review-lead" style={{ marginBottom: "var(--space-4)" }}>
+        <h2 style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-lg)", fontWeight: 800 }}>{lead.headline}</h2>
+        {lead.needsYou.length > 0 ? (
+          <ul style={{ margin: "0 0 var(--space-3)", paddingLeft: "1.1rem" }}>
+            {lead.needsYou.map((line) => (
+              <li key={line} style={{ marginBottom: "var(--space-1)" }}>{line}</li>
+            ))}
+          </ul>
+        ) : null}
+        {lead.handledSummary ? (
+          <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>{lead.handledSummary}. Review if needed.</p>
+        ) : null}
+      </section>
       <CompanyDayStoryCard story={story} holdHref={holdHref} />
       <DayCloseChecklist
         businessDayId={payload.businessDayId}
