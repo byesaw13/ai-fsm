@@ -134,6 +134,39 @@ export async function removeAutoMaterialHandlingLine(
   );
 }
 
+/** Freeze handling and card-fee percents while the invoice is still a draft. */
+export async function snapshotInvoiceFeePolicy(
+  client: PoolClient,
+  invoiceId: string,
+  accountId: string,
+): Promise<void> {
+  const account = await client.query<{ settings: Record<string, unknown> }>(
+    `SELECT settings FROM accounts WHERE id = $1`,
+    [accountId],
+  );
+  const pricing = await client.query<{ material_handling_pct: number; card_fee_pct: string | number }>(
+    `SELECT material_handling_pct, card_fee_pct
+     FROM business_pricing_settings WHERE account_id = $1`,
+    [accountId],
+  );
+  const legacyPct = account.rows[0]?.settings?.material_handling_pct;
+  const resolved = resolveMaterialHandlingPct({
+    snapshotPct: null,
+    pricingPct: pricing.rows[0]?.material_handling_pct ?? null,
+    legacyPct: typeof legacyPct === "number" ? legacyPct : null,
+    invoiceStatus: "sent",
+  });
+  const cardRaw = pricing.rows[0] ? Number(pricing.rows[0].card_fee_pct) : 0;
+  const cardFee = Number.isFinite(cardRaw) ? Math.min(10, Math.max(0, cardRaw)) : 0;
+  await client.query(
+    `UPDATE invoices
+     SET material_handling_pct_snapshot = COALESCE(material_handling_pct_snapshot, $2),
+         card_fee_pct_snapshot = COALESCE(card_fee_pct_snapshot, $3)
+     WHERE id = $1 AND account_id = $4 AND status = 'draft'`,
+    [invoiceId, resolved.pct, cardFee, accountId],
+  );
+}
+
 /** Recompute material handling from all material lines when enabled on the invoice. */
 export async function upsertMaterialHandlingFeeLine(
   client: PoolClient,

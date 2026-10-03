@@ -28,7 +28,7 @@ SELECT kind, id, title, detail, href FROM (
            ELSE 4
          END AS rank
   FROM properties p
-  JOIN clients c ON c.id = p.client_id AND c.account_id = p.account_id
+  LEFT JOIN clients c ON c.id = p.client_id AND c.account_id = p.account_id
   WHERE p.account_id = $1
     AND (
       c.name ILIKE $2 ESCAPE '\\'
@@ -59,3 +59,54 @@ SELECT kind, id, title, detail, href FROM (
 ) hits
 ORDER BY rank, title
 LIMIT 8`;
+
+/** Technician search: houses tied to a visit assigned to $3. No invoice numbers. */
+export const TECH_PROPERTY_SEARCH_SQL = `
+SELECT kind, id, title, detail, href FROM (
+  SELECT 'property'::text AS kind,
+         p.id::text AS id,
+         COALESCE(NULLIF(c.name, ''), NULLIF(p.name, ''), 'House') AS title,
+         p.address AS detail,
+         '/app/properties/' || p.id::text AS href,
+         CASE
+           WHEN c.name ILIKE $2 ESCAPE '\\' THEN 1
+           WHEN p.address ILIKE $2 ESCAPE '\\' THEN 2
+           WHEN COALESCE(p.name, '') ILIKE $2 ESCAPE '\\' THEN 3
+           ELSE 4
+         END AS rank
+  FROM properties p
+  LEFT JOIN clients c ON c.id = p.client_id AND c.account_id = p.account_id
+  WHERE p.account_id = $1
+    AND EXISTS (
+      SELECT 1
+      FROM jobs j
+      JOIN visits v ON v.job_id = j.id AND v.account_id = j.account_id
+      WHERE j.property_id = p.id
+        AND j.account_id = p.account_id
+        AND v.assigned_user_id = $3
+    )
+    AND (
+      c.name ILIKE $2 ESCAPE '\\'
+      OR COALESCE(p.name, '') ILIKE $2 ESCAPE '\\'
+      OR p.address ILIKE $2 ESCAPE '\\'
+      OR EXISTS (
+        SELECT 1
+        FROM jobs j
+        JOIN visits v ON v.job_id = j.id AND v.account_id = j.account_id
+        JOIN site_visit_assessments a ON a.visit_id = v.id AND a.account_id = j.account_id
+        WHERE j.property_id = p.id
+          AND j.account_id = p.account_id
+          AND v.assigned_user_id = $3
+          AND a.rooms::text ILIKE $2 ESCAPE '\\'
+      )
+    )
+) hits
+ORDER BY rank, title
+LIMIT 8`;
+
+export function propertySearchForRole(role: string): { sql: string; scopedToUser: boolean } {
+  if (role === "owner" || role === "admin") {
+    return { sql: PROPERTY_SEARCH_SQL, scopedToUser: false };
+  }
+  return { sql: TECH_PROPERTY_SEARCH_SQL, scopedToUser: true };
+}
