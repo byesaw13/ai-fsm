@@ -1,24 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui";
 import {
-  appendTechNote,
   buildMapsUrl,
   buildTelUrl,
-  heroKitchenHref,
-  heroKitchenLabel,
-  heroPrimaryAction,
-  heroPrimaryLabel,
-  visitNotesPath,
   type HeroVisit,
 } from "@/lib/my-day/visit-hero";
 import { formatBusinessTime } from "@/lib/time/business-tz";
-import { CloseoutWizard } from "@/components/visits/CloseoutWizard";
-import { HeroPhotoButton } from "./HeroPhotoButton";
+import {
+  fieldPlaceTitle,
+  fieldPurpose,
+  materialsNeededLine,
+  todayCommand,
+  todayWhenLabel,
+} from "@/lib/field/face";
 
 async function transitionVisit(visitId: string, targetStatus: string): Promise<string | null> {
   const res = await fetch(`/api/v1/visits/${visitId}/transition`, {
@@ -31,190 +30,126 @@ async function transitionVisit(visitId: string, targetStatus: string): Promise<s
   return null;
 }
 
-function formatTime(iso: string): string {
-  return formatBusinessTime(iso);
-}
-
-export function NextVisitHero({ visit, canSend = false }: { visit: HeroVisit; canSend?: boolean }) {
+export function NextVisitHero({ visit }: { visit: HeroVisit }) {
   const router = useRouter();
   const toast = useToast();
   const [pending, setPending] = useState(false);
-  const [closeoutOpen, setCloseoutOpen] = useState(false);
-  const [note, setNote] = useState("");
-  const [notePending, setNotePending] = useState(false);
-
   const mapsUrl = buildMapsUrl(visit.property_address);
   const telUrl = buildTelUrl(visit.client_phone);
-  const action = heroPrimaryAction(visit.status);
-  const activeOnSite = visit.status === "arrived" || visit.status === "in_progress";
-  const kicker = activeOnSite ? "Right now" : "Next";
-  const primaryLabel = heroPrimaryLabel(visit.status);
+  const command = todayCommand(visit.status, !!mapsUrl);
+  const place = fieldPlaceTitle(visit.client_name, visit.property_address);
+  const purpose = fieldPurpose(visit.job_title, "Look");
+  const needed = materialsNeededLine(visit.materials_needed);
+  const when = `${formatBusinessTime(visit.scheduled_start)} · ${todayWhenLabel(visit.status)}`;
 
-  async function handlePrimary() {
-    if (!action) return;
+  async function startJob() {
     setPending(true);
-    if (action === "complete") {
-      setPending(false);
-      setCloseoutOpen(true);
-      return;
-    }
-    const target = "arrived";
-    const err = await transitionVisit(visit.id, target);
+    const err = await transitionVisit(visit.id, "arrived");
     setPending(false);
     if (err) {
       toast.error(err);
       return;
     }
     toast.success("Job started");
+    router.push(`/app/visits/${visit.id}` as Route);
     router.refresh();
   }
 
-  async function handleSaveNote() {
-    const addition = note.trim();
-    if (!addition) return;
-    setNotePending(true);
-    try {
-      const getRes = await fetch(visitNotesPath(visit.id));
-      const getData = await getRes.json().catch(() => ({}));
-      if (!getRes.ok) {
-        toast.error(getData.error?.message ?? "Could not save note");
-        return;
-      }
-      const existing = (getData.data?.tech_notes as string | null) ?? "";
-      const res = await fetch(visitNotesPath(visit.id), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tech_notes: appendTechNote(existing, addition) }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast.error(data.error?.message ?? "Could not save note");
-        return;
-      }
-      setNote("");
-      toast.success("Note saved");
-      router.refresh();
-    } catch {
-      toast.error("Could not save note");
-    } finally {
-      setNotePending(false);
-    }
-  }
+  const primary = command.verb === "navigate" && mapsUrl ? (
+    <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="p7-field-hero__primary" data-testid="hero-navigate">
+      {command.label}
+    </a>
+  ) : command.verb === "continue" ? (
+    <Link href={`/app/visits/${visit.id}` as Route} className="p7-field-hero__primary" data-testid="hero-continue">
+      {command.label}
+    </Link>
+  ) : (
+    <button type="button" className="p7-field-hero__primary" data-testid="hero-start-job" disabled={pending} onClick={() => void startJob()}>
+      {pending ? "…" : command.label}
+    </button>
+  );
 
   return (
-    <div className="p7-field-hero" data-testid="next-visit-hero">
-      <div className="p7-field-hero__kicker">
-        {kicker} · {formatTime(visit.scheduled_start)}
-      </div>
-      <div className="p7-field-hero__title">{visit.job_title ?? "Untitled job"}</div>
-      {visit.client_name ? (
-        <div className="p7-field-hero__meta">{visit.client_name}</div>
-      ) : null}
-      {visit.property_address ? (
-        <div className="p7-field-hero__meta">{visit.property_address}</div>
-      ) : null}
-      {visit.first_up ? (
-        <div className="p7-field-hero__meta" data-testid="hero-first-up">
-          First up: {visit.first_up}
-        </div>
-      ) : null}
-
-      <div className="p7-field-hero__actions">
-        {primaryLabel ? (
-          <button
-            type="button"
-            onClick={handlePrimary}
-            disabled={pending}
-            data-testid="hero-start-job"
-            className="p7-field-hero__primary"
-          >
-            {pending ? "…" : primaryLabel}
-          </button>
+    <>
+      <section className="field-command" data-testid="next-visit-hero">
+        <p className="field-command__when">{when}</p>
+        <h2 className="field-command__place">{place}</h2>
+        <p className="field-command__purpose">{purpose}</p>
+        {visit.property_address && visit.client_name ? (
+          <p className="field-command__where">{visit.property_address}</p>
         ) : null}
-
-        <div
-          className="p7-field-hero__row"
-          style={{ gridTemplateColumns: "1fr 1fr 1fr" }}
-        >
-          <HeroPhotoButton visit={visit} />
-          {telUrl ? (
-            <a href={telUrl} className="p7-field-hero__secondary" data-testid="hero-call">
-              Call
-            </a>
-          ) : (
-            <button type="button" disabled className="p7-field-hero__secondary" title="No phone on file">
-              Call
+        {visit.first_up ? (
+          <p className="field-command__next" data-testid="hero-first-up">
+            <span>First up</span>
+            {visit.first_up}
+          </p>
+        ) : null}
+        {needed ? <p className="field-command__need">{needed}</p> : null}
+        <div className="field-command__inline-action">{primary}</div>
+        <div className="field-command__quiet">
+          {command.verb === "navigate" ? (
+            <button type="button" className="field-text-action" data-testid="hero-start-job" disabled={pending} onClick={() => void startJob()}>
+              {pending ? "…" : "Start job"}
             </button>
-          )}
-          {mapsUrl ? (
-            <a
-              href={mapsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p7-field-hero__secondary"
-              data-testid="hero-navigate"
-            >
-              Navigate
-            </a>
-          ) : (
-            <button type="button" disabled className="p7-field-hero__secondary" title="No address on file">
-              Navigate
-            </button>
-          )}
+          ) : null}
+          <span className="field-command__phone-only">
+            {telUrl ? (
+              <a href={telUrl} className="field-text-action" data-testid="hero-call">Call</a>
+            ) : null}
+            {command.verb !== "navigate" && mapsUrl ? (
+              <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="field-text-action" data-testid="hero-navigate">
+                Navigate
+              </a>
+            ) : null}
+          </span>
         </div>
+      </section>
+      <div className="field-command-dock">
+        {command.verb === "navigate" && mapsUrl ? (
+          <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="p7-field-hero__primary">
+            {place} · {command.label}
+          </a>
+        ) : command.verb === "continue" ? (
+          <Link href={`/app/visits/${visit.id}` as Route} className="p7-field-hero__primary">
+            {place} · {command.label}
+          </Link>
+        ) : (
+          <button type="button" className="p7-field-hero__primary" disabled={pending} onClick={() => void startJob()}>
+            {pending ? "…" : `${place} · ${command.label}`}
+          </button>
+        )}
       </div>
+    </>
+  );
+}
 
-      <div data-testid="hero-note" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
-        <textarea
-          data-testid="hero-note-input"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Voice or type a note"
-          rows={2}
-          disabled={notePending}
-          style={{
-            width: "100%",
-            minHeight: 56,
-            padding: "10px 12px",
-            borderRadius: "var(--radius-md)",
-            border: "1px solid var(--color-slate-700, #44403c)",
-            background: "var(--color-slate-800, #292524)",
-            color: "var(--color-slate-100, #f5f5f4)",
-            fontSize: "var(--text-sm)",
-            resize: "vertical",
-          }}
-        />
-        <button
-          type="button"
-          data-testid="hero-note-save"
-          className="p7-field-hero__secondary"
-          disabled={notePending || !note.trim()}
-          onClick={() => void handleSaveNote()}
-        >
-          {notePending ? "…" : "Save note"}
-        </button>
+/** Same stop, beside the list on a wide screen. Hidden on a phone. */
+export function TodayStopRail({ visit }: { visit: HeroVisit }) {
+  const mapsUrl = buildMapsUrl(visit.property_address);
+  const telUrl = buildTelUrl(visit.client_phone);
+  const needed = materialsNeededLine(visit.materials_needed);
+  return (
+    <aside className="field-today__rail" data-testid="today-stop-rail">
+      <p className="field-kicker">This stop</p>
+      {visit.first_up ? (
+        <p className="field-command__next">
+          <span>First up</span>
+          {visit.first_up}
+        </p>
+      ) : (
+        <p className="field-command__purpose">{fieldPurpose(visit.job_title, "Look")}</p>
+      )}
+      {needed ? <p className="field-command__need">{needed}</p> : null}
+      <div className="field-command__quiet">
+        {telUrl ? (
+          <a href={telUrl} className="field-text-action">Call</a>
+        ) : null}
+        {mapsUrl ? (
+          <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="field-text-action">
+            Navigate
+          </a>
+        ) : null}
       </div>
-
-      <Link
-        href={heroKitchenHref(visit.id) as Route}
-        data-testid="hero-more"
-        className="p7-field-hero__meta"
-        style={{
-          display: "block",
-          marginTop: "var(--space-1)",
-          fontWeight: 600,
-          color: "var(--color-forest-100, #fbeee4)",
-          textDecoration: "none",
-        }}
-      >
-        {heroKitchenLabel()}
-      </Link>
-      <CloseoutWizard
-        visitId={visit.id}
-        open={closeoutOpen}
-        onClose={() => setCloseoutOpen(false)}
-        canSend={canSend}
-      />
-    </div>
+    </aside>
   );
 }

@@ -43,6 +43,7 @@ import { MembershipVisitPanel } from "./MembershipVisitPanel";
 import { VisitSnapshotPanel } from "./VisitSnapshotPanel";
 import { VisitCommandBanner } from "./VisitCommandBanner";
 import { VisitDayTasks } from "./VisitDayTasks";
+import { VisitFieldFace } from "./VisitFieldFace";
 import { loadVisitPlannedTasks } from "@/lib/work-orders/job-tasks";
 import { VisitPropertyContext } from "./VisitPropertyContext";
 import { VisitHandoffCard } from "@/components/visits/VisitHandoffCard";
@@ -152,6 +153,8 @@ type VisitRow = Visit & {
   sub_status: string | null;
   visit_type: string | null;
   property_address: string | null;
+  client_name: string | null;
+  client_phone: string | null;
   work_order_id?: string | null;
 };
 
@@ -174,12 +177,14 @@ export default async function VisitDetailPage({
             j.title AS job_title, j.job_type AS job_type, j.description AS job_description,
             j.property_id AS job_property_id, j.client_id AS job_client_id,
             p.address AS property_address,
+            c.name AS client_name, c.phone AS client_phone,
             mp.annual_visit_count AS plan_annual_visit_count,
             mp.routing_zone AS plan_routing_zone,
             u.full_name AS assigned_user_name
      FROM visits v
      LEFT JOIN jobs j ON j.id = v.job_id
      LEFT JOIN properties p ON p.id = j.property_id
+     LEFT JOIN clients c ON c.id = j.client_id
      LEFT JOIN maintenance_plans mp ON mp.id = v.generated_from_plan_id AND mp.account_id = v.account_id
      LEFT JOIN users u ON u.id = v.assigned_user_id
      WHERE v.id = $1 AND v.account_id = $2`,
@@ -447,6 +452,43 @@ export default async function VisitDetailPage({
   // TASK-067: production sequence from lifecycle + visit-linked activities
   const productionTimeline = await loadVisitTimeline(session.accountId, id);
 
+  const [mediaFace, laterVisit, addWorkEstimate] = await Promise.all([
+    queryOneForSession<{ n: number; latest_id: string | null }>(
+      session,
+      `SELECT
+         (SELECT COUNT(*)::int FROM visit_media WHERE visit_id = $1 AND account_id = $2) AS n,
+         (SELECT id::text FROM visit_media WHERE visit_id = $1 AND account_id = $2 ORDER BY created_at DESC LIMIT 1) AS latest_id`,
+      [id, session.accountId],
+    ),
+    visit.job_id
+      ? queryOneForSession<{ id: string }>(
+          session,
+          `SELECT id::text FROM visits
+           WHERE job_id = $1 AND account_id = $2 AND id <> $3
+             AND status NOT IN ('cancelled','completed')
+             AND scheduled_start > now()
+           ORDER BY scheduled_start ASC
+           LIMIT 1`,
+          [visit.job_id, session.accountId, id],
+        )
+      : Promise.resolve(null),
+    !approvedEstimate && canCreateEstimate && visit.job_id
+      ? queryOneForSession<{ id: string }>(
+          session,
+          `SELECT id::text FROM estimates
+           WHERE job_id = $1 AND account_id = $2 AND status = 'approved'
+           ORDER BY created_at DESC LIMIT 1`,
+          [visit.job_id, session.accountId],
+        )
+      : Promise.resolve(null),
+  ]);
+
+  const onFieldFace = currentStatus !== "completed" && currentStatus !== "cancelled";
+  const hoistMembershipTools = onFieldFace && isMembershipVisit && !isRepairFlow;
+  const noteAnchor = isRepairFlow ? "visit-resolution" : "visit-notes";
+  const materialAnchor = isRepairFlow ? "visit-parts" : "need-material";
+  const usedAnchor = isRepairFlow ? "visit-parts" : "visit-materials";
+
   return (
     <PageContainer>
       {overdue && canReschedule && (currentStatus === "scheduled" || currentStatus === "arrived") && (
@@ -457,6 +499,75 @@ export default async function VisitDetailPage({
           jobTitle={visit.job_title}
         />
       )}
+      <VisitFieldFace
+        visitId={visit.id}
+        status={currentStatus}
+        clientName={visit.client_name}
+        address={visit.property_address}
+        jobTitle={visit.job_title}
+        clientPhone={visit.client_phone}
+        tasks={dayTasks.map((task) => ({
+          id: task.id,
+          label: task.label,
+          completed: task.completed,
+          status: task.status,
+        }))}
+        canToggleTasks={
+          canUpdateChecklist(session.role) ||
+          session.role === "owner" ||
+          session.role === "admin" ||
+          session.role === "tech"
+        }
+        photoCount={Number(mediaFace?.n ?? 0)}
+        latestMediaId={mediaFace?.latest_id ?? null}
+        materialsUsed={(visit as Visit & { materials_used?: string | null }).materials_used ?? null}
+        materialsNeeded={(visit as Visit & { materials_needed?: string | null }).materials_needed ?? null}
+        techNotes={visit.tech_notes ?? null}
+        hasNextVisit={!!laterVisit}
+        canNotes={canNotes}
+        canCreateEstimate={canCreateEstimate}
+        approvedEstimateId={approvedEstimate?.id ?? addWorkEstimate?.id ?? null}
+        clientId={visit.job_client_id}
+        jobId={visit.job_id}
+        propertyId={visit.job_property_id}
+        fieldKind={fieldKind}
+        noteAnchor={noteAnchor}
+        materialAnchor={materialAnchor}
+        usedAnchor={usedAnchor}
+      >
+        {hoistMembershipTools ? (
+          <>
+            <Card data-testid="membership-visit-phase-card">
+              <SectionHeader title="Membership Visit" />
+              <MembershipVisitPanel
+                visitId={visit.id}
+                phase={visit.membership_visit_phase ?? "health_check"}
+                capMinutes={visit.included_labor_cap_minutes}
+                minutesUsed={visit.included_labor_minutes_used ?? 0}
+                capStatus={visit.membership_cap_status ?? "within_cap"}
+                canUpdate={canNotes}
+                visitStatus={currentStatus}
+                propertyId={visit.job_property_id ?? null}
+                vaultCollection={membershipVaultCollection}
+              />
+            </Card>
+            {checklistItems.length > 0 && visit.membership_visit_phase !== "reporting" ? (
+              <Card id="visit-checklist" data-testid="visit-checklist-panel">
+                <SectionHeader title="Walkthrough Checklist" />
+                <VisitChecklistForm
+                  visitId={visit.id}
+                  initialItems={checklistItems}
+                  canUpdate={canChecklist}
+                  propertyId={visit.job_property_id ?? null}
+                />
+              </Card>
+            ) : null}
+          </>
+        ) : null}
+      </VisitFieldFace>
+      <details id="visit-record" className="field-record" data-testid="visit-field-record">
+        <summary>More</summary>
+        <div className="field-record__body">
       <Breadcrumbs
         items={
           session.role === "tech"
@@ -493,6 +604,7 @@ export default async function VisitDetailPage({
         }
       />
       <PageHeader
+        titleAs="p"
         title={`${
           visit.visit_type === "site_visit"
             ? "Assessment"
@@ -528,7 +640,7 @@ export default async function VisitDetailPage({
                 Print Report
               </LinkButton>
             )}
-            <span data-testid="visit-status">
+            <span>
               <StatusBadge variant={visit.status as StatusVariant}>
                 {VISIT_STATUS_LABELS[currentStatus]}
               </StatusBadge>
@@ -666,7 +778,7 @@ export default async function VisitDetailPage({
           )}
 
           {/* ── Membership visit: phase stepper + labor cap ── */}
-          {isMembershipVisit && !isRepairFlow && currentStatus !== "cancelled" && (
+          {isMembershipVisit && !isRepairFlow && currentStatus !== "cancelled" && !hoistMembershipTools && (
             <Card data-testid="membership-visit-phase-card">
               <SectionHeader title="Membership Visit" />
               <MembershipVisitPanel
@@ -751,7 +863,7 @@ export default async function VisitDetailPage({
 
           {/* ── Maintenance flow: full 28-item walkthrough (health_check / included_action phases) ── */}
           {!isRepairFlow && currentStatus !== "cancelled" && checklistItems.length > 0 &&
-            visit.membership_visit_phase !== "reporting" && (
+            visit.membership_visit_phase !== "reporting" && !hoistMembershipTools && (
             showMore("walkthrough_checklist") ? (
               <Disclosure title="More · walkthrough">
                 <VisitChecklistForm
@@ -1153,6 +1265,8 @@ export default async function VisitDetailPage({
           </Card>
         </div>
       </div>
+        </div>
+      </details>
     </PageContainer>
   );
 }

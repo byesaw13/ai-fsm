@@ -39,8 +39,8 @@ test.describe("P7 jobs/visits smoke", () => {
     await page.locator('[data-testid="visit-schedule-form"] button[type="submit"]').click();
 
     await page.waitForURL(/\/app\/visits\/[0-9a-f-]+/);
-    await expect(page.locator('[data-testid="visit-status"]')).toContainText("Scheduled");
-    await expect(page.locator("h1")).toContainText("Visit");
+    await expect(page.locator('[data-testid="visit-status"]')).toContainText("Next");
+    await expect(page.locator("h1")).toBeVisible();
   });
 });
 

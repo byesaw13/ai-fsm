@@ -50,8 +50,11 @@ test.describe("My Day mobile", () => {
     await expect(wizard.getByRole("button", { name: "Start mileage" })).toBeVisible();
   });
 
-  test("quick actions grid visible", async ({ page }) => {
+  test("quick actions sit under More", async ({ page }) => {
     await page.goto(`${BASE}/app/my-work`);
+    const more = page.getByTestId("today-more");
+    await expect(more).toBeVisible();
+    await more.locator("summary").click();
     await expect(page.getByTestId("field-quick-actions")).toBeVisible();
     await expect(page.getByText("Quote")).toBeVisible();
   });

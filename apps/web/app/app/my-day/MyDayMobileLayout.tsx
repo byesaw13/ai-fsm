@@ -5,11 +5,9 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StartMyDayWizard } from "./StartMyDayWizard";
 import { DayStatusPill } from "./DayStatusPill";
-import { NextVisitHero } from "./NextVisitHero";
+import { NextVisitHero, TodayStopRail } from "./NextVisitHero";
 import { FieldQuickActions } from "./FieldQuickActions";
-import { FieldRightNowCard } from "../my-work/FieldRightNowCard";
 import { PushPermissionPrompt } from "@/components/push/PushPermissionPrompt";
-import { todayNowKind, todayShowsFieldRightNow } from "@/lib/my-day/today-now";
 import { useToast } from "@/components/ui";
 import { isDaySetupComplete, startDayMode, type DaySetupState } from "@/lib/my-day/day-setup";
 import { shouldShowVisitHero, type HeroVisit } from "@/lib/my-day/visit-hero";
@@ -21,7 +19,6 @@ import type { DayMileageSummary } from "@/lib/mileage/sessions";
 export function MyDayMobileLayout({
   openSession,
   vehicles,
-  activityEntries,
   dayMileage,
   heroVisit,
   clockedIn,
@@ -31,6 +28,7 @@ export function MyDayMobileLayout({
   canQuickBook = false,
   priorDayNeedsMileage = false,
   priorOpenSession = null,
+  more = null,
   children,
 }: {
   openSession: OpenSession | null;
@@ -45,6 +43,7 @@ export function MyDayMobileLayout({
   canQuickBook?: boolean;
   priorDayNeedsMileage?: boolean;
   priorOpenSession?: OpenSession | null;
+  more?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -110,14 +109,11 @@ export function MyDayMobileLayout({
     setWizardOpen(true);
   }
 
-  return (
-    <>
-      {showHero && heroVisit ? (
-        <div style={{ marginBottom: "var(--space-4)" }}>
-          <NextVisitHero visit={heroVisit} canSend={canCapture} />
-        </div>
-      ) : null}
+  const showCommand = complete && showHero && !!heroVisit;
 
+  return (
+    <div className={showCommand ? "field-today field-today--split" : "field-today"}>
+      <div className="field-today__main">
       <PushPermissionPrompt enabled={!!canCapture} />
 
       {!complete ? (
@@ -162,49 +158,26 @@ export function MyDayMobileLayout({
           </div>
         </div>
       ) : (
-        <div style={{ marginBottom: "var(--space-4)" }}>
+        <>
+          {showCommand && heroVisit ? <NextVisitHero visit={heroVisit} /> : null}
           <DayStatusPill
             state={setup}
             vehicleLabel={openSession?.vehicle_nickname ?? null}
             milesToday={dayMileage.totalMiles}
             onReopen={() => setWizardOpen(true)}
           />
-        </div>
+        </>
       )}
 
-      {complete &&
-      todayShowsFieldRightNow(
-        todayNowKind({
-          dayStarted: complete,
-          hasParkProposal,
-          hasHero: showHero,
-        }),
-      ) ? (
-        <div style={{ marginBottom: "var(--space-4)" }}>
-          <FieldRightNowCard
-            openSession={openSession}
-            vehicles={vehicles}
-            activityEntries={activityEntries}
-            milesToday={dayMileage.totalMiles}
-            onStartMileage={() => setWizardOpen(true)}
-          />
-        </div>
-      ) : null}
-
-      <StartMyDayWizard
-        open={wizardOpen}
-        onClose={() => setWizardOpen(false)}
-        onVehicleReady={() => setVehicleStepDone(true)}
-        initialState={setup}
-        vehicles={vehicles}
-        priorOpenSession={priorOpenSession}
-      />
-
-      <div style={{ marginBottom: "var(--space-6)" }}>
-        <FieldQuickActions canQuickBook={canQuickBook} currentJobId={currentJobId} />
-      </div>
-
       {children}
+
+      <details className="field-more" data-testid="today-more">
+        <summary>More</summary>
+        <div className="field-more__body">
+          <FieldQuickActions canQuickBook={canQuickBook} currentJobId={currentJobId} />
+          {more}
+        </div>
+      </details>
 
       {complete ? (
         <div style={{ marginTop: "var(--space-6)", textAlign: "center" }}>
@@ -222,6 +195,16 @@ export function MyDayMobileLayout({
           </Link>
         </div>
       ) : null}
-    </>
+      </div>
+      {showCommand && heroVisit ? <TodayStopRail visit={heroVisit} /> : null}
+      <StartMyDayWizard
+        open={wizardOpen}
+        onClose={() => setWizardOpen(false)}
+        onVehicleReady={() => setVehicleStepDone(true)}
+        initialState={setup}
+        vehicles={vehicles}
+        priorOpenSession={priorOpenSession}
+      />
+    </div>
   );
 }

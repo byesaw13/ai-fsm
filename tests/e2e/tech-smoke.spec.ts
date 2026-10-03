@@ -53,8 +53,11 @@ test.describe("Tech smoke — assigned jobs and visits", () => {
     const firstCard = page.locator('[data-testid="visit-card"]').first();
     if (await firstCard.isVisible()) {
       await firstCard.click();
-      // Transition panel should be visible (status buttons)
-      await expect(page.locator('[data-testid="visit-notes-panel"]')).toBeVisible();
+      const notes = page.locator('[data-testid="visit-notes-panel"]');
+      if (!(await notes.isVisible())) {
+        await page.locator("#visit-record > summary").click();
+      }
+      await expect(notes).toBeVisible();
     }
   });
 
@@ -64,6 +67,9 @@ test.describe("Tech smoke — assigned jobs and visits", () => {
     if (await firstCard.isVisible()) {
       await firstCard.click();
       const textarea = page.locator('[data-testid="visit-notes-input"]');
+      if (!(await textarea.isVisible())) {
+        await page.locator("#visit-record > summary").click();
+      }
       await textarea.fill("Completed inspection — all clear.");
       await page.locator('[data-testid="save-notes-btn"]').click();
       await expect(page.locator(".success-inline")).toBeVisible();

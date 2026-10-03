@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { queryForSession } from "@/lib/db";
 import { formatVisitTime, isSameCalendarDay } from "@/lib/visits/formatting";
-import { BUSINESS_TIMEZONE, formatBusinessDateTime } from "@/lib/time/business-tz";
+import { BUSINESS_TIMEZONE } from "@/lib/time/business-tz";
 import { pickHeroVisit, type HeroVisit } from "@/lib/my-day/visit-hero";
 import { loadFieldDayData } from "@/lib/my-work/field-day-data";
 import {
@@ -18,18 +18,17 @@ import { ArrivalProposalBanner } from "@/components/field/ArrivalProposalBanner"
 import { Suspense } from "react";
 import {
   OPERATIONAL_VISIT_TYPES,
-  WORK_ORDER_STATUS_LABELS,
   VISIT_TYPE_LABELS,
-  type WorkOrderStatus,
   type VisitType,
 } from "@ai-fsm/domain";
-import { PageContainer, PageHeader, Card, SectionHeader, EmptyState, LinkButton } from "@/components/ui";
+import { PageContainer, PageHeader, EmptyState, LinkButton } from "@/components/ui";
 import { loadNeedsAttention } from "@/lib/attention/load-needs-attention";
 import { NeedsAttentionPanel } from "../NeedsAttentionPanel";
 import { TodayTimeline } from "./TodayTimeline";
-import { compareTodayWork, standaloneLookTodaySql, todayEmptyCopy, todayWorkCountLabel, todayWorkHeading } from "./today-list";
+import { compareTodayWork, standaloneLookTodaySql, todayEmptyCopy, todayWorkHeading } from "./today-list";
 import { filterAttentionForSurface } from "@/lib/attention/surfaces";
-import { coveringTechStartHere, todayCoveringTechSql } from "@/lib/visits/covering-tech";
+import { todayCoveringTechSql } from "@/lib/visits/covering-tech";
+import { materialsNeededCount } from "@/lib/field/face";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +45,9 @@ type WoCard = {
   property_address: string | null;
   next_scheduled: string | null;
   active_visit_id: string | null;
+  face_visit_id: string | null;
+  face_scheduled: string | null;
+  materials_needed: string | null;
   first_up: string | null;
 };
 
@@ -57,6 +59,7 @@ type AssessmentCard = {
   client_name: string | null;
   job_title: string | null;
   property_address: string | null;
+  materials_needed: string | null;
 };
 
 export default async function MyWorkPage({ searchParams }: PageProps) {
@@ -81,6 +84,9 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
                WHERE v.work_order_id = w.id AND v.assigned_user_id = $2
                  AND v.status IN ('dispatched','traveling','arrived','in_progress','waiting')
                LIMIT 1) AS active_visit_id,
+              face.face_visit_id,
+              face.face_scheduled,
+              face.materials_needed,
               (SELECT t.label FROM visit_tasks vt
                JOIN work_order_tasks t ON t.id = vt.task_id
                JOIN visits vfirst ON vfirst.id = vt.visit_id
@@ -92,6 +98,19 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
        JOIN jobs j ON j.id = w.job_id
        LEFT JOIN clients c ON c.id = w.client_id
        LEFT JOIN properties p ON p.id = j.property_id
+       LEFT JOIN LATERAL (
+         SELECT v.id::text AS face_visit_id,
+                v.scheduled_start::text AS face_scheduled,
+                v.materials_needed
+         FROM visits v
+         WHERE v.work_order_id = w.id
+           AND v.assigned_user_id = $2
+           AND v.status NOT IN ('completed','cancelled')
+         ORDER BY
+           CASE WHEN v.status IN ('arrived','in_progress','waiting','dispatched','traveling') THEN 0 ELSE 1 END,
+           v.scheduled_start ASC
+         LIMIT 1
+       ) face ON true
        WHERE w.account_id = $1 AND ${todayCoveringTechSql("$2")}
          AND w.status NOT IN ('draft','completed','cancelled')
        ORDER BY
@@ -103,7 +122,8 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
     queryForSession<AssessmentCard>(
       session,
       `SELECT v.id, v.visit_type, v.scheduled_start::text, v.status,
-              c.name AS client_name, j.title AS job_title, p.address AS property_address
+              c.name AS client_name, j.title AS job_title, p.address AS property_address,
+              v.materials_needed
        FROM visits v
        LEFT JOIN jobs j ON j.id = v.job_id
        LEFT JOIN clients c ON c.id = j.client_id
@@ -121,6 +141,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
       session,
       `SELECT v.id, v.status, v.scheduled_start::text, j.id::text AS job_id, j.title AS job_title,
               p.address AS property_address, c.name AS client_name, c.phone AS client_phone,
+              v.materials_needed,
               (SELECT t.label FROM visit_tasks vt
                JOIN work_order_tasks t ON t.id = vt.task_id
                WHERE vt.visit_id = v.id AND vt.account_id = v.account_id
@@ -156,43 +177,31 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
     ? { items: filterAttentionForSurface(needsAttentionRaw.items, "today"), openPromiseRows: [] as typeof needsAttentionRaw.openPromiseRows }
     : null;
 
-  const nowHour = now.getHours();
-  const greeting =
-    nowHour < 12 ? "Good morning" : nowHour < 17 ? "Good afternoon" : "Good evening";
-
-  let statusLabel = todayWorkCountLabel(workOrders.length + assessments.length);
-  if (heroVisit?.status === "in_progress" || heroVisit?.status === "arrived") {
-    statusLabel += " · In progress now";
-  } else if (heroVisit) {
-    const d = new Date(heroVisit.scheduled_start);
-    statusLabel += ` · ${formatVisitTime(heroVisit.scheduled_start).toLowerCase()} next`;
-  }
+  const dayStarted = !!fieldDay.openSession;
+  const heroVisible = dayStarted && !!heroVisit && proposals.length === 0;
+  const heroId = heroVisible ? heroVisit?.id ?? null : null;
+  const otherStops = [
+    ...workOrders.map((wo) => ({
+      kind: "job" as const,
+      active: Boolean(wo.active_visit_id),
+      sortTime: wo.face_scheduled ?? wo.next_scheduled,
+      faceId: wo.face_visit_id,
+      wo,
+    })),
+    ...assessments.map((visit) => ({
+      kind: "look" as const,
+      active: ["dispatched", "traveling", "arrived", "in_progress", "waiting"].includes(visit.status),
+      sortTime: visit.scheduled_start,
+      faceId: visit.id,
+      visit,
+    })),
+  ]
+    .filter((item) => item.faceId !== heroId)
+    .sort(compareTodayWork);
 
   return (
     <PageContainer>
-      <PageHeader
-        title="Today"
-        subtitle={`${greeting} — ${statusLabel}`}
-        actions={
-          isTech ? (
-            <LinkButton href="/app/visits" variant="secondary" size="sm">
-              Visits →
-            </LinkButton>
-          ) : (
-            <span style={{ display: "inline-flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-              <LinkButton href={"/app/timeline" as Route} variant="ghost" size="sm">
-                Vehicle tracking
-              </LinkButton>
-              <ManualSiteVisitButton />
-              <span className="p7-only-desktop">
-                <LinkButton href="/app" variant="secondary" size="sm">
-                  ← Desk
-                </LinkButton>
-              </span>
-            </span>
-          )
-        }
-      />
+      <PageHeader title="Today" />
 
       {proposals.length > 0 && (() => {
         const active = fieldDay.activityEntries?.find((e) => e.ended_at === null) ?? null;
@@ -220,17 +229,6 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
         );
       })()}
 
-      {fieldDay.locationSettings && (
-        <div style={{ marginBottom: "var(--space-4)" }}>
-          <LocationCaptureControl
-            enabled={fieldDay.locationSettings.enabled}
-            pausedUntil={fieldDay.locationSettings.pausedUntil}
-            hasActiveWorkday={!!fieldDay.openSession}
-            showTrackingLink={!isTech}
-          />
-        </div>
-      )}
-
       <MyDayMobileLayout
         openSession={fieldDay.openSession}
         vehicles={fieldDay.vehicles}
@@ -244,112 +242,89 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
         canQuickBook={isOwner}
         priorDayNeedsMileage={fieldDay.priorDayNeedsMileage}
         priorOpenSession={fieldDay.priorOpenSession}
+        more={
+          <>
+            <div className="field-more__links">
+              {isTech ? (
+                <LinkButton href="/app/visits" variant="secondary" size="sm">Visits</LinkButton>
+              ) : (
+                <>
+                  <LinkButton href={"/app/timeline" as Route} variant="ghost" size="sm">
+                    Vehicle tracking
+                  </LinkButton>
+                  <ManualSiteVisitButton />
+                  <LinkButton href="/app" variant="secondary" size="sm">Desk</LinkButton>
+                </>
+              )}
+            </div>
+            {fieldDay.locationSettings ? (
+              <LocationCaptureControl
+                enabled={fieldDay.locationSettings.enabled}
+                pausedUntil={fieldDay.locationSettings.pausedUntil}
+                hasActiveWorkday={!!fieldDay.openSession}
+                showTrackingLink={!isTech}
+              />
+            ) : null}
+            <TodayTimeline
+              entries={
+                isTech
+                  ? fieldDay.activityEntries.filter((e) => e.user_id === session.userId)
+                  : fieldDay.activityEntries
+              }
+              showTrackingLink={!isTech}
+            />
+          </>
+        }
       >
-        {needsAttention && (
+        {needsAttention && needsAttention.items.length > 0 ? (
           <NeedsAttentionPanel
             items={needsAttention.items}
             openPromiseRows={needsAttention.openPromiseRows}
             promisesParam={promisesParam}
           />
-        )}
-        <TodayTimeline
-          entries={
-            isTech
-              ? fieldDay.activityEntries.filter((e) => e.user_id === session.userId)
-              : fieldDay.activityEntries
-          }
-          showTrackingLink={!isTech}
-        />
-        <Card style={{ marginBottom: "var(--space-4)" }}>
-          <SectionHeader title={todayWorkHeading()} count={workOrders.length + assessments.length} />
-          {workOrders.length + assessments.length === 0 ? (
-            <EmptyState
-              title={todayEmptyCopy().title}
-              description={todayEmptyCopy().description}
-            />
-          ) : (
-            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-              {[
-                ...workOrders.map((wo) => ({
-                  kind: "job" as const,
-                  active: Boolean(wo.active_visit_id),
-                  sortTime: wo.next_scheduled,
-                  wo,
-                })),
-                ...assessments.map((visit) => ({
-                  kind: "look" as const,
-                  active: ["dispatched", "traveling", "arrived", "in_progress", "waiting"].includes(visit.status),
-                  sortTime: visit.scheduled_start,
-                  visit,
-                })),
-              ]
-                .sort(compareTodayWork)
-                .map((item) => {
-                  if (item.kind === "job") {
-                    const wo = item.wo;
-                    const status =
-                      WORK_ORDER_STATUS_LABELS[wo.status as WorkOrderStatus] ?? wo.status;
-                    const derived = wo.active_visit_id ? " · In progress" : "";
-                    const startHere = coveringTechStartHere(wo.first_up);
-                    return (
-                      <li key={`job-${wo.id}`} style={{ borderBottom: "1px solid var(--border)" }}>
-                        <Link
-                          href={`/app/my-work/${wo.id}` as Route}
-                          style={{
-                            display: "block",
-                            padding: "var(--space-3) 0",
-                            textDecoration: "none",
-                            color: "inherit",
-                          }}
-                        >
-                          <strong>{wo.client_name ?? "Client"}</strong>
-                          {wo.property_address ? (
-                            <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>{wo.property_address}</div>
-                          ) : null}
-                          <div>{wo.title}</div>
-                          {startHere ? (
-                            <div data-testid="today-start-here" style={{ marginTop: "var(--space-1)" }}>
-                              Start here: {startHere}
-                            </div>
-                          ) : null}
-                          <small style={{ color: "var(--fg-muted)" }}>
-                            {status}
-                            {derived}
-                            {wo.next_scheduled &&
-                              ` · ${formatBusinessDateTime(wo.next_scheduled)}`}
-                          </small>
-                        </Link>
-                      </li>
-                    );
-                  }
-                  const visit = item.visit;
-                  const purpose = visit.job_title || (VISIT_TYPE_LABELS[visit.visit_type as VisitType] ?? "Look");
+        ) : null}
+        {otherStops.length === 0 && !heroVisit ? (
+          <EmptyState
+            title={todayEmptyCopy().title}
+            description={todayEmptyCopy().description}
+          />
+        ) : otherStops.length > 0 ? (
+          <section>
+            <h2 className="field-kicker">{todayWorkHeading()}</h2>
+            <ul className="field-today-list">
+              {otherStops.map((item) => {
+                if (item.kind === "job") {
+                  const wo = item.wo;
+                  const when = wo.face_scheduled ?? wo.next_scheduled;
+                  const missing = materialsNeededCount(wo.materials_needed) > 0;
                   return (
-                    <li key={`look-${visit.id}`} style={{ borderBottom: "1px solid var(--border)" }}>
-                      <Link
-                        href={`/app/visits/${visit.id}` as Route}
-                        style={{
-                          display: "block",
-                          padding: "var(--space-3) 0",
-                          textDecoration: "none",
-                          color: "inherit",
-                        }}
-                      >
-                        <strong>{visit.client_name ?? visit.job_title ?? "Customer"}</strong>
-                        {visit.property_address ? (
-                          <div style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}>{visit.property_address}</div>
-                        ) : null}
-                        <div>{purpose}</div>
-                        <small style={{ color: "var(--fg-muted)" }}>
-                          {formatBusinessDateTime(visit.scheduled_start)}
-                        </small>
+                    <li key={`job-${wo.id}`}>
+                      <Link href={(wo.face_visit_id ? `/app/visits/${wo.face_visit_id}` : `/app/my-work/${wo.id}`) as Route}>
+                        <span className="when">{when ? formatVisitTime(when) : ""}</span>
+                        <span className="who">{wo.client_name?.trim() || wo.property_address || "This house"}</span>
+                        <span className="purpose">{wo.title}</span>
+                        {missing ? <span className="miss">Material missing</span> : null}
                       </Link>
                     </li>
                   );
-                })}
+                }
+                const visit = item.visit;
+                const purpose = visit.job_title || (VISIT_TYPE_LABELS[visit.visit_type as VisitType] ?? "Look");
+                const missing = materialsNeededCount(visit.materials_needed) > 0;
+                return (
+                  <li key={`look-${visit.id}`}>
+                    <Link href={`/app/visits/${visit.id}` as Route}>
+                      <span className="when">{formatVisitTime(visit.scheduled_start)}</span>
+                      <span className="who">{visit.client_name?.trim() || visit.property_address || "This house"}</span>
+                      <span className="purpose">{purpose}</span>
+                      {missing ? <span className="miss">Material missing</span> : null}
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
-          )}
-        </Card>
+          </section>
+        ) : null}
       </MyDayMobileLayout>
     </PageContainer>
   );
