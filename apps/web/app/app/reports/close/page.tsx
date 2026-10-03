@@ -7,6 +7,7 @@ import { withReportContext } from "@/lib/reports/db";
 import { query } from "@/lib/db";
 import { formatCents } from "@/lib/money";
 import { businessMonthKey, loadBusinessTimeZone, timestampBusinessMonthExpr } from "@/lib/reports/business-month";
+import { collectedCashStatusSql } from "@/lib/reports/collected-cash";
 import {
   PageContainer,
   PageHeader,
@@ -114,6 +115,7 @@ export default async function ClosePage({ searchParams }: PageProps) {
         `SELECT COUNT(*)::int AS count
          FROM payments
          WHERE account_id = $1
+           AND ${collectedCashStatusSql()}
            AND ${timestampBusinessMonthExpr("received_at", timeZone)} = $2`,
         [session.accountId, targetMonth]
       ),

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { queryForSession } from "@/lib/db";
 import { formatVisitTime, isSameCalendarDay } from "@/lib/visits/formatting";
-import { formatBusinessDateTime } from "@/lib/time/business-tz";
+import { BUSINESS_TIMEZONE, formatBusinessDateTime } from "@/lib/time/business-tz";
 import { pickHeroVisit, type HeroVisit } from "@/lib/my-day/visit-hero";
 import { loadFieldDayData } from "@/lib/my-work/field-day-data";
 import {
@@ -27,7 +27,7 @@ import { PageContainer, PageHeader, Card, SectionHeader, EmptyState, LinkButton 
 import { loadNeedsAttention } from "@/lib/attention/load-needs-attention";
 import { NeedsAttentionPanel } from "../NeedsAttentionPanel";
 import { TodayTimeline } from "./TodayTimeline";
-import { compareTodayWork, todayEmptyCopy, todayWorkCountLabel, todayWorkHeading } from "./today-list";
+import { compareTodayWork, standaloneLookTodaySql, todayEmptyCopy, todayWorkCountLabel, todayWorkHeading } from "./today-list";
 import { filterAttentionForSurface } from "@/lib/attention/surfaces";
 import { coveringTechStartHere, todayCoveringTechSql } from "@/lib/visits/covering-tech";
 
@@ -112,6 +112,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
          AND v.work_order_id IS NULL
          AND v.visit_type = ANY($3::text[])
          AND v.status NOT IN ('completed','cancelled')
+         AND ${standaloneLookTodaySql(BUSINESS_TIMEZONE)}
        ORDER BY v.scheduled_start ASC
        LIMIT 50`,
       [session.accountId, session.userId, opTypes],

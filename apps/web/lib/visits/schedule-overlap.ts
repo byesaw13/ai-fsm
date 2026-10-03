@@ -37,6 +37,15 @@ export function scheduleConflictMessage(slot: Pick<ScheduleSlot, "label" | "star
   return `${slot.label} is already booked ${formatBusinessTime(slot.start)}–${formatBusinessTime(slot.end)}.`;
 }
 
+/** Move anyway applies only to the interval the server just rejected. */
+export function overlapOverrideApplies(
+  requested: { start: string; end: string },
+  rejected: { start: string; end: string } | null,
+): boolean {
+  if (!rejected) return false;
+  return requested.start === rejected.start && requested.end === rejected.end;
+}
+
 export function scheduleSlotLabel(clientName: string | null, address: string | null): string {
   const who = clientName?.trim() || "Another visit";
   const where = address?.trim();

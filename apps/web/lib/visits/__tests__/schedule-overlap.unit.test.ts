@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assigneeOverlap, scheduleConflictMessage, scheduleSlotLabel, type ScheduleSlot } from "../schedule-overlap";
+import { assigneeOverlap, overlapOverrideApplies, scheduleConflictMessage, scheduleSlotLabel, type ScheduleSlot } from "../schedule-overlap";
 
 const smith: ScheduleSlot = {
   id: "smith",
@@ -58,6 +58,18 @@ describe("assigneeOverlap", () => {
         [smith],
       ),
     ).toBeNull();
+  });
+});
+
+describe("overlapOverrideApplies", () => {
+  it("honors Move anyway only for the interval that was rejected", () => {
+    const rejected = { start: "2026-10-02T13:00:00.000Z", end: "2026-10-02T15:00:00.000Z" };
+    expect(overlapOverrideApplies(rejected, rejected)).toBe(true);
+    expect(overlapOverrideApplies(
+      { start: "2026-10-02T16:00:00.000Z", end: "2026-10-02T17:00:00.000Z" },
+      rejected,
+    )).toBe(false);
+    expect(overlapOverrideApplies(rejected, null)).toBe(false);
   });
 });
 

@@ -1,5 +1,6 @@
 import { query } from "@/lib/db";
 import { MINIMUM_SERVICE_FEE_CENTS } from "@ai-fsm/domain";
+import { collectedCashStatusSql } from "@/lib/reports/collected-cash";
 import { loadBusinessTimeZone, timestampBusinessMonthExpr } from "@/lib/reports/business-month";
 
 // ---------------------------------------------------------------------------
@@ -189,6 +190,7 @@ export async function loadReportData(accountId: string, targetMonth: string): Pr
     `SELECT COALESCE(SUM(amount_cents), 0)::bigint AS cash_cents
      FROM payments
      WHERE account_id = $1
+       AND ${collectedCashStatusSql()}
        AND ${monthOf("received_at")} = $2`,
     [accountId, targetMonth],
   );

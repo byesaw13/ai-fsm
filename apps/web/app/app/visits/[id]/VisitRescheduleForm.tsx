@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button, Card, ScheduleFields, SectionHeader, useToast } from "@/components/ui";
 import type { ScheduleValue } from "@/components/ui";
 import { scheduleToISOPair } from "@/components/ui";
+import { overlapOverrideApplies } from "@/lib/visits/schedule-overlap";
 
 interface Props {
   visitId: string;
@@ -38,6 +39,13 @@ export function VisitRescheduleForm({ visitId, initialStart, initialEnd }: Props
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<string | null>(null);
+  const [rejectedSlot, setRejectedSlot] = useState<{ start: string; end: string } | null>(null);
+
+  function changeSchedule(next: ScheduleValue) {
+    setSchedule(next);
+    setConflict(null);
+    setRejectedSlot(null);
+  }
 
   async function save(allowOverlap: boolean) {
     const { start, end } = scheduleToISOPair(schedule);
@@ -45,26 +53,30 @@ export function VisitRescheduleForm({ visitId, initialStart, initialEnd }: Props
     setError(null);
     setPending(true);
     try {
+      const honorOverride = allowOverlap && overlapOverrideApplies({ start, end }, rejectedSlot);
       const res = await fetch(`/api/v1/visits/${visitId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           scheduled_start: start,
           scheduled_end: end,
-          ...(allowOverlap ? { allow_overlap: true } : {}),
+          ...(honorOverride ? { allow_overlap: true } : {}),
         }),
       });
       const data = await res.json();
       if (res.status === 409 && data.error?.code === "SCHEDULE_CONFLICT") {
         setConflict(data.error.message ?? "That time overlaps another visit.");
+        setRejectedSlot({ start, end });
         return;
       }
       if (!res.ok) {
         setConflict(null);
+        setRejectedSlot(null);
         setError(data.error?.message ?? "Failed to reschedule visit");
         return;
       }
       setConflict(null);
+      setRejectedSlot(null);
       toast.success("Visit rescheduled");
       router.refresh();
     } catch {
@@ -94,7 +106,7 @@ export function VisitRescheduleForm({ visitId, initialStart, initialEnd }: Props
             </Button>
           </div>
         )}
-        <ScheduleFields value={schedule} onChange={setSchedule} disabled={pending} />
+        <ScheduleFields value={schedule} onChange={changeSchedule} disabled={pending} />
         <div className="p7-form-actions">
           <Button type="submit" disabled={pending} loading={pending}>
             {pending ? "Saving…" : "Save Schedule"}
