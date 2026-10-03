@@ -4,16 +4,28 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import type { Role } from "@ai-fsm/domain";
-import { filterCommands, type CommandItem } from "@/lib/navigation/command-index";
+import { filterCommands } from "@/lib/navigation/command-index";
 
 export function CommandPalette({ role }: { role: Role }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  const [houses, setHouses] = useState<Array<{ id: string; kind?: string; title: string; detail: string; href: string }>>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const results = useMemo(() => filterCommands(query, role).slice(0, 12), [query, role]);
+  const commands = useMemo(() => filterCommands(query, role).slice(0, 8), [query, role]);
+  const results = useMemo(
+    () => [
+      ...houses.map((house) => ({
+        id: `${house.kind ?? "hit"}-${house.id}`,
+        label: house.detail ? `${house.title} — ${house.detail}` : house.title,
+        href: house.href,
+      })),
+      ...commands.map((item) => ({ id: item.id, label: item.label, href: item.href })),
+    ].slice(0, 12),
+    [houses, commands],
+  );
 
   const close = useCallback(() => {
     setOpen(false);
@@ -22,12 +34,33 @@ export function CommandPalette({ role }: { role: Role }) {
   }, []);
 
   const go = useCallback(
-    (item: CommandItem) => {
+    (item: { href: string }) => {
       close();
       router.push(item.href as Route);
     },
     [close, router],
   );
+
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setHouses([]);
+      return;
+    }
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => {
+      void fetch(`/api/v1/search?q=${encodeURIComponent(q)}`, { signal: ctrl.signal })
+        .then((res) => (res.ok ? res.json() : { data: [] }))
+        .then((json: { data?: Array<{ id: string; kind?: string; title: string; detail: string; href: string }> }) => {
+          setHouses(json.data ?? []);
+        })
+        .catch(() => {});
+    }, 200);
+    return () => {
+      clearTimeout(timer);
+      ctrl.abort();
+    };
+  }, [query]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {

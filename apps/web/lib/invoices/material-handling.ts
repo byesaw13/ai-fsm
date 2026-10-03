@@ -7,6 +7,35 @@ export type AccountSettingsSlice = {
 export const DEFAULT_MATERIAL_HANDLING_PCT = Math.round(MATERIAL_HANDLING_CLIENT_RATE * 100);
 
 /** Account settings override; falls back to domain default (15%). */
+export function clampHandlingPct(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_MATERIAL_HANDLING_PCT;
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
+/**
+ * Draft invoices follow the current account percent.
+ * A saved snapshot wins. A sent invoice with no snapshot freezes the current percent.
+ */
+export function resolveMaterialHandlingPct(input: {
+  snapshotPct: number | null | undefined;
+  pricingPct: number | null | undefined;
+  legacyPct: number | null | undefined;
+  invoiceStatus: string;
+}): { pct: number; writeSnapshot: boolean } {
+  if (typeof input.snapshotPct === "number" && Number.isFinite(input.snapshotPct)) {
+    return { pct: clampHandlingPct(input.snapshotPct), writeSnapshot: false };
+  }
+  const live = typeof input.pricingPct === "number" && Number.isFinite(input.pricingPct)
+    ? input.pricingPct
+    : typeof input.legacyPct === "number" && Number.isFinite(input.legacyPct)
+      ? input.legacyPct
+      : DEFAULT_MATERIAL_HANDLING_PCT;
+  return {
+    pct: clampHandlingPct(live),
+    writeSnapshot: input.invoiceStatus !== "draft",
+  };
+}
+
 export function materialHandlingRateFromSettings(
   settings?: AccountSettingsSlice | Record<string, unknown> | null,
 ): number {

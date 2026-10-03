@@ -11,6 +11,7 @@ import {
   MINIMUM_SERVICE_FEE_CENTS,
   HALF_DAY_RATE_CENTS,
   FULL_DAY_RATE_CENTS,
+  MATERIAL_HANDLING_CLIENT_RATE,
 } from "./dovetails";
 import type { PricingRules } from "./estimate-engine/types";
 import { CURRENT_RULES, RULES_VERSION } from "./estimate-engine/rules";
@@ -27,6 +28,10 @@ export interface BusinessPricingSettings {
   minimum_service_fee_cents: number;
   half_day_rate_cents: number;
   full_day_rate_cents: number;
+  /** Percent added to material cost on customer bills. 15 means 15%. */
+  material_handling_pct: number;
+  /** Percent added when a customer pays by card. 0 means no card fee. */
+  card_fee_pct: number;
 }
 
 /** Seed / fallback when no DB row exists. Cost default $50 matches solo owner pay. */
@@ -38,6 +43,8 @@ export const DEFAULT_PRICING_SETTINGS: BusinessPricingSettings = {
   minimum_service_fee_cents: MINIMUM_SERVICE_FEE_CENTS,
   half_day_rate_cents: HALF_DAY_RATE_CENTS,
   full_day_rate_cents: FULL_DAY_RATE_CENTS,
+  material_handling_pct: Math.round(MATERIAL_HANDLING_CLIENT_RATE * 100),
+  card_fee_pct: 0,
 };
 
 /** Customer bill rate for a job state (NH baseline or MA premium). */
@@ -92,6 +99,7 @@ export function buildPricingRules(
     laborBillingCentsPerHour: settings.labor_billing_cents_per_hour,
     minimumTotalCents: settings.minimum_service_fee_cents,
     marginFloor: settings.margin_floor_pct,
+    materialHandlingRate: settings.material_handling_pct / 100,
   };
 }
 
@@ -101,9 +109,11 @@ export function calculateFinancialComparison(opts: {
   totalQuoteCents: number;
   laborCostRateCents: number;
   laborBillingRateCents: number;
+  materialHandlingRate?: number;
 }) {
   if (opts.laborCostCents === null || opts.materialCostCents === null) return null;
-  const materialHandlingCents = Math.round(opts.materialCostCents * 0.15);
+  const handlingRate = opts.materialHandlingRate ?? MATERIAL_HANDLING_CLIENT_RATE;
+  const materialHandlingCents = Math.round(opts.materialCostCents * handlingRate);
   const totalDirectCostCents = opts.laborCostCents + opts.materialCostCents;
   const grossProfitCents = opts.totalQuoteCents - totalDirectCostCents;
   const grossMarginPct = opts.totalQuoteCents > 0 ? Math.round((grossProfitCents / opts.totalQuoteCents) * 1000) / 10 : 0;

@@ -38,6 +38,7 @@ describe("pricing-settings", () => {
     });
     expect(rules.laborCostCentsPerHour).toBe(45_00);
     expect(rules.laborBillingCentsPerHour).toBe(120_00);
+    expect(rules.materialHandlingRate).toBe(0.15);
     expect(rules.marginFloor).toBe(0.25);
   });
 

@@ -15,6 +15,7 @@ import { writeAssessmentContext } from "@/lib/estimates/assessment-context";
 import { MaterialsGenerator } from "@/app/app/estimates/components/MaterialsGenerator";
 import type { MaterialItem } from "@/app/app/estimates/components/MaterialsGenerator";
 import { buildAiMaterialsDelta } from "@/lib/estimates/materials-delta";
+import { areaCaptureStatus, areaStatusLabel, assessmentAreaProgress } from "@/lib/assessments/area-status";
 
 const TRADE_KEYS = Object.keys(ASSESSMENT_TRADE_LABELS) as AssessmentTradeKey[];
 
@@ -106,6 +107,19 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
   const [showMaterials, setShowMaterials] = useState(false);
 
   const totalSqft = calcTotalSqft(rooms);
+  const areaProgress = assessmentAreaProgress(rooms);
+
+  function focusCapture(kind: "photo" | "note") {
+    if (kind === "photo") {
+      document.getElementById("assessment-photos")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("assessment-photo-input")?.click();
+      return;
+    }
+    const next = rooms.find((room) => areaCaptureStatus(room) !== "captured") ?? rooms[0];
+    if (!next) return;
+    document.getElementById(`area-${next.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById(`area-note-${next.id}`)?.focus();
+  }
 
   function updateRoom(idx: number, field: keyof Room, value: string | number | null) {
     setRooms((prev) => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
@@ -281,6 +295,38 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
         </div>
       )}
 
+      <section data-testid="assessment-areas">
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-2)", alignItems: "baseline" }}>
+          <h3 style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 600 }}>
+            {areaProgress.captured} captured · {areaProgress.needsConfirmation} need confirmation · {areaProgress.notStarted} not started
+          </h3>
+        </div>
+        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", margin: "var(--space-2) 0" }}>
+          <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" onClick={() => focusCapture("photo")} disabled={disabled}>
+            Photo
+          </button>
+          <button type="button" className="p7-btn p7-btn-secondary p7-btn-sm" onClick={() => focusCapture("note")} disabled={disabled}>
+            Note
+          </button>
+          <button type="button" className="p7-btn p7-btn-ghost p7-btn-sm" onClick={addRoom} disabled={disabled}>
+            Add area
+          </button>
+        </div>
+        <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+          {rooms.map((room) => {
+            const status = areaCaptureStatus(room);
+            return (
+              <li key={room.id}>
+                <a href={`#area-${room.id}`} style={{ color: "inherit", textDecoration: "none" }}>
+                  <strong>{room.name.trim() || "Unnamed area"}</strong>
+                  <span style={{ color: "var(--fg-muted)" }}> — {areaStatusLabel(status)}</span>
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
       {/* Rooms */}
       <section>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)" }}>
@@ -295,6 +341,7 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
         {rooms.map((room, idx) => (
           <div
             key={room.id}
+            id={`area-${room.id}`}
             style={{
               padding: "var(--space-3)",
               marginBottom: "var(--space-2)",
@@ -371,6 +418,7 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
             <div>
               <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Notes</label>
               <input
+                id={`area-note-${room.id}`}
                 type="text"
                 value={room.notes}
                 placeholder="Crown moulding, water damage, accent wall…"
@@ -530,7 +578,7 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
       </section>
 
       {/* Photos */}
-      <section>
+      <section id="assessment-photos">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-2)" }}>
           <h3 style={{ margin: 0, fontSize: "var(--text-sm)", fontWeight: 600 }}>
             Assessment Photos ({photos.length})
@@ -549,6 +597,7 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
             >
               {uploading ? `Uploading${uploadProgress ? ` ${uploadProgress}` : ""}…` : "+ Add Photos"}
               <input
+                id="assessment-photo-input"
                 type="file"
                 accept="image/*"
                 multiple

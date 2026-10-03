@@ -8,6 +8,7 @@ import { invoiceStatusSchema, invoiceTransitions } from "@ai-fsm/domain";
 import type { InvoiceStatus } from "@ai-fsm/domain";
 import { writeWorkflowEvent } from "@/lib/workflow-events";
 import { recordStatusChange } from "@/lib/status-history";
+import { snapshotInvoiceFeePolicy } from "@/lib/invoices/job-expenses";
 
 export const dynamic = "force-dynamic";
 
@@ -94,6 +95,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           ),
           { code: "INVALID_TRANSITION" }
         );
+      }
+
+      if (currentStatus === "draft" && targetStatus !== "draft") {
+        await snapshotInvoiceFeePolicy(client, id, session.accountId);
       }
 
       if (targetStatus === "draft") {

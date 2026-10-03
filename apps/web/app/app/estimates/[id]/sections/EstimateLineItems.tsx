@@ -1,5 +1,6 @@
 import { formatDollars } from "../format";
 import type { EstimateRow, LineItemRow, OptionWithItems } from "../detail-data";
+import { lineNeedsPriceReview } from "@/lib/estimates/review-health";
 
 /** Postgres numerics arrive as "1.00" — render whole quantities without decimals. */
 function fmtQty(q: number | string): string {
@@ -22,7 +23,7 @@ interface Props {
 export function EstimateLineItems({ estimate, lineItems, options }: Props) {
   if (estimate.presentation_mode === "multi_option" && options.length > 0) {
     return (
-      <div>
+      <div id="estimate-lines">
         <div className="card">
           <h2>Options</h2>
           <p className="muted">Compare options and choose the one that best fits your needs.</p>
@@ -56,8 +57,11 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
               <table className="line-items-table" style={{ flex: 1 }}>
                 <tbody>
                   {option.line_items.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.description}</td>
+                    <tr key={item.id} data-review={lineNeedsPriceReview(item) ? "needed" : "ready"}>
+                      <td>
+                        {item.description}
+                        {lineNeedsPriceReview(item) && <ReviewMark />}
+                      </td>
                       <td>{fmtQty(item.quantity)}</td>
                       <td>{formatDollars(item.unit_price_cents)}</td>
                       <td>{formatDollars(item.total_cents)}</td>
@@ -86,7 +90,7 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
   }
 
   return (
-    <>
+    <div id="estimate-lines">
       {/* ---- Phone: card list ---- */}
       <div className="p7-only-mobile">
         <div className="card">
@@ -101,9 +105,12 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
               {lineItems.map((item) => (
-                <div key={item.id} style={{ padding: "var(--space-3)", borderRadius: "var(--radius)", background: "var(--bg)", border: "1px solid var(--border)" }}>
+                <div key={item.id} data-review={lineNeedsPriceReview(item) ? "needed" : "ready"} style={{ padding: "var(--space-3)", borderRadius: "var(--radius)", background: "var(--bg)", border: "1px solid var(--border)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "var(--space-2)" }}>
-                    <span style={{ fontWeight: 500, fontSize: "var(--text-sm)", flex: 1 }}>{item.description}</span>
+                    <span style={{ fontWeight: 500, fontSize: "var(--text-sm)", flex: 1 }}>
+                      {item.description}
+                      {lineNeedsPriceReview(item) && <ReviewMark />}
+                    </span>
                     <span style={{ fontWeight: 700, fontSize: "var(--text-sm)", whiteSpace: "nowrap" }}>{formatDollars(item.total_cents)}</span>
                   </div>
                   {Number(item.quantity) !== 1 && (
@@ -181,8 +188,11 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
                   const handlingItems = lineItems.filter((li) => li.line_item_type === "handling_fee");
                   const adjustmentItems = lineItems.filter((li) => li.line_item_type === "adjustment");
                   const renderRow = (item: LineItemRow, muted = false) => (
-                    <tr key={item.id} data-testid="line-item-row" style={muted ? { color: "var(--fg-muted)" } : undefined}>
-                      <td>{item.description}</td>
+                    <tr key={item.id} data-testid="line-item-row" data-review={lineNeedsPriceReview(item) ? "needed" : "ready"} style={muted ? { color: "var(--fg-muted)" } : undefined}>
+                      <td>
+                        {item.description}
+                        {lineNeedsPriceReview(item) && <ReviewMark />}
+                      </td>
                       <td>{fmtQty(item.quantity)}</td>
                       <td>{formatDollars(item.unit_price_cents)}</td>
                       <td>{formatDollars(item.total_cents)}</td>
@@ -233,6 +243,14 @@ export function EstimateLineItems({ estimate, lineItems, options }: Props) {
           )}
         </div>
       </div>
-    </>
+    </div>
+  );
+}
+
+function ReviewMark() {
+  return (
+    <span style={{ display: "block", fontSize: "var(--text-xs)", color: "var(--color-warning)" }}>
+      Needs review
+    </span>
   );
 }

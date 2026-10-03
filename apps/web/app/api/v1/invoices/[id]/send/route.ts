@@ -9,6 +9,7 @@ import { invoiceEmailHtml, invoiceEmailText } from "@ai-fsm/email-templates";
 import { logCommunication } from "@/lib/communications-log";
 import { loadInvoicePdf } from "@/lib/pdf/load";
 import { applyServiceMinimum, isServiceMinimumEligible } from "@/lib/invoices/service-minimum";
+import { snapshotInvoiceFeePolicy } from "@/lib/invoices/job-expenses";
 import { amountDueCents } from "@/lib/invoices/payments";
 import { writeWorkflowEvent } from "@/lib/workflow-events";
 import { dueDateUponCompletion, invoiceDueOnCompletion } from "@ai-fsm/domain";
@@ -209,6 +210,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       });
       let statusAfter = inv.status;
       if (inv.status === "draft") {
+        await snapshotInvoiceFeePolicy(client, id, session.accountId);
         const dueDate = dueOnCompletion ? null : inv.due_date ?? dueDateUponCompletion();
         // DB settles a reopened invoice with payments to partial/paid (192).
         const upd = await client.query<{ status: string }>(

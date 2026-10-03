@@ -28,7 +28,7 @@ export default async function NewExpensePage({
 
   // Open / in-progress jobs only — closed jobs clutter receipt entry.
   // Always include defaultJobId when deep-linked from a job page.
-  const [jobs, clients, vehicles, openSession] = await Promise.all([
+  const [jobs, clients, vehicles, openSession, activeVisits] = await Promise.all([
     query<{ id: string; title: string; job_number: string | null; client_id: string | null }>(
       isMaterialRun
         ? `SELECT j.id, j.title, j.job_number, j.client_id
@@ -78,7 +78,19 @@ export default async function NewExpensePage({
         LIMIT 1`,
       [session.accountId, session.userId],
     ),
+    query<{ job_id: string }>(
+      `SELECT v.job_id
+       FROM visits v
+       WHERE v.account_id = $1 AND v.assigned_user_id = $2
+         AND v.status IN ('dispatched','traveling','arrived','in_progress','waiting')
+       ORDER BY v.updated_at DESC NULLS LAST
+       LIMIT 1`,
+      [session.accountId, session.userId],
+    ),
   ]);
+  const suggestedJobId = activeVisits[0]?.job_id ?? null;
+  const suggestedIsListed = !!suggestedJobId && jobs.some((job) => job.id === suggestedJobId);
+  const chosenJobId = defaultJobId ?? (suggestedIsListed ? suggestedJobId : undefined);
 
   return (
     <PageContainer>
@@ -90,7 +102,13 @@ export default async function NewExpensePage({
       />
       <PageHeader
         title={isMaterialRun ? "Material Run" : "New Expense"}
-        subtitle={isMaterialRun ? "Capture the receipt first, then save the supplier run" : "Record an expense for this account"}
+        subtitle={
+          !defaultJobId && suggestedIsListed
+            ? "Suggested from the visit you are on. Change it if this receipt is for a different job."
+            : isMaterialRun
+              ? "Capture the receipt first, then save the supplier run"
+              : "Record an expense for this account"
+        }
         actions={
           <LinkButton href="/app/expenses" variant="ghost" size="sm">
             ← Back
@@ -103,7 +121,7 @@ export default async function NewExpensePage({
         clients={clients}
         vehicles={vehicles}
         activeVehicleId={openSession[0]?.vehicle_id ?? (vehicles.length === 1 ? vehicles[0].id : null)}
-        defaultJobId={defaultJobId}
+        defaultJobId={chosenJobId ?? undefined}
         defaultClientId={defaultClientId}
         mode={isMaterialRun ? "run" : "standard"}
       />

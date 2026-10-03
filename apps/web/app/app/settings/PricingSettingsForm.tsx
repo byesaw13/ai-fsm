@@ -39,6 +39,8 @@ export function PricingSettingsForm() {
             minimum_service_fee_cents: json.data.minimum_service_fee_cents,
             half_day_rate_cents: json.data.half_day_rate_cents,
             full_day_rate_cents: json.data.full_day_rate_cents,
+            material_handling_pct: json.data.material_handling_pct,
+            card_fee_pct: json.data.card_fee_pct,
           });
         }
       } catch {
@@ -240,6 +242,53 @@ export function PricingSettingsForm() {
                 })
               }
             />
+          </label>
+        </div>
+      </section>
+
+      <section style={{ display: "grid", gap: "var(--space-3)" }}>
+        <h3 style={{ margin: 0, fontSize: "var(--text-base)", fontWeight: 700 }}>Materials and card payments</h3>
+        <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: "var(--text-sm)", lineHeight: 1.5 }}>
+          Material handling is added to material cost on estimates and invoices. A card fee is added
+          only when you set a percent. An invoice keeps the percents it was sent with.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+          <label style={{ display: "grid", gap: 4, fontSize: "var(--text-sm)" }}>
+            <span>Material handling (%)</span>
+            <Input
+              id="material-handling-pct"
+              type="number"
+              step="1"
+              min="0"
+              max="100"
+              value={String(settings.material_handling_pct)}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  material_handling_pct: Math.min(100, Math.max(0, Math.round(Number(e.target.value) || 0))),
+                })
+              }
+            />
+          </label>
+          <label style={{ display: "grid", gap: 4, fontSize: "var(--text-sm)" }}>
+            <span>Card fee (%)</span>
+            <Input
+              id="card-fee-pct"
+              type="number"
+              step="0.01"
+              min="0"
+              max="10"
+              value={String(settings.card_fee_pct)}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  card_fee_pct: Math.min(10, Math.max(0, Number(e.target.value) || 0)),
+                })
+              }
+            />
+            <span style={{ color: "var(--fg-muted)", fontSize: "var(--text-xs)" }}>
+              0 means the customer is not charged a card fee.
+            </span>
           </label>
         </div>
       </section>

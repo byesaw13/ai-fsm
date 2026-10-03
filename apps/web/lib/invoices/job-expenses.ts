@@ -9,7 +9,7 @@ import {
   materialExpenseDescription,
   materialHandlingCents,
   materialHandlingLineDescription,
-  materialHandlingRateFromSettings,
+  resolveMaterialHandlingPct,
   materialInvoiceTotalCents,
   type LinkableMaterialExpense,
   type ExpenseLineItemPreview,
@@ -134,14 +134,52 @@ export async function removeAutoMaterialHandlingLine(
   );
 }
 
+/** Freeze handling and card-fee percents while the invoice is still a draft. */
+export async function snapshotInvoiceFeePolicy(
+  client: PoolClient,
+  invoiceId: string,
+  accountId: string,
+): Promise<void> {
+  const account = await client.query<{ settings: Record<string, unknown> }>(
+    `SELECT settings FROM accounts WHERE id = $1`,
+    [accountId],
+  );
+  const pricing = await client.query<{ material_handling_pct: number; card_fee_pct: string | number }>(
+    `SELECT material_handling_pct, card_fee_pct
+     FROM business_pricing_settings WHERE account_id = $1`,
+    [accountId],
+  );
+  const legacyPct = account.rows[0]?.settings?.material_handling_pct;
+  const resolved = resolveMaterialHandlingPct({
+    snapshotPct: null,
+    pricingPct: pricing.rows[0]?.material_handling_pct ?? null,
+    legacyPct: typeof legacyPct === "number" ? legacyPct : null,
+    invoiceStatus: "sent",
+  });
+  const cardRaw = pricing.rows[0] ? Number(pricing.rows[0].card_fee_pct) : 0;
+  const cardFee = Number.isFinite(cardRaw) ? Math.min(10, Math.max(0, cardRaw)) : 0;
+  await client.query(
+    `UPDATE invoices
+     SET material_handling_pct_snapshot = COALESCE(material_handling_pct_snapshot, $2),
+         card_fee_pct_snapshot = COALESCE(card_fee_pct_snapshot, $3)
+     WHERE id = $1 AND account_id = $4 AND status = 'draft'`,
+    [invoiceId, resolved.pct, cardFee, accountId],
+  );
+}
+
 /** Recompute material handling from all material lines when enabled on the invoice. */
 export async function upsertMaterialHandlingFeeLine(
   client: PoolClient,
   invoiceId: string,
   accountId: string,
 ): Promise<InvoiceLineItemRow | null> {
-  const inv = await client.query<{ apply_material_handling: boolean }>(
-    `SELECT apply_material_handling FROM invoices WHERE id = $1`,
+  const inv = await client.query<{
+    apply_material_handling: boolean;
+    status: string;
+    material_handling_pct_snapshot: number | null;
+  }>(
+    `SELECT apply_material_handling, status, material_handling_pct_snapshot
+     FROM invoices WHERE id = $1`,
     [invoiceId],
   );
   if (!inv.rows[0]?.apply_material_handling) {
@@ -153,7 +191,29 @@ export async function upsertMaterialHandlingFeeLine(
     `SELECT settings FROM accounts WHERE id = $1`,
     [accountId],
   );
-  const rate = materialHandlingRateFromSettings(account.rows[0]?.settings);
+  const pricing = await client.query<{ material_handling_pct: number; card_fee_pct: string | number }>(
+    `SELECT material_handling_pct, card_fee_pct
+     FROM business_pricing_settings WHERE account_id = $1`,
+    [accountId],
+  );
+  const legacyPct = account.rows[0]?.settings?.material_handling_pct;
+  const resolved = resolveMaterialHandlingPct({
+    snapshotPct: inv.rows[0].material_handling_pct_snapshot,
+    pricingPct: pricing.rows[0]?.material_handling_pct ?? null,
+    legacyPct: typeof legacyPct === "number" ? legacyPct : null,
+    invoiceStatus: inv.rows[0].status,
+  });
+  if (resolved.writeSnapshot) {
+    const cardFee = pricing.rows[0] ? Number(pricing.rows[0].card_fee_pct) : 0;
+    await client.query(
+      `UPDATE invoices
+       SET material_handling_pct_snapshot = $2,
+           card_fee_pct_snapshot = COALESCE(card_fee_pct_snapshot, $3)
+       WHERE id = $1 AND material_handling_pct_snapshot IS NULL`,
+      [invoiceId, resolved.pct, Number.isFinite(cardFee) ? cardFee : 0],
+    );
+  }
+  const rate = resolved.pct / 100;
   const description = materialHandlingLineDescription(rate);
 
   const sum = await client.query<{ material_cost_cents: string }>(
@@ -636,11 +696,22 @@ export async function materialLineItemsFromJobExpenses(
     }
   }
 
+  const pricing = await client.query<{ material_handling_pct: number }>(
+    `SELECT material_handling_pct FROM business_pricing_settings WHERE account_id = $1`,
+    [accountId],
+  );
   const account = await client.query<{ settings: Record<string, unknown> }>(
     `SELECT settings FROM accounts WHERE id = $1`,
     [accountId],
   );
-  const rate = materialHandlingRateFromSettings(account.rows[0]?.settings);
+  const legacyPct = account.rows[0]?.settings?.material_handling_pct;
+  const resolved = resolveMaterialHandlingPct({
+    snapshotPct: null,
+    pricingPct: pricing.rows[0]?.material_handling_pct ?? null,
+    legacyPct: typeof legacyPct === "number" ? legacyPct : null,
+    invoiceStatus: "draft",
+  });
+  const rate = resolved.pct / 100;
   const handling = materialHandlingCents(materialCost, rate);
   if (handling > 0) {
     lines.push({
