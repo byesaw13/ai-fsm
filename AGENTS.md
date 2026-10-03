@@ -29,7 +29,14 @@ Product direction:
 - `docs/canonical/PRODUCTION_INTELLIGENCE.md`
 - `docs/canonical/OPERATIONS.md`
 
-Archived, generated, and working documents may provide evidence, implementation notes, or historical context. They do not override canonical docs.
+**UX implementation direction (required before changing screens, workflows, intake, estimates, jobs, visits, materials, invoices, payments, schedule, reports, or settings):**
+`docs/working/ux-implementation-direction.md`
+
+Read it and follow it. Preserve existing working architecture unless a section explicitly calls for replacement. Sections 22, 23, and 25 are the method for every UX change. Sections 26–30 are confirmed code deltas; later audits append in the delta-only format from section 27.
+
+This brief does not override `docs/canonical/` on product identity, domain model, or roadmap phase scope. It does govern presentation, hierarchy, and the required code changes it names.
+
+Other archived, generated, and working documents may provide evidence, implementation notes, or historical context. They do not override canonical docs or this UX brief.
 
 Active implementation backlog: docs/backlog/README.md
 

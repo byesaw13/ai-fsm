@@ -1,0 +1,48 @@
+# TASK-173: UX implementation direction
+
+Status: In Progress
+
+Phase: cross-cutting
+
+Problem:
+Operational screens still make Nick choose among database objects, equal-weight
+buttons, and report labels that do not match the events they measure. The
+working brief is `docs/working/ux-implementation-direction.md`.
+
+Business Value:
+The same plumbing supports fewer decisions: one next action, information
+entered once, and money figures that mean what they say.
+
+Scope:
+- Follow `docs/superpowers/plans/2026-10-02-ux-implementation-direction.md`.
+- Wave 1: Today's Work, quiet End Day, Capture copy, progressive staff intake,
+  request next-action hierarchy, report date basis and labels, travel-rate
+  display.
+- Later waves stay in that plan. Do not rebuild working subsystems.
+- Preserve `docs/canonical/` on product identity and phase scope. Phase 4
+  Production Intelligence and LiDAR are not part of Wave 1.
+
+Out of Scope:
+- A greenfield UI or a second estimate, inbox, or day-review engine.
+- Changing company deposit policy storage until Wave 4.
+- A technician scorecard. Wave 1 only renames the visit-completion section.
+
+Acceptance Criteria:
+- [x] Before day start, Start Day is the primary action. End Day is still reachable and does not lead the started day.
+- [x] Today's Work lists scheduled jobs and looks together. The cards do not ask which backend object they are.
+- [x] Capture can be saved with no category, customer, or job, and the typed prompt is not promise-only.
+- [x] Staff intake can save before category, preferred date, or address are known. Those fields remain available. Migration `200_intake_progressive_capture.sql` is written and not yet applied.
+- [x] A request's recommended next step is the dominant action. Pricing and status are secondary.
+- [x] Pricing Health uses the account minimum service fee.
+- [x] Invoiced, Cash Collected, and Outstanding AR use the definitions in brief section 30.
+- [x] Month-End Close does not report clean receivables when an older invoice is still open.
+- [x] A timestamp at 11:30 PM Eastern on the last day of a month stays in that business month.
+- [x] Visit Volume and Visit Completion are not labeled utilization or tech performance.
+- [x] Travel Settings does not show an editable rate while Standard labor is selected.
+
+Still open on this task:
+- Needs Attention sorts by promise, money, lateness, blocked work, then cleanup. Day Review leads with unresolved items. Unit-tested. Not browser-checked.
+- Dragging a visit warns on an assignee overlap. Owner can choose Move anyway. Week cards show the property address.
+- New estimates open on the account deposit percentage. Materials only, no deposit, and custom amount stay on the same estimate. Approved amounts still snapshot through the existing deposit policy.
+- Assessment workspace, estimate review-first, visit/invoice linkage, materials-from-visit, property search, and material-handling/card-fee settings are not built yet.
+- Phase 4 LiDAR and the production library stay deferred.

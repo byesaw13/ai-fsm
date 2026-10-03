@@ -4,6 +4,11 @@
 must know before auditing status, building infra, or deploying (deploy lag,
 worker egress, RLS/superuser, migration numbering, HA schedules, running tests).
 
+**Before UI or workflow changes:** read and follow
+[`docs/working/ux-implementation-direction.md`](../docs/working/ux-implementation-direction.md).
+Do not duplicate that brief here. Preserve working plumbing unless a section
+explicitly calls for replacement.
+
 This directory is intentionally small. Treat the canonical docs as the source of truth:
 
 - docs/canonical/ARCHITECTURE.md
