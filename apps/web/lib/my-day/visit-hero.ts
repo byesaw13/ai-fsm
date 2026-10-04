@@ -16,9 +16,10 @@ function isOverdueScheduled(visit: HeroVisit, nowMs: number): boolean {
 }
 
 function priority(visit: HeroVisit, nowMs: number): number {
-  if (visit.status === "in_progress" || visit.status === "arrived") return 0;
-  if (isOverdueScheduled(visit, nowMs)) return 1;
-  if (visit.status === "scheduled") return 2;
+  if (["in_progress", "arrived", "waiting"].includes(visit.status)) return 0;
+  if (visit.status === "traveling" || visit.status === "dispatched") return 1;
+  if (isOverdueScheduled(visit, nowMs)) return 2;
+  if (visit.status === "scheduled") return 3;
   return 99;
 }
 
@@ -85,7 +86,7 @@ export function visitMediaUploadPath(visitId: string): string {
 }
 
 export function heroPhotoCategory(status: string): "before" | "after" {
-  if (status === "arrived" || status === "in_progress") return "after";
+  if (["arrived", "in_progress", "waiting"].includes(status)) return "after";
   return "before";
 }
 

@@ -45,6 +45,16 @@ describe("pickHeroVisit", () => {
   it("returns null when no pending visits", () => {
     expect(pickHeroVisit([], now)).toBeNull();
   });
+
+  it("keeps an active carry-over ahead of today's scheduled visit", () => {
+    for (const status of ["waiting", "traveling", "dispatched", "arrived", "in_progress"]) {
+      expect(pickHeroVisit([
+        { id: "today", status: "scheduled", scheduled_start: "2026-06-30T08:00:00Z", ...base },
+        { id: "active", status, scheduled_start: "2026-06-29T08:00:00Z", ...base },
+      ], now)?.id).toBe("active");
+    }
+    expect(heroPhotoCategory("waiting")).toBe("after");
+  });
 });
 
 describe("buildMapsUrl", () => {

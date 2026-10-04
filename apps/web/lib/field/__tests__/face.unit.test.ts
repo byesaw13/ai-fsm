@@ -15,18 +15,18 @@ describe("today command", () => {
   it("sends you to the house until you are on site", () => {
     expect(todayCommand("scheduled", true)).toEqual({ verb: "navigate", label: "Navigate" });
     expect(todayCommand("traveling", true)).toEqual({ verb: "navigate", label: "Navigate" });
-    expect(todayCommand("scheduled", false)).toEqual({ verb: "start", label: "Start job" });
+    expect(todayCommand("scheduled", false)).toEqual({ verb: "start", label: "Start visit" });
   });
 
   it("continues work once the visit is underway", () => {
-    expect(todayCommand("in_progress", true).label).toBe("Continue work");
+    expect(todayCommand("in_progress", true).label).toBe("Continue visit");
     expect(todayCommand("arrived", true).verb).toBe("continue");
   });
 });
 
 describe("visit face", () => {
   it("uses the customer as the place, then the street", () => {
-    expect(fieldPlaceTitle("Smith", "12 Oak")).toBe("Smith");
+    expect(fieldPlaceTitle("Smith", "12 Oak")).toBe("12 Oak");
     expect(fieldPlaceTitle("  ", "12 Oak")).toBe("12 Oak");
   });
 
@@ -38,13 +38,17 @@ describe("visit face", () => {
   });
 
   it("names the other tasks from the current task, not a guess", () => {
-    expect(restOfVisitHeading("open")).toBe("Still on this visit");
-    expect(restOfVisitHeading("partial")).toBe("While that dries");
+    expect(restOfVisitHeading("open")).toBe("Remaining today");
+    expect(restOfVisitHeading("partial")).toBe("Remaining today");
     expect(openFieldTasks([
       { completed: false, status: "open", id: "a" },
       { completed: true, status: "done", id: "b" },
       { completed: false, status: "partial", id: "c" },
     ]).map((task) => task.id)).toEqual(["a", "c"]);
+    expect(openFieldTasks([
+      { completed: false, status: "partial", id: "original" },
+      { completed: false, status: "open", id: "remainder" },
+    ]).map(task => task.id)).toEqual(["remainder", "original"]);
   });
 
   it("says where the visit is in one word", () => {
@@ -53,12 +57,14 @@ describe("visit face", () => {
   });
 
   it("starts a work visit before it offers to complete a task", () => {
+    expect(visitCommand({ status: "waiting", fieldKind: "standard", hasOpenTask: true, hasAddress: true }))
+      .toEqual({ kind: "start", label: "Resume visit", nextStatus: "in_progress" });
     expect(visitCommand({
       status: "scheduled",
       fieldKind: "standard",
       hasOpenTask: true,
       hasAddress: true,
-    })).toEqual({ kind: "start", label: "Start job", nextStatus: "arrived" });
+    })).toEqual({ kind: "start", label: "Start visit", nextStatus: "arrived" });
     const arrived = visitCommand({
       status: "arrived",
       fieldKind: "repair",
@@ -109,6 +115,9 @@ describe("visit face", () => {
       hasNextVisit: false,
     });
     expect(checks.find((check) => check.key === "note")?.done).toBe(true);
+    expect(checks.find((check) => check.key === "note")?.label).toBe("Visit notes");
+    expect(checks.some((check) => check.key === "next")).toBe(false);
+    expect(visitFaceStatus("waiting")).toBe("Waiting");
     expect(checks.find((check) => check.key === "photos")?.done).toBe(false);
     expect(checks.find((check) => check.key === "materials")?.done).toBe(false);
     expect(leaveChecks({

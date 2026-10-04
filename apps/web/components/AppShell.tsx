@@ -587,6 +587,7 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
       {isAdminOrOwner &&
         !pathname.startsWith("/app/my-work") &&
         !pathname.startsWith("/app/my-day") &&
+        !/^\/app\/visits\/[^/]+$/.test(pathname) &&
         !pathname.startsWith("/app/capture") && <FloatingActionButton />}
       <CommandPalette role={role} />
     </ToastProvider>

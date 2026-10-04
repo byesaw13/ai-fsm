@@ -14,7 +14,10 @@ interface PartRow {
   receipt_media_id: string | null;
 }
 
+import { useFieldDraft } from "@/components/features/field/useFieldDraft";
+
 interface Props {
+  draftKey?: string;
   visitId: string;
   initialParts: PartRow[];
   canUpdate: boolean;
@@ -25,15 +28,16 @@ function formatDollars(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-export function VisitPartsPanel({ visitId, initialParts, canUpdate, jobType }: Props) {
+export function VisitPartsPanel({ draftKey, visitId, initialParts, canUpdate, jobType }: Props) {
   const router = useRouter();
   const toast = useToast();
   const receiptInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const [parts, setParts] = useState<PartRow[]>(initialParts);
-  const [addName, setAddName] = useState("");
-  const [addQty, setAddQty] = useState("1");
-  const [addCost, setAddCost] = useState("");
+  const [addName, setAddName, clearAddName] = useFieldDraft(draftKey ? `${draftKey}:addName` : undefined, "");
+  const [addQty, setAddQty, clearAddQty] = useFieldDraft(draftKey ? `${draftKey}:addQty` : undefined, "1");
+  const [addCost, setAddCost, clearAddCost] = useFieldDraft(draftKey ? `${draftKey}:addCost` : undefined, "");
+  const [error, setError] = useState("");
   const [adding, setAdding] = useState(false);
   const [uploadingReceiptFor, setUploadingReceiptFor] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -55,6 +59,8 @@ export function VisitPartsPanel({ visitId, initialParts, canUpdate, jobType }: P
     const actual_cost_cents = Math.round(costDollars * 100);
     const quantity = parseFloat(addQty) || 1;
 
+    if (adding) return;
+    setError("");
     setAdding(true);
     try {
       const res = await fetch(`/api/v1/visits/${visitId}/parts`, {
@@ -64,17 +70,18 @@ export function VisitPartsPanel({ visitId, initialParts, canUpdate, jobType }: P
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error?.message ?? "Failed to add part");
+        setError(data.error?.message ?? "Could not save. Your draft is kept; retry.");
       } else {
         setParts((prev) => [...prev, data.data]);
         setAddName("");
         setAddQty("1");
         setAddCost("");
+        clearAddName(); clearAddQty(); clearAddCost();
         router.refresh();
         toast.success("Part added");
       }
     } catch {
-      toast.error("Unexpected error");
+      setError("Could not save. Your draft is kept; retry.");
     } finally {
       setAdding(false);
     }
@@ -107,6 +114,8 @@ export function VisitPartsPanel({ visitId, initialParts, canUpdate, jobType }: P
       toast.error("Already added");
       return;
     }
+    if (adding) return;
+    setError("");
     setAdding(true);
     try {
       const res = await fetch(`/api/v1/visits/${visitId}/parts`, {
@@ -116,7 +125,7 @@ export function VisitPartsPanel({ visitId, initialParts, canUpdate, jobType }: P
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error?.message ?? "Failed to add part");
+        setError(data.error?.message ?? "Could not save. Your draft is kept; retry.");
       } else {
         setParts((prev) => [...prev, data.data]);
         setAddedSuggestions((prev) => new Set([...prev, normalizedName]));
@@ -172,6 +181,7 @@ export function VisitPartsPanel({ visitId, initialParts, canUpdate, jobType }: P
 
   return (
     <div>
+      {error && <p role="alert" className="p7-field-error">{error}</p>}
       {/* Suggested materials */}
       {canUpdate && hasSuggestions && (
         <div style={{ marginBottom: "var(--space-4)" }}>

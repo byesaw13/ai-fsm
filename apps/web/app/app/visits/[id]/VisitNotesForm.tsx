@@ -4,15 +4,18 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Textarea, useToast } from "@/components/ui";
 
+import { useFieldDraft } from "@/components/features/field/useFieldDraft";
+
 interface Props {
+  draftKey?: string;
   visitId: string;
   initialNotes: string;
 }
 
-export function VisitNotesForm({ visitId, initialNotes }: Props) {
+export function VisitNotesForm({ draftKey, visitId, initialNotes }: Props) {
   const router = useRouter();
   const toast = useToast();
-  const [notes, setNotes] = useState(initialNotes);
+  const [notes, setNotes, clearDraft, conflictingDraft] = useFieldDraft(draftKey, initialNotes);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -40,6 +43,7 @@ export function VisitNotesForm({ visitId, initialNotes }: Props) {
         setError(message);
         toast.error(message);
       } else {
+        clearDraft();
         setSaved(true);
         toast.success("Visit notes saved.");
         router.refresh();
@@ -55,9 +59,14 @@ export function VisitNotesForm({ visitId, initialNotes }: Props) {
 
   return (
     <form onSubmit={handleSave} data-testid="visit-notes-form">
+      {conflictingDraft !== undefined ? <div role="status" className="field-draft-conflict">
+        <p>The saved note changed while this draft was open. The latest saved note is shown below.</p>
+        <p style={{ whiteSpace: "pre-wrap" }}>{conflictingDraft}</p>
+        <Button type="button" variant="secondary" onClick={() => setNotes(conflictingDraft)}>Restore my draft</Button>
+      </div> : null}
       <Textarea
         id="visit-notes-input"
-        label="Tech Notes"
+        label="Visit notes"
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
         rows={5}
@@ -65,7 +74,7 @@ export function VisitNotesForm({ visitId, initialNotes }: Props) {
         disabled={saving}
         data-testid="visit-notes-input"
       />
-      {error && <p className="p7-field-error">{error}</p>}
+      {error && <p role="alert" className="p7-field-error">{error}</p>}
       {saved && (
         <p className="success-inline" data-testid="notes-saved-msg">
           Notes saved.

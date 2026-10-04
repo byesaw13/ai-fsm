@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { useToast } from "@/components/ui";
+import { Modal, useToast } from "@/components/ui";
 import {
   fieldPlaceTitle,
   fieldPurpose,
@@ -35,10 +35,18 @@ export type FaceTask = {
   status: string;
 };
 
-type Sheet = "add" | null;
+import { useFieldDraft } from "@/components/features/field/useFieldDraft";
+
+type Sheet = "add" | "note" | "materials" | "plan" | "partial" | null;
 
 export function VisitFieldFace({
   visitId,
+  draftKey,
+  noteForm,
+  materialsForm,
+  planForm,
+  completionForm,
+  canTransition,
   status,
   clientName,
   address,
@@ -67,6 +75,12 @@ export function VisitFieldFace({
   children,
 }: {
   visitId: string;
+  draftKey: string;
+  noteForm?: React.ReactNode;
+  materialsForm?: React.ReactNode;
+  planForm?: React.ReactNode;
+  completionForm?: React.ReactNode;
+  canTransition: boolean;
   status: string;
   clientName: string | null;
   address: string | null;
@@ -104,8 +118,23 @@ export function VisitFieldFace({
   const [uploading, setUploading] = useState(false);
   const [primaryOff, setPrimaryOff] = useState(false);
   const [sheet, setSheet] = useState<Sheet>(null);
-  const [description, setDescription] = useState("");
-  const [area, setArea] = useState("");
+  const [description, setDescription, clearDescription] = useFieldDraft(`${draftKey}:add-description`, "");
+  const [area, setArea, clearArea] = useFieldDraft(`${draftKey}:add-area`, "");
+  const [partialTask, setPartialTask] = useState<FaceTask | null>(null);
+  const [remainder, setRemainder, clearRemainder] = useFieldDraft(`${draftKey}:partial`, "");
+  const [error, setError] = useState("");
+  const [finishing, setFinishing] = useState(false);
+  const opener = useRef<HTMLElement | null>(null);
+  function openSheet(next: Sheet) {
+    opener.current = document.activeElement as HTMLElement;
+    setError("");
+    setSheet(next);
+  }
+  function closeSheet() {
+    if (pending) return;
+    setSheet(null);
+    opener.current?.focus();
+  }
   const [localNotes, setLocalNotes] = useState(techNotes ?? "");
 
   useEffect(() => {
@@ -135,7 +164,7 @@ export function VisitFieldFace({
     techNotes: localNotes,
     hasNextVisit,
   });
-  const showTasks = fieldKind === "standard" || fieldKind === "repair";
+  const showTasks = status !== "completed" && status !== "cancelled" && (fieldKind === "standard" || fieldKind === "repair");
 
   useEffect(() => {
     const el = primaryRef.current;
@@ -148,6 +177,51 @@ export function VisitFieldFace({
     return () => observer.disconnect();
   }, [command.kind, first?.id]);
 
+  const hasNoteForm = !!noteForm;
+  const hasMaterialsForm = !!materialsForm;
+  const hasPlanForm = !!planForm;
+  const hasCompletionForm = !!completionForm;
+  useEffect(() => {
+    function followAnchor(anchor: string) {
+      let targetSheet: Sheet = null;
+      if (hasNoteForm && ["visit-notes", "visit-resolution"].includes(anchor)) targetSheet = "note";
+      if (hasMaterialsForm && ["visit-parts", "need-material", "visit-materials"].includes(anchor)) targetSheet = "materials";
+      if (hasPlanForm && anchor === "visit-day-tasks") targetSheet = "plan";
+      if (targetSheet) {
+        opener.current = document.activeElement as HTMLElement;
+        setError("");
+        setSheet(targetSheet);
+      } else if (hasCompletionForm && anchor === "visit-completion") {
+        setFinishing(true);
+        window.setTimeout(() => document.getElementById(anchor)?.scrollIntoView({ block: "start" }), 50);
+      } else if (anchor) {
+        const record = document.getElementById("visit-record");
+        if (record instanceof HTMLDetailsElement && record.querySelector(`[id="${CSS.escape(anchor)}"]`)) record.open = true;
+      }
+    }
+    function onHashChange() { followAnchor(window.location.hash.slice(1)); }
+    function onAnchorClick(event: MouseEvent) {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (!(link instanceof HTMLAnchorElement)) return;
+      const url = new URL(link.href);
+      if (url.origin !== window.location.origin || url.pathname !== window.location.pathname || !url.hash) return;
+      // Next Link uses pushState for hashes; preserve links to moved field tools.
+      const anchor = url.hash.slice(1);
+      if (!["visit-notes", "visit-resolution", "visit-parts", "need-material", "visit-materials", "visit-day-tasks", "visit-completion"].includes(anchor)) return;
+      event.preventDefault();
+      if (window.location.hash === url.hash) followAnchor(anchor);
+      else window.location.hash = url.hash;
+    }
+    onHashChange();
+    window.addEventListener("hashchange", onHashChange);
+    document.addEventListener("click", onAnchorClick, true);
+    return () => {
+      window.removeEventListener("hashchange", onHashChange);
+      document.removeEventListener("click", onAnchorClick, true);
+    };
+  }, [visitId, hasNoteForm, hasMaterialsForm, hasPlanForm, hasCompletionForm]);
+
   function openRecord(anchorId: string) {
     const record = document.getElementById("visit-record");
     if (record instanceof HTMLDetailsElement) record.open = true;
@@ -159,6 +233,8 @@ export function VisitFieldFace({
   }
 
   async function postTransition(nextStatus: string) {
+    if (pending) return;
+    setError("");
     setPending(true);
     try {
       const res = await fetch(`/api/v1/visits/${visitId}/transition`, {
@@ -168,11 +244,13 @@ export function VisitFieldFace({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(data.error?.message ?? "Could not update the visit");
+        setError(data.error?.message ?? "Could not update the visit. Retry below.");
         return;
       }
-      toast.success("Job started");
+      toast.success("Visit started");
       router.refresh();
+    } catch {
+      setError("Could not save. Your draft is kept; retry.");
     } finally {
       setPending(false);
     }
@@ -180,6 +258,8 @@ export function VisitFieldFace({
 
   async function markDone(taskId: string) {
     if (!canToggleTasks) return;
+    if (pending) return;
+    setError("");
     setPending(true);
     try {
       const res = await fetch(`/api/v1/visits/${visitId}/tasks`, {
@@ -189,10 +269,12 @@ export function VisitFieldFace({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(data.error?.message ?? "Could not mark done");
+        setError(data.error?.message ?? "Could not mark done. Retry below.");
         return;
       }
       router.refresh();
+    } catch {
+      setError("Could not save. Your draft is kept; retry.");
     } finally {
       setPending(false);
     }
@@ -200,15 +282,12 @@ export function VisitFieldFace({
 
   async function markPartial(task: FaceTask) {
     if (!canToggleTasks) return;
-    const remainder = window.prompt(
-      `Started but not finished:\n“${task.label}”\n\nWhat is left to do?`,
-      "",
-    );
-    if (remainder == null) return;
     if (!remainder.trim()) {
-      toast.error("Describe what is left to do, or cancel.");
+      setError("Describe what is left to do, or cancel.");
       return;
     }
+    if (pending) return;
+    setError("");
     setPending(true);
     try {
       const res = await fetch(`/api/v1/visits/${visitId}/tasks`, {
@@ -222,10 +301,17 @@ export function VisitFieldFace({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(data.error?.message ?? "Could not save partial progress");
+        setError(data.error?.message ?? "Could not save partial progress. Retry below.");
         return;
       }
+      clearRemainder();
+      setRemainder("");
+      clearRemainder();
+      setSheet(null);
+      opener.current?.focus();
       router.refresh();
+    } catch {
+      setError("Could not save. Your draft is kept; retry.");
     } finally {
       setPending(false);
     }
@@ -240,13 +326,13 @@ export function VisitFieldFace({
       const res = await fetch(visitMediaUploadPath(visitId), { method: "POST", body: formData });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(data.error?.message ?? "Upload failed");
+        setError(data.error?.message ?? "Upload failed. Select the photo again to retry.");
         return;
       }
       toast.success("Photo saved on this visit");
       router.refresh();
     } catch {
-      toast.error("Upload failed");
+      setError("Upload failed. Select the photo again to retry.");
     } finally {
       setUploading(false);
       if (photoRef.current) photoRef.current.value = "";
@@ -267,11 +353,13 @@ export function VisitFieldFace({
     if (savedLine.current === line) return true;
     if (inflight.current?.line === line) return inflight.current.promise;
 
+    setPending(true);
+    setError("");
     const promise = (async () => {
       const currentRes = await fetch(visitNotesPath(visitId));
       const currentBody = await currentRes.json().catch(() => ({}));
       if (!currentRes.ok) {
-        toast.error(currentBody.error?.message ?? "Could not read the current note");
+        setError(currentBody.error?.message ?? "Could not read the current note. Retry.");
         return false;
       }
       const current = typeof currentBody?.data?.tech_notes === "string"
@@ -285,10 +373,11 @@ export function VisitFieldFace({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(data.error?.message ?? "Could not save the note");
+        setError(data.error?.message ?? "Could not save the note. Your draft is kept; retry.");
         return false;
       }
       setLocalNotes(next);
+      clearDescription(); clearArea();
       toast.success("Saved as a note. It is not billable work yet.");
       router.refresh();
       return true;
@@ -299,7 +388,11 @@ export function VisitFieldFace({
       const ok = await promise;
       if (ok) savedLine.current = line;
       return ok;
+    } catch {
+      setError("Could not save added work. Your draft is kept; retry.");
+      return false;
     } finally {
+      setPending(false);
       if (inflight.current?.promise === promise) inflight.current = null;
     }
   }
@@ -316,6 +409,12 @@ export function VisitFieldFace({
     visitId,
   });
 
+  function finishVisit() {
+    if (!completionForm) { openRecord("visit-actions"); return; }
+    setFinishing(true);
+    window.setTimeout(() => document.getElementById("visit-completion")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
+  const finishIsNext = command.kind === "none" && status === "in_progress" && canTransition && !!completionForm;
   function renderPrimary() {
     if (command.kind === "assessment") {
       return (
@@ -352,7 +451,7 @@ export function VisitFieldFace({
         <button
           type="button"
           className="p7-field-hero__primary"
-          disabled={pending}
+          disabled={pending || !canTransition}
           onClick={() => void postTransition(command.nextStatus)}
         >
           {pending ? "…" : command.label}
@@ -366,10 +465,11 @@ export function VisitFieldFace({
         </a>
       );
     }
+    if (finishIsNext) return <button type="button" className="p7-field-hero__primary" onClick={finishVisit}>Finish visit</button>;
     return null;
   }
 
-  const primaryShown = command.kind !== "none" && !(command.kind === "navigate" && !mapsUrl) && !(command.kind === "task" && !first);
+  const primaryShown = finishIsNext || command.kind !== "none" && !(command.kind === "navigate" && !mapsUrl) && !(command.kind === "task" && !first);
 
   const photoInput = (
     <input
@@ -395,7 +495,7 @@ export function VisitFieldFace({
         </div>
         <h1 className="field-visit__place">{place}</h1>
         <p className="field-visit__purpose">{purpose}</p>
-        {address && clientName ? <p className="field-visit__where">{address}</p> : null}
+        {address && clientName ? <p className="field-visit__where">{clientName}</p> : null}
         {telUrl ? (
           <div className="field-visit__quiet">
             <a href={telUrl} className="field-text-action">Call</a>
@@ -404,23 +504,25 @@ export function VisitFieldFace({
 
         {showTasks && first ? (
           <div className="field-task" data-testid="visit-first-up">
-            <p className="field-kicker">First up</p>
+            <p className="field-kicker">Next task</p>
             <p className="field-task__label">{first.label}</p>
             {needed ? <p className="field-command__need">{needed}</p> : null}
             <div className="field-visit__primary" ref={primaryRef}>{renderPrimary()}</div>
             <div className="field-visit__quiet">
-              <button type="button" className="field-text-action" disabled={pending} onClick={() => void markPartial(first)}>
-                I’ll come back to this
+              <button type="button" className="field-text-action" disabled={pending || !canToggleTasks || command.kind !== "task"} onClick={() => { setPartialTask(first); openSheet("partial"); }}>
+                Started, not finished
               </button>
             </div>
           </div>
         ) : (
           <div className="field-task" ref={primaryRef}>
-            {fieldKind === "site_visit" ? <p className="field-kicker">First up</p> : null}
+            {fieldKind === "site_visit" ? <p className="field-kicker">Next task</p> : null}
             {primaryShown ? <div className="field-visit__primary">{renderPrimary()}</div> : null}
           </div>
         )}
 
+        {error && !sheet ? <p role="alert" className="p7-field-error">{error}</p> : null}
+        {showTasks && planForm ? <button type="button" className="field-text-action" onClick={() => openSheet("plan")}>Edit today’s plan</button> : null}
         {children}
 
         {showTasks && rest.length > 0 ? (
@@ -428,7 +530,7 @@ export function VisitFieldFace({
             <p className="field-kicker" style={{ marginTop: "var(--space-6)" }}>{restOfVisitHeading(first?.status)}</p>
             <ul className="field-task__rest">
               {rest.map((task) => (
-                <li key={task.id}>{task.label}</li>
+                <li key={task.id}><span>{task.label}</span>{task.status === "partial" ? <small>Started · not finished</small> : null}{command.kind === "task" ? <button type="button" className="field-text-action" disabled={pending || !canToggleTasks} onClick={() => void markDone(task.id)}>Done</button> : null}</li>
               ))}
             </ul>
           </>
@@ -443,7 +545,7 @@ export function VisitFieldFace({
               return (
                 <button key={check.key} type="button" onClick={() => photoRef.current?.click()}>
                   <span>{check.label}</span>
-                  <span className="done">{check.done ? "Done" : "Add"}</span>
+                  <span className="done">{check.done ? "Recorded" : "Add"}</span>
                 </button>
               );
             }
@@ -465,20 +567,26 @@ export function VisitFieldFace({
             }
             const anchor = check.key === "materials" ? usedAnchor : check.key === "note" ? noteAnchor : materialAnchor;
             return (
-              <button key={check.key} type="button" onClick={() => openRecord(anchor)}>
+              <button key={check.key} type="button" onClick={() => { if (check.key === "materials" && materialsForm) openSheet("materials"); else if (check.key === "note" && noteForm) openSheet("note"); else openRecord(anchor); }}>
                 <span>{check.label}</span>
-                <span className="done">{check.done ? "Done" : "Add"}</span>
+                <span className="done">{check.done ? "Recorded" : "Add"}</span>
               </button>
             );
           })}
         </section>
       ) : null}
 
-      <button type="button" className="field-text-action field-finish" onClick={() => openRecord("visit-actions")}>
-        Finish the visit
-      </button>
+      {status === "in_progress" && canTransition ? <div className="field-finish">
+        {!finishIsNext ? <button type="button" className="p7-field-hero__secondary" onClick={finishVisit}>Finish visit</button> : null}
+        {finishing ? <section className="field-completion">{completionForm}</section> : null}
+      </div> : null}
+      <details className="field-recorded">
+        <summary>Recorded today · {tasks.filter(t => t.completed || t.status === "done").length} tasks done · {photoCount} completion photos</summary>
+        <ul>{tasks.filter(t => t.completed || t.status === "done").map(t => <li key={t.id}>{t.label} · Done (locked)</li>)}</ul>
+        <p style={{ whiteSpace: "pre-wrap" }}>{localNotes || "No visit notes recorded."}</p>
+      </details>
 
-      <aside className="field-visit__rail">
+      {status !== "completed" && status !== "cancelled" ? <aside className="field-visit__rail">
         {photoInput}
         {latestMediaId ? (
           <Image
@@ -496,21 +604,24 @@ export function VisitFieldFace({
           <button type="button" disabled={uploading} onClick={() => photoRef.current?.click()}>
             {uploading ? "…" : "Photo"}
           </button>
-          <button type="button" disabled={!canNotes} onClick={() => openRecord(noteAnchor)}>Note</button>
-          <button type="button" disabled={!canNotes} onClick={() => openRecord(materialAnchor)}>Need material</button>
-          <button type="button" onClick={() => setSheet("add")}>Add work</button>
+          <button type="button" disabled={!canNotes} onClick={() => noteForm ? openSheet("note") : openRecord(noteAnchor)}>Note</button>
+          <button type="button" disabled={!canNotes} onClick={() => materialsForm ? openSheet("materials") : openRecord(materialAnchor)}>Materials</button>
+          <button type="button" disabled={!canNotes} onClick={() => openSheet("add")}>Add work</button>
         </div>
-      </aside>
+      </aside> : null}
 
-      {sheet === "add" ? (
-        <div className="field-sheet" role="presentation" onClick={() => setSheet(null)}>
-          <div
-            className="field-sheet__panel"
-            role="dialog"
-            aria-labelledby="add-work-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2 id="add-work-title">Add work</h2>
+      <Modal open={sheet !== null} onClose={closeSheet} title={sheet === "add" ? "Add work" : sheet === "partial" ? "Started, not finished" : sheet === "plan" ? "Today’s plan" : sheet === "materials" ? "Materials" : "Visit notes"} data-testid="visit-tool-sheet">
+        {error ? <p role="alert" className="p7-field-error">{error}</p> : null}
+        {sheet === "note" ? noteForm : null}
+        {sheet === "materials" ? materialsForm : null}
+        {sheet === "plan" ? planForm : null}
+        {sheet === "partial" && partialTask ? <form onSubmit={e => { e.preventDefault(); void markPartial(partialTask); }} className="field-sheet__panel">
+          <p>{partialTask.label}</p>
+          <label>What is left to do?<textarea value={remainder} onChange={e => setRemainder(e.target.value)} required maxLength={500} /></label>
+          <p>This records partial progress and creates a follow-up task.</p>
+          <button type="submit" className="p7-field-hero__primary" disabled={pending || !remainder.trim()}>Save partial progress</button>
+        </form> : null}
+        {sheet === "add" ? <div className="field-sheet__panel">
             <p className="field-visit__where">
               This stays a note until someone prices it. It does not change the estimate.
             </p>
@@ -544,17 +655,17 @@ export function VisitFieldFace({
                   Save as a note
                 </button>
                 {canCreateEstimate && approvedEstimateId ? (
-                  <button type="button" className="field-text-action" onClick={() => void saveThenGo(`/app/estimates/${approvedEstimateId}#change-orders`)}>
+                  <button type="button" className="field-text-action" disabled={pending} onClick={() => void saveThenGo(`/app/estimates/${approvedEstimateId}#change-orders`)}>
                     Change order
                   </button>
                 ) : null}
                 {canCreateEstimate && estimateHref ? (
-                  <button type="button" className="field-text-action" onClick={() => void saveThenGo(estimateHref)}>
+                  <button type="button" className="field-text-action" disabled={pending} onClick={() => void saveThenGo(estimateHref)}>
                     Separate estimate
                   </button>
                 ) : null}
                 {canCreateEstimate ? (
-                  <button type="button" className="field-text-action" onClick={() => void saveThenGo("/app/intake/new")}>
+                  <button type="button" className="field-text-action" disabled={pending} onClick={() => void saveThenGo("/app/intake/new")}>
                     Future request
                   </button>
                 ) : null}
@@ -563,10 +674,8 @@ export function VisitFieldFace({
                 ) : null}
               </div>
             ) : null}
-            <button type="button" className="field-text-action" onClick={() => setSheet(null)}>Close</button>
-          </div>
-        </div>
-      ) : null}
+          </div> : null}
+      </Modal>
     </div>
   );
 }

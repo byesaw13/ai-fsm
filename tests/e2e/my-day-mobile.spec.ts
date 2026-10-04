@@ -56,7 +56,7 @@ test.describe("My Day mobile", () => {
     await expect(more).toBeVisible();
     await more.locator("summary").click();
     await expect(page.getByTestId("field-quick-actions")).toBeVisible();
-    await expect(page.getByText("Quote")).toBeVisible();
+    await expect(page.getByTestId("field-quick-actions").getByText("Quote", { exact: true })).toBeVisible();
   });
 
   test("one Now: start day or van pill, not activity chips", async ({ page }) => {

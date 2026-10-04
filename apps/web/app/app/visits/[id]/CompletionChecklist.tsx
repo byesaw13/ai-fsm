@@ -16,6 +16,9 @@ type CompletionPacketValues = {
 };
 
 interface CompletionChecklistProps {
+  draftKey?: string;
+  initialVisitNotes?: string;
+  existingPhotos?: { id: string; original_name: string }[];
   visitId: string;
   initialPacket: CompletionPacketValues | null;
   canUpdate: boolean;
@@ -55,6 +58,9 @@ export function CompletionChecklist({
   closePhotosItemId,
   isQuickJob = false,
   canSend = true,
+  draftKey,
+  initialVisitNotes,
+  existingPhotos = [],
 }: CompletionChecklistProps) {
   const router = useRouter();
   const toast = useToast();
@@ -73,6 +79,15 @@ export function CompletionChecklist({
         mediaId: null,
       }))
   );
+  // Reuse photos recorded through the field tool in the existing completion packet.
+  useEffect(() => {
+    setPhotoEntries(previous => {
+      const additions = existingPhotos.map(photo => ({ url: `/api/v1/visits/${visitId}/media/${photo.id}/image`, label: photo.original_name, mediaId: photo.id }));
+      const urls = new Set(previous.map(photo => photo.url));
+      const missing = additions.filter(photo => !urls.has(photo.url));
+      return missing.length ? [...previous, ...missing] : previous;
+    });
+  }, [existingPhotos, visitId]);
   const [signatureUrl, setSignatureUrl] = useState(initialPacket?.signature_url ?? "");
   const [signatureWaiver, setSignatureWaiver] = useState(initialPacket?.signature_waiver ?? false);
   const [notes, setNotes] = useState(initialPacket?.notes ?? "");
@@ -541,6 +556,8 @@ export function CompletionChecklist({
         onClose={() => setCloseoutOpen(false)}
         onBeforeSubmit={savePacket}
         canSend={canSend}
+        draftKey={draftKey}
+        initialNotes={initialVisitNotes}
       />
     </div>
   );
