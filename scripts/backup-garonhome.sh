@@ -57,17 +57,39 @@ else
   echo "WARNING: ${PASSPHRASE_FILE} not found; skipping encrypted .env backup" >&2
 fi
 
-# Offsite copy to Google Drive (non-fatal — pruning must still run)
+# Offsite copy to Google Drive (non-fatal — pruning must still run).
+# Dumps and .env gpg stay dated: they are tiny, and 30 days of them fit.
+# Uploads are one replaced object. A new ~1GB tarball every night filled
+# the Drive quota and then blocked the dump upload too.
 RCLONE_REMOTE="${FSM_RCLONE_REMOTE:-googledrive}"
 RCLONE_DEST="${RCLONE_REMOTE}:ai-fsm-backups"
-for f in "${DB_FILE}" "${UPLOADS_FILE}" "${ENV_FILE_BACKUP}"; do
-  [[ -z "${f}" ]] && continue
-  if rclone copy "${f}" "${RCLONE_DEST}/" --log-level INFO; then
-    echo "offsite copy complete: ${RCLONE_DEST}/$(basename "${f}")"
+UPLOADS_LATEST_NAME="ai_fsm_uploads_latest.tar.gz"
+
+# Drop dated uploads archives before copying, or the new copy has no room.
+if rclone delete "${RCLONE_DEST}" --include "ai_fsm_uploads_2*.tar.gz" --log-level INFO; then
+  echo "dated offsite uploads archives removed"
+else
+  echo "WARNING: failed to remove dated offsite uploads archives (rclone exit $?)" >&2
+fi
+
+copy_offsite() {
+  local src="$1" dest_name="$2"
+  if rclone copyto "${src}" "${RCLONE_DEST}/${dest_name}" --log-level INFO; then
+    echo "offsite copy complete: ${RCLONE_DEST}/${dest_name}"
   else
-    echo "WARNING: offsite copy failed for $(basename "${f}") (rclone exit $?); local backup retained" >&2
+    echo "WARNING: offsite copy failed for ${dest_name} (rclone exit $?); local backup retained" >&2
   fi
-done
+}
+
+if [[ -n "${DB_FILE}" && -f "${DB_FILE}" ]]; then
+  copy_offsite "${DB_FILE}" "$(basename "${DB_FILE}")"
+fi
+if [[ -n "${UPLOADS_FILE}" && -f "${UPLOADS_FILE}" ]]; then
+  copy_offsite "${UPLOADS_FILE}" "${UPLOADS_LATEST_NAME}"
+fi
+if [[ -n "${ENV_FILE_BACKUP}" && -f "${ENV_FILE_BACKUP}" ]]; then
+  copy_offsite "${ENV_FILE_BACKUP}" "$(basename "${ENV_FILE_BACKUP}")"
+fi
 
 # Prune local backups older than 7 days (runs regardless of offsite result)
 find "${BACKUP_DIR}" \( -name "ai_fsm_*.dump" -o -name "ai_fsm_uploads_*.tar.gz" -o -name "ai_fsm_env_*.gpg" \) -mtime +7 -delete

@@ -13,7 +13,7 @@ Deploy root: `/opt/business/ai-fsm/`
 | Backup type | Tool | Frequency | Retention |
 |-------------|------|-----------|-----------|
 | Logical (SQL dump) | `pg_dump` | Daily (cron) | 7 days local + 30 days offsite (Google Drive, via rclone) |
-| Uploaded files (`data/uploads/`) | `tar` | Daily (cron) | 7 days local + 30 days offsite |
+| Uploaded files (`data/uploads/`) | `tar` | Daily (cron) | 7 days local + one current offsite copy, replaced each night |
 | Secrets (`.env`) | `gpg --symmetric` | Daily (cron) | 7 days local + 30 days offsite |
 | WAL archiving | Not configured | — | N/A (MVP) |
 
@@ -48,7 +48,7 @@ The backup script (`scripts/backup-garonhome.sh`) performs:
 1. `pg_dump` from the running postgres container to `/opt/business/ai-fsm/backups/ai_fsm_YYYYMMDDTHHMMSSZ.dump`
 2. `tar` of `/opt/business/ai-fsm/data/uploads/` to `ai_fsm_uploads_YYYYMMDDTHHMMSSZ.tar.gz`
 3. `gpg --symmetric` encryption of `.env` to `ai_fsm_env_YYYYMMDDTHHMMSSZ.gpg` (requires a passphrase file — see setup below; skipped with a warning if the file is missing)
-4. Pushes all three files offsite via `rclone`
+4. Pushes the dump and the `.env` gpg offsite as dated files. Pushes uploads as `ai_fsm_uploads_latest.tar.gz`, replacing the previous copy. Deletes dated `ai_fsm_uploads_2*.tar.gz` objects from Drive first so those archives cannot fill the quota.
 5. Prunes local copies of all three older than 7 days
 6. Prunes offsite (Google Drive) copies older than 30 days via `rclone delete --min-age`
 
@@ -66,7 +66,7 @@ Then store that passphrase value in the company password manager (1Password/Bitw
 
 ## Offsite / Remote Backup
 
-This is already automatic — `scripts/backup-garonhome.sh` pushes every dump/uploads-tar/`.env.gpg` to the `googledrive:ai-fsm-backups` Google Drive folder via `rclone` as part of the nightly cron run, and prunes copies there older than 30 days (`rclone delete --min-age 30d`, configurable via `FSM_BACKUP_REMOTE_RETENTION_DAYS`).
+This is already automatic — `scripts/backup-garonhome.sh` pushes each dump and `.env.gpg` to the `googledrive:ai-fsm-backups` Google Drive folder via `rclone`, and replaces a single `ai_fsm_uploads_latest.tar.gz` there. Dated dump and `.env` copies older than 30 days are pruned (`rclone delete --min-age 30d`, configurable via `FSM_BACKUP_REMOTE_RETENTION_DAYS`). Dated uploads tarballs are not kept offsite.
 
 Direct folder link: `https://drive.google.com/drive/folders/1gYp-bXjpAj3DpTKOvF6RZt1ElH4HNT36`
 
@@ -152,8 +152,12 @@ Needed for a full disaster-recovery rebuild (new host, or a wiped drive) — the
 
 ### Restore uploaded files
 
+Local archives are dated. The Drive copy is the single replaced file.
+
 ```bash
 tar -xzf ai_fsm_uploads_YYYYMMDDTHHMMSSZ.tar.gz -C /opt/business/ai-fsm/data/
+# or, from Drive:
+tar -xzf ai_fsm_uploads_latest.tar.gz -C /opt/business/ai-fsm/data/
 ```
 
 ### Restore `.env`
