@@ -4,11 +4,13 @@ import type { DaySetupState } from "@/lib/my-day/day-setup";
 
 export function DayStatusPill({
   state,
+  activityLabel,
   vehicleLabel,
   milesToday,
   onReopen,
 }: {
   state: DaySetupState;
+  activityLabel: string;
   vehicleLabel: string | null;
   milesToday: number;
   onReopen: () => void;
@@ -25,7 +27,7 @@ export function DayStatusPill({
       data-testid="day-status-pill"
       className="field-day-pill"
     >
-      {parts.join(" · ")}
+      <span>{activityLabel}</span><span>{parts.join(" · ")}</span>
     </button>
   );
 }

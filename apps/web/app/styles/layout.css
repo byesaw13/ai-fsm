@@ -1857,7 +1857,7 @@ main { max-width: 980px; margin: 0 auto; padding: 24px; }
 
 @media (max-width: 799px) {
   .field-command__inline-action {
-    display: none;
+    display: block;
   }
 
   .field-command-dock,
@@ -1872,6 +1872,8 @@ main { max-width: 980px; margin: 0 auto; padding: 24px; }
     background: var(--bg);
     border-top: 1px solid var(--border);
   }
+
+  .field-command-dock:not(.is-on) { display: none; }
 
   .field-today__main,
   .field-visit {
@@ -1948,5 +1950,43 @@ main { max-width: 980px; margin: 0 auto; padding: 24px; }
   .field-visit__rail .field-actions button {
     min-height: 72px;
     font-size: var(--text-sm);
+  }
+}
+
+/* Today + Active Visit: a readable work surface and a quiet recording rail. */
+.field-command, .field-task[data-testid="visit-first-up"] {
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+}
+.field-task[data-testid="visit-first-up"] { border-left: 4px solid var(--accent); }
+.field-day-pill { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); min-height: 52px; }
+.field-day-pill span:first-child { font-weight: 700; color: var(--fg); }
+.field-command__inline-action { max-width: none; }
+.field-task__rest li { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.field-task__rest li > span { flex: 1; }
+.field-task__rest small { color: var(--fg-muted); }
+.field-recorded { margin: var(--space-5) 0; grid-column: 1; }
+.field-recorded summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font-weight: 650; }
+.field-finish { width: 100%; margin-top: var(--space-5); }
+.field-finish > button { width: 100%; min-height: 48px; }
+.field-completion { margin-top: var(--space-4); }
+.field-visit .p7-modal { width: min(600px, calc(100vw - 24px)); max-height: 90dvh; overflow: auto; }
+.field-visit .p7-modal .field-sheet__panel { width: 100%; padding: 0; max-height: none; }
+.field-visit .p7-modal textarea, .field-visit .p7-modal input { font-size: 16px; }
+.field-visit button:focus-visible, .field-today button:focus-visible, .field-visit a:focus-visible, .field-today a:focus-visible {
+  outline: 3px solid var(--accent); outline-offset: 3px;
+}
+@media (max-width: 799px) {
+  .field-command, .field-task[data-testid="visit-first-up"] { padding: var(--space-4); }
+  .field-visit { padding-bottom: 160px; }
+  .field-actions button { font-size: var(--text-sm); }
+  .field-visit .p7-modal-overlay { align-items: flex-end; }
+}
+@media (max-width: 799px) {
+  body:has(.field-visit) .p7-toast-container,
+  body:has(.field-today) .p7-toast-container {
+    bottom: calc(204px + env(safe-area-inset-bottom, 0px));
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
@@ -34,6 +34,16 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
   const router = useRouter();
   const toast = useToast();
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const [primaryOff, setPrimaryOff] = useState(false);
+  const primaryRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = primaryRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(([entry]) => setPrimaryOff(!entry.isIntersecting), { threshold: 0.4 });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [visit.id]);
   const mapsUrl = buildMapsUrl(visit.property_address);
   const telUrl = buildTelUrl(visit.client_phone);
   const command = todayCommand(visit.status, !!mapsUrl);
@@ -43,16 +53,17 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
   const when = `${formatBusinessTime(visit.scheduled_start)} · ${todayWhenLabel(visit.status)}`;
 
   async function startJob() {
+    if (pending) return;
     setPending(true);
-    const err = await transitionVisit(visit.id, "arrived");
-    setPending(false);
-    if (err) {
-      toast.error(err);
-      return;
-    }
-    toast.success("Job started");
-    router.push(`/app/visits/${visit.id}` as Route);
-    router.refresh();
+    setError("");
+    try {
+      const err = await transitionVisit(visit.id, "arrived");
+      if (err) { setError(err); return; }
+      toast.success("Visit started");
+      router.push(`/app/visits/${visit.id}` as Route);
+      router.refresh();
+    } catch { setError("Could not start the visit. Retry below."); }
+    finally { setPending(false); }
   }
 
   const primary = command.verb === "navigate" && mapsUrl ? (
@@ -76,7 +87,7 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
         <h2 className="field-command__place">{place}</h2>
         <p className="field-command__purpose">{purpose}</p>
         {visit.property_address && visit.client_name ? (
-          <p className="field-command__where">{visit.property_address}</p>
+          <p className="field-command__where">{visit.client_name}</p>
         ) : null}
         {visit.first_up ? (
           <p className="field-command__next" data-testid="hero-first-up">
@@ -85,11 +96,13 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
           </p>
         ) : null}
         {needed ? <p className="field-command__need">{needed}</p> : null}
-        <div className="field-command__inline-action">{primary}</div>
+        {error ? <p role="alert" className="p7-field-error">{error}</p> : null}
+        <div ref={primaryRef} className="field-command__inline-action">{primary}</div>
         <div className="field-command__quiet">
+          <Link href={`/app/visits/${visit.id}` as Route} className="field-text-action">View visit plan</Link>
           {command.verb === "navigate" ? (
             <button type="button" className="field-text-action" data-testid="hero-start-job" disabled={pending} onClick={() => void startJob()}>
-              {pending ? "…" : "Start job"}
+              {pending ? "…" : "Start visit"}
             </button>
           ) : null}
           <span className="field-command__phone-only">
@@ -104,7 +117,7 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
           </span>
         </div>
       </section>
-      <div className="field-command-dock">
+      <div className={`field-command-dock${primaryOff ? " is-on" : ""}`}>
         {command.verb === "navigate" && mapsUrl ? (
           <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="p7-field-hero__primary">
             {place} · {command.label}

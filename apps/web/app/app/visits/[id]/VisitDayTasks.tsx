@@ -29,32 +29,46 @@ export function VisitDayTasks({
   visitId,
   initialTasks,
   canToggle,
+  planOnly = false,
 }: {
   visitId: string;
   initialTasks: DayTask[];
   canToggle: boolean;
+  planOnly?: boolean;
 }) {
   const router = useRouter();
   const [tasks, setTasks] = useState(initialTasks);
   const [selectable, setSelectable] = useState<Selectable[]>([]);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [editingPlan, setEditingPlan] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>(initialTasks.map(task => task.id));
+  const [planLoaded, setPlanLoaded] = useState(false);
+  const [loadingPlan, setLoadingPlan] = useState(false);
+  const [editingPlan, setEditingPlan] = useState(planOnly);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [savingPlan, setSavingPlan] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refreshSelectable = useCallback(async () => {
-    const res = await fetch(`/api/v1/visits/${visitId}/tasks?selectable=1`);
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok) return;
-    setTasks(j.data?.tasks ?? []);
-    setSelectable(j.data?.selectable ?? []);
-    setSelectedIds((j.data?.tasks ?? []).map((t: DayTask) => t.id));
+    setLoadingPlan(true);
+    setPlanLoaded(false);
+    setError(null);
+    try {
+      const res = await fetch(`/api/v1/visits/${visitId}/tasks?selectable=1`);
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error?.message ?? "Could not load tasks to plan");
+      setTasks(j.data?.tasks ?? []);
+      setSelectable(j.data?.selectable ?? []);
+      setSelectedIds((j.data?.tasks ?? []).map((t: DayTask) => t.id));
+      setPlanLoaded(true);
+    } finally { setLoadingPlan(false); }
   }, [visitId]);
 
   useEffect(() => {
     setTasks(initialTasks);
   }, [initialTasks]);
+
+  useEffect(() => {
+    if (planOnly) void refreshSelectable().catch(error => setError(error instanceof Error ? error.message : "Could not load tasks."));
+  }, [planOnly, refreshSelectable]);
 
   async function openPlanner() {
     setError(null);
@@ -74,6 +88,7 @@ export function VisitDayTasks({
   }
 
   async function savePlan() {
+    if (!planLoaded || loadingPlan || savingPlan) return;
     setSavingPlan(true);
     setError(null);
     try {
@@ -88,8 +103,10 @@ export function VisitDayTasks({
         return;
       }
       setTasks(j.data?.tasks ?? []);
-      setEditingPlan(false);
+      setEditingPlan(planOnly);
       router.refresh();
+    } catch {
+      setError("Could not save the plan. Your choices are kept; retry.");
     } finally {
       setSavingPlan(false);
     }
@@ -353,10 +370,11 @@ export function VisitDayTasks({
             </ul>
           )}
           <div style={{ display: "flex", gap: 8, marginTop: "var(--space-3)" }}>
-            <Button type="button" size="sm" loading={savingPlan} onClick={savePlan}>
+            <Button type="button" size="sm" loading={savingPlan} disabled={!planLoaded || loadingPlan || savingPlan} onClick={savePlan}>
               Save day plan
             </Button>
-            <Button
+            {!planLoaded ? <Button type="button" size="sm" variant="secondary" disabled={loadingPlan} onClick={() => void refreshSelectable().catch(error => setError(error instanceof Error ? error.message : "Could not load tasks."))}>{loadingPlan ? "Loading tasks…" : "Retry loading tasks"}</Button> : null}
+            {!planOnly ? <Button
               type="button"
               size="sm"
               variant="ghost"
@@ -364,7 +382,7 @@ export function VisitDayTasks({
               onClick={() => setEditingPlan(false)}
             >
               Cancel
-            </Button>
+            </Button> : null}
           </div>
         </div>
       )}

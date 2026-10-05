@@ -3,7 +3,7 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { queryForSession } from "@/lib/db";
-import { formatVisitTime, isSameCalendarDay } from "@/lib/visits/formatting";
+import { formatVisitTime } from "@/lib/visits/formatting";
 import { BUSINESS_TIMEZONE } from "@/lib/time/business-tz";
 import { pickHeroVisit, type HeroVisit } from "@/lib/my-day/visit-hero";
 import { loadFieldDayData } from "@/lib/my-work/field-day-data";
@@ -28,7 +28,7 @@ import { TodayTimeline } from "./TodayTimeline";
 import { compareTodayWork, standaloneLookTodaySql, todayEmptyCopy, todayWorkHeading } from "./today-list";
 import { filterAttentionForSurface } from "@/lib/attention/surfaces";
 import { todayCoveringTechSql } from "@/lib/visits/covering-tech";
-import { materialsNeededCount } from "@/lib/field/face";
+import { materialsNeededCount, fieldPlaceTitle, showLeaveList } from "@/lib/field/face";
 
 export const dynamic = "force-dynamic";
 
@@ -90,10 +90,10 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
               (SELECT t.label FROM visit_tasks vt
                JOIN work_order_tasks t ON t.id = vt.task_id
                JOIN visits vfirst ON vfirst.id = vt.visit_id
-               WHERE vfirst.work_order_id = w.id AND vfirst.assigned_user_id = $2
+               WHERE vt.visit_id = face.face_visit_id::uuid AND vfirst.assigned_user_id = $2
                  AND vfirst.status NOT IN ('completed','cancelled')
                  AND t.completed = false AND t.status <> 'done'
-               ORDER BY vfirst.scheduled_start ASC, t.sort_order ASC LIMIT 1) AS first_up
+               ORDER BY CASE WHEN t.status = 'partial' THEN 1 ELSE 0 END, t.sort_order ASC LIMIT 1) AS first_up
        FROM work_orders w
        JOIN jobs j ON j.id = w.job_id
        LEFT JOIN clients c ON c.id = w.client_id
@@ -106,6 +106,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
          WHERE v.work_order_id = w.id
            AND v.assigned_user_id = $2
            AND v.status NOT IN ('completed','cancelled')
+           AND ${standaloneLookTodaySql(BUSINESS_TIMEZONE)}
          ORDER BY
            CASE WHEN v.status IN ('arrived','in_progress','waiting','dispatched','traveling') THEN 0 ELSE 1 END,
            v.scheduled_start ASC
@@ -113,6 +114,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
        ) face ON true
        WHERE w.account_id = $1 AND ${todayCoveringTechSql("$2")}
          AND w.status NOT IN ('draft','completed','cancelled')
+         AND face.face_visit_id IS NOT NULL
        ORDER BY
          CASE w.status WHEN 'dispatched' THEN 0 WHEN 'scheduled' THEN 1 WHEN 'waiting' THEN 2 ELSE 3 END,
          next_scheduled NULLS LAST,
@@ -146,13 +148,14 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
                JOIN work_order_tasks t ON t.id = vt.task_id
                WHERE vt.visit_id = v.id AND vt.account_id = v.account_id
                  AND t.completed = false AND t.status <> 'done'
-               ORDER BY t.sort_order ASC LIMIT 1) AS first_up
+               ORDER BY CASE WHEN t.status = 'partial' THEN 1 ELSE 0 END, t.sort_order ASC LIMIT 1) AS first_up
        FROM visits v
        LEFT JOIN jobs j ON j.id = v.job_id
        LEFT JOIN clients c ON c.id = j.client_id
        LEFT JOIN properties p ON p.id = j.property_id
        WHERE v.account_id = $1 AND v.assigned_user_id = $2
          AND v.status NOT IN ('completed','cancelled')
+         AND ${standaloneLookTodaySql(BUSINESS_TIMEZONE)}
        ORDER BY v.scheduled_start ASC
        LIMIT 100`,
       [session.accountId, session.userId],
@@ -170,15 +173,14 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
     propIds,
   );
 
-  const todayVisits = heroVisits.filter((v) => isSameCalendarDay(v.scheduled_start));
-  const heroVisit = pickHeroVisit(todayVisits, now.getTime());
+  const heroVisit = pickHeroVisit(heroVisits, now.getTime());
   const needsAttentionRaw = isOwner ? await loadNeedsAttention(session) : null;
   const needsAttention = needsAttentionRaw
     ? { items: filterAttentionForSurface(needsAttentionRaw.items, "today"), openPromiseRows: [] as typeof needsAttentionRaw.openPromiseRows }
     : null;
 
   const dayStarted = !!fieldDay.openSession;
-  const heroVisible = dayStarted && !!heroVisit && proposals.length === 0;
+  const heroVisible = !!heroVisit && (dayStarted || showLeaveList(heroVisit.status)) && proposals.length === 0;
   const heroId = heroVisible ? heroVisit?.id ?? null : null;
   const otherStops = [
     ...workOrders.map((wo) => ({
@@ -204,7 +206,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
       <PageHeader title="Today" />
 
       {proposals.length > 0 && (() => {
-        const active = fieldDay.activityEntries?.find((e) => e.ended_at === null) ?? null;
+        const active = fieldDay.activityEntries?.find((e) => e.ended_at === null && e.user_id === session.userId) ?? null;
         const top = proposals[0];
         const alreadyOnSiteWork =
           !!active &&
@@ -232,12 +234,12 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
       <MyDayMobileLayout
         openSession={fieldDay.openSession}
         vehicles={fieldDay.vehicles}
-        activityEntries={fieldDay.activityEntries}
+        activityEntries={fieldDay.activityEntries.filter((e) => e.user_id === session.userId)}
         dayMileage={fieldDay.dayMileage}
         heroVisit={heroVisit}
         clockedIn={fieldDay.clockedIn}
         hasParkProposal={proposals.length > 0}
-        currentJobId={heroVisit?.job_id ?? workOrders.find((w) => w.active_visit_id)?.job_id ?? workOrders[0]?.job_id ?? null}
+        currentJobId={heroVisit?.job_id ?? workOrders.find((w) => w.active_visit_id)?.job_id ?? null}
         canCapture={isOwner}
         canQuickBook={isOwner}
         priorDayNeedsMileage={fieldDay.priorDayNeedsMileage}
@@ -301,7 +303,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
                     <li key={`job-${wo.id}`}>
                       <Link href={(wo.face_visit_id ? `/app/visits/${wo.face_visit_id}` : `/app/my-work/${wo.id}`) as Route}>
                         <span className="when">{when ? formatVisitTime(when) : ""}</span>
-                        <span className="who">{wo.client_name?.trim() || wo.property_address || "This house"}</span>
+                        <span className="who">{fieldPlaceTitle(wo.client_name, wo.property_address)}</span>
                         <span className="purpose">{wo.title}</span>
                         {missing ? <span className="miss">Material missing</span> : null}
                       </Link>
@@ -315,7 +317,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
                   <li key={`look-${visit.id}`}>
                     <Link href={`/app/visits/${visit.id}` as Route}>
                       <span className="when">{formatVisitTime(visit.scheduled_start)}</span>
-                      <span className="who">{visit.client_name?.trim() || visit.property_address || "This house"}</span>
+                      <span className="who">{fieldPlaceTitle(visit.client_name, visit.property_address)}</span>
                       <span className="purpose">{purpose}</span>
                       {missing ? <span className="miss">Material missing</span> : null}
                     </Link>

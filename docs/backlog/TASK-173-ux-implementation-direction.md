@@ -51,3 +51,35 @@ Still open on this task:
   - Search finds a house by client name, property name, street, room text, or invoice number.
   - Pricing settings store the material-handling percent and the card-fee percent. A non-draft invoice snapshots both.
 - Phase 4 LiDAR and the production library stay deferred.
+
+## Approved Today + Active Visit follow-up — 2026-10-03
+
+Implements the reviewed design within this task and UX direction sections
+22–23 and 26. This is a presentation change on the existing visits, tasks,
+completion packet, closeout, activity, clock, and mileage records.
+
+- [x] Today shows assigned visits on the business date and unfinished active
+  carry-over. Future and unscheduled work does not masquerade as today's stops.
+  Day setup and the GPS arrival proposal retain their existing handlers.
+- [x] The house address, purpose, first unfinished task, and remaining plan lead
+  Active Visit. Partial work explicitly records the remainder; it never implies
+  drying. Completed tasks stay locked.
+- [x] Photo, Note, Materials, and Add work open focused tools. Completion photos,
+  materials used, and visit notes report recorded facts. Notes do not imply
+  customer contact. Scope, assignment, specialist controls, and history remain
+  available under Visit details & history.
+- [x] Finish opens the existing completion packet and closeout. Coming back keeps
+  the job open; Whole job done uses the existing job and bill handlers. Send
+  remains explicit and permission-gated. Payroll and mileage stay independent.
+- [x] Edited drafts survive a same-tab interruption for up to eight hours,
+  scoped by account, user, and visit. A changed server baseline shows the saved
+  version and offers explicit draft restoration. Failed saves retain text;
+  failed task loads disable planner Save and offer Retry.
+- [x] Mobile tools have field-sized targets; the global creation FAB does not
+  obscure the visit dock. Desktop uses a work column and recording/leave rail.
+  Existing completion and recording deep links open the moved tools.
+
+Verification is documented in
+[Today + Active Visit validation](../validation/today-active-visit.md).
+No new routes, tables, migrations, or operational test records were added to
+production. Deployment has not been requested or performed.

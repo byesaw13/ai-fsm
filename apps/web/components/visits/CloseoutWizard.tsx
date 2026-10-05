@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button, Modal, Textarea, useToast } from "@/components/ui";
 import { closeoutHoldSendCopy, comingBackStartHereGuide } from "@/lib/guide/next-move";
 
+import { useFieldDraft } from "@/components/features/field/useFieldDraft";
+
 type Kind = "done" | "return";
 type NextWhen = "tomorrow" | "date" | "unsure";
 
@@ -14,8 +16,12 @@ export function CloseoutWizard({
   onClose,
   onBeforeSubmit,
   canSend = false,
+  draftKey,
+  initialNotes = "",
 }: {
   visitId: string;
+  draftKey?: string;
+  initialNotes?: string;
   open: boolean;
   onClose: () => void;
   /** e.g. save completion packet before closeout */
@@ -25,11 +31,12 @@ export function CloseoutWizard({
 }) {
   const router = useRouter();
   const toast = useToast();
-  const [kind, setKind] = useState<Kind | null>(null);
-  const [notes, setNotes] = useState("");
-  const [nextWhen, setNextWhen] = useState<NextWhen>("tomorrow");
-  const [nextDate, setNextDate] = useState("");
-  const [firstUp, setFirstUp] = useState("");
+  const [kind, setKind, clearKind] = useFieldDraft<Kind | null>(draftKey ? `${draftKey}:kind` : undefined, null);
+  const [notes, setNotes, clearNotes, conflictingNotes] = useFieldDraft<string>(draftKey ? `${draftKey}:notes` : undefined, initialNotes);
+  const [nextWhen, setNextWhen, clearNextWhen] = useFieldDraft<NextWhen>(draftKey ? `${draftKey}:nextWhen` : undefined, "tomorrow");
+  const [nextDate, setNextDate, clearNextDate] = useFieldDraft<string>(draftKey ? `${draftKey}:nextDate` : undefined, "");
+  const [firstUp, setFirstUp, clearFirstUp] = useFieldDraft<string>(draftKey ? `${draftKey}:firstUp` : undefined, "");
+  const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
   function reset() {
@@ -42,7 +49,6 @@ export function CloseoutWizard({
 
   function handleClose() {
     if (pending) return;
-    reset();
     onClose();
   }
 
@@ -64,6 +70,8 @@ export function CloseoutWizard({
       toast.error("Pick a date");
       return;
     }
+    if (pending) return;
+    setError("");
     setPending(true);
     try {
       if (onBeforeSubmit) {
@@ -88,11 +96,12 @@ export function CloseoutWizard({
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(json.error?.message ?? "Could not close out");
+        setError(json.error?.message ?? "Could not close out. Your draft is kept; retry.");
         return;
       }
       const invoiceId = json.data?.invoice_id as string | undefined;
       reset();
+      clearKind(); clearNotes(); clearNextWhen(); clearNextDate(); clearFirstUp();
       onClose();
       if (kind === "done" && invoiceId && sendBill && canSend) {
         const sent = await fetch(`/api/v1/invoices/${invoiceId}/send`, { method: "POST" });
@@ -110,15 +119,16 @@ export function CloseoutWizard({
       }
       router.refresh();
     } catch {
-      toast.error("Could not close out");
+      setError("Could not close out. Your draft is kept; retry.");
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <Modal open={open} onClose={handleClose} title="Close out this job" data-testid="closeout-wizard">
+    <Modal open={open} onClose={handleClose} title="Finish this visit" data-testid="closeout-wizard">
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {error && <p role="alert" className="p7-field-error">{error}</p>}
         <p style={{ margin: 0, fontWeight: 600 }}>Done with this job, or coming back?</p>
         <div style={{ display: "flex", gap: 8 }}>
           <Button
@@ -127,7 +137,7 @@ export function CloseoutWizard({
             onClick={() => setKind("done")}
             data-testid="closeout-kind-done"
           >
-            Done
+            Whole job done
           </Button>
           <Button
             type="button"
@@ -141,6 +151,11 @@ export function CloseoutWizard({
 
         {kind ? (
           <>
+            {conflictingNotes !== undefined ? <div role="status">
+              <p>Saved visit notes changed. Your earlier closeout draft is kept here:</p>
+              <p style={{ whiteSpace: "pre-wrap" }}>{conflictingNotes}</p>
+              <Button type="button" variant="secondary" onClick={() => setNotes(conflictingNotes)}>Restore my draft</Button>
+            </div> : null}
             <label>
               <div style={{ fontWeight: 600, marginBottom: 4 }}>What did you do today?</div>
               <Textarea

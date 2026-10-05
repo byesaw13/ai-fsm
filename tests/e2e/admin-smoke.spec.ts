@@ -69,9 +69,12 @@ test.describe("Admin smoke — jobs and visits", () => {
     if (await firstCard.isVisible()) {
       await firstCard.click();
       await page.waitForURL(/\/app\/visits\/[0-9a-f-]+/);
-      const notes = page.locator('[data-testid="visit-notes-panel"]');
+      await expect(page.getByTestId("visit-status")).toBeVisible();
+      const notes = page.locator('[data-testid="visit-notes-form"]');
       if (!(await notes.isVisible())) {
-        await page.locator("#visit-record > summary").click();
+        const directNote = page.getByRole("button", { name: "Note", exact: true });
+        if (!["Done", "Cancelled"].includes((await page.getByTestId("visit-status").textContent())?.trim() ?? "")) await directNote.click();
+        else await page.locator("#visit-record > summary").click();
       }
       await expect(notes).toBeVisible();
     }

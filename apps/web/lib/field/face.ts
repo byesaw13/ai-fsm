@@ -5,9 +5,9 @@ export function fieldPlaceTitle(
   address: string | null | undefined,
 ): string {
   const client = clientName?.trim();
-  if (client) return client;
   const street = address?.trim();
   if (street) return street;
+  if (client) return client;
   return "This house";
 }
 
@@ -22,10 +22,10 @@ export function todayCommand(
   hasAddress: boolean,
 ): { verb: "navigate" | "continue" | "start"; label: string } {
   if (status === "arrived" || status === "in_progress" || status === "waiting") {
-    return { verb: "continue", label: "Continue work" };
+    return { verb: "continue", label: "Continue visit" };
   }
   if (hasAddress) return { verb: "navigate", label: "Navigate" };
-  return { verb: "start", label: "Start job" };
+  return { verb: "start", label: "Start visit" };
 }
 
 export function todayWhenLabel(status: string): string {
@@ -48,16 +48,18 @@ export function materialsNeededLine(text: string | null | undefined): string | n
 }
 
 export function openFieldTasks<T extends { completed: boolean; status: string }>(tasks: T[]): T[] {
-  return tasks.filter((task) => !task.completed && task.status !== "done");
+  return tasks.filter((task) => !task.completed && task.status !== "done")
+    .sort((a, b) => Number(a.status === "partial") - Number(b.status === "partial"));
 }
 
-/** Partial means this task was started and left unfinished. That is the only dry-time signal. */
-export function restOfVisitHeading(firstStatus: string | null | undefined): string {
-  return firstStatus === "partial" ? "While that dries" : "Still on this visit";
+/** Partial records unfinished work; it never implies a drying condition. */
+export function restOfVisitHeading(_firstStatus: string | null | undefined): string {
+  return "Remaining today";
 }
 
 export function visitFaceStatus(status: string): string {
-  if (status === "in_progress" || status === "arrived" || status === "waiting") return "In progress";
+  if (status === "waiting") return "Waiting";
+  if (status === "in_progress" || status === "arrived") return "In progress";
   if (status === "traveling" || status === "dispatched") return "On the way";
   if (status === "completed") return "Done";
   if (status === "cancelled") return "Cancelled";
@@ -67,7 +69,7 @@ export function visitFaceStatus(status: string): string {
 export type VisitFieldKindName = "standard" | "site_visit" | "membership" | "repair";
 
 export type VisitCommand =
-  | { kind: "start"; label: "Start job"; nextStatus: "arrived" | "in_progress" }
+  | { kind: "start"; label: "Start visit" | "Resume visit"; nextStatus: "arrived" | "in_progress" }
   | { kind: "task"; label: "Complete task" }
   | { kind: "navigate"; label: "Navigate" }
   | { kind: "assessment"; label: "Open assessment" }
@@ -92,15 +94,16 @@ export function visitCommand(input: {
     if (input.assessmentComplete) return { kind: "closeout", label: "Complete walkthrough" };
     return { kind: "assessment", label: "Open assessment" };
   }
+  if (input.status === "waiting") return { kind: "start", label: "Resume visit", nextStatus: "in_progress" };
   if (
     input.fieldKind !== "membership" &&
-    (input.status === "in_progress" || input.status === "waiting") &&
+    input.status === "in_progress" &&
     input.hasOpenTask
   ) {
     return { kind: "task", label: "Complete task" };
   }
-  if (input.status === "scheduled") return { kind: "start", label: "Start job", nextStatus: "arrived" };
-  if (input.status === "arrived") return { kind: "start", label: "Start job", nextStatus: "in_progress" };
+  if (input.status === "scheduled") return { kind: "start", label: "Start visit", nextStatus: "arrived" };
+  if (input.status === "arrived") return { kind: "start", label: "Start visit", nextStatus: "in_progress" };
   if ((input.status === "dispatched" || input.status === "traveling") && input.hasAddress) {
     return { kind: "navigate", label: "Navigate" };
   }
@@ -121,9 +124,8 @@ export function leaveChecks(input: {
 }): { key: "photos" | "materials" | "note" | "next"; label: string; done: boolean }[] {
   const materialsDone = Boolean(input.materialsUsed?.trim()) || (input.partsRecorded ?? 0) > 0;
   return [
-    { key: "photos", label: "Photos", done: input.photoCount > 0 },
-    { key: "materials", label: "Materials", done: materialsDone },
-    { key: "note", label: "Customer note", done: Boolean(input.techNotes?.trim()) },
-    { key: "next", label: "Next visit", done: input.hasNextVisit },
+    { key: "photos", label: "Completion photos", done: input.photoCount > 0 },
+    { key: "materials", label: "Materials used", done: materialsDone },
+    { key: "note", label: "Visit notes", done: Boolean(input.techNotes?.trim()) },
   ];
 }

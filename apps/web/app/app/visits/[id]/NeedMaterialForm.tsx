@@ -4,16 +4,20 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, useToast } from "@/components/ui";
 
+import { useFieldDraft } from "@/components/features/field/useFieldDraft";
+
 interface Props {
+  draftKey?: string;
   visitId: string;
   initialValue: string | null;
   canUpdate: boolean;
 }
 
-export function NeedMaterialForm({ visitId, initialValue, canUpdate }: Props) {
+export function NeedMaterialForm({ draftKey, visitId, initialValue, canUpdate }: Props) {
   const router = useRouter();
   const toast = useToast();
-  const [line, setLine] = useState("");
+  const [line, setLine, clearDraft] = useFieldDraft(draftKey, "");
+  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function add(e: React.FormEvent) {
@@ -21,6 +25,7 @@ export function NeedMaterialForm({ visitId, initialValue, canUpdate }: Props) {
     const nextLine = line.trim();
     if (!nextLine) return;
     const next = [initialValue?.trim(), nextLine].filter(Boolean).join("\n");
+    setError("");
     setSaving(true);
     try {
       const res = await fetch(`/api/v1/visits/${visitId}`, {
@@ -30,14 +35,16 @@ export function NeedMaterialForm({ visitId, initialValue, canUpdate }: Props) {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        toast.error(data.error?.message ?? "Could not save the material");
+        setError(data.error?.message ?? "Could not save the material. Your draft is kept; retry.");
         return;
       }
+      clearDraft();
       setLine("");
+      clearDraft();
       toast.success("Added to this visit");
       router.refresh();
     } catch {
-      toast.error("Unexpected error");
+      setError("Could not save. Your draft is kept; retry.");
     } finally {
       setSaving(false);
     }
@@ -45,6 +52,7 @@ export function NeedMaterialForm({ visitId, initialValue, canUpdate }: Props) {
 
   return (
     <div data-testid="need-material">
+      {error && <p role="alert" className="p7-field-error">{error}</p>}
       {initialValue?.trim() ? (
         <p style={{ whiteSpace: "pre-wrap", fontSize: "var(--font-size-sm)", marginTop: 0 }} data-testid="materials-needed-text">
           {initialValue}

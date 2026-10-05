@@ -53,9 +53,12 @@ test.describe("Tech smoke — assigned jobs and visits", () => {
     const firstCard = page.locator('[data-testid="visit-card"]').first();
     if (await firstCard.isVisible()) {
       await firstCard.click();
-      const notes = page.locator('[data-testid="visit-notes-panel"]');
+      await expect(page.getByTestId("visit-status")).toBeVisible();
+      const notes = page.locator('[data-testid="visit-notes-form"]');
       if (!(await notes.isVisible())) {
-        await page.locator("#visit-record > summary").click();
+        const directNote = page.getByRole("button", { name: "Note", exact: true });
+        if (!["Done", "Cancelled"].includes((await page.getByTestId("visit-status").textContent())?.trim() ?? "")) await directNote.click();
+        else await page.locator("#visit-record > summary").click();
       }
       await expect(notes).toBeVisible();
     }
@@ -66,9 +69,12 @@ test.describe("Tech smoke — assigned jobs and visits", () => {
     const firstCard = page.locator('[data-testid="visit-card"]').first();
     if (await firstCard.isVisible()) {
       await firstCard.click();
+      await expect(page.getByTestId("visit-status")).toBeVisible();
       const textarea = page.locator('[data-testid="visit-notes-input"]');
       if (!(await textarea.isVisible())) {
-        await page.locator("#visit-record > summary").click();
+        const directNote = page.getByRole("button", { name: "Note", exact: true });
+        if (!["Done", "Cancelled"].includes((await page.getByTestId("visit-status").textContent())?.trim() ?? "")) await directNote.click();
+        else await page.locator("#visit-record > summary").click();
       }
       await textarea.fill("Completed inspection — all clear.");
       await page.locator('[data-testid="save-notes-btn"]').click();

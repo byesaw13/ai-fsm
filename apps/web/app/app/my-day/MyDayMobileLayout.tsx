@@ -11,6 +11,9 @@ import { PushPermissionPrompt } from "@/components/push/PushPermissionPrompt";
 import { useToast } from "@/components/ui";
 import { isDaySetupComplete, startDayMode, type DaySetupState } from "@/lib/my-day/day-setup";
 import { shouldShowVisitHero, type HeroVisit } from "@/lib/my-day/visit-hero";
+import { showLeaveList } from "@/lib/field/face";
+import { ACTIVITY_TYPE_META, type ActivityType } from "@ai-fsm/domain";
+import { ClockBar } from "../ClockBar";
 import { pickStartVehicle } from "@/lib/mileage/start-day";
 import type { OpenSession, VehicleOption } from "@/lib/my-work/field-day-types";
 import type { ActivityEntryDto } from "@/lib/my-work/field-day-types";
@@ -18,6 +21,7 @@ import type { DayMileageSummary } from "@/lib/mileage/sessions";
 
 export function MyDayMobileLayout({
   openSession,
+  activityEntries,
   vehicles,
   dayMileage,
   heroVisit,
@@ -96,6 +100,9 @@ export function MyDayMobileLayout({
       }
       window.dispatchEvent(new Event("ops:refresh"));
       router.refresh();
+    } catch {
+      toast.error("Could not start the day. Open day setup to retry.");
+      setWizardOpen(true);
     } finally {
       setStarting(false);
     }
@@ -109,7 +116,9 @@ export function MyDayMobileLayout({
     setWizardOpen(true);
   }
 
-  const showCommand = complete && showHero && !!heroVisit;
+  const showCommand = showHero && !!heroVisit && (complete || showLeaveList(heroVisit.status));
+  const activity = activityEntries.find(e => !e.ended_at);
+  const activityLabel = activity ? ACTIVITY_TYPE_META[activity.activity_type as ActivityType]?.label ?? "Activity recorded" : "No activity running";
 
   return (
     <div className={showCommand ? "field-today field-today--split" : "field-today"}>
@@ -128,7 +137,7 @@ export function MyDayMobileLayout({
           </div>
           <p className="p7-field-hero__meta" style={{ margin: 0 }}>
             {priorDayNeedsMileage
-              ? "Yesterday never got a closing reading. One number, then the day can start."
+              ? "A previous day has no closing reading. Add it before starting mileage today."
               : mode === "one_tap"
                 ? `${defaultVehicle?.nickname ?? "Truck"} · ${defaultVehicle?.current_odometer?.toLocaleString()} mi`
                 : mode === "odometer"
@@ -157,29 +166,30 @@ export function MyDayMobileLayout({
             ) : null}
           </div>
         </div>
-      ) : (
-        <>
+      ) : null}
+      <>
           {showCommand && heroVisit ? <NextVisitHero visit={heroVisit} /> : null}
-          <DayStatusPill
+          {complete ? <DayStatusPill
             state={setup}
+            activityLabel={activityLabel}
             vehicleLabel={openSession?.vehicle_nickname ?? null}
             milesToday={dayMileage.totalMiles}
             onReopen={() => setWizardOpen(true)}
-          />
-        </>
-      )}
+          /> : null}
+      </>
 
       {children}
 
       <details className="field-more" data-testid="today-more">
-        <summary>More</summary>
+        <summary>Day details &amp; history</summary>
         <div className="field-more__body">
           <FieldQuickActions canQuickBook={canQuickBook} currentJobId={currentJobId} />
+          <ClockBar />
           {more}
         </div>
       </details>
 
-      {complete ? (
+      {complete || clockedIn ? (
         <div style={{ marginTop: "var(--space-6)", textAlign: "center" }}>
           <Link
             href="/app/day-review"
@@ -191,7 +201,7 @@ export function MyDayMobileLayout({
               textDecoration: "underline",
             }}
           >
-            End day
+            Review &amp; end day
           </Link>
         </div>
       ) : null}

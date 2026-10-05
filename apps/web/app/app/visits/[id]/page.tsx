@@ -337,9 +337,9 @@ export default async function VisitDetailPage({
   const closePhotosItem = checklistItems.find(i => i.item_key === 'close_photos');
   const closePhotosItemId = closePhotosItem?.id;
 
-  // Load media and parts for repair/painting/custom visits
+  // Completion photos belong to every visit, including maintenance.
   const [beforePhotos, afterPhotos, visitParts] =
-    isRepairFlow && currentStatus !== "cancelled"
+    currentStatus !== "cancelled"
       ? await Promise.all([
           queryForSession<PhotoMeta>(
             session,
@@ -490,6 +490,7 @@ export default async function VisitDetailPage({
 
   const onFieldFace = currentStatus !== "completed" && currentStatus !== "cancelled";
   const hoistMembershipTools = onFieldFace && isMembershipVisit && !isRepairFlow;
+  const draftKey = `${session.accountId}:${session.userId}:${visit.id}`;
   const noteAnchor = isRepairFlow ? "visit-resolution" : "visit-notes";
   const materialAnchor = isRepairFlow ? "visit-parts" : "need-material";
   const usedAnchor = isRepairFlow ? "visit-parts" : "visit-materials";
@@ -506,6 +507,21 @@ export default async function VisitDetailPage({
       )}
       <VisitFieldFace
         visitId={visit.id}
+        draftKey={draftKey}
+        canTransition={canTransition}
+        noteForm={onFieldFace && canNotes ? <VisitNotesForm visitId={visit.id} initialNotes={visit.tech_notes ?? ""} draftKey={`${draftKey}:notes`} /> : null}
+        materialsForm={onFieldFace ? <>
+          <h3>Still needed</h3>
+          <NeedMaterialForm visitId={visit.id} initialValue={(visit as Visit & { materials_needed?: string | null }).materials_needed ?? null} canUpdate={canNotes} draftKey={`${draftKey}:need`} />
+          <h3>Used on this visit</h3>
+          {isRepairFlow ? <VisitPartsPanel visitId={visit.id} initialParts={visitParts} canUpdate={canNotes} jobType={visit.job_type} draftKey={`${draftKey}:parts`} /> : <MaterialsUsedForm visitId={visit.id} initialValue={(visit as Visit & { materials_used?: string | null }).materials_used ?? null} canUpdate={canNotes} draftKey={`${draftKey}:used`} />}
+          {visit.job_id ? <LinkButton href={`/app/expenses/new?job=${visit.job_id}`} variant="secondary" size="sm" data-testid="visit-receipt-link">Receipt</LinkButton> : null}
+        </> : null}
+        planForm={onFieldFace ? <VisitDayTasks visitId={visit.id} initialTasks={dayTasks} canToggle={canChecklist || session.role === "owner" || session.role === "admin" || session.role === "tech"} planOnly /> : null}
+        completionForm={currentStatus === "in_progress" ? <Card id="visit-completion" data-testid="completion-checklist-panel">
+          <SectionHeader title="Before you finish" />
+          <CompletionChecklist visitId={visit.id} initialPacket={completionPacket} canUpdate={canNotes} canComplete={canTransition} closePhotosItemId={closePhotosItemId} isQuickJob={isQuickJob} canSend={canSendInvoices(session.role)} draftKey={`${draftKey}:closeout`} existingPhotos={afterPhotos} initialVisitNotes={visit.tech_notes ?? ""} />
+        </Card> : null}
         status={currentStatus}
         clientName={visit.client_name}
         address={visit.property_address}
@@ -523,7 +539,7 @@ export default async function VisitDetailPage({
           session.role === "admin" ||
           session.role === "tech"
         }
-        photoCount={Number(mediaFace?.n ?? 0)}
+        photoCount={afterPhotos.length}
         latestMediaId={mediaFace?.latest_id ?? null}
         materialsUsed={(visit as Visit & { materials_used?: string | null }).materials_used ?? null}
         partsRecorded={visitParts.length}
@@ -573,7 +589,7 @@ export default async function VisitDetailPage({
         ) : null}
       </VisitFieldFace>
       <details id="visit-record" className="field-record" data-testid="visit-field-record">
-        <summary>More</summary>
+        <summary>Visit details &amp; history</summary>
         <div className="field-record__body">
       <Breadcrumbs
         items={
@@ -734,7 +750,7 @@ export default async function VisitDetailPage({
             </Card>
           )}
 
-          {(dayTasks.length > 0 || visit.work_order_id || visit.job_id) && (
+          {!onFieldFace && (dayTasks.length > 0 || visit.work_order_id || visit.job_id) && (
             <Card id="visit-day-tasks" data-testid="visit-day-tasks-card">
               <SectionHeader title="Tasks for this day" count={dayTasks.length || undefined} />
               <VisitDayTasks
@@ -977,7 +993,7 @@ export default async function VisitDetailPage({
                 </>
               )}
 
-              <Card id="visit-parts">
+              {!onFieldFace && <Card id="visit-parts">
                 <SectionHeader title="Parts" />
                 <VisitPartsPanel
                   visitId={visit.id}
@@ -985,9 +1001,9 @@ export default async function VisitDetailPage({
                   canUpdate={canNotes}
                   jobType={visit.job_type}
                 />
-              </Card>
+              </Card>}
 
-              <Card id="visit-resolution">
+              {!onFieldFace && <Card id="visit-resolution">
                 <SectionHeader title="Resolution" />
                 <VisitResolutionPanel
                   visitId={visit.id}
@@ -996,7 +1012,7 @@ export default async function VisitDetailPage({
                   canUpdate={canNotes}
                   canDelete={canDeleteMedia}
                 />
-              </Card>
+              </Card>}
 
               {currentStatus !== "completed" && (
                 showMore("closing_checklist") ? (
@@ -1021,21 +1037,6 @@ export default async function VisitDetailPage({
             </>
           )}
 
-          {currentStatus === "in_progress" && (
-            <Card id="visit-completion" data-testid="completion-checklist-panel">
-              <SectionHeader title="Completion Checklist" />
-              <CompletionChecklist
-                visitId={visit.id}
-                initialPacket={completionPacket}
-                canUpdate={canNotes}
-                canComplete={canTransition}
-                closePhotosItemId={closePhotosItemId}
-                isQuickJob={isQuickJob}
-                canSend={canSendInvoices(session.role)}
-              />
-            </Card>
-          )}
-
           {!showTransitionEarly && canTransition && currentStatus !== "completed" && currentStatus !== "cancelled" &&
             !(session.role === "tech" && currentStatus === "in_progress") && (
             <Card id="visit-actions" data-testid="visit-transition-panel">
@@ -1058,14 +1059,14 @@ export default async function VisitDetailPage({
           )}
 
           {/* ── Maintenance: show notes and materials panels ── */}
-          {!isRepairFlow && canNotes && (
+          {!onFieldFace && !isRepairFlow && canNotes && (
             <Card id="visit-notes" data-testid="visit-notes-panel">
               <SectionHeader title="Tech Notes" />
               <VisitNotesForm visitId={visit.id} initialNotes={visit.tech_notes ?? ""} />
             </Card>
           )}
 
-          {!isRepairFlow && currentStatus !== "cancelled" && (
+          {!onFieldFace && !isRepairFlow && currentStatus !== "cancelled" && (
             <Card id="need-material" data-testid="need-material-panel">
               <SectionHeader title="Need Material" />
               <NeedMaterialForm
@@ -1076,7 +1077,7 @@ export default async function VisitDetailPage({
             </Card>
           )}
 
-          {!isRepairFlow && currentStatus !== "cancelled" && (
+          {!onFieldFace && !isRepairFlow && currentStatus !== "cancelled" && (
             <Card id="visit-materials" data-testid="materials-used-panel">
               <SectionHeader title="Materials Used" />
               <MaterialsUsedForm
