@@ -42,7 +42,7 @@ export function timestampBusinessMonthExpr(column: string, timeZone: string): st
 export async function loadBusinessTimeZone(accountId: string): Promise<string> {
   const rows = await query<{ working_hours_tz: string | null }>(
     `SELECT working_hours_tz
-     FROM automation_rules
+     FROM automation_settings
      WHERE account_id = $1
      LIMIT 1`,
     [accountId],
