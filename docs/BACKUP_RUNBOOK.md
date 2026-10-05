@@ -48,9 +48,9 @@ The backup script (`scripts/backup-garonhome.sh`) performs:
 1. `pg_dump` from the running postgres container to `/opt/business/ai-fsm/backups/ai_fsm_YYYYMMDDTHHMMSSZ.dump`
 2. `tar` of `/opt/business/ai-fsm/data/uploads/` to `ai_fsm_uploads_YYYYMMDDTHHMMSSZ.tar.gz`
 3. `gpg --symmetric` encryption of `.env` to `ai_fsm_env_YYYYMMDDTHHMMSSZ.gpg` (requires a passphrase file — see setup below; skipped with a warning if the file is missing)
-4. Pushes the dump and the `.env` gpg offsite as dated files. Pushes uploads as `ai_fsm_uploads_latest.tar.gz`, replacing the previous copy. Deletes dated `ai_fsm_uploads_2*.tar.gz` objects from Drive first so those archives cannot fill the quota.
+4. Pushes the dump and the `.env` gpg offsite as dated files. Pushes uploads as `ai_fsm_uploads_latest.tar.gz`, replacing the previous copy. Permanently deletes dated `ai_fsm_uploads_2*.tar.gz` objects from Drive first (`--drive-use-trash=false`, because Trash still counts against quota) so those archives cannot fill the quota.
 5. Prunes local copies of all three older than 7 days
-6. Prunes offsite (Google Drive) copies older than 30 days via `rclone delete --min-age`
+6. Permanently deletes offsite copies older than 30 days (`rclone delete --drive-use-trash=false --min-age`)
 
 ### One-time setup: the `.env` backup passphrase
 

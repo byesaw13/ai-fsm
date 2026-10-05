@@ -66,7 +66,8 @@ RCLONE_DEST="${RCLONE_REMOTE}:ai-fsm-backups"
 UPLOADS_LATEST_NAME="ai_fsm_uploads_latest.tar.gz"
 
 # Drop dated uploads archives before copying, or the new copy has no room.
-if rclone delete "${RCLONE_DEST}" --include "ai_fsm_uploads_2*.tar.gz" --log-level INFO; then
+# Drive trash still counts against quota, so the delete has to be permanent.
+if rclone delete "${RCLONE_DEST}" --drive-use-trash=false --include "ai_fsm_uploads_2*.tar.gz" --log-level INFO; then
   echo "dated offsite uploads archives removed"
 else
   echo "WARNING: failed to remove dated offsite uploads archives (rclone exit $?)" >&2
@@ -97,7 +98,7 @@ echo "old local backups pruned"
 
 # Prune offsite copies older than 30 days (best-effort; local retention is authoritative)
 REMOTE_RETENTION_DAYS="${FSM_BACKUP_REMOTE_RETENTION_DAYS:-30}"
-if rclone delete "${RCLONE_DEST}" --min-age "${REMOTE_RETENTION_DAYS}d" --log-level INFO; then
+if rclone delete "${RCLONE_DEST}" --drive-use-trash=false --min-age "${REMOTE_RETENTION_DAYS}d" --log-level INFO; then
   echo "old offsite backups pruned (older than ${REMOTE_RETENTION_DAYS}d)"
 else
   echo "WARNING: offsite prune failed (rclone exit $?)" >&2
