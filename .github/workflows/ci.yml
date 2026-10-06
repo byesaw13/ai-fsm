@@ -237,7 +237,7 @@ jobs:
         run: sleep 10 && curl -f http://localhost:3000/api/health
 
       - name: Run required release smoke
-        run: pnpm exec playwright test tests/e2e/core-flow.spec.ts --reporter=list
+        run: pnpm exec playwright test tests/e2e/core-flow.spec.ts tests/e2e/public-booking.spec.ts --reporter=list
 
       - uses: actions/upload-artifact@v4
         if: always()

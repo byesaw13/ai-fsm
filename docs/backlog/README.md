@@ -100,7 +100,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-174**. TASK-167 through TASK-172 are held by the customer home record work and are not in this index yet.
+Next available ID: **TASK-175**. TASK-167 through TASK-172 are held by the customer home record work and are not in this index yet.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -156,6 +156,7 @@ closed in tests; owner-flow AC still open.
 | TASK-164 | [Portal answers what we did, what's in your home, what's next](TASK-164-portal-three-questions.md) | 003 | Proposed |
 | TASK-165 | [Home Record report (one-page house history)](TASK-165-home-record-report.md) | 003 | Proposed |
 | TASK-166 | [Realtor portal — work you paid for, by address, and "bill me" requests](TASK-166-realtor-portal.md) | 003 | Proposed |
+| TASK-174 | [Align public booking with Dovetails service scope](TASK-174-public-service-alignment.md) | 005 | In Progress |
 | TASK-173 | [UX implementation direction](TASK-173-ux-implementation-direction.md) | cross-cutting | In Progress |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
