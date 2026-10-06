@@ -6,6 +6,17 @@ import type { Route } from "next";
 import { INTAKE_QUESTIONS } from "@/lib/intake/questions";
 import { SmsConsentLabel } from "@/components/sms/SmsConsentLabel";
 
+// Public follow-up choices stay within the advertised scope. Shared intake
+// questions and metadata labels still support historical and staff-led requests.
+const BOOKING_QUESTIONS: typeof INTAKE_QUESTIONS = {
+  ...INTAKE_QUESTIONS,
+  painting_finishes: INTAKE_QUESTIONS.painting_finishes.filter((q) => q.key !== "surface"),
+  maintenance_small: INTAKE_QUESTIONS.maintenance_small.map((q) => ({
+    ...q,
+    options: q.options.filter((option) => ["lock_hardware", "other"].includes(option.value)),
+  })),
+};
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -22,13 +33,13 @@ interface BookingClientProps {
 }
 
 const NEXT_STEPS_SITE_VISIT = [
-  { title: "We review your request", body: "We look at every submission within 1 business day." },
+  { title: "We review your request", body: "We review the details and follow up about the scope and next steps." },
   { title: "We schedule a walkthrough", body: "For this type of project we like to see the space first — we'll reach out to set up a quick on-site assessment." },
   { title: "You get a written estimate", body: "After the walkthrough we send a detailed estimate before any work begins." },
 ];
 
 const NEXT_STEPS_REMOTE = [
-  { title: "We review your request", body: "We look at every submission within 1 business day." },
+  { title: "We review your request", body: "We review the details and follow up about the scope and next steps." },
   { title: "We confirm the scope", body: "We'll follow up to go over the details — sometimes a few photos do it, sometimes we'll set up a quick look at the space." },
   { title: "You get a written estimate", body: "Once we understand the full scope, we send a detailed estimate before any work begins." },
 ];
@@ -197,7 +208,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
 
         {/* Page title */}
         <div style={{ textAlign: "center", marginBottom: 16 }}>
-          <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 4 }}>Request Service</h1>
+          <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 4 }}>Request service</h1>
           <p style={{ color: "#6c6860", fontSize: 15, margin: 0 }}>Tell us what you need and we&apos;ll confirm the details before scheduling.</p>
         </div>
 
@@ -236,6 +247,11 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
         {step === 1 && (
           <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e7e3dc", padding: 32 }}>
             <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 20 }}>What do you need help with?</h2>
+            <p style={{ color: "#6c6860", fontSize: 14, margin: "0 0 20px" }}>
+              We confirm the tasks and price with you before arranging the work. Electrical, plumbing,
+              gas, structural work, and larger renovations need separate review and may require a
+              qualified specialist. Additional work needs your approval first.
+            </p>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
               {serviceCategories.map((cat) => (
@@ -278,7 +294,7 @@ export function BookingClient({ serviceCategories }: BookingClientProps) {
             </label>
 
             {/* Service-specific branching questions */}
-            {serviceCategory && INTAKE_QUESTIONS[serviceCategory]?.map((q) => (
+            {serviceCategory && BOOKING_QUESTIONS[serviceCategory]?.map((q) => (
               <div key={q.key}>
                 <p style={{ fontSize: 14, fontWeight: 600, margin: "8px 0 8px" }}>{q.label}</p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>

@@ -2,16 +2,14 @@ import { BookingClient } from "./BookingClient";
 
 export const dynamic = "force-dynamic";
 
+// Public choices match the marketing site. Keep existing IDs so request routing
+// and historical price-book categories retain their current meaning.
 const SERVICE_CATEGORIES = [
-  { id: "painting_finishes", label: "Painting & Finishes", icon: "🎨", description: "Interior/exterior painting, staining, wallpaper" },
-  { id: "general_repairs", label: "General Repairs", icon: "🔧", description: "Drywall, door/window repair, fixture fixes" },
-  { id: "plumbing", label: "Plumbing", icon: "🚿", description: "Leak repairs, faucet/toilet replacement, drain clearing" },
-  { id: "electrical", label: "Electrical", icon: "⚡", description: "Outlet/switch replacement, light fixture installs" },
-  { id: "carpentry_furniture", label: "Carpentry & Furniture", icon: "🪚", description: "Shelving, trim work, furniture assembly" },
-  { id: "mounting_installs", label: "Mounting & Installs", icon: "📺", description: "TV mounting, shelves, curtain rods, hardware" },
-  { id: "outdoor_seasonal", label: "Outdoor & Seasonal", icon: "🏡", description: "Deck/fence repair, gutter cleaning, seasonal prep" },
-  { id: "maintenance_small", label: "Maintenance & Small Jobs", icon: "🛠️", description: "General upkeep, minor fixes, handyman tasks" },
-  { id: "specialty_expansion", label: "Specialty Projects", icon: "✨", description: "Custom work, renovations, unique projects" },
+  { id: "painting_finishes", label: "Painting & drywall", icon: "🎨", description: "Interior walls, ceilings, trim, and drywall repairs" },
+  { id: "general_repairs", label: "Repairs", icon: "🔧", description: "Doors, trim, caulking, hardware, and small repairs" },
+  { id: "mounting_installs", label: "Mounting & installations", icon: "📺", description: "TVs, shelves, mirrors, window treatments, and furniture assembly" },
+  { id: "maintenance_small", label: "Maintenance", icon: "🛠️", description: "Tailored seasonal checks, weatherproofing, and preventive repairs" },
+  { id: "carpentry_furniture", label: "Custom woodworking", icon: "🪚", description: "Shelving, trim, woodwork repairs, and pieces made to fit" },
 ];
 
 export default function BookingPage() {
