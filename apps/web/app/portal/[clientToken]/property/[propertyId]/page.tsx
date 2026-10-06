@@ -223,7 +223,7 @@ export default async function PortalPropertyPage({
               <div
                 key={group.category}
                 data-testid={`portal-vault-${group.category}`}
-                style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: "12px 16px", opacity: group.items.length ? 1 : 0.75 }}
+                style={{ background: group.items.length ? "#fff" : "#fafafa", border: "1px solid #e5e7eb", borderRadius: 8, padding: "12px 16px" }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
                   <h3 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{group.label}</h3>
@@ -231,7 +231,7 @@ export default async function PortalPropertyPage({
                 </div>
                 <div style={{ fontSize: 12, color: "#6b7280", margin: "2px 0 8px" }}>{group.description}</div>
                 {group.items.length === 0 ? (
-                  <div style={{ fontSize: 13, color: "#9ca3af", fontStyle: "italic" }}>Not recorded yet</div>
+                  <div style={{ fontSize: 13, color: "#6b7280", fontStyle: "italic" }}>Not recorded yet</div>
                 ) : (
                   group.items.map((item) => {
                     const spec = [item.manufacturer, item.model_number].filter(Boolean).join(" · ");
