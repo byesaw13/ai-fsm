@@ -29,5 +29,6 @@ The screen exists so a homeowner can describe a service need for review. Continu
 - `pnpm gate:fast` passed: lint, dead-code/migration/RLS checks, types, build, and unit suites (2,606 unit tests across workspaces).
 - Targeted ESLint on the two changed booking files passed after the public question changes.
 - Local production-build browser checks: five categories at 390px and 1440px (10 paths), every category reached contact details, no JavaScript errors or horizontal overflow, no submissions.
+- Added `tests/e2e/public-booking.spec.ts` to required CI smoke coverage. Both 390px/1440px regression cases passed locally; each blocks `/api/booking` and verifies public categories, omitted specialist follow-ups, and continuation to contact details.
 - Independent source review confirmed the narrowed follow-ups and historical metadata remain consistent.
 - Separate production release remains pending explicit authorization. This branch does not change the live booking form.
