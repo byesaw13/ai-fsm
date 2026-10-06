@@ -9,7 +9,9 @@ import { isSmsGatewayConfigured, sendSmsViaGateway } from "@/lib/sms/gateway";
 import { logOutboundSms } from "@/lib/sms/outbound";
 import { loadReportEditor } from "@/lib/job-reports/load";
 import { cleanRecords, REPORT_AREAS, REPORT_WORK_TYPES } from "@/lib/job-reports/logic";
+import { saveRecordsToVault } from "@/lib/job-reports/vault";
 import { logger } from "@/lib/logger";
+import { VAULT_CATEGORIES } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +21,11 @@ const content = z.object({
   area: z.enum(Object.keys(REPORT_AREAS) as [string, ...string[]]).nullable(),
   work_type: z.enum(Object.keys(REPORT_WORK_TYPES) as [string, ...string[]]).nullable(),
   media_ids: z.array(z.string().uuid()).max(40),
-  records: z.array(z.object({ label: z.string().max(200), detail: z.string().max(500) })).max(40),
+  records: z.array(z.object({
+    label: z.string().max(200),
+    detail: z.string().max(500),
+    vault_category: z.enum(VAULT_CATEGORIES).nullable().optional(),
+  })).max(40),
 });
 const body = z.discriminatedUnion("action", [
   content.extend({ action: z.literal("save") }),
@@ -108,7 +114,16 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
           input.media_ids, JSON.stringify(editor.recipient.sponsored ? [] : records), publish, session.userId,
         ],
       );
-      return { status: 200, data: { status: rows[0].status, url: reportUrl(rows[0].share_token) } } as const;
+      // TASK-175: a published owner report also fills the house's vault.
+      // Sponsored (realtor-paid) reports carry no records and never write here.
+      let vaultAdded = 0;
+      if (rows[0].status === "published" && !editor.recipient.sponsored && editor.job.property_id) {
+        vaultAdded = await saveRecordsToVault(db, {
+          accountId: session.accountId, userId: session.userId, traceId: session.traceId,
+          jobId, propertyId: editor.job.property_id, records,
+        });
+      }
+      return { status: 200, data: { status: rows[0].status, url: reportUrl(rows[0].share_token), vault_added: vaultAdded } } as const;
     });
 
     if ("error" in result) {

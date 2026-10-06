@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  groupVaultForCustomer,
   roleSchema,
   jobStatusSchema,
   visitStatusSchema,
@@ -369,6 +370,21 @@ describe('Dovetails standards', () => {
         VAULT_COMPLETENESS_TARGET_CATEGORIES.map((category) => ({ category }))
       ).percent
     ).toBe(100)
+  })
+
+  it('groups vault items for the customer view in site order', () => {
+    const groups = groupVaultForCustomer([
+      { category: 'paint_finish', name: 'Trim' },
+      { category: 'paint_finish', name: 'Living room' },
+      { category: 'mechanical', name: 'Boiler' },
+    ])
+    expect(groups.map((g) => g.category)).toEqual([
+      'mechanical', 'appliance', 'filter', 'paint_finish', 'monitor', 'vendor',
+    ])
+    expect(groups[3]).toMatchObject({ label: 'Paint & Finishes' })
+    expect(groups[3].items.map((i) => i.name)).toEqual(['Living room', 'Trim'])
+    expect(groups[1].items).toEqual([])
+    expect(groupVaultForCustomer([{ category: 'other', name: 'Doorbell' }]).at(-1)?.category).toBe('other')
   })
 
   it('builds staged vault collection prompts from visit number', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanRecords, prefillSummary, resolveRecipient } from "../logic";
+import { cleanRecords, prefillSummary, resolveRecipient, vaultItemsFromRecords } from "../logic";
 
 const inv = (client_id: string, status = "sent", billing_context = "standard") => ({ client_id, status, billing_context });
 
@@ -45,5 +45,30 @@ describe("cleanRecords", () => {
     expect(cleanRecords([{ label: " Hall ", detail: " BM White Dove " }, { label: " ", detail: "" }]))
       .toEqual([{ label: "Hall", detail: "BM White Dove" }]);
     expect(cleanRecords(many)).toHaveLength(30);
+  });
+});
+
+describe("vaultItemsFromRecords (TASK-175)", () => {
+  it("keeps a valid vault tag through cleanRecords and drops an unknown one", () => {
+    expect(cleanRecords([{ label: "Door", detail: "Hale Navy", vault_category: "paint_finish" }]))
+      .toEqual([{ label: "Door", detail: "Hale Navy", vault_category: "paint_finish" }]);
+    expect(cleanRecords([{ label: "Door", detail: "Hale Navy", vault_category: "bogus" as never }]))
+      .toEqual([{ label: "Door", detail: "Hale Navy" }]);
+  });
+
+  it("maps only tagged lines; label names the item, detail is the note", () => {
+    expect(vaultItemsFromRecords([
+      { label: "Door color", detail: "BM Hale Navy HC-154", vault_category: "paint_finish" },
+      { label: "", detail: "Furnace filter 16x25x1 MERV 11", vault_category: "filter" },
+      { label: "Caulk", detail: "DAP Dynaflex" },
+    ])).toEqual([
+      { category: "paint_finish", name: "Door color", notes: "BM Hale Navy HC-154" },
+      { category: "filter", name: "Furnace filter 16x25x1 MERV 11", notes: null },
+    ]);
+  });
+
+  it("collapses duplicate lines", () => {
+    const line = { label: "Trim", detail: "Simply White", vault_category: "paint_finish" as const };
+    expect(vaultItemsFromRecords([line, { ...line, label: "trim" }])).toHaveLength(1);
   });
 });

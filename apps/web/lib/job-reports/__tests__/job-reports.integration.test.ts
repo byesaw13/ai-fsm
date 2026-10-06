@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
 
 // TASK-162: Job Reports — publish rules, public page, photo scoping, withdraw.
+// TASK-175: vault-tagged records fill the house's vault on publish.
 const RUN = Boolean(process.env.TEST_DATABASE_URL && process.env.TEST_BASE_URL);
 const BASE_URL = process.env.TEST_BASE_URL ?? "http://localhost:3000";
 
@@ -98,6 +99,7 @@ describe.skipIf(!RUN)("job reports", () => {
     await db.query(`DELETE FROM visit_media WHERE visit_id = ANY($1::uuid[])`, [[visitId, sponsoredVisitId]]).catch(() => undefined);
     await db.query(`DELETE FROM visits WHERE job_id = ANY($1::uuid[])`, [jobs]).catch(() => undefined);
     await db.query(`DELETE FROM jobs WHERE id = ANY($1::uuid[])`, [jobs]).catch(() => undefined);
+    await db.query(`DELETE FROM property_vault_items WHERE property_id = $1`, [propertyId]).catch(() => undefined);
     await db.query(`DELETE FROM properties WHERE id = $1`, [propertyId]).catch(() => undefined);
     await db.query(`DELETE FROM clients WHERE id = ANY($1::uuid[])`, [[clientId, realtorId]]).catch(() => undefined);
     await db.end();
@@ -235,5 +237,37 @@ describe.skipIf(!RUN)("job reports", () => {
     expect(row.rows[0]).toEqual({ client_id: realtorId, sponsored: true, records: [] });
     const html = await (await fetch(`${BASE_URL}/portal/reports/${tokenOf((await res.json()).url)}`)).text();
     expect(html).not.toContain("Keep for your records");
+  }, 60_000);
+
+  it("vault-tagged records fill the house's vault once; realtor-paid reports never do", async () => {
+    const tagged = {
+      ...content([media.after]),
+      records: [
+        { label: "Hall walls", detail: "BM White Dove, eggshell", vault_category: "paint_finish" },
+        { label: "Furnace filter", detail: "16x25x1 MERV 11", vault_category: "filter" },
+        { label: "Drop cloths", detail: "used and removed" },
+      ],
+    };
+    const vault = () => db.query<{ category: string; name: string; notes: string | null; linked_visit_id: string | null }>(
+      `SELECT category, name, notes, linked_visit_id::text FROM property_vault_items WHERE property_id = $1 ORDER BY category`,
+      [propertyId],
+    );
+
+    const first = await post(jobId, { action: "publish", ...tagged });
+    expect(first.status).toBe(200);
+    expect((await first.json()).vault_added).toBe(2);
+    expect((await vault()).rows).toEqual([
+      { category: "filter", name: "Furnace filter", notes: "16x25x1 MERV 11", linked_visit_id: visitId },
+      { category: "paint_finish", name: "Hall walls", notes: "BM White Dove, eggshell", linked_visit_id: visitId },
+    ]);
+
+    const again = await post(jobId, { action: "publish", ...tagged });
+    expect((await again.json()).vault_added).toBe(0);
+    expect((await vault()).rows).toHaveLength(2);
+
+    const sponsored = await post(sponsoredJobId, { action: "publish", ...tagged, media_ids: [media.sponsoredAfter] });
+    expect(sponsored.status).toBe(200);
+    expect((await sponsored.json()).vault_added).toBe(0);
+    expect((await vault()).rows).toHaveLength(2);
   }, 60_000);
 });

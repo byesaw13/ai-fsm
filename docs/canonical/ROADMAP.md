@@ -88,8 +88,12 @@ Location capture, visit candidates, day map, hybrid tracking are **shipped infra
   Adds one table (`portal_job_updates`) so a finished job becomes an owner-published,
   no-login Job Report, and the portal leads with what we did / what's in your home /
   what's next. Portal self-service (request service, edit contact info, lifetime spend,
-  multi-invoice print) and the one-page Home Record report use existing tables; the realtor "bill me" request adds one boolean to `booking_requests`. Does not reopen memberships or the manual
-  vault. Design: `docs/designs/customer-home-record-job-reports.md`.
+  multi-invoice print) and the one-page Home Record report use existing tables; the realtor "bill me" request adds one boolean to `booking_requests`. Does not reopen memberships. Design: `docs/designs/customer-home-record-job-reports.md`.
+- **Amendment 2026-10-06 — Customer Home Vault (TASK-168, TASK-175).** Owner decision:
+  the vault the marketing site shows is what the customer gets. The portal property
+  page shows the six vault categories with their recorded fields, and Job Report
+  "keep for your records" lines can be saved into the house's vault at publish.
+  Uses the existing `property_vault_items` table; no new schema.
 
 ### Phase 3 — Estimate & Billing Closure
 

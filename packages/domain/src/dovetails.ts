@@ -751,6 +751,17 @@ export const VAULT_CATEGORY_LABELS: Record<VaultCategory, string> = {
   other:        "Other",
 };
 
+/** Customer-facing one-liners — same wording as the marketing site's Home Vault page. */
+export const VAULT_CATEGORY_DESCRIPTIONS: Record<VaultCategory, string> = {
+  mechanical:   "The systems that run the house, with install dates and service history.",
+  appliance:    "Make, model, and serial for every major appliance, so parts are easy to source.",
+  filter:       "The sizes and schedules nobody remembers when they are standing in the hardware aisle.",
+  paint_finish: "Exact colors and sheens by room, so touch-ups match the first time.",
+  monitor:      "The things we are keeping an eye on before they become repairs.",
+  vendor:       "A vetted list of who to call, and what they already did here.",
+  other:        "Other details we have recorded for this home.",
+};
+
 export const VAULT_COMPLETENESS_TARGET_CATEGORIES = [
   "mechanical",
   "appliance",
@@ -844,6 +855,23 @@ export function computeVaultCompleteness(items: ReadonlyArray<{ category: VaultC
     coveredCategories,
     missingCategories,
   };
+}
+
+/**
+ * Customer vault view: the six core categories always appear (empty ones too, so
+ * the record reads honestly); "other" appears only when it has items.
+ */
+export function groupVaultForCustomer<T extends { category: VaultCategory; name: string }>(items: ReadonlyArray<T>) {
+  const categories: VaultCategory[] = [...VAULT_COMPLETENESS_TARGET_CATEGORIES];
+  if (items.some((i) => i.category === "other")) categories.push("other");
+  return categories.map((category) => ({
+    category,
+    label: VAULT_CATEGORY_LABELS[category],
+    description: VAULT_CATEGORY_DESCRIPTIONS[category],
+    items: items
+      .filter((i) => i.category === category)
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  }));
 }
 
 // ---------------------------------------------------------------------------
