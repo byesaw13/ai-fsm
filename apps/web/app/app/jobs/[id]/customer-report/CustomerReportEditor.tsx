@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { REPORT_AREAS, REPORT_WORK_TYPES, type ReportRecord } from "@/lib/job-reports/logic";
 import type { ReportPhoto } from "@/lib/job-reports/load";
+import { VAULT_CATEGORIES, VAULT_CATEGORY_LABELS, type VaultCategory } from "@ai-fsm/domain";
 
 interface Draft {
   title: string;
@@ -52,14 +53,18 @@ export function CustomerReportEditor(props: {
     setBusy(null);
     if (!res?.ok) {
       setMsg({ ok: false, text: json?.error?.message ?? "Something went wrong." });
-      return false;
+      return null;
     }
     router.refresh();
-    return true;
+    return (json ?? {}) as { vault_added?: number };
   }
 
   const save = (action: "save" | "publish") =>
-    post({ action, ...d }, action).then((ok) => ok && setMsg({ ok: true, text: action === "publish" ? "Published. Send it below." : "Draft saved." }));
+    post({ action, ...d }, action).then((res) => {
+      if (!res) return;
+      const vault = res.vault_added ? ` ${res.vault_added} item${res.vault_added === 1 ? "" : "s"} added to the home vault.` : "";
+      setMsg({ ok: true, text: (action === "publish" ? "Published. Send it below." : "Draft saved.") + vault });
+    });
 
   const togglePhoto = (id: string) =>
     setD({ ...d, media_ids: d.media_ids.includes(id) ? d.media_ids.filter((x) => x !== id) : [...d.media_ids, id] });
@@ -167,7 +172,7 @@ export function CustomerReportEditor(props: {
         <>
           <h3 style={h}>Keep for your records</h3>
           <p style={{ fontSize: 13, color: "var(--fg-muted)", margin: "0 0 8px" }}>
-            Only lasting things — paint colors, fixtures, materials installed. Nothing is ticked until you tick it.
+            Only lasting things — paint colors, fixtures, materials installed. Nothing is ticked until you tick it. Pick a vault category to also keep a line in the house&apos;s Home Vault.
           </p>
           {props.materialLines.map((line) => (
             <label key={line} style={{ display: "flex", gap: 8, alignItems: "center", padding: "4px 0", fontSize: 14 }}>
@@ -176,10 +181,25 @@ export function CustomerReportEditor(props: {
             </label>
           ))}
           {d.records.map((r, i) => (
-            <div key={i} style={{ display: "flex", gap: 6, marginTop: 6 }}>
-              <input aria-label="What" placeholder="What (e.g. Hall walls)" value={r.label} onChange={(e) => setRecord(i, { label: e.target.value })} style={{ ...field, flex: 1 }} />
-              <input aria-label="Detail" placeholder="Detail (e.g. BM White Dove, eggshell)" value={r.detail} onChange={(e) => setRecord(i, { detail: e.target.value })} style={{ ...field, flex: 2 }} />
-              <button type="button" aria-label="Remove" className="p7-btn p7-btn-sm" onClick={() => setD({ ...d, records: d.records.filter((_, j) => j !== i) })}>✕</button>
+            <div key={i} style={{ marginTop: 6 }}>
+              <div style={{ display: "flex", gap: 6 }}>
+                <input aria-label="What" placeholder="What (e.g. Hall walls)" value={r.label} onChange={(e) => setRecord(i, { label: e.target.value })} style={{ ...field, flex: 1 }} />
+                <input aria-label="Detail" placeholder="Detail (e.g. BM White Dove, eggshell)" value={r.detail} onChange={(e) => setRecord(i, { detail: e.target.value })} style={{ ...field, flex: 2 }} />
+                <button type="button" aria-label="Remove" className="p7-btn p7-btn-sm" onClick={() => setD({ ...d, records: d.records.filter((_, j) => j !== i) })}>✕</button>
+              </div>
+              {/* TASK-175: published lines tagged here are copied into the house's vault. */}
+              <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4, fontSize: 13, color: "var(--fg-muted)" }}>
+                Save to home vault
+                <select
+                  aria-label="Save to home vault"
+                  value={r.vault_category ?? ""}
+                  onChange={(e) => setRecord(i, { vault_category: (e.target.value || null) as VaultCategory | null })}
+                  style={{ ...field, width: "auto", padding: "6px 8px", fontSize: 13 }}
+                >
+                  <option value="">No</option>
+                  {VAULT_CATEGORIES.map((c) => <option key={c} value={c}>{VAULT_CATEGORY_LABELS[c]}</option>)}
+                </select>
+              </label>
             </div>
           ))}
           <button type="button" className="p7-btn p7-btn-sm" style={{ marginTop: 8 }} onClick={() => setD({ ...d, records: [...d.records, { label: "", detail: "" }] })}>

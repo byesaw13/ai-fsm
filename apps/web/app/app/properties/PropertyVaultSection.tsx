@@ -42,15 +42,146 @@ const BLANK_FORM = {
   notes: "",
 };
 
+// DATE columns arrive as Date objects (server render) or ISO timestamps (API
+// JSON). Keep them as calendar days so the date inputs can show and resave them.
+function toDay(v: string | Date | null): string | null {
+  if (!v) return null;
+  return (v instanceof Date ? v.toISOString() : String(v)).slice(0, 10);
+}
+
+function withDays<T extends VaultItem>(item: T): T {
+  return {
+    ...item,
+    install_date: toDay(item.install_date),
+    last_serviced_date: toDay(item.last_serviced_date),
+    next_service_date: toDay(item.next_service_date),
+  };
+}
+
 function fmtDate(s: string | null): string {
   if (!s) return "—";
-  return new Date(s).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  return new Date(`${s}T12:00:00`).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+
+// Module-level (TASK-168): defined inside the section it remounted on every
+// keystroke and inputs lost focus.
+function VaultItemForm({
+  values,
+  onChange,
+  onSave,
+  onCancel,
+  saveLabel,
+  saving,
+}: {
+  values: typeof BLANK_FORM;
+  onChange: (patch: Partial<typeof BLANK_FORM>) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  saveLabel: string;
+  saving: boolean;
+}) {
+  const prefix = saveLabel === "Add Item" ? "add" : "edit";
+  const categoryOptions = VAULT_CATEGORIES.map((c) => ({
+    value: c,
+    label: VAULT_CATEGORY_LABELS[c],
+  }));
+
+  return (
+    <div
+      style={{
+        display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)",
+        padding: "var(--space-4)", background: "var(--color-surface)",
+        border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)",
+        marginBottom: "var(--space-3)",
+      }}
+    >
+      <Select
+        id={`${prefix}-vault-item-category`}
+        label="Category"
+        containerClassName="col-span-2"
+        style={{ gridColumn: "1 / -1" }}
+        options={categoryOptions}
+        value={values.category}
+        onChange={(e) => onChange({ category: e.target.value as VaultCategory })}
+      />
+      <Input
+        id={`${prefix}-vault-item-name`}
+        label="Name"
+        required
+        containerClassName="col-span-2"
+        style={{ gridColumn: "1 / -1" }}
+        value={values.name}
+        onChange={(e) => onChange({ name: e.target.value })}
+        placeholder="e.g. HVAC System, Refrigerator"
+      />
+      <Input
+        id={`${prefix}-vault-item-location`}
+        label="Location"
+        value={values.location ?? ""}
+        onChange={(e) => onChange({ location: e.target.value })}
+        placeholder="e.g. Basement"
+      />
+      <Input
+        id={`${prefix}-vault-item-manufacturer`}
+        label="Manufacturer"
+        value={values.manufacturer ?? ""}
+        onChange={(e) => onChange({ manufacturer: e.target.value })}
+      />
+      <Input
+        id={`${prefix}-vault-item-model-number`}
+        label="Model Number"
+        value={values.model_number ?? ""}
+        onChange={(e) => onChange({ model_number: e.target.value })}
+      />
+      <Input
+        id={`${prefix}-vault-item-serial-number`}
+        label="Serial Number"
+        value={values.serial_number ?? ""}
+        onChange={(e) => onChange({ serial_number: e.target.value })}
+      />
+      <Input
+        id={`${prefix}-vault-item-install-date`}
+        label="Install Date"
+        type="date"
+        value={values.install_date ?? ""}
+        onChange={(e) => onChange({ install_date: e.target.value })}
+      />
+      <Input
+        id={`${prefix}-vault-item-last-serviced-date`}
+        label="Last Serviced"
+        type="date"
+        value={values.last_serviced_date ?? ""}
+        onChange={(e) => onChange({ last_serviced_date: e.target.value })}
+      />
+      <Input
+        id={`${prefix}-vault-item-next-service-date`}
+        label="Next Service"
+        type="date"
+        value={values.next_service_date ?? ""}
+        onChange={(e) => onChange({ next_service_date: e.target.value })}
+      />
+      <Textarea
+        id={`${prefix}-vault-item-notes`}
+        label="Notes (the customer sees these)"
+        containerClassName="col-span-2"
+        style={{ gridColumn: "1 / -1" }}
+        rows={2}
+        value={values.notes ?? ""}
+        onChange={(e) => onChange({ notes: e.target.value })}
+        placeholder="Filter size, paint color code, vendor contact…"
+      />
+      <div style={{ gridColumn: "1 / -1", display: "flex", gap: "var(--space-2)" }}>
+        <Button variant="primary" onClick={onSave} loading={saving}>{saveLabel}</Button>
+        <Button variant="secondary" onClick={onCancel} disabled={saving}>Cancel</Button>
+      </div>
+    </div>
+  );
 }
 
 export function PropertyVaultSection({ propertyId, clientId, initialItems, canEdit }: Props) {
   const router = useRouter();
   const toast = useToast();
-  const [items, setItems] = useState<VaultItem[]>(initialItems);
+  const [items, setItems] = useState<VaultItem[]>(() => initialItems.map(withDays));
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState(BLANK_FORM);
   const [saving, setSaving] = useState(false);
@@ -97,7 +228,7 @@ export function PropertyVaultSection({ propertyId, clientId, initialItems, canEd
         return;
       }
       const { data } = await res.json();
-      setItems((prev) => [...prev, { ...data, photo_count: 0 }]);
+      setItems((prev) => [...prev, withDays({ ...data, photo_count: 0 })]);
       setForm(BLANK_FORM);
       setShowAdd(false);
       router.refresh();
@@ -149,7 +280,7 @@ export function PropertyVaultSection({ propertyId, clientId, initialItems, canEd
         return;
       }
       const { data } = await res.json();
-      setItems((prev) => prev.map((i) => (i.id === id ? data : i)));
+      setItems((prev) => prev.map((i) => (i.id === id ? withDays({ ...data, photo_count: i.photo_count }) : i)));
       setEditingId(null);
       router.refresh();
     } catch {
@@ -159,7 +290,12 @@ export function PropertyVaultSection({ propertyId, clientId, initialItems, canEd
     }
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete(item: VaultItem) {
+    const photos = item.photo_count > 0
+      ? ` and its ${item.photo_count} photo${item.photo_count === 1 ? "" : "s"}`
+      : "";
+    if (!window.confirm(`Delete "${item.name}"${photos} from the vault? This can't be undone.`)) return;
+    const id = item.id;
     setDeletingId(id);
     try {
       const res = await fetch(`/api/v1/vault-items/${id}`, { method: "DELETE" });
@@ -177,119 +313,6 @@ export function PropertyVaultSection({ propertyId, clientId, initialItems, canEd
     }
   }
 
-  const inputStyle: React.CSSProperties = { width: "100%" };
-
-  function VaultItemForm({
-    values,
-    onChange,
-    onSave,
-    onCancel,
-    saveLabel,
-  }: {
-    values: typeof BLANK_FORM;
-    onChange: (patch: Partial<typeof BLANK_FORM>) => void;
-    onSave: () => void;
-    onCancel: () => void;
-    saveLabel: string;
-  }) {
-    const prefix = saveLabel === "Add Item" ? "add" : "edit";
-    const categoryOptions = VAULT_CATEGORIES.map((c) => ({
-      value: c,
-      label: VAULT_CATEGORY_LABELS[c],
-    }));
-
-    return (
-      <div
-        style={{
-          display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)",
-          padding: "var(--space-4)", background: "var(--color-surface)",
-          border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)",
-          marginBottom: "var(--space-3)",
-        }}
-      >
-        <Select
-          id={`${prefix}-vault-item-category`}
-          label="Category"
-          containerClassName="col-span-2"
-          style={{ gridColumn: "1 / -1" }}
-          options={categoryOptions}
-          value={values.category}
-          onChange={(e) => onChange({ category: e.target.value as VaultCategory })}
-        />
-        <Input
-          id={`${prefix}-vault-item-name`}
-          label="Name"
-          required
-          containerClassName="col-span-2"
-          style={{ gridColumn: "1 / -1" }}
-          value={values.name}
-          onChange={(e) => onChange({ name: e.target.value })}
-          placeholder="e.g. HVAC System, Refrigerator"
-        />
-        <Input
-          id={`${prefix}-vault-item-location`}
-          label="Location"
-          value={values.location ?? ""}
-          onChange={(e) => onChange({ location: e.target.value })}
-          placeholder="e.g. Basement"
-        />
-        <Input
-          id={`${prefix}-vault-item-manufacturer`}
-          label="Manufacturer"
-          value={values.manufacturer ?? ""}
-          onChange={(e) => onChange({ manufacturer: e.target.value })}
-        />
-        <Input
-          id={`${prefix}-vault-item-model-number`}
-          label="Model Number"
-          value={values.model_number ?? ""}
-          onChange={(e) => onChange({ model_number: e.target.value })}
-        />
-        <Input
-          id={`${prefix}-vault-item-serial-number`}
-          label="Serial Number"
-          value={values.serial_number ?? ""}
-          onChange={(e) => onChange({ serial_number: e.target.value })}
-        />
-        <Input
-          id={`${prefix}-vault-item-install-date`}
-          label="Install Date"
-          type="date"
-          value={values.install_date ?? ""}
-          onChange={(e) => onChange({ install_date: e.target.value })}
-        />
-        <Input
-          id={`${prefix}-vault-item-last-serviced-date`}
-          label="Last Serviced"
-          type="date"
-          value={values.last_serviced_date ?? ""}
-          onChange={(e) => onChange({ last_serviced_date: e.target.value })}
-        />
-        <Input
-          id={`${prefix}-vault-item-next-service-date`}
-          label="Next Service"
-          type="date"
-          value={values.next_service_date ?? ""}
-          onChange={(e) => onChange({ next_service_date: e.target.value })}
-        />
-        <Textarea
-          id={`${prefix}-vault-item-notes`}
-          label="Notes"
-          containerClassName="col-span-2"
-          style={{ gridColumn: "1 / -1" }}
-          rows={2}
-          value={values.notes ?? ""}
-          onChange={(e) => onChange({ notes: e.target.value })}
-          placeholder="Filter size, paint color code, vendor contact…"
-        />
-        <div style={{ gridColumn: "1 / -1", display: "flex", gap: "var(--space-2)" }}>
-          <Button variant="primary" onClick={onSave} loading={saving}>{saveLabel}</Button>
-          <Button variant="secondary" onClick={onCancel} disabled={saving}>Cancel</Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div data-testid="property-vault-section">
       <div
@@ -305,14 +328,14 @@ export function PropertyVaultSection({ propertyId, clientId, initialItems, canEd
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
           <div>
             <div style={{ fontSize: "var(--font-size-xs)", fontWeight: 600, color: "var(--color-text-secondary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              Vault Completeness
+              Categories Recorded
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-2)", flexWrap: "wrap", marginTop: "var(--space-1)" }}>
               <span style={{ fontSize: "var(--font-size-xl)", fontWeight: 700, color: completenessColor }}>
                 {completeness.percent}%
               </span>
               <span style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
-                {completeness.coveredCount} of {completeness.totalCount} core categories documented
+                {completeness.coveredCount} of {completeness.totalCount} categories have at least one item
               </span>
             </div>
           </div>
@@ -344,6 +367,7 @@ export function PropertyVaultSection({ propertyId, clientId, initialItems, canEd
           onSave={handleAdd}
           onCancel={() => { setShowAdd(false); setForm(BLANK_FORM); }}
           saveLabel="Add Item"
+          saving={saving}
         />
       )}
 
@@ -377,6 +401,7 @@ export function PropertyVaultSection({ propertyId, clientId, initialItems, canEd
                       onSave={() => handleEdit(item.id)}
                       onCancel={() => setEditingId(null)}
                       saveLabel="Save Changes"
+                      saving={saving}
                     />
                   ) : (
                     <div style={{
@@ -450,7 +475,7 @@ export function PropertyVaultSection({ propertyId, clientId, initialItems, canEd
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleDelete(item.id)}
+                                onClick={() => handleDelete(item)}
                                 disabled={deletingId === item.id}
                                 style={{ color: "var(--color-error, #dc2626)" }}
                               >
