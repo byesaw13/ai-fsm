@@ -1,14 +1,88 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Modal, Textarea, useToast } from "@/components/ui";
 import { closeoutHoldSendCopy, comingBackStartHereGuide } from "@/lib/guide/next-move";
+import { browserSpeechAvailable, startBrowserSpeech, type SpeechStop } from "@/app/app/capture/speech-transcript";
+import { spokenCloseoutBody } from "@/lib/visits/spoken-closeout";
 
 import { useFieldDraft } from "@/components/features/field/useFieldDraft";
 
 type Kind = "done" | "return";
 type NextWhen = "tomorrow" | "date" | "unsure";
+
+function SpokenNote({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  const [listening, setListening] = useState(false);
+  const [mode, setMode] = useState<"speak" | "type">(() => (browserSpeechAvailable() ? "speak" : "type"));
+  const stopRef = useRef<SpeechStop | null>(null);
+
+  async function halt() {
+    const stop = stopRef.current;
+    stopRef.current = null;
+    setListening(false);
+    if (!stop) return;
+    const result = await stop();
+    if (result.text) onChange(result.text);
+    if (result.error && result.error !== "aborted" && result.error !== "no-speech") setMode("type");
+  }
+
+  useEffect(() => {
+    return () => {
+      const stop = stopRef.current;
+      stopRef.current = null;
+      void stop?.();
+    };
+  }, []);
+
+  async function toggle() {
+    if (!listening) {
+      setListening(true);
+      stopRef.current = startBrowserSpeech(onChange);
+      return;
+    }
+    await halt();
+  }
+
+  const prompt = "Say what happened. Those words are the note.";
+  if (mode === "type") {
+    return (
+      <label>
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>{prompt}</div>
+        <Textarea
+          id="closeout-today-notes"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          rows={3}
+          data-testid="closeout-today-notes"
+        />
+      </label>
+    );
+  }
+  return (
+    <div>
+      <div style={{ fontWeight: 600, marginBottom: 4 }}>{prompt}</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <Button type="button" variant={listening ? "primary" : "secondary"} onClick={() => void toggle()} data-testid="closeout-speak">
+          {listening ? "Stop" : value ? "Say it again" : "Say it"}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => {
+            void halt();
+            setMode("type");
+          }}
+        >
+          Type it
+        </Button>
+      </div>
+      <p data-testid="closeout-spoken" style={{ margin: "8px 0 0", whiteSpace: "pre-wrap" }}>
+        {value || "The words show up here."}
+      </p>
+    </div>
+  );
+}
 
 export function CloseoutWizard({
   visitId,
@@ -35,7 +109,6 @@ export function CloseoutWizard({
   const [notes, setNotes, clearNotes, conflictingNotes] = useFieldDraft<string>(draftKey ? `${draftKey}:notes` : undefined, initialNotes);
   const [nextWhen, setNextWhen, clearNextWhen] = useFieldDraft<NextWhen>(draftKey ? `${draftKey}:nextWhen` : undefined, "tomorrow");
   const [nextDate, setNextDate, clearNextDate] = useFieldDraft<string>(draftKey ? `${draftKey}:nextDate` : undefined, "");
-  const [firstUp, setFirstUp, clearFirstUp] = useFieldDraft<string>(draftKey ? `${draftKey}:firstUp` : undefined, "");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -44,7 +117,6 @@ export function CloseoutWizard({
     setNotes("");
     setNextWhen("tomorrow");
     setNextDate("");
-    setFirstUp("");
   }
 
   function handleClose() {
@@ -57,17 +129,16 @@ export function CloseoutWizard({
 
   async function submit(sendBill = false) {
     if (!kind) return;
-    const today_notes = notes.trim();
-    if (!today_notes) {
-      toast.error("What did you do today is required");
-      return;
-    }
-    if (kind === "return" && !firstUp.trim()) {
-      toast.error(returnGuide.move);
-      return;
-    }
-    if (kind === "return" && nextWhen === "date" && !nextDate) {
-      toast.error("Pick a date");
+    const spoken = spokenCloseoutBody({
+      kind,
+      note: notes,
+      nextWhen,
+      nextDate,
+      sendBill,
+      canSend,
+    });
+    if (!spoken.ok) {
+      toast.error(spoken.error);
       return;
     }
     if (pending) return;
@@ -81,18 +152,7 @@ export function CloseoutWizard({
       const res = await fetch(`/api/v1/visits/${visitId}/closeout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          kind,
-          today_notes,
-          ...(kind === "done" ? { send_invoice: sendBill && canSend } : {}),
-          ...(kind === "return"
-            ? {
-                next_when: nextWhen,
-                next_date: nextWhen === "date" ? nextDate : undefined,
-                first_up: firstUp.trim(),
-              }
-            : {}),
-        }),
+        body: JSON.stringify(spoken.body),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -101,7 +161,7 @@ export function CloseoutWizard({
       }
       const invoiceId = json.data?.invoice_id as string | undefined;
       reset();
-      clearKind(); clearNotes(); clearNextWhen(); clearNextDate(); clearFirstUp();
+      clearKind(); clearNotes(); clearNextWhen(); clearNextDate();
       onClose();
       if (kind === "done" && invoiceId && sendBill && canSend) {
         const sent = await fetch(`/api/v1/invoices/${invoiceId}/send`, { method: "POST" });
@@ -156,17 +216,7 @@ export function CloseoutWizard({
               <p style={{ whiteSpace: "pre-wrap" }}>{conflictingNotes}</p>
               <Button type="button" variant="secondary" onClick={() => setNotes(conflictingNotes)}>Restore my draft</Button>
             </div> : null}
-            <label>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>What did you do today?</div>
-              <Textarea
-                id="closeout-today-notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={4}
-                data-testid="closeout-today-notes"
-                placeholder="Voice or type. This becomes the invoice description."
-              />
-            </label>
+            <SpokenNote value={notes} onChange={setNotes} />
 
             {kind === "return" ? (
               <>
@@ -195,20 +245,9 @@ export function CloseoutWizard({
                     />
                   ) : null}
                 </div>
-                <label>
-                  <div style={{ fontWeight: 600, marginBottom: 4 }}>What’s first when you get here?</div>
-                  <Textarea
-                    id="closeout-first-up"
-                    value={firstUp}
-                    onChange={(e) => setFirstUp(e.target.value)}
-                    rows={2}
-                    data-testid="closeout-first-up"
-                    placeholder="Paint the bedroom. Closet doors still in the truck."
-                  />
-                  <p style={{ margin: "8px 0 0", color: "var(--fg-muted)", fontSize: 14 }}>
-                    {returnGuide.move} {returnGuide.why}
-                  </p>
-                </label>
+                <p style={{ margin: 0, color: "var(--fg-muted)", fontSize: 14 }}>
+                  {returnGuide.move} {returnGuide.why}
+                </p>
               </>
             ) : null}
 

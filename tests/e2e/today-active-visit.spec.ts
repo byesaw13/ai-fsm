@@ -106,7 +106,6 @@ test.describe("Today and Active Visit", () => {
     await page.getByTestId("completion-mark-complete").click();
     await page.getByTestId("closeout-kind-return").click();
     await page.getByTestId("closeout-today-notes").fill("Prepared and patched the bedroom");
-    await page.getByTestId("closeout-first-up").fill("Sand and paint the bedroom");
     await page.getByTestId("closeout-next-unsure").click();
     await page.getByTestId("closeout-wizard").getByRole("button", { name: "Close dialog" }).click();
     await page.getByTestId("completion-mark-complete").click();

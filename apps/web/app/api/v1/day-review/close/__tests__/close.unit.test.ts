@@ -4,7 +4,7 @@ import { NextRequest } from "next/server";
 const mockSession = {
   userId: "00000000-0000-0000-0000-000000000001",
   accountId: "00000000-0000-0000-0000-000000000002",
-  role: "owner" as const,
+  role: "owner" as "owner" | "admin" | "tech",
   traceId: "00000000-0000-0000-0000-000000000099",
 };
 
@@ -46,6 +46,7 @@ function request(body?: unknown): NextRequest {
 }
 
 beforeEach(() => {
+  mockSession.role = "owner";
   vi.resetAllMocks();
   mockWithDbSession.mockImplementation(async (_session, fn) => fn({}));
   mockGetBusinessDayById.mockResolvedValue({
@@ -77,7 +78,18 @@ describe("POST /api/v1/day-review/close", () => {
   it("closes when checklist passes", async () => {
     const res = await closeDay(request({ id: DAY_ID }));
     expect(res.status).toBe(200);
-    expect(mockAssertDayCloseAllowed).toHaveBeenCalledWith(mockSession, "2026-07-06", mockSession.userId);
+    expect(mockAssertDayCloseAllowed).toHaveBeenCalledWith(mockSession, "2026-07-06", mockSession.userId, {
+      ignoreStops: false,
+    });
     expect(mockSetBusinessDayStatus).toHaveBeenCalled();
+  });
+
+  it("lets a technician skip unanswered stops on their own day", async () => {
+    mockSession.role = "tech";
+    const res = await closeDay(request({ id: DAY_ID }));
+    expect(res.status).toBe(200);
+    expect(mockAssertDayCloseAllowed).toHaveBeenCalledWith(mockSession, "2026-07-06", mockSession.userId, {
+      ignoreStops: true,
+    });
   });
 });

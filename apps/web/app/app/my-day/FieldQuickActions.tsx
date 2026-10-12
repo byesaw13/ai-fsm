@@ -6,16 +6,18 @@ import { FIELD_QUICK_ACTIONS, fieldReceiptHref } from "@/lib/navigation/quick-ac
 
 export function FieldQuickActions({
   canQuickBook = false,
+  canQuote = true,
   currentJobId = null,
 }: {
   canQuickBook?: boolean;
+  canQuote?: boolean;
   currentJobId?: string | null;
 }) {
   return (
     <section data-testid="field-quick-actions">
       <SectionHeader title="Today" as="h3" />
       <div className="my-day-quick-grid" style={{ marginTop: "var(--space-3)" }}>
-        {FIELD_QUICK_ACTIONS.filter((act) => act.action !== "quick-book" || canQuickBook).map((act) => {
+        {FIELD_QUICK_ACTIONS.filter((act) => (act.action !== "quick-book" || canQuickBook) && (canQuote || !act.href.startsWith("/app/estimates"))).map((act) => {
           const tileStyle = {
             display: "flex" as const,
             flexDirection: "column" as const,

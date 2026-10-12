@@ -5,13 +5,17 @@ function row(ok: boolean, soft = false): DayCloseRowStatus {
   return soft ? "warning" : "blocked";
 }
 
-export function deriveDayCloseStatus(payload: DayCloseStatusPayload): DayCloseDerived {
+export function deriveDayCloseStatus(
+  payload: DayCloseStatusPayload,
+  options?: { ignoreStops?: boolean },
+): DayCloseDerived {
   const payroll = row(!payload.clockOpen);
   const activity = row(!payload.activeActivity);
   const mileage = row(!payload.openSession);
   const expenses = row(payload.missingReceiptPhotos === 0, payload.missingReceiptPhotos > 0);
   const notes = row(payload.notesAcknowledged, !payload.notesAcknowledged);
-  const stops = row((payload.unansweredStops ?? 0) === 0);
+  const unanswered = (payload.unansweredStops ?? 0) > 0;
+  const stops = options?.ignoreStops ? row(!unanswered, unanswered) : row(!unanswered);
 
   const rows = {
     payroll: { status: payroll },
@@ -22,14 +26,14 @@ export function deriveDayCloseStatus(payload: DayCloseStatusPayload): DayCloseDe
     stops: { status: stops },
   };
   const hardBlockerCount = [payroll, activity, mileage, stops].filter((s) => s === "blocked").length;
-  const softWarningCount = [expenses, notes].filter((s) => s === "warning").length;
+  const softWarningCount = [expenses, notes, stops].filter((s) => s === "warning").length;
   const readyCount = Object.values(rows).filter((r) => r.status === "ok").length;
 
   let closeButtonHint = "Close Day";
   if (hardBlockerCount === 1 && payload.clockOpen) closeButtonHint = "Close Day — clock out first";
   else if (hardBlockerCount === 1 && payload.activeActivity) closeButtonHint = "Close Day — stop activity first";
   else if (hardBlockerCount === 1 && payload.openSession) closeButtonHint = "Close Day — close mileage first";
-  else if (hardBlockerCount === 1 && (payload.unansweredStops ?? 0) > 0) {
+  else if (hardBlockerCount === 1 && (payload.unansweredStops ?? 0) > 0 && !options?.ignoreStops) {
     closeButtonHint = "Close Day — finish today’s stops first";
   } else if (hardBlockerCount > 1) closeButtonHint = `Close Day — ${hardBlockerCount} items left`;
 

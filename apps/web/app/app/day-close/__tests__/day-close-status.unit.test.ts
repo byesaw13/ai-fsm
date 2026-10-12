@@ -61,4 +61,10 @@ describe("deriveDayCloseStatus", () => {
     expect(s.rows.stops.status).toBe("blocked");
     expect(s.closeButtonHint).toMatch(/stops/i);
   });
+
+  it("lets a field close skip the stop gate", () => {
+    const s = deriveDayCloseStatus({ ...base, unansweredStops: 3 }, { ignoreStops: true });
+    expect(s.canClose).toBe(true);
+    expect(s.rows.stops.status).toBe("warning");
+  });
 });

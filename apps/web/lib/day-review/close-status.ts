@@ -14,9 +14,10 @@ export async function assertDayCloseAllowed(
   date: string,
   /** The day owner — defaults to the caller; managers closing another user's day pass `day.user_id`. */
   userId: string = session.userId,
+  options?: { ignoreStops?: boolean },
 ): Promise<DayCloseGateResult> {
   const payload = await loadDayCloseStatus(session, date, userId);
-  const derived = deriveDayCloseStatus(payload);
+  const derived = deriveDayCloseStatus(payload, options);
   if (!derived.canClose) {
     return { ok: false, reason: derived.closeButtonHint, code: "CHECKLIST_INCOMPLETE" };
   }
