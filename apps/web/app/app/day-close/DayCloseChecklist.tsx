@@ -161,11 +161,13 @@ export function DayCloseChecklist({
     try {
       if (payload.clockOpen) {
         const clock = await fetch("/api/v1/time-clock/clock-out", { method: "POST" });
-        if (!clock.ok) throw new Error("Could not clock out");
+        if (!clock.ok && clock.status !== 409) throw new Error("Could not clock out");
+        setPayload((p) => ({ ...p, clockOpen: false }));
       }
       if (payload.activeActivity) {
         const activity = await fetch("/api/v1/activities/stop", { method: "POST" });
-        if (!activity.ok) throw new Error("Could not stop the tracker");
+        if (!activity.ok && activity.status !== 409) throw new Error("Could not stop the tracker");
+        setPayload((p) => ({ ...p, activeActivity: null }));
       }
       if (session) {
         const miles = await fetch(`/api/v1/sessions/${session.id}`, {
@@ -177,6 +179,7 @@ export function DayCloseChecklist({
           const json = await miles.json().catch(() => ({}));
           throw new Error(json.error?.message ?? "Could not save the miles");
         }
+        setPayload((p) => ({ ...p, openSession: null }));
       }
       const closed = await fetch("/api/v1/day-review/close", {
         method: "POST",

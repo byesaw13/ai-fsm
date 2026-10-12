@@ -31,6 +31,7 @@ export function MyDayMobileLayout({
   canCapture = false,
   canQuickBook = false,
   canQuote = true,
+  alwaysShowEndDay = false,
   priorDayNeedsMileage = false,
   priorOpenSession = null,
   more = null,
@@ -47,6 +48,7 @@ export function MyDayMobileLayout({
   canCapture?: boolean;
   canQuickBook?: boolean;
   canQuote?: boolean;
+  alwaysShowEndDay?: boolean;
   priorDayNeedsMileage?: boolean;
   priorOpenSession?: OpenSession | null;
   more?: React.ReactNode;
@@ -191,7 +193,7 @@ export function MyDayMobileLayout({
         </div>
       </details>
 
-      {complete || clockedIn ? (
+      {complete || clockedIn || alwaysShowEndDay ? (
         <div style={{ marginTop: "var(--space-6)", textAlign: "center" }}>
           <Link
             href="/app/day-review"

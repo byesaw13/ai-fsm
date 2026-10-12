@@ -243,6 +243,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
         canCapture={isOwner}
         canQuickBook={isOwner}
         canQuote={!isTech}
+        alwaysShowEndDay={isTech}
         priorDayNeedsMileage={fieldDay.priorDayNeedsMileage}
         priorOpenSession={fieldDay.priorOpenSession}
         more={

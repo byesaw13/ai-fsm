@@ -55,10 +55,16 @@ describe("deriveDayCloseStatus", () => {
     expect(deriveDayCloseStatus({ ...base, notesAcknowledged: true }).rows.notes.status).toBe("ok");
   });
 
-  it("leaves unanswered stops as a reminder so the miles number can end the day", () => {
+  it("blocks close when GPS stops are unanswered", () => {
     const s = deriveDayCloseStatus({ ...base, unansweredStops: 3 });
+    expect(s.canClose).toBe(false);
+    expect(s.rows.stops.status).toBe("blocked");
+    expect(s.closeButtonHint).toMatch(/stops/i);
+  });
+
+  it("lets a field close skip the stop gate", () => {
+    const s = deriveDayCloseStatus({ ...base, unansweredStops: 3 }, { ignoreStops: true });
     expect(s.canClose).toBe(true);
     expect(s.rows.stops.status).toBe("warning");
-    expect(s.hardBlockerCount).toBe(0);
   });
 });

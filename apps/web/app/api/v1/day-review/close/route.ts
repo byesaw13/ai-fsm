@@ -28,7 +28,9 @@ export const POST = withAuth(async (request: NextRequest, session) => {
       if (!day) return { kind: "not_found" as const };
       if (day.status === "CLOSED") return { kind: "ok" as const, closedAt: day.closed_at };
 
-      const gate = await assertDayCloseAllowed(session, day.business_date, day.user_id);
+      const gate = await assertDayCloseAllowed(session, day.business_date, day.user_id, {
+        ignoreStops: session.role === "tech" && day.user_id === session.userId,
+      });
       if (!gate.ok) return { kind: "blocked" as const, reason: gate.reason };
 
       // Transition to READY_TO_CLOSE first if not already there

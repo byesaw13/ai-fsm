@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Modal, Textarea, useToast } from "@/components/ui";
 import { closeoutHoldSendCopy, comingBackStartHereGuide } from "@/lib/guide/next-move";
-import { browserSpeechAvailable, startBrowserSpeech } from "@/app/app/capture/speech-transcript";
+import { browserSpeechAvailable, startBrowserSpeech, type SpeechStop } from "@/app/app/capture/speech-transcript";
 import { spokenCloseoutBody } from "@/lib/visits/spoken-closeout";
 
 import { useFieldDraft } from "@/components/features/field/useFieldDraft";
@@ -14,23 +14,38 @@ type NextWhen = "tomorrow" | "date" | "unsure";
 
 function SpokenNote({ value, onChange }: { value: string; onChange: (next: string) => void }) {
   const [listening, setListening] = useState(false);
-  const [canSpeak] = useState(() => browserSpeechAvailable());
-  const [stop, setStop] = useState<null | (() => Promise<{ text: string; error: string }>)>(null);
+  const [mode, setMode] = useState<"speak" | "type">(() => (browserSpeechAvailable() ? "speak" : "type"));
+  const stopRef = useRef<SpeechStop | null>(null);
+
+  async function halt() {
+    const stop = stopRef.current;
+    stopRef.current = null;
+    setListening(false);
+    if (!stop) return;
+    const result = await stop();
+    if (result.text) onChange(result.text);
+    if (result.error && result.error !== "aborted" && result.error !== "no-speech") setMode("type");
+  }
+
+  useEffect(() => {
+    return () => {
+      const stop = stopRef.current;
+      stopRef.current = null;
+      void stop?.();
+    };
+  }, []);
 
   async function toggle() {
     if (!listening) {
       setListening(true);
-      setStop(() => startBrowserSpeech(onChange));
+      stopRef.current = startBrowserSpeech(onChange);
       return;
     }
-    setListening(false);
-    const result = await stop?.();
-    setStop(null);
-    if (result?.text) onChange(result.text);
+    await halt();
   }
 
   const prompt = "Say what happened. Those words are the note.";
-  if (!canSpeak) {
+  if (mode === "type") {
     return (
       <label>
         <div style={{ fontWeight: 600, marginBottom: 4 }}>{prompt}</div>
@@ -47,9 +62,21 @@ function SpokenNote({ value, onChange }: { value: string; onChange: (next: strin
   return (
     <div>
       <div style={{ fontWeight: 600, marginBottom: 4 }}>{prompt}</div>
-      <Button type="button" variant={listening ? "primary" : "secondary"} onClick={() => void toggle()} data-testid="closeout-speak">
-        {listening ? "Stop" : value ? "Say it again" : "Say it"}
-      </Button>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <Button type="button" variant={listening ? "primary" : "secondary"} onClick={() => void toggle()} data-testid="closeout-speak">
+          {listening ? "Stop" : value ? "Say it again" : "Say it"}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => {
+            void halt();
+            setMode("type");
+          }}
+        >
+          Type it
+        </Button>
+      </div>
       <p data-testid="closeout-spoken" style={{ margin: "8px 0 0", whiteSpace: "pre-wrap" }}>
         {value || "The words show up here."}
       </p>
