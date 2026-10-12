@@ -54,11 +54,14 @@ export function DayCloseChecklist({
   dayStatus,
   closedAt,
   initial,
+  milesOnly = false,
 }: {
   businessDayId: string;
   dayStatus: string;
   closedAt: string | null;
   initial: DayCloseStatusPayload;
+  /** Field end of day: one miles number. Clock-out and the tracker finish with it. */
+  milesOnly?: boolean;
 }) {
   const router = useRouter();
   const [payload, setPayload] = useState(initial);
@@ -145,6 +148,99 @@ export function DayCloseChecklist({
   }
 
   const isClosed = dayStatus === "CLOSED";
+
+  async function endWithMiles() {
+    const session = payload.openSession;
+    const odometer = Number(endOdometer);
+    if (session && (!Number.isInteger(odometer) || odometer <= session.startOdometer)) {
+      setError(`Ending miles must be more than ${fmtOdo(session.startOdometer)}`);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      if (payload.clockOpen) {
+        const clock = await fetch("/api/v1/time-clock/clock-out", { method: "POST" });
+        if (!clock.ok) throw new Error("Could not clock out");
+      }
+      if (payload.activeActivity) {
+        const activity = await fetch("/api/v1/activities/stop", { method: "POST" });
+        if (!activity.ok) throw new Error("Could not stop the tracker");
+      }
+      if (session) {
+        const miles = await fetch(`/api/v1/sessions/${session.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ end_odometer: odometer }),
+        });
+        if (!miles.ok) {
+          const json = await miles.json().catch(() => ({}));
+          throw new Error(json.error?.message ?? "Could not save the miles");
+        }
+      }
+      const closed = await fetch("/api/v1/day-review/close", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: businessDayId }),
+      });
+      if (!closed.ok) {
+        const json = await closed.json().catch(() => ({}));
+        throw new Error(json.error?.message ?? "Could not end the day");
+      }
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not end the day");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (milesOnly) {
+    return (
+      <section data-testid="end-day-miles" style={{ marginBottom: "var(--space-6)" }}>
+        {isClosed ? (
+          <p style={{ margin: 0 }}>Day closed.</p>
+        ) : (
+          <>
+            {payload.openSession ? (
+              <label style={{ display: "flex", flexDirection: "column", gap: 6, fontWeight: 700 }}>
+                Ending miles
+                <input
+                  value={endOdometer}
+                  onChange={(e) => setEndOdometer(e.target.value)}
+                  inputMode="numeric"
+                  data-testid="end-day-odometer"
+                  style={{
+                    minHeight: 48,
+                    fontSize: 24,
+                    padding: "0 12px",
+                    borderRadius: "var(--radius-md)",
+                    border: "1px solid var(--border)",
+                    fontFamily: "var(--font-mono), monospace",
+                  }}
+                />
+              </label>
+            ) : (
+              <p style={{ margin: "0 0 var(--space-3)" }}>Miles are already in.</p>
+            )}
+            {error ? (
+              <p role="alert" style={{ color: "var(--color-red-600, #dc2626)" }}>{error}</p>
+            ) : null}
+            <button
+              type="button"
+              className="p7-btn p7-btn-primary"
+              data-testid="end-day-save"
+              onClick={() => void endWithMiles()}
+              disabled={busy || (Boolean(payload.openSession) && !endOdometer)}
+              style={{ marginTop: "var(--space-3)", minHeight: 48, width: "100%" }}
+            >
+              {busy ? "Saving…" : "End day"}
+            </button>
+          </>
+        )}
+      </section>
+    );
+  }
 
   return (
     <section style={{ marginBottom: "var(--space-6)" }} data-testid="day-close-checklist">

@@ -22,7 +22,7 @@ const DESTINATIONS: CommandItem[] = [
   { id: "my-day", label: "Today", href: "/app/my-work", keywords: "today field home clock my day", roles: ["owner", "tech"] },
   { id: "overview", label: "Desk", href: "/app", keywords: "office dashboard numbers overview desk", roles: OWNER_ADMIN },
   { id: "capture", label: "Capture", href: "/app/capture", keywords: "voice promise record", roles: OWNER_ADMIN },
-  { id: "day-review", label: "Day Review", href: "/app/day-review", keywords: "end close evening", roles: ALL },
+  { id: "day-review", label: "Day Review", href: "/app/day-review", keywords: "end close evening", roles: OWNER_ADMIN },
   { id: "tracking", label: "Tracking", href: "/app/timeline", keywords: "timeline mileage gps vehicle", roles: OWNER_ADMIN },
   { id: "visits", label: "Visits", href: "/app/visits", keywords: "today schedule stop", roles: ALL },
   { id: "price-book", label: "Price book", href: "/app/price-book", keywords: "services rates", roles: OWNER_ADMIN },

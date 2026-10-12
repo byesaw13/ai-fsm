@@ -242,6 +242,7 @@ export default async function MyWorkPage({ searchParams }: PageProps) {
         currentJobId={heroVisit?.job_id ?? workOrders.find((w) => w.active_visit_id)?.job_id ?? null}
         canCapture={isOwner}
         canQuickBook={isOwner}
+        canQuote={!isTech}
         priorDayNeedsMileage={fieldDay.priorDayNeedsMileage}
         priorOpenSession={fieldDay.priorOpenSession}
         more={

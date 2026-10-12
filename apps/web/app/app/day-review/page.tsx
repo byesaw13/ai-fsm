@@ -77,7 +77,7 @@ export default async function DayReviewPage({
 
   const header = (
     <PageHeader
-      title="Day Review"
+      title={session.role === "tech" ? "End day" : "Day Review"}
       subtitle={new Date(date + "T12:00:00").toLocaleDateString("en-US", {
         weekday: "long",
         month: "long",
@@ -126,8 +126,9 @@ export default async function DayReviewPage({
     unansweredStops: stopInterview.unansweredCount,
   });
   const story = companyDayStory(storyInput);
+  const isTech = session.role === "tech";
   const hold = storyInput.billsOnHold.length === 1 ? storyInput.billsOnHold[0] : undefined;
-  const holdHref = hold?.invoiceId ? `/app/invoices/${hold.invoiceId}` : null;
+  const holdHref = !isTech && hold?.invoiceId ? `/app/invoices/${hold.invoiceId}` : null;
   const lead = dayReviewLead({
     unansweredStops: stopInterview.unansweredCount,
     suggestedStops: stopInterview.stops.filter((stop) => !stop.answeredReason && stop.suggested).length,
@@ -159,8 +160,8 @@ export default async function DayReviewPage({
   return (
     <PageContainer>
       {header}
-      <ScrollToNextUnresolved active={stopInterview.unansweredCount > 0} />
-      <section data-testid="day-review-lead" style={{ marginBottom: "var(--space-4)" }}>
+      {isTech ? null : <ScrollToNextUnresolved active={stopInterview.unansweredCount > 0} />}
+      {isTech ? null : <section data-testid="day-review-lead" style={{ marginBottom: "var(--space-4)" }}>
         <h2 style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-lg)", fontWeight: 800 }}>{lead.headline}</h2>
         {lead.needsYou.length > 0 ? (
           <ul style={{ margin: "0 0 var(--space-3)", paddingLeft: "1.1rem" }}>
@@ -172,15 +173,16 @@ export default async function DayReviewPage({
         {lead.handledSummary ? (
           <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-muted)" }}>{lead.handledSummary}. Review if needed.</p>
         ) : null}
-      </section>
+      </section>}
       <CompanyDayStoryCard story={story} holdHref={holdHref} />
       <DayCloseChecklist
         businessDayId={payload.businessDayId}
         dayStatus={payload.status}
         closedAt={payload.closedAt}
+        milesOnly={isTech}
         initial={{ ...closeStatus, unansweredStops: stopInterview.unansweredCount }}
       />
-      {story.isQuietNight ? (
+      {isTech ? null : story.isQuietNight ? (
         <details className="mb-8">
           <summary className="cursor-pointer font-semibold mb-4">Leftovers</summary>
           {leftoverEngines}

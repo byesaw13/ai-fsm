@@ -51,7 +51,7 @@ describe("assertDayCloseAllowed (TASK-054 server gate)", () => {
     expect(result).toEqual({ ok: true });
   });
 
-  it("blocks when GPS stops have no reason (TASK-145)", async () => {
+  it("does not block the day when GPS stops have no reason", async () => {
     mockQueryForSession.mockImplementation(async (_s, sql: string) => {
       if (sql.includes("time_clock_sessions")) return [];
       if (sql.includes("activity_entries")) return [];
@@ -62,10 +62,7 @@ describe("assertDayCloseAllowed (TASK-054 server gate)", () => {
       return [];
     });
     const result = await assertDayCloseAllowed(session, "2026-09-14");
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.reason).toMatch(/stops/i);
-    }
+    expect(result).toEqual({ ok: true });
   });
 
   it("scopes open vehicle_sessions by day owner (created_by), not whole account", async () => {

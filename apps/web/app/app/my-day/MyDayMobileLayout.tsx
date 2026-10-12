@@ -30,6 +30,7 @@ export function MyDayMobileLayout({
   currentJobId = null,
   canCapture = false,
   canQuickBook = false,
+  canQuote = true,
   priorDayNeedsMileage = false,
   priorOpenSession = null,
   more = null,
@@ -45,6 +46,7 @@ export function MyDayMobileLayout({
   currentJobId?: string | null;
   canCapture?: boolean;
   canQuickBook?: boolean;
+  canQuote?: boolean;
   priorDayNeedsMileage?: boolean;
   priorOpenSession?: OpenSession | null;
   more?: React.ReactNode;
@@ -183,7 +185,7 @@ export function MyDayMobileLayout({
       <details className="field-more" data-testid="today-more">
         <summary>Day details &amp; history</summary>
         <div className="field-more__body">
-          <FieldQuickActions canQuickBook={canQuickBook} currentJobId={currentJobId} />
+          <FieldQuickActions canQuickBook={canQuickBook} canQuote={canQuote} currentJobId={currentJobId} />
           <ClockBar />
           {more}
         </div>
@@ -201,7 +203,7 @@ export function MyDayMobileLayout({
               textDecoration: "underline",
             }}
           >
-            Review &amp; end day
+            End day
           </Link>
         </div>
       ) : null}
