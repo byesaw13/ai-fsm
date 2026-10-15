@@ -5,6 +5,7 @@ import { appUrl } from "./mailer.js";
 import type { AutomationRow, RunResult } from "./automations/types.js";
 import { enqueueNotification } from "./notification/enqueue.js";
 import { PRIORITY } from "./notification/priority.js";
+import { noticeTarget, quoteFollowupText } from "./sms/customer.js";
 
 /**
  * Estimate Follow-up Automation
@@ -28,6 +29,10 @@ interface EligibleEstimate {
   days_since_sent: number;
   client_name: string | null;
   client_email: string | null;
+  client_phone?: string | null;
+  sms_consent?: boolean | null;
+  preferred_contact?: string | null;
+  share_token?: string | null;
 }
 
 export async function findDueEstimateFollowups(client: Client): Promise<AutomationRow[]> {
@@ -52,7 +57,9 @@ export async function findEligibleEstimates(
             e.total_cents,
             e.sent_at::text AS sent_at,
             EXTRACT(DAY FROM (now() - e.sent_at))::int AS days_since_sent,
-            c.name AS client_name, c.email AS client_email
+            c.name AS client_name, c.email AS client_email,
+            c.phone AS client_phone, c.sms_consent, c.preferred_contact,
+            e.share_token
        FROM estimates e
        JOIN clients c ON c.id = e.client_id AND c.account_id = e.account_id
       WHERE e.account_id = $1
@@ -60,7 +67,10 @@ export async function findEligibleEstimates(
         AND e.sent_at IS NOT NULL
         AND e.sent_at <= now() - ($2 || ' days')::interval
         AND e.sent_at >  now() - ($2 || ' days')::interval - interval '1 day'
-        AND c.email IS NOT NULL
+        AND (
+          c.email IS NOT NULL
+          OR (c.sms_consent IS TRUE AND c.preferred_contact = 'sms' AND c.phone IS NOT NULL)
+        )
         AND NOT EXISTS (
           SELECT 1 FROM audit_log al
            WHERE al.entity_type = 'estimate_followup'
@@ -89,21 +99,27 @@ async function emitEstimateFollowup(
   );
   if (rowCount && rowCount > 0) return false;
 
-  if (est.client_email && est.client_name) {
+  const target = noticeTarget(est, est.client_email);
+  if (target && est.client_name) {
+    const portalUrl = est.share_token ? `${appUrl()}/portal/estimates/${est.share_token}` : null;
     const enqueueResult = await enqueueNotification(client, {
       accountId: est.account_id,
       clientId: est.client_id,
       automationType: "estimate_followup",
       priority: PRIORITY.MEDIUM,
-      toAddress: est.client_email,
+      channel: target.channel,
+      toAddress: target.to,
       subject: `Following up on your estimate (#${est.id.slice(0, 8)})`,
-      htmlBody: estimateFollowupHtml({
-        clientName: est.client_name,
-        estimateNumber: est.id.slice(0, 8),
-        totalCents: est.total_cents,
-        daysSinceSent: est.days_since_sent,
-        viewUrl: `${appUrl()}/app/estimates/${est.id}`,
-      }),
+      htmlBody:
+        target.channel === "sms"
+          ? quoteFollowupText(est.total_cents, portalUrl)
+          : estimateFollowupHtml({
+              clientName: est.client_name,
+              estimateNumber: est.id.slice(0, 8),
+              totalCents: est.total_cents,
+              daysSinceSent: est.days_since_sent,
+              viewUrl: `${appUrl()}/app/estimates/${est.id}`,
+            }),
       idempotencyKey: `estimate_followup:${est.id}`,
       entityType: "estimate",
       entityId: est.id,

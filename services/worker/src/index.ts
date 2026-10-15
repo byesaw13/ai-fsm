@@ -6,6 +6,7 @@ import { pruneLocationEvents } from "./prune-location-events.js";
 import { pruneAttentionEvents } from "./prune-attention-events.js";
 import { processWorkflowEvents } from "./workflow-events.js";
 import { dispatchNotificationQueue } from "./notification/dispatch.js";
+import { alertIfSmsGatewayStale } from "./sms/health.js";
 import { runVehicleMaintenanceReminders } from "./vehicle-maintenance-reminder.js";
 import { processCaptures } from "./process-captures.js";
 import { logger } from "./logger.js";
@@ -36,7 +37,7 @@ async function runPollIteration(client: Client): Promise<void> {
       logger.info("workflow-events processed", { count: processedEvents });
     }
 
-    // Dispatch notification queue (send emails from the queue)
+    // Dispatch notification queue (email, or a service text when the customer asked for one)
     const dispatchResult = await dispatchNotificationQueue(client);
     const dispatchTotal = dispatchResult.sent + dispatchResult.failed + dispatchResult.retried + dispatchResult.delayed + dispatchResult.cancelled;
     if (dispatchTotal > 0) {
@@ -67,6 +68,12 @@ async function runPollIteration(client: Client): Promise<void> {
 
     // TASK-093: vehicle service/renewal attention + monthly loan payment expenses
     await runVehicleMaintenanceReminders(client);
+
+    try {
+      await alertIfSmsGatewayStale(client);
+    } catch (err) {
+      logger.warn("sms gateway health alert failed", { error: (err as Error).message });
+    }
 
     const captureResult = await processCaptures(client);
     if (captureResult.processed > 0 || captureResult.errors > 0) {

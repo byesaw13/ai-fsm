@@ -4,6 +4,7 @@ import { reviewRequestEmailHtml } from "@ai-fsm/email-templates";
 import type { AutomationRow, RunResult } from "./automations/types.js";
 import { enqueueNotification } from "./notification/enqueue.js";
 import { PRIORITY } from "./notification/priority.js";
+import { noticeTarget, reviewRequestText } from "./sms/customer.js";
 
 /**
  * Review Request Automation
@@ -26,6 +27,9 @@ interface EligibleJob {
   title: string | null;
   client_name: string | null;
   client_email: string | null;
+  client_phone?: string | null;
+  sms_consent?: boolean | null;
+  preferred_contact?: string | null;
   tech_name: string | null;
 }
 
@@ -49,6 +53,7 @@ export async function findEligibleJobs(
   const { rows } = await client.query<EligibleJob>(
     `SELECT j.id, j.account_id, c.id AS client_id, j.title,
             c.name AS client_name, c.email AS client_email,
+            c.phone AS client_phone, c.sms_consent, c.preferred_contact,
             u.full_name AS tech_name
      FROM jobs j
      JOIN clients c ON c.id = j.client_id
@@ -64,7 +69,10 @@ export async function findEligibleJobs(
        AND j.status = 'completed'
        AND j.updated_at >= now() - ($2 || ' days')::interval - interval '1 day'
        AND j.updated_at < now() - ($2 || ' days')::interval
-       AND c.email IS NOT NULL
+       AND (
+         c.email IS NOT NULL
+         OR (c.sms_consent IS TRUE AND c.preferred_contact = 'sms' AND c.phone IS NOT NULL)
+       )
        AND NOT EXISTS (
          SELECT 1 FROM audit_log al
          WHERE al.entity_type = 'review_request'
@@ -96,19 +104,24 @@ async function emitReviewRequest(
     return false;
   }
 
-  if (job.client_email && job.client_name && job.title) {
+  const target = noticeTarget(job, job.client_email);
+  if (target && job.client_name && job.title) {
     const enqueueResult = await enqueueNotification(client, {
       accountId: job.account_id,
       clientId: job.client_id,
       automationType: "review_request",
       priority: PRIORITY.LOW,
-      toAddress: job.client_email,
+      channel: target.channel,
+      toAddress: target.to,
       subject: `How did we do? — ${job.title}`,
-      htmlBody: reviewRequestEmailHtml({
-        clientName: job.client_name,
-        jobTitle: job.title,
-        techName: job.tech_name,
-      }),
+      htmlBody:
+        target.channel === "sms"
+          ? reviewRequestText(job.title)
+          : reviewRequestEmailHtml({
+              clientName: job.client_name,
+              jobTitle: job.title,
+              techName: job.tech_name,
+            }),
       idempotencyKey: `review_request:${job.id}`,
       entityType: "job",
       entityId: job.id,

@@ -1,5 +1,6 @@
 import type { Client } from "pg";
 import { sendEmail } from "../mailer.js";
+import { sendSms } from "../sms/gateway.js";
 import { logger } from "../logger.js";
 import { getRules, checkGovernor, updateCooldown } from "./governor.js";
 
@@ -9,6 +10,7 @@ interface QueueRow {
   client_id: string | null;
   automation_type: string;
   priority: number;
+  channel: "email" | "sms";
   to_address: string;
   subject: string;
   html_body: string;
@@ -48,7 +50,7 @@ export async function dispatchNotificationQueue(client: Client): Promise<Dispatc
     // Pick up to 20 pending items ordered by priority then scheduled time.
     // FOR UPDATE SKIP LOCKED: concurrent workers skip these rows rather than block.
     const { rows } = await client.query<QueueRow>(
-      `SELECT id, account_id, client_id, automation_type, priority, to_address,
+      `SELECT id, account_id, client_id, automation_type, priority, channel, to_address,
               subject, html_body, idempotency_key, attempt_count, max_attempts,
               entity_type, entity_id, metadata
        FROM notification_queue
@@ -93,12 +95,14 @@ export async function dispatchNotificationQueue(client: Client): Promise<Dispatc
           [row.id]
         );
 
-        // Send
-        const sendResult = await sendEmail({
-          to: row.to_address,
-          subject: row.subject,
-          html: row.html_body,
-        });
+        const sendResult =
+          row.channel === "sms"
+            ? await sendSms(row.to_address, row.html_body)
+            : await sendEmail({
+                to: row.to_address,
+                subject: row.subject,
+                html: row.html_body,
+              });
 
         if (sendResult.ok) {
           await client.query(
@@ -113,16 +117,19 @@ export async function dispatchNotificationQueue(client: Client): Promise<Dispatc
 
           // Log to communications_log
           if (row.client_id) {
+            const preview =
+              row.channel === "sms"
+                ? row.html_body.slice(0, 1000)
+                : `${row.automation_type}: ${row.subject}`.slice(0, 200);
+            const externalId =
+              row.channel === "sms" && "messageId" in sendResult && sendResult.messageId
+                ? sendResult.messageId
+                : row.id;
             await client.query(
               `INSERT INTO communications_log
                  (account_id, client_id, channel, direction, outcome, body_preview, external_id)
-               VALUES ($1, $2, 'email', 'outbound', 'sent', $3, $4)`,
-              [
-                row.account_id,
-                row.client_id,
-                `${row.automation_type}: ${row.subject}`.slice(0, 200),
-                row.id,
-              ]
+               VALUES ($1, $2, $3, 'outbound', 'sent', $4, $5)`,
+              [row.account_id, row.client_id, row.channel === "sms" ? "sms" : "email", preview, externalId]
             );
           }
 

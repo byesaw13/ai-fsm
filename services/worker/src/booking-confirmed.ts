@@ -4,6 +4,7 @@ import { bookingConfirmedEmailHtml } from "@ai-fsm/email-templates";
 import type { AutomationRow, RunResult } from "./automations/types.js";
 import { enqueueNotification } from "./notification/enqueue.js";
 import { PRIORITY } from "./notification/priority.js";
+import { appointmentWhen, bookingConfirmedText, noticeTarget } from "./sms/customer.js";
 
 /**
  * Booking Confirmation Automation
@@ -28,6 +29,9 @@ interface EligibleBooking {
   job_title: string | null;
   client_name: string | null;
   client_email: string | null;
+  client_phone?: string | null;
+  sms_consent?: boolean | null;
+  preferred_contact?: string | null;
   property_address: string | null;
   tech_name: string | null;
 }
@@ -54,6 +58,7 @@ export async function findEligibleBookings(
             v.scheduled_start::text, v.scheduled_end::text,
             j.title AS job_title,
             c.name AS client_name, c.email AS client_email,
+            c.phone AS client_phone, c.sms_consent, c.preferred_contact,
             p.address AS property_address,
             u.full_name AS tech_name
      FROM visits v
@@ -96,22 +101,28 @@ async function emitBookingConfirmation(
     return false;
   }
 
-  if (booking.client_email && booking.client_name && booking.job_title) {
+  const target = noticeTarget(booking, booking.client_email);
+  if (target && booking.client_name && booking.job_title) {
+    const when = appointmentWhen(booking.scheduled_start);
     const enqueueResult = await enqueueNotification(client, {
       accountId: booking.account_id,
       clientId: booking.client_id,
       automationType: "booking_confirmed",
       priority: PRIORITY.MEDIUM,
-      toAddress: booking.client_email,
+      channel: target.channel,
+      toAddress: target.to,
       subject: `Appointment Confirmed — ${booking.job_title}`,
-      htmlBody: bookingConfirmedEmailHtml({
-        clientName: booking.client_name,
-        jobTitle: booking.job_title,
-        scheduledStart: booking.scheduled_start,
-        scheduledEnd: booking.scheduled_end,
-        propertyAddress: booking.property_address,
-        techName: booking.tech_name,
-      }),
+      htmlBody:
+        target.channel === "sms"
+          ? bookingConfirmedText(booking.job_title, when, booking.property_address)
+          : bookingConfirmedEmailHtml({
+              clientName: booking.client_name,
+              jobTitle: booking.job_title,
+              scheduledStart: booking.scheduled_start,
+              scheduledEnd: booking.scheduled_end,
+              propertyAddress: booking.property_address,
+              techName: booking.tech_name,
+            }),
       idempotencyKey: `booking_confirmed:${booking.id}`,
       entityType: "visit",
       entityId: booking.id,

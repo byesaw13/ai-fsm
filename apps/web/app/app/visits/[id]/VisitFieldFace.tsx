@@ -27,6 +27,7 @@ import {
   visitNotesPath,
 } from "@/lib/my-day/visit-hero";
 import { buildEstimateUrl } from "./visit-execution-helpers";
+import { notifyOnTheWay } from "@/lib/sms/notify-on-the-way";
 
 export type FaceTask = {
   id: string;
@@ -460,7 +461,13 @@ export function VisitFieldFace({
     }
     if (command.kind === "navigate" && mapsUrl) {
       return (
-        <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="p7-field-hero__primary">
+        <a
+          href={mapsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="p7-field-hero__primary"
+          onClick={() => notifyOnTheWay(visitId)}
+        >
           {command.label}
         </a>
       );

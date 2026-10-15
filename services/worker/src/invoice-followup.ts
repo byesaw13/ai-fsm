@@ -4,6 +4,7 @@ import { invoiceFollowupEmailHtml } from "@ai-fsm/email-templates";
 import { appUrl } from "./mailer.js";
 import { enqueueNotification } from "./notification/enqueue.js";
 import { PRIORITY } from "./notification/priority.js";
+import { billFollowupText, noticeTarget } from "./sms/customer.js";
 import type { AutomationRow, RunResult } from "./automations/types.js";
 
 /**
@@ -88,6 +89,10 @@ export interface OverdueInvoice {
   due_date: string;
   client_name: string | null;
   client_email: string | null;
+  client_phone?: string | null;
+  sms_consent?: boolean | null;
+  preferred_contact?: string | null;
+  share_token?: string | null;
 }
 
 const DEFAULT_DAYS_OVERDUE = [7, 14, 30];
@@ -122,7 +127,9 @@ export async function findOverdueInvoices(
   const { rows } = await client.query<OverdueInvoice>(
     `SELECT i.id, i.account_id, i.client_id, i.invoice_number,
             i.status, i.total_cents, i.paid_cents,
-            i.due_date::text, c.name AS client_name, c.email AS client_email
+            i.due_date::text, i.share_token,
+            c.name AS client_name, c.email AS client_email,
+            c.phone AS client_phone, c.sms_consent, c.preferred_contact
      FROM invoices i
      JOIN clients c ON c.id = i.client_id
      LEFT JOIN jobs j ON j.id = i.job_id
@@ -197,24 +204,30 @@ export async function emitInvoiceFollowup(
     return false; // Already sent for this cadence step
   }
 
-  if (invoice.client_email && invoice.client_name) {
+  const target = noticeTarget(invoice, invoice.client_email);
+  if (target && invoice.client_name) {
     const balanceCents = invoice.total_cents - invoice.paid_cents;
     const viewUrl = `${appUrl()}/app/invoices/${invoice.id}`;
+    const portalUrl = invoice.share_token ? `${appUrl()}/portal/invoices/${invoice.share_token}` : null;
     const enqueueResult = await enqueueNotification(client, {
       accountId: invoice.account_id,
       clientId: invoice.client_id,
       automationType: "invoice_followup",
       priority: PRIORITY.HIGH,
-      toAddress: invoice.client_email,
+      channel: target.channel,
+      toAddress: target.to,
       subject: `Payment reminder: Invoice ${invoice.invoice_number} is ${cadenceStep} days overdue`,
-      htmlBody: invoiceFollowupEmailHtml({
-        clientName: invoice.client_name,
-        invoiceNumber: invoice.invoice_number,
-        totalCents: invoice.total_cents,
-        balanceCents,
-        daysOverdue: cadenceStep,
-        viewUrl,
-      }),
+      htmlBody:
+        target.channel === "sms"
+          ? billFollowupText(invoice.invoice_number, balanceCents, portalUrl)
+          : invoiceFollowupEmailHtml({
+              clientName: invoice.client_name,
+              invoiceNumber: invoice.invoice_number,
+              totalCents: invoice.total_cents,
+              balanceCents,
+              daysOverdue: cadenceStep,
+              viewUrl,
+            }),
       idempotencyKey: `invoice_followup:${invoice.id}:${cadenceStep}`,
       entityType: "invoice",
       entityId: invoice.id,

@@ -10,9 +10,11 @@ type Props = {
   phone: string;
   /** Optional job to attach the message to */
   defaultJobId?: string | null;
+  /** Suggested reply from the last inbound text. One tap sends it. */
+  draft?: string | null;
 };
 
-export function SendSmsButton({ clientId, clientName, phone, defaultJobId }: Props) {
+export function SendSmsButton({ clientId, clientName, phone, defaultJobId, draft }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -20,13 +22,7 @@ export function SendSmsButton({ clientId, clientName, phone, defaultJobId }: Pro
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
 
-  async function handleSend(e: FormEvent) {
-    e.preventDefault();
-    const text = message.trim();
-    if (!text) {
-      setError("Message is required.");
-      return;
-    }
+  async function sendText(text: string) {
     setSubmitting(true);
     setError(null);
     try {
@@ -56,20 +52,46 @@ export function SendSmsButton({ clientId, clientName, phone, defaultJobId }: Pro
     }
   }
 
+  async function handleSend(e: FormEvent) {
+    e.preventDefault();
+    const text = message.trim();
+    if (!text) {
+      setError("Message is required.");
+      return;
+    }
+    await sendText(text);
+  }
+
   if (!open) {
     return (
-      <button
-        type="button"
-        className="p7-btn p7-btn-secondary p7-btn-sm"
-        onClick={() => {
-          setOpen(true);
-          setSent(false);
-          setError(null);
-        }}
-        data-testid="send-sms-open"
-      >
-        Text (app)
-      </button>
+      <span style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        {draft ? (
+          <button
+            type="button"
+            className="p7-btn p7-btn-primary p7-btn-sm"
+            disabled={submitting}
+            onClick={() => void sendText(draft)}
+            title={draft}
+            aria-label={`Send reply: ${draft}`}
+            data-testid="send-sms-reply"
+          >
+            {submitting ? "Sending…" : sent ? "Reply sent" : `Send: ${draft.length > 32 ? `${draft.slice(0, 32)}…` : draft}`}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="p7-btn p7-btn-secondary p7-btn-sm"
+          onClick={() => {
+            setOpen(true);
+            setSent(false);
+            setError(null);
+          }}
+          data-testid="send-sms-open"
+        >
+          Text (app)
+        </button>
+        {error ? <span role="alert">{error}</span> : null}
+      </span>
     );
   }
 
