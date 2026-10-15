@@ -333,6 +333,21 @@ export async function POST(req: NextRequest) {
   // Reply YES confirms the next appointment when they are already subscribed.
   // A bare YES from someone who opted out stays a START (re-subscribe).
   if (existing?.sms_consent && isBareYes(message)) {
+    // Claim the inbound id before any visit update or reply, so a second
+    // delivery of the same webhook cannot confirm twice or text twice.
+    const claimId = await logCommunication({
+      accountId,
+      channel: "sms",
+      direction: "inbound",
+      outcome: "received",
+      clientId: existing.id,
+      bodyPreview: message.slice(0, 1000),
+      externalId: external_id ?? null,
+    });
+    if (external_id && claimId === null) {
+      logger.info("SMS YES duplicate ignored (claim)", { traceId, external_id });
+      return NextResponse.json({ duplicate: true });
+    }
     const upcoming = await queryOne<{ id: string; title: string | null; scheduled_start: string }>(
       `SELECT v.id, COALESCE(j.title, 'your appointment') AS title, v.scheduled_start::text
        FROM visits v
@@ -354,17 +369,10 @@ export async function POST(req: NextRequest) {
         `UPDATE visits SET customer_confirmed_at = now(), updated_at = now() WHERE id = $1 AND customer_confirmed_at IS NULL`,
         [upcoming.id]
       );
+      if (claimId) {
+        await query(`UPDATE communications_log SET visit_id = $1 WHERE id = $2`, [upcoming.id, claimId]);
+      }
     }
-    await logCommunication({
-      accountId,
-      channel: "sms",
-      direction: "inbound",
-      outcome: "received",
-      clientId: existing.id,
-      visitId: upcoming?.id ?? null,
-      bodyPreview: message.slice(0, 1000),
-      externalId: external_id ?? null,
-    });
     let autoReplied = false;
     if (isSmsGatewayConfigured()) {
       const sendResult = await sendSmsViaGateway({ phone, message: reply });

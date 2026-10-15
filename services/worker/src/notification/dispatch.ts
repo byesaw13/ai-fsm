@@ -89,6 +89,26 @@ export async function dispatchNotificationQueue(client: Client): Promise<Dispatc
           continue;
         }
 
+        // A STOP or portal opt-out after enqueue must not still go out.
+        if (row.channel === "sms") {
+          const consent = row.client_id
+            ? await client.query<{ sms_consent: boolean }>(
+                `SELECT sms_consent FROM clients WHERE id = $1 AND account_id = $2`,
+                [row.client_id, row.account_id]
+              )
+            : { rows: [] };
+          if (consent.rows[0]?.sms_consent !== true) {
+            await client.query(
+              `UPDATE notification_queue
+                  SET status = 'cancelled', failure_reason = 'sms consent withdrawn'
+                WHERE id = $1`,
+              [row.id]
+            );
+            result.cancelled++;
+            continue;
+          }
+        }
+
         // Mark as in-flight (increment attempt_count)
         await client.query(
           `UPDATE notification_queue SET attempt_count = attempt_count + 1 WHERE id = $1`,

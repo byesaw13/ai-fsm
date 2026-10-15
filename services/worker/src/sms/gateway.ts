@@ -1,74 +1,66 @@
 /**
- * Android SMS Gateway send. Same payload as apps/web/lib/sms/gateway.ts.
- * The worker shares the production env file, so the three SMS_GATEWAY_* values
- * are already present when the phone gateway is configured.
+ * The worker has no internet egress. Service texts are sent by the web tier,
+ * which can reach the Android SMS gateway. Both containers share the env file,
+ * so SMS_INTERNAL_KEY is present here. SMS_WEB_URL defaults to the compose
+ * service name on the internal network.
  */
 
 export type SmsSendResult =
   | { ok: true; messageId: string | null }
   | { ok: false; error: string };
 
-export function smsGatewayConfigured(): boolean {
-  return Boolean(
-    process.env.SMS_GATEWAY_URL?.trim() &&
-      process.env.SMS_GATEWAY_USERNAME?.trim() &&
-      process.env.SMS_GATEWAY_PASSWORD?.trim()
-  );
+export type GatewayHealth =
+  | { configured: false }
+  | { configured: true; lastSeen: Date | null };
+
+function webBase(): string {
+  return (process.env.SMS_WEB_URL || "http://web:3000").replace(/\/$/, "");
 }
 
-function authHeader(): string {
-  const user = process.env.SMS_GATEWAY_USERNAME!.trim();
-  const pass = process.env.SMS_GATEWAY_PASSWORD!.trim();
-  return `Basic ${Buffer.from(`${user}:${pass}`).toString("base64")}`;
+export function smsGatewayConfigured(): boolean {
+  return Boolean(process.env.SMS_INTERNAL_KEY?.trim());
 }
 
 export async function sendSms(phone: string, message: string): Promise<SmsSendResult> {
-  const url = process.env.SMS_GATEWAY_URL?.trim();
-  if (!url || !smsGatewayConfigured()) {
-    return { ok: false, error: "SMS gateway is not configured" };
-  }
-  const sim = Number(process.env.SMS_GATEWAY_SIM_NUMBER ?? "1");
+  const key = process.env.SMS_INTERNAL_KEY?.trim();
+  if (!key) return { ok: false, error: "SMS dispatch is not configured" };
   try {
-    const res = await fetch(url, {
+    const res = await fetch(`${webBase()}/api/internal/sms/dispatch`, {
       method: "POST",
       headers: {
-        Authorization: authHeader(),
         "Content-Type": "application/json",
         Accept: "application/json",
+        "x-api-key": key,
       },
-      body: JSON.stringify({
-        textMessage: { text: message },
-        phoneNumbers: [phone],
-        simNumber: Number.isFinite(sim) && sim > 0 ? sim : 1,
-        withDeliveryReport: true,
-      }),
+      body: JSON.stringify({ phone, message }),
     });
     const text = await res.text();
-    let json: { id?: string; message?: string } = {};
+    let json: { ok?: boolean; messageId?: string | null; error?: string } = {};
     try {
-      json = text ? (JSON.parse(text) as { id?: string; message?: string }) : {};
+      json = text ? (JSON.parse(text) as typeof json) : {};
     } catch {
       json = {};
     }
-    if (!res.ok) {
-      return { ok: false, error: json.message || text.slice(0, 200) || `Gateway HTTP ${res.status}` };
+    if (!res.ok || json.ok === false) {
+      return { ok: false, error: json.error || text.slice(0, 200) || `Dispatch HTTP ${res.status}` };
     }
-    return { ok: true, messageId: json.id ?? null };
+    return { ok: true, messageId: json.messageId ?? null };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "SMS gateway request failed" };
+    return { ok: false, error: err instanceof Error ? err.message : "SMS dispatch request failed" };
   }
 }
 
-/** Newest device check-in, or null when the gateway cannot be asked. */
-export async function gatewayLastSeen(): Promise<Date | null> {
-  if (!smsGatewayConfigured()) return null;
-  const res = await fetch("https://api.sms-gate.app/3rdparty/v1/devices", {
-    headers: { Authorization: authHeader(), Accept: "application/json" },
+/** Asks the web tier when the business phone last checked in. */
+export async function gatewayHealth(): Promise<GatewayHealth> {
+  const key = process.env.SMS_INTERNAL_KEY?.trim();
+  if (!key) return { configured: false };
+  const res = await fetch(`${webBase()}/api/internal/sms/dispatch`, {
+    headers: { Accept: "application/json", "x-api-key": key },
   });
-  if (!res.ok) return null;
-  const data = (await res.json()) as Array<{ lastSeen?: string }> | { lastSeen?: string };
-  const device = Array.isArray(data) ? data[0] : data;
-  if (!device?.lastSeen) return null;
-  const seen = new Date(device.lastSeen);
-  return Number.isNaN(seen.getTime()) ? null : seen;
+  if (!res.ok) throw new Error(`sms health HTTP ${res.status}`);
+  const data = (await res.json()) as { configured?: boolean; lastSeen?: string | null };
+  if (!data.configured) return { configured: false };
+  if (!data.lastSeen) return { configured: true, lastSeen: null };
+  const seen = new Date(data.lastSeen);
+  return { configured: true, lastSeen: Number.isNaN(seen.getTime()) ? null : seen };
 }

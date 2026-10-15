@@ -94,3 +94,20 @@ export async function sendSmsViaGateway(opts: {
     };
   }
 }
+
+/** Newest device check-in. Null when the gateway answers but no device has checked in. */
+export async function gatewayDevicesLastSeen(): Promise<Date | null> {
+  const username = process.env.SMS_GATEWAY_USERNAME?.trim();
+  const password = process.env.SMS_GATEWAY_PASSWORD?.trim();
+  if (!username || !password || !isSmsGatewayConfigured()) return null;
+  const auth = Buffer.from(`${username}:${password}`).toString("base64");
+  const res = await fetch("https://api.sms-gate.app/3rdparty/v1/devices", {
+    headers: { Authorization: `Basic ${auth}`, Accept: "application/json" },
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as Array<{ lastSeen?: string }> | { lastSeen?: string };
+  const device = Array.isArray(data) ? data[0] : data;
+  if (!device?.lastSeen) return null;
+  const seen = new Date(device.lastSeen);
+  return Number.isNaN(seen.getTime()) ? null : seen;
+}

@@ -1,6 +1,6 @@
 import type { Client } from "pg";
 import { logger } from "../logger.js";
-import { gatewayLastSeen, smsGatewayConfigured } from "./gateway.js";
+import { gatewayHealth, smsGatewayConfigured } from "./gateway.js";
 
 const STALE_MS = 20 * 60 * 1000;
 const CHECK_EVERY_MS = 5 * 60 * 1000;
@@ -17,7 +17,9 @@ export async function alertIfSmsGatewayStale(client: Client): Promise<void> {
   lastCheckAt = now;
   let seen: Date | null = null;
   try {
-    seen = await gatewayLastSeen();
+    const health = await gatewayHealth();
+    if (!health.configured) return;
+    seen = health.lastSeen;
   } catch (err) {
     logger.warn("sms gateway health check failed", { error: (err as Error).message });
     return;
