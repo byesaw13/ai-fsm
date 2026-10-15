@@ -7,6 +7,9 @@ import { logger } from "@/lib/logger";
 import { sendEmail, appUrl, isEmailConfigured } from "@/lib/email/mailer";
 import { invoiceEmailHtml, invoiceEmailText } from "@ai-fsm/email-templates";
 import { logCommunication } from "@/lib/communications-log";
+import { sendSmsViaGateway } from "@/lib/sms/gateway";
+import { invoiceReadyText, serviceSmsPhone } from "@/lib/sms/messages";
+import { logOutboundSms } from "@/lib/sms/outbound";
 import { loadInvoicePdf } from "@/lib/pdf/load";
 import { applyServiceMinimum, isServiceMinimumEligible } from "@/lib/invoices/service-minimum";
 import { snapshotInvoiceFeePolicy } from "@/lib/invoices/job-expenses";
@@ -39,7 +42,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
                 i.paid_cents, i.deposit_cents, i.due_date, i.notes, i.sent_at, i.paid_at, i.share_token,
                 i.invoice_kind, i.job_id, j.status AS job_status,
                 e.minimum_service_override_reason AS estimate_override,
-                c.id AS client_id, c.name AS client_name, c.email AS client_email
+                c.id AS client_id, c.name AS client_name, c.email AS client_email,
+                c.phone AS client_phone, c.sms_consent, c.preferred_contact
          FROM invoices i
          JOIN clients c ON c.id = i.client_id
          LEFT JOIN jobs j ON j.id = i.job_id
@@ -58,6 +62,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         invoice_kind: string; job_id: string | null; job_status: string | null;
         estimate_override: string | null;
         client_id: string; client_name: string; client_email: string | null;
+        client_phone: string | null; sms_consent: boolean; preferred_contact: string | null;
       };
 
       // Void invoices stay blocked. Paid invoices are allowed so staff can email
@@ -66,11 +71,16 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         return { status: 422, message: "Cannot send a void invoice" };
       }
 
-      if (!inv.client_email) {
-        return { status: 422, message: "Client has no email address on file" };
-      }
-
-      if (!isEmailConfigured()) {
+      const textPhone = serviceSmsPhone({
+        sms_consent: inv.sms_consent,
+        preferred_contact: inv.preferred_contact,
+        phone: inv.client_phone,
+      });
+      const canEmail = Boolean(inv.client_email) && isEmailConfigured();
+      if (!canEmail && !textPhone) {
+        if (!inv.client_email) {
+          return { status: 422, message: "Client has no email address on file" };
+        }
         return { status: 503, message: "Email is not configured on this server" };
       }
 
@@ -141,59 +151,86 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         ? `Receipt — Invoice ${inv.invoice_number} from Dovetails Services LLC`
         : `Invoice ${inv.invoice_number} from Dovetails Services LLC`;
 
-      const emailResult = await sendEmail({
-        to: inv.client_email,
-        subject,
-        html: invoiceEmailHtml({
-          invoiceNumber: inv.invoice_number,
-          clientName: inv.client_name,
-          totalCents: inv.total_cents,
-          balanceCents: isPaid ? 0 : amountDue,
-          dueDateStr: isPaid ? null : dueDateStr,
-          viewUrl,
-          notes: inv.notes,
-          isPaid,
-          paidAtStr,
-        }),
-        text: invoiceEmailText({
-          invoiceNumber: inv.invoice_number,
-          clientName: inv.client_name,
-          totalCents: inv.total_cents,
-          balanceCents: isPaid ? 0 : amountDue,
-          dueDateStr: isPaid ? null : dueDateStr,
-          viewUrl,
-          notes: inv.notes,
-          isPaid,
-          paidAtStr,
-        }),
-        attachments: pdf
-          ? [{ filename: pdf.filename, content: pdf.bytes, contentType: "application/pdf" }]
-          : undefined,
-      });
+      if (canEmail) {
+        const emailResult = await sendEmail({
+          to: inv.client_email!,
+          subject,
+          html: invoiceEmailHtml({
+            invoiceNumber: inv.invoice_number,
+            clientName: inv.client_name,
+            totalCents: inv.total_cents,
+            balanceCents: isPaid ? 0 : amountDue,
+            dueDateStr: isPaid ? null : dueDateStr,
+            viewUrl,
+            notes: inv.notes,
+            isPaid,
+            paidAtStr,
+          }),
+          text: invoiceEmailText({
+            invoiceNumber: inv.invoice_number,
+            clientName: inv.client_name,
+            totalCents: inv.total_cents,
+            balanceCents: isPaid ? 0 : amountDue,
+            dueDateStr: isPaid ? null : dueDateStr,
+            viewUrl,
+            notes: inv.notes,
+            isPaid,
+            paidAtStr,
+          }),
+          attachments: pdf
+            ? [{ filename: pdf.filename, content: pdf.bytes, contentType: "application/pdf" }]
+            : undefined,
+        });
 
-      if (!emailResult.ok) {
+        if (!emailResult.ok) {
+          await logCommunication({
+            accountId: session.accountId,
+            channel: "email",
+            direction: "outbound",
+            outcome: "failed",
+            clientId: inv.client_id,
+            bodyPreview: subject,
+            initiatedBy: session.userId,
+            externalId: emailResult.error ?? null,
+          });
+          return { status: 502, message: `Email send failed: ${emailResult.error}` };
+        }
+
         await logCommunication({
           accountId: session.accountId,
           channel: "email",
           direction: "outbound",
-          outcome: "failed",
+          outcome: "sent",
           clientId: inv.client_id,
           bodyPreview: subject,
           initiatedBy: session.userId,
-          externalId: emailResult.error ?? null,
         });
-        return { status: 502, message: `Email send failed: ${emailResult.error}` };
       }
 
-      await logCommunication({
-        accountId: session.accountId,
-        channel: "email",
-        direction: "outbound",
-        outcome: "sent",
-        clientId: inv.client_id,
-        bodyPreview: subject,
-        initiatedBy: session.userId,
-      });
+      if (textPhone) {
+        const smsBody = invoiceReadyText({
+          number: inv.invoice_number,
+          amountDueCents: isPaid ? 0 : amountDue,
+          url: viewUrl,
+          paid: isPaid,
+        });
+        const sms = await sendSmsViaGateway({ phone: textPhone, message: smsBody });
+        await logOutboundSms({
+          accountId: session.accountId,
+          clientId: inv.client_id,
+          jobId: inv.job_id,
+          bodyPreview: smsBody,
+          outcome: sms.ok ? "sent" : "failed",
+          externalId: sms.ok ? sms.messageId : null,
+          initiatedBy: session.userId,
+        });
+        if (!sms.ok && !canEmail) {
+          return { status: 502, message: `Text send failed: ${sms.error}` };
+        }
+        if (!sms.ok) {
+          logger.warn("[invoices/send] text failed after email", { invoiceId: id, error: sms.error });
+        }
+      }
 
       // Only the draft→sent transition writes sent_at. The invoice
       // immutability invariant (migration 004) forbids changing sent_at once

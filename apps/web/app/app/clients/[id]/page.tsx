@@ -136,6 +136,26 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   );
   if (!client) notFound();
 
+  const suggestedReply = await queryOne<{ suggested_reply: string }>(
+    `SELECT suggested_reply
+     FROM communications_log cl
+     WHERE cl.account_id = $1 AND cl.client_id = $2
+       AND cl.channel = 'sms' AND cl.direction = 'inbound'
+       AND cl.suggested_reply IS NOT NULL
+       AND cl.created_at > COALESCE((
+         SELECT max(o.created_at)
+         FROM communications_log o
+         WHERE o.account_id = cl.account_id
+           AND o.client_id = cl.client_id
+           AND o.channel = 'sms'
+           AND o.direction = 'outbound'
+           AND o.outcome IN ('sent', 'delivered')
+       ), '-infinity'::timestamptz)
+     ORDER BY cl.created_at DESC
+     LIMIT 1`,
+    [session.accountId, id]
+  );
+
   const squareTxnCount = Number(client.transaction_count) || 0;
   const squareSpendCents = Number(client.lifetime_spend_cents) || 0;
   const hasSquareHistory =
@@ -387,6 +407,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
                   clientName={client.name}
                   phone={client.phone}
                   defaultJobId={activeJobs[0]?.id ?? null}
+                  draft={suggestedReply?.suggested_reply ?? null}
                 />
               </>
             ) : null}

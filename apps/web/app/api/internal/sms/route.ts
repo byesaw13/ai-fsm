@@ -9,6 +9,12 @@ import { classifySms, type SmsClassification } from "@/lib/sms/classify";
 import { logCommunication } from "@/lib/communications-log";
 import { detectSmsKeyword, replyForSmsKeyword, type SmsKeyword } from "@/lib/sms/keywords";
 import { SMS_CONSENT_TEXT } from "@/lib/sms/consent";
+import {
+  appointmentWhen,
+  confirmReply,
+  isBareYes,
+  nothingToConfirmReply,
+} from "@/lib/sms/messages";
 import { isSmsGatewayConfigured, sendSmsViaGateway } from "@/lib/sms/gateway";
 import { logOutboundSms } from "@/lib/sms/outbound";
 
@@ -324,6 +330,82 @@ export async function POST(req: NextRequest) {
     [accountId, phone, `+${phone.replace(/\D/g, "")}`, last10]
   );
 
+  // Reply YES confirms the next appointment when they are already subscribed.
+  // A bare YES from someone who opted out stays a START (re-subscribe).
+  if (existing?.sms_consent && isBareYes(message)) {
+    // Claim the inbound id before any visit update or reply, so a second
+    // delivery of the same webhook cannot confirm twice or text twice.
+    const claimId = await logCommunication({
+      accountId,
+      channel: "sms",
+      direction: "inbound",
+      outcome: "received",
+      clientId: existing.id,
+      bodyPreview: message.slice(0, 1000),
+      externalId: external_id ?? null,
+    });
+    if (external_id && claimId === null) {
+      logger.info("SMS YES duplicate ignored (claim)", { traceId, external_id });
+      return NextResponse.json({ duplicate: true });
+    }
+    const upcoming = await queryOne<{ id: string; title: string | null; scheduled_start: string }>(
+      `SELECT v.id, COALESCE(j.title, 'your appointment') AS title, v.scheduled_start::text
+       FROM visits v
+       JOIN jobs j ON j.id = v.job_id
+       WHERE v.account_id = $1
+         AND j.client_id = $2
+         AND v.status = 'scheduled'
+         AND v.scheduled_start > now() - interval '2 hours'
+         AND v.customer_confirmed_at IS NULL
+       ORDER BY v.scheduled_start ASC
+       LIMIT 1`,
+      [accountId, existing.id]
+    );
+    const reply = upcoming
+      ? confirmReply(upcoming.title ?? "your appointment", appointmentWhen(upcoming.scheduled_start))
+      : nothingToConfirmReply();
+    if (upcoming) {
+      await query(
+        `UPDATE visits SET customer_confirmed_at = now(), updated_at = now() WHERE id = $1 AND customer_confirmed_at IS NULL`,
+        [upcoming.id]
+      );
+      if (claimId) {
+        await query(`UPDATE communications_log SET visit_id = $1 WHERE id = $2`, [upcoming.id, claimId]);
+      }
+    }
+    let autoReplied = false;
+    if (isSmsGatewayConfigured()) {
+      const sendResult = await sendSmsViaGateway({ phone, message: reply });
+      autoReplied = sendResult.ok;
+      if (sendResult.ok) {
+        await logOutboundSms({
+          accountId,
+          clientId: existing.id,
+          bodyPreview: reply.slice(0, 1000),
+          outcome: "sent",
+          externalId: sendResult.messageId,
+        });
+      }
+    }
+    return NextResponse.json({
+      keyword: "yes",
+      client_id: existing.id,
+      job_id: null,
+      message_type: upcoming ? "confirmed" : "nothing_to_confirm",
+      confidence: "high",
+      is_new_client: false,
+      client_name: existing.name,
+      estimate_to_confirm: null,
+      needs_review: false,
+      auto_replied: autoReplied,
+      notification: {
+        title: upcoming ? `✅ Appointment confirmed: ${existing.name}` : `ℹ️ YES with nothing to confirm: ${existing.name}`,
+        body: [`📞 ${phone}`, reply].join("\n"),
+      },
+      reply,
+    });
+  }
+
   // CTIA keywords — handle before Claude; never create draft jobs for STOP/HELP/START
   const keyword = detectSmsKeyword(message);
   if (keyword) {
@@ -484,6 +566,12 @@ export async function POST(req: NextRequest) {
   // Back-fill the job linkage onto the claimed inbound row.
   if (commsId && jobId) {
     await query(`UPDATE communications_log SET job_id = $1 WHERE id = $2`, [jobId, commsId]);
+  }
+  if (commsId && ai.reply.trim()) {
+    await query(`UPDATE communications_log SET suggested_reply = $1 WHERE id = $2`, [
+      ai.reply.trim().slice(0, 1000),
+      commsId,
+    ]);
   }
 
   logger.info("SMS ingested", {

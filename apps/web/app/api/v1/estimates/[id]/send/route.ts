@@ -10,6 +10,9 @@ import { getEnv } from "@/lib/env";
 import { reviewEstimateGuardrails } from "@/lib/estimates/guardrails";
 import { loadPricingRules } from "@/lib/pricing/settings";
 import { logCommunication } from "@/lib/communications-log";
+import { sendSmsViaGateway } from "@/lib/sms/gateway";
+import { quoteReadyText, serviceSmsPhone } from "@/lib/sms/messages";
+import { logOutboundSms } from "@/lib/sms/outbound";
 import { loadEstimatePdf } from "@/lib/pdf/load";
 import {
   resolveEstimateExpiryDays,
@@ -49,6 +52,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
                 e.travel_surcharge_cents, e.risk_adjustment_cents,
                 e.minimum_service_override_reason,
                 c.id AS client_id, c.name AS client_name, c.email AS client_email,
+                c.phone AS client_phone, c.sms_consent, c.preferred_contact,
                 (SELECT COUNT(*)::int FROM estimate_line_items eli
                  WHERE eli.estimate_id = e.id AND eli.visible_to_customer = true) AS line_item_count
          FROM estimates e
@@ -74,6 +78,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         risk_adjustment_cents: number;
         minimum_service_override_reason: "bundled" | "membership_included" | "promo" | "owner_approved" | null;
         client_id: string; client_name: string; client_email: string | null;
+        client_phone: string | null; sms_consent: boolean; preferred_contact: string | null;
         line_item_count: number;
       };
 
@@ -109,11 +114,58 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
 
       // Mark-as-sent without email: no client email, explicit markOnly, or SMTP off.
       // Staff must be able to progress the workflow after in-person / verbal delivery.
+      const textPhone = serviceSmsPhone({
+        sms_consent: est.sms_consent,
+        preferred_contact: est.preferred_contact,
+        phone: est.client_phone,
+      });
       const skipEmail =
         markOnly ||
         !est.client_email ||
         process.env.E2E_SKIP_EMAIL_DELIVERY === "1" ||
         !isEmailConfigured();
+
+      // No email, but they asked for texts: the quote link goes out as a text.
+      // markOnly stays a silent handoff (in person).
+      if (skipEmail && textPhone && !markOnly) {
+        const viewUrl = `${appUrl()}/portal/estimates/${est.share_token}`;
+        const estimateRef = id.slice(0, 8).toUpperCase();
+        const sms = await sendSmsViaGateway({ phone: textPhone, message: quoteReadyText(estimateRef, viewUrl) });
+        await logOutboundSms({
+          accountId: session.accountId,
+          clientId: est.client_id,
+          jobId: est.job_id,
+          bodyPreview: quoteReadyText(estimateRef, viewUrl),
+          outcome: sms.ok ? "sent" : "failed",
+          externalId: sms.ok ? sms.messageId : null,
+          initiatedBy: session.userId,
+        });
+        if (!sms.ok) return { status: 502, message: `Text send failed: ${sms.error}` };
+        if (est.status === "draft") {
+          await sendEstimateCascade(client, {
+            estimateId: id,
+            accountId: session.accountId,
+            userId: session.userId,
+            traceId: session.traceId,
+            jobId: est.job_id,
+          });
+          await client.query(
+            `UPDATE estimates SET status = 'sent', sent_at = now(), updated_at = now() WHERE id = $1`,
+            [id],
+          );
+        }
+        await appendAuditLog(client, {
+          account_id: session.accountId,
+          entity_type: "estimate",
+          entity_id: id,
+          action: "update",
+          actor_id: session.userId,
+          trace_id: session.traceId,
+          old_value: { status: est.status },
+          new_value: { status: est.status === "draft" ? "sent" : est.status, sent_via: "sms" },
+        });
+        return { status: 200, sentTo: textPhone, emailSkipped: true };
+      }
 
       if (skipEmail) {
         if (est.status === "draft") {
@@ -237,6 +289,23 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
         bodyPreview: `Estimate ${estimateRef} from Dovetails Services LLC`,
         initiatedBy: session.userId,
       });
+
+      if (textPhone) {
+        const smsBody = quoteReadyText(estimateRef, viewUrl);
+        const sms = await sendSmsViaGateway({ phone: textPhone, message: smsBody });
+        await logOutboundSms({
+          accountId: session.accountId,
+          clientId: est.client_id,
+          jobId: est.job_id,
+          bodyPreview: smsBody,
+          outcome: sms.ok ? "sent" : "failed",
+          externalId: sms.ok ? sms.messageId : null,
+          initiatedBy: session.userId,
+        });
+        if (!sms.ok) {
+          logger.warn("[estimates/send] text failed after email", { estimateId: id, error: sms.error });
+        }
+      }
 
       // Only the draft→sent transition writes sent_at. The estimate
       // immutability invariant (migration 004) forbids changing sent_at once

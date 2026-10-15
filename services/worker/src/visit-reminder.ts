@@ -3,6 +3,7 @@ import { logger } from "./logger.js";
 import { visitReminderEmailHtml } from "@ai-fsm/email-templates";
 import { enqueueNotification } from "./notification/enqueue.js";
 import { PRIORITY } from "./notification/priority.js";
+import { appointmentWhen, noticeTarget, visitReminderText } from "./sms/customer.js";
 import type { AutomationRow, RunResult } from "./automations/types.js";
 
 /**
@@ -40,6 +41,9 @@ export interface EligibleVisit {
   job_title: string | null;
   client_name: string | null;
   client_email: string | null;
+  client_phone?: string | null;
+  sms_consent?: boolean | null;
+  preferred_contact?: string | null;
   property_address: string | null;
   tech_name: string | null;
 }
@@ -77,6 +81,7 @@ export async function findEligibleVisits(
     `SELECT v.id, v.account_id, v.job_id, c.id AS client_id, v.assigned_user_id,
             v.scheduled_start::text, j.title AS job_title,
             c.name AS client_name, c.email AS client_email,
+            c.phone AS client_phone, c.sms_consent, c.preferred_contact,
             p.address AS property_address,
             u.full_name AS tech_name
      FROM visits v
@@ -126,25 +131,28 @@ export async function emitVisitReminder(
     return false; // Already sent
   }
 
-  if (visit.client_email && visit.client_name && visit.job_title) {
-    const when = new Date(visit.scheduled_start).toLocaleString("en-US", {
-      weekday: "long", month: "long", day: "numeric", year: "numeric",
-      hour: "numeric", minute: "2-digit",
-    });
+  const target = noticeTarget(visit, visit.client_email);
+  if (target && visit.client_name && visit.job_title) {
+    const when = appointmentWhen(visit.scheduled_start);
+    const text = visitReminderText(visit.job_title, when, visit.property_address);
     const enqueueResult = await enqueueNotification(client, {
       accountId: visit.account_id,
       clientId: visit.client_id,
       automationType: "visit_reminder",
       priority: PRIORITY.MEDIUM,
-      toAddress: visit.client_email,
+      channel: target.channel,
+      toAddress: target.to,
       subject: `Reminder: ${visit.job_title} visit on ${when}`,
-      htmlBody: visitReminderEmailHtml({
-        clientName: visit.client_name,
-        jobTitle: visit.job_title,
-        scheduledStart: visit.scheduled_start,
-        propertyAddress: visit.property_address,
-        techName: visit.tech_name,
-      }),
+      htmlBody:
+        target.channel === "sms"
+          ? text
+          : visitReminderEmailHtml({
+              clientName: visit.client_name,
+              jobTitle: visit.job_title,
+              scheduledStart: visit.scheduled_start,
+              propertyAddress: visit.property_address,
+              techName: visit.tech_name,
+            }),
       idempotencyKey: `visit_reminder:${visit.id}`,
       entityType: "visit",
       entityId: visit.id,

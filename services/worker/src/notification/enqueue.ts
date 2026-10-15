@@ -6,6 +6,8 @@ export interface EnqueueOpts {
   clientId: string | null;
   automationType: string;
   priority: number;
+  /** email is the default. sms stores the plain text in htmlBody. */
+  channel?: "email" | "sms";
   toAddress: string;
   subject: string;
   htmlBody: string;
@@ -75,20 +77,25 @@ export async function enqueueNotification(
   const nextAttemptAt = opts.scheduledFor ?? new Date();
   await client.query(
     `INSERT INTO notification_queue
-       (account_id, client_id, automation_type, priority, to_address,
+       (account_id, client_id, automation_type, priority, channel, to_address,
         subject, html_body, idempotency_key, entity_type, entity_id,
         cancel_on_events, next_attempt_at, metadata)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
      ON CONFLICT (idempotency_key) DO UPDATE
        SET status          = 'pending',
            attempt_count   = 0,
            failure_reason  = NULL,
-           next_attempt_at = EXCLUDED.next_attempt_at`,
+           next_attempt_at = EXCLUDED.next_attempt_at,
+           channel         = EXCLUDED.channel,
+           to_address      = EXCLUDED.to_address,
+           subject         = EXCLUDED.subject,
+           html_body       = EXCLUDED.html_body`,
     [
       opts.accountId,
       opts.clientId,
       opts.automationType,
       opts.priority,
+      opts.channel ?? "email",
       opts.toAddress,
       opts.subject,
       opts.htmlBody,

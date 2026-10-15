@@ -18,6 +18,7 @@ import {
   todayCommand,
   todayWhenLabel,
 } from "@/lib/field/face";
+import { notifyOnTheWay } from "@/lib/sms/notify-on-the-way";
 
 async function transitionVisit(visitId: string, targetStatus: string): Promise<string | null> {
   const res = await fetch(`/api/v1/visits/${visitId}/transition`, {
@@ -67,7 +68,7 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
   }
 
   const primary = command.verb === "navigate" && mapsUrl ? (
-    <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="p7-field-hero__primary" data-testid="hero-navigate">
+    <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="p7-field-hero__primary" data-testid="hero-navigate" onClick={() => notifyOnTheWay(visit.id)}>
       {command.label}
     </a>
   ) : command.verb === "continue" ? (
@@ -110,7 +111,7 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
               <a href={telUrl} className="field-text-action" data-testid="hero-call">Call</a>
             ) : null}
             {command.verb !== "navigate" && mapsUrl ? (
-              <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="field-text-action" data-testid="hero-navigate">
+              <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="field-text-action" data-testid="hero-navigate" onClick={() => notifyOnTheWay(visit.id)}>
                 Navigate
               </a>
             ) : null}
@@ -119,7 +120,7 @@ export function NextVisitHero({ visit }: { visit: HeroVisit }) {
       </section>
       <div className={`field-command-dock${primaryOff ? " is-on" : ""}`}>
         {command.verb === "navigate" && mapsUrl ? (
-          <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="p7-field-hero__primary">
+          <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="p7-field-hero__primary" onClick={() => notifyOnTheWay(visit.id)}>
             {place} · {command.label}
           </a>
         ) : command.verb === "continue" ? (
@@ -158,7 +159,7 @@ export function TodayStopRail({ visit }: { visit: HeroVisit }) {
           <a href={telUrl} className="field-text-action">Call</a>
         ) : null}
         {mapsUrl ? (
-          <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="field-text-action">
+          <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="field-text-action" onClick={() => notifyOnTheWay(visit.id)}>
             Navigate
           </a>
         ) : null}
