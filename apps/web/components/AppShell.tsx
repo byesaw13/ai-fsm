@@ -33,6 +33,7 @@ import {
   NavCountBadge,
   useAttentionSummary,
 } from "./attention/AttentionBell";
+import { Logo } from "@/components/brand/Logo";
 
 type IconComponent = (props: { size?: number }) => React.ReactElement;
 
@@ -260,7 +261,7 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
           <div style={{ position: "relative" }}>
             <Link href={homeHref as Route} className="p7-sidebar-brand">
               <div className="p7-brand-logo" aria-hidden="true">
-                <span className="p7-brand-logo-text">DV</span>
+                <Logo variant="icon" height={29} alt="" />
               </div>
               <span className="p7-brand-name">Dovetails</span>
             </Link>

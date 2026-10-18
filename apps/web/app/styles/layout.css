@@ -53,19 +53,16 @@
 .p7-brand-logo {
   width: 34px;
   height: 34px;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, var(--color-forest-800), var(--color-forest-900));
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: var(--shadow-sm);
 }
 
-.p7-brand-logo-text {
-  color: var(--fg-inverse);
-  font-weight: var(--font-bold);
-  font-size: var(--text-sm);
+.p7-brand-logo img {
+  width: 34px;
+  height: auto;
+  display: block;
 }
 
 .p7-brand-name {
