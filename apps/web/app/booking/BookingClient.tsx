@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { INTAKE_QUESTIONS } from "@/lib/intake/questions";
 import { SmsConsentLabel } from "@/components/sms/SmsConsentLabel";
+import { Logo } from "@/components/brand/Logo";
 
 // Public follow-up choices stay within the advertised scope. Shared intake
 // questions and metadata labels still support historical and staff-led requests.
@@ -46,14 +47,8 @@ const NEXT_STEPS_REMOTE = [
 
 function BookingLogo() {
   return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
-      {/* eslint-disable-next-line @next/next/no-img-element -- static brand SVG */}
-      <img src="/brand/logo-mark.svg" alt="" width={36} height={30} style={{ flex: "none" }} />
-      <div style={{ textAlign: "left", lineHeight: 1.05 }}>
-        <div style={{ fontWeight: 800, fontSize: 18, color: "#26221c", letterSpacing: "-0.02em" }}>
-          Dovetails <span style={{ color: "#9a3f12", fontWeight: 700 }}>Home Services</span>
-        </div>
-      </div>
+    <div style={{ display: "inline-flex", alignItems: "center" }}>
+      <Logo variant="horizontal" height={44} />
     </div>
   );
 }

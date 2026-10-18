@@ -1,0 +1,9 @@
+/* Dovetails brand colors. Change these once; every logo file uses the same values. */
+:root {
+	--dt-navy: #13263c; /* logo outline, wordmark, headings */
+	--dt-navy-soft: #1c2b4a; /* dark backgrounds, sidebar */
+	--dt-orange: #d2672a; /* the wing, buttons, accents */
+	--dt-orange-dark: #b3541f; /* hover, orange text on white */
+	--dt-cream: #f6f3ee; /* warm page background */
+	--dt-white: #ffffff; /* reverse logo, cards */
+}

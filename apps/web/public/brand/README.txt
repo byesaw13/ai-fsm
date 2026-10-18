@@ -1,14 +1,19 @@
-Dovetails Home Services - logo files
+Dovetails Home Services brand kit
 
-Two logos, nothing else:
-  2C logo             house with a dove and an orange wing (main logo)
-  Chimney house logo  solid navy house, white dove, orange chimney (favicon, small spaces, app icon)
+Logo A  = outline chimney (the default logo)
+Logo A2 = solid chimney (available everywhere as an option; used for the browser-tab icon)
 
-Colors: navy #1C2B4A, burnt orange #C45C26, white.
-SVG = sharp at any size (website, print shop, sign shop, embroidery digitizer).
-PNG = ready to drop into email, Google Business, documents.
-  -reverse     for navy or dark backgrounds
-  -mono-navy   one color, navy (single-thread embroidery, stamps)
-  -mono-white  one color, white (white thread on navy hats and polos)
-  lockup-*     logo with DOVETAILS / HOME SERVICES (horizontal or stacked)
-Hat front: use the logo alone. HOME SERVICES is too small to stitch on a hat.
+public/brand/svg/dovetails-{icon|stacked|horizontal}-{color|reverse|mono|mono-white}[-solid-chimney].svg
+public/brand/png/  same names as PNG (horizontal 1200px, stacked 800px, icon 512px wide)
+  color       light backgrounds
+  reverse     navy or dark backgrounds
+  mono        one color navy (stamps, single-thread embroidery)
+  mono-white  one color white (white thread on navy hats and polos)
+app/          Next.js icon files: icon.svg (favicon, A2), favicon.ico, apple-icon.png, opengraph-image.png
+public/brand/ icon-192.png, icon-512.png, icon-maskable-512.png for the web app manifest
+components/   Logo.tsx (Next/React) and Logo.astro (website)
+styles/brand.css  brand colors
+
+Colors: navy #13263c, navy soft #1c2b4a, orange #d2672a, orange dark #b3541f, cream #f6f3ee, white.
+Minimum sizes: horizontal 140px wide, stacked 96px, icon 24px (below that use the favicon).
+Hat front: use the icon. HOME SERVICES is too small to stitch on a hat.
