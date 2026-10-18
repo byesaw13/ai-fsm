@@ -260,7 +260,8 @@ export function AppShell({ role, userName, reviewPending, children }: AppShellPr
           <div style={{ position: "relative" }}>
             <Link href={homeHref as Route} className="p7-sidebar-brand">
               <div className="p7-brand-logo" aria-hidden="true">
-                <span className="p7-brand-logo-text">DV</span>
+                {/* eslint-disable-next-line @next/next/no-img-element -- static brand SVG */}
+                <img src="/brand/logo-mark.svg" alt="" width={34} height={29} />
               </div>
               <span className="p7-brand-name">Dovetails</span>
             </Link>
