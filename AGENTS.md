@@ -40,6 +40,11 @@ Other archived, generated, and working documents may provide evidence, implement
 
 Active implementation backlog: docs/backlog/README.md
 
+**System map (required when you add, move, finish, or drop backlog work, or change what a job step does):**
+`docs/working/system-map.md`
+
+Update `apps/web/app/app/map/work-items.json` in that same change. When the step itself changed, update that bubble's "there" text in `apps/web/app/app/map/map-data.ts`. Read any `map_notes` on the bubble before changing it. Do not delete a source file because it looks unused. It has to be listed on the map first, and the owner has to ask.
+
 ## Prime Directive
 
 Complete requested tasks end-to-end while preserving reliability, traceability, and canonical product scope.

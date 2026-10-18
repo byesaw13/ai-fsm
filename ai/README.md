@@ -6,6 +6,9 @@ worker egress, RLS/superuser, migration numbering, HA schedules, running tests).
 
 **Before UI or workflow changes:** read and follow
 [`docs/working/ux-implementation-direction.md`](../docs/working/ux-implementation-direction.md).
+
+**When backlog work moves, or a job step changes:** update the owner map in the same change.
+[`docs/working/system-map.md`](../docs/working/system-map.md).
 Do not duplicate that brief here. Preserve working plumbing unless a section
 explicitly calls for replacement.
 

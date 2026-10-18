@@ -17,6 +17,7 @@ import {
   IconEstimates,
   IconInbox,
   IconSettings,
+  IconMap,
   IconMyDay,
   IconProperties,
   IconJobs,
@@ -89,6 +90,7 @@ const NAV_SCHEDULE:   NavItem = { href: "/app/schedule",     label: "Schedule", 
 const NAV_INVOICES:   NavItem = { href: "/app/invoices",     label: "Bills",      Icon: IconInvoices,  adminOnly: true };
 const NAV_REPORTS:    NavItem = { href: "/app/reports",      label: "Reports",    Icon: IconReports,   adminOnly: true };
 const NAV_SETTINGS:   NavItem = { href: "/app/settings",     label: "Settings",   Icon: IconSettings,  adminOnly: true };
+const NAV_MAP:        NavItem = { href: "/app/map",          label: "Map",        Icon: IconMap };
 
 /** Nested hub IA — Home / Work / People / Money (+ Settings). Home item is injected per role/view. */
 function buildHubSections(home: NavItem): NavSection[] {
@@ -124,7 +126,10 @@ export function getNavSections(role: Role, view: "office" | "field" = "field"): 
   // Owner: sidebar reflects the ACTIVE workspace so the two homes never sit
   // side-by-side (TASK-058 follow-up). Shared business destinations stay in both.
   const home = view === "office" ? NAV_TODAY : NAV_MY_DAY;
-  return buildHubSections(home);
+  const sections = buildHubSections(home);
+  const last = sections.length - 1;
+  sections[last] = { ...sections[last], items: [...sections[last].items, NAV_MAP] };
+  return sections;
 }
 
 /**

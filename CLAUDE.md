@@ -54,6 +54,8 @@ Working doctrine: `docs/working/execution-doctrine.md`
 
 UX implementation direction: `docs/working/ux-implementation-direction.md`. Read and follow it before UI or workflow changes. Preserve working architecture unless that file explicitly calls for replacement. It governs presentation and the code deltas it names. It does not redefine product scope in `docs/canonical/`.
 
+System map: `docs/working/system-map.md`. The same change that adds, moves, finishes, or drops backlog work, or that changes what a job step does, updates the owner map. Do not delete a source file because it looks unused.
+
 Other working, archived, and generated documents can provide implementation evidence or historical context, but they do not define product scope.
 
 ## Commands
