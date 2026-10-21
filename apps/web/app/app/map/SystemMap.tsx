@@ -12,7 +12,7 @@ import {
   STATUS_LABEL,
   type WorkStatus,
 } from "./map-data";
-import { neighborId, nodeById, workById, workFor } from "./map-logic";
+import { neighborId, nodeById, noteTargetId, workById, workFor, type MapSelection } from "./map-logic";
 import unlinkedJson from "./unlinked.json";
 import "./map.css";
 
@@ -28,12 +28,6 @@ const STATUS_RANK: Record<WorkStatus, number> = { asked: 0, idea: 1, progress: 2
 
 export type MapNote = { id: string; nodeId: string; body: string; createdAt: string };
 
-type Selection =
-  | { type: "node"; id: string }
-  | { type: "work"; id: string }
-  | { type: "edge"; id: number }
-  | { type: "lens"; id: string };
-
 const ALWAYS: WorkStatus[] = ["asked", "idea"];
 
 function visibleStatuses(showProgress: boolean, showBacklog: boolean, showDeferred: boolean): WorkStatus[] {
@@ -45,7 +39,7 @@ function visibleStatuses(showProgress: boolean, showBacklog: boolean, showDeferr
 }
 
 export function SystemMap({ notes: initialNotes, notesReady }: { notes: MapNote[]; notesReady: boolean }) {
-  const [selected, setSelected] = useState<Selection>({ type: "node", id: "request" });
+  const [selected, setSelected] = useState<MapSelection>({ type: "node", id: "request" });
   const [lens, setLens] = useState<string | null>(null);
   const [showProgress, setShowProgress] = useState(true);
   const [showBacklog, setShowBacklog] = useState(false);
@@ -120,19 +114,22 @@ export function SystemMap({ notes: initialNotes, notesReady }: { notes: MapNote[
     };
   }, [selected, shownKey]);
 
-  function chooseNode(id: string) {
-    setLens(null);
-    setSelected({ type: "node", id });
-    setDraft("");
-    setError(null);
+  const activeNodeId = noteTargetId(selected);
+
+  function select(next: MapSelection) {
+    if (noteTargetId(next) !== activeNodeId) {
+      setDraft("");
+      setError(null);
+    }
+    setSelected(next);
   }
 
-  const activeNodeId =
-    selected.type === "node" ? selected.id :
-    selected.type === "work" ? workById(selected.id)?.branch ?? "request" :
-    selected.type === "lens" ? selected.id :
-    selected.type === "edge" ? EDGES[selected.id]?.from ?? "request" :
-    "request";
+  function chooseNode(id: string) {
+    setLens(null);
+    setDraft("");
+    setError(null);
+    setSelected({ type: "node", id });
+  }
 
   async function saveNote() {
     const body = draft.trim();
@@ -186,7 +183,7 @@ export function SystemMap({ notes: initialNotes, notesReady }: { notes: MapNote[
               onClick={() => {
                 const next = lens === lensNode.id ? null : lensNode.id;
                 setLens(next);
-                setSelected(next ? { type: "lens", id: next } : { type: "node", id: "request" });
+                select(next ? { type: "lens", id: next } : { type: "node", id: "request" });
               }}
             >
               {lensNode.label}
@@ -210,9 +207,9 @@ export function SystemMap({ notes: initialNotes, notesReady }: { notes: MapNote[
               const node = (event.target as HTMLElement).closest<HTMLElement>("[data-node]");
               const work = (event.target as HTMLElement).closest<HTMLElement>("[data-work]");
               const edge = (event.target as HTMLElement).closest<HTMLElement>("[data-edge]");
-              if (work) setSelected({ type: "work", id: work.dataset.work! });
+              if (work) select({ type: "work", id: work.dataset.work! });
               else if (node) chooseNode(node.dataset.node!);
-              else if (edge) setSelected({ type: "edge", id: Number(edge.dataset.edge) });
+              else if (edge) select({ type: "edge", id: Number(edge.dataset.edge) });
             }}>
               <svg className="smap-wires" id="smap-wires" />
               <svg className="smap-labels" id="smap-labels" />
@@ -231,7 +228,7 @@ export function SystemMap({ notes: initialNotes, notesReady }: { notes: MapNote[
                 <p className="smap-kicker">Under the floor</p>
                 <div className="smap-floor-row">
                   {workFor("floor", statuses).map((item) => (
-                    <button key={item.id} type="button" className={`smap-bubble smap-sat ${item.status}`} data-work={item.id} aria-pressed={selected.type === "work" && selected.id === item.id} onClick={() => setSelected({ type: "work", id: item.id })}>
+                    <button key={item.id} type="button" className={`smap-bubble smap-sat ${item.status}`} data-work={item.id} aria-pressed={selected.type === "work" && selected.id === item.id} onClick={() => select({ type: "work", id: item.id })}>
                       <small>{STATUS_LABEL[item.status]}</small>
                       {item.title}
                     </button>
@@ -250,8 +247,8 @@ export function SystemMap({ notes: initialNotes, notesReady }: { notes: MapNote[
             onDraft={setDraft}
             onSave={saveNote}
             onRemove={removeNote}
-            onOpenWork={(id) => setSelected({ type: "work", id })}
-            onOpenEdge={(id) => setSelected({ type: "edge", id })}
+            onOpenWork={(id) => select({ type: "work", id })}
+            onOpenEdge={(id) => select({ type: "edge", id })}
             onOpenNode={chooseNode}
           />
         </div>
@@ -287,7 +284,7 @@ function Count({ branch }: { branch: string }) {
   return <small> · {count}</small>;
 }
 
-function Satellites({ branch, statuses, selected, lit }: { branch: string; statuses: WorkStatus[]; selected: Selection; lit: boolean }) {
+function Satellites({ branch, statuses, selected, lit }: { branch: string; statuses: WorkStatus[]; selected: MapSelection; lit: boolean }) {
   const items = workFor(branch, statuses).sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status]);
   if (!items.length) return null;
   const shown = items.slice(0, CANVAS_CAP);
@@ -310,7 +307,7 @@ function Satellites({ branch, statuses, selected, lit }: { branch: string; statu
 }
 
 function Drawer(props: {
-  selected: Selection;
+  selected: MapSelection;
   notes: MapNote[];
   notesReady: boolean;
   draft: string;

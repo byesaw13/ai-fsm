@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { ALL_NODES, BRANCHES, EDGES, LENSES, WORK } from "../map-data";
-import { neighborId, nodeById, placementProblems, workById, workFor } from "../map-logic";
+import { neighborId, nodeById, noteTargetId, placementProblems, workById, workFor } from "../map-logic";
 
 const readmePath = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../../../docs/backlog/README.md");
 
@@ -65,6 +65,23 @@ describe("system map path", () => {
       expect(workById(row.id)?.status).toBe(row.bucket);
       expect(ALL_NODES.some((node) => node.id === workById(row.id)?.branch)).toBe(true);
     }
+  });
+
+  it("keeps a typed request on the same bubble when a satellite or outgoing line is chosen", () => {
+    const quote = { type: "node" as const, id: "quote" };
+    const outgoing = EDGES.findIndex((edge) => edge.from === "quote" && edge.to === "job");
+    expect(noteTargetId({ type: "work", id: "ask-lines" })).toBe(noteTargetId(quote));
+    expect(noteTargetId({ type: "edge", id: outgoing })).toBe(noteTargetId(quote));
+  });
+
+  it("moves a typed request when the owner picks another step, an incoming line, or a lens", () => {
+    const quote = noteTargetId({ type: "node", id: "quote" });
+    const incoming = EDGES.findIndex((edge) => edge.to === "quote");
+    expect(noteTargetId({ type: "work", id: "ask-moved" })).toBe("visit");
+    expect(noteTargetId({ type: "work", id: "ask-moved" })).not.toBe(quote);
+    expect(noteTargetId({ type: "edge", id: incoming })).toBe("house");
+    expect(noteTargetId({ type: "lens", id: "today" })).toBe("today");
+    expect(noteTargetId({ type: "node", id: "floor" })).toBe("floor");
   });
 
   it("keeps the asked-for gaps on the step they belong to", () => {

@@ -1,4 +1,17 @@
-import { ALL_NODES, BRANCHES, WORK, type MapNode, type WorkItem, type WorkStatus } from "./map-data";
+import { ALL_NODES, BRANCHES, EDGES, WORK, type MapNode, type WorkItem, type WorkStatus } from "./map-data";
+
+export type MapSelection =
+  | { type: "node"; id: string }
+  | { type: "work"; id: string }
+  | { type: "edge"; id: number }
+  | { type: "lens"; id: string };
+
+/** Bubble a saved request belongs to. A line keeps the note on the bubble it starts from. */
+export function noteTargetId(selected: MapSelection): string {
+  if (selected.type === "node" || selected.type === "lens") return selected.id;
+  if (selected.type === "work") return workById(selected.id)?.branch ?? "request";
+  return EDGES[selected.id]?.from ?? "request";
+}
 
 export function nodeById(id: string): MapNode | undefined {
   return ALL_NODES.find((node) => node.id === id);
