@@ -45,6 +45,13 @@ const schema = z.object({
    */
   BOOKING_ACCOUNT_ID: z.string().uuid().optional(),
   /**
+   * Rebuild mydovetails.com when the business card changes (TASK-177).
+   * Fine-grained GitHub token on the site repo with Contents read/write.
+   * Unset = saves still work; the site picks them up on its next deploy.
+   */
+  SITE_REBUILD_GITHUB_TOKEN: z.string().optional(),
+  SITE_REBUILD_REPO: z.string().optional(),
+  /**
    * Web Push (VAPID) — optional. If any is unset, push degrades gracefully:
    * the public-key endpoint returns none, the client can't subscribe, and
    * sends are a no-op. Generate a keypair once with:

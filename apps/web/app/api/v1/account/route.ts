@@ -5,6 +5,8 @@ import type { AuthSession } from "@/lib/auth/middleware";
 import { getPool, queryOne } from "@/lib/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
+import { PUBLIC_CARD_KEYS, publicCardSettingsSchema } from "@/lib/company/public-card";
+import { triggerSiteRebuild, type SiteRebuild } from "@/lib/company/site-rebuild";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,7 @@ const patchAccountBody = z
         labor_rate_cents: z.number().int().min(0).optional(),
         material_markup_pct: z.number().min(0).max(200).optional(),
       })
+      .merge(publicCardSettingsSchema)
       .optional(),
   })
   .refine((v) => Object.keys(v).length > 0, { message: "At least one field is required" });
@@ -99,7 +102,13 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
     });
 
     await client.query("COMMIT");
-    return NextResponse.json({ data: rows[0] });
+
+    // The website and /card read these at build time; rebuild it after a change.
+    let siteRebuild: SiteRebuild | undefined;
+    if (settings && PUBLIC_CARD_KEYS.some((k) => settings[k] !== undefined)) {
+      siteRebuild = await triggerSiteRebuild();
+    }
+    return NextResponse.json({ data: rows[0], ...(siteRebuild ? { site_rebuild: siteRebuild } : {}) });
   } catch (error) {
     await client.query("ROLLBACK");
     logger.error("PATCH /api/v1/account error", error, { traceId: session.traceId });
