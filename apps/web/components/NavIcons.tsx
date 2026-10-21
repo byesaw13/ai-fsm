@@ -130,6 +130,17 @@ export function IconSchedule(props: IconProps) {
   );
 }
 
+export function IconMap(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="4" cy="4" r="1.6" />
+      <circle cx="4" cy="16" r="1.6" />
+      <circle cx="15" cy="10" r="1.6" />
+      <path d="M4 5.6v8.8M4 10h9.4" />
+    </Icon>
+  );
+}
+
 export function IconSettings(props: IconProps) {
   return (
     <Icon {...props}>

@@ -32,6 +32,10 @@ build-from-scratch.
 
 See [TASK-143-overview-leak-list.md](./TASK-143-overview-leak-list.md).
 
+# TASK-176: Owner system map
+
+See [TASK-176-system-map.md](./TASK-176-system-map.md).
+
 ## Architecture
 
 > **Historical (2026-06):** the `WorkdayPanel`/`DailyCommandCenter` design below was

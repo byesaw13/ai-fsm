@@ -172,7 +172,8 @@ describe("getNavSections (nested hubs)", () => {
       expect(hrefs).toContain("/app/timeline");
       expect(hrefs).not.toContain("/app/mileage");
       expect(hrefs).toContain("/app/capture");
-      expect(hrefs).toHaveLength(13);
+      expect(hrefs).toContain("/app/map");
+      expect(hrefs).toHaveLength(14);
     }
   });
 
@@ -183,6 +184,7 @@ describe("getNavSections (nested hubs)", () => {
     expect(hrefs).toContain("/app/settings");
     expect(hrefs).toContain("/app/timeline");
     expect(hrefs).toContain("/app/capture");
+    expect(hrefs).not.toContain("/app/map");
     expect(hrefs).toHaveLength(13);
   });
 
@@ -203,7 +205,8 @@ describe("getNavSections (nested hubs)", () => {
       const sections = getNavSections("owner", view);
       expect(sections.map((s) => s.label).filter(Boolean)).toEqual(HUB_LABELS);
       const hrefs = flattenSections(sections).map((i) => i.href);
-      expect(hrefs).toHaveLength(13);
+      expect(hrefs).toHaveLength(14);
+      expect(hrefs).toContain("/app/map");
       expect(hrefs).toContain("/app/timeline");
       expect(hrefs).toContain("/app/capture");
       if (view === "field") {
@@ -231,6 +234,7 @@ describe("getNavSections (nested hubs)", () => {
     expect(hrefs).not.toContain("/app/invoices");
     expect(hrefs).not.toContain("/app/automations");
     expect(hrefs).not.toContain("/app/capture");
+    expect(hrefs).not.toContain("/app/map");
   });
 
   it("leads with Today for owner/tech, Desk for pure admin", () => {
