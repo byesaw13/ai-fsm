@@ -30,10 +30,21 @@ describe("resolvePublicCard", () => {
       card_badges: [" Licensed ", ""],
     });
     expect(card.nickname).toBe("Nicky");
-    expect(card.phoneDisplay).toBe("603-555-0100");
+    expect(card.phoneDisplay).toBe("(603) 555-0100");
     expect(card.phoneE164).toBe("+16035550100");
     expect(card.email).toBe("nick@example.com");
     expect(card.badges).toEqual(["Licensed"]);
+  });
+
+  it("formats the phone the same way however it was typed", () => {
+    expect(resolvePublicCard({ company_phone: "6034791094" }).phoneDisplay).toBe("(603) 479-1094");
+  });
+
+  it("uses the business email on the card unless the card has its own", () => {
+    expect(resolvePublicCard({ company_email: "hello@example.com" }).cardEmail).toBe("hello@example.com");
+    const card = resolvePublicCard({ company_email: "hello@example.com", card_email: " nick@example.com " });
+    expect(card.email).toBe("hello@example.com");
+    expect(card.cardEmail).toBe("nick@example.com");
   });
 
   it("keeps an emptied badge list empty", () => {

@@ -5,11 +5,13 @@ import { z } from "zod";
  * Company; mydovetails.com reads them at build time from
  * /api/public/business-card for the site contact info, /card, and the saved
  * contact file. Phone and email are the same fields the estimate and invoice
- * letterhead uses, so the two can't drift apart.
+ * letterhead uses, so the two can't drift apart. The card can carry its own
+ * email (card_email); empty means the business email.
  */
 export const publicCardSettingsSchema = z.object({
   company_phone: z.string().max(50).optional(),
   company_email: z.string().max(255).optional(),
+  card_email: z.string().max(255).optional(),
   card_first_name: z.string().max(80).optional(),
   card_last_name: z.string().max(80).optional(),
   card_nickname: z.string().max(80).optional(),
@@ -44,6 +46,8 @@ export interface PublicCard {
   phoneDisplay: string;
   phoneE164: string;
   email: string;
+  /** Email on /card and the saved contact. */
+  cardEmail: string;
   location: string;
   serviceArea: string;
   badges: string[];
@@ -57,6 +61,12 @@ export function toE164(phone: string): string | null {
   return null;
 }
 
+/** "+16034791094" → "(603) 479-1094", however the owner typed it. */
+function formatUsPhone(e164: string): string {
+  const d = e164.slice(2);
+  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+}
+
 export function resolvePublicCard(
   settings: Partial<PublicCardSettings> | null | undefined,
 ): PublicCard {
@@ -67,14 +77,16 @@ export function resolvePublicCard(
   const phoneInput = s.company_phone?.trim();
   const phoneE164 = phoneInput ? toE164(phoneInput) : null;
   const badges = s.card_badges?.map((b) => b.trim()).filter(Boolean);
+  const email = pick(s.company_email, DEFAULTS.email);
   return {
     firstName: pick(s.card_first_name, DEFAULTS.firstName),
     lastName: pick(s.card_last_name, DEFAULTS.lastName),
     nickname: pick(s.card_nickname, DEFAULTS.nickname),
     title: pick(s.card_title, DEFAULTS.title),
-    phoneDisplay: phoneE164 ? phoneInput! : DEFAULTS.phone,
+    phoneDisplay: phoneE164 ? formatUsPhone(phoneE164) : DEFAULTS.phone,
     phoneE164: phoneE164 ?? toE164(DEFAULTS.phone)!,
-    email: pick(s.company_email, DEFAULTS.email),
+    email,
+    cardEmail: pick(s.card_email, email),
     location: pick(s.card_location, DEFAULTS.location),
     serviceArea: pick(s.card_service_area, DEFAULTS.serviceArea),
     // An explicitly emptied list means "no badges".
