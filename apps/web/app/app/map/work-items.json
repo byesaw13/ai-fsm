@@ -1,6 +1,7 @@
 [
   { "id": "ask-photos", "title": "Photos on the request", "branch": "request", "status": "asked", "phase": "Phase 2", "fit": "The website says to send a few photos. The request form has nowhere to attach them." },
   { "id": "TASK-174", "title": "Public booking matches the five services", "branch": "request", "status": "progress", "phase": "Cross-cutting", "fit": "The request form is the front door. Its categories have to match the website." },
+  { "id": "TASK-177", "title": "Website and card info edited in the app", "branch": "request", "status": "progress", "phase": "Cross-cutting", "fit": "The website and your card are how people reach you. They show the same phone and email as your estimates." },
   { "id": "TASK-159", "title": "Sponsored work for any realtor, one form", "branch": "request", "status": "progress", "phase": "Phase 2", "fit": "An agent request should land in the same inbox as a homeowner request." },
   { "id": "TASK-158", "title": "Realtor-sponsored property work", "branch": "request", "status": "backlog", "phase": "Phase 2", "fit": "Who pays, and for which house, starts when the request comes in." },
 

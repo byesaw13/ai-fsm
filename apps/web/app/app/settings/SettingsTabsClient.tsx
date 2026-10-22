@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { Card } from "@/components/ui";
 import { CompanyForm } from "./CompanyForm";
+import { PublicCardForm } from "./PublicCardForm";
 import { TeamPanel, type TeamMember } from "./TeamPanel";
 import { ProfileForm } from "./ProfileForm";
 import { EnableNotifications } from "@/components/push/EnableNotifications";
@@ -141,6 +142,13 @@ export function SettingsTabsClient({ role, userId, me, account, users, square, l
                 initialName={account.name}
                 initialSettings={account.settings ?? {}}
               />
+            </Card>
+            <h2 style={{ fontSize: 20, fontWeight: 700, margin: "32px 0 8px 0" }}>Website & business card</h2>
+            <p style={{ color: "var(--fg-muted)", fontSize: "var(--text-sm)", marginTop: 0, marginBottom: 24 }}>
+              Your contact info on mydovetails.com and your card page.
+            </p>
+            <Card padding="default">
+              <PublicCardForm initialSettings={account.settings ?? {}} />
             </Card>
           </section>
         )}
