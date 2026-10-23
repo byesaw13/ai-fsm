@@ -17,6 +17,7 @@ import {
   loadAssessmentSummaryById,
 } from "@/lib/estimates/assessment-summary-loader";
 import type { AssessmentSummary } from "@ai-fsm/domain";
+import { assessmentRoomOpeningFields } from "@/lib/assessments/room-schema";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ const roomSchema = z.object({
   width_ft: z.number().nullable().default(null),
   height_ft: z.number().nullable().default(null),
   notes: z.string().optional(),
+  ...assessmentRoomOpeningFields,
 });
 
 // scope/job_type become optional when an assessment is supplied — they are
