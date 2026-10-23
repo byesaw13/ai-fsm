@@ -10,6 +10,7 @@ interface Props {
 
 const REBUILD_MESSAGE: Record<string, string> = {
   queued: "Saved. The website and your card update in about 2 minutes.",
+  unchanged: "Saved.",
   not_configured: "Saved. The website isn't connected yet, so it updates on its next deploy.",
   failed: "Saved, but the website rebuild didn't start. It updates on its next deploy.",
 };

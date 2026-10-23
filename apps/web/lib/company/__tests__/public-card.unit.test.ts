@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { publicCardSettingsSchema, resolvePublicCard, toE164 } from "../public-card";
-import { triggerSiteRebuild } from "../site-rebuild";
+import { publicCardSettingsSchema, resolvePublicCard, toE164, type PublicCard } from "../public-card";
+import { businessCardDocument, triggerSiteRebuild } from "../site-rebuild";
 
 describe("toE164", () => {
   it("accepts 10- and 11-digit US numbers in any format", () => {
@@ -69,6 +69,15 @@ describe("publicCardSettingsSchema", () => {
   });
 });
 
+const card: PublicCard = resolvePublicCard({
+  company_email: "sales@example.com",
+  card_email: "nick@example.com",
+});
+
+function jsonResponse(body: unknown, status = 200) {
+  return { ok: status >= 200 && status < 300, status, json: async () => body };
+}
+
 describe("triggerSiteRebuild", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -77,23 +86,43 @@ describe("triggerSiteRebuild", () => {
   it("does nothing without a token", async () => {
     vi.stubEnv("SITE_REBUILD_GITHUB_TOKEN", "");
     const fetchImpl = vi.fn();
-    expect(await triggerSiteRebuild(fetchImpl as never)).toBe("not_configured");
+    expect(await triggerSiteRebuild(card, fetchImpl as never)).toBe("not_configured");
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("sends a repository_dispatch to the site repo", async () => {
+  it("commits the card file when master does not have it yet", async () => {
     vi.stubEnv("SITE_REBUILD_GITHUB_TOKEN", "tok");
-    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 204 });
-    expect(await triggerSiteRebuild(fetchImpl as never)).toBe("queued");
-    const [url, init] = fetchImpl.mock.calls[0];
-    expect(url).toBe("https://api.github.com/repos/byesaw13/mydovetails-site/dispatches");
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({}, 404))
+      .mockResolvedValueOnce(jsonResponse({}, 201));
+    expect(await triggerSiteRebuild(card, fetchImpl as never)).toBe("queued");
+    const [url, init] = fetchImpl.mock.calls[1];
+    expect(url).toBe("https://api.github.com/repos/byesaw13/mydovetails-site/contents/src/data/business-card.json");
+    expect(init.method).toBe("PUT");
     expect(init.headers.Authorization).toBe("Bearer tok");
-    expect(JSON.parse(init.body)).toEqual({ event_type: "business-card-updated" });
+    const body = JSON.parse(init.body);
+    expect(body.branch).toBe("master");
+    expect(body.sha).toBeUndefined();
+    expect(Buffer.from(body.content, "base64").toString("utf8")).toBe(businessCardDocument(card));
   });
 
-  it("reports a rejected or failed dispatch", async () => {
+  it("does not commit when the file already matches", async () => {
     vi.stubEnv("SITE_REBUILD_GITHUB_TOKEN", "tok");
-    expect(await triggerSiteRebuild(vi.fn().mockResolvedValue({ ok: false, status: 401 }) as never)).toBe("failed");
-    expect(await triggerSiteRebuild(vi.fn().mockRejectedValue(new Error("offline")) as never)).toBe("failed");
+    const fetchImpl = vi.fn().mockResolvedValueOnce(jsonResponse({
+      sha: "abc",
+      content: Buffer.from(businessCardDocument(card)).toString("base64"),
+    }));
+    expect(await triggerSiteRebuild(card, fetchImpl as never)).toBe("unchanged");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a rejected read or a failed publish", async () => {
+    vi.stubEnv("SITE_REBUILD_GITHUB_TOKEN", "tok");
+    expect(await triggerSiteRebuild(card, vi.fn().mockResolvedValue(jsonResponse({}, 401)) as never)).toBe("failed");
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({}, 404))
+      .mockResolvedValueOnce(jsonResponse({}, 422));
+    expect(await triggerSiteRebuild(card, fetchImpl as never)).toBe("failed");
+    expect(await triggerSiteRebuild(card, vi.fn().mockRejectedValue(new Error("offline")) as never)).toBe("failed");
   });
 });

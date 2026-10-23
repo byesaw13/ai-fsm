@@ -5,7 +5,7 @@ import type { AuthSession } from "@/lib/auth/middleware";
 import { getPool, queryOne } from "@/lib/db";
 import { appendAuditLog } from "@/lib/db/audit";
 import { logger } from "@/lib/logger";
-import { PUBLIC_CARD_KEYS, publicCardSettingsSchema } from "@/lib/company/public-card";
+import { PUBLIC_CARD_KEYS, publicCardSettingsSchema, resolvePublicCard } from "@/lib/company/public-card";
 import { triggerSiteRebuild, type SiteRebuild } from "@/lib/company/site-rebuild";
 
 export const dynamic = "force-dynamic";
@@ -106,7 +106,7 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
     // The website and /card read these at build time; rebuild it after a change.
     let siteRebuild: SiteRebuild | undefined;
     if (settings && PUBLIC_CARD_KEYS.some((k) => settings[k] !== undefined)) {
-      siteRebuild = await triggerSiteRebuild();
+      siteRebuild = await triggerSiteRebuild(resolvePublicCard(rows[0].settings));
     }
     return NextResponse.json({ data: rows[0], ...(siteRebuild ? { site_rebuild: siteRebuild } : {}) });
   } catch (error) {
