@@ -1,5 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { ASSESSMENT_TRADE_LABELS, type AssessmentSummary, type AssessmentTradeKey } from "@ai-fsm/domain";
+import {
+  ASSESSMENT_TRADE_LABELS,
+  computeAssessmentRoomGeometry,
+  type AssessmentRoom,
+  type AssessmentSummary,
+  type AssessmentTradeKey,
+} from "@ai-fsm/domain";
 
 /**
  * A materials-generation failure with a user-facing reason and HTTP status.
@@ -21,14 +27,7 @@ export class MaterialsGenerationError extends Error {
 // Types
 // ---------------------------------------------------------------------------
 
-export interface RoomMeasurement {
-  id: string;
-  name: string;
-  length_ft: number | null;
-  width_ft: number | null;
-  height_ft: number | null;
-  notes?: string;
-}
+export type RoomMeasurement = Omit<AssessmentRoom, "notes"> & { notes?: string };
 
 export interface SavedMaterial {
   id: string;
@@ -221,6 +220,28 @@ export function matchToSaved(
 // User message builder (pure — unit tested)
 // ---------------------------------------------------------------------------
 
+function fmtQty(n: number): string {
+  return String(Math.round(n * 10) / 10);
+}
+
+/**
+ * Counted openings and the quantities they make possible (TASK-178). An owner
+ * override is passed as the wall area to use, not re-estimated.
+ */
+function roomOpeningContext(r: RoomMeasurement): string | null {
+  const parts: string[] = [];
+  if (r.door_count !== undefined) parts.push(`${r.door_count} door${r.door_count === 1 ? "" : "s"}`);
+  if (r.window_count !== undefined) parts.push(`${r.window_count} window${r.window_count === 1 ? "" : "s"}`);
+  for (const o of r.openings ?? []) parts.push(`${o.label.trim() || "opening"} ${o.width_in} in wide`);
+  const g = computeAssessmentRoomGeometry({ ...r, notes: r.notes ?? "" });
+  if (g.net_wall_sqft.value !== null) {
+    const source = g.net_wall_sqft.basis === "override" ? "owner override, use as given" : g.net_wall_sqft.basis;
+    parts.push(`net wall ${fmtQty(g.net_wall_sqft.value)} sqft (${source})`);
+  }
+  if (g.baseboard_lf.value !== null) parts.push(`baseboard ${fmtQty(g.baseboard_lf.value)} LF (${g.baseboard_lf.basis})`);
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
 function roomContextLines(rooms: RoomMeasurement[] | undefined): string | null {
   if (!rooms || rooms.length === 0) return null;
   const lines = rooms
@@ -230,7 +251,8 @@ function roomContextLines(rooms: RoomMeasurement[] | undefined): string | null {
         r.length_ft && r.width_ft
           ? `${r.length_ft}ft × ${r.width_ft}ft${r.height_ft ? ` × ${r.height_ft}ft ceiling` : ""} = ${(r.length_ft * r.width_ft).toFixed(0)} sqft floor`
           : "(dimensions not recorded)";
-      return `- ${r.name || "Area"}: ${dims}${r.notes ? ` — ${r.notes}` : ""}`;
+      const openings = roomOpeningContext(r);
+      return `- ${r.name || "Area"}: ${dims}${openings ? ` — ${openings}` : ""}${r.notes ? ` — ${r.notes}` : ""}`;
     });
   return lines.length > 0 ? lines.join("\n") : null;
 }

@@ -120,3 +120,33 @@ describe("generateMaterials — configuration guard", () => {
     expect(e.status).toBe(422);
   });
 });
+
+describe("buildMaterialsUserMessage — counted openings (TASK-178)", () => {
+  it("passes door/window counts, openings and derived quantities to the model", () => {
+    const msg = buildMaterialsUserMessage({
+      scope: "Bathroom refresh",
+      rooms: [
+        { id: "b", name: "Bathroom", length_ft: 12, width_ft: 8, height_ft: 8, notes: "", door_count: 1, window_count: 1, openings: [{ label: "Closet door", width_in: 20 }] },
+      ],
+    });
+    expect(msg).toContain("1 door, 1 window, Closet door 20 in wide");
+    expect(msg).toContain("baseboard 35.3 LF (assumed)");
+    expect(msg).toMatch(/net wall \d+(\.\d)? sqft \(assumed\)/);
+  });
+
+  it("hands an owner override to the model as the wall area to use", () => {
+    const msg = buildMaterialsUserMessage({
+      scope: "Bathroom paint",
+      rooms: [{ id: "b", name: "Bathroom", length_ft: 12, width_ft: 8, height_ft: null, wall_sqft_override: 243 }],
+    });
+    expect(msg).toContain("net wall 243 sqft (owner override, use as given)");
+  });
+
+  it("adds nothing for rooms without counted openings", () => {
+    const msg = buildMaterialsUserMessage({
+      scope: "Hall",
+      rooms: [{ id: "h", name: "Hall", length_ft: 10, width_ft: 4, height_ft: 8 }],
+    });
+    expect(msg).not.toMatch(/door|window|net wall|baseboard/);
+  });
+});

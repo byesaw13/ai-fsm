@@ -17,7 +17,7 @@
   { "id": "TASK-008", "title": "Room-based estimate templates", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Repeatable room scopes belong on the quote, before a job exists." },
   { "id": "TASK-009", "title": "Estimate versioning", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "A changed price should keep the earlier quote, not overwrite it." },
   { "id": "TASK-100", "title": "Time-and-materials versus fixed price card", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "The choice of how the quote is priced sits on the quote." },
-  { "id": "TASK-178", "title": "Doors and windows on assessment rooms", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "What you counted in the room decides the wall and trim numbers on the quote." },
+  { "id": "TASK-178", "title": "Doors and windows on assessment rooms", "branch": "quote", "status": "progress", "phase": "Phase 3", "fit": "What you counted in the room decides the wall and trim numbers on the quote." },
   { "id": "TASK-179", "title": "Prepare Quote from the walkthrough", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Your room-by-room notes become the draft quote without typing them twice." },
   { "id": "TASK-180", "title": "Hours, profit and proposal on one draft", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "How long it takes, what it costs and what the customer sees are all decided on the quote." },
   { "id": "TASK-181", "title": "Customer's option choice is saved", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "The customer's yes on the quote has to say which option they picked." },

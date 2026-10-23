@@ -11,7 +11,7 @@
  * (packages/domain) — not a competing definition (TASK-018).
  */
 
-import type { AssessmentRoom, AssessmentSummary } from "@ai-fsm/domain";
+import { normalizeAssessmentRooms, type AssessmentRoom, type AssessmentSummary } from "@ai-fsm/domain";
 
 export const ASSESSMENT_CONTEXT_KEY = "dovetails.assessmentContext";
 
@@ -24,29 +24,12 @@ export type AssessmentContext = Pick<
   "generatedJobDescription" | "rooms" | "visitId" | "assessmentId"
 >;
 
-function toNullableNumber(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
 /**
- * Normalize arbitrary room-ish objects to the exact shape MaterialsGenerator
- * expects. Tolerant of missing/extra fields so it is safe to feed assessment
- * form rooms or rehydrated sessionStorage data.
+ * Normalize arbitrary room-ish objects to the canonical room the materials
+ * generator expects. Tolerant of missing/extra fields so it is safe to feed
+ * assessment form rooms or rehydrated sessionStorage data.
  */
-export function normalizeAssessmentRooms(rooms: unknown): AssessmentContextRoom[] {
-  if (!Array.isArray(rooms)) return [];
-  return rooms.map((raw) => {
-    const r = (raw ?? {}) as Record<string, unknown>;
-    return {
-      id: typeof r.id === "string" ? r.id : "",
-      name: typeof r.name === "string" ? r.name : "",
-      length_ft: toNullableNumber(r.length_ft),
-      width_ft: toNullableNumber(r.width_ft),
-      height_ft: toNullableNumber(r.height_ft),
-      notes: typeof r.notes === "string" ? r.notes : "",
-    };
-  });
-}
+export { normalizeAssessmentRooms };
 
 /** Persist assessment context for the estimate page to pick up. No-op on the server. */
 export function writeAssessmentContext(context: AssessmentContext): void {
