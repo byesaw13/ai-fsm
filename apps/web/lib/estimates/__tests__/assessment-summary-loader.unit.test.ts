@@ -71,3 +71,16 @@ describe("mapRowToAssessmentSummary", () => {
     expect(s.generatedJobDescription).toContain("Mask floors");
   });
 });
+
+describe("mapRowToAssessmentSummary openings (TASK-178)", () => {
+  it("keeps counted openings from the persisted row", () => {
+    const s = mapRowToAssessmentSummary({
+      ...baseRow,
+      rooms: [
+        { id: "b", name: "Bathroom", length_ft: 12, width_ft: 8, door_count: 1, window_count: 1, openings: [{ label: "Closet door", width_in: 20 }] },
+      ],
+    });
+    expect(s.rooms[0]).toMatchObject({ door_count: 1, window_count: 1, openings: [{ label: "Closet door", width_in: 20 }] });
+    expect(s.generatedJobDescription).toContain("1 door, 1 window, Closet door 20 in wide");
+  });
+});

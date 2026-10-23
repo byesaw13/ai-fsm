@@ -98,11 +98,23 @@ describe("normalizeAssessmentRooms", () => {
 
   it("defaults non-finite / wrong-typed dimensions to null and missing strings to ''", () => {
     const out = normalizeAssessmentRooms([
-      { id: 5, name: 42, length_ft: "10", width_ft: NaN, height_ft: undefined, notes: null },
+      { id: 5, name: 42, length_ft: "ten", width_ft: NaN, height_ft: undefined, notes: null },
     ]);
     expect(out).toEqual([
       { id: "", name: "", length_ft: null, width_ft: null, height_ft: null, notes: "" },
     ]);
+  });
+
+  it("reads numeric strings, the same as the persisted-row loader", () => {
+    const [room] = normalizeAssessmentRooms([{ id: "1", name: "Bath", length_ft: "10" }]);
+    expect(room.length_ft).toBe(10);
+  });
+
+  it("carries counted openings across the hand-off", () => {
+    const [room] = normalizeAssessmentRooms([
+      { id: "b", name: "Bath", length_ft: 12, width_ft: 8, door_count: 1, window_count: 1, openings: [{ label: "Closet", width_in: 20 }] },
+    ]);
+    expect(room).toMatchObject({ door_count: 1, window_count: 1, openings: [{ label: "Closet", width_in: 20 }] });
   });
 
   it("returns [] for non-array input", () => {

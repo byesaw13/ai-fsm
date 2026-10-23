@@ -18,6 +18,9 @@ export interface AssessmentSummaryRoom {
   width_ft?: number | null;
   height_ft?: number | null;
   notes?: string | null;
+  door_count?: number;
+  window_count?: number;
+  openings?: AssessmentRoomOpening[];
 }
 
 /**
@@ -32,6 +35,72 @@ export interface AssessmentRoom {
   width_ft: number | null;
   height_ft: number | null;
   notes: string;
+  /** Standard doors counted in the room. Absent = not counted yet (TASK-178). */
+  door_count?: number;
+  /** Standard windows counted in the room. Absent = not counted yet. */
+  window_count?: number;
+  /** Non-standard openings measured by width, e.g. a 20 in closet door. */
+  openings?: AssessmentRoomOpening[];
+  /** Owner-entered net wall area that replaces the calculated one. */
+  wall_sqft_override?: number;
+}
+
+export interface AssessmentRoomOpening {
+  label: string;
+  width_in: number;
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  const n = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
+  return typeof n === "number" && Number.isFinite(n) ? n : null;
+}
+
+function toCount(value: unknown): number | undefined {
+  const n = toFiniteNumber(value);
+  return n !== null && n >= 0 && Number.isInteger(n) ? n : undefined;
+}
+
+function toOpenings(value: unknown): AssessmentRoomOpening[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const openings = value.flatMap((raw) => {
+    if (!raw || typeof raw !== "object") return [];
+    const o = raw as Record<string, unknown>;
+    const width = toFiniteNumber(o.width_in);
+    if (width === null || width <= 0) return [];
+    return [{ label: typeof o.label === "string" ? o.label : "", width_in: width }];
+  });
+  return openings.length > 0 ? openings : undefined;
+}
+
+/**
+ * Normalize any room-ish value into the canonical `AssessmentRoom`. The single
+ * place a persisted, form or hand-off room is cleaned, so every flow keeps the
+ * same fields. Opening fields are only present when entered; absent means
+ * unknown, which keeps rooms saved before TASK-178 unchanged.
+ */
+export function normalizeAssessmentRoom(raw: unknown): AssessmentRoom {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const room: AssessmentRoom = {
+    id: typeof r.id === "string" ? r.id : "",
+    name: typeof r.name === "string" ? r.name : "",
+    length_ft: toFiniteNumber(r.length_ft),
+    width_ft: toFiniteNumber(r.width_ft),
+    height_ft: toFiniteNumber(r.height_ft),
+    notes: typeof r.notes === "string" ? r.notes : "",
+  };
+  const doors = toCount(r.door_count);
+  if (doors !== undefined) room.door_count = doors;
+  const windows = toCount(r.window_count);
+  if (windows !== undefined) room.window_count = windows;
+  const openings = toOpenings(r.openings);
+  if (openings) room.openings = openings;
+  const override = toFiniteNumber(r.wall_sqft_override);
+  if (override !== null && override >= 0) room.wall_sqft_override = override;
+  return room;
+}
+
+export function normalizeAssessmentRooms(raw: unknown): AssessmentRoom[] {
+  return Array.isArray(raw) ? raw.map(normalizeAssessmentRoom) : [];
 }
 
 export type AssessmentTradeKey = "painting" | "drywall" | "trim" | "flooring";
@@ -98,6 +167,21 @@ function formatDimension(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
+function describeOpenings(room: AssessmentSummaryRoom): string | null {
+  const parts: string[] = [];
+  if (room.door_count !== undefined) parts.push(plural(room.door_count, "door"));
+  if (room.window_count !== undefined) parts.push(plural(room.window_count, "window"));
+  for (const o of room.openings ?? []) {
+    const label = clean(o.label) || "opening";
+    parts.push(`${label} ${formatDimension(o.width_in)} in wide`);
+  }
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
 function describeRoom(room: AssessmentSummaryRoom): string | null {
   const name = clean(room.name);
   const notes = clean(room.notes);
@@ -111,6 +195,8 @@ function describeRoom(room: AssessmentSummaryRoom): string | null {
   } else if (room.height_ft) {
     parts.push(`${formatDimension(room.height_ft)} ft ceiling`);
   }
+  const openings = describeOpenings(room);
+  if (openings) parts.push(openings);
   if (notes) parts.push(notes);
 
   if (!name && parts.length === 0) return null;
@@ -235,14 +321,7 @@ export function buildAssessmentSummary(
   input: AssessmentSummaryBuildInput,
   options: JobDescriptionOptions = {}
 ): AssessmentSummary {
-  const rooms = (input.rooms ?? []).map((r) => ({
-    id: r.id,
-    name: r.name,
-    length_ft: r.length_ft ?? null,
-    width_ft: r.width_ft ?? null,
-    height_ft: r.height_ft ?? null,
-    notes: r.notes ?? "",
-  }));
+  const rooms = normalizeAssessmentRooms(input.rooms);
   const scopeNotes = input.scopeNotes ?? null;
   const accessNotes = input.accessNotes ?? null;
   const totalSqft = input.totalSqft ?? null;

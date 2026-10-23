@@ -9,21 +9,13 @@ import type { AuthSession } from "../../../../../../lib/auth/middleware";
 import { getPool } from "../../../../../../lib/db";
 import { logger } from "../../../../../../lib/logger";
 import { completeAssessmentCascade } from "@/lib/workflow/cascades";
+import { assessmentRoomSchema } from "@/lib/assessments/room-schema";
 
 export const dynamic = "force-dynamic";
 
 function extractVisitId(url: string) {
   return url.match(/\/visits\/([^/]+)\/assessment/)?.[1] ?? null;
 }
-
-const roomSchema = z.object({
-  id: z.string(),
-  name: z.string().max(100),
-  length_ft: z.number().min(0).nullable().optional(),
-  width_ft: z.number().min(0).nullable().optional(),
-  height_ft: z.number().min(0).nullable().optional(),
-  notes: z.string().max(500).optional(),
-});
 
 const tradeNotesSchema = z
   .object({
@@ -35,7 +27,7 @@ const tradeNotesSchema = z
   .optional();
 
 const assessmentSchema = z.object({
-  rooms: z.array(roomSchema).default([]),
+  rooms: z.array(assessmentRoomSchema).default([]),
   scope_notes: z.string().max(5000).nullable().optional(),
   access_notes: z.string().max(2000).nullable().optional(),
   has_pets: z.boolean().optional(),

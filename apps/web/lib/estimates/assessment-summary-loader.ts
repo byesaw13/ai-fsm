@@ -1,6 +1,6 @@
 import {
   buildAssessmentSummary,
-  type AssessmentRoom,
+  normalizeAssessmentRooms,
   type AssessmentSummary,
 } from "@ai-fsm/domain";
 import { queryForSession } from "@/lib/db";
@@ -15,7 +15,7 @@ import type { SessionPayload } from "@/lib/auth/session";
 export type SiteVisitAssessmentRow = {
   id: string;
   visit_id: string;
-  rooms: unknown; // jsonb: [{ id, name, length_ft, width_ft, height_ft, notes }]
+  rooms: unknown; // jsonb: AssessmentRoom[] (see normalizeAssessmentRoom)
   scope_notes: string | null;
   access_notes: string | null;
   has_pets: boolean;
@@ -29,25 +29,6 @@ export type SiteVisitAssessmentRow = {
   trade_notes?: unknown;
   customer_supplied_materials?: string | null;
 };
-
-function toRooms(value: unknown): AssessmentRoom[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((r) => {
-    const room = (r ?? {}) as Record<string, unknown>;
-    const num = (v: unknown): number | null => {
-      const n = typeof v === "string" ? parseFloat(v) : (v as number);
-      return Number.isFinite(n) ? (n as number) : null;
-    };
-    return {
-      id: typeof room.id === "string" ? room.id : "",
-      name: typeof room.name === "string" ? room.name : "",
-      length_ft: num(room.length_ft),
-      width_ft: num(room.width_ft),
-      height_ft: num(room.height_ft),
-      notes: typeof room.notes === "string" ? room.notes : "",
-    };
-  });
-}
 
 function toWorkItems(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -73,7 +54,7 @@ export function mapRowToAssessmentSummary(row: SiteVisitAssessmentRow): Assessme
   return buildAssessmentSummary({
     visitId: row.visit_id,
     assessmentId: row.id,
-    rooms: toRooms(row.rooms),
+    rooms: normalizeAssessmentRooms(row.rooms),
     scopeNotes: row.scope_notes,
     accessNotes: row.access_notes,
     hasPets: row.has_pets,

@@ -55,6 +55,7 @@ export type { ProductionRate, ProductionRateModifier, LaborEstimate } from "./pr
 export {
   computeRoomMeasurements,
   computePaintingProject,
+  computeAssessmentRoomGeometry,
 } from "./painting";
 export type {
   RoomPrepLevel,
@@ -65,6 +66,9 @@ export type {
   RoomMeasurements,
   RoomPaintingResult,
   PaintingProjectResult,
+  QuantityBasis,
+  RoomQuantity,
+  AssessmentRoomGeometry,
 } from "./painting";
 export * from "./activities";
 export * from "./business-day";

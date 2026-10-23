@@ -61,7 +61,7 @@ scope: the owner should not have to invent every number.
 # TASK-178: Door, window and opening counts on assessment rooms
 
 Status:
-Proposed
+In progress
 
 Phase:
 3

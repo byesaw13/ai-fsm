@@ -11,6 +11,7 @@ import {
   MATERIAL_HANDLING_CLIENT_RATE,
   LABOR_COST_CENTS_PER_HOUR,
 } from "./dovetails";
+import type { AssessmentRoom } from "./assessment-summary";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -136,6 +137,110 @@ export function computeRoomMeasurements(room: RoomSpec): RoomMeasurements {
     : 0;
 
   return { wall_sqft, ceiling_sqft, trim_lf, gross_wall_sqft };
+}
+
+// ---------------------------------------------------------------------------
+// Assessment room geometry (TASK-178)
+// ---------------------------------------------------------------------------
+
+/** Assumed height of a non-standard opening measured only by width (6 ft 8 in). */
+const OPENING_HEIGHT_IN = 80;
+
+/** Where a quantity came from. Unknown is never shown as a number. */
+export type QuantityBasis = "measured" | "assumed" | "override" | "unknown";
+
+export interface RoomQuantity {
+  value: number | null;
+  basis: QuantityBasis;
+}
+
+export interface AssessmentRoomGeometry {
+  floor_sqft: RoomQuantity;
+  ceiling_sqft: RoomQuantity;
+  perimeter_lf: RoomQuantity;
+  gross_wall_sqft: RoomQuantity;
+  opening_deduction_sqft: RoomQuantity;
+  net_wall_sqft: RoomQuantity;
+  baseboard_lf: RoomQuantity;
+  /** Doors and windows were both counted, so deductions can be calculated. */
+  openings_known: boolean;
+}
+
+const UNKNOWN: RoomQuantity = { value: null, basis: "unknown" };
+
+function measured(value: number | null): RoomQuantity {
+  return value === null ? UNKNOWN : { value, basis: "measured" };
+}
+
+function positive(n: number | null | undefined): number | null {
+  return typeof n === "number" && n > 0 ? n : null;
+}
+
+/** A half-typed form value (negative, fractional, NaN) counts as not counted. */
+function count(n: number | undefined): number | undefined {
+  return typeof n === "number" && Number.isInteger(n) && n >= 0 ? n : undefined;
+}
+
+/**
+ * Quantities for one assessment room, with the source of each. Standard doors
+ * and windows use the same deductions as the painting estimator; a measured
+ * opening deducts its width at standard door height. Missing measurements
+ * leave a quantity unknown rather than zero or a default. Does not replace
+ * `computeRoomMeasurements`, which the painting editor and saved quotes use.
+ */
+export function computeAssessmentRoomGeometry(room: AssessmentRoom): AssessmentRoomGeometry {
+  const length = positive(room.length_ft);
+  const width = positive(room.width_ft);
+  const height = positive(room.height_ft);
+  const area = length !== null && width !== null ? length * width : null;
+  const perimeter = length !== null && width !== null ? 2 * (length + width) : null;
+
+  const openings = (room.openings ?? []).filter((o) => o.width_in > 0);
+  const doors = count(room.door_count);
+  const windows = count(room.window_count);
+  const override =
+    typeof room.wall_sqft_override === "number" && room.wall_sqft_override >= 0 ? room.wall_sqft_override : undefined;
+  const openingsKnown = doors !== undefined && windows !== undefined;
+  // Standard sizes and the assumed opening height make a deduction an estimate.
+  const deductionBasis: QuantityBasis =
+    (doors ?? 0) > 0 || (windows ?? 0) > 0 || openings.length > 0 ? "assumed" : "measured";
+
+  const grossWall = perimeter !== null && height !== null ? perimeter * height : null;
+  const deduction = openingsKnown
+    ? doors * DOOR_DEDUCTION_SQFT +
+      windows * WINDOW_DEDUCTION_SQFT +
+      openings.reduce((sum, o) => sum + (o.width_in / 12) * (OPENING_HEIGHT_IN / 12), 0)
+    : null;
+
+  let netWall: RoomQuantity = UNKNOWN;
+  if (override !== undefined) {
+    netWall = { value: override, basis: "override" };
+  } else if (grossWall !== null && deduction !== null) {
+    netWall = { value: Math.max(0, grossWall - deduction), basis: deductionBasis };
+  }
+
+  // Baseboard skips doorways; windows do not affect it.
+  const baseboard =
+    perimeter !== null && doors !== undefined
+      ? {
+          value: Math.max(
+            0,
+            perimeter - doors * DOOR_TRIM_DEDUCTION_LF - openings.reduce((sum, o) => sum + o.width_in / 12, 0),
+          ),
+          basis: (doors > 0 || openings.length > 0 ? "assumed" : "measured") as QuantityBasis,
+        }
+      : UNKNOWN;
+
+  return {
+    floor_sqft: measured(area),
+    ceiling_sqft: measured(area),
+    perimeter_lf: measured(perimeter),
+    gross_wall_sqft: measured(grossWall),
+    opening_deduction_sqft: deduction === null ? UNKNOWN : { value: deduction, basis: deductionBasis },
+    net_wall_sqft: netWall,
+    baseboard_lf: baseboard,
+    openings_known: openingsKnown,
+  };
 }
 
 export function computeRoomPainting(room: RoomSpec, coatCount: number = 2): RoomPaintingResult {

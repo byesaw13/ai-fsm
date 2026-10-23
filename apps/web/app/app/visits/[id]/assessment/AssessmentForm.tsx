@@ -7,6 +7,9 @@ import type { Route } from "next";
 import {
   ASSESSMENT_TRADE_LABELS,
   buildAssessmentJobDescription,
+  computeAssessmentRoomGeometry,
+  normalizeAssessmentRoom,
+  type AssessmentRoom,
   type AssessmentTradeKey,
 } from "@ai-fsm/domain";
 import { useToast } from "@/components/ui";
@@ -16,17 +19,11 @@ import { MaterialsGenerator } from "@/app/app/estimates/components/MaterialsGene
 import type { MaterialItem } from "@/app/app/estimates/components/MaterialsGenerator";
 import { buildAiMaterialsDelta } from "@/lib/estimates/materials-delta";
 import { areaCaptureStatus, areaStatusLabel, assessmentAreaProgress } from "@/lib/assessments/area-status";
+import { roomGeometryLines } from "@/lib/assessments/room-geometry-display";
 
 const TRADE_KEYS = Object.keys(ASSESSMENT_TRADE_LABELS) as AssessmentTradeKey[];
 
-export interface Room {
-  id: string;
-  name: string;
-  length_ft: number | null;
-  width_ft: number | null;
-  height_ft: number | null;
-  notes: string;
-}
+export type Room = AssessmentRoom;
 
 interface PhotoMeta {
   id: string;
@@ -77,7 +74,7 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
   const router = useRouter();
   const toast = useToast();
   const [rooms, setRooms] = useState<Room[]>(
-    initialAssessment?.rooms?.length ? initialAssessment.rooms : [newRoom()]
+    initialAssessment?.rooms?.length ? initialAssessment.rooms.map(normalizeAssessmentRoom) : [newRoom()]
   );
   const [scopeNotes, setScopeNotes] = useState(initialAssessment?.scope_notes ?? "");
   const [accessNotes, setAccessNotes] = useState(initialAssessment?.access_notes ?? "");
@@ -121,8 +118,26 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
     document.getElementById(`area-note-${next.id}`)?.focus();
   }
 
-  function updateRoom(idx: number, field: keyof Room, value: string | number | null) {
+  function updateRoom(idx: number, field: keyof Room, value: Room[keyof Room]) {
     setRooms((prev) => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r));
+  }
+
+  function updateOpening(idx: number, openingIdx: number, patch: Partial<{ label: string; width_in: number }>) {
+    setRooms((prev) => prev.map((r, i) => i === idx
+      ? { ...r, openings: (r.openings ?? []).map((o, j) => j === openingIdx ? { ...o, ...patch } : o) }
+      : r));
+  }
+
+  function addOpening(idx: number) {
+    setRooms((prev) => prev.map((r, i) => i === idx
+      ? { ...r, openings: [...(r.openings ?? []), { label: "", width_in: 0 }] }
+      : r));
+  }
+
+  function removeOpening(idx: number, openingIdx: number) {
+    setRooms((prev) => prev.map((r, i) => i === idx
+      ? { ...r, openings: (r.openings ?? []).filter((_, j) => j !== openingIdx) }
+      : r));
   }
 
   function addRoom() {
@@ -143,14 +158,7 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
   );
 
   const buildPayload = useCallback(() => ({
-    rooms: rooms.map((r) => ({
-      id: r.id,
-      name: r.name,
-      length_ft: r.length_ft,
-      width_ft: r.width_ft,
-      height_ft: r.height_ft,
-      notes: r.notes,
-    })),
+    rooms: rooms.map(normalizeAssessmentRoom),
     scope_notes: scopeNotes || null,
     access_notes: accessNotes || null,
     has_pets: hasPets,
@@ -410,11 +418,103 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
                 </button>
               )}
             </div>
-            {room.length_ft && room.width_ft && (
-              <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginBottom: "var(--space-1)" }}>
-                {(room.length_ft * room.width_ft).toFixed(0)} sqft
+            <div style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-2)", flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 70px" }}>
+                <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Doors</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputMode="numeric"
+                  value={room.door_count ?? ""}
+                  placeholder="?"
+                  onChange={(e) => updateRoom(idx, "door_count", e.target.value === "" ? undefined : parseInt(e.target.value, 10))}
+                  disabled={disabled}
+                  style={{ width: "100%" }}
+                />
               </div>
+              <div style={{ flex: "1 1 70px" }}>
+                <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Windows</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputMode="numeric"
+                  value={room.window_count ?? ""}
+                  placeholder="?"
+                  onChange={(e) => updateRoom(idx, "window_count", e.target.value === "" ? undefined : parseInt(e.target.value, 10))}
+                  disabled={disabled}
+                  style={{ width: "100%" }}
+                />
+              </div>
+              <div style={{ flex: "2 1 120px" }}>
+                <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Wall sq ft override</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={room.wall_sqft_override ?? ""}
+                  placeholder="Optional"
+                  onChange={(e) => updateRoom(idx, "wall_sqft_override", e.target.value === "" ? undefined : parseFloat(e.target.value))}
+                  disabled={disabled}
+                  style={{ width: "100%" }}
+                />
+              </div>
+            </div>
+            {(room.openings ?? []).map((opening, openingIdx) => (
+              <div key={openingIdx} style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-2)", alignItems: "flex-end" }}>
+                <div style={{ flex: "2 1 140px" }}>
+                  <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Other opening</label>
+                  <input
+                    type="text"
+                    value={opening.label}
+                    placeholder="Closet door, archway…"
+                    onChange={(e) => updateOpening(idx, openingIdx, { label: e.target.value })}
+                    disabled={disabled}
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                <div style={{ flex: "1 1 80px" }}>
+                  <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Width (in)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={opening.width_in || ""}
+                    onChange={(e) => updateOpening(idx, openingIdx, { width_in: e.target.value ? parseFloat(e.target.value) : 0 })}
+                    disabled={disabled}
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => removeOpening(idx, openingIdx)}
+                    disabled={disabled}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}
+                    aria-label="Remove opening"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => addOpening(idx)}
+                disabled={disabled}
+                className="p7-btn p7-btn-ghost p7-btn-sm"
+                style={{ marginBottom: "var(--space-2)" }}
+              >
+                + Other opening (closet, archway)
+              </button>
             )}
+            {roomGeometryLines(computeAssessmentRoomGeometry(room)).map((line) => (
+              <div key={line} style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginBottom: "var(--space-1)" }}>
+                {line}
+              </div>
+            ))}
             <div>
               <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Notes</label>
               <input
