@@ -103,10 +103,14 @@ export const PATCH = withRole(["owner", "admin"], async (request: NextRequest, s
 
     await client.query("COMMIT");
 
-    // The website and /card read these at build time; rebuild it after a change.
+    // The website and /card read the public account's card. Reload it during
+    // publish so an older save cannot overwrite a newer one.
     let siteRebuild: SiteRebuild | undefined;
     if (settings && PUBLIC_CARD_KEYS.some((k) => settings[k] !== undefined)) {
-      siteRebuild = await triggerSiteRebuild(resolvePublicCard(rows[0].settings));
+      siteRebuild = await triggerSiteRebuild(session.accountId, async () => {
+        const latest = await client.query("SELECT settings FROM accounts WHERE id = $1", [session.accountId]);
+        return resolvePublicCard(latest.rows[0]?.settings);
+      });
     }
     return NextResponse.json({ data: rows[0], ...(siteRebuild ? { site_rebuild: siteRebuild } : {}) });
   } catch (error) {

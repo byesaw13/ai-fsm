@@ -1,7 +1,7 @@
 import { logger } from "@/lib/logger";
 import type { PublicCard } from "./public-card";
 
-export type SiteRebuild = "queued" | "unchanged" | "not_configured" | "failed";
+export type SiteRebuild = "queued" | "unchanged" | "skipped" | "not_configured" | "failed";
 
 /** File the site build reads. GitHub Actions gets HTTP 403 from Cloudflare on the app. */
 export const BUSINESS_CARD_PATH = "src/data/business-card.json";
@@ -11,17 +11,43 @@ export function businessCardDocument(card: PublicCard): string {
   return `${JSON.stringify(card, null, "\t")}\n`;
 }
 
+/** One publish at a time, so an older save cannot commit over a newer one. */
+let publishTail: Promise<void> = Promise.resolve();
+
+function oneAtATime<T>(task: () => Promise<T>): Promise<T> {
+  const run = publishTail.then(task, task);
+  publishTail = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 /**
  * Commit the public card onto mydovetails-site master. That push runs the
  * existing Pages deploy. Off unless SITE_REBUILD_GITHUB_TOKEN is set: a
  * fine-grained token on the site repo with Contents read/write.
+ *
+ * Only BOOKING_ACCOUNT_ID is the public site. loadCard runs while this
+ * publish holds its turn, so the caller reloads the saved card then.
  */
 export async function triggerSiteRebuild(
-  card: PublicCard,
+  accountId: string,
+  loadCard: () => Promise<PublicCard>,
   fetchImpl: typeof fetch = fetch,
 ): Promise<SiteRebuild> {
   const token = process.env.SITE_REBUILD_GITHUB_TOKEN?.trim();
   if (!token) return "not_configured";
+  const publicAccount = process.env.BOOKING_ACCOUNT_ID?.trim();
+  if (!publicAccount || accountId !== publicAccount) return "skipped";
+  return oneAtATime(() => publishCard(loadCard, token, fetchImpl));
+}
+
+async function publishCard(
+  loadCard: () => Promise<PublicCard>,
+  token: string,
+  fetchImpl: typeof fetch,
+): Promise<SiteRebuild> {
   const repo = process.env.SITE_REBUILD_REPO || "byesaw13/mydovetails-site";
   const headers = {
     Authorization: `Bearer ${token}`,
@@ -29,8 +55,8 @@ export async function triggerSiteRebuild(
     "Content-Type": "application/json",
     "X-GitHub-Api-Version": "2022-11-28",
   };
-  const document = businessCardDocument(card);
   try {
+    const document = businessCardDocument(await loadCard());
     const current = await fetchImpl(
       `https://api.github.com/repos/${repo}/contents/${BUSINESS_CARD_PATH}?ref=master`,
       { headers, signal: AbortSignal.timeout(8000) },
