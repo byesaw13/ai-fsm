@@ -53,9 +53,10 @@ With a test-only $85/hour rate and no handling, tax or travel: $4,025–$5,640.
 This proves the arithmetic only. It does not set the account's billing rate.
 
 Out of scope for this group: LiDAR/RoomPlan, local market price comparison,
-researched production rates, labor-versus-elapsed schedule modeling,
-automatic learning from actuals, a separate signed work agreement, and AI
-revise-from-feedback beyond regenerating the draft.
+labor-versus-elapsed schedule modeling, automatic learning from actuals, a
+separate signed work agreement, and AI revise-from-feedback beyond
+regenerating the draft. Researched starting assumptions for hours are in
+scope: the owner should not have to invent every number.
 
 # TASK-178: Door, window and opening counts on assessment rooms
 
@@ -122,6 +123,8 @@ Scope:
 - One Prepare Quote action on the assessment. It saves first, then builds the
   draft server-side from the saved rooms, notes and photos. Extend the T&M
   briefing path; do not create a second estimate engine.
+- Reuse T&M preparation, not T&M billing. The saved scope must also be able
+  to feed a fixed-price proposal (TASK-180).
 - Every requested action is kept with its room. Grouping several actions into
   one customer line is allowed; dropping one is not. Remove the six-service
   cap. If any limit is hit, show it.
@@ -129,9 +132,15 @@ Scope:
   addition. Never silently add whole-room painting, subfloor replacement or
   fixture upgrades.
 - Quantities are calculated in code from the measurements, never by the
-  model. Mark each as measured, assumed or overridden.
-- Hours low–high and a materials allowance per group, labeled as suggestions.
-  Use matching price-book `labor_hours_low/typical/high` where they exist.
+  model, and attach to the task they drive (bathroom ceiling paint → 96 sq ft;
+  Room 1 baseboard → 2 LF). Use the shared geometry helper in
+  `packages/domain`. Mark each as measured, assumed or overridden. An unknown
+  dimension leaves the quantity unknown, never zero or a default.
+- Hours low–high and a materials allowance per group, labeled as editable
+  suggestions with their source. Starting points, in order: matching
+  price-book `labor_hours_low/typical/high`; existing production rates
+  (migration 090) applied to measured quantities; otherwise a labeled AI
+  allowance. The owner never has to supply hours.
 - A draft appears immediately. Questions are attached to the items they
   affect and only cover things that change price or scope. Answers already in
   the notes are not asked again.
@@ -144,7 +153,8 @@ Scope:
   required.
 
 Out of Scope:
-- Independent production-rate research, market comparison, schedule modeling.
+- Market price comparison, schedule modeling, a catalog-wide production-rate
+  project.
 
 Acceptance Criteria:
 - [ ] The reference notes produce every named task in the right room without
@@ -153,7 +163,8 @@ Acceptance Criteria:
       and subfloor condition stay unknown.
 - [ ] The four recorded answers are kept and not asked again.
 - [ ] With hours removed from the notes, the draft still proposes hour ranges
-      with visible sources for the owner to correct.
+      with visible sources for the owner to correct. Supplying hours manually
+      is not required.
 - [ ] Save and reload keep tasks, assumptions, questions and alternatives.
 - [ ] Regenerating does not duplicate the estimate or overwrite owner edits.
 - [ ] With the AI off, rooms and quantities still reach a draft.
