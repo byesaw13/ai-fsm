@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { publicCardSettingsSchema, resolvePublicCard, toE164 } from "../public-card";
-import { triggerSiteRebuild } from "../site-rebuild";
+import { publicCardSettingsSchema, resolvePublicCard, toE164, type PublicCard } from "../public-card";
+import { businessCardDocument, triggerSiteRebuild } from "../site-rebuild";
 
 describe("toE164", () => {
   it("accepts 10- and 11-digit US numbers in any format", () => {
@@ -69,6 +69,20 @@ describe("publicCardSettingsSchema", () => {
   });
 });
 
+const ACCOUNT = "aaaaaaaa-0000-0000-0000-000000000001";
+const card: PublicCard = resolvePublicCard({
+  company_email: "sales@example.com",
+  card_email: "nick@example.com",
+});
+
+function jsonResponse(body: unknown, status = 200) {
+  return { ok: status >= 200 && status < 300, status, json: async () => body };
+}
+
+function publish(fetchImpl: unknown, load: () => Promise<PublicCard> = async () => card) {
+  return triggerSiteRebuild(ACCOUNT, load, fetchImpl as never);
+}
+
 describe("triggerSiteRebuild", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -76,24 +90,91 @@ describe("triggerSiteRebuild", () => {
 
   it("does nothing without a token", async () => {
     vi.stubEnv("SITE_REBUILD_GITHUB_TOKEN", "");
+    vi.stubEnv("BOOKING_ACCOUNT_ID", ACCOUNT);
     const fetchImpl = vi.fn();
-    expect(await triggerSiteRebuild(fetchImpl as never)).toBe("not_configured");
+    expect(await publish(fetchImpl)).toBe("not_configured");
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("sends a repository_dispatch to the site repo", async () => {
+  it("does not publish another account, or when no public account is set", async () => {
     vi.stubEnv("SITE_REBUILD_GITHUB_TOKEN", "tok");
-    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 204 });
-    expect(await triggerSiteRebuild(fetchImpl as never)).toBe("queued");
-    const [url, init] = fetchImpl.mock.calls[0];
-    expect(url).toBe("https://api.github.com/repos/byesaw13/mydovetails-site/dispatches");
-    expect(init.headers.Authorization).toBe("Bearer tok");
-    expect(JSON.parse(init.body)).toEqual({ event_type: "business-card-updated" });
+    vi.stubEnv("BOOKING_ACCOUNT_ID", ACCOUNT);
+    const fetchImpl = vi.fn();
+    expect(
+      await triggerSiteRebuild("bbbbbbbb-0000-0000-0000-000000000002", async () => card, fetchImpl as never),
+    ).toBe("skipped");
+    vi.stubEnv("BOOKING_ACCOUNT_ID", "");
+    expect(await publish(fetchImpl)).toBe("skipped");
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("reports a rejected or failed dispatch", async () => {
+  it("commits the card file when master does not have it yet", async () => {
     vi.stubEnv("SITE_REBUILD_GITHUB_TOKEN", "tok");
-    expect(await triggerSiteRebuild(vi.fn().mockResolvedValue({ ok: false, status: 401 }) as never)).toBe("failed");
-    expect(await triggerSiteRebuild(vi.fn().mockRejectedValue(new Error("offline")) as never)).toBe("failed");
+    vi.stubEnv("BOOKING_ACCOUNT_ID", ACCOUNT);
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({}, 404))
+      .mockResolvedValueOnce(jsonResponse({}, 201));
+    expect(await publish(fetchImpl)).toBe("queued");
+    const [url, init] = fetchImpl.mock.calls[1];
+    expect(url).toBe("https://api.github.com/repos/byesaw13/mydovetails-site/contents/src/data/business-card.json");
+    expect(init.method).toBe("PUT");
+    expect(init.headers.Authorization).toBe("Bearer tok");
+    const body = JSON.parse(init.body);
+    expect(body.branch).toBe("master");
+    expect(body.sha).toBeUndefined();
+    expect(Buffer.from(body.content, "base64").toString("utf8")).toBe(businessCardDocument(card));
+  });
+
+  it("does not commit when the file already matches", async () => {
+    vi.stubEnv("SITE_REBUILD_GITHUB_TOKEN", "tok");
+    vi.stubEnv("BOOKING_ACCOUNT_ID", ACCOUNT);
+    const fetchImpl = vi.fn().mockResolvedValueOnce(jsonResponse({
+      sha: "abc",
+      content: Buffer.from(businessCardDocument(card)).toString("base64"),
+    }));
+    expect(await publish(fetchImpl)).toBe("unchanged");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("loads the next card only after the earlier publish finishes", async () => {
+    vi.stubEnv("SITE_REBUILD_GITHUB_TOKEN", "tok");
+    vi.stubEnv("BOOKING_ACCOUNT_ID", ACCOUNT);
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const order: string[] = [];
+    const fetchImpl = vi.fn().mockImplementation(async () => {
+      order.push("fetch");
+      return jsonResponse({}, 404);
+    });
+    const first = publish(fetchImpl, async () => {
+      order.push("load-1");
+      await gate;
+      order.push("load-1-done");
+      return card;
+    });
+    await vi.waitFor(() => expect(order).toContain("load-1"));
+    const second = publish(fetchImpl, async () => {
+      order.push("load-2");
+      return card;
+    });
+    await Promise.resolve();
+    expect(order).not.toContain("load-2");
+    release();
+    await first;
+    await second;
+    expect(order.indexOf("load-2")).toBeGreaterThan(order.indexOf("load-1-done"));
+  });
+
+  it("reports a rejected read or a failed publish", async () => {
+    vi.stubEnv("SITE_REBUILD_GITHUB_TOKEN", "tok");
+    vi.stubEnv("BOOKING_ACCOUNT_ID", ACCOUNT);
+    expect(await publish(vi.fn().mockResolvedValue(jsonResponse({}, 401)))).toBe("failed");
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({}, 404))
+      .mockResolvedValueOnce(jsonResponse({}, 422));
+    expect(await publish(fetchImpl)).toBe("failed");
+    expect(await publish(vi.fn().mockRejectedValue(new Error("offline")))).toBe("failed");
   });
 });
