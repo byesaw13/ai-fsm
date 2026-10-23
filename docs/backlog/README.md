@@ -103,7 +103,7 @@ tasks in `docs/archive/backlog-done/`.
 
 ## Task index
 
-Next available ID: **TASK-183**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
+Next available ID: **TASK-178**. TASK-167, TASK-169 through TASK-172 are held by the customer home record work and are not in this index yet.
 
 Wave 0b 2026-08-05 closed 079/080; Wave 0a 2026-08-05 closed false In Progress: 046, 053, 068, 071, 078.
 Truth pass 2026-08-05: fixed ID collisions (ledger/T&M/terms had reused 081–083),
@@ -165,11 +165,6 @@ closed in tests; owner-flow AC still open.
 | TASK-173 | [UX implementation direction](TASK-173-ux-implementation-direction.md) | cross-cutting | In Progress |
 | TASK-176 | [Owner system map](TASK-176-system-map.md) | cross-cutting | In progress |
 | TASK-177 | [Edit the website contact info and business card from the app](TASK-177-public-business-card.md) | 005 | In progress |
-| TASK-178 | Door, window and opening counts on assessment rooms | 002 | Proposed |
-| TASK-179 | Prepare Quote from the saved assessment | 002 | Proposed |
-| TASK-180 | Price, profitability and proposal from the same draft | 002 | Proposed |
-| TASK-181 | Record the customer's chosen option on approval | 002 | Proposed |
-| TASK-182 | On approval, request the deposit and start scheduling | 002 | Proposed |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
 | TASK-003 | Wrong Vehicle Correction | 001 | Done |
