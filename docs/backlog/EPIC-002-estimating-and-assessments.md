@@ -14,7 +14,7 @@ hours and materials per group, and only the questions that change price or
 scope. After the customer approves the chosen option, the right deposit is
 requested and scheduling starts.
 
-Build order: TASK-178 → TASK-179 → TASK-180 is the quote track. TASK-181 →
+Build order: TASK-178 (done) → TASK-179 → TASK-180 is the quote track. TASK-181 →
 TASK-182 is the approval track. The two tracks do not depend on each other.
 Documentation approved 2026-10-23. Implementation is not yet authorized.
 
@@ -58,49 +58,10 @@ separate signed work agreement, and AI revise-from-feedback beyond
 regenerating the draft. Researched starting assumptions for hours are in
 scope: the owner should not have to invent every number.
 
-# TASK-178: Door, window and opening counts on assessment rooms
-
-Status:
-In progress
-
-Phase:
-3
-
-Problem:
-`AssessmentRoom` stores only length, width, height and notes. The painting
-room editor fills in one door and two windows for every room
-(`RoomByRoomEditor.tsx`, `Step2Pricing.tsx`), so its net wall area is a guess
-presented as a measurement.
-
-Business Value:
-Wall, baseboard and trim quantities come from what was seen in the room, and
-an unknown stays visibly unknown.
-
-Scope:
-- Optional door count, window count and other opening widths (for example a
-  20 in closet door) on assessment rooms. Update the domain type, the visit
-  assessment API schema, the persisted-row loader and the estimate handoff
-  normalizer together.
-- Empty means unknown. Show gross area and flag it. No default counts.
-- Each room shows gross, deductions and net, with an explicit override.
-
-Out of Scope:
-- Wall segmentation, drawings, photo markup.
-
-Acceptance Criteria:
-- [ ] The reference bathroom saves one door, one 20 in closet door and one
-      window, and reloads unchanged.
-- [ ] A room with no openings entered shows gross area marked "openings
-      unknown", never a net figure.
-- [ ] Existing assessments load unchanged.
-
-Notes:
-Fixture: reference scenario above.
-
 # TASK-179: Prepare Quote from the saved assessment
 
 Status:
-Proposed
+In progress
 
 Phase:
 3
@@ -803,6 +764,8 @@ buy list → confirm no mud/tape). Headless browser on this host cannot launch
 (Chromium sandbox).
 
 ## Completed
+- [TASK-178: Door, window and opening counts on assessment rooms](../archive/backlog-done/TASK-178-assessment-room-openings.md) — Done (#711, deployed 2026-10-23)
+
 - [TASK-112: Job materials builder templates](../archive/backlog-done/TASK-112-job-materials-builder-templates.md) — Done (validated 2026-09-09)
 
 - [TASK-018: Assessment Summary Engine](../archive/backlog-done/TASK-018-assessment-summary-engine.md) — Done (Wave 3 2026-08-05)

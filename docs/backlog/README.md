@@ -165,8 +165,8 @@ closed in tests; owner-flow AC still open.
 | TASK-173 | [UX implementation direction](TASK-173-ux-implementation-direction.md) | cross-cutting | In Progress |
 | TASK-176 | [Owner system map](TASK-176-system-map.md) | cross-cutting | In progress |
 | TASK-177 | [Edit the website contact info and business card from the app](TASK-177-public-business-card.md) | 005 | In progress |
-| TASK-178 | Door, window and opening counts on assessment rooms | 002 | In progress |
-| TASK-179 | Prepare Quote from the saved assessment | 002 | Proposed |
+| TASK-178 | [Door, window and opening counts on assessment rooms](../archive/backlog-done/TASK-178-assessment-room-openings.md) | 002 | Done |
+| TASK-179 | Prepare Quote from the saved assessment | 002 | In progress |
 | TASK-180 | Price, profitability and proposal from the same draft | 002 | Proposed |
 | TASK-181 | Record the customer's chosen option on approval | 002 | Proposed |
 | TASK-182 | On approval, request the deposit and start scheduling | 002 | Proposed |
