@@ -25,6 +25,8 @@ export function PublicCardForm({ initialSettings }: Props) {
   const [title, setTitle] = useState(live.title);
   const [phone, setPhone] = useState(live.phoneDisplay);
   const [email, setEmail] = useState(live.email);
+  // Blank when the card just uses the business email.
+  const [cardEmail, setCardEmail] = useState(initialSettings.card_email ?? "");
   const [location, setLocation] = useState(live.location);
   const [serviceArea, setServiceArea] = useState(live.serviceArea);
   const [badges, setBadges] = useState([0, 1, 2].map((i) => live.badges[i] ?? ""));
@@ -51,6 +53,7 @@ export function PublicCardForm({ initialSettings }: Props) {
             card_title: title,
             company_phone: phone,
             company_email: email,
+            card_email: cardEmail.trim(),
             card_location: location,
             card_service_area: serviceArea,
             card_badges: badges.map((b) => b.trim()).filter(Boolean),
@@ -110,7 +113,19 @@ export function PublicCardForm({ initialSettings }: Props) {
           />
           {!phoneOk && <small style={{ color: "var(--danger, #b42318)" }}>Enter a 10-digit US number.</small>}
         </div>
-        {field("card-email", "Business email", email, setEmail, { type: "email", max: 255, required: true })}
+        {field("card-email", "Business email (website, estimates, invoices)", email, setEmail, { type: "email", max: 255, required: true })}
+        <div className="form-group">
+          <label htmlFor="card-own-email">Card email (optional)</label>
+          <input
+            id="card-own-email"
+            type="email"
+            value={cardEmail}
+            onChange={(e) => setCardEmail(e.target.value)}
+            maxLength={255}
+            placeholder={email}
+          />
+          <small style={{ color: "var(--fg-muted)" }}>On your card page and saved contact. Blank uses the business email.</small>
+        </div>
         {field("card-location", "Based in", location, setLocation, { required: true })}
         {field("card-area", "Serving", serviceArea, setServiceArea, { max: 120, required: true })}
       </div>
@@ -131,7 +146,7 @@ export function PublicCardForm({ initialSettings }: Props) {
       </fieldset>
       <small style={{ color: "var(--fg-muted)" }}>
         Shown on mydovetails.com, your card page at mydovetails.com/card, and the contact people save
-        from it. Phone and email also print on estimates and invoices.
+        from it. Phone and business email also print on estimates and invoices.
       </small>
       <div>
         <button type="submit" className="btn btn-primary" disabled={saving}>
