@@ -146,8 +146,21 @@ Scope:
   the notes are not asked again.
 - The structured result (tasks, rooms, ranges, assumptions, questions,
   alternatives, answers) is saved on the estimate and reloads intact.
-- Pressing again resumes the same draft, does not duplicate it, and keeps
-  owner edits.
+- One open draft per assessment visit. Pressing again opens that draft, does
+  not duplicate it, and keeps owner edits. A second version is made by
+  copying the draft.
+- The draft opens on the existing estimate page (`estimates/[id]`), not the
+  new-estimate wizard. A Prepared scope section sits above the summary card:
+  tasks by room, quantities with their source, editable hours and materials,
+  questions beside the items they affect.
+- Apply to quote rebuilds customer line items, one per group, through the
+  existing compute path. Each generated line records the group that made it.
+  Lines the owner adds by hand are never changed or removed by Apply or by
+  regenerating. In the edit form, generated lines are marked "from prepared
+  scope" and are edited in the Prepared scope section. Other edit-form fields
+  work as today.
+- After the estimate is sent, the section is read-only. Estimates without a
+  prepared scope show no section and behave as today.
 - With the AI unavailable, the draft still opens with rooms and quantities.
 - Typed notes work with phone keyboard dictation; custom audio capture is not
   required.
@@ -167,10 +180,19 @@ Acceptance Criteria:
       is not required.
 - [ ] Save and reload keep tasks, assumptions, questions and alternatives.
 - [ ] Regenerating does not duplicate the estimate or overwrite owner edits.
+- [ ] A second Prepare Quote on the same visit opens the existing draft.
+- [ ] Apply to quote leaves hand-added lines unchanged.
+- [ ] An estimate without a prepared scope renders and saves exactly as
+      before.
 - [ ] With the AI off, rooms and quantities still reach a draft.
 
 Notes:
 Depends on TASK-178. Milestone 1 of the assessment-to-quote assistant.
+Data change (additive, reversible migration): `estimates.source_visit_id`,
+`estimates.prepared_scope` (jsonb), a unique index on account and source visit
+for draft estimates, and a nullable group key on `estimate_line_items` marking
+lines produced by Apply to quote. Owner decisions 2026-10-23: existing estimate
+page; one draft per visit.
 
 # TASK-180: Price, profitability and proposal from the same draft
 
