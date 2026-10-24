@@ -55,6 +55,8 @@ const lineItemInputSchema = z.object({
   visible_to_customer: z.boolean().default(true),
   adjustment_type: estimateAdjustmentTypeSchema.nullable().optional(),
   sort_order: z.number().int().default(0),
+  price_book_id: z.string().uuid().nullable().optional(),
+  prepared_group_key: z.string().max(60).nullable().optional(),
 });
 
 const estimateOptionInputSchema = z.object({

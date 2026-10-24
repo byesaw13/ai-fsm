@@ -19,6 +19,12 @@ export interface LineItemRow {
   quantity: string;
   unit_price: string;
   price_book_id?: string;
+  /** Kept from the saved line so an edit-form save does not reclassify it. */
+  line_item_type?: "labor" | "materials" | "handling_fee" | "adjustment";
+  visible_to_customer?: boolean;
+  adjustment_type?: string | null;
+  /** Prepared-scope group that produced the line; Apply to quote replaces it (TASK-179). */
+  prepared_group_key?: string | null;
   /**
    * Links this flattened row back to its AiMaterialsDeltaItem (by `key`),
    * when it came from the AI materials generator. Lets submit-time
@@ -63,6 +69,52 @@ export function mapPrepLevel(level: number): PrepLevel {
 // ---------------------------------------------------------------------------
 
 export const EMPTY_ROW: LineItemRow = { description: "", quantity: "1", unit_price: "0.00" };
+
+/** A saved line item as the edit form receives it. */
+export interface SavedLineItem {
+  description: string;
+  quantity: number;
+  unit_price_cents: number;
+  line_item_type?: LineItemRow["line_item_type"];
+  visible_to_customer?: boolean;
+  adjustment_type?: string | null;
+  price_book_id?: string | null;
+  prepared_group_key?: string | null;
+}
+
+/** Saved line → editable row, keeping the fields the form does not show. */
+export function savedLineToRow(item: SavedLineItem): LineItemRow {
+  return {
+    description: item.description,
+    quantity: String(item.quantity),
+    unit_price: (item.unit_price_cents / 100).toFixed(2),
+    ...(item.price_book_id ? { price_book_id: item.price_book_id } : {}),
+    ...(item.line_item_type ? { line_item_type: item.line_item_type } : {}),
+    ...(item.visible_to_customer !== undefined ? { visible_to_customer: item.visible_to_customer } : {}),
+    ...(item.adjustment_type ? { adjustment_type: item.adjustment_type } : {}),
+    ...(item.prepared_group_key ? { prepared_group_key: item.prepared_group_key } : {}),
+  };
+}
+
+/**
+ * Editable row → PATCH line item. Type, visibility, adjustment type, price-book
+ * link and prepared group are sent back as they were, so saving the form never
+ * turns a materials line into labor or detaches a prepared line. New rows take
+ * the API defaults.
+ */
+export function rowToLineItemPayload(row: LineItemRow, index: number) {
+  return {
+    description: row.description,
+    quantity: parseFloat(row.quantity) || 1,
+    unit_price_cents: parseCents(row.unit_price),
+    sort_order: index,
+    ...(row.line_item_type ? { line_item_type: row.line_item_type } : {}),
+    ...(row.visible_to_customer !== undefined ? { visible_to_customer: row.visible_to_customer } : {}),
+    ...(row.adjustment_type ? { adjustment_type: row.adjustment_type } : {}),
+    ...(row.price_book_id ? { price_book_id: row.price_book_id } : {}),
+    ...(row.prepared_group_key ? { prepared_group_key: row.prepared_group_key } : {}),
+  };
+}
 
 export const PREP_LEVEL_LABELS: Record<number, string> = {
   1: "1 — Light dusting",

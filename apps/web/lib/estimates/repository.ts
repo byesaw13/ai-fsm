@@ -15,6 +15,9 @@ export interface LineItemInput {
   visible_to_customer: boolean;
   adjustment_type?: string | null;
   sort_order: number;
+  price_book_id?: string | null;
+  /** Prepared-scope group that produced this line; null for owner-added lines (TASK-179). */
+  prepared_group_key?: string | null;
 }
 
 export interface EstimateOptionInput {
@@ -371,12 +374,14 @@ export async function updateEstimateById(
         await client.query(
           `INSERT INTO estimate_line_items
              (estimate_id, description, quantity, unit_price_cents, total_cents,
-              line_item_type, visible_to_customer, adjustment_type, sort_order)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+              line_item_type, visible_to_customer, adjustment_type, sort_order,
+              price_book_id, prepared_group_key)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
           [
             id, item.description, item.quantity, item.unit_price_cents,
             lineItemTotal(item), item.line_item_type, item.visible_to_customer,
             item.adjustment_type ?? null, item.sort_order ?? i,
+            item.price_book_id ?? null, item.prepared_group_key ?? null,
           ]
         );
       }
