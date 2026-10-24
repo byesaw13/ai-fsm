@@ -81,6 +81,26 @@ export interface PreparedAlternative {
   note: string | null;
 }
 
+/** How the owner prices the prepared quote, and the inputs for modeling profit (TASK-180). */
+export interface PreparedPricing {
+  mode: "tm" | "fixed";
+  fixed_price_cents: number | null;
+  /** Hours used for profit; null means the midpoint of the range. */
+  expected_hours: number | null;
+  /** Overhead and job expenses allocated to this quote. */
+  overhead_cents: number;
+  /** Risk reserve, percent of modeled cost. */
+  reserve_pct: number;
+}
+
+export const DEFAULT_PREPARED_PRICING: PreparedPricing = {
+  mode: "tm",
+  fixed_price_cents: null,
+  expected_hours: null,
+  overhead_cents: 0,
+  reserve_pct: 0,
+};
+
 export interface PreparedScope {
   version: 1;
   source: {
@@ -94,6 +114,9 @@ export interface PreparedScope {
   questions: PreparedQuestion[];
   alternatives: PreparedAlternative[];
   exclusions: string[];
+  pricing?: PreparedPricing;
+  /** The customer notes Apply last wrote; Apply only replaces notes that are blank or still this text. */
+  proposal_notes?: string | null;
 }
 
 const UNITS: Record<QuantityKey, PreparedQuantity["unit"]> = {
@@ -263,10 +286,119 @@ export const preparedScopeSchema = z.object({
     .array(z.object({ id: z.string(), label: z.string().max(200), task_ids: z.array(z.string()), note: z.string().max(500).nullable() }))
     .max(50),
   exclusions: z.array(z.string().max(500)).max(50),
+  pricing: z
+    .object({
+      mode: z.enum(["tm", "fixed"]),
+      fixed_price_cents: z.number().int().min(0).max(100_000_000).nullable(),
+      expected_hours: z.number().min(0).max(10_000).nullable(),
+      overhead_cents: z.number().int().min(0).max(100_000_000),
+      reserve_pct: z.number().min(0).max(100),
+    })
+    .optional(),
+  proposal_notes: z.string().max(20_000).nullable().optional(),
 });
 
 /** Read a stored prepared scope. Null when absent or not a valid version-1 scope. */
 export function parsePreparedScope(raw: unknown): PreparedScope | null {
   const parsed = preparedScopeSchema.safeParse(raw);
   return parsed.success ? (parsed.data as PreparedScope) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Pricing and modeled profit (TASK-180)
+// ---------------------------------------------------------------------------
+
+export interface PreparedProfitModel {
+  mode: PreparedPricing["mode"];
+  tm_low_cents: number;
+  tm_high_cents: number;
+  expected_hours: number;
+  labor_cost_cents: number;
+  materials_cents: number;
+  overhead_cents: number;
+  reserve_cents: number;
+  /** Labor cost + materials + overhead (reserve shown separately). */
+  modeled_cost_cents: number;
+  /** Fixed price, or the T&M bill at the expected hours; null for a fixed quote with no price yet. */
+  sell_cents: number | null;
+  /** Sell price minus modeled cost and reserve. Not net profit. */
+  remainder_cents: number | null;
+  /** Remainder as a percent of the sell price, two decimals. */
+  margin_pct: number | null;
+}
+
+/**
+ * Model what a prepared quote leaves after allocated costs. Labor cost uses the
+ * owner's cost rate, not the billing rate, so overhead or profit inside the
+ * billing rate is not counted twice. Pure.
+ */
+export function modelPreparedProfit(
+  scope: PreparedScope,
+  rates: { laborRateCents: number; laborCostCents: number },
+): PreparedProfitModel {
+  const pricing = scope.pricing ?? DEFAULT_PREPARED_PRICING;
+  const s = summarizePreparedScope(scope);
+  const expected = pricing.expected_hours ?? (s.hours_low + s.hours_high) / 2;
+  const labor = Math.round(expected * rates.laborCostCents);
+  const modeled = labor + s.materials_cents + pricing.overhead_cents;
+  const reserve = Math.round((modeled * pricing.reserve_pct) / 100);
+  const sell =
+    pricing.mode === "fixed"
+      ? pricing.fixed_price_cents
+      : Math.round(expected * rates.laborRateCents) + s.materials_cents;
+  const remainder = sell === null ? null : sell - modeled - reserve;
+  return {
+    mode: pricing.mode,
+    tm_low_cents: Math.round(s.hours_low * rates.laborRateCents) + s.materials_cents,
+    tm_high_cents: Math.round(s.hours_high * rates.laborRateCents) + s.materials_cents,
+    expected_hours: expected,
+    labor_cost_cents: labor,
+    materials_cents: s.materials_cents,
+    overhead_cents: pricing.overhead_cents,
+    reserve_cents: reserve,
+    modeled_cost_cents: modeled,
+    sell_cents: sell,
+    remainder_cents: remainder,
+    margin_pct: sell && remainder !== null ? Math.round((remainder / sell) * 10_000) / 100 : null,
+  };
+}
+
+export interface FixedPriceLine {
+  group_key: string;
+  label: string;
+  kind: "labor" | "materials";
+  cents: number;
+}
+
+/**
+ * Split a fixed price into per-group lines that sum to it exactly. Each group
+ * keeps its materials allowance; the rest is shared by each group's midpoint
+ * labor hours (largest-remainder rounding). Throws when the price is below the
+ * materials total. Pure.
+ */
+export function allocateFixedPrice(scope: PreparedScope, laborRateCents: number, fixedCents: number): FixedPriceLine[] {
+  const s = summarizePreparedScope(scope);
+  const pool = fixedCents - s.materials_cents;
+  if (pool < 0) throw new Error("The fixed price is below the materials total");
+  const groups = s.groups.filter((g) => g.hours_high > 0 || g.materials_cents > 0);
+  const weights = groups.map((g) => ((g.hours_low + g.hours_high) / 2) * laborRateCents);
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+  const shares =
+    totalWeight > 0
+      ? weights.map((w) => (pool * w) / totalWeight)
+      : groups.map((_, i) => (i === 0 ? pool : 0));
+  const floors = shares.map(Math.floor);
+  let left = pool - floors.reduce((a, b) => a + b, 0);
+  const byFraction = shares.map((v, i) => [v - floors[i], i] as const).sort((a, b) => b[0] - a[0]);
+  for (const [, i] of byFraction) {
+    if (left <= 0) break;
+    floors[i] += 1;
+    left -= 1;
+  }
+  const lines: FixedPriceLine[] = [];
+  groups.forEach((g, i) => {
+    if (floors[i] > 0) lines.push({ group_key: g.key, label: g.label, kind: "labor", cents: floors[i] });
+    if (g.materials_cents > 0) lines.push({ group_key: g.key, label: g.label, kind: "materials", cents: g.materials_cents });
+  });
+  return lines;
 }

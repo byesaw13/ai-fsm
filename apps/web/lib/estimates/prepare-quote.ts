@@ -3,6 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 // The SDK's zodOutputFormat helper requires Zod 4 schemas; zod 3.25 ships them at "zod/v4".
 import { z } from "zod/v4";
 import {
+  allocateFixedPrice,
   bindQuantities,
   computeAssessmentRoomGeometry,
   pickStartingHours,
@@ -254,6 +255,22 @@ export function preparedScopeToLineItems(
   const summary = summarizePreparedScope(scope);
   const lineItems: PreparedLineItem[] = [];
   const groupKeys: string[] = [];
+  const pricing = scope.pricing;
+  if (pricing?.mode === "fixed" && pricing.fixed_price_cents) {
+    // Fixed price (TASK-180): per-group labor and materials lines summing to the price, no hours shown.
+    for (const line of allocateFixedPrice(scope, laborRateCents, pricing.fixed_price_cents)) {
+      lineItems.push({
+        description: line.kind === "labor" ? `${line.label} — labor` : `${line.label} — materials allowance`,
+        quantity: 1,
+        unit_price_cents: line.cents,
+        line_item_type: line.kind,
+        visible_to_customer: true,
+        sort_order: lineItems.length,
+      });
+      groupKeys.push(line.group_key);
+    }
+    return { lineItems, groupKeys };
+  }
   for (const g of summary.groups) {
     const mid = Math.round(((g.hours_low + g.hours_high) / 2) * 4) / 4;
     if (mid > 0) {
@@ -359,9 +376,49 @@ export function applyScopeEdits(stored: PreparedScope, incoming: PreparedScope):
         confirmed: e.confirmed,
       };
     }),
+    pricing: incoming.pricing ?? stored.pricing,
+    // Server-managed: only Apply sets it.
+    proposal_notes: stored.proposal_notes ?? null,
     questions: stored.questions.map((q) => {
       const a = answers.get(q.id);
       return a === undefined ? q : { ...q, answer: a && a.trim() ? a.trim().slice(0, 1000) : null };
     }),
   };
+}
+
+/**
+ * Customer-facing "What's included" text for the quote notes (TASK-180):
+ * included work by group, options the customer can choose, the allowance note
+ * and the pricing terms. Never mentions hours, cost or margin. Pure.
+ */
+export function buildProposalNotes(scope: PreparedScope, laborRateCents: number): string {
+  const summary = summarizePreparedScope(scope);
+  const labels = new Map(scope.groups.map((g) => [g.key, g.label]));
+  const order = [...scope.groups.map((g) => g.key), ...scope.tasks.map((t) => t.group_key)].filter(
+    (k, i, all) => all.indexOf(k) === i,
+  );
+  const sections: string[] = ["What's included"];
+  for (const key of order) {
+    const included = scope.tasks.filter((t) => t.group_key === key && t.confirmed);
+    if (included.length === 0) continue;
+    sections.push(`${labels.get(key) ?? key}\n${included.map((t) => `- ${t.description}`).join("\n")}`);
+  }
+  const options = scope.alternatives.length
+    ? scope.alternatives.map((a) => a.label)
+    : scope.tasks.filter((t) => !t.confirmed).map((t) => t.description);
+  if (options.length) {
+    sections.push(`Options (not included unless you choose them)\n${options.map((o) => `- ${o}`).join("\n")}`);
+  }
+  if (scope.tasks.some((t) => t.confirmed && t.materials_cents !== null && t.materials_cents > 0)) {
+    sections.push("Materials are allowances. The final cost follows the products chosen.");
+  }
+  const dollars = (c: number) => `$${Math.round(c / 100).toLocaleString("en-US")}`;
+  if (scope.pricing?.mode === "fixed" && scope.pricing.fixed_price_cents) {
+    sections.push(`Pricing: fixed price of ${dollars(scope.pricing.fixed_price_cents)} for the work above.`);
+  } else if (summary.hours_high > 0) {
+    const low = summary.hours_low * laborRateCents + summary.materials_cents;
+    const high = summary.hours_high * laborRateCents + summary.materials_cents;
+    sections.push(`Pricing: time and materials, estimated ${dollars(low)}–${dollars(high)}. You are billed for the actual time and materials used.`);
+  }
+  return sections.join("\n\n");
 }

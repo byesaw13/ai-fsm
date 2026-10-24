@@ -167,7 +167,7 @@ closed in tests; owner-flow AC still open.
 | TASK-177 | [Edit the website contact info and business card from the app](TASK-177-public-business-card.md) | 005 | In progress |
 | TASK-178 | [Door, window and opening counts on assessment rooms](../archive/backlog-done/TASK-178-assessment-room-openings.md) | 002 | Done |
 | TASK-179 | [Prepare Quote from the saved assessment](../archive/backlog-done/TASK-179-prepare-quote.md) | 002 | Done |
-| TASK-180 | Price, profitability and proposal from the same draft | 002 | Proposed |
+| TASK-180 | [Price, profitability and proposal from the same draft](../archive/backlog-done/TASK-180-price-profit-proposal.md) | 002 | Done |
 | TASK-181 | Record the customer's chosen option on approval | 002 | Proposed |
 | TASK-182 | On approval, request the deposit and start scheduling | 002 | Proposed |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
@@ -266,7 +266,7 @@ closed in tests; owner-flow AC still open.
 | TASK-097 | Trade Construction Knowledge Engine | 002 | Done |
 | TASK-098 | 3-Layer Hybrid Estimating Engine | 002 | Cancelled (scaffold deleted PR #603) |
 | TASK-099 | Reconcile TASK-094 delta capture with TASK-098 benchmark calibration | 002 | Deferred |
-| TASK-100 | Fix T&M vs Fixed comparison card (hours-overrun modeling, shared rate constant) | 002 | Proposed |
+| TASK-100 | [Fix T&M vs Fixed comparison card (hours-overrun modeling, shared rate constant)](../archive/backlog-done/TASK-100-tm-vs-fixed-card.md) | 002 | Done |
 | TASK-101 | Standalone & direct quick materials generator (uncouple materials from estimates) | 002 | Done |
 | TASK-102 | Quick materials — assessment context + save-to-job (follow-up to TASK-101) | 002 | Proposed |
 | TASK-103 | Door hardware (1007) deterministic materials takeoff → buy list | 002 | In Progress |

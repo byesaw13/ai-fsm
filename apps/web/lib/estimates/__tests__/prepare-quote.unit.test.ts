@@ -3,6 +3,7 @@ import { buildAssessmentSummary, type AssessmentRoom } from "@ai-fsm/domain";
 import {
   applyScopeEdits,
   buildPreparationPrompt,
+  buildProposalNotes,
   fallbackPreparedScope,
   preparedScopeInternalNote,
   preparedScopeToLineItems,
@@ -271,5 +272,59 @@ describe("applyScopeEdits", () => {
     const incoming = structuredClone(stored);
     incoming.tasks[0] = { ...incoming.tasks[0], hours_low: 9, hours_high: 6 };
     expect(applyScopeEdits(stored, incoming).tasks[0]).toMatchObject({ hours_low: 6, hours_high: 9 });
+  });
+});
+
+describe("fixed price lines (TASK-180)", () => {
+  const base = toPreparedScope(OUTPUT, SUMMARY, [], SOURCE);
+  const fixed = { ...base, pricing: { mode: "fixed" as const, fixed_price_cents: 550_000, expected_hours: 42, overhead_cents: 30_000, reserve_pct: 12 } };
+
+  it("one labor and one materials line per group, summing exactly to the fixed price, no hours shown", () => {
+    const { lineItems, groupKeys } = preparedScopeToLineItems(fixed, TEST_RATE_CENTS);
+    expect(lineItems.reduce((s, l) => s + l.quantity * l.unit_price_cents, 0)).toBe(550_000);
+    expect(lineItems.every((l) => l.quantity === 1 && !/\bh\b|hours/.test(l.description))).toBe(true);
+    expect(lineItems.filter((l) => l.line_item_type === "materials").map((l) => l.unit_price_cents)).toEqual([8500, 4000, 19000, 75000, 24000]);
+    expect(groupKeys).toHaveLength(lineItems.length);
+  });
+
+  it("a fixed quote without a price falls back to T&M lines", () => {
+    const noPrice = { ...base, pricing: { ...fixed.pricing, fixed_price_cents: null } };
+    expect(preparedScopeToLineItems(noPrice, TEST_RATE_CENTS).lineItems[0].description).toMatch(/labor, est\. 5–8 h/);
+  });
+});
+
+describe("buildProposalNotes", () => {
+  const scope = toPreparedScope(OUTPUT, SUMMARY, [], SOURCE);
+
+  it("lists included work by group, options and the T&M range, without hours or cost", () => {
+    const text = buildProposalNotes(scope, TEST_RATE_CENTS);
+    expect(text).toMatch(/^What's included\n\nRoom 1 repairs, ceiling, baseboard and plates\n- Patch picture-hanger pinholes/);
+    expect(text).toContain("Options (not included unless you choose them)\n- Vinyl plank instead of sheet vinyl");
+    expect(text).toContain("Materials are allowances.");
+    expect(text).toContain("Pricing: time and materials, estimated $4,025–$5,640.");
+    expect(text).not.toMatch(/\d+(\.\d+)?\s*h\b|hours|\/h|margin|labor cost|remainder|reserve|overhead/i);
+  });
+
+  it("states the fixed price when the quote is fixed", () => {
+    const text = buildProposalNotes({ ...scope, pricing: { mode: "fixed", fixed_price_cents: 550_000, expected_hours: null, overhead_cents: 0, reserve_pct: 0 } }, TEST_RATE_CENTS);
+    expect(text).toContain("Pricing: fixed price of $5,500 for the work above.");
+    expect(text).not.toContain("time and materials");
+  });
+
+  it("leaves out unchecked tasks from the included work", () => {
+    const s = structuredClone(scope);
+    s.tasks[0].confirmed = false;
+    expect(buildProposalNotes(s, TEST_RATE_CENTS).split("Options")[0]).not.toContain("Patch picture-hanger pinholes");
+  });
+});
+
+describe("applyScopeEdits pricing", () => {
+  const stored = { ...toPreparedScope(OUTPUT, SUMMARY, [], SOURCE), proposal_notes: "What's included…" };
+
+  it("takes the owner's pricing inputs and keeps the server's proposal text", () => {
+    const incoming = { ...structuredClone(stored), proposal_notes: "tampered", pricing: { mode: "fixed" as const, fixed_price_cents: 550_000, expected_hours: 42, overhead_cents: 30_000, reserve_pct: 12 } };
+    const merged = applyScopeEdits(stored, incoming);
+    expect(merged.pricing).toEqual(incoming.pricing);
+    expect(merged.proposal_notes).toBe("What's included…");
   });
 });
