@@ -266,6 +266,9 @@ export default async function EstimateDetailPage({
       {/* Edit form — owner/admin only, draft only */}
       {canTransition && currentStatus === "draft" && (
         <EstimateEditForm
+          // Remount when the saved lines change (Apply to quote replaces them), so the
+          // form never saves stale lines over the rebuilt quote.
+          key={lineItems.map((item) => item.id).join(",")}
           estimateId={estimate.id}
           presentationMode={estimate.presentation_mode}
           initialClientId={estimate.client_id}

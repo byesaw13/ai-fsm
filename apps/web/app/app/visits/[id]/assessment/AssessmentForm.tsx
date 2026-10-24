@@ -20,6 +20,7 @@ import type { MaterialItem } from "@/app/app/estimates/components/MaterialsGener
 import { buildAiMaterialsDelta } from "@/lib/estimates/materials-delta";
 import { areaCaptureStatus, areaStatusLabel, assessmentAreaProgress } from "@/lib/assessments/area-status";
 import { roomGeometryLines } from "@/lib/assessments/room-geometry-display";
+import { completionToKeep } from "@/lib/assessments/completion";
 
 const TRADE_KEYS = Object.keys(ASSESSMENT_TRADE_LABELS) as AssessmentTradeKey[];
 
@@ -209,7 +210,8 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
   async function handlePrepareQuote() {
     setPreparing(true);
     try {
-      if (!(await save(null))) return;
+      // Keep the stored completion: preparing a quote must not reopen the assessment.
+      if (!(await save(completionToKeep(initialAssessment?.completed_at)))) return;
       const res = await fetch(`/api/v1/visits/${visitId}/prepare-quote`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
