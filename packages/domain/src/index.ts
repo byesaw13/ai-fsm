@@ -22,6 +22,7 @@ export * from "./job-materials";
 export * from "./stages";
 export * from "./scope";
 export * from "./assessment-summary";
+export * from "./prepared-scope";
 export * from "./construction-profiles";
 export * from "./production-takeoff";
 export * from "./work-order";
