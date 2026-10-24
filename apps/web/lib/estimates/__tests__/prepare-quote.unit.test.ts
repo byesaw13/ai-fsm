@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildAssessmentSummary, type AssessmentRoom } from "@ai-fsm/domain";
 import {
+  applyScopeEdits,
   buildPreparationPrompt,
   fallbackPreparedScope,
   preparedScopeInternalNote,
@@ -233,5 +234,42 @@ describe("buildPreparationPrompt", () => {
     expect(prompt).toContain("Possible subfloor damage.");
     expect(prompt).toContain("3002 Ceiling fan replace");
     expect(prompt).not.toContain("9099");
+  });
+});
+
+describe("applyScopeEdits", () => {
+  const stored = toPreparedScope(OUTPUT, SUMMARY, [], SOURCE);
+
+  it("takes the owner's hours, materials, inclusion and answers, labeling changed hours as theirs", () => {
+    const incoming = structuredClone(stored);
+    incoming.tasks[0] = { ...incoming.tasks[0], hours_low: 6, hours_high: 9, materials_cents: 9000 };
+    incoming.tasks[13] = { ...incoming.tasks[13], confirmed: false };
+    incoming.questions[0] = { ...incoming.questions[0], answer: "  Exclude it  " };
+    const merged = applyScopeEdits(stored, incoming);
+    expect(merged.tasks[0]).toMatchObject({ hours_low: 6, hours_high: 9, hours_source: "owner", materials_cents: 9000 });
+    expect(merged.tasks[13].confirmed).toBe(false);
+    expect(merged.questions[0].answer).toBe("Exclude it");
+  });
+
+  it("keeps the hours source when hours did not change", () => {
+    const merged = applyScopeEdits(stored, structuredClone(stored));
+    expect(merged.tasks[0].hours_source).toBe("ai_allowance");
+  });
+
+  it("ignores edits to rooms, quantities, text, source and unknown tasks", () => {
+    const incoming = structuredClone(stored);
+    incoming.tasks[2] = { ...incoming.tasks[2], room_id: "r2", description: "Paint everything", quantity: { key: "ceiling_sqft", value: 9999, unit: "sqft", basis: "measured" } };
+    incoming.tasks.push({ ...incoming.tasks[0], id: "t99", description: "Injected" });
+    incoming.source = { visit_id: "other", assessment_id: null, assessment_updated_at: null };
+    const merged = applyScopeEdits(stored, incoming);
+    expect(merged.tasks[2]).toMatchObject({ room_id: "r1", description: "Paint ceiling", quantity: { value: 100 } });
+    expect(merged.tasks).toHaveLength(15);
+    expect(merged.source.visit_id).toBe("v1");
+  });
+
+  it("puts reversed hours back in order", () => {
+    const incoming = structuredClone(stored);
+    incoming.tasks[0] = { ...incoming.tasks[0], hours_low: 9, hours_high: 6 };
+    expect(applyScopeEdits(stored, incoming).tasks[0]).toMatchObject({ hours_low: 6, hours_high: 9 });
   });
 });

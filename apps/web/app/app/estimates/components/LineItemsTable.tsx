@@ -87,6 +87,11 @@ export function LineItemsTable({
                       disabled={disabled}
                       data-testid={`${p}line-item-desc-${i}`}
                     />
+                    {row.prepared_group_key && (
+                      <div className="muted" style={{ fontSize: "var(--text-xs)", marginTop: "var(--space-1)" }}>
+                        From prepared scope. Apply to quote replaces this line.
+                      </div>
+                    )}
                   </td>
                   <td>
                     <input

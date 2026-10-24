@@ -28,7 +28,15 @@ import {
 } from "@ai-fsm/domain";
 import type { RoomSpec, ProjectOptions, EstimateResult } from "@ai-fsm/domain";
 import type { OptionTier } from "@/lib/estimates/form-helpers";
-import { parseCents, lineTotal, EMPTY_ROW, type LineItemRow } from "@/lib/estimates/form-helpers";
+import {
+  parseCents,
+  lineTotal,
+  EMPTY_ROW,
+  rowToLineItemPayload,
+  savedLineToRow,
+  type LineItemRow,
+  type SavedLineItem,
+} from "@/lib/estimates/form-helpers";
 import { RoomByRoomEditor } from "../../estimates/new/components/RoomByRoomEditor";
 
 // ---------------------------------------------------------------------------
@@ -40,10 +48,7 @@ interface JobOption { id: string; title: string; client_id: string; }
 interface PropertyOption { id: string; address: string; client_id: string; }
 
 
-interface InitialLineItem {
-  description: string;
-  quantity: number;
-  unit_price_cents: number;
+interface InitialLineItem extends SavedLineItem {
   sort_order: number;
 }
 
@@ -189,11 +194,7 @@ function StandardEstimateEditForm({
   const [expiresAt, setExpiresAt] = useState(isoToDateString(initialExpiresAt));
   const [lineItems, setLineItems] = useState<LineItemRow[]>(
     initialLineItems.length > 0
-      ? initialLineItems.map((item) => ({
-          description: item.description,
-          quantity: String(item.quantity),
-          unit_price: centsToDisplayDollars(item.unit_price_cents),
-        }))
+      ? initialLineItems.map(savedLineToRow)
       : [{ ...EMPTY_ROW }]
   );
 
@@ -334,7 +335,8 @@ function StandardEstimateEditForm({
 
   function duplicateLineItem(index: number) {
     setLineItems((prev) => {
-      const copy = { ...prev[index] };
+      // A copy is the owner's line: Apply to quote must not replace it.
+      const { prepared_group_key: _group, ...copy } = prev[index];
       const next = [...prev];
       next.splice(index + 1, 0, copy);
       return next;
@@ -455,12 +457,7 @@ function StandardEstimateEditForm({
           notes: notes.trim() || null,
           expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
           tax_rate: taxRateNum,
-          line_items: lineItems.map((row, i) => ({
-            description: row.description,
-            quantity: parseFloat(row.quantity) || 1,
-            unit_price_cents: parseCents(row.unit_price),
-            sort_order: i,
-          })),
+          line_items: lineItems.map(rowToLineItemPayload),
           trip_count: tripCount,
           requires_drying_or_curing: requiresDryingOrCuring,
           difficult_access: difficultAccess,
