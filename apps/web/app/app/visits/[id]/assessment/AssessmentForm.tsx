@@ -97,6 +97,7 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [preparing, setPreparing] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -204,6 +205,25 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
     setSaving(false);
   }
 
+  // Prepare Quote (TASK-179): save, build or reopen this visit's draft, open it.
+  async function handlePrepareQuote() {
+    setPreparing(true);
+    try {
+      if (!(await save(null))) return;
+      const res = await fetch(`/api/v1/visits/${visitId}/prepare-quote`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error?.message ?? "Could not prepare the quote");
+        return;
+      }
+      router.push(`/app/estimates/${data.id}` as Route);
+    } catch {
+      setError("Network error — try again");
+    } finally {
+      setPreparing(false);
+    }
+  }
+
   async function handleComplete() {
     setCompleting(true);
     const ok = await save(new Date().toISOString());
@@ -267,7 +287,7 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
     } catch { /* ignore */ }
   }
 
-  const disabled = !canEdit || saving || completing;
+  const disabled = !canEdit || saving || completing || preparing;
 
   // Seed the materials generator with the full assessment, not just scope
   // notes. The generator's scope textarea stays editable as the preview.
@@ -827,7 +847,7 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
           <button
             type="button"
             onClick={handleSave}
-            disabled={saving || completing}
+            disabled={saving || completing || preparing}
             className="p7-btn p7-btn-secondary p7-btn-sm"
           >
             {saving ? "Saving…" : "Save Draft"}
@@ -835,10 +855,19 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
           <button
             type="button"
             onClick={handleComplete}
-            disabled={saving || completing}
+            disabled={saving || completing || preparing}
             className="p7-btn p7-btn-primary p7-btn-sm"
           >
             {completing ? "Completing…" : "Mark Assessment Complete"}
+          </button>
+          <button
+            type="button"
+            onClick={handlePrepareQuote}
+            disabled={saving || completing || preparing}
+            className="p7-btn p7-btn-secondary p7-btn-sm"
+            data-testid="prepare-quote"
+          >
+            {preparing ? "Preparing quote…" : "Prepare Quote →"}
           </button>
           <button
             type="button"
@@ -857,6 +886,11 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
           <a href={`/app/visits/${visitId}`} className="p7-btn p7-btn-ghost p7-btn-sm">
             Back to Visit
           </a>
+          {preparing && (
+            <p role="status" style={{ flex: "1 1 100%", margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
+              Reading your rooms and notes and listing the work. This takes about a minute; keep this page open.
+            </p>
+          )}
         </div>
       )}
     </div>

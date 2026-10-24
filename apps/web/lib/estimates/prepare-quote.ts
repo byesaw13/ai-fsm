@@ -331,3 +331,37 @@ export async function extractPreparedScope(
   const parsed = preparationOutputSchema.safeParse(response.parsed_output);
   return parsed.success ? parsed.data : null;
 }
+
+/**
+ * Merge the owner's edits into the stored scope. Only hours, materials,
+ * confirmation and answers can change; rooms, quantities, source and task text
+ * come from the stored copy, and unknown task or question ids are ignored.
+ * Changed hours are labeled as the owner's. Pure.
+ */
+export function applyScopeEdits(stored: PreparedScope, incoming: PreparedScope): PreparedScope {
+  const editedTasks = new Map(incoming.tasks.map((t) => [t.id, t]));
+  const answers = new Map(incoming.questions.map((q) => [q.id, q.answer]));
+  return {
+    ...stored,
+    tasks: stored.tasks.map((t) => {
+      const e = editedTasks.get(t.id);
+      if (!e) return t;
+      let low = e.hours_low;
+      let high = e.hours_high;
+      if (low !== null && high !== null && low > high) [low, high] = [high, low];
+      const hoursChanged = low !== t.hours_low || high !== t.hours_high;
+      return {
+        ...t,
+        hours_low: low,
+        hours_high: high,
+        hours_source: hoursChanged ? (low === null && high === null ? null : "owner") : t.hours_source,
+        materials_cents: e.materials_cents,
+        confirmed: e.confirmed,
+      };
+    }),
+    questions: stored.questions.map((q) => {
+      const a = answers.get(q.id);
+      return a === undefined ? q : { ...q, answer: a && a.trim() ? a.trim().slice(0, 1000) : null };
+    }),
+  };
+}

@@ -14,7 +14,7 @@ hours and materials per group, and only the questions that change price or
 scope. After the customer approves the chosen option, the right deposit is
 requested and scheduling starts.
 
-Build order: TASK-178 (done) → TASK-179 → TASK-180 is the quote track. TASK-181 →
+Build order: TASK-178 (done) → TASK-179 (done) → TASK-180 is the quote track. TASK-181 →
 TASK-182 is the approval track. The two tracks do not depend on each other.
 Documentation approved 2026-10-23. Implementation is not yet authorized.
 
@@ -57,109 +57,6 @@ labor-versus-elapsed schedule modeling, automatic learning from actuals, a
 separate signed work agreement, and AI revise-from-feedback beyond
 regenerating the draft. Researched starting assumptions for hours are in
 scope: the owner should not have to invent every number.
-
-# TASK-179: Prepare Quote from the saved assessment
-
-Status:
-In progress
-
-Phase:
-3
-
-Problem:
-The T&M briefing path (`lib/estimates/tm-briefing.ts`,
-`api/v1/estimates/ai-tm-briefing`, `TmDraftReviewPanel.tsx`) already extracts
-scope, labor hour ranges, materials with supplier responsibility, risks and
-drying/trip flags, and prices from account settings. But it reads only the
-job's title, notes and property, not the saved assessment. Hours are one
-range for the whole job. Scope items are plain strings with no room. On save
-the extraction is flattened into notes text (`useEstimateForm.ts`), so
-assumptions and questions do not survive a reload. The separate AI draft
-prompt caps a draft at six services (`ai-draft.ts`).
-
-Business Value:
-One button turns a walkthrough into a usable draft without retyping it.
-
-Scope:
-- One Prepare Quote action on the assessment. It saves first, then builds the
-  draft server-side from the saved rooms, notes and photos. Extend the T&M
-  briefing path; do not create a second estimate engine.
-- Reuse T&M preparation, not T&M billing. The saved scope must also be able
-  to feed a fixed-price proposal (TASK-180).
-- Every requested action is kept with its room. Grouping several actions into
-  one customer line is allowed; dropping one is not. Remove the six-service
-  cap. If any limit is hit, show it.
-- Separate a field observation, a customer request and an AI-suggested
-  addition. Never silently add whole-room painting, subfloor replacement or
-  fixture upgrades.
-- Quantities are calculated in code from the measurements, never by the
-  model, and attach to the task they drive (bathroom ceiling paint → 96 sq ft;
-  Room 1 baseboard → 2 LF). Use the shared geometry helper in
-  `packages/domain`. Mark each as measured, assumed or overridden. An unknown
-  dimension leaves the quantity unknown, never zero or a default.
-- Hours low–high and a materials allowance per group, labeled as editable
-  suggestions with their source. Starting points, in order: matching
-  price-book `labor_hours_low/typical/high`; existing production rates
-  (migration 090) applied to measured quantities; otherwise a labeled AI
-  allowance. The owner never has to supply hours.
-- A draft appears immediately. Questions are attached to the items they
-  affect and only cover things that change price or scope. Answers already in
-  the notes are not asked again.
-- The structured result (tasks, rooms, ranges, assumptions, questions,
-  alternatives, answers) is saved on the estimate and reloads intact.
-- One open draft per assessment visit. Pressing again opens that draft, does
-  not duplicate it, and keeps owner edits. A second version is made by
-  copying the draft.
-- The draft opens on the existing estimate page (`estimates/[id]`), not the
-  new-estimate wizard. A Prepared scope section sits above the summary card:
-  tasks by room, quantities with their source, editable hours and materials,
-  questions beside the items they affect.
-- Apply to quote rebuilds customer line items, one per group, through the
-  existing compute path. Each generated line records the group that made it.
-  Lines the owner adds by hand are never changed or removed by Apply or by
-  regenerating. In the edit form, generated lines are marked "from prepared
-  scope" and are edited in the Prepared scope section. Other edit-form fields
-  work as today.
-- After the estimate is sent, the section is read-only. Estimates without a
-  prepared scope show no section and behave as today.
-- With the AI unavailable, the draft still opens with rooms and quantities.
-- Typed notes work with phone keyboard dictation; custom audio capture is not
-  required.
-
-Out of Scope:
-- Market price comparison, schedule modeling, a catalog-wide production-rate
-  project.
-
-Acceptance Criteria:
-- [ ] The reference notes produce every named task in the right room without
-      hand-written estimate lines.
-- [ ] Known quantities match the reference; unknown height, product details
-      and subfloor condition stay unknown.
-- [ ] The four recorded answers are kept and not asked again.
-- [ ] With hours removed from the notes, the draft still proposes hour ranges
-      with visible sources for the owner to correct. Supplying hours manually
-      is not required.
-- [ ] Save and reload keep tasks, assumptions, questions and alternatives.
-- [ ] Regenerating does not duplicate the estimate or overwrite owner edits.
-- [ ] A second Prepare Quote on the same visit opens the existing draft.
-- [ ] Apply to quote leaves hand-added lines unchanged.
-- [ ] An estimate without a prepared scope renders and saves exactly as
-      before.
-- [ ] With the AI off, rooms and quantities still reach a draft.
-
-Notes:
-Depends on TASK-178. Milestone 1 of the assessment-to-quote assistant.
-Progress: slice 1 (prepared-scope types, migration 204) shipped #712. Slice 2
-adds `POST /api/v1/visits/[id]/prepare-quote` and moves estimate creation into
-`lib/estimates/create-estimate.ts` (one create path). Open for slice 3: the
-review section and Prepare Quote button; starting hours from production rates
-(today: price book, then a labeled AI allowance); a progress state, since the
-model call takes about a minute.
-Data change (additive, reversible migration): `estimates.source_visit_id`,
-`estimates.prepared_scope` (jsonb), a unique index on account and source visit
-for draft estimates, and a nullable group key on `estimate_line_items` marking
-lines produced by Apply to quote. Owner decisions 2026-10-23: existing estimate
-page; one draft per visit.
 
 # TASK-180: Price, profitability and proposal from the same draft
 
@@ -770,6 +667,7 @@ buy list → confirm no mud/tape). Headless browser on this host cannot launch
 (Chromium sandbox).
 
 ## Completed
+- [TASK-179: Prepare Quote from the saved assessment](../archive/backlog-done/TASK-179-prepare-quote.md) — Done (#712, #713, slice 3; 2026-10-24)
 - [TASK-178: Door, window and opening counts on assessment rooms](../archive/backlog-done/TASK-178-assessment-room-openings.md) — Done (#711, deployed 2026-10-23)
 
 - [TASK-112: Job materials builder templates](../archive/backlog-done/TASK-112-job-materials-builder-templates.md) — Done (validated 2026-09-09)

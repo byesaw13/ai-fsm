@@ -20,6 +20,10 @@ import { buildClientDocumentFilename } from "@/lib/estimates/guardrails";
 import { ChangeOrdersClient } from "./ChangeOrdersClient";
 import { DecomposeWorkPanel } from "./DecomposeWorkPanel";
 import { loadEstimateDetail } from "./detail-data";
+import { PreparedScopePanel } from "./sections/PreparedScopePanel";
+import { parsePreparedScope } from "@ai-fsm/domain";
+import { loadAssessmentSummary } from "@/lib/estimates/assessment-summary-loader";
+import { resolveLaborRateCents } from "@/lib/estimates/tm-briefing";
 import { laborHoursFromCostCents } from "@/lib/pricing/labor-hours";
 import { LinkedDocuments } from "@/components/documents/LinkedDocuments";
 import { STATUS_LABELS } from "./format";
@@ -85,6 +89,15 @@ export default async function EstimateDetailPage({
     documentType: "estimate",
     status: estimate.status === "declined" || estimate.status === "expired" ? "archived" : estimate.status,
   });
+  // Prepare Quote (TASK-179): the structured scope and the rate Apply uses.
+  const preparedScope = parsePreparedScope(estimate.prepared_scope);
+  const preparedSource =
+    preparedScope && estimate.source_visit_id ? await loadAssessmentSummary(session, estimate.source_visit_id) : null;
+  const preparedRoomNames = Object.fromEntries(
+    (preparedSource?.rooms ?? []).map((r) => [r.id, r.name || "Unnamed area"]),
+  );
+  const preparedRateCents = resolveLaborRateCents(location?.property_state ?? null, pricingSettings).labor_rate_cents;
+
   const reviewHealth = estimateReviewHealth(
     estimate.presentation_mode === "multi_option"
       ? options.flatMap((option) => option.line_items)
@@ -213,6 +226,15 @@ export default async function EstimateDetailPage({
         </div>
       )}
 
+      {preparedScope && (
+        <PreparedScopePanel
+          estimateId={estimate.id}
+          initialScope={preparedScope}
+          roomNames={preparedRoomNames}
+          laborRateCents={preparedRateCents}
+          editable={canTransition && currentStatus === "draft"}
+        />
+      )}
       <EstimateSummaryCard
         estimate={estimate}
         role={session.role}
@@ -258,6 +280,11 @@ export default async function EstimateDetailPage({
             quantity: item.quantity,
             unit_price_cents: item.unit_price_cents,
             sort_order: item.sort_order,
+            line_item_type: item.line_item_type,
+            visible_to_customer: item.visible_to_customer,
+            adjustment_type: item.adjustment_type,
+            price_book_id: item.price_book_id,
+            prepared_group_key: item.prepared_group_key,
           }))}
           initialOptions={options.map((opt) => ({
             id: opt.id,
