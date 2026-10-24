@@ -1,0 +1,237 @@
+import { describe, it, expect } from "vitest";
+import { buildAssessmentSummary, type AssessmentRoom } from "@ai-fsm/domain";
+import {
+  buildPreparationPrompt,
+  fallbackPreparedScope,
+  preparedScopeInternalNote,
+  preparedScopeToLineItems,
+  toPreparedScope,
+  type PreparationOutput,
+  type PriceBookHours,
+} from "../prepare-quote";
+
+// The owner's four-room walkthrough (TASK-179 reference scenario).
+const ROOMS: AssessmentRoom[] = [
+  { id: "r1", name: "Room 1", length_ft: 10, width_ft: 10, height_ft: null, notes: "pinholes, 2 ft baseboard missing, paint ceiling, 3 faceplates missing", door_count: 1, window_count: 2 },
+  { id: "r2", name: "Room 2", length_ft: null, width_ft: null, height_ft: null, notes: "6 in hole lower left, patch prep paint match, no matching paint on site" },
+  { id: "r3", name: "Room 3", length_ft: null, width_ft: null, height_ft: null, notes: "replace 2 can lights with LED, replace ceiling fan" },
+  { id: "r4", name: "Bathroom", length_ft: 12, width_ft: 8, height_ft: null, notes: "toilet, vanity, sink, faucet; vinyl floor; reseal shower; paint; baseboard; trim", door_count: 1, window_count: 1, openings: [{ label: "Closet door", width_in: 20 }] },
+];
+
+const SUMMARY = buildAssessmentSummary({
+  visitId: "v1",
+  assessmentId: "a1",
+  rooms: ROOMS,
+  scopeNotes: "Dovetails supplies toilet, vanity, faucet and fan. Show sheet vinyl and vinyl plank. Bathroom ceiling included. Possible subfloor damage.",
+});
+
+const SOURCE = { visitId: "v1", assessmentUpdatedAt: "2026-10-23 12:00:00+00" };
+
+const PRICE_BOOK: PriceBookHours[] = [
+  { code: "3002", name: "Ceiling fan replace", labor_hours_low: 1, labor_hours_typical: 1.5, labor_hours_high: 2 },
+  { code: "9099", name: "Custom", labor_hours_low: null, labor_hours_typical: null, labor_hours_high: null },
+];
+
+type RawTask = PreparationOutput["tasks"][number];
+function raw(t: Partial<RawTask> & Pick<RawTask, "description" | "group_key">): RawTask {
+  return {
+    room_id: null,
+    kind: "requested",
+    quantity_key: null,
+    count: null,
+    count_unit: null,
+    hours_low: null,
+    hours_high: null,
+    materials_cents: null,
+    customer_supplied: false,
+    is_alternative: false,
+    price_book_code: null,
+    ...t,
+  };
+}
+
+// Model output for the walkthrough, with the owner's demonstration hours on one
+// task per group so group totals equal the fixture (32–51 h, $1,305).
+const OUTPUT: PreparationOutput = {
+  groups: [
+    { key: "room1", label: "Room 1 repairs, ceiling, baseboard and plates" },
+    { key: "room2", label: "Room 2 drywall repair and paint blending" },
+    { key: "room3", label: "Room 3 LED retrofits and fan" },
+    { key: "bath", label: "Bathroom fixtures, paint, trim and reseal" },
+    { key: "bath_floor", label: "Bathroom sheet vinyl floor" },
+  ],
+  tasks: [
+    raw({ room_id: "r1", group_key: "room1", description: "Patch picture-hanger pinholes", hours_low: 5, hours_high: 8, materials_cents: 8500 }),
+    raw({ room_id: "r1", group_key: "room1", description: "Replace missing baseboard", quantity_key: "count", count: 2, count_unit: "lf", materials_cents: 0 }),
+    raw({ room_id: "r1", group_key: "room1", description: "Paint ceiling", quantity_key: "ceiling_sqft", materials_cents: 0 }),
+    raw({ room_id: "r1", group_key: "room1", description: "Install missing faceplates", quantity_key: "count", count: 3, count_unit: "each", materials_cents: 0 }),
+    raw({ room_id: "r2", group_key: "room2", description: "Patch 6 in hole, prep and blend paint", hours_low: 3, hours_high: 5, materials_cents: 4000 }),
+    raw({ room_id: "r3", group_key: "room3", description: "Replace 2 can lights with LED retrofits", quantity_key: "count", count: 2, count_unit: "each", hours_low: 3, hours_high: 5, materials_cents: 19000 }),
+    raw({ room_id: "r3", group_key: "room3", description: "Replace ceiling fan", quantity_key: "count", count: 1, count_unit: "each", materials_cents: 0 }),
+    raw({ room_id: "r4", group_key: "bath", description: "Replace toilet, vanity, sink and faucet", hours_low: 15, hours_high: 23, materials_cents: 75000 }),
+    raw({ room_id: "r4", group_key: "bath", description: "Reseal shower", materials_cents: 0 }),
+    raw({ room_id: "r4", group_key: "bath", description: "Paint walls", quantity_key: "net_wall_sqft", materials_cents: 0 }),
+    raw({ room_id: "r4", group_key: "bath", description: "Paint ceiling", quantity_key: "ceiling_sqft", materials_cents: 0 }),
+    raw({ room_id: "r4", group_key: "bath", description: "Replace baseboard", quantity_key: "baseboard_lf", materials_cents: 0 }),
+    raw({ room_id: "r4", group_key: "bath", description: "Prep and paint all trim", materials_cents: 0 }),
+    raw({ room_id: "r4", group_key: "bath_floor", description: "Install sheet vinyl floor", quantity_key: "floor_sqft", hours_low: 6, hours_high: 10, materials_cents: 24000 }),
+    raw({ room_id: "r4", group_key: "bath_floor", description: "Remove existing vinyl floor", materials_cents: 0 }),
+  ],
+  questions: [{ text: "Repair any subfloor damage found, or exclude it?", task_indexes: [13, 14] }],
+  alternatives: [{ label: "Vinyl plank instead of sheet vinyl", task_indexes: [13], note: null }],
+  exclusions: ["Concealed subfloor damage"],
+};
+
+const TEST_RATE_CENTS = 8500; // test-only rate from the owner's demonstration
+
+describe("toPreparedScope", () => {
+  const scope = toPreparedScope(OUTPUT, SUMMARY, [], SOURCE);
+
+  it("keeps all 15 requested tasks, each in its room", () => {
+    expect(scope.tasks).toHaveLength(15);
+    expect(scope.tasks.filter((t) => t.room_id === "r4")).toHaveLength(8);
+    expect(scope.tasks.every((t) => t.room_id !== null)).toBe(true);
+  });
+
+  it("binds measured quantities in code and keeps unknowns unknown", () => {
+    const byDesc = (d: string, room: string) => scope.tasks.find((t) => t.description === d && t.room_id === room)!;
+    expect(byDesc("Paint ceiling", "r1").quantity).toMatchObject({ value: 100, basis: "measured" });
+    expect(byDesc("Paint ceiling", "r4").quantity).toMatchObject({ value: 96, basis: "measured" });
+    expect(byDesc("Install sheet vinyl floor", "r4").quantity).toMatchObject({ value: 96, unit: "sqft" });
+    expect(byDesc("Replace baseboard", "r4").quantity?.value).toBeCloseTo(35.33, 1);
+    expect(byDesc("Paint walls", "r4").quantity).toMatchObject({ value: null, basis: "unknown" });
+    expect(byDesc("Replace missing baseboard", "r1").quantity).toMatchObject({ value: 2, unit: "lf" });
+  });
+
+  it("records the source visit and assessment revision", () => {
+    expect(scope.source).toEqual({ visit_id: "v1", assessment_id: "a1", assessment_updated_at: "2026-10-23 12:00:00+00" });
+  });
+
+  it("ties questions and alternatives to tasks by id", () => {
+    expect(scope.questions[0]).toMatchObject({ id: "q1", task_ids: ["t14", "t15"], answer: null });
+    expect(scope.alternatives[0].task_ids).toEqual(["t14"]);
+    expect(scope.exclusions).toEqual(["Concealed subfloor damage"]);
+  });
+
+  it("starts AI suggestions unconfirmed", () => {
+    const s = toPreparedScope(
+      { ...OUTPUT, tasks: [raw({ room_id: "r2", group_key: "room2", description: "Repaint whole wall", kind: "suggested" })] },
+      SUMMARY, [], SOURCE,
+    );
+    expect(s.tasks[0]).toMatchObject({ kind: "suggested", confirmed: false });
+  });
+
+  it("charges for one side of an option: the alternative starts unconfirmed and stays out of totals", () => {
+    const s = toPreparedScope(
+      {
+        ...OUTPUT,
+        tasks: [
+          raw({ room_id: "r4", group_key: "bath_floor", description: "Sheet vinyl", quantity_key: "floor_sqft", hours_low: 6, hours_high: 10, materials_cents: 24000 }),
+          raw({ room_id: "r4", group_key: "bath_floor", description: "Vinyl plank", quantity_key: "floor_sqft", hours_low: 8, hours_high: 12, materials_cents: 40000, is_alternative: true }),
+        ],
+      },
+      SUMMARY, [], SOURCE,
+    );
+    expect(s.tasks.map((t) => [t.kind, t.confirmed])).toEqual([["requested", true], ["requested", false]]);
+    const { lineItems } = preparedScopeToLineItems(s, TEST_RATE_CENTS);
+    expect(lineItems.map((l) => [l.quantity, l.unit_price_cents])).toEqual([[8, 8500], [1, 24000]]);
+  });
+
+  it("prefers price-book hours over the model's allowance and labels the source", () => {
+    const s = toPreparedScope(
+      { ...OUTPUT, tasks: [raw({ room_id: "r3", group_key: "room3", description: "Replace ceiling fan", price_book_code: "3002", hours_low: 4, hours_high: 6 })] },
+      SUMMARY, PRICE_BOOK, SOURCE,
+    );
+    expect(s.tasks[0]).toMatchObject({ hours_low: 1, hours_high: 2, hours_source: "price_book", price_book_code: "3002" });
+  });
+
+  it("falls back to a labeled AI allowance when the price book has no hours", () => {
+    const s = toPreparedScope(
+      { ...OUTPUT, tasks: [raw({ room_id: "r1", group_key: "room1", description: "Custom work", price_book_code: "9099", hours_low: 2, hours_high: 3 })] },
+      SUMMARY, PRICE_BOOK, SOURCE,
+    );
+    expect(s.tasks[0]).toMatchObject({ hours_low: 2, hours_high: 3, hours_source: "ai_allowance" });
+  });
+
+  it("prices customer-supplied items at zero and leaves unpriced products null", () => {
+    const s = toPreparedScope(
+      {
+        ...OUTPUT,
+        tasks: [
+          raw({ room_id: "r4", group_key: "bath", description: "Install customer's vanity", customer_supplied: true, materials_cents: 50000 }),
+          raw({ room_id: "r4", group_key: "bath", description: "Faucet (model not chosen)", materials_cents: null }),
+        ],
+      },
+      SUMMARY, [], SOURCE,
+    );
+    expect(s.tasks.map((t) => t.materials_cents)).toEqual([0, null]);
+  });
+
+  it("drops room ids the assessment does not have, and adds a group for an unknown key", () => {
+    const s = toPreparedScope(
+      { ...OUTPUT, groups: [], tasks: [raw({ room_id: "nope", group_key: "Hallway Work", description: "Touch up" })] },
+      SUMMARY, [], SOURCE,
+    );
+    expect(s.tasks[0].room_id).toBeNull();
+    expect(s.groups).toEqual([{ key: "hallway_work", label: "hallway work" }]);
+  });
+});
+
+describe("preparedScopeToLineItems", () => {
+  const scope = toPreparedScope(OUTPUT, SUMMARY, [], SOURCE);
+  const { lineItems, groupKeys } = preparedScopeToLineItems(scope, TEST_RATE_CENTS);
+
+  it("makes a labor line at mid hours and a materials line per group", () => {
+    expect(lineItems[0]).toMatchObject({
+      description: "Room 1 repairs, ceiling, baseboard and plates — labor, est. 5–8 h",
+      quantity: 6.5,
+      unit_price_cents: 8500,
+      line_item_type: "labor",
+    });
+    expect(lineItems[1]).toMatchObject({ description: "Room 1 repairs, ceiling, baseboard and plates — materials allowance", quantity: 1, unit_price_cents: 8500, line_item_type: "materials" });
+    expect(lineItems).toHaveLength(10);
+  });
+
+  it("records the group of every line", () => {
+    expect(groupKeys).toEqual(["room1", "room1", "room2", "room2", "room3", "room3", "bath", "bath", "bath_floor", "bath_floor"]);
+  });
+
+  it("adds no labor line for a group still missing hours", () => {
+    const empty = fallbackPreparedScope(SUMMARY, SOURCE);
+    expect(preparedScopeToLineItems(empty, TEST_RATE_CENTS)).toEqual({ lineItems: [], groupKeys: [] });
+  });
+});
+
+describe("preparedScopeInternalNote", () => {
+  it("states the reference T&M range: 32–51 h, $1,305 materials, $4,025–$5,640 at $85/h", () => {
+    const note = preparedScopeInternalNote(toPreparedScope(OUTPUT, SUMMARY, [], SOURCE), TEST_RATE_CENTS);
+    expect(note).toContain("T&M estimate $4,025–$5,640: 32–51 h at $85/h plus $1,305 materials.");
+    expect(note).toContain("1 open question(s).");
+  });
+});
+
+describe("fallbackPreparedScope", () => {
+  it("keeps one group per room and says the work list is missing", () => {
+    const s = fallbackPreparedScope(SUMMARY, SOURCE);
+    expect(s.groups.map((g) => g.label)).toEqual(["Room 1", "Room 2", "Room 3", "Bathroom"]);
+    expect(s.tasks).toEqual([]);
+    expect(s.questions[0].text).toMatch(/AI preparation was unavailable/);
+  });
+});
+
+describe("buildPreparationPrompt", () => {
+  const prompt = buildPreparationPrompt(SUMMARY, PRICE_BOOK);
+
+  it("gives the model room ids, counted openings and measured quantities", () => {
+    expect(prompt).toContain("room_id r4: Bathroom");
+    expect(prompt).toContain("openings: 1 door(s), 1 window(s), Closet door 20 in wide");
+    expect(prompt).toContain("Floor / ceiling 96 sq ft");
+    expect(prompt).toContain("room_id r2: Room 2\n  measured: no dimensions");
+  });
+
+  it("includes the owner's notes and only price-book codes that carry hours", () => {
+    expect(prompt).toContain("Possible subfloor damage.");
+    expect(prompt).toContain("3002 Ceiling fan replace");
+    expect(prompt).not.toContain("9099");
+  });
+});
