@@ -14,7 +14,7 @@ hours and materials per group, and only the questions that change price or
 scope. After the customer approves the chosen option, the right deposit is
 requested and scheduling starts.
 
-Build order: TASK-178 (done) → TASK-179 (done) → TASK-180 is the quote track. TASK-181 →
+Build order: TASK-178 (done) → TASK-179 (done) → TASK-180 (done) is the quote track. TASK-181 →
 TASK-182 is the approval track. The two tracks do not depend on each other.
 Documentation approved 2026-10-23. Implementation is not yet authorized.
 
@@ -57,59 +57,6 @@ labor-versus-elapsed schedule modeling, automatic learning from actuals, a
 separate signed work agreement, and AI revise-from-feedback beyond
 regenerating the draft. Researched starting assumptions for hours are in
 scope: the owner should not have to invent every number.
-
-# TASK-180: Price, profitability and proposal from the same draft
-
-Status:
-Proposed
-
-Phase:
-3
-
-Problem:
-The general engine derives labor hours from selling price divided by billing
-rate (`estimate-engine/general.ts`), so hours, T&M and margin are computed
-from the price instead of the work. The summary card comparison (TASK-100)
-inherits this.
-
-Business Value:
-The owner sees how long the job should take, what it costs, and what is left,
-before choosing a price.
-
-Scope:
-- Edit hours and materials per group; totals recalculate at once.
-- T&M range = hours × account billing rate + materials. A fixed-price field
-  sits beside it. The selected pricing mode is always shown. Rates come from
-  Settings; a pasted rate is never used.
-- Modeled profitability uses the labor cost rate from Settings, allocated
-  overhead and an optional reserve, labeled "modeled remainder", not net
-  profit. Overhead already inside a billing rate is not counted twice.
-- Owner-approved alternatives (paint blend vs whole wall, floor options,
-  fixture packages) carry their own prices or stay marked unpriced.
-- Customer proposal preview shows scope, options, exclusions and allowances,
-  never internal cost or margin. Save and Send stay separate actions.
-- Approved hours are stored so they can later be compared with actual hours.
-- Sent or accepted estimates keep their reviewed amounts and are never
-  recalculated.
-
-Out of Scope:
-- Market comparison; automatic calibration from actuals.
-
-Acceptance Criteria:
-- [ ] The numeric fixture totals 32–51 hours, $1,305 materials and
-      $4,025–$5,640 at a test-only $85/hour.
-- [ ] The profitability scenario (42 h × $50 cost, $300 overhead, 12% reserve
-      of modeled cost, $5,500 fixed) shows $3,705 modeled cost, $444.60
-      reserve, $1,350.40 remainder, 24.55%.
-- [ ] The fixed scenario and the T&M range are never shown as the same offer.
-- [ ] Customer-supplied items stay out of materials cost; tax, handling and
-      deposit survive save and reload.
-- [ ] Historical estimates show the same totals as before.
-
-Notes:
-Depends on TASK-179. Absorbs TASK-100; close TASK-100 when this ships.
-Owner must set a real labor cost rate in Settings before margins mean
-anything.
 
 # TASK-181: Record the customer's chosen option on approval
 
@@ -509,47 +456,6 @@ Acceptance Criteria:
 Notes:
 Surfaced during CEO review of PR #589. TASK-098 cancelled in PR #603.
 
-# TASK-100: Fix T&M vs Fixed-Rate Comparison Card (Hours-Overrun Modeling)
-
-Status:
-Proposed
-
-Phase:
-3
-
-Problem:
-`EstimateSummaryCard.tsx`'s T&M vs. Fixed-Rate comparison (TASK-096) derives
-T&M estimated hours from the same `effectiveHours` value used for the fixed
-quote, so the comparison structurally can never model an hours-overrun
-scenario — the actual reason T&M exists as a pricing option. The
-"Recommendation: Fixed yields $X more" line is close to tautological given
-how it's computed. The $85/hr burdened rate is hardcoded in
-`EstimateSummaryCard.tsx` (`hybrid-pricing/engine.ts` was deleted in PR #603).
-
-Business Value:
-A T&M-vs-Fixed comparison that can actually inform the pricing decision,
-instead of one that's rigged toward Fixed by construction.
-
-Scope:
-- Model T&M hours independently of the fixed quote's hour estimate — e.g. a
-  founder-adjustable "expected overrun %" input, or (once TASK-095/098 have
-  real data) a historical variance-based estimate.
-- Extract the burdened labor rate into one shared constant.
-
-Out of Scope:
-- Automated overrun prediction from historical data — depends on TASK-095
-  accumulating enough real samples first.
-
-Acceptance Criteria:
-- [ ] T&M estimated hours can diverge from the fixed quote's hours in the UI.
-- [ ] Burdened rate defined once and imported by `EstimateSummaryCard.tsx`.
-
-Notes:
-Surfaced during CEO review of PR #589. Priority P2 — the card's Fixed-price
-math is currently correct, only the comparison framing is misleading.
-To be absorbed by TASK-180 (hours from the work, not the price). Close this
-task when TASK-180 ships.
-
 # TASK-101: Standalone & Direct Job/Visit Quick Materials Generator (Uncouple Materials from Estimates)
 
 Status:
@@ -667,6 +573,8 @@ buy list → confirm no mud/tape). Headless browser on this host cannot launch
 (Chromium sandbox).
 
 ## Completed
+- [TASK-180: Price, profitability and proposal from the same draft](../archive/backlog-done/TASK-180-price-profit-proposal.md) — Done (2026-10-24)
+- [TASK-100: T&M vs fixed comparison card](../archive/backlog-done/TASK-100-tm-vs-fixed-card.md) — Done, absorbed by TASK-180
 - [TASK-179: Prepare Quote from the saved assessment](../archive/backlog-done/TASK-179-prepare-quote.md) — Done (#712, #713, slice 3; 2026-10-24)
 - [TASK-178: Door, window and opening counts on assessment rooms](../archive/backlog-done/TASK-178-assessment-room-openings.md) — Done (#711, deployed 2026-10-23)
 

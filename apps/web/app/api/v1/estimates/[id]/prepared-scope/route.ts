@@ -15,10 +15,10 @@ import { logger } from "@/lib/logger";
 import { getPathId } from "@/lib/route-utils";
 import { withEstimateContext } from "@/lib/estimates/db";
 import { updateEstimateById, type LineItemInput } from "@/lib/estimates/repository";
-import { applyScopeEdits, preparedScopeToLineItems } from "@/lib/estimates/prepare-quote";
+import { applyScopeEdits, buildProposalNotes, preparedScopeToLineItems } from "@/lib/estimates/prepare-quote";
 import { resolveLaborRateCents } from "@/lib/estimates/tm-briefing";
 import { loadPricingSettings } from "@/lib/pricing/settings";
-import { parsePreparedScope } from "@ai-fsm/domain";
+import { modelPreparedProfit, parsePreparedScope } from "@ai-fsm/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -49,10 +49,11 @@ export const PUT = withRole(["owner", "admin"], async (request: NextRequest, ses
         status: string;
         subtotal_cents: number;
         tax_cents: number;
+        notes: string | null;
         prepared_scope: unknown;
         property_state: string | null;
       }>(
-        `SELECT e.status, e.subtotal_cents, e.tax_cents, e.prepared_scope, p.state AS property_state
+        `SELECT e.status, e.subtotal_cents, e.tax_cents, e.notes, e.prepared_scope, p.state AS property_state
          FROM estimates e
          LEFT JOIN properties p ON p.id = e.property_id
          WHERE e.id = $1 AND e.account_id = $2
@@ -73,7 +74,13 @@ export const PUT = withRole(["owner", "admin"], async (request: NextRequest, ses
 
       const settings = await loadPricingSettings(client, session.accountId);
       const { labor_rate_cents } = resolveLaborRateCents(est.property_state, settings);
-      const { lineItems, groupKeys } = preparedScopeToLineItems(merged, labor_rate_cents);
+      let built;
+      try {
+        built = preparedScopeToLineItems(merged, labor_rate_cents);
+      } catch (err) {
+        throw Object.assign(err as Error, { code: "INVALID_PRICE" });
+      }
+      const { lineItems, groupKeys } = built;
 
       // Lines the owner added by hand stay exactly as they are, after the prepared ones.
       const { rows: handLines } = await client.query<LineItemInput & { sort_order: number }>(
@@ -98,7 +105,34 @@ export const PUT = withRole(["owner", "admin"], async (request: NextRequest, ses
       ];
       const taxRate = est.subtotal_cents > 0 ? Math.round((est.tax_cents / est.subtotal_cents) * 10_000) / 100 : 0;
       await updateEstimateById(client, id, session, { line_items: combined, tax_rate: taxRate });
-      return { prepared_scope: merged, applied: true };
+
+      // TASK-180: pricing lane, internal costs from the owner's hours (not price ÷ rate),
+      // and the customer's "What's included" when notes are blank or still Apply's own text.
+      const profit = modelPreparedProfit(merged, {
+        laborRateCents: labor_rate_cents,
+        laborCostCents: settings.labor_cost_cents_per_hour,
+      });
+      const notesAreOurs = !est.notes?.trim() || est.notes === stored.proposal_notes;
+      const proposal = notesAreOurs ? buildProposalNotes(merged, labor_rate_cents) : null;
+      const final = { ...merged, proposal_notes: proposal ?? merged.proposal_notes ?? null };
+      await client.query(
+        `UPDATE estimates
+         SET pricing_mode = $1,
+             internal_labor_cost_cents = $2,
+             internal_material_cost_cents = $3,
+             notes = COALESCE($4, notes),
+             prepared_scope = $5
+         WHERE id = $6`,
+        [
+          merged.pricing?.mode === "fixed" ? "flat_rate" : "hourly_internal",
+          profit.labor_cost_cents,
+          profit.materials_cents,
+          proposal,
+          JSON.stringify(final),
+          id,
+        ],
+      );
+      return { prepared_scope: final, applied: true };
     });
     return NextResponse.json(result);
   } catch (error) {
@@ -106,6 +140,7 @@ export const PUT = withRole(["owner", "admin"], async (request: NextRequest, ses
     if (err.code === "NOT_FOUND") return errorResponse(session, 404, "NOT_FOUND", err.message);
     if (err.code === "IMMUTABLE_ENTITY") return errorResponse(session, 422, "IMMUTABLE_ENTITY", err.message);
     if (err.code === "NO_PREPARED_SCOPE") return errorResponse(session, 400, "NO_PREPARED_SCOPE", err.message);
+    if (err.code === "INVALID_PRICE") return errorResponse(session, 400, "INVALID_PRICE", err.message);
     logger.error("PUT /api/v1/estimates/[id]/prepared-scope error", error, { traceId: session.traceId, estimateId: id });
     return errorResponse(session, 500, "INTERNAL_ERROR", "Failed to save the prepared scope");
   }

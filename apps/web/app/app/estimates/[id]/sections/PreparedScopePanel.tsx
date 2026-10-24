@@ -2,8 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { summarizePreparedScope, type PreparedScope, type PreparedTask } from "@ai-fsm/domain";
+import {
+  DEFAULT_PREPARED_PRICING,
+  modelPreparedProfit,
+  summarizePreparedScope,
+  type PreparedPricing,
+  type PreparedScope,
+  type PreparedTask,
+} from "@ai-fsm/domain";
 import { Button, useToast } from "@/components/ui";
+import { formatCents } from "@/lib/money";
 import { hoursSourceLabel, kindLabel, quantityLabel, tmRangeLabel } from "@/lib/estimates/prepared-scope-display";
 
 interface Props {
@@ -11,7 +19,15 @@ interface Props {
   initialScope: PreparedScope;
   roomNames: Record<string, string>;
   laborRateCents: number;
+  /** Owner's internal cost per hour; profit is modeled with it, never the billing rate. */
+  laborCostCents: number;
   editable: boolean;
+  /** Owner/admin only: show modeled cost and remainder. */
+  showInternal: boolean;
+}
+
+function fmtHours(n: number): string {
+  return String(Math.round(n * 100) / 100);
 }
 
 function hoursValue(n: number | null): string {
@@ -41,13 +57,25 @@ const label: React.CSSProperties = { fontSize: "var(--text-xs)", color: "var(--f
  * Owner edits hours, materials, which tasks are included, and answers; Apply
  * to quote rebuilds only the lines this scope produced.
  */
-export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborRateCents, editable }: Props) {
+export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborRateCents, laborCostCents, editable, showInternal }: Props) {
   const router = useRouter();
   const toast = useToast();
   const [scope, setScope] = useState(initialScope);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState<"save" | "apply" | null>(null);
   const summary = useMemo(() => summarizePreparedScope(scope), [scope]);
+  const pricing = scope.pricing ?? DEFAULT_PREPARED_PRICING;
+  const profit = useMemo(
+    () => modelPreparedProfit(scope, { laborRateCents, laborCostCents }),
+    [scope, laborRateCents, laborCostCents],
+  );
+  const fixedTooLow =
+    pricing.mode === "fixed" && pricing.fixed_price_cents !== null && pricing.fixed_price_cents < summary.materials_cents;
+
+  function patchPricing(patch: Partial<PreparedPricing>) {
+    setScope((s) => ({ ...s, pricing: { ...(s.pricing ?? DEFAULT_PREPARED_PRICING), ...patch } }));
+    setDirty(true);
+  }
 
   function patchTask(id: string, patch: Partial<PreparedTask>) {
     setScope((s) => ({ ...s, tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
@@ -195,12 +223,88 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
         </div>
       )}
 
+
+      <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)", marginTop: "var(--space-3)" }} data-testid="prepared-pricing">
+        <h3 style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)" }}>Pricing</h3>
+        <div role="radiogroup" aria-label="Pricing" style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
+          <label style={{ display: "flex", gap: "var(--space-1)", alignItems: "center" }}>
+            <input type="radio" name={`pricing-${estimateId}`} checked={pricing.mode === "tm"} disabled={!editable}
+              onChange={() => patchPricing({ mode: "tm" })} />
+            Time &amp; materials {tmRangeLabel(summary, laborRateCents)}
+          </label>
+          <label style={{ display: "flex", gap: "var(--space-1)", alignItems: "center" }}>
+            <input type="radio" name={`pricing-${estimateId}`} checked={pricing.mode === "fixed"} disabled={!editable}
+              onChange={() => patchPricing({ mode: "fixed" })} />
+            Fixed price
+          </label>
+        </div>
+        {pricing.mode === "fixed" && (
+          <div style={{ marginTop: "var(--space-2)", maxWidth: 220 }}>
+            <span style={label}>Fixed price $</span>
+            <input className="p7-input" type="number" min="0" step="1" inputMode="decimal" value={dollarsValue(pricing.fixed_price_cents)}
+              placeholder="Your price" disabled={!editable} data-testid="prepared-fixed-price"
+              onChange={(e) => patchPricing({ fixed_price_cents: parseDollars(e.target.value) })} />
+            {fixedTooLow && (
+              <span style={{ ...label, color: "var(--danger, #b42318)", display: "block" }}>
+                Below the ${Math.round(summary.materials_cents / 100).toLocaleString("en-US")} materials allowance.
+              </span>
+            )}
+          </div>
+        )}
+        <p style={{ ...label, margin: "var(--space-2) 0 0" }}>
+          {pricing.mode === "fixed"
+            ? "The customer sees one price per room that adds up to your fixed price, with materials shown as allowances."
+            : "The customer sees labor and materials per room at your T&M rate."}
+        </p>
+
+        {showInternal && (
+          <div style={{ marginTop: "var(--space-3)" }} data-testid="prepared-profit">
+            <h3 style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)" }}>Modeled profit (owner only)</h3>
+            <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+              <div style={{ flex: "1 1 90px" }}>
+                <span style={label}>Expected hours</span>
+                <input className="p7-input" type="number" min="0" step="0.25" inputMode="decimal" value={hoursValue(pricing.expected_hours)}
+                  placeholder={fmtHours(profit.expected_hours)} disabled={!editable}
+                  onChange={(e) => patchPricing({ expected_hours: parseHours(e.target.value) })} />
+              </div>
+              <div style={{ flex: "1 1 90px" }}>
+                <span style={label}>Overhead $</span>
+                <input className="p7-input" type="number" min="0" step="1" inputMode="decimal" value={pricing.overhead_cents ? dollarsValue(pricing.overhead_cents) : ""}
+                  placeholder="0" disabled={!editable}
+                  onChange={(e) => patchPricing({ overhead_cents: parseDollars(e.target.value) ?? 0 })} />
+              </div>
+              <div style={{ flex: "1 1 90px" }}>
+                <span style={label}>Reserve %</span>
+                <input className="p7-input" type="number" min="0" max="100" step="1" inputMode="decimal" value={pricing.reserve_pct || ""}
+                  placeholder="0" disabled={!editable}
+                  onChange={(e) => patchPricing({ reserve_pct: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })} />
+              </div>
+            </div>
+            <table style={{ width: "100%", marginTop: "var(--space-2)", fontSize: "var(--text-sm)" }}>
+              <tbody>
+                <tr><td>{pricing.mode === "fixed" ? "Fixed price" : `T&M at ${fmtHours(profit.expected_hours)} h`}</td><td style={{ textAlign: "right" }}>{profit.sell_cents === null ? "—" : formatCents(profit.sell_cents)}</td></tr>
+                <tr><td>Labor cost ({fmtHours(profit.expected_hours)} h × {formatCents(laborCostCents)})</td><td style={{ textAlign: "right" }}>−{formatCents(profit.labor_cost_cents)}</td></tr>
+                <tr><td>Materials</td><td style={{ textAlign: "right" }}>−{formatCents(profit.materials_cents)}</td></tr>
+                <tr><td>Overhead</td><td style={{ textAlign: "right" }}>−{formatCents(profit.overhead_cents)}</td></tr>
+                <tr><td>Reserve ({pricing.reserve_pct}% of {formatCents(profit.modeled_cost_cents)})</td><td style={{ textAlign: "right" }}>−{formatCents(profit.reserve_cents)}</td></tr>
+                <tr style={{ fontWeight: 600 }}><td>Modeled remainder</td><td style={{ textAlign: "right" }}>{profit.remainder_cents === null ? "—" : formatCents(profit.remainder_cents)}{profit.margin_pct === null ? "" : ` (${profit.margin_pct}%)`}</td></tr>
+              </tbody>
+            </table>
+            <p style={{ ...label, margin: "var(--space-1) 0 0" }}>
+              Modeled from your expected hours and cost rate. Not net profit: taxes and unrecorded costs are not included.
+            </p>
+          </div>
+        )}
+      </div>
       {editable && (
-        <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end", marginTop: "var(--space-4)", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "var(--space-2)", justifyContent: "flex-end", alignItems: "center", marginTop: "var(--space-4)", flexWrap: "wrap" }}>
+          <a href={`/app/estimates/${estimateId}/print`} target="_blank" rel="noreferrer" style={{ fontSize: "var(--text-sm)" }}>
+            Preview what the customer sees
+          </a>
           <Button variant="secondary" onClick={() => save(false)} loading={saving === "save"} disabled={!dirty || saving !== null}>
             Save
           </Button>
-          <Button onClick={() => save(true)} loading={saving === "apply"} disabled={saving !== null} data-testid="prepared-scope-apply">
+          <Button onClick={() => save(true)} loading={saving === "apply"} disabled={saving !== null || fixedTooLow} data-testid="prepared-scope-apply">
             Apply to quote
           </Button>
         </div>

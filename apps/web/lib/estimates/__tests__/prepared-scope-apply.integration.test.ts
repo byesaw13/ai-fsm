@@ -129,6 +129,29 @@ describe.skipIf(!RUN)("prepared scope Apply to quote", () => {
     expect(total_cents).toBe(after.reduce((s, l) => s + l.total_cents, 0));
   });
 
+  it("fixed price: total equals the price, flat-rate lane, internal cost from expected hours, notes written", async () => {
+    const fixed: PreparedScope = {
+      ...structuredClone(scope),
+      pricing: { mode: "fixed", fixed_price_cents: 60_000, expected_hours: 4, overhead_cents: 0, reserve_pct: 0 },
+    };
+    const res = await api("PUT", `/api/v1/estimates/${estimateId}/prepared-scope`, { prepared_scope: fixed, apply: true });
+    expect(res.status).toBe(200);
+    const [est] = await db<{ total_cents: number; pricing_mode: string; internal_labor_cost_cents: number; internal_material_cost_cents: number; notes: string | null }>(
+      `SELECT total_cents, pricing_mode, internal_labor_cost_cents, internal_material_cost_cents, notes FROM estimates WHERE id = $1`,
+      [estimateId],
+    );
+    const settingsRows = await db<{ labor_cost_cents_per_hour: number }>(
+      `SELECT labor_cost_cents_per_hour FROM business_pricing_settings bps JOIN estimates e ON e.account_id = bps.account_id WHERE e.id = $1`,
+      [estimateId],
+    );
+    const labor_cost_cents_per_hour = settingsRows[0]?.labor_cost_cents_per_hour ?? 5000; // default when no settings row
+    expect(est.pricing_mode).toBe("flat_rate");
+    expect(est.total_cents).toBe(60_000 + 7500); // fixed price plus the owner's haul-away line
+    expect(est.internal_labor_cost_cents).toBe(4 * labor_cost_cents_per_hour);
+    expect(est.internal_material_cost_cents).toBe(4000);
+    expect(est.notes).toMatch(/^What's included[\s\S]*Pricing: fixed price of \$600 for the work above\.$/);
+  });
+
   it("a sent quote can no longer be changed from its scope", async () => {
     await db(`UPDATE estimates SET status = 'sent' WHERE id = $1`, [estimateId]);
     const res = await api("PUT", `/api/v1/estimates/${estimateId}/prepared-scope`, { prepared_scope: scope, apply: true });

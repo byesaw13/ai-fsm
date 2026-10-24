@@ -26,6 +26,7 @@ interface EstimateRow {
   deposit_cents: number;
   balance_cents: number;
   notes: string | null;
+  scope_assumptions: string | null;
   sent_at: string | null;
   expires_at: string | null;
   created_at: string;
@@ -87,7 +88,7 @@ export default async function EstimatePrintPage({
          e.subtotal_cents, e.tax_cents, e.total_cents,
          COALESCE(e.deposit_cents, 0) AS deposit_cents,
          COALESCE(e.balance_cents, 0) AS balance_cents,
-         e.notes, e.sent_at, e.expires_at, e.created_at,
+         e.notes, e.scope_assumptions, e.sent_at, e.expires_at, e.created_at,
          e.sq_ft, e.prep_level, e.includes_trim, e.includes_ceiling,
          e.shopping_list_json, e.room_specs,
          c.name   AS client_name,
@@ -428,6 +429,14 @@ export default async function EstimatePrintPage({
           <div className="section-block">
             <h2>Notes</h2>
             <p className="terms">{estimate.notes}</p>
+          </div>
+        )}
+
+        {/* What the quote does not cover — same block the customer portal shows */}
+        {estimate.scope_assumptions && (
+          <div className="section-block">
+            <h2>Scope &amp; assumptions</h2>
+            <p className="terms">{estimate.scope_assumptions}</p>
           </div>
         )}
 

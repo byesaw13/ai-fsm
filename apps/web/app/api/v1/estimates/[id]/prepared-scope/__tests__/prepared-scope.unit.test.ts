@@ -27,7 +27,7 @@ vi.mock("@/lib/estimates/repository", () => ({
   updateEstimateById: (...args: unknown[]) => mockUpdate(...args),
 }));
 
-vi.mock("@/lib/pricing/settings", () => ({ loadPricingSettings: vi.fn().mockResolvedValue({}) }));
+vi.mock("@/lib/pricing/settings", () => ({ loadPricingSettings: vi.fn().mockResolvedValue({ labor_cost_cents_per_hour: 5000 }) }));
 vi.mock("@/lib/estimates/tm-briefing", () => ({
   resolveLaborRateCents: () => ({ labor_rate_cents: 8500, travel_rate_cents: 8500, is_ma: false }),
 }));
@@ -58,8 +58,8 @@ const SCOPE: PreparedScope = {
   exclusions: [],
 };
 
-function estimateRow(status = "draft") {
-  return { rows: [{ status, subtotal_cents: 100_000, tax_cents: 6_250, prepared_scope: SCOPE, property_state: "NH" }] };
+function estimateRow(status = "draft", notes: string | null = null, scope: PreparedScope = SCOPE) {
+  return { rows: [{ status, subtotal_cents: 100_000, tax_cents: 6_250, notes, prepared_scope: scope, property_state: "NH" }] };
 }
 
 const HAND_LINE = {
@@ -121,5 +121,55 @@ describe("PUT /estimates/[id]/prepared-scope", () => {
     expect((await PUT(put({ prepared_scope: { version: 2 } }))).status).toBe(400);
     mockQuery.mockResolvedValueOnce({ rows: [] });
     expect((await PUT(put({ prepared_scope: SCOPE }))).status).toBe(404);
+  });
+});
+
+describe("PUT /estimates/[id]/prepared-scope pricing (TASK-180)", () => {
+  function finalUpdate() {
+    const call = mockQuery.mock.calls.find((c) => String(c[0]).includes("SET pricing_mode"));
+    return call?.[1] as unknown[];
+  }
+
+  it("records T&M lane, internal costs from expected hours, and writes notes when blank", async () => {
+    mockQuery.mockResolvedValueOnce(estimateRow()).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] });
+    const res = await PUT(put({ prepared_scope: SCOPE, apply: true }));
+    expect(res.status).toBe(200);
+    const [mode, laborCost, materials, notes] = finalUpdate();
+    expect(mode).toBe("hourly_internal");
+    expect(laborCost).toBe(12_500); // 2.5 midpoint hours × $50 cost, not price ÷ rate
+    expect(materials).toBe(4000);
+    expect(notes).toMatch(/^What's included/);
+    expect((await res.json()).prepared_scope.proposal_notes).toBe(notes);
+  });
+
+  it("never overwrites notes the owner wrote", async () => {
+    mockQuery.mockResolvedValueOnce(estimateRow("draft", "Owner wrote this")).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] });
+    await PUT(put({ prepared_scope: SCOPE, apply: true }));
+    expect(finalUpdate()[3]).toBeNull();
+  });
+
+  it("replaces notes that are still Apply's own earlier text", async () => {
+    const stored = { ...SCOPE, proposal_notes: "What's included\n\nold" };
+    mockQuery.mockResolvedValueOnce(estimateRow("draft", "What's included\n\nold", stored)).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] });
+    await PUT(put({ prepared_scope: SCOPE, apply: true }));
+    expect(finalUpdate()[3]).toMatch(/Paint ceiling/);
+  });
+
+  it("fixed price: flat-rate lane and lines summing to the price", async () => {
+    mockQuery.mockResolvedValueOnce(estimateRow()).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] });
+    const fixed = { ...SCOPE, pricing: { mode: "fixed" as const, fixed_price_cents: 60_000, expected_hours: null, overhead_cents: 0, reserve_pct: 0 } };
+    await PUT(put({ prepared_scope: fixed, apply: true }));
+    expect(finalUpdate()[0]).toBe("flat_rate");
+    const lines = mockUpdate.mock.calls[0][3].line_items as Array<{ unit_price_cents: number; quantity: number }>;
+    expect(lines.reduce((s, l) => s + l.unit_price_cents * l.quantity, 0)).toBe(60_000);
+  });
+
+  it("400 INVALID_PRICE when the fixed price is below materials", async () => {
+    mockQuery.mockResolvedValueOnce(estimateRow()).mockResolvedValueOnce({ rows: [] });
+    const fixed = { ...SCOPE, pricing: { mode: "fixed" as const, fixed_price_cents: 1000, expected_hours: null, overhead_cents: 0, reserve_pct: 0 } };
+    const res = await PUT(put({ prepared_scope: fixed, apply: true }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error.code).toBe("INVALID_PRICE");
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });

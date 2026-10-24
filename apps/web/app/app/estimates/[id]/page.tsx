@@ -232,7 +232,9 @@ export default async function EstimateDetailPage({
           initialScope={preparedScope}
           roomNames={preparedRoomNames}
           laborRateCents={preparedRateCents}
+          laborCostCents={pricingSettings.labor_cost_cents_per_hour}
           editable={canTransition && currentStatus === "draft"}
+          showInternal={session.role === "owner" || session.role === "admin"}
         />
       )}
       <EstimateSummaryCard
