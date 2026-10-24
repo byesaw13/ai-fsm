@@ -149,6 +149,12 @@ Acceptance Criteria:
 
 Notes:
 Depends on TASK-178. Milestone 1 of the assessment-to-quote assistant.
+Progress: slice 1 (prepared-scope types, migration 204) shipped #712. Slice 2
+adds `POST /api/v1/visits/[id]/prepare-quote` and moves estimate creation into
+`lib/estimates/create-estimate.ts` (one create path). Open for slice 3: the
+review section and Prepare Quote button; starting hours from production rates
+(today: price book, then a labeled AI allowance); a progress state, since the
+model call takes about a minute.
 Data change (additive, reversible migration): `estimates.source_visit_id`,
 `estimates.prepared_scope` (jsonb), a unique index on account and source visit
 for draft estimates, and a nullable group key on `estimate_line_items` marking
