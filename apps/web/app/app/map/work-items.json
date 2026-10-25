@@ -21,7 +21,6 @@
   { "id": "TASK-099", "title": "Reconcile estimate calibration", "branch": "quote", "status": "deferred", "phase": "Phase 3", "fit": "Deferred with the cancelled estimating scaffold. The quote is still where it would land." },
   { "id": "TASK-047", "title": "Work item library", "branch": "quote", "status": "deferred", "phase": "Phase 4", "fit": "A library of common work would feed quotes. Production intelligence is deferred." },
 
-  { "id": "TASK-182", "title": "Deposit request and scheduling on approval", "branch": "job", "status": "backlog", "phase": "Phase 3", "fit": "Once the customer says yes, the job asks for its deposit and waits for a date." },
   { "id": "TASK-102", "title": "Save quick materials onto the job", "branch": "job", "status": "backlog", "phase": "Phase 3", "fit": "Materials gathered outside a quote still have to land on the job." },
 
   { "id": "ask-moved", "title": "Text when the day moves", "branch": "visit", "status": "asked", "phase": "Phase 1", "fit": "The website says a schedule change comes from you. A moved visit does not text the customer. No task owns it yet." },

@@ -5,6 +5,7 @@ import { queryOne, query, getPool } from "@/lib/db";
 import { createJobFromEstimate, getAccountOwnerUserId } from "@/lib/estimates/create-job-db";
 import { createApprovalArtifacts } from "@/lib/estimates/approve";
 import { recordOptionChoice } from "@/lib/estimates/option-choice";
+import { requestDepositAfterApproval } from "@/lib/estimates/deposit-request";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -213,6 +214,9 @@ export async function POST(
   } finally {
     dbClient.release();
   }
+
+  // TASK-182: send the deposit request once the approval is committed.
+  if (newStatus === "approved") await requestDepositAfterApproval(estimate.id);
 
   return NextResponse.json({ status: newStatus });
 }

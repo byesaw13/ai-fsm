@@ -87,7 +87,7 @@ export const BRANCHES: MapNode[] = [
     kind: "branch",
     step: 5,
     intended: "The accepted commitment. The quote, the visits, and the bill hang off this one job.",
-    built: "Approving the quote creates the job. A work order sits under it for planning. You open the job, then its visits.",
+    built: "Approving the quote creates the job and a \"Schedule this job\" item, and sends the deposit request with its pay link (Settings can turn that off). The item waits on the deposit when the quote says so, and turns ready to book once the deposit is paid. A work order sits under it for planning. You open the job, then its visits.",
     records: [
       { name: "jobs", holds: "Title, house, person, and where it stands from quoted through invoiced." },
       { name: "work_orders", holds: "The internal plan. Not a screen of its own." },

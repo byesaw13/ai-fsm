@@ -22,6 +22,8 @@ const patchAccountBody = z
         estimate_expiry_days: z.number().int().min(1).max(365).optional(),
         labor_rate_cents: z.number().int().min(0).optional(),
         material_markup_pct: z.number().min(0).max(200).optional(),
+        /** TASK-182: send the deposit invoice automatically when a customer approves. Absent = on. */
+        auto_send_deposit_request: z.boolean().optional(),
       })
       .merge(publicCardSettingsSchema)
       .optional(),
