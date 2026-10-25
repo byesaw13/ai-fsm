@@ -8,17 +8,22 @@ interface Props {
   estimateId: string;
   allowedTransitions: EstimateStatus[];
   statusLabels: Record<EstimateStatus, string>;
+  /** Good/Better/Best choices; approving needs the one the customer picked (TASK-181). */
+  options?: Array<{ id: string; label: string; total_cents: number; is_recommended: boolean }>;
 }
 
 export function EstimateTransitionForm({
   estimateId,
   allowedTransitions,
   statusLabels,
+  options = [],
 }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  // No default: the owner must say which option the customer chose.
+  const [optionId, setOptionId] = useState("");
 
   useEffect(() => {
     if (!success) return;
@@ -34,7 +39,10 @@ export function EstimateTransitionForm({
       const res = await fetch(`/api/v1/estimates/${estimateId}/transition`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: targetStatus }),
+        body: JSON.stringify({
+          status: targetStatus,
+          ...(targetStatus === "approved" && options.length > 0 ? { option_id: optionId || undefined } : {}),
+        }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -70,13 +78,32 @@ export function EstimateTransitionForm({
       <p style={{ margin: 0, fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>
         Manual status for offline approvals. Approving creates the materials deposit invoice and project handoff.
       </p>
+      {options.length > 0 && allowedTransitions.includes("approved") && (
+        <label style={{ fontSize: "var(--text-sm)" }}>
+          Option the customer chose
+          <select
+            className="p7-input"
+            value={optionId}
+            onChange={(e) => setOptionId(e.target.value)}
+            data-testid="approve-option"
+            style={{ display: "block", marginTop: "var(--space-1)" }}
+          >
+            <option value="">Choose…</option>
+            {options.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label} — ${(o.total_cents / 100).toFixed(2)}{o.is_recommended ? " (recommended)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
         {allowedTransitions.map((status) => (
           <button
             key={status}
             type="button"
             onClick={() => handleTransition(status)}
-            disabled={loading}
+            disabled={loading || (status === "approved" && options.length > 0 && !optionId)}
             className={status === "approved" ? "btn btn-primary" : "btn btn-secondary"}
             data-testid={`transition-btn-${status}`}
             style={

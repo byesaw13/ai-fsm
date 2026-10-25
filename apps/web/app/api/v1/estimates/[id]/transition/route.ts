@@ -7,6 +7,7 @@ import { logger } from "@/lib/logger";
 import { estimateStatusSchema, estimateTransitions } from "@ai-fsm/domain";
 import type { EstimateStatus } from "@ai-fsm/domain";
 import { createApprovalArtifacts } from "@/lib/estimates/approve";
+import { recordOptionChoice } from "@/lib/estimates/option-choice";
 import { createJobFromEstimate } from "@/lib/estimates/create-job-db";
 import { advanceBookingRequestForEstimate } from "@/lib/booking-requests/advance-stage";
 
@@ -14,6 +15,8 @@ export const dynamic = "force-dynamic";
 
 const transitionSchema = z.object({
   status: estimateStatusSchema,
+  /** The option the customer chose, required to approve a multi-option estimate (TASK-181). */
+  option_id: z.string().uuid().optional(),
 });
 
 /**
@@ -63,7 +66,7 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     );
   }
 
-  const { status: targetStatus } = parseResult.data;
+  const { status: targetStatus, option_id: optionId } = parseResult.data;
 
   // `sent` may never be reached through the manual transition endpoint. The
   // only path to `sent` is the Send action, which actually delivers the
@@ -138,6 +141,10 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
       // Note: the `sent` target is rejected before the transaction (see the
       // USE_SEND_ACTION guard above). The Send action performs its own pricing
       // review and the draft→sent flip, so no sent handling is needed here.
+
+      // Approving a multi-option estimate records the customer's pick first, so
+      // totals and the deposit follow it. Throws OPTION_REQUIRED without one.
+      if (targetStatus === "approved") await recordOptionChoice(client, id, optionId);
 
       // Execute the transition; DB triggers enforce at storage layer too
       await client.query(
@@ -282,6 +289,13 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
           },
         },
         { status: 404 }
+      );
+    }
+
+    if (err.code === "OPTION_REQUIRED") {
+      return NextResponse.json(
+        { error: { code: "OPTION_REQUIRED", message: err.message, traceId: session.traceId } },
+        { status: 400 }
       );
     }
 

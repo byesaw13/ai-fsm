@@ -357,6 +357,11 @@ export default async function EstimateDetailPage({
             estimateId={estimate.id}
             allowedTransitions={allowedTransitions as EstimateStatus[]}
             statusLabels={STATUS_LABELS}
+            options={
+              estimate.presentation_mode === "multi_option"
+                ? options.map((o) => ({ id: o.id, label: o.label, total_cents: o.total_cents, is_recommended: o.is_recommended }))
+                : []
+            }
           />
         </div>
       )}

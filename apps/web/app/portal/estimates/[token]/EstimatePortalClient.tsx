@@ -163,6 +163,11 @@ export function EstimatePortalClient({ token, estimate, lineItems, options = [],
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState<"approve" | "decline" | null>(null);
+  const isMultiOption = estimate.presentation_mode === "multi_option" && options.length > 0;
+  // The customer picks one option to approve; the recommended one starts selected (TASK-181).
+  const [optionId, setOptionId] = useState<string>(
+    () => options.find((o) => o.is_recommended)?.id ?? options[0]?.id ?? "",
+  );
 
   const canRespond = status === "sent" && !readOnly;
   const isExpired = estimate.expires_at && new Date(estimate.expires_at) < new Date();
@@ -176,13 +181,22 @@ export function EstimatePortalClient({ token, estimate, lineItems, options = [],
       setError("Please sign above before approving.");
       return;
     }
+    if (action === "approve" && isMultiOption && !optionId) {
+      setError("Please choose an option to approve.");
+      return;
+    }
     setError("");
     setSubmitting(true);
     try {
       const res = await fetch(`/api/portal/estimates/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, name: name.trim() || undefined, signature_svg: signatureSvg || undefined }),
+        body: JSON.stringify({
+          action,
+          name: name.trim() || undefined,
+          signature_svg: signatureSvg || undefined,
+          option_id: action === "approve" && isMultiOption ? optionId : undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error ?? "Something went wrong"); return; }
@@ -372,6 +386,26 @@ export function EstimatePortalClient({ token, estimate, lineItems, options = [],
         {showForm === "approve" && (
           <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, padding: 20, marginBottom: 24 }}>
             <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 600 }}>Approve Estimate</h3>
+            {isMultiOption && (
+              <fieldset style={{ border: "none", padding: 0, margin: "0 0 12px" }}>
+                <legend style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Which option are you approving? *</legend>
+                {options.map((option) => (
+                  <label key={option.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 0", fontSize: 15 }}>
+                    <input
+                      type="radio"
+                      name="approved-option"
+                      value={option.id}
+                      checked={optionId === option.id}
+                      onChange={() => setOptionId(option.id)}
+                    />
+                    <span>
+                      {option.label} — {cents(option.total_cents)}
+                      {option.is_recommended ? " (recommended)" : ""}
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
+            )}
             <div style={{ marginBottom: 12 }}>
               <label style={{ display: "block", fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Full name *</label>
               <input

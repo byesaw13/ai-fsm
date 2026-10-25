@@ -14,7 +14,7 @@ hours and materials per group, and only the questions that change price or
 scope. After the customer approves the chosen option, the right deposit is
 requested and scheduling starts.
 
-Build order: TASK-178 (done) → TASK-179 (done) → TASK-180 (done) is the quote track. TASK-181 →
+Build order: TASK-178 (done) → TASK-179 (done) → TASK-180 (done) is the quote track. TASK-181 (guard done) →
 TASK-182 is the approval track. The two tracks do not depend on each other.
 Documentation approved 2026-10-23. Implementation is not yet authorized.
 
@@ -58,52 +58,37 @@ separate signed work agreement, and AI revise-from-feedback beyond
 regenerating the draft. Researched starting assumptions for hours are in
 scope: the owner should not have to invent every number.
 
-# TASK-181: Record the customer's chosen option on approval
+# TASK-183: Chosen option flows into totals, job and invoices
 
 Status:
-Proposed
+Deferred (until Good/Better/Best estimates are used)
 
 Phase:
 3
 
 Problem:
-Multi-option estimates (`estimate_options`, migration 020) show Good/Better/
-Best, but no approval route records a choice. The portal accepts only a name
-and an optional signature; the email and SMS routes carry no option. The
-deposit comes from one estimate-level `deposit_cents` regardless of choice.
-
-Business Value:
-The job, the deposit and the final bill follow what the customer actually
-picked.
+TASK-181 records the customer's pick and the deposit follows it, but a
+multi-option estimate still stores a $0 total, and readers of approved lines
+disagree: the final invoice and job ledger read only lines with no option
+(empty for a multi-option estimate) while convert, work orders, the buy-list
+seed and invoice prefill read every option's lines (summing all options).
 
 Scope:
-- A multi-option estimate can only be approved in the portal, where the
-  customer chooses one option (the recommended one pre-selected). Email and
-  SMS approval of a multi-option estimate reply with the portal link. No
-  route guesses an option.
-- Save the chosen option on the estimate. Only its work flows to the job,
-  materials and final invoice.
-- Recalculate the deposit from the chosen option with the existing
-  `calculateDepositPolicy` rules: percentage of that option's total; materials
-  from that option's materials; fixed stays fixed, capped at that option's
-  total.
-- Single-option estimates approve exactly as today on every route.
-
-Out of Scope:
-- Requiring a signature on every route. Today the portal collects one but the
-  server accepts approval without it; that stays as is until decided
-  separately.
+- One shared "approved lines" rule: lines with no option plus the selected
+  option's lines, used by final invoice, convert, job ledger, work orders,
+  buy-list seed, invoice prefill and reports.
+- Set the estimate's subtotal/tax/total from the chosen option on approval,
+  with an explicit, tested amendment to the estimate immutability trigger.
 
 Acceptance Criteria:
-- [ ] Approving Better saves Better; the job and final invoice contain only
-      Better's work.
-- [ ] Percentage, materials and fixed deposits each follow the chosen option.
-- [ ] A multi-option estimate cannot be approved without a choice, and email
-      or SMS approval of one sends the customer to the portal.
-- [ ] Single-option estimates behave as today.
+- [ ] Approving Better leaves the job, final invoice, work orders and buy list
+      with only Better's work.
+- [ ] The approved estimate's total equals the chosen option's total.
+- [ ] Standard estimates are unchanged.
 
 Notes:
-Must ship before TASK-182.
+Split from TASK-181 on 2026-10-24 (owner decision). Revisit when the owner
+starts sending Good/Better/Best estimates.
 
 # TASK-182: On approval, request the deposit and start scheduling
 
@@ -573,6 +558,7 @@ buy list → confirm no mud/tape). Headless browser on this host cannot launch
 (Chromium sandbox).
 
 ## Completed
+- [TASK-181: Record the customer's chosen option on approval (guard)](../archive/backlog-done/TASK-181-option-choice-guard.md) — Done as a guard; wiring in TASK-183
 - [TASK-180: Price, profitability and proposal from the same draft](../archive/backlog-done/TASK-180-price-profit-proposal.md) — Done (2026-10-24)
 - [TASK-100: T&M vs fixed comparison card](../archive/backlog-done/TASK-100-tm-vs-fixed-card.md) — Done, absorbed by TASK-180
 - [TASK-179: Prepare Quote from the saved assessment](../archive/backlog-done/TASK-179-prepare-quote.md) — Done (#712, #713, slice 3; 2026-10-24)

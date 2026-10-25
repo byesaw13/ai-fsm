@@ -72,7 +72,7 @@ export const BRANCHES: MapNode[] = [
     kind: "branch",
     step: 4,
     intended: "A clear price for the agreed work, approved by the customer before the job starts.",
-    built: "Prepare Quote on the assessment turns the walkthrough into a draft: work by room, measured quantities, starting hours and questions. You adjust it, choose T&M or a fixed price, see the modeled profit, then Apply to quote. The customer opens a link, types their name, and signs. That accepts the whole quote. Extra work can be drafted in the office. The customer has no link to approve the added price.",
+    built: "Prepare Quote on the assessment turns the walkthrough into a draft: work by room, measured quantities, starting hours and questions. You adjust it, choose T&M or a fixed price, see the modeled profit, then Apply to quote. The customer opens a link, types their name, and signs. That accepts the quote; on a Good/Better/Best quote they must pick an option, and the deposit follows that option. The job and final bill do not follow the pick yet. Extra work can be drafted in the office. The customer has no link to approve the added price.",
     records: [
       { name: "estimates", holds: "The quote, its status, and its total." },
       { name: "estimate_line_items", holds: "Each priced line." },
