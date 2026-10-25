@@ -17,7 +17,7 @@ import { computeAssessmentRoomGeometry, type QuantityBasis } from "./painting";
 export type ScopeTaskKind = "observed" | "requested" | "suggested";
 
 /** Where a starting hour range came from. */
-export type HoursSource = "price_book" | "production_rate" | "ai_allowance" | "owner";
+export type HoursSource = "price_book" | "production_rate" | "ai_allowance" | "owner" | "revision";
 
 /** Which room quantity a task uses, or a plain count of items. */
 export type QuantityKey =
@@ -117,6 +117,14 @@ export interface PreparedScope {
   pricing?: PreparedPricing;
   /** The customer notes Apply last wrote; Apply only replaces notes that are blank or still this text. */
   proposal_notes?: string | null;
+  /** Revisions the owner kept, newest last (TASK-186). */
+  revisions?: PreparedRevision[];
+}
+
+export interface PreparedRevision {
+  at: string;
+  instruction: string;
+  summary: string;
 }
 
 const UNITS: Record<QuantityKey, PreparedQuantity["unit"]> = {
@@ -167,7 +175,7 @@ export function pickStartingHours(candidates: {
   production_rate?: HoursCandidate | null;
   ai_allowance?: HoursCandidate | null;
 }): { low: number; high: number; source: HoursSource } | null {
-  const order: Array<[Exclude<HoursSource, "owner">, HoursCandidate | null | undefined]> = [
+  const order: Array<[Exclude<HoursSource, "owner" | "revision">, HoursCandidate | null | undefined]> = [
     ["price_book", candidates.price_book],
     ["production_rate", candidates.production_rate],
     ["ai_allowance", candidates.ai_allowance],
@@ -303,7 +311,7 @@ export const preparedScopeSchema = z.object({
           .nullable(),
         hours_low: hoursSchema,
         hours_high: hoursSchema,
-        hours_source: z.enum(["price_book", "production_rate", "ai_allowance", "owner"]).nullable(),
+        hours_source: z.enum(["price_book", "production_rate", "ai_allowance", "owner", "revision"]).nullable(),
         materials_cents: z.number().int().min(0).nullable(),
         price_book_code: z.string().max(40).nullable().optional(),
       }),
@@ -326,6 +334,10 @@ export const preparedScopeSchema = z.object({
     })
     .optional(),
   proposal_notes: z.string().max(20_000).nullable().optional(),
+  revisions: z
+    .array(z.object({ at: z.string(), instruction: z.string().max(2000), summary: z.string().max(2000) }))
+    .max(50)
+    .optional(),
 });
 
 /** Read a stored prepared scope. Null when absent or not a valid version-1 scope. */

@@ -488,6 +488,7 @@ buy list → confirm no mud/tape). Headless browser on this host cannot launch
 (Chromium sandbox).
 
 ## Completed
+- [TASK-186: Revise the prepared quote with a note](../archive/backlog-done/TASK-186-revise-with-a-note.md) — Done (2026-10-25)
 - [TASK-185: Review the prepared quote by work area](../archive/backlog-done/TASK-185-work-area-review.md) — Done (2026-10-25)
 - [TASK-184: Wall area and painting hours that match the room](../archive/backlog-done/TASK-184-wall-area-painting-pace.md) — Done (2026-10-25)
 - [TASK-182: On approval, request the deposit and start scheduling](../archive/backlog-done/TASK-182-deposit-request-scheduling.md) — Done (2026-10-25)

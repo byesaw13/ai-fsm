@@ -12,6 +12,7 @@ import {
 } from "@ai-fsm/domain";
 import { Button, useToast } from "@/components/ui";
 import { formatCents } from "@/lib/money";
+import type { RevisionChange } from "@/lib/estimates/revise-quote";
 import { hoursSourceLabel, kindLabel, quantityLabel, tmRangeLabel, workAreaFlags, workAreaRows } from "@/lib/estimates/prepared-scope-display";
 
 interface Props {
@@ -48,6 +49,26 @@ function parseDollars(value: string): number | null {
   if (value.trim() === "") return null;
   const n = Number(value);
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null;
+}
+
+interface RevisionProposal {
+  proposed_scope: PreparedScope;
+  changes: RevisionChange[];
+  summary: string;
+  output: unknown;
+}
+
+function changeLine(c: RevisionChange): string {
+  const h = (v: { hours_low: number | null; hours_high: number | null }) =>
+    v.hours_low === null || v.hours_high === null ? "no hours" : `${fmtHours(v.hours_low)}–${fmtHours(v.hours_high)} h`;
+  const m = (cents: number | null) => (cents === null ? "not priced" : formatCents(cents));
+  if (c.action === "add") return `Added: ${c.description} (${h(c.after)}, ${m(c.after.materials_cents)})`;
+  if (c.action === "exclude") return `Taken out: ${c.description}`;
+  if (c.action === "include") return `Put back: ${c.description}`;
+  const parts: string[] = [];
+  if (c.before && (c.before.hours_low !== c.after.hours_low || c.before.hours_high !== c.after.hours_high)) parts.push(`${h(c.before)} → ${h(c.after)}`);
+  if (c.before && c.before.materials_cents !== c.after.materials_cents) parts.push(`materials ${m(c.before.materials_cents)} → ${m(c.after.materials_cents)}`);
+  return `Changed: ${c.description}${parts.length ? ` (${parts.join(", ")})` : ""}`;
 }
 
 const label: React.CSSProperties = { fontSize: "var(--text-xs)", color: "var(--fg-muted)" };
@@ -98,6 +119,48 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
     setDirty(true);
   }
 
+  // Revise with a note (TASK-186): proposal held here until the owner keeps or discards it.
+  const [note, setNote] = useState("");
+  const [revising, setRevising] = useState(false);
+  const [proposal, setProposal] = useState<RevisionProposal | null>(null);
+  const proposedAreas = useMemo(
+    () => (proposal ? workAreaRows(proposal.proposed_scope, laborRateCents) : null),
+    [proposal, laborRateCents],
+  );
+
+  async function revise(accept: boolean) {
+    setRevising(true);
+    try {
+      const res = await fetch(`/api/v1/estimates/${estimateId}/prepared-scope/revise`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prepared_scope: scope,
+          instruction: note,
+          ...(accept && proposal ? { accept: { output: proposal.output } } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error?.message ?? "Revision failed");
+        return;
+      }
+      setScope(data.prepared_scope);
+      setDirty(false);
+      if (accept) {
+        setProposal(null);
+        setNote("");
+        toast.success("Changes kept. Apply to quote to update the lines.");
+      } else {
+        setProposal(data as RevisionProposal);
+      }
+    } catch {
+      toast.error("Revision failed. Your edits are still on this page.");
+    } finally {
+      setRevising(false);
+    }
+  }
+
   async function save(apply: boolean) {
     setSaving(apply ? "apply" : "save");
     try {
@@ -122,6 +185,7 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
     }
   }
 
+  const openQuestionList = scope.questions.filter((q) => !q.answer?.trim());
   const looseQuestions = scope.questions.filter((q) => q.task_ids.length === 0);
   const openQuestions = scope.questions.filter((q) => !q.answer).length;
 
@@ -247,6 +311,60 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
           <span style={{ textAlign: "right" }} data-testid="work-area-total">{formatCents(areas.total_cents)}</span>
         </div>
       </div>
+
+      {editable && (
+        <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)", marginTop: "var(--space-3)" }} data-testid="revise-box">
+          <h3 style={{ margin: "0 0 var(--space-2)", fontSize: "var(--text-sm)" }}>Revise with a note</h3>
+          {openQuestionList.map((q) => (
+            <div key={q.id} style={{ marginBottom: "var(--space-2)" }}>
+              <span style={label}>{q.text}</span>
+              <input className="p7-input" type="text" value={q.answer ?? ""} placeholder="Answer" disabled={revising || !!proposal}
+                onChange={(e) => answer(q.id, e.target.value)} />
+            </div>
+          ))}
+          <textarea
+            className="p7-input"
+            rows={3}
+            maxLength={2000}
+            value={note}
+            disabled={revising || !!proposal}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="For example: the vanity comes out easily, keep the subfloor allowance, and show sheet vinyl against LVP."
+            style={{ width: "100%" }}
+          />
+          {!proposal && (
+            <Button variant="secondary" onClick={() => revise(false)} disabled={revising || saving !== null}>
+              {revising ? "Revising…" : "Revise"}
+            </Button>
+          )}
+          {proposal && (
+            <div style={{ marginTop: "var(--space-2)" }} data-testid="revision-proposal">
+              <p style={{ margin: "0 0 var(--space-2)" }}>{proposal.summary}</p>
+              {proposal.changes.length === 0 ? (
+                <p style={label}>No task changes.</p>
+              ) : (
+                <ul style={{ margin: "0 0 var(--space-2)", paddingLeft: "var(--space-4)" }}>
+                  {proposal.changes.map((c) => (
+                    <li key={`${c.action}-${c.task_id}`} style={{ marginBottom: "var(--space-1)" }}>
+                      {changeLine(c)}
+                      {c.reason && <span style={{ ...label, display: "block" }}>{c.reason}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {proposedAreas && (
+                <p style={{ margin: "0 0 var(--space-2)", fontWeight: 600 }}>
+                  Total {formatCents(areas.total_cents)} → {formatCents(proposedAreas.total_cents)}
+                </p>
+              )}
+              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                <Button onClick={() => revise(true)} disabled={revising}>{revising ? "Saving…" : "Keep changes"}</Button>
+                <Button variant="secondary" onClick={() => setProposal(null)} disabled={revising}>Discard</Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {scope.alternatives.length > 0 && (
         <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)", marginTop: "var(--space-3)" }}>

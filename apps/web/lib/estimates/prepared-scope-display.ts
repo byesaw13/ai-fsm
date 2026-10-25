@@ -42,6 +42,7 @@ export function hoursSourceLabel(source: HoursSource | null): string {
     case "production_rate": return "production rate";
     case "ai_allowance": return "AI allowance";
     case "owner": return "yours";
+    case "revision": return "revised from your note";
     default: return "no hours yet";
   }
 }

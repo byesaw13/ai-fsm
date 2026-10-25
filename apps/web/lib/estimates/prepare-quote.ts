@@ -43,34 +43,36 @@ const QUANTITY_KEYS = [
   "count",
 ] as const;
 
+/** One task as the model writes it, in a preparation or a revision. */
+export const preparationTaskSchema = z.object({
+  room_id: z.string().nullable(),
+  description: z.string(),
+  kind: z.enum(["observed", "requested", "suggested"]),
+  group_key: z.string(),
+  quantity_key: z.enum(QUANTITY_KEYS).nullable(),
+  count: z.number().nullable(),
+  count_unit: z.enum(["each", "lf", "sqft"]).nullable(),
+  hours_low: z.number().nullable(),
+  hours_high: z.number().nullable(),
+  materials_cents: z.number().nullable(),
+  customer_supplied: z.boolean(),
+  is_alternative: z.boolean(),
+  price_book_code: z.string().nullable(),
+  work_type: z.enum(["wall_paint", "other"]),
+  paint_grade: z.enum(["economy", "standard", "premium", "designer"]).nullable(),
+});
+
 /** What the model returns. Rooms are referenced by the ids it was given. */
 export const preparationOutputSchema = z.object({
   groups: z.array(z.object({ key: z.string(), label: z.string() })),
-  tasks: z.array(
-    z.object({
-      room_id: z.string().nullable(),
-      description: z.string(),
-      kind: z.enum(["observed", "requested", "suggested"]),
-      group_key: z.string(),
-      quantity_key: z.enum(QUANTITY_KEYS).nullable(),
-      count: z.number().nullable(),
-      count_unit: z.enum(["each", "lf", "sqft"]).nullable(),
-      hours_low: z.number().nullable(),
-      hours_high: z.number().nullable(),
-      materials_cents: z.number().nullable(),
-      customer_supplied: z.boolean(),
-      is_alternative: z.boolean(),
-      price_book_code: z.string().nullable(),
-      work_type: z.enum(["wall_paint", "other"]),
-      paint_grade: z.enum(["economy", "standard", "premium", "designer"]).nullable(),
-    }),
-  ),
+  tasks: z.array(preparationTaskSchema),
   questions: z.array(z.object({ text: z.string(), task_indexes: z.array(z.number()) })),
   alternatives: z.array(z.object({ label: z.string(), task_indexes: z.array(z.number()), note: z.string().nullable() })),
   exclusions: z.array(z.string()),
 });
 
 export type PreparationOutput = z.infer<typeof preparationOutputSchema>;
+export type PreparationTask = z.infer<typeof preparationTaskSchema>;
 
 export interface PriceBookHours {
   code: string;
@@ -155,6 +157,80 @@ function nonNegative(n: number | null): number | null {
   return typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+export interface TaskBuildContext {
+  roomsById: Map<string, AssessmentRoom>;
+  byCode: Map<string, PriceBookHours>;
+  /** Group key → label; new group keys are added here. */
+  groups: Map<string, string>;
+  wallPaintRate?: WallPaintRate | null;
+}
+
+export function taskBuildContext(
+  summary: AssessmentSummary,
+  priceBook: PriceBookHours[],
+  groups: Map<string, string>,
+  wallPaintRate?: WallPaintRate | null,
+): TaskBuildContext {
+  return {
+    roomsById: new Map(summary.rooms.map((r) => [r.id, r])),
+    byCode: new Map(priceBook.map((p) => [p.code, p])),
+    groups,
+    wallPaintRate,
+  };
+}
+
+/**
+ * One model task as a prepared task (quantity not yet bound). Unknown rooms
+ * become whole-job work, suggestions and non-default options start
+ * unconfirmed, wall painting is paced and its paint computed from the area,
+ * and price-book hours win over the model's allowance. Pure.
+ */
+export function buildPreparedTask(t: PreparationTask, id: string, ctx: TaskBuildContext): PreparedTask {
+  const groupKey = slug(t.group_key, "general");
+  if (!ctx.groups.has(groupKey)) ctx.groups.set(groupKey, groupKey.replace(/_/g, " "));
+  const pb = t.price_book_code ? ctx.byCode.get(t.price_book_code) : undefined;
+  const roomId = t.room_id && ctx.roomsById.has(t.room_id) ? t.room_id : null;
+  const geometry = roomId ? computeAssessmentRoomGeometry(ctx.roomsById.get(roomId)!) : null;
+  // Wall painting is priced from the net wall area when the room has one (TASK-184).
+  const wallPaint = t.work_type === "wall_paint" && geometry !== null;
+  const quantityKey =
+    wallPaint && geometry.net_wall_sqft.value !== null ? ("net_wall_sqft" as const) : t.quantity_key;
+  const wallSqft =
+    wallPaint && (quantityKey === "net_wall_sqft" || quantityKey === "gross_wall_sqft")
+      ? geometry[quantityKey].value
+      : null;
+  const isCount = quantityKey === "count";
+  const paced = wallPaintHours(wallSqft, geometry?.max_wall_height_ft ?? null, ctx.wallPaintRate ?? null);
+  // A paced area beats the price book's flat per-room hours.
+  const hours = pickStartingHours({
+    price_book: pb && !paced ? { low: pb.labor_hours_low ?? pb.labor_hours_typical, high: pb.labor_hours_high ?? pb.labor_hours_typical } : null,
+    production_rate: paced,
+    ai_allowance: { low: nonNegative(t.hours_low), high: nonNegative(t.hours_high) },
+  });
+  let materials = t.customer_supplied ? 0 : nonNegative(t.materials_cents);
+  if (wallSqft !== null && !t.customer_supplied) {
+    materials = wallPaintGallons(wallSqft) * PAINT_CENTS_PER_GALLON[t.paint_grade ?? "standard"];
+  }
+  return {
+    id,
+    room_id: roomId,
+    description: t.description.trim().slice(0, 500),
+    kind: t.kind,
+    // Suggestions and the non-default side of an option wait for the owner.
+    confirmed: t.kind !== "suggested" && !t.is_alternative,
+    group_key: groupKey,
+    quantity_key: quantityKey,
+    count: isCount && typeof t.count === "number" && t.count > 0 ? t.count : null,
+    ...(isCount && t.count_unit ? { count_unit: t.count_unit } : {}),
+    quantity: null,
+    hours_low: hours?.low ?? null,
+    hours_high: hours?.high ?? null,
+    hours_source: hours?.source ?? null,
+    materials_cents: materials === null ? null : Math.round(materials),
+    price_book_code: pb ? pb.code : null,
+  };
+}
+
 /**
  * Turn the model's output into a prepared scope. Unknown rooms become
  * whole-job tasks, suggestions start unconfirmed, price-book hours win over
@@ -166,62 +242,16 @@ export function toPreparedScope(
   priceBook: PriceBookHours[],
   source: PreparationSource,
 ): PreparedScope {
-  const roomIds = new Set(summary.rooms.map((r) => r.id));
-  const byCode = new Map(priceBook.map((p) => [p.code, p]));
   const groups = new Map<string, string>();
   for (const g of output.groups) {
     const key = slug(g.key, "group");
     if (!groups.has(key)) groups.set(key, g.label.trim() || key);
   }
 
-  const roomsById = new Map(summary.rooms.map((r) => [r.id, r]));
+  const ctx = taskBuildContext(summary, priceBook, groups, source.wallPaintRate);
   const tasks: PreparedTask[] = output.tasks
     .filter((t) => t.description.trim())
-    .map((t, i) => {
-      const groupKey = slug(t.group_key, "general");
-      if (!groups.has(groupKey)) groups.set(groupKey, groupKey.replace(/_/g, " "));
-      const pb = t.price_book_code ? byCode.get(t.price_book_code) : undefined;
-      const roomId = t.room_id && roomIds.has(t.room_id) ? t.room_id : null;
-      const geometry = roomId ? computeAssessmentRoomGeometry(roomsById.get(roomId)!) : null;
-      // Wall painting is priced from the net wall area when the room has one (TASK-184).
-      const wallPaint = t.work_type === "wall_paint" && geometry !== null;
-      const quantityKey =
-        wallPaint && geometry.net_wall_sqft.value !== null ? ("net_wall_sqft" as const) : t.quantity_key;
-      const wallSqft =
-        wallPaint && (quantityKey === "net_wall_sqft" || quantityKey === "gross_wall_sqft")
-          ? geometry[quantityKey].value
-          : null;
-      const isCount = quantityKey === "count";
-      const paced = wallPaintHours(wallSqft, geometry?.max_wall_height_ft ?? null, source.wallPaintRate ?? null);
-      // A paced area beats the price book's flat per-room hours.
-      const hours = pickStartingHours({
-        price_book: pb && !paced ? { low: pb.labor_hours_low ?? pb.labor_hours_typical, high: pb.labor_hours_high ?? pb.labor_hours_typical } : null,
-        production_rate: paced,
-        ai_allowance: { low: nonNegative(t.hours_low), high: nonNegative(t.hours_high) },
-      });
-      let materials = t.customer_supplied ? 0 : nonNegative(t.materials_cents);
-      if (wallSqft !== null && !t.customer_supplied) {
-        materials = wallPaintGallons(wallSqft) * PAINT_CENTS_PER_GALLON[t.paint_grade ?? "standard"];
-      }
-      return {
-        id: `t${i + 1}`,
-        room_id: roomId,
-        description: t.description.trim().slice(0, 500),
-        kind: t.kind,
-        // Suggestions and the non-default side of an option wait for the owner.
-        confirmed: t.kind !== "suggested" && !t.is_alternative,
-        group_key: groupKey,
-        quantity_key: quantityKey,
-        count: isCount && typeof t.count === "number" && t.count > 0 ? t.count : null,
-        ...(isCount && t.count_unit ? { count_unit: t.count_unit } : {}),
-        quantity: null,
-        hours_low: hours?.low ?? null,
-        hours_high: hours?.high ?? null,
-        hours_source: hours?.source ?? null,
-        materials_cents: materials === null ? null : Math.round(materials),
-        price_book_code: pb ? pb.code : null,
-      };
-    });
+    .map((t, i) => buildPreparedTask(t, `t${i + 1}`, ctx));
 
   const idAt = (index: number) => tasks[index]?.id;
   const questions: PreparedQuestion[] = output.questions
