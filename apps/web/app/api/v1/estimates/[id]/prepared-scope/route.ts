@@ -5,6 +5,7 @@
  * Apply replaces only line items the prepared scope produced (those with a
  * prepared_group_key); lines the owner added by hand are kept as they are.
  * Totals, deposit and tax go through the same update path as the edit form.
+ * Itemized materials (TASK-187) are written to the buy list on Apply.
  * Draft estimates only.
  */
 import { NextRequest, NextResponse } from "next/server";
@@ -17,6 +18,7 @@ import { withEstimateContext } from "@/lib/estimates/db";
 import { updateEstimateById, type LineItemInput } from "@/lib/estimates/repository";
 import { applyScopeEdits, buildProposalNotes, preparedScopeToLineItems } from "@/lib/estimates/prepare-quote";
 import { resolveLaborRateCents } from "@/lib/estimates/tm-briefing";
+import { preparedShoppingList } from "@/lib/estimates/itemize-materials";
 import { loadPricingSettings } from "@/lib/pricing/settings";
 import { modelPreparedProfit, parsePreparedScope } from "@ai-fsm/domain";
 
@@ -115,13 +117,15 @@ export const PUT = withRole(["owner", "admin"], async (request: NextRequest, ses
       const notesAreOurs = !est.notes?.trim() || est.notes === stored.proposal_notes;
       const proposal = notesAreOurs ? buildProposalNotes(merged, labor_rate_cents) : null;
       const final = { ...merged, proposal_notes: proposal ?? merged.proposal_notes ?? null };
+      const shopping = preparedShoppingList(merged);
       await client.query(
         `UPDATE estimates
          SET pricing_mode = $1,
              internal_labor_cost_cents = $2,
              internal_material_cost_cents = $3,
              notes = COALESCE($4, notes),
-             prepared_scope = $5
+             prepared_scope = $5,
+             shopping_list_json = COALESCE($7, shopping_list_json)
          WHERE id = $6`,
         [
           merged.pricing?.mode === "fixed" ? "flat_rate" : "hourly_internal",
@@ -130,6 +134,8 @@ export const PUT = withRole(["owner", "admin"], async (request: NextRequest, ses
           proposal,
           JSON.stringify(final),
           id,
+          // TASK-187: itemized materials feed the job's buy list.
+          shopping ? JSON.stringify(shopping) : null,
         ],
       );
       return { prepared_scope: final, applied: true };

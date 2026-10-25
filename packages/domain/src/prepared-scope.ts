@@ -119,6 +119,47 @@ export interface PreparedScope {
   proposal_notes?: string | null;
   /** Revisions the owner kept, newest last (TASK-186). */
   revisions?: PreparedRevision[];
+  /** Itemized materials by group key (TASK-187). A listed group's materials come from its lines, not task allowances. */
+  materials?: Record<string, PreparedMaterialList>;
+}
+
+/** Where a material line's price came from. */
+export type MaterialPriceSource = "your_price" | "ai_estimate" | "owner";
+
+export interface PreparedMaterialLine {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  /** Cost per unit in cents; null means not priced. */
+  unit_cost_cents: number | null;
+  source: MaterialPriceSource;
+  /** The saved material it was priced from, if any. */
+  price_book_id: string | null;
+  notes: string;
+}
+
+export interface PreparedMaterialList {
+  /** The included tasks the list was made for; a different set means it may be out of date. */
+  task_ids: string[];
+  lines: PreparedMaterialLine[];
+  /** Items the customer supplies, left off the list. */
+  customer_supplied: string[];
+  assumptions: string[];
+}
+
+/** Cost of one material line, or null when it has no price. */
+export function materialLineCents(line: PreparedMaterialLine): number | null {
+  return line.unit_cost_cents === null ? null : Math.round(line.unit_cost_cents * line.quantity);
+}
+
+/** The group's included tasks no longer match the ones its list was made for. */
+export function materialListStale(scope: PreparedScope, groupKey: string): boolean {
+  const list = scope.materials?.[groupKey];
+  if (!list) return false;
+  const now = scope.tasks.filter((t) => t.group_key === groupKey && t.confirmed).map((t) => t.id).sort();
+  const then = [...list.task_ids].sort();
+  return now.length !== then.length || now.some((id, i) => id !== then[i]);
 }
 
 export interface PreparedRevision {
@@ -235,8 +276,10 @@ export interface PreparedScopeSummary {
   materials_cents: number;
   /** Confirmed tasks with no hour range yet. */
   tasks_without_hours: number;
-  /** Confirmed tasks with no materials price yet (null, not zero). */
+  /** Confirmed tasks with no materials price yet (null, not zero), outside itemized groups. */
   tasks_without_materials_price: number;
+  /** Itemized material lines with no price yet (TASK-187). */
+  material_lines_without_price?: number;
   unconfirmed_suggestions: number;
 }
 
@@ -251,13 +294,24 @@ export function summarizePreparedScope(scope: PreparedScope): PreparedScopeSumma
       groups.set(key, { key, label: labels.get(key) ?? key, hours_low: 0, hours_high: 0, materials_cents: 0 });
     }
   }
+  const itemized = scope.materials ?? {};
   for (const t of confirmed) {
     const g = groups.get(t.group_key)!;
     if (t.hours_low !== null && t.hours_high !== null) {
       g.hours_low += t.hours_low;
       g.hours_high += t.hours_high;
     }
-    if (t.materials_cents !== null) g.materials_cents += t.materials_cents;
+    if (t.materials_cents !== null && !itemized[t.group_key]) g.materials_cents += t.materials_cents;
+  }
+  let unpricedLines = 0;
+  for (const [key, list] of Object.entries(itemized)) {
+    const g = groups.get(key);
+    if (!g) continue;
+    for (const line of list.lines) {
+      const cents = materialLineCents(line);
+      if (cents === null) unpricedLines += 1;
+      else g.materials_cents += cents;
+    }
   }
   const list = [...groups.values()];
   return {
@@ -266,7 +320,8 @@ export function summarizePreparedScope(scope: PreparedScope): PreparedScopeSumma
     hours_high: list.reduce((s, g) => s + g.hours_high, 0),
     materials_cents: list.reduce((s, g) => s + g.materials_cents, 0),
     tasks_without_hours: confirmed.filter((t) => t.hours_low === null || t.hours_high === null).length,
-    tasks_without_materials_price: confirmed.filter((t) => t.materials_cents === null).length,
+    tasks_without_materials_price: confirmed.filter((t) => t.materials_cents === null && !itemized[t.group_key]).length,
+    material_lines_without_price: unpricedLines,
     unconfirmed_suggestions: scope.tasks.filter((t) => t.kind === "suggested" && !t.confirmed).length,
   };
 }
@@ -337,6 +392,30 @@ export const preparedScopeSchema = z.object({
   revisions: z
     .array(z.object({ at: z.string(), instruction: z.string().max(2000), summary: z.string().max(2000) }))
     .max(50)
+    .optional(),
+  materials: z
+    .record(
+      z.string().max(60),
+      z.object({
+        task_ids: z.array(z.string()).max(200),
+        lines: z
+          .array(
+            z.object({
+              id: z.string().min(1).max(60),
+              name: z.string().min(1).max(200),
+              quantity: z.number().min(0).max(100_000),
+              unit: z.string().max(40),
+              unit_cost_cents: z.number().int().min(0).max(10_000_000).nullable(),
+              source: z.enum(["your_price", "ai_estimate", "owner"]),
+              price_book_id: z.string().nullable(),
+              notes: z.string().max(500),
+            }),
+          )
+          .max(100),
+        customer_supplied: z.array(z.string().max(200)).max(50),
+        assumptions: z.array(z.string().max(500)).max(50),
+      }),
+    )
     .optional(),
 });
 

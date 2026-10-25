@@ -4,8 +4,11 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   DEFAULT_PREPARED_PRICING,
+  materialLineCents,
   modelPreparedProfit,
   summarizePreparedScope,
+  type PreparedMaterialLine,
+  type PreparedMaterialList,
   type PreparedPricing,
   type PreparedScope,
   type PreparedTask,
@@ -117,6 +120,52 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
   function answer(id: string, value: string) {
     setScope((s) => ({ ...s, questions: s.questions.map((q) => (q.id === id ? { ...q, answer: value } : q)) }));
     setDirty(true);
+  }
+
+  // Itemized materials (TASK-187): which area is generating, "all" for every area.
+  const [itemizing, setItemizing] = useState<string | null>(null);
+
+  function patchMaterialLine(groupKey: string, lineId: string, patch: Partial<PreparedMaterialLine>) {
+    setScope((s) => {
+      const list = s.materials?.[groupKey];
+      if (!list) return s;
+      return { ...s, materials: { ...s.materials, [groupKey]: { ...list, lines: list.lines.map((l) => (l.id === lineId ? { ...l, ...patch } : l)) } } };
+    });
+    setDirty(true);
+  }
+
+  function removeMaterialLine(groupKey: string, lineId: string) {
+    setScope((s) => {
+      const list = s.materials?.[groupKey];
+      if (!list) return s;
+      return { ...s, materials: { ...s.materials, [groupKey]: { ...list, lines: list.lines.filter((l) => l.id !== lineId) } } };
+    });
+    setDirty(true);
+  }
+
+  async function itemize(groupKeys: string[], clear: string[] = []) {
+    setItemizing(groupKeys.length === 1 ? groupKeys[0] : groupKeys.length > 1 ? "all" : clear[0] ?? "all");
+    try {
+      const res = await fetch(`/api/v1/estimates/${estimateId}/prepared-scope/materials`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prepared_scope: scope, group_keys: groupKeys, clear }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error?.message ?? "Materials could not be listed");
+        return;
+      }
+      setScope(data.prepared_scope);
+      setDirty(false);
+      const failed = (data.failed ?? []) as Array<{ group_key: string }>;
+      if (failed.length > 0) toast.error(`${failed.length} area(s) could not be listed and keep their allowance.`);
+      else if (groupKeys.length > 0) toast.success("Materials listed. Apply to quote to update the lines and buy list.");
+    } catch {
+      toast.error("Materials could not be listed. Your edits are still on this page.");
+    } finally {
+      setItemizing(null);
+    }
   }
 
   // Revise with a note (TASK-186): proposal held here until the owner keeps or discards it.
@@ -245,7 +294,10 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
                   {flags && <span style={{ ...label, display: "block", color: "var(--warning, var(--fg))" }}>{flags}</span>}
                 </span>
                 <span style={{ textAlign: "right" }}>{formatCents(area.labor_cents)}</span>
-                <span style={{ textAlign: "right" }}>{formatCents(area.materials_cents)}</span>
+                <span style={{ textAlign: "right" }}>
+                  {formatCents(area.materials_cents)}
+                  <span style={{ ...label, display: "block" }}>{area.materials_itemized ? "itemized" : "allowance"}</span>
+                </span>
                 <span style={{ textAlign: "right", fontWeight: 600 }}>{formatCents(area.total_cents)}</span>
               </button>
               {open && (
@@ -299,6 +351,17 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
                 </div>
               );
             })}
+                  <MaterialsList
+                    list={scope.materials?.[area.key] ?? null}
+                    stale={area.materials_stale}
+                    editable={editable}
+                    busy={itemizing !== null}
+                    itemizingThis={itemizing === area.key}
+                    onItemize={() => itemize([area.key])}
+                    onClear={() => itemize([], [area.key])}
+                    onEditLine={(lineId, patch) => patchMaterialLine(area.key, lineId, patch)}
+                    onRemoveLine={(lineId) => removeMaterialLine(area.key, lineId)}
+                  />
                 </div>
               )}
             </div>
@@ -310,6 +373,11 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
           <span style={{ textAlign: "right" }}>{formatCents(areas.materials_cents)}</span>
           <span style={{ textAlign: "right" }} data-testid="work-area-total">{formatCents(areas.total_cents)}</span>
         </div>
+        {editable && areas.rows.some((r) => !r.materials_itemized) && (
+          <Button variant="secondary" onClick={() => itemize(areas.rows.filter((r) => !r.materials_itemized).map((r) => r.key))} disabled={itemizing !== null || revising}>
+            {itemizing === "all" ? "Listing materials…" : "Itemize materials for every area"}
+          </Button>
+        )}
       </div>
 
       {editable && (
@@ -470,5 +538,74 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
         </div>
       )}
     </section>
+  );
+}
+
+const SOURCE_LABEL: Record<PreparedMaterialLine["source"], string> = {
+  your_price: "your price",
+  ai_estimate: "AI estimate",
+  owner: "yours",
+};
+
+/** One work area's itemized materials (TASK-187), or the button to list them. */
+function MaterialsList({
+  list, stale, editable, busy, itemizingThis, onItemize, onClear, onEditLine, onRemoveLine,
+}: {
+  list: PreparedMaterialList | null;
+  stale: boolean;
+  editable: boolean;
+  busy: boolean;
+  itemizingThis: boolean;
+  onItemize: () => void;
+  onClear: () => void;
+  onEditLine: (lineId: string, patch: Partial<PreparedMaterialLine>) => void;
+  onRemoveLine: (lineId: string) => void;
+}) {
+  if (!list) {
+    return editable ? (
+      <div style={{ paddingLeft: "var(--space-5)", marginTop: "var(--space-2)" }}>
+        <Button variant="secondary" size="sm" onClick={onItemize} disabled={busy}>
+          {itemizingThis ? "Listing materials…" : "Itemize materials"}
+        </Button>
+        <span style={{ ...label, display: "block" }}>Lists what to buy, priced from your saved materials first. Replaces the allowance.</span>
+      </div>
+    ) : null;
+  }
+  const total = list.lines.reduce((s, l) => s + (materialLineCents(l) ?? 0), 0);
+  return (
+    <div style={{ paddingLeft: "var(--space-5)", marginTop: "var(--space-2)" }} data-testid="materials-list">
+      <span style={{ ...label, fontWeight: 600 }}>Materials · {formatCents(total)}</span>
+      {stale && <span style={{ ...label, display: "block" }}>Made before the tasks changed. Itemize again to update it.</span>}
+      {list.lines.map((l) => (
+        <div key={l.id} style={{ display: "flex", gap: "var(--space-2)", alignItems: "flex-end", flexWrap: "wrap", marginTop: "var(--space-1)" }}>
+          <span style={{ flex: "2 1 160px" }}>
+            {l.name}
+            <span style={{ ...label, display: "block" }}>{l.unit_cost_cents === null ? "not priced" : SOURCE_LABEL[l.source]}{l.notes ? ` · ${l.notes}` : ""}</span>
+          </span>
+          <label style={{ flex: "0 1 80px" }}>
+            <span style={label}>Qty ({l.unit})</span>
+            <input className="p7-input" type="number" min="0" step="any" inputMode="decimal" value={l.quantity} disabled={!editable}
+              onChange={(e) => onEditLine(l.id, { quantity: Math.max(0, Number(e.target.value) || 0) })} />
+          </label>
+          <label style={{ flex: "0 1 90px" }}>
+            <span style={label}>Each $</span>
+            <input className="p7-input" type="number" min="0" step="0.01" inputMode="decimal" value={dollarsValue(l.unit_cost_cents)} placeholder="Price" disabled={!editable}
+              onChange={(e) => onEditLine(l.id, { unit_cost_cents: parseDollars(e.target.value) })} />
+          </label>
+          {editable && (
+            <button type="button" onClick={() => onRemoveLine(l.id)} aria-label={`Remove ${l.name}`}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg-muted)" }}>✕</button>
+          )}
+        </div>
+      ))}
+      {list.customer_supplied.length > 0 && <span style={{ ...label, display: "block", marginTop: "var(--space-1)" }}>Customer supplies: {list.customer_supplied.join(", ")}</span>}
+      {list.assumptions.length > 0 && <span style={{ ...label, display: "block" }}>Assumed: {list.assumptions.join("; ")}</span>}
+      {editable && (
+        <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)", flexWrap: "wrap" }}>
+          <Button variant="secondary" size="sm" onClick={onItemize} disabled={busy}>{itemizingThis ? "Listing materials…" : "Itemize again"}</Button>
+          <Button variant="ghost" size="sm" onClick={onClear} disabled={busy}>Use the allowance instead</Button>
+        </div>
+      )}
+    </div>
   );
 }

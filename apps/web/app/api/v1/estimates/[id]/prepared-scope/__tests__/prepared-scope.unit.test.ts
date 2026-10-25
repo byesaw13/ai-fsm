@@ -142,6 +142,35 @@ describe("PUT /estimates/[id]/prepared-scope pricing (TASK-180)", () => {
     expect((await res.json()).prepared_scope.proposal_notes).toBe(notes);
   });
 
+  it("itemized materials set the internal materials cost and the buy list (TASK-187)", async () => {
+    const itemized: PreparedScope = {
+      ...SCOPE,
+      materials: {
+        bath: {
+          task_ids: ["t1"],
+          lines: [{ id: "m1", name: "Ceiling paint", quantity: 2, unit: "gallon", unit_cost_cents: 4500, source: "your_price", price_book_id: "pb1", notes: "" }],
+          customer_supplied: [],
+          assumptions: [],
+        },
+      },
+    };
+    mockQuery.mockResolvedValueOnce(estimateRow("draft", null, itemized)).mockResolvedValue({ rows: [] });
+    const res = await PUT(put({ prepared_scope: itemized, apply: true }));
+    expect(res.status).toBe(200);
+    const params = finalUpdate();
+    expect(params[2]).toBe(9000);
+    expect(JSON.parse(params[6] as string)).toEqual({
+      source: "prepared_scope",
+      sections: [{ section: "Bathroom", computed_items: [{ material: { name: "Ceiling paint", unit: "gallon" }, quantity: 2 }] }],
+    });
+  });
+
+  it("leaves the buy list alone when nothing is itemized", async () => {
+    mockQuery.mockResolvedValueOnce(estimateRow()).mockResolvedValue({ rows: [] });
+    await PUT(put({ prepared_scope: SCOPE, apply: true }));
+    expect(finalUpdate()[6]).toBeNull();
+  });
+
   it("never overwrites notes the owner wrote", async () => {
     mockQuery.mockResolvedValueOnce(estimateRow("draft", "Owner wrote this")).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] }).mockResolvedValueOnce({ rows: [] });
     await PUT(put({ prepared_scope: SCOPE, apply: true }));

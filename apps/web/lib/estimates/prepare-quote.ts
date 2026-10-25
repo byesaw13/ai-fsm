@@ -412,6 +412,38 @@ export async function extractPreparedScope(
 }
 
 /**
+ * Owner edits to itemized materials (TASK-187): quantity and unit price of
+ * stored lines, and removing lines. Lines and lists only come from the server;
+ * a changed price is labeled the owner's.
+ */
+function mergeMaterialEdits(
+  stored: PreparedScope["materials"],
+  incoming: PreparedScope["materials"],
+): PreparedScope["materials"] {
+  if (!stored) return stored;
+  if (!incoming) return stored;
+  const out: NonNullable<PreparedScope["materials"]> = {};
+  for (const [key, list] of Object.entries(stored)) {
+    const edited = incoming[key];
+    if (!edited) {
+      out[key] = list;
+      continue;
+    }
+    const byId = new Map(edited.lines.map((l) => [l.id, l]));
+    out[key] = {
+      ...list,
+      lines: list.lines.flatMap((l) => {
+        const e = byId.get(l.id);
+        if (!e) return [];
+        const priceChanged = e.unit_cost_cents !== l.unit_cost_cents;
+        return [{ ...l, quantity: e.quantity, unit_cost_cents: e.unit_cost_cents, source: priceChanged ? "owner" : l.source }];
+      }),
+    };
+  }
+  return out;
+}
+
+/**
  * Merge the owner's edits into the stored scope. Only hours, materials,
  * confirmation and answers can change; rooms, quantities, source and task text
  * come from the stored copy, and unknown task or question ids are ignored.
@@ -439,6 +471,7 @@ export function applyScopeEdits(stored: PreparedScope, incoming: PreparedScope):
       };
     }),
     pricing: incoming.pricing ?? stored.pricing,
+    materials: mergeMaterialEdits(stored.materials, incoming.materials),
     // Server-managed: only Apply sets it.
     proposal_notes: stored.proposal_notes ?? null,
     questions: stored.questions.map((q) => {

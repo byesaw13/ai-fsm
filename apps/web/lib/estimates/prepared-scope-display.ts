@@ -1,5 +1,6 @@
 import {
   allocateFixedPrice,
+  materialListStale,
   summarizePreparedScope,
   type HoursSource,
   type PreparedQuantity,
@@ -72,6 +73,9 @@ export interface WorkAreaRow {
   open_questions: number;
   missing_hours: number;
   missing_materials: number;
+  /** Materials come from an itemized list (TASK-187), and whether its tasks changed since. */
+  materials_itemized: boolean;
+  materials_stale: boolean;
 }
 
 export interface WorkAreaTable {
@@ -103,6 +107,7 @@ export function workAreaRows(scope: PreparedScope, laborRateCents: number): Work
       const included = tasks.filter((t) => t.confirmed);
       const ids = new Set(tasks.map((t) => t.id));
       const mid = Math.round(((g.hours_low + g.hours_high) / 2) * 4) / 4;
+      const list = scope.materials?.[g.key];
       const labor = fixedLabor ? fixedLabor.get(g.key) ?? 0 : Math.round(mid * laborRateCents);
       return {
         key: g.key,
@@ -116,7 +121,11 @@ export function workAreaRows(scope: PreparedScope, laborRateCents: number): Work
         included_count: included.length,
         open_questions: scope.questions.filter((q) => !q.answer && q.task_ids.some((id) => ids.has(id))).length,
         missing_hours: included.filter((t) => t.hours_low === null || t.hours_high === null).length,
-        missing_materials: included.filter((t) => t.materials_cents === null).length,
+        missing_materials: list
+          ? list.lines.filter((l) => l.unit_cost_cents === null).length
+          : included.filter((t) => t.materials_cents === null).length,
+        materials_itemized: !!list,
+        materials_stale: materialListStale(scope, g.key),
       };
     })
     .filter((r) => r.task_count > 0);
@@ -130,5 +139,6 @@ export function workAreaFlags(row: WorkAreaRow): string {
     row.open_questions > 0 ? `${row.open_questions} open question${row.open_questions === 1 ? "" : "s"}` : null,
     row.missing_hours > 0 ? `${row.missing_hours} without hours` : null,
     row.missing_materials > 0 ? `${row.missing_materials} not priced` : null,
+    row.materials_stale ? "materials list made before the tasks changed" : null,
   ].filter(Boolean).join(" · ");
 }

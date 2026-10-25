@@ -4,6 +4,8 @@ import {
   parsePreparedScope,
   pickStartingHours,
   wallPaintHours,
+  materialLineCents,
+  materialListStale,
   summarizePreparedScope,
   type PreparedScope,
   type PreparedTask,
@@ -197,5 +199,42 @@ describe("wallPaintHours (TASK-184)", () => {
     expect(wallPaintHours(null, 8, RATE)).toBeNull();
     expect(wallPaintHours(0, 8, RATE)).toBeNull();
     expect(wallPaintHours(300, 8, null)).toBeNull();
+  });
+});
+
+describe("itemized materials (TASK-187)", () => {
+  const line = (id: string, quantity: number, unit_cost_cents: number | null) => ({
+    id, name: id, quantity, unit: "each", unit_cost_cents, source: "ai_estimate" as const, price_book_id: null, notes: "",
+  });
+  const bathTasks = SCOPE.tasks.filter((t) => t.group_key === "bath").map((t) => t.id);
+  const itemized: PreparedScope = {
+    ...SCOPE,
+    materials: {
+      bath: { task_ids: bathTasks, lines: [line("toilet", 1, 28900), line("caulk", 2, 899), line("vanity", 1, null)], customer_supplied: [], assumptions: [] },
+    },
+  };
+
+  it("a listed group's materials come from its lines, not the task allowance", () => {
+    const s = summarizePreparedScope(itemized);
+    const bath = s.groups.find((g) => g.key === "bath")!;
+    expect(bath.materials_cents).toBe(28900 + 1798);
+    // Other groups keep their allowances
+    expect(s.groups.find((g) => g.key === "room1")!.materials_cents).toBe(8500);
+    expect(s.material_lines_without_price).toBe(1);
+    // Bath tasks without an allowance no longer count as unpriced
+    expect(s.tasks_without_materials_price).toBe(summarizePreparedScope(SCOPE).tasks_without_materials_price - 4);
+  });
+
+  it("prices a line by quantity, and says when the group's tasks changed since listing", () => {
+    expect(materialLineCents(line("caulk", 2, 899))).toBe(1798);
+    expect(materialLineCents(line("vanity", 1, null))).toBeNull();
+    expect(materialListStale(itemized, "bath")).toBe(false);
+    const changed = { ...itemized, tasks: itemized.tasks.map((t) => (t.id === "t9" ? { ...t, confirmed: false } : t)) };
+    expect(materialListStale(changed, "bath")).toBe(true);
+    expect(materialListStale(itemized, "room1")).toBe(false);
+  });
+
+  it("survives a save and readback", () => {
+    expect(parsePreparedScope(JSON.parse(JSON.stringify(itemized)))?.materials?.bath.lines).toHaveLength(3);
   });
 });
