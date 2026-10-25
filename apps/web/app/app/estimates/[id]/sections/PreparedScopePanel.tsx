@@ -12,7 +12,7 @@ import {
 } from "@ai-fsm/domain";
 import { Button, useToast } from "@/components/ui";
 import { formatCents } from "@/lib/money";
-import { hoursSourceLabel, kindLabel, quantityLabel, tmRangeLabel } from "@/lib/estimates/prepared-scope-display";
+import { hoursSourceLabel, kindLabel, quantityLabel, tmRangeLabel, workAreaFlags, workAreaRows } from "@/lib/estimates/prepared-scope-display";
 
 interface Props {
   estimateId: string;
@@ -69,6 +69,17 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
     () => modelPreparedProfit(scope, { laborRateCents, laborCostCents }),
     [scope, laborRateCents, laborCostCents],
   );
+  const areas = useMemo(() => workAreaRows(scope, laborRateCents), [scope, laborRateCents]);
+  // Work areas start collapsed (TASK-185); the owner opens one to edit its tasks.
+  const [openAreas, setOpenAreas] = useState<Set<string>>(() => new Set());
+  function toggleArea(key: string) {
+    setOpenAreas((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
   const fixedTooLow =
     pricing.mode === "fixed" && pricing.fixed_price_cents !== null && pricing.fixed_price_cents < summary.materials_cents;
 
@@ -111,10 +122,6 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
     }
   }
 
-  const groupOrder = [...scope.groups.map((g) => g.key), ...scope.tasks.map((t) => t.group_key)].filter(
-    (k, i, all) => all.indexOf(k) === i,
-  );
-  const groupLabel = new Map(scope.groups.map((g) => [g.key, g.label]));
   const looseQuestions = scope.questions.filter((q) => q.task_ids.length === 0);
   const openQuestions = scope.questions.filter((q) => !q.answer).length;
 
@@ -143,16 +150,42 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
         <p key={q.id} className="muted" style={{ margin: "0 0 var(--space-3)" }}>{q.text}</p>
       ))}
 
-      {groupOrder.map((key) => {
-        const tasks = scope.tasks.filter((t) => t.group_key === key);
-        if (tasks.length === 0) return null;
-        const g = summary.groups.find((x) => x.key === key);
-        return (
-          <div key={key} style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)", marginTop: "var(--space-3)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-2)", flexWrap: "wrap" }}>
-              <h3 style={{ margin: 0, fontSize: "var(--text-sm)" }}>{groupLabel.get(key) ?? key}</h3>
-              {g && <span style={label}>{g.hours_low}–{g.hours_high} h · ${Math.round(g.materials_cents / 100).toLocaleString("en-US")} materials</span>}
-            </div>
+      <div data-testid="work-area-table">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: "var(--space-3)", ...label, padding: "var(--space-1) 0" }}>
+          <span>Work area</span>
+          <span style={{ textAlign: "right" }}>Labor</span>
+          <span style={{ textAlign: "right" }}>Materials</span>
+          <span style={{ textAlign: "right" }}>Total</span>
+        </div>
+        {areas.rows.map((area) => {
+          const tasks = scope.tasks.filter((t) => t.group_key === area.key);
+          const open = openAreas.has(area.key);
+          const flags = workAreaFlags(area);
+          return (
+            <div key={area.key} style={{ borderTop: "1px solid var(--border)" }} data-testid={`work-area-${area.key}`}>
+              <button
+                type="button"
+               
+                onClick={() => toggleArea(area.key)}
+                aria-expanded={open}
+                style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: "var(--space-3)", width: "100%", padding: "var(--space-2) 0", background: "none", border: "none", textAlign: "left", cursor: "pointer", color: "inherit", font: "inherit" }}
+              >
+                <span>
+                  <span style={{ fontWeight: 600 }}>{open ? "▾" : "▸"} {area.label}</span>
+                  <span style={{ ...label, display: "block" }}>
+                    {[
+                      `${fmtHours(area.hours_low)}–${fmtHours(area.hours_high)} h`,
+                      area.included_count === area.task_count ? `${area.task_count} task${area.task_count === 1 ? "" : "s"}` : `${area.included_count} of ${area.task_count} tasks included`,
+                    ].join(" · ")}
+                  </span>
+                  {flags && <span style={{ ...label, display: "block", color: "var(--warning, var(--fg))" }}>{flags}</span>}
+                </span>
+                <span style={{ textAlign: "right" }}>{formatCents(area.labor_cents)}</span>
+                <span style={{ textAlign: "right" }}>{formatCents(area.materials_cents)}</span>
+                <span style={{ textAlign: "right", fontWeight: 600 }}>{formatCents(area.total_cents)}</span>
+              </button>
+              {open && (
+                <div style={{ paddingBottom: "var(--space-2)" }}>
             {tasks.map((t) => {
               const questions = scope.questions.filter((q) => q.task_ids.includes(t.id));
               return (
@@ -202,9 +235,18 @@ export function PreparedScopePanel({ estimateId, initialScope, roomNames, laborR
                 </div>
               );
             })}
-          </div>
-        );
-      })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto auto", gap: "var(--space-3)", borderTop: "2px solid var(--border)", padding: "var(--space-2) 0", fontWeight: 600 }}>
+          <span>Total</span>
+          <span style={{ textAlign: "right" }}>{formatCents(areas.labor_cents)}</span>
+          <span style={{ textAlign: "right" }}>{formatCents(areas.materials_cents)}</span>
+          <span style={{ textAlign: "right" }} data-testid="work-area-total">{formatCents(areas.total_cents)}</span>
+        </div>
+      </div>
 
       {scope.alternatives.length > 0 && (
         <div style={{ borderTop: "1px solid var(--border)", paddingTop: "var(--space-3)", marginTop: "var(--space-3)" }}>

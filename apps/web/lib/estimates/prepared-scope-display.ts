@@ -1,4 +1,12 @@
-import type { HoursSource, PreparedQuantity, PreparedScopeSummary, ScopeTaskKind } from "@ai-fsm/domain";
+import {
+  allocateFixedPrice,
+  summarizePreparedScope,
+  type HoursSource,
+  type PreparedQuantity,
+  type PreparedScope,
+  type PreparedScopeSummary,
+  type ScopeTaskKind,
+} from "@ai-fsm/domain";
 
 const QUANTITY_NAMES: Record<PreparedQuantity["key"], string> = {
   floor_sqft: "floor",
@@ -46,4 +54,80 @@ export function kindLabel(kind: ScopeTaskKind): string {
 export function tmRangeLabel(summary: PreparedScopeSummary, laborRateCents: number): string {
   const dollars = (c: number) => `$${Math.round(c / 100).toLocaleString("en-US")}`;
   return `${dollars(summary.hours_low * laborRateCents + summary.materials_cents)}–${dollars(summary.hours_high * laborRateCents + summary.materials_cents)}`;
+}
+
+export interface WorkAreaRow {
+  key: string;
+  label: string;
+  hours_low: number;
+  hours_high: number;
+  labor_cents: number;
+  materials_cents: number;
+  total_cents: number;
+  /** Tasks in the area, and how many are in the price. */
+  task_count: number;
+  included_count: number;
+  /** What still needs the owner: unanswered questions, included tasks missing hours or a materials price. */
+  open_questions: number;
+  missing_hours: number;
+  missing_materials: number;
+}
+
+export interface WorkAreaTable {
+  rows: WorkAreaRow[];
+  labor_cents: number;
+  materials_cents: number;
+  total_cents: number;
+}
+
+/**
+ * One row per work area for the collapsed review (TASK-185). T&M labor is the
+ * group's midpoint hours (to the quarter hour) at the rate, the same as the
+ * quote line; a fixed price uses its allocation, so rows add up to the price.
+ * Pure.
+ */
+export function workAreaRows(scope: PreparedScope, laborRateCents: number): WorkAreaTable {
+  const summary = summarizePreparedScope(scope);
+  const pricing = scope.pricing;
+  let fixedLabor: Map<string, number> | null = null;
+  if (pricing?.mode === "fixed" && pricing.fixed_price_cents && pricing.fixed_price_cents >= summary.materials_cents) {
+    fixedLabor = new Map();
+    for (const line of allocateFixedPrice(scope, laborRateCents, pricing.fixed_price_cents)) {
+      if (line.kind === "labor") fixedLabor.set(line.group_key, line.cents);
+    }
+  }
+  const rows = summary.groups
+    .map((g): WorkAreaRow => {
+      const tasks = scope.tasks.filter((t) => t.group_key === g.key);
+      const included = tasks.filter((t) => t.confirmed);
+      const ids = new Set(tasks.map((t) => t.id));
+      const mid = Math.round(((g.hours_low + g.hours_high) / 2) * 4) / 4;
+      const labor = fixedLabor ? fixedLabor.get(g.key) ?? 0 : Math.round(mid * laborRateCents);
+      return {
+        key: g.key,
+        label: g.label,
+        hours_low: g.hours_low,
+        hours_high: g.hours_high,
+        labor_cents: labor,
+        materials_cents: g.materials_cents,
+        total_cents: labor + g.materials_cents,
+        task_count: tasks.length,
+        included_count: included.length,
+        open_questions: scope.questions.filter((q) => !q.answer && q.task_ids.some((id) => ids.has(id))).length,
+        missing_hours: included.filter((t) => t.hours_low === null || t.hours_high === null).length,
+        missing_materials: included.filter((t) => t.materials_cents === null).length,
+      };
+    })
+    .filter((r) => r.task_count > 0);
+  const sum = (k: "labor_cents" | "materials_cents" | "total_cents") => rows.reduce((s, r) => s + r[k], 0);
+  return { rows, labor_cents: sum("labor_cents"), materials_cents: sum("materials_cents"), total_cents: sum("total_cents") };
+}
+
+/** "2 open questions · 1 without hours", or "" when nothing needs the owner. */
+export function workAreaFlags(row: WorkAreaRow): string {
+  return [
+    row.open_questions > 0 ? `${row.open_questions} open question${row.open_questions === 1 ? "" : "s"}` : null,
+    row.missing_hours > 0 ? `${row.missing_hours} without hours` : null,
+    row.missing_materials > 0 ? `${row.missing_materials} not priced` : null,
+  ].filter(Boolean).join(" · ");
 }
