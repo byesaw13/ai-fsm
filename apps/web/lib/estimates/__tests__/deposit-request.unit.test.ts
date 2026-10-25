@@ -25,7 +25,6 @@ function itemNote() {
 beforeEach(() => {
   mockPoolQuery.mockReset().mockResolvedValue({ rows: [ROW] });
   mockCtxQuery.mockReset().mockImplementation(async (sql: string) => {
-    if (sql.includes("SELECT outcome FROM invoice_delivery_attempts")) return { rows: [] };
     if (sql.includes("INSERT INTO invoice_delivery_attempts")) return { rows: [{ id: "att1" }] };
     return { rows: [] };
   });
@@ -70,6 +69,24 @@ describe("requestDepositAfterApproval", () => {
     expect(itemNote()).toMatch(/deposit request not sent \(Client has no email address on file\)/);
   });
 
+  it("a delivery error (502) is unknown, never treated as safe to resend", async () => {
+    mockSend.mockResolvedValueOnce({ status: 502, message: "Email send failed: socket hang up" });
+    expect(await requestDepositAfterApproval("e1")).toBe("unknown");
+    expect(attemptUpdate()?.slice(0, 2)).toEqual(["unknown", "Email send failed: socket hang up"]);
+    expect(itemNote()).toMatch(/may not have gone out; check before resending/);
+  });
+
+  it("email not configured (503) is a failure before contact", async () => {
+    mockSend.mockResolvedValueOnce({ status: 503, message: "Email is not configured on this server" });
+    expect(await requestDepositAfterApproval("e1")).toBe("failed");
+  });
+
+  it("claims the attempt in one statement guarded by the unique index", async () => {
+    await requestDepositAfterApproval("e1");
+    const claim = mockCtxQuery.mock.calls.find((c) => String(c[0]).includes("INSERT INTO invoice_delivery_attempts"))?.[0] as string;
+    expect(claim).toMatch(/ON CONFLICT \(invoice_id\) WHERE outcome <> 'failed' DO NOTHING/);
+  });
+
   it("an error partway through is unknown, and the item says to check before resending", async () => {
     mockSend.mockRejectedValueOnce(new Error("connection reset"));
     expect(await requestDepositAfterApproval("e1")).toBe("unknown");
@@ -77,9 +94,8 @@ describe("requestDepositAfterApproval", () => {
     expect(itemNote()).toMatch(/may not have gone out; check before resending/);
   });
 
-  it("never sends again when an earlier attempt was delivered, pending or unknown", async () => {
-    mockCtxQuery.mockImplementation(async (sql: string) =>
-      sql.includes("SELECT outcome FROM invoice_delivery_attempts") ? { rows: [{ outcome: "unknown" }] } : { rows: [] });
+  it("never sends when the claim loses to an earlier delivered, pending or unknown attempt", async () => {
+    mockCtxQuery.mockImplementation(async () => ({ rows: [] })); // ON CONFLICT DO NOTHING returned no row
     expect(await requestDepositAfterApproval("e1")).toBe("already_handled");
     expect(mockSend).not.toHaveBeenCalled();
   });

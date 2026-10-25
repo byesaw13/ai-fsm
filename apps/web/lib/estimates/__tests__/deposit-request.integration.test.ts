@@ -117,6 +117,19 @@ describe.skipIf(!RUN)("deposit request and scheduling on approval", () => {
     expect(await scheduleItem(id)).toEqual(["Schedule this job — deposit received, ready to book"]);
   });
 
+  it("the database allows only one live delivery attempt per invoice", async () => {
+    const { id } = await approved({ deposit_required: true, deposit_type: "percentage", deposit_percentage: 30, deposit_due_trigger: "before_scheduling" });
+    const [invoice] = await db<{ id: string; account_id: string }>(
+      `SELECT id, account_id FROM invoices WHERE estimate_id = $1 AND invoice_kind = 'deposit'`,
+      [id],
+    );
+    // The approval's attempt failed (no contact details), which frees the invoice.
+    await db(`INSERT INTO invoice_delivery_attempts (account_id, invoice_id) VALUES ($1, $2)`, [invoice.account_id, invoice.id]);
+    await expect(
+      db(`INSERT INTO invoice_delivery_attempts (account_id, invoice_id) VALUES ($1, $2)`, [invoice.account_id, invoice.id]),
+    ).rejects.toMatchObject({ code: "23505" });
+  });
+
   it("no deposit: ready to book, nothing sent", async () => {
     const { id, res } = await approved({ deposit_required: false });
     expect(res.data.deposit_request).toBe("no_deposit");

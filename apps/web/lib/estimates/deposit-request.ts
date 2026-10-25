@@ -61,6 +61,13 @@ export function autoSendDepositEnabled(settings: unknown): boolean {
   return s.auto_send_deposit_request !== false;
 }
 
+/**
+ * sendInvoice results that return before any email or text is attempted:
+ * not found, void or no contact details (422), email not configured (503).
+ * Anything else that is not 200 came from a delivery attempt.
+ */
+const PRE_CONTACT_STATUSES = new Set([404, 422, 503]);
+
 export type DepositRequestOutcome =
   | "sent"
   | "disabled"
@@ -107,19 +114,17 @@ export async function requestDepositAfterApproval(estimateId: string): Promise<D
     const session: AuthSession = { accountId: row.account_id, userId: row.owner_id, role: "owner", traceId: randomUUID() };
     const invoiceId = row.invoice_id;
 
-    // Record the attempt before contacting anyone. Any earlier attempt that was
-    // delivered, is still pending, or is unknown blocks an automatic send.
+    // Claim the send before contacting anyone, in one statement: the unique
+    // index allows one live attempt per invoice, so an earlier delivered,
+    // pending or unknown attempt (or a concurrent claim) blocks this one.
     const attemptId = await withInvoiceContext(session, async (client) => {
-      const { rows: prior } = await client.query<{ outcome: string }>(
-        `SELECT outcome FROM invoice_delivery_attempts WHERE invoice_id = $1 AND outcome <> 'failed' LIMIT 1`,
-        [invoiceId],
-      );
-      if (prior.length > 0) return null;
       const { rows: inserted } = await client.query<{ id: string }>(
-        `INSERT INTO invoice_delivery_attempts (account_id, invoice_id) VALUES ($1, $2) RETURNING id`,
+        `INSERT INTO invoice_delivery_attempts (account_id, invoice_id) VALUES ($1, $2)
+         ON CONFLICT (invoice_id) WHERE outcome <> 'failed' DO NOTHING
+         RETURNING id`,
         [row.account_id, invoiceId],
       );
-      return inserted[0].id;
+      return inserted[0]?.id ?? null;
     });
     if (!attemptId) return "already_handled";
 
@@ -127,11 +132,17 @@ export async function requestDepositAfterApproval(estimateId: string): Promise<D
     let detail: string | null = null;
     try {
       const result = await sendInvoice(session, invoiceId);
+      detail = result.message ?? null;
       if (result.status === 200) {
         outcome = "sent";
+      } else if (PRE_CONTACT_STATUSES.has(result.status)) {
+        outcome = "failed"; // refused before any message was attempted
+        detail = detail ?? `status ${result.status}`;
       } else {
-        outcome = "failed"; // non-200 results return before anyone is contacted
-        detail = result.message ?? `status ${result.status}`;
+        // A delivery error (502): the provider may have accepted the message
+        // before the connection failed, so it is not safe to send again.
+        outcome = "unknown";
+        detail = detail ?? `status ${result.status}`;
       }
     } catch (err) {
       outcome = "unknown"; // may have been sent before the error

@@ -26,6 +26,12 @@ CREATE TABLE IF NOT EXISTS invoice_delivery_attempts (
 CREATE INDEX IF NOT EXISTS idx_invoice_delivery_attempts_invoice
   ON invoice_delivery_attempts (invoice_id, created_at DESC);
 
+-- At most one live (not failed) attempt per invoice: two overlapping approvals
+-- cannot both claim a send. Only a 'failed' attempt frees the invoice.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_invoice_delivery_attempts_live
+  ON invoice_delivery_attempts (invoice_id)
+  WHERE outcome <> 'failed';
+
 ALTER TABLE invoice_delivery_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invoice_delivery_attempts FORCE ROW LEVEL SECURITY;
 
