@@ -142,6 +142,25 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
       : r));
   }
 
+  // Listed walls and unpainted areas (TASK-184): one editor for both lists.
+  type RoomList = "wall_lengths" | "skip_areas";
+  function updateListItem(idx: number, list: RoomList, itemIdx: number, patch: Record<string, string | number>) {
+    setRooms((prev) => prev.map((r, i) => i === idx
+      ? { ...r, [list]: ((r[list] ?? []) as object[]).map((o, j) => j === itemIdx ? { ...o, ...patch } : o) }
+      : r));
+  }
+
+  function addListItem(idx: number, list: RoomList) {
+    const blank = list === "wall_lengths" ? { label: "", length_ft: 0 } : { label: "", width_ft: 0, height_ft: 0 };
+    setRooms((prev) => prev.map((r, i) => i === idx ? { ...r, [list]: [...((r[list] ?? []) as object[]), blank] } : r));
+  }
+
+  function removeListItem(idx: number, list: RoomList, itemIdx: number) {
+    setRooms((prev) => prev.map((r, i) => i === idx
+      ? { ...r, [list]: ((r[list] ?? []) as object[]).filter((_, j) => j !== itemIdx) }
+      : r));
+  }
+
   function addRoom() {
     setRooms((prev) => [...prev, newRoom()]);
   }
@@ -428,6 +447,19 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
                   style={{ width: "100%" }}
                 />
               </div>
+              <div style={{ flex: "1 1 70px" }}>
+                <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }} title="Vaulted ceiling: height at the peak. H is then the wall height at the low side.">Peak (ft)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={room.peak_height_ft ?? ""}
+                  placeholder="Vaulted"
+                  onChange={(e) => updateRoom(idx, "peak_height_ft", e.target.value === "" ? undefined : parseFloat(e.target.value))}
+                  disabled={disabled}
+                  style={{ width: "100%" }}
+                />
+              </div>
               {canEdit && rooms.length > 1 && (
                 <button
                   type="button"
@@ -497,7 +529,7 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
                   />
                 </div>
                 <div style={{ flex: "1 1 80px" }}>
-                  <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Width (in)</label>
+                  <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Width (inches)</label>
                   <input
                     type="number"
                     min="0"
@@ -531,6 +563,104 @@ export function AssessmentForm({ visitId, jobId, jobTitle, clientId, propertyId,
               >
                 + Other opening (closet, archway)
               </button>
+            )}
+            {(room.wall_lengths ?? []).map((wall, wallIdx) => (
+              <div key={`wall-${wallIdx}`} style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-2)", alignItems: "flex-end" }}>
+                <div style={{ flex: "2 1 140px" }}>
+                  <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Paint only this wall</label>
+                  <input
+                    type="text"
+                    value={wall.label}
+                    placeholder="Wall with door, stair wall…"
+                    onChange={(e) => updateListItem(idx, "wall_lengths", wallIdx, { label: e.target.value })}
+                    disabled={disabled}
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                <div style={{ flex: "1 1 80px" }}>
+                  <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Length (ft)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={wall.length_ft || ""}
+                    onChange={(e) => updateListItem(idx, "wall_lengths", wallIdx, { length_ft: e.target.value ? parseFloat(e.target.value) : 0 })}
+                    disabled={disabled}
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => removeListItem(idx, "wall_lengths", wallIdx)}
+                    disabled={disabled}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}
+                    aria-label="Remove wall"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+            {(room.skip_areas ?? []).map((area, areaIdx) => (
+              <div key={`skip-${areaIdx}`} style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-2)", alignItems: "flex-end" }}>
+                <div style={{ flex: "2 1 140px" }}>
+                  <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>Not painted</label>
+                  <input
+                    type="text"
+                    value={area.label}
+                    placeholder="Built-in, cabinets, wide opening…"
+                    onChange={(e) => updateListItem(idx, "skip_areas", areaIdx, { label: e.target.value })}
+                    disabled={disabled}
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                <div style={{ flex: "1 1 70px" }}>
+                  <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>W (ft)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={area.width_ft || ""}
+                    onChange={(e) => updateListItem(idx, "skip_areas", areaIdx, { width_ft: e.target.value ? parseFloat(e.target.value) : 0 })}
+                    disabled={disabled}
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                <div style={{ flex: "1 1 70px" }}>
+                  <label style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)" }}>H (ft)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={area.height_ft || ""}
+                    onChange={(e) => updateListItem(idx, "skip_areas", areaIdx, { height_ft: e.target.value ? parseFloat(e.target.value) : 0 })}
+                    disabled={disabled}
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => removeListItem(idx, "skip_areas", areaIdx)}
+                    disabled={disabled}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--fg-muted)", fontSize: "var(--text-sm)" }}
+                    aria-label="Remove unpainted area"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+            {canEdit && (
+              <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", marginBottom: "var(--space-2)" }}>
+                <button type="button" onClick={() => addListItem(idx, "wall_lengths")} disabled={disabled} className="p7-btn p7-btn-ghost p7-btn-sm">
+                  + Paint only some walls
+                </button>
+                <button type="button" onClick={() => addListItem(idx, "skip_areas")} disabled={disabled} className="p7-btn p7-btn-ghost p7-btn-sm">
+                  + Area not painted (built-in, cabinets)
+                </button>
+              </div>
             )}
             {roomGeometryLines(computeAssessmentRoomGeometry(room)).map((line) => (
               <div key={line} style={{ fontSize: "var(--text-xs)", color: "var(--fg-muted)", marginBottom: "var(--space-1)" }}>

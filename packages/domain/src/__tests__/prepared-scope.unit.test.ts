@@ -3,6 +3,7 @@ import {
   bindQuantities,
   parsePreparedScope,
   pickStartingHours,
+  wallPaintHours,
   summarizePreparedScope,
   type PreparedScope,
   type PreparedTask,
@@ -175,5 +176,26 @@ describe("parsePreparedScope", () => {
     expect(parsePreparedScope(null)).toBeNull();
     expect(parsePreparedScope({ ...SCOPE, version: 2 })).toBeNull();
     expect(parsePreparedScope({ ...SCOPE, tasks: [{ id: "x" }] })).toBeNull();
+  });
+});
+
+describe("wallPaintHours (TASK-184)", () => {
+  const RATE = { sqft_per_day: 400, tall_wall_modifier_pct: -0.15 };
+
+  it("is the area over the daily pace, plus or minus 15%", () => {
+    // 466 sq ft at 50 sq ft/h = 9.32 h
+    expect(wallPaintHours(466, 8, RATE)).toEqual({ low: 8, high: 10.75 });
+  });
+
+  it("slows down walls taller than 10 ft", () => {
+    // 214 sq ft at 340 sq ft/day = 5.04 h
+    expect(wallPaintHours(214, 18, RATE)).toEqual({ low: 4.25, high: 5.75 });
+    expect(wallPaintHours(214, 10, RATE)).toEqual({ low: 3.75, high: 5 });
+  });
+
+  it("is null without an area or a pace", () => {
+    expect(wallPaintHours(null, 8, RATE)).toBeNull();
+    expect(wallPaintHours(0, 8, RATE)).toBeNull();
+    expect(wallPaintHours(300, 8, null)).toBeNull();
   });
 });

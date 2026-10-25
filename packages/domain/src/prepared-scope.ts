@@ -182,6 +182,36 @@ export function pickStartingHours(candidates: {
   return null;
 }
 
+/** Walls above this height are tall work: ladders or planks, slower going. */
+export const TALL_WALL_FT = 10;
+
+/** The owner's wall painting pace (production rate 5012 and its vaulted modifier). */
+export interface WallPaintRate {
+  /** Wall square feet per 8-hour day, two finish coats, standard prep. */
+  sqft_per_day: number;
+  /** Production change for tall walls, e.g. -0.15 = 15% slower. */
+  tall_wall_modifier_pct: number;
+}
+
+/**
+ * Hour range for painting a wall area at the owner's pace (TASK-184): the
+ * area over the daily rate, slowed for tall walls, plus or minus 15%, in
+ * quarter hours. Null when the area or the rate is missing.
+ */
+export function wallPaintHours(
+  sqft: number | null,
+  maxWallHeightFt: number | null,
+  rate: WallPaintRate | null,
+): HoursCandidate | null {
+  if (!rate || rate.sqft_per_day <= 0 || sqft === null || sqft <= 0) return null;
+  const tall = maxWallHeightFt !== null && maxWallHeightFt > TALL_WALL_FT;
+  const perDay = rate.sqft_per_day * (1 + (tall ? rate.tall_wall_modifier_pct : 0));
+  if (perDay <= 0) return null;
+  const hours = (sqft / perDay) * 8;
+  const quarter = (n: number) => Math.max(0.25, Math.round(n * 4) / 4);
+  return { low: quarter(hours * 0.85), high: quarter(hours * 1.15) };
+}
+
 export interface PreparedGroupSummary {
   key: string;
   label: string;

@@ -103,7 +103,7 @@ const COVERAGE_SQFT_PER_GAL = 350;   // finish coat coverage
 const PRIMER_COVERAGE_SQFT_PER_GAL = 250;
 const WASTE_FACTOR = 1.10;
 
-const PAINT_CENTS_PER_GALLON: Record<PaintGrade, number> = {
+export const PAINT_CENTS_PER_GALLON: Record<PaintGrade, number> = {
   economy:  35_00,   // $35/gal
   standard: 55_00,   // $55/gal (Sherwin-Williams ProMar 200)
   premium:  75_00,   // $75/gal
@@ -164,6 +164,12 @@ export interface AssessmentRoomGeometry {
   baseboard_lf: RoomQuantity;
   /** Doors and windows were both counted, so deductions can be calculated. */
   openings_known: boolean;
+  /** Tallest painted wall point: the peak when vaulted, else the wall height. */
+  max_wall_height_ft: number | null;
+  /** Gross area comes from the listed walls only, not the whole perimeter. */
+  partial_walls: boolean;
+  /** Built-ins and other unpainted areas included in the deduction. */
+  skip_area_sqft: number;
 }
 
 const UNKNOWN: RoomQuantity = { value: null, basis: "unknown" };
@@ -187,6 +193,11 @@ function count(n: number | undefined): number | undefined {
  * opening deducts its width at standard door height. Missing measurements
  * leave a quantity unknown rather than zero or a default. Does not replace
  * `computeRoomMeasurements`, which the painting editor and saved quotes use.
+ *
+ * TASK-184: listed walls replace the perimeter (each at the wall height), a
+ * vaulted peak adds a gable triangle to both end walls (the width sides), and
+ * skip areas (built-ins, cabinets, wide openings) are deducted by their own
+ * width and height. Skip areas are measured, so they never block a net figure.
  */
 export function computeAssessmentRoomGeometry(room: AssessmentRoom): AssessmentRoomGeometry {
   const length = positive(room.length_ft);
@@ -196,6 +207,9 @@ export function computeAssessmentRoomGeometry(room: AssessmentRoom): AssessmentR
   const perimeter = length !== null && width !== null ? 2 * (length + width) : null;
 
   const openings = (room.openings ?? []).filter((o) => o.width_in > 0);
+  const walls = (room.wall_lengths ?? []).filter((w) => w.length_ft > 0);
+  const skips = (room.skip_areas ?? []).filter((a) => a.width_ft > 0 && a.height_ft > 0);
+  const peak = height !== null && (room.peak_height_ft ?? 0) > height ? room.peak_height_ft! : null;
   const doors = count(room.door_count);
   const windows = count(room.window_count);
   const override =
@@ -205,11 +219,19 @@ export function computeAssessmentRoomGeometry(room: AssessmentRoom): AssessmentR
   const deductionBasis: QuantityBasis =
     (doors ?? 0) > 0 || (windows ?? 0) > 0 || openings.length > 0 ? "assumed" : "measured";
 
-  const grossWall = perimeter !== null && height !== null ? perimeter * height : null;
+  let grossWall: number | null = null;
+  if (height !== null && walls.length > 0) {
+    grossWall = walls.reduce((sum, w) => sum + w.length_ft * height, 0);
+  } else if (perimeter !== null && height !== null) {
+    // Two gable ends, each a triangle of the room width by the rise above the walls.
+    grossWall = perimeter * height + (peak !== null ? width! * (peak - height) : 0);
+  }
+  const skipSqft = skips.reduce((sum, a) => sum + a.width_ft * a.height_ft, 0);
   const deduction = openingsKnown
     ? doors * DOOR_DEDUCTION_SQFT +
       windows * WINDOW_DEDUCTION_SQFT +
-      openings.reduce((sum, o) => sum + (o.width_in / 12) * (OPENING_HEIGHT_IN / 12), 0)
+      openings.reduce((sum, o) => sum + (o.width_in / 12) * (OPENING_HEIGHT_IN / 12), 0) +
+      skipSqft
     : null;
 
   let netWall: RoomQuantity = UNKNOWN;
@@ -219,13 +241,14 @@ export function computeAssessmentRoomGeometry(room: AssessmentRoom): AssessmentR
     netWall = { value: Math.max(0, grossWall - deduction), basis: deductionBasis };
   }
 
-  // Baseboard skips doorways; windows do not affect it.
+  // Baseboard skips doorways; windows do not affect it. Listed walls replace the perimeter.
+  const baseRun = walls.length > 0 ? walls.reduce((sum, w) => sum + w.length_ft, 0) : perimeter;
   const baseboard =
-    perimeter !== null && doors !== undefined
+    baseRun !== null && doors !== undefined
       ? {
           value: Math.max(
             0,
-            perimeter - doors * DOOR_TRIM_DEDUCTION_LF - openings.reduce((sum, o) => sum + o.width_in / 12, 0),
+            baseRun - doors * DOOR_TRIM_DEDUCTION_LF - openings.reduce((sum, o) => sum + o.width_in / 12, 0),
           ),
           basis: (doors > 0 || openings.length > 0 ? "assumed" : "measured") as QuantityBasis,
         }
@@ -240,7 +263,15 @@ export function computeAssessmentRoomGeometry(room: AssessmentRoom): AssessmentR
     net_wall_sqft: netWall,
     baseboard_lf: baseboard,
     openings_known: openingsKnown,
+    max_wall_height_ft: peak ?? height,
+    partial_walls: walls.length > 0,
+    skip_area_sqft: skipSqft,
   };
+}
+
+/** Finish paint for a wall area: coats at standard coverage plus waste, whole gallons (TASK-184). */
+export function wallPaintGallons(sqft: number, coats: number = 2): number {
+  return sqft > 0 ? Math.ceil(((sqft * coats) / COVERAGE_SQFT_PER_GAL) * WASTE_FACTOR) : 0;
 }
 
 export function computeRoomPainting(room: RoomSpec, coatCount: number = 2): RoomPaintingResult {

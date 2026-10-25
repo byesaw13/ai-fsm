@@ -48,6 +48,8 @@ function raw(t: Partial<RawTask> & Pick<RawTask, "description" | "group_key">): 
     customer_supplied: false,
     is_alternative: false,
     price_book_code: null,
+    work_type: "other",
+    paint_grade: null,
     ...t,
   };
 }
@@ -326,5 +328,58 @@ describe("applyScopeEdits pricing", () => {
     const merged = applyScopeEdits(stored, incoming);
     expect(merged.pricing).toEqual(incoming.pricing);
     expect(merged.proposal_notes).toBe("What's included…");
+  });
+});
+
+describe("toPreparedScope — wall painting at the owner's pace (TASK-184)", () => {
+  const BEDROOM: AssessmentRoom = { id: "b1", name: "Bedroom", length_ft: 16, width_ft: 17.5, height_ft: 8, notes: "", door_count: 2, window_count: 2 };
+  const FOYER: AssessmentRoom = {
+    id: "f1", name: "Foyer", length_ft: 18, width_ft: 10, height_ft: 18, notes: "", door_count: 1, window_count: 0,
+    wall_lengths: [{ label: "Stair wall", length_ft: 13 }],
+  };
+  const summary = buildAssessmentSummary({ visitId: "v2", assessmentId: "a2", rooms: [BEDROOM, FOYER], scopeNotes: "High quality paint" });
+  const priceBook: PriceBookHours[] = [{ code: "5020", name: "Paint room", labor_hours_low: 7, labor_hours_typical: 9, labor_hours_high: 11 }];
+  const rate = { sqft_per_day: 400, tall_wall_modifier_pct: -0.15 };
+  const output: PreparationOutput = {
+    groups: [{ key: "bed", label: "Bedroom" }, { key: "foyer", label: "Foyer" }],
+    tasks: [
+      raw({ room_id: "b1", description: "Paint walls", group_key: "bed", quantity_key: "gross_wall_sqft", hours_low: 7, hours_high: 11, materials_cents: 25000, price_book_code: "5020", work_type: "wall_paint", paint_grade: "premium" }),
+      raw({ room_id: "f1", description: "Paint stair wall", group_key: "foyer", quantity_key: "count", count: 13, count_unit: "lf", hours_low: 2, hours_high: 4, materials_cents: 6000, work_type: "wall_paint", paint_grade: "premium" }),
+      raw({ room_id: "b1", description: "Patch hole", group_key: "bed", hours_low: 1, hours_high: 2, materials_cents: 1500 }),
+    ],
+    questions: [],
+    alternatives: [],
+    exclusions: [],
+  };
+
+  it("uses the net wall area, the pace (over the price book) and computed paint", () => {
+    const scope = toPreparedScope(output, summary, priceBook, { ...SOURCE, wallPaintRate: rate });
+    const [bed, foyer, patch] = scope.tasks;
+    // 536 gross − 2 doors − 2 windows = 466 sq ft
+    expect(bed.quantity).toMatchObject({ key: "net_wall_sqft", value: 466 });
+    expect(bed).toMatchObject({ hours_low: 8, hours_high: 10.75, hours_source: "production_rate" });
+    // 466 x 2 coats / 350 x 1.1 = 2.93 → 3 gal premium at $75
+    expect(bed.materials_cents).toBe(22500);
+    // The foyer's listed 13 ft wall at 18 ft, tall-wall pace
+    expect(foyer.quantity).toMatchObject({ key: "net_wall_sqft", value: 214 });
+    expect(foyer).toMatchObject({ hours_low: 4.25, hours_high: 5.75, hours_source: "production_rate", count: null });
+    expect(foyer.materials_cents).toBe(15000);
+    // Other work is untouched
+    expect(patch).toMatchObject({ hours_low: 1, hours_high: 2, hours_source: "ai_allowance", materials_cents: 1500 });
+  });
+
+  it("falls back to the price book and the model's allowance without a pace", () => {
+    const scope = toPreparedScope(output, summary, priceBook, SOURCE);
+    expect(scope.tasks[0]).toMatchObject({ hours_low: 7, hours_high: 11, hours_source: "price_book" });
+    // Paint is still computed from the area
+    expect(scope.tasks[0].materials_cents).toBe(22500);
+  });
+
+  it("keeps a wall paint task on the model's quantity when the net area is unknown", () => {
+    const uncounted = buildAssessmentSummary({ visitId: "v3", assessmentId: "a3", rooms: [{ ...BEDROOM, door_count: undefined }] });
+    const scope = toPreparedScope({ ...output, tasks: [output.tasks[0]] }, uncounted, [], { ...SOURCE, wallPaintRate: rate });
+    // Gross is known, so the pace still applies to it.
+    expect(scope.tasks[0].quantity).toMatchObject({ key: "gross_wall_sqft", value: 536 });
+    expect(scope.tasks[0].hours_source).toBe("production_rate");
   });
 });

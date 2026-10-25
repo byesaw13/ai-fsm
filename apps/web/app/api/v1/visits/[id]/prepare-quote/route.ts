@@ -84,11 +84,22 @@ export const POST = withRole(["owner", "admin"], async (request: NextRequest, se
                 labor_hours_high::float AS labor_hours_high
          FROM price_book WHERE is_active = true ORDER BY code`,
       );
-      return { ...rows[0], settings, priceBook };
+      // The owner's wall painting pace (TASK-184): interior walls rate and its tall-wall modifier.
+      const { rows: paceRows } = await client.query<{ sqft_per_day: number; tall_pct: number | null }>(
+        `SELECT r.base_rate::float AS sqft_per_day, m.modifier_pct::float AS tall_pct
+         FROM production_rates r
+         LEFT JOIN production_rate_modifiers m
+           ON m.service_code = r.service_code AND m.complexity_factor_key = 'vaulted_ceilings'
+         WHERE r.service_code = '5012' AND r.scope_component_key = 'wall_sqft' AND r.rate_unit = 'sqft_per_day'`,
+      );
+      const wallPaintRate = paceRows[0]
+        ? { sqft_per_day: paceRows[0].sqft_per_day, tall_wall_modifier_pct: paceRows[0].tall_pct ?? 0 }
+        : null;
+      return { ...rows[0], settings, priceBook, wallPaintRate };
     });
     if (!context) return errorResponse(session, 404, "NOT_FOUND", "Visit not found");
 
-    const source = { visitId, assessmentUpdatedAt: context.assessment_updated_at };
+    const source = { visitId, assessmentUpdatedAt: context.assessment_updated_at, wallPaintRate: context.wallPaintRate };
     let ai: "ok" | "unavailable" = "ok";
     let scope;
     try {

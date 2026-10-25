@@ -57,6 +57,8 @@ export {
   computeRoomMeasurements,
   computePaintingProject,
   computeAssessmentRoomGeometry,
+  wallPaintGallons,
+  PAINT_CENTS_PER_GALLON,
 } from "./painting";
 export type {
   RoomPrepLevel,

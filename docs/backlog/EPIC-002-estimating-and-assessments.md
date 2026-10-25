@@ -488,6 +488,7 @@ buy list → confirm no mud/tape). Headless browser on this host cannot launch
 (Chromium sandbox).
 
 ## Completed
+- [TASK-184: Wall area and painting hours that match the room](../archive/backlog-done/TASK-184-wall-area-painting-pace.md) — Done (2026-10-25)
 - [TASK-182: On approval, request the deposit and start scheduling](../archive/backlog-done/TASK-182-deposit-request-scheduling.md) — Done (2026-10-25)
 - [TASK-181: Record the customer's chosen option on approval (guard)](../archive/backlog-done/TASK-181-option-choice-guard.md) — Done as a guard; wiring in TASK-183
 - [TASK-180: Price, profitability and proposal from the same draft](../archive/backlog-done/TASK-180-price-profit-proposal.md) — Done (2026-10-24)
