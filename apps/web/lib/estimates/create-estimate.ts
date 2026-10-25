@@ -301,6 +301,12 @@ export async function createEstimate(
   });
   const deposit_cents = depositPolicy.deposit_cents;
   const balance_cents = depositPolicy.balance_cents;
+  // A multi-option estimate has no single total until the customer picks, so
+  // keep the owner's deposit rule as entered; approval applies it to the chosen
+  // option (TASK-181). Others store the rule as calculated.
+  const storedDeposit = is_multi_option
+    ? { deposit_required: deposit_required && deposit_type !== "none", deposit_type: deposit_required ? deposit_type : "none" }
+    : { deposit_required: depositPolicy.deposit_required, deposit_type: depositPolicy.deposit_type };
   const conditionTier = computeConditionTier({ old_house_risk, difficult_access, trip_count, requires_drying_or_curing, coordination_required });
   const pricingReview = reviewEstimateGuardrails({
     total_cents,
@@ -364,10 +370,10 @@ export async function createEstimate(
         total_cents,
         deposit_cents,
         balance_cents,
-        depositPolicy.deposit_required,
-        depositPolicy.deposit_type,
-        depositPolicy.deposit_type === "percentage" ? deposit_percentage ?? null : null,
-        depositPolicy.deposit_type === "fixed" ? deposit_fixed_cents ?? null : null,
+        storedDeposit.deposit_required,
+        storedDeposit.deposit_type,
+        storedDeposit.deposit_type === "percentage" ? deposit_percentage ?? null : null,
+        storedDeposit.deposit_type === "fixed" ? deposit_fixed_cents ?? null : null,
         deposit_due_trigger,
         terms_scope_accepted,
         terms_payment_accepted,

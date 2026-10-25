@@ -16,7 +16,7 @@
   { "id": "TASK-103", "title": "Door hardware materials onto the buy list", "branch": "quote", "status": "progress", "phase": "Phase 3", "fit": "A known door scope should price itself onto the quote's material list." },
   { "id": "TASK-008", "title": "Room-based estimate templates", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Repeatable room scopes belong on the quote, before a job exists." },
   { "id": "TASK-009", "title": "Estimate versioning", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "A changed price should keep the earlier quote, not overwrite it." },
-  { "id": "TASK-181", "title": "Customer's option choice is saved", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "The customer's yes on the quote has to say which option they picked." },
+  { "id": "TASK-183", "title": "Chosen option flows into totals and invoices", "branch": "quote", "status": "deferred", "phase": "Phase 3", "fit": "When you offer Good/Better/Best, the job and bill should follow the option the customer picked." },
   { "id": "TASK-153", "title": "Change orders reach the bill, prior invoices credited", "branch": "quote", "status": "backlog", "phase": "Phase 3", "fit": "Extra work needs a customer yes on the quote side, then the bill has to include it." },
   { "id": "TASK-099", "title": "Reconcile estimate calibration", "branch": "quote", "status": "deferred", "phase": "Phase 3", "fit": "Deferred with the cancelled estimating scaffold. The quote is still where it would land." },
   { "id": "TASK-047", "title": "Work item library", "branch": "quote", "status": "deferred", "phase": "Phase 4", "fit": "A library of common work would feed quotes. Production intelligence is deferred." },

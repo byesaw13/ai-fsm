@@ -4,6 +4,7 @@ import { z } from "zod";
 import { queryOne, query, getPool } from "@/lib/db";
 import { createJobFromEstimate, getAccountOwnerUserId } from "@/lib/estimates/create-job-db";
 import { createApprovalArtifacts } from "@/lib/estimates/approve";
+import { recordOptionChoice } from "@/lib/estimates/option-choice";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -79,6 +80,8 @@ const respondBody = z.object({
   action: z.enum(["approve", "decline"]),
   name: z.string().min(1).max(255).optional(),
   signature_svg: z.string().optional(),
+  /** The customer's pick on a Good/Better/Best estimate (TASK-181). */
+  option_id: z.string().uuid().optional(),
 });
 
 export async function POST(
@@ -115,7 +118,7 @@ export async function POST(
     return NextResponse.json({ error: "Invalid request" }, { status: 422 });
   }
 
-  const { action, name, signature_svg } = parsed.data;
+  const { action, name, signature_svg, option_id } = parsed.data;
 
   if (action === "approve" && !name) {
     return NextResponse.json({ error: "Name is required to approve" }, { status: 422 });
@@ -127,6 +130,10 @@ export async function POST(
   const dbClient = await pool.connect();
   try {
     await dbClient.query("BEGIN");
+
+    // A multi-option estimate is approved with the customer's pick; totals and
+    // deposit follow it. Throws OPTION_REQUIRED when no valid pick was sent.
+    if (action === "approve") await recordOptionChoice(dbClient, estimate.id, option_id);
 
     await dbClient.query(
       `UPDATE estimates
@@ -199,6 +206,9 @@ export async function POST(
     await dbClient.query("COMMIT");
   } catch (err) {
     await dbClient.query("ROLLBACK");
+    if ((err as { code?: string }).code === "OPTION_REQUIRED") {
+      return NextResponse.json({ error: (err as Error).message }, { status: 422 });
+    }
     throw err;
   } finally {
     dbClient.release();

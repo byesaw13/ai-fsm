@@ -70,6 +70,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const newStatus = action === "approve" ? "approved" : "declined";
 
+    // A Good/Better/Best estimate is approved in the portal, where the customer
+    // picks an option. The email link never guesses one (TASK-181).
+    if (action === "approve") {
+      const { rows: modeRows } = await client.query<{ presentation_mode: string; share_token: string | null }>(
+        `SELECT presentation_mode, share_token FROM estimates WHERE id = $1`,
+        [id],
+      );
+      if (modeRows[0]?.presentation_mode === "multi_option") {
+        await client.query("ROLLBACK");
+        return NextResponse.redirect(
+          modeRows[0].share_token ? `${origin}/portal/estimates/${modeRows[0].share_token}` : errorUrl,
+        );
+      }
+    }
+
     // Atomic first-writer-wins: only transitions from draft/sent.
     // If status is already approved/declined/expired, RETURNING returns nothing
     // and we treat it as idempotent success.
