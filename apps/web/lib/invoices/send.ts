@@ -1,0 +1,304 @@
+import type { AuthSession } from "@/lib/auth/middleware";
+import { withInvoiceContext } from "@/lib/invoices/db";
+import { appendAuditLog } from "@/lib/db/audit";
+import { logger } from "@/lib/logger";
+import { sendEmail, appUrl, isEmailConfigured } from "@/lib/email/mailer";
+import { invoiceEmailHtml, invoiceEmailText } from "@ai-fsm/email-templates";
+import { logCommunication } from "@/lib/communications-log";
+import { sendSmsViaGateway } from "@/lib/sms/gateway";
+import { invoiceReadyText, serviceSmsPhone } from "@/lib/sms/messages";
+import { logOutboundSms } from "@/lib/sms/outbound";
+import { loadInvoicePdf } from "@/lib/pdf/load";
+import { applyServiceMinimum, isServiceMinimumEligible } from "@/lib/invoices/service-minimum";
+import { snapshotInvoiceFeePolicy } from "@/lib/invoices/job-expenses";
+import { amountDueCents } from "@/lib/invoices/payments";
+import { writeWorkflowEvent } from "@/lib/workflow-events";
+import { dueDateUponCompletion, invoiceDueOnCompletion } from "@ai-fsm/domain";
+
+/** 200 = delivered (sentTo/isPaid set); anything else = the client was not contacted. */
+export interface SendInvoiceResult {
+  status: number;
+  message?: string;
+  sentTo?: string | null;
+  isPaid?: boolean;
+}
+
+/**
+ * Send (or re-send) an invoice to its client by email and/or text, then mark a
+ * draft sent. The one send path, shared by POST /api/v1/invoices/[id]/send and
+ * the automatic deposit request on estimate approval (TASK-182). Delivery
+ * happens before the status update inside one transaction; a non-200 result
+ * means the client was not contacted.
+ */
+export async function sendInvoice(session: AuthSession, id: string): Promise<SendInvoiceResult> {
+  return withInvoiceContext(session, async (client) => {
+    const { rows, rowCount } = await client.query(
+      `SELECT i.id, i.status, i.invoice_number, i.total_cents, i.balance_cents,
+              i.paid_cents, i.deposit_cents, i.due_date, i.notes, i.sent_at, i.paid_at, i.share_token,
+              i.invoice_kind, i.job_id, j.status AS job_status,
+              e.minimum_service_override_reason AS estimate_override,
+              c.id AS client_id, c.name AS client_name, c.email AS client_email,
+              c.phone AS client_phone, c.sms_consent, c.preferred_contact
+       FROM invoices i
+       JOIN clients c ON c.id = i.client_id
+       LEFT JOIN jobs j ON j.id = i.job_id
+       LEFT JOIN estimates e ON e.id = i.estimate_id
+       WHERE i.id = $1 AND i.account_id = $2`,
+      [id, session.accountId]
+    );
+
+    if (!rowCount || rowCount === 0) return { status: 404 };
+
+    const inv = rows[0] as {
+      id: string; status: string; invoice_number: string;
+      total_cents: number; balance_cents: number; paid_cents: number; deposit_cents: number;
+      due_date: string | null; notes: string | null; sent_at: string | null;
+      paid_at: string | null; share_token: string;
+      invoice_kind: string; job_id: string | null; job_status: string | null;
+      estimate_override: string | null;
+      client_id: string; client_name: string; client_email: string | null;
+      client_phone: string | null; sms_consent: boolean; preferred_contact: string | null;
+    };
+
+    // Void invoices stay blocked. Paid invoices are allowed so staff can email
+    // a final PDF receipt even when the client never uses the portal.
+    if (inv.status === "void") {
+      return { status: 422, message: "Cannot send a void invoice" };
+    }
+
+    const textPhone = serviceSmsPhone({
+      sms_consent: inv.sms_consent,
+      preferred_contact: inv.preferred_contact,
+      phone: inv.client_phone,
+    });
+    const canEmail = Boolean(inv.client_email) && isEmailConfigured();
+    if (!canEmail && !textPhone) {
+      if (!inv.client_email) {
+        return { status: 422, message: "Client has no email address on file" };
+      }
+      return { status: 503, message: "Email is not configured on this server" };
+    }
+
+    // TASK-119: floor a draft to the account's service minimum before it goes
+    // out — maintains the single "Service minimum" adjustment line and refreshes
+    // totals so the email + PDF reflect it. Only on the draft→sent finalize
+    // (sent invoices are immutable). Non-fatal: a settings hiccup must not block
+    // the send — fall through with the current totals.
+    if (
+      inv.status === "draft" &&
+      isServiceMinimumEligible({
+        invoiceKind: inv.invoice_kind,
+        minimumServiceOverrideReason: inv.estimate_override,
+      })
+    ) {
+      // SAVEPOINT: a failure here must not poison the send transaction — that
+      // would let the email go out while the later status update rolls back,
+      // risking a duplicate email on retry. Roll back to the savepoint and
+      // continue the send with the current totals.
+      try {
+        await client.query("SAVEPOINT svc_min");
+        const totals = await applyServiceMinimum(client, id, session.accountId);
+        await client.query("RELEASE SAVEPOINT svc_min");
+        inv.total_cents = totals.total_cents;
+        inv.balance_cents = totals.balance_cents;
+      } catch (err) {
+        await client.query("ROLLBACK TO SAVEPOINT svc_min").catch(() => {});
+        logger.warn("[invoices/send] service minimum not applied", {
+          invoiceId: id,
+          error: (err as Error).message,
+        });
+      }
+    }
+
+    // What the client still owes: total − deposit credit − payments already made.
+    // balance_cents excludes payments, so a re-sent partially paid invoice
+    // (TASK-154) would otherwise email the full total as the balance.
+    const paidCents = Number(inv.paid_cents ?? 0);
+    const amountDue = amountDueCents(inv.total_cents, paidCents, inv.deposit_cents);
+    // A reopened invoice whose payments already cover the edited total becomes
+    // paid on this send (migration 192) — email the receipt, not a $0 invoice.
+    const settlesPaidOnSend = inv.status === "draft" && paidCents > 0 && amountDue === 0;
+    const isPaid = inv.status === "paid" || settlesPaidOnSend;
+
+    // Public share link (no login). PDF attachment is the offline artifact.
+    const viewUrl = `${appUrl()}/portal/invoices/${inv.share_token}`;
+    const dueDateStr = inv.due_date
+      ? new Date(inv.due_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+      : null;
+    const paidAtStr = inv.paid_at || settlesPaidOnSend
+      ? new Date(inv.paid_at ?? Date.now()).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+      : null;
+
+    // Attach the invoice as a PDF (best-effort: a render failure must not
+    // block the notification email from going out). Critical for paid
+    // receipts when clients don't open the portal.
+    let pdf: Awaited<ReturnType<typeof loadInvoicePdf>> = null;
+    try {
+      pdf = await loadInvoicePdf(client, session.accountId, id);
+    } catch (err) {
+      logger.warn("[invoices/send] PDF render failed; sending without attachment", {
+        invoiceId: id,
+        error: (err as Error).message,
+      });
+    }
+
+    const subject = isPaid
+      ? `Receipt — Invoice ${inv.invoice_number} from Dovetails Services LLC`
+      : `Invoice ${inv.invoice_number} from Dovetails Services LLC`;
+
+    if (canEmail) {
+      const emailResult = await sendEmail({
+        to: inv.client_email!,
+        subject,
+        html: invoiceEmailHtml({
+          invoiceNumber: inv.invoice_number,
+          clientName: inv.client_name,
+          totalCents: inv.total_cents,
+          balanceCents: isPaid ? 0 : amountDue,
+          dueDateStr: isPaid ? null : dueDateStr,
+          viewUrl,
+          notes: inv.notes,
+          isPaid,
+          paidAtStr,
+        }),
+        text: invoiceEmailText({
+          invoiceNumber: inv.invoice_number,
+          clientName: inv.client_name,
+          totalCents: inv.total_cents,
+          balanceCents: isPaid ? 0 : amountDue,
+          dueDateStr: isPaid ? null : dueDateStr,
+          viewUrl,
+          notes: inv.notes,
+          isPaid,
+          paidAtStr,
+        }),
+        attachments: pdf
+          ? [{ filename: pdf.filename, content: pdf.bytes, contentType: "application/pdf" }]
+          : undefined,
+      });
+
+      if (!emailResult.ok) {
+        await logCommunication({
+          accountId: session.accountId,
+          channel: "email",
+          direction: "outbound",
+          outcome: "failed",
+          clientId: inv.client_id,
+          bodyPreview: subject,
+          initiatedBy: session.userId,
+          externalId: emailResult.error ?? null,
+        });
+        return { status: 502, message: `Email send failed: ${emailResult.error}` };
+      }
+
+      await logCommunication({
+        accountId: session.accountId,
+        channel: "email",
+        direction: "outbound",
+        outcome: "sent",
+        clientId: inv.client_id,
+        bodyPreview: subject,
+        initiatedBy: session.userId,
+      });
+    }
+
+    if (textPhone) {
+      const smsBody = invoiceReadyText({
+        number: inv.invoice_number,
+        amountDueCents: isPaid ? 0 : amountDue,
+        url: viewUrl,
+        paid: isPaid,
+      });
+      const sms = await sendSmsViaGateway({ phone: textPhone, message: smsBody });
+      await logOutboundSms({
+        accountId: session.accountId,
+        clientId: inv.client_id,
+        jobId: inv.job_id,
+        bodyPreview: smsBody,
+        outcome: sms.ok ? "sent" : "failed",
+        externalId: sms.ok ? sms.messageId : null,
+        initiatedBy: session.userId,
+      });
+      if (!sms.ok && !canEmail) {
+        return { status: 502, message: `Text send failed: ${sms.error}` };
+      }
+      if (!sms.ok) {
+        logger.warn("[invoices/send] text failed after email", { invoiceId: id, error: sms.error });
+      }
+    }
+
+    // Only the draft→sent transition writes sent_at. The invoice
+    // immutability invariant (migration 004) forbids changing sent_at once
+    // the invoice has left draft (sent/partial/overdue/paid), so a re-send
+    // or paid receipt must not touch it — the send is recorded via the
+    // communications + audit log.
+    // Payment terms: due upon completion (TASK-078). A standard/final invoice
+    // tied to an open job stays due_date=NULL on send — it's "due on completion"
+    // and is filled when the job is marked complete. Deposits / jobless invoices
+    // are due now, so send fills their due_date if it was missing.
+    const dueOnCompletion = invoiceDueOnCompletion({
+      invoiceKind: inv.invoice_kind,
+      jobStatus: inv.job_status,
+    });
+    let statusAfter = inv.status;
+    if (inv.status === "draft") {
+      await snapshotInvoiceFeePolicy(client, id, session.accountId);
+      const dueDate = dueOnCompletion ? null : inv.due_date ?? dueDateUponCompletion();
+      // DB settles a reopened invoice with payments to partial/paid (192).
+      const upd = await client.query<{ status: string }>(
+        `UPDATE invoices
+         SET status = 'sent', sent_at = now(), updated_at = now(),
+             due_date = COALESCE(due_date, $2::timestamptz)
+         WHERE id = $1
+         RETURNING status`,
+        [id, dueDate]
+      );
+      statusAfter = upd.rows[0]?.status ?? "sent";
+      if (statusAfter === "paid") {
+        // Same side effects as the payment / webhook / transition paths.
+        await writeWorkflowEvent(client, {
+          accountId: session.accountId,
+          eventType: "invoice.paid",
+          entityType: "invoice",
+          entityId: id,
+          payload: { source: "resend_settled" },
+        });
+        if (inv.job_id) {
+          const { closeJobIfFullyPaid } = await import("@/lib/jobs/close-if-paid");
+          await closeJobIfFullyPaid(client, {
+            accountId: session.accountId,
+            jobId: inv.job_id,
+            actorId: session.userId,
+            traceId: session.traceId,
+          });
+        }
+      }
+    } else if (!dueOnCompletion && !inv.due_date && ["sent", "partial", "overdue"].includes(inv.status)) {
+      // One-time fill when due_date was never set (allowed by migration 149).
+      // Uses sent_at as completion day so aging matches payment terms.
+      await client.query(
+        `UPDATE invoices
+         SET due_date = $2::timestamptz, updated_at = now()
+         WHERE id = $1 AND due_date IS NULL`,
+        [id, dueDateUponCompletion(inv.sent_at)]
+      );
+    }
+
+    await appendAuditLog(client, {
+      account_id: session.accountId,
+      entity_type: "invoice",
+      entity_id: id,
+      action: "update",
+      actor_id: session.userId,
+      trace_id: session.traceId,
+      old_value: { status: inv.status, sent_at: inv.sent_at },
+      new_value: {
+        sent_to: inv.client_email,
+        status: statusAfter,
+        kind: isPaid ? "paid_receipt" : "invoice",
+      },
+    });
+
+    return { status: 200, sentTo: inv.client_email, isPaid };
+  });
+}

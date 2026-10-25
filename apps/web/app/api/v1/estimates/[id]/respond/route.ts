@@ -6,6 +6,7 @@ import { getEnv } from "@/lib/env";
 import { writeWorkflowEvent } from "@/lib/workflow-events";
 import { createJobFromEstimate, getAccountOwnerUserId } from "@/lib/estimates/create-job-db";
 import { createApprovalArtifacts } from "@/lib/estimates/approve";
+import { requestDepositAfterApproval } from "@/lib/estimates/deposit-request";
 import { advanceBookingRequestForEstimate } from "@/lib/booking-requests/advance-stage";
 
 export const dynamic = "force-dynamic";
@@ -201,6 +202,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     await client.query("COMMIT");
+    // TASK-182: send the deposit request once the approval is committed.
+    if (action === "approve") await requestDepositAfterApproval(id);
     return NextResponse.redirect(thanksUrl(action));
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});

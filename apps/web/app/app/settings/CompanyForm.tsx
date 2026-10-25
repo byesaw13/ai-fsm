@@ -15,6 +15,7 @@ interface AccountSettings {
   deposit_percent?: number;
   deposit_terms?: string;
   estimate_expiry_days?: number;
+  auto_send_deposit_request?: boolean;
 }
 
 interface Props {
@@ -36,6 +37,7 @@ export function CompanyForm({ initialName, initialSettings }: Props) {
     initialSettings.deposit_terms ?? STANDARD_DEPOSIT_TERMS,
   );
   const [expiryDays, setExpiryDays] = useState(String(initialSettings.estimate_expiry_days ?? 30));
+  const [autoSendDeposit, setAutoSendDeposit] = useState(initialSettings.auto_send_deposit_request !== false);
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -57,6 +59,7 @@ export function CompanyForm({ initialName, initialSettings }: Props) {
             // persist "" so the separate Deposits section is suppressed.
             deposit_terms: depositTerms,
             estimate_expiry_days: expiryDays ? parseInt(expiryDays, 10) : undefined,
+            auto_send_deposit_request: autoSendDeposit,
           },
         }),
       });
@@ -150,6 +153,21 @@ export function CompanyForm({ initialName, initialSettings }: Props) {
           Separate short “Deposits” block on documents. Use{" "}
           <code>{"{deposit_percent}"}</code> where the percentage should appear. Clear this
           box if the deposit sentence already lives inside Estimate/Invoice terms above.
+        </small>
+      </div>
+      <div className="form-group">
+        <label style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
+          <input
+            type="checkbox"
+            checked={autoSendDeposit}
+            onChange={(e) => setAutoSendDeposit(e.target.checked)}
+            data-testid="auto-send-deposit"
+          />
+          Send the deposit request automatically when a customer approves
+        </label>
+        <small style={{ color: "var(--fg-muted)" }}>
+          The deposit invoice goes out by email or text with its pay link, and the job gets a
+          “Schedule this job” item. Off: the deposit invoice waits as a draft for you to send.
         </small>
       </div>
       <div className="form-group">

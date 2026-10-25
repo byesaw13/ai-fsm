@@ -1,14 +1,16 @@
 import type { PoolClient } from "pg";
 import { generateInvoiceNumber } from "@/lib/invoices/db";
+import { createScheduleItem } from "./deposit-request";
+import type { DepositDueTrigger } from "./deposit-policy";
 
 /**
  * Side effects that accompany an estimate being approved:
  *  - auto-create the deposit invoice (once) only when deposit_required is true and deposit_cents > 0
  * Callers must create/link the job first so this deposit inherits job_id.
  *
- * The deposit invoice is created as a DRAFT (invoice_kind='deposit') so the
- * owner reviews and sends it deliberately — it is never silently put into a
- * billable `sent` state. The final invoice (invoice_kind='final', created by
+ * The deposit invoice is created as a DRAFT (invoice_kind='deposit'). Sending
+ * it happens after the approval commits, through requestDepositAfterApproval
+ * (TASK-182), which the account can switch off. The final invoice (invoice_kind='final', created by
  * the estimate→invoice Convert path) credits this deposit so the two invoices
  * sum to exactly the estimate total. See lib/invoices/billing.ts and
  * migration 104_invoice_kind.sql.
@@ -30,9 +32,10 @@ export async function createApprovalArtifacts(
     property_id: string | null;
     deposit_cents: number;
     deposit_required: boolean;
+    deposit_due_trigger: DepositDueTrigger | null;
     notes: string | null;
   }>(
-    `SELECT client_id, job_id, property_id, deposit_cents, deposit_required, notes
+    `SELECT client_id, job_id, property_id, deposit_cents, deposit_required, deposit_due_trigger, notes
      FROM estimates WHERE id = $1`,
     [estimateId]
   );
@@ -77,6 +80,19 @@ export async function createApprovalArtifacts(
       );
       depositInvoiceId = depositResult.rows[0].id;
     }
+  }
+
+  // TASK-182: one "Schedule this job" item; whether booking waits on the deposit
+  // follows the estimate's deposit_due_trigger. The deposit request itself is
+  // sent after the approval commits (requestDepositAfterApproval).
+  if (est) {
+    await createScheduleItem(client, {
+      accountId,
+      estimateId,
+      jobId: est.job_id,
+      depositRequested: est.deposit_required && est.deposit_cents > 0,
+      trigger: est.deposit_due_trigger,
+    });
   }
 
   return { depositInvoiceId };

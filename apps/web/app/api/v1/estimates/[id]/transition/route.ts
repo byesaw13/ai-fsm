@@ -8,6 +8,7 @@ import { estimateStatusSchema, estimateTransitions } from "@ai-fsm/domain";
 import type { EstimateStatus } from "@ai-fsm/domain";
 import { createApprovalArtifacts } from "@/lib/estimates/approve";
 import { recordOptionChoice } from "@/lib/estimates/option-choice";
+import { requestDepositAfterApproval } from "@/lib/estimates/deposit-request";
 import { createJobFromEstimate } from "@/lib/estimates/create-job-db";
 import { advanceBookingRequestForEstimate } from "@/lib/booking-requests/advance-stage";
 
@@ -263,6 +264,8 @@ export const POST = withRole(["owner", "admin"], async (request, session) => {
     });
 
     const response: Record<string, unknown> = { status: targetStatus };
+    // TASK-182: send the deposit request once the approval is committed.
+    if (targetStatus === "approved") response.deposit_request = await requestDepositAfterApproval(id);
     if (createdDepositInvoiceId) {
       response.deposit_invoice_id = createdDepositInvoiceId;
     }

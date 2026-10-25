@@ -170,7 +170,7 @@ closed in tests; owner-flow AC still open.
 | TASK-180 | [Price, profitability and proposal from the same draft](../archive/backlog-done/TASK-180-price-profit-proposal.md) | 002 | Done |
 | TASK-181 | [Record the customer's chosen option on approval (guard)](../archive/backlog-done/TASK-181-option-choice-guard.md) | 002 | Done |
 | TASK-183 | Chosen option flows into totals, job and invoices | 002 | Deferred |
-| TASK-182 | On approval, request the deposit and start scheduling | 002 | Proposed |
+| TASK-182 | [On approval, request the deposit and start scheduling](../archive/backlog-done/TASK-182-deposit-request-scheduling.md) | 002 | Done |
 | TASK-001 | Vehicle Mileage Sessions | 001 | Done |
 | TASK-002 | Vehicle Session Recovery | 001 | Done |
 | TASK-003 | Wrong Vehicle Correction | 001 | Done |
