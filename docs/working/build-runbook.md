@@ -27,7 +27,7 @@ Next step           : B1 (TASK-190)
 Blocked on          : nothing
 Last known-good     : e7b27ef9 (branch deploy-good/e7b27ef9); previous 1a8cc54c
                       (branch deploy-good/1a8cc54c)
-Notes               : B1 in progress. B1 Implemented is recorded only after CI is green.
+Notes               : B1 Implemented on #724. Merged and Deployed are recorded after they happen.
                       A line's hours are accepted for the cost math and not stored (TASK-191).
 ```
 
@@ -103,7 +103,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | A1 | TASK-197 | 2026-10-26 (CI 40406723540, #722) | 2026-10-26 (#722, 1a8cc54c) | 2026-10-26 (~22:05 UTC) | 2026-10-26 (health ok, /login 200, 22:06 UTC) |
 | A2 | TASK-196 | 2026-10-26 (CI 40413156570, 40413164445, #723) | 2026-10-26 (#723, e7b27ef9) | 2026-10-26 (~22:51 UTC) | 2026-10-26 (health ok, /login 200, 22:51 UTC) |
 | B0 | TASK-189 | doc in #720 | 2026-10-26 (#720) | n/a | n/a |
-| B1 | TASK-190 | | | | |
+| B1 | TASK-190 | 2026-10-26 (CI 40419939119, 40419947446, #724) | | | |
 | B2 | TASK-191 | | | | |
 | B3 | TASK-192 | | | | |
 | B4 | TASK-193 | | | | |
@@ -516,6 +516,7 @@ Each follows its backlog task's scope and acceptance criteria. Items marked
 
 One line per state change: date, step, state, PR, evidence.
 
+- 2026-10-26 · B1 · Implemented · #724 · CI runs 40419939119 and 40419947446 green (lint, typecheck, build, test, e2e-smoke) on c9a4e416
 - 2026-10-26 · B1 · In progress · #724 · materials cost separate from the customer price
 - 2026-10-26 · A2 · Verified · health ok and /login HTTP/2 200 at 22:51 UTC; known-good deploy-good/e7b27ef9
 - 2026-10-26 · A2 · Deployed · e7b27ef9 · web recreated and healthy ~22:51 UTC. No migration, so no backup. Worker image left as it was.
