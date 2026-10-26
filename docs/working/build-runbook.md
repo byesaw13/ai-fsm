@@ -22,7 +22,7 @@ docs-only commit when there is no PR).
 Last step           : S0.4 PR #721 merged by the owner (c0544597) at
                       2026-10-26 21:25 UTC. G0 is active (owner comment on
                       #721 at 21:29 UTC).
-In-flight PR        : A1 (TASK-197) branch task/197-ai-suggestion-price
+In-flight PR        : #722 — A1 (TASK-197)
 Next step           : A1 (TASK-197)
 Blocked on          : nothing
 Last known-good     : ddd2a31b (branch deploy-good/ddd2a31b); previous 7a68ace6
@@ -516,7 +516,7 @@ Each follows its backlog task's scope and acceptance criteria. Items marked
 One line per state change: date, step, state, PR, evidence.
 
 - 2026-10-26 · S0.4 · Merged by owner (#721, c0544597). G0 active: owner comment on #721 at 21:29 UTC.
-- 2026-10-26 · A1 · In progress · task/197-ai-suggestion-price · price book price only; model price ignored
+- 2026-10-26 · A1 · In progress · #722 · price book price only; model price ignored
 - 2026-10-26 · S0.3 · Merged by owner (#720, ddd2a31b); deployed 19:39 UTC; verified /api/health ok, /login 200, /app/map 307 to relative /login; last known-good branches deploy-good/7a68ace6 and deploy-good/ddd2a31b
 - 2026-10-26 · S0.2 · G1 and G5 approved in session; G0 approved in session, awaiting PR comment to activate
 - 2026-10-26 · S0.1 · Implemented · PR #721 · runbook written, then revised after an independent review (authority gated on PR comment, recovery gated on G5, database checklist, worktree isolation, four-state status, attribution by actual contributor)
