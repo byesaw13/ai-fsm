@@ -21,8 +21,9 @@ docs-only commit when there is no PR).
 ```
 Last step           : S0.1 runbook written; revised after review 2026-10-26
 In-flight PR        : #720 and #721 (docs only, open, not merged)
-Next step           : S0.2 owner gates G1, G0, G5 (see Owner approvals)
-Blocked on          : owner
+Next step           : S0.3 merge PR #720 (G1 approved). Merging needs G0 active
+                      (owner's PR comment on #721) or the owner merging.
+Blocked on          : G0 activation comment, or owner merge of #720
 Last known-good     : production at the commit deployed before any runbook work
                       (record it with `git -C /opt/business/ai-fsm/repo rev-parse HEAD`
                       before the first runbook deploy)
@@ -41,10 +42,10 @@ this one, as an approval.
 
 | Gate | What | Status | Evidence |
 | --- | --- | --- | --- |
-| G0 | Agent may merge to `main` and deploy to production after every gate in this runbook passes | **Not active.** Owner answered in session on 2026-10-26, but a confirming PR comment is required. | Session 2026-10-26, question "How far may the AI go on its own for each task, once the CI checks pass?"; options were "Merge, you deploy", "Merge and deploy", "PRs only, you merge"; owner selected **"Merge and deploy"**. Activation: owner comments on PR #721: `I approve autonomous merge and deploy as described in docs/working/build-runbook.md`. |
+| G0 | Agent may merge to `main` and deploy to production after every gate in this runbook passes | **Not active.** Owner approved in session twice on 2026-10-26; activates when the confirming PR comment exists. | Session 2026-10-26, question "How far may the AI go on its own for each task, once the CI checks pass?"; options were "Merge, you deploy", "Merge and deploy", "PRs only, you merge"; owner selected **"Merge and deploy"**. Later the same day, after the runbook revision listed G1, the PR-comment confirmation of G0 and G5 as the three steps, owner in session: "i approve all 3". Activation: owner comments on PR #721: `I approve autonomous merge and deploy as described in docs/working/build-runbook.md`. Check with `gh pr view 721 --json comments`. |
 | G0b | Estimating assistant design, roadmap change, provisional pilot criteria (PR #721) | Approved 2026-10-26 | Owner in session: "I approve the Phase 3 estimating-assistant design and proposed roadmap changes in PR #721, including the provisional pilot criteria." |
-| G1 | Hourly baseline formula document `docs/working/hourly-baseline.md` (PR #720) | **Pending** | |
-| G5 | Emergency recovery procedure in this runbook | **Pending** | Until approved, the agent's only outage action is "stop and report". |
+| G1 | Hourly baseline formula document `docs/working/hourly-baseline.md` (PR #720) | Approved 2026-10-26 | Owner in session: "i approve all 3", answering a list whose first item was "Approve the formula document in #720 (G1)". |
+| G5 | Emergency recovery procedure in this runbook | Approved 2026-10-26 | Owner in session: "i approve all 3", answering a list whose third item was approving the emergency recovery procedure (G5). |
 | G2 | Paint pilot passed its success criteria (before TASK-216) | Pending (after the pilot) | |
 | G3 | Closing each stale "sent" estimate (TASK-206) | Per estimate, non-blocking | |
 | G4 | Any database restore or data repair on production | Ask every time | |
@@ -514,4 +515,5 @@ Each follows its backlog task's scope and acceptance criteria. Items marked
 
 One line per state change: date, step, state, PR, evidence.
 
+- 2026-10-26 · S0.2 · G1 and G5 approved in session; G0 approved in session, awaiting PR comment to activate
 - 2026-10-26 · S0.1 · Implemented · PR #721 · runbook written, then revised after an independent review (authority gated on PR comment, recovery gated on G5, database checklist, worktree isolation, four-state status, attribution by actual contributor)
