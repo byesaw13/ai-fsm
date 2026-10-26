@@ -12,6 +12,8 @@
 
 ## Start gate
 
+This plan is Track C of `docs/working/build-runbook.md`; the runbook's operating rules (merge gates, deploy, progress, handoff) apply to every task here.
+
 Do not start Task 1 until all are true:
 
 1. PR #720's formula document (`docs/working/hourly-baseline.md`) is approved by the owner.
