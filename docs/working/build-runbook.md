@@ -19,15 +19,15 @@ Updated by the agent at the end of every step (in the step's PR, or a
 docs-only commit when there is no PR).
 
 ```
-Last step           : S0.4 PR #721 merged by the owner (c0544597) at
-                      2026-10-26 21:25 UTC. G0 is active (owner comment on
-                      #721 at 21:29 UTC).
-In-flight PR        : #722 — A1 (TASK-197)
-Next step           : A1 (TASK-197)
+Last step           : A1 (TASK-197) verified on production at 2026-10-26
+                      22:06 UTC. Squash 1a8cc54c (#722). Health ok, /login
+                      HTTP/2 200, no redirect to 0.0.0.0:3000.
+In-flight PR        : #723 — A2 (TASK-196)
+Next step           : A2 (TASK-196)
 Blocked on          : nothing
-Last known-good     : ddd2a31b (branch deploy-good/ddd2a31b); previous 7a68ace6
-                      (branch deploy-good/7a68ace6)
-Notes               : A1 in progress. Implemented is recorded only after CI is green.
+Last known-good     : 1a8cc54c (branch deploy-good/1a8cc54c); previous ddd2a31b
+                      (branch deploy-good/ddd2a31b)
+Notes               : A2 in progress. A2 Implemented is recorded only after CI is green.
 ```
 
 ## Owner approvals
@@ -99,7 +99,7 @@ docs-only commit after the event. Planned tests are not passing tests.
 | S0.1 | Runbook | 2026-10-26 (PR #721) | | n/a | n/a |
 | S0.3 | Merge #720 | n/a | 2026-10-26 (owner, ddd2a31b) | 2026-10-26 | 2026-10-26 (health ok, /login 200) |
 | S0.4 | Merge #721 | n/a | 2026-10-26 (owner, c0544597) | n/a | n/a |
-| A1 | TASK-197 | | | | |
+| A1 | TASK-197 | 2026-10-26 (CI 40406723540, #722) | 2026-10-26 (#722, 1a8cc54c) | 2026-10-26 (~22:05 UTC) | 2026-10-26 (health ok, /login 200, 22:06 UTC) |
 | A2 | TASK-196 | | | | |
 | B0 | TASK-189 | doc in #720 | 2026-10-26 (#720) | n/a | n/a |
 | B1 | TASK-190 | | | | |
@@ -516,6 +516,11 @@ Each follows its backlog task's scope and acceptance criteria. Items marked
 One line per state change: date, step, state, PR, evidence.
 
 - 2026-10-26 · S0.4 · Merged by owner (#721, c0544597). G0 active: owner comment on #721 at 21:29 UTC.
+- 2026-10-26 · A2 · In progress · #723 · chosen option plus shared lines; hidden lines fold; lines sum to the invoice subtotal
+- 2026-10-26 · A1 · Verified · health ok and /login HTTP/2 200 at 22:06 UTC; known-good deploy-good/1a8cc54c
+- 2026-10-26 · A1 · Deployed · 1a8cc54c · web recreated and healthy ~22:05 UTC. No migration, so no backup. Worker image left as it was (web-only change).
+- 2026-10-26 · A1 · Merged · #722 · squash 1a8cc54c at 21:57 UTC
+- 2026-10-26 · A1 · Implemented · #722 · CI run 40406723540 green (lint, typecheck, build, test, e2e-smoke) on 09ad83dd
 - 2026-10-26 · A1 · In progress · #722 · price book price only; model price ignored
 - 2026-10-26 · S0.3 · Merged by owner (#720, ddd2a31b); deployed 19:39 UTC; verified /api/health ok, /login 200, /app/map 307 to relative /login; last known-good branches deploy-good/7a68ace6 and deploy-good/ddd2a31b
 - 2026-10-26 · S0.2 · G1 and G5 approved in session; G0 approved in session, awaiting PR comment to activate
